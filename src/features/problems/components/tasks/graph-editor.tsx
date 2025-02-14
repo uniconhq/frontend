@@ -242,7 +242,7 @@ const GraphEditor: React.FC<GraphEditorProps> = ({ graphId, className }) => {
               }}
             />
             <Controls showInteractive={edit} />
-            <MiniMap />
+            <MiniMap pannable className="opacity-50 hover:opacity-100" />
           </ReactFlow>
         </ResizablePanel>
       </ResizablePanelGroup>
