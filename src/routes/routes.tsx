@@ -257,7 +257,7 @@ export const routes = [
                                     element: <CreateMultipleChoice />,
                                     handle: {
                                       crumb: () => ({
-                                        label: "New multiple choice task",
+                                        label: "New Multiple Choice Task",
                                       }),
                                     },
                                   },
@@ -266,7 +266,7 @@ export const routes = [
                                     element: <CreateMultipleResponse />,
                                     handle: {
                                       crumb: () => ({
-                                        label: "New multiple response task",
+                                        label: "New Multiple Response Task",
                                       }),
                                     },
                                   },
@@ -275,7 +275,7 @@ export const routes = [
                                     element: <CreateShortAnswer />,
                                     handle: {
                                       crumb: () => ({
-                                        label: "New short answer task",
+                                        label: "New Short Answer Task",
                                       }),
                                     },
                                   },
@@ -284,7 +284,7 @@ export const routes = [
                                     element: <CreateProgramming />,
                                     handle: {
                                       crumb: () => ({
-                                        label: "New programming task",
+                                        label: "New Programming Task",
                                       }),
                                     },
                                   },
