@@ -197,14 +197,14 @@ const deleteSocket = (state: GraphState, { payload }: DeleteSocketAction) => {
   if (!step) return state;
 
   step.inputs = step.inputs?.filter((socket) => socket.id !== payload.socketId);
-  step.outputs = step.outputs?.filter(
-    (socket) => socket.id !== payload.socketId,
-  );
+  step.outputs = step.outputs?.filter((socket) => socket.id !== payload.socketId); // prettier-ignore
 
   state.edges = state.edges.filter(
     (edge) =>
-      payload.stepId in [edge.from_node_id, edge.to_node_id] &&
-      payload.socketId in [edge.from_socket_id, edge.to_socket_id],
+      !(
+        [edge.from_node_id, edge.to_node_id].includes(payload.stepId) &&
+        [edge.from_socket_id, edge.to_socket_id].includes(payload.socketId)
+      ),
   );
 
   state.selectedStepId =
