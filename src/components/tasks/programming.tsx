@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-import { InputStep, ProgrammingTask } from "@/api";
+import { ProgrammingTask } from "@/api";
 import Testcase from "@/features/problems/components/tasks/testcase";
 import TaskContainer from "@/features/tasks/components/task-container";
 import TaskSection from "@/features/tasks/components/task-section";
@@ -18,13 +18,6 @@ export function Programming({
   problemId: number;
   task: ProgrammingTask;
 }) {
-  const userInput: InputStep = {
-    id: 0,
-    type: "INPUT_STEP",
-    inputs: [],
-    outputs: task.required_inputs,
-  };
-
   const [selectedTestcaseIdx, setSelectedTestcaseIdx] = useState<number | null>(
     task.testcases.length ? 0 : null,
   );
@@ -89,7 +82,6 @@ export function Programming({
               key={testcase.id}
               index={index}
               testcase={testcase}
-              userInput={userInput}
               isSelected={selectedTestcaseIdx === index}
               onSelected={setSelectedTestcaseIdx}
             />

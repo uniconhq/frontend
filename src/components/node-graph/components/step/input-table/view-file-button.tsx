@@ -1,6 +1,6 @@
 import { useContext } from "react";
 
-import { File, InputStep, StepSocket } from "@/api";
+import { InputStep, StepSocket } from "@/api";
 import { Button } from "@/components/ui/button";
 import {
   GraphActionType,
@@ -30,7 +30,7 @@ const ViewFileButton: React.FC<OwnProps> = ({ step, socket }) => {
         });
       }}
     >
-      View file ({(socket.data as File).name})
+      View file
     </Button>
   );
 };

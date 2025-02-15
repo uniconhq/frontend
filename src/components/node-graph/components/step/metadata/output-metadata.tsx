@@ -14,9 +14,8 @@ import {
   GraphActionType,
   GraphContext,
   GraphDispatchContext,
-  SocketType,
+  SocketDir,
 } from "@/features/problems/components/tasks/graph-context";
-import { isControlSocket } from "@/utils/socket";
 
 import OutputTable from "../output-table/output-table";
 import OutputMetadataRow from "./output-metadata-row";
@@ -43,17 +42,18 @@ const OutputMetadata: React.FC<OwnProps> = ({ step }) => {
       });
     };
 
-  const handleEditSocketId = (oldSocketId: string) => (newSocketId: string) => {
-    dispatch({
-      type: GraphActionType.UpdateSocketId,
-      payload: { stepId: step.id, oldSocketId, newSocketId },
-    });
-  };
+  const handleEditSocketLabel =
+    (socketId: string) => (newSocketLabel: string) => {
+      dispatch({
+        type: GraphActionType.UpdateSocketLabel,
+        payload: { stepId: step.id, socketId, newSocketLabel },
+      });
+    };
 
   const addInputSocket = useCallback(() => {
     dispatch({
       type: GraphActionType.AddSocket,
-      payload: { stepId: step.id, socketType: SocketType.Input },
+      payload: { stepId: step.id, socketDir: SocketDir.Input },
     });
   }, [dispatch, step]);
 
@@ -77,11 +77,12 @@ const OutputMetadata: React.FC<OwnProps> = ({ step }) => {
         <Table hideOverflow>
           <TableHeader>
             <TableRow>
+              {/* Socket */}
               <TableHead></TableHead>
-              <TableHead>Socket ID</TableHead>
               <TableHead>Label</TableHead>
               <TableHead>Expected</TableHead>
               <TableHead>Public</TableHead>
+              {/* Delete Button */}
               <TableHead></TableHead>
             </TableRow>
           </TableHeader>
@@ -91,9 +92,9 @@ const OutputMetadata: React.FC<OwnProps> = ({ step }) => {
                 key={index}
                 socket={socket}
                 onUpdateSocketMetadata={updateSocketMetadata(index)}
-                onEditSocketId={handleEditSocketId}
+                onEditSocketLabel={handleEditSocketLabel(socket.id)}
                 onDeleteSocket={deleteSocket(socket.id)}
-                isEditable={!isControlSocket(socket)}
+                isEditable={socket.type != "CONTROL"}
               />
             ))}
           </TableBody>

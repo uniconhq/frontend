@@ -8,7 +8,7 @@ import {
   GraphActionType,
   GraphContext,
   GraphDispatchContext,
-  SocketType,
+  SocketDir,
 } from "@/features/problems/components/tasks/graph-context";
 import { Step } from "@/features/problems/components/tasks/types";
 import { StepNodeColorMap, StepTypeAliasMap } from "@/lib/colors";
@@ -21,21 +21,22 @@ export function StepNode({ data }: { data: Step }) {
   const { edit } = useContext(GraphContext)!;
   const dispatch = useContext(GraphDispatchContext)!;
 
-  const isStepEditable = data.id !== 0;
+  const isStepEditable = "is_user" in data ? !data.is_user : true;
   const showEditElements = edit && isStepEditable;
 
-  const handleEditSocketId = (oldSocketId: string) => (newSocketId: string) => {
-    dispatch({
-      type: GraphActionType.UpdateSocketId,
-      payload: { stepId: data.id, oldSocketId, newSocketId },
-    });
-  };
+  const handleEditSocketLabel =
+    (socketId: string) => (newSocketLabel: string) => {
+      dispatch({
+        type: GraphActionType.UpdateSocketLabel,
+        payload: { stepId: data.id, socketId, newSocketLabel },
+      });
+    };
 
   const addSocket = useCallback(
-    (socketType: SocketType) => () => {
+    (socketDir: SocketDir) => () => {
       dispatch({
         type: GraphActionType.AddSocket,
-        payload: { stepId: data.id, socketType },
+        payload: { stepId: data.id, socketDir },
       });
     },
     [data.id, dispatch],
@@ -93,14 +94,13 @@ export function StepNode({ data }: { data: Step }) {
         <div className="text-xs font-light">
           <div className="flex flex-row justify-between">
             <NodeSlotGroup>
-              {data.inputs.map((stepSocket: StepSocket, index: number) => (
+              {data.inputs?.map((stepSocket: StepSocket, index: number) => (
                 <NodeSlot
                   key={index}
-                  id={stepSocket.id}
-                  label={stepSocket.id}
+                  socket={stepSocket}
                   type="target"
                   edit={edit}
-                  onEditSocketId={handleEditSocketId(stepSocket.id)}
+                  onEditSocketLabel={handleEditSocketLabel(stepSocket.id)}
                   onDeleteSocket={deleteSocket(stepSocket.id)}
                 />
               ))}
@@ -109,7 +109,7 @@ export function StepNode({ data }: { data: Step }) {
                   size={"sm"}
                   className="ml-3 h-fit w-fit px-1 py-1"
                   variant={"secondary"}
-                  onClick={addSocket(SocketType.Input)}
+                  onClick={addSocket(SocketDir.Input)}
                   type="button"
                 >
                   <Plus className="h-2 w-2" />
@@ -117,14 +117,13 @@ export function StepNode({ data }: { data: Step }) {
               )}
             </NodeSlotGroup>
             <NodeSlotGroup>
-              {data.outputs.map((stepSocket: StepSocket, index: number) => (
+              {data.outputs?.map((stepSocket: StepSocket, index: number) => (
                 <NodeSlot
                   key={index}
-                  id={stepSocket.id}
-                  label={stepSocket.id}
+                  socket={stepSocket}
                   type="source"
                   edit={edit}
-                  onEditSocketId={handleEditSocketId(stepSocket.id)}
+                  onEditSocketLabel={handleEditSocketLabel(stepSocket.id)}
                   onDeleteSocket={deleteSocket(stepSocket.id)}
                 />
               ))}
@@ -133,7 +132,7 @@ export function StepNode({ data }: { data: Step }) {
                   size={"sm"}
                   className="mr-3 h-fit w-fit self-end px-1 py-1"
                   variant={"secondary"}
-                  onClick={addSocket(SocketType.Output)}
+                  onClick={addSocket(SocketDir.Output)}
                   type="button"
                 >
                   <Plus className="h-2 w-2" />

@@ -11,7 +11,7 @@ import { SubmitHandler, useFieldArray, useForm } from "react-hook-form";
 import { useDebouncedCallback } from "use-debounce";
 import { z } from "zod";
 
-import { File } from "@/api";
+import { File, InputStep } from "@/api";
 import {
   NumberField,
   SelectField,
@@ -83,6 +83,14 @@ const ProgrammingForm: React.FC<OwnProps> = ({
   const slurmOptions = form.watch("environment.slurm_options");
 
   const { data: validPythonVersions } = useQuery(getSupportedPythonVersions());
+
+  // Shared user input step for all testcases
+  const sharedUserInputStep: InputStep = {
+    id: "__USER_INPUT__",
+    type: "INPUT_STEP",
+    is_user: true,
+    outputs: form.getValues("required_user_inputs"),
+  };
 
   const addTestcase = () =>
     testcases.append({
@@ -347,18 +355,13 @@ const ProgrammingForm: React.FC<OwnProps> = ({
               </div>
             </div>
             <div className="flex w-full flex-col gap-4">
-              {testcases.fields.map((testcase, index) => (
+              {form.watch("testcases").map((testcase, index) => (
                 <div className="mt-2" key={testcase.id}>
                   <Testcase
                     index={index}
                     testcase={testcase}
-                    userInput={{
-                      id: uuid(),
-                      type: "INPUT_STEP",
-                      inputs: [],
-                      outputs: [],
-                    }}
                     edit={true}
+                    sharedUserInput={sharedUserInputStep}
                     nodeGraphOnChange={updateTestcase(index)}
                     onDelete={testcases.remove}
                   />

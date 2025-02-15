@@ -35,12 +35,13 @@ const GraphFileEditor = () => {
   }, 1000);
 
   const selectedStep = steps.find((step) => step.id === selectedStepId);
-  const selectedSocket = selectedStep?.outputs.find(
+  const selectedSocket = selectedStep?.outputs?.find(
     (socket) => socket.id === selectedSocketId,
   );
   if (!selectedStep || !selectedSocket) return null;
 
   const file = selectedSocket.data as File;
+  const isUserInput = "is_user" in selectedStep ? selectedStep.is_user : false;
 
   return (
     <FileEditor
@@ -50,8 +51,8 @@ const GraphFileEditor = () => {
       onUpdateFileName={updateFileName}
       onUpdateFileContent={updateFileContent}
       onDeselectFile={() => dispatch({ type: GraphActionType.DeselectSocket })}
-      editableName={edit && selectedStepId !== 0}
-      editableContent={edit && selectedStepId !== 0}
+      editableName={edit && !isUserInput}
+      editableContent={edit && !isUserInput}
     />
   );
 };

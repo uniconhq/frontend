@@ -25,7 +25,7 @@ import {
   useState,
 } from "react";
 
-import { GraphEdge } from "@/api";
+import { GraphEdgeStr } from "@/api";
 import { StepNode } from "@/components/node-graph/components/step/step-node";
 import { Button } from "@/components/ui/button";
 import {
@@ -54,11 +54,11 @@ const stepNodeToRfNode = (step: Step): Node<Step> => ({
   type: "step",
 });
 
-const stepEdgeToRfEdge = (edge: GraphEdge): Edge => ({
-  id: edge.id.toString(),
-  source: edge.from_node_id.toString(),
+const stepEdgeToRfEdge = (edge: GraphEdgeStr): Edge => ({
+  id: edge.id,
+  source: edge.from_node_id,
   sourceHandle: edge.from_socket_id,
-  target: edge.to_node_id.toString(),
+  target: edge.to_node_id,
   targetHandle: edge.to_socket_id,
   markerEnd: {
     type: MarkerType.ArrowClosed,
@@ -128,9 +128,9 @@ const GraphEditor: React.FC<GraphEditorProps> = ({ graphId, className }) => {
       dispatch({
         type: GraphActionType.AddEdge,
         payload: {
-          from_node_id: parseInt(connection.source),
+          from_node_id: connection.source,
           from_socket_id: connection.sourceHandle!,
-          to_node_id: parseInt(connection.target),
+          to_node_id: connection.target,
           to_socket_id: connection.targetHandle!,
         },
       });
@@ -151,14 +151,14 @@ const GraphEditor: React.FC<GraphEditorProps> = ({ graphId, className }) => {
 
       dispatch({
         type: GraphActionType.DeleteEdge,
-        payload: { id: parseInt(oldEdge.id) },
+        payload: { id: oldEdge.id },
       });
       dispatch({
         type: GraphActionType.AddEdge,
         payload: {
-          from_node_id: parseInt(newConnection.source),
+          from_node_id: newConnection.source,
           from_socket_id: newConnection.sourceHandle!,
-          to_node_id: parseInt(newConnection.target),
+          to_node_id: newConnection.target,
           to_socket_id: newConnection.targetHandle!,
         },
       });
@@ -174,7 +174,7 @@ const GraphEditor: React.FC<GraphEditorProps> = ({ graphId, className }) => {
       if (!edgeReconnectSuccessful.current) {
         dispatch({
           type: GraphActionType.DeleteEdge,
-          payload: { id: parseInt(edge.id) },
+          payload: { id: edge.id },
         });
         setFlowEdges((eds) => eds.filter((e) => e.id !== edge.id));
       }

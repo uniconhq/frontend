@@ -16,12 +16,14 @@ import { cn } from "@/lib/utils";
 import { GraphAction } from "./graph-context";
 
 type TestcaseProps = {
-  index: number; // TODO: Reconcile with `Testcase::id`
+  index: number;
   testcase: TestcaseApi;
-  userInput: InputStep;
   // Node graph editor props
   edit: boolean;
   nodeGraphOnChange?: (action: GraphAction) => void;
+  // Used during testcase creation where each testcase has the same user input
+  // NOTE: If this is set, the nodes in the testcase will not contain the user input node
+  sharedUserInput?: InputStep;
   // UI state
   isSelected?: boolean;
   onSelected?: (index: number | null) => void;
@@ -31,9 +33,9 @@ type TestcaseProps = {
 const Testcase: React.FC<TestcaseProps> = ({
   index,
   testcase,
-  userInput,
   edit,
   nodeGraphOnChange,
+  sharedUserInput,
   isSelected,
   onSelected,
   onDelete,
@@ -66,9 +68,9 @@ const Testcase: React.FC<TestcaseProps> = ({
       <CollapsibleContent className="space-y-4">
         <NodeGraph
           edit={edit}
-          id={`${testcase.id}`}
+          id={testcase.id}
           key={testcase.id}
-          input={userInput}
+          sharedUserInput={sharedUserInput}
           steps={testcase.nodes}
           edges={testcase.edges}
           onChange={nodeGraphOnChange}

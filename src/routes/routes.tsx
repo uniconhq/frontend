@@ -167,7 +167,6 @@ export const routes = [
                         loader: groupLoader,
                         handle: {
                           crumb: (match: UIMatch<GroupPublic>) => {
-                            console.log({ match });
                             return {
                               label: match.data.name,
                               href: `/projects/${match.params.projectId}/groups/${match.params.groupId}`,

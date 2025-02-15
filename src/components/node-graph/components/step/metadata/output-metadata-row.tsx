@@ -18,7 +18,7 @@ import NodeInput from "../node-input";
 type OwnProps = {
   socket: OutputSocket;
   onUpdateSocketMetadata: (newMetadata: Partial<OutputSocket>) => void;
-  onEditSocketId: (oldSocketId: string) => (newSocketId: string) => void;
+  onEditSocketLabel: (newSocketLabel: string) => void;
   onDeleteSocket: () => void;
   isEditable: boolean;
 };
@@ -26,7 +26,7 @@ type OwnProps = {
 const OutputMetadataRow: React.FC<OwnProps> = ({
   socket,
   onUpdateSocketMetadata,
-  onEditSocketId,
+  onEditSocketLabel,
   onDeleteSocket,
   isEditable,
 }) => {
@@ -34,8 +34,7 @@ const OutputMetadataRow: React.FC<OwnProps> = ({
     <TableRow>
       <TableCell>
         <NodeSlot
-          id={socket.id}
-          label=""
+          socket={socket}
           type="target"
           hideLabel
           style={{ width: "20px", borderRadius: "10px", left: "-12px" }}
@@ -43,23 +42,9 @@ const OutputMetadataRow: React.FC<OwnProps> = ({
       </TableCell>
       <TableCell>
         {isEditable ? (
-          <NodeInput value={socket.id} onChange={onEditSocketId(socket.id)} />
+          <NodeInput value={socket.label ?? ""} onChange={onEditSocketLabel} />
         ) : (
-          <span>{socket.id}</span>
-        )}
-      </TableCell>
-      <TableCell>
-        {isEditable ? (
-          <NodeInput
-            value={socket.user_label || ""}
-            onChange={(newLabel) => {
-              onUpdateSocketMetadata({
-                user_label: newLabel,
-              });
-            }}
-          />
-        ) : (
-          <span>{socket.user_label}</span>
+          <span>{socket.label}</span>
         )}
       </TableCell>
       <TableCell>

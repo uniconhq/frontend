@@ -14,9 +14,8 @@ import {
   GraphActionType,
   GraphContext,
   GraphDispatchContext,
-  SocketType,
+  SocketDir,
 } from "@/features/problems/components/tasks/graph-context";
-import { isControlSocket } from "@/utils/socket";
 
 import InputTable from "../input-table/input-table";
 import InputMetadataRow from "./input-metadata-row";
@@ -29,7 +28,7 @@ const InputMetadata: React.FC<OwnProps> = ({ step }) => {
   const { edit } = useContext(GraphContext)!;
   const dispatch = useContext(GraphDispatchContext)!;
 
-  const isStepEditable = step.id !== 0;
+  const isStepEditable = !step.is_user;
   const showEditElements = edit && isStepEditable;
 
   const deleteSocket = useCallback(
@@ -42,12 +41,13 @@ const InputMetadata: React.FC<OwnProps> = ({ step }) => {
     [dispatch, step.id],
   );
 
-  const handleEditSocketId = (oldSocketId: string) => (newSocketId: string) => {
-    dispatch({
-      type: GraphActionType.UpdateSocketId,
-      payload: { stepId: step.id, oldSocketId, newSocketId },
-    });
-  };
+  const handleEditSocketLabel =
+    (socketId: string) => (newSocketLabel: string) => {
+      dispatch({
+        type: GraphActionType.UpdateSocketLabel,
+        payload: { stepId: step.id, socketId, newSocketLabel },
+      });
+    };
 
   const handleSocketChangeToFile = (socket: StepSocket) => () => {
     dispatch({
@@ -68,7 +68,7 @@ const InputMetadata: React.FC<OwnProps> = ({ step }) => {
   const addOutputSocket = useCallback(() => {
     dispatch({
       type: GraphActionType.AddSocket,
-      payload: { stepId: step.id, socketType: SocketType.Output },
+      payload: { stepId: step.id, socketDir: SocketDir.Output },
     });
   }, [dispatch, step.id]);
 
@@ -105,7 +105,7 @@ const InputMetadata: React.FC<OwnProps> = ({ step }) => {
           <TableHeader>
             <TableRow>
               <TableHead></TableHead>
-              <TableHead>Socket ID</TableHead>
+              <TableHead>Label</TableHead>
               <TableHead>Value</TableHead>
               <TableHead></TableHead>
             </TableRow>
@@ -116,12 +116,12 @@ const InputMetadata: React.FC<OwnProps> = ({ step }) => {
                 key={index}
                 socket={socket}
                 onDelete={deleteSocket(socket.id)}
-                onEditSocketId={handleEditSocketId(socket.id)}
+                onEditSocketLabel={handleEditSocketLabel(socket.id)}
                 onChangeToFile={handleSocketChangeToFile(socket)}
                 onChangeToValue={onChangeToValue(socket)}
                 onChangeValue={onChangeValue(socket)}
                 step={step}
-                isEditable={showEditElements && !isControlSocket(socket)}
+                isEditable={showEditElements && socket.type !== "CONTROL"}
               />
             ))}
           </TableBody>

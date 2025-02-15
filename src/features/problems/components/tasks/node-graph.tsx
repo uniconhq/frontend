@@ -4,7 +4,7 @@ import { ReactFlowProvider } from "@xyflow/react";
 import { useCallback, useEffect } from "react";
 import { useImmerReducer } from "use-immer";
 
-import { GraphEdge } from "@/api";
+import { GraphEdgeStr, InputStep } from "@/api";
 
 import {
   GraphAction,
@@ -18,16 +18,16 @@ import { Step } from "./types";
 
 type NodeGraphProps = {
   id: string;
-  input?: Step;
+  sharedUserInput?: InputStep;
   steps: Step[];
-  edges: GraphEdge[];
+  edges: GraphEdgeStr[];
   edit: boolean;
   onChange?: (action: GraphAction) => void;
 };
 
 const NodeGraph: React.FC<NodeGraphProps> = ({
   id,
-  input,
+  sharedUserInput,
   steps: initialSteps,
   edges: initialEdges,
   edit,
@@ -35,20 +35,19 @@ const NodeGraph: React.FC<NodeGraphProps> = ({
 }) => {
   const [graph, dispatch] = useImmerReducer(graphReducer, {
     id,
-    steps: input ? [input, ...initialSteps] : initialSteps,
+    steps: sharedUserInput ? [sharedUserInput, ...initialSteps] : initialSteps,
     edges: initialEdges,
     selectedSocketId: null,
     selectedStepId: null,
     edit,
   });
-
   useEffect(() => {
-    if (!input) return;
+    if (!sharedUserInput) return;
     dispatch({
       type: GraphActionType.UpdateUserInputStep,
-      payload: { step: input },
+      payload: { step: sharedUserInput },
     });
-  }, [input]);
+  }, [sharedUserInput]);
 
   const wrappedDispatch = useCallback(
     (action: GraphAction) => {

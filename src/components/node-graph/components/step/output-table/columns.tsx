@@ -9,12 +9,11 @@ export const columns: ColumnDef<OutputSocket>[] = [
     id: "handle",
     header: "",
     cell: ({ row }) => {
-      const id = row.original.id;
+      const socket = row.original;
       return (
         <NodeSlot
-          key={id}
-          id={id}
-          label=""
+          key={socket.id}
+          socket={socket}
           type="target"
           hideLabel
           style={{ width: "20px", borderRadius: "10px", left: "-12px" }}

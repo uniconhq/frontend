@@ -8,8 +8,8 @@ import ViewFileButton from "./view-file-button";
 
 export const columns: ColumnDef<StepSocket & { step: InputStep }>[] = [
   {
-    accessorFn: (row) => row.id.replace(/^DATA\.OUT\./, ""),
-    header: "Socket ID",
+    accessorFn: (row) => row.label,
+    header: "Label",
   },
   {
     header: "Value",
@@ -30,12 +30,11 @@ export const columns: ColumnDef<StepSocket & { step: InputStep }>[] = [
     id: "handle",
     header: "",
     cell: ({ row }) => {
-      const id = row.original.id;
+      const socket = row.original;
       return (
         <NodeSlot
-          key={id}
-          id={id}
-          label=""
+          key={socket.id}
+          socket={socket}
           type="source"
           hideLabel
           style={{ width: "20px", borderRadius: "10px", right: "-12px" }}

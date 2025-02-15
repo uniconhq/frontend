@@ -1,4 +1,5 @@
 import {
+  InputStep,
   ObjectAccessStep,
   OutputStep,
   PyRunFunctionStep,
@@ -37,7 +38,7 @@ const StepMetadata: React.FC<OwnProps> = ({ step }) => {
       {step.type === "OUTPUT_STEP" && (
         <OutputMetadata step={step as OutputStep} />
       )}
-      {step.type === "INPUT_STEP" && <InputMetadata step={step} />}
+      {step.type === "INPUT_STEP" && <InputMetadata step={step as InputStep} />}
     </div>
   );
 };

@@ -12,7 +12,7 @@ import NodeInput from "../node-input";
 type OwnProps = {
   socket: StepSocket;
   onDelete: () => void;
-  onEditSocketId: (newValue: string) => void;
+  onEditSocketLabel: (newValue: string) => void;
   onChangeToFile: () => void;
   // this means changing from file to not file
   onChangeToValue: () => void;
@@ -26,7 +26,7 @@ type OwnProps = {
 const InputMetadataRow: React.FC<OwnProps> = ({
   socket,
   onDelete,
-  onEditSocketId,
+  onEditSocketLabel,
   onChangeToFile,
   onChangeToValue,
   onChangeValue,
@@ -50,9 +50,9 @@ const InputMetadataRow: React.FC<OwnProps> = ({
       </TableCell>
       <TableCell>
         {isEditable ? (
-          <NodeInput value={socket.id} onChange={onEditSocketId} />
+          <NodeInput value={socket.label ?? ""} onChange={onEditSocketLabel} />
         ) : (
-          <span>{socket.id}</span>
+          <span>{socket.label}</span>
         )}
       </TableCell>
       <TableCell>
@@ -98,8 +98,7 @@ const InputMetadataRow: React.FC<OwnProps> = ({
       <TableCell>
         <NodeSlot
           style={{ width: "20px", borderRadius: "10px", right: "-12px" }}
-          id={socket.id}
-          label=""
+          socket={socket}
           type="source"
           hideLabel
         />

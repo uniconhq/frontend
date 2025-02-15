@@ -28,7 +28,7 @@ const PyRunMetadata: React.FC<OwnProps> = ({ step }) => {
     dispatch({
       type: GraphActionType.UpdateStepMetadata,
       payload: {
-        stepId: step.id,
+        id: step.id,
         stepMetadata: {
           function_identifier: newFunctionIdentifier,
           allow_error,
