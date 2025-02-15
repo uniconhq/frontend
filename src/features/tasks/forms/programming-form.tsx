@@ -79,7 +79,6 @@ const ProgrammingForm: React.FC<OwnProps> = ({
   const testcases = useFieldArray({ control: form.control, name: "testcases" });
 
   const dependencies = form.watch("environment.extra_options.requirements");
-
   const slurmOptions = form.watch("environment.slurm_options");
 
   const { data: validPythonVersions } = useQuery(getSupportedPythonVersions());
@@ -300,8 +299,8 @@ const ProgrammingForm: React.FC<OwnProps> = ({
                 Add input
               </Button>
               {userInputs.fields.map((input, index) => (
-                <Collapsible className="w-full" key={index}>
-                  <div className="flex items-center gap-4" key={index}>
+                <Collapsible className="w-full" key={input.id}>
+                  <div className="flex items-center gap-4" key={input.id}>
                     <NodeInput
                       className={["min-w-[160px]", "py-2"]}
                       value={input.label}

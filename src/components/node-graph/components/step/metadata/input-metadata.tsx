@@ -111,9 +111,9 @@ const InputMetadata: React.FC<OwnProps> = ({ step }) => {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {step.outputs.map((socket, index) => (
+            {step.outputs.map((socket) => (
               <InputMetadataRow
-                key={index}
+                key={socket.id}
                 socket={socket}
                 onDelete={deleteSocket(socket.id)}
                 onEditSocketLabel={handleEditSocketLabel(socket.id)}

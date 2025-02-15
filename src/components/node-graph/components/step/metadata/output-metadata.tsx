@@ -89,7 +89,7 @@ const OutputMetadata: React.FC<OwnProps> = ({ step }) => {
           <TableBody>
             {step.inputs.map((socket, index) => (
               <OutputMetadataRow
-                key={index}
+                key={socket.id}
                 socket={socket}
                 onUpdateSocketMetadata={updateSocketMetadata(index)}
                 onEditSocketLabel={handleEditSocketLabel(socket.id)}
