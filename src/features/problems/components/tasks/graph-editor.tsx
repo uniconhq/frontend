@@ -138,6 +138,20 @@ const GraphEditor: React.FC<GraphEditorProps> = ({ graphId, className }) => {
     [dispatch, edit],
   );
 
+  const onEdgesDelete = useCallback(
+    (edges: Edge[]) => {
+      if (!edit) return;
+
+      edges.forEach((edge) =>
+        dispatch({
+          type: GraphActionType.DeleteEdge,
+          payload: { id: edge.id },
+        }),
+      );
+    },
+    [dispatch, edit],
+  );
+
   const edgeReconnectSuccessful = useRef(true);
 
   const onReconnectStart = useCallback(() => {
@@ -211,6 +225,7 @@ const GraphEditor: React.FC<GraphEditorProps> = ({ graphId, className }) => {
             onNodesChange={onFlowNodesChange}
             onEdgesChange={onFlowEdgesChange}
             onConnect={onConnect}
+            onEdgesDelete={onEdgesDelete}
             onReconnectStart={onReconnectStart}
             onReconnectEnd={onReconnectEnd}
             onReconnect={onReconnect}
