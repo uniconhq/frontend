@@ -155,7 +155,7 @@ const addStep = (state: GraphState, { payload }: AddStepAction) => {
 
 const deleteStep = (state: GraphState, { payload }: DeleteStepAction) => {
   state.steps = state.steps.filter((node) => node.id !== payload.id);
-  state.edges.filter(
+  state.edges = state.edges.filter(
     (edge) =>
       edge.from_node_id !== payload.id && edge.to_node_id !== payload.id,
   );
