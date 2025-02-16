@@ -28,15 +28,15 @@ type NodeGraphProps = {
 const NodeGraph: React.FC<NodeGraphProps> = ({
   id,
   sharedUserInput,
-  steps: initialSteps,
-  edges: initialEdges,
+  steps,
+  edges,
   edit,
   onChange,
 }) => {
   const [graph, dispatch] = useImmerReducer(graphReducer, {
     id,
-    steps: sharedUserInput ? [sharedUserInput, ...initialSteps] : initialSteps,
-    edges: initialEdges,
+    steps: steps,
+    edges: edges,
     selectedSocketId: null,
     selectedStepId: null,
     edit,
@@ -47,7 +47,7 @@ const NodeGraph: React.FC<NodeGraphProps> = ({
       type: GraphActionType.UpdateUserInputStep,
       payload: { step: sharedUserInput },
     });
-  }, [sharedUserInput]);
+  }, [sharedUserInput, dispatch]);
 
   const wrappedDispatch = useCallback(
     (action: GraphAction) => {

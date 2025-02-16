@@ -3,7 +3,7 @@ import { Trash } from "lucide-react";
 import { InputStep, StepSocket } from "@/api";
 import { Button } from "@/components/ui/button";
 import { TableCell, TableRow } from "@/components/ui/table";
-import { isFile } from "@/lib/types";
+import { isFile } from "@/lib/utils";
 
 import { NodeSlot } from "../../node-slot";
 import ViewFileButton from "../input-table/view-file-button";

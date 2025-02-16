@@ -1,6 +1,8 @@
 import { z } from "zod";
 
-import { PythonVersion, Testcase } from "@/api/types.gen";
+import { ProgrammingTask, PythonVersion, Testcase } from "@/api/types.gen";
+
+export const DEFAULT_PY_VERSION: PythonVersion = "3.11.9";
 
 const positiveLimitZ = (label: string) =>
   z.coerce.number().positive(`${label} must be greater than 0!`);
@@ -8,11 +10,11 @@ const positiveLimitZ = (label: string) =>
 const FileZ = z.object({
   name: z.string().nonempty("File name cannot be empty!"),
   content: z.string(),
-  trusted: z.boolean().optional().default(false),
+  trusted: z.boolean().optional(),
 });
 
 const RequiredInputZ = z.object({
-  id: z.string().nonempty("Input ID cannot be empty!").uuid(),
+  id: z.string().nonempty("Input ID cannot be empty!"),
   label: z.string().nonempty("Input Label cannot be empty!"),
   data: z.union([z.string(), z.number(), z.boolean(), FileZ]),
 });
@@ -41,9 +43,7 @@ export const ProgTaskFormZ = z
       slurm: z.boolean().default(true),
       slurm_options: z.array(SlurmOptionZ),
     }),
-    required_user_inputs: z
-      .array(RequiredInputZ)
-      .nonempty("At least one user input is required!"),
+    required_user_inputs: z.array(RequiredInputZ),
     testcases: z.array(z.custom<Testcase>(() => true)),
   })
   .superRefine((values, context) => {
@@ -58,3 +58,47 @@ export const ProgTaskFormZ = z
   });
 
 export type ProgTaskForm = z.infer<typeof ProgTaskFormZ>;
+
+export const toProgrammingTask = (
+  form: ProgTaskForm,
+): Omit<ProgrammingTask, "order_index"> => ({
+  id: -1,
+  type: "PROGRAMMING_TASK",
+  question: form.title,
+  autograde: true,
+  environment: {
+    ...form.environment,
+    language: "PYTHON",
+    extra_options: {
+      version: form.environment.extra_options.version,
+      requirements: form.environment.extra_options.requirements.join("\n"),
+    },
+  },
+  required_inputs: form.required_user_inputs,
+  testcases: form.testcases,
+});
+
+export const fromProgrammingTask = (
+  progTask: ProgrammingTask,
+): ProgTaskForm => ({
+  title: progTask.question,
+  description: "",
+  environment: {
+    ...progTask.environment,
+    language: "Python",
+    extra_options: {
+      version:
+        progTask.environment.extra_options?.version ?? DEFAULT_PY_VERSION,
+      requirements:
+        progTask.environment.extra_options?.requirements?.split("\n") ?? [],
+    },
+    slurm: progTask.environment.slurm ?? false,
+    slurm_options: progTask.environment.slurm_options ?? [],
+  },
+  required_user_inputs: progTask.required_inputs.map((input) => ({
+    id: input.id,
+    label: input.label ?? "",
+    data: input.data,
+  })),
+  testcases: progTask.testcases,
+});

@@ -1,7 +1,7 @@
 import { ColumnDef } from "@tanstack/react-table";
 
 import { InputStep, StepSocket } from "@/api";
-import { isFile } from "@/lib/types";
+import { isFile } from "@/lib/utils";
 
 import { NodeSlot } from "../../node-slot";
 import ViewFileButton from "./view-file-button";

@@ -28,7 +28,11 @@ import {
 } from "@/features/problems/components/tasks/graph-context";
 import Testcase from "@/features/problems/components/tasks/testcase";
 import { getSupportedPythonVersions } from "@/features/problems/queries";
-import { ProgTaskForm, ProgTaskFormZ } from "@/lib/schema/prog-task-form";
+import {
+  DEFAULT_PY_VERSION,
+  ProgTaskForm,
+  ProgTaskFormZ,
+} from "@/lib/schema/prog-task-form";
 import { uuid } from "@/lib/utils";
 
 const createDefaultUserInput = () => ({
@@ -47,7 +51,7 @@ const DEFAULT_FORM_VALUES: ProgTaskForm = {
   environment: {
     language: "Python",
     extra_options: {
-      version: "3.11.9",
+      version: DEFAULT_PY_VERSION,
       requirements: [],
     },
     time_limit_secs: 5,
@@ -57,6 +61,12 @@ const DEFAULT_FORM_VALUES: ProgTaskForm = {
   },
   required_user_inputs: [createDefaultUserInput()],
   testcases: [],
+};
+
+const DEFAULT_USER_INPUT_STEP: Omit<InputStep, "outputs"> = {
+  id: "__USER_INPUT__",
+  type: "INPUT_STEP",
+  is_user: true,
 };
 
 // NOTE: WE have our own "id" field for our data objects, in order to deconflict with react-hook-form's own identifier field
@@ -89,9 +99,7 @@ const ProgrammingForm: React.FC<OwnProps> = ({
 
   // Shared user input step for all testcases
   const sharedUserInputStep: InputStep = {
-    id: "__USER_INPUT__",
-    type: "INPUT_STEP",
-    is_user: true,
+    ...DEFAULT_USER_INPUT_STEP,
     outputs: form.watch("required_user_inputs"),
   };
 
@@ -99,7 +107,7 @@ const ProgrammingForm: React.FC<OwnProps> = ({
     testcases.append({
       id: uuid(),
       order_index: testcases.fields.length,
-      nodes: [],
+      nodes: [sharedUserInputStep],
       edges: [],
     });
 

@@ -95,8 +95,7 @@ const GraphEditor: React.FC<GraphEditorProps> = ({ graphId, className }) => {
   // Apply layout algorithm to graph after nodes are initialized by ReactFlow
   useEffect(() => {
     if (flowNodesInitialized && !layoutApplied) {
-      const { nodes: layoutedNodes, edges: layoutedEdges } =
-        getLayoutedElements(flowNodes, flowEdges);
+      const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(flowNodes, flowEdges); // prettier-ignore
       setFlowNodes([...layoutedNodes]);
       setFlowEdges([...layoutedEdges]);
       setLayoutApplied(true);
@@ -211,7 +210,7 @@ const GraphEditor: React.FC<GraphEditorProps> = ({ graphId, className }) => {
       }
       edgeReconnectSuccessful.current = true;
     },
-    [dispatch, setFlowEdges],
+    [dispatch],
   );
 
   return (

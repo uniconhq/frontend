@@ -5,9 +5,12 @@ import { useNavigate } from "react-router-dom";
 import { ProgrammingTask } from "@/api";
 import { useUpdateTask } from "@/features/problems/queries";
 import { useProjectId } from "@/features/projects/hooks/use-id";
-import ProgrammingForm, {
-  ProgrammingFormType,
-} from "@/features/tasks/forms/programming-form";
+import ProgrammingForm from "@/features/tasks/forms/programming-form";
+import {
+  fromProgrammingTask,
+  ProgTaskForm,
+  toProgrammingTask,
+} from "@/lib/schema/prog-task-form";
 import { isSafeChangeForProgrammingTask } from "@/utils/task";
 
 import RerunDialog from "./rerun-dialog";
@@ -23,19 +26,13 @@ const EditProgramming: React.FC<OwnProps> = ({ task, problemId }) => {
   const updateTaskMutation = useUpdateTask(problemId, task.id);
   const navigate = useNavigate();
   const [openDialog, setOpenDialog] = useState(false);
-  const [data, setData] = useState<ProgrammingFormType | null>(null);
+  const [data, setData] = useState<ProgTaskForm | null>(null);
   const [isSafe, setIsSafe] = useState<boolean>(false);
 
-  const updateTask = (data: ProgrammingFormType) => (rerun: boolean) => {
+  const updateTask = (form: ProgTaskForm) => (rerun: boolean) => {
     updateTaskMutation.mutate(
       {
-        task: {
-          ...task,
-          ...data,
-          environment: {
-            ...data.environment,
-          },
-        },
+        task: { ...task, ...toProgrammingTask(form) },
         rerun,
       },
       {
@@ -46,10 +43,10 @@ const EditProgramming: React.FC<OwnProps> = ({ task, problemId }) => {
     );
   };
 
-  const onSubmit: SubmitHandler<ProgrammingFormType> = async (data) => {
+  const onSubmit: SubmitHandler<ProgTaskForm> = async (form: ProgTaskForm) => {
     setOpenDialog(true);
     setData(data);
-    setIsSafe(isSafeChangeForProgrammingTask(task, data));
+    setIsSafe(isSafeChangeForProgrammingTask(task, toProgrammingTask(form)));
   };
 
   return (
@@ -65,19 +62,7 @@ const EditProgramming: React.FC<OwnProps> = ({ task, problemId }) => {
       <ProgrammingForm
         title="Edit programming task"
         onSubmit={onSubmit}
-        initialValue={{
-          ...task,
-          autograde: !!task.autograde,
-          environment: {
-            ...task.environment,
-            extra_options: {
-              ...task.environment.extra_options,
-              version: task.environment.extra_options?.version ?? "3.11.9",
-              requirements: task.environment.extra_options?.requirements ?? "",
-            },
-            slurm_options: task.environment.slurm_options ?? [],
-          },
-        }}
+        initialValue={fromProgrammingTask(task)}
       />
     </>
   );
