@@ -7,8 +7,8 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { produce } from "immer";
 import { PlusIcon, Trash } from "lucide-react";
+import { useEffect } from "react";
 import { SubmitHandler, useFieldArray, useForm } from "react-hook-form";
-import { useDebouncedCallback } from "use-debounce";
 
 import { File, InputStep } from "@/api";
 import {
@@ -103,37 +103,29 @@ const ProgrammingForm: React.FC<OwnProps> = ({
     outputs: form.watch("required_user_inputs"),
   };
 
-  const addTestcase = () =>
-    testcases.append({
-      id: uuid(),
-      order_index: testcases.fields.length,
-      nodes: [sharedUserInputStep],
-      edges: [],
-    });
+  const addTestcase = () => testcases.append({ id: uuid(), order_index: testcases.fields.length, nodes: [sharedUserInputStep], edges: [] }); // prettier-ignore
 
   const addUserInput = () => userInputs.append(createDefaultUserInput());
 
-  const updateUserInput = useDebouncedCallback(
-    (
-      index: number,
-      {
-        newLabel,
-        newFileContent,
-      }: { newLabel?: string; newFileContent?: string },
-    ) => {
-      const oldInput = userInputs.fields[index];
-      const oldFileData = oldInput.data as File;
-      userInputs.update(index, {
-        ...oldInput,
-        label: newLabel ?? oldInput.label,
-        data: {
-          ...oldFileData,
-          name: newLabel ?? oldInput.label,
-          content: newFileContent ?? oldFileData.content,
-        },
-      });
-    },
-  );
+  const updateUserInput = (
+    index: number,
+    {
+      newLabel,
+      newFileContent,
+    }: { newLabel?: string; newFileContent?: string },
+  ) => {
+    const oldInput = userInputs.fields[index];
+    const oldFileData = oldInput.data as File;
+    userInputs.update(index, {
+      ...oldInput,
+      label: newLabel ?? oldInput.label,
+      data: {
+        ...oldFileData,
+        name: newLabel ?? oldInput.label,
+        content: newFileContent ?? oldFileData.content,
+      },
+    });
+  };
 
   const addDependency = () => {
     const _KEY = "environment.extra_options.requirements";
@@ -154,6 +146,22 @@ const ProgrammingForm: React.FC<OwnProps> = ({
     const _KEY = "environment.slurm_options";
     form.setValue(_KEY, form.getValues(_KEY).filter((_, i) => i !== index)); // prettier-ignore
   };
+
+  // Update all testcases with the updated shared user input step
+  useEffect(() => {
+    for (let i = 0; i < testcases.fields.length; i++) {
+      const testcase = testcases.fields[i];
+      testcases.update(i, {
+        ...testcase,
+        nodes: [
+          sharedUserInputStep,
+          ...testcase.nodes.filter(
+            (node) => node.id !== sharedUserInputStep.id,
+          ),
+        ],
+      });
+    }
+  }, [sharedUserInputStep]);
 
   const updateTestcase = (index: number) => (action: GraphAction) => {
     const testcase = form.getValues("testcases")[index];
