@@ -9,6 +9,7 @@ import {
   MarkerType,
   MiniMap,
   Node,
+  OnBeforeDelete,
   ReactFlow,
   ReactFlowInstance,
   useEdgesState,
@@ -25,7 +26,7 @@ import {
   useState,
 } from "react";
 
-import { GraphEdgeStr } from "@/api";
+import { GraphEdgeStr, InputStep } from "@/api";
 import { StepNode } from "@/components/node-graph/components/step/step-node";
 import { Button } from "@/components/ui/button";
 import {
@@ -45,10 +46,17 @@ import {
 import GraphFileEditor from "./graph-file-editor";
 import { Step } from "./types";
 
+type RfInstance = ReactFlowInstance<Node<Step>, Edge>;
+
+type GraphEditorProps = {
+  graphId: string;
+  className?: string;
+};
+
 const nodeTypes = { step: StepNode };
 
 const stepNodeToRfNode = (step: Step): Node<Step> => ({
-  id: step.id.toString(),
+  id: step.id,
   position: { x: 0, y: 0 },
   data: step,
   type: "step",
@@ -67,15 +75,9 @@ const stepEdgeToRfEdge = (edge: GraphEdgeStr): Edge => ({
   },
 });
 
-type RfInstance = ReactFlowInstance<Node<Step>, Edge>;
-
-type GraphEditorProps = {
-  graphId: string;
-  className?: string;
-};
-
 const GraphEditor: React.FC<GraphEditorProps> = ({ graphId, className }) => {
   const { steps, edges, edit, selectedSocketId } = useContext(GraphContext)!;
+  const dispatch = useContext(GraphDispatchContext)!;
 
   const nodeData = useMemo(() => steps.map(stepNodeToRfNode), [steps]);
   const edgeData = useMemo(() => edges.map(stepEdgeToRfEdge), [edges]);
@@ -90,112 +92,126 @@ const GraphEditor: React.FC<GraphEditorProps> = ({ graphId, className }) => {
 
   const onInit = (rf: RfInstance) => setRfInstance(rf);
 
+  // Apply layout algorithm to graph after nodes are initialized by ReactFlow
   useEffect(() => {
-    if (!flowNodesInitialized || layoutApplied) return;
-
-    const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(
-      flowNodes,
-      flowEdges,
-    );
-    setFlowNodes([...layoutedNodes]);
-    setFlowEdges([...layoutedEdges]);
-
-    setLayoutApplied(true);
+    if (flowNodesInitialized && !layoutApplied) {
+      const { nodes: layoutedNodes, edges: layoutedEdges } =
+        getLayoutedElements(flowNodes, flowEdges);
+      setFlowNodes([...layoutedNodes]);
+      setFlowEdges([...layoutedEdges]);
+      setLayoutApplied(true);
+    }
   }, [flowNodesInitialized, layoutApplied]);
 
+  // Fit graph to viewport after layout is applied
+  // This will only be done once after layout is applied and not on every update graph state (e.g. node/edge changes)
   useEffect(() => {
-    if (!layoutApplied || !rfInstance) return;
-    rfInstance.fitView();
+    if (layoutApplied && rfInstance) rfInstance.fitView();
   }, [layoutApplied, rfInstance]);
 
+  // Update ReactFlow internal states when graph state changes
   useEffect(() => {
     setFlowNodes((flowNodes) =>
       nodeData.map((node) => {
+        // Only update data of existing nodes while retaining their position
         const existingRfNode = flowNodes.find((n) => n.id === node.id);
         return existingRfNode ? { ...existingRfNode, data: node.data } : node;
       }),
     );
-  }, [nodeData, setFlowNodes]);
+    setFlowEdges(edgeData);
+  }, [nodeData, edgeData, setFlowNodes, setFlowEdges]);
 
-  useEffect(() => setFlowEdges(edgeData), [edgeData, setFlowEdges]);
+  // NOTE: This is triggered before all the other event handlers e.g. onNodeDelete, onEdgesDelete, onNodesChange, onEdgesChange
+  // All nodes and edges returned by this handler will then be passed to the respective event handlers
+  const onBeforeDelete: OnBeforeDelete<Node<Step>, Edge> = useCallback(
+    async ({ nodes, edges }) => {
+      // Do not allow any deletes if edit mode is disabled
+      if (!edit) return false;
 
-  const dispatch = useContext(GraphDispatchContext)!;
+      // Filter out user `InputStep` nodes to prevent deletion
+      const userNodes = nodes.filter((node) => {
+        const data = node.data as Step;
+        return data.type === "INPUT_STEP" && (data as InputStep).is_user;
+      });
+      // Preserve user `InputStep` nodes
+      const nonUserNodes = nodes.filter((node) => userNodes.indexOf(node) === -1); // prettier-ignore
+      // Preserve outgoing edges of user `InputStep` edges if user `InputStep` nodes are deleted
+      // This is to retain expected behavior where edges are preserved when we prevent deletion of user `InputStep` nodes
+      const nonUserEdges = edges.filter((edge) => userNodes.find((node) => node.id === edge.source) === undefined) // prettier-ignore
+
+      return { nodes: nonUserNodes, edges: nonUserEdges };
+    },
+    [edit],
+  );
+
+  // Node handlers
+
+  const onNodesDelete = useCallback(
+    (nodes: Node<Step>[]) => {
+      if (edit) nodes.forEach(({ id }) => dispatch({ type: GraphActionType.DeleteStep, payload: { id } })); // prettier-ignore
+    },
+    [dispatch, edit],
+  );
+
+  // Edge handlers
+
+  const onEdgesDelete = useCallback(
+    (edges: Edge[]) => {
+      if (edit) edges.forEach(({ id }) => dispatch({ type: GraphActionType.DeleteEdge, payload: { id } })); // prettier-ignore
+    },
+    [dispatch, edit],
+  );
 
   const onConnect = useCallback(
-    (connection: Connection) => {
+    ({ source, sourceHandle, target, targetHandle }: Connection) => {
       if (!edit) return;
-
       dispatch({
         type: GraphActionType.AddEdge,
         payload: {
-          from_node_id: connection.source,
-          from_socket_id: connection.sourceHandle!,
-          to_node_id: connection.target,
-          to_socket_id: connection.targetHandle!,
+          from_node_id: source,
+          from_socket_id: sourceHandle!,
+          to_node_id: target,
+          to_socket_id: targetHandle!,
         },
       });
     },
     [dispatch, edit],
   );
 
-  const onEdgesDelete = useCallback(
-    (edges: Edge[]) => {
-      if (!edit) return;
-
-      edges.forEach((edge) =>
-        dispatch({
-          type: GraphActionType.DeleteEdge,
-          payload: { id: edge.id },
-        }),
-      );
-    },
-    [dispatch, edit],
-  );
+  // Edge reconnect handling
 
   const edgeReconnectSuccessful = useRef(true);
 
-  const onReconnectStart = useCallback(() => {
-    if (!edit) return;
-    edgeReconnectSuccessful.current = false;
-  }, [edit]);
+  const onReconnectStart = useCallback(() => { edgeReconnectSuccessful.current = false;}, []); // prettier-ignore
 
   const onReconnect = useCallback(
-    (oldEdge: Edge, newConnection: Connection) => {
-      if (!edit) return;
-
-      dispatch({
-        type: GraphActionType.DeleteEdge,
-        payload: { id: oldEdge.id },
-      });
+    (
+      { id }: Edge,
+      { source, sourceHandle, target, targetHandle }: Connection,
+    ) => {
+      dispatch({ type: GraphActionType.DeleteEdge, payload: { id } });
       dispatch({
         type: GraphActionType.AddEdge,
         payload: {
-          from_node_id: newConnection.source,
-          from_socket_id: newConnection.sourceHandle!,
-          to_node_id: newConnection.target,
-          to_socket_id: newConnection.targetHandle!,
+          from_node_id: source,
+          from_socket_id: sourceHandle!,
+          to_node_id: target,
+          to_socket_id: targetHandle!,
         },
       });
       edgeReconnectSuccessful.current = true;
     },
-    [dispatch, edit],
+    [dispatch],
   );
 
   const onReconnectEnd = useCallback(
     (_: unknown, edge: Edge) => {
-      if (!edit) return;
-
       if (!edgeReconnectSuccessful.current) {
-        dispatch({
-          type: GraphActionType.DeleteEdge,
-          payload: { id: edge.id },
-        });
-        setFlowEdges((eds) => eds.filter((e) => e.id !== edge.id));
+        dispatch({ type: GraphActionType.DeleteEdge, payload: { id: edge.id }}); // prettier-ignore
       }
-
       edgeReconnectSuccessful.current = true;
     },
-    [dispatch, setFlowEdges, edit],
+    [dispatch, setFlowEdges],
   );
 
   return (
@@ -222,10 +238,12 @@ const GraphEditor: React.FC<GraphEditorProps> = ({ graphId, className }) => {
             nodeTypes={nodeTypes}
             nodes={flowNodes}
             edges={flowEdges}
+            onBeforeDelete={onBeforeDelete}
             onNodesChange={onFlowNodesChange}
             onEdgesChange={onFlowEdgesChange}
-            onConnect={onConnect}
+            onNodesDelete={onNodesDelete}
             onEdgesDelete={onEdgesDelete}
+            onConnect={onConnect}
             onReconnectStart={onReconnectStart}
             onReconnectEnd={onReconnectEnd}
             onReconnect={onReconnect}
