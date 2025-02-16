@@ -29,7 +29,6 @@ const OutputMetadata: React.FC<OwnProps> = ({ step }) => {
   const { edit } = useContext(GraphContext)!;
   const dispatch = useContext(GraphDispatchContext)!;
 
-  // Does not handle updating socket ids. See handleEditSocketId for that
   const updateSocketMetadata =
     (metadataIndex: number) => (newMetadata: Partial<OutputSocket>) => {
       const { id: _, ...newMetadataWithoutId } = newMetadata;

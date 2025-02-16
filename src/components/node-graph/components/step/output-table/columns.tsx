@@ -22,10 +22,6 @@ export const columns: ColumnDef<OutputSocket>[] = [
     },
   },
   {
-    accessorFn: (row) => row.id.replace(/^DATA\.IN\./, ""),
-    header: "Socket ID",
-  },
-  {
     accessorKey: "label",
     header: "Label",
   },
