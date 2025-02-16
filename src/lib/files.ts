@@ -1,0 +1,73 @@
+// This class is used for managing an array of files and converting them to file trees.
+
+// Note: This is a file. It is NOT a folder.
+export type FileType = {
+  path: string;
+  content: string;
+  isBinary: boolean;
+  downloadUrl: string;
+};
+
+export type TreeFile = FileType & {
+  name: string;
+};
+
+export type TreeFolder = {
+  name: string;
+  children: (TreeFolder | TreeFile)[];
+};
+
+export const isFolder = (item: TreeFolder | TreeFile): item is TreeFolder => {
+  return "children" in item;
+};
+
+export const getName = (path: string) => {
+  return path.split("/").pop();
+};
+
+export type FileTreeType = (TreeFolder | TreeFile)[];
+
+const sortFileTree = (files: FileTreeType) => {
+  files.sort((a, b) => {
+    return a.name.localeCompare(b.name);
+  });
+  for (const item of files) {
+    if (isFolder(item)) {
+      sortFileTree(item.children);
+    }
+  }
+};
+
+export const convertFilesToFileTree = (files: FileType[]): FileTreeType => {
+  const tree: FileTreeType = [];
+  for (const file of files) {
+    const pathParts = file.path
+      .split("/")
+      .filter((part) => !["", "."].includes(part));
+    let currentTree = tree;
+    for (let i = 0; i < pathParts.length - 1; i++) {
+      const folderName = pathParts[i];
+      const folder = currentTree.find(
+        (item): item is TreeFolder =>
+          "children" in item && item.name === folderName,
+      );
+      if (folder) {
+        currentTree = folder.children;
+      } else {
+        const newFolder: TreeFolder = {
+          name: folderName,
+          children: [],
+        };
+        currentTree.push(newFolder);
+        currentTree = newFolder.children;
+      }
+    }
+    const fileName = pathParts[pathParts.length - 1];
+    currentTree.push({
+      name: fileName,
+      ...file,
+    });
+  }
+  sortFileTree(tree);
+  return tree;
+};

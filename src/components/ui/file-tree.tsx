@@ -1,4 +1,6 @@
-import { ChevronRight, File, Folder, X } from "lucide-react";
+// Referenced from: https://ui.shadcn.com/blocks/sidebar#sidebar-11
+
+import { ChevronRight, File, Folder, FolderOpen, X } from "lucide-react";
 import * as React from "react";
 
 import {
@@ -17,12 +19,14 @@ import {
   SidebarMenuItem,
   SidebarMenuSub,
 } from "@/components/ui/sidebar";
+import { FileTreeType, isFolder, TreeFile, TreeFolder } from "@/lib/files";
 
-type TreeType = string | TreeType[];
-
+type OwnProps = {
+  files: FileTreeType;
+};
 export function FileTree({
   ...props
-}: React.ComponentProps<typeof Sidebar> & { files: TreeType[] }) {
+}: React.ComponentProps<typeof Sidebar> & OwnProps) {
   return (
     <Sidebar
       {...props}
@@ -40,6 +44,8 @@ export function FileTree({
           </SidebarGroupLabel>
           <SidebarGroupContent className="h-full">
             <SidebarMenu>
+              {/* TODO: DELETE THIS LATER */}
+              <SidebarMenuItem />
               {props.files.map((item, index) => (
                 <Tree key={index} item={item} />
               ))}
@@ -51,39 +57,36 @@ export function FileTree({
   );
 }
 
-function Tree({ item }: { item: TreeType }) {
-  const [name, ...items] = Array.isArray(item) ? item : [item];
+function Tree({ item }: { item: TreeFolder | TreeFile }) {
+  const isItemFolder = isFolder(item);
 
-  if (!items.length) {
+  if (!isItemFolder) {
     return (
       <SidebarMenuButton
-        isActive={name === "button.tsx"}
         className="data-[active=true]:bg-transparent"
         type="button"
         size="big"
       >
         <File />
-        {name}
+        {item.name}
       </SidebarMenuButton>
     );
   }
 
   return (
     <SidebarMenuItem>
-      <Collapsible
-        className="group/collapsible [&[data-state=open]>button>svg:first-child]:rotate-90"
-        defaultOpen={name === "components" || name === "ui"}
-      >
+      <Collapsible className="group/collapsible [&[data-state=open]>button>svg:first-child]:rotate-90">
         <CollapsibleTrigger asChild>
           <SidebarMenuButton>
             <ChevronRight className="transition-transform" />
-            <Folder />
-            {name}
+            <Folder className="hidden group-data-[state=closed]/collapsible:block" />
+            <FolderOpen className="hidden group-data-[state=open]/collapsible:block" />
+            {item.name}
           </SidebarMenuButton>
         </CollapsibleTrigger>
         <CollapsibleContent>
           <SidebarMenuSub className="mr-0 pr-0">
-            {items.map((subItem, index) => (
+            {item.children.map((subItem, index) => (
               <Tree key={index} item={subItem} />
             ))}
           </SidebarMenuSub>
