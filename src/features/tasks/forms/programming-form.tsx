@@ -9,7 +9,6 @@ import { produce } from "immer";
 import { PlusIcon, Trash } from "lucide-react";
 import { SubmitHandler, useFieldArray, useForm } from "react-hook-form";
 import { useDebouncedCallback } from "use-debounce";
-import { z } from "zod";
 
 import { File, InputStep } from "@/api";
 import {
@@ -29,12 +28,20 @@ import {
 } from "@/features/problems/components/tasks/graph-context";
 import Testcase from "@/features/problems/components/tasks/testcase";
 import { getSupportedPythonVersions } from "@/features/problems/queries";
-import { ProgTaskForm } from "@/lib/schema/prog-task-form";
+import { ProgTaskForm, ProgTaskFormZ } from "@/lib/schema/prog-task-form";
 import { uuid } from "@/lib/utils";
 
-export type ProgTaskFormT = z.infer<typeof ProgTaskForm>;
+const createDefaultUserInput = () => ({
+  id: uuid(),
+  label: "",
+  data: {
+    name: "",
+    content: "# INSERT FILE TEMPLATE HERE",
+    trusted: false,
+  },
+});
 
-const DEFAULT_FORM_VALUES: Omit<ProgTaskFormT, "required_user_inputs"> = {
+const DEFAULT_FORM_VALUES: ProgTaskForm = {
   title: "",
   description: "",
   environment: {
@@ -48,21 +55,18 @@ const DEFAULT_FORM_VALUES: Omit<ProgTaskFormT, "required_user_inputs"> = {
     slurm: true,
     slurm_options: [],
   },
+  required_user_inputs: [createDefaultUserInput()],
   testcases: [],
 };
 
-const DEFAULT_USER_INPUT: File = {
-  name: "",
-  content: "# INSERT FILE TEMPLATE HERE",
-  trusted: false,
-};
-
-const DEFAULT_UPDATE_DEBOUNCE: number = 500;
+// NOTE: WE have our own "id" field for our data objects, in order to deconflict with react-hook-form's own identifier field
+// when using `useFieldArray`, we need to specify a custom keyName to avoid conflicts
+const _REACT_FORM_ID_KEY = "_id";
 
 type OwnProps = {
   title: string;
-  initialValue?: ProgTaskFormT;
-  onSubmit: SubmitHandler<ProgTaskFormT>;
+  initialValue?: ProgTaskForm;
+  onSubmit: SubmitHandler<ProgTaskForm>;
 };
 
 const ProgrammingForm: React.FC<OwnProps> = ({
@@ -70,13 +74,13 @@ const ProgrammingForm: React.FC<OwnProps> = ({
   initialValue,
   onSubmit,
 }) => {
-  const form = useForm<ProgTaskFormT>({
-    resolver: zodResolver(ProgTaskForm),
+  const form = useForm<ProgTaskForm>({
+    resolver: zodResolver(ProgTaskFormZ),
     defaultValues: initialValue ?? DEFAULT_FORM_VALUES,
   });
 
-  const userInputs = useFieldArray({ control: form.control, name: "required_user_inputs" }); // prettier-ignore
-  const testcases = useFieldArray({ control: form.control, name: "testcases" });
+  const userInputs = useFieldArray({ control: form.control, name: "required_user_inputs", keyName: _REACT_FORM_ID_KEY }); // prettier-ignore
+  const testcases = useFieldArray({ control: form.control, name: "testcases", keyName: _REACT_FORM_ID_KEY }); // prettier-ignore
 
   const dependencies = form.watch("environment.extra_options.requirements");
   const slurmOptions = form.watch("environment.slurm_options");
@@ -88,7 +92,7 @@ const ProgrammingForm: React.FC<OwnProps> = ({
     id: "__USER_INPUT__",
     type: "INPUT_STEP",
     is_user: true,
-    outputs: form.getValues("required_user_inputs"),
+    outputs: form.watch("required_user_inputs"),
   };
 
   const addTestcase = () =>
@@ -99,12 +103,7 @@ const ProgrammingForm: React.FC<OwnProps> = ({
       edges: [],
     });
 
-  const addUserInput = () =>
-    userInputs.append({
-      id: uuid(),
-      label: "",
-      data: { ...DEFAULT_USER_INPUT },
-    });
+  const addUserInput = () => userInputs.append(createDefaultUserInput());
 
   const updateUserInput = useDebouncedCallback(
     (
@@ -114,7 +113,7 @@ const ProgrammingForm: React.FC<OwnProps> = ({
         newFileContent,
       }: { newLabel?: string; newFileContent?: string },
     ) => {
-      const oldInput = form.watch("required_user_inputs")[index];
+      const oldInput = userInputs.fields[index];
       const oldFileData = oldInput.data as File;
       userInputs.update(index, {
         ...oldInput,
@@ -126,26 +125,26 @@ const ProgrammingForm: React.FC<OwnProps> = ({
         },
       });
     },
-    DEFAULT_UPDATE_DEBOUNCE,
   );
 
-  const addDependency = () =>
-    form.setValue(
-      "environment.extra_options.requirements",
-      dependencies.concat(""),
-    );
-
-  const deleteDependency = (index: number) => {
-    const updatedDeps = dependencies.filter((_, i) => i !== index);
-    form.setValue("environment.extra_options.requirements", updatedDeps);
+  const addDependency = () => {
+    const _KEY = "environment.extra_options.requirements";
+    form.setValue(_KEY, form.getValues(_KEY).concat(""));
   };
 
-  const addSlurmOption = () =>
-    form.setValue("environment.slurm_options", slurmOptions.concat(""));
+  const deleteDependency = (index: number) => {
+    const _KEY = "environment.extra_options.requirements";
+    form.setValue(_KEY, form.getValues(_KEY).filter((_, i) => i !== index)); // prettier-ignore
+  };
+
+  const addSlurmOption = () => {
+    const _KEY = "environment.slurm_options";
+    form.setValue(_KEY, form.getValues(_KEY).concat(""));
+  };
 
   const deleteSlurmOption = (index: number) => {
-    const updatedOpts = slurmOptions.filter((_, i) => i !== index);
-    form.setValue("environment.slurm_options", updatedOpts);
+    const _KEY = "environment.slurm_options";
+    form.setValue(_KEY, form.getValues(_KEY).filter((_, i) => i !== index)); // prettier-ignore
   };
 
   const updateTestcase = (index: number) => (action: GraphAction) => {
@@ -354,7 +353,7 @@ const ProgrammingForm: React.FC<OwnProps> = ({
               </div>
             </div>
             <div className="flex w-full flex-col gap-4">
-              {form.watch("testcases").map((testcase, index) => (
+              {testcases.fields.map((testcase, index) => (
                 <div className="mt-2" key={testcase.id}>
                   <Testcase
                     index={index}
