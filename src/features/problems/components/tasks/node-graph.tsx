@@ -4,7 +4,7 @@ import { ReactFlowProvider } from "@xyflow/react";
 import { useCallback, useEffect } from "react";
 import { useImmerReducer } from "use-immer";
 
-import { GraphEdgeStr, InputStep } from "@/api";
+import { GraphEdgeStr as GraphEdge, InputStep } from "@/api";
 
 import {
   GraphAction,
@@ -20,7 +20,7 @@ type NodeGraphProps = {
   id: string;
   sharedUserInput?: InputStep;
   steps: Step[];
-  edges: GraphEdgeStr[];
+  edges: GraphEdge[];
   edit: boolean;
   onChange?: (action: GraphAction) => void;
 };
@@ -35,8 +35,8 @@ const NodeGraph: React.FC<NodeGraphProps> = ({
 }) => {
   const [graph, dispatch] = useImmerReducer(graphReducer, {
     id,
-    steps: steps,
-    edges: edges,
+    steps,
+    edges,
     selectedSocketId: null,
     selectedStepId: null,
     edit,

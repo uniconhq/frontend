@@ -12,6 +12,7 @@ import {
 } from "@/features/problems/components/tasks/graph-context";
 import { Step } from "@/features/problems/components/tasks/types";
 import { StepNodeColorMap, StepTypeAliasMap } from "@/lib/colors";
+import { createSocket } from "@/lib/compute-graph";
 import { cn } from "@/lib/utils";
 
 import { NodeSlot, NodeSlotGroup } from "../node-slot";
@@ -36,7 +37,11 @@ export function StepNode({ data }: { data: Step }) {
     (socketDir: SocketDir) => () => {
       dispatch({
         type: GraphActionType.AddSocket,
-        payload: { stepId: data.id, socketDir },
+        payload: {
+          stepId: data.id,
+          socketDir,
+          socket: createSocket("DATA", ""),
+        },
       });
     },
     [data.id, dispatch],

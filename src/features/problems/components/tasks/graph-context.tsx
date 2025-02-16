@@ -1,11 +1,9 @@
 import { createContext, Dispatch } from "react";
 import { ImmerReducer } from "use-immer";
 
-import { GraphEdgeStr as GraphEdge, InputStep, StepType } from "@/api";
-import { createDefaultStep, createSocket } from "@/lib/compute-graph";
+import { GraphEdgeStr as GraphEdge, InputStep, StepSocket } from "@/api";
+import { Step } from "@/features/problems/components/tasks/types";
 import { uuid } from "@/lib/utils";
-
-import { Step } from "./types";
 
 export type GraphState = {
   id: string;
@@ -43,7 +41,7 @@ interface BaseGraphAction {
 
 interface AddStepAction extends BaseGraphAction {
   type: GraphActionType.AddStep;
-  payload: { type: StepType };
+  payload: { step: Step };
 }
 
 interface DeleteStepAction extends BaseGraphAction {
@@ -63,7 +61,7 @@ export enum SocketDir {
 
 interface AddSocketAction extends BaseGraphAction {
   type: GraphActionType.AddSocket;
-  payload: { stepId: string; socketDir: SocketDir };
+  payload: { stepId: string; socketDir: SocketDir; socket: StepSocket };
 }
 
 interface DeleteSocketAction extends BaseGraphAction {
@@ -149,7 +147,7 @@ const updateUserInputStep = (
 };
 
 const addStep = (state: GraphState, { payload }: AddStepAction) => {
-  state.steps.push(createDefaultStep(payload.type));
+  state.steps.push(payload.step);
   return state;
 };
 
@@ -186,9 +184,7 @@ const addSocket = (state: GraphState, { payload }: AddSocketAction) => {
   const step = state.steps.find((node) => node.id === payload.stepId);
   if (!step) return state;
 
-  (payload.socketDir === SocketDir.Input ? step.inputs : step.outputs)?.push(
-    createSocket("DATA", ""),
-  );
+  (payload.socketDir === SocketDir.Input ? step.inputs : step.outputs)?.push(payload.socket); // prettier-ignore
   return state;
 };
 

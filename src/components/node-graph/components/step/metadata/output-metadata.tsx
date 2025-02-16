@@ -16,6 +16,7 @@ import {
   GraphDispatchContext,
   SocketDir,
 } from "@/features/problems/components/tasks/graph-context";
+import { createSocket } from "@/lib/compute-graph";
 
 import OutputTable from "../output-table/output-table";
 import OutputMetadataRow from "./output-metadata-row";
@@ -53,7 +54,7 @@ const OutputMetadata: React.FC<OwnProps> = ({ step }) => {
   const addInputSocket = useCallback(() => {
     dispatch({
       type: GraphActionType.AddSocket,
-      payload: { stepId: step.id, socketDir: SocketDir.Input },
+      payload: { stepId: step.id, socketDir: SocketDir.Input, socket: createSocket("DATA", "") }, // prettier-ignore
     });
   }, [dispatch, step]);
 

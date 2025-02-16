@@ -26,7 +26,7 @@ import {
   useState,
 } from "react";
 
-import { GraphEdgeStr, InputStep } from "@/api";
+import { GraphEdgeStr as GraphEdge, InputStep } from "@/api";
 import { StepNode } from "@/components/node-graph/components/step/step-node";
 import { Button } from "@/components/ui/button";
 import {
@@ -62,7 +62,7 @@ const stepNodeToRfNode = (step: Step): Node<Step> => ({
   type: "step",
 });
 
-const stepEdgeToRfEdge = (edge: GraphEdgeStr): Edge => ({
+const stepEdgeToRfEdge = (edge: GraphEdge): Edge => ({
   id: edge.id,
   source: edge.from_node_id,
   sourceHandle: edge.from_socket_id,
@@ -91,6 +91,10 @@ const GraphEditor: React.FC<GraphEditorProps> = ({ graphId, className }) => {
   const [expanded, setExpanded] = useState(false);
 
   const onInit = (rf: RfInstance) => setRfInstance(rf);
+
+  useEffect(() => {
+    console.log("graphContext", steps);
+  }, [steps, edges]);
 
   // Apply layout algorithm to graph after nodes are initialized by ReactFlow
   useEffect(() => {

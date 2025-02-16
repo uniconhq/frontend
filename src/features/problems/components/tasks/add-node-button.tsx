@@ -8,6 +8,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { createDefaultStep } from "@/lib/compute-graph";
 
 import { GraphActionType, GraphDispatchContext } from "./graph-context";
 
@@ -42,7 +43,7 @@ const AddNodeButton: React.FC = () => {
               onClick={() => {
                 dispatch({
                   type: GraphActionType.AddStep,
-                  payload: { type: stepType as StepType },
+                  payload: { step: createDefaultStep(stepType as StepType) },
                 });
                 setOpen(false);
               }}
