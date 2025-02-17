@@ -292,6 +292,7 @@ export type ProblemBase = {
 };
 
 export type ProblemBaseWithPermissions = ProblemBase & {
+  view: boolean;
   edit: boolean;
   make_submission: boolean;
 };
