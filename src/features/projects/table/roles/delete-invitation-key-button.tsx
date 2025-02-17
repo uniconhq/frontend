@@ -11,20 +11,14 @@ type OwnProps = {
 };
 
 const DeleteInvitationKeyButton: React.FC<OwnProps> = ({ role }) => {
-  const deleteInvitationKeyMutation = useDeleteInvitationKey(
-    role.project_id,
-    role.id,
-  );
+  const deleteInvitationKeyMutation = useDeleteInvitationKey(role.project_id, role.id);
 
   const [dialogOpen, setDialogOpen] = useState(false);
 
   return (
     <>
       {dialogOpen && (
-        <ConfirmationDialog
-          setOpen={setDialogOpen}
-          onConfirm={() => deleteInvitationKeyMutation.mutate()}
-        />
+        <ConfirmationDialog setOpen={setDialogOpen} onConfirm={() => deleteInvitationKeyMutation.mutate()} />
       )}
       <Button variant="destructive" onClick={() => setDialogOpen(true)}>
         delete

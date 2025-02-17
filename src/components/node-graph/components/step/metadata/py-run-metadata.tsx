@@ -18,9 +18,7 @@ const PyRunMetadata: React.FC<OwnProps> = ({ step }) => {
   const { edit } = useContext(GraphContext)!;
   const dispatch = useContext(GraphDispatchContext)!;
 
-  const [functionIdentifier, setFunctionIdentifier] = useState(
-    step.function_identifier,
-  );
+  const [functionIdentifier, setFunctionIdentifier] = useState(step.function_identifier);
 
   const [allowError, setAllowError] = useState(step.allow_error || false);
 
@@ -62,9 +60,7 @@ const PyRunMetadata: React.FC<OwnProps> = ({ step }) => {
   ) : (
     <div className="flex flex-col items-center gap-1">
       <div>{(step as PyRunFunctionStep).function_identifier}(...)</div>
-      <div>
-        allow_error: {JSON.stringify((step as PyRunFunctionStep).allow_error)}
-      </div>
+      <div>allow_error: {JSON.stringify((step as PyRunFunctionStep).allow_error)}</div>
     </div>
   );
 };

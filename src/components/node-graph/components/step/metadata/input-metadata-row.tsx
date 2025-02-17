@@ -37,13 +37,7 @@ const InputMetadataRow: React.FC<OwnProps> = ({
     <TableRow>
       <TableCell>
         {isEditable && (
-          <Button
-            size={"sm"}
-            className="h-fit w-fit px-1 py-1"
-            variant={"secondary"}
-            onClick={onDelete}
-            type="button"
-          >
+          <Button size={"sm"} className="h-fit w-fit px-1 py-1" variant={"secondary"} onClick={onDelete} type="button">
             <Trash className="h-2 w-2" />
           </Button>
         )}
@@ -74,10 +68,7 @@ const InputMetadataRow: React.FC<OwnProps> = ({
         ) : (
           <div className="flex gap-2">
             {isEditable ? (
-              <NodeInput
-                value={JSON.stringify(socket.data)}
-                onChange={onChangeValue}
-              />
+              <NodeInput value={JSON.stringify(socket.data)} onChange={onChangeValue} />
             ) : (
               <span>{JSON.stringify(socket.data)}</span>
             )}

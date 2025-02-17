@@ -5,7 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { getProblemById, useCreateTask } from "@/features/problems/queries";
 import { useProblemId, useProjectId } from "@/features/projects/hooks/use-id";
 import ProgrammingForm from "@/features/tasks/forms/programming-form";
-import { ProgTaskForm, toProgrammingTask } from "@/lib/schema/prog-task-form";
+import { ProgTaskFormT, toProgrammingTask } from "@/lib/schema/prog-task-form";
 
 import { Unauthorized } from "../error";
 
@@ -18,7 +18,7 @@ const CreateProgramming = () => {
   const { data } = useQuery(getProblemById(problemId));
   if (data && !data.edit) throw Unauthorized;
 
-  const onSubmit: SubmitHandler<ProgTaskForm> = async (form) => {
+  const onSubmit: SubmitHandler<ProgTaskFormT> = async (form) => {
     createTaskMutation.mutate(toProgrammingTask(form), {
       onSuccess: () => {
         navigate(`/projects/${projectId}/problems/${problemId}/edit`);

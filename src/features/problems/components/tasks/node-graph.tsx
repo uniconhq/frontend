@@ -6,13 +6,7 @@ import { useImmerReducer } from "use-immer";
 
 import { GraphEdgeStr as GraphEdge, InputStep } from "@/api";
 
-import {
-  GraphAction,
-  GraphActionType,
-  GraphContext,
-  GraphDispatchContext,
-  graphReducer,
-} from "./graph-context";
+import { GraphAction, GraphActionType, GraphContext, GraphDispatchContext, graphReducer } from "./graph-context";
 import GraphEditor from "./graph-editor";
 import { Step } from "./types";
 
@@ -25,14 +19,7 @@ type NodeGraphProps = {
   onChange?: (action: GraphAction) => void;
 };
 
-const NodeGraph: React.FC<NodeGraphProps> = ({
-  id,
-  sharedUserInput,
-  steps,
-  edges,
-  edit,
-  onChange,
-}) => {
+const NodeGraph: React.FC<NodeGraphProps> = ({ id, sharedUserInput, steps, edges, edit, onChange }) => {
   const [graph, dispatch] = useImmerReducer(graphReducer, {
     id,
     steps,

@@ -1,9 +1,4 @@
-import {
-  Handle,
-  HandleType,
-  Position as HandlePosition,
-  useNodeConnections,
-} from "@xyflow/react";
+import { Handle, HandleType, Position as HandlePosition, useNodeConnections } from "@xyflow/react";
 import { Trash } from "lucide-react";
 import { twJoin } from "tailwind-merge";
 
@@ -64,9 +59,7 @@ export function NodeSlot({
         )}
         id={socket.id}
         type={type}
-        position={
-          type === "target" ? HandlePosition.Left : HandlePosition.Right
-        }
+        position={type === "target" ? HandlePosition.Left : HandlePosition.Right}
       />
       {!hideLabel &&
         (edit && socket.type !== "CONTROL" ? (

@@ -3,13 +3,7 @@ import { useCallback, useContext } from "react";
 
 import { InputStep, StepSocket } from "@/api";
 import { Button } from "@/components/ui/button";
-import {
-  Table,
-  TableBody,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Table, TableBody, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   GraphActionType,
   GraphContext,
@@ -42,13 +36,12 @@ const InputMetadata: React.FC<OwnProps> = ({ step }) => {
     [dispatch, step.id],
   );
 
-  const handleEditSocketLabel =
-    (socketId: string) => (newSocketLabel: string) => {
-      dispatch({
-        type: GraphActionType.UpdateSocketLabel,
-        payload: { stepId: step.id, socketId, newSocketLabel },
-      });
-    };
+  const handleEditSocketLabel = (socketId: string) => (newSocketLabel: string) => {
+    dispatch({
+      type: GraphActionType.UpdateSocketLabel,
+      payload: { stepId: step.id, socketId, newSocketLabel },
+    });
+  };
 
   const handleSocketChangeToFile = (socket: StepSocket) => () => {
     dispatch({
@@ -69,7 +62,7 @@ const InputMetadata: React.FC<OwnProps> = ({ step }) => {
   const addOutputSocket = useCallback(() => {
     dispatch({
       type: GraphActionType.AddSocket,
-      payload: { stepId: step.id, socketDir: SocketDir.Output, socket: createSocket("DATA", "") }, // prettier-ignore
+      payload: { stepId: step.id, socketDir: SocketDir.Output, socket: createSocket("DATA", "") },
     });
   }, [dispatch, step.id]);
 

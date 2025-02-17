@@ -9,8 +9,7 @@ export enum UserQueryKeys {
 export const getUserProfile = () => {
   return queryOptions({
     queryKey: [UserQueryKeys.UserProfile],
-    queryFn: () =>
-      getUser({ withCredentials: true }).then((response) => response.data),
+    queryFn: () => getUser({ withCredentials: true }).then((response) => response.data),
     retry: false,
   });
 };

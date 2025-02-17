@@ -5,11 +5,9 @@ import { useNavigate } from "react-router-dom";
 import { MultipleResponseTask } from "@/api";
 import { getProblemById, useCreateTask } from "@/features/problems/queries";
 import { useProblemId, useProjectId } from "@/features/projects/hooks/use-id";
-import MultipleResponseForm, {
-  MultipleResponseFormType,
-} from "@/features/tasks/forms/multiple-response-form";
-
-import { Unauthorized } from "../error";
+import MultipleResponseForm from "@/features/tasks/forms/multiple-response-form";
+import { MultipleResponseFormT } from "@/lib/schema/multi-choice-form";
+import { Unauthorized } from "@/pages/error";
 
 const CreateMultipleResponse = () => {
   const problemId = useProblemId();
@@ -19,11 +17,9 @@ const CreateMultipleResponse = () => {
   const navigate = useNavigate();
 
   const { data } = useQuery(getProblemById(problemId));
-  if (data && !data.edit) {
-    throw Unauthorized;
-  }
+  if (data && !data.edit) throw Unauthorized;
 
-  const onSubmit: SubmitHandler<MultipleResponseFormType> = async (data) => {
+  const onSubmit: SubmitHandler<MultipleResponseFormT> = async (data) => {
     createTaskMutation.mutate(
       {
         ...data,

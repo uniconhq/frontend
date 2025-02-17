@@ -1,11 +1,11 @@
 import { z } from "zod";
 
 import { ProgrammingTask, PythonVersion, Testcase } from "@/api/types.gen";
+import { TaskFormZ } from "@/lib/schema/task-form";
 
 export const DEFAULT_PY_VERSION: PythonVersion = "3.11.9";
 
-const positiveLimitZ = (label: string) =>
-  z.coerce.number().positive(`${label} must be greater than 0!`);
+const positiveLimitZ = (label: string) => z.coerce.number().positive(`${label} must be greater than 0!`);
 
 const FileZ = z.object({
   name: z.string().nonempty("File name cannot be empty!"),
@@ -26,46 +26,39 @@ const SlurmOptionZ = z
     message: "Slurm option cannot contain spaces!",
   });
 
-export const ProgTaskFormZ = z
-  .object({
-    title: z.string().nonempty("Title cannot be empty!"),
-    description: z.string(),
-    environment: z.object({
-      language: z.literal("Python"),
-      extra_options: z.object({
-        version: z.custom<PythonVersion>(() => true),
-        requirements: z
-          .array(z.string().nonempty("Package name cannot be empty!"))
-          .default([]),
-      }),
-      time_limit_secs: positiveLimitZ("Time limit"),
-      memory_limit_mb: positiveLimitZ("Memory limit"),
-      slurm: z.boolean().default(true),
-      slurm_options: z.array(SlurmOptionZ),
+export const ProgTaskFormTZ = TaskFormZ.extend({
+  environment: z.object({
+    language: z.literal("Python"),
+    extra_options: z.object({
+      version: z.custom<PythonVersion>(() => true),
+      requirements: z.array(z.string().nonempty("Package name cannot be empty!")).default([]),
     }),
-    required_user_inputs: z.array(RequiredInputZ),
-    testcases: z.array(z.custom<Testcase>(() => true)),
-  })
-  .superRefine((values, context) => {
-    // If `slurm` is not enabled, `slurm_options` should be empty
-    if (!values.environment.slurm && values.environment.slurm_options.length) {
-      context.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "There should no be Slurm options when Slurm is disabled!",
-        path: ["slurm_options"],
-      });
-    }
-  });
+    time_limit_secs: positiveLimitZ("Time limit"),
+    memory_limit_mb: positiveLimitZ("Memory limit"),
+    slurm: z.boolean().default(true),
+    slurm_options: z.array(SlurmOptionZ),
+  }),
+  required_user_inputs: z.array(RequiredInputZ),
+  testcases: z.array(z.custom<Testcase>(() => true)),
+}).superRefine((values, context) => {
+  // If `slurm` is not enabled, `slurm_options` should be empty
+  if (!values.environment.slurm && values.environment.slurm_options.length) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "There should no be Slurm options when Slurm is disabled!",
+      path: ["slurm_options"],
+    });
+  }
+});
 
-export type ProgTaskForm = z.infer<typeof ProgTaskFormZ>;
+export type ProgTaskFormT = z.infer<typeof ProgTaskFormTZ>;
 
-export const toProgrammingTask = (
-  form: ProgTaskForm,
-): Omit<ProgrammingTask, "order_index"> => ({
+export const toProgrammingTask = (form: ProgTaskFormT): Omit<ProgrammingTask, "order_index"> => ({
   id: -1,
   type: "PROGRAMMING_TASK",
-  question: form.title,
-  autograde: true,
+  title: form.title,
+  description: form.description,
+  autograde: form.autograde,
   environment: {
     ...form.environment,
     language: "PYTHON",
@@ -78,19 +71,15 @@ export const toProgrammingTask = (
   testcases: form.testcases,
 });
 
-export const fromProgrammingTask = (
-  progTask: ProgrammingTask,
-): ProgTaskForm => ({
-  title: progTask.question,
-  description: "",
+export const fromProgrammingTask = (progTask: ProgrammingTask): ProgTaskFormT => ({
+  title: progTask.title,
+  description: progTask.description,
   environment: {
     ...progTask.environment,
     language: "Python",
     extra_options: {
-      version:
-        progTask.environment.extra_options?.version ?? DEFAULT_PY_VERSION,
-      requirements:
-        progTask.environment.extra_options?.requirements?.split("\n") ?? [],
+      version: progTask.environment.extra_options?.version ?? DEFAULT_PY_VERSION,
+      requirements: progTask.environment.extra_options?.requirements?.split("\n") ?? [],
     },
     slurm: progTask.environment.slurm ?? false,
     slurm_options: progTask.environment.slurm_options ?? [],

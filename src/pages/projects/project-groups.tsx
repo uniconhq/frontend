@@ -6,27 +6,15 @@ import EmptyPlaceholder from "@/components/layout/empty-placeholder";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardTitle } from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import AddGroupDialog from "@/features/projects/components/add-group-dialog";
 import { useProjectId } from "@/features/projects/hooks/use-id";
-import {
-  getProjectById,
-  getProjectGroupsById,
-} from "@/features/projects/queries";
+import { getProjectById, getProjectGroupsById } from "@/features/projects/queries";
 
 const ProjectGroups = () => {
   const id = useProjectId();
   const { data: project, isLoading } = useQuery(getProjectById(id));
-  const { data: groups, isLoading: isLoadingGroups } = useQuery(
-    getProjectGroupsById(id),
-  );
+  const { data: groups, isLoading: isLoadingGroups } = useQuery(getProjectGroupsById(id));
   if (isLoading || isLoadingGroups) {
     return <div>Loading...</div>;
   }
@@ -48,9 +36,7 @@ const ProjectGroups = () => {
         )}
       </div>
       <div className="flex flex-col gap-2">
-        {groups.length === 0 && (
-          <EmptyPlaceholder description="No groups found." />
-        )}
+        {groups.length === 0 && <EmptyPlaceholder description="No groups found." />}
         {groups.map((group) => (
           <Card className="p-4">
             <CardTitle className="p-2">
@@ -86,11 +72,7 @@ const ProjectGroups = () => {
                       <TableCell>{index + 1}</TableCell>
                       <TableCell>{member.user.username}</TableCell>
                       <TableCell>
-                        {member.is_supervisor ? (
-                          <Badge variant={"green"}>supervisor</Badge>
-                        ) : (
-                          <Badge>member</Badge>
-                        )}
+                        {member.is_supervisor ? <Badge variant={"green"}>supervisor</Badge> : <Badge>member</Badge>}
                       </TableCell>
                     </TableRow>
                   ))}

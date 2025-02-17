@@ -1,12 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import {
-  ChevronDown,
-  ChevronUp,
-  FileQuestion,
-  Group,
-  ListChecks,
-  User2,
-} from "lucide-react";
+import { ChevronDown, ChevronUp, FileQuestion, Group, ListChecks, User2 } from "lucide-react";
 import { AiFillSecurityScan } from "react-icons/ai";
 import { GoPeople, GoProject, GoProjectSymlink } from "react-icons/go";
 import { Link, useNavigate } from "react-router-dom";
@@ -105,18 +98,11 @@ const AppSidebar: React.FC<OwnProps> = ({ pathname }) => {
 
   const isProjectPath = pathname.match(/\/projects\/\d+.*/)?.length ?? 0 > 0;
   const currentProjectId = isProjectPath ? Number(pathname.split("/")[2]) : -1;
-  const currentProject = projects?.find(
-    (project) => project.id == currentProjectId,
-  );
+  const currentProject = projects?.find((project) => project.id == currentProjectId);
 
-  const isOrganisationPath =
-    pathname.match(/\/organisations\/\d+.*/)?.length ?? 0 > 0;
-  const currentOrganisationId = isOrganisationPath
-    ? Number(pathname.split("/")[2])
-    : -1;
-  const currentOrganisation = organisations?.find(
-    (organisation) => organisation.id == currentOrganisationId,
-  );
+  const isOrganisationPath = pathname.match(/\/organisations\/\d+.*/)?.length ?? 0 > 0;
+  const currentOrganisationId = isOrganisationPath ? Number(pathname.split("/")[2]) : -1;
+  const currentOrganisation = organisations?.find((organisation) => organisation.id == currentOrganisationId);
 
   const signout = async () => {
     await logout({ withCredentials: true });
@@ -157,35 +143,28 @@ const AppSidebar: React.FC<OwnProps> = ({ pathname }) => {
                   <DropdownMenuContent className="w-[--radix-popper-anchor-width]">
                     {projects?.map((project) => (
                       <DropdownMenuItem asChild key={project.id}>
-                        <Link to={`/projects/${project.id}`}>
-                          {project.name}
-                        </Link>
+                        <Link to={`/projects/${project.id}`}>{project.name}</Link>
                       </DropdownMenuItem>
                     ))}
                   </DropdownMenuContent>
                 </DropdownMenu>
               </SidebarMenuItem>
-              {PROJECT_SIDEBAR_ITEMS.map(
-                ({ icon, label, path, permission }) => {
-                  const fullPath = `/projects/${currentProjectId}${path}`;
-                  if (permission && !currentProject[permission]) {
-                    return;
-                  }
-                  return (
-                    <SidebarMenuItem key={path}>
-                      <SidebarMenuButton
-                        asChild
-                        isActive={pathname === fullPath}
-                      >
-                        <Link to={fullPath}>
-                          {icon}
-                          <span>{label}</span>
-                        </Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  );
-                },
-              )}
+              {PROJECT_SIDEBAR_ITEMS.map(({ icon, label, path, permission }) => {
+                const fullPath = `/projects/${currentProjectId}${path}`;
+                if (permission && !currentProject[permission]) {
+                  return;
+                }
+                return (
+                  <SidebarMenuItem key={path}>
+                    <SidebarMenuButton asChild isActive={pathname === fullPath}>
+                      <Link to={fullPath}>
+                        {icon}
+                        <span>{label}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                );
+              })}
             </SidebarMenu>
           </SidebarGroup>
         )}
@@ -204,9 +183,7 @@ const AppSidebar: React.FC<OwnProps> = ({ pathname }) => {
                   <DropdownMenuContent className="w-[--radix-popper-anchor-width]">
                     {organisations?.map((organisation) => (
                       <DropdownMenuItem asChild key={organisation.id}>
-                        <Link to={`/organisations/${organisation.id}`}>
-                          {organisation.name}
-                        </Link>
+                        <Link to={`/organisations/${organisation.id}`}>{organisation.name}</Link>
                       </DropdownMenuItem>
                     ))}
                   </DropdownMenuContent>
@@ -242,10 +219,7 @@ const AppSidebar: React.FC<OwnProps> = ({ pathname }) => {
                   <ChevronUp className="ml-auto" />
                 </SidebarMenuButton>
               </DropdownMenuTrigger>
-              <DropdownMenuContent
-                side="top"
-                className="w-[--radix-popper-anchor-width]"
-              >
+              <DropdownMenuContent side="top" className="w-[--radix-popper-anchor-width]">
                 <DropdownMenuItem onClick={signout} className="cursor-pointer">
                   <span>Sign out</span>
                 </DropdownMenuItem>

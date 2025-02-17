@@ -7,18 +7,8 @@ import { SubmitHandler, useForm } from "react-hook-form";
 import { ProgrammingTask } from "@/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  getTaskAttemptResults,
-  useCreateTaskAttempt,
-  useRerunTaskAttempt,
-} from "@/features/problems/queries";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { getTaskAttemptResults, useCreateTaskAttempt, useRerunTaskAttempt } from "@/features/problems/queries";
 import TaskSection from "@/features/tasks/components/task-section";
 import TaskSectionHeader from "@/features/tasks/components/task-section-header";
 
@@ -26,13 +16,7 @@ import TaskResultCard from "./submission-results/task-result";
 
 const DEFAULT_REFETCH_INTERVAL: number = 5000;
 
-export function ProgrammingSubmitForm({
-  problemId,
-  task,
-}: {
-  problemId: number;
-  task: ProgrammingTask;
-}) {
+export function ProgrammingSubmitForm({ problemId, task }: { problemId: number; task: ProgrammingTask }) {
   const { register, handleSubmit } = useForm();
   const rerunAttemptMutation = useRerunTaskAttempt(problemId);
 
@@ -41,36 +25,27 @@ export function ProgrammingSubmitForm({
     ...getTaskAttemptResults(problemId, task.id),
     refetchInterval: ({ state: { data } }) =>
       // Only refetch if there is a pending task result
-      data?.some((taskAttempt) =>
-        taskAttempt.task_results.some((result) => result.status == "PENDING"),
-      )
+      data?.some((taskAttempt) => taskAttempt.task_results.some((result) => result.status == "PENDING"))
         ? DEFAULT_REFETCH_INTERVAL
         : false,
   });
 
-  const [selectedAttemptIdx, setSelectedAttemptIdx] = useState<number | null>(
-    null,
-  );
-  const [selectedResultIdx, setSelectedResultIdx] = useState<number | null>(
-    null,
-  );
+  const [selectedAttemptIdx, setSelectedAttemptIdx] = useState<number | null>(null);
+  const [selectedResultIdx, setSelectedResultIdx] = useState<number | null>(null);
 
   useEffect(() => {
     if (taskAttemptResults?.length) {
       const lastAttemptIdx = taskAttemptResults.length - 1;
       setSelectedAttemptIdx(lastAttemptIdx);
-      setSelectedResultIdx(
-        taskAttemptResults[lastAttemptIdx]?.task_results.length - 1,
-      );
+      setSelectedResultIdx(taskAttemptResults[lastAttemptIdx]?.task_results.length - 1);
     }
   }, [taskAttemptResults]);
 
   // NOTE: Assume that all required inputs are files
-  const requiredInputs: { id: string; name: string }[] =
-    task.required_inputs.map((input) => ({
-      id: input.id,
-      name: (input.data as unknown as File).name,
-    }));
+  const requiredInputs: { id: string; name: string }[] = task.required_inputs.map((input) => ({
+    id: input.id,
+    name: (input.data as unknown as File).name,
+  }));
 
   const submitForm: SubmitHandler<Record<string, FileList>> = (formData) => {
     Promise.all(
@@ -93,9 +68,7 @@ export function ProgrammingSubmitForm({
   };
 
   const selectedAttempt =
-    taskAttemptResults && selectedAttemptIdx !== null
-      ? taskAttemptResults[selectedAttemptIdx]
-      : undefined;
+    taskAttemptResults && selectedAttemptIdx !== null ? taskAttemptResults[selectedAttemptIdx] : undefined;
 
   return (
     <div className="flex flex-col gap-6">
@@ -103,16 +76,9 @@ export function ProgrammingSubmitForm({
         <TaskSectionHeader content="Submission" />
         <form onSubmit={handleSubmit(submitForm)}>
           {requiredInputs.map(({ id, name }) => (
-            <div
-              key={id}
-              className="mt-2 grid w-full max-w-sm items-center gap-2"
-            >
+            <div key={id} className="mt-2 grid w-full max-w-sm items-center gap-2">
               <Label className="text-md font-mono">{name}</Label>
-              <Input
-                {...register(id.replace(/\./g, "_"), { required: true })}
-                id={id}
-                type="file"
-              />
+              <Input {...register(id.replace(/\./g, "_"), { required: true })} id={id} type="file" />
             </div>
           ))}
           <Button className="mt-6" type="submit">
@@ -128,13 +94,8 @@ export function ProgrammingSubmitForm({
               value={selectedAttemptIdx?.toString() ?? ""}
               onValueChange={(value) => {
                 setSelectedAttemptIdx(+value);
-                if (
-                  taskAttemptResults &&
-                  taskAttemptResults[+value]?.task_results.length > 0
-                ) {
-                  setSelectedResultIdx(
-                    taskAttemptResults[+value]?.task_results.length - 1,
-                  );
+                if (taskAttemptResults && taskAttemptResults[+value]?.task_results.length > 0) {
+                  setSelectedResultIdx(taskAttemptResults[+value]?.task_results.length - 1);
                 }
               }}
               disabled={!taskAttemptResults?.length}
@@ -147,10 +108,7 @@ export function ProgrammingSubmitForm({
                   ?.slice()
                   .reverse()
                   .map((taskAttempt, index) => (
-                    <SelectItem
-                      key={taskAttempt.id}
-                      value={`${taskAttemptResults.length - index - 1}`}
-                    >
+                    <SelectItem key={taskAttempt.id} value={`${taskAttemptResults.length - index - 1}`}>
                       Attempt #{taskAttemptResults.length - index}
                     </SelectItem>
                   ))}
@@ -170,10 +128,7 @@ export function ProgrammingSubmitForm({
                     ?.slice()
                     .reverse()
                     .map((taskResult, index) => (
-                      <SelectItem
-                        key={taskResult.id}
-                        value={`${selectedAttempt.task_results.length - index - 1}`}
-                      >
+                      <SelectItem key={taskResult.id} value={`${selectedAttempt.task_results.length - index - 1}`}>
                         Result #{selectedAttempt.task_results.length - index}
                       </SelectItem>
                     ))}
@@ -181,30 +136,23 @@ export function ProgrammingSubmitForm({
               </Select>
             )}
             {selectedAttempt && (
-              <Button
-                onClick={() => rerunAttemptMutation.mutate(selectedAttempt.id)}
-              >
+              <Button onClick={() => rerunAttemptMutation.mutate(selectedAttempt.id)}>
                 <RefreshCcw />
                 Rerun
               </Button>
             )}
           </div>
-          {selectedAttemptIdx !== null &&
-          taskAttemptResults?.length &&
-          selectedAttempt ? (
+          {selectedAttemptIdx !== null && taskAttemptResults?.length && selectedAttempt ? (
             <TaskResultCard
               title={`Attempt ${selectedAttemptIdx + 1}`}
               taskAttempt={{
                 ...selectedAttempt,
-                task_results: selectedAttempt.task_results.filter(
-                  (_result, index) => index === selectedResultIdx,
-                ),
+                task_results: selectedAttempt.task_results.filter((_result, index) => index === selectedResultIdx),
                 task: {
                   ...task,
                   problem_id: problemId,
                   autograde: task.autograde ?? false,
                   other_fields: { ...task },
-                  updated_version_id: null,
                 },
               }}
             />

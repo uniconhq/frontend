@@ -18,16 +18,10 @@ export function Programming({
   problemId: number;
   task: ProgrammingTask;
 }) {
-  const [selectedTestcaseIdx, setSelectedTestcaseIdx] = useState<number | null>(
-    task.testcases.length ? 0 : null,
-  );
+  const [selectedTestcaseIdx, setSelectedTestcaseIdx] = useState<number | null>(task.testcases.length ? 0 : null);
 
   return (
-    <TaskContainer>
-      <TaskSection>
-        <TaskSectionHeader content="Question" />
-        <span className="text-gray-300">{task.question}</span>
-      </TaskSection>
+    <TaskContainer title={task.title} description={task.description}>
       <TaskSection>
         <TaskSectionHeader content="Environment" />
         <div className="w-fit">
@@ -57,9 +51,7 @@ export function Programming({
                               !!value && (
                                 <TableRow key={key}>
                                   <TableHead>{key}</TableHead>
-                                  <TableCell className="whitespace-pre-line">
-                                    {value}
-                                  </TableCell>
+                                  <TableCell className="whitespace-pre-line">{value}</TableCell>
                                 </TableRow>
                               ),
                           )}

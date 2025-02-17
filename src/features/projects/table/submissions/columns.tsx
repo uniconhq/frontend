@@ -44,9 +44,7 @@ export const columnsWithUser: ColumnDef<SubmissionPublic>[] = [
   {
     header: "Group",
     cell: ({ row }) => {
-      const groups = row.original.user.group_members.map(
-        (group_member) => group_member.group.name,
-      );
+      const groups = row.original.user.group_members.map((group_member) => group_member.group.name);
 
       return groups.join(", ");
     },

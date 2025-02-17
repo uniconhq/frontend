@@ -15,9 +15,7 @@ export const columns: ColumnDef<ProblemOrm>[] = [
       return (
         <div className="flex gap-2">
           <span>{row.original.name}</span>
-          {row.original.restricted && (
-            <Badge variant={"destructive"}>Restricted</Badge>
-          )}
+          {row.original.restricted && <Badge variant={"destructive"}>Restricted</Badge>}
         </div>
       );
     },

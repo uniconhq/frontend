@@ -4,15 +4,10 @@ import { useDebouncedCallback } from "use-debounce";
 import { File } from "@/api";
 
 import FileEditor from "./file-editor";
-import {
-  GraphActionType,
-  GraphContext,
-  GraphDispatchContext,
-} from "./graph-context";
+import { GraphActionType, GraphContext, GraphDispatchContext } from "./graph-context";
 
 const GraphFileEditor = () => {
-  const { selectedStepId, selectedSocketId, edit, steps } =
-    useContext(GraphContext)!;
+  const { selectedStepId, selectedSocketId, edit, steps } = useContext(GraphContext)!;
 
   const dispatch = useContext(GraphDispatchContext)!;
 
@@ -27,17 +22,14 @@ const GraphFileEditor = () => {
     });
   };
 
-  const updateFileName = (newName: string) =>
-    updateFile({ ...file, name: newName });
+  const updateFileName = (newName: string) => updateFile({ ...file, name: newName });
 
   const updateFileContent = useDebouncedCallback((newFileContent: string) => {
     updateFile({ ...file, content: newFileContent });
   }, 1000);
 
   const selectedStep = steps.find((step) => step.id === selectedStepId);
-  const selectedSocket = selectedStep?.outputs?.find(
-    (socket) => socket.id === selectedSocketId,
-  );
+  const selectedSocket = selectedStep?.outputs?.find((socket) => socket.id === selectedSocketId);
   if (!selectedStep || !selectedSocket) return null;
 
   const file = selectedSocket.data as File;

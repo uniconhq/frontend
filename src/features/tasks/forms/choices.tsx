@@ -1,17 +1,12 @@
-import {
-  DragDropContext,
-  Draggable,
-  Droppable,
-  OnDragEndResponder,
-} from "@hello-pangea/dnd";
+import { DragDropContext, Draggable, Droppable, OnDragEndResponder } from "@hello-pangea/dnd";
 import { TrashIcon } from "lucide-react";
 import { UseFieldArrayReturn } from "react-hook-form";
-import { z } from "zod";
 
 import TextField from "@/components/form/fields/text-field";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import { ChoicesT } from "@/lib/schema/multi-choice-form";
 
 export type Choice = {
   id: string; // UUID
@@ -19,49 +14,22 @@ export type Choice = {
   text: string;
 };
 
-export const formWithChoicesSchema = z.object({
-  choices: z
-    .array(
-      z.object({
-        id: z.string().uuid(),
-        text: z.string().min(1, "Choice text cannot be empty"),
-      }),
-    )
-    .nonempty("Choices cannot be empty"),
-});
-
-export type FormWithChoicesType = z.infer<typeof formWithChoicesSchema>;
-
 type OwnProps = {
-  choices: UseFieldArrayReturn<FormWithChoicesType, "choices", "genId">;
+  choices: UseFieldArrayReturn<ChoicesT, "choices", "genId">;
   onDragEnd: OnDragEndResponder<string>;
   onCheck: (index: number) => void;
   isChecked: (index: number) => boolean;
   onDelete: (index: number) => void;
 };
 
-const Choices: React.FC<OwnProps> = ({
-  choices,
-  onDragEnd,
-  isChecked,
-  onCheck,
-  onDelete,
-}) => {
+const Choices: React.FC<OwnProps> = ({ choices, onDragEnd, isChecked, onCheck, onDelete }) => {
   return (
     <DragDropContext onDragEnd={onDragEnd}>
       <Droppable droppableId="choices">
         {(provided) => (
-          <div
-            className="flex w-full flex-col gap-2"
-            ref={provided.innerRef}
-            {...provided.droppableProps}
-          >
+          <div className="flex w-full flex-col gap-2" ref={provided.innerRef} {...provided.droppableProps}>
             {choices.fields.map((choice, index) => (
-              <Draggable
-                draggableId={choice.genId}
-                index={index}
-                key={choice.genId}
-              >
+              <Draggable draggableId={choice.genId} index={index} key={choice.genId}>
                 {(provided) => (
                   <Card
                     className="flex w-full items-start gap-2 p-2"
@@ -79,11 +47,7 @@ const Choices: React.FC<OwnProps> = ({
                     <div className="flex-grow">
                       <TextField name={`choices[${index}].text`} />
                     </div>
-                    <Button
-                      type="button"
-                      variant={"destructive"}
-                      onClick={() => onDelete(index)}
-                    >
+                    <Button type="button" variant={"destructive"} onClick={() => onDelete(index)}>
                       <TrashIcon />
                     </Button>
                   </Card>

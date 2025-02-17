@@ -5,11 +5,7 @@ import TaskSectionHeader from "@/features/tasks/components/task-section-header";
 
 export function MultipleChoice({ task }: { task: MultipleChoiceTask }) {
   return (
-    <TaskContainer>
-      <TaskSection>
-        <TaskSectionHeader content="Question" />
-        <span className="text-gray-300">{task.question}</span>
-      </TaskSection>
+    <TaskContainer title={task.title} description={task.description}>
       <TaskSection>
         <TaskSectionHeader content="Choices" />
         <ul className="list-inside list-disc space-y-2">

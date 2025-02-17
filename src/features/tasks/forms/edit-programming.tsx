@@ -6,11 +6,7 @@ import { ProgrammingTask } from "@/api";
 import { useUpdateTask } from "@/features/problems/queries";
 import { useProjectId } from "@/features/projects/hooks/use-id";
 import ProgrammingForm from "@/features/tasks/forms/programming-form";
-import {
-  fromProgrammingTask,
-  ProgTaskForm,
-  toProgrammingTask,
-} from "@/lib/schema/prog-task-form";
+import { fromProgrammingTask, ProgTaskFormT, toProgrammingTask } from "@/lib/schema/prog-task-form";
 import { isSafeChangeForProgrammingTask } from "@/utils/task";
 
 import RerunDialog from "./rerun-dialog";
@@ -26,10 +22,10 @@ const EditProgramming: React.FC<OwnProps> = ({ task, problemId }) => {
   const updateTaskMutation = useUpdateTask(problemId, task.id);
   const navigate = useNavigate();
   const [openDialog, setOpenDialog] = useState(false);
-  const [form, setForm] = useState<ProgTaskForm | null>(null);
+  const [form, setForm] = useState<ProgTaskFormT | null>(null);
   const [isSafe, setIsSafe] = useState<boolean>(false);
 
-  const updateTask = (form: ProgTaskForm) => (rerun: boolean) => {
+  const updateTask = (form: ProgTaskFormT) => (rerun: boolean) => {
     updateTaskMutation.mutate(
       {
         task: { ...task, ...toProgrammingTask(form) },
@@ -43,7 +39,7 @@ const EditProgramming: React.FC<OwnProps> = ({ task, problemId }) => {
     );
   };
 
-  const onSubmit: SubmitHandler<ProgTaskForm> = async (form: ProgTaskForm) => {
+  const onSubmit: SubmitHandler<ProgTaskFormT> = async (form: ProgTaskFormT) => {
     setOpenDialog(true);
     setForm(form);
     setIsSafe(isSafeChangeForProgrammingTask(task, toProgrammingTask(form)));
@@ -59,11 +55,7 @@ const EditProgramming: React.FC<OwnProps> = ({ task, problemId }) => {
           onSaveWithRerun={() => updateTask(form)(true)}
         />
       )}
-      <ProgrammingForm
-        title="Edit programming task"
-        onSubmit={onSubmit}
-        initialValue={fromProgrammingTask(task)}
-      />
+      <ProgrammingForm title="Edit programming task" onSubmit={onSubmit} initialValue={fromProgrammingTask(task)} />
     </>
   );
 };

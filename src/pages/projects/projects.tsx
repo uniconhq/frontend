@@ -29,23 +29,14 @@ const Projects = () => {
         </Button>
       </div>
       <div className="flex flex-col gap-4">
-        {joinDialogOpen && (
-          <JoinProjectDialog
-            open={joinDialogOpen}
-            onOpenChange={setJoinDialogOpen}
-          />
-        )}
+        {joinDialogOpen && <JoinProjectDialog open={joinDialogOpen} onOpenChange={setJoinDialogOpen} />}
         {!isLoading &&
           projects?.map((project) => (
             <Link to={`/projects/${project.id}`} key={project.id}>
               <Card className="group flex items-center justify-between p-4 hover:opacity-80">
                 <div>
                   <CardTitle className="text-xl">{project.name}</CardTitle>
-                  {project.roles[0] && (
-                    <Badge className="mt-2 bg-gray-400">
-                      {project.roles[0].name}
-                    </Badge>
-                  )}
+                  {project.roles[0] && <Badge className="mt-2 bg-gray-400">{project.roles[0].name}</Badge>}
                 </div>
 
                 <ArrowRight className="hidden h-4 w-4 group-hover:block" />
@@ -54,10 +45,7 @@ const Projects = () => {
           ))}
         {!isLoading && !projects?.length && (
           <EmptyPlaceholder description="No projects found.">
-            <span
-              className="cursor-pointer text-purple-400 hover:opacity-80"
-              onClick={() => setJoinDialogOpen(true)}
-            >
+            <span className="cursor-pointer text-purple-400 hover:opacity-80" onClick={() => setJoinDialogOpen(true)}>
               Join a project with an invitation key.
             </span>
           </EmptyPlaceholder>

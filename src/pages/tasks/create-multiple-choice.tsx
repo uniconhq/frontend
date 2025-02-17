@@ -5,11 +5,9 @@ import { useNavigate } from "react-router-dom";
 import { MultipleChoiceTask } from "@/api";
 import { getProblemById, useCreateTask } from "@/features/problems/queries";
 import { useProblemId, useProjectId } from "@/features/projects/hooks/use-id";
-
-import MultipleChoiceForm, {
-  MultipleChoiceFormType,
-} from "../../features/tasks/forms/multiple-choice-form";
-import { Unauthorized } from "../error";
+import MultipleChoiceForm from "@/features/tasks/forms/multiple-choice-form";
+import { MultipleChoiceFormT } from "@/lib/schema/multi-choice-form";
+import { Unauthorized } from "@/pages/error";
 
 const CreateMultipleChoice = () => {
   const problemId = useProblemId();
@@ -23,7 +21,7 @@ const CreateMultipleChoice = () => {
     throw Unauthorized;
   }
 
-  const onSubmit: SubmitHandler<MultipleChoiceFormType> = async (data) => {
+  const onSubmit: SubmitHandler<MultipleChoiceFormT> = async (data) => {
     createTaskMutation.mutate(
       {
         ...data,
@@ -42,9 +40,7 @@ const CreateMultipleChoice = () => {
     );
   };
 
-  return (
-    <MultipleChoiceForm onSubmit={onSubmit} title="New multiple choice task" />
-  );
+  return <MultipleChoiceForm onSubmit={onSubmit} title="New multiple choice task" />;
 };
 
 export default CreateMultipleChoice;

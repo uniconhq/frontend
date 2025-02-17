@@ -1,9 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@radix-ui/react-collapsible";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@radix-ui/react-collapsible";
 import { useQuery } from "@tanstack/react-query";
 import { produce } from "immer";
 import { PlusIcon, Trash } from "lucide-react";
@@ -11,28 +7,16 @@ import { useEffect } from "react";
 import { SubmitHandler, useFieldArray, useForm } from "react-hook-form";
 
 import { File, InputStep } from "@/api";
-import {
-  NumberField,
-  SelectField,
-  TextAreaField,
-  TextField,
-} from "@/components/form/fields";
+import { NumberField, SelectField, TextAreaField, TextField } from "@/components/form/fields";
 import FormSection from "@/components/form/form-section";
 import NodeInput from "@/components/node-graph/components/step/node-input";
 import { Button } from "@/components/ui/button";
 import { Form, FormLabel } from "@/components/ui/form";
 import FileEditor from "@/features/problems/components/tasks/file-editor";
-import {
-  GraphAction,
-  graphReducer,
-} from "@/features/problems/components/tasks/graph-context";
+import { GraphAction, graphReducer } from "@/features/problems/components/tasks/graph-context";
 import Testcase from "@/features/problems/components/tasks/testcase";
 import { getSupportedPythonVersions } from "@/features/problems/queries";
-import {
-  DEFAULT_PY_VERSION,
-  ProgTaskForm,
-  ProgTaskFormZ,
-} from "@/lib/schema/prog-task-form";
+import { DEFAULT_PY_VERSION, ProgTaskFormT, ProgTaskFormTZ } from "@/lib/schema/prog-task-form";
 import { uuid } from "@/lib/utils";
 
 const createDefaultUserInput = () => ({
@@ -45,9 +29,8 @@ const createDefaultUserInput = () => ({
   },
 });
 
-const DEFAULT_FORM_VALUES: ProgTaskForm = {
+const DEFAULT_FORM_VALUES: ProgTaskFormT = {
   title: "",
-  description: "",
   environment: {
     language: "Python",
     extra_options: {
@@ -75,22 +58,22 @@ const _REACT_FORM_ID_KEY = "_id";
 
 type OwnProps = {
   title: string;
-  initialValue?: ProgTaskForm;
-  onSubmit: SubmitHandler<ProgTaskForm>;
+  initialValue?: ProgTaskFormT;
+  onSubmit: SubmitHandler<ProgTaskFormT>;
 };
 
-const ProgrammingForm: React.FC<OwnProps> = ({
-  title,
-  initialValue,
-  onSubmit,
-}) => {
-  const form = useForm<ProgTaskForm>({
-    resolver: zodResolver(ProgTaskFormZ),
+const ProgrammingForm: React.FC<OwnProps> = ({ title, initialValue, onSubmit }) => {
+  const form = useForm<ProgTaskFormT>({
+    resolver: zodResolver(ProgTaskFormTZ),
     defaultValues: initialValue ?? DEFAULT_FORM_VALUES,
   });
 
-  const userInputs = useFieldArray({ control: form.control, name: "required_user_inputs", keyName: _REACT_FORM_ID_KEY }); // prettier-ignore
-  const testcases = useFieldArray({ control: form.control, name: "testcases", keyName: _REACT_FORM_ID_KEY }); // prettier-ignore
+  const userInputs = useFieldArray({
+    control: form.control,
+    name: "required_user_inputs",
+    keyName: _REACT_FORM_ID_KEY,
+  });
+  const testcases = useFieldArray({ control: form.control, name: "testcases", keyName: _REACT_FORM_ID_KEY });
 
   const dependencies = form.watch("environment.extra_options.requirements");
   const slurmOptions = form.watch("environment.slurm_options");
@@ -103,16 +86,14 @@ const ProgrammingForm: React.FC<OwnProps> = ({
     outputs: form.watch("required_user_inputs"),
   };
 
-  const addTestcase = () => testcases.append({ id: uuid(), order_index: testcases.fields.length, nodes: [sharedUserInputStep], edges: [] }); // prettier-ignore
+  const addTestcase = () =>
+    testcases.append({ id: uuid(), order_index: testcases.fields.length, nodes: [sharedUserInputStep], edges: [] });
 
   const addUserInput = () => userInputs.append(createDefaultUserInput());
 
   const updateUserInput = (
     index: number,
-    {
-      newLabel,
-      newFileContent,
-    }: { newLabel?: string; newFileContent?: string },
+    { newLabel, newFileContent }: { newLabel?: string; newFileContent?: string },
   ) => {
     const oldInput = userInputs.fields[index];
     const oldFileData = oldInput.data as File;
@@ -134,7 +115,10 @@ const ProgrammingForm: React.FC<OwnProps> = ({
 
   const deleteDependency = (index: number) => {
     const _KEY = "environment.extra_options.requirements";
-    form.setValue(_KEY, form.getValues(_KEY).filter((_, i) => i !== index)); // prettier-ignore
+    form.setValue(
+      _KEY,
+      form.getValues(_KEY).filter((_, i) => i !== index),
+    );
   };
 
   const addSlurmOption = () => {
@@ -144,7 +128,10 @@ const ProgrammingForm: React.FC<OwnProps> = ({
 
   const deleteSlurmOption = (index: number) => {
     const _KEY = "environment.slurm_options";
-    form.setValue(_KEY, form.getValues(_KEY).filter((_, i) => i !== index)); // prettier-ignore
+    form.setValue(
+      _KEY,
+      form.getValues(_KEY).filter((_, i) => i !== index),
+    );
   };
 
   // Update all testcases with the updated shared user input step
@@ -153,12 +140,7 @@ const ProgrammingForm: React.FC<OwnProps> = ({
       const testcase = testcases.fields[i];
       testcases.update(i, {
         ...testcase,
-        nodes: [
-          sharedUserInputStep,
-          ...testcase.nodes.filter(
-            (node) => node.id !== sharedUserInputStep.id,
-          ),
-        ],
+        nodes: [sharedUserInputStep, ...testcase.nodes.filter((node) => node.id !== sharedUserInputStep.id)],
       });
     }
   }, [sharedUserInputStep]);
@@ -191,10 +173,7 @@ const ProgrammingForm: React.FC<OwnProps> = ({
         <h1 className="text-2xl font-semibold">{title}</h1>
       </div>
       <Form {...form}>
-        <form
-          onSubmit={form.handleSubmit(onSubmit)}
-          className="flex flex-col gap-8"
-        >
+        <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-8">
           <FormSection title="Title">
             <TextField name="title" className="w-1/3" />
           </FormSection>
@@ -220,16 +199,8 @@ const ProgrammingForm: React.FC<OwnProps> = ({
                 }))}
               />
               {/* Time and memory limits */}
-              <NumberField
-                label="Time limit (secs)"
-                name="environment.time_limit_secs"
-                className="w-fit"
-              />
-              <NumberField
-                label="Memory limit (MB)"
-                name="environment.memory_limit_mb"
-                className="w-fit"
-              />
+              <NumberField label="Time limit (secs)" name="environment.time_limit_secs" className="w-fit" />
+              <NumberField label="Memory limit (MB)" name="environment.memory_limit_mb" className="w-fit" />
             </div>
             {/* Dependencies */}
             <div className="flex flex-col gap-4">
@@ -237,12 +208,7 @@ const ProgrammingForm: React.FC<OwnProps> = ({
                 <FormLabel>
                   <div className="flex items-center gap-2">
                     Dependencies
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      size="sm"
-                      onClick={addDependency}
-                    >
+                    <Button type="button" variant="secondary" size="sm" onClick={addDependency}>
                       <PlusIcon />
                     </Button>
                   </div>
@@ -251,14 +217,8 @@ const ProgrammingForm: React.FC<OwnProps> = ({
               <div className="flex flex-wrap gap-4">
                 {dependencies.map((_, index) => (
                   <div key={index} className="flex items-center gap-4">
-                    <TextField
-                      name={`environment.extra_options.requirements.${index}`}
-                    />
-                    <Button
-                      type="button"
-                      variant="destructive"
-                      onClick={() => deleteDependency(index)}
-                    >
+                    <TextField name={`environment.extra_options.requirements.${index}`} />
+                    <Button type="button" variant="destructive" onClick={() => deleteDependency(index)}>
                       <Trash />
                     </Button>
                   </div>
@@ -271,12 +231,7 @@ const ProgrammingForm: React.FC<OwnProps> = ({
                 <FormLabel>
                   <div className="flex items-center gap-2">
                     Slurm options
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      size="sm"
-                      onClick={addSlurmOption}
-                    >
+                    <Button type="button" variant="secondary" size="sm" onClick={addSlurmOption}>
                       <PlusIcon />
                     </Button>
                   </div>
@@ -286,11 +241,7 @@ const ProgrammingForm: React.FC<OwnProps> = ({
                 {slurmOptions.map((_, index) => (
                   <div key={index} className="flex items-center gap-4">
                     <TextField name={`environment.slurm_options.${index}`} />
-                    <Button
-                      type="button"
-                      variant="destructive"
-                      onClick={() => deleteSlurmOption(index)}
-                    >
+                    <Button type="button" variant="destructive" onClick={() => deleteSlurmOption(index)}>
                       <Trash />
                     </Button>
                   </div>
@@ -299,9 +250,7 @@ const ProgrammingForm: React.FC<OwnProps> = ({
               {slurmOptions.filter((opt) => opt.length).length > 0 && (
                 <span className="text-gray-500">
                   Preview of <code>srun</code> command used to execute programs:{" "}
-                  <code className="rounded-md border px-2 py-1 font-mono">
-                    {`srun ${slurmOptions.join(" ")}`}
-                  </code>
+                  <code className="rounded-md border px-2 py-1 font-mono">{`srun ${slurmOptions.join(" ")}`}</code>
                 </span>
               )}
             </div>
@@ -319,24 +268,14 @@ const ProgrammingForm: React.FC<OwnProps> = ({
                     <NodeInput
                       className={["min-w-[160px]", "py-2"]}
                       value={input.label}
-                      onChange={(newLabel) =>
-                        updateUserInput(index, { newLabel })
-                      }
+                      onChange={(newLabel) => updateUserInput(index, { newLabel })}
                     />
                     <CollapsibleTrigger asChild>
-                      <Button
-                        variant={"secondary"}
-                        type="button"
-                        className="text-xs"
-                      >
+                      <Button variant={"secondary"} type="button" className="text-xs">
                         View/Edit
                       </Button>
                     </CollapsibleTrigger>
-                    <Button
-                      type="button"
-                      variant={"destructive"}
-                      onClick={() => userInputs.remove(index)}
-                    >
+                    <Button type="button" variant={"destructive"} onClick={() => userInputs.remove(index)}>
                       <Trash />
                     </Button>
                   </div>
@@ -345,9 +284,7 @@ const ProgrammingForm: React.FC<OwnProps> = ({
                       <FileEditor
                         fileName={input.label}
                         fileContent={(input.data as File).content}
-                        onUpdateFileContent={(newFileContent: string) =>
-                          updateUserInput(index, { newFileContent })
-                        }
+                        onUpdateFileContent={(newFileContent: string) => updateUserInput(index, { newFileContent })}
                         editableContent={true}
                         editableName={false}
                       />
@@ -384,9 +321,7 @@ const ProgrammingForm: React.FC<OwnProps> = ({
             </div>
           </div>
           <div>
-            <Button className="mt-5 bg-purple-600 text-white hover:bg-purple-600 hover:bg-opacity-80">
-              Submit
-            </Button>
+            <Button className="mt-5 bg-purple-600 text-white hover:bg-purple-600 hover:bg-opacity-80">Submit</Button>
           </div>
         </form>
       </Form>

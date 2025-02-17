@@ -16,15 +16,8 @@ type OwnProps = {
   onSaveWithoutRerun: () => void;
   isSafe: boolean;
 };
-const RerunDialog: React.FC<OwnProps> = ({
-  isSafe,
-  onClose,
-  onSaveWithRerun,
-  onSaveWithoutRerun,
-}) => {
-  const title = isSafe
-    ? "Rerun past attempts?"
-    : "Changes may break previous attempts.";
+const RerunDialog: React.FC<OwnProps> = ({ isSafe, onClose, onSaveWithRerun, onSaveWithoutRerun }) => {
+  const title = isSafe ? "Rerun past attempts?" : "Changes may break previous attempts.";
   const description = isSafe
     ? "If you do not rerun, users will need to manually rerun their own submissions."
     : "Rerunning could cause inconsistencies in previous attempts' result displays.";
@@ -44,9 +37,7 @@ const RerunDialog: React.FC<OwnProps> = ({
                 <Button variant={"destructive"} onClick={onSaveWithoutRerun}>
                   Save only
                 </Button>
-                <AlertDialogAction onClick={onSaveWithRerun}>
-                  Save and rerun
-                </AlertDialogAction>
+                <AlertDialogAction onClick={onSaveWithRerun}>Save and rerun</AlertDialogAction>
               </>
             )}
             {!isSafe && (
@@ -54,9 +45,7 @@ const RerunDialog: React.FC<OwnProps> = ({
                 <Button variant={"destructive"} onClick={onSaveWithRerun}>
                   Save and rerun
                 </Button>
-                <AlertDialogAction onClick={onSaveWithoutRerun}>
-                  Save only
-                </AlertDialogAction>
+                <AlertDialogAction onClick={onSaveWithoutRerun}>Save only</AlertDialogAction>
               </>
             )}
           </div>

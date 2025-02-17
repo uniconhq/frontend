@@ -1,13 +1,6 @@
 import { useFormContext } from "react-hook-form";
 
-import {
-  FormControl,
-  FormDescription,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
+import { FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 
 interface TextFieldProps {
@@ -18,13 +11,7 @@ interface TextFieldProps {
   className?: string;
 }
 
-function TextField({
-  name,
-  label,
-  placeholder,
-  description,
-  className,
-}: TextFieldProps) {
+function TextField({ name, label, placeholder, description, className }: TextFieldProps) {
   const { control } = useFormContext();
   return (
     <FormField

@@ -1,20 +1,7 @@
 import { useFormContext } from "react-hook-form";
 
-import {
-  FormControl,
-  FormDescription,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 type Option = {
   label: string;
@@ -30,14 +17,7 @@ interface SelectFieldProps {
   disabled?: boolean;
 }
 
-function SelectField({
-  name,
-  label,
-  placeholder,
-  description,
-  options,
-  disabled = false,
-}: SelectFieldProps) {
+function SelectField({ name, label, placeholder, description, options, disabled = false }: SelectFieldProps) {
   const { control } = useFormContext();
   return (
     <FormField
@@ -47,20 +27,13 @@ function SelectField({
         <FormItem>
           {label && <FormLabel className="!text-current">{label}</FormLabel>}
           <FormControl>
-            <Select
-              onValueChange={field.onChange}
-              defaultValue={field.value}
-              disabled={disabled}
-            >
+            <Select onValueChange={field.onChange} defaultValue={field.value} disabled={disabled}>
               <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder={placeholder} />
               </SelectTrigger>
               <SelectContent>
                 {options.map((option) => (
-                  <SelectItem
-                    key={`option-${option.value}-${option.label}`}
-                    value={option.value}
-                  >
+                  <SelectItem key={`option-${option.value}-${option.label}`} value={option.value}>
                     {option.label}
                   </SelectItem>
                 ))}

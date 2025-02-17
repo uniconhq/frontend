@@ -17,32 +17,17 @@ import {
   useNodesState,
 } from "@xyflow/react";
 import { ExpandIcon, ShrinkIcon } from "lucide-react";
-import {
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 
 import { GraphEdgeStr as GraphEdge, InputStep } from "@/api";
 import { StepNode } from "@/components/node-graph/components/step/step-node";
 import { Button } from "@/components/ui/button";
-import {
-  ResizableHandle,
-  ResizablePanel,
-  ResizablePanelGroup,
-} from "@/components/ui/resizable";
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { cn } from "@/lib/utils";
 import getLayoutedElements from "@/utils/graph";
 
 import AddNodeButton from "./add-node-button";
-import {
-  GraphActionType,
-  GraphContext,
-  GraphDispatchContext,
-} from "./graph-context";
+import { GraphActionType, GraphContext, GraphDispatchContext } from "./graph-context";
 import GraphFileEditor from "./graph-file-editor";
 import { Step } from "./types";
 
@@ -95,7 +80,7 @@ const GraphEditor: React.FC<GraphEditorProps> = ({ graphId, className }) => {
   // Apply layout algorithm to graph after nodes are initialized by ReactFlow
   useEffect(() => {
     if (flowNodesInitialized && !layoutApplied) {
-      const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(flowNodes, flowEdges); // prettier-ignore
+      const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(flowNodes, flowEdges);
       setFlowNodes([...layoutedNodes]);
       setFlowEdges([...layoutedEdges]);
       setLayoutApplied(true);
@@ -133,10 +118,10 @@ const GraphEditor: React.FC<GraphEditorProps> = ({ graphId, className }) => {
         return data.type === "INPUT_STEP" && (data as InputStep).is_user;
       });
       // Preserve user `InputStep` nodes
-      const nonUserNodes = nodes.filter((node) => userNodes.indexOf(node) === -1); // prettier-ignore
+      const nonUserNodes = nodes.filter((node) => userNodes.indexOf(node) === -1);
       // Preserve outgoing edges of user `InputStep` edges if user `InputStep` nodes are deleted
       // This is to retain expected behavior where edges are preserved when we prevent deletion of user `InputStep` nodes
-      const nonUserEdges = edges.filter((edge) => userNodes.find((node) => node.id === edge.source) === undefined) // prettier-ignore
+      const nonUserEdges = edges.filter((edge) => userNodes.find((node) => node.id === edge.source) === undefined);
 
       return { nodes: nonUserNodes, edges: nonUserEdges };
     },
@@ -147,7 +132,7 @@ const GraphEditor: React.FC<GraphEditorProps> = ({ graphId, className }) => {
 
   const onNodesDelete = useCallback(
     (nodes: Node<Step>[]) => {
-      if (edit) nodes.forEach(({ id }) => dispatch({ type: GraphActionType.DeleteStep, payload: { id } })); // prettier-ignore
+      if (edit) nodes.forEach(({ id }) => dispatch({ type: GraphActionType.DeleteStep, payload: { id } }));
     },
     [dispatch, edit],
   );
@@ -156,7 +141,7 @@ const GraphEditor: React.FC<GraphEditorProps> = ({ graphId, className }) => {
 
   const onEdgesDelete = useCallback(
     (edges: Edge[]) => {
-      if (edit) edges.forEach(({ id }) => dispatch({ type: GraphActionType.DeleteEdge, payload: { id } })); // prettier-ignore
+      if (edit) edges.forEach(({ id }) => dispatch({ type: GraphActionType.DeleteEdge, payload: { id } }));
     },
     [dispatch, edit],
   );
@@ -181,13 +166,12 @@ const GraphEditor: React.FC<GraphEditorProps> = ({ graphId, className }) => {
 
   const edgeReconnectSuccessful = useRef(true);
 
-  const onReconnectStart = useCallback(() => { edgeReconnectSuccessful.current = false;}, []); // prettier-ignore
+  const onReconnectStart = useCallback(() => {
+    edgeReconnectSuccessful.current = false;
+  }, []);
 
   const onReconnect = useCallback(
-    (
-      { id }: Edge,
-      { source, sourceHandle, target, targetHandle }: Connection,
-    ) => {
+    ({ id }: Edge, { source, sourceHandle, target, targetHandle }: Connection) => {
       dispatch({ type: GraphActionType.DeleteEdge, payload: { id } });
       dispatch({
         type: GraphActionType.AddEdge,
@@ -206,7 +190,7 @@ const GraphEditor: React.FC<GraphEditorProps> = ({ graphId, className }) => {
   const onReconnectEnd = useCallback(
     (_: unknown, edge: Edge) => {
       if (!edgeReconnectSuccessful.current) {
-        dispatch({ type: GraphActionType.DeleteEdge, payload: { id: edge.id }}); // prettier-ignore
+        dispatch({ type: GraphActionType.DeleteEdge, payload: { id: edge.id } });
       }
       edgeReconnectSuccessful.current = true;
     },
@@ -252,18 +236,9 @@ const GraphEditor: React.FC<GraphEditorProps> = ({ graphId, className }) => {
             proOptions={{ hideAttribution: true }}
           >
             {/* Custom controls */}
-            <div
-              className={cn(
-                "absolute right-1 top-1 z-10 mt-4 flex space-x-1 px-2",
-                { "z-30": expanded },
-              )}
-            >
+            <div className={cn("absolute right-1 top-1 z-10 mt-4 flex space-x-1 px-2", { "z-30": expanded })}>
               {edit && <AddNodeButton />}
-              <Button
-                onClick={() => setExpanded((prev) => !prev)}
-                type="button"
-                variant="outline"
-              >
+              <Button onClick={() => setExpanded((prev) => !prev)} type="button" variant="outline">
                 {expanded ? <ShrinkIcon /> : <ExpandIcon />}
               </Button>
             </div>

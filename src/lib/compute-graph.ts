@@ -20,11 +20,7 @@ export const createSocket = (
   data: string | number | boolean | File | null = null,
 ) => ({ id: uuid(), type, label, data });
 
-const createBaseStep = (
-  type: StepType,
-  inputs: StepSocket[],
-  outputs: StepSocket[],
-) => ({
+const createBaseStep = (type: StepType, inputs: StepSocket[], outputs: StepSocket[]) => ({
   id: uuid(),
   type,
   inputs: [createSocket("CONTROL"), ...inputs],
@@ -48,11 +44,7 @@ export const createDefaultStep = (type: StepType) => {
       } as PyRunFunctionStep;
     case "OBJECT_ACCESS_STEP":
       return {
-        ...createBaseStep(
-          type,
-          [createSocket("DATA", "Object")],
-          [createSocket("DATA", "Value")],
-        ),
+        ...createBaseStep(type, [createSocket("DATA", "Object")], [createSocket("DATA", "Value")]),
         key: "",
       } as ObjectAccessStep;
     case "STRING_MATCH_STEP":

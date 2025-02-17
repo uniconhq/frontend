@@ -3,11 +3,7 @@ import React, { useContext, useState } from "react";
 
 import { StepType } from "@/api";
 import { Button } from "@/components/ui/button";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { createDefaultStep } from "@/lib/compute-graph";
 
 import { GraphActionType, GraphDispatchContext } from "./graph-context";

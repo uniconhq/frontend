@@ -33,13 +33,12 @@ export function StepNode({ data }: { data: Step }) {
   // Reference: https://reactflow.dev/learn/troubleshooting#008
   useEffect(() => updateNodeInternals(data.id), [data]);
 
-  const handleEditSocketLabel =
-    (socketId: string) => (newSocketLabel: string) => {
-      dispatch({
-        type: GraphActionType.UpdateSocketLabel,
-        payload: { stepId: data.id, socketId, newSocketLabel },
-      });
-    };
+  const handleEditSocketLabel = (socketId: string) => (newSocketLabel: string) => {
+    dispatch({
+      type: GraphActionType.UpdateSocketLabel,
+      payload: { stepId: data.id, socketId, newSocketLabel },
+    });
+  };
 
   const addSocket = useCallback(
     (socketDir: SocketDir) => () => {
@@ -63,14 +62,11 @@ export function StepNode({ data }: { data: Step }) {
   };
 
   const deleteStep = useCallback(
-    () =>
-      dispatch({ type: GraphActionType.DeleteStep, payload: { id: data.id } }),
+    () => dispatch({ type: GraphActionType.DeleteStep, payload: { id: data.id } }),
     [data.id, dispatch],
   );
 
-  const handlesInStepMetadata = ["OUTPUT_STEP", "INPUT_STEP"].includes(
-    data.type,
-  );
+  const handlesInStepMetadata = ["OUTPUT_STEP", "INPUT_STEP"].includes(data.type);
 
   return (
     <div
@@ -81,10 +77,7 @@ export function StepNode({ data }: { data: Step }) {
       {/* Node header */}
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-1 rounded-t py-2 pl-1 pr-4 font-medium uppercase">
-          <GoDotFill
-            style={{ color: `${StepNodeColorMap[data.type]}` }}
-            className="h-5 w-5"
-          />
+          <GoDotFill style={{ color: `${StepNodeColorMap[data.type]}` }} className="h-5 w-5" />
           {StepTypeAliasMap[data.type]}
         </div>
         {showEditElements && (

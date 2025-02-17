@@ -130,13 +130,8 @@ export type GraphAction =
   | DeselectSocketAction
   | UpdateUserInputStepAction;
 
-const updateUserInputStep = (
-  state: GraphState,
-  { payload }: UpdateUserInputStepAction,
-) => {
-  const inputSteps = state.steps.filter(
-    (node) => node.type === "INPUT_STEP",
-  ) as InputStep[];
+const updateUserInputStep = (state: GraphState, { payload }: UpdateUserInputStepAction) => {
+  const inputSteps = state.steps.filter((node) => node.type === "INPUT_STEP") as InputStep[];
   const userInputStepIdx = inputSteps.findIndex((node) => node.is_user);
   if (userInputStepIdx !== -1) {
     Object.assign(state.steps[userInputStepIdx], {
@@ -153,10 +148,7 @@ const addStep = (state: GraphState, { payload }: AddStepAction) => {
 
 const deleteStep = (state: GraphState, { payload }: DeleteStepAction) => {
   state.steps = state.steps.filter((node) => node.id !== payload.id);
-  state.edges = state.edges.filter(
-    (edge) =>
-      edge.from_node_id !== payload.id && edge.to_node_id !== payload.id,
-  );
+  state.edges = state.edges.filter((edge) => edge.from_node_id !== payload.id && edge.to_node_id !== payload.id);
 
   if (state.selectedStepId === payload.id) {
     state.selectedStepId = null;
@@ -166,10 +158,7 @@ const deleteStep = (state: GraphState, { payload }: DeleteStepAction) => {
   return state;
 };
 
-const updateStepMetadata = (
-  state: GraphState,
-  { payload }: UpdateStepMetadataAction,
-) => {
+const updateStepMetadata = (state: GraphState, { payload }: UpdateStepMetadataAction) => {
   const stepIndex = state.steps.findIndex((node) => node.id === payload.id);
   state.steps[stepIndex] = {
     ...state.steps[stepIndex],
@@ -184,7 +173,7 @@ const addSocket = (state: GraphState, { payload }: AddSocketAction) => {
   const step = state.steps.find((node) => node.id === payload.stepId);
   if (!step) return state;
 
-  (payload.socketDir === SocketDir.Input ? step.inputs : step.outputs)?.push(payload.socket); // prettier-ignore
+  (payload.socketDir === SocketDir.Input ? step.inputs : step.outputs)?.push(payload.socket);
   return state;
 };
 
@@ -193,7 +182,7 @@ const deleteSocket = (state: GraphState, { payload }: DeleteSocketAction) => {
   if (!step) return state;
 
   step.inputs = step.inputs?.filter((socket) => socket.id !== payload.socketId);
-  step.outputs = step.outputs?.filter((socket) => socket.id !== payload.socketId); // prettier-ignore
+  step.outputs = step.outputs?.filter((socket) => socket.id !== payload.socketId);
 
   state.edges = state.edges.filter(
     (edge) =>
@@ -203,18 +192,13 @@ const deleteSocket = (state: GraphState, { payload }: DeleteSocketAction) => {
       ),
   );
 
-  state.selectedStepId =
-    state.selectedStepId === payload.stepId ? null : state.selectedStepId;
-  state.selectedSocketId =
-    state.selectedSocketId === payload.socketId ? null : state.selectedSocketId;
+  state.selectedStepId = state.selectedStepId === payload.stepId ? null : state.selectedStepId;
+  state.selectedSocketId = state.selectedSocketId === payload.socketId ? null : state.selectedSocketId;
 
   return state;
 };
 
-const updateSocketLabel = (
-  state: GraphState,
-  { payload }: UpdateSocketLabelAction,
-) => {
+const updateSocketLabel = (state: GraphState, { payload }: UpdateSocketLabelAction) => {
   const stepIndex = state.steps.findIndex((node) => node.id === payload.stepId);
   if (stepIndex === -1) return state;
 
@@ -228,10 +212,7 @@ const updateSocketLabel = (
   return state;
 };
 
-const updateSocketMetadata = (
-  state: GraphState,
-  { payload }: UpdateSocketMetadataAction,
-) => {
+const updateSocketMetadata = (state: GraphState, { payload }: UpdateSocketMetadataAction) => {
   const step = state.steps.find((node) => node.id === payload.stepId);
   if (!step) return state;
 
@@ -250,9 +231,7 @@ const selectSocket = (state: GraphState, { payload }: SelectSocketAction) => {
   if (!selectedStep) return state;
 
   // NOTE: This is used only for `InputStep` so far, so this is okay
-  const selectedSocket = selectedStep.outputs?.find(
-    (socket) => socket.id === payload.socketId,
-  );
+  const selectedSocket = selectedStep.outputs?.find((socket) => socket.id === payload.socketId);
 
   if (!selectedSocket) return state;
 
@@ -301,6 +280,4 @@ export const graphReducer: ImmerReducer<GraphState, GraphAction> = (
 };
 
 export const GraphContext = createContext<GraphState | null>(null);
-export const GraphDispatchContext = createContext<Dispatch<GraphAction> | null>(
-  null,
-);
+export const GraphDispatchContext = createContext<Dispatch<GraphAction> | null>(null);

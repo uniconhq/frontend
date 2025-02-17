@@ -6,12 +6,4 @@ import SelectField from "./select-field";
 import TextField from "./text-field";
 import TextAreaField from "./textarea-field";
 
-export {
-  CheckboxField,
-  ErrorAlert,
-  NumberField,
-  PasswordField,
-  SelectField,
-  TextAreaField,
-  TextField,
-};
+export { CheckboxField, ErrorAlert, NumberField, PasswordField, SelectField, TextAreaField, TextField };

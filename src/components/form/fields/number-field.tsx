@@ -1,13 +1,6 @@
 import { useFormContext } from "react-hook-form";
 
-import {
-  FormControl,
-  FormDescription,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
+import { FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 
 interface NumberFieldProps {
@@ -18,13 +11,7 @@ interface NumberFieldProps {
   className?: string;
 }
 
-function NumberField({
-  name,
-  label,
-  placeholder,
-  description,
-  className,
-}: NumberFieldProps) {
+function NumberField({ name, label, placeholder, description, className }: NumberFieldProps) {
   const { control } = useFormContext();
   return (
     <FormField
@@ -34,12 +21,7 @@ function NumberField({
         <FormItem>
           {label && <FormLabel className="!text-current">{label}</FormLabel>}
           <FormControl>
-            <Input
-              type="number"
-              placeholder={placeholder}
-              {...field}
-              className={className}
-            />
+            <Input type="number" placeholder={placeholder} {...field} className={className} />
           </FormControl>
           <FormMessage />
           {description && <FormDescription>{description}</FormDescription>}

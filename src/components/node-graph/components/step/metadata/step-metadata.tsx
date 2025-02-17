@@ -1,10 +1,4 @@
-import {
-  InputStep,
-  ObjectAccessStep,
-  OutputStep,
-  PyRunFunctionStep,
-  StepType,
-} from "@/api";
+import { InputStep, ObjectAccessStep, OutputStep, PyRunFunctionStep, StepType } from "@/api";
 import { Step } from "@/features/problems/components/tasks/types";
 
 import InputMetadata from "./input-metadata";
@@ -29,15 +23,9 @@ const StepMetadata: React.FC<OwnProps> = ({ step }) => {
   }
   return (
     <div className="mx-2 pb-4 text-sm">
-      {step.type === "PY_RUN_FUNCTION_STEP" && (
-        <PyRunMetadata step={step as PyRunFunctionStep} />
-      )}
-      {step.type === "OBJECT_ACCESS_STEP" && (
-        <ObjectAccessMetadata step={step as ObjectAccessStep} />
-      )}
-      {step.type === "OUTPUT_STEP" && (
-        <OutputMetadata step={step as OutputStep} />
-      )}
+      {step.type === "PY_RUN_FUNCTION_STEP" && <PyRunMetadata step={step as PyRunFunctionStep} />}
+      {step.type === "OBJECT_ACCESS_STEP" && <ObjectAccessMetadata step={step as ObjectAccessStep} />}
+      {step.type === "OUTPUT_STEP" && <OutputMetadata step={step as OutputStep} />}
       {step.type === "INPUT_STEP" && <InputMetadata step={step as InputStep} />}
     </div>
   );

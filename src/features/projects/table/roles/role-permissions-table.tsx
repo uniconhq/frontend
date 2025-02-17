@@ -4,14 +4,7 @@ import { useState } from "react";
 import { RolePublicWithInvitationKeys } from "@/api";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 import { getProjectById, useUpdateRoles } from "../../queries";
 
@@ -97,9 +90,7 @@ const RolePermissionsTable: React.FC<OwnProps> = ({ data, projectId }) => {
             {/* submissions */}
             <TableHead className="border-l text-center">create</TableHead>
             <TableHead className="border-l text-center">view own</TableHead>
-            <TableHead className="border-l text-center">
-              view supervised
-            </TableHead>
+            <TableHead className="border-l text-center">view supervised</TableHead>
             <TableHead className="border-l text-center">view all</TableHead>
             {/* groups */}
             <TableHead className="border-l text-center">view</TableHead>

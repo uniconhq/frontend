@@ -3,13 +3,7 @@ import { Delete, Plus, Trash } from "lucide-react";
 import { OutputSocket } from "@/api";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { TableCell, TableRow } from "@/components/ui/table";
 
 import { NodeSlot } from "../../node-slot";
@@ -104,8 +98,7 @@ const OutputMetadataRow: React.FC<OwnProps> = ({
               </>
             ) : (
               <span>
-                {socket.comparison.operator}{" "}
-                {JSON.stringify(socket.comparison.value)}
+                {socket.comparison.operator} {JSON.stringify(socket.comparison.value)}
               </span>
             )
           ) : (

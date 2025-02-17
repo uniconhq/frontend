@@ -1,15 +1,5 @@
-import {
-  OutputStep,
-  Status,
-  Testcase,
-  TestcaseResult as TestcaseResultType,
-} from "@/api";
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
+import { OutputStep, Status, Testcase, TestcaseResult as TestcaseResultType } from "@/api";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
@@ -37,14 +27,10 @@ const getTestcaseResultBadge = (status: Status) => {
 };
 
 const TestcaseResult: React.FC<OwnProps> = ({ result, index, testcase }) => {
-  const outputStep = testcase.nodes.filter(
-    (node) => node.type == "OUTPUT_STEP",
-  )[0] as OutputStep;
+  const outputStep = testcase.nodes.filter((node) => node.type == "OUTPUT_STEP")[0] as OutputStep;
 
   const combinedResults = result.results?.map((socketResult) => {
-    const testcaseSocketMetadata = outputStep.inputs.filter(
-      (input) => input.id === socketResult.id,
-    );
+    const testcaseSocketMetadata = outputStep.inputs.filter((input) => input.id === socketResult.id);
     return {
       ...socketResult,
       value: socketResult.value,
@@ -59,11 +45,7 @@ const TestcaseResult: React.FC<OwnProps> = ({ result, index, testcase }) => {
         <span>Testcase {index + 1}</span>
         {getTestcaseResultBadge(result.status)}
       </div>
-      <Accordion
-        type="multiple"
-        className="mt-2"
-        defaultValue={[`result-${index}`]}
-      >
+      <Accordion type="multiple" className="mt-2" defaultValue={[`result-${index}`]}>
         {/* TODO: hide stdout/stderr for unpriviledged users */}
         <AccordionItem value={`stderr-${index}`}>
           <AccordionTrigger>stderr</AccordionTrigger>

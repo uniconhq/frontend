@@ -2,10 +2,7 @@ import { useContext } from "react";
 
 import { InputStep, StepSocket } from "@/api";
 import { Button } from "@/components/ui/button";
-import {
-  GraphActionType,
-  GraphDispatchContext,
-} from "@/features/problems/components/tasks/graph-context";
+import { GraphActionType, GraphDispatchContext } from "@/features/problems/components/tasks/graph-context";
 
 type OwnProps = {
   step: InputStep;

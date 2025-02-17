@@ -5,11 +5,7 @@ import * as React from "react";
 
 import { InputStep, Testcase as TestcaseApi } from "@/api";
 import { Button } from "@/components/ui/button";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import NodeGraph from "@/features/problems/components/tasks/node-graph";
 import { cn } from "@/lib/utils";
 

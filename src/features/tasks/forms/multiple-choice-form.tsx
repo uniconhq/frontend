@@ -2,81 +2,42 @@ import { OnDragEndResponder } from "@hello-pangea/dnd";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { PlusIcon } from "lucide-react";
 import React from "react";
-import {
-  SubmitHandler,
-  useFieldArray,
-  UseFieldArrayReturn,
-  useForm,
-} from "react-hook-form";
-import { v4 as uuidv4 } from "uuid";
-import { z } from "zod";
+import { SubmitHandler, useFieldArray, UseFieldArrayReturn, useForm } from "react-hook-form";
 
-import CheckboxField from "@/components/form/fields/checkbox-field";
-import ErrorAlert from "@/components/form/fields/error-alert";
-import TextField from "@/components/form/fields/text-field";
+import { CheckboxField, ErrorAlert, TextField } from "@/components/form/fields";
 import FormSection from "@/components/form/form-section";
 import { Button } from "@/components/ui/button";
 import { Form } from "@/components/ui/form";
+import Choices from "@/features/tasks/forms/choices";
+import { ChoicesT, MultipleChoiceFormT, MultipleChoiceFormZ } from "@/lib/schema/multi-choice-form";
+import { uuid } from "@/lib/utils";
 
-import Choices, { formWithChoicesSchema, FormWithChoicesType } from "./choices";
-
-const multipleChoiceFormSchema = formWithChoicesSchema
-  .extend({
-    question: z.string().min(1, "Question cannot be empty"),
-    expected_answer: z.string().uuid(),
-    autograde: z.boolean(),
-  })
-  .refine(
-    (data) =>
-      data.choices.map((choice) => choice.id).includes(data.expected_answer),
-    {},
-  );
-
-export type MultipleChoiceFormType = z.infer<typeof multipleChoiceFormSchema>;
-
-const multipleChoiceFormDefault = {
-  question: "",
-  choices: [],
-  expected_answer: undefined,
+const DEFAULT_FORM_VALUES: Omit<MultipleChoiceFormT, "expected_answer" | "choices"> = {
+  title: "",
   autograde: true,
 };
 
 type OwnProps = {
   title: string;
-  initialValue?: MultipleChoiceFormType;
-  onSubmit: SubmitHandler<MultipleChoiceFormType>;
+  initialValue?: MultipleChoiceFormT;
+  onSubmit: SubmitHandler<MultipleChoiceFormT>;
 };
 
-const MultipleChoiceForm: React.FC<OwnProps> = ({
-  title,
-  initialValue,
-  onSubmit,
-}) => {
-  const form = useForm<MultipleChoiceFormType>({
-    resolver: zodResolver(multipleChoiceFormSchema),
-    defaultValues: initialValue ?? multipleChoiceFormDefault,
+const MultipleChoiceForm: React.FC<OwnProps> = ({ title, initialValue, onSubmit }) => {
+  const form = useForm<MultipleChoiceFormT>({
+    resolver: zodResolver(MultipleChoiceFormZ),
+    defaultValues: initialValue ?? DEFAULT_FORM_VALUES,
   });
 
   const { formState, trigger } = form;
-  const choices = useFieldArray({
-    control: form.control,
-    name: "choices",
-    keyName: "genId",
-  });
+  const choices = useFieldArray({ control: form.control, name: "choices", keyName: "genId" });
 
   const onDragEnd: OnDragEndResponder<string> = ({ source, destination }) => {
-    if (!destination) {
-      return;
-    }
-    if (source.index === destination.index) {
-      return;
-    }
-
+    if (!destination || source.index === destination.index) return;
     choices.move(source.index, destination.index);
   };
 
-  const isChecked = (index: number) =>
-    form.getValues().choices[index].id === form.getValues().expected_answer;
+  const isChecked = (index: number) => form.getValues().choices[index].id === form.getValues().expected_answer;
 
   const onCheck = (index: number) => {
     form.setValue("expected_answer", choices.fields[index].id);
@@ -98,12 +59,9 @@ const MultipleChoiceForm: React.FC<OwnProps> = ({
         <h1 className="text-2xl font-semibold">{title}</h1>
       </div>
       <Form {...form}>
-        <form
-          onSubmit={form.handleSubmit(onSubmit)}
-          className="flex flex-col gap-4"
-        >
+        <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-4">
           <FormSection title="Task details">
-            <TextField label="Question" name="question" />
+            <TextField label="Question" name="title" />
           </FormSection>
           <hr />
           <FormSection title="Autograde?">
@@ -112,28 +70,13 @@ const MultipleChoiceForm: React.FC<OwnProps> = ({
           <hr />
           <FormSection title="Choices">
             <div className="flex flex-col items-start gap-4">
-              <Button
-                variant={"outline"}
-                type="button"
-                onClick={() => {
-                  const id = uuidv4();
-                  choices.append({ id, text: "" });
-                }}
-              >
+              <Button variant={"outline"} type="button" onClick={() => choices.append({ id: uuid(), text: "" })}>
                 <PlusIcon />
                 Add choice
               </Button>
-              {formState.errors.expected_answer && (
-                <ErrorAlert message="Select the correct option." />
-              )}
+              {formState.errors.expected_answer && <ErrorAlert message="Select the correct option." />}
               <Choices
-                choices={
-                  choices as unknown as UseFieldArrayReturn<
-                    FormWithChoicesType,
-                    "choices",
-                    "genId"
-                  >
-                }
+                choices={choices as unknown as UseFieldArrayReturn<ChoicesT, "choices", "genId">}
                 onDragEnd={onDragEnd}
                 onCheck={onCheck}
                 isChecked={isChecked}
@@ -143,9 +86,7 @@ const MultipleChoiceForm: React.FC<OwnProps> = ({
           </FormSection>
 
           <div className="ml-4 mt-12">
-            <Button className="bg-purple-600 text-white hover:bg-purple-600 hover:bg-opacity-80">
-              Submit
-            </Button>
+            <Button className="bg-purple-600 text-white hover:bg-purple-600 hover:bg-opacity-80">Submit</Button>
           </div>
         </form>
       </Form>

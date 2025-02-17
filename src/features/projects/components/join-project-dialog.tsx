@@ -63,9 +63,7 @@ export function JoinProjectDialog({ open, onOpenChange }: OwnProps) {
           <form onSubmit={form.handleSubmit(onSubmit)}>
             <DialogHeader>
               <DialogTitle>Join project</DialogTitle>
-              <DialogDescription>
-                Enter your project's invitation key.
-              </DialogDescription>
+              <DialogDescription>Enter your project's invitation key.</DialogDescription>
               {error && <ErrorAlert message={error} />}
             </DialogHeader>
             <div className="grid gap-4 py-4">

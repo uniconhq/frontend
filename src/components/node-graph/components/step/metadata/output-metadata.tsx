@@ -3,13 +3,7 @@ import { useCallback, useContext } from "react";
 
 import { OutputSocket, OutputStep } from "@/api";
 import { Button } from "@/components/ui/button";
-import {
-  Table,
-  TableBody,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Table, TableBody, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   GraphActionType,
   GraphContext,
@@ -29,31 +23,29 @@ const OutputMetadata: React.FC<OwnProps> = ({ step }) => {
   const { edit } = useContext(GraphContext)!;
   const dispatch = useContext(GraphDispatchContext)!;
 
-  const updateSocketMetadata =
-    (metadataIndex: number) => (newMetadata: Partial<OutputSocket>) => {
-      const { id: _, ...newMetadataWithoutId } = newMetadata;
-      dispatch({
-        type: GraphActionType.UpdateSocketMetadata,
-        payload: {
-          stepId: step.id,
-          socketId: step.inputs[metadataIndex].id,
-          socketMetadata: newMetadataWithoutId,
-        },
-      });
-    };
+  const updateSocketMetadata = (metadataIndex: number) => (newMetadata: Partial<OutputSocket>) => {
+    const { id: _, ...newMetadataWithoutId } = newMetadata;
+    dispatch({
+      type: GraphActionType.UpdateSocketMetadata,
+      payload: {
+        stepId: step.id,
+        socketId: step.inputs[metadataIndex].id,
+        socketMetadata: newMetadataWithoutId,
+      },
+    });
+  };
 
-  const handleEditSocketLabel =
-    (socketId: string) => (newSocketLabel: string) => {
-      dispatch({
-        type: GraphActionType.UpdateSocketLabel,
-        payload: { stepId: step.id, socketId, newSocketLabel },
-      });
-    };
+  const handleEditSocketLabel = (socketId: string) => (newSocketLabel: string) => {
+    dispatch({
+      type: GraphActionType.UpdateSocketLabel,
+      payload: { stepId: step.id, socketId, newSocketLabel },
+    });
+  };
 
   const addInputSocket = useCallback(() => {
     dispatch({
       type: GraphActionType.AddSocket,
-      payload: { stepId: step.id, socketDir: SocketDir.Input, socket: createSocket("DATA", "") }, // prettier-ignore
+      payload: { stepId: step.id, socketDir: SocketDir.Input, socket: createSocket("DATA", "") },
     });
   }, [dispatch, step]);
 
