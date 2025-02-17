@@ -2,7 +2,7 @@ import { ColumnDef } from "@tanstack/react-table";
 import { Info } from "lucide-react";
 import { Link } from "react-router-dom";
 
-import { ProblemOrm } from "@/api";
+import { ProblemBaseWithPermissions } from "@/api";
 import { Badge } from "@/components/ui/badge";
 import {
   Tooltip,
@@ -13,7 +13,7 @@ import {
 import { cn } from "@/lib/utils";
 import { formatDateShort } from "@/utils/date";
 
-export const columns: ColumnDef<ProblemOrm>[] = [
+export const columns: ColumnDef<ProblemBaseWithPermissions>[] = [
   {
     header: "Name",
     cell: ({ row }) => {

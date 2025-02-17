@@ -1,10 +1,10 @@
-import { ProblemOrm } from "@/api";
+import { ProblemBaseWithPermissions } from "@/api";
 import { DataTable } from "@/components/ui/data-table";
 
 import { columns } from "./columns";
 
 type OwnProps = {
-  data: ProblemOrm[];
+  data: ProblemBaseWithPermissions[];
 };
 
 const ProblemsTable: React.FC<OwnProps> = ({ data }) => {
