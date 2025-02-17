@@ -96,7 +96,13 @@ export function Programming({
           ))}
         </div>
       </TaskSection>
-      {submit && <ProgrammingSubmitForm problemId={problemId} task={task} />}
+      {
+        <ProgrammingSubmitForm
+          problemId={problemId}
+          task={task}
+          submit={submit}
+        />
+      }
     </TaskContainer>
   );
 }
