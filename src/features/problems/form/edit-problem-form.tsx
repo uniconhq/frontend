@@ -4,9 +4,9 @@ import { SubmitHandler, useForm } from "react-hook-form";
 import { z } from "zod";
 
 import { Problem } from "@/api";
-import CheckboxField from "@/components/form/fields/checkbox-field";
 import { DateTimeField } from "@/components/form/fields/datetime-field";
 import ErrorAlert from "@/components/form/fields/error-alert";
+import RadioBooleanField from "@/components/form/fields/radio-boolean-field";
 import TextField from "@/components/form/fields/text-field";
 import TextareaField from "@/components/form/fields/textarea-field";
 import { Button } from "@/components/ui/button";
@@ -117,8 +117,12 @@ const EditProblemForm: React.FC<OwnProps> = ({ id, problem }) => {
                 <DateTimeField name="ended_at" label="Ends at" />
                 <DateTimeField name="closed_at" label="Closes at" />
               </div>
-
-              <CheckboxField label="Restricted" name="restricted" />
+              <RadioBooleanField
+                label="Access control"
+                name="restricted"
+                trueLabel="Restricted"
+                falseLabel="Unrestricted"
+              />
             </div>
           </div>
           <EditTasksDisplay
