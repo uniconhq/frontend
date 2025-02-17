@@ -85,9 +85,11 @@ export function DateTimeField({ name, label, description }: DateFieldProps) {
               <div className="sm:flex">
                 <Calendar
                   mode="single"
-                  selected={new Date(field.value)}
+                  selected={field.value ? new Date(field.value) : undefined}
                   onSelect={handleDateSelect}
-                  defaultMonth={new Date(field.value)}
+                  defaultMonth={
+                    field.value ? new Date(field.value) : new Date()
+                  }
                   initialFocus
                 />
                 <div className="flex flex-col divide-y sm:h-[300px] sm:flex-row sm:divide-x sm:divide-y-0">
