@@ -1,8 +1,16 @@
 import { ColumnDef } from "@tanstack/react-table";
+import { Info } from "lucide-react";
 import { Link } from "react-router-dom";
 
 import { ProblemOrm } from "@/api";
 import { Badge } from "@/components/ui/badge";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 import { formatDateShort } from "@/utils/date";
 
 export const columns: ColumnDef<ProblemOrm>[] = [
@@ -10,7 +18,7 @@ export const columns: ColumnDef<ProblemOrm>[] = [
     header: "Name",
     cell: ({ row }) => {
       return (
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2">
           <span>{row.original.name}</span>
           {row.original.restricted && (
             <Badge variant={"destructive"}>Restricted</Badge>
@@ -22,7 +30,26 @@ export const columns: ColumnDef<ProblemOrm>[] = [
   {
     header: "Starts at",
     cell: ({ row }) => {
-      return formatDateShort(row.original.started_at);
+      const isOpen = new Date(row.original.started_at) <= new Date();
+      return (
+        <div className="flex items-center gap-2">
+          <span className={cn(!isOpen && "font-bold")}>
+            {formatDateShort(row.original.started_at)}
+          </span>
+          {!isOpen && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Info className="h-4 w-4 cursor-pointer" />
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>This problem is not available yet.</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
+        </div>
+      );
     },
   },
   {
@@ -37,12 +64,24 @@ export const columns: ColumnDef<ProblemOrm>[] = [
     cell: ({ row }) => {
       const id = row.original.id;
       return (
-        <Link
-          to={`/projects/${row.original.project_id}/problems/${id}`}
-          className="hover:text-purple-300 hover:underline"
-        >
-          View
-        </Link>
+        <div className="flex gap-2">
+          {row.original.view && (
+            <Link
+              to={`/projects/${row.original.project_id}/problems/${id}`}
+              className="hover:text-purple-300 hover:underline"
+            >
+              View
+            </Link>
+          )}
+          {row.original.edit && (
+            <Link
+              to={`/projects/${row.original.project_id}/problems/${id}/edit`}
+              className="hover:text-purple-300 hover:underline"
+            >
+              Edit
+            </Link>
+          )}
+        </div>
       );
     },
   },

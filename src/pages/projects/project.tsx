@@ -4,7 +4,7 @@ import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import CreateProblemModal from "@/features/problems/components/form/create-problem-modal";
-import DefinitionsTable from "@/features/problems/table/definitions-table";
+import ProblemsTable from "@/features/problems/table/problems-table";
 import { useProjectId } from "@/features/projects/hooks/use-id";
 import { getProjectById } from "@/features/projects/queries";
 
@@ -38,7 +38,7 @@ const Project = () => {
         )}
       </div>
       <div className="flex flex-col gap-4">
-        <DefinitionsTable data={project.problems} />
+        <ProblemsTable data={project.problems} />
       </div>
     </div>
   );
