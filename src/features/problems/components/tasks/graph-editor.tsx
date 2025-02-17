@@ -92,10 +92,6 @@ const GraphEditor: React.FC<GraphEditorProps> = ({ graphId, className }) => {
 
   const onInit = (rf: RfInstance) => setRfInstance(rf);
 
-  useEffect(() => {
-    console.log("graphContext", steps);
-  }, [steps, edges]);
-
   // Apply layout algorithm to graph after nodes are initialized by ReactFlow
   useEffect(() => {
     if (flowNodesInitialized && !layoutApplied) {
