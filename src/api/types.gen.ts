@@ -450,10 +450,12 @@ export type RolePublic = {
   id: number;
   project_id: number;
   view_problems_access: boolean;
+  view_full_problem_details_access: boolean;
   create_problems_access: boolean;
   edit_problems_access: boolean;
   delete_problems_access: boolean;
   view_restricted_problems_access: boolean;
+  view_full_restricted_problem_details_access: boolean;
   edit_restricted_problems_access: boolean;
   delete_restricted_problems_access: boolean;
   make_submission_access: boolean;
@@ -471,10 +473,12 @@ export type RolePublicWithInvitationKeys = {
   id: number;
   project_id: number;
   view_problems_access: boolean;
+  view_full_problem_details_access: boolean;
   create_problems_access: boolean;
   edit_problems_access: boolean;
   delete_problems_access: boolean;
   view_restricted_problems_access: boolean;
+  view_full_restricted_problem_details_access: boolean;
   edit_restricted_problems_access: boolean;
   delete_restricted_problems_access: boolean;
   make_submission_access: boolean;
@@ -491,10 +495,12 @@ export type RolePublicWithInvitationKeys = {
 export type RoleUpdate = {
   name: string;
   view_problems_access: boolean;
+  view_full_problem_details_access: boolean;
   create_problems_access: boolean;
   edit_problems_access: boolean;
   delete_problems_access: boolean;
   view_restricted_problems_access: boolean;
+  view_full_restricted_problem_details_access: boolean;
   edit_restricted_problems_access: boolean;
   delete_restricted_problems_access: boolean;
   make_submission_access: boolean;
