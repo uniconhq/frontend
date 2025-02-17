@@ -1,5 +1,6 @@
+import { useUpdateNodeInternals } from "@xyflow/react";
 import { Plus, Trash } from "lucide-react";
-import { useCallback, useContext } from "react";
+import { useCallback, useContext, useEffect } from "react";
 import { GoDotFill } from "react-icons/go";
 
 import { StepSocket } from "@/api";
@@ -22,8 +23,15 @@ export function StepNode({ data }: { data: Step }) {
   const { edit } = useContext(GraphContext)!;
   const dispatch = useContext(GraphDispatchContext)!;
 
+  const updateNodeInternals = useUpdateNodeInternals();
+
   const isStepEditable = "is_user" in data ? !data.is_user : true;
   const showEditElements = edit && isStepEditable;
+
+  // We are programmatically updating the internal state of the node (e.g. adding more handles)
+  // as such we will need to sync it with ReactFlow
+  // Reference: https://reactflow.dev/learn/troubleshooting#008
+  useEffect(() => updateNodeInternals(data.id), [data]);
 
   const handleEditSocketLabel =
     (socketId: string) => (newSocketLabel: string) => {
@@ -94,7 +102,6 @@ export function StepNode({ data }: { data: Step }) {
       {/* Node metadata */}
       <StepMetadata step={data} />
       {/* Node body */}
-
       {!handlesInStepMetadata && (
         <div className="text-xs font-light">
           <div className="flex flex-row justify-between">
