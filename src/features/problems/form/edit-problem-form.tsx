@@ -5,6 +5,7 @@ import { z } from "zod";
 
 import { Problem } from "@/api";
 import CheckboxField from "@/components/form/fields/checkbox-field";
+import { DateTimeField } from "@/components/form/fields/datetime-field";
 import ErrorAlert from "@/components/form/fields/error-alert";
 import TextField from "@/components/form/fields/text-field";
 import TextareaField from "@/components/form/fields/textarea-field";
@@ -25,6 +26,9 @@ const problemFormSchema = z.object({
   name: z.string().min(1, "Name cannot be empty"),
   description: z.string().min(1, "Description cannot be empty"),
   restricted: z.boolean(),
+  started_at: z.coerce.date(),
+  ended_at: z.coerce.date(),
+  closed_at: z.coerce.date().optional(),
 });
 
 type ProblemFormType = z.infer<typeof problemFormSchema>;
@@ -99,7 +103,7 @@ const EditProblemForm: React.FC<OwnProps> = ({ id, problem }) => {
             <Button variant="primary">Save</Button>
           </div>
           {error && <ErrorAlert message={error} />}
-          <div className="flex w-full items-start">
+          <div className="flex w-full flex-col items-start gap-6 lg:flex-row lg:gap-0">
             <div className="sticky top-0">
               <h2 className="min-w-[200px] text-lg font-medium">
                 Problem details
@@ -108,6 +112,12 @@ const EditProblemForm: React.FC<OwnProps> = ({ id, problem }) => {
             <div className="flex w-full flex-col gap-4">
               <TextField label="Title" name="name" />
               <TextareaField label="Description" name="description" rows={5} />
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+                <DateTimeField name="started_at" label="Starts at" />
+                <DateTimeField name="ended_at" label="Ends at" />
+                <DateTimeField name="closed_at" label="Closes at" />
+              </div>
+
               <CheckboxField label="Restricted" name="restricted" />
             </div>
           </div>

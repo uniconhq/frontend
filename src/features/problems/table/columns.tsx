@@ -3,12 +3,9 @@ import { Link } from "react-router-dom";
 
 import { ProblemOrm } from "@/api";
 import { Badge } from "@/components/ui/badge";
+import { formatDateShort } from "@/utils/date";
 
 export const columns: ColumnDef<ProblemOrm>[] = [
-  {
-    accessorKey: "id",
-    header: "Problem ID",
-  },
   {
     header: "Name",
     cell: ({ row }) => {
@@ -23,11 +20,20 @@ export const columns: ColumnDef<ProblemOrm>[] = [
     },
   },
   {
-    accessorKey: "description",
-    header: "Description",
+    header: "Starts at",
+    cell: ({ row }) => {
+      return formatDateShort(row.original.started_at);
+    },
+  },
+  {
+    header: "Ends at",
+    cell: ({ row }) => {
+      return formatDateShort(row.original.ended_at);
+    },
   },
   {
     id: "actions",
+    header: "Actions",
     cell: ({ row }) => {
       const id = row.original.id;
       return (
