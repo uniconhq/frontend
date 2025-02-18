@@ -3,7 +3,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@radix-ui/r
 import { useQuery } from "@tanstack/react-query";
 import { produce } from "immer";
 import { PlusIcon, Trash, UploadIcon } from "lucide-react";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { SubmitHandler, useFieldArray, useForm } from "react-hook-form";
 
 import { File, InputStep } from "@/api";
@@ -80,6 +80,18 @@ const ProgrammingForm: React.FC<OwnProps> = ({ title, initialValue, onSubmit }) 
   const slurmOptions = form.watch("environment.slurm_options");
 
   const { data: validPythonVersions } = useQuery(getSupportedPythonVersions());
+
+  const depsFileInputRef = useRef<HTMLInputElement>(null);
+  const handleDepsFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const depsFile = event.target.files?.[0];
+    if (!depsFile) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      form.setValue("environment.extra_options.requirements", (e.target?.result as string).trim().split("\n"));
+      depsFileInputRef.current!.value = ""; // Reset file input
+    };
+    reader.readAsText(depsFile);
+  };
 
   // Shared user input step for all testcases
   const sharedUserInputStep: InputStep = {
@@ -214,14 +226,29 @@ const ProgrammingForm: React.FC<OwnProps> = ({ title, initialValue, onSubmit }) 
                     </Button>
                     <Tooltip>
                       <TooltipTrigger>
-                        <Button type="button" variant="secondary" size="sm">
-                          <UploadIcon />
-                        </Button>
                         <TooltipContent side="top" align="center">
                           <span>
                             You can upload a <code>requirements.txt</code> file to prefill dependencies
                           </span>
                         </TooltipContent>
+                        <input
+                          accept=".txt"
+                          type="file"
+                          style={{ display: "none" }}
+                          ref={depsFileInputRef}
+                          onChange={handleDepsFileUpload}
+                        />
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="sm"
+                          onClick={(event) => {
+                            event.preventDefault();
+                            depsFileInputRef.current?.click();
+                          }}
+                        >
+                          <UploadIcon />
+                        </Button>
                       </TooltipTrigger>
                     </Tooltip>
                   </div>
