@@ -33,6 +33,7 @@ const Problem = () => {
                 not restricted
               </Badge>
             )}
+            {!data.published && <Badge variant={"orange"}>draft</Badge>}
           </h1>
         </div>
         <div className="flex gap-1">
