@@ -16,7 +16,15 @@ import TaskResultCard from "./submission-results/task-result";
 
 const DEFAULT_REFETCH_INTERVAL: number = 5000;
 
-export function ProgrammingSubmitForm({ problemId, task }: { problemId: number; task: ProgrammingTask }) {
+export function ProgrammingSubmitForm({
+  problemId,
+  task,
+  submit, // whether user is allowed to make submissions
+}: {
+  problemId: number;
+  task: ProgrammingTask;
+  submit: boolean;
+}) {
   const { register, handleSubmit } = useForm();
   const rerunAttemptMutation = useRerunTaskAttempt(problemId);
 
@@ -72,20 +80,22 @@ export function ProgrammingSubmitForm({ problemId, task }: { problemId: number; 
 
   return (
     <div className="flex flex-col gap-6">
-      <TaskSection>
-        <TaskSectionHeader content="Submission" />
-        <form onSubmit={handleSubmit(submitForm)}>
-          {requiredInputs.map(({ id, name }) => (
-            <div key={id} className="mt-2 grid w-full max-w-sm items-center gap-2">
-              <Label className="text-md font-mono">{name}</Label>
-              <Input {...register(id.replace(/\./g, "_"), { required: true })} id={id} type="file" />
-            </div>
-          ))}
-          <Button className="mt-6" type="submit">
-            Submit
-          </Button>
-        </form>
-      </TaskSection>
+      {submit && (
+        <TaskSection>
+          <TaskSectionHeader content="Submission" />
+          <form onSubmit={handleSubmit(submitForm)}>
+            {requiredInputs.map(({ id, name }) => (
+              <div key={id} className="mt-2 grid w-full max-w-sm items-center gap-2">
+                <Label className="text-md font-mono">{name}</Label>
+                <Input {...register(id.replace(/\./g, "_"), { required: true })} id={id} type="file" />
+              </div>
+            ))}
+            <Button className="mt-6" type="submit">
+              Submit
+            </Button>
+          </form>
+        </TaskSection>
+      )}
       <TaskSection>
         <TaskSectionHeader content="Results" />
         <div className="relative flex flex-col gap-4">
@@ -135,7 +145,7 @@ export function ProgrammingSubmitForm({ problemId, task }: { problemId: number; 
                 </SelectContent>
               </Select>
             )}
-            {selectedAttempt && (
+            {submit && selectedAttempt && (
               <Button onClick={() => rerunAttemptMutation.mutate(selectedAttempt.id)}>
                 <RefreshCcw />
                 Rerun

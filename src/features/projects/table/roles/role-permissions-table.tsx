@@ -15,10 +15,12 @@ type OwnProps = {
 
 const keys: (keyof RolePublicWithInvitationKeys)[] = [
   "view_problems_access",
+  "view_full_problem_details_access",
   "create_problems_access",
   "edit_problems_access",
   "delete_problems_access",
   "view_restricted_problems_access",
+  "view_full_restricted_problem_details_access",
   "edit_restricted_problems_access",
   "delete_restricted_problems_access",
   "make_submission_access",
@@ -64,10 +66,10 @@ const RolePermissionsTable: React.FC<OwnProps> = ({ data, projectId }) => {
             <TableHead rowSpan={2} className="text-center">
               role
             </TableHead>
-            <TableHead colSpan={4} className="border-l text-center">
+            <TableHead colSpan={5} className="border-l text-center">
               problems
             </TableHead>
-            <TableHead colSpan={3} className="border-l text-center">
+            <TableHead colSpan={4} className="border-l text-center">
               restricted problems
             </TableHead>
             <TableHead colSpan={4} className="border-l text-center">
@@ -80,11 +82,13 @@ const RolePermissionsTable: React.FC<OwnProps> = ({ data, projectId }) => {
           <TableRow>
             {/* problems */}
             <TableHead className="border-l text-center">view</TableHead>
+            <TableHead className="border-l text-center">view details</TableHead>
             <TableHead className="border-l text-center">create</TableHead>
             <TableHead className="border-l text-center">update</TableHead>
             <TableHead className="border-l text-center">delete</TableHead>
             {/* restricted problems */}
             <TableHead className="border-l text-center">view</TableHead>
+            <TableHead className="border-l text-center">view details</TableHead>
             <TableHead className="border-l text-center">update</TableHead>
             <TableHead className="border-l text-center">delete</TableHead>
             {/* submissions */}

@@ -5,10 +5,8 @@ import { SubmitHandler, useForm } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
 import { z } from "zod";
 
-import CheckboxField from "@/components/form/fields/checkbox-field";
+import { DateTimeField, RadioBooleanField, TextAreaField, TextField } from "@/components/form/fields";
 import ErrorAlert from "@/components/form/fields/error-alert";
-import TextField from "@/components/form/fields/text-field";
-import TextareaField from "@/components/form/fields/textarea-field";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Form } from "@/components/ui/form";
@@ -24,6 +22,9 @@ const problemFormSchema = z.object({
   name: z.string().min(1, "Title cannot be empty"),
   description: z.string().min(1, "Description cannot be empty"),
   restricted: z.boolean(),
+  started_at: z.string().datetime({ offset: true }),
+  ended_at: z.string().datetime({ offset: true }),
+  closed_at: z.string().datetime({ offset: true }).optional(),
 });
 
 type ProblemFormType = z.infer<typeof problemFormSchema>;
@@ -76,8 +77,19 @@ const CreateProblemModal: React.FC<OwnProps> = ({ setOpen }) => {
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-2">
               <TextField label="Title" name="name" />
-              <TextareaField label="Description" name="description" rows={5} />
-              <CheckboxField label="Restricted" name="restricted" />
+              <TextAreaField label="Description" name="description" rows={5} />
+
+              <div className="my-2 grid grid-cols-1 gap-4 lg:grid-cols-3">
+                <DateTimeField name="started_at" label="Starts at" />
+                <DateTimeField name="ended_at" label="Ends at" />
+                <DateTimeField name="closed_at" label="Closes at" />
+              </div>
+              <RadioBooleanField
+                label="Access control"
+                name="restricted"
+                trueLabel="Restricted"
+                falseLabel="Unrestricted"
+              />
               <div className="mt-6 flex justify-between">
                 <Button variant="outline" type="button" onClick={() => setOpen(false)}>
                   Cancel

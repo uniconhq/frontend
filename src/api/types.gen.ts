@@ -270,6 +270,7 @@ export type OutputStep = {
 export type Problem = {
     name: string;
     restricted: boolean;
+    published?: boolean;
     description: string;
     tasks: Array<({
         type?: 'PROGRAMMING_TASK';
@@ -280,14 +281,23 @@ export type Problem = {
     } & MultipleResponseTask) | ({
         type?: 'SHORT_ANSWER_TASK';
     } & ShortAnswerTask)>;
+    started_at: string;
+    ended_at: string;
+    closed_at?: string | null;
 };
 
-export type ProblemBase = {
+export type ProblemBaseWithPermissions = {
     id: number;
     name: string;
     description: string;
     project_id: number;
     restricted: boolean;
+    published: boolean;
+    started_at: string;
+    ended_at: string;
+    closed_at: string | null;
+    view: boolean;
+    edit: boolean;
 };
 
 export type ProblemOrm = {
@@ -295,12 +305,17 @@ export type ProblemOrm = {
     name: string;
     description: string;
     restricted?: boolean;
+    started_at: string;
+    ended_at: string;
+    closed_at: string | null;
+    published?: boolean;
     project_id: number;
 };
 
 export type ProblemPublic = {
     name: string;
     restricted: boolean;
+    published?: boolean;
     description: string;
     tasks: Array<({
         type?: 'PROGRAMMING_TASK';
@@ -311,6 +326,9 @@ export type ProblemPublic = {
     } & MultipleResponseTask) | ({
         type?: 'SHORT_ANSWER_TASK';
     } & ShortAnswerTask)>;
+    started_at: string;
+    ended_at: string;
+    closed_at?: string | null;
     edit: boolean;
     make_submission: boolean;
 };
@@ -318,8 +336,12 @@ export type ProblemPublic = {
 export type ProblemUpdate = {
     name: string;
     restricted: boolean;
+    published: boolean;
     description: string;
     task_order: Array<TaskOrder>;
+    started_at: string;
+    ended_at: string;
+    closed_at: string | null;
 };
 
 export type ProgrammingTask = {
@@ -382,7 +404,7 @@ export type ProjectPublicWithProblems = {
     create_groups: boolean;
     edit_groups: boolean;
     delete_groups: boolean;
-    problems: Array<ProblemBase>;
+    problems: Array<ProblemBaseWithPermissions>;
 };
 
 export type ProjectUpdate = {
@@ -429,10 +451,12 @@ export type RolePublic = {
     id: number;
     project_id: number;
     view_problems_access: boolean;
+    view_full_problem_details_access: boolean;
     create_problems_access: boolean;
     edit_problems_access: boolean;
     delete_problems_access: boolean;
     view_restricted_problems_access: boolean;
+    view_full_restricted_problem_details_access: boolean;
     edit_restricted_problems_access: boolean;
     delete_restricted_problems_access: boolean;
     make_submission_access: boolean;
@@ -450,10 +474,12 @@ export type RolePublicWithInvitationKeys = {
     id: number;
     project_id: number;
     view_problems_access: boolean;
+    view_full_problem_details_access: boolean;
     create_problems_access: boolean;
     edit_problems_access: boolean;
     delete_problems_access: boolean;
     view_restricted_problems_access: boolean;
+    view_full_restricted_problem_details_access: boolean;
     edit_restricted_problems_access: boolean;
     delete_restricted_problems_access: boolean;
     make_submission_access: boolean;
@@ -470,10 +496,12 @@ export type RolePublicWithInvitationKeys = {
 export type RoleUpdate = {
     name: string;
     view_problems_access: boolean;
+    view_full_problem_details_access: boolean;
     create_problems_access: boolean;
     edit_problems_access: boolean;
     delete_problems_access: boolean;
     view_restricted_problems_access: boolean;
+    view_full_restricted_problem_details_access: boolean;
     edit_restricted_problems_access: boolean;
     delete_restricted_problems_access: boolean;
     make_submission_access: boolean;
