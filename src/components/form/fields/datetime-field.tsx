@@ -17,7 +17,7 @@ interface DateFieldProps {
   className?: string;
 }
 
-export function DateTimeField({ name, label, description }: DateFieldProps) {
+export default function DateTimeField({ name, label, description }: DateFieldProps) {
   const { control, setValue, getValues } = useFormContext();
   function handleDateSelect(date: Date | undefined) {
     if (date) {

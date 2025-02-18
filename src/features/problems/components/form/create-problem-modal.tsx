@@ -5,11 +5,8 @@ import { SubmitHandler, useForm } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
 import { z } from "zod";
 
-import { DateTimeField } from "@/components/form/fields/datetime-field";
+import { DateTimeField, RadioBooleanField, TextAreaField, TextField } from "@/components/form/fields";
 import ErrorAlert from "@/components/form/fields/error-alert";
-import RadioBooleanField from "@/components/form/fields/radio-boolean-field";
-import TextField from "@/components/form/fields/text-field";
-import TextareaField from "@/components/form/fields/textarea-field";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Form } from "@/components/ui/form";
@@ -80,7 +77,7 @@ const CreateProblemModal: React.FC<OwnProps> = ({ setOpen }) => {
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-2">
               <TextField label="Title" name="name" />
-              <TextareaField label="Description" name="description" rows={5} />
+              <TextAreaField label="Description" name="description" rows={5} />
 
               <div className="my-2 grid grid-cols-1 gap-4 lg:grid-cols-3">
                 <DateTimeField name="started_at" label="Starts at" />

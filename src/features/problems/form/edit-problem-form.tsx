@@ -4,11 +4,8 @@ import { SubmitHandler, useForm } from "react-hook-form";
 import { z } from "zod";
 
 import { Problem } from "@/api";
-import { DateTimeField } from "@/components/form/fields/datetime-field";
+import { DateTimeField, RadioBooleanField, TextAreaField, TextField } from "@/components/form/fields";
 import ErrorAlert from "@/components/form/fields/error-alert";
-import RadioBooleanField from "@/components/form/fields/radio-boolean-field";
-import TextField from "@/components/form/fields/text-field";
-import TextareaField from "@/components/form/fields/textarea-field";
 import { Button } from "@/components/ui/button";
 import { Form } from "@/components/ui/form";
 import { useProjectId } from "@/features/projects/hooks/use-id";
@@ -124,7 +121,7 @@ const EditProblemForm: React.FC<OwnProps> = ({ id, problem }) => {
             </div>
             <div className="flex w-full flex-col gap-4">
               <TextField label="Title" name="name" />
-              <TextareaField label="Description" name="description" rows={5} />
+              <TextAreaField label="Description" name="description" rows={5} />
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
                 <DateTimeField name="started_at" label="Starts at" />
                 <DateTimeField name="ended_at" label="Ends at" />
