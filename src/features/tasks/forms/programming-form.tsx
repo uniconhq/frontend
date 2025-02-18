@@ -2,7 +2,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@radix-ui/react-collapsible";
 import { useQuery } from "@tanstack/react-query";
 import { produce } from "immer";
-import { PlusIcon, Trash } from "lucide-react";
+import { PlusIcon, Trash, UploadIcon } from "lucide-react";
 import { useEffect } from "react";
 import { SubmitHandler, useFieldArray, useForm } from "react-hook-form";
 
@@ -12,6 +12,7 @@ import FormSection from "@/components/form/form-section";
 import NodeInput from "@/components/node-graph/components/step/node-input";
 import { Button } from "@/components/ui/button";
 import { Form, FormLabel } from "@/components/ui/form";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import FileEditor from "@/features/problems/components/tasks/file-editor";
 import { GraphAction, graphReducer } from "@/features/problems/components/tasks/graph-context";
 import Testcase from "@/features/problems/components/tasks/testcase";
@@ -211,6 +212,18 @@ const ProgrammingForm: React.FC<OwnProps> = ({ title, initialValue, onSubmit }) 
                     <Button type="button" variant="secondary" size="sm" onClick={addDependency}>
                       <PlusIcon />
                     </Button>
+                    <Tooltip>
+                      <TooltipTrigger>
+                        <Button type="button" variant="secondary" size="sm">
+                          <UploadIcon />
+                        </Button>
+                        <TooltipContent side="top" align="center">
+                          <span>
+                            You can upload a <code>requirements.txt</code> file to prefill dependencies
+                          </span>
+                        </TooltipContent>
+                      </TooltipTrigger>
+                    </Tooltip>
                   </div>
                 </FormLabel>
               </div>
