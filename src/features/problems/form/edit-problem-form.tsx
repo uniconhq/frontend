@@ -58,9 +58,7 @@ const EditProblemForm: React.FC<OwnProps> = ({ id, problem }) => {
     );
   }, [problem.tasks]);
 
-  const sortedTasks = taskOrder.map(
-    (order) => problem.tasks.find((task) => task.id === order.id)!,
-  );
+  const sortedTasks = taskOrder.map((order) => problem.tasks.find((task) => task.id === order.id)!);
 
   const onSubmit: SubmitHandler<ProblemFormType> = async (data) => {
     updateProblemMutation.mutate(
@@ -101,9 +99,7 @@ const EditProblemForm: React.FC<OwnProps> = ({ id, problem }) => {
           {error && <ErrorAlert message={error} />}
           <div className="flex w-full items-start">
             <div className="sticky top-0">
-              <h2 className="min-w-[200px] text-lg font-medium">
-                Problem details
-              </h2>
+              <h2 className="min-w-[200px] text-lg font-medium">Problem details</h2>
             </div>
             <div className="flex w-full flex-col gap-4">
               <TextField label="Title" name="name" />
@@ -111,12 +107,7 @@ const EditProblemForm: React.FC<OwnProps> = ({ id, problem }) => {
               <CheckboxField label="Restricted" name="restricted" />
             </div>
           </div>
-          <EditTasksDisplay
-            tasks={sortedTasks}
-            problemId={id}
-            projectId={projectId}
-            handleUpdateOrder={setTaskOrder}
-          />
+          <EditTasksDisplay tasks={sortedTasks} problemId={id} projectId={projectId} handleUpdateOrder={setTaskOrder} />
         </div>
       </form>
     </Form>

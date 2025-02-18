@@ -1,184 +1,155 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@radix-ui/react-collapsible";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@radix-ui/react-collapsible";
 import { useQuery } from "@tanstack/react-query";
 import { produce } from "immer";
 import { PlusIcon, Trash } from "lucide-react";
+import { useEffect } from "react";
 import { SubmitHandler, useFieldArray, useForm } from "react-hook-form";
-import { useDebouncedCallback } from "use-debounce";
-import { z } from "zod";
 
-import {
-  File as FileType,
-  InputStep,
-  PythonVersion,
-  Testcase as TestcaseApi,
-} from "@/api";
-import CheckboxField from "@/components/form/fields/checkbox-field";
-import NumberField from "@/components/form/fields/number-field";
-import SelectField from "@/components/form/fields/select-field";
-import TextField from "@/components/form/fields/text-field";
-import TextareaField from "@/components/form/fields/textarea-field";
+import { File, InputStep } from "@/api";
+import { NumberField, SelectField, TextAreaField, TextField } from "@/components/form/fields";
 import FormSection from "@/components/form/form-section";
-import EmptyPlaceholder from "@/components/layout/empty-placeholder";
 import NodeInput from "@/components/node-graph/components/step/node-input";
 import { Button } from "@/components/ui/button";
 import { Form, FormLabel } from "@/components/ui/form";
 import FileEditor from "@/features/problems/components/tasks/file-editor";
-import {
-  GraphAction,
-  graphReducer,
-} from "@/features/problems/components/tasks/graph-context";
+import { GraphAction, graphReducer } from "@/features/problems/components/tasks/graph-context";
 import Testcase from "@/features/problems/components/tasks/testcase";
 import { getSupportedPythonVersions } from "@/features/problems/queries";
+import { DEFAULT_PY_VERSION, ProgTaskFormT, ProgTaskFormTZ } from "@/lib/schema/prog-task-form";
+import { uuid } from "@/lib/utils";
 
-const fileSchema = z.object({
-  name: z.string(),
-  content: z.string(),
-});
-
-const requiredInputSchema = z.object({
-  id: z.string(),
-  data: z.union([z.string(), z.number(), z.boolean(), fileSchema]),
-});
-
-const programmingFormSchema = z.object({
-  // TODO: fix this once we have more than one option
-  question: z.string().min(1, "Question cannot be empty"),
-  // there is some weird bug that makes autograde undefined sometimes
-  autograde: z.boolean().transform((val) => Boolean(val)),
-  environment: z.object({
-    language: z.literal("PYTHON"),
-    extra_options: z.object({
-      version: z.custom<PythonVersion>(() => true),
-      requirements: z.string(),
-    }),
-    slurm_options: z.array(
-      z
-        .string()
-        .regex(
-          /^-{1,2}[^-]+/,
-          "Must start with - or -- and contain at least one character.",
-        ),
-    ),
-    time_limit_secs: z
-      .union([z.string(), z.number()])
-      .transform((val) => Number(val))
-      .refine((val) => val > 0, {
-        message: "Time limit must be greater than 0",
-      }),
-    memory_limit_mb: z
-      .union([z.string(), z.number()])
-      .transform((val) => Number(val))
-      .refine((val) => val > 0, {
-        message: "Memory limit must be greater than 0",
-      }),
-  }),
-  required_inputs: z.array(requiredInputSchema),
-
-  // TODO: no validation here
-  testcases: z.array(z.custom<TestcaseApi>(() => true)),
-});
-
-export type ProgrammingFormType = z.infer<typeof programmingFormSchema>;
-
-const programmingFormDefault = {
-  question: "",
-  autograde: true,
-  environment: {
-    language: "PYTHON" as const,
-    extra_options: {
-      version: "3.11.9" as PythonVersion,
-      requirements: "",
-    },
-    slurm_options: [],
-    time_limit_secs: 1,
-    memory_limit_mb: 256,
+const createDefaultUserInput = () => ({
+  id: uuid(),
+  label: "",
+  data: {
+    name: "",
+    content: "# INSERT FILE TEMPLATE HERE",
+    trusted: false,
   },
-  required_inputs: [],
+});
+
+const DEFAULT_FORM_VALUES: ProgTaskFormT = {
+  title: "",
+  environment: {
+    language: "Python",
+    extra_options: {
+      version: DEFAULT_PY_VERSION,
+      requirements: [],
+    },
+    time_limit_secs: 5,
+    memory_limit_mb: 256,
+    slurm: true,
+    slurm_options: [],
+  },
+  required_user_inputs: [createDefaultUserInput()],
   testcases: [],
 };
 
-type OwnProps = {
-  title: string;
-  initialValue?: ProgrammingFormType;
-  onSubmit: SubmitHandler<ProgrammingFormType>;
+const DEFAULT_USER_INPUT_STEP: Omit<InputStep, "outputs"> = {
+  id: "__USER_INPUT__",
+  type: "INPUT_STEP",
+  is_user: true,
 };
 
-const ProgrammingForm: React.FC<OwnProps> = ({
-  title,
-  initialValue,
-  onSubmit,
-}) => {
-  const form = useForm<ProgrammingFormType>({
-    resolver: zodResolver(programmingFormSchema),
-    defaultValues: initialValue ?? programmingFormDefault,
+// NOTE: WE have our own "id" field for our data objects, in order to deconflict with react-hook-form's own identifier field
+// when using `useFieldArray`, we need to specify a custom keyName to avoid conflicts
+const _REACT_FORM_ID_KEY = "_id";
+
+type OwnProps = {
+  title: string;
+  initialValue?: ProgTaskFormT;
+  onSubmit: SubmitHandler<ProgTaskFormT>;
+};
+
+const ProgrammingForm: React.FC<OwnProps> = ({ title, initialValue, onSubmit }) => {
+  const form = useForm<ProgTaskFormT>({
+    resolver: zodResolver(ProgTaskFormTZ),
+    defaultValues: initialValue ?? DEFAULT_FORM_VALUES,
   });
-  const { data: versions } = useQuery(getSupportedPythonVersions());
-  const inputs = useFieldArray({ control: form.control, name: "required_inputs" }); // prettier-ignore
-  const testcases = useFieldArray({ control: form.control, name: "testcases" });
 
-  const userInputNode: InputStep = {
-    id: 0,
-    type: "INPUT_STEP",
-    inputs: [],
-    outputs: form.getValues("required_inputs"),
+  const userInputs = useFieldArray({
+    control: form.control,
+    name: "required_user_inputs",
+    keyName: _REACT_FORM_ID_KEY,
+  });
+  const testcases = useFieldArray({ control: form.control, name: "testcases", keyName: _REACT_FORM_ID_KEY });
+
+  const dependencies = form.watch("environment.extra_options.requirements");
+  const slurmOptions = form.watch("environment.slurm_options");
+
+  const { data: validPythonVersions } = useQuery(getSupportedPythonVersions());
+
+  // Shared user input step for all testcases
+  const sharedUserInputStep: InputStep = {
+    ...DEFAULT_USER_INPUT_STEP,
+    outputs: form.watch("required_user_inputs"),
   };
-  console.log(form.getValues("environment.slurm_options"));
 
-  const addTestcase = () => {
-    const newId = Math.max(...form.watch("testcases").map((t) => t.id), -1) + 1;
-    testcases.append({ id: newId, nodes: [], edges: [] });
-  };
+  const addTestcase = () =>
+    testcases.append({ id: uuid(), order_index: testcases.fields.length, nodes: [sharedUserInputStep], edges: [] });
 
-  const addInput = () => {
-    const parseInputId = (id: string) => parseInt(id.split(".").slice(-1)[0]);
-    const newId =
-      Math.max(
-        ...form.watch("required_inputs").map((input) => parseInputId(input.id)),
-        -1,
-      ) + 1;
-    inputs.append({
-      id: `DATA.TEMP.${newId}`,
+  const addUserInput = () => userInputs.append(createDefaultUserInput());
+
+  const updateUserInput = (
+    index: number,
+    { newLabel, newFileContent }: { newLabel?: string; newFileContent?: string },
+  ) => {
+    const oldInput = userInputs.fields[index];
+    const oldFileData = oldInput.data as File;
+    userInputs.update(index, {
+      ...oldInput,
+      label: newLabel ?? oldInput.label,
       data: {
-        name: `file${newId}.py`,
-        content: "def some_function():\n\tpass",
+        ...oldFileData,
+        name: newLabel ?? oldInput.label,
+        content: newFileContent ?? oldFileData.content,
       },
     });
   };
 
-  const updateInput = useDebouncedCallback(
-    (
-      index: number,
-      {
-        newId,
-        newFileName,
-        newFileContent,
-      }: { newId?: string; newFileName?: string; newFileContent?: string },
-    ) => {
-      const oldInput = form.watch("required_inputs")[index];
-      const oldInputFileData = oldInput.data as FileType;
-      inputs.update(index, {
-        ...oldInput,
-        id: newId ?? oldInput.id,
-        data: {
-          ...(oldInput.data as FileType),
-          name: newFileName ?? oldInputFileData.name,
-          content: newFileContent ?? oldInputFileData.content,
-        },
+  const addDependency = () => {
+    const _KEY = "environment.extra_options.requirements";
+    form.setValue(_KEY, form.getValues(_KEY).concat(""));
+  };
+
+  const deleteDependency = (index: number) => {
+    const _KEY = "environment.extra_options.requirements";
+    form.setValue(
+      _KEY,
+      form.getValues(_KEY).filter((_, i) => i !== index),
+    );
+  };
+
+  const addSlurmOption = () => {
+    const _KEY = "environment.slurm_options";
+    form.setValue(_KEY, form.getValues(_KEY).concat(""));
+  };
+
+  const deleteSlurmOption = (index: number) => {
+    const _KEY = "environment.slurm_options";
+    form.setValue(
+      _KEY,
+      form.getValues(_KEY).filter((_, i) => i !== index),
+    );
+  };
+
+  // Update all testcases with the updated shared user input step
+  useEffect(() => {
+    for (let i = 0; i < testcases.fields.length; i++) {
+      const testcase = testcases.fields[i];
+      testcases.update(i, {
+        ...testcase,
+        nodes: [sharedUserInputStep, ...testcase.nodes.filter((node) => node.id !== sharedUserInputStep.id)],
       });
-    },
-    500,
-  );
+    }
+  }, [sharedUserInputStep]);
 
   const updateTestcase = (index: number) => (action: GraphAction) => {
     const testcase = form.getValues("testcases")[index];
     const newState = produce(
       {
-        id: `${testcase.id}`,
+        id: testcase.id,
         steps: testcase.nodes,
         edges: testcase.edges,
         selectedStepId: null,
@@ -189,17 +160,12 @@ const ProgrammingForm: React.FC<OwnProps> = ({
         graphReducer(draft, action);
       },
     );
-
     testcases.update(index, {
       ...testcase,
-      // NOTE: We remove the user input node since it is separately added to the graph on re-render
-      nodes: newState.steps.filter((node) => node.id !== 0),
+      nodes: newState.steps,
       edges: newState.edges,
     });
   };
-
-  const args = form.watch("environment.slurm_options");
-  const validArgs = args.filter((arg) => arg.startsWith("-"));
 
   return (
     <div className="flex w-full flex-col gap-8 px-8 py-6">
@@ -207,147 +173,120 @@ const ProgrammingForm: React.FC<OwnProps> = ({
         <h1 className="text-2xl font-semibold">{title}</h1>
       </div>
       <Form {...form}>
-        <form
-          onSubmit={form.handleSubmit(onSubmit)}
-          className="flex flex-col gap-8"
-        >
-          <FormSection title="Task details">
-            <TextField label="Question" name="question" />
+        <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-8">
+          <FormSection title="Title">
+            <TextField name="title" className="w-1/3" />
           </FormSection>
-          <hr />
-          <FormSection title="Autograde?">
-            <CheckboxField label="" name="autograde" className="mt-2" />
+          <FormSection title="Description">
+            <TextAreaField name="description" rows={4} />
           </FormSection>
           <hr />
           <FormSection title="Environment">
-            <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+            <div className="flex flex-wrap gap-8">
               <SelectField
                 label="Language"
                 name="environment.language"
-                options={[{ label: "Python", value: "PYTHON" }]}
+                options={[{ label: "Python", value: "Python" }]}
                 disabled
               />
+              {/* Python version */}
               <SelectField
                 label="Version"
                 name="environment.extra_options.version"
-                options={(versions ?? []).map((version) => ({
+                options={(validPythonVersions ?? []).map((version) => ({
                   label: version,
                   value: version,
                 }))}
-                // disabled
               />
-              <NumberField
-                label="Time limit (seconds)"
-                name="environment.time_limit_secs"
-              />
-              <NumberField
-                label="Memory limit (MB)"
-                name="environment.memory_limit_mb"
-              />
+              {/* Time and memory limits */}
+              <NumberField label="Time limit (secs)" name="environment.time_limit_secs" className="w-fit" />
+              <NumberField label="Memory limit (MB)" name="environment.memory_limit_mb" className="w-fit" />
             </div>
-            {/* requirements.txt */}
-            <div>
-              <TextareaField
-                label="Packages (requirements.txt)"
-                name="environment.extra_options.requirements"
-                rows={8}
-              />
-            </div>
-            {/* slurm args */}
-            <div>
+            {/* Dependencies */}
+            <div className="flex flex-col gap-4">
               <div className="flex items-center justify-between">
-                <FormLabel>Slurm arguments</FormLabel>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  onClick={() =>
-                    form.setValue(
-                      "environment.slurm_options",
-                      form.getValues("environment.slurm_options").concat(""),
-                    )
-                  }
-                >
-                  Add argument
-                </Button>
+                <FormLabel>
+                  <div className="flex items-center gap-2">
+                    Dependencies
+                    <Button type="button" variant="secondary" size="sm" onClick={addDependency}>
+                      <PlusIcon />
+                    </Button>
+                  </div>
+                </FormLabel>
               </div>
-              <div className="mt-4 flex flex-col gap-2">
-                {form.getValues("environment.slurm_options").map((_, index) => (
-                  <div key={index} className="flex gap-4">
-                    <TextField
-                      name={`environment.slurm_options.${index}`}
-                      placeholder="--gpus=a100-80"
-                    />
-                    <Button
-                      type="button"
-                      variant="destructive"
-                      onClick={() =>
-                        form.setValue(
-                          "environment.slurm_options",
-                          form
-                            .getValues("environment.slurm_options")
-                            .filter((_, i) => i !== index),
-                        )
-                      }
-                    >
+              <div className="flex flex-wrap gap-4">
+                {dependencies.map((_, index) => (
+                  <div key={index} className="flex items-center gap-4">
+                    <TextField name={`environment.extra_options.requirements.${index}`} />
+                    <Button type="button" variant="destructive" onClick={() => deleteDependency(index)}>
                       <Trash />
                     </Button>
                   </div>
                 ))}
-                {validArgs.length > 0 && (
-                  <span className="text-gray-500">
-                    Your code will be run on slurm with flags:{" "}
-                    <code className="border px-2 font-mono">
-                      {validArgs.reduce((acc, curr) => `${acc} ${curr}`, "")}
-                    </code>
-                  </span>
-                )}
-                {args.length === 0 && (
-                  <EmptyPlaceholder description={"No arguments added."} />
-                )}
               </div>
+            </div>
+            {/* Slurm options */}
+            <div className="flex flex-col gap-4">
+              <div className="flex items-center justify-between">
+                <FormLabel>
+                  <div className="flex items-center gap-2">
+                    Slurm options
+                    <Button type="button" variant="secondary" size="sm" onClick={addSlurmOption}>
+                      <PlusIcon />
+                    </Button>
+                  </div>
+                </FormLabel>
+              </div>
+              <div className="flex flex-wrap gap-4">
+                {slurmOptions.map((_, index) => (
+                  <div key={index} className="flex items-center gap-4">
+                    <TextField name={`environment.slurm_options.${index}`} />
+                    <Button type="button" variant="destructive" onClick={() => deleteSlurmOption(index)}>
+                      <Trash />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+              {slurmOptions.filter((opt) => opt.length).length > 0 && (
+                <span className="text-gray-500">
+                  Preview of <code>srun</code> command used to execute programs:{" "}
+                  <code className="rounded-md border px-2 py-1 font-mono">{`srun ${slurmOptions.join(" ")}`}</code>
+                </span>
+              )}
             </div>
           </FormSection>
           <hr />
-          <FormSection title="Required inputs">
+          <FormSection title="User File Inputs">
             <div className="flex flex-col items-start gap-4">
-              <Button variant="secondary" type="button" onClick={addInput}>
+              <Button variant="secondary" type="button" onClick={addUserInput}>
                 <PlusIcon />
                 Add input
               </Button>
-              {form.getValues("required_inputs").map((input, index) => (
-                <Collapsible className="w-full" key={index}>
-                  <div className="flex gap-4 rounded-md border p-2" key={index}>
+              {userInputs.fields.map((input, index) => (
+                <Collapsible className="w-full" key={input.id}>
+                  <div className="flex items-center gap-4" key={input.id}>
                     <NodeInput
-                      className={["min-w-[160px]"]}
-                      value={input.id}
-                      onChange={(newId) => updateInput(index, { newId })}
+                      className={["min-w-[160px]", "py-2"]}
+                      value={input.label}
+                      onChange={(newLabel) => updateUserInput(index, { newLabel })}
                     />
                     <CollapsibleTrigger asChild>
-                      <Button variant={"secondary"} type="button">
-                        View/Edit {(input.data as FileType).name}
+                      <Button variant={"secondary"} type="button" className="text-xs">
+                        View/Edit
                       </Button>
                     </CollapsibleTrigger>
-                    <Button
-                      type="button"
-                      variant={"destructive"}
-                      onClick={() => inputs.remove(index)}
-                    >
+                    <Button type="button" variant={"destructive"} onClick={() => userInputs.remove(index)}>
                       <Trash />
                     </Button>
                   </div>
                   <CollapsibleContent>
-                    <div className="h-[50vh]">
+                    <div className="h-[30vh]">
                       <FileEditor
-                        fileName={(input.data as FileType).name}
-                        fileContent={(input.data as FileType).content}
-                        onUpdateFileName={(newFileName: string) =>
-                          updateInput(index, { newFileName })
-                        }
-                        onUpdateFileContent={(newFileContent: string) =>
-                          updateInput(index, { newFileContent })
-                        }
+                        fileName={input.label}
+                        fileContent={(input.data as File).content}
+                        onUpdateFileContent={(newFileContent: string) => updateUserInput(index, { newFileContent })}
                         editableContent={true}
-                        editableName={true}
+                        editableName={false}
                       />
                     </div>
                   </CollapsibleContent>
@@ -367,13 +306,13 @@ const ProgrammingForm: React.FC<OwnProps> = ({
               </div>
             </div>
             <div className="flex w-full flex-col gap-4">
-              {form.watch("testcases").map((testcase, index) => (
+              {testcases.fields.map((testcase, index) => (
                 <div className="mt-2" key={testcase.id}>
                   <Testcase
                     index={index}
                     testcase={testcase}
-                    userInput={userInputNode}
                     edit={true}
+                    sharedUserInput={sharedUserInputStep}
                     nodeGraphOnChange={updateTestcase(index)}
                     onDelete={testcases.remove}
                   />
@@ -381,10 +320,8 @@ const ProgrammingForm: React.FC<OwnProps> = ({
               ))}
             </div>
           </div>
-          <div className="mt-12">
-            <Button className="bg-purple-600 text-white hover:bg-purple-600 hover:bg-opacity-80">
-              Submit
-            </Button>
+          <div>
+            <Button className="mt-5 bg-purple-600 text-white hover:bg-purple-600 hover:bg-opacity-80">Submit</Button>
           </div>
         </form>
       </Form>

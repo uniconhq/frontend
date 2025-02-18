@@ -33,10 +33,7 @@ type OwnProps = {
   organisation: OrganisationPublic;
 } & PropsWithChildren;
 
-const EditOrganisationDialog: React.FC<OwnProps> = ({
-  organisation,
-  children,
-}) => {
+const EditOrganisationDialog: React.FC<OwnProps> = ({ organisation, children }) => {
   const form = useForm<OrganisationFormType>({
     resolver: zodResolver(organisationFormSchema),
     defaultValues: organisation,

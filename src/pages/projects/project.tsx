@@ -28,11 +28,7 @@ const Project = () => {
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-semibold">Problems</h2>
         {project.create_problems && (
-          <Button
-            variant="ghost"
-            className="hover:text-purple-300"
-            onClick={() => setNewProblemOpen(true)}
-          >
+          <Button variant="ghost" className="hover:text-purple-300" onClick={() => setNewProblemOpen(true)}>
             <Plus /> New Problem
           </Button>
         )}

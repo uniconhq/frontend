@@ -46,20 +46,12 @@ const FileEditor: React.FC<OwnProps> = ({
       {/* file tab */}
       <div className="flex w-fit items-center gap-2 border-b border-purple-200 py-1">
         {editableName ? (
-          <NodeInput
-            key={displayFileName}
-            value={displayFileName}
-            onChange={updateFileName}
-          />
+          <NodeInput key={displayFileName} value={displayFileName} onChange={updateFileName} />
         ) : (
           <span className="px-1 text-xs">{displayFileName}</span>
         )}
         {onDeselectFile && (
-          <Button
-            className="h-fit p-1"
-            variant={"ghost"}
-            onClick={onDeselectFile}
-          >
+          <Button className="h-fit p-1" variant={"ghost"} onClick={onDeselectFile}>
             <X />
           </Button>
         )}

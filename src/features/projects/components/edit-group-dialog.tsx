@@ -32,11 +32,7 @@ type OwnProps = {
   group: GroupPublic;
 } & PropsWithChildren;
 
-const EditGroupDialog: React.FC<OwnProps> = ({
-  children,
-  projectId,
-  group,
-}) => {
+const EditGroupDialog: React.FC<OwnProps> = ({ children, projectId, group }) => {
   const form = useForm<GroupFormType>({
     resolver: zodResolver(groupFormSchema),
     defaultValues: { name: group.name },
@@ -50,12 +46,8 @@ const EditGroupDialog: React.FC<OwnProps> = ({
     updateGroupMutation.mutate(
       {
         ...data,
-        supervisors: group.members
-          .filter((member) => member.is_supervisor)
-          .map((member) => member.user.id),
-        members: group.members
-          .filter((member) => !member.is_supervisor)
-          .map((member) => member.user.id),
+        supervisors: group.members.filter((member) => member.is_supervisor).map((member) => member.user.id),
+        members: group.members.filter((member) => !member.is_supervisor).map((member) => member.user.id),
       },
       {
         onError: () => {
@@ -76,9 +68,7 @@ const EditGroupDialog: React.FC<OwnProps> = ({
           <form onSubmit={form.handleSubmit(onSubmit)}>
             <DialogHeader>
               <DialogTitle>Edit group</DialogTitle>
-              <DialogDescription>
-                Edit the name of your group.
-              </DialogDescription>
+              <DialogDescription>Edit the name of your group.</DialogDescription>
               {error && <ErrorAlert message={error} />}
             </DialogHeader>
             <div className="grid gap-4 py-4">

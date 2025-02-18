@@ -2,12 +2,7 @@ import "@/index.css";
 
 import { Navigate, UIMatch } from "react-router-dom";
 
-import {
-  GroupPublic,
-  OrganisationPublicWithProjects,
-  Problem as ProblemType,
-  ProjectPublicWithProblems,
-} from "@/api";
+import { GroupPublic, OrganisationPublicWithProjects, Problem as ProblemType, ProjectPublicWithProblems } from "@/api";
 import AuthenticatedPage from "@/components/layout/authenticated-page";
 import Layout from "@/components/layout/layout.tsx";
 import CreateSubmission from "@/pages/create-submission";
@@ -36,12 +31,7 @@ import CreateProgramming from "@/pages/tasks/create-programming";
 import CreateShortAnswer from "@/pages/tasks/create-short-answer";
 import EditTask from "@/pages/tasks/edit-task";
 
-import {
-  groupLoader,
-  organisationLoader,
-  problemLoader,
-  projectLoader,
-} from "./loaders";
+import { groupLoader, organisationLoader, problemLoader, projectLoader } from "./loaders";
 
 export const routes = [
   {
@@ -167,7 +157,6 @@ export const routes = [
                         loader: groupLoader,
                         handle: {
                           crumb: (match: UIMatch<GroupPublic>) => {
-                            console.log({ match });
                             return {
                               label: match.data.name,
                               href: `/projects/${match.params.projectId}/groups/${match.params.groupId}`,
@@ -239,11 +228,8 @@ export const routes = [
                                 handle: {
                                   crumb: (match: UIMatch<ProblemType>) => ({
                                     label: `Task ${
-                                      (match.data.tasks.find(
-                                        (task) =>
-                                          task.id ===
-                                          Number(match.params.taskId),
-                                      )?.order_index ?? 0) + 1
+                                      (match.data.tasks.find((task) => task.id === Number(match.params.taskId))
+                                        ?.order_index ?? 0) + 1
                                     }`,
                                     href: `/projects/${match.params.projectId}/problems/${match.params.problemId}/edit`,
                                   }),
@@ -257,7 +243,7 @@ export const routes = [
                                     element: <CreateMultipleChoice />,
                                     handle: {
                                       crumb: () => ({
-                                        label: "New multiple choice task",
+                                        label: "New Multiple Choice Task",
                                       }),
                                     },
                                   },
@@ -266,7 +252,7 @@ export const routes = [
                                     element: <CreateMultipleResponse />,
                                     handle: {
                                       crumb: () => ({
-                                        label: "New multiple response task",
+                                        label: "New Multiple Response Task",
                                       }),
                                     },
                                   },
@@ -275,7 +261,7 @@ export const routes = [
                                     element: <CreateShortAnswer />,
                                     handle: {
                                       crumb: () => ({
-                                        label: "New short answer task",
+                                        label: "New Short Answer Task",
                                       }),
                                     },
                                   },
@@ -284,7 +270,7 @@ export const routes = [
                                     element: <CreateProgramming />,
                                     handle: {
                                       crumb: () => ({
-                                        label: "New programming task",
+                                        label: "New Programming Task",
                                       }),
                                     },
                                   },

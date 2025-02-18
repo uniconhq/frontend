@@ -4,8 +4,8 @@ import { useNavigate } from "react-router-dom";
 import { ShortAnswerTask } from "@/api";
 import { useUpdateTask } from "@/features/problems/queries";
 import { useProjectId } from "@/features/projects/hooks/use-id";
-
-import ShortAnswerForm, { ShortAnswerFormType } from "./short-answer-form";
+import ShortAnswerForm from "@/features/tasks/forms/short-answer-form";
+import { ShortAnswerFormT } from "@/lib/schema/short-answer-form";
 
 type OwnProps = {
   task: ShortAnswerTask;
@@ -18,7 +18,7 @@ const EditShortAnswer: React.FC<OwnProps> = ({ task, problemId }) => {
   const updateTaskMutation = useUpdateTask(problemId, task.id);
   const navigate = useNavigate();
 
-  const onSubmit: SubmitHandler<ShortAnswerFormType> = async (data) => {
+  const onSubmit: SubmitHandler<ShortAnswerFormT> = async (data) => {
     updateTaskMutation.mutate(
       {
         task: { ...task, ...data },
@@ -35,7 +35,7 @@ const EditShortAnswer: React.FC<OwnProps> = ({ task, problemId }) => {
 
   return (
     <ShortAnswerForm
-      title="Edit short answer task"
+      title="Edit Short Answer Task"
       onSubmit={onSubmit}
       initialValue={{ ...task, expected_answer: task.expected_answer ?? "" }}
     />

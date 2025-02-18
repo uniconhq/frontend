@@ -63,9 +63,7 @@ export function JoinOrganisationDialog({ open, onOpenChange }: OwnProps) {
           <form onSubmit={form.handleSubmit(onSubmit)}>
             <DialogHeader>
               <DialogTitle>Join organisation</DialogTitle>
-              <DialogDescription>
-                Enter your organisation's invitation key.
-              </DialogDescription>
+              <DialogDescription>Enter your organisation's invitation key.</DialogDescription>
               {error && <ErrorAlert message={error} />}
             </DialogHeader>
             <div className="grid gap-4 py-4">

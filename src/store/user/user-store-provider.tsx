@@ -13,11 +13,7 @@ export const UserStoreProvider = ({ children }: { children: ReactNode }) => {
     storeRef.current = createUserStore();
   }
 
-  return (
-    <UserStoreContext.Provider value={storeRef.current}>
-      {children}
-    </UserStoreContext.Provider>
-  );
+  return <UserStoreContext.Provider value={storeRef.current}>{children}</UserStoreContext.Provider>;
 };
 
 export const useUserStore = <T,>(selector: (store: UserStore) => T): T => {

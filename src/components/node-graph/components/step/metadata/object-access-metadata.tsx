@@ -27,7 +27,7 @@ const ObjectAccessMetadata: React.FC<OwnProps> = ({ step }) => {
             dispatch({
               type: GraphActionType.UpdateStepMetadata,
               payload: {
-                stepId: step.id,
+                id: step.id,
                 stepMetadata: { key: newKey },
               },
             })

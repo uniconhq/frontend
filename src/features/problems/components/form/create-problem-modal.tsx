@@ -10,12 +10,7 @@ import ErrorAlert from "@/components/form/fields/error-alert";
 import TextField from "@/components/form/fields/text-field";
 import TextareaField from "@/components/form/fields/textarea-field";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Form } from "@/components/ui/form";
 import { useProjectId } from "@/features/projects/hooks/use-id";
 
@@ -79,24 +74,15 @@ const CreateProblemModal: React.FC<OwnProps> = ({ setOpen }) => {
         <div>
           {error && <ErrorAlert message={error} />}
           <Form {...form}>
-            <form
-              onSubmit={form.handleSubmit(onSubmit)}
-              className="flex flex-col gap-2"
-            >
+            <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-2">
               <TextField label="Title" name="name" />
               <TextareaField label="Description" name="description" rows={5} />
               <CheckboxField label="Restricted" name="restricted" />
               <div className="mt-6 flex justify-between">
-                <Button
-                  variant="outline"
-                  type="button"
-                  onClick={() => setOpen(false)}
-                >
+                <Button variant="outline" type="button" onClick={() => setOpen(false)}>
                   Cancel
                 </Button>
-                <Button className="bg-purple-600 text-white hover:bg-purple-600 hover:bg-opacity-80">
-                  Create
-                </Button>
+                <Button className="bg-purple-600 text-white hover:bg-purple-600 hover:bg-opacity-80">Create</Button>
               </div>
             </form>
           </Form>

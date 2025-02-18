@@ -16,8 +16,7 @@ const MultipleChoiceResult: React.FC<OwnProps> = ({ taskAttempt }) => {
 
   const choices = taskAttempt.task.other_fields?.choices as unknown as Choice[];
   const chosenAnswerId = taskAttempt.other_fields.user_input as string;
-  const correctAnswerId = taskAttempt.task.other_fields
-    ?.expected_answer as string;
+  const correctAnswerId = taskAttempt.task.other_fields?.expected_answer as string;
 
   return (
     <SubmittedChoices
