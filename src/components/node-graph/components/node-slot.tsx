@@ -1,48 +1,39 @@
-import {
-  Handle,
-  HandleType,
-  Position as HandlePosition,
-  useNodeConnections,
-} from "@xyflow/react";
+import { Handle, HandleType, Position as HandlePosition, useNodeConnections } from "@xyflow/react";
 import { Trash } from "lucide-react";
 import { twJoin } from "tailwind-merge";
 
+import { StepSocket } from "@/api";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 import NodeInput from "./step/node-input";
 
 interface NodeSlotProps {
-  id: string;
-  label: string;
+  socket: StepSocket;
   type: HandleType;
   hideLabel?: boolean;
   edit?: boolean;
-  onEditSocketId?: (socketId: string) => void;
+  onEditSocketLabel?: (newSocketLabel: string) => void;
   onDeleteSocket?: () => void;
   style?: React.CSSProperties;
 }
 
 export function NodeSlot({
-  id,
+  socket,
   type,
   hideLabel = false,
   edit = false,
-  onEditSocketId,
+  onEditSocketLabel,
   onDeleteSocket,
   style,
 }: NodeSlotProps) {
-  const [slotType] = id.split(".");
-  const isControl = slotType === "CONTROL";
-  const handleEditSocketId = (newSocketId: string) => {
-    if (onEditSocketId) {
-      onEditSocketId(newSocketId);
-    }
+  const handleEditSocketLabel = (newSocketLabel: string) => {
+    if (onEditSocketLabel) onEditSocketLabel(newSocketLabel);
   };
 
   const connections = useNodeConnections({
     handleType: type,
-    handleId: id,
+    handleId: socket.id,
   });
   const hasConnections = connections.length > 0;
 
@@ -66,14 +57,12 @@ export function NodeSlot({
           type === "target" && "rounded-bl-full rounded-tl-full",
           type === "source" && "rounded-br-full rounded-tr-full",
         )}
-        id={id}
+        id={socket.id}
         type={type}
-        position={
-          type === "target" ? HandlePosition.Left : HandlePosition.Right
-        }
+        position={type === "target" ? HandlePosition.Left : HandlePosition.Right}
       />
       {!hideLabel &&
-        (edit && !isControl ? (
+        (edit && socket.type !== "CONTROL" ? (
           <div
             className={cn("flex grow justify-between gap-2", {
               "flex-row-reverse space-x-reverse": type === "source",
@@ -85,10 +74,8 @@ export function NodeSlot({
                   "text-right": type === "source",
                 },
               ]}
-              value={id}
-              onChange={(newValue) => {
-                handleEditSocketId(newValue);
-              }}
+              value={socket.label ?? ""}
+              onChange={handleEditSocketLabel}
             />
             <Button
               size={"sm"}
@@ -101,7 +88,7 @@ export function NodeSlot({
             </Button>
           </div>
         ) : (
-          <span className="text-xs">{id}</span>
+          <span className="text-xs">{socket.label ?? ""}</span>
         ))}
     </div>
   );

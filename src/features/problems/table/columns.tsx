@@ -4,12 +4,7 @@ import { Link } from "react-router-dom";
 
 import { ProblemBaseWithPermissions } from "@/api";
 import { Badge } from "@/components/ui/badge";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { formatDateShort } from "@/utils/date";
 
@@ -21,9 +16,7 @@ export const columns: ColumnDef<ProblemBaseWithPermissions>[] = [
         <div className="flex items-center gap-2">
           <span>{row.original.name}</span>
           {!row.original.published && <Badge variant={"orange"}>Draft</Badge>}
-          {row.original.restricted && (
-            <Badge variant={"destructive"}>Restricted</Badge>
-          )}
+          {row.original.restricted && <Badge variant={"destructive"}>Restricted</Badge>}
         </div>
       );
     },
@@ -34,9 +27,7 @@ export const columns: ColumnDef<ProblemBaseWithPermissions>[] = [
       const isOpen = new Date(row.original.started_at) <= new Date();
       return (
         <div className="flex items-center gap-2">
-          <span className={cn(!isOpen && "font-bold")}>
-            {formatDateShort(row.original.started_at)}
-          </span>
+          <span className={cn(!isOpen && "font-bold")}>{formatDateShort(row.original.started_at)}</span>
           {!isOpen && (
             <TooltipProvider>
               <Tooltip>

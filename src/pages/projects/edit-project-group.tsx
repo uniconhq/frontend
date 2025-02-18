@@ -10,13 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import EditGroupDialog from "@/features/projects/components/edit-group-dialog";
 import { useGroupId, useProjectId } from "@/features/projects/hooks/use-id";
 import {
@@ -34,23 +28,15 @@ const EditProjectGroup = () => {
   const projectId = useProjectId();
   const groupId = useGroupId();
   const { data: project, isLoading } = useQuery(getProjectById(projectId));
-  const { data: group, isLoading: isLoadingGroup } = useQuery(
-    getProjectGroupById(projectId, groupId),
-  );
-  const { data: users, isLoading: isLoadingUsers } = useQuery(
-    getProjectUsersById(projectId),
-  );
+  const { data: group, isLoading: isLoadingGroup } = useQuery(getProjectGroupById(projectId, groupId));
+  const { data: users, isLoading: isLoadingUsers } = useQuery(getProjectUsersById(projectId));
 
-  if (project && !project.edit_groups) {
-    throw Unauthorized;
-  }
+  if (project && !project.edit_groups) throw Unauthorized;
 
   const userMap = new Map<number, UserPublicWithRolesAndGroups>();
   users?.forEach((user) => userMap.set(user.id, user));
 
-  const [usersInGroup, setUsersInGroup] = useState(
-    [] as MiniGroupMemberPublic[],
-  );
+  const [usersInGroup, setUsersInGroup] = useState([] as MiniGroupMemberPublic[]);
   const [hideUsersInOtherGroups, setHideUsersInOtherGroups] = useState(true);
   const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
 
@@ -72,28 +58,19 @@ const EditProjectGroup = () => {
     return <div>Something went wrong.</div>;
   }
 
-  const usersNotInGroup = users.filter(
-    (user) => !usersInGroup.some((member) => member.user.id === user.id),
-  );
+  const usersNotInGroup = users.filter((user) => !usersInGroup.some((member) => member.user.id === user.id));
 
   const onSave = () => {
     updateGroupMutation.mutate({
       ...group,
-      members: usersInGroup
-        .filter((member) => !member.is_supervisor)
-        .map((member) => member.user.id),
-      supervisors: usersInGroup
-        .filter((member) => member.is_supervisor)
-        .map((member) => member.user.id),
+      members: usersInGroup.filter((member) => !member.is_supervisor).map((member) => member.user.id),
+      supervisors: usersInGroup.filter((member) => member.is_supervisor).map((member) => member.user.id),
     });
   };
 
   const filteredUsersNotInGroup = hideUsersInOtherGroups
     ? usersNotInGroup.filter(
-        (user) =>
-          user.group_members.filter(
-            (groupMember) => groupMember.group.id !== groupId,
-          ).length === 0,
+        (user) => user.group_members.filter((groupMember) => groupMember.group.id !== groupId).length === 0,
       )
     : usersNotInGroup;
 
@@ -111,10 +88,7 @@ const EditProjectGroup = () => {
           )}
 
           {project.delete_groups && (
-            <Button
-              variant={"destructive"}
-              onClick={() => setOpenDeleteDialog(true)}
-            >
+            <Button variant={"destructive"} onClick={() => setOpenDeleteDialog(true)}>
               <TrashIcon />
             </Button>
           )}
@@ -140,29 +114,18 @@ const EditProjectGroup = () => {
             {filteredUsersNotInGroup?.map((user) => (
               <Card
                 className={cn("cursor-pointer p-2", {
-                  "bg-red-950":
-                    group.members.filter((member) => user.id === member.user.id)
-                      .length > 0,
+                  "bg-red-950": group.members.filter((member) => user.id === member.user.id).length > 0,
                 })}
                 onClick={() => {
-                  setUsersInGroup([
-                    ...usersInGroup,
-                    { user, is_supervisor: false },
-                  ]);
+                  setUsersInGroup([...usersInGroup, { user, is_supervisor: false }]);
                 }}
               >
                 <div className="flex items-center gap-2">
                   <Checkbox className="h-4 w-4" checked={false} />
-                  {user.username}{" "}
-                  <Badge variant={"secondary"}>
-                    {userMap.get(user.id)?.roles[0]?.name}
-                  </Badge>
+                  {user.username} <Badge variant={"secondary"}>{userMap.get(user.id)?.roles[0]?.name}</Badge>
                   {user.group_members.length > 0 && (
                     <span className="text-sm text-gray-500">
-                      existing member of group(s):{" "}
-                      {user.group_members.map(
-                        (group_member) => group_member.group.name,
-                      )}
+                      existing member of group(s): {user.group_members.map((group_member) => group_member.group.name)}
                     </span>
                   )}
                 </div>
@@ -175,29 +138,17 @@ const EditProjectGroup = () => {
           <div className="mt-4 flex max-h-[50vh] flex-col gap-2 overflow-y-auto">
             {usersInGroup.map((groupMember) => (
               <Card
-                className={cn(
-                  "flex cursor-pointer items-center justify-between p-2",
-                  {
-                    "bg-lime-950":
-                      group.members.filter(
-                        (member) => groupMember.user.id === member.user.id,
-                      ).length === 0,
-                  },
-                )}
+                className={cn("flex cursor-pointer items-center justify-between p-2", {
+                  "bg-lime-950": group.members.filter((member) => groupMember.user.id === member.user.id).length === 0,
+                })}
                 onClick={() => {
-                  setUsersInGroup(
-                    usersInGroup.filter(
-                      (member) => member.user.id !== groupMember.user.id,
-                    ),
-                  );
+                  setUsersInGroup(usersInGroup.filter((member) => member.user.id !== groupMember.user.id));
                 }}
               >
                 <div className="flex items-center gap-2">
                   <Checkbox className="h-4 w-4" checked />
                   {groupMember.user.username}
-                  <Badge variant={"secondary"}>
-                    {userMap.get(groupMember.user.id)?.roles[0]?.name}
-                  </Badge>
+                  <Badge variant={"secondary"}>{userMap.get(groupMember.user.id)?.roles[0]?.name}</Badge>
                 </div>
                 <Select
                   value={groupMember.is_supervisor ? "supervisor" : "member"}

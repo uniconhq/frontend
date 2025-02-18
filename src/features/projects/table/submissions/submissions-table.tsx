@@ -9,9 +9,7 @@ type OwnProps = {
 };
 
 const SubmissionsTable: React.FC<OwnProps> = ({ data, showUser }) => {
-  return (
-    <DataTable columns={showUser ? columnsWithUser : columns} data={data} />
-  );
+  return <DataTable columns={showUser ? columnsWithUser : columns} data={data} />;
 };
 
 export default SubmissionsTable;

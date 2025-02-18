@@ -8,10 +8,7 @@ import EmptyPlaceholder from "@/components/layout/empty-placeholder";
 import { Button } from "@/components/ui/button";
 import { Card, CardTitle } from "@/components/ui/card";
 import EditOrganisationDialog from "@/features/organisations/components/edit-organisation-dialog";
-import {
-  getOrganisationById,
-  useDeleteOrganisation,
-} from "@/features/organisations/queries";
+import { getOrganisationById, useDeleteOrganisation } from "@/features/organisations/queries";
 import { useOrganisationId } from "@/features/projects/hooks/use-id";
 
 const Organisation = () => {
@@ -43,10 +40,7 @@ const Organisation = () => {
             </Button>
           </EditOrganisationDialog>
           {organisation.delete && (
-            <Button
-              variant="destructive"
-              onClick={() => setOpenDeleteDialog(true)}
-            >
+            <Button variant="destructive" onClick={() => setOpenDeleteDialog(true)}>
               <Trash />
             </Button>
           )}
@@ -74,9 +68,7 @@ const Organisation = () => {
         </Link>
       </div>
       <div className="flex flex-col gap-4">
-        {organisation.projects.length === 0 && (
-          <EmptyPlaceholder description="No projects found." />
-        )}
+        {organisation.projects.length === 0 && <EmptyPlaceholder description="No projects found." />}
         {organisation.projects.map((project) => (
           <Link to={`/projects/${project.id}`} key={project.id}>
             <Card className="group flex justify-between p-4 hover:opacity-80">

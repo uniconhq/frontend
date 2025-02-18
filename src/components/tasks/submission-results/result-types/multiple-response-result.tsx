@@ -14,19 +14,14 @@ const MultipleResponseResult: React.FC<OwnProps> = ({ taskAttempt }) => {
     return null;
   }
 
-  const selectedChoices = taskResult?.result?.correct_choices.concat(
-    taskResult.result?.incorrect_choices,
-  );
+  const selectedChoices = taskResult?.result?.correct_choices.concat(taskResult.result?.incorrect_choices);
 
   return (
     <SubmittedChoices
-      choices={(
-        taskAttempt.task.other_fields?.choices as unknown as Choice[]
-      ).map((choice) => ({
+      choices={(taskAttempt.task.other_fields?.choices as unknown as Choice[]).map((choice) => ({
         text: choice.text,
         wasChosen: selectedChoices.includes(choice.id),
-        isCorrect:
-          taskResult.result?.correct_choices.includes(choice.id) ?? false,
+        isCorrect: taskResult.result?.correct_choices.includes(choice.id) ?? false,
       }))}
     />
   );

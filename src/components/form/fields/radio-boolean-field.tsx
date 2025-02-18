@@ -1,13 +1,6 @@
 import { useFormContext } from "react-hook-form";
 
-import {
-  FormControl,
-  FormDescription,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
+import { FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
@@ -19,13 +12,7 @@ interface RadioBooleanField {
   falseLabel: string;
 }
 
-function RadioBooleanField({
-  name,
-  label,
-  description,
-  trueLabel,
-  falseLabel,
-}: RadioBooleanField) {
+function RadioBooleanField({ name, label, description, trueLabel, falseLabel }: RadioBooleanField) {
   const { control, setValue, getValues } = useFormContext();
 
   return (

@@ -1,9 +1,4 @@
-import {
-  MultipleChoiceTask,
-  MultipleResponseTask,
-  ProgrammingTask,
-  ShortAnswerTask,
-} from "@/api";
+import { MultipleChoiceTask, MultipleResponseTask, ProgrammingTask, ShortAnswerTask } from "@/api";
 import { MultipleChoice } from "@/components/tasks/multiple-choice";
 import { MultipleResponse } from "@/components/tasks/multiple-response";
 import { Programming } from "@/components/tasks/programming";
@@ -16,11 +11,7 @@ export function Task({
 }: {
   submit: boolean;
   problemId: number;
-  task:
-    | MultipleChoiceTask
-    | MultipleResponseTask
-    | ProgrammingTask
-    | ShortAnswerTask;
+  task: MultipleChoiceTask | MultipleResponseTask | ProgrammingTask | ShortAnswerTask;
 }) {
   // Based on the task type, render the appropriate component
   switch (task.type) {
@@ -33,8 +24,6 @@ export function Task({
     case "PROGRAMMING_TASK":
       return <Programming submit={submit} problemId={problemId} task={task} />;
     default:
-      return (
-        <div className="font-mono text-red-400">Task type not supported</div>
-      );
+      return <div className="font-mono text-red-400">Task type not supported</div>;
   }
 }

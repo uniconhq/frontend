@@ -11,14 +11,7 @@ import { Box } from "@/components/ui/box";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { useUserStore } from "@/store/user/user-store-provider";
 
@@ -84,23 +77,16 @@ const SignUp = () => {
       <div className="flex h-full w-full flex-col items-center justify-center gap-4">
         <h1 className="font-mono text-5xl text-purple-400">Unicon 🦄</h1>
         <h2 className="mt-1 text-xl italic text-neutral-300">
-          <span className="text-purple-400 underline">Uni</span>versal
-          Programming <span className="text-purple-400 underline">Con</span>
+          <span className="text-purple-400 underline">Uni</span>versal Programming{" "}
+          <span className="text-purple-400 underline">Con</span>
           test Platform
         </h2>
         <Card className="mt-8 w-full border-neutral-500 bg-neutral-800 p-6 sm:max-w-lg">
           <CardContent>
             <Box className="space-y-6">
-              {isError && (
-                <ErrorAlert
-                  message={"Your username is already taken. Please try again."}
-                />
-              )}
+              {isError && <ErrorAlert message={"Your username is already taken. Please try again."} />}
               <Form {...form}>
-                <form
-                  className="space-y-10"
-                  onSubmit={form.handleSubmit(onSubmit)}
-                >
+                <form className="space-y-10" onSubmit={form.handleSubmit(onSubmit)}>
                   <div className="space-y-4">
                     <TextField label="Username" name="username" />
                     {/* <PasswordField label="Password" name="password" />
@@ -114,14 +100,9 @@ const SignUp = () => {
                         name={"password"}
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel className="!text-current">
-                              Password
-                            </FormLabel>
+                            <FormLabel className="!text-current">Password</FormLabel>
                             <FormControl>
-                              <Input
-                                {...field}
-                                type={isPasswordVisible ? "text" : "password"}
-                              />
+                              <Input {...field} type={isPasswordVisible ? "text" : "password"} />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -134,14 +115,9 @@ const SignUp = () => {
                         name={"confirmPassword"}
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel className="!text-current">
-                              Confirm password
-                            </FormLabel>
+                            <FormLabel className="!text-current">Confirm password</FormLabel>
                             <FormControl>
-                              <Input
-                                {...field}
-                                type={isPasswordVisible ? "text" : "password"}
-                              />
+                              <Input {...field} type={isPasswordVisible ? "text" : "password"} />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -153,11 +129,7 @@ const SignUp = () => {
                         checked={isPasswordVisible}
                         id="password-visibility"
                         onCheckedChange={(checkedState) =>
-                          setIsPasswordVisible(
-                            checkedState === "indeterminate"
-                              ? false
-                              : checkedState,
-                          )
+                          setIsPasswordVisible(checkedState === "indeterminate" ? false : checkedState)
                         }
                       />
                       <label

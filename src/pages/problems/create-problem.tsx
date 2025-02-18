@@ -65,15 +65,9 @@ const CreateProblem = () => {
       {error && <ErrorAlert message={error} />}
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)}>
-          <TextareaField
-            label="Contest definition"
-            name="definition"
-            rows={20}
-          />
+          <TextareaField label="Contest definition" name="definition" rows={20} />
           <div className="mt-12">
-            <Button className="bg-purple-600 text-white hover:bg-purple-600 hover:bg-opacity-80">
-              Submit
-            </Button>
+            <Button className="bg-purple-600 text-white hover:bg-purple-600 hover:bg-opacity-80">Submit</Button>
           </div>
         </form>
       </Form>

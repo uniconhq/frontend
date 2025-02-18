@@ -63,9 +63,7 @@ const AddRoleDialog: React.FC<OwnProps> = ({ children, projectId }) => {
           <form onSubmit={form.handleSubmit(onSubmit)}>
             <DialogHeader>
               <DialogTitle>Add role</DialogTitle>
-              <DialogDescription>
-                Enter the name of your new role.
-              </DialogDescription>
+              <DialogDescription>Enter the name of your new role.</DialogDescription>
               {error && <ErrorAlert message={error} />}
             </DialogHeader>
             <div className="grid gap-4 py-4">

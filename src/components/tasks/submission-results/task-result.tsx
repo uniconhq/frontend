@@ -1,11 +1,5 @@
 import { TaskAttemptPublic } from "@/api";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
 import MultipleChoiceResult from "./result-types/multiple-choice-result";
@@ -28,8 +22,7 @@ const taskStatusToColor = (status: string) => {
   }
 };
 
-const parseDateTime = (dateTimeString: string) =>
-  new Date(dateTimeString).toLocaleString();
+const parseDateTime = (dateTimeString: string) => new Date(dateTimeString).toLocaleString();
 
 const TaskResultCard: React.FC<OwnProps> = ({ title, taskAttempt }) => {
   const taskResult = taskAttempt.task_results[0];
@@ -52,10 +45,7 @@ const TaskResultCard: React.FC<OwnProps> = ({ title, taskAttempt }) => {
               )}
             ></span>
             <span
-              className={cn(
-                "absolute inline-flex h-4 w-4 rounded-full",
-                taskStatusToColor(taskResult.status),
-              )}
+              className={cn("absolute inline-flex h-4 w-4 rounded-full", taskStatusToColor(taskResult.status))}
             ></span>
           </span>
           <span className="text-lg font-medium">{title}</span>
@@ -63,9 +53,7 @@ const TaskResultCard: React.FC<OwnProps> = ({ title, taskAttempt }) => {
         {taskResult.status != "SKIPPED" && (
           <CardDescription className="flex flex-col gap-1 py-2 font-mono text-sm">
             <span>STARTED: {parseDateTime(taskResult.started_at)}</span>
-            {taskResult.completed_at && (
-              <span>FINISHED: {parseDateTime(taskResult.completed_at)}</span>
-            )}
+            {taskResult.completed_at && <span>FINISHED: {parseDateTime(taskResult.completed_at)}</span>}
           </CardDescription>
         )}
       </CardHeader>
@@ -74,20 +62,14 @@ const TaskResultCard: React.FC<OwnProps> = ({ title, taskAttempt }) => {
           <span className="text-gray-300">Manual grading is required!</span>
         ) : (
           <>
-            {taskAttempt.task.type === "PROGRAMMING_TASK" && (
-              <ProgrammingResult taskAttempt={taskAttempt} />
-            )}
-            {taskAttempt.task.type === "MULTIPLE_CHOICE_TASK" && (
-              <MultipleChoiceResult taskAttempt={taskAttempt} />
-            )}
+            {taskAttempt.task.type === "PROGRAMMING_TASK" && <ProgrammingResult taskAttempt={taskAttempt} />}
+            {taskAttempt.task.type === "MULTIPLE_CHOICE_TASK" && <MultipleChoiceResult taskAttempt={taskAttempt} />}
             {taskAttempt.task.type === "SHORT_ANSWER_TASK" && (
               <pre className="whitespace-pre-wrap rounded-md bg-gray-900 p-4 text-gray-100">
                 {JSON.stringify(taskResult.result, null, 2)}
               </pre>
             )}
-            {taskAttempt.task.type === "MULTIPLE_RESPONSE_TASK" && (
-              <MultipleResponseResult taskAttempt={taskAttempt} />
-            )}
+            {taskAttempt.task.type === "MULTIPLE_RESPONSE_TASK" && <MultipleResponseResult taskAttempt={taskAttempt} />}
           </>
         )}
       </CardContent>

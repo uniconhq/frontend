@@ -10,10 +10,7 @@ import TextField from "@/components/form/fields/text-field";
 import { Button } from "@/components/ui/button";
 import { Form } from "@/components/ui/form";
 import { useOrganisationId } from "@/features/projects/hooks/use-id";
-import {
-  ProjectQueryKeys,
-  useCreateProject,
-} from "@/features/projects/queries";
+import { ProjectQueryKeys, useCreateProject } from "@/features/projects/queries";
 
 const projectFormSchema = z.object({
   name: z.string().min(1, "Name cannot be empty"),
@@ -59,15 +56,10 @@ const CreateProject = () => {
       </div>
       {error && <ErrorAlert message={error} />}
       <Form {...form}>
-        <form
-          onSubmit={form.handleSubmit(onSubmit)}
-          className="flex flex-col gap-6"
-        >
+        <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-6">
           <TextField name="name" label="Name" />
           <div>
-            <Button className="bg-purple-600 text-white hover:bg-purple-600 hover:bg-opacity-80">
-              Submit
-            </Button>
+            <Button className="bg-purple-600 text-white hover:bg-purple-600 hover:bg-opacity-80">Submit</Button>
           </div>
         </form>
       </Form>

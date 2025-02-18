@@ -21,10 +21,7 @@ const ProblemsTable: React.FC<OwnProps> = ({ data }) => {
       columns={columns}
       data={data.map((row) => ({
         ...row,
-        className:
-          new Date() < new Date(row.started_at)
-            ? "bg-neutral-700/30 !text-gray-400"
-            : "",
+        className: new Date() < new Date(row.started_at) ? "bg-neutral-700/30 !text-gray-400" : "",
       }))}
     />
   );

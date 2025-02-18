@@ -5,19 +5,8 @@ import { useFormContext } from "react-hook-form";
 
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
-import {
-  FormControl,
-  FormDescription,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+import { FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 
@@ -67,16 +56,9 @@ export function DateTimeField({ name, label, description }: DateFieldProps) {
               <FormControl>
                 <Button
                   variant={"outline"}
-                  className={cn(
-                    "w-full pl-3 text-left font-normal",
-                    !field.value && "text-muted-foreground",
-                  )}
+                  className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")}
                 >
-                  {field.value ? (
-                    format(field.value, "dd/MM/yyyy hh:mm aa")
-                  ) : (
-                    <span>DD/MM/YYYY hh:mm aa</span>
-                  )}
+                  {field.value ? format(field.value, "dd/MM/yyyy hh:mm aa") : <span>DD/MM/YYYY hh:mm aa</span>}
                   <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                 </Button>
               </FormControl>
@@ -87,9 +69,7 @@ export function DateTimeField({ name, label, description }: DateFieldProps) {
                   mode="single"
                   selected={field.value ? new Date(field.value) : undefined}
                   onSelect={handleDateSelect}
-                  defaultMonth={
-                    field.value ? new Date(field.value) : new Date()
-                  }
+                  defaultMonth={field.value ? new Date(field.value) : new Date()}
                   initialFocus
                 />
                 <div className="flex flex-col divide-y sm:h-[300px] sm:flex-row sm:divide-x sm:divide-y-0">
@@ -102,16 +82,10 @@ export function DateTimeField({ name, label, description }: DateFieldProps) {
                             key={hour}
                             size="icon"
                             variant={
-                              field.value &&
-                              new Date(field.value).getHours() % 12 ===
-                                hour % 12
-                                ? "default"
-                                : "ghost"
+                              field.value && new Date(field.value).getHours() % 12 === hour % 12 ? "default" : "ghost"
                             }
                             className="aspect-square shrink-0 sm:w-full"
-                            onClick={() =>
-                              handleTimeChange("hour", hour.toString())
-                            }
+                            onClick={() => handleTimeChange("hour", hour.toString())}
                           >
                             {hour}
                           </Button>
@@ -127,16 +101,9 @@ export function DateTimeField({ name, label, description }: DateFieldProps) {
                           <Button
                             key={minute}
                             size="icon"
-                            variant={
-                              field.value &&
-                              new Date(field.value).getMinutes() === minute
-                                ? "default"
-                                : "ghost"
-                            }
+                            variant={field.value && new Date(field.value).getMinutes() === minute ? "default" : "ghost"}
                             className="aspect-square shrink-0 sm:w-full"
-                            onClick={() =>
-                              handleTimeChange("minute", minute.toString())
-                            }
+                            onClick={() => handleTimeChange("minute", minute.toString())}
                           >
                             {minute.toString().padStart(2, "0")}
                           </Button>
@@ -152,10 +119,8 @@ export function DateTimeField({ name, label, description }: DateFieldProps) {
                           size="icon"
                           variant={
                             field.value &&
-                            ((ampm === "AM" &&
-                              new Date(field.value).getHours() < 12) ||
-                              (ampm === "PM" &&
-                                new Date(field.value).getHours() >= 12))
+                            ((ampm === "AM" && new Date(field.value).getHours() < 12) ||
+                              (ampm === "PM" && new Date(field.value).getHours() >= 12))
                               ? "default"
                               : "ghost"
                           }
@@ -171,9 +136,7 @@ export function DateTimeField({ name, label, description }: DateFieldProps) {
               </div>
             </PopoverContent>
           </Popover>
-          <FormDescription>
-            {description && <FormDescription>{description}</FormDescription>}
-          </FormDescription>
+          <FormDescription>{description && <FormDescription>{description}</FormDescription>}</FormDescription>
           <FormMessage />
         </FormItem>
       )}

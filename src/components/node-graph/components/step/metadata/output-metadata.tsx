@@ -3,20 +3,14 @@ import { useCallback, useContext } from "react";
 
 import { OutputSocket, OutputStep } from "@/api";
 import { Button } from "@/components/ui/button";
-import {
-  Table,
-  TableBody,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Table, TableBody, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   GraphActionType,
   GraphContext,
   GraphDispatchContext,
-  SocketType,
+  SocketDir,
 } from "@/features/problems/components/tasks/graph-context";
-import { isControlSocket } from "@/utils/socket";
+import { createSocket } from "@/lib/compute-graph";
 
 import OutputTable from "../output-table/output-table";
 import OutputMetadataRow from "./output-metadata-row";
@@ -29,31 +23,29 @@ const OutputMetadata: React.FC<OwnProps> = ({ step }) => {
   const { edit } = useContext(GraphContext)!;
   const dispatch = useContext(GraphDispatchContext)!;
 
-  // Does not handle updating socket ids. See handleEditSocketId for that
-  const updateSocketMetadata =
-    (metadataIndex: number) => (newMetadata: Partial<OutputSocket>) => {
-      const { id: _, ...newMetadataWithoutId } = newMetadata;
-      dispatch({
-        type: GraphActionType.UpdateSocketMetadata,
-        payload: {
-          stepId: step.id,
-          socketId: step.inputs[metadataIndex].id,
-          socketMetadata: newMetadataWithoutId,
-        },
-      });
-    };
-
-  const handleEditSocketId = (oldSocketId: string) => (newSocketId: string) => {
+  const updateSocketMetadata = (metadataIndex: number) => (newMetadata: Partial<OutputSocket>) => {
+    const { id: _, ...newMetadataWithoutId } = newMetadata;
     dispatch({
-      type: GraphActionType.UpdateSocketId,
-      payload: { stepId: step.id, oldSocketId, newSocketId },
+      type: GraphActionType.UpdateSocketMetadata,
+      payload: {
+        stepId: step.id,
+        socketId: step.inputs[metadataIndex].id,
+        socketMetadata: newMetadataWithoutId,
+      },
+    });
+  };
+
+  const handleEditSocketLabel = (socketId: string) => (newSocketLabel: string) => {
+    dispatch({
+      type: GraphActionType.UpdateSocketLabel,
+      payload: { stepId: step.id, socketId, newSocketLabel },
     });
   };
 
   const addInputSocket = useCallback(() => {
     dispatch({
       type: GraphActionType.AddSocket,
-      payload: { stepId: step.id, socketType: SocketType.Input },
+      payload: { stepId: step.id, socketDir: SocketDir.Input, socket: createSocket("DATA", "") },
     });
   }, [dispatch, step]);
 
@@ -77,23 +69,24 @@ const OutputMetadata: React.FC<OwnProps> = ({ step }) => {
         <Table hideOverflow>
           <TableHeader>
             <TableRow>
+              {/* Socket */}
               <TableHead></TableHead>
-              <TableHead>Socket ID</TableHead>
               <TableHead>Label</TableHead>
               <TableHead>Expected</TableHead>
               <TableHead>Public</TableHead>
+              {/* Delete Button */}
               <TableHead></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {step.inputs.map((socket, index) => (
               <OutputMetadataRow
-                key={index}
+                key={socket.id}
                 socket={socket}
                 onUpdateSocketMetadata={updateSocketMetadata(index)}
-                onEditSocketId={handleEditSocketId}
+                onEditSocketLabel={handleEditSocketLabel(socket.id)}
                 onDeleteSocket={deleteSocket(socket.id)}
-                isEditable={!isControlSocket(socket)}
+                isEditable={socket.type != "CONTROL"}
               />
             ))}
           </TableBody>

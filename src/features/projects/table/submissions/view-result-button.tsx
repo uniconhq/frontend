@@ -9,10 +9,7 @@ type OwnProps = {
 const ViewResultButton = ({ submissionId }: OwnProps) => {
   const projectId = useProjectId();
   return (
-    <Link
-      to={`/projects/${projectId}/submissions/${submissionId}`}
-      className="hover:text-purple-300 hover:underline"
-    >
+    <Link to={`/projects/${projectId}/submissions/${submissionId}`} className="hover:text-purple-300 hover:underline">
       View results
     </Link>
   );

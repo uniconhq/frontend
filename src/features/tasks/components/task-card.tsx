@@ -19,15 +19,7 @@ type OwnProps = {
   provided?: DraggableProvided;
 };
 
-const TaskCard: React.FC<OwnProps> = ({
-  index,
-  task,
-  problemId,
-  projectId,
-  edit,
-  submit,
-  provided,
-}) => {
+const TaskCard: React.FC<OwnProps> = ({ index, task, problemId, projectId, edit, submit, provided }) => {
   const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
   const deleteTaskMutation = useDeleteTask(problemId, task.id);
   const handleDelete = () => {
@@ -47,11 +39,7 @@ const TaskCard: React.FC<OwnProps> = ({
           onConfirm={handleDelete}
         />
       )}
-      <Card
-        className="bg-inherit"
-        {...(provided?.draggableProps ?? {})}
-        ref={provided?.innerRef}
-      >
+      <Card className="bg-inherit" {...(provided?.draggableProps ?? {})} ref={provided?.innerRef}>
         <CardHeader>
           <CardTitle
             className="-mx-6 -mt-6 flex items-center justify-between rounded-t-xl bg-neutral-800 px-6 pb-4 pt-4 font-mono"
@@ -61,35 +49,19 @@ const TaskCard: React.FC<OwnProps> = ({
               {edit && <GripVertical className="-mr-2" />}
               <span className="text-lg font-medium">Task #{index + 1}</span>
               <div className="flex items-center gap-2 text-sm text-stone-300">
-                <span className="rounded-md border border-blue-700 p-2">
-                  {task.type}
-                </span>
-                {task.autograde && (
-                  <span className="rounded-md border border-green-700 p-2">
-                    Autograded
-                  </span>
-                )}
+                <span className="rounded-md border border-blue-700 p-2">{task.type}</span>
+                {task.autograde && <span className="rounded-md border border-green-700 p-2">Autograded</span>}
               </div>
             </div>
             {edit && (
               <div className="flex items-center gap-4">
-                <Button
-                  asChild
-                  variant="ghost"
-                  className="hover:text-purple-300"
-                >
-                  <Link
-                    to={`/projects/${projectId}/problems/${problemId}/edit/tasks/${task.id}`}
-                  >
+                <Button asChild variant="ghost" className="hover:text-purple-300">
+                  <Link to={`/projects/${projectId}/problems/${problemId}/edit/tasks/${task.id}`}>
                     <Pencil />
                     Edit
                   </Link>
                 </Button>
-                <Button
-                  type="button"
-                  variant={"destructive"}
-                  onClick={() => setOpenDeleteDialog(true)}
-                >
+                <Button type="button" variant={"destructive"} onClick={() => setOpenDeleteDialog(true)}>
                   <Trash />
                   Delete
                 </Button>
