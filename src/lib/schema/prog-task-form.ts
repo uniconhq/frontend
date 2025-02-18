@@ -64,7 +64,7 @@ export const toProgrammingTask = (form: ProgTaskFormT): Omit<ProgrammingTask, "o
     language: "PYTHON",
     extra_options: {
       version: form.environment.extra_options.version,
-      requirements: form.environment.extra_options.requirements.join("\n"),
+      requirements: form.environment.extra_options.requirements,
     },
   },
   required_inputs: form.required_user_inputs,
@@ -79,7 +79,7 @@ export const fromProgrammingTask = (progTask: ProgrammingTask): ProgTaskFormT =>
     language: "Python",
     extra_options: {
       version: progTask.environment.extra_options?.version ?? DEFAULT_PY_VERSION,
-      requirements: progTask.environment.extra_options?.requirements?.split("\n") ?? [],
+      requirements: progTask.environment.extra_options?.requirements ?? [],
     },
     slurm: progTask.environment.slurm ?? false,
     slurm_options: progTask.environment.slurm_options ?? [],

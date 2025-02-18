@@ -37,7 +37,7 @@ export type ComputeContext = {
 
 export type ExtraOptions = {
     version?: PythonVersion | null;
-    requirements?: string | null;
+    requirements?: Array<string>;
 };
 
 export type File = {

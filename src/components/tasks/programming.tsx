@@ -33,11 +33,11 @@ export function Programming({
               </TableRow>
               <TableRow>
                 <TableHead>Time Limit</TableHead>
-                <TableCell>{task.environment.time_limit_secs}s</TableCell>
+                <TableCell className="font-mono">{task.environment.time_limit_secs}s</TableCell>
               </TableRow>
               <TableRow>
                 <TableHead>Memory Limit</TableHead>
-                <TableCell>{task.environment.memory_limit_mb}MB</TableCell>
+                <TableCell className="font-mono">{task.environment.memory_limit_mb}MB</TableCell>
               </TableRow>
               {task.environment.extra_options && (
                 <>
@@ -46,15 +46,21 @@ export function Programming({
                     <TableCell>
                       <Table className="w-fit">
                         <TableBody>
-                          {Object.entries(task.environment.extra_options).map(
-                            ([key, value]) =>
-                              !!value && (
-                                <TableRow key={key}>
-                                  <TableHead>{key}</TableHead>
-                                  <TableCell className="whitespace-pre-line">{value}</TableCell>
-                                </TableRow>
-                              ),
+                          {task.environment.extra_options.version && (
+                            <TableRow>
+                              <TableHead>Version</TableHead>
+                              <TableCell className="font-mono">{task.environment.extra_options.version}</TableCell>
+                            </TableRow>
                           )}
+                          {task.environment.extra_options.requirements &&
+                            task.environment.extra_options.requirements.length > 0 && (
+                              <TableRow>
+                                <TableHead>Dependencies</TableHead>
+                                <TableCell className="font-mono">
+                                  {task.environment.extra_options.requirements.join(", ")}
+                                </TableCell>
+                              </TableRow>
+                            )}
                         </TableBody>
                       </Table>
                     </TableCell>
