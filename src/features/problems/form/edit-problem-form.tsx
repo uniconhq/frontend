@@ -25,9 +25,9 @@ const problemFormSchema = z
     description: z.string().min(1, "Description cannot be empty"),
     restricted: z.boolean(),
     published: z.boolean(),
-    started_at: z.string().date(),
-    ended_at: z.string().date(),
-    closed_at: z.string().date().nullable(),
+    started_at: z.string(),
+    ended_at: z.string(),
+    closed_at: z.string().nullable(),
   })
   .superRefine(({ started_at, ended_at, closed_at }, ctx) => {
     if (ended_at < started_at) {

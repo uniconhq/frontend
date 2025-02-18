@@ -21,7 +21,7 @@ export default function DateTimeField({ name, label, description }: DateFieldPro
   const { control, setValue, getValues } = useFormContext();
   function handleDateSelect(date: Date | undefined) {
     if (date) {
-      setValue(name, date);
+      setValue(name, date.toISOString());
     }
   }
 
@@ -42,7 +42,7 @@ export default function DateTimeField({ name, label, description }: DateFieldPro
         newDate.setHours(hours + 12);
       }
     }
-    setValue(name, newDate);
+    setValue(name, newDate.toISOString());
   }
   return (
     <FormField
