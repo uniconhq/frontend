@@ -27,6 +27,7 @@ interface DateFieldProps {
   description?: string;
   className?: string;
 }
+
 export function DateTimeField({ name, label, description }: DateFieldProps) {
   const { control, setValue, getValues } = useFormContext();
   function handleDateSelect(date: Date | undefined) {
@@ -52,7 +53,6 @@ export function DateTimeField({ name, label, description }: DateFieldProps) {
         newDate.setHours(hours + 12);
       }
     }
-
     setValue(name, newDate);
   }
   return (

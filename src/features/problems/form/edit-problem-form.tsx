@@ -22,14 +22,31 @@ type OwnProps = {
   problem: Problem;
 };
 
-const problemFormSchema = z.object({
-  name: z.string().min(1, "Name cannot be empty"),
-  description: z.string().min(1, "Description cannot be empty"),
-  restricted: z.boolean(),
-  started_at: z.coerce.date(),
-  ended_at: z.coerce.date(),
-  closed_at: z.coerce.date().optional(),
-});
+const problemFormSchema = z
+  .object({
+    name: z.string().min(1, "Name cannot be empty"),
+    description: z.string().min(1, "Description cannot be empty"),
+    restricted: z.boolean(),
+    published: z.boolean(),
+    started_at: z.coerce.date(),
+    ended_at: z.coerce.date(),
+    closed_at: z.coerce.date().optional().nullable(),
+  })
+  .superRefine(({ started_at, ended_at, closed_at }, ctx) => {
+    if (ended_at < started_at) {
+      return ctx.addIssue({
+        code: "custom",
+        message: "End date cannot be before start date",
+        path: ["ended_at"],
+      });
+    }
+    if (closed_at && closed_at < ended_at) {
+      return ctx.addIssue({
+        code: "custom",
+        message: "Close date cannot be before end date",
+      });
+    }
+  });
 
 type ProblemFormType = z.infer<typeof problemFormSchema>;
 
@@ -117,12 +134,20 @@ const EditProblemForm: React.FC<OwnProps> = ({ id, problem }) => {
                 <DateTimeField name="ended_at" label="Ends at" />
                 <DateTimeField name="closed_at" label="Closes at" />
               </div>
-              <RadioBooleanField
-                label="Access control"
-                name="restricted"
-                trueLabel="Restricted"
-                falseLabel="Unrestricted"
-              />
+              <div className="grid grid-cols-2">
+                <RadioBooleanField
+                  label="Access control"
+                  name="restricted"
+                  trueLabel="Restricted"
+                  falseLabel="Unrestricted"
+                />
+                <RadioBooleanField
+                  label="Visibility"
+                  name="published"
+                  trueLabel="Published"
+                  falseLabel="Draft"
+                />
+              </div>
             </div>
           </div>
           <EditTasksDisplay

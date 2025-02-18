@@ -20,6 +20,7 @@ export const columns: ColumnDef<ProblemBaseWithPermissions>[] = [
       return (
         <div className="flex items-center gap-2">
           <span>{row.original.name}</span>
+          {!row.original.published && <Badge variant={"orange"}>Draft</Badge>}
           {row.original.restricted && (
             <Badge variant={"destructive"}>Restricted</Badge>
           )}
