@@ -2,9 +2,9 @@ import { useQuery } from "@tanstack/react-query";
 import { Pencil, Plus } from "lucide-react";
 import { Link } from "react-router-dom";
 
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableCell, TableHead, TableRow } from "@/components/ui/table";
+import { DraftBadge, RestrictedBadge } from "@/features/problems/components/badges";
 import { getProblemById } from "@/features/problems/queries";
 import { useProblemId, useProjectId } from "@/features/projects/hooks/use-id";
 import TaskCard from "@/features/tasks/components/task-card";
@@ -25,15 +25,8 @@ const Problem = () => {
       <div className="flex justify-between">
         <div>
           <h1 className="mb-4 flex items-center gap-4 text-2xl font-semibold">
-            {data.name} (#{id}){" "}
-            {data.restricted ? (
-              <Badge variant={"destructive"}>restricted</Badge>
-            ) : (
-              <Badge variant={"secondary"} className="text-nowrap">
-                not restricted
-              </Badge>
-            )}
-            {!data.published && <Badge variant={"orange"}>draft</Badge>}
+            {data.name} (#{id}) {data.restricted && <RestrictedBadge />}
+            {!data.published && <DraftBadge />}
           </h1>
         </div>
         <div className="flex gap-1">
