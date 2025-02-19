@@ -22,8 +22,9 @@ import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "r
 import { GraphEdgeStr as GraphEdge, InputStep } from "@/api";
 import { StepNode } from "@/components/node-graph/components/step/step-node";
 import { Button } from "@/components/ui/button";
+import { FileTree } from "@/components/ui/file-tree";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
-import { cn } from "@/lib/utils";
+import { cn, isFile } from "@/lib/utils";
 import getLayoutedElements from "@/utils/graph";
 
 import AddNodeButton from "./add-node-button";
@@ -197,6 +198,27 @@ const GraphEditor: React.FC<GraphEditorProps> = ({ graphId, className }) => {
     [dispatch],
   );
 
+  const inputSteps = steps.filter((step) => step.type === "INPUT_STEP") as InputStep[];
+  const files = inputSteps.flatMap((step) =>
+    step.outputs.flatMap((output) => {
+      if (!isFile(output.data)) return [];
+      return [
+        {
+          name: output.data.path.split("/").pop()!,
+          path: output.data.path,
+          content: output.data.content,
+          isBinary: false,
+          downloadUrl: "",
+          onClick: () => {
+            dispatch({ type: GraphActionType.SelectSocket, payload: { stepId: step.id, socketId: output.id } });
+          },
+        },
+      ];
+    }),
+  );
+
+  const [showFileTree, setShowFileTree] = useState(true);
+
   return (
     <div
       className={cn(className, {
@@ -205,6 +227,7 @@ const GraphEditor: React.FC<GraphEditorProps> = ({ graphId, className }) => {
       data-state={expanded ? "open" : "closed"}
     >
       <ResizablePanelGroup direction="horizontal">
+        <>{showFileTree && <FileTree files={files} onCloseFileTree={() => setShowFileTree(false)} />}</>
         {selectedSocketId && (
           <>
             <ResizablePanel defaultSize={2} order={0}>
@@ -236,11 +259,24 @@ const GraphEditor: React.FC<GraphEditorProps> = ({ graphId, className }) => {
             proOptions={{ hideAttribution: true }}
           >
             {/* Custom controls */}
-            <div className={cn("absolute right-1 top-1 z-10 mt-4 flex space-x-1 px-2", { "z-30": expanded })}>
-              {edit && <AddNodeButton />}
-              <Button onClick={() => setExpanded((prev) => !prev)} type="button" variant="outline">
-                {expanded ? <ShrinkIcon /> : <ExpandIcon />}
-              </Button>
+            <div
+              className={cn("absolute right-1 top-1 z-10 mt-4 flex w-full justify-between px-2", {
+                "z-30": expanded,
+              })}
+            >
+              <div className="ml-2">
+                {!showFileTree && (
+                  <Button variant="outline" type="button" onClick={() => setShowFileTree(true)}>
+                    Show files
+                  </Button>
+                )}
+              </div>
+              <div className="flex space-x-1">
+                {edit && <AddNodeButton />}
+                <Button onClick={() => setExpanded((prev) => !prev)} type="button" variant="outline">
+                  {expanded ? <ShrinkIcon /> : <ExpandIcon />}
+                </Button>
+              </div>
             </div>
             <Background
               variant={BackgroundVariant.Dots}

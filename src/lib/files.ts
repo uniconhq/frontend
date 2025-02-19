@@ -6,6 +6,7 @@ export type FileType = {
   content: string;
   isBinary: boolean;
   downloadUrl: string;
+  onClick?: () => void;
 };
 
 export type TreeFile = FileType & {
@@ -41,16 +42,11 @@ const sortFileTree = (files: FileTreeType) => {
 export const convertFilesToFileTree = (files: FileType[]): FileTreeType => {
   const tree: FileTreeType = [];
   for (const file of files) {
-    const pathParts = file.path
-      .split("/")
-      .filter((part) => !["", "."].includes(part));
+    const pathParts = file.path.split("/").filter((part) => !["", "."].includes(part));
     let currentTree = tree;
     for (let i = 0; i < pathParts.length - 1; i++) {
       const folderName = pathParts[i];
-      const folder = currentTree.find(
-        (item): item is TreeFolder =>
-          "children" in item && item.name === folderName,
-      );
+      const folder = currentTree.find((item): item is TreeFolder => "children" in item && item.name === folderName);
       if (folder) {
         currentTree = folder.children;
       } else {

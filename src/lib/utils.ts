@@ -14,5 +14,5 @@ export function uuid(): string {
 
 export const isFile = (data: unknown): data is File => {
   if (data === undefined || data === null) return false;
-  return typeof data === "object" && "name" in data && "content" in data;
+  return typeof data === "object" && "path" in data && "content" in data;
 };

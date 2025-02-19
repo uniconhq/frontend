@@ -37,8 +37,8 @@ const GraphFileEditor = () => {
 
   return (
     <FileEditor
-      key={selectedStepId + file.name}
-      fileName={file.name}
+      key={selectedStepId + file.path}
+      fileName={file.path}
       fileContent={file.content}
       onUpdateFileName={updateFileName}
       onUpdateFileContent={updateFileContent}

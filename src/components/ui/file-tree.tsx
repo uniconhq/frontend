@@ -3,11 +3,7 @@
 import { ChevronRight, File, Folder, FolderOpen, X } from "lucide-react";
 import * as React from "react";
 
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
   Sidebar,
   SidebarContent,
@@ -23,33 +19,27 @@ import { FileTreeType, isFolder, TreeFile, TreeFolder } from "@/lib/files";
 
 type OwnProps = {
   files: FileTreeType;
+  onCloseFileTree: () => void;
 };
-export function FileTree({
-  ...props
-}: React.ComponentProps<typeof Sidebar> & OwnProps) {
+export function FileTree({ ...props }: React.ComponentProps<typeof Sidebar> & OwnProps) {
   return (
-    <Sidebar
-      {...props}
-      className="relative w-full"
-      variant="filetree"
-      collapsible="none"
-    >
+    <Sidebar {...props} className="relative w-[200px]" variant="filetree" collapsible="none">
       <SidebarContent className="h-full overflow-y-scroll">
         <SidebarGroup className="relative h-full">
           <SidebarGroupLabel>
             <div className="flex w-full items-center justify-between">
               <div>Files</div>
-              <X className="h-4 w-4 cursor-pointer" />
+              <X className="h-4 w-4 cursor-pointer" onClick={props.onCloseFileTree} />
             </div>
           </SidebarGroupLabel>
           <SidebarGroupContent className="h-full">
-            <SidebarMenu>
-              {/* TODO: DELETE THIS LATER */}
-              <SidebarMenuItem />
-              {props.files.map((item, index) => (
-                <Tree key={index} item={item} />
-              ))}
-            </SidebarMenu>
+            {props.files && (
+              <SidebarMenu>
+                {props.files.map((item, index) => (
+                  <Tree key={index} item={item} />
+                ))}
+              </SidebarMenu>
+            )}
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
@@ -62,11 +52,7 @@ function Tree({ item }: { item: TreeFolder | TreeFile }) {
 
   if (!isItemFolder) {
     return (
-      <SidebarMenuButton
-        className="data-[active=true]:bg-transparent"
-        type="button"
-        size="big"
-      >
+      <SidebarMenuButton className="data-[active=true]:bg-transparent" type="button" size="big" onClick={item.onClick}>
         <File />
         {item.name}
       </SidebarMenuButton>
