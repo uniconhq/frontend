@@ -17,9 +17,7 @@ const NodeInput: React.FC<OwnProps> = ({ className = [], value, onChange }) => {
         ...className,
       )}
       value={value}
-      onChange={(e) => {
-        onChange(e.target.value);
-      }}
+      onChange={(e) => onChange(e.target.value)}
       size={value.length}
     />
   );
