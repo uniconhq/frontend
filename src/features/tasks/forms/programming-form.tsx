@@ -87,7 +87,8 @@ const ProgrammingForm: React.FC<OwnProps> = ({ title, initialValue, onSubmit }) 
     if (!depsFile) return;
     const reader = new FileReader();
     reader.onload = (e) => {
-      form.setValue("environment.extra_options.requirements", (e.target?.result as string).trim().split("\n"));
+      const depsData = (e.target?.result as string).trim();
+      form.setValue("environment.extra_options.requirements", depsData.split("\n"));
       depsFileInputRef.current!.value = ""; // Reset file input
     };
     reader.readAsText(depsFile);
@@ -225,27 +226,25 @@ const ProgrammingForm: React.FC<OwnProps> = ({ title, initialValue, onSubmit }) 
                       <PlusIcon />
                     </Button>
                     <Tooltip>
-                      <TooltipTrigger>
-                        <TooltipContent side="top" align="center">
-                          <span>
-                            You can upload a <code>requirements.txt</code> file to prefill dependencies
-                          </span>
-                        </TooltipContent>
-                        <input
-                          accept=".txt"
-                          type="file"
-                          style={{ display: "none" }}
-                          ref={depsFileInputRef}
-                          onChange={handleDepsFileUpload}
-                        />
+                      <TooltipContent side="right" align="center">
+                        <span>
+                          You can upload a <code>requirements.txt</code> file to prefill dependencies
+                        </span>
+                      </TooltipContent>
+                      <input
+                        accept=".txt"
+                        type="file"
+                        style={{ display: "none" }}
+                        ref={depsFileInputRef}
+                        onChange={handleDepsFileUpload}
+                      />
+                      <TooltipTrigger asChild type="button">
+                        {/* Proxy click event to HTML input element above */}
                         <Button
                           type="button"
                           variant="secondary"
                           size="sm"
-                          onClick={(event) => {
-                            event.preventDefault();
-                            depsFileInputRef.current?.click();
-                          }}
+                          onClick={() => depsFileInputRef.current?.click()}
                         >
                           <UploadIcon />
                         </Button>
@@ -256,7 +255,7 @@ const ProgrammingForm: React.FC<OwnProps> = ({ title, initialValue, onSubmit }) 
               </div>
               <div className="flex flex-wrap gap-4">
                 {dependencies.map((_, index) => (
-                  <div key={index} className="flex items-center gap-4">
+                  <div key={index} className="flex items-center gap-4 font-mono">
                     <TextField name={`environment.extra_options.requirements.${index}`} />
                     <Button type="button" variant="destructive" onClick={() => deleteDependency(index)}>
                       <Trash />
@@ -279,7 +278,7 @@ const ProgrammingForm: React.FC<OwnProps> = ({ title, initialValue, onSubmit }) 
               </div>
               <div className="flex flex-wrap gap-4">
                 {slurmOptions.map((_, index) => (
-                  <div key={index} className="flex items-center gap-4">
+                  <div key={index} className="flex items-center gap-4 font-mono">
                     <TextField name={`environment.slurm_options.${index}`} />
                     <Button type="button" variant="destructive" onClick={() => deleteSlurmOption(index)}>
                       <Trash />
