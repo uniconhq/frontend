@@ -53,7 +53,7 @@ const InputMetadataRow: React.FC<OwnProps> = ({
         {socket.data && isFile(socket.data) ? (
           <div className="flex gap-2">
             <ViewFileButton step={step} socket={socket} />
-            {isEditable && (
+            {isEditable && !socket.data.on_minio && (
               <Button
                 size={"sm"}
                 className="h-fit w-fit px-1 py-1"

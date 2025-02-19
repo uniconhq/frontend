@@ -21,7 +21,8 @@ import { uuid } from "@/lib/utils";
 
 const createDefaultUserInput = () => ({
   id: uuid(),
-  label: "",
+  // TODO: make sure this is a valid file name (not already taken)
+  label: "file.py",
   data: {
     path: "file.py",
     content: "# INSERT FILE TEMPLATE HERE",

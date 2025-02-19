@@ -60,6 +60,7 @@ const FileEditor: React.FC<OwnProps> = ({
         className="grow"
         theme="vs-dark"
         defaultLanguage="python"
+        language={fileName.split(".").pop()}
         options={{
           padding: { top: 5 },
           minimap: { enabled: false },

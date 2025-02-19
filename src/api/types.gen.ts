@@ -1923,8 +1923,10 @@ export type CreateFileResponses = {
     /**
      * Successful Response
      */
-    200: unknown;
+    200: string;
 };
+
+export type CreateFileResponse = CreateFileResponses[keyof CreateFileResponses];
 
 export type GetFileData = {
     body?: never;
