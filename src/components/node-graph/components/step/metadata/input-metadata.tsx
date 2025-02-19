@@ -84,6 +84,8 @@ const InputMetadata: React.FC<OwnProps> = ({ step }) => {
   };
 
   const onChangeToValue = (socket: StepSocket) => () => {
+    // De-select the socket to close the file editor
+    dispatch({ type: GraphActionType.DeselectSocket });
     dispatch({
       type: GraphActionType.UpdateSocketMetadata,
       payload: {

@@ -1,6 +1,4 @@
 import { ClassValue } from "clsx";
-import { useState } from "react";
-import { useDebouncedCallback } from "use-debounce";
 
 import { cn } from "@/lib/utils";
 
@@ -11,9 +9,6 @@ type OwnProps = {
 };
 
 const NodeInput: React.FC<OwnProps> = ({ className = [], value, onChange }) => {
-  const debouncedHandleChange = useDebouncedCallback(onChange, 1000);
-  const [displayValue, setDisplayValue] = useState(value);
-
   return (
     <input
       type="text"
@@ -21,13 +16,9 @@ const NodeInput: React.FC<OwnProps> = ({ className = [], value, onChange }) => {
         "nodrag inline max-w-fit rounded-sm border border-gray-500/50 bg-transparent p-1 font-mono text-xs",
         ...className,
       )}
-      value={displayValue}
-      onChange={(e) => {
-        const newValue = e.target.value;
-        setDisplayValue(newValue);
-        debouncedHandleChange(newValue);
-      }}
-      size={displayValue.length}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      size={value.length}
     />
   );
 };

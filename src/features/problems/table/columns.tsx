@@ -1,10 +1,10 @@
 import { ColumnDef } from "@tanstack/react-table";
-import { Info } from "lucide-react";
+import { Info, PencilIcon, ScanIcon } from "lucide-react";
 import { Link } from "react-router-dom";
 
 import { ProblemBaseWithPermissions } from "@/api";
-import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { DraftBadge, RestrictedBadge } from "@/features/problems/components/badges";
 import { cn } from "@/lib/utils";
 import { formatDateShort } from "@/utils/date";
 
@@ -15,8 +15,8 @@ export const columns: ColumnDef<ProblemBaseWithPermissions>[] = [
       return (
         <div className="flex items-center gap-2">
           <span>{row.original.name}</span>
-          {!row.original.published && <Badge variant={"orange"}>Draft</Badge>}
-          {row.original.restricted && <Badge variant={"destructive"}>Restricted</Badge>}
+          {row.original.restricted && <RestrictedBadge />}
+          {!row.original.published && <DraftBadge />}
         </div>
       );
     },
@@ -62,7 +62,7 @@ export const columns: ColumnDef<ProblemBaseWithPermissions>[] = [
               to={`/projects/${row.original.project_id}/problems/${id}`}
               className="hover:text-purple-300 hover:underline"
             >
-              View
+              <ScanIcon />
             </Link>
           )}
           {row.original.edit && (
@@ -70,7 +70,7 @@ export const columns: ColumnDef<ProblemBaseWithPermissions>[] = [
               to={`/projects/${row.original.project_id}/problems/${id}/edit`}
               className="hover:text-purple-300 hover:underline"
             >
-              Edit
+              <PencilIcon />
             </Link>
           )}
         </div>

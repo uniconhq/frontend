@@ -1,8 +1,16 @@
 import { createContext, Dispatch } from "react";
 import { ImmerReducer } from "use-immer";
 
-import { GraphEdgeStr as GraphEdge, InputStep, StepSocket } from "@/api";
+import {
+  GraphEdgeStr as GraphEdge,
+  InputStep,
+  ParsedFunction,
+  PyRunFunctionSocket,
+  PyRunFunctionStep,
+  StepSocket,
+} from "@/api";
 import { Step } from "@/features/problems/components/tasks/types";
+import { createSocket } from "@/lib/compute-graph";
 import { uuid } from "@/lib/utils";
 
 export type GraphState = {
@@ -32,6 +40,7 @@ export enum GraphActionType {
   DeselectSocket = "DESELECT_SOCKET",
   // Special actions
   UpdateUserInputStep = "UPDATE_USER_INPUT_STEP",
+  UpdatePyRunFunctionStep = "UPDATE_FUNCTION_IDENTIFIER_STEP",
 }
 
 interface BaseGraphAction {
@@ -116,6 +125,17 @@ interface UpdateUserInputStepAction extends BaseGraphAction {
   payload: { step: InputStep };
 }
 
+interface UpdatePyRunFunctionStepAction extends BaseGraphAction {
+  type: GraphActionType.UpdatePyRunFunctionStep;
+  payload: {
+    stepId: string;
+    functionIdentifier: string;
+    functionSignature?: ParsedFunction;
+    allowError: boolean;
+    uuids: string[];
+  };
+}
+
 export type GraphAction =
   | AddStepAction
   | DeleteStepAction
@@ -128,7 +148,8 @@ export type GraphAction =
   | DeleteEdgeAction
   | SelectSocketAction
   | DeselectSocketAction
-  | UpdateUserInputStepAction;
+  | UpdateUserInputStepAction
+  | UpdatePyRunFunctionStepAction;
 
 const updateUserInputStep = (state: GraphState, { payload }: UpdateUserInputStepAction) => {
   const inputSteps = state.steps.filter((node) => node.type === "INPUT_STEP") as InputStep[];
@@ -138,6 +159,92 @@ const updateUserInputStep = (state: GraphState, { payload }: UpdateUserInputStep
       outputs: payload.step.outputs,
     });
   }
+  return state;
+};
+
+const updatePyRunFunctionStep = (state: GraphState, { payload }: UpdatePyRunFunctionStepAction) => {
+  const stepIndex = state.steps.findIndex((node) => node.id === payload.stepId);
+  const step = state.steps[stepIndex] as PyRunFunctionStep;
+
+  const getUuid = (() => {
+    let index = 0;
+    return () => {
+      const uuid = payload.uuids[index];
+      if (!uuid) throw new Error("UUIDs are empty");
+      index++;
+      return uuid;
+    };
+  })();
+
+  // Detect changes
+  const functionIdentifierChanged = step.function_identifier !== payload.functionIdentifier;
+  const functionSignatureChanged = payload.functionSignature !== undefined;
+  const allowErrorChanged = step.allow_error !== payload.allowError;
+
+  if (functionIdentifierChanged) {
+    // 1. Update the identifier.
+    state.steps[stepIndex] = {
+      ...state.steps[stepIndex],
+      function_identifier: payload.functionIdentifier,
+    };
+  }
+
+  if (functionSignatureChanged && payload.functionSignature) {
+    // 1. Remove all edges connected to the node except the file edge.
+    const fileSocket = step.inputs.find((socket) => socket.import_as_module);
+    state.edges = state.edges.filter(
+      (edge) => edge.to_node_id !== payload.stepId || edge.to_socket_id === fileSocket?.id,
+    );
+
+    // 2. Replace the input sockets with arguments of the new function signature.
+    const functionArgs: PyRunFunctionSocket[] = payload.functionSignature.args.map((arg, index) => ({
+      ...createSocket("DATA", arg.name + (arg.default ? ` (default:${arg.default})` : "")),
+      id: getUuid(),
+      arg_metadata: {
+        position: index,
+        arg_name: arg.name,
+      },
+    }));
+
+    const functionKwargs: PyRunFunctionSocket[] = payload.functionSignature.kwargs.map((kwarg) => ({
+      ...createSocket("DATA", kwarg.name + (kwarg.default ? ` = ${kwarg.default}` : "")),
+      id: getUuid(),
+      kwarg_name: kwarg.name,
+    }));
+
+    state.steps[stepIndex] = {
+      ...state.steps[stepIndex],
+      inputs: [
+        { ...createSocket("CONTROL"), id: getUuid() },
+        { ...createSocket("DATA", "Module"), id: fileSocket?.id ?? getUuid(), import_as_module: true },
+        ...functionArgs,
+        ...functionKwargs,
+      ],
+    };
+  }
+
+  if (allowErrorChanged) {
+    // If allow error is changed to true, add a new output socket.
+    // If allow error is changed to false, remove the output socket and outgoing edges.
+    state.steps[stepIndex] = {
+      ...state.steps[stepIndex],
+      allow_error: payload.allowError,
+    };
+    if (payload.allowError) {
+      (state.steps[stepIndex] as PyRunFunctionStep).outputs.push({
+        ...createSocket("DATA", "Error"),
+        id: getUuid(),
+        handles_error: true,
+      });
+    } else {
+      const errorSocketId = step.outputs.find((socket) => socket.handles_error)?.id;
+      state.steps[stepIndex].outputs = step.outputs.filter((socket) => !socket.handles_error);
+      state.edges = state.edges.filter(
+        (edge) => edge.from_node_id !== payload.stepId || edge.from_socket_id !== errorSocketId,
+      );
+    }
+  }
+
   return state;
 };
 
@@ -270,6 +377,7 @@ const actionHandlers = {
   [GraphActionType.AddEdge]: addEdge,
   [GraphActionType.DeleteEdge]: deleteEdge,
   [GraphActionType.UpdateUserInputStep]: updateUserInputStep,
+  [GraphActionType.UpdatePyRunFunctionStep]: updatePyRunFunctionStep,
 };
 
 export const graphReducer: ImmerReducer<GraphState, GraphAction> = (
