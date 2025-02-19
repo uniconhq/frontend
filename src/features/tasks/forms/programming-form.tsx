@@ -2,8 +2,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@radix-ui/react-collapsible";
 import { useQuery } from "@tanstack/react-query";
 import { produce } from "immer";
-import { PlusIcon, Trash } from "lucide-react";
-import { useEffect } from "react";
+import { PlusIcon, Trash, UploadIcon } from "lucide-react";
+import { useEffect, useRef } from "react";
 import { SubmitHandler, useFieldArray, useForm } from "react-hook-form";
 
 import { File, InputStep } from "@/api";
@@ -12,6 +12,7 @@ import FormSection from "@/components/form/form-section";
 import NodeInput from "@/components/node-graph/components/step/node-input";
 import { Button } from "@/components/ui/button";
 import { Form, FormLabel } from "@/components/ui/form";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import FileEditor from "@/features/problems/components/tasks/file-editor";
 import { GraphAction, graphReducer } from "@/features/problems/components/tasks/graph-context";
 import Testcase from "@/features/problems/components/tasks/testcase";
@@ -79,6 +80,19 @@ const ProgrammingForm: React.FC<OwnProps> = ({ title, initialValue, onSubmit }) 
   const slurmOptions = form.watch("environment.slurm_options");
 
   const { data: validPythonVersions } = useQuery(getSupportedPythonVersions());
+
+  const depsFileInputRef = useRef<HTMLInputElement>(null);
+  const handleDepsFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const depsFile = event.target.files?.[0];
+    if (!depsFile) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const depsData = (e.target?.result as string).trim();
+      form.setValue("environment.extra_options.requirements", depsData.split("\n"));
+      depsFileInputRef.current!.value = ""; // Reset file input
+    };
+    reader.readAsText(depsFile);
+  };
 
   // Shared user input step for all testcases
   const sharedUserInputStep: InputStep = {
@@ -211,12 +225,37 @@ const ProgrammingForm: React.FC<OwnProps> = ({ title, initialValue, onSubmit }) 
                     <Button type="button" variant="secondary" size="sm" onClick={addDependency}>
                       <PlusIcon />
                     </Button>
+                    <Tooltip>
+                      <TooltipContent side="right" align="center">
+                        <span>
+                          You can upload a <code>requirements.txt</code> file to prefill dependencies
+                        </span>
+                      </TooltipContent>
+                      <input
+                        accept=".txt"
+                        type="file"
+                        style={{ display: "none" }}
+                        ref={depsFileInputRef}
+                        onChange={handleDepsFileUpload}
+                      />
+                      <TooltipTrigger asChild type="button">
+                        {/* Proxy click event to HTML input element above */}
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => depsFileInputRef.current?.click()}
+                        >
+                          <UploadIcon />
+                        </Button>
+                      </TooltipTrigger>
+                    </Tooltip>
                   </div>
                 </FormLabel>
               </div>
               <div className="flex flex-wrap gap-4">
                 {dependencies.map((_, index) => (
-                  <div key={index} className="flex items-center gap-4">
+                  <div key={index} className="flex items-center gap-4 font-mono">
                     <TextField name={`environment.extra_options.requirements.${index}`} />
                     <Button type="button" variant="destructive" onClick={() => deleteDependency(index)}>
                       <Trash />
@@ -239,7 +278,7 @@ const ProgrammingForm: React.FC<OwnProps> = ({ title, initialValue, onSubmit }) 
               </div>
               <div className="flex flex-wrap gap-4">
                 {slurmOptions.map((_, index) => (
-                  <div key={index} className="flex items-center gap-4">
+                  <div key={index} className="flex items-center gap-4 font-mono">
                     <TextField name={`environment.slurm_options.${index}`} />
                     <Button type="button" variant="destructive" onClick={() => deleteSlurmOption(index)}>
                       <Trash />
