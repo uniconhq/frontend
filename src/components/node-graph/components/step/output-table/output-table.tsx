@@ -8,9 +8,7 @@ type OwnProps = {
 };
 
 const OutputTable: React.FC<OwnProps> = ({ data }) => {
-  return (
-    <DataTable columns={columns} data={data} hidePagination hideOverflow />
-  );
+  return <DataTable columns={columns} data={data} hidePagination hideOverflow />;
 };
 
 export default OutputTable;

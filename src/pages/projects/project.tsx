@@ -4,7 +4,7 @@ import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import CreateProblemModal from "@/features/problems/components/form/create-problem-modal";
-import DefinitionsTable from "@/features/problems/table/definitions-table";
+import ProblemsTable from "@/features/problems/table/problems-table";
 import { useProjectId } from "@/features/projects/hooks/use-id";
 import { getProjectById } from "@/features/projects/queries";
 
@@ -28,17 +28,13 @@ const Project = () => {
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-semibold">Problems</h2>
         {project.create_problems && (
-          <Button
-            variant="ghost"
-            className="hover:text-purple-300"
-            onClick={() => setNewProblemOpen(true)}
-          >
+          <Button variant="ghost" className="hover:text-purple-300" onClick={() => setNewProblemOpen(true)}>
             <Plus /> New Problem
           </Button>
         )}
       </div>
       <div className="flex flex-col gap-4">
-        <DefinitionsTable data={project.problems} />
+        <ProblemsTable data={project.problems} />
       </div>
     </div>
   );

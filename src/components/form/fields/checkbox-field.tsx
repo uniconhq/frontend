@@ -1,14 +1,7 @@
 import { useFormContext } from "react-hook-form";
 
 import { Checkbox } from "@/components/ui/checkbox";
-import {
-  FormControl,
-  FormDescription,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
+import { FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 interface CheckboxFieldProps {
   name: string;
   label?: string;
@@ -16,12 +9,7 @@ interface CheckboxFieldProps {
   className?: string;
 }
 
-function CheckboxField({
-  name,
-  label,
-  description,
-  className,
-}: CheckboxFieldProps) {
+function CheckboxField({ name, label, description, className }: CheckboxFieldProps) {
   const { control } = useFormContext();
 
   return (

@@ -5,11 +5,7 @@ import TaskSectionHeader from "@/features/tasks/components/task-section-header";
 
 export function MultipleResponse({ task }: { task: MultipleResponseTask }) {
   return (
-    <TaskContainer>
-      <TaskSection>
-        <TaskSectionHeader content="Question" />
-        <span className="text-gray-300">{task.question}</span>
-      </TaskSection>
+    <TaskContainer title={task.title} description={task.description}>
       <TaskSection>
         <TaskSectionHeader content="Options" />
         <ul className="list-inside list-decimal space-y-2">

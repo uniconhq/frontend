@@ -14,9 +14,7 @@ const EditTask = () => {
   const taskId = useTaskId();
 
   const { data: problem, isLoading } = useQuery(getProblemById(problemId));
-  if (problem && !problem.edit) {
-    throw Unauthorized;
-  }
+  if (problem && !problem.edit) throw Unauthorized;
 
   const task = problem?.tasks.find((task) => task.id === taskId);
   if (!isLoading && !task) {

@@ -35,18 +35,10 @@ const Organisations = () => {
         </div>
       </div>
       <div className="flex flex-col gap-4">
-        {joinDialogOpen && (
-          <JoinOrganisationDialog
-            open={joinDialogOpen}
-            onOpenChange={setJoinDialogOpen}
-          />
-        )}
+        {joinDialogOpen && <JoinOrganisationDialog open={joinDialogOpen} onOpenChange={setJoinDialogOpen} />}
         {!isLoading &&
           organisations?.map((organisation) => (
-            <Link
-              to={`/organisations/${organisation.id}`}
-              key={organisation.id}
-            >
+            <Link to={`/organisations/${organisation.id}`} key={organisation.id}>
               <Card className="group flex justify-between p-4 hover:opacity-80">
                 <CardTitle>{organisation.name}</CardTitle>
                 <ArrowRight className="hidden h-4 w-4 group-hover:block" />
@@ -58,10 +50,7 @@ const Organisations = () => {
             <br />
             <span className="text-gray-500">
               If you're looking to submit solutions, check out{" "}
-              <Link
-                to="/projects"
-                className="text-purple-500 hover:text-purple-500/80"
-              >
+              <Link to="/projects" className="text-purple-500 hover:text-purple-500/80">
                 Projects
               </Link>
               .

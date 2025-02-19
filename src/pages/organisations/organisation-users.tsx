@@ -38,12 +38,8 @@ const OrganisationUsers = () => {
   const admins = data.members.filter((member) => member.role === "admin");
   const observers = data.members.filter((member) => member.role === "observer");
 
-  const adminInvitationKey = data.invitation_keys?.filter(
-    (key) => key.role === "admin",
-  )[0];
-  const observerInvitationKey = data.invitation_keys?.filter(
-    (key) => key.role === "observer",
-  )[0];
+  const adminInvitationKey = data.invitation_keys?.filter((key) => key.role === "admin")[0];
+  const observerInvitationKey = data.invitation_keys?.filter((key) => key.role === "observer")[0];
   const canEditRoles = data.edit_roles;
 
   return (
@@ -56,9 +52,8 @@ const OrganisationUsers = () => {
         <div>
           <div className="text-xl font-semibold">Owner</div>
           <p className="text-slate-500">
-            An owner has full permissions for the organisation and its projects,
-            including managing member roles/invitations and transferring
-            ownership.
+            An owner has full permissions for the organisation and its projects, including managing member
+            roles/invitations and transferring ownership.
           </p>
           <div className="mt-4 flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -72,25 +67,19 @@ const OrganisationUsers = () => {
         <div>
           <div className="text-xl font-semibold">Admins</div>
           <p className="text-slate-500">
-            Admins can edit the organization and fully manage projects but
-            cannot manage organization roles or delete the organization.
+            Admins can edit the organization and fully manage projects but cannot manage organization roles or delete
+            the organization.
           </p>
           <div className="mt-4 flex flex-col gap-2">
             {admins.map((admin) => (
-              <Card
-                key={admin.user.id}
-                className="flex items-center justify-between gap-2 px-4 py-2"
-              >
+              <Card key={admin.user.id} className="flex items-center justify-between gap-2 px-4 py-2">
                 <div>{admin.user.username}</div>
                 <div className="flex items-center gap-2">
                   <div className="text-gray-500">Admin</div>
                   {canEditRoles && (
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          className="hover:text-purple-300"
-                        >
+                        <Button variant="ghost" className="hover:text-purple-300">
                           <EllipsisVertical className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>
@@ -115,11 +104,7 @@ const OrganisationUsers = () => {
                         >
                           Downgrade to Observer
                         </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() =>
-                            deleteMemberMutation.mutate(admin.user.id)
-                          }
-                        >
+                        <DropdownMenuItem onClick={() => deleteMemberMutation.mutate(admin.user.id)}>
                           Remove Admin
                         </DropdownMenuItem>
                       </DropdownMenuContent>
@@ -128,33 +113,20 @@ const OrganisationUsers = () => {
                 </div>
               </Card>
             ))}
-            {admins.length === 0 && (
-              <EmptyPlaceholder description="No admins found." />
-            )}
+            {admins.length === 0 && <EmptyPlaceholder description="No admins found." />}
           </div>
           {canEditRoles && (
             <div className="mt-4 flex justify-between">
               <h3 className="text-lg">Admin invitation key</h3>
               {adminInvitationKey ? (
                 <div className="flex items-center gap-2">
-                  <InvitationKeyDisplay
-                    variant="border"
-                    invitationKey={adminInvitationKey.key}
-                  />
-                  <Button
-                    variant="secondary"
-                    onClick={() =>
-                      deleteKeyMutation.mutate(adminInvitationKey.id)
-                    }
-                  >
+                  <InvitationKeyDisplay variant="border" invitationKey={adminInvitationKey.key} />
+                  <Button variant="secondary" onClick={() => deleteKeyMutation.mutate(adminInvitationKey.id)}>
                     Delete
                   </Button>
                 </div>
               ) : (
-                <Button
-                  variant="ghost"
-                  onClick={() => createKeyMutation.mutate({ role: "admin" })}
-                >
+                <Button variant="ghost" onClick={() => createKeyMutation.mutate({ role: "admin" })}>
                   Generate new key
                 </Button>
               )}
@@ -164,26 +136,17 @@ const OrganisationUsers = () => {
         {/* Observers */}
         <div>
           <div className="text-xl font-semibold">Observers</div>
-          <p className="text-slate-500">
-            Observers can view the organisation and its projects but cannot
-            modify them.
-          </p>
+          <p className="text-slate-500">Observers can view the organisation and its projects but cannot modify them.</p>
           <div className="mt-4 flex flex-col gap-2">
             {observers.map((observer) => (
-              <Card
-                key={observer.user.id}
-                className="flex items-center justify-between gap-2 px-4 py-2"
-              >
+              <Card key={observer.user.id} className="flex items-center justify-between gap-2 px-4 py-2">
                 <div>{observer.user.username}</div>
                 <div className="flex items-center gap-2">
                   <div className="text-gray-500">Observer</div>
                   {canEditRoles && (
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          className="hover:text-purple-300"
-                        >
+                        <Button variant="ghost" className="hover:text-purple-300">
                           <EllipsisVertical className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>
@@ -208,11 +171,7 @@ const OrganisationUsers = () => {
                         >
                           Upgrade to Admin
                         </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() =>
-                            deleteMemberMutation.mutate(observer.user.id)
-                          }
-                        >
+                        <DropdownMenuItem onClick={() => deleteMemberMutation.mutate(observer.user.id)}>
                           Remove Observer
                         </DropdownMenuItem>
                       </DropdownMenuContent>
@@ -221,33 +180,20 @@ const OrganisationUsers = () => {
                 </div>
               </Card>
             ))}
-            {observers.length === 0 && (
-              <EmptyPlaceholder description="No observers in the organisation." />
-            )}
+            {observers.length === 0 && <EmptyPlaceholder description="No observers in the organisation." />}
           </div>
           {canEditRoles && (
             <div className="mt-4 flex justify-between">
               <h3 className="text-lg">Observer invitation key</h3>
               {observerInvitationKey ? (
                 <div className="flex items-center gap-2">
-                  <InvitationKeyDisplay
-                    variant="border"
-                    invitationKey={observerInvitationKey.key}
-                  />
-                  <Button
-                    variant="secondary"
-                    onClick={() =>
-                      deleteKeyMutation.mutate(observerInvitationKey.id)
-                    }
-                  >
+                  <InvitationKeyDisplay variant="border" invitationKey={observerInvitationKey.key} />
+                  <Button variant="secondary" onClick={() => deleteKeyMutation.mutate(observerInvitationKey.id)}>
                     Delete
                   </Button>
                 </div>
               ) : (
-                <Button
-                  variant="ghost"
-                  onClick={() => createKeyMutation.mutate({ role: "observer" })}
-                >
+                <Button variant="ghost" onClick={() => createKeyMutation.mutate({ role: "observer" })}>
                   Generate new key
                 </Button>
               )}

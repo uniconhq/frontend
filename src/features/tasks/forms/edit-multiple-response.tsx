@@ -5,9 +5,8 @@ import { useNavigate } from "react-router-dom";
 import { MultipleResponseTask } from "@/api";
 import { useUpdateTask } from "@/features/problems/queries";
 import { useProjectId } from "@/features/projects/hooks/use-id";
-import MultipleResponseForm, {
-  MultipleResponseFormType,
-} from "@/features/tasks/forms/multiple-response-form";
+import MultipleResponseForm from "@/features/tasks/forms/multiple-response-form";
+import { MultipleResponseFormT } from "@/lib/schema/multi-choice-form";
 import { ChoiceWithoutOrder, normaliseChoices } from "@/utils/task";
 
 type OwnProps = {
@@ -21,11 +20,8 @@ const EditMultipleResponse: React.FC<OwnProps> = ({ task, problemId }) => {
   const updateTaskMutation = useUpdateTask(problemId, task.id);
   const navigate = useNavigate();
 
-  const onSubmit: SubmitHandler<MultipleResponseFormType> = async (data) => {
-    data.choices = normaliseChoices(task.choices, data.choices) as [
-      ChoiceWithoutOrder,
-      ...ChoiceWithoutOrder[],
-    ];
+  const onSubmit: SubmitHandler<MultipleResponseFormT> = async (data) => {
+    data.choices = normaliseChoices(task.choices, data.choices) as [ChoiceWithoutOrder, ...ChoiceWithoutOrder[]];
 
     updateTaskMutation.mutate(
       {

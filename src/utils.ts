@@ -6,10 +6,6 @@
  * @param interval interval between elements
  * @returns an array of numbers from start to start + n * interval
  */
-export function range(
-  n: number,
-  start: number = 0,
-  interval: number = 1,
-): number[] {
+export function range(n: number, start: number = 0, interval: number = 1): number[] {
   return [...Array(n)].map((_, i) => start + i * interval);
 }

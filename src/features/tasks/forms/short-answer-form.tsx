@@ -1,6 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { SubmitHandler, useForm } from "react-hook-form";
-import { z } from "zod";
 
 import CheckboxField from "@/components/form/fields/checkbox-field";
 import TextField from "@/components/form/fields/text-field";
@@ -8,39 +7,24 @@ import TextareaField from "@/components/form/fields/textarea-field";
 import FormSection from "@/components/form/form-section";
 import { Button } from "@/components/ui/button";
 import { Form } from "@/components/ui/form";
+import { ShortAnswerFormT, ShortAnswerFormZ } from "@/lib/schema/short-answer-form";
 
-const shortAnswerFormSchema = z
-  .object({
-    question: z.string().min(1, "Question cannot be empty"),
-    expected_answer: z.string(),
-    autograde: z.boolean().optional(),
-  })
-  .refine((data) => !data.autograde || data.expected_answer.length > 0, {
-    message: "Expected answer cannot be empty if autograde is enabled",
-    path: ["expected_answer"],
-  });
-
-export type ShortAnswerFormType = z.infer<typeof shortAnswerFormSchema>;
-const shortAnswerFormDefault = {
-  question: "",
+const DEFAULT_FORM_VALUES: ShortAnswerFormT = {
+  title: "",
   expected_answer: "",
-  autograded: false,
+  autograde: false,
 };
 
 type OwnProps = {
   title: string;
-  initialValue?: ShortAnswerFormType;
-  onSubmit: SubmitHandler<ShortAnswerFormType>;
+  initialValue?: ShortAnswerFormT;
+  onSubmit: SubmitHandler<ShortAnswerFormT>;
 };
 
-const ShortAnswerForm: React.FC<OwnProps> = ({
-  title,
-  initialValue,
-  onSubmit,
-}) => {
-  const form = useForm<ShortAnswerFormType>({
-    resolver: zodResolver(shortAnswerFormSchema),
-    defaultValues: initialValue ?? shortAnswerFormDefault,
+const ShortAnswerForm: React.FC<OwnProps> = ({ title, initialValue, onSubmit }) => {
+  const form = useForm<ShortAnswerFormT>({
+    resolver: zodResolver(ShortAnswerFormZ),
+    defaultValues: initialValue ?? DEFAULT_FORM_VALUES,
   });
 
   const { watch } = form;
@@ -51,25 +35,18 @@ const ShortAnswerForm: React.FC<OwnProps> = ({
         <h1 className="text-2xl font-semibold">{title}</h1>
       </div>
       <Form {...form}>
-        <form
-          onSubmit={form.handleSubmit(onSubmit)}
-          className="flex flex-col gap-4"
-        >
+        <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-4">
           <FormSection title="Task details">
-            <TextareaField label="Question" name="question" />
+            <TextareaField label="Question" name="title" />
           </FormSection>
           <hr />
           <FormSection title="Autograde?">
             <CheckboxField label="" name="autograde" className="mt-2" />
-            {watch("autograde") && (
-              <TextField label="Expected answer" name="expected_answer" />
-            )}
+            {watch("autograde") && <TextField label="Expected answer" name="expected_answer" />}
           </FormSection>
 
           <div className="mt-12">
-            <Button className="bg-purple-600 text-white hover:bg-purple-600 hover:bg-opacity-80">
-              Submit
-            </Button>
+            <Button className="bg-purple-600 text-white hover:bg-purple-600 hover:bg-opacity-80">Submit</Button>
           </div>
         </form>
       </Form>

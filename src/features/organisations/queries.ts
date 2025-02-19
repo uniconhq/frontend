@@ -1,8 +1,4 @@
-import {
-  queryOptions,
-  useMutation,
-  useQueryClient,
-} from "@tanstack/react-query";
+import { queryOptions, useMutation, useQueryClient } from "@tanstack/react-query";
 
 import {
   createOrganisation,
@@ -37,16 +33,14 @@ export const getOrganisations = () => {
 export const getOrganisationById = (id: number) => {
   return queryOptions({
     queryKey: [OrganisationQueryKeys.Organisation, id],
-    queryFn: () =>
-      getOrganisation({ path: { id } }).then((response) => response.data),
+    queryFn: () => getOrganisation({ path: { id } }).then((response) => response.data),
   });
 };
 
 export const useCreateOrganisation = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (data: OrganisationCreate) =>
-      createOrganisation({ body: data }),
+    mutationFn: (data: OrganisationCreate) => createOrganisation({ body: data }),
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: [OrganisationQueryKeys.Organisation],
@@ -58,8 +52,7 @@ export const useCreateOrganisation = () => {
 export const useUpdateOrganisation = (id: number) => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (data: OrganisationUpdate) =>
-      updateOrganisation({ path: { id }, body: data }),
+    mutationFn: (data: OrganisationUpdate) => updateOrganisation({ path: { id }, body: data }),
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: [OrganisationQueryKeys.Organisation, id],
@@ -84,15 +77,8 @@ export const useDeleteOrganisation = (id: number) => {
 
 export const getOrganisationMembersById = (id: number) => {
   return queryOptions({
-    queryKey: [
-      OrganisationQueryKeys.Organisation,
-      id,
-      OrganisationQueryKeys.Member,
-    ],
-    queryFn: () =>
-      getOrganisationMembers({ path: { id } }).then(
-        (response) => response.data,
-      ),
+    queryKey: [OrganisationQueryKeys.Organisation, id, OrganisationQueryKeys.Member],
+    queryFn: () => getOrganisationMembers({ path: { id } }).then((response) => response.data),
   });
 };
 
@@ -100,16 +86,10 @@ export const useCreateOrganisationInvitationKey = (id: number) => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (data: OrganisationInvitationKeyCreate) =>
-      createOrganisationInvitationKey({ path: { id }, body: data }).then(
-        (response) => response.data,
-      ),
+      createOrganisationInvitationKey({ path: { id }, body: data }).then((response) => response.data),
     onSuccess: () => {
       queryClient.invalidateQueries({
-        queryKey: [
-          OrganisationQueryKeys.Organisation,
-          id,
-          OrganisationQueryKeys.Member,
-        ],
+        queryKey: [OrganisationQueryKeys.Organisation, id, OrganisationQueryKeys.Member],
       });
     },
   });
@@ -118,15 +98,10 @@ export const useCreateOrganisationInvitationKey = (id: number) => {
 export const useDeleteOrganisationInvitationKey = (id: number) => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (keyId: number) =>
-      deleteOrganisationInvitationKey({ path: { id, key_id: keyId } }),
+    mutationFn: (keyId: number) => deleteOrganisationInvitationKey({ path: { id, key_id: keyId } }),
     onSuccess: () => {
       queryClient.invalidateQueries({
-        queryKey: [
-          OrganisationQueryKeys.Organisation,
-          id,
-          OrganisationQueryKeys.Member,
-        ],
+        queryKey: [OrganisationQueryKeys.Organisation, id, OrganisationQueryKeys.Member],
       });
     },
   });
@@ -135,8 +110,7 @@ export const useDeleteOrganisationInvitationKey = (id: number) => {
 export const useJoinOrganisation = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (data: OrganisationJoinRequest) =>
-      joinOrganisation({ body: data }),
+    mutationFn: (data: OrganisationJoinRequest) => joinOrganisation({ body: data }),
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: [OrganisationQueryKeys.Organisation],
@@ -148,21 +122,14 @@ export const useJoinOrganisation = () => {
 export const useUpdateMember = (id: number) => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (data: {
-      userId: number;
-      updateData: OrganisationMemberUpdate;
-    }) =>
+    mutationFn: (data: { userId: number; updateData: OrganisationMemberUpdate }) =>
       updateMember({
         path: { id, user_id: data.userId },
         body: data.updateData,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({
-        queryKey: [
-          OrganisationQueryKeys.Organisation,
-          id,
-          OrganisationQueryKeys.Member,
-        ],
+        queryKey: [OrganisationQueryKeys.Organisation, id, OrganisationQueryKeys.Member],
       });
     },
   });
@@ -180,11 +147,7 @@ export const useDeleteMember = (id: number) => {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({
-        queryKey: [
-          OrganisationQueryKeys.Organisation,
-          id,
-          OrganisationQueryKeys.Member,
-        ],
+        queryKey: [OrganisationQueryKeys.Organisation, id, OrganisationQueryKeys.Member],
       });
     },
   });

@@ -1,12 +1,3 @@
-import { NodeType } from "./types";
-
-export const NodeColorMap = {
-  [NodeType.USER]: "blue",
-  [NodeType.GROUP]: "green",
-  [NodeType.ARTIFACT]: "yellow",
-  [NodeType.TASK]: "purple",
-};
-
 export const StepNodeColorMap = {
   PY_RUN_FUNCTION_STEP: "dodgerblue",
   OBJECT_ACCESS_STEP: "lime",

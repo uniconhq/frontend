@@ -18,37 +18,28 @@ const SubmissionResults = () => {
     refetchInterval: pending ? 5000 : false,
   });
 
-  const task_attempts = submission?.task_attempts.sort(
-    (a, b) => a.task.order_index - b.task.order_index,
-  );
+  const task_attempts = submission?.task_attempts.sort((a, b) => a.task.order_index - b.task.order_index);
 
   useEffect(() => {
     if (
       task_attempts &&
       pending &&
       task_attempts.every(
-        (task_attempt) =>
-          task_attempt.task_results.length == 0 ||
-          task_attempt.task_results[0]?.status !== "PENDING",
+        (task_attempt) => task_attempt.task_results.length == 0 || task_attempt.task_results[0]?.status !== "PENDING",
       )
     ) {
       setPending(false);
     }
   }, [task_attempts, pending]);
 
-  const contest_id: number = task_attempts
-    ? task_attempts[0]?.task?.problem_id
-    : 0;
+  const contest_id: number = task_attempts ? task_attempts[0]?.task?.problem_id : 0;
 
   return (
     <div className="flex w-full flex-col gap-8 px-8 py-6">
       <div className="flex items-center gap-2">
         <h1 className="text-2xl font-semibold">Submission (#{id})</h1>
         <Link to={`/projects/${projectId}/problems/${contest_id}`}>
-          <Button
-            variant="outline"
-            className="font-mono text-sm hover:text-purple-500"
-          >
+          <Button variant="outline" className="font-mono text-sm hover:text-purple-500">
             CONTEST #{contest_id}
           </Button>
         </Link>

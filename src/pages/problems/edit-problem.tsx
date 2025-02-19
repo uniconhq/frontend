@@ -9,9 +9,8 @@ import { Unauthorized } from "../error";
 const EditProblem = () => {
   const id = useProblemId();
   const { data } = useQuery(getProblemById(Number(id)));
-  if (data && !data.edit) {
-    throw Unauthorized;
-  }
+  if (data && !data.edit) throw Unauthorized;
+
   return data && <EditProblemForm id={Number(id)} problem={data} />;
 };
 

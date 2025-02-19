@@ -9,14 +9,7 @@ type OwnProps = {
 };
 
 const InputTable: React.FC<OwnProps> = ({ data, step }) => {
-  return (
-    <DataTable
-      columns={columns}
-      data={data.map((row) => ({ ...row, step }))}
-      hidePagination
-      hideOverflow
-    />
-  );
+  return <DataTable columns={columns} data={data.map((row) => ({ ...row, step }))} hidePagination hideOverflow />;
 };
 
 export default InputTable;

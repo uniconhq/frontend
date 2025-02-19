@@ -8,16 +8,10 @@ type OwnProps = {
 };
 
 const CreateInvitationKeyButton: React.FC<OwnProps> = ({ role }) => {
-  const createInvitationKeyMutation = useCreateInvitationKey(
-    role.project_id,
-    role.id,
-  );
+  const createInvitationKeyMutation = useCreateInvitationKey(role.project_id, role.id);
 
   return (
-    <Button
-      variant="outline"
-      onClick={() => createInvitationKeyMutation.mutate()}
-    >
+    <Button variant="outline" onClick={() => createInvitationKeyMutation.mutate()}>
       create
     </Button>
   );

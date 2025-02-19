@@ -1,8 +1,4 @@
-import {
-  queryOptions,
-  useMutation,
-  useQueryClient,
-} from "@tanstack/react-query";
+import { queryOptions, useMutation, useQueryClient } from "@tanstack/react-query";
 
 import {
   addTaskToProblem,
@@ -45,23 +41,17 @@ export const getSupportedPythonVersions = () => {
 
 export const useCreateProblem = (project_id: number) => {
   return useMutation({
-    mutationFn: (data: Problem) =>
-      createProblem({ body: data, path: { id: project_id } }),
+    mutationFn: (data: Problem) => createProblem({ body: data, path: { id: project_id } }),
   });
 };
 
 export const useUpdateProblem = (problemId: number) => {
   return useMutation({
-    mutationFn: (data: ProblemUpdate) =>
-      updateProblem({ body: data, path: { id: problemId } }),
+    mutationFn: (data: ProblemUpdate) => updateProblem({ body: data, path: { id: problemId } }),
   });
 };
 
-export type TaskType =
-  | ProgrammingTask
-  | MultipleChoiceTask
-  | MultipleResponseTask
-  | ShortAnswerTask;
+export type TaskType = ProgrammingTask | MultipleChoiceTask | MultipleResponseTask | ShortAnswerTask;
 
 export const useCreateTask = (problemId: number) => {
   return useMutation({
@@ -125,18 +115,13 @@ export const useRerunTaskAttempt = (problemId: number) => {
 export const getProblemById = (problemId: number) => {
   return queryOptions({
     queryKey: [ContestQueryKeys.Problem, problemId],
-    queryFn: () =>
-      getProblem({ path: { id: problemId } }).then((response) => response.data),
+    queryFn: () => getProblem({ path: { id: problemId } }).then((response) => response.data),
   });
 };
 
 export const getAllProjectSubmissions = (projectId: number) => {
   return queryOptions({
-    queryKey: [
-      ContestQueryKeys.Project,
-      projectId,
-      ContestQueryKeys.Submission,
-    ],
+    queryKey: [ContestQueryKeys.Project, projectId, ContestQueryKeys.Submission],
     queryFn: () =>
       getProjectSubmissions({
         path: {
@@ -158,12 +143,7 @@ export const useCreateTaskAttempt = (problemId: number, taskId: number) => {
 
 export const getTaskAttemptResults = (problemId: number, taskId: number) => {
   return queryOptions({
-    queryKey: [
-      ContestQueryKeys.Problem,
-      problemId,
-      ContestQueryKeys.TaskResult,
-      taskId,
-    ],
+    queryKey: [ContestQueryKeys.Problem, problemId, ContestQueryKeys.TaskResult, taskId],
     queryFn: () =>
       getProblemTaskAttemptResults({
         path: { id: problemId, task_id: taskId },
@@ -174,10 +154,7 @@ export const getTaskAttemptResults = (problemId: number, taskId: number) => {
 export const getSubmissionById = (submissionId: number) => {
   return queryOptions({
     queryKey: [ContestQueryKeys.Submission, submissionId],
-    queryFn: () =>
-      getSubmission({ path: { submission_id: submissionId } }).then(
-        (response) => response.data,
-      ),
+    queryFn: () => getSubmission({ path: { submission_id: submissionId } }).then((response) => response.data),
   });
 };
 
@@ -200,9 +177,7 @@ export const useCreateSubmission = (problemId: number) => {
         ),
       ).then((response) =>
         makeSubmission({
-          body: response
-            .map((res) => res.data?.id)
-            .filter((id) => id !== undefined),
+          body: response.map((res) => res.data?.id).filter((id) => id !== undefined),
           path: { id: problemId },
         }),
       );

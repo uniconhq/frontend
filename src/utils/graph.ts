@@ -1,10 +1,7 @@
 import Dagre from "@dagrejs/dagre";
 import { Edge, Node } from "@xyflow/react";
 
-function getLayoutedElements<T extends Record<string, unknown>>(
-  nodes: Node<T>[],
-  edges: Edge[],
-) {
+function getLayoutedElements<T extends Record<string, unknown>>(nodes: Node<T>[], edges: Edge[]) {
   const g = new Dagre.graphlib.Graph().setDefaultEdgeLabel(() => ({}));
   g.setGraph({ rankdir: "LR" });
 
