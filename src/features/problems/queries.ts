@@ -12,6 +12,7 @@ import {
   makeSubmission,
   MultipleChoiceTask,
   MultipleResponseTask,
+  parsePythonFunctions,
   Problem,
   ProblemUpdate,
   ProgrammingTask,
@@ -23,17 +24,18 @@ import {
   UserInput,
 } from "@/api";
 
-export enum ContestQueryKeys {
+export enum ProblemQueryKeys {
   Project = "Project",
   Problem = "Problem",
   TaskResult = "TaskResult",
   Submission = "Submission",
   PythonVersions = "PythonVersions",
+  File = "File",
 }
 
 export const getSupportedPythonVersions = () => {
   return queryOptions({
-    queryKey: [ContestQueryKeys.PythonVersions],
+    queryKey: [ProblemQueryKeys.PythonVersions],
     queryFn: () => getPythonVersions().then((response) => response.data ?? []),
     staleTime: Infinity,
   });
@@ -76,7 +78,7 @@ export const useUpdateTask = (problemId: number, taskId: number) => {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({
-        queryKey: [ContestQueryKeys.Problem, problemId],
+        queryKey: [ProblemQueryKeys.Problem, problemId],
       });
     },
   });
@@ -91,7 +93,7 @@ export const useDeleteTask = (problemId: number, taskId: number) => {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({
-        queryKey: [ContestQueryKeys.Problem, problemId],
+        queryKey: [ProblemQueryKeys.Problem, problemId],
       });
     },
   });
@@ -106,7 +108,7 @@ export const useRerunTaskAttempt = (problemId: number) => {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({
-        queryKey: [ContestQueryKeys.Problem, problemId],
+        queryKey: [ProblemQueryKeys.Problem, problemId],
       });
     },
   });
@@ -114,14 +116,14 @@ export const useRerunTaskAttempt = (problemId: number) => {
 
 export const getProblemById = (problemId: number) => {
   return queryOptions({
-    queryKey: [ContestQueryKeys.Problem, problemId],
+    queryKey: [ProblemQueryKeys.Problem, problemId],
     queryFn: () => getProblem({ path: { id: problemId } }).then((response) => response.data),
   });
 };
 
 export const getAllProjectSubmissions = (projectId: number) => {
   return queryOptions({
-    queryKey: [ContestQueryKeys.Project, projectId, ContestQueryKeys.Submission],
+    queryKey: [ProblemQueryKeys.Project, projectId, ProblemQueryKeys.Submission],
     queryFn: () =>
       getProjectSubmissions({
         path: {
@@ -143,7 +145,7 @@ export const useCreateTaskAttempt = (problemId: number, taskId: number) => {
 
 export const getTaskAttemptResults = (problemId: number, taskId: number) => {
   return queryOptions({
-    queryKey: [ContestQueryKeys.Problem, problemId, ContestQueryKeys.TaskResult, taskId],
+    queryKey: [ProblemQueryKeys.Problem, problemId, ProblemQueryKeys.TaskResult, taskId],
     queryFn: () =>
       getProblemTaskAttemptResults({
         path: { id: problemId, task_id: taskId },
@@ -153,7 +155,7 @@ export const getTaskAttemptResults = (problemId: number, taskId: number) => {
 
 export const getSubmissionById = (submissionId: number) => {
   return queryOptions({
-    queryKey: [ContestQueryKeys.Submission, submissionId],
+    queryKey: [ProblemQueryKeys.Submission, submissionId],
     queryFn: () => getSubmission({ path: { submission_id: submissionId } }).then((response) => response.data),
   });
 };
@@ -182,5 +184,19 @@ export const useCreateSubmission = (problemId: number) => {
         }),
       );
     },
+  });
+};
+
+export const getFunctions = (content: string) => {
+  return queryOptions({
+    queryKey: [ProblemQueryKeys.File, content],
+    queryFn: () =>
+      parsePythonFunctions({
+        body: {
+          content,
+        },
+      }).then((response) => response.data),
+    staleTime: Infinity,
+    enabled: !!content,
   });
 };

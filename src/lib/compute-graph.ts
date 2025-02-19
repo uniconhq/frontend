@@ -5,6 +5,7 @@ import {
   LoopStep,
   ObjectAccessStep,
   OutputStep,
+  PyRunFunctionSocket,
   PyRunFunctionStep,
   SocketType,
   StepSocket,
@@ -38,7 +39,11 @@ export const createDefaultStep = (type: StepType) => {
       return createBaseStep(type, [createSocket("DATA")], []) as OutputStep;
     case "PY_RUN_FUNCTION_STEP":
       return {
-        ...createBaseStep(type, [createSocket("DATA", "Module")], []),
+        ...createBaseStep(
+          type,
+          [{ ...createSocket("DATA", "Module"), import_as_module: true }] as PyRunFunctionSocket[],
+          [createSocket("DATA", "Result")],
+        ),
         function_identifier: "",
         allow_error: false,
       } as PyRunFunctionStep;
