@@ -8,6 +8,7 @@ import { Task } from "@/components/tasks/task";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TaskType, useDeleteTask } from "@/features/problems/queries";
+import { AutogradedBadge, TaskTypeBadge } from "@/features/tasks/components/badges";
 
 type OwnProps = {
   index: number;
@@ -42,15 +43,15 @@ const TaskCard: React.FC<OwnProps> = ({ index, task, problemId, projectId, edit,
       <Card className="bg-inherit" {...(provided?.draggableProps ?? {})} ref={provided?.innerRef}>
         <CardHeader>
           <CardTitle
-            className="-mx-6 -mt-6 flex items-center justify-between rounded-t-xl bg-neutral-800 px-6 pb-4 pt-4 font-mono"
+            className="-mx-6 -mt-6 flex items-center justify-between rounded-t-xl bg-neutral-800 px-6 pb-4 pt-4"
             {...(provided?.dragHandleProps ?? {})}
           >
             <div className="flex items-center gap-4">
               {edit && <GripVertical className="-mr-2" />}
               <span className="text-lg font-medium">Task #{index + 1}</span>
-              <div className="flex items-center gap-2 text-sm text-stone-300">
-                <span className="rounded-md border border-blue-700 p-2">{task.type}</span>
-                {task.autograde && <span className="rounded-md border border-green-700 p-2">Autograded</span>}
+              <div className="flex items-center gap-2">
+                <TaskTypeBadge type={task.type} />
+                {task.autograde && <AutogradedBadge />}
               </div>
             </div>
             {edit && (
