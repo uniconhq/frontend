@@ -24,6 +24,7 @@ import { StepNode } from "@/components/node-graph/components/step/step-node";
 import { Button } from "@/components/ui/button";
 import { FileTree } from "@/components/ui/file-tree";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
+import { convertFilesToFileTree } from "@/lib/files";
 import { cn, isFile } from "@/lib/utils";
 import getLayoutedElements from "@/utils/graph";
 
@@ -227,7 +228,11 @@ const GraphEditor: React.FC<GraphEditorProps> = ({ graphId, className }) => {
       data-state={expanded ? "open" : "closed"}
     >
       <ResizablePanelGroup direction="horizontal">
-        <>{showFileTree && <FileTree files={files} onCloseFileTree={() => setShowFileTree(false)} />}</>
+        <>
+          {showFileTree && (
+            <FileTree files={convertFilesToFileTree(files)} onCloseFileTree={() => setShowFileTree(false)} />
+          )}
+        </>
         {selectedSocketId && (
           <>
             <ResizablePanel defaultSize={2} order={0}>

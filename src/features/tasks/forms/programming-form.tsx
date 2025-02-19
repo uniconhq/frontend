@@ -23,7 +23,7 @@ const createDefaultUserInput = () => ({
   id: uuid(),
   label: "",
   data: {
-    name: "",
+    path: "file.py",
     content: "# INSERT FILE TEMPLATE HERE",
     trusted: false,
   },
@@ -102,7 +102,7 @@ const ProgrammingForm: React.FC<OwnProps> = ({ title, initialValue, onSubmit }) 
       label: newLabel ?? oldInput.label,
       data: {
         ...oldFileData,
-        name: newLabel ?? oldInput.label,
+        path: newLabel ?? oldInput.label,
         content: newFileContent ?? oldFileData.content,
       },
     });

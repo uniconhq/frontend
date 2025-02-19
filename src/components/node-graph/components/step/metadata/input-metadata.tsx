@@ -2,6 +2,7 @@ import { Plus } from "lucide-react";
 import { useCallback, useContext } from "react";
 
 import { InputStep, StepSocket } from "@/api";
+import FileInputButton from "@/components/form/inputs/file-input-button";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
@@ -11,6 +12,7 @@ import {
   SocketDir,
 } from "@/features/problems/components/tasks/graph-context";
 import { createSocket } from "@/lib/compute-graph";
+import { uuid } from "@/lib/utils";
 
 import InputTable from "../input-table/input-table";
 import InputMetadataRow from "./input-metadata-row";
@@ -121,15 +123,90 @@ const InputMetadata: React.FC<OwnProps> = ({ step }) => {
           </TableBody>
         </Table>
       </div>
-      <Button
-        size={"sm"}
-        className="mt-3 h-fit w-fit px-1 py-1"
-        variant={"secondary"}
-        onClick={addOutputSocket}
-        type="button"
-      >
-        <Plus className="h-2 w-2" />
-      </Button>
+      <div className="flex gap-2">
+        <Button
+          size={"sm"}
+          className="mt-3 h-fit w-fit px-1 py-1"
+          variant={"secondary"}
+          onClick={addOutputSocket}
+          type="button"
+        >
+          <Plus className="h-2 w-2" />
+        </Button>
+        <FileInputButton
+          multiple
+          buttonText="File"
+          onFileChange={(files) => {
+            if (!files) {
+              return;
+            }
+            for (const file of files) {
+              if (file.type.startsWith("text")) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                  const fileContent = (e.target?.result as string).trim();
+                  dispatch({
+                    type: GraphActionType.AddSocket,
+                    payload: {
+                      stepId: step.id,
+                      socketDir: SocketDir.Output,
+                      socket: {
+                        ...createSocket("DATA", file.name),
+                        id: uuid(),
+                        data: {
+                          path: file.name,
+                          content: fileContent,
+                          trusted: true,
+                        },
+                      },
+                    },
+                  });
+                };
+                reader.readAsText(file);
+              }
+              // TODO: handle minio case
+            }
+          }}
+        />
+        <FileInputButton
+          buttonText="Folder"
+          webkitdirectory="true"
+          onFileChange={(files) => {
+            if (!files) {
+              return;
+            }
+            for (const file of files) {
+              // pyproject.toml had file.type === ""
+              if (file.type.startsWith("text") || file.type === "") {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                  const fileContent = (e.target?.result as string).trim();
+                  dispatch({
+                    type: GraphActionType.AddSocket,
+                    payload: {
+                      stepId: step.id,
+                      socketDir: SocketDir.Output,
+                      socket: {
+                        ...createSocket("DATA", file.webkitRelativePath),
+                        id: uuid(),
+                        data: {
+                          path: file.webkitRelativePath,
+                          content: fileContent,
+                          trusted: true,
+                        },
+                      },
+                    },
+                  });
+                };
+                reader.readAsText(file);
+              } else {
+                console.log({ file });
+              }
+              // TODO: handle minio case
+            }
+          }}
+        />
+      </div>
     </div>
   );
 };
