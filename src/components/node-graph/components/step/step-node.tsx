@@ -27,6 +27,7 @@ export function StepNode({ data }: { data: Step }) {
 
   const isStepEditable = "is_user" in data ? !data.is_user : true;
   const showEditElements = edit && isStepEditable;
+  const allowEditSockets = showEditElements && data.type !== "PY_RUN_FUNCTION_STEP";
 
   // We are programmatically updating the internal state of the node (e.g. adding more handles)
   // as such we will need to sync it with ReactFlow
@@ -104,12 +105,13 @@ export function StepNode({ data }: { data: Step }) {
                   key={stepSocket.id}
                   socket={stepSocket}
                   type="target"
-                  edit={edit}
+                  edit={showEditElements}
+                  allowEditSockets={allowEditSockets}
                   onEditSocketLabel={handleEditSocketLabel(stepSocket.id)}
                   onDeleteSocket={deleteSocket(stepSocket.id)}
                 />
               ))}
-              {showEditElements && (
+              {showEditElements && allowEditSockets && (
                 <Button
                   size={"sm"}
                   className="ml-3 h-fit w-fit px-1 py-1"
@@ -127,12 +129,13 @@ export function StepNode({ data }: { data: Step }) {
                   key={stepSocket.id}
                   socket={stepSocket}
                   type="source"
-                  edit={edit}
+                  edit={showEditElements}
+                  allowEditSockets={allowEditSockets}
                   onEditSocketLabel={handleEditSocketLabel(stepSocket.id)}
                   onDeleteSocket={deleteSocket(stepSocket.id)}
                 />
               ))}
-              {showEditElements && (
+              {showEditElements && allowEditSockets && (
                 <Button
                   size={"sm"}
                   className="mr-3 h-fit w-fit self-end px-1 py-1"

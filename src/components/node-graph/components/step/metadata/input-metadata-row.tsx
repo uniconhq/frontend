@@ -67,11 +67,7 @@ const InputMetadataRow: React.FC<OwnProps> = ({
           </div>
         ) : (
           <div className="flex gap-2">
-            {isEditable ? (
-              <NodeInput value={JSON.stringify(socket.data)} onChange={onChangeValue} />
-            ) : (
-              <span>{JSON.stringify(socket.data)}</span>
-            )}
+            {isEditable ? <NodeInput value={socket.data ?? ""} onChange={onChangeValue} /> : <span>{socket.data}</span>}
             {isEditable && (
               <Button
                 size={"sm"}

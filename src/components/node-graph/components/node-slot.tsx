@@ -13,6 +13,7 @@ interface NodeSlotProps {
   type: HandleType;
   hideLabel?: boolean;
   edit?: boolean;
+  allowEditSockets?: boolean;
   onEditSocketLabel?: (newSocketLabel: string) => void;
   onDeleteSocket?: () => void;
   style?: React.CSSProperties;
@@ -23,6 +24,7 @@ export function NodeSlot({
   type,
   hideLabel = false,
   edit = false,
+  allowEditSockets = true,
   onEditSocketLabel,
   onDeleteSocket,
   style,
@@ -62,7 +64,7 @@ export function NodeSlot({
         position={type === "target" ? HandlePosition.Left : HandlePosition.Right}
       />
       {!hideLabel &&
-        (edit && socket.type !== "CONTROL" ? (
+        (edit && allowEditSockets && socket.type !== "CONTROL" ? (
           <div
             className={cn("flex grow justify-between gap-2", {
               "flex-row-reverse space-x-reverse": type === "source",
@@ -88,7 +90,7 @@ export function NodeSlot({
             </Button>
           </div>
         ) : (
-          <span className="text-xs">{socket.label ?? ""}</span>
+          <span className="min-h-[12px] text-xs">{socket.label ?? ""}</span>
         ))}
     </div>
   );
