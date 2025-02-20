@@ -42,7 +42,7 @@ const FileEditor: React.FC<OwnProps> = ({
   };
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full grow flex-col">
       {/* file tab */}
       <div className="flex w-fit items-center gap-2 border-b border-purple-200 py-1">
         {editableName ? (

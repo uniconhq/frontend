@@ -15,6 +15,7 @@ import {
   useEdgesState,
   useNodesInitialized,
   useNodesState,
+  useReactFlow,
 } from "@xyflow/react";
 import { ExpandIcon, ShrinkIcon } from "lucide-react";
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
@@ -63,7 +64,7 @@ const stepEdgeToRfEdge = (edge: GraphEdge): Edge => ({
 });
 
 const GraphEditor: React.FC<GraphEditorProps> = ({ graphId, className }) => {
-  const { steps, edges, edit, selectedSocketId } = useContext(GraphContext)!;
+  const { steps, edges, edit, selectedSocketId, selectedStepId } = useContext(GraphContext)!;
   const dispatch = useContext(GraphDispatchContext)!;
 
   const nodeData = useMemo(() => steps.map(stepNodeToRfNode), [steps]);
@@ -78,6 +79,8 @@ const GraphEditor: React.FC<GraphEditorProps> = ({ graphId, className }) => {
   const [expanded, setExpanded] = useState(false);
 
   const onInit = (rf: RfInstance) => setRfInstance(rf);
+
+  const { fitView } = useReactFlow();
 
   // Apply layout algorithm to graph after nodes are initialized by ReactFlow
   useEffect(() => {
@@ -199,6 +202,9 @@ const GraphEditor: React.FC<GraphEditorProps> = ({ graphId, className }) => {
     [dispatch],
   );
 
+  const selectedStep = steps.find((step) => step.id === selectedStepId);
+  const selectedSocket = selectedStep?.outputs?.find((socket) => socket.id === selectedSocketId);
+
   const inputSteps = steps.filter((step) => step.type === "INPUT_STEP") as InputStep[];
   const files = inputSteps.flatMap((step) =>
     step.outputs.flatMap((output) => {
@@ -208,11 +214,13 @@ const GraphEditor: React.FC<GraphEditorProps> = ({ graphId, className }) => {
           name: output.data.path.split("/").pop()!,
           path: output.data.path,
           content: output.data.content,
-          isBinary: false,
+          isBinary: !!output.data.on_minio,
           downloadUrl: "",
           onClick: () => {
+            fitView({ nodes: [{ id: step.id }], duration: 100, maxZoom: 0.8 });
             dispatch({ type: GraphActionType.SelectSocket, payload: { stepId: step.id, socketId: output.id } });
           },
+          highlighted: output.id === selectedSocketId && step.id === selectedStepId,
         },
       ];
     }),
@@ -220,6 +228,8 @@ const GraphEditor: React.FC<GraphEditorProps> = ({ graphId, className }) => {
 
   const [showFileTree, setShowFileTree] = useState(true);
 
+  // The file editor is hidden if the file is a binary file.
+  const showFile = selectedSocket && isFile(selectedSocket.data) && !selectedSocket?.data.on_minio;
   return (
     <div
       className={cn(className, {
@@ -233,7 +243,7 @@ const GraphEditor: React.FC<GraphEditorProps> = ({ graphId, className }) => {
             <FileTree files={convertFilesToFileTree(files)} onCloseFileTree={() => setShowFileTree(false)} />
           )}
         </>
-        {selectedSocketId && (
+        {showFile && (
           <>
             <ResizablePanel defaultSize={2} order={0}>
               <GraphFileEditor />

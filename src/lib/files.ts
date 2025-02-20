@@ -11,6 +11,7 @@ export type FileType = {
 
 export type TreeFile = FileType & {
   name: string;
+  highlighted?: boolean;
 };
 
 export type TreeFolder = {
