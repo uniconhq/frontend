@@ -22,7 +22,7 @@ const StepMetadata: React.FC<OwnProps> = ({ step }) => {
     return null;
   }
   return (
-    <div className="mx-2 pb-4 text-sm">
+    <div className="mx-2 pb-4 font-mono text-sm">
       {step.type === "PY_RUN_FUNCTION_STEP" && <PyRunMetadata step={step as PyRunFunctionStep} />}
       {step.type === "OBJECT_ACCESS_STEP" && <ObjectAccessMetadata step={step as ObjectAccessStep} />}
       {step.type === "OUTPUT_STEP" && <OutputMetadata step={step as OutputStep} />}

@@ -126,7 +126,7 @@ const InputMetadata: React.FC<OwnProps> = ({ step }) => {
       <Button
         size={"sm"}
         className="mt-3 h-fit w-fit px-1 py-1"
-        variant={"secondary"}
+        variant="secondary"
         onClick={addOutputSocket}
         type="button"
       >

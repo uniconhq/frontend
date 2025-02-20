@@ -31,7 +31,7 @@ const OutputMetadataRow: React.FC<OwnProps> = ({
           socket={socket}
           type="target"
           hideLabel
-          style={{ width: "20px", borderRadius: "10px", left: "-12px" }}
+          handleStyle={{ width: "20px", borderRadius: "10px", left: "-12px" }}
         />
       </TableCell>
       <TableCell>
@@ -85,7 +85,7 @@ const OutputMetadataRow: React.FC<OwnProps> = ({
                 <Button
                   size={"sm"}
                   className="h-fit w-fit px-1 py-1"
-                  variant={"secondary"}
+                  variant="secondary"
                   onClick={() =>
                     onUpdateSocketMetadata({
                       comparison: null,
@@ -106,7 +106,7 @@ const OutputMetadataRow: React.FC<OwnProps> = ({
               <Button
                 size={"sm"}
                 className="h-fit w-fit px-1 py-1"
-                variant={"secondary"}
+                variant="secondary"
                 onClick={() =>
                   onUpdateSocketMetadata({
                     comparison: {
@@ -140,7 +140,7 @@ const OutputMetadataRow: React.FC<OwnProps> = ({
           <Button
             size={"sm"}
             className="h-fit w-fit px-1 py-1"
-            variant={"secondary"}
+            variant="secondary"
             onClick={onDeleteSocket}
             type="button"
           >

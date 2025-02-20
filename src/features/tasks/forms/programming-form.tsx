@@ -321,7 +321,7 @@ const ProgrammingForm: React.FC<OwnProps> = ({ title, initialValue, onSubmit }) 
                       onChange={(newLabel) => updateUserInput(index, { newLabel })}
                     />
                     <CollapsibleTrigger asChild>
-                      <Button variant={"secondary"} type="button" className="text-xs">
+                      <Button variant="secondary" type="button" className="text-xs">
                         View/Edit
                       </Button>
                     </CollapsibleTrigger>

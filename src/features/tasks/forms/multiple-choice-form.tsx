@@ -72,7 +72,7 @@ const MultipleChoiceForm: React.FC<OwnProps> = ({ title, initialValue, onSubmit 
           <hr />
           <FormSection title="Choices">
             <div className="flex flex-col items-start gap-4">
-              <Button variant={"outline"} type="button" onClick={() => choices.append({ id: uuid(), text: "" })}>
+              <Button variant="outline" type="button" onClick={() => choices.append({ id: uuid(), text: "" })}>
                 <PlusIcon />
                 Add choice
               </Button>
