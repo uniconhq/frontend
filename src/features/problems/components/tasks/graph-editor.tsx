@@ -6,6 +6,7 @@ import {
   Connection,
   Controls,
   Edge,
+  IsValidConnection,
   MarkerType,
   MiniMap,
   Node,
@@ -197,6 +198,18 @@ const GraphEditor: React.FC<GraphEditorProps> = ({ graphId, className }) => {
     [dispatch],
   );
 
+  const isValidConnection: IsValidConnection<Edge> = useCallback(
+    (newEdge) => {
+      // Check there is no existing edge to the target node + handle.
+      const { target, targetHandle } = newEdge;
+      if (edges.find((edge) => edge.to_node_id === target && edge.to_socket_id === targetHandle)) {
+        return false;
+      }
+      return true;
+    },
+    [edges],
+  );
+
   return (
     <div
       className={cn(className, {
@@ -232,6 +245,7 @@ const GraphEditor: React.FC<GraphEditorProps> = ({ graphId, className }) => {
             onReconnect={onReconnect}
             nodesConnectable={edit}
             edgesReconnectable={edit}
+            isValidConnection={isValidConnection}
             colorMode="dark"
             proOptions={{ hideAttribution: true }}
           >
