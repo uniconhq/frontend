@@ -11,7 +11,6 @@ import {
 } from "@/api";
 import { Step } from "@/features/problems/components/tasks/types";
 import { createSocket } from "@/lib/compute-graph";
-import { uuid } from "@/lib/utils";
 
 export type GraphState = {
   id: string;
@@ -95,6 +94,7 @@ interface UpdateSocketMetadataAction extends BaseGraphAction {
 interface AddEdgeAction extends BaseGraphAction {
   type: GraphActionType.AddEdge;
   payload: {
+    id: string;
     from_node_id: string;
     from_socket_id: string;
     to_node_id: string;
@@ -355,7 +355,7 @@ const deselectSocket = (state: GraphState, _action: DeselectSocketAction) => {
 };
 
 const addEdge = (state: GraphState, { payload }: AddEdgeAction) => {
-  state.edges.push({ id: uuid(), ...payload });
+  state.edges.push({ ...payload });
   return state;
 };
 

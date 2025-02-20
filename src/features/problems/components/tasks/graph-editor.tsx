@@ -23,7 +23,7 @@ import { GraphEdgeStr as GraphEdge, InputStep } from "@/api";
 import { StepNode } from "@/components/node-graph/components/step/step-node";
 import { Button } from "@/components/ui/button";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
-import { cn } from "@/lib/utils";
+import { cn, uuid } from "@/lib/utils";
 import getLayoutedElements from "@/utils/graph";
 
 import AddNodeButton from "./add-node-button";
@@ -152,6 +152,7 @@ const GraphEditor: React.FC<GraphEditorProps> = ({ graphId, className }) => {
       dispatch({
         type: GraphActionType.AddEdge,
         payload: {
+          id: uuid(),
           from_node_id: source,
           from_socket_id: sourceHandle!,
           to_node_id: target,
@@ -176,6 +177,7 @@ const GraphEditor: React.FC<GraphEditorProps> = ({ graphId, className }) => {
       dispatch({
         type: GraphActionType.AddEdge,
         payload: {
+          id: uuid(),
           from_node_id: source,
           from_socket_id: sourceHandle!,
           to_node_id: target,
