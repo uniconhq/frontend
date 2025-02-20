@@ -52,7 +52,7 @@ const ProjectGroups = () => {
                 </div>
                 {project.edit_groups && (
                   <Link to={`/projects/${id}/groups/${group.id}`}>
-                    <Button variant={"secondary"}>Edit group</Button>
+                    <Button variant="secondary">Edit group</Button>
                   </Link>
                 )}
               </div>
@@ -72,7 +72,7 @@ const ProjectGroups = () => {
                       <TableCell>{index + 1}</TableCell>
                       <TableCell>{member.user.username}</TableCell>
                       <TableCell>
-                        {member.is_supervisor ? <Badge variant={"green"}>supervisor</Badge> : <Badge>member</Badge>}
+                        {member.is_supervisor ? <Badge variant="green">supervisor</Badge> : <Badge>member</Badge>}
                       </TableCell>
                     </TableRow>
                   ))}

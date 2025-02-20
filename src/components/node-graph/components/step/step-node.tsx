@@ -1,9 +1,9 @@
 import { useUpdateNodeInternals } from "@xyflow/react";
-import { Plus, Trash } from "lucide-react";
+import { PlusIcon, TrashIcon } from "lucide-react";
 import { useCallback, useContext, useEffect } from "react";
 import { GoDotFill } from "react-icons/go";
 
-import { StepSocket } from "@/api";
+import { StepSocket, StepType } from "@/api";
 import { Button } from "@/components/ui/button";
 import {
   GraphActionType,
@@ -18,6 +18,25 @@ import { cn } from "@/lib/utils";
 
 import { NodeSlot, NodeSlotGroup } from "../node-slot";
 import StepMetadata from "./metadata/step-metadata";
+
+const NodeHeader = ({ type, edit, deleteStep }: { type: StepType; edit: boolean; deleteStep: () => void }) => {
+  return (
+    <div
+      className="w-content mb-4 flex items-center justify-between gap-10 rounded-t border-2 p-2"
+      style={{ borderColor: StepNodeColorMap[type] }}
+    >
+      <div className="flex items-center gap-1">
+        <GoDotFill className="h-6 w-6 animate-pulse" style={{ color: `${StepNodeColorMap[type]}` }} />
+        <span className="pr-4 text-base font-medium capitalize tracking-tight">{StepTypeAliasMap[type]}</span>
+      </div>
+      {edit && (
+        <Button className="h-fit w-fit bg-transparent px-2" variant="secondary" onClick={deleteStep} type="button">
+          <TrashIcon />
+        </Button>
+      )}
+    </div>
+  );
+};
 
 export function StepNode({ data }: { data: Step }) {
   const { edit } = useContext(GraphContext)!;
@@ -72,33 +91,17 @@ export function StepNode({ data }: { data: Step }) {
   return (
     <div
       className={cn(
-        "flex min-w-52 flex-col rounded bg-[#141414] pb-2 font-mono text-slate-300 outline outline-[0.08rem] outline-neutral-500",
+        "flex min-w-52 flex-col rounded bg-[#141414] pb-2 text-slate-300 outline outline-[0.05rem] outline-neutral-500",
       )}
     >
       {/* Node header */}
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-1 rounded-t py-2 pl-1 pr-4 font-medium uppercase">
-          <GoDotFill style={{ color: `${StepNodeColorMap[data.type]}` }} className="h-5 w-5" />
-          {StepTypeAliasMap[data.type]}
-        </div>
-        {showEditElements && (
-          <Button
-            size={"sm"}
-            className="mr-3 h-fit w-fit px-1 py-1"
-            variant={"secondary"}
-            onClick={deleteStep}
-            type="button"
-          >
-            <Trash className="h-2 w-2" />
-          </Button>
-        )}
-      </div>
+      <NodeHeader type={data.type} edit={showEditElements} deleteStep={deleteStep} />
       {/* Node metadata */}
       <StepMetadata step={data} />
       {/* Node body */}
       {!handlesInStepMetadata && (
         <div className="text-xs font-light">
-          <div className="flex flex-row justify-between">
+          <div className="flex flex-row justify-between gap-4">
             <NodeSlotGroup>
               {data.inputs?.map((stepSocket: StepSocket) => (
                 <NodeSlot
@@ -114,12 +117,12 @@ export function StepNode({ data }: { data: Step }) {
               {showEditElements && allowEditSockets && (
                 <Button
                   size={"sm"}
-                  className="ml-3 h-fit w-fit px-1 py-1"
-                  variant={"secondary"}
+                  className="ml-2 h-fit w-fit px-1 py-1"
+                  variant="secondary"
                   onClick={addSocket(SocketDir.Input)}
                   type="button"
                 >
-                  <Plus className="h-2 w-2" />
+                  <PlusIcon />
                 </Button>
               )}
             </NodeSlotGroup>
@@ -138,12 +141,12 @@ export function StepNode({ data }: { data: Step }) {
               {showEditElements && allowEditSockets && (
                 <Button
                   size={"sm"}
-                  className="mr-3 h-fit w-fit self-end px-1 py-1"
-                  variant={"secondary"}
+                  className="mr-2 h-fit w-fit self-end px-1 py-1"
+                  variant="secondary"
                   onClick={addSocket(SocketDir.Output)}
                   type="button"
                 >
-                  <Plus className="h-2 w-2" />
+                  <PlusIcon />
                 </Button>
               )}
             </NodeSlotGroup>

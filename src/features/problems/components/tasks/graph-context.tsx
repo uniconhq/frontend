@@ -29,6 +29,7 @@ export enum GraphActionType {
   // Socket actions
   AddSocket = "ADD_SOCKET",
   DeleteSocket = "DELETE_SOCKET",
+  UpdateSocketData = "UPDATE_SOCKET_DATA",
   UpdateSocketLabel = "UPDATE_SOCKET_LABEL",
   UpdateSocketMetadata = "UPDATE_SOCKET_METADATA",
   // Edge actions

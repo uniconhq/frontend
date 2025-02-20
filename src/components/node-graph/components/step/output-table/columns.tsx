@@ -16,7 +16,7 @@ export const columns: ColumnDef<OutputSocket>[] = [
           socket={socket}
           type="target"
           hideLabel
-          style={{ width: "20px", borderRadius: "10px", left: "-12px" }}
+          handleStyle={{ width: "20px", borderRadius: "10px", left: "-12px" }}
         />
       );
     },

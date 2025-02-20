@@ -1,5 +1,5 @@
 import { Handle, HandleType, Position as HandlePosition, useNodeConnections } from "@xyflow/react";
-import { Trash } from "lucide-react";
+import { TrashIcon } from "lucide-react";
 import { twJoin } from "tailwind-merge";
 
 import { StepSocket } from "@/api";
@@ -16,8 +16,44 @@ interface NodeSlotProps {
   allowEditSockets?: boolean;
   onEditSocketLabel?: (newSocketLabel: string) => void;
   onDeleteSocket?: () => void;
-  style?: React.CSSProperties;
+  handleStyle?: React.CSSProperties;
 }
+
+const DataSocket = ({
+  socket,
+  hideLabel,
+  edit,
+  allowEditSockets,
+  onEditSocketLabel,
+  onDeleteSocket,
+  type,
+}: Omit<NodeSlotProps, "handleStyle"> & { type: "source" | "target" }) => {
+  if (hideLabel) return null;
+
+  const editable = edit && allowEditSockets;
+  return (
+    <>
+      {editable ? (
+        <div
+          className={cn("flex grow items-center justify-between gap-2 px-2", {
+            "flex-row-reverse space-x-reverse": type === "source",
+          })}
+        >
+          <NodeInput
+            className={[cn({ "text-right": type === "source" })]}
+            value={socket.label ?? ""}
+            onChange={onEditSocketLabel ?? (() => {})}
+          />
+          <Button className="h-fit w-fit p-1" variant="outline" onClick={onDeleteSocket} type="button">
+            <TrashIcon />
+          </Button>
+        </div>
+      ) : (
+        <span className="min-h-[12px] px-2 text-sm">{socket.label ?? ""}</span>
+      )}
+    </>
+  );
+};
 
 export function NodeSlot({
   socket,
@@ -27,12 +63,8 @@ export function NodeSlot({
   allowEditSockets = true,
   onEditSocketLabel,
   onDeleteSocket,
-  style,
+  handleStyle,
 }: NodeSlotProps) {
-  const handleEditSocketLabel = (newSocketLabel: string) => {
-    if (onEditSocketLabel) onEditSocketLabel(newSocketLabel);
-  };
-
   const connections = useNodeConnections({
     handleType: type,
     handleId: socket.id,
@@ -52,7 +84,7 @@ export function NodeSlot({
           height: "12px",
           backgroundColor: hasConnections ? "white" : "black",
           border: "1px solid white",
-          ...(style ?? {}),
+          ...(handleStyle ?? {}),
         }} // NOTE: Override default position to use flex positioning
         className={twJoin(
           "bg-neutral-700",
@@ -63,35 +95,19 @@ export function NodeSlot({
         type={type}
         position={type === "target" ? HandlePosition.Left : HandlePosition.Right}
       />
-      {!hideLabel &&
-        (edit && allowEditSockets && socket.type !== "CONTROL" ? (
-          <div
-            className={cn("flex grow justify-between gap-2", {
-              "flex-row-reverse space-x-reverse": type === "source",
-            })}
-          >
-            <NodeInput
-              className={[
-                {
-                  "text-right": type === "source",
-                },
-              ]}
-              value={socket.label ?? ""}
-              onChange={handleEditSocketLabel}
-            />
-            <Button
-              size={"sm"}
-              className="h-fit w-fit px-1 py-1"
-              variant={"secondary"}
-              onClick={onDeleteSocket}
-              type="button"
-            >
-              <Trash className="h-2 w-2" />
-            </Button>
-          </div>
-        ) : (
-          <span className="min-h-[12px] text-xs">{socket.label ?? ""}</span>
-        ))}
+      {socket.type === "DATA" ? (
+        <DataSocket
+          socket={socket}
+          hideLabel={hideLabel}
+          edit={edit}
+          allowEditSockets={allowEditSockets}
+          onEditSocketLabel={onEditSocketLabel}
+          onDeleteSocket={onDeleteSocket}
+          type={type}
+        />
+      ) : (
+        <span className="min-h-[12px] text-xs">{socket.label ?? ""}</span>
+      )}
     </div>
   );
 }

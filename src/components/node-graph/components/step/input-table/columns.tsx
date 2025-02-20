@@ -37,7 +37,7 @@ export const columns: ColumnDef<StepSocket & { step: InputStep }>[] = [
           socket={socket}
           type="source"
           hideLabel
-          style={{ width: "20px", borderRadius: "10px", right: "-12px" }}
+          handleStyle={{ width: "20px", borderRadius: "10px", right: "-12px" }}
         />
       );
     },

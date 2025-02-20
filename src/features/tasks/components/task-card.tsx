@@ -62,7 +62,7 @@ const TaskCard: React.FC<OwnProps> = ({ index, task, problemId, projectId, edit,
                     Edit
                   </Link>
                 </Button>
-                <Button type="button" variant={"destructive"} onClick={() => setOpenDeleteDialog(true)}>
+                <Button type="button" variant="destructive" onClick={() => setOpenDeleteDialog(true)}>
                   <Trash />
                   Delete
                 </Button>
