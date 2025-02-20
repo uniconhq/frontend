@@ -16,6 +16,7 @@ export type TreeFile = FileType & {
 
 export type TreeFolder = {
   name: string;
+  path: string;
   children: (TreeFolder | TreeFile)[];
 };
 
@@ -53,6 +54,7 @@ export const convertFilesToFileTree = (files: FileType[]): FileTreeType => {
       } else {
         const newFolder: TreeFolder = {
           name: folderName,
+          path: pathParts.slice(0, i + 1).join("/"),
           children: [],
         };
         currentTree.push(newFolder);

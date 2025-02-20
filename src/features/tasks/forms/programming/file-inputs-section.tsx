@@ -46,6 +46,8 @@ const FileInputSection = () => {
     }
   };
 
+  const [selectedFile, setSelectedFile] = useState<FileT | null>();
+
   const files = form.watch("files").map((file) => ({
     name: file.path.split("/").pop()!,
     path: file.path,
@@ -55,26 +57,51 @@ const FileInputSection = () => {
     onClick: () => {
       setSelectedFile(file);
     },
-    highlighted: false,
+    highlighted: file.path === (selectedFile?.path || ""),
   }));
 
-  const [selectedFile, setSelectedFile] = useState<FileT | null>();
+  const handleFileContentUpdate = (newContent: string) => {
+    if (!selectedFile) {
+      return;
+    }
+    form.setValue(
+      "files",
+      form
+        .getValues("files")
+        .map((file) => (file.path === selectedFile.path ? { ...file, content: newContent } : file)),
+    );
+  };
+
+  const handlePathChange = (oldPath: string, newPath: string) => {
+    form.setValue(
+      "files",
+      form
+        .getValues("files")
+        .map((file) => (file.path.startsWith(oldPath) ? { ...file, path: file.path.replace(oldPath, newPath) } : file)),
+    );
+    if (selectedFile && selectedFile.path.startsWith(oldPath)) {
+      const newSelectedFilePath = selectedFile.path.replace(oldPath, newPath);
+      setSelectedFile({ ...selectedFile, path: newSelectedFilePath });
+    }
+  };
+
   return (
     <FormSection title="Files">
       <div className="flex gap-2">
-        <FileInputButton multiple buttonText="File" onFileChange={handleUploadFiles} />
-        <FileInputButton buttonText="Folder" webkitdirectory="true" onFileChange={handleUploadFiles} />
+        <FileInputButton multiple buttonText="Upload File" onFileChange={handleUploadFiles} />
+        <FileInputButton buttonText="Upload Folder" webkitdirectory="true" onFileChange={handleUploadFiles} />
       </div>
       <div className="flex !h-[500px] gap-0">
-        <FileTree files={convertFilesToFileTree(files)} />
+        <FileTree files={convertFilesToFileTree(files)} onPathChange={handlePathChange} />
         {selectedFile && !selectedFile.on_minio && (
           <FileEditor
-            key={selectedFile.id}
+            key={selectedFile.id + selectedFile.path}
             fileName={selectedFile.path.split("/").pop()!}
             fileContent={selectedFile.content}
-            editableName
-            editableContent
+            onUpdateFileContent={handleFileContentUpdate}
             onDeselectFile={() => setSelectedFile(null)}
+            editableContent
+            editableName={false}
           />
         )}
       </div>

@@ -1,6 +1,5 @@
 import { Editor } from "@monaco-editor/react";
 import { X } from "lucide-react";
-import { useState } from "react";
 
 import NodeInput from "@/components/node-graph/components/step/node-input";
 import { Button } from "@/components/ui/button";
@@ -25,11 +24,7 @@ const FileEditor: React.FC<OwnProps> = ({
   editableName,
   editableContent,
 }) => {
-  const [displayFileName, setDisplayFilename] = useState(fileName);
-  const [displayFileContent, setDisplayFileValue] = useState(fileContent);
-
   const updateFileName = (newValue: string) => {
-    setDisplayFilename(newValue);
     if (onUpdateFileName) onUpdateFileName(newValue);
   };
 
@@ -37,7 +32,6 @@ const FileEditor: React.FC<OwnProps> = ({
     if (newValue === undefined) {
       return;
     }
-    setDisplayFileValue(newValue);
     if (onUpdateFileContent) onUpdateFileContent(newValue);
   };
 
@@ -46,9 +40,9 @@ const FileEditor: React.FC<OwnProps> = ({
       {/* file tab */}
       <div className="flex w-fit items-center gap-2 border-b border-purple-200 py-1">
         {editableName ? (
-          <NodeInput key={displayFileName} value={displayFileName} onChange={updateFileName} />
+          <NodeInput value={fileName} onChange={updateFileName} />
         ) : (
-          <span className="px-1 text-xs">{displayFileName}</span>
+          <span className="px-1 text-xs">{fileName}</span>
         )}
         {onDeselectFile && (
           <Button className="h-fit p-1" variant={"ghost"} onClick={onDeselectFile}>
@@ -66,7 +60,7 @@ const FileEditor: React.FC<OwnProps> = ({
           minimap: { enabled: false },
           readOnly: !editableContent,
         }}
-        value={displayFileContent}
+        value={fileContent}
         onChange={updateFileContent}
       />
     </div>

@@ -1,4 +1,4 @@
-import { Plus } from "lucide-react";
+import { Upload } from "lucide-react";
 import React, { useRef } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -37,7 +37,7 @@ const FileInputButton: React.FC<OwnProps & React.HTMLProps<HTMLInputElement> & {
         onClick={onBtnClick}
         type="button"
       >
-        <Plus className="h-2 w-2" />
+        <Upload className="h-2 w-2" />
         {buttonText}
       </Button>
     </div>

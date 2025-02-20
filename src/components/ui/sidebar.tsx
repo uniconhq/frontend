@@ -202,7 +202,7 @@ const Sidebar = React.forwardRef<
         className={cn(
           "fixed inset-y-0 z-10 transition-[left,right,width] duration-200 ease-linear md:flex",
           variant !== "filetree" && "hidden h-svh w-[--sidebar-width]",
-          variant === "filetree" && "w-[200px]",
+          variant === "filetree" && "w-[300px]",
           side === "left"
             ? "left-0 group-data-[collapsible=offcanvas]:left-[calc(var(--sidebar-width)*-1)]"
             : "right-0 group-data-[collapsible=offcanvas]:right-[calc(var(--sidebar-width)*-1)]",
