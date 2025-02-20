@@ -30,7 +30,6 @@ export const MultipleResponseFormZ = TaskFormZ.extend({
   ...ChoicesZ.shape,
 }).refine(
   (data) => {
-    console.log(data.choices);
     const ids = data.choices.map((choice) => choice.id);
     return data.expected_answer.every((answer) => ids.includes(answer));
   },

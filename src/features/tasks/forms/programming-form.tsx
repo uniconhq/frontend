@@ -3,22 +3,24 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@radix-ui/r
 import { useQuery } from "@tanstack/react-query";
 import { produce } from "immer";
 import { PlusIcon, Trash, UploadIcon } from "lucide-react";
-import { useEffect, useRef } from "react";
+import { useRef } from "react";
 import { SubmitHandler, useFieldArray, useForm } from "react-hook-form";
 
-import { File, InputStep } from "@/api";
+import { File as ApiFile, InputStep } from "@/api";
 import { NumberField, SelectField, TextAreaField, TextField } from "@/components/form/fields";
 import FormSection from "@/components/form/form-section";
 import NodeInput from "@/components/node-graph/components/step/node-input";
 import { Button } from "@/components/ui/button";
 import { Form, FormLabel } from "@/components/ui/form";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import FileEditor from "@/features/problems/components/tasks/file-editor";
 import { GraphAction, graphReducer } from "@/features/problems/components/tasks/graph-context";
 import Testcase from "@/features/problems/components/tasks/testcase";
 import { getSupportedPythonVersions } from "@/features/problems/queries";
 import { DEFAULT_PY_VERSION, ProgTaskFormT, ProgTaskFormTZ } from "@/lib/schema/prog-task-form";
 import { uuid } from "@/lib/utils";
+
+import FileInputSection from "./programming/file-inputs-section";
 
 const createDefaultUserInput = () => ({
   id: uuid(),
@@ -45,6 +47,7 @@ const DEFAULT_FORM_VALUES: ProgTaskFormT = {
     slurm_options: [],
   },
   required_user_inputs: [createDefaultUserInput()],
+  files: [],
   testcases: [],
 };
 
@@ -111,7 +114,7 @@ const ProgrammingForm: React.FC<OwnProps> = ({ title, initialValue, onSubmit }) 
     { newLabel, newFileContent }: { newLabel?: string; newFileContent?: string },
   ) => {
     const oldInput = userInputs.fields[index];
-    const oldFileData = oldInput.data as File;
+    const oldFileData = oldInput.data as ApiFile;
     userInputs.update(index, {
       ...oldInput,
       label: newLabel ?? oldInput.label,
@@ -150,15 +153,15 @@ const ProgrammingForm: React.FC<OwnProps> = ({ title, initialValue, onSubmit }) 
   };
 
   // Update all testcases with the updated shared user input step
-  useEffect(() => {
-    for (let i = 0; i < testcases.fields.length; i++) {
-      const testcase = testcases.fields[i];
-      testcases.update(i, {
-        ...testcase,
-        nodes: [sharedUserInputStep, ...testcase.nodes.filter((node) => node.id !== sharedUserInputStep.id)],
-      });
-    }
-  }, [sharedUserInputStep]);
+  // useEffect(() => {
+  //   for (let i = 0; i < testcases.fields.length; i++) {
+  //     const testcase = testcases.fields[i];
+  //     testcases.update(i, {
+  //       ...testcase,
+  //       nodes: [sharedUserInputStep, ...testcase.nodes.filter((node) => node.id !== sharedUserInputStep.id)],
+  //     });
+  //   }
+  // }, [sharedUserInputStep]);
 
   const updateTestcase = (index: number) => (action: GraphAction) => {
     const testcase = form.getValues("testcases")[index];
@@ -226,31 +229,33 @@ const ProgrammingForm: React.FC<OwnProps> = ({ title, initialValue, onSubmit }) 
                     <Button type="button" variant="secondary" size="sm" onClick={addDependency}>
                       <PlusIcon />
                     </Button>
-                    <Tooltip>
-                      <TooltipContent side="right" align="center">
-                        <span>
-                          You can upload a <code>requirements.txt</code> file to prefill dependencies
-                        </span>
-                      </TooltipContent>
-                      <input
-                        accept=".txt"
-                        type="file"
-                        style={{ display: "none" }}
-                        ref={depsFileInputRef}
-                        onChange={handleDepsFileUpload}
-                      />
-                      <TooltipTrigger asChild type="button">
-                        {/* Proxy click event to HTML input element above */}
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          size="sm"
-                          onClick={() => depsFileInputRef.current?.click()}
-                        >
-                          <UploadIcon />
-                        </Button>
-                      </TooltipTrigger>
-                    </Tooltip>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipContent side="right" align="center">
+                          <span>
+                            You can upload a <code>requirements.txt</code> file to prefill dependencies
+                          </span>
+                        </TooltipContent>
+                        <input
+                          accept=".txt"
+                          type="file"
+                          style={{ display: "none" }}
+                          ref={depsFileInputRef}
+                          onChange={handleDepsFileUpload}
+                        />
+                        <TooltipTrigger asChild type="button">
+                          {/* Proxy click event to HTML input element above */}
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => depsFileInputRef.current?.click()}
+                          >
+                            <UploadIcon />
+                          </Button>
+                        </TooltipTrigger>
+                      </Tooltip>
+                    </TooltipProvider>
                   </div>
                 </FormLabel>
               </div>
@@ -296,6 +301,8 @@ const ProgrammingForm: React.FC<OwnProps> = ({ title, initialValue, onSubmit }) 
             </div>
           </FormSection>
           <hr />
+          <FileInputSection />
+          <hr />
           <FormSection title="User File Inputs">
             <div className="flex flex-col items-start gap-4">
               <Button variant="secondary" type="button" onClick={addUserInput}>
@@ -323,7 +330,7 @@ const ProgrammingForm: React.FC<OwnProps> = ({ title, initialValue, onSubmit }) 
                     <div className="h-[30vh]">
                       <FileEditor
                         fileName={input.label}
-                        fileContent={(input.data as File).content}
+                        fileContent={(input.data as ApiFile).content}
                         onUpdateFileContent={(newFileContent: string) => updateUserInput(index, { newFileContent })}
                         editableContent={true}
                         editableName={false}

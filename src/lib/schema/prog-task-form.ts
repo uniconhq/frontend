@@ -11,7 +11,11 @@ const FileZ = z.object({
   path: z.string().nonempty("File name cannot be empty!"),
   content: z.string(),
   trusted: z.boolean().optional(),
+  key: z.string().optional().nullable(),
+  on_minio: z.boolean().optional(),
 });
+
+export type FileT = z.infer<typeof FileZ>;
 
 const RequiredInputZ = z.object({
   id: z.string().nonempty("Input ID cannot be empty!"),
@@ -40,6 +44,7 @@ export const ProgTaskFormTZ = TaskFormZ.extend({
   }),
   required_user_inputs: z.array(RequiredInputZ),
   testcases: z.array(z.custom<Testcase>(() => true)),
+  files: z.array(FileZ),
 }).superRefine((values, context) => {
   // If `slurm` is not enabled, `slurm_options` should be empty
   if (!values.environment.slurm && values.environment.slurm_options.length) {
@@ -69,6 +74,7 @@ export const toProgrammingTask = (form: ProgTaskFormT): Omit<ProgrammingTask, "o
   },
   required_inputs: form.required_user_inputs,
   testcases: form.testcases,
+  files: form.files,
 });
 
 export const fromProgrammingTask = (progTask: ProgrammingTask): ProgTaskFormT => ({
@@ -90,4 +96,5 @@ export const fromProgrammingTask = (progTask: ProgrammingTask): ProgTaskFormT =>
     data: input.data,
   })),
   testcases: progTask.testcases,
+  files: progTask.files,
 });
