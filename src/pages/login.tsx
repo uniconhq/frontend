@@ -65,18 +65,17 @@ const Login = () => {
   return (
     <div className="flex h-screen w-full items-center justify-center">
       <div className="flex h-full w-full flex-col items-center justify-center gap-4">
-        <h1 className="font-mono text-5xl text-purple-400">Unicon 🦄</h1>
-        <h2 className="mt-1 text-xl italic text-neutral-300">
-          <span className="text-purple-400 underline">Uni</span>versal Programming{" "}
-          <span className="text-purple-400 underline">Con</span>
+        <h1 className="text-5xl font-medium tracking-tight text-purple-400">Unicon 🦄</h1>
+        <h2 className="mt-1 text-xl text-neutral-300">
+          <span className="text-purple-400">Uni</span>versal Programming <span className="text-purple-400">Con</span>
           test Platform
         </h2>
-        <Card className="mt-8 w-full border-neutral-500 bg-neutral-800 p-6 sm:max-w-lg">
+        <Card className="mt-8 w-full bg-neutral-800 p-6 sm:max-w-lg">
           <CardContent>
             <Box className="space-y-6">
               {isError && <ErrorAlert message={" Your username or password is incorrect. Please try again."} />}
               <Form {...form}>
-                <form className="space-y-10" onSubmit={form.handleSubmit(onSubmit)}>
+                <form className="space-y-6" onSubmit={form.handleSubmit(onSubmit)}>
                   <div className="space-y-4">
                     <TextField label="Username" name="username" />
                     <PasswordField label="Password" name="password" />
