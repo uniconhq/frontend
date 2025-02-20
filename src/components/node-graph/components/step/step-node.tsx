@@ -4,6 +4,8 @@ import { useCallback, useContext, useEffect } from "react";
 import { GoDotFill } from "react-icons/go";
 
 import { StepSocket, StepType } from "@/api";
+import { NodeSlot, NodeSlotGroup } from "@/components/node-graph/components/node-slot";
+import StepMetadata from "@/components/node-graph/components/step/metadata/step-metadata";
 import { Button } from "@/components/ui/button";
 import {
   GraphActionType,
@@ -15,9 +17,6 @@ import { Step } from "@/features/problems/components/tasks/types";
 import { StepNodeColorMap, StepTypeAliasMap } from "@/lib/colors";
 import { createSocket } from "@/lib/compute-graph";
 import { cn } from "@/lib/utils";
-
-import { NodeSlot, NodeSlotGroup } from "../node-slot";
-import StepMetadata from "./metadata/step-metadata";
 
 const NodeHeader = ({ type, edit, deleteStep }: { type: StepType; edit: boolean; deleteStep: () => void }) => {
   return (
@@ -36,6 +35,13 @@ const NodeHeader = ({ type, edit, deleteStep }: { type: StepType; edit: boolean;
       )}
     </div>
   );
+};
+
+const orderSockets = (s1: StepSocket, s2: StepSocket) => {
+  // Control sockets should always be in front of data sockets
+  if (s1.type === "CONTROL" && s2.type === "DATA") return -1;
+  if (s1.type === "DATA" && s2.type === "CONTROL") return 1;
+  return 0;
 };
 
 export function StepNode({ data }: { data: Step }) {
@@ -103,17 +109,19 @@ export function StepNode({ data }: { data: Step }) {
         <div className="text-xs font-light">
           <div className="flex flex-row justify-between gap-4">
             <NodeSlotGroup>
-              {data.inputs?.map((stepSocket: StepSocket) => (
-                <NodeSlot
-                  key={stepSocket.id}
-                  socket={stepSocket}
-                  type="target"
-                  edit={showEditElements}
-                  allowEditSockets={allowEditSockets}
-                  onEditSocketLabel={handleEditSocketLabel(stepSocket.id)}
-                  onDeleteSocket={deleteSocket(stepSocket.id)}
-                />
-              ))}
+              {data.inputs
+                ?.sort(orderSockets)
+                .map((stepSocket: StepSocket) => (
+                  <NodeSlot
+                    key={stepSocket.id}
+                    socket={stepSocket}
+                    type="target"
+                    edit={showEditElements}
+                    allowEditSockets={allowEditSockets}
+                    onEditSocketLabel={handleEditSocketLabel(stepSocket.id)}
+                    onDeleteSocket={deleteSocket(stepSocket.id)}
+                  />
+                ))}
               {showEditElements && allowEditSockets && (
                 <Button
                   size={"sm"}
@@ -127,17 +135,19 @@ export function StepNode({ data }: { data: Step }) {
               )}
             </NodeSlotGroup>
             <NodeSlotGroup>
-              {data.outputs?.map((stepSocket: StepSocket) => (
-                <NodeSlot
-                  key={stepSocket.id}
-                  socket={stepSocket}
-                  type="source"
-                  edit={showEditElements}
-                  allowEditSockets={allowEditSockets}
-                  onEditSocketLabel={handleEditSocketLabel(stepSocket.id)}
-                  onDeleteSocket={deleteSocket(stepSocket.id)}
-                />
-              ))}
+              {data.outputs
+                ?.sort(orderSockets)
+                .map((stepSocket: StepSocket) => (
+                  <NodeSlot
+                    key={stepSocket.id}
+                    socket={stepSocket}
+                    type="source"
+                    edit={showEditElements}
+                    allowEditSockets={allowEditSockets}
+                    onEditSocketLabel={handleEditSocketLabel(stepSocket.id)}
+                    onDeleteSocket={deleteSocket(stepSocket.id)}
+                  />
+                ))}
               {showEditElements && allowEditSockets && (
                 <Button
                   size={"sm"}
