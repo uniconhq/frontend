@@ -1,8 +1,9 @@
 import { Handle, HandleType, Position as HandlePosition, useNodeConnections } from "@xyflow/react";
-import { TrashIcon } from "lucide-react";
+import { ArrowBigRightIcon, TrashIcon } from "lucide-react";
 import { twJoin } from "tailwind-merge";
 
 import { StepSocket } from "@/api";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -27,7 +28,7 @@ const DataSocket = ({
   onEditSocketLabel,
   onDeleteSocket,
   type,
-}: Omit<NodeSlotProps, "handleStyle"> & { type: "source" | "target" }) => {
+}: Omit<NodeSlotProps, "handleStyle"> & { type: HandleType }) => {
   if (hideLabel) return null;
 
   const editable = edit && allowEditSockets;
@@ -52,6 +53,21 @@ const DataSocket = ({
         <span className="min-h-[12px] px-2 text-sm">{socket.label ?? ""}</span>
       )}
     </>
+  );
+};
+
+const ControlSocket = ({ socket, type }: { socket: StepSocket; type: HandleType }) => {
+  return (
+    <div className={cn("flex items-center gap-1 px-1", { "flex-row-reverse": type === "target" })}>
+      {socket.label && (
+        <>
+          <Badge variant="outline">
+            <span className="font-mono font-medium">{socket.label}</span>
+          </Badge>
+        </>
+      )}
+      <ArrowBigRightIcon color="#73F777" />
+    </div>
   );
 };
 
@@ -106,7 +122,7 @@ export function NodeSlot({
           type={type}
         />
       ) : (
-        <span className="min-h-[12px] text-xs">{socket.label ?? ""}</span>
+        <ControlSocket socket={socket} type={type} />
       )}
     </div>
   );
