@@ -50,6 +50,7 @@ export type ExtraOptions = {
 };
 
 export type File = {
+    id?: string;
     path: string;
     content: string;
     trusted?: boolean;
@@ -377,6 +378,7 @@ export type ProgrammingTask = {
     environment: ComputeContext;
     required_inputs: Array<RequiredInput>;
     testcases: Array<Testcase>;
+    files: Array<File>;
 };
 
 export type ProgrammingTaskResult = {
