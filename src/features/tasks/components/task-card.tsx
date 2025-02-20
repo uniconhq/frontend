@@ -70,7 +70,7 @@ const TaskCard: React.FC<OwnProps> = ({ index, task, problemId, projectId, edit,
             )}
           </CardTitle>
           <CardContent className="p-0 py-2">
-            <Task submit={submit && !edit} problemId={problemId} task={task} />
+            <Task submit={submit && !edit} problemId={problemId} task={task} edit={edit} />
           </CardContent>
         </CardHeader>
       </Card>

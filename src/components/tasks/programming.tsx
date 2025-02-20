@@ -11,10 +11,12 @@ import ProgrammingSubmitForm from "./programming-submit";
 
 export function Programming({
   submit,
+  edit,
   problemId,
   task,
 }: {
   submit: boolean;
+  edit: boolean;
   problemId: number;
   task: ProgrammingTask;
 }) {
@@ -41,7 +43,7 @@ export function Programming({
           ))}
         </div>
       </TaskSection>
-      {<ProgrammingSubmitForm problemId={problemId} task={task} submit={submit} />}
+      {!edit && <ProgrammingSubmitForm problemId={problemId} task={task} submit={submit} />}
     </TaskContainer>
   );
 }

@@ -6,10 +6,12 @@ import { ShortAnswer } from "@/components/tasks/short-answer";
 
 export function Task({
   submit,
+  edit,
   problemId,
   task,
 }: {
   submit: boolean;
+  edit: boolean;
   problemId: number;
   task: MultipleChoiceTask | MultipleResponseTask | ProgrammingTask | ShortAnswerTask;
 }) {
@@ -22,7 +24,7 @@ export function Task({
     case "SHORT_ANSWER_TASK":
       return <ShortAnswer task={task} />;
     case "PROGRAMMING_TASK":
-      return <Programming submit={submit} problemId={problemId} task={task} />;
+      return <Programming submit={submit} problemId={problemId} task={task} edit={edit} />;
     default:
       return <div className="font-mono text-red-400">Task type not supported</div>;
   }
