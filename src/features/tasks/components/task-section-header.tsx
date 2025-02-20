@@ -3,7 +3,7 @@ type OwnProps = {
 };
 
 const TaskSectionHeader: React.FC<OwnProps> = ({ content }) => {
-  return <span className="font-medium uppercase">{content}</span>;
+  return <span className="font-medium text-zinc-400">{content}</span>;
 };
 
 export default TaskSectionHeader;

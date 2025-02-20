@@ -6,7 +6,7 @@ import TaskContainer from "@/features/tasks/components/task-container";
 import TaskSection from "@/features/tasks/components/task-section";
 import TaskSectionHeader from "@/features/tasks/components/task-section-header";
 
-import { Table, TableBody, TableCell, TableHead, TableRow } from "../ui/table";
+import { ProgrammingEnvironment } from "./programming-environment";
 import ProgrammingSubmitForm from "./programming-submit";
 
 export function Programming({
@@ -24,52 +24,7 @@ export function Programming({
     <TaskContainer title={task.title} description={task.description}>
       <TaskSection>
         <TaskSectionHeader content="Environment" />
-        <div className="w-fit">
-          <Table>
-            <TableBody>
-              <TableRow>
-                <TableHead>Language</TableHead>
-                <TableCell>{task.environment.language}</TableCell>
-              </TableRow>
-              <TableRow>
-                <TableHead>Time Limit</TableHead>
-                <TableCell className="font-mono">{task.environment.time_limit_secs}s</TableCell>
-              </TableRow>
-              <TableRow>
-                <TableHead>Memory Limit</TableHead>
-                <TableCell className="font-mono">{task.environment.memory_limit_mb}MB</TableCell>
-              </TableRow>
-              {task.environment.extra_options && (
-                <>
-                  <TableRow>
-                    <TableHead>Extra Options</TableHead>
-                    <TableCell>
-                      <Table className="w-fit">
-                        <TableBody>
-                          {task.environment.extra_options.version && (
-                            <TableRow>
-                              <TableHead>Version</TableHead>
-                              <TableCell className="font-mono">{task.environment.extra_options.version}</TableCell>
-                            </TableRow>
-                          )}
-                          {task.environment.extra_options.requirements &&
-                            task.environment.extra_options.requirements.length > 0 && (
-                              <TableRow>
-                                <TableHead>Dependencies</TableHead>
-                                <TableCell className="font-mono">
-                                  {task.environment.extra_options.requirements.join(", ")}
-                                </TableCell>
-                              </TableRow>
-                            )}
-                        </TableBody>
-                      </Table>
-                    </TableCell>
-                  </TableRow>
-                </>
-              )}
-            </TableBody>
-          </Table>
-        </div>
+        <ProgrammingEnvironment environment={task.environment} />
       </TaskSection>
       <TaskSection>
         <TaskSectionHeader content="Testcases" />
