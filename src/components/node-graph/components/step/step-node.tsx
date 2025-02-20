@@ -109,7 +109,7 @@ export function StepNode({ data }: { data: Step }) {
         <div className="text-xs font-light">
           <div className="flex flex-row justify-between gap-4">
             <NodeSlotGroup>
-              {data.inputs
+              {[...(data.inputs ?? [])]
                 ?.sort(orderSockets)
                 .map((stepSocket: StepSocket) => (
                   <NodeSlot
@@ -135,7 +135,7 @@ export function StepNode({ data }: { data: Step }) {
               )}
             </NodeSlotGroup>
             <NodeSlotGroup>
-              {data.outputs
+              {[...(data.outputs ?? [])]
                 ?.sort(orderSockets)
                 .map((stepSocket: StepSocket) => (
                   <NodeSlot
