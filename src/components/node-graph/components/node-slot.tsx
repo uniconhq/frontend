@@ -3,11 +3,10 @@ import { ArrowBigRightIcon, TrashIcon } from "lucide-react";
 import { twJoin } from "tailwind-merge";
 
 import { StepSocket } from "@/api";
+import NodeInput from "@/components/node-graph/components/step/node-input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-
-import NodeInput from "./step/node-input";
 
 interface NodeSlotProps {
   socket: StepSocket;
@@ -61,7 +60,7 @@ const ControlSocket = ({ socket, type }: { socket: StepSocket; type: HandleType 
     <div className={cn("flex items-center gap-1 px-1", { "flex-row-reverse": type === "target" })}>
       {socket.label && (
         <>
-          <Badge variant="outline">
+          <Badge variant="outline" className="border-[#73F777]">
             <span className="font-mono font-medium">{socket.label}</span>
           </Badge>
         </>
@@ -111,7 +110,9 @@ export function NodeSlot({
         type={type}
         position={type === "target" ? HandlePosition.Left : HandlePosition.Right}
       />
-      {socket.type === "DATA" ? (
+      {socket.type === "CONTROL" ? (
+        <ControlSocket socket={socket} type={type} />
+      ) : (
         <DataSocket
           socket={socket}
           hideLabel={hideLabel}
@@ -121,8 +122,6 @@ export function NodeSlot({
           onDeleteSocket={onDeleteSocket}
           type={type}
         />
-      ) : (
-        <ControlSocket socket={socket} type={type} />
       )}
     </div>
   );
