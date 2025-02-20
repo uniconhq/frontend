@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 
 export const ProgrammingEnvironment = ({ environment }: { environment: ComputeContext }) => {
   const dependencies = environment.extra_options?.requirements ?? [];
+  const slurmOptions = environment.slurm_options ?? [];
 
   return (
     <div className="flex flex-col gap-4">
@@ -17,7 +18,8 @@ export const ProgrammingEnvironment = ({ environment }: { environment: ComputeCo
           </Badge>
         )}
       </div>
-      {environment.slurm && <SlurmBadge options={environment.slurm_options} />}
+
+      {slurmOptions.length > 0 && <SlurmBadge options={slurmOptions} />}
 
       <div className="flex flex-wrap gap-3">
         <div className="flex items-center gap-3 rounded-md bg-zinc-800 p-4 transition-colors duration-100 hover:bg-zinc-700">

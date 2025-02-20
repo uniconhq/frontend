@@ -17,7 +17,7 @@ import FileEditor from "@/features/problems/components/tasks/file-editor";
 import { GraphAction, graphReducer } from "@/features/problems/components/tasks/graph-context";
 import Testcase from "@/features/problems/components/tasks/testcase";
 import { getSupportedPythonVersions } from "@/features/problems/queries";
-import { DEFAULT_PY_VERSION, ProgTaskFormT, ProgTaskFormTZ } from "@/lib/schema/prog-task-form";
+import { DEFAULT_PY_VERSION, ProgTaskFormT, ProgTaskFormZ } from "@/lib/schema/prog-task-form";
 import { uuid } from "@/lib/utils";
 
 const createDefaultUserInput = () => ({
@@ -32,6 +32,7 @@ const createDefaultUserInput = () => ({
 
 const DEFAULT_FORM_VALUES: ProgTaskFormT = {
   title: "",
+  description: "",
   environment: {
     language: "Python",
     extra_options: {
@@ -65,7 +66,7 @@ type OwnProps = {
 
 const ProgrammingForm: React.FC<OwnProps> = ({ title, initialValue, onSubmit }) => {
   const form = useForm<ProgTaskFormT>({
-    resolver: zodResolver(ProgTaskFormTZ),
+    resolver: zodResolver(ProgTaskFormZ),
     defaultValues: initialValue ?? DEFAULT_FORM_VALUES,
   });
 
@@ -359,9 +360,9 @@ const ProgrammingForm: React.FC<OwnProps> = ({ title, initialValue, onSubmit }) 
               ))}
             </div>
           </div>
-          <div>
-            <Button className="mt-5 bg-purple-600 text-white hover:bg-purple-600 hover:bg-opacity-80">Submit</Button>
-          </div>
+          <Button className="mt-5 w-fit bg-purple-600 text-white hover:bg-purple-600 hover:bg-opacity-80">
+            Submit
+          </Button>
         </form>
       </Form>
     </div>

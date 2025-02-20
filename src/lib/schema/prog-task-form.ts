@@ -26,7 +26,7 @@ const SlurmOptionZ = z
     message: "Slurm option cannot contain spaces!",
   });
 
-export const ProgTaskFormTZ = TaskFormZ.extend({
+export const ProgTaskFormZ = TaskFormZ.extend({
   environment: z.object({
     language: z.literal("Python"),
     extra_options: z.object({
@@ -40,18 +40,9 @@ export const ProgTaskFormTZ = TaskFormZ.extend({
   }),
   required_user_inputs: z.array(RequiredInputZ),
   testcases: z.array(z.custom<Testcase>(() => true)),
-}).superRefine((values, context) => {
-  // If `slurm` is not enabled, `slurm_options` should be empty
-  if (!values.environment.slurm && values.environment.slurm_options.length) {
-    context.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: "There should no be Slurm options when Slurm is disabled!",
-      path: ["slurm_options"],
-    });
-  }
 });
 
-export type ProgTaskFormT = z.infer<typeof ProgTaskFormTZ>;
+export type ProgTaskFormT = z.infer<typeof ProgTaskFormZ>;
 
 export const toProgrammingTask = (form: ProgTaskFormT): Omit<ProgrammingTask, "order_index"> => ({
   id: -1,
@@ -73,7 +64,7 @@ export const toProgrammingTask = (form: ProgTaskFormT): Omit<ProgrammingTask, "o
 
 export const fromProgrammingTask = (progTask: ProgrammingTask): ProgTaskFormT => ({
   title: progTask.title,
-  description: progTask.description,
+  description: progTask.description ?? "",
   environment: {
     ...progTask.environment,
     language: "Python",
