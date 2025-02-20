@@ -74,6 +74,7 @@ const FileInputSection = () => {
             fileContent={selectedFile.content}
             editableName
             editableContent
+            onDeselectFile={() => setSelectedFile(null)}
           />
         )}
       </div>
