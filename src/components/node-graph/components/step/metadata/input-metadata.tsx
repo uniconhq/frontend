@@ -1,5 +1,6 @@
 import { Plus } from "lucide-react";
 import { useCallback, useContext } from "react";
+import { useDrop } from "react-dnd";
 
 import { InputStep, StepSocket } from "@/api";
 import { Button } from "@/components/ui/button";
@@ -11,6 +12,7 @@ import {
   SocketDir,
 } from "@/features/problems/components/tasks/graph-context";
 import { createSocket } from "@/lib/compute-graph";
+import { isFolder, TreeFile, TreeFolder } from "@/lib/files";
 
 import InputTable from "../input-table/input-table";
 import InputMetadataRow from "./input-metadata-row";
@@ -20,7 +22,7 @@ type OwnProps = {
 };
 
 const InputMetadata: React.FC<OwnProps> = ({ step }) => {
-  const { edit } = useContext(GraphContext)!;
+  const { edit, files } = useContext(GraphContext)!;
   const dispatch = useContext(GraphDispatchContext)!;
 
   const isStepEditable = !step.is_user;
@@ -50,6 +52,7 @@ const InputMetadata: React.FC<OwnProps> = ({ step }) => {
         stepId: step.id,
         socketId: socket.id,
         socketMetadata: {
+          label: "file.py",
           data: {
             name: "file.py",
             content: "print('Hello World')",
@@ -58,6 +61,34 @@ const InputMetadata: React.FC<OwnProps> = ({ step }) => {
       },
     });
   };
+
+  const [, drop] = useDrop<TreeFile | TreeFolder>(
+    () => ({
+      accept: "File",
+      drop: (draggedItem) => {
+        // copy files to user input
+        const addFileToInputStep = (treeFile: TreeFile | TreeFolder) => {
+          if (isFolder(treeFile)) {
+            treeFile.children.forEach(addFileToInputStep);
+          } else {
+            const file = files.find((file) => file.id === treeFile.id);
+            if (!file) return;
+            dispatch({
+              type: GraphActionType.AddSocket,
+              payload: {
+                stepId: step.id,
+                socketDir: SocketDir.Output,
+                socket: { ...createSocket("DATA", file.path), data: file },
+              },
+            });
+          }
+        };
+
+        addFileToInputStep(draggedItem);
+      },
+    }),
+    [],
+  );
 
   const addOutputSocket = useCallback(() => {
     dispatch({
@@ -95,7 +126,7 @@ const InputMetadata: React.FC<OwnProps> = ({ step }) => {
   };
 
   return (
-    <div>
+    <div ref={drop}>
       <div className="rounded-md border">
         <Table hideOverflow>
           <TableHeader>
@@ -123,15 +154,17 @@ const InputMetadata: React.FC<OwnProps> = ({ step }) => {
           </TableBody>
         </Table>
       </div>
-      <Button
-        size={"sm"}
-        className="mt-3 h-fit w-fit px-1 py-1"
-        variant={"secondary"}
-        onClick={addOutputSocket}
-        type="button"
-      >
-        <Plus className="h-2 w-2" />
-      </Button>
+      <div className="flex gap-2">
+        <Button
+          size={"sm"}
+          className="mt-3 h-fit w-fit px-1 py-1"
+          variant={"secondary"}
+          onClick={addOutputSocket}
+          type="button"
+        >
+          <Plus className="h-2 w-2" />
+        </Button>
+      </div>
     </div>
   );
 };

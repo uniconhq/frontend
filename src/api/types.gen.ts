@@ -10,6 +10,10 @@ export type ArgMetadata = {
     arg_name?: string | null;
 };
 
+export type BodyCreateFileFilesPost = {
+    file: Blob | File;
+};
+
 export type BodyLoginAuthTokenPost = {
     grant_type?: string | null;
     username: string;
@@ -46,8 +50,11 @@ export type ExtraOptions = {
 };
 
 export type File = {
-    name: string;
+    id: string;
+    path: string;
     content: string;
+    on_minio?: boolean;
+    key?: string | null;
     trusted?: boolean;
 };
 
@@ -371,6 +378,7 @@ export type ProgrammingTask = {
     environment: ComputeContext;
     required_inputs: Array<RequiredInput>;
     testcases: Array<Testcase>;
+    files: Array<File>;
 };
 
 export type ProgrammingTaskResult = {
@@ -1896,3 +1904,53 @@ export type UpdateGroupResponses = {
 };
 
 export type UpdateGroupResponse = UpdateGroupResponses[keyof UpdateGroupResponses];
+
+export type CreateFileData = {
+    body: BodyCreateFileFilesPost;
+    path?: never;
+    query?: never;
+    url: '/files';
+};
+
+export type CreateFileErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type CreateFileError = CreateFileErrors[keyof CreateFileErrors];
+
+export type CreateFileResponses = {
+    /**
+     * Successful Response
+     */
+    200: string;
+};
+
+export type CreateFileResponse = CreateFileResponses[keyof CreateFileResponses];
+
+export type GetFileData = {
+    body?: never;
+    path: {
+        file_id: string;
+    };
+    query?: never;
+    url: '/files/{file_id}';
+};
+
+export type GetFileErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type GetFileError = GetFileErrors[keyof GetFileErrors];
+
+export type GetFileResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
