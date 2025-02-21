@@ -1,6 +1,7 @@
 import { Handle, HandleType, Position as HandlePosition, useNodeConnections } from "@xyflow/react";
 import { ArrowBigRightIcon, PlusIcon, TrashIcon } from "lucide-react";
 import { twJoin } from "tailwind-merge";
+import { useDebouncedCallback } from "use-debounce";
 
 import { StepSocket } from "@/api";
 import NodeInput from "@/components/node-graph/components/step/node-input";
@@ -9,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { cn } from "@/lib/utils";
+import { cn, isFile } from "@/lib/utils";
 
 interface NodeSlotProps {
   socket: StepSocket;
@@ -18,18 +19,27 @@ interface NodeSlotProps {
   edit?: boolean;
   allowEditSockets?: boolean;
   onEditSocketLabel?: (newSocketLabel: string) => void;
+  onEditSocketData?: (newSocketData: string | boolean | number) => void;
   onDeleteSocket?: () => void;
   handleStyle?: React.CSSProperties;
 }
 
-const DataSocketDefaultValuePopover = () => {
+const DataSocketDefaultValuePopover = ({
+  children,
+  onValueChanged,
+}: {
+  children?: React.ReactNode;
+  onValueChanged?: (newSocketData: string | boolean | number) => void;
+}) => {
+  const debouncedOnValueChanged = useDebouncedCallback((value: string) => {
+    if (onValueChanged) {
+      onValueChanged(value);
+    }
+  }, 500);
+
   return (
     <Popover>
-      <PopoverTrigger asChild>
-        <Button variant="ghost" size="icon" className="h-6 w-6 hover:bg-white/10">
-          <PlusIcon className="h-4 w-4" />
-        </Button>
-      </PopoverTrigger>
+      <PopoverTrigger asChild>{children}</PopoverTrigger>
       <PopoverContent className="w-60 bg-zinc-900">
         <div className="grid gap-4">
           <div className="space-y-2">
@@ -40,7 +50,12 @@ const DataSocketDefaultValuePopover = () => {
             <Label htmlFor="value" className="text-xs text-zinc-400">
               Value
             </Label>
-            <Input id="value" placeholder="Enter default value..." className="h-8 border-zinc-700 bg-zinc-800" />
+            <Input
+              id="value"
+              placeholder="Enter default value..."
+              className="h-8 border-zinc-700 bg-zinc-800"
+              onChange={(e) => debouncedOnValueChanged(e.target.value)}
+            />
           </div>
         </div>
       </PopoverContent>
@@ -54,12 +69,16 @@ const DataSocket = ({
   edit,
   allowEditSockets,
   onEditSocketLabel,
+  onEditSocketData,
   onDeleteSocket,
   type,
 }: Omit<NodeSlotProps, "handleStyle"> & { type: HandleType }) => {
   if (hideLabel) return null;
 
   const editable = edit && allowEditSockets;
+  const hasDefaultValue = socket.data && !isFile(socket.data);
+  const socketDefaultValue = socket.data as string | boolean | number;
+
   return (
     <>
       {editable ? (
@@ -68,20 +87,50 @@ const DataSocket = ({
             "flex-row-reverse space-x-reverse": type === "source",
           })}
         >
-          <NodeInput
-            className={[cn({ "text-right": type === "source" })]}
-            value={socket.label ?? ""}
-            onChange={onEditSocketLabel ?? (() => {})}
-          />
-          <div className="flex gap-1">
-            <DataSocketDefaultValuePopover />
+          <div className="flex items-center gap-2">
+            <NodeInput
+              className={[cn({ "text-right": type === "source" })]}
+              value={socket.label ?? ""}
+              onChange={onEditSocketLabel ?? (() => {})}
+            />
+            <DataSocketDefaultValuePopover onValueChanged={onEditSocketData}>
+              {type === "target" &&
+                (hasDefaultValue ? (
+                  <button type="button">
+                    <div className="flex items-center gap-2 py-1">
+                      <div className="rounded-md border border-zinc-700/50 bg-zinc-800/50 px-3 py-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-zinc-400">Default:</span>
+                          <span className="font-mono text-xs text-orange-400">{socketDefaultValue}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </button>
+                ) : (
+                  <Button variant="ghost" size="icon" className="h-6 w-6 hover:bg-white/10">
+                    <PlusIcon className="h-4 w-4" />
+                  </Button>
+                ))}
+            </DataSocketDefaultValuePopover>
             <Button className="h-fit w-fit p-1" variant="outline" onClick={onDeleteSocket} type="button">
               <TrashIcon />
             </Button>
           </div>
         </div>
       ) : (
-        <span className="min-h-[12px] px-2 text-sm">{socket.label ?? ""}</span>
+        <div className="flex items-center">
+          <span className="min-h-[12px] px-2 text-lg">{socket.label ?? ""}</span>
+          {hasDefaultValue && (
+            <div className="flex items-center gap-2 py-1">
+              <div className="rounded-md border border-zinc-700/50 bg-zinc-800/50 px-3 py-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-zinc-400">Default:</span>
+                  <span className="font-mono text-xs text-orange-400">{socketDefaultValue}</span>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
       )}
     </>
   );
@@ -109,6 +158,7 @@ export function NodeSlot({
   edit = false,
   allowEditSockets = true,
   onEditSocketLabel,
+  onEditSocketData,
   onDeleteSocket,
   handleStyle,
 }: NodeSlotProps) {
@@ -150,6 +200,7 @@ export function NodeSlot({
           hideLabel={hideLabel}
           edit={edit}
           allowEditSockets={allowEditSockets}
+          onEditSocketData={onEditSocketData}
           onEditSocketLabel={onEditSocketLabel}
           onDeleteSocket={onDeleteSocket}
           type={type}
