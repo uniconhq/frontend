@@ -44,7 +44,12 @@ const sortFileTree = (files: FileTreeType) => {
 export const convertFilesToFileTree = (files: FileType[]): FileTreeType => {
   const tree: FileTreeType = [];
   for (const file of files) {
-    const pathParts = file.path.split("/").filter((part) => !["", "."].includes(part));
+    const unfilteredPathParts = file.path.split("/");
+    // It is possible there are "folder/" files, so the last part could be "".
+    // In that case, show the folder, but don't create a file.
+    const pathParts = unfilteredPathParts.filter(
+      (part, index) => !["", "."].includes(part) || index === unfilteredPathParts.length - 1,
+    );
     let currentTree = tree;
     for (let i = 0; i < pathParts.length - 1; i++) {
       const folderName = pathParts[i];
@@ -62,11 +67,14 @@ export const convertFilesToFileTree = (files: FileType[]): FileTreeType => {
       }
     }
     const fileName = pathParts[pathParts.length - 1];
-    currentTree.push({
-      name: fileName,
-      ...file,
-    });
+    if (fileName) {
+      currentTree.push({
+        name: fileName,
+        ...file,
+      });
+    }
   }
   sortFileTree(tree);
+  console.log({ tree });
   return tree;
 };

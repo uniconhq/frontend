@@ -24,12 +24,16 @@ import { Button } from "./button";
 type OwnProps = {
   files: FileTreeType;
   onCloseFileTree?: () => void;
-  onPathChange: (oldPath: string, newPath: string) => void;
+  onPathChange?: (oldPath: string, newPath: string) => void;
+  onFileAdd?: () => void;
+  onFolderAdd?: () => void;
 };
 
 export function FileTree({
   onCloseFileTree,
   onPathChange,
+  onFileAdd,
+  onFolderAdd,
   files,
   ...props
 }: React.ComponentProps<typeof Sidebar> & OwnProps) {
@@ -56,16 +60,22 @@ export function FileTree({
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
-      <SidebarFooter>
-        <div className="flex items-center justify-end gap-2">
-          <Button variant="outline" className="h-8 w-8">
-            <FilePlus />
-          </Button>
-          <Button variant="outline" className="h-8 w-8">
-            <FolderPlus />
-          </Button>
-        </div>
-      </SidebarFooter>
+      {(onFileAdd || onFolderAdd) && (
+        <SidebarFooter>
+          <div className="flex items-center justify-end gap-2">
+            {onFileAdd && (
+              <Button variant="outline" className="h-8 w-8" type="button" onClick={onFileAdd}>
+                <FilePlus />
+              </Button>
+            )}
+            {onFolderAdd && (
+              <Button variant="outline" className="h-8 w-8" type="button" onClick={onFolderAdd}>
+                <FolderPlus />
+              </Button>
+            )}
+          </div>
+        </SidebarFooter>
+      )}
     </Sidebar>
   );
 }
@@ -150,13 +160,15 @@ function Tree({
             </span>
           </SidebarMenuButton>
         </CollapsibleTrigger>
-        <CollapsibleContent>
-          <SidebarMenuSub className="mr-0 pr-0">
-            {item.children.map((subItem, index) => (
-              <Tree key={index} item={subItem} onPathChange={onPathChange} />
-            ))}
-          </SidebarMenuSub>
-        </CollapsibleContent>
+        {item.children.length > 0 && (
+          <CollapsibleContent>
+            <SidebarMenuSub className="mr-0 pr-0">
+              {item.children.map((subItem, index) => (
+                <Tree key={index} item={subItem} onPathChange={onPathChange} />
+              ))}
+            </SidebarMenuSub>
+          </CollapsibleContent>
+        )}
       </Collapsible>
     </SidebarMenuItem>
   );

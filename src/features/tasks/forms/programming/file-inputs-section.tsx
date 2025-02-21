@@ -6,16 +6,16 @@ import FormSection from "@/components/form/form-section";
 import FileInputButton from "@/components/form/inputs/file-input-button";
 import { FileTree } from "@/components/ui/file-tree";
 import FileEditor from "@/features/problems/components/tasks/file-editor";
-// import { useToast } from "@/hooks/use-toast";
 import { convertFilesToFileTree } from "@/lib/files";
 import { FileT, ProgTaskFormT } from "@/lib/schema/prog-task-form";
 
+const cleanFilePath = (path: string) => path.replace(/^\//, "");
+
 const FileInputSection = () => {
   const form = useFormContext<ProgTaskFormT>();
-  // const toast = useToast();
 
   const handleUploadFile = (file: File) => {
-    const filePath = file.webkitRelativePath || file.name;
+    const filePath = cleanFilePath(file.webkitRelativePath || file.name);
     // If file is a text file, extract text content to File format for socket.
     if (file.type.startsWith("text") || file.type === "" || file.type === "application/json") {
       const reader = new FileReader();
@@ -85,6 +85,28 @@ const FileInputSection = () => {
     }
   };
 
+  const handleFileAdd = () => {
+    // Generate a unique filename.
+    let fileName = "file.py";
+    let i = 1;
+    while (form.getValues("files").some((file) => file.path === fileName)) {
+      fileName = `file${i}.py`;
+      i++;
+    }
+    form.setValue("files", form.getValues("files").concat({ path: fileName, content: "", trusted: true }));
+  };
+
+  const handleFolderAdd = () => {
+    // Generate a unique folder name.
+    let folderName = "folder/";
+    let i = 1;
+    while (form.getValues("files").some((file) => file.path.startsWith(folderName))) {
+      folderName = `folder${i}/`;
+      i++;
+    }
+    form.setValue("files", form.getValues("files").concat({ path: folderName, content: "", trusted: true }));
+  };
+
   return (
     <FormSection title="Files">
       <div className="flex gap-2">
@@ -92,7 +114,12 @@ const FileInputSection = () => {
         <FileInputButton buttonText="Upload Folder" webkitdirectory="true" onFileChange={handleUploadFiles} />
       </div>
       <div className="flex !h-[500px] gap-0">
-        <FileTree files={convertFilesToFileTree(files)} onPathChange={handlePathChange} />
+        <FileTree
+          files={convertFilesToFileTree(files)}
+          onPathChange={handlePathChange}
+          onFileAdd={handleFileAdd}
+          onFolderAdd={handleFolderAdd}
+        />
         {selectedFile && !selectedFile.on_minio && (
           <FileEditor
             key={selectedFile.id + selectedFile.path}
