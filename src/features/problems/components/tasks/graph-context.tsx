@@ -29,6 +29,7 @@ export enum GraphActionType {
   // Socket actions
   AddSocket = "ADD_SOCKET",
   DeleteSocket = "DELETE_SOCKET",
+  UpdateSocketData = "UPDATE_SOCKET_DATA",
   UpdateSocketLabel = "UPDATE_SOCKET_LABEL",
   UpdateSocketMetadata = "UPDATE_SOCKET_METADATA",
   // Edge actions
@@ -91,6 +92,15 @@ interface UpdateSocketMetadataAction extends BaseGraphAction {
   };
 }
 
+interface UpdateSocketDataAction extends BaseGraphAction {
+  type: GraphActionType.UpdateSocketData;
+  payload: {
+    stepId: string;
+    socketId: string;
+    data: string | number | boolean;
+  };
+}
+
 interface AddEdgeAction extends BaseGraphAction {
   type: GraphActionType.AddEdge;
   payload: {
@@ -142,6 +152,7 @@ export type GraphAction =
   | UpdateStepMetadataAction
   | AddSocketAction
   | DeleteSocketAction
+  | UpdateSocketDataAction
   | UpdateSocketLabelAction
   | UpdateSocketMetadataAction
   | AddEdgeAction
@@ -209,14 +220,23 @@ const updatePyRunFunctionStep = (state: GraphState, { payload }: UpdatePyRunFunc
     //   1. Replace the input sockets with arguments of the new function signature.
     //   2. Remove all edges and replace args/kwargs connected to the node except the file edge
     // Otherwise, become a no-op.
-    const functionArgs: PyRunFunctionSocket[] = payload.functionSignature.args.map((arg, index) => ({
-      ...createSocket("DATA", arg.name + (arg.default ? ` (default:${arg.default})` : "")),
-      id: getUuid(),
-      arg_metadata: {
-        position: index,
-        arg_name: arg.name,
-      },
-    }));
+
+    const functionArgs: PyRunFunctionSocket[] = payload.functionSignature.args.map((arg, index) => {
+      // Check if the socket is pre-filled with data
+      const existingSocket = step.inputs.find((socket) => socket.arg_metadata?.position === index);
+      return {
+        ...createSocket(
+          "DATA",
+          arg.name + (arg.default ? ` (default:${arg.default})` : ""),
+          existingSocket?.data ?? null,
+        ),
+        id: getUuid(),
+        arg_metadata: {
+          position: index,
+          arg_name: arg.name,
+        },
+      };
+    });
 
     const functionKwargs: PyRunFunctionSocket[] = payload.functionSignature.kwargs.map((kwarg) => ({
       ...createSocket("DATA", kwarg.name + (kwarg.default ? ` = ${kwarg.default}` : "")),
@@ -329,6 +349,20 @@ const deleteSocket = (state: GraphState, { payload }: DeleteSocketAction) => {
   return state;
 };
 
+const updateSocketData = (state: GraphState, { payload }: UpdateSocketDataAction) => {
+  const stepIndex = state.steps.findIndex((node) => node.id === payload.stepId);
+  if (stepIndex === -1) return state;
+
+  const step = state.steps[stepIndex];
+  const socket =
+    step.inputs?.find((socket) => socket.id === payload.socketId) ||
+    step.outputs?.find((socket) => socket.id === payload.socketId);
+  if (socket === undefined) return state;
+
+  socket.data = payload.data;
+  return state;
+};
+
 const updateSocketLabel = (state: GraphState, { payload }: UpdateSocketLabelAction) => {
   const stepIndex = state.steps.findIndex((node) => node.id === payload.stepId);
   if (stepIndex === -1) return state;
@@ -394,6 +428,7 @@ const actionHandlers = {
   [GraphActionType.UpdateStepMetadata]: updateStepMetadata,
   [GraphActionType.AddSocket]: addSocket,
   [GraphActionType.DeleteSocket]: deleteSocket,
+  [GraphActionType.UpdateSocketData]: updateSocketData,
   [GraphActionType.UpdateSocketLabel]: updateSocketLabel,
   [GraphActionType.UpdateSocketMetadata]: updateSocketMetadata,
   [GraphActionType.SelectSocket]: selectSocket,

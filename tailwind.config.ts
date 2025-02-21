@@ -6,8 +6,8 @@ export default {
   content: ["./index.html", "./src/**/*.{js,ts,jsx,tsx}"],
   theme: {
   	fontFamily: {
-  		sans: ["Inter"],
-  		mono: ["JetBrains Mono"]
+  		sans: ["Geist"],
+  		mono: ["Geist Mono"]
   	},
   	extend: {
   		borderRadius: {
