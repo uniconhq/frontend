@@ -50,12 +50,12 @@ export type ExtraOptions = {
 };
 
 export type File = {
-    id?: string;
+    id: string;
     path: string;
     content: string;
-    trusted?: boolean;
     on_minio?: boolean;
     key?: string | null;
+    trusted?: boolean;
 };
 
 export type GraphEdgeStr = {

@@ -18,7 +18,7 @@ import { GraphAction, graphReducer } from "@/features/problems/components/tasks/
 import Testcase from "@/features/problems/components/tasks/testcase";
 import { getSupportedPythonVersions } from "@/features/problems/queries";
 import { DEFAULT_PY_VERSION, ProgTaskFormT, ProgTaskFormZ } from "@/lib/schema/prog-task-form";
-import { useSyncFormFields, uuid } from "@/lib/utils";
+import { isFile, useSyncFormFields, uuid } from "@/lib/utils";
 
 import FileInputSection from "./programming/file-inputs-section";
 
@@ -27,6 +27,7 @@ const createDefaultUserInput = () => ({
   // TODO: make sure this is a valid file name (not already taken)
   label: "user_file.py",
   data: {
+    id: uuid(),
     path: "user_file.py",
     content: "# INSERT FILE TEMPLATE HERE",
     trusted: false,
@@ -119,6 +120,26 @@ const ProgrammingForm: React.FC<OwnProps> = ({ title, initialValue, onSubmit }) 
         nodes: [newSharedUserInputStep, ...testcase.nodes.filter((node) => node.id !== sharedUserInputStep.id)],
       }));
       setSharedInputStep(newSharedUserInputStep);
+      return testcases;
+    },
+  });
+
+  useSyncFormFields({
+    form,
+    fromKey: "files",
+    toKey: "testcases",
+    merge: (fromValue, toValue) => {
+      const idToFile: Record<string, ApiFile> = fromValue.reduce((acc, file) => ({ ...acc, [file.id]: file }), {});
+      const testcases = toValue.map((testcase) => ({
+        ...testcase,
+        nodes: testcase.nodes.map((node) => {
+          if (node.type !== "INPUT_STEP") return node;
+          const outputs = (node as InputStep).outputs.map((output) =>
+            isFile(output.data) && output.data.id in idToFile ? { ...output, data: idToFile[output.data.id] } : output,
+          );
+          return { ...node, outputs };
+        }),
+      }));
       return testcases;
     },
   });
@@ -368,7 +389,7 @@ const ProgrammingForm: React.FC<OwnProps> = ({ title, initialValue, onSubmit }) 
                     index={index}
                     testcase={testcase}
                     edit={true}
-                    taskFiles={form.getValues("files") || []}
+                    taskFiles={form.watch("files") || []}
                     sharedUserInput={sharedUserInputStep}
                     nodeGraphOnChange={updateTestcase(index)}
                     onDelete={testcases.remove}

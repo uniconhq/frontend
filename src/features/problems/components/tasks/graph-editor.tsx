@@ -206,6 +206,7 @@ const GraphEditor: React.FC<GraphEditorProps> = ({ graphId, className }) => {
   const selectedSocket = selectedStep?.outputs?.find((socket) => socket.id === selectedSocketId);
 
   const treeFiles = files.map((file) => ({
+    id: file.id,
     name: file.path.split("/").pop()!,
     path: file.path,
     content: file.content,

@@ -2,6 +2,7 @@
 
 // Note: This is a file. It is NOT a folder.
 export type FileType = {
+  id: string;
   path: string;
   content: string;
   isBinary: boolean;

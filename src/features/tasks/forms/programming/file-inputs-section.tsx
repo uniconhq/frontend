@@ -8,11 +8,9 @@ import { FileTree } from "@/components/ui/file-tree";
 import FileEditor from "@/features/problems/components/tasks/file-editor";
 import { cleanFilePath, convertFilesToFileTree } from "@/lib/files";
 import { FileT, ProgTaskFormT } from "@/lib/schema/prog-task-form";
+import { uuid } from "@/lib/utils";
 
 const shouldPathBeMoved = (filePath: string, pathToMove: string) => {
-  // const filePathParts = filePath.split("/");
-  // const pathToMoveParts = pathToMove.split("/");
-
   if (!filePath.startsWith(pathToMove)) {
     return false;
   }
@@ -43,7 +41,10 @@ const FileInputSection = () => {
       const reader = new FileReader();
       reader.onload = (e) => {
         const fileContent = (e.target?.result as string).trim();
-        form.setValue("files", form.getValues("files").concat({ path: filePath, content: fileContent, trusted: true }));
+        form.setValue(
+          "files",
+          form.getValues("files").concat({ id: uuid(), path: filePath, content: fileContent, trusted: true }),
+        );
       };
       reader.readAsText(file);
     } else {
@@ -53,7 +54,7 @@ const FileInputSection = () => {
           "files",
           form
             .getValues("files")
-            .concat({ path: filePath, content: "", trusted: true, on_minio: true, key: response.data }),
+            .concat({ id: uuid(), path: filePath, content: "", trusted: true, on_minio: true, key: response.data }),
         );
       });
     }
@@ -71,6 +72,7 @@ const FileInputSection = () => {
   const [selectedFile, setSelectedFile] = useState<FileT | null>();
 
   const files = form.watch("files").map((file) => ({
+    id: file.id,
     name: file.path.split("/").pop()!,
     path: file.path,
     content: file.content,
@@ -135,7 +137,7 @@ const FileInputSection = () => {
       fileName = `file${i}.py`;
       i++;
     }
-    form.setValue("files", form.getValues("files").concat({ path: fileName, content: "", trusted: true }));
+    form.setValue("files", form.getValues("files").concat({ id: uuid(), path: fileName, content: "", trusted: true }));
   };
 
   const handleFolderAdd = () => {
@@ -146,7 +148,10 @@ const FileInputSection = () => {
       folderName = `folder${i}/`;
       i++;
     }
-    form.setValue("files", form.getValues("files").concat({ path: folderName, content: "", trusted: true }));
+    form.setValue(
+      "files",
+      form.getValues("files").concat({ id: uuid(), path: folderName, content: "", trusted: true }),
+    );
   };
 
   return (

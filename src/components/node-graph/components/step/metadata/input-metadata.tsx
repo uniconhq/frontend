@@ -22,7 +22,7 @@ type OwnProps = {
 };
 
 const InputMetadata: React.FC<OwnProps> = ({ step }) => {
-  const { edit } = useContext(GraphContext)!;
+  const { edit, files } = useContext(GraphContext)!;
   const dispatch = useContext(GraphDispatchContext)!;
 
   const isStepEditable = !step.is_user;
@@ -67,16 +67,18 @@ const InputMetadata: React.FC<OwnProps> = ({ step }) => {
       accept: "File",
       drop: (draggedItem) => {
         // copy files to user input
-        const addFileToInputStep = (file: TreeFile | TreeFolder) => {
-          if (isFolder(file)) {
-            file.children.forEach(addFileToInputStep);
+        const addFileToInputStep = (treeFile: TreeFile | TreeFolder) => {
+          if (isFolder(treeFile)) {
+            treeFile.children.forEach(addFileToInputStep);
           } else {
+            const file = files.find((file) => file.id === treeFile.id);
+            if (!file) return;
             dispatch({
               type: GraphActionType.AddSocket,
               payload: {
                 stepId: step.id,
                 socketDir: SocketDir.Output,
-                socket: { ...createSocket("DATA", file.name), data: file },
+                socket: { ...createSocket("DATA", file.path), data: file },
               },
             });
           }

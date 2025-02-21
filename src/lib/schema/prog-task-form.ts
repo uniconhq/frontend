@@ -8,6 +8,7 @@ export const DEFAULT_PY_VERSION: PythonVersion = "3.11.9";
 const positiveLimitZ = (label: string) => z.coerce.number().positive(`${label} must be greater than 0!`);
 
 const FileZ = z.object({
+  id: z.string(),
   path: z.string().nonempty("File name cannot be empty!"),
   content: z.string(),
   trusted: z.boolean().optional(),
