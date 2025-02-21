@@ -1,10 +1,10 @@
 // Referenced from: https://ui.shadcn.com/blocks/sidebar#sidebar-11
-
 import { ChevronRight, File, FileDigit, FilePlus, Folder, FolderPlus, X } from "lucide-react";
 import * as React from "react";
 import { useDrag, useDrop } from "react-dnd";
 
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from "@/components/ui/context-menu";
 import {
   Sidebar,
   SidebarContent,
@@ -28,6 +28,23 @@ type OwnProps = {
   onPathChange?: (oldPath: string, newPath: string) => void;
   onFileAdd?: () => void;
   onFolderAdd?: () => void;
+  onPathDelete: (path: string) => void;
+};
+
+const DeleteContextMenu: React.FC<
+  React.PropsWithChildren & { path: string; onPathDelete?: (path: string) => void }
+> = ({ path, onPathDelete, children }) => {
+  if (!onPathDelete) {
+    return <>{children}</>;
+  }
+  return (
+    <ContextMenu>
+      <ContextMenuTrigger>{children}</ContextMenuTrigger>
+      <ContextMenuContent>
+        <ContextMenuItem onClick={() => onPathDelete(path)}>Delete</ContextMenuItem>
+      </ContextMenuContent>
+    </ContextMenu>
+  );
 };
 
 export function FileTree({
@@ -35,6 +52,7 @@ export function FileTree({
   onPathChange,
   onFileAdd,
   onFolderAdd,
+  onPathDelete,
   files,
   ...props
 }: React.ComponentProps<typeof Sidebar> & OwnProps) {
@@ -69,7 +87,7 @@ export function FileTree({
             {files && (
               <SidebarMenu>
                 {files.map((item, index) => (
-                  <Tree key={index} item={item} onPathChange={onPathChange} />
+                  <Tree key={index} item={item} onPathChange={onPathChange} onPathDelete={onPathDelete} />
                 ))}
               </SidebarMenu>
             )}
@@ -99,9 +117,11 @@ export function FileTree({
 function Tree({
   item,
   onPathChange,
+  onPathDelete,
 }: {
   item: TreeFolder | TreeFile;
   onPathChange?: (oldPath: string, newPath: string) => void;
+  onPathDelete: (path: string) => void;
 }) {
   const isItemFolder = isFolder(item);
   // for file/folder name editing
@@ -144,77 +164,81 @@ function Tree({
 
   if (!isItemFolder) {
     return (
-      <SidebarMenuButton
-        className={cn({
-          "bg-emerald-900 hover:bg-emerald-800": item.highlighted,
-          "data-[active=true]:bg-transparent": !item.highlighted,
-          "bg-red-200 opacity-50": isDragging,
-        })}
-        type="button"
-        size="big"
-        onClick={item.onClick}
-        ref={drag}
-      >
-        {item.isBinary ? <FileDigit /> : <File />}
-        <span
-          className="inline-block"
-          contentEditable={isEditing}
-          spellCheck={false}
-          onClick={() => onPathChange && setIsEditing(true)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
+      <DeleteContextMenu onPathDelete={onPathDelete} path={item.path}>
+        <SidebarMenuButton
+          className={cn({
+            "bg-emerald-900 hover:bg-emerald-800": item.highlighted,
+            "data-[active=true]:bg-transparent": !item.highlighted,
+            "bg-red-200 opacity-50": isDragging,
+          })}
+          type="button"
+          size="big"
+          onClick={item.onClick}
+          ref={drag}
+        >
+          {item.isBinary ? <FileDigit /> : <File />}
+          <span
+            className="inline-block"
+            contentEditable={isEditing}
+            spellCheck={false}
+            onClick={() => onPathChange && setIsEditing(true)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                setIsEditing(false);
+                handleNameChange(e.currentTarget.textContent);
+              }
+            }}
+            onBlur={(e) => {
               setIsEditing(false);
               handleNameChange(e.currentTarget.textContent);
-            }
-          }}
-          onBlur={(e) => {
-            setIsEditing(false);
-            handleNameChange(e.currentTarget.textContent);
-          }}
-        >
-          {item.name}
-        </span>
-      </SidebarMenuButton>
+            }}
+          >
+            {item.name}
+          </span>
+        </SidebarMenuButton>
+      </DeleteContextMenu>
     );
   }
 
   return (
-    <SidebarMenuItem ref={drop}>
-      <Collapsible className="group/collapsible [&[data-state=open]>button>svg:first-child]:rotate-90">
-        <CollapsibleTrigger asChild>
-          <SidebarMenuButton ref={drag}>
-            <ChevronRight className="transition-transform" />
-            <Folder />
-            <span
-              className="inline-block"
-              contentEditable={isEditing}
-              spellCheck={false}
-              onClick={() => onPathChange && setIsEditing(true)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
+    <DeleteContextMenu onPathDelete={onPathDelete} path={item.path}>
+      <SidebarMenuItem ref={drop}>
+        <Collapsible className="group/collapsible [&[data-state=open]>button>svg:first-child]:rotate-90">
+          <CollapsibleTrigger asChild>
+            <SidebarMenuButton ref={drag}>
+              <ChevronRight className="transition-transform" />
+              <Folder />
+              <span
+                className="inline-block"
+                contentEditable={isEditing}
+                spellCheck={false}
+                onClick={() => onPathChange && setIsEditing(true)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    setIsEditing(false);
+                    handleNameChange(e.currentTarget.textContent);
+                  }
+                }}
+                onBlur={(e) => {
                   setIsEditing(false);
                   handleNameChange(e.currentTarget.textContent);
-                }
-              }}
-              onBlur={(e) => {
-                setIsEditing(false);
-                handleNameChange(e.currentTarget.textContent);
-              }}
-            >
-              {item.name}
-            </span>
-          </SidebarMenuButton>
-        </CollapsibleTrigger>
-        {item.children.length > 0 && (
-          <CollapsibleContent>
-            <SidebarMenuSub className="mr-0 pr-0">
-              {item.children.map((subItem, index) => (
-                <Tree key={index} item={subItem} onPathChange={onPathChange} />
-              ))}
-            </SidebarMenuSub>
-          </CollapsibleContent>
-        )}
-      </Collapsible>
-    </SidebarMenuItem>
+                }}
+              >
+                {item.name}
+              </span>
+            </SidebarMenuButton>
+          </CollapsibleTrigger>
+          {item.children.length > 0 && (
+            <CollapsibleContent>
+              <SidebarMenuSub className="mr-0 pr-0">
+                {item.children.map((subItem, index) => (
+                  <Tree key={index} item={subItem} onPathChange={onPathChange} onPathDelete={onPathDelete} />
+                ))}
+              </SidebarMenuSub>
+            </CollapsibleContent>
+          )}
+        </Collapsible>
+      </SidebarMenuItem>
+    </DeleteContextMenu>
   );
 }

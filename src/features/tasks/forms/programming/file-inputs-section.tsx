@@ -89,6 +89,16 @@ const FileInputSection = () => {
     }
   };
 
+  const handlePathDelete = (path: string) => {
+    form.setValue(
+      "files",
+      form.getValues("files").filter((file) => !file.path.startsWith(path)),
+    );
+    if (selectedFile && selectedFile.path.startsWith(path)) {
+      setSelectedFile(null);
+    }
+  };
+
   const handleFileAdd = () => {
     // Generate a unique filename.
     let fileName = "file.py";
@@ -123,6 +133,7 @@ const FileInputSection = () => {
           onPathChange={handlePathChange}
           onFileAdd={handleFileAdd}
           onFolderAdd={handleFolderAdd}
+          onPathDelete={handlePathDelete}
         />
         {selectedFile && !selectedFile.on_minio && (
           <FileEditor
