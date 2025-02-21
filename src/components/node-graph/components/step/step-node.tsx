@@ -86,6 +86,13 @@ export function StepNode({ data }: { data: Step }) {
     });
   };
 
+  const handleEditSocketData = (socketId: string) => (newSocketData: string | number | boolean) => {
+    dispatch({
+      type: GraphActionType.UpdateSocketData,
+      payload: { stepId: data.id, socketId, data: newSocketData },
+    });
+  };
+
   const addSocket = useCallback(
     (socketDir: SocketDir) => () => {
       dispatch({
@@ -135,6 +142,7 @@ export function StepNode({ data }: { data: Step }) {
                       type="target"
                       edit={showEditElements}
                       allowEditSockets={allowEditSockets}
+                      onEditSocketData={handleEditSocketData(stepSocket.id)}
                       onEditSocketLabel={handleEditSocketLabel(stepSocket.id)}
                       onDeleteSocket={deleteSocket(stepSocket.id)}
                     />
