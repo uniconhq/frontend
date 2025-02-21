@@ -1,5 +1,3 @@
-import { useState } from "react";
-
 import { ProgrammingTask } from "@/api";
 import Testcase from "@/features/problems/components/tasks/testcase";
 import TaskContainer from "@/features/tasks/components/task-container";
@@ -20,8 +18,6 @@ export function Programming({
   problemId: number;
   task: ProgrammingTask;
 }) {
-  const [selectedTestcaseIdx, setSelectedTestcaseIdx] = useState<number | null>(task.testcases.length ? 0 : null);
-
   return (
     <TaskContainer title={task.title} description={task.description}>
       <TaskSection>
@@ -30,16 +26,9 @@ export function Programming({
       </TaskSection>
       <TaskSection>
         <TaskSectionHeader content="Testcases" />
-        <div className="flex gap-2 font-mono text-gray-300">
+        <div className="flex flex-col gap-2 font-mono text-gray-300">
           {task.testcases.map((testcase, index) => (
-            <Testcase
-              edit={false}
-              key={testcase.id}
-              index={index}
-              testcase={testcase}
-              isSelected={selectedTestcaseIdx === index}
-              onSelected={setSelectedTestcaseIdx}
-            />
+            <Testcase edit={false} key={testcase.id} index={index} testcase={testcase} />
           ))}
         </div>
       </TaskSection>

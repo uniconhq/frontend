@@ -7,7 +7,6 @@ import { InputStep, Testcase as TestcaseApi } from "@/api";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import NodeGraph from "@/features/problems/components/tasks/node-graph";
-import { cn } from "@/lib/utils";
 
 import { GraphAction } from "./graph-context";
 
@@ -20,38 +19,15 @@ type TestcaseProps = {
   // Used during testcase creation where each testcase has the same user input
   // NOTE: If this is set, the nodes in the testcase will not contain the user input node
   sharedUserInput?: InputStep;
-  // UI state
-  isSelected?: boolean;
-  onSelected?: (index: number | null) => void;
   onDelete?: (index: number) => void;
 };
 
-const Testcase: React.FC<TestcaseProps> = ({
-  index,
-  testcase,
-  edit,
-  nodeGraphOnChange,
-  sharedUserInput,
-  isSelected,
-  onSelected,
-  onDelete,
-}) => {
+const Testcase: React.FC<TestcaseProps> = ({ index, testcase, edit, nodeGraphOnChange, sharedUserInput, onDelete }) => {
   return (
-    <Collapsible
-      defaultOpen
-      open={isSelected}
-      onOpenChange={(isOpen: boolean) => onSelected?.(isOpen ? index : null)}
-      className="w-full space-y-2"
-    >
+    <Collapsible defaultOpen className="w-full space-y-2">
       <div className="flex items-center justify-between">
         <CollapsibleTrigger asChild>
-          <Button
-            variant="outline"
-            key={index}
-            className={cn({
-              "border-2 border-purple-400 text-purple-400": isSelected,
-            })}
-          >
+          <Button variant="outline" key={index}>
             #{index + 1}
           </Button>
         </CollapsibleTrigger>
