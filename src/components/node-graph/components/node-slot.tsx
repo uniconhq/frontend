@@ -1,11 +1,14 @@
 import { Handle, HandleType, Position as HandlePosition, useNodeConnections } from "@xyflow/react";
-import { ArrowBigRightIcon, TrashIcon } from "lucide-react";
+import { ArrowBigRightIcon, PlusIcon, TrashIcon } from "lucide-react";
 import { twJoin } from "tailwind-merge";
 
 import { StepSocket } from "@/api";
 import NodeInput from "@/components/node-graph/components/step/node-input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 
 interface NodeSlotProps {
@@ -18,6 +21,32 @@ interface NodeSlotProps {
   onDeleteSocket?: () => void;
   handleStyle?: React.CSSProperties;
 }
+
+const DataSocketDefaultValuePopover = () => {
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button variant="ghost" size="icon" className="h-6 w-6 hover:bg-white/10">
+          <PlusIcon className="h-4 w-4" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-60 bg-zinc-900">
+        <div className="grid gap-4">
+          <div className="space-y-2">
+            <h4 className="text-sm font-medium text-zinc-200">Default Value</h4>
+            <p className="text-xs text-zinc-400">This value will be used when no input is connected</p>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="value" className="text-xs text-zinc-400">
+              Value
+            </Label>
+            <Input id="value" placeholder="Enter default value..." className="h-8 border-zinc-700 bg-zinc-800" />
+          </div>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+};
 
 const DataSocket = ({
   socket,
@@ -44,9 +73,12 @@ const DataSocket = ({
             value={socket.label ?? ""}
             onChange={onEditSocketLabel ?? (() => {})}
           />
-          <Button className="h-fit w-fit p-1" variant="outline" onClick={onDeleteSocket} type="button">
-            <TrashIcon />
-          </Button>
+          <div className="flex gap-1">
+            <DataSocketDefaultValuePopover />
+            <Button className="h-fit w-fit p-1" variant="outline" onClick={onDeleteSocket} type="button">
+              <TrashIcon />
+            </Button>
+          </div>
         </div>
       ) : (
         <span className="min-h-[12px] px-2 text-sm">{socket.label ?? ""}</span>
@@ -57,15 +89,15 @@ const DataSocket = ({
 
 const ControlSocket = ({ socket, type }: { socket: StepSocket; type: HandleType }) => {
   return (
-    <div className={cn("flex items-center gap-1 px-1", { "flex-row-reverse": type === "target" })}>
+    <div className={cn("flex h-fit items-center gap-1 px-1", { "flex-row-reverse": type === "target" })}>
       {socket.label && (
         <>
           <Badge variant="outline" className="border-[#73F777]">
-            <span className="font-mono font-medium">{socket.label}</span>
+            <span className="py-1 font-mono font-light uppercase text-zinc-300">{socket.label}</span>
           </Badge>
         </>
       )}
-      <ArrowBigRightIcon color="#73F777" />
+      <ArrowBigRightIcon size={25} color="#73F777" />
     </div>
   );
 };
@@ -128,5 +160,5 @@ export function NodeSlot({
 }
 
 export function NodeSlotGroup({ children }: { children: React.ReactNode }) {
-  return <div className="flex grow-0 flex-col">{children}</div>;
+  return <div className="flex flex-col gap-2">{children}</div>;
 }

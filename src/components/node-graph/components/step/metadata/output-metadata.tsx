@@ -60,12 +60,16 @@ const OutputMetadata: React.FC<OwnProps> = ({ step }) => {
   );
 
   if (!edit) {
-    return <OutputTable data={step.inputs} />;
+    return (
+      <div className="px-2 pt-2">
+        <OutputTable data={step.inputs} />
+      </div>
+    );
   }
 
   return (
-    <div>
-      <div className="rounded-md border">
+    <div className="px-2 pt-2">
+      <div className="rounded-md">
         <Table hideOverflow>
           <TableHeader>
             <TableRow>

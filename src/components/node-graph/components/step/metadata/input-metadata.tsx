@@ -66,10 +66,6 @@ const InputMetadata: React.FC<OwnProps> = ({ step }) => {
     });
   }, [dispatch, step.id]);
 
-  if (!showEditElements) {
-    return <InputTable data={step.outputs} step={step} />;
-  }
-
   const onChangeValue = (socket: StepSocket) => (newValue: string) => {
     dispatch({
       type: GraphActionType.UpdateSocketMetadata,
@@ -94,9 +90,17 @@ const InputMetadata: React.FC<OwnProps> = ({ step }) => {
     });
   };
 
+  if (!showEditElements) {
+    return (
+      <div className="px-2 pt-2">
+        <InputTable data={step.outputs} step={step} />
+      </div>
+    );
+  }
+
   return (
-    <div>
-      <div className="rounded-md border">
+    <div className="px-2 pt-2">
+      <div className="rounded-md">
         <Table hideOverflow>
           <TableHeader>
             <TableRow>

@@ -16,17 +16,16 @@ import {
 import { Step } from "@/features/problems/components/tasks/types";
 import { StepNodeColorMap, StepTypeAliasMap } from "@/lib/colors";
 import { createSocket } from "@/lib/compute-graph";
-import { cn } from "@/lib/utils";
 
 const NodeHeader = ({ type, edit, deleteStep }: { type: StepType; edit: boolean; deleteStep: () => void }) => {
   return (
     <div
-      className="w-content mb-4 flex items-center justify-between gap-10 rounded-t border-2 p-2"
+      className="w-content flex items-center justify-between gap-10 rounded-t border-2 p-2"
       style={{ borderColor: StepNodeColorMap[type] }}
     >
       <div className="flex items-center gap-1">
-        <GoDotFill className="h-6 w-6 animate-pulse" style={{ color: `${StepNodeColorMap[type]}` }} />
-        <span className="pr-4 text-base font-medium capitalize tracking-tight">{StepTypeAliasMap[type]}</span>
+        <GoDotFill className="h-4 w-4 animate-pulse" style={{ color: `${StepNodeColorMap[type]}` }} />
+        <span className="pr-4 text-sm font-medium capitalize tracking-tight">{StepTypeAliasMap[type]}</span>
       </div>
       {edit && (
         <Button className="h-fit w-fit bg-transparent px-2" variant="secondary" onClick={deleteStep} type="button">
@@ -95,74 +94,72 @@ export function StepNode({ data }: { data: Step }) {
   const handlesInStepMetadata = ["OUTPUT_STEP", "INPUT_STEP"].includes(data.type);
 
   return (
-    <div
-      className={cn(
-        "flex min-w-52 flex-col rounded bg-[#141414] pb-2 text-slate-300 outline outline-[0.05rem] outline-neutral-500",
-      )}
-    >
+    <div className="rounded-b-lg bg-[#141414]">
       {/* Node header */}
       <NodeHeader type={data.type} edit={showEditElements} deleteStep={deleteStep} />
-      {/* Node metadata */}
-      <StepMetadata step={data} />
-      {/* Node body */}
-      {!handlesInStepMetadata && (
-        <div className="text-xs font-light">
-          <div className="flex flex-row justify-between gap-4">
-            <NodeSlotGroup>
-              {[...(data.inputs ?? [])]
-                ?.sort(orderSockets)
-                .map((stepSocket: StepSocket) => (
-                  <NodeSlot
-                    key={stepSocket.id}
-                    socket={stepSocket}
-                    type="target"
-                    edit={showEditElements}
-                    allowEditSockets={allowEditSockets}
-                    onEditSocketLabel={handleEditSocketLabel(stepSocket.id)}
-                    onDeleteSocket={deleteSocket(stepSocket.id)}
-                  />
-                ))}
-              {showEditElements && allowEditSockets && (
-                <Button
-                  size={"sm"}
-                  className="ml-2 h-fit w-fit px-1 py-1"
-                  variant="secondary"
-                  onClick={addSocket(SocketDir.Input)}
-                  type="button"
-                >
-                  <PlusIcon />
-                </Button>
-              )}
-            </NodeSlotGroup>
-            <NodeSlotGroup>
-              {[...(data.outputs ?? [])]
-                ?.sort(orderSockets)
-                .map((stepSocket: StepSocket) => (
-                  <NodeSlot
-                    key={stepSocket.id}
-                    socket={stepSocket}
-                    type="source"
-                    edit={showEditElements}
-                    allowEditSockets={allowEditSockets}
-                    onEditSocketLabel={handleEditSocketLabel(stepSocket.id)}
-                    onDeleteSocket={deleteSocket(stepSocket.id)}
-                  />
-                ))}
-              {showEditElements && allowEditSockets && (
-                <Button
-                  size={"sm"}
-                  className="mr-2 h-fit w-fit self-end px-1 py-1"
-                  variant="secondary"
-                  onClick={addSocket(SocketDir.Output)}
-                  type="button"
-                >
-                  <PlusIcon />
-                </Button>
-              )}
-            </NodeSlotGroup>
+      <div className="flex min-w-52 flex-col gap-2 rounded-b-lg border-x-2 border-b-2 pb-2">
+        {/* Node metadata */}
+        <StepMetadata step={data} />
+        {/* Node body */}
+        {!handlesInStepMetadata && (
+          <div className="pt-1 font-mono text-xs">
+            <div className="flex flex-row justify-between gap-4">
+              <NodeSlotGroup>
+                {[...(data.inputs ?? [])]
+                  ?.sort(orderSockets)
+                  .map((stepSocket: StepSocket) => (
+                    <NodeSlot
+                      key={stepSocket.id}
+                      socket={stepSocket}
+                      type="target"
+                      edit={showEditElements}
+                      allowEditSockets={allowEditSockets}
+                      onEditSocketLabel={handleEditSocketLabel(stepSocket.id)}
+                      onDeleteSocket={deleteSocket(stepSocket.id)}
+                    />
+                  ))}
+                {showEditElements && allowEditSockets && (
+                  <Button
+                    size={"sm"}
+                    className="ml-2 h-fit w-fit px-1 py-1"
+                    variant="secondary"
+                    onClick={addSocket(SocketDir.Input)}
+                    type="button"
+                  >
+                    <PlusIcon />
+                  </Button>
+                )}
+              </NodeSlotGroup>
+              <NodeSlotGroup>
+                {[...(data.outputs ?? [])]
+                  ?.sort(orderSockets)
+                  .map((stepSocket: StepSocket) => (
+                    <NodeSlot
+                      key={stepSocket.id}
+                      socket={stepSocket}
+                      type="source"
+                      edit={showEditElements}
+                      allowEditSockets={allowEditSockets}
+                      onEditSocketLabel={handleEditSocketLabel(stepSocket.id)}
+                      onDeleteSocket={deleteSocket(stepSocket.id)}
+                    />
+                  ))}
+                {showEditElements && allowEditSockets && (
+                  <Button
+                    size={"sm"}
+                    className="mr-2 h-fit w-fit self-end px-1 py-1"
+                    variant="secondary"
+                    onClick={addSocket(SocketDir.Output)}
+                    type="button"
+                  >
+                    <PlusIcon />
+                  </Button>
+                )}
+              </NodeSlotGroup>
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }
