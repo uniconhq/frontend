@@ -2,6 +2,7 @@
 
 import { ChevronRight, File, FileDigit, FilePlus, Folder, FolderPlus, X } from "lucide-react";
 import * as React from "react";
+import { useDrag, useDrop } from "react-dnd";
 
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
@@ -37,9 +38,24 @@ export function FileTree({
   files,
   ...props
 }: React.ComponentProps<typeof Sidebar> & OwnProps) {
+  const [, drop] = useDrop<TreeFile | TreeFolder>(() => ({
+    accept: "File",
+    drop: (draggedItem, monitor) => {
+      if (monitor.didDrop()) {
+        return;
+      }
+      if ("children" in draggedItem) {
+        const oldPath = draggedItem.path.endsWith("/") ? draggedItem.path : draggedItem.path + "/";
+        onPathChange?.(oldPath, "");
+      } else {
+        onPathChange?.(draggedItem.path, draggedItem.name);
+      }
+    },
+  }));
+
   return (
     <Sidebar {...props} className="relative h-full w-[300px] rounded-md border" variant="filetree" collapsible="none">
-      <SidebarContent className="h-full overflow-y-scroll">
+      <SidebarContent className="h-full overflow-y-scroll" ref={drop}>
         <SidebarGroup className="relative h-full">
           {onCloseFileTree && (
             <SidebarGroupLabel>
@@ -99,16 +115,45 @@ function Tree({
     onPathChange?.(item.path, newPath);
   };
 
+  const [{ isDragging }, drag] = useDrag(
+    () => ({
+      type: "File", // todo: refactor
+      item,
+      collect: (monitor) => ({
+        isDragging: monitor.isDragging(),
+      }),
+    }),
+    [item],
+  );
+
+  const [, drop] = useDrop<TreeFile | TreeFolder>(
+    () => ({
+      accept: "File",
+      drop: (draggedItem, monitor) => {
+        if (monitor.didDrop()) {
+          return;
+        }
+        if (!("children" in item)) {
+          return;
+        }
+        onPathChange?.(draggedItem.path, item.path + "/" + draggedItem.name);
+      },
+    }),
+    [item],
+  );
+
   if (!isItemFolder) {
     return (
       <SidebarMenuButton
         className={cn({
           "bg-emerald-900 hover:bg-emerald-800": item.highlighted,
           "data-[active=true]:bg-transparent": !item.highlighted,
+          "bg-red-200 opacity-50": isDragging,
         })}
         type="button"
         size="big"
         onClick={item.onClick}
+        ref={drag}
       >
         {item.isBinary ? <FileDigit /> : <File />}
         <span
@@ -134,10 +179,10 @@ function Tree({
   }
 
   return (
-    <SidebarMenuItem>
+    <SidebarMenuItem ref={drop}>
       <Collapsible className="group/collapsible [&[data-state=open]>button>svg:first-child]:rotate-90">
         <CollapsibleTrigger asChild>
-          <SidebarMenuButton>
+          <SidebarMenuButton ref={drag}>
             <ChevronRight className="transition-transform" />
             <Folder />
             <span

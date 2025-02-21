@@ -6,10 +6,8 @@ import FormSection from "@/components/form/form-section";
 import FileInputButton from "@/components/form/inputs/file-input-button";
 import { FileTree } from "@/components/ui/file-tree";
 import FileEditor from "@/features/problems/components/tasks/file-editor";
-import { convertFilesToFileTree } from "@/lib/files";
+import { cleanFilePath, convertFilesToFileTree } from "@/lib/files";
 import { FileT, ProgTaskFormT } from "@/lib/schema/prog-task-form";
-
-const cleanFilePath = (path: string) => path.replace(/^\//, "");
 
 const FileInputSection = () => {
   const form = useFormContext<ProgTaskFormT>();
@@ -73,14 +71,20 @@ const FileInputSection = () => {
   };
 
   const handlePathChange = (oldPath: string, newPath: string) => {
+    if (newPath.startsWith(oldPath)) {
+      // Cannot move a folder into itself
+      return;
+    }
     form.setValue(
       "files",
       form
         .getValues("files")
-        .map((file) => (file.path.startsWith(oldPath) ? { ...file, path: file.path.replace(oldPath, newPath) } : file)),
+        .map((file) =>
+          file.path.startsWith(oldPath) ? { ...file, path: cleanFilePath(file.path.replace(oldPath, newPath)) } : file,
+        ),
     );
     if (selectedFile && selectedFile.path.startsWith(oldPath)) {
-      const newSelectedFilePath = selectedFile.path.replace(oldPath, newPath);
+      const newSelectedFilePath = cleanFilePath(selectedFile.path.replace(oldPath, newPath));
       setSelectedFile({ ...selectedFile, path: newSelectedFilePath });
     }
   };

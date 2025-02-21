@@ -30,6 +30,8 @@ export const getName = (path: string) => {
 
 export type FileTreeType = (TreeFolder | TreeFile)[];
 
+export const cleanFilePath = (path: string) => path.replace(/^\//, "");
+
 const sortFileTree = (files: FileTreeType) => {
   files.sort((a, b) => {
     return a.name.localeCompare(b.name);
@@ -75,6 +77,5 @@ export const convertFilesToFileTree = (files: FileType[]): FileTreeType => {
     }
   }
   sortFileTree(tree);
-  console.log({ tree });
   return tree;
 };
