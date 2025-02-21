@@ -1,7 +1,16 @@
 import { useUpdateNodeInternals } from "@xyflow/react";
-import { PlusIcon, TrashIcon } from "lucide-react";
+import {
+  CircleDotIcon,
+  EqualIcon,
+  EyeIcon,
+  InfinityIcon,
+  PlayIcon,
+  PlusIcon,
+  SplitIcon,
+  TextCursorInputIcon,
+  TrashIcon,
+} from "lucide-react";
 import { useCallback, useContext, useEffect } from "react";
-import { GoDotFill } from "react-icons/go";
 
 import { StepSocket, StepType } from "@/api";
 import { NodeSlot, NodeSlotGroup } from "@/components/node-graph/components/node-slot";
@@ -17,15 +26,27 @@ import { Step } from "@/features/problems/components/tasks/types";
 import { StepNodeColorMap, StepTypeAliasMap } from "@/lib/colors";
 import { createSocket } from "@/lib/compute-graph";
 
+const STEP_TYPE_ICONS: Record<StepType, JSX.Element> = {
+  PY_RUN_FUNCTION_STEP: <PlayIcon />,
+  OBJECT_ACCESS_STEP: <CircleDotIcon />,
+  OUTPUT_STEP: <EyeIcon />,
+  INPUT_STEP: <TextCursorInputIcon />,
+  STRING_MATCH_STEP: <EqualIcon />,
+  LOOP_STEP: <InfinityIcon />,
+  IF_ELSE_STEP: <SplitIcon />,
+};
+
 const NodeHeader = ({ type, edit, deleteStep }: { type: StepType; edit: boolean; deleteStep: () => void }) => {
   return (
     <div
       className="w-content flex items-center justify-between gap-10 rounded-t border-2 p-2"
       style={{ borderColor: StepNodeColorMap[type] }}
     >
-      <div className="flex items-center gap-1">
-        <GoDotFill className="h-4 w-4 animate-pulse" style={{ color: `${StepNodeColorMap[type]}` }} />
-        <span className="pr-4 text-sm font-medium capitalize">{StepTypeAliasMap[type]}</span>
+      <div className="flex items-center gap-2">
+        <div className="flex h-5 w-5 items-center" style={{ color: StepNodeColorMap[type] }}>
+          {STEP_TYPE_ICONS[type]}
+        </div>
+        <span className="text-sm font-medium capitalize">{StepTypeAliasMap[type]}</span>
       </div>
       {edit && (
         <Button className="h-fit w-fit bg-transparent px-2" variant="secondary" onClick={deleteStep} type="button">
