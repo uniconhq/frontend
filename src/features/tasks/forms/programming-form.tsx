@@ -3,7 +3,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@radix-ui/r
 import { useQuery } from "@tanstack/react-query";
 import { produce } from "immer";
 import { PlusIcon, Trash, UploadIcon } from "lucide-react";
-import { useEffect, useRef } from "react";
+import { useRef, useState } from "react";
 import { SubmitHandler, useFieldArray, useForm } from "react-hook-form";
 
 import { File as ApiFile, InputStep } from "@/api";
@@ -17,8 +17,8 @@ import FileEditor from "@/features/problems/components/tasks/file-editor";
 import { GraphAction, graphReducer } from "@/features/problems/components/tasks/graph-context";
 import Testcase from "@/features/problems/components/tasks/testcase";
 import { getSupportedPythonVersions } from "@/features/problems/queries";
-import { DEFAULT_PY_VERSION, ProgTaskFormT, ProgTaskFormTZ } from "@/lib/schema/prog-task-form";
-import { uuid } from "@/lib/utils";
+import { DEFAULT_PY_VERSION, ProgTaskFormT, ProgTaskFormZ } from "@/lib/schema/prog-task-form";
+import { useSyncFormFields, uuid } from "@/lib/utils";
 
 import FileInputSection from "./programming/file-inputs-section";
 
@@ -35,6 +35,7 @@ const createDefaultUserInput = () => ({
 
 const DEFAULT_FORM_VALUES: ProgTaskFormT = {
   title: "",
+  description: "",
   environment: {
     language: "Python",
     extra_options: {
@@ -69,7 +70,7 @@ type OwnProps = {
 
 const ProgrammingForm: React.FC<OwnProps> = ({ title, initialValue, onSubmit }) => {
   const form = useForm<ProgTaskFormT>({
-    resolver: zodResolver(ProgTaskFormTZ),
+    resolver: zodResolver(ProgTaskFormZ),
     defaultValues: initialValue ?? DEFAULT_FORM_VALUES,
   });
 
@@ -98,11 +99,29 @@ const ProgrammingForm: React.FC<OwnProps> = ({ title, initialValue, onSubmit }) 
     reader.readAsText(depsFile);
   };
 
-  // Shared user input step for all testcases
-  const sharedUserInputStep: InputStep = {
+  const [sharedUserInputStep, setSharedInputStep] = useState<InputStep>({
     ...DEFAULT_USER_INPUT_STEP,
-    outputs: form.watch("required_user_inputs"),
-  };
+    outputs: form.getValues("required_user_inputs"),
+  });
+
+  useSyncFormFields({
+    form,
+    fromKey: "required_user_inputs",
+    toKey: "testcases",
+    merge: (fromValue, toValue) => {
+      // Shared user input step for all testcases
+      const newSharedUserInputStep: InputStep = {
+        ...DEFAULT_USER_INPUT_STEP,
+        outputs: fromValue,
+      };
+      const testcases = toValue.map((testcase) => ({
+        ...testcase,
+        nodes: [newSharedUserInputStep, ...testcase.nodes.filter((node) => node.id !== sharedUserInputStep.id)],
+      }));
+      setSharedInputStep(newSharedUserInputStep);
+      return testcases;
+    },
+  });
 
   const addTestcase = () =>
     testcases.append({ id: uuid(), order_index: testcases.fields.length, nodes: [sharedUserInputStep], edges: [] });
@@ -151,17 +170,6 @@ const ProgrammingForm: React.FC<OwnProps> = ({ title, initialValue, onSubmit }) 
       form.getValues(_KEY).filter((_, i) => i !== index),
     );
   };
-
-  // Update all testcases with the updated shared user input step
-  useEffect(() => {
-    for (let i = 0; i < testcases.fields.length; i++) {
-      const testcase = testcases.fields[i];
-      testcases.update(i, {
-        ...testcase,
-        nodes: [sharedUserInputStep, ...testcase.nodes.filter((node) => node.id !== sharedUserInputStep.id)],
-      });
-    }
-  }, [sharedUserInputStep]);
 
   const updateTestcase = (index: number) => (action: GraphAction) => {
     const testcase = form.getValues("testcases")[index];
@@ -369,9 +377,9 @@ const ProgrammingForm: React.FC<OwnProps> = ({ title, initialValue, onSubmit }) 
               ))}
             </div>
           </div>
-          <div>
-            <Button className="mt-5 bg-purple-600 text-white hover:bg-purple-600 hover:bg-opacity-80">Submit</Button>
-          </div>
+          <Button className="mt-5 w-fit bg-purple-600 text-white hover:bg-purple-600 hover:bg-opacity-80">
+            Submit
+          </Button>
         </form>
       </Form>
     </div>

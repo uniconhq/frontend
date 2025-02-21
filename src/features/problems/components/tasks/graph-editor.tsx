@@ -6,6 +6,7 @@ import {
   Connection,
   Controls,
   Edge,
+  IsValidConnection,
   MarkerType,
   MiniMap,
   Node,
@@ -25,7 +26,7 @@ import { Button } from "@/components/ui/button";
 import { FileTree } from "@/components/ui/file-tree";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { convertFilesToFileTree } from "@/lib/files";
-import { cn, isFile } from "@/lib/utils";
+import { cn, isFile, uuid } from "@/lib/utils";
 import getLayoutedElements from "@/utils/graph";
 
 import AddNodeButton from "./add-node-button";
@@ -154,6 +155,7 @@ const GraphEditor: React.FC<GraphEditorProps> = ({ graphId, className }) => {
       dispatch({
         type: GraphActionType.AddEdge,
         payload: {
+          id: uuid(),
           from_node_id: source,
           from_socket_id: sourceHandle!,
           to_node_id: target,
@@ -178,6 +180,7 @@ const GraphEditor: React.FC<GraphEditorProps> = ({ graphId, className }) => {
       dispatch({
         type: GraphActionType.AddEdge,
         payload: {
+          id: uuid(),
           from_node_id: source,
           from_socket_id: sourceHandle!,
           to_node_id: target,
@@ -216,6 +219,18 @@ const GraphEditor: React.FC<GraphEditorProps> = ({ graphId, className }) => {
 
   // The file editor is hidden if the file is a binary file.
   const showFile = selectedSocket && isFile(selectedSocket.data) && !selectedSocket?.data.on_minio;
+  const isValidConnection: IsValidConnection<Edge> = useCallback(
+    (newEdge) => {
+      // Check there is no existing edge to the target node + handle.
+      const { target, targetHandle } = newEdge;
+      if (edges.find((edge) => edge.to_node_id === target && edge.to_socket_id === targetHandle)) {
+        return false;
+      }
+      return true;
+    },
+    [edges],
+  );
+
   return (
     <div
       className={cn(className, {
@@ -256,6 +271,7 @@ const GraphEditor: React.FC<GraphEditorProps> = ({ graphId, className }) => {
             onReconnect={onReconnect}
             nodesConnectable={edit}
             edgesReconnectable={edit}
+            isValidConnection={isValidConnection}
             colorMode="dark"
             proOptions={{ hideAttribution: true }}
           >

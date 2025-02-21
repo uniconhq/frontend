@@ -30,7 +30,7 @@ const SlurmOptionZ = z
     message: "Slurm option cannot contain spaces!",
   });
 
-export const ProgTaskFormTZ = TaskFormZ.extend({
+export const ProgTaskFormZ = TaskFormZ.extend({
   environment: z.object({
     language: z.literal("Python"),
     extra_options: z.object({
@@ -56,7 +56,7 @@ export const ProgTaskFormTZ = TaskFormZ.extend({
   }
 });
 
-export type ProgTaskFormT = z.infer<typeof ProgTaskFormTZ>;
+export type ProgTaskFormT = z.infer<typeof ProgTaskFormZ>;
 
 export const toProgrammingTask = (form: ProgTaskFormT): Omit<ProgrammingTask, "order_index"> => ({
   id: -1,
@@ -79,7 +79,7 @@ export const toProgrammingTask = (form: ProgTaskFormT): Omit<ProgrammingTask, "o
 
 export const fromProgrammingTask = (progTask: ProgrammingTask): ProgTaskFormT => ({
   title: progTask.title,
-  description: progTask.description,
+  description: progTask.description ?? "",
   environment: {
     ...progTask.environment,
     language: "Python",
