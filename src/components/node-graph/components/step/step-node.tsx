@@ -25,7 +25,7 @@ const NodeHeader = ({ type, edit, deleteStep }: { type: StepType; edit: boolean;
     >
       <div className="flex items-center gap-1">
         <GoDotFill className="h-4 w-4 animate-pulse" style={{ color: `${StepNodeColorMap[type]}` }} />
-        <span className="pr-4 text-sm font-medium capitalize tracking-tight">{StepTypeAliasMap[type]}</span>
+        <span className="pr-4 text-sm font-medium capitalize">{StepTypeAliasMap[type]}</span>
       </div>
       {edit && (
         <Button className="h-fit w-fit bg-transparent px-2" variant="secondary" onClick={deleteStep} type="button">
