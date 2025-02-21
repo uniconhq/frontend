@@ -9,6 +9,30 @@ import FileEditor from "@/features/problems/components/tasks/file-editor";
 import { cleanFilePath, convertFilesToFileTree } from "@/lib/files";
 import { FileT, ProgTaskFormT } from "@/lib/schema/prog-task-form";
 
+const shouldPathBeMoved = (filePath: string, pathToMove: string) => {
+  // const filePathParts = filePath.split("/");
+  // const pathToMoveParts = pathToMove.split("/");
+
+  if (!filePath.startsWith(pathToMove)) {
+    return false;
+  }
+  if (filePath === pathToMove) {
+    return true;
+  }
+  const remainingPath = filePath.slice(pathToMove.length);
+  if (pathToMove[pathToMove.length - 1] !== "/" && remainingPath[0] !== "/") {
+    return false;
+  }
+  return true;
+};
+
+const movePath = (filePath: string, oldPath: string, newPath: string) => {
+  if (!shouldPathBeMoved(filePath, oldPath)) {
+    return filePath;
+  }
+  return cleanFilePath(filePath.replace(oldPath, newPath));
+};
+
 const FileInputSection = () => {
   const form = useFormContext<ProgTaskFormT>();
 
@@ -71,17 +95,18 @@ const FileInputSection = () => {
   };
 
   const handlePathChange = (oldPath: string, newPath: string) => {
-    if (newPath.startsWith(oldPath)) {
-      // Cannot move a folder into itself
+    // TODO: Check if newPath is valid
+    if (oldPath.endsWith("/") && !newPath.endsWith("/")) {
+      return;
+    }
+    if (oldPath.endsWith("/") && newPath.endsWith("/") && newPath.startsWith(oldPath)) {
       return;
     }
     form.setValue(
       "files",
-      form
-        .getValues("files")
-        .map((file) =>
-          file.path.startsWith(oldPath) ? { ...file, path: cleanFilePath(file.path.replace(oldPath, newPath)) } : file,
-        ),
+      form.getValues("files").map((file) => {
+        return { ...file, path: movePath(file.path, oldPath, newPath) };
+      }),
     );
     if (selectedFile && selectedFile.path.startsWith(oldPath)) {
       const newSelectedFilePath = cleanFilePath(selectedFile.path.replace(oldPath, newPath));
@@ -90,11 +115,14 @@ const FileInputSection = () => {
   };
 
   const handlePathDelete = (path: string) => {
+    const isFileDeleted = (filePath: string) => {
+      return filePath === path || (path.endsWith("/") && filePath.startsWith(path));
+    };
     form.setValue(
       "files",
-      form.getValues("files").filter((file) => !file.path.startsWith(path)),
+      form.getValues("files").filter((file) => !isFileDeleted(file.path)),
     );
-    if (selectedFile && selectedFile.path.startsWith(path)) {
+    if (selectedFile && isFileDeleted(selectedFile.path)) {
       setSelectedFile(null);
     }
   };

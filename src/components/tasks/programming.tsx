@@ -76,6 +76,7 @@ export function Programming({
         <div className="flex gap-2 font-mono text-gray-300">
           {task.testcases.map((testcase, index) => (
             <Testcase
+              taskFiles={task.files}
               edit={false}
               key={testcase.id}
               index={index}

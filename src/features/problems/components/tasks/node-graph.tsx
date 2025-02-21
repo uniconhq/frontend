@@ -4,7 +4,7 @@ import { ReactFlowProvider } from "@xyflow/react";
 import { useCallback, useEffect } from "react";
 import { useImmerReducer } from "use-immer";
 
-import { GraphEdgeStr as GraphEdge, InputStep } from "@/api";
+import { File as ApiFile, GraphEdgeStr as GraphEdge, InputStep } from "@/api";
 
 import { GraphAction, GraphActionType, GraphContext, GraphDispatchContext, graphReducer } from "./graph-context";
 import GraphEditor from "./graph-editor";
@@ -17,9 +17,10 @@ type NodeGraphProps = {
   edges: GraphEdge[];
   edit: boolean;
   onChange?: (action: GraphAction) => void;
+  taskFiles: ApiFile[];
 };
 
-const NodeGraph: React.FC<NodeGraphProps> = ({ id, sharedUserInput, steps, edges, edit, onChange }) => {
+const NodeGraph: React.FC<NodeGraphProps> = ({ id, sharedUserInput, steps, edges, edit, onChange, taskFiles }) => {
   const [graph, dispatch] = useImmerReducer(graphReducer, {
     id,
     steps,
@@ -27,6 +28,7 @@ const NodeGraph: React.FC<NodeGraphProps> = ({ id, sharedUserInput, steps, edges
     selectedSocketId: null,
     selectedStepId: null,
     edit,
+    files: taskFiles,
   });
   useEffect(() => {
     if (!sharedUserInput) return;
@@ -46,7 +48,7 @@ const NodeGraph: React.FC<NodeGraphProps> = ({ id, sharedUserInput, steps, edges
 
   return (
     <ReactFlowProvider>
-      <GraphContext.Provider value={graph}>
+      <GraphContext.Provider value={{ ...graph, files: taskFiles }}>
         <GraphDispatchContext.Provider value={wrappedDispatch}>
           <GraphEditor graphId={id} className="h-[60vh]" />
         </GraphDispatchContext.Provider>

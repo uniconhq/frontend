@@ -9,6 +9,7 @@ import {
   PyRunFunctionStep,
   StepSocket,
 } from "@/api";
+import { File as ApiFile } from "@/api";
 import { Step } from "@/features/problems/components/tasks/types";
 import { createSocket } from "@/lib/compute-graph";
 import { uuid } from "@/lib/utils";
@@ -20,6 +21,7 @@ export type GraphState = {
   selectedStepId: string | null;
   selectedSocketId: string | null;
   edit: boolean;
+  files: ApiFile[];
 };
 
 export enum GraphActionType {

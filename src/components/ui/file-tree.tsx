@@ -28,7 +28,7 @@ type OwnProps = {
   onPathChange?: (oldPath: string, newPath: string) => void;
   onFileAdd?: () => void;
   onFolderAdd?: () => void;
-  onPathDelete: (path: string) => void;
+  onPathDelete?: (path: string) => void;
 };
 
 const DeleteContextMenu: React.FC<
@@ -63,8 +63,7 @@ export function FileTree({
         return;
       }
       if ("children" in draggedItem) {
-        const oldPath = draggedItem.path.endsWith("/") ? draggedItem.path : draggedItem.path + "/";
-        onPathChange?.(oldPath, "");
+        onPathChange?.(draggedItem.path, draggedItem.name + "/");
       } else {
         onPathChange?.(draggedItem.path, draggedItem.name);
       }
@@ -121,7 +120,7 @@ function Tree({
 }: {
   item: TreeFolder | TreeFile;
   onPathChange?: (oldPath: string, newPath: string) => void;
-  onPathDelete: (path: string) => void;
+  onPathDelete?: (path: string) => void;
 }) {
   const isItemFolder = isFolder(item);
   // for file/folder name editing
@@ -153,10 +152,20 @@ function Tree({
         if (monitor.didDrop()) {
           return;
         }
-        if (!("children" in item)) {
+        if (!isFolder(item)) {
           return;
         }
-        onPathChange?.(draggedItem.path, item.path + "/" + draggedItem.name);
+        if (draggedItem.path === item.path) {
+          return;
+        }
+
+        const oldPath = draggedItem.path;
+        if (isFolder(draggedItem) && oldPath[oldPath.length - 1] !== "/") {
+          throw new Error("Folder path should end with /, " + JSON.stringify(draggedItem));
+        }
+
+        const newPath = item.path + draggedItem.name + (isFolder(draggedItem) ? "/" : "");
+        onPathChange?.(oldPath, newPath);
       },
     }),
     [item],
@@ -180,6 +189,7 @@ function Tree({
           <span
             className="inline-block"
             contentEditable={isEditing}
+            suppressContentEditableWarning={true}
             spellCheck={false}
             onClick={() => onPathChange && setIsEditing(true)}
             onKeyDown={(e) => {
@@ -211,6 +221,7 @@ function Tree({
               <span
                 className="inline-block"
                 contentEditable={isEditing}
+                suppressContentEditableWarning={true}
                 spellCheck={false}
                 onClick={() => onPathChange && setIsEditing(true)}
                 onKeyDown={(e) => {

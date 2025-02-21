@@ -1,5 +1,6 @@
 import { Plus } from "lucide-react";
 import { useCallback, useContext } from "react";
+import { useDrop } from "react-dnd";
 
 import { InputStep, StepSocket } from "@/api";
 import { Button } from "@/components/ui/button";
@@ -11,6 +12,7 @@ import {
   SocketDir,
 } from "@/features/problems/components/tasks/graph-context";
 import { createSocket } from "@/lib/compute-graph";
+import { isFolder, TreeFile, TreeFolder } from "@/lib/files";
 
 import InputTable from "../input-table/input-table";
 import InputMetadataRow from "./input-metadata-row";
@@ -60,6 +62,32 @@ const InputMetadata: React.FC<OwnProps> = ({ step }) => {
     });
   };
 
+  const [, drop] = useDrop<TreeFile | TreeFolder>(
+    () => ({
+      accept: "File",
+      drop: (draggedItem) => {
+        // copy files to user input
+        const addFileToInputStep = (file: TreeFile | TreeFolder) => {
+          if (isFolder(file)) {
+            file.children.forEach(addFileToInputStep);
+          } else {
+            dispatch({
+              type: GraphActionType.AddSocket,
+              payload: {
+                stepId: step.id,
+                socketDir: SocketDir.Output,
+                socket: { ...createSocket("DATA", file.name), data: file },
+              },
+            });
+          }
+        };
+
+        addFileToInputStep(draggedItem);
+      },
+    }),
+    [],
+  );
+
   const addOutputSocket = useCallback(() => {
     dispatch({
       type: GraphActionType.AddSocket,
@@ -96,7 +124,7 @@ const InputMetadata: React.FC<OwnProps> = ({ step }) => {
   };
 
   return (
-    <div>
+    <div ref={drop}>
       <div className="rounded-md border">
         <Table hideOverflow>
           <TableHeader>

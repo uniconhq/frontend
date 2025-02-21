@@ -3,7 +3,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@radix-ui/r
 import { useQuery } from "@tanstack/react-query";
 import { produce } from "immer";
 import { PlusIcon, Trash, UploadIcon } from "lucide-react";
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import { SubmitHandler, useFieldArray, useForm } from "react-hook-form";
 
 import { File as ApiFile, InputStep } from "@/api";
@@ -25,9 +25,9 @@ import FileInputSection from "./programming/file-inputs-section";
 const createDefaultUserInput = () => ({
   id: uuid(),
   // TODO: make sure this is a valid file name (not already taken)
-  label: "file.py",
+  label: "user_file.py",
   data: {
-    path: "file.py",
+    path: "user_file.py",
     content: "# INSERT FILE TEMPLATE HERE",
     trusted: false,
   },
@@ -153,15 +153,15 @@ const ProgrammingForm: React.FC<OwnProps> = ({ title, initialValue, onSubmit }) 
   };
 
   // Update all testcases with the updated shared user input step
-  // useEffect(() => {
-  //   for (let i = 0; i < testcases.fields.length; i++) {
-  //     const testcase = testcases.fields[i];
-  //     testcases.update(i, {
-  //       ...testcase,
-  //       nodes: [sharedUserInputStep, ...testcase.nodes.filter((node) => node.id !== sharedUserInputStep.id)],
-  //     });
-  //   }
-  // }, [sharedUserInputStep]);
+  useEffect(() => {
+    for (let i = 0; i < testcases.fields.length; i++) {
+      const testcase = testcases.fields[i];
+      testcases.update(i, {
+        ...testcase,
+        nodes: [sharedUserInputStep, ...testcase.nodes.filter((node) => node.id !== sharedUserInputStep.id)],
+      });
+    }
+  }, [sharedUserInputStep]);
 
   const updateTestcase = (index: number) => (action: GraphAction) => {
     const testcase = form.getValues("testcases")[index];
@@ -173,6 +173,7 @@ const ProgrammingForm: React.FC<OwnProps> = ({ title, initialValue, onSubmit }) 
         selectedStepId: null,
         selectedSocketId: null,
         edit: true,
+        files: [],
       },
       (draft) => {
         graphReducer(draft, action);
@@ -359,6 +360,7 @@ const ProgrammingForm: React.FC<OwnProps> = ({ title, initialValue, onSubmit }) 
                     index={index}
                     testcase={testcase}
                     edit={true}
+                    taskFiles={form.getValues("files") || []}
                     sharedUserInput={sharedUserInputStep}
                     nodeGraphOnChange={updateTestcase(index)}
                     onDelete={testcases.remove}
