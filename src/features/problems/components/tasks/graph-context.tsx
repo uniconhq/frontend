@@ -162,6 +162,21 @@ const updateUserInputStep = (state: GraphState, { payload }: UpdateUserInputStep
   return state;
 };
 
+const sameFunctionSignature = (a: PyRunFunctionSocket[], b: PyRunFunctionSocket[]) => {
+  if (a.length !== b.length) return false;
+  return a.every((socket, index) => {
+    const other = b[index];
+    return (
+      socket.type === other.type &&
+      socket.label === other.label &&
+      socket.arg_metadata?.position === other.arg_metadata?.position &&
+      socket.arg_metadata?.arg_name === other.arg_metadata?.arg_name &&
+      // In the case where one is null and the other is undefined - consider them the same
+      ((!socket.kwarg_name && !other.kwarg_name) || socket.kwarg_name === other.kwarg_name)
+    );
+  });
+};
+
 const updatePyRunFunctionStep = (state: GraphState, { payload }: UpdatePyRunFunctionStepAction) => {
   const stepIndex = state.steps.findIndex((node) => node.id === payload.stepId);
   const step = state.steps[stepIndex] as PyRunFunctionStep;
@@ -190,13 +205,10 @@ const updatePyRunFunctionStep = (state: GraphState, { payload }: UpdatePyRunFunc
   }
 
   if (functionSignatureChanged && payload.functionSignature) {
-    // 1. Remove all edges connected to the node except the file edge.
-    const fileSocket = step.inputs.find((socket) => socket.import_as_module);
-    state.edges = state.edges.filter(
-      (edge) => edge.to_node_id !== payload.stepId || edge.to_socket_id === fileSocket?.id,
-    );
-
-    // 2. Replace the input sockets with arguments of the new function signature.
+    // If args/kwargs have changed, we need to:
+    //   1. Replace the input sockets with arguments of the new function signature.
+    //   2. Remove all edges and replace args/kwargs connected to the node except the file edge
+    // Otherwise, become a no-op.
     const functionArgs: PyRunFunctionSocket[] = payload.functionSignature.args.map((arg, index) => ({
       ...createSocket("DATA", arg.name + (arg.default ? ` (default:${arg.default})` : "")),
       id: getUuid(),
@@ -212,15 +224,27 @@ const updatePyRunFunctionStep = (state: GraphState, { payload }: UpdatePyRunFunc
       kwarg_name: kwarg.name,
     }));
 
-    state.steps[stepIndex] = {
-      ...state.steps[stepIndex],
-      inputs: [
-        { ...createSocket("CONTROL"), id: getUuid() },
-        { ...createSocket("DATA", "Module"), id: fileSocket?.id ?? getUuid(), import_as_module: true },
-        ...functionArgs,
-        ...functionKwargs,
-      ],
-    };
+    if (
+      !sameFunctionSignature(
+        step.inputs.filter((input) => !input.import_as_module && input.type !== "CONTROL"),
+        [...functionArgs, ...functionKwargs],
+      )
+    ) {
+      const fileSocket = step.inputs.find((socket) => socket.import_as_module);
+      state.edges = state.edges.filter(
+        (edge) => edge.to_node_id !== payload.stepId || edge.to_socket_id === fileSocket?.id,
+      );
+
+      state.steps[stepIndex] = {
+        ...state.steps[stepIndex],
+        inputs: [
+          { ...createSocket("CONTROL"), id: getUuid() },
+          { ...createSocket("DATA", "Module"), id: fileSocket?.id ?? getUuid(), import_as_module: true },
+          ...functionArgs,
+          ...functionKwargs,
+        ],
+      };
+    }
   }
 
   if (allowErrorChanged) {
