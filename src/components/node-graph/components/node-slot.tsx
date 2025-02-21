@@ -32,9 +32,18 @@ const DataSocketDefaultValuePopover = ({
   onValueChanged?: (newSocketData: string | boolean | number) => void;
 }) => {
   const debouncedOnValueChanged = useDebouncedCallback((value: string) => {
-    if (onValueChanged) {
-      onValueChanged(value);
+    let parsedValue: string | boolean | number = value;
+    if (value.startsWith('"') && value.endsWith('"')) {
+      parsedValue = value.slice(1, -1); // Remove the quotes
+    } else if (value.toLowerCase() === "true") {
+      parsedValue = true;
+    } else if (value.toLowerCase() === "false") {
+      parsedValue = false;
+    } else if (!isNaN(Number(value))) {
+      parsedValue = Number(value);
     }
+
+    if (onValueChanged) onValueChanged(parsedValue);
   }, 500);
 
   return (
@@ -101,7 +110,9 @@ const DataSocket = ({
                       <div className="rounded-md border border-zinc-700/50 bg-zinc-800/50 px-3 py-1">
                         <div className="flex items-center gap-2">
                           <span className="text-xs text-zinc-400">Default:</span>
-                          <span className="font-mono text-xs text-orange-400">{socketDefaultValue}</span>
+                          <span className="font-mono text-xs text-orange-400">
+                            {JSON.stringify(socketDefaultValue)}
+                          </span>
                         </div>
                       </div>
                     </div>
