@@ -86,11 +86,11 @@ const DataSocketDefaultValueDisplay = ({
         </div>
       </div>
     </div>
-  ) : (
+  ) : onValueChanged ? (
     <Button variant="ghost" size="icon" className="h-6 w-6 hover:bg-white/10">
       <PlusIcon className="h-4 w-4" />
     </Button>
-  );
+  ) : null;
 
   return onValueChanged ? (
     <DataSocketDefaultValuePopover onValueChanged={onValueChanged}>{content}</DataSocketDefaultValuePopover>
@@ -121,7 +121,7 @@ const DataSocket = ({
         socketLabel && <span className="min-h-[12px]">{socketLabel}</span>
       )}
 
-      {onEditData && type === "target" && (
+      {type === "target" && (
         <DataSocketDefaultValueDisplay
           hasDefaultValue={hasDefaultValue}
           socketDefaultValue={socketDefaultValue}
