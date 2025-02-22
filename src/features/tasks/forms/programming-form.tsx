@@ -7,6 +7,7 @@ import { useRef, useState } from "react";
 import { SubmitHandler, useFieldArray, useForm } from "react-hook-form";
 
 import { File, InputStep } from "@/api";
+import ConfirmationDialog from "@/components/confirmation-dialog";
 import { NumberField, SelectField, TextAreaField, TextField } from "@/components/form/fields";
 import FormSection from "@/components/form/form-section";
 import NodeInput from "@/components/node-graph/components/step/node-input";
@@ -322,9 +323,14 @@ const ProgrammingForm: React.FC<OwnProps> = ({ title, initialValue, onSubmit }) 
                         View/Edit
                       </Button>
                     </CollapsibleTrigger>
-                    <Button type="button" variant={"destructive"} onClick={() => userInputs.remove(index)}>
-                      <Trash />
-                    </Button>
+                    <ConfirmationDialog
+                      onConfirm={() => userInputs.remove(index)}
+                      description="Are you sure you want to delete this user file?"
+                    >
+                      <Button type="button" variant={"destructive"}>
+                        <Trash />
+                      </Button>
+                    </ConfirmationDialog>
                   </div>
                   <CollapsibleContent>
                     <div className="h-[30vh]">
