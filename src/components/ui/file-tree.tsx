@@ -18,6 +18,7 @@ import {
   SidebarMenuSub,
 } from "@/components/ui/sidebar";
 import { useToast } from "@/hooks/use-toast";
+import { DragItemType } from "@/lib/drag";
 import { cleanFilePath, FileTreeType, isFolder, TreeFile, TreeFolder } from "@/lib/files";
 import { cn } from "@/lib/utils";
 
@@ -58,7 +59,7 @@ export function FileTree({
   ...props
 }: React.ComponentProps<typeof Sidebar> & OwnProps) {
   const [, drop] = useDrop<TreeFile | TreeFolder>(() => ({
-    accept: "File",
+    accept: DragItemType.File,
     drop: (draggedItem, monitor) => {
       if (monitor.didDrop()) {
         return;
@@ -152,7 +153,7 @@ function Tree({
 
   const [{ isDragging }, drag] = useDrag(
     () => ({
-      type: "File", // todo: refactor
+      type: DragItemType.File, // todo: refactor
       item,
       collect: (monitor) => ({
         isDragging: monitor.isDragging(),
@@ -163,7 +164,7 @@ function Tree({
 
   const [, drop] = useDrop<TreeFile | TreeFolder>(
     () => ({
-      accept: "File",
+      accept: DragItemType.File,
       drop: (draggedItem, monitor) => {
         if (monitor.didDrop()) {
           return;

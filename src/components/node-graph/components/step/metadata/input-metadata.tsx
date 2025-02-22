@@ -12,6 +12,7 @@ import {
   SocketDir,
 } from "@/features/problems/components/tasks/graph-context";
 import { createSocket } from "@/lib/compute-graph";
+import { DragItemType } from "@/lib/drag";
 import { isFolder, TreeFile, TreeFolder } from "@/lib/files";
 import { isFile } from "@/lib/utils";
 
@@ -66,7 +67,7 @@ const InputMetadata: React.FC<OwnProps> = ({ step }) => {
 
   const [, drop] = useDrop<TreeFile | TreeFolder>(
     () => ({
-      accept: "File",
+      accept: DragItemType.File,
       drop: (draggedItem) => {
         // copy files to user input
         const addFileToInputStep = (treeFile: TreeFile | TreeFolder) => {
