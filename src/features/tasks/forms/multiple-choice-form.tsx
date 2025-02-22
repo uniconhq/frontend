@@ -6,6 +6,7 @@ import { SubmitHandler, useFieldArray, UseFieldArrayReturn, useForm } from "reac
 
 import { CheckboxField, ErrorAlert, TextField } from "@/components/form/fields";
 import FormSection from "@/components/form/form-section";
+import UnsavedChangesHandler from "@/components/form/unsaved-changes-handler";
 import { Button } from "@/components/ui/button";
 import { Form } from "@/components/ui/form";
 import Choices from "@/features/tasks/forms/choices";
@@ -59,6 +60,7 @@ const MultipleChoiceForm: React.FC<OwnProps> = ({ title, initialValue, onSubmit 
         <h1 className="text-2xl font-semibold">{title}</h1>
       </div>
       <Form {...form}>
+        <UnsavedChangesHandler form={form} />
         <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-4">
           <FormSection title="Task details">
             <TextField label="Question" name="title" />

@@ -14,6 +14,8 @@ import {
 type OwnProps = {
   setOpen?: (active: boolean) => void;
   onConfirm: () => void;
+  onCancel?: () => void;
+  title?: string;
   description?: string;
 };
 
@@ -21,6 +23,8 @@ const ConfirmationDialog: React.FC<OwnProps & React.PropsWithChildren> = ({
   children,
   setOpen,
   onConfirm,
+  onCancel,
+  title = "Are you absolutely sure?",
   description = "This action cannot be undone.",
 }) => {
   const openControlledByParent = setOpen !== undefined;
@@ -30,11 +34,11 @@ const ConfirmationDialog: React.FC<OwnProps & React.PropsWithChildren> = ({
       {children && <AlertDialogTrigger asChild>{children}</AlertDialogTrigger>}
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+          <AlertDialogTitle>{title}</AlertDialogTitle>
           <AlertDialogDescription>{description}</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogCancel onClick={onCancel}>Cancel</AlertDialogCancel>
           <AlertDialogAction onClick={onConfirm}>Continue</AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

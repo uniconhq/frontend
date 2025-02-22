@@ -1,6 +1,7 @@
 import { type ClassValue, clsx } from "clsx";
 import { useEffect } from "react";
 import { FieldValues, Path, PathValue, UseFormReturn, useWatch } from "react-hook-form";
+import { useBlocker } from "react-router-dom";
 import { twMerge } from "tailwind-merge";
 import { v4 as randomUUID } from "uuid";
 
@@ -47,4 +48,32 @@ export const useSyncFormFields = <T extends FieldValues, K1 extends keyof T, K2 
     // which is not very convenient
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fromValue, form.setValue, fromKey, toKey]);
+};
+
+export const useBlockUnsavedChanges = (hasUnsavedChanges: boolean) => {
+  const blocker = useBlocker(hasUnsavedChanges);
+  const blocked = blocker.state === "blocked";
+
+  useEffect(() => {
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (hasUnsavedChanges) {
+        const message = "You have unsaved changes. Are you sure you want to leave?";
+        event.returnValue = message; // For most browsers
+
+        return message; // For some older versions
+      }
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  }, [hasUnsavedChanges]);
+
+  return {
+    blocked,
+    ignoreBlock: () => blocker.proceed?.(),
+    resetBlock: () => blocker.reset?.(),
+  };
 };

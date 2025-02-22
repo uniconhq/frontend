@@ -5,6 +5,7 @@ import CheckboxField from "@/components/form/fields/checkbox-field";
 import TextField from "@/components/form/fields/text-field";
 import TextareaField from "@/components/form/fields/textarea-field";
 import FormSection from "@/components/form/form-section";
+import UnsavedChangesHandler from "@/components/form/unsaved-changes-handler";
 import { Button } from "@/components/ui/button";
 import { Form } from "@/components/ui/form";
 import { ShortAnswerFormT, ShortAnswerFormZ } from "@/lib/schema/short-answer-form";
@@ -35,6 +36,7 @@ const ShortAnswerForm: React.FC<OwnProps> = ({ title, initialValue, onSubmit }) 
         <h1 className="text-2xl font-semibold">{title}</h1>
       </div>
       <Form {...form}>
+        <UnsavedChangesHandler form={form} />
         <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-4">
           <FormSection title="Task details">
             <TextareaField label="Question" name="title" />
