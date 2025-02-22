@@ -1,9 +1,8 @@
-"use client";
-
 import { Trash } from "lucide-react";
 import * as React from "react";
 
 import { File as ApiFile, InputStep, Testcase as TestcaseApi } from "@/api";
+import ConfirmationDialog from "@/components/confirmation-dialog";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import NodeGraph from "@/features/problems/components/tasks/node-graph";
@@ -41,9 +40,14 @@ const Testcase: React.FC<TestcaseProps> = ({
           </Button>
         </CollapsibleTrigger>
         {onDelete && (
-          <Button variant="destructive" onClick={() => onDelete(index)}>
-            <Trash />
-          </Button>
+          <ConfirmationDialog
+            description="Are you sure you want to delete this testcase?"
+            onConfirm={() => onDelete(index)}
+          >
+            <Button variant="destructive">
+              <Trash />
+            </Button>
+          </ConfirmationDialog>
         )}
       </div>
       <CollapsibleContent className="space-y-4">

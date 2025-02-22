@@ -2,6 +2,7 @@ import { Trash } from "lucide-react";
 import { useContext } from "react";
 
 import { InputStep, StepSocket } from "@/api";
+import ConfirmationDialog from "@/components/confirmation-dialog";
 import { Button } from "@/components/ui/button";
 import { TableCell, TableRow } from "@/components/ui/table";
 import { GraphContext } from "@/features/problems/components/tasks/graph-context";
@@ -58,15 +59,14 @@ const InputMetadataRow: React.FC<OwnProps> = ({
           <div className="flex gap-2">
             <ViewFileButton step={step} socket={socket} />
             {isEditable && !socket.data.on_minio && (
-              <Button
-                size={"sm"}
-                className="h-fit w-fit px-1 py-1"
-                variant={"secondary"}
-                type="button"
-                onClick={onChangeToValue}
+              <ConfirmationDialog
+                onConfirm={onChangeToValue}
+                description="Are you sure you want to change this file to a primitive value?"
               >
-                Change to value
-              </Button>
+                <Button size="sm" className="h-fit w-fit px-1 py-1" variant="secondary" type="button">
+                  Change to value
+                </Button>
+              </ConfirmationDialog>
             )}
           </div>
         ) : (
@@ -77,15 +77,14 @@ const InputMetadataRow: React.FC<OwnProps> = ({
               <span>{JSON.stringify(socket.data)}</span>
             )}
             {isEditable && (
-              <Button
-                size={"sm"}
-                className="h-fit w-fit px-1 py-1"
-                variant={"secondary"}
-                type="button"
-                onClick={onChangeToFile}
+              <ConfirmationDialog
+                onConfirm={onChangeToFile}
+                description="Are you sure you want to change this value to a file?"
               >
-                Change to file
-              </Button>
+                <Button size="sm" className="h-fit w-fit px-1 py-1" variant="secondary" type="button">
+                  Change to file
+                </Button>
+              </ConfirmationDialog>
             )}
           </div>
         )}

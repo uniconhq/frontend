@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Crown, EllipsisVertical } from "lucide-react";
 
+import ConfirmationDialog from "@/components/confirmation-dialog";
 import EmptyPlaceholder from "@/components/layout/empty-placeholder";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -121,9 +122,12 @@ const OrganisationUsers = () => {
               {adminInvitationKey ? (
                 <div className="flex items-center gap-2">
                   <InvitationKeyDisplay variant="border" invitationKey={adminInvitationKey.key} />
-                  <Button variant="secondary" onClick={() => deleteKeyMutation.mutate(adminInvitationKey.id)}>
-                    Delete
-                  </Button>
+                  <ConfirmationDialog
+                    onConfirm={() => deleteKeyMutation.mutate(adminInvitationKey.id)}
+                    description="Are you sure you want to delete this invitation key?"
+                  >
+                    <Button variant="secondary">Delete</Button>
+                  </ConfirmationDialog>
                 </div>
               ) : (
                 <Button variant="ghost" onClick={() => createKeyMutation.mutate({ role: "admin" })}>
@@ -188,9 +192,14 @@ const OrganisationUsers = () => {
               {observerInvitationKey ? (
                 <div className="flex items-center gap-2">
                   <InvitationKeyDisplay variant="border" invitationKey={observerInvitationKey.key} />
-                  <Button variant="secondary" onClick={() => deleteKeyMutation.mutate(observerInvitationKey.id)}>
-                    Delete
-                  </Button>
+                  <ConfirmationDialog
+                    onConfirm={() => deleteKeyMutation.mutate(observerInvitationKey.id)}
+                    description="Are you sure you want to delete this invitation key?"
+                  >
+                    <Button variant="secondary" onClick={() => deleteKeyMutation.mutate(observerInvitationKey.id)}>
+                      Delete
+                    </Button>
+                  </ConfirmationDialog>
                 </div>
               ) : (
                 <Button variant="ghost" onClick={() => createKeyMutation.mutate({ role: "observer" })}>

@@ -7,7 +7,7 @@ import { File, InputStep, PyRunFunctionStep } from "@/api";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   GraphActionType,
   GraphContext,
@@ -106,16 +106,14 @@ const PyRunMetadata: React.FC<OwnProps> = ({ step }) => {
           </SelectContent>
         </Select>
         {isFunctionMissing && (
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <TriangleAlert className="h-4 w-4 text-yellow-500" />
-              </TooltipTrigger>
-              <TooltipContent className="flex items-center gap-2">
-                <TriangleAlert className="h-4 w-4 text-yellow-600" /> Function not found. Please check the file.
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <TriangleAlert className="h-4 w-4 text-yellow-500" />
+            </TooltipTrigger>
+            <TooltipContent className="flex items-center gap-2">
+              <TriangleAlert className="h-4 w-4 text-yellow-600" /> Function not found. Please check the file.
+            </TooltipContent>
+          </Tooltip>
         )}
         <Button
           size="sm"

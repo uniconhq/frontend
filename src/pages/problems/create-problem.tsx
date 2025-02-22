@@ -6,6 +6,7 @@ import { z } from "zod";
 
 import ErrorAlert from "@/components/form/fields/error-alert";
 import TextareaField from "@/components/form/fields/textarea-field";
+import UnsavedChangesHandler from "@/components/form/unsaved-changes-handler";
 import { Button } from "@/components/ui/button";
 import { Form } from "@/components/ui/form";
 import { useCreateProblem } from "@/features/problems/queries";
@@ -63,6 +64,7 @@ const CreateProblem = () => {
         <h1 className="text-2xl font-semibold">Create new contest</h1>
       </div>
       {error && <ErrorAlert message={error} />}
+      <UnsavedChangesHandler form={form} />
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)}>
           <TextareaField label="Contest definition" name="definition" rows={20} />

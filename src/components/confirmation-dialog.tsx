@@ -1,3 +1,5 @@
+import { AlertDialogTrigger } from "@radix-ui/react-alert-dialog";
+
 import {
   AlertDialog,
   AlertDialogAction,
@@ -10,25 +12,33 @@ import {
 } from "@/components/ui/alert-dialog";
 
 type OwnProps = {
-  setOpen: (active: boolean) => void;
+  setOpen?: (active: boolean) => void;
   onConfirm: () => void;
+  onCancel?: () => void;
+  title?: string;
   description?: string;
 };
 
-const ConfirmationDialog: React.FC<OwnProps> = ({
+const ConfirmationDialog: React.FC<OwnProps & React.PropsWithChildren> = ({
+  children,
   setOpen,
   onConfirm,
+  onCancel,
+  title = "Are you absolutely sure?",
   description = "This action cannot be undone.",
 }) => {
+  const openControlledByParent = setOpen !== undefined;
+  const openProps = openControlledByParent ? { open: true, onOpenChange: setOpen } : {};
   return (
-    <AlertDialog open onOpenChange={setOpen}>
+    <AlertDialog {...openProps}>
+      {children && <AlertDialogTrigger asChild>{children}</AlertDialogTrigger>}
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+          <AlertDialogTitle>{title}</AlertDialogTitle>
           <AlertDialogDescription>{description}</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogCancel onClick={onCancel}>Cancel</AlertDialogCancel>
           <AlertDialogAction onClick={onConfirm}>Continue</AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
