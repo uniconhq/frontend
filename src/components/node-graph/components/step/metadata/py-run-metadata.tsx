@@ -89,7 +89,7 @@ const PyRunMetadata: React.FC<OwnProps> = ({ step, editable }) => {
             onChange(newFunctionIdentifier);
           }}
         >
-          <SelectTrigger className="bor h-8 min-w-[120px] text-xs">
+          <SelectTrigger className="h-8 min-w-[120px] text-xs">
             <SelectValue placeholder="Select a function" className="p-2" />
           </SelectTrigger>
           <SelectContent>
