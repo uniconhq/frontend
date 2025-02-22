@@ -6,6 +6,7 @@ import FormSection from "@/components/form/form-section";
 import FileInputButton from "@/components/form/inputs/file-input-button";
 import { FileTree } from "@/components/ui/file-tree";
 import FileEditor from "@/features/problems/components/tasks/file-editor";
+import { useToast } from "@/hooks/use-toast";
 import { cleanFilePath, convertFilesToFileTree } from "@/lib/files";
 import { FileT, ProgTaskFormT } from "@/lib/schema/prog-task-form";
 import { uuid } from "@/lib/utils";
@@ -34,8 +35,17 @@ const movePath = (filePath: string, oldPath: string, newPath: string) => {
 const FileInputSection = () => {
   const form = useFormContext<ProgTaskFormT>();
 
+  const toast = useToast();
   const handleUploadFile = (file: File) => {
     const filePath = cleanFilePath(file.webkitRelativePath || file.name);
+    // If filePath already exists, reject the upload.
+    if (form.getValues("files").some((file) => file.path === filePath)) {
+      toast.toast({
+        title: "Upload Failed",
+        description: `The file ${filePath} already exists. Please rename it and try again.`,
+      });
+      return;
+    }
     // If file is a text file, extract text content to File format for socket.
     if (file.type.startsWith("text") || file.type === "" || file.type === "application/json") {
       const reader = new FileReader();
