@@ -51,7 +51,7 @@ const FileEditor: React.FC<OwnProps> = ({
           <span className="px-1 text-xs">{displayFileName}</span>
         )}
         {onDeselectFile && (
-          <Button className="h-fit p-1" variant={"ghost"} onClick={onDeselectFile}>
+          <Button className="h-fit p-1" variant="ghost" onClick={onDeselectFile}>
             <X />
           </Button>
         )}

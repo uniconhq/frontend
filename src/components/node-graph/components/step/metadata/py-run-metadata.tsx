@@ -1,27 +1,23 @@
 import { useQuery } from "@tanstack/react-query";
 import { useNodeConnections, useNodesData } from "@xyflow/react";
-import { RefreshCcw, TriangleAlert } from "lucide-react";
+import { ParenthesesIcon, RefreshCcw, TriangleAlert } from "lucide-react";
 import { useContext, useState } from "react";
 
 import { File, InputStep, PyRunFunctionStep } from "@/api";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import {
-  GraphActionType,
-  GraphContext,
-  GraphDispatchContext,
-} from "@/features/problems/components/tasks/graph-context";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { GraphActionType, GraphDispatchContext } from "@/features/problems/components/tasks/graph-context";
 import { getFunctions } from "@/features/problems/queries";
 import { isFile, uuid } from "@/lib/utils";
 
 type OwnProps = {
   step: PyRunFunctionStep;
+  editable: boolean;
 };
 
-const PyRunMetadata: React.FC<OwnProps> = ({ step }) => {
-  const { edit } = useContext(GraphContext)!;
+const PyRunMetadata: React.FC<OwnProps> = ({ step, editable }) => {
   const dispatch = useContext(GraphDispatchContext)!;
 
   const [functionIdentifier, setFunctionIdentifier] = useState(step.function_identifier);
@@ -82,10 +78,10 @@ const PyRunMetadata: React.FC<OwnProps> = ({ step }) => {
   const isFunctionMissing =
     functionIdentifier && !functionSignatures?.filter((signature) => signature.name === functionIdentifier).length;
 
-  return edit ? (
-    <>
+  return editable ? (
+    <div className="flex flex-col gap-2 border-b-2 border-zinc-800 px-3 pb-4 font-mono">
       <div className="flex items-center gap-2">
-        function_identifier:
+        <label className="text-nowrap font-mono text-sm text-zinc-400">Function Identifier:</label>
         <Select
           value={functionIdentifier}
           onValueChange={(newFunctionIdentifier) => {
@@ -93,8 +89,8 @@ const PyRunMetadata: React.FC<OwnProps> = ({ step }) => {
             onChange(newFunctionIdentifier);
           }}
         >
-          <SelectTrigger className="w-fit">
-            <SelectValue placeholder="Select a function" />
+          <SelectTrigger className="h-8 min-w-[120px] text-xs">
+            <SelectValue placeholder="Select a function" className="p-2" />
           </SelectTrigger>
           <SelectContent>
             {functionSignatures?.map((signature) => (
@@ -105,36 +101,57 @@ const PyRunMetadata: React.FC<OwnProps> = ({ step }) => {
             {isFunctionMissing && <SelectItem value={functionIdentifier}>{functionIdentifier}</SelectItem>}
           </SelectContent>
         </Select>
-        {isFunctionMissing && (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <TriangleAlert className="h-4 w-4 text-yellow-500" />
-            </TooltipTrigger>
-            <TooltipContent className="flex items-center gap-2">
-              <TriangleAlert className="h-4 w-4 text-yellow-600" /> Function not found. Please check the file.
-            </TooltipContent>
-          </Tooltip>
-        )}
-        <Button
-          size="sm"
-          variant="secondary"
-          type="button"
-          onClick={() => {
-            onChange(functionIdentifier);
-          }}
-        >
-          <RefreshCcw />
-        </Button>
+        <div className="flex items-center gap-1">
+          {isFunctionMissing && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <TriangleAlert className="h-4 w-4 text-yellow-500" />
+                </TooltipTrigger>
+                <TooltipContent className="flex items-center gap-2">
+                  <TriangleAlert className="h-4 w-4 text-yellow-600" /> Function not found. Please check the file.
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
+          <Button
+            size="icon"
+            variant="ghost"
+            type="button"
+            onClick={() => {
+              onChange(functionIdentifier);
+            }}
+          >
+            <RefreshCcw />
+          </Button>
+        </div>
       </div>
-      <div className="flex items-center gap-2">
-        allow_error:
-        <Checkbox className="inline bg-transparent text-xs" checked={allowError} onCheckedChange={onAllowErrorChange} />
+      <div className="flex items-center gap-4">
+        <label className="font-mono text-sm text-zinc-400">Propagate Error:</label>
+        <Checkbox
+          className="inline h-5 w-5 border-zinc-400 bg-transparent text-xs"
+          checked={allowError}
+          onCheckedChange={onAllowErrorChange}
+        />
       </div>
-    </>
+    </div>
   ) : (
-    <div className="flex flex-col items-center gap-1">
-      <div>{(step as PyRunFunctionStep).function_identifier}(...)</div>
-      <div>allow_error: {JSON.stringify((step as PyRunFunctionStep).allow_error)}</div>
+    <div className="min-w-[280px] px-2">
+      <div className="flex items-center gap-3">
+        <ParenthesesIcon size={20} className="text-zinc-400" />
+        <div className="flex flex-col">
+          <span className="text-xs text-zinc-400">Function Identifier</span>
+          <span className="font-mono font-medium text-white">{(step as PyRunFunctionStep).function_identifier}</span>
+        </div>
+      </div>
+      <div className="pt-3">
+        <div className="flex items-center justify-between rounded-lg border border-zinc-800/50 bg-zinc-900/30 p-2">
+          <span className="font-mono text-xs text-zinc-400">Propagate Error</span>
+          <span className="rounded-md bg-zinc-900 px-2 py-1 font-mono text-xs text-zinc-300">
+            {JSON.stringify((step as PyRunFunctionStep).allow_error)}
+          </span>
+        </div>
+      </div>
     </div>
   );
 };
