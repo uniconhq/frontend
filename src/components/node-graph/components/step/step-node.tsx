@@ -71,10 +71,12 @@ export function StepNode({ data }: { data: Step }) {
   const dispatch = useContext(GraphDispatchContext)!;
 
   const editable = inEditMode && ("is_user" in data ? !data.is_user : true);
+
+  // `PyRunFunctionStep` is a special case where we don't allow the same level of socket editing
+  // as the other steps. This is because the step has its own mechanism to determine the number of
+  // inputs and outputs, along with the labels for each socket.
   const _isPyRunFunc = data.type === "PY_RUN_FUNCTION_STEP";
   const editableLabel = editable && !_isPyRunFunc;
-  // `PyRunFunctionStep` is a special case where we don't allow adding or removing of the sockets
-  // since the step has its own mechanism to determine the number of inputs and outputs
   const canAddSockets = editable && !_isPyRunFunc;
   const canDeleteSockets = editable && !_isPyRunFunc;
 
@@ -126,14 +128,11 @@ export function StepNode({ data }: { data: Step }) {
 
   return (
     <div className="rounded-b-lg bg-[#141414]">
-      {/* Node header */}
       <NodeHeader type={data.type} edit={inEditMode} deleteStep={deleteStep} />
-      <div className="flex min-w-52 flex-col gap-2 rounded-b-lg border-x-2 border-b-2 pb-2">
-        {/* Node metadata */}
-        <StepMetadata step={data} />
-        {/* Node body */}
+      <div className="flex min-w-52 flex-col gap-2 rounded-b-lg border-x-2 border-b-2 py-3">
+        <StepMetadata step={data} editable={editable} />
         {!socketsInMetadata && (
-          <div className="pt-1 font-mono text-xs">
+          <div className="font-mono text-xs">
             <div className="flex flex-row justify-between gap-8">
               <NodeSlotGroup>
                 {[...(data.inputs ?? [])]

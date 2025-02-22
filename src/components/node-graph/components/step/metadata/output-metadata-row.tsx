@@ -127,11 +127,7 @@ const OutputMetadataRow: React.FC<OwnProps> = ({
         <Checkbox
           className="rounded-sm border border-gray-500/50"
           checked={socket.public || false}
-          onCheckedChange={() => {
-            onUpdateSocketMetadata({
-              public: !socket.public,
-            });
-          }}
+          onCheckedChange={() => onUpdateSocketMetadata({ public: !socket.public })}
           disabled={!isEditable}
         ></Checkbox>
       </TableCell>

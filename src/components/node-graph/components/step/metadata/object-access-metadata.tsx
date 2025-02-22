@@ -2,25 +2,20 @@ import { KeyRoundIcon } from "lucide-react";
 import { useContext } from "react";
 
 import { ObjectAccessStep } from "@/api";
-import {
-  GraphActionType,
-  GraphContext,
-  GraphDispatchContext,
-} from "@/features/problems/components/tasks/graph-context";
-
-import NodeInput from "../node-input";
+import NodeInput from "@/components/node-graph/components/step/node-input";
+import { GraphActionType, GraphDispatchContext } from "@/features/problems/components/tasks/graph-context";
 
 type OwnProps = {
   step: ObjectAccessStep;
+  editable: boolean;
 };
 
-const ObjectAccessMetadata: React.FC<OwnProps> = ({ step }) => {
-  const { edit } = useContext(GraphContext)!;
+const ObjectAccessMetadata: React.FC<OwnProps> = ({ step, editable }) => {
   const dispatch = useContext(GraphDispatchContext)!;
 
   return (
-    <div className="border-b-2 border-zinc-800 px-2 pb-3 pt-2">
-      {edit ? (
+    <div className="border-b-2 border-zinc-800 px-2 pb-3">
+      {editable ? (
         <div className="flex items-center gap-2">
           <label className="text-nowrap font-mono text-sm text-zinc-400">Key:</label>
           <NodeInput

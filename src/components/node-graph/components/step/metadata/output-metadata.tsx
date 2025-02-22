@@ -1,15 +1,10 @@
-import { Plus } from "lucide-react";
+import { PlusIcon } from "lucide-react";
 import { useCallback, useContext } from "react";
 
 import { OutputSocket, OutputStep } from "@/api";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import {
-  GraphActionType,
-  GraphContext,
-  GraphDispatchContext,
-  SocketDir,
-} from "@/features/problems/components/tasks/graph-context";
+import { GraphActionType, GraphDispatchContext, SocketDir } from "@/features/problems/components/tasks/graph-context";
 import { createSocket } from "@/lib/compute-graph";
 
 import OutputTable from "../output-table/output-table";
@@ -17,10 +12,10 @@ import OutputMetadataRow from "./output-metadata-row";
 
 type OwnProps = {
   step: OutputStep;
+  editable: boolean;
 };
 
-const OutputMetadata: React.FC<OwnProps> = ({ step }) => {
-  const { edit } = useContext(GraphContext)!;
+const OutputMetadata: React.FC<OwnProps> = ({ step, editable }) => {
   const dispatch = useContext(GraphDispatchContext)!;
 
   const updateSocketMetadata = (metadataIndex: number) => (newMetadata: Partial<OutputSocket>) => {
@@ -59,52 +54,48 @@ const OutputMetadata: React.FC<OwnProps> = ({ step }) => {
     [dispatch, step],
   );
 
-  if (!edit) {
-    return (
-      <div className="px-2 pt-2">
-        <OutputTable data={step.inputs} />
-      </div>
-    );
-  }
+  const editableOutputTable = (
+    <Table hideOverflow>
+      <TableHeader>
+        <TableRow>
+          {/* Socket */}
+          <TableHead></TableHead>
+          <TableHead>Label</TableHead>
+          <TableHead>Expected</TableHead>
+          <TableHead>Public</TableHead>
+          {/* Delete Button */}
+          <TableHead></TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {step.inputs.map((socket, index) => (
+          <OutputMetadataRow
+            key={socket.id}
+            socket={socket}
+            onUpdateSocketMetadata={updateSocketMetadata(index)}
+            onEditSocketLabel={handleEditSocketLabel(socket.id)}
+            onDeleteSocket={deleteSocket(socket.id)}
+            isEditable={socket.type != "CONTROL"}
+          />
+        ))}
+      </TableBody>
+    </Table>
+  );
 
   return (
-    <div className="px-2 pt-2">
-      <div className="rounded-md">
-        <Table hideOverflow>
-          <TableHeader>
-            <TableRow>
-              {/* Socket */}
-              <TableHead></TableHead>
-              <TableHead>Label</TableHead>
-              <TableHead>Expected</TableHead>
-              <TableHead>Public</TableHead>
-              {/* Delete Button */}
-              <TableHead></TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {step.inputs.map((socket, index) => (
-              <OutputMetadataRow
-                key={socket.id}
-                socket={socket}
-                onUpdateSocketMetadata={updateSocketMetadata(index)}
-                onEditSocketLabel={handleEditSocketLabel(socket.id)}
-                onDeleteSocket={deleteSocket(socket.id)}
-                isEditable={socket.type != "CONTROL"}
-              />
-            ))}
-          </TableBody>
-        </Table>
-      </div>
-      <Button
-        size={"sm"}
-        className="mt-3 h-fit w-fit px-1 py-1"
-        variant="secondary"
-        onClick={addInputSocket}
-        type="button"
-      >
-        <Plus className="h-2 w-2" />
-      </Button>
+    <div className="flex flex-col gap-2 px-2">
+      {editable ? editableOutputTable : <OutputTable data={step.inputs} />}
+      {editable && (
+        <Button
+          size={"sm"}
+          className="h-fit w-fit px-1 py-1"
+          variant="secondary"
+          onClick={addInputSocket}
+          type="button"
+        >
+          <PlusIcon />
+        </Button>
+      )}
     </div>
   );
 };

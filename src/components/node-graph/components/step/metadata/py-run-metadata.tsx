@@ -8,20 +8,16 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import {
-  GraphActionType,
-  GraphContext,
-  GraphDispatchContext,
-} from "@/features/problems/components/tasks/graph-context";
+import { GraphActionType, GraphDispatchContext } from "@/features/problems/components/tasks/graph-context";
 import { getFunctions } from "@/features/problems/queries";
 import { isFile, uuid } from "@/lib/utils";
 
 type OwnProps = {
   step: PyRunFunctionStep;
+  editable: boolean;
 };
 
-const PyRunMetadata: React.FC<OwnProps> = ({ step }) => {
-  const { edit } = useContext(GraphContext)!;
+const PyRunMetadata: React.FC<OwnProps> = ({ step, editable }) => {
   const dispatch = useContext(GraphDispatchContext)!;
 
   const [functionIdentifier, setFunctionIdentifier] = useState(step.function_identifier);
@@ -82,8 +78,8 @@ const PyRunMetadata: React.FC<OwnProps> = ({ step }) => {
   const isFunctionMissing =
     functionIdentifier && !functionSignatures?.filter((signature) => signature.name === functionIdentifier).length;
 
-  return edit ? (
-    <div className="flex flex-col gap-2 border-b-2 border-zinc-800 px-3 pb-4 pt-2 font-mono">
+  return editable ? (
+    <div className="flex flex-col gap-2 border-b-2 border-zinc-800 px-3 pb-4 font-mono">
       <div className="flex items-center gap-2">
         <label className="text-nowrap font-mono text-sm text-zinc-400">Function Identifier:</label>
         <Select
@@ -140,7 +136,7 @@ const PyRunMetadata: React.FC<OwnProps> = ({ step }) => {
       </div>
     </div>
   ) : (
-    <div className="min-w-[280px] px-2 pt-3">
+    <div className="min-w-[280px] px-2">
       <div className="flex items-center gap-3">
         <ParenthesesIcon size={20} className="text-zinc-400" />
         <div className="flex flex-col">
