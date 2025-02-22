@@ -26,7 +26,7 @@ const OutputMetadata: React.FC<OwnProps> = ({ step, editable }) => {
       type: GraphActionType.UpdateSocketMetadata,
       payload: {
         stepId: step.id,
-        socketId: step.inputs[metadataIndex].id,
+        socketId: sockets[metadataIndex].id,
         socketMetadata: newMetadataWithoutId,
       },
     });
