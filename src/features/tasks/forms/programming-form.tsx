@@ -18,7 +18,7 @@ import { GraphAction, graphReducer } from "@/features/problems/components/tasks/
 import Testcase from "@/features/problems/components/tasks/testcase";
 import { getSupportedPythonVersions } from "@/features/problems/queries";
 import { DEFAULT_PY_VERSION, ProgTaskFormT, ProgTaskFormZ } from "@/lib/schema/prog-task-form";
-import { isFile, useSyncFormFields, uuid } from "@/lib/utils";
+import { isFile, useSyncFormFieldsMultiple, uuid } from "@/lib/utils";
 
 import FileInputSection from "./programming/file-inputs-section";
 
@@ -105,43 +105,41 @@ const ProgrammingForm: React.FC<OwnProps> = ({ title, initialValue, onSubmit }) 
     outputs: form.getValues("required_user_inputs"),
   });
 
-  useSyncFormFields({
+  useSyncFormFieldsMultiple({
     form,
-    fromKey: "required_user_inputs",
+    fromKeys: ["required_user_inputs", "files"],
     toKey: "testcases",
-    merge: (fromValue, toValue) => {
-      // Shared user input step for all testcases
-      const newSharedUserInputStep: InputStep = {
-        ...DEFAULT_USER_INPUT_STEP,
-        outputs: fromValue,
-      };
-      const testcases = toValue.map((testcase) => ({
-        ...testcase,
-        nodes: [newSharedUserInputStep, ...testcase.nodes.filter((node) => node.id !== sharedUserInputStep.id)],
-      }));
-      setSharedInputStep(newSharedUserInputStep);
-      return testcases;
-    },
-  });
-
-  useSyncFormFields({
-    form,
-    fromKey: "files",
-    toKey: "testcases",
-    merge: (fromValue, toValue) => {
-      const idToFile: Record<string, ApiFile> = fromValue.reduce((acc, file) => ({ ...acc, [file.id]: file }), {});
-      const testcases = toValue.map((testcase) => ({
-        ...testcase,
-        nodes: testcase.nodes.map((node) => {
-          if (node.type !== "INPUT_STEP") return node;
-          const outputs = (node as InputStep).outputs.map((output) =>
-            isFile(output.data) && output.data.id in idToFile ? { ...output, data: idToFile[output.data.id] } : output,
-          );
-          return { ...node, outputs };
-        }),
-      }));
-      return testcases;
-    },
+    merges: [
+      (fromValue, toValue) => {
+        // Shared user input step for all testcases
+        const newSharedUserInputStep: InputStep = {
+          ...DEFAULT_USER_INPUT_STEP,
+          outputs: fromValue,
+        };
+        const testcases = toValue.map((testcase) => ({
+          ...testcase,
+          nodes: [newSharedUserInputStep, ...testcase.nodes.filter((node) => node.id !== sharedUserInputStep.id)],
+        }));
+        setSharedInputStep(newSharedUserInputStep);
+        return testcases;
+      },
+      (fromValue, toValue) => {
+        const idToFile: Record<string, ApiFile> = fromValue.reduce((acc, file) => ({ ...acc, [file.id]: file }), {});
+        const testcases = toValue.map((testcase) => ({
+          ...testcase,
+          nodes: testcase.nodes.map((node) => {
+            if (node.type !== "INPUT_STEP") return node;
+            const outputs = (node as InputStep).outputs.map((output) =>
+              isFile(output.data) && output.data.id in idToFile
+                ? { ...output, data: idToFile[output.data.id] }
+                : output,
+            );
+            return { ...node, outputs };
+          }),
+        }));
+        return testcases;
+      },
+    ],
   });
 
   const addTestcase = () =>

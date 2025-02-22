@@ -24,6 +24,8 @@ const RequiredInputZ = z.object({
   data: z.union([z.string(), z.number(), z.boolean(), FileZ]),
 });
 
+export type RequiredInputT = z.infer<typeof RequiredInputZ>;
+
 const SlurmOptionZ = z
   .string()
   .nonempty("Slurm option cannot be empty!")

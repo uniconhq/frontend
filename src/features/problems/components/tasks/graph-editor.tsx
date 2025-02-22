@@ -212,8 +212,23 @@ const GraphEditor: React.FC<GraphEditorProps> = ({ graphId, className }) => {
     content: file.content,
     isBinary: !!file.on_minio,
     downloadUrl: "",
-    onClick: () => {},
-    highlighted: false,
+    onClick: () => {
+      // Figure out if this file is in the graph. If yes, select it.
+      const step = steps.find((step) =>
+        step.outputs?.find((socket) => isFile(socket.data) && socket.data?.id === file.id),
+      );
+      const socket = step?.outputs?.find((socket) => isFile(socket.data) && socket.data?.id === file.id);
+      if (step && socket) {
+        dispatch({
+          type: GraphActionType.SelectSocket,
+          payload: {
+            stepId: step.id,
+            socketId: socket.id,
+          },
+        });
+      }
+    },
+    highlighted: isFile(selectedSocket?.data) && selectedSocket?.data.id === file.id,
   }));
 
   const [showFileTree, setShowFileTree] = useState(true);
