@@ -38,7 +38,6 @@ const EditProjectGroup = () => {
 
   const [usersInGroup, setUsersInGroup] = useState([] as MiniGroupMemberPublic[]);
   const [hideUsersInOtherGroups, setHideUsersInOtherGroups] = useState(true);
-  const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
 
   useEffect(() => {
     if (group && group.members) {
@@ -88,25 +87,23 @@ const EditProjectGroup = () => {
           )}
 
           {project.delete_groups && (
-            <Button variant={"destructive"} onClick={() => setOpenDeleteDialog(true)}>
-              <TrashIcon />
-            </Button>
+            <ConfirmationDialog
+              description={`This will delete the group '${group.name}'and cannot be undone.`}
+              onConfirm={() => {
+                deleteGroupMutation.mutate(undefined, {
+                  onSuccess: () => {
+                    navigate(`/projects/${projectId}/groups`);
+                  },
+                });
+              }}
+            >
+              <Button variant={"destructive"}>
+                <TrashIcon />
+              </Button>
+            </ConfirmationDialog>
           )}
         </div>
       </div>
-      {project.delete_groups && openDeleteDialog && (
-        <ConfirmationDialog
-          setOpen={setOpenDeleteDialog}
-          onConfirm={() => {
-            deleteGroupMutation.mutate(undefined, {
-              onSuccess: () => {
-                navigate(`/projects/${projectId}/groups`);
-              },
-            });
-          }}
-          description={`This will delete the group '${group.name}' and cannot be undone.`}
-        />
-      )}
       <div className="grid grid-cols-2 gap-4">
         <div>
           <h3 className="text-xl font-[450]">Users that can be added</h3>

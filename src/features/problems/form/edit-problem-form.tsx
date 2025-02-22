@@ -6,6 +6,7 @@ import { z } from "zod";
 import { Problem } from "@/api";
 import { DateTimeField, RadioBooleanField, TextAreaField, TextField } from "@/components/form/fields";
 import ErrorAlert from "@/components/form/fields/error-alert";
+import UnsavedChangesHandler from "@/components/form/unsaved-changes-handler";
 import { Button } from "@/components/ui/button";
 import { Form } from "@/components/ui/form";
 import { useProjectId } from "@/features/projects/hooks/use-id";
@@ -100,6 +101,7 @@ const EditProblemForm: React.FC<OwnProps> = ({ id, problem }) => {
               title: "Problem updated",
               description: `"${problem.name}" has been updated successfully.`,
             });
+            form.reset(data);
           }
         },
       },
@@ -108,6 +110,7 @@ const EditProblemForm: React.FC<OwnProps> = ({ id, problem }) => {
 
   return (
     <Form {...form}>
+      <UnsavedChangesHandler form={form} />
       <form onSubmit={form.handleSubmit(onSubmit)}>
         <div className="flex w-full flex-col gap-8 px-8 py-6">
           <div className="flex items-center justify-between">

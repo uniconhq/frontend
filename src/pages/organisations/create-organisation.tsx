@@ -7,6 +7,7 @@ import { z } from "zod";
 import ErrorAlert from "@/components/form/fields/error-alert";
 import TextField from "@/components/form/fields/text-field";
 import TextareaField from "@/components/form/fields/textarea-field";
+import UnsavedChangesHandler from "@/components/form/unsaved-changes-handler";
 import { Button } from "@/components/ui/button";
 import { Form } from "@/components/ui/form";
 import { useCreateOrganisation } from "@/features/organisations/queries";
@@ -40,6 +41,7 @@ const CreateOrganisation = () => {
         setError(error.message);
       },
       onSuccess: (response) => {
+        form.reset();
         navigate(`/organisations/${response.data?.id}`);
       },
     });
@@ -51,6 +53,7 @@ const CreateOrganisation = () => {
         <h1 className="text-2xl font-semibold">Create new organisation</h1>
       </div>
       {error && <ErrorAlert message={error} />}
+      <UnsavedChangesHandler form={form} />
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-6">
           <TextField name="name" label="Name" />

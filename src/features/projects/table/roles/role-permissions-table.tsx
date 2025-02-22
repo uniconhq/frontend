@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 
 import { RolePublicWithInvitationKeys } from "@/api";
+import UnsavedChangesHandler from "@/components/form/unsaved-changes-handler";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -58,8 +59,14 @@ const RolePermissionsTable: React.FC<OwnProps> = ({ data, projectId }) => {
     return;
   }
 
+  const isDirty = roles.some((role, index) => {
+    const originalRole = data[index];
+    return keys.some((key) => role[key] !== originalRole[key]);
+  });
+
   return (
     <div className="flex flex-col items-start gap-4">
+      <UnsavedChangesHandler isDirty={isDirty} />
       <Table className="rounded-md border">
         <TableHeader>
           <TableRow>

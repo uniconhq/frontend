@@ -1,6 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
 import { ArrowRight, Edit, Plus, Trash } from "lucide-react";
-import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
 import ConfirmationDialog from "@/components/confirmation-dialog";
@@ -14,7 +13,6 @@ import { useOrganisationId } from "@/features/projects/hooks/use-id";
 const Organisation = () => {
   const id = useOrganisationId();
   const { data: organisation, isLoading } = useQuery(getOrganisationById(id));
-  const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
   const deleteOrganisationMutation = useDeleteOrganisation(id);
   const navigate = useNavigate();
 
@@ -40,25 +38,23 @@ const Organisation = () => {
             </Button>
           </EditOrganisationDialog>
           {organisation.delete && (
-            <Button variant="destructive" onClick={() => setOpenDeleteDialog(true)}>
-              <Trash />
-            </Button>
+            <ConfirmationDialog
+              onConfirm={() => {
+                deleteOrganisationMutation.mutate(undefined, {
+                  onSuccess: () => {
+                    navigate(`/organisations`);
+                  },
+                });
+              }}
+              description="This will delete the organisation and all its projects. This action cannot be undone."
+            >
+              <Button variant="destructive">
+                <Trash />
+              </Button>
+            </ConfirmationDialog>
           )}
         </div>
       </div>
-      {organisation.delete && openDeleteDialog && (
-        <ConfirmationDialog
-          setOpen={setOpenDeleteDialog}
-          onConfirm={() => {
-            deleteOrganisationMutation.mutate(undefined, {
-              onSuccess: () => {
-                navigate(`/organisations`);
-              },
-            });
-          }}
-          description={`This will permanently delete the organization '${organisation.name}' and all its projects, including problems and submissions.`}
-        />
-      )}
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-semibold">Projects</h2>
         <Link to={`/organisations/${id}/projects/new`} className="flex gap-1">

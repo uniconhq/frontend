@@ -7,8 +7,10 @@ import { useRef, useState } from "react";
 import { SubmitHandler, useFieldArray, useForm } from "react-hook-form";
 
 import { File, InputStep } from "@/api";
+import ConfirmationDialog from "@/components/confirmation-dialog";
 import { NumberField, SelectField, TextAreaField, TextField } from "@/components/form/fields";
 import FormSection from "@/components/form/form-section";
+import UnsavedChangesHandler from "@/components/form/unsaved-changes-handler";
 import NodeInput from "@/components/node-graph/components/step/node-input";
 import { Button } from "@/components/ui/button";
 import { Form, FormLabel } from "@/components/ui/form";
@@ -195,6 +197,7 @@ const ProgrammingForm: React.FC<OwnProps> = ({ title, initialValue, onSubmit }) 
         <h1 className="text-2xl font-semibold">{title}</h1>
       </div>
       <Form {...form}>
+        <UnsavedChangesHandler form={form} />
         <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-8">
           <FormSection title="Title">
             <TextField name="title" className="w-1/3" />
@@ -322,9 +325,14 @@ const ProgrammingForm: React.FC<OwnProps> = ({ title, initialValue, onSubmit }) 
                         View/Edit
                       </Button>
                     </CollapsibleTrigger>
-                    <Button type="button" variant={"destructive"} onClick={() => userInputs.remove(index)}>
-                      <Trash />
-                    </Button>
+                    <ConfirmationDialog
+                      onConfirm={() => userInputs.remove(index)}
+                      description="Are you sure you want to delete this user file?"
+                    >
+                      <Button type="button" variant={"destructive"}>
+                        <Trash />
+                      </Button>
+                    </ConfirmationDialog>
                   </div>
                   <CollapsibleContent>
                     <div className="h-[30vh]">

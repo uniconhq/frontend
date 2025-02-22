@@ -3,7 +3,7 @@ import { Info, PencilIcon, ScanIcon } from "lucide-react";
 import { Link } from "react-router-dom";
 
 import { ProblemBaseWithPermissions } from "@/api";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { DraftBadge, RestrictedBadge } from "@/features/problems/components/badges";
 import { cn } from "@/lib/utils";
 import { formatDateShort } from "@/utils/date";
@@ -29,16 +29,14 @@ export const columns: ColumnDef<ProblemBaseWithPermissions>[] = [
         <div className="flex items-center gap-2">
           <span className={cn(!isOpen && "font-bold")}>{formatDateShort(row.original.started_at)}</span>
           {!isOpen && (
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Info className="h-4 w-4 cursor-pointer" />
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>This problem is not available yet.</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Info className="h-4 w-4 cursor-pointer" />
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>This problem is not available yet.</p>
+              </TooltipContent>
+            </Tooltip>
           )}
         </div>
       );

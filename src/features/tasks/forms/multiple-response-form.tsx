@@ -5,6 +5,7 @@ import { SubmitHandler, useFieldArray, UseFieldArrayReturn, useForm } from "reac
 
 import { CheckboxField, ErrorAlert, TextAreaField } from "@/components/form/fields";
 import FormSection from "@/components/form/form-section";
+import UnsavedChangesHandler from "@/components/form/unsaved-changes-handler";
 import { Button } from "@/components/ui/button";
 import { Form } from "@/components/ui/form";
 import Choices from "@/features/tasks/forms/choices";
@@ -67,6 +68,7 @@ const MultipleResponseForm: React.FC<OwnProps> = ({ initialValue, onSubmit }) =>
         <h1 className="text-2xl font-semibold">New multiple response task</h1>
       </div>
       <Form {...form}>
+        <UnsavedChangesHandler form={form} />
         <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-4">
           <FormSection title="Task details">
             <TextAreaField label="Question" name="title" />
