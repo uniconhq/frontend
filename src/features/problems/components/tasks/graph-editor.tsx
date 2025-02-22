@@ -226,6 +226,7 @@ const GraphEditor: React.FC<GraphEditorProps> = ({ graphId, className }) => {
             socketId: socket.id,
           },
         });
+        rfInstance?.fitView({ nodes: [{ id: step.id }], duration: 1000, maxZoom: 0.8 });
       }
     },
     highlighted: isFile(selectedSocket?.data) && selectedSocket?.data.id === file.id,
