@@ -97,10 +97,7 @@ const ProgrammingForm: React.FC<OwnProps> = ({ title, initialValue, onSubmit }) 
     reader.readAsText(depsFile);
   };
 
-  const [sharedUserInputStep, setSharedInputStep] = useState<InputStep>({
-    ...DEFAULT_USER_INPUT_STEP,
-    outputs: form.getValues("required_user_inputs"),
-  });
+  const [sharedUserInputStep, setSharedInputStep] = useState<InputStep>({ ...DEFAULT_USER_INPUT_STEP, outputs: [] });
 
   useSyncFormFields({
     form,

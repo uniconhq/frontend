@@ -33,15 +33,11 @@ const DataSocketDefaultValuePopover = ({
 }) => {
   const debouncedOnValueChanged = useDebouncedCallback((value: string) => {
     let parsedValue: string | boolean | number = value;
-    if (value.startsWith('"') && value.endsWith('"')) {
-      parsedValue = value.slice(1, -1); // Remove the quotes
-    } else if (value.toLowerCase() === "true") {
-      parsedValue = true;
-    } else if (value.toLowerCase() === "false") {
-      parsedValue = false;
-    } else if (!isNaN(Number(value))) {
-      parsedValue = Number(value);
-    }
+
+    if (value.startsWith('"') && value.endsWith('"')) parsedValue = value.slice(1, -1);
+    else if (value.toLowerCase() === "true") parsedValue = true;
+    else if (value.toLowerCase() === "false") parsedValue = false;
+    else if (!isNaN(Number(value))) parsedValue = Number(value);
 
     if (onValueChanged) onValueChanged(parsedValue);
   }, 500);
@@ -72,6 +68,41 @@ const DataSocketDefaultValuePopover = ({
   );
 };
 
+const DataSocketDefaultValueDisplay = ({
+  hasDefaultValue,
+  socketDefaultValue,
+  onValueChanged,
+  type,
+}: {
+  hasDefaultValue: boolean;
+  socketDefaultValue: string | boolean | number;
+  onValueChanged?: (newSocketData: string | boolean | number) => void;
+  type: HandleType;
+}) => {
+  if (type === "source") return null;
+
+  const content = hasDefaultValue ? (
+    <div className="flex items-center gap-2 py-1">
+      <div className="rounded-md border border-zinc-700/50 bg-zinc-800/50 px-2 py-1 hover:bg-zinc-800">
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-zinc-400">Default:</span>
+          <span className="font-mono text-xs text-orange-400">{JSON.stringify(socketDefaultValue)}</span>
+        </div>
+      </div>
+    </div>
+  ) : (
+    <Button variant="ghost" size="icon" className="h-6 w-6 hover:bg-white/10">
+      <PlusIcon className="h-4 w-4" />
+    </Button>
+  );
+
+  return onValueChanged ? (
+    <DataSocketDefaultValuePopover onValueChanged={onValueChanged}>{content}</DataSocketDefaultValuePopover>
+  ) : (
+    content
+  );
+};
+
 const DataSocket = ({
   socket,
   hideLabel,
@@ -85,7 +116,7 @@ const DataSocket = ({
   if (hideLabel) return null;
 
   const editable = edit && allowEditSockets;
-  const hasDefaultValue = socket.data && !isFile(socket.data);
+  const hasDefaultValue = socket.data && !isFile(socket.data) ? true : false;
   const socketDefaultValue = socket.data as string | boolean | number;
 
   return (
@@ -102,27 +133,12 @@ const DataSocket = ({
               value={socket.label ?? ""}
               onChange={onEditSocketLabel ?? (() => {})}
             />
-            <DataSocketDefaultValuePopover onValueChanged={onEditSocketData}>
-              {type === "target" &&
-                (hasDefaultValue ? (
-                  <button type="button">
-                    <div className="flex items-center gap-2 py-1">
-                      <div className="rounded-md border border-zinc-700/50 bg-zinc-800/50 px-3 py-1">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs text-zinc-400">Default:</span>
-                          <span className="font-mono text-xs text-orange-400">
-                            {JSON.stringify(socketDefaultValue)}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </button>
-                ) : (
-                  <Button variant="ghost" size="icon" className="h-6 w-6 hover:bg-white/10">
-                    <PlusIcon className="h-4 w-4" />
-                  </Button>
-                ))}
-            </DataSocketDefaultValuePopover>
+            <DataSocketDefaultValueDisplay
+              hasDefaultValue={hasDefaultValue}
+              socketDefaultValue={socketDefaultValue}
+              onValueChanged={onEditSocketData}
+              type={type}
+            />
             <Button className="h-fit w-fit p-1" variant="outline" onClick={onDeleteSocket} type="button">
               <TrashIcon />
             </Button>
@@ -131,16 +147,11 @@ const DataSocket = ({
       ) : (
         <div className="flex items-center">
           <span className="min-h-[12px] px-2 text-lg">{socket.label ?? ""}</span>
-          {hasDefaultValue && (
-            <div className="flex items-center gap-2 py-1">
-              <div className="rounded-md border border-zinc-700/50 bg-zinc-800/50 px-3 py-1">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-zinc-400">Default:</span>
-                  <span className="font-mono text-xs text-orange-400">{socketDefaultValue}</span>
-                </div>
-              </div>
-            </div>
-          )}
+          <DataSocketDefaultValueDisplay
+            hasDefaultValue={hasDefaultValue}
+            socketDefaultValue={socketDefaultValue}
+            type={type}
+          />
         </div>
       )}
     </>
