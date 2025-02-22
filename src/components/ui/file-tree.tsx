@@ -17,7 +17,8 @@ import {
   SidebarMenuItem,
   SidebarMenuSub,
 } from "@/components/ui/sidebar";
-import { FileTreeType, isFolder, TreeFile, TreeFolder } from "@/lib/files";
+import { useToast } from "@/hooks/use-toast";
+import { cleanFilePath, FileTreeType, isFolder, TreeFile, TreeFolder } from "@/lib/files";
 import { cn } from "@/lib/utils";
 
 import { Button } from "./button";
@@ -85,8 +86,8 @@ export function FileTree({
           <SidebarGroupContent className="h-full">
             {files && (
               <SidebarMenu>
-                {files.map((item, index) => (
-                  <Tree key={index} item={item} onPathChange={onPathChange} onPathDelete={onPathDelete} />
+                {files.map((item) => (
+                  <Tree key={item.path} item={item} onPathChange={onPathChange} onPathDelete={onPathDelete} />
                 ))}
               </SidebarMenu>
             )}
@@ -125,13 +126,29 @@ function Tree({
   const isItemFolder = isFolder(item);
   // for file/folder name editing
   const [isEditing, setIsEditing] = React.useState(false);
+  const [name, setName] = React.useState(item.name);
 
-  const handleNameChange = (newName: string | null) => {
+  const toast = useToast();
+
+  const handleNameChange = (oldName: string, newName: string) => {
+    console.log("you ran right?? moshi moshi", { oldName, newName });
     if (!newName) {
       return;
     }
-    const newPath = item.path.split("/").slice(0, -1).join("/") + "/" + newName;
-    onPathChange?.(item.path, newPath);
+    if (oldName === newName) {
+      return;
+    }
+    const newPath = cleanFilePath(item.path.split("/").slice(0, -1).join("/") + "/" + newName);
+    const success = onPathChange?.(item.path, newPath);
+    if (!success) {
+      toast.toast({
+        title: `Error - Cannot rename ${item.path} to ${newPath}`,
+        description: "Name already exists",
+      });
+      setName(oldName);
+    } else {
+      setName(newName);
+    }
   };
 
   const [{ isDragging }, drag] = useDrag(
@@ -186,25 +203,41 @@ function Tree({
           ref={drag}
         >
           {item.isBinary ? <FileDigit /> : <File />}
-          <span
-            className="inline-block"
-            contentEditable={isEditing}
-            suppressContentEditableWarning={true}
-            spellCheck={false}
-            onClick={() => onPathChange && setIsEditing(true)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                setIsEditing(false);
-                handleNameChange(e.currentTarget.textContent);
-              }
-            }}
-            onBlur={(e) => {
-              setIsEditing(false);
-              handleNameChange(e.currentTarget.textContent);
-            }}
-          >
-            {item.name}
-          </span>
+          {isEditing ? (
+            <input
+              type="text"
+              className={cn(
+                "nodrag inline max-w-fit rounded-sm border border-gray-500/50 bg-transparent p-1 font-mono text-xs",
+              )}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              onKeyUp={(e) => {
+                e.preventDefault();
+                if (e.key === "Enter") {
+                  setIsEditing(false);
+                  handleNameChange(item.name, name);
+                }
+                if (e.key === "Escape") {
+                  setIsEditing(false);
+                  setName(item.name);
+                }
+              }}
+              size={name.length}
+            />
+          ) : (
+            <span
+              className={cn("inline-block", { "border border-input px-1": isEditing })}
+              spellCheck={false}
+              onClick={(e) => {
+                if (onPathChange) {
+                  setIsEditing(true);
+                  e.stopPropagation();
+                }
+              }}
+            >
+              {item.name}
+            </span>
+          )}
         </SidebarMenuButton>
       </DeleteContextMenu>
     );
@@ -218,32 +251,47 @@ function Tree({
             <SidebarMenuButton ref={drag}>
               <ChevronRight className="transition-transform" />
               <Folder />
-              <span
-                className="inline-block"
-                contentEditable={isEditing}
-                suppressContentEditableWarning={true}
-                spellCheck={false}
-                onClick={() => onPathChange && setIsEditing(true)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    setIsEditing(false);
-                    handleNameChange(e.currentTarget.textContent);
-                  }
-                }}
-                onBlur={(e) => {
-                  setIsEditing(false);
-                  handleNameChange(e.currentTarget.textContent);
-                }}
-              >
-                {item.name}
-              </span>
+              {isEditing ? (
+                <input
+                  type="text"
+                  className={cn(
+                    "nodrag inline max-w-fit rounded-sm border border-gray-500/50 bg-transparent p-1 font-mono text-xs",
+                  )}
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  onKeyUp={(e) => {
+                    e.preventDefault();
+                    if (e.key === "Enter") {
+                      setIsEditing(false);
+                      handleNameChange(item.name, name);
+                    }
+                    if (e.key === "Escape") {
+                      setIsEditing(false);
+                      setName(item.name);
+                    }
+                  }}
+                  size={name.length}
+                />
+              ) : (
+                <span
+                  className={cn("inline-block", { "border border-input px-1": isEditing })}
+                  onClick={(e) => {
+                    if (onPathChange) {
+                      setIsEditing(true);
+                      e.stopPropagation();
+                    }
+                  }}
+                >
+                  {item.name}
+                </span>
+              )}
             </SidebarMenuButton>
           </CollapsibleTrigger>
           {item.children.length > 0 && (
             <CollapsibleContent>
               <SidebarMenuSub className="mr-0 pr-0">
-                {item.children.map((subItem, index) => (
-                  <Tree key={index} item={subItem} onPathChange={onPathChange} onPathDelete={onPathDelete} />
+                {item.children.map((subItem) => (
+                  <Tree key={subItem.path} item={subItem} onPathChange={onPathChange} onPathDelete={onPathDelete} />
                 ))}
               </SidebarMenuSub>
             </CollapsibleContent>

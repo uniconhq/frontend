@@ -109,21 +109,27 @@ const FileInputSection = () => {
   const handlePathChange = (oldPath: string, newPath: string) => {
     // TODO: Check if newPath is valid
     if (oldPath.endsWith("/") && !newPath.endsWith("/")) {
-      return;
+      return false;
     }
     if (oldPath.endsWith("/") && newPath.endsWith("/") && newPath.startsWith(oldPath)) {
-      return;
+      return false;
     }
-    form.setValue(
-      "files",
-      form.getValues("files").map((file) => {
-        return { ...file, path: movePath(file.path, oldPath, newPath) };
-      }),
-    );
+    const newFilesValue = form
+      .getValues("files")
+      .map((file) => ({ ...file, path: movePath(file.path, oldPath, newPath) }));
+
+    // if the paths are no longer unique, reject the change
+    if (newFilesValue.some((file) => newFilesValue.filter((f) => f.path === file.path).length > 1)) {
+      return false;
+    }
+
+    form.setValue("files", newFilesValue);
     if (selectedFile && selectedFile.path.startsWith(oldPath)) {
       const newSelectedFilePath = cleanFilePath(selectedFile.path.replace(oldPath, newPath));
       setSelectedFile({ ...selectedFile, path: newSelectedFilePath });
     }
+
+    return true;
   };
 
   const handlePathDelete = (path: string) => {
