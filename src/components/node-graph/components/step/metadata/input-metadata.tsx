@@ -55,8 +55,9 @@ const InputMetadata: React.FC<OwnProps> = ({ step }) => {
         socketMetadata: {
           label: "file.py",
           data: {
-            name: "file.py",
+            path: "file.py",
             content: "print('Hello World')",
+            trusted: true,
           },
         },
       },
