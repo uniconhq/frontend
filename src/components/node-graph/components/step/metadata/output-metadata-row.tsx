@@ -123,9 +123,9 @@ const OutputMetadataRow: React.FC<OwnProps> = ({
           )}
         </div>
       </TableCell>
-      <TableCell className="flex items-center justify-center">
+      <TableCell>
         <Checkbox
-          className="inline h-4 w-4 rounded-sm border border-gray-500/50"
+          className="rounded-sm border border-gray-500/50"
           checked={socket.public || false}
           onCheckedChange={() => {
             onUpdateSocketMetadata({
