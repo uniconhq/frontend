@@ -131,7 +131,6 @@ function Tree({
   const toast = useToast();
 
   const handleNameChange = (oldName: string, newName: string) => {
-    console.log("you ran right?? moshi moshi", { oldName, newName });
     if (!newName) {
       return;
     }
