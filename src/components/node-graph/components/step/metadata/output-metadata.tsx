@@ -16,6 +16,8 @@ type OwnProps = {
 };
 
 const OutputMetadata: React.FC<OwnProps> = ({ step, editable }) => {
+  // NOTE: Control sockets are handled separately by parent `StepNode` component
+  const sockets = step.inputs.filter((socket) => socket.type != "CONTROL");
   const dispatch = useContext(GraphDispatchContext)!;
 
   const updateSocketMetadata = (metadataIndex: number) => (newMetadata: Partial<OutputSocket>) => {
@@ -68,7 +70,7 @@ const OutputMetadata: React.FC<OwnProps> = ({ step, editable }) => {
         </TableRow>
       </TableHeader>
       <TableBody>
-        {step.inputs.map((socket, index) => (
+        {sockets.map((socket, index) => (
           <OutputMetadataRow
             key={socket.id}
             socket={socket}
@@ -84,7 +86,7 @@ const OutputMetadata: React.FC<OwnProps> = ({ step, editable }) => {
 
   return (
     <div className="flex flex-col gap-2 px-2">
-      {editable ? editableOutputTable : <OutputTable data={step.inputs} />}
+      {editable ? editableOutputTable : <OutputTable data={sockets} />}
       {editable && (
         <Button
           size={"sm"}

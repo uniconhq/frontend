@@ -1,4 +1,4 @@
-import { useUpdateNodeInternals } from "@xyflow/react";
+import { HandleType, useUpdateNodeInternals } from "@xyflow/react";
 import {
   CircleDotIcon,
   EqualIcon,
@@ -13,7 +13,7 @@ import {
 import { useCallback, useContext, useEffect } from "react";
 
 import { StepSocket, StepType } from "@/api";
-import { NodeSlot, NodeSlotGroup } from "@/components/node-graph/components/node-slot";
+import { NodeSlot } from "@/components/node-graph/components/node-slot";
 import StepMetadata from "@/components/node-graph/components/step/metadata/step-metadata";
 import { Button } from "@/components/ui/button";
 import {
@@ -25,6 +25,7 @@ import {
 import { Step } from "@/features/problems/components/tasks/types";
 import { StepNodeColorMap, StepTypeAliasMap } from "@/lib/colors";
 import { createSocket } from "@/lib/compute-graph";
+import { cn } from "@/lib/utils";
 
 const STEP_TYPE_ICONS: Record<StepType, JSX.Element> = {
   PY_RUN_FUNCTION_STEP: <PlayIcon />,
@@ -57,18 +58,53 @@ const NodeHeader = ({ type, edit, deleteStep }: { type: StepType; edit: boolean;
   );
 };
 
-const orderSockets = (s1: StepSocket, s2: StepSocket) => {
-  // Control sockets should always be in front of data sockets
-  if (s1.type === "CONTROL" && s2.type === "DATA") return -1;
-  if (s1.type === "DATA" && s2.type === "CONTROL") return 1;
-  return 0;
-};
+function NodeSlotGroup({
+  type,
+  sockets,
+  onEditData,
+  onEditLabel,
+  onDelete,
+  children,
+}: {
+  type: HandleType;
+  sockets: StepSocket[];
+  onEditData?: (socketId: string) => (newSocketData: string | number | boolean) => void;
+  onEditLabel?: (socketId: string) => (newSocketLabel: string) => void;
+  onDelete?: (socketId: string) => () => void;
+  children?: React.ReactNode;
+}) {
+  return (
+    <div className="flex flex-col gap-2">
+      {sockets.map((s) => (
+        <NodeSlot
+          key={s.id}
+          type={type}
+          socket={s}
+          onEditData={onEditData ? onEditData(s.id) : undefined}
+          onEditLabel={onEditLabel ? onEditLabel(s.id) : undefined}
+          onDelete={onDelete ? onDelete(s.id) : undefined}
+        />
+      ))}
+      {children}
+    </div>
+  );
+}
 
 export function StepNode({ data }: { data: Step }) {
   const updateNodeInternals = useUpdateNodeInternals();
 
   const { edit: inEditMode } = useContext(GraphContext)!;
   const dispatch = useContext(GraphDispatchContext)!;
+
+  const inSockets = data.inputs ?? [];
+  const outSockets = data.outputs ?? [];
+  const filterSocketsByType = (sockets: StepSocket[], type: string) => sockets.filter((s) => s.type === type);
+
+  const inControlSockets = filterSocketsByType(inSockets, "CONTROL");
+  const outControlSockets = filterSocketsByType(outSockets, "CONTROL");
+
+  const inDataSockets = filterSocketsByType(inSockets, "DATA");
+  const outDataSockets = filterSocketsByType(outSockets, "DATA");
 
   const editable = inEditMode && ("is_user" in data ? !data.is_user : true);
 
@@ -90,26 +126,29 @@ export function StepNode({ data }: { data: Step }) {
   // Reference: https://reactflow.dev/learn/troubleshooting#008
   useEffect(() => updateNodeInternals(data.id), [data]);
 
-  const onEditLabel = (socketId: string) => (newSocketLabel: string) => {
+  const _onEditLabel = (socketId: string) => (newSocketLabel: string) => {
     dispatch({
       type: GraphActionType.UpdateSocketLabel,
       payload: { stepId: data.id, socketId, newSocketLabel },
     });
   };
+  const onEditLabel = editableLabel ? _onEditLabel : undefined;
 
-  const onEditData = (socketId: string) => (newSocketData: string | number | boolean) => {
+  const _onEditData = (socketId: string) => (newSocketData: string | number | boolean) => {
     dispatch({
       type: GraphActionType.UpdateSocketData,
       payload: { stepId: data.id, socketId, data: newSocketData },
     });
   };
+  const onEditData = inEditMode ? _onEditData : undefined;
 
-  const onDeleteSocket = (socketId: string) => () => {
+  const _onDeleteSocket = (socketId: string) => () => {
     dispatch({
       type: GraphActionType.DeleteSocket,
       payload: { stepId: data.id, socketId },
     });
   };
+  const onDeleteSocket = canDeleteSockets ? _onDeleteSocket : undefined;
 
   const addSocket = useCallback(
     (socketDir: SocketDir) => () => {
@@ -130,23 +169,23 @@ export function StepNode({ data }: { data: Step }) {
     <div className="rounded-b-lg bg-[#141414]">
       <NodeHeader type={data.type} edit={inEditMode} deleteStep={deleteStep} />
       <div className="flex min-w-52 flex-col gap-2 rounded-b-lg border-x-2 border-b-2 py-3">
-        <StepMetadata step={data} editable={editable} />
+        <div className={cn("flex flex-col gap-2", { "flex-col-reverse": !socketsInMetadata })}>
+          <div className="flex flex-row justify-between gap-8">
+            <NodeSlotGroup type="target" sockets={inControlSockets} />
+            <NodeSlotGroup type="source" sockets={outControlSockets} />
+          </div>
+          <StepMetadata step={data} editable={editable} />
+        </div>
         {!socketsInMetadata && (
           <div className="font-mono text-xs">
             <div className="flex flex-row justify-between gap-8">
-              <NodeSlotGroup>
-                {[...(data.inputs ?? [])]
-                  ?.sort(orderSockets)
-                  .map((stepSocket: StepSocket) => (
-                    <NodeSlot
-                      key={stepSocket.id}
-                      type="target"
-                      socket={stepSocket}
-                      onEditData={inEditMode ? onEditData(stepSocket.id) : undefined}
-                      onEditLabel={editableLabel ? onEditLabel(stepSocket.id) : undefined}
-                      onDelete={canDeleteSockets ? onDeleteSocket(stepSocket.id) : undefined}
-                    />
-                  ))}
+              <NodeSlotGroup
+                type="target"
+                sockets={inDataSockets}
+                onEditData={onEditData}
+                onEditLabel={onEditLabel}
+                onDelete={onDeleteSocket}
+              >
                 {canAddSockets && (
                   <Button
                     size={"sm"}
@@ -159,19 +198,13 @@ export function StepNode({ data }: { data: Step }) {
                   </Button>
                 )}
               </NodeSlotGroup>
-              <NodeSlotGroup>
-                {[...(data.outputs ?? [])]
-                  ?.sort(orderSockets)
-                  .map((stepSocket: StepSocket) => (
-                    <NodeSlot
-                      key={stepSocket.id}
-                      type="source"
-                      socket={stepSocket}
-                      onEditData={inEditMode ? onEditData(stepSocket.id) : undefined}
-                      onEditLabel={editableLabel ? onEditLabel(stepSocket.id) : undefined}
-                      onDelete={canDeleteSockets ? onDeleteSocket(stepSocket.id) : undefined}
-                    />
-                  ))}
+              <NodeSlotGroup
+                type="source"
+                sockets={outDataSockets}
+                onEditData={onEditData}
+                onEditLabel={onEditLabel}
+                onDelete={onDeleteSocket}
+              >
                 {canAddSockets && (
                   <Button
                     size={"sm"}
