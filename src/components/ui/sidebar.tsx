@@ -132,13 +132,13 @@ const Sidebar = React.forwardRef<
   HTMLDivElement,
   React.ComponentProps<"div"> & {
     side?: "left" | "right";
-    variant?: "sidebar" | "floating" | "inset";
+    variant?: "sidebar" | "floating" | "inset" | "filetree";
     collapsible?: "offcanvas" | "icon" | "none";
   }
 >(({ side = "left", variant = "sidebar", collapsible = "offcanvas", className, children, ...props }, ref) => {
   const { isMobile, state, openMobile, setOpenMobile } = useSidebar();
-
-  if (collapsible === "none") {
+  const isFileTree = variant === "filetree";
+  if (collapsible === "none" && !isFileTree) {
     return (
       <div
         className={cn("flex h-full w-[--sidebar-width] flex-col bg-sidebar text-sidebar-foreground", className)}
@@ -150,7 +150,7 @@ const Sidebar = React.forwardRef<
     );
   }
 
-  if (isMobile) {
+  if (isMobile && !isFileTree) {
     return (
       <Sheet open={openMobile} onOpenChange={setOpenMobile} {...props}>
         <SheetContent
@@ -170,12 +170,18 @@ const Sidebar = React.forwardRef<
     );
   }
 
+  const dataState = isFileTree ? state : "expanded";
+  const dataCollapsible = isFileTree ? "" : state === "collapsed" ? collapsible : "";
   return (
     <div
       ref={ref}
-      className="group peer hidden text-sidebar-foreground md:block"
-      data-state={state}
-      data-collapsible={state === "collapsed" ? collapsible : ""}
+      className={cn(
+        "group peer text-sidebar-foreground md:block",
+        variant !== "filetree" && "hidden",
+        variant === "filetree" && "h-full overflow-y-scroll break-all",
+      )}
+      data-state={dataState}
+      data-collapsible={dataCollapsible}
       data-variant={variant}
       data-side={side}
     >
@@ -188,15 +194,19 @@ const Sidebar = React.forwardRef<
           variant === "floating" || variant === "inset"
             ? "group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)_+_theme(spacing.4))]"
             : "group-data-[collapsible=icon]:w-[--sidebar-width-icon]",
+          // CUSTOM: file tree doesnt overlap with sidebar
+          variant === "filetree" && "hidden h-full",
         )}
       />
       <div
         className={cn(
-          "fixed inset-y-0 z-10 hidden h-svh w-[--sidebar-width] transition-[left,right,width] duration-200 ease-linear md:flex",
+          "fixed inset-y-0 z-10 transition-[left,right,width] duration-200 ease-linear md:flex",
+          variant !== "filetree" && "hidden h-svh w-[--sidebar-width]",
+          variant === "filetree" && "w-[300px]",
           side === "left"
             ? "left-0 group-data-[collapsible=offcanvas]:left-[calc(var(--sidebar-width)*-1)]"
             : "right-0 group-data-[collapsible=offcanvas]:right-[calc(var(--sidebar-width)*-1)]",
-          // Adjust the padding for floating and inset variants.
+          // Adjust the padding for floating and inset variants.,
           variant === "floating" || variant === "inset"
             ? "p-2 group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)_+_theme(spacing.4)_+2px)]"
             : "group-data-[collapsible=icon]:w-[--sidebar-width-icon]",
@@ -424,6 +434,7 @@ const sidebarMenuButtonVariants = cva(
         default: "h-8 text-sm",
         sm: "h-7 text-xs",
         lg: "h-12 text-sm group-data-[collapsible=icon]:!p-0",
+        big: "text-sm",
       },
     },
     defaultVariants: {

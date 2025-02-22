@@ -23,8 +23,10 @@ import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "r
 import { GraphEdgeStr as GraphEdge, InputStep } from "@/api";
 import { StepNode } from "@/components/node-graph/components/step/step-node";
 import { Button } from "@/components/ui/button";
+import { FileTree } from "@/components/ui/file-tree";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
-import { cn, uuid } from "@/lib/utils";
+import { convertFilesToFileTree } from "@/lib/files";
+import { cn, isFile, uuid } from "@/lib/utils";
 import getLayoutedElements from "@/utils/graph";
 
 import AddNodeButton from "./add-node-button";
@@ -62,7 +64,7 @@ const stepEdgeToRfEdge = (edge: GraphEdge): Edge => ({
 });
 
 const GraphEditor: React.FC<GraphEditorProps> = ({ graphId, className }) => {
-  const { steps, edges, edit, selectedSocketId } = useContext(GraphContext)!;
+  const { steps, edges, edit, selectedSocketId, selectedStepId, files } = useContext(GraphContext)!;
   const dispatch = useContext(GraphDispatchContext)!;
 
   const nodeData = useMemo(() => steps.map(stepNodeToRfNode), [steps]);
@@ -200,6 +202,40 @@ const GraphEditor: React.FC<GraphEditorProps> = ({ graphId, className }) => {
     [dispatch],
   );
 
+  const selectedStep = steps.find((step) => step.id === selectedStepId);
+  const selectedSocket = selectedStep?.outputs?.find((socket) => socket.id === selectedSocketId);
+
+  const treeFiles = files.map((file) => ({
+    id: file.id,
+    name: file.path.split("/").pop()!,
+    path: file.path,
+    content: file.content,
+    isBinary: !!file.on_minio,
+    downloadUrl: "",
+    onClick: () => {
+      // Figure out if this file is in the graph. If yes, select it.
+      const step = steps.find((step) =>
+        step.outputs?.find((socket) => isFile(socket.data) && socket.data?.id === file.id),
+      );
+      const socket = step?.outputs?.find((socket) => isFile(socket.data) && socket.data?.id === file.id);
+      if (step && socket) {
+        dispatch({
+          type: GraphActionType.SelectSocket,
+          payload: {
+            stepId: step.id,
+            socketId: socket.id,
+          },
+        });
+        rfInstance?.fitView({ nodes: [{ id: step.id }], duration: 1000, maxZoom: 0.8 });
+      }
+    },
+    highlighted: isFile(selectedSocket?.data) && selectedSocket?.data.id === file.id,
+  }));
+
+  const [showFileTree, setShowFileTree] = useState(true);
+
+  // The file editor is hidden if the file is a binary file.
+  const showFile = selectedSocket && isFile(selectedSocket.data) && !selectedSocket?.data.on_minio;
   const isValidConnection: IsValidConnection<Edge> = useCallback(
     (newEdge) => {
       // Check there is no existing edge to the target node + handle.
@@ -220,7 +256,12 @@ const GraphEditor: React.FC<GraphEditorProps> = ({ graphId, className }) => {
       data-state={expanded ? "open" : "closed"}
     >
       <ResizablePanelGroup direction="horizontal">
-        {selectedSocketId && (
+        <>
+          {showFileTree && (
+            <FileTree files={convertFilesToFileTree(treeFiles)} onCloseFileTree={() => setShowFileTree(false)} />
+          )}
+        </>
+        {showFile && (
           <>
             <ResizablePanel defaultSize={2} order={0}>
               <GraphFileEditor />
@@ -252,11 +293,24 @@ const GraphEditor: React.FC<GraphEditorProps> = ({ graphId, className }) => {
             proOptions={{ hideAttribution: true }}
           >
             {/* Custom controls */}
-            <div className={cn("absolute right-1 top-1 z-10 mt-4 flex space-x-1 px-2", { "z-30": expanded })}>
-              {edit && <AddNodeButton />}
-              <Button onClick={() => setExpanded((prev) => !prev)} type="button" variant="outline">
-                {expanded ? <ShrinkIcon /> : <ExpandIcon />}
-              </Button>
+            <div
+              className={cn("absolute right-1 top-1 z-10 mt-4 flex w-full justify-between px-2", {
+                "z-30": expanded,
+              })}
+            >
+              <div className="ml-2">
+                {!showFileTree && (
+                  <Button variant="outline" type="button" onClick={() => setShowFileTree(true)}>
+                    Show files
+                  </Button>
+                )}
+              </div>
+              <div className="flex space-x-1">
+                {edit && <AddNodeButton />}
+                <Button onClick={() => setExpanded((prev) => !prev)} type="button" variant="outline">
+                  {expanded ? <ShrinkIcon /> : <ExpandIcon />}
+                </Button>
+              </div>
             </div>
             <Background
               variant={BackgroundVariant.Dots}
@@ -265,7 +319,7 @@ const GraphEditor: React.FC<GraphEditorProps> = ({ graphId, className }) => {
               }}
             />
             <Controls showInteractive={edit} />
-            <MiniMap />
+            <MiniMap pannable className="opacity-50 hover:opacity-100" />
           </ReactFlow>
         </ResizablePanel>
       </ResizablePanelGroup>

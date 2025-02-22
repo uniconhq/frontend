@@ -1,5 +1,6 @@
 import { Plus } from "lucide-react";
 import { useCallback, useContext } from "react";
+import { useDrop } from "react-dnd";
 
 import { InputStep, StepSocket } from "@/api";
 import { Button } from "@/components/ui/button";
@@ -11,6 +12,9 @@ import {
   SocketDir,
 } from "@/features/problems/components/tasks/graph-context";
 import { createSocket } from "@/lib/compute-graph";
+import { DragItemType } from "@/lib/drag";
+import { isFolder, TreeFile, TreeFolder } from "@/lib/files";
+import { isFile } from "@/lib/utils";
 
 import InputTable from "../input-table/input-table";
 import InputMetadataRow from "./input-metadata-row";
@@ -20,7 +24,7 @@ type OwnProps = {
 };
 
 const InputMetadata: React.FC<OwnProps> = ({ step }) => {
-  const { edit } = useContext(GraphContext)!;
+  const { steps, edit, files } = useContext(GraphContext)!;
   const dispatch = useContext(GraphDispatchContext)!;
 
   const isStepEditable = !step.is_user;
@@ -50,14 +54,56 @@ const InputMetadata: React.FC<OwnProps> = ({ step }) => {
         stepId: step.id,
         socketId: socket.id,
         socketMetadata: {
+          label: "file.py",
           data: {
-            name: "file.py",
+            path: "file.py",
             content: "print('Hello World')",
+            trusted: true,
           },
         },
       },
     });
   };
+
+  const [, drop] = useDrop<TreeFile | TreeFolder>(
+    () => ({
+      accept: DragItemType.File,
+      drop: (draggedItem) => {
+        // copy files to user input
+        const addFileToInputStep = (treeFile: TreeFile | TreeFolder) => {
+          if (isFolder(treeFile)) {
+            treeFile.children.forEach(addFileToInputStep);
+          } else {
+            // If the file wasn't in the task file list, no-op.
+            const file = files.find((file) => file.id === treeFile.id);
+            if (!file) return;
+
+            // If the file is already somewhere in the graph, also no-op.
+            if (
+              steps.some(
+                (step) =>
+                  step.type === "INPUT_STEP" &&
+                  step?.outputs?.some((socket) => isFile(socket.data) && socket.data?.id === file.id),
+              )
+            )
+              return;
+
+            dispatch({
+              type: GraphActionType.AddSocket,
+              payload: {
+                stepId: step.id,
+                socketDir: SocketDir.Output,
+                socket: { ...createSocket("DATA", file.path), data: file },
+              },
+            });
+          }
+        };
+
+        addFileToInputStep(draggedItem);
+      },
+    }),
+    [steps],
+  );
 
   const addOutputSocket = useCallback(() => {
     dispatch({
@@ -95,7 +141,7 @@ const InputMetadata: React.FC<OwnProps> = ({ step }) => {
   };
 
   return (
-    <div>
+    <div ref={drop}>
       <div className="rounded-md border">
         <Table hideOverflow>
           <TableHeader>
@@ -123,15 +169,17 @@ const InputMetadata: React.FC<OwnProps> = ({ step }) => {
           </TableBody>
         </Table>
       </div>
-      <Button
-        size={"sm"}
-        className="mt-3 h-fit w-fit px-1 py-1"
-        variant={"secondary"}
-        onClick={addOutputSocket}
-        type="button"
-      >
-        <Plus className="h-2 w-2" />
-      </Button>
+      <div className="flex gap-2">
+        <Button
+          size={"sm"}
+          className="mt-3 h-fit w-fit px-1 py-1"
+          variant={"secondary"}
+          onClick={addOutputSocket}
+          type="button"
+        >
+          <Plus className="h-2 w-2" />
+        </Button>
+      </div>
     </div>
   );
 };

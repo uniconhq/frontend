@@ -1,5 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { PropsWithChildren, useEffect } from "react";
+import { DndProvider } from "react-dnd";
+import { HTML5Backend } from "react-dnd-html5-backend";
 import { Outlet, useLocation } from "react-router-dom";
 
 import AppSidebar from "@/components/layout/app-sidebar";
@@ -30,24 +32,26 @@ const Layout: React.FC<PropsWithChildren> = () => {
 
   return (
     <main className="flex h-screen w-screen flex-col overflow-y-scroll bg-[#141414]">
-      <TooltipProvider>
-        <Toaster />
-        <div className="flex max-h-screen w-full text-neutral-300">
-          {user && (
-            <SidebarProvider>
-              <AppSidebar pathname={pathname} />
-              <main className="w-full p-4">
-                <div className="flex items-center gap-2">
-                  <SidebarTrigger />
-                  <Breadcrumb />
-                </div>
-                <Outlet />
-              </main>
-            </SidebarProvider>
-          )}
-          {!user && <Outlet />}
-        </div>
-      </TooltipProvider>
+      <DndProvider backend={HTML5Backend}>
+        <TooltipProvider>
+          <Toaster />
+          <div className="flex max-h-screen w-full text-neutral-300">
+            {user && (
+              <SidebarProvider>
+                <AppSidebar pathname={pathname} />
+                <main className="w-full p-4">
+                  <div className="flex items-center gap-2">
+                    <SidebarTrigger />
+                    <Breadcrumb />
+                  </div>
+                  <Outlet />
+                </main>
+              </SidebarProvider>
+            )}
+            {!user && <Outlet />}
+          </div>
+        </TooltipProvider>
+      </DndProvider>
     </main>
   );
 };
