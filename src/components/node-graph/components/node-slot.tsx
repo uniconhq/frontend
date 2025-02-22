@@ -13,14 +13,14 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { cn, isFile } from "@/lib/utils";
 
 interface NodeSlotProps {
-  socket: StepSocket;
   type: HandleType;
+  socket: StepSocket;
+  // Edit props
+  onEditLabel?: (newSocketLabel: string) => void;
+  onEditData?: (newSocketData: string | boolean | number) => void;
+  onDelete?: () => void;
+  // Styling props
   hideLabel?: boolean;
-  edit?: boolean;
-  allowEditSockets?: boolean;
-  onEditSocketLabel?: (newSocketLabel: string) => void;
-  onEditSocketData?: (newSocketData: string | boolean | number) => void;
-  onDeleteSocket?: () => void;
   handleStyle?: React.CSSProperties;
 }
 
@@ -72,15 +72,11 @@ const DataSocketDefaultValueDisplay = ({
   hasDefaultValue,
   socketDefaultValue,
   onValueChanged,
-  type,
 }: {
   hasDefaultValue: boolean;
   socketDefaultValue: string | boolean | number;
   onValueChanged?: (newSocketData: string | boolean | number) => void;
-  type: HandleType;
 }) => {
-  if (type === "source") return null;
-
   const content = hasDefaultValue ? (
     <div className="flex items-center gap-2 py-1">
       <div className="rounded-md border border-zinc-700/50 bg-zinc-800/50 px-2 py-1 hover:bg-zinc-800">
@@ -104,67 +100,50 @@ const DataSocketDefaultValueDisplay = ({
 };
 
 const DataSocket = ({
-  socket,
-  hideLabel,
-  edit,
-  allowEditSockets,
-  onEditSocketLabel,
-  onEditSocketData,
-  onDeleteSocket,
   type,
-}: Omit<NodeSlotProps, "handleStyle"> & { type: HandleType }) => {
-  if (hideLabel) return null;
-
-  const editable = edit && allowEditSockets;
+  socket,
+  onEditLabel,
+  onEditData,
+  onDelete,
+}: Omit<NodeSlotProps, "handleStyle" | "hideLabel">) => {
+  const socketLabel = socket.label ?? "";
   const hasDefaultValue = socket.data && !isFile(socket.data) ? true : false;
   const socketDefaultValue = socket.data as string | boolean | number;
-
   return (
-    <>
-      {editable ? (
-        <div
-          className={cn("flex grow items-center justify-between gap-2 px-2", {
-            "flex-row-reverse space-x-reverse": type === "source",
-          })}
-        >
-          <div className="flex items-center gap-2">
-            <NodeInput
-              className={[cn({ "text-right": type === "source" })]}
-              value={socket.label ?? ""}
-              onChange={onEditSocketLabel ?? (() => {})}
-            />
-            <DataSocketDefaultValueDisplay
-              hasDefaultValue={hasDefaultValue}
-              socketDefaultValue={socketDefaultValue}
-              onValueChanged={onEditSocketData}
-              type={type}
-            />
-            <Button className="h-fit w-fit p-1" variant="outline" onClick={onDeleteSocket} type="button">
-              <TrashIcon />
-            </Button>
-          </div>
-        </div>
+    <div
+      className={cn("flex grow items-center gap-2 px-2", {
+        "flex-row-reverse space-x-reverse": type === "source",
+      })}
+    >
+      {onEditLabel ? (
+        <NodeInput className={[cn({ "text-right": type === "source" })]} value={socketLabel} onChange={onEditLabel} />
       ) : (
-        <div className="flex items-center">
-          <span className="min-h-[12px] px-2 text-lg">{socket.label ?? ""}</span>
-          <DataSocketDefaultValueDisplay
-            hasDefaultValue={hasDefaultValue}
-            socketDefaultValue={socketDefaultValue}
-            type={type}
-          />
-        </div>
+        socketLabel && <span className="min-h-[12px] px-2 text-lg">{socketLabel}</span>
       )}
-    </>
+
+      {onEditData && type === "target" && (
+        <DataSocketDefaultValueDisplay
+          hasDefaultValue={hasDefaultValue}
+          socketDefaultValue={socketDefaultValue}
+          onValueChanged={onEditData}
+        />
+      )}
+      {onDelete && (
+        <Button className="h-fit w-fit p-1" variant="outline" onClick={onDelete} type="button">
+          <TrashIcon />
+        </Button>
+      )}
+    </div>
   );
 };
 
-const ControlSocket = ({ socket, type }: { socket: StepSocket; type: HandleType }) => {
+const ControlSocket = ({ type, socket }: { type: HandleType; socket: StepSocket }) => {
   return (
     <div className={cn("flex h-fit items-center gap-1 px-1", { "flex-row-reverse": type === "target" })}>
       {socket.label && (
         <>
           <Badge variant="outline" className="border-[#73F777]">
-            <span className="py-1 font-mono font-light uppercase text-zinc-300">{socket.label}</span>
+            <span className="py-1 font-mono font-light uppercase text-zinc-400">{socket.label}</span>
           </Badge>
         </>
       )}
@@ -174,22 +153,16 @@ const ControlSocket = ({ socket, type }: { socket: StepSocket; type: HandleType 
 };
 
 export function NodeSlot({
-  socket,
   type,
+  socket,
+  onEditLabel,
+  onEditData,
+  onDelete,
   hideLabel = false,
-  edit = false,
-  allowEditSockets = true,
-  onEditSocketLabel,
-  onEditSocketData,
-  onDeleteSocket,
   handleStyle,
 }: NodeSlotProps) {
-  const connections = useNodeConnections({
-    handleType: type,
-    handleId: socket.id,
-  });
+  const connections = useNodeConnections({ handleType: type, handleId: socket.id });
   const hasConnections = connections.length > 0;
-
   return (
     <div
       className={twJoin(
@@ -214,20 +187,18 @@ export function NodeSlot({
         type={type}
         position={type === "target" ? HandlePosition.Left : HandlePosition.Right}
       />
-      {socket.type === "CONTROL" ? (
-        <ControlSocket socket={socket} type={type} />
-      ) : (
-        <DataSocket
-          socket={socket}
-          hideLabel={hideLabel}
-          edit={edit}
-          allowEditSockets={allowEditSockets}
-          onEditSocketData={onEditSocketData}
-          onEditSocketLabel={onEditSocketLabel}
-          onDeleteSocket={onDeleteSocket}
-          type={type}
-        />
-      )}
+      {!hideLabel &&
+        (socket.type === "CONTROL" ? (
+          <ControlSocket socket={socket} type={type} />
+        ) : (
+          <DataSocket
+            type={type}
+            socket={socket}
+            onEditData={onEditData}
+            onEditLabel={onEditLabel}
+            onDelete={onDelete}
+          />
+        ))}
     </div>
   );
 }

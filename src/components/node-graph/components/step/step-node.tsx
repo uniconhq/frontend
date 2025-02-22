@@ -65,31 +65,47 @@ const orderSockets = (s1: StepSocket, s2: StepSocket) => {
 };
 
 export function StepNode({ data }: { data: Step }) {
-  const { edit } = useContext(GraphContext)!;
-  const dispatch = useContext(GraphDispatchContext)!;
-
   const updateNodeInternals = useUpdateNodeInternals();
 
-  const isStepEditable = "is_user" in data ? !data.is_user : true;
-  const showEditElements = edit && isStepEditable;
-  const allowEditSockets = showEditElements && data.type !== "PY_RUN_FUNCTION_STEP";
+  const { edit: inEditMode } = useContext(GraphContext)!;
+  const dispatch = useContext(GraphDispatchContext)!;
+
+  const editable = inEditMode && ("is_user" in data ? !data.is_user : true);
+  const _isPyRunFunc = data.type === "PY_RUN_FUNCTION_STEP";
+  const editableLabel = editable && !_isPyRunFunc;
+  // `PyRunFunctionStep` is a special case where we don't allow adding or removing of the sockets
+  // since the step has its own mechanism to determine the number of inputs and outputs
+  const canAddSockets = editable && !_isPyRunFunc;
+  const canDeleteSockets = editable && !_isPyRunFunc;
+
+  // `Input` and `Output` steps have the sockets and handles in their custom metadata
+  // components, so we there's no need to provide them with default sockets and handles
+  // like the other steps
+  const socketsInMetadata = ["OUTPUT_STEP", "INPUT_STEP"].includes(data.type);
 
   // We are programmatically updating the internal state of the node (e.g. adding more handles)
   // as such we will need to sync it with ReactFlow
   // Reference: https://reactflow.dev/learn/troubleshooting#008
   useEffect(() => updateNodeInternals(data.id), [data]);
 
-  const handleEditSocketLabel = (socketId: string) => (newSocketLabel: string) => {
+  const onEditLabel = (socketId: string) => (newSocketLabel: string) => {
     dispatch({
       type: GraphActionType.UpdateSocketLabel,
       payload: { stepId: data.id, socketId, newSocketLabel },
     });
   };
 
-  const handleEditSocketData = (socketId: string) => (newSocketData: string | number | boolean) => {
+  const onEditData = (socketId: string) => (newSocketData: string | number | boolean) => {
     dispatch({
       type: GraphActionType.UpdateSocketData,
       payload: { stepId: data.id, socketId, data: newSocketData },
+    });
+  };
+
+  const onDeleteSocket = (socketId: string) => () => {
+    dispatch({
+      type: GraphActionType.DeleteSocket,
+      payload: { stepId: data.id, socketId },
     });
   };
 
@@ -97,57 +113,42 @@ export function StepNode({ data }: { data: Step }) {
     (socketDir: SocketDir) => () => {
       dispatch({
         type: GraphActionType.AddSocket,
-        payload: {
-          stepId: data.id,
-          socketDir,
-          socket: createSocket("DATA", ""),
-        },
+        payload: { stepId: data.id, socketDir, socket: createSocket("DATA", "") },
       });
     },
     [data.id, dispatch],
   );
-
-  const deleteSocket = (socketId: string) => () => {
-    dispatch({
-      type: GraphActionType.DeleteSocket,
-      payload: { stepId: data.id, socketId },
-    });
-  };
 
   const deleteStep = useCallback(
     () => dispatch({ type: GraphActionType.DeleteStep, payload: { id: data.id } }),
     [data.id, dispatch],
   );
 
-  const handlesInStepMetadata = ["OUTPUT_STEP", "INPUT_STEP"].includes(data.type);
-
   return (
     <div className="rounded-b-lg bg-[#141414]">
       {/* Node header */}
-      <NodeHeader type={data.type} edit={showEditElements} deleteStep={deleteStep} />
+      <NodeHeader type={data.type} edit={inEditMode} deleteStep={deleteStep} />
       <div className="flex min-w-52 flex-col gap-2 rounded-b-lg border-x-2 border-b-2 pb-2">
         {/* Node metadata */}
         <StepMetadata step={data} />
         {/* Node body */}
-        {!handlesInStepMetadata && (
+        {!socketsInMetadata && (
           <div className="pt-1 font-mono text-xs">
-            <div className="flex flex-row justify-between gap-4">
+            <div className="flex flex-row justify-between gap-8">
               <NodeSlotGroup>
                 {[...(data.inputs ?? [])]
                   ?.sort(orderSockets)
                   .map((stepSocket: StepSocket) => (
                     <NodeSlot
                       key={stepSocket.id}
-                      socket={stepSocket}
                       type="target"
-                      edit={showEditElements}
-                      allowEditSockets={allowEditSockets}
-                      onEditSocketData={handleEditSocketData(stepSocket.id)}
-                      onEditSocketLabel={handleEditSocketLabel(stepSocket.id)}
-                      onDeleteSocket={deleteSocket(stepSocket.id)}
+                      socket={stepSocket}
+                      onEditData={inEditMode ? onEditData(stepSocket.id) : undefined}
+                      onEditLabel={editableLabel ? onEditLabel(stepSocket.id) : undefined}
+                      onDelete={canDeleteSockets ? onDeleteSocket(stepSocket.id) : undefined}
                     />
                   ))}
-                {showEditElements && allowEditSockets && (
+                {canAddSockets && (
                   <Button
                     size={"sm"}
                     className="ml-2 h-fit w-fit px-1 py-1"
@@ -165,15 +166,14 @@ export function StepNode({ data }: { data: Step }) {
                   .map((stepSocket: StepSocket) => (
                     <NodeSlot
                       key={stepSocket.id}
-                      socket={stepSocket}
                       type="source"
-                      edit={showEditElements}
-                      allowEditSockets={allowEditSockets}
-                      onEditSocketLabel={handleEditSocketLabel(stepSocket.id)}
-                      onDeleteSocket={deleteSocket(stepSocket.id)}
+                      socket={stepSocket}
+                      onEditData={inEditMode ? onEditData(stepSocket.id) : undefined}
+                      onEditLabel={editableLabel ? onEditLabel(stepSocket.id) : undefined}
+                      onDelete={canDeleteSockets ? onDeleteSocket(stepSocket.id) : undefined}
                     />
                   ))}
-                {showEditElements && allowEditSockets && (
+                {canAddSockets && (
                   <Button
                     size={"sm"}
                     className="mr-2 h-fit w-fit self-end px-1 py-1"
