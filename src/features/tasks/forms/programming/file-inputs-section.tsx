@@ -107,7 +107,6 @@ const FileInputSection = () => {
   };
 
   const handlePathChange = (oldPath: string, newPath: string) => {
-    // TODO: Check if newPath is valid
     if (oldPath.endsWith("/") && !newPath.endsWith("/")) {
       return false;
     }
