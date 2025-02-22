@@ -118,7 +118,7 @@ const DataSocket = ({
       {onEditLabel ? (
         <NodeInput className={[cn({ "text-right": type === "source" })]} value={socketLabel} onChange={onEditLabel} />
       ) : (
-        socketLabel && <span className="min-h-[12px] px-2 text-lg">{socketLabel}</span>
+        socketLabel && <span className="min-h-[12px]">{socketLabel}</span>
       )}
 
       {onEditData && type === "target" && (
