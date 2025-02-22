@@ -13,6 +13,7 @@ import {
 } from "@/features/problems/components/tasks/graph-context";
 import { createSocket } from "@/lib/compute-graph";
 import { isFolder, TreeFile, TreeFolder } from "@/lib/files";
+import { isFile } from "@/lib/utils";
 
 import InputTable from "../input-table/input-table";
 import InputMetadataRow from "./input-metadata-row";
@@ -22,7 +23,7 @@ type OwnProps = {
 };
 
 const InputMetadata: React.FC<OwnProps> = ({ step }) => {
-  const { edit, files } = useContext(GraphContext)!;
+  const { steps, edit, files } = useContext(GraphContext)!;
   const dispatch = useContext(GraphDispatchContext)!;
 
   const isStepEditable = !step.is_user;
@@ -71,8 +72,20 @@ const InputMetadata: React.FC<OwnProps> = ({ step }) => {
           if (isFolder(treeFile)) {
             treeFile.children.forEach(addFileToInputStep);
           } else {
+            // If the file wasn't in the task file list, no-op.
             const file = files.find((file) => file.id === treeFile.id);
             if (!file) return;
+
+            // If the file is already somewhere in the graph, also no-op.
+            if (
+              steps.some(
+                (step) =>
+                  step.type === "INPUT_STEP" &&
+                  step?.outputs?.some((socket) => isFile(socket.data) && socket.data?.id === file.id),
+              )
+            )
+              return;
+
             dispatch({
               type: GraphActionType.AddSocket,
               payload: {
@@ -87,7 +100,7 @@ const InputMetadata: React.FC<OwnProps> = ({ step }) => {
         addFileToInputStep(draggedItem);
       },
     }),
-    [],
+    [steps],
   );
 
   const addOutputSocket = useCallback(() => {
