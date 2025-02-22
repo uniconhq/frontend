@@ -77,7 +77,6 @@ const OutputMetadata: React.FC<OwnProps> = ({ step, editable }) => {
             onUpdateSocketMetadata={updateSocketMetadata(index)}
             onEditSocketLabel={handleEditSocketLabel(socket.id)}
             onDeleteSocket={deleteSocket(socket.id)}
-            isEditable={socket.type != "CONTROL"}
           />
         ))}
       </TableBody>
