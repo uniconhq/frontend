@@ -45,7 +45,7 @@ export const ProgrammingEnvironment = ({ environment }: { environment: ComputeCo
               <span className="text-xs text-zinc-400">Dependencies</span>
               <div className="flex flex-wrap gap-2">
                 {dependencies.map((req) => (
-                  <Badge className="py-1 font-mono text-xs font-medium" variant="outline">
+                  <Badge key={req} className="py-1 font-mono text-xs font-medium" variant="outline">
                     {req}
                   </Badge>
                 ))}
