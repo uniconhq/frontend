@@ -2,11 +2,12 @@ import { useQuery } from "@tanstack/react-query";
 import { format, parseISO } from "date-fns";
 import { Pencil } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
+import ConfirmationDialog from "@/components/confirmation-dialog";
 import { Button } from "@/components/ui/button";
 import { DraftBadge, RestrictedBadge } from "@/features/problems/components/badges";
-import { getProblemById } from "@/features/problems/queries";
+import { getProblemById, useCreateProblemSubmission } from "@/features/problems/queries";
 import { useProblemId, useProjectId } from "@/features/projects/hooks/use-id";
 import TaskCard from "@/features/tasks/components/task-card";
 import { cn } from "@/lib/utils";
@@ -54,13 +55,23 @@ function TimelineDate({ date, position }: { date: Date; position: "start" | "end
 const Problem = () => {
   const projectId = useProjectId();
   const problemId = useProblemId();
+  const navigate = useNavigate();
+  const createSubmission = useCreateProblemSubmission(problemId);
 
   const { data: problem } = useQuery(getProblemById(problemId));
   if (!problem) return;
   const { edit: canEdit, make_submission: canSubmit, restricted, published, started_at, ended_at } = problem;
 
+  const handleSubmit = async () => {
+    createSubmission.mutate(undefined, {
+      onSuccess: (response) => {
+        navigate(`/projects/${projectId}/submissions/${response.data?.id}`);
+      },
+    });
+  };
+
   return (
-    <div className="flex w-full flex-col gap-8 px-8 py-6">
+    <div className="flex flex-col gap-8 px-8 py-6">
       <div className="flex items-center justify-between">
         <h1 className="flex items-center gap-4 text-3xl font-medium">
           <span>
@@ -69,13 +80,24 @@ const Problem = () => {
           {restricted && <RestrictedBadge />}
           {!published && <DraftBadge />}
         </h1>
-        {canEdit && (
-          <Link to={`/projects/${projectId}/problems/${problemId}/edit`}>
-            <Button variant="outline">
-              <Pencil /> Edit problem
-            </Button>
-          </Link>
-        )}
+        <div className="flex items-center gap-2">
+          {canEdit && (
+            <Link to={`/projects/${projectId}/problems/${problemId}/edit`}>
+              <Button variant="outline">
+                <Pencil /> Edit problem
+              </Button>
+            </Link>
+          )}
+          {canSubmit && (
+            <ConfirmationDialog
+              onConfirm={handleSubmit}
+              title="Confirm Submission"
+              description="Are you sure you want to submit?"
+            >
+              <Button variant="primary">Submit</Button>
+            </ConfirmationDialog>
+          )}
+        </div>
       </div>
       <div className="flex flex-col gap-4">
         <div className="text-lg font-medium">Timeline</div>
