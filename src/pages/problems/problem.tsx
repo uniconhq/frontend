@@ -1,75 +1,102 @@
 import { useQuery } from "@tanstack/react-query";
-import { Pencil, Plus } from "lucide-react";
+import { format, parseISO } from "date-fns";
+import { Pencil } from "lucide-react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
-import { Table, TableCell, TableHead, TableRow } from "@/components/ui/table";
 import { DraftBadge, RestrictedBadge } from "@/features/problems/components/badges";
 import { getProblemById } from "@/features/problems/queries";
 import { useProblemId, useProjectId } from "@/features/projects/hooks/use-id";
 import TaskCard from "@/features/tasks/components/task-card";
-import { formatDateLong } from "@/utils/date";
+import { cn } from "@/lib/utils";
+
+interface TimelineVizProps {
+  startDate: Date;
+  endDate: Date;
+}
+
+export function TimelineViz({ startDate, endDate }: TimelineVizProps) {
+  const [progress, setProgress] = useState(0);
+
+  useEffect(() => {
+    const now = new Date();
+    const total = endDate.getTime() - startDate.getTime();
+    const current = now.getTime() - startDate.getTime();
+
+    // Calculate progress percentage
+    const progressPercent = Math.max(0, Math.min(100, (current / total) * 100));
+    setProgress(progressPercent);
+  }, [startDate, endDate]);
+
+  return (
+    <div className="flex w-full flex-col gap-4">
+      <div className="relative h-2.5 overflow-hidden rounded-full bg-muted">
+        <div className="absolute h-full rounded-r-full bg-purple-400" style={{ width: `${progress}%` }} />
+      </div>
+      <div className="flex justify-between">
+        <TimelineDate date={startDate} position="start" />
+        <TimelineDate date={endDate} position="end" />
+      </div>
+    </div>
+  );
+}
+
+function TimelineDate({ date, position }: { date: Date; position: "start" | "end" }) {
+  return (
+    <div className={cn("grid gap-0.5 text-sm text-muted-foreground", position === "end" && "text-right")}>
+      <span className="font-light capitalize">{position}</span>
+      <span className="font-medium">{format(date, "MMMM d, HH:mm")}</span>
+    </div>
+  );
+}
 
 const Problem = () => {
   const projectId = useProjectId();
-  const id = useProblemId();
-  const { data } = useQuery(getProblemById(id));
-  const submitLink = `/projects/${projectId}/problems/${id}/submissions/new`;
-  const editLink = `/projects/${projectId}/problems/${id}/edit`;
+  const problemId = useProblemId();
 
-  if (!data) {
-    return;
-  }
+  const { data: problem } = useQuery(getProblemById(problemId));
+  if (!problem) return;
+  const { edit: canEdit, make_submission: canSubmit, restricted, published, started_at, ended_at } = problem;
+
   return (
     <div className="flex w-full flex-col gap-8 px-8 py-6">
-      <div className="flex justify-between">
-        <div>
-          <h1 className="mb-4 flex items-center gap-4 text-2xl font-semibold">
-            {data.name} (#{id}) {data.restricted && <RestrictedBadge />}
-            {!data.published && <DraftBadge />}
-          </h1>
-        </div>
-        <div className="flex gap-1">
-          {data.edit && (
-            <Link to={editLink} className="flex gap-1">
-              <Button variant="ghost" className="hover:text-purple-300">
-                <Pencil /> Edit problem
-              </Button>
-            </Link>
-          )}
-          {data.make_submission && (
-            <Link to={submitLink} className="flex gap-1">
-              <Button variant="ghost" className="hover:text-purple-300">
-                <Plus /> New Submission
-              </Button>
-            </Link>
-          )}
+      <div className="flex items-center justify-between">
+        <h1 className="flex items-center gap-4 text-3xl font-medium">
+          <span>
+            {problem.name} (<code>#{problemId}</code>)
+          </span>
+          {restricted && <RestrictedBadge />}
+          {!published && <DraftBadge />}
+        </h1>
+        {canEdit && (
+          <Link to={`/projects/${projectId}/problems/${problemId}/edit`}>
+            <Button variant="outline">
+              <Pencil /> Edit problem
+            </Button>
+          </Link>
+        )}
+      </div>
+      <div className="flex flex-col gap-4">
+        <div className="text-lg font-medium">Timeline</div>
+        <div className="xl:w-1/3">
+          <TimelineViz startDate={parseISO(started_at)} endDate={parseISO(ended_at)} />
         </div>
       </div>
-      <Table>
-        <TableRow>
-          <TableHead>Starts at</TableHead>
-          <TableCell>{formatDateLong(data.started_at)}</TableCell>
-        </TableRow>
-        <TableRow>
-          <TableHead>Ends at</TableHead>
-          <TableCell>{formatDateLong(data.ended_at)}</TableCell>
-        </TableRow>
-        <TableRow>
-          <TableHead>Description</TableHead>
-          <TableCell>{data.description}</TableCell>
-        </TableRow>
-      </Table>
+      <div className="flex flex-col gap-2">
+        <div className="text-lg font-medium">Description</div>
+        <p className="text-muted-foreground">Add 2 integers (error propagation)</p>
+      </div>
       <div className="flex flex-col gap-8">
-        {data?.tasks.map((task, index) => (
+        {problem.tasks.map((task, index) => (
           <TaskCard
             index={index}
             key={task.id}
             task={task}
-            problemId={id}
+            problemId={problemId}
             projectId={projectId}
             edit={false}
-            submit={data.make_submission}
+            submit={canSubmit}
           />
         ))}
       </div>
