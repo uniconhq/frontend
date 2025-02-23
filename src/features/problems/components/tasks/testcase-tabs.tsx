@@ -20,7 +20,7 @@ type OwnProps = {
   edit: boolean;
   taskFiles: File[];
   sharedUserInput?: InputStep;
-  onDelete?: (index: number) => void;
+  onDelete?: (index: number) => () => void;
   onGraphChange?: (index: number) => (action: GraphAction) => void;
   onSettingsChange?: (index: number) => (change: SettingsChange) => void;
   onDuplicateTestcase?: (index: number) => () => void;
@@ -87,16 +87,18 @@ const TestcaseTabs: React.FC<OwnProps> = ({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {testcaseOutputSteps[index].inputs.map((socket) => (
-                  <TableRow key={socket.id}>
-                    <TableCell>{socket.label}</TableCell>
-                    <TableCell>
-                      {socket.comparison
-                        ? `${socket.comparison?.operator} ${JSON.stringify(socket.comparison?.value)}`
-                        : "-"}
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {testcaseOutputSteps[index].inputs
+                  .filter((socket) => socket.type === "DATA")
+                  .map((socket) => (
+                    <TableRow key={socket.id}>
+                      <TableCell>{socket.label}</TableCell>
+                      <TableCell>
+                        {socket.comparison
+                          ? `${socket.comparison?.operator} ${JSON.stringify(socket.comparison?.value)}`
+                          : "-"}
+                      </TableCell>
+                    </TableRow>
+                  ))}
               </TableBody>
             </Table>
           )}

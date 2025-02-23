@@ -37,9 +37,11 @@ const ProgrammingResult: React.FC<OwnProps> = ({ taskAttempt, problemId }) => {
               );
             })}
           </TabsList>
-          <div className="flex items-center px-4 text-sm uppercase text-muted-foreground">
-            Private testcase(s) failed.
-          </div>
+          {taskAttempt.has_private_failure && (
+            <div className="flex items-center px-4 text-sm uppercase text-muted-foreground">
+              Private testcase(s) failed.
+            </div>
+          )}
         </div>
         {taskResult.result.map((testcaseResult, index) => (
           <TabsContent className="mt-4" value={testcaseResult.id} key={testcaseResult.id}>

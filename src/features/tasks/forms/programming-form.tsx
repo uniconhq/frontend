@@ -405,7 +405,9 @@ const ProgrammingForm: React.FC<OwnProps> = ({ title, initialValue, onSubmit }) 
                 onGraphChange={updateTestcaseGraph}
                 onSettingsChange={updateTestcaseSettings}
                 onDuplicateTestcase={(index) => () => duplicateTestcase(index)}
-                onDelete={(index) => () => testcases.remove(index)}
+                onDelete={(index) => () => {
+                  testcases.remove(index);
+                }}
               />
             </div>
           </div>

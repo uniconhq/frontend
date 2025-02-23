@@ -15,7 +15,7 @@ type TestcaseProps = {
   // Used during testcase creation where each testcase has the same user input
   // NOTE: If this is set, the nodes in the testcase will not contain the user input node
   sharedUserInput?: InputStep;
-  onDelete?: (index: number) => void;
+  onDelete?: (index: number) => () => void;
   // For testcase settings metadata (e.g. name, private)
   onSettingsChange?: (change: { name?: string; isPrivate?: boolean }) => void;
   onDuplicateTestcase?: () => void;
@@ -46,7 +46,7 @@ const Testcase: React.FC<TestcaseProps> = ({
       onChange={nodeGraphOnChange}
       // For testcase settings menu
       settings={settings}
-      onDelete={onDelete && (() => onDelete(index))}
+      onDelete={onDelete && onDelete(index)}
       onSettingsChange={onSettingsChange}
       onDuplicateTestcase={onDuplicateTestcase}
     />

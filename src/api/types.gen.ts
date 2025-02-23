@@ -292,6 +292,7 @@ export type ParsedFunction = {
 };
 
 export type Problem = {
+    id?: number | null;
     name: string;
     restricted: boolean;
     published?: boolean;
@@ -337,6 +338,7 @@ export type ProblemOrm = {
 };
 
 export type ProblemPublic = {
+    id?: number | null;
     name: string;
     restricted: boolean;
     published?: boolean;
@@ -612,6 +614,7 @@ export type TaskAttemptPublic = {
     };
     task_results: Array<TaskResult>;
     task: TaskOrm;
+    has_private_failure?: boolean;
 };
 
 export type TaskAttemptResult = {

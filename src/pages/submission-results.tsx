@@ -32,8 +32,7 @@ const SubmissionResults = () => {
     }
   }, [task_attempts, pending]);
 
-  const contest_id: number = task_attempts ? task_attempts[0]?.task?.problem_id : 0;
-
+  const problemId = submission?.problem_id;
   if (!submission) {
     return null;
   }
@@ -42,9 +41,9 @@ const SubmissionResults = () => {
     <div className="flex w-full flex-col gap-8 px-8 py-6">
       <div className="flex items-center gap-2">
         <h1 className="text-2xl font-semibold">Submission (#{id})</h1>
-        <Link to={`/projects/${projectId}/problems/${contest_id}`}>
+        <Link to={`/projects/${projectId}/problems/${problemId}}`}>
           <Button variant="outline" className="font-mono text-sm hover:text-purple-500">
-            CONTEST #{contest_id}
+            Problem #{problemId}
           </Button>
         </Link>
       </div>
