@@ -55,7 +55,7 @@ const TestcaseTabs: React.FC<OwnProps> = ({
     <Tabs defaultValue={testcases[0]?.id}>
       <TabsList>
         {testcases.map((testcase, index) => (
-          <TabsTrigger key={testcase.id} value={testcase.id} className="text-base">
+          <TabsTrigger key={testcase.id} value={testcase.id} className="text-sm">
             #{index + 1} {testcase.name} {testcase.is_private ? "(Private)" : ""}
           </TabsTrigger>
         ))}

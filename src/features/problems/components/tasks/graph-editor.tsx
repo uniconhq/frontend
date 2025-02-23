@@ -18,7 +18,7 @@ import {
   useNodesState,
 } from "@xyflow/react";
 import { CopyPlus, ExpandIcon, ShrinkIcon } from "lucide-react";
-import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { GraphEdgeStr as GraphEdge, InputStep } from "@/api";
 import { StepNode } from "@/components/node-graph/components/step/step-node";
@@ -106,7 +106,7 @@ const GraphEditor: React.FC<GraphEditorProps> = ({
 
   // Fit graph to viewport after layout is applied
   // This will only be done once after layout is applied and not on every update graph state (e.g. node/edge changes)
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (layoutApplied && rfInstance) rfInstance.fitView();
   }, [layoutApplied, rfInstance]);
 
@@ -240,7 +240,7 @@ const GraphEditor: React.FC<GraphEditorProps> = ({
             socketId: socket.id,
           },
         });
-        rfInstance?.fitView({ nodes: [{ id: step.id }], duration: 1000, maxZoom: 0.8 });
+        setTimeout(() => rfInstance?.fitView({ nodes: [{ id: step.id }], duration: 1000, maxZoom: 0.8 }), 0);
       }
     },
     highlighted: isFile(selectedSocket?.data) && selectedSocket?.data.id === file.id,
@@ -305,6 +305,7 @@ const GraphEditor: React.FC<GraphEditorProps> = ({
             isValidConnection={isValidConnection}
             colorMode="dark"
             proOptions={{ hideAttribution: true }}
+            className={cn(!layoutApplied && "")}
           >
             {/* Custom controls */}
             <div
