@@ -47,7 +47,7 @@ const Choices: React.FC<OwnProps> = ({ choices, onDragEnd, isChecked, onCheck, o
                     <div className="flex-grow">
                       <TextField name={`choices[${index}].text`} />
                     </div>
-                    <Button type="button" variant={"destructive"} onClick={() => onDelete(index)}>
+                    <Button type="button" variant="destructive" onClick={() => onDelete(index)}>
                       <TrashIcon />
                     </Button>
                   </Card>

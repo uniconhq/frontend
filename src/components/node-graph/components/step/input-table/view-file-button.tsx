@@ -46,7 +46,7 @@ const ViewFileButton: React.FC<OwnProps> = ({ step, socket }) => {
       type="button"
       size={"sm"}
       className="h-fit w-fit px-1 py-1"
-      variant={"secondary"}
+      variant="secondary"
       onClick={() => {
         dispatch({
           type: GraphActionType.SelectSocket,

@@ -34,7 +34,7 @@ const RerunDialog: React.FC<OwnProps> = ({ isSafe, onClose, onSaveWithRerun, onS
           <div className="flex space-x-2">
             {isSafe && (
               <>
-                <Button variant={"destructive"} onClick={onSaveWithoutRerun}>
+                <Button variant="destructive" onClick={onSaveWithoutRerun}>
                   Save only
                 </Button>
                 <AlertDialogAction onClick={onSaveWithRerun}>Save and rerun</AlertDialogAction>
@@ -42,7 +42,7 @@ const RerunDialog: React.FC<OwnProps> = ({ isSafe, onClose, onSaveWithRerun, onS
             )}
             {!isSafe && (
               <>
-                <Button variant={"destructive"} onClick={onSaveWithRerun}>
+                <Button variant="destructive" onClick={onSaveWithRerun}>
                   Save and rerun
                 </Button>
                 <AlertDialogAction onClick={onSaveWithoutRerun}>Save only</AlertDialogAction>

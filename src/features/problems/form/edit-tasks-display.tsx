@@ -48,7 +48,7 @@ const EditTasksDisplay: React.FC<OwnProps> = ({ tasks, problemId, projectId, han
       {tasks.length > 0 && (
         <>
           <CreateTaskPopover>
-            <Button variant={"secondary"} className="mt-2" type="button">
+            <Button variant="secondary" className="mt-2" type="button">
               <PlusIcon />
               Add task
             </Button>

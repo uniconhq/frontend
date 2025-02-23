@@ -55,7 +55,7 @@ export default function DateTimeField({ name, label, description }: DateFieldPro
             <PopoverTrigger asChild>
               <FormControl>
                 <Button
-                  variant={"outline"}
+                  variant="outline"
                   className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")}
                 >
                   {field.value ? format(field.value, "dd/MM/yyyy hh:mm aa") : <span>DD/MM/YYYY hh:mm aa</span>}

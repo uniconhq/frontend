@@ -102,10 +102,7 @@ const ProgrammingForm: React.FC<OwnProps> = ({ title, initialValue, onSubmit }) 
     reader.readAsText(depsFile);
   };
 
-  const [sharedUserInputStep, setSharedInputStep] = useState<InputStep>({
-    ...DEFAULT_USER_INPUT_STEP,
-    outputs: form.getValues("required_user_inputs"),
-  });
+  const [sharedUserInputStep, setSharedInputStep] = useState<InputStep>({ ...DEFAULT_USER_INPUT_STEP, outputs: [] });
 
   useSyncFormFieldsMultiple({
     form,
@@ -349,7 +346,7 @@ const ProgrammingForm: React.FC<OwnProps> = ({ title, initialValue, onSubmit }) 
                       onChange={(newLabel) => updateUserInput(index, { newLabel })}
                     />
                     <CollapsibleTrigger asChild>
-                      <Button variant={"secondary"} type="button" className="text-xs">
+                      <Button variant="secondary" type="button" className="text-xs">
                         View/Edit
                       </Button>
                     </CollapsibleTrigger>

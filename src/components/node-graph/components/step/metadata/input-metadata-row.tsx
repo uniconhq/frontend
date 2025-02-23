@@ -42,7 +42,7 @@ const InputMetadataRow: React.FC<OwnProps> = ({
     <TableRow className={cn({ "!bg-emerald-900 hover:bg-emerald-800": rowIsSelected })}>
       <TableCell>
         {isEditable && (
-          <Button size={"sm"} className="h-fit w-fit px-1 py-1" variant={"secondary"} onClick={onDelete} type="button">
+          <Button size={"sm"} className="h-fit w-fit px-1 py-1" variant="secondary" onClick={onDelete} type="button">
             <Trash className="h-2 w-2" />
           </Button>
         )}
@@ -91,7 +91,7 @@ const InputMetadataRow: React.FC<OwnProps> = ({
       </TableCell>
       <TableCell>
         <NodeSlot
-          style={{ width: "20px", borderRadius: "10px", right: "-12px" }}
+          handleStyle={{ width: "20px", borderRadius: "10px", right: "-12px" }}
           socket={socket}
           type="source"
           hideLabel
