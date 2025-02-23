@@ -107,7 +107,9 @@ const GraphEditor: React.FC<GraphEditorProps> = ({
   // Fit graph to viewport after layout is applied
   // This will only be done once after layout is applied and not on every update graph state (e.g. node/edge changes)
   useLayoutEffect(() => {
-    if (layoutApplied && rfInstance) rfInstance.fitView();
+    if (layoutApplied && rfInstance) {
+      setTimeout(() => rfInstance.fitView(), 0);
+    }
   }, [layoutApplied, rfInstance]);
 
   // Update ReactFlow internal states when graph state changes

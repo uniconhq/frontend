@@ -9,6 +9,7 @@ import ProgrammingResult from "./result-types/programming-result";
 type OwnProps = {
   title: string;
   taskAttempt: TaskAttemptPublic;
+  problemId: number;
 };
 
 const taskStatusToColor = (status: string) => {
@@ -24,7 +25,7 @@ const taskStatusToColor = (status: string) => {
 
 const parseDateTime = (dateTimeString: string) => new Date(dateTimeString).toLocaleString();
 
-const TaskResultCard: React.FC<OwnProps> = ({ title, taskAttempt }) => {
+const TaskResultCard: React.FC<OwnProps> = ({ title, taskAttempt, problemId }) => {
   const taskResult = taskAttempt.task_results[0];
 
   if (!taskResult) {
@@ -62,7 +63,9 @@ const TaskResultCard: React.FC<OwnProps> = ({ title, taskAttempt }) => {
           <span className="text-gray-300">Manual grading is required!</span>
         ) : (
           <>
-            {taskAttempt.task.type === "PROGRAMMING_TASK" && <ProgrammingResult taskAttempt={taskAttempt} />}
+            {taskAttempt.task.type === "PROGRAMMING_TASK" && (
+              <ProgrammingResult taskAttempt={taskAttempt} problemId={problemId} />
+            )}
             {taskAttempt.task.type === "MULTIPLE_CHOICE_TASK" && <MultipleChoiceResult taskAttempt={taskAttempt} />}
             {taskAttempt.task.type === "SHORT_ANSWER_TASK" && (
               <pre className="whitespace-pre-wrap rounded-md bg-gray-900 p-4 text-gray-100">

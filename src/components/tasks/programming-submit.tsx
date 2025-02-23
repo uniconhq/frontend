@@ -165,6 +165,7 @@ export function ProgrammingSubmitForm({
                   other_fields: { ...task },
                 },
               }}
+              problemId={problemId}
             />
           ) : null}
         </div>

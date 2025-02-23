@@ -53,14 +53,15 @@ const TestcaseTabs: React.FC<OwnProps> = ({
   );
   return (
     <Tabs defaultValue={testcases[0]?.id}>
-      <TabsList>
-        {testcases.map((testcase, index) => (
-          <TabsTrigger key={testcase.id} value={testcase.id} className="text-sm">
-            #{index + 1} {testcase.name} {testcase.is_private ? "(Private)" : ""}
-          </TabsTrigger>
-        ))}
-      </TabsList>
-      {}
+      <div className="flex justify-between">
+        <TabsList>
+          {testcases.map((testcase, index) => (
+            <TabsTrigger key={testcase.id} value={testcase.id} className="text-sm">
+              #{index + 1} {testcase.name} {testcase.is_private ? "(Private)" : ""}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+      </div>
       {testcases.map((testcase, index) => (
         <TabsContent key={testcase.id} value={testcase.id}>
           {showDetails && (

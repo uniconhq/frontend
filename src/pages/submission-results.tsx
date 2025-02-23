@@ -8,7 +8,7 @@ import { getSubmissionById } from "@/features/problems/queries";
 import { useProjectId } from "@/features/projects/hooks/use-id";
 
 const SubmissionResults = () => {
-  const { id } = useParams<{ id: string }>();
+  const { submissionId: id } = useParams<{ submissionId: string }>();
   const projectId = useProjectId();
 
   const [pending, setPending] = useState(true);
@@ -34,6 +34,10 @@ const SubmissionResults = () => {
 
   const contest_id: number = task_attempts ? task_attempts[0]?.task?.problem_id : 0;
 
+  if (!submission) {
+    return null;
+  }
+
   return (
     <div className="flex w-full flex-col gap-8 px-8 py-6">
       <div className="flex items-center gap-2">
@@ -52,6 +56,7 @@ const SubmissionResults = () => {
                 key={task_attempt.id}
                 title={`Task #${task_attempt.task_id + 1}`}
                 taskAttempt={task_attempt}
+                problemId={submission?.problem_id}
               />
             ),
         )}
