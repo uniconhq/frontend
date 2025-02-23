@@ -28,7 +28,7 @@ export function Programming({
         <TaskSectionHeader content="Testcases" />
         <div className="flex flex-col gap-2 font-mono text-gray-300">
           {task.testcases.map((testcase, index) => (
-            <Testcase edit={false} key={testcase.id} index={index} testcase={testcase} />
+            <Testcase edit={false} key={testcase.id} index={index} testcase={testcase} taskFiles={task.files} />
           ))}
         </div>
       </TaskSection>

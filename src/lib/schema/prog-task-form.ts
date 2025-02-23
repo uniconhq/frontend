@@ -8,16 +8,23 @@ export const DEFAULT_PY_VERSION: PythonVersion = "3.11.9";
 const positiveLimitZ = (label: string) => z.coerce.number().positive(`${label} must be greater than 0!`);
 
 const FileZ = z.object({
-  name: z.string().nonempty("File name cannot be empty!"),
+  id: z.string(),
+  path: z.string().nonempty("File name cannot be empty!"),
   content: z.string(),
   trusted: z.boolean().optional(),
+  key: z.string().optional().nullable(),
+  on_minio: z.boolean().optional(),
 });
+
+export type FileT = z.infer<typeof FileZ>;
 
 const RequiredInputZ = z.object({
   id: z.string().nonempty("Input ID cannot be empty!"),
   label: z.string().nonempty("Input Label cannot be empty!"),
   data: z.union([z.string(), z.number(), z.boolean(), FileZ]),
 });
+
+export type RequiredInputT = z.infer<typeof RequiredInputZ>;
 
 const SlurmOptionZ = z
   .string()
@@ -40,6 +47,16 @@ export const ProgTaskFormZ = TaskFormZ.extend({
   }),
   required_user_inputs: z.array(RequiredInputZ),
   testcases: z.array(z.custom<Testcase>(() => true)),
+  files: z.array(FileZ),
+}).superRefine((values, context) => {
+  // If `slurm` is not enabled, `slurm_options` should be empty
+  if (!values.environment.slurm && values.environment.slurm_options.length) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "There should no be Slurm options when Slurm is disabled!",
+      path: ["slurm_options"],
+    });
+  }
 });
 
 export type ProgTaskFormT = z.infer<typeof ProgTaskFormZ>;
@@ -60,6 +77,7 @@ export const toProgrammingTask = (form: ProgTaskFormT): Omit<ProgrammingTask, "o
   },
   required_inputs: form.required_user_inputs,
   testcases: form.testcases,
+  files: form.files,
 });
 
 export const fromProgrammingTask = (progTask: ProgrammingTask): ProgTaskFormT => ({
@@ -81,4 +99,5 @@ export const fromProgrammingTask = (progTask: ProgrammingTask): ProgTaskFormT =>
     data: input.data,
   })),
   testcases: progTask.testcases,
+  files: progTask.files,
 });

@@ -23,7 +23,11 @@ const GraphFileEditor = () => {
     });
   };
 
-  const updateFileName = (newName: string) => updateFile({ ...file, name: newName });
+  const updateFileName = (newName: string) => {
+    const splitPath = file.path.split("/");
+    const folderPath = splitPath.slice(0, -1).join("/");
+    updateFile({ ...file, path: `${folderPath}/${newName}` });
+  };
 
   const updateFileContent = useDebouncedCallback((newFileContent: string) => {
     updateFile({ ...file, content: newFileContent });
@@ -40,8 +44,8 @@ const GraphFileEditor = () => {
 
   return (
     <FileEditor
-      key={selectedStepId + file.name}
-      fileName={file.name}
+      key={selectedStepId + file.path}
+      fileName={file.path.split("/").pop()!}
       fileContent={file.content}
       onUpdateFileName={updateFileName}
       onUpdateFileContent={updateFileContent}

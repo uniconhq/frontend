@@ -1,10 +1,12 @@
 import { Trash } from "lucide-react";
+import { useContext } from "react";
 
 import { InputStep, StepSocket } from "@/api";
 import ConfirmationDialog from "@/components/confirmation-dialog";
 import { Button } from "@/components/ui/button";
 import { TableCell, TableRow } from "@/components/ui/table";
-import { isFile } from "@/lib/utils";
+import { GraphContext } from "@/features/problems/components/tasks/graph-context";
+import { cn, isFile } from "@/lib/utils";
 
 import { NodeSlot } from "../../node-slot";
 import ViewFileButton from "../input-table/view-file-button";
@@ -34,8 +36,10 @@ const InputMetadataRow: React.FC<OwnProps> = ({
   step,
   isEditable,
 }) => {
+  const { selectedSocketId, selectedStepId } = useContext(GraphContext)!;
+  const rowIsSelected = selectedSocketId === socket.id && selectedStepId === step.id;
   return (
-    <TableRow>
+    <TableRow className={cn({ "!bg-emerald-900 hover:bg-emerald-800": rowIsSelected })}>
       <TableCell>
         {isEditable && (
           <Button size={"sm"} className="h-fit w-fit px-1 py-1" variant="secondary" onClick={onDelete} type="button">
@@ -54,7 +58,7 @@ const InputMetadataRow: React.FC<OwnProps> = ({
         {socket.data && isFile(socket.data) ? (
           <div className="flex gap-2">
             <ViewFileButton step={step} socket={socket} />
-            {isEditable && (
+            {isEditable && !socket.data.on_minio && (
               <ConfirmationDialog
                 onConfirm={onChangeToValue}
                 description="Are you sure you want to change this file to a primitive value?"
