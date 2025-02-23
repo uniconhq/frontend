@@ -17,7 +17,7 @@ import {
   useNodesInitialized,
   useNodesState,
 } from "@xyflow/react";
-import { ExpandIcon, ShrinkIcon } from "lucide-react";
+import { CopyPlus, ExpandIcon, ShrinkIcon } from "lucide-react";
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 
 import { GraphEdgeStr as GraphEdge, InputStep } from "@/api";
@@ -32,6 +32,7 @@ import getLayoutedElements from "@/utils/graph";
 import AddNodeButton from "./add-node-button";
 import { GraphActionType, GraphContext, GraphDispatchContext } from "./graph-context";
 import GraphFileEditor from "./graph-file-editor";
+import TestcaseSettings from "./testcase-settings";
 import { Step } from "./types";
 
 type RfInstance = ReactFlowInstance<Node<Step>, Edge>;
@@ -39,6 +40,12 @@ type RfInstance = ReactFlowInstance<Node<Step>, Edge>;
 type GraphEditorProps = {
   graphId: string;
   className?: string;
+
+  // For testcase settings menu
+  settings?: { name?: string; isPrivate?: boolean };
+  onDelete?: () => void;
+  onSettingsChange?: (change: { name?: string; isPrivate?: boolean }) => void;
+  onDuplicateTestcase?: () => void;
 };
 
 const nodeTypes = { step: StepNode };
@@ -63,7 +70,14 @@ const stepEdgeToRfEdge = (edge: GraphEdge): Edge => ({
   },
 });
 
-const GraphEditor: React.FC<GraphEditorProps> = ({ graphId, className }) => {
+const GraphEditor: React.FC<GraphEditorProps> = ({
+  graphId,
+  className,
+  onDelete,
+  onSettingsChange,
+  settings,
+  onDuplicateTestcase,
+}) => {
   const { steps, edges, edit, selectedSocketId, selectedStepId, files } = useContext(GraphContext)!;
   const dispatch = useContext(GraphDispatchContext)!;
 
@@ -307,6 +321,14 @@ const GraphEditor: React.FC<GraphEditorProps> = ({ graphId, className }) => {
               </div>
               <div className="flex space-x-1">
                 {edit && <AddNodeButton />}
+                {edit && onDelete && settings && onSettingsChange && (
+                  <TestcaseSettings onDelete={onDelete} onSettingsChange={onSettingsChange} settings={settings} />
+                )}
+                {edit && onDuplicateTestcase && (
+                  <Button onClick={onDuplicateTestcase} type="button" variant="outline">
+                    <CopyPlus /> Duplicate testcase
+                  </Button>
+                )}
                 <Button onClick={() => setExpanded((prev) => !prev)} type="button" variant="outline">
                   {expanded ? <ShrinkIcon /> : <ExpandIcon />}
                 </Button>

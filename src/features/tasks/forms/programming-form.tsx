@@ -17,7 +17,7 @@ import { Form, FormLabel } from "@/components/ui/form";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import FileEditor from "@/features/problems/components/tasks/file-editor";
 import { GraphAction, graphReducer } from "@/features/problems/components/tasks/graph-context";
-import Testcase from "@/features/problems/components/tasks/testcase";
+import TestcaseTabs from "@/features/problems/components/tasks/testcase-tabs";
 import { getSupportedPythonVersions } from "@/features/problems/queries";
 import { DEFAULT_PY_VERSION, ProgTaskFormT, ProgTaskFormZ } from "@/lib/schema/prog-task-form";
 import { isFile, useSyncFormFieldsMultiple, uuid } from "@/lib/utils";
@@ -144,6 +144,10 @@ const ProgrammingForm: React.FC<OwnProps> = ({ title, initialValue, onSubmit }) 
   const addTestcase = () =>
     testcases.append({ id: uuid(), order_index: testcases.fields.length, nodes: [sharedUserInputStep], edges: [] });
 
+  const duplicateTestcase = (index: number) => {
+    testcases.append({ ...testcases.fields[index], id: uuid(), order_index: testcases.fields.length });
+  };
+
   const addUserInput = () => userInputs.append(createDefaultUserInput());
 
   const updateUserInput = (
@@ -189,7 +193,7 @@ const ProgrammingForm: React.FC<OwnProps> = ({ title, initialValue, onSubmit }) 
     );
   };
 
-  const updateTestcase = (index: number) => (action: GraphAction) => {
+  const updateTestcaseGraph = (index: number) => (action: GraphAction) => {
     const testcase = form.getValues("testcases")[index];
     const newState = produce(
       {
@@ -210,6 +214,13 @@ const ProgrammingForm: React.FC<OwnProps> = ({ title, initialValue, onSubmit }) 
       nodes: newState.steps,
       edges: newState.edges,
     });
+  };
+
+  const updateTestcaseSettings = (index: number) => (change: { name?: string; isPrivate?: boolean }) => {
+    const testcase = form.getValues("testcases")[index];
+    const newTestcase = { ...testcase, ...{ name: change.name, is_private: change.isPrivate } };
+
+    testcases.update(index, newTestcase);
   };
 
   return (
@@ -386,19 +397,16 @@ const ProgrammingForm: React.FC<OwnProps> = ({ title, initialValue, onSubmit }) 
               </div>
             </div>
             <div className="flex w-full flex-col gap-4">
-              {testcases.fields.map((testcase, index) => (
-                <div className="mt-2" key={testcase.id}>
-                  <Testcase
-                    index={index}
-                    testcase={testcase}
-                    edit={true}
-                    taskFiles={form.watch("files") || []}
-                    sharedUserInput={sharedUserInputStep}
-                    nodeGraphOnChange={updateTestcase(index)}
-                    onDelete={testcases.remove}
-                  />
-                </div>
-              ))}
+              <TestcaseTabs
+                edit
+                testcases={testcases.fields}
+                taskFiles={form.watch("files") || []}
+                sharedUserInput={sharedUserInputStep}
+                onGraphChange={updateTestcaseGraph}
+                onSettingsChange={updateTestcaseSettings}
+                onDuplicateTestcase={(index) => () => duplicateTestcase(index)}
+                onDelete={(index) => () => testcases.remove(index)}
+              />
             </div>
           </div>
           <Button className="mt-5 w-fit bg-purple-600 text-white hover:bg-purple-600 hover:bg-opacity-80">

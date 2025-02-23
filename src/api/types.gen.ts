@@ -659,6 +659,8 @@ export type Testcase = {
     edges: Array<GraphEdgeStr>;
     id: string;
     order_index: number;
+    is_private?: boolean;
+    name?: string;
 };
 
 export type TestcaseResult = {

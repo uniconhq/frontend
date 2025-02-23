@@ -1,10 +1,6 @@
-import { Trash } from "lucide-react";
 import * as React from "react";
 
 import { File as ApiFile, InputStep, Testcase as TestcaseApi } from "@/api";
-import ConfirmationDialog from "@/components/confirmation-dialog";
-import { Button } from "@/components/ui/button";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import NodeGraph from "@/features/problems/components/tasks/node-graph";
 
 import { GraphAction } from "./graph-context";
@@ -20,6 +16,9 @@ type TestcaseProps = {
   // NOTE: If this is set, the nodes in the testcase will not contain the user input node
   sharedUserInput?: InputStep;
   onDelete?: (index: number) => void;
+  // For testcase settings metadata (e.g. name, private)
+  onSettingsChange?: (change: { name?: string; isPrivate?: boolean }) => void;
+  onDuplicateTestcase?: () => void;
 };
 
 const Testcase: React.FC<TestcaseProps> = ({
@@ -30,39 +29,27 @@ const Testcase: React.FC<TestcaseProps> = ({
   sharedUserInput,
   onDelete,
   taskFiles,
+  onSettingsChange,
+  onDuplicateTestcase,
 }) => {
+  const settings = { name: testcase.name, isPrivate: testcase.is_private };
+
   return (
-    <Collapsible defaultOpen className="w-full space-y-2">
-      <div className="flex items-center justify-between">
-        <CollapsibleTrigger asChild>
-          <Button variant="outline" key={index}>
-            #{index + 1}
-          </Button>
-        </CollapsibleTrigger>
-        {onDelete && (
-          <ConfirmationDialog
-            description="Are you sure you want to delete this testcase?"
-            onConfirm={() => onDelete(index)}
-          >
-            <Button variant="destructive">
-              <Trash />
-            </Button>
-          </ConfirmationDialog>
-        )}
-      </div>
-      <CollapsibleContent className="space-y-4">
-        <NodeGraph
-          edit={edit}
-          id={testcase.id}
-          key={testcase.id}
-          taskFiles={taskFiles}
-          sharedUserInput={sharedUserInput}
-          steps={testcase.nodes}
-          edges={testcase.edges}
-          onChange={nodeGraphOnChange}
-        />
-      </CollapsibleContent>
-    </Collapsible>
+    <NodeGraph
+      edit={edit}
+      id={testcase.id}
+      key={testcase.id}
+      taskFiles={taskFiles}
+      sharedUserInput={sharedUserInput}
+      steps={testcase.nodes}
+      edges={testcase.edges}
+      onChange={nodeGraphOnChange}
+      // For testcase settings menu
+      settings={settings}
+      onDelete={onDelete && (() => onDelete(index))}
+      onSettingsChange={onSettingsChange}
+      onDuplicateTestcase={onDuplicateTestcase}
+    />
   );
 };
 
