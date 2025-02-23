@@ -1,6 +1,10 @@
+import { useQuery } from "@tanstack/react-query";
+
 import { ProgrammingTask, ProgrammingTaskResult, TaskAttemptPublic } from "@/api";
 import TestcaseResult from "@/components/tasks/submission-results/result-types/testcase-result";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { getProblemById } from "@/features/problems/queries";
+import { useProblemId } from "@/features/projects/hooks/use-id";
 import { cn } from "@/lib/utils";
 
 type OwnProps = {
@@ -10,7 +14,10 @@ type OwnProps = {
 const ProgrammingResult: React.FC<OwnProps> = ({ taskAttempt }) => {
   const taskResult = taskAttempt.task_results[0] as unknown as ProgrammingTaskResult;
 
-  if (taskResult.result === null) {
+  const problemId = useProblemId();
+  const { data: problem } = useQuery(getProblemById(problemId));
+
+  if (taskResult.result === null || !problem) {
     return null;
   }
 
@@ -33,7 +40,12 @@ const ProgrammingResult: React.FC<OwnProps> = ({ taskAttempt }) => {
         </TabsList>
         {taskResult.result.map((testcaseResult, index) => (
           <TabsContent className="mt-4" value={testcaseResult.id} key={testcaseResult.id}>
-            <TestcaseResult result={testcaseResult} index={index} testcase={testcases[index]} />
+            <TestcaseResult
+              result={testcaseResult}
+              index={index}
+              testcase={testcases[index]}
+              hideDetails={!problem.view_hidden_details}
+            />
           </TabsContent>
         ))}
       </Tabs>

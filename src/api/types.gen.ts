@@ -355,6 +355,7 @@ export type ProblemPublic = {
     closed_at?: string | null;
     edit: boolean;
     make_submission: boolean;
+    view_hidden_details: boolean;
 };
 
 export type ProblemUpdate = {
