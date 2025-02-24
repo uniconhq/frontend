@@ -4,13 +4,14 @@ import { RefreshCcw } from "lucide-react";
 import { useEffect, useState } from "react";
 import { SubmitHandler, useForm } from "react-hook-form";
 
-import { ProgrammingTask } from "@/api";
+import { File, ProgrammingTask } from "@/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getTaskAttemptResults, useCreateTaskAttempt, useRerunTaskAttempt } from "@/features/problems/queries";
 import TaskSection from "@/features/tasks/components/task-section";
 import TaskSectionHeader from "@/features/tasks/components/task-section-header";
+import { isFile } from "@/lib/utils";
 
 import TaskResultCard from "./submission-results/task-result";
 
@@ -50,10 +51,12 @@ export function ProgrammingSubmitForm({
   }, [taskAttemptResults]);
 
   // NOTE: Assume that all required inputs are files
-  const requiredInputs: { id: string; name: string }[] = task.required_inputs.map((input) => ({
-    id: input.id,
-    name: (input.data as unknown as File).name,
-  }));
+  const requiredInputs: { id: string; name: string }[] = task.required_inputs
+    .filter((input) => isFile(input.data))
+    .map((input) => ({
+      id: input.id,
+      name: (input.data as File).path,
+    }));
 
   const submitForm: SubmitHandler<Record<string, FileList>> = (formData) => {
     Promise.all(
