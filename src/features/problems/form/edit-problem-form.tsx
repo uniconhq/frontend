@@ -126,9 +126,9 @@ const EditProblemForm: React.FC<OwnProps> = ({ id, problem }) => {
               <TextField label="Title" name="name" />
               <TextAreaField label="Description" name="description" rows={5} />
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-                <DateTimeField name="started_at" label="Starts at" />
-                <DateTimeField name="ended_at" label="Ends at" />
-                <DateTimeField name="closed_at" label="Closes at" />
+                <DateTimeField name="started_at" label="Release Date" />
+                <DateTimeField name="ended_at" label="Due Date" />
+                <DateTimeField name="closed_at" label="Lock Date" />
               </div>
               <div className="grid grid-cols-2">
                 <RadioBooleanField
