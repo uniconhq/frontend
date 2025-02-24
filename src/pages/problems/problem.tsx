@@ -61,7 +61,16 @@ const Problem = () => {
 
   const { data: problem } = useQuery(getProblemById(problemId));
   if (!problem) return;
-  const { edit: canEdit, make_submission: canSubmit, restricted, published, started_at, ended_at, closed_at } = problem;
+  const {
+    edit: canEdit,
+    make_submission: canSubmit,
+    restricted,
+    published,
+    started_at,
+    ended_at,
+    closed_at,
+    description,
+  } = problem;
 
   const handleSubmit = async () => {
     createSubmission.mutate(undefined, {
@@ -120,10 +129,12 @@ const Problem = () => {
           )}
         </div>
       </div>
-      <div className="flex flex-col gap-2">
-        <div className="text-lg font-medium">Description</div>
-        <p className="text-muted-foreground">Add 2 integers (error propagation)</p>
-      </div>
+      {description.length > 0 && (
+        <div className="flex flex-col gap-2">
+          <div className="text-lg font-medium">Description</div>
+          <p className="text-muted-foreground">{description}</p>
+        </div>
+      )}
       <div className="flex flex-col gap-8">
         {problem.tasks.map((task, index) => (
           <TaskCard
