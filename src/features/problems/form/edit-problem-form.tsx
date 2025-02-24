@@ -1,4 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
+import { parseISO } from "date-fns";
 import { useEffect, useState } from "react";
 import { SubmitHandler, useForm } from "react-hook-form";
 import { z } from "zod";
@@ -9,11 +10,10 @@ import ErrorAlert from "@/components/form/fields/error-alert";
 import UnsavedChangesHandler from "@/components/form/unsaved-changes-handler";
 import { Button } from "@/components/ui/button";
 import { Form } from "@/components/ui/form";
+import EditTasksDisplay from "@/features/problems/form/edit-tasks-display";
+import { useUpdateProblem } from "@/features/problems/queries";
 import { useProjectId } from "@/features/projects/hooks/use-id";
 import { useToast } from "@/hooks/use-toast";
-
-import { useUpdateProblem } from "../queries";
-import EditTasksDisplay from "./edit-tasks-display";
 
 type OwnProps = {
   id: number;
@@ -31,14 +31,17 @@ const problemFormSchema = z
     closed_at: z.string().nullable(),
   })
   .superRefine(({ started_at, ended_at, closed_at }, ctx) => {
-    if (ended_at < started_at) {
+    const startedDate = parseISO(started_at);
+    const endedDate = parseISO(ended_at);
+    const closedDate = closed_at ? parseISO(closed_at) : undefined;
+    if (endedDate < startedDate) {
       return ctx.addIssue({
         code: "custom",
         message: "End date cannot be before start date",
         path: ["ended_at"],
       });
     }
-    if (closed_at && closed_at < ended_at) {
+    if (closedDate && closedDate < endedDate) {
       return ctx.addIssue({
         code: "custom",
         message: "Close date cannot be before end date",
@@ -110,6 +113,7 @@ const EditProblemForm: React.FC<OwnProps> = ({ id, problem }) => {
 
   return (
     <Form {...form}>
+      {JSON.stringify(form.formState.errors)}
       <UnsavedChangesHandler form={form} />
       <form onSubmit={form.handleSubmit(onSubmit)}>
         <div className="flex w-full flex-col gap-8 px-8 py-6">

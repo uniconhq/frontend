@@ -20,9 +20,7 @@ interface DateFieldProps {
 export default function DateTimeField({ name, label, description }: DateFieldProps) {
   const { control, setValue, getValues } = useFormContext();
   function handleDateSelect(date: Date | undefined) {
-    if (date) {
-      setValue(name, date.toISOString());
-    }
+    if (date) setValue(name, date.toISOString());
   }
 
   function handleTimeChange(type: "hour" | "minute" | "ampm", value: string) {
