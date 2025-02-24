@@ -18,7 +18,7 @@ import {
   useNodesState,
 } from "@xyflow/react";
 import { CopyPlus, ExpandIcon, ShrinkIcon } from "lucide-react";
-import { useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 
 import { GraphEdgeStr as GraphEdge, InputStep } from "@/api";
 import { StepNode } from "@/components/node-graph/components/step/step-node";
@@ -106,9 +106,9 @@ const GraphEditor: React.FC<GraphEditorProps> = ({
 
   // Fit graph to viewport after layout is applied
   // This will only be done once after layout is applied and not on every update graph state (e.g. node/edge changes)
-  useLayoutEffect(() => {
+  useEffect(() => {
     if (layoutApplied && rfInstance) {
-      setTimeout(() => rfInstance.fitView(), 0);
+      rfInstance.fitView();
     }
   }, [layoutApplied, rfInstance]);
 
@@ -242,6 +242,8 @@ const GraphEditor: React.FC<GraphEditorProps> = ({
             socketId: socket.id,
           },
         });
+        // We use a settimeout here because opening the code editor makes the graph smaller,
+        // so if fitView runs too early it's not centered
         setTimeout(() => rfInstance?.fitView({ nodes: [{ id: step.id }], duration: 1000, maxZoom: 0.8 }), 0);
       }
     },
