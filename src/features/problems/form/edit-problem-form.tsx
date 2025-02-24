@@ -113,7 +113,6 @@ const EditProblemForm: React.FC<OwnProps> = ({ id, problem }) => {
 
   return (
     <Form {...form}>
-      {JSON.stringify(form.formState.errors)}
       <UnsavedChangesHandler form={form} />
       <form onSubmit={form.handleSubmit(onSubmit)}>
         <div className="flex w-full flex-col gap-8 px-8 py-6">
