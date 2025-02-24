@@ -292,6 +292,7 @@ export type ParsedFunction = {
 };
 
 export type Problem = {
+    id?: number | null;
     name: string;
     restricted: boolean;
     published?: boolean;
@@ -337,6 +338,7 @@ export type ProblemOrm = {
 };
 
 export type ProblemPublic = {
+    id?: number | null;
     name: string;
     restricted: boolean;
     published?: boolean;
@@ -355,6 +357,7 @@ export type ProblemPublic = {
     closed_at?: string | null;
     edit: boolean;
     make_submission: boolean;
+    view_hidden_details: boolean;
 };
 
 export type ProblemUpdate = {
@@ -611,6 +614,7 @@ export type TaskAttemptPublic = {
     };
     task_results: Array<TaskResult>;
     task: TaskOrm;
+    has_private_failure?: boolean;
 };
 
 export type TaskAttemptResult = {
@@ -622,6 +626,7 @@ export type TaskAttemptResult = {
         [key: string]: unknown;
     };
     task_results: Array<TaskResult>;
+    has_private_failure?: boolean;
 };
 
 export type TaskEvalStatus = 'SUCCESS' | 'PENDING' | 'SKIPPED' | 'FAILED';
@@ -659,6 +664,8 @@ export type Testcase = {
     edges: Array<GraphEdgeStr>;
     id: string;
     order_index: number;
+    is_private?: boolean;
+    name?: string;
 };
 
 export type TestcaseResult = {

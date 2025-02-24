@@ -180,7 +180,7 @@ export const routes = [
                         element: <Submissions />,
                       },
                       {
-                        path: ":id",
+                        path: ":submissionId",
                         element: <SubmissionResults />,
                         handle: {
                           crumb: (match: UIMatch) => ({

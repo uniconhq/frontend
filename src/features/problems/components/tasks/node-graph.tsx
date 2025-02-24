@@ -18,9 +18,27 @@ type NodeGraphProps = {
   edit: boolean;
   onChange?: (action: GraphAction) => void;
   taskFiles: ApiFile[];
+
+  // For testcase settings menu
+  settings?: { name?: string; isPrivate?: boolean };
+  onDelete?: () => void;
+  onSettingsChange?: (change: { name?: string; isPrivate?: boolean }) => void;
+  onDuplicateTestcase?: () => void;
 };
 
-const NodeGraph: React.FC<NodeGraphProps> = ({ id, sharedUserInput, steps, edges, edit, onChange, taskFiles }) => {
+const NodeGraph: React.FC<NodeGraphProps> = ({
+  id,
+  sharedUserInput,
+  steps,
+  edges,
+  edit,
+  onChange,
+  taskFiles,
+  settings,
+  onDelete,
+  onSettingsChange,
+  onDuplicateTestcase,
+}) => {
   const [graph, dispatch] = useImmerReducer(graphReducer, {
     id,
     steps,
@@ -50,7 +68,14 @@ const NodeGraph: React.FC<NodeGraphProps> = ({ id, sharedUserInput, steps, edges
     <ReactFlowProvider>
       <GraphContext.Provider value={{ ...graph, files: taskFiles }}>
         <GraphDispatchContext.Provider value={wrappedDispatch}>
-          <GraphEditor graphId={id} className="h-[60vh]" />
+          <GraphEditor
+            graphId={id}
+            className="h-[60vh]"
+            settings={settings}
+            onDelete={onDelete}
+            onSettingsChange={onSettingsChange}
+            onDuplicateTestcase={onDuplicateTestcase}
+          />
         </GraphDispatchContext.Provider>
       </GraphContext.Provider>
     </ReactFlowProvider>

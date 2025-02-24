@@ -91,3 +91,12 @@ table > :last-child > :last-child > :first-child {
 table > :last-child > :last-child > :last-child {
   border-bottom-right-radius: 5px;
 }
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}

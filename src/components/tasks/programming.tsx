@@ -1,5 +1,5 @@
 import { ProgrammingTask } from "@/api";
-import Testcase from "@/features/problems/components/tasks/testcase";
+import TestcaseTabs from "@/features/problems/components/tasks/testcase-tabs";
 import TaskContainer from "@/features/tasks/components/task-container";
 import TaskSection from "@/features/tasks/components/task-section";
 import TaskSectionHeader from "@/features/tasks/components/task-section-header";
@@ -27,9 +27,7 @@ export function Programming({
       <TaskSection>
         <TaskSectionHeader content="Testcases" />
         <div className="flex flex-col gap-2 font-mono text-gray-300">
-          {task.testcases.map((testcase, index) => (
-            <Testcase edit={false} key={testcase.id} index={index} testcase={testcase} taskFiles={task.files} />
-          ))}
+          <TestcaseTabs testcases={task.testcases} edit={false} taskFiles={task.files} />
         </div>
       </TaskSection>
       {!edit && <ProgrammingSubmitForm problemId={problemId} task={task} submit={submit} />}
