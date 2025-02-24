@@ -53,10 +53,7 @@ export function ProgrammingSubmitForm({
   // NOTE: Assume that all required inputs are files
   const requiredInputs: { id: string; name: string }[] = task.required_inputs
     .filter((input) => isFile(input.data))
-    .map((input) => ({
-      id: input.id,
-      name: (input.data as File).path,
-    }));
+    .map((input) => ({ id: input.id, name: (input.data as File).path }));
 
   const submitForm: SubmitHandler<Record<string, FileList>> = (formData) => {
     Promise.all(
@@ -66,15 +63,7 @@ export function ProgrammingSubmitForm({
         return { id, data: { name, content } };
       }),
     ).then((files) => {
-      createTaskAttemptMutation.mutate(
-        {
-          task_id: task.id,
-          value: files,
-        },
-        {
-          onSuccess: () => refetch(),
-        },
-      );
+      createTaskAttemptMutation.mutate({ task_id: task.id, value: files }, { onSuccess: () => refetch() });
     });
   };
 

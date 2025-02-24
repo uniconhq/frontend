@@ -186,9 +186,7 @@ const GraphEditor: React.FC<GraphEditorProps> = ({
 
   const edgeReconnectSuccessful = useRef(true);
 
-  const onReconnectStart = useCallback(() => {
-    edgeReconnectSuccessful.current = false;
-  }, []);
+  const onReconnectStart = useCallback(() => (edgeReconnectSuccessful.current = false), []);
 
   const onReconnect = useCallback(
     ({ id }: Edge, { source, sourceHandle, target, targetHandle }: Connection) => {
@@ -210,9 +208,7 @@ const GraphEditor: React.FC<GraphEditorProps> = ({
 
   const onReconnectEnd = useCallback(
     (_: unknown, edge: Edge) => {
-      if (!edgeReconnectSuccessful.current) {
-        dispatch({ type: GraphActionType.DeleteEdge, payload: { id: edge.id } });
-      }
+      if (!edgeReconnectSuccessful.current) dispatch({ type: GraphActionType.DeleteEdge, payload: { id: edge.id } });
       edgeReconnectSuccessful.current = true;
     },
     [dispatch],
@@ -244,8 +240,19 @@ const GraphEditor: React.FC<GraphEditorProps> = ({
     [steps, edges],
   );
 
+  // Additional UI components
+
   const selectedStep = steps.find((step) => step.id === selectedStepId);
   const selectedSocket = selectedStep?.outputs?.find((socket) => socket.id === selectedSocketId);
+
+  const [showFileTree, setShowFileTree] = useState(false);
+  const showFileEditor = selectedSocket && isFile(selectedSocket.data) && !selectedSocket?.data.on_minio;
+
+  // Fit view to selected step when it changes
+  useEffect(() => {
+    if (!rfInstance || !selectedStep) return;
+    rfInstance.fitView({ nodes: [{ id: selectedStep.id }], duration: 1000, maxZoom: 0.8 });
+  }, [selectedStep]);
 
   const treeFiles = files.map((file) => ({
     id: file.id,
@@ -260,26 +267,11 @@ const GraphEditor: React.FC<GraphEditorProps> = ({
         step.outputs?.find((socket) => isFile(socket.data) && socket.data?.id === file.id),
       );
       const socket = step?.outputs?.find((socket) => isFile(socket.data) && socket.data?.id === file.id);
-      if (step && socket) {
-        dispatch({
-          type: GraphActionType.SelectSocket,
-          payload: {
-            stepId: step.id,
-            socketId: socket.id,
-          },
-        });
-        // We use a settimeout here because opening the code editor makes the graph smaller,
-        // so if fitView runs too early it's not centered
-        setTimeout(() => rfInstance?.fitView({ nodes: [{ id: step.id }], duration: 1000, maxZoom: 0.8 }), 0);
-      }
+      if (!step || !socket) return;
+      dispatch({ type: GraphActionType.SelectSocket, payload: { stepId: step.id, socketId: socket.id } });
     },
     highlighted: isFile(selectedSocket?.data) && selectedSocket?.data.id === file.id,
   }));
-
-  const [showFileTree, setShowFileTree] = useState(false);
-
-  // The file editor is hidden if the file is a binary file.
-  const showFileEditor = selectedSocket && isFile(selectedSocket.data) && !selectedSocket?.data.on_minio;
 
   return (
     <div
@@ -300,7 +292,6 @@ const GraphEditor: React.FC<GraphEditorProps> = ({
             <ResizableHandle withHandle />
           </>
         )}
-
         <ResizablePanel defaultSize={3} order={1}>
           <ReactFlow
             id={graphId}
@@ -352,12 +343,7 @@ const GraphEditor: React.FC<GraphEditorProps> = ({
                 </Button>
               </div>
             </div>
-            <Background
-              variant={BackgroundVariant.Dots}
-              style={{
-                backgroundColor: "#1c1c1c",
-              }}
-            />
+            <Background variant={BackgroundVariant.Dots} style={{ backgroundColor: "#1c1c1c" }} />
             <Controls showInteractive={edit} />
             <MiniMap pannable className="opacity-50 hover:opacity-100" />
           </ReactFlow>
