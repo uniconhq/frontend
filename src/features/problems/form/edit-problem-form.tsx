@@ -26,14 +26,14 @@ const problemFormSchema = z
     description: z.string().min(1, "Description cannot be empty"),
     restricted: z.boolean(),
     published: z.boolean(),
-    started_at: z.string(),
-    ended_at: z.string(),
+    started_at: z.string().nullable(),
+    ended_at: z.string().nullable(),
     closed_at: z.string().nullable(),
   })
   .superRefine(({ started_at, ended_at, closed_at }, ctx) => {
-    const startedDate = parseISO(started_at);
-    const endedDate = parseISO(ended_at);
-    const closedDate = closed_at ? parseISO(closed_at) : undefined;
+    const startedDate = started_at ? parseISO(started_at) : new Date(0);
+    const endedDate = ended_at ? parseISO(ended_at) : new Date(8.64e15);
+    const closedDate = closed_at ? parseISO(closed_at) : new Date(8.64e15);
     if (endedDate < startedDate) {
       return ctx.addIssue({
         code: "custom",
@@ -41,7 +41,7 @@ const problemFormSchema = z
         path: ["ended_at"],
       });
     }
-    if (closedDate && closedDate < endedDate) {
+    if (closedDate < endedDate) {
       return ctx.addIssue({
         code: "custom",
         message: "Close date cannot be before end date",
@@ -86,6 +86,7 @@ const EditProblemForm: React.FC<OwnProps> = ({ id, problem }) => {
     updateProblemMutation.mutate(
       {
         ...data,
+        started_at: (new Date()).toISOString(),
         task_order: taskOrder.map((order) => ({
           id: order.id,
           order_index: order.orderIndex,
