@@ -626,6 +626,7 @@ export type TaskAttemptResult = {
         [key: string]: unknown;
     };
     task_results: Array<TaskResult>;
+    has_private_failure?: boolean;
 };
 
 export type TaskEvalStatus = 'SUCCESS' | 'PENDING' | 'SKIPPED' | 'FAILED';
