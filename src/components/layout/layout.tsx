@@ -31,7 +31,7 @@ const Layout: React.FC<PropsWithChildren> = () => {
   }, [setUser, userProfile, isLoading]);
 
   return (
-    <main className="flex h-screen w-screen flex-col overflow-y-scroll bg-[#141414]">
+    <main className="flex h-screen w-screen flex-col overflow-y-auto bg-[#141414]">
       <DndProvider backend={HTML5Backend}>
         <TooltipProvider>
           <Toaster />

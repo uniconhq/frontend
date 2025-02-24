@@ -74,7 +74,7 @@ export function FileTree({
 
   return (
     <Sidebar {...props} className="relative h-full w-[300px] rounded-md border" variant="filetree" collapsible="none">
-      <SidebarContent className="h-full overflow-y-scroll" ref={drop}>
+      <SidebarContent className="h-full overflow-y-auto" ref={drop}>
         <SidebarGroup className="relative h-full">
           {onCloseFileTree && (
             <SidebarGroupLabel>
