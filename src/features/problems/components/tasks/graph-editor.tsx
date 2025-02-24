@@ -218,6 +218,32 @@ const GraphEditor: React.FC<GraphEditorProps> = ({
     [dispatch],
   );
 
+  // Edge connection validation
+
+  const isValidConnection: IsValidConnection<Edge> = useCallback(
+    ({ source, sourceHandle, target, targetHandle }) => {
+      const sourceStep = steps.find((step) => step.id === source);
+      const targetStep = steps.find((step) => step.id === target);
+      const sourceSocket = sourceStep?.outputs?.find((socket) => socket.id === sourceHandle);
+      const targetSocket = targetStep?.inputs?.find((socket) => socket.id === targetHandle);
+      // This should never happen but just in case
+      if (!sourceStep || !targetStep || !sourceSocket || !targetSocket) return false;
+
+      // Do not allow connections between different socket types e.g. "DATA" to "CONTROL" and vice versa
+      if (sourceSocket.type !== targetSocket.type) return false;
+
+      // Do not allow "DATA" connections if there is already an edge connected to target node socket/handle
+      // This is to prevent multiple "DATA" inputs to a single node socket/handle
+      // This is not applicable to "CONTROL" connections since it is perfectly valid to have multiple nodes
+      // execute before a single node
+      if (targetSocket.type === "DATA")
+        return !edges.some((edge) => edge.to_node_id === target && edge.to_socket_id === targetHandle);
+
+      return true;
+    },
+    [steps, edges],
+  );
+
   const selectedStep = steps.find((step) => step.id === selectedStepId);
   const selectedSocket = selectedStep?.outputs?.find((socket) => socket.id === selectedSocketId);
 
@@ -250,21 +276,10 @@ const GraphEditor: React.FC<GraphEditorProps> = ({
     highlighted: isFile(selectedSocket?.data) && selectedSocket?.data.id === file.id,
   }));
 
-  const [showFileTree, setShowFileTree] = useState(true);
+  const [showFileTree, setShowFileTree] = useState(false);
 
   // The file editor is hidden if the file is a binary file.
-  const showFile = selectedSocket && isFile(selectedSocket.data) && !selectedSocket?.data.on_minio;
-  const isValidConnection: IsValidConnection<Edge> = useCallback(
-    (newEdge) => {
-      // Check there is no existing edge to the target node + handle.
-      const { target, targetHandle } = newEdge;
-      if (edges.find((edge) => edge.to_node_id === target && edge.to_socket_id === targetHandle)) {
-        return false;
-      }
-      return true;
-    },
-    [edges],
-  );
+  const showFileEditor = selectedSocket && isFile(selectedSocket.data) && !selectedSocket?.data.on_minio;
 
   return (
     <div
@@ -274,12 +289,10 @@ const GraphEditor: React.FC<GraphEditorProps> = ({
       data-state={expanded ? "open" : "closed"}
     >
       <ResizablePanelGroup direction="horizontal">
-        <>
-          {showFileTree && (
-            <FileTree files={convertFilesToFileTree(treeFiles)} onCloseFileTree={() => setShowFileTree(false)} />
-          )}
-        </>
-        {showFile && (
+        {showFileTree && (
+          <FileTree files={convertFilesToFileTree(treeFiles)} onCloseFileTree={() => setShowFileTree(false)} />
+        )}
+        {showFileEditor && (
           <>
             <ResizablePanel defaultSize={2} order={0}>
               <GraphFileEditor />
