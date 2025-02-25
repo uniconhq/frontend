@@ -1,6 +1,6 @@
 // Referenced from: https://time.rdsx.dev/
-import { CalendarIcon } from "@radix-ui/react-icons";
 import { format } from "date-fns";
+import { CalendarIcon, DeleteIcon } from "lucide-react";
 import { useFormContext } from "react-hook-form";
 
 import { Button } from "@/components/ui/button";
@@ -20,9 +20,7 @@ interface DateFieldProps {
 export default function DateTimeField({ name, label, description }: DateFieldProps) {
   const { control, setValue, getValues } = useFormContext();
   function handleDateSelect(date: Date | undefined) {
-    if (date) {
-      setValue(name, date.toISOString());
-    }
+    if (date) setValue(name, date.toISOString());
   }
 
   function handleTimeChange(type: "hour" | "minute" | "ampm", value: string) {
@@ -50,7 +48,14 @@ export default function DateTimeField({ name, label, description }: DateFieldPro
       name={name}
       render={({ field }) => (
         <FormItem className="flex flex-col">
-          {label && <FormLabel className="!text-current">{label}</FormLabel>}
+          <div className="mb-1 flex items-center gap-3">
+            {label && <FormLabel className="!text-current">{label}</FormLabel>}
+            {field.value && (
+              <button type="button" onClick={() => setValue(name, null)}>
+                <DeleteIcon size={15} />
+              </button>
+            )}{" "}
+          </div>
           <Popover>
             <PopoverTrigger asChild>
               <FormControl>
@@ -58,7 +63,7 @@ export default function DateTimeField({ name, label, description }: DateFieldPro
                   variant="outline"
                   className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")}
                 >
-                  {field.value ? format(field.value, "dd/MM/yyyy hh:mm aa") : <span>DD/MM/YYYY hh:mm aa</span>}
+                  {field.value ? format(field.value, "dd/MM/yyyy hh:mm aa") : <span>Choose date and time</span>}
                   <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                 </Button>
               </FormControl>

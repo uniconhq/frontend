@@ -178,7 +178,7 @@ const Sidebar = React.forwardRef<
       className={cn(
         "group peer text-sidebar-foreground md:block",
         variant !== "filetree" && "hidden",
-        variant === "filetree" && "h-full overflow-y-scroll break-all",
+        variant === "filetree" && "h-full overflow-y-auto break-all",
       )}
       data-state={dataState}
       data-collapsible={dataCollapsible}

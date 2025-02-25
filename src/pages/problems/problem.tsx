@@ -1,75 +1,146 @@
 import { useQuery } from "@tanstack/react-query";
-import { Pencil, Plus } from "lucide-react";
-import { Link } from "react-router-dom";
+import { differenceInDays, differenceInHours, format, parseISO } from "date-fns";
+import { Pencil } from "lucide-react";
+import { DynamicIcon, IconName } from "lucide-react/dynamic";
+import { Link, useNavigate } from "react-router-dom";
 
+import { TaskAttemptPublic } from "@/api";
+import ConfirmationDialog from "@/components/confirmation-dialog";
 import { Button } from "@/components/ui/button";
-import { Table, TableCell, TableHead, TableRow } from "@/components/ui/table";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { DraftBadge, RestrictedBadge } from "@/features/problems/components/badges";
-import { getProblemById } from "@/features/problems/queries";
+import { getProblemById, useCreateProblemSubmission } from "@/features/problems/queries";
 import { useProblemId, useProjectId } from "@/features/projects/hooks/use-id";
 import TaskCard from "@/features/tasks/components/task-card";
-import { formatDateLong } from "@/utils/date";
 
-const Problem = () => {
-  const projectId = useProjectId();
-  const id = useProblemId();
-  const { data } = useQuery(getProblemById(id));
-  const submitLink = `/projects/${projectId}/problems/${id}/submissions/new`;
-  const editLink = `/projects/${projectId}/problems/${id}/edit`;
-
-  if (!data) {
-    return;
-  }
+const TimeDisplay = ({ label, datetime, iconName }: { label: string; datetime: Date; iconName: IconName }) => {
+  const now = new Date();
+  const isOver = datetime < now;
   return (
-    <div className="flex w-full flex-col gap-8 px-8 py-6">
-      <div className="flex justify-between">
-        <div>
-          <h1 className="mb-4 flex items-center gap-4 text-2xl font-semibold">
-            {data.name} (#{id}) {data.restricted && <RestrictedBadge />}
-            {!data.published && <DraftBadge />}
-          </h1>
+    <Tooltip>
+      <TooltipTrigger asChild className="cursor-default">
+        <div className="flex items-center gap-3 rounded-md bg-zinc-900 p-4">
+          <DynamicIcon name={iconName} className="h-5 w-5" />
+          <div className="flex flex-col gap-1">
+            <span className="text-xs text-zinc-400">{label}</span>
+            <span className={`text-sm font-medium`}>{format(datetime, "MMM d yyyy, hh:mm a")}</span>
+          </div>
         </div>
-        <div className="flex gap-1">
-          {data.edit && (
-            <Link to={editLink} className="flex gap-1">
-              <Button variant="ghost" className="hover:text-purple-300">
-                <Pencil /> Edit problem
-              </Button>
-            </Link>
-          )}
-          {data.make_submission && (
-            <Link to={submitLink} className="flex gap-1">
-              <Button variant="ghost" className="hover:text-purple-300">
-                <Plus /> New Submission
-              </Button>
-            </Link>
-          )}
+      </TooltipTrigger>
+      <TooltipContent>
+        {isOver ? (
+          <span>
+            {differenceInDays(now, datetime)} day(s), {differenceInHours(now, datetime) % 24} hour(s) since
+          </span>
+        ) : (
+          <span>
+            {differenceInDays(datetime, now)} day(s), {differenceInHours(datetime, now) % 24} hour(s) left
+          </span>
+        )}
+      </TooltipContent>
+    </Tooltip>
+  );
+};
+
+type ProblemProps = {
+  id?: number;
+  submissionId?: number;
+  submissionAttempts?: TaskAttemptPublic[];
+  submittedAt?: string;
+};
+
+const Problem = ({ id, submissionId, submissionAttempts, submittedAt }: ProblemProps) => {
+  const isSubmissionView = submissionId !== undefined;
+
+  const projectId = useProjectId();
+  const problemId = useProblemId();
+
+  const navigate = useNavigate();
+
+  const createSubmission = useCreateProblemSubmission(id ?? problemId);
+  const { data: problem } = useQuery(getProblemById(id ?? problemId));
+  if (!problem) return;
+
+  const {
+    edit: canEdit,
+    make_submission: canSubmit,
+    restricted,
+    published,
+    started_at,
+    ended_at,
+    closed_at,
+    description,
+  } = problem;
+
+  const handleSubmit = async () => {
+    createSubmission.mutate(undefined, {
+      onSuccess: (response) => {
+        navigate(`/projects/${projectId}/submissions/${response.data?.id}`);
+      },
+    });
+  };
+
+  return (
+    <div className="flex flex-col gap-8 px-8 py-6">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <h1 className="flex items-center gap-4 text-3xl font-medium">
+          <span>
+            {problem.name} (<code>#{id ?? problemId}</code>)
+          </span>
+          {restricted && <RestrictedBadge />}
+          {!published && <DraftBadge />}
+        </h1>
+        {!isSubmissionView && (
+          <div className="flex items-center gap-2">
+            {canEdit && (
+              <Link to={`/projects/${projectId}/problems/${problemId}/edit`}>
+                <Button variant="outline">
+                  <Pencil /> Edit problem
+                </Button>
+              </Link>
+            )}
+            {canSubmit && (
+              <ConfirmationDialog
+                onConfirm={handleSubmit}
+                title="Confirm Submission"
+                description="Are you sure you want to submit?"
+              >
+                <Button variant="primary">Submit</Button>
+              </ConfirmationDialog>
+            )}
+          </div>
+        )}
+      </div>
+      {isSubmissionView && (
+        <div className="flex text-green-400">
+          <TimeDisplay label="Submitted At" datetime={parseISO(submittedAt!)} iconName="circle-check-big" />
+        </div>
+      )}
+      <div className="flex flex-col gap-4">
+        <div className="text-lg font-medium">Timeline</div>
+        <div className="flex flex-wrap items-center gap-2">
+          {started_at && <TimeDisplay label="Release Date" datetime={parseISO(started_at)} iconName="calendar" />}
+          {ended_at && <TimeDisplay label="Due Date" datetime={parseISO(ended_at)} iconName="alarm-clock" />}
+          {closed_at && <TimeDisplay label="Lock Date" datetime={parseISO(closed_at)} iconName="lock-keyhole" />}
         </div>
       </div>
-      <Table>
-        <TableRow>
-          <TableHead>Starts at</TableHead>
-          <TableCell>{formatDateLong(data.started_at)}</TableCell>
-        </TableRow>
-        <TableRow>
-          <TableHead>Ends at</TableHead>
-          <TableCell>{formatDateLong(data.ended_at)}</TableCell>
-        </TableRow>
-        <TableRow>
-          <TableHead>Description</TableHead>
-          <TableCell>{data.description}</TableCell>
-        </TableRow>
-      </Table>
+      {description.length > 0 && (
+        <div className="flex flex-col gap-2">
+          <div className="text-lg font-medium">Description</div>
+          <p className="text-muted-foreground">{description}</p>
+        </div>
+      )}
       <div className="flex flex-col gap-8">
-        {data?.tasks.map((task, index) => (
+        {problem.tasks.map((task, index) => (
           <TaskCard
-            index={index}
             key={task.id}
+            index={index}
             task={task}
-            problemId={id}
+            problemId={id ?? problemId}
             projectId={projectId}
-            edit={false}
-            submit={data.make_submission}
+            canEdit={false}
+            canSubmit={!isSubmissionView && canSubmit}
+            submissionAttempt={submissionAttempts?.find((attempt) => attempt.task_id === task.id)}
           />
         ))}
       </div>

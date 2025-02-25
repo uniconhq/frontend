@@ -68,8 +68,8 @@ const EditTasksDisplay: React.FC<OwnProps> = ({ tasks, problemId, projectId, han
                               task={task}
                               problemId={problemId}
                               projectId={projectId}
-                              edit={true}
-                              submit={false}
+                              canEdit={true}
+                              canSubmit={false}
                               provided={provided}
                             />
                           )}
