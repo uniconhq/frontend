@@ -70,7 +70,15 @@ const EditProblemFilesSection: React.FC<OwnProps> = ({ supportingFiles }) => {
                       }}
                     />
                   </TableCell>
-                  <TableCell>{file.path}</TableCell>
+                  <TableCell>
+                    <a
+                      className="underline decoration-gray-500 hover:decoration-white"
+                      href={import.meta.env.VITE_BACKEND_URL + "/files/" + file.key}
+                      download={file.path.split("/").pop()!}
+                    >
+                      {file.path}
+                    </a>
+                  </TableCell>
                   <TableCell>{formatDateShort(file.created_at)}</TableCell>
                 </TableRow>
               ))}
