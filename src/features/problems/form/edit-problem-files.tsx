@@ -39,7 +39,7 @@ const EditProblemFilesSection: React.FC<OwnProps> = ({ supportingFiles }) => {
           )}
         </div>
         {/* File table */}
-        <Table>
+        <Table hideOverflow>
           <TableHeader>
             <TableRow>
               <TableHead>
