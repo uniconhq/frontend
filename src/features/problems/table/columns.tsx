@@ -47,7 +47,18 @@ export const columns: ExtendedColumnDef<ProblemBaseWithPermissions>[] = [
     header: "Due Date",
     tooltip: "The date when the problem is due, after which submissions will be considered late.",
     cell: ({ row }) => {
-      return formatDateShort(row.original.ended_at);
+      return row.original.ended_at ? (
+        formatDateShort(row.original.ended_at)
+      ) : (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <BanIcon className="h-4 w-4 text-zinc-500" />
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>No due date set, submissions will not be considered late as long as the problem is open</p>
+          </TooltipContent>
+        </Tooltip>
+      );
     },
   },
   {
