@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { differenceInDays, differenceInHours, format, parseISO } from "date-fns";
-import { Pencil } from "lucide-react";
+import { FileIcon, Pencil } from "lucide-react";
 import { DynamicIcon, IconName } from "lucide-react/dynamic";
 import { Link, useNavigate } from "react-router-dom";
 
@@ -70,6 +70,7 @@ const Problem = ({ id, submissionId, submissionAttempts, submittedAt }: ProblemP
     ended_at,
     closed_at,
     description,
+    supporting_files,
   } = problem;
 
   const handleSubmit = async () => {
@@ -128,6 +129,40 @@ const Problem = ({ id, submissionId, submissionAttempts, submittedAt }: ProblemP
         <div className="flex flex-col gap-2">
           <div className="text-lg font-medium">Description</div>
           <p className="text-muted-foreground">{description}</p>
+        </div>
+      )}
+      {supporting_files && supporting_files.length > 0 && (
+        <div className="flex flex-col gap-2">
+          <div className="text-lg font-medium">Files</div>
+          <div className="flex flex-wrap gap-2">
+            {supporting_files.map((file) => (
+              <a
+                key={file.id}
+                className="flex w-fit items-center gap-2 rounded-md bg-zinc-800 p-4 px-8 transition-colors hover:bg-zinc-700 hover:underline"
+                download={file.path}
+                onClick={() => {
+                  fetch(import.meta.env.VITE_BACKEND_URL + "/files/" + file.key, {
+                    credentials: "include",
+                  })
+                    .then((response) => response.blob())
+                    .then((blob) => {
+                      const url = window.URL.createObjectURL(blob);
+                      const a = document.createElement("a");
+                      a.style.display = "none";
+                      a.href = url;
+                      a.download = file.path;
+                      document.body.appendChild(a);
+                      a.click();
+                      window.URL.revokeObjectURL(url);
+                    })
+                    .catch((err) => console.error("Error downloading file:", err));
+                }}
+              >
+                <FileIcon className="h-4 w-4" />
+                {file.path}
+              </a>
+            ))}
+          </div>
         </div>
       )}
       <div className="flex flex-col gap-8">

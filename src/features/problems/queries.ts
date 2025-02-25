@@ -3,6 +3,7 @@ import { queryOptions, useMutation, useQueryClient } from "@tanstack/react-query
 import {
   addTaskToProblem,
   createProblem,
+  deleteFileFromProblem,
   deleteTask,
   getProblem,
   getProblemTaskAttemptResults,
@@ -21,6 +22,7 @@ import {
   submitProblemTaskAttempt,
   updateProblem,
   updateTask,
+  uploadFilesToProblem,
   UserInput,
 } from "@/api";
 
@@ -50,6 +52,48 @@ export const useCreateProblem = (project_id: number) => {
 export const useUpdateProblem = (problemId: number) => {
   return useMutation({
     mutationFn: (data: ProblemUpdate) => updateProblem({ body: data, path: { id: problemId } }),
+  });
+};
+
+export const useAddFilesToProblem = (problemId: number) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (files: File[]) =>
+      uploadFilesToProblem({
+        path: {
+          id: problemId,
+        },
+        body: {
+          files,
+        },
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: [ProblemQueryKeys.Problem, problemId],
+      });
+    },
+  });
+};
+
+export const useDeleteProblemFiles = (problemId: number) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (fileIds: number[]) =>
+      Promise.all(
+        fileIds.map((fileId) =>
+          deleteFileFromProblem({
+            path: {
+              id: problemId,
+              file_id: fileId,
+            },
+          }),
+        ),
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: [ProblemQueryKeys.Problem, problemId],
+      });
+    },
   });
 };
 
