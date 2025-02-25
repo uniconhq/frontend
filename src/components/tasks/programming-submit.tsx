@@ -20,11 +20,11 @@ const DEFAULT_REFETCH_INTERVAL: number = 5000;
 export function ProgrammingSubmitForm({
   problemId,
   task,
-  submit, // whether user is allowed to make submissions
+  canSubmit,
 }: {
   problemId: number;
   task: ProgrammingTask;
-  submit: boolean;
+  canSubmit: boolean;
 }) {
   const { register, handleSubmit } = useForm();
   const rerunAttemptMutation = useRerunTaskAttempt(problemId);
@@ -72,7 +72,7 @@ export function ProgrammingSubmitForm({
 
   return (
     <div className="flex flex-col gap-6">
-      {submit && (
+      {canSubmit && (
         <TaskSection>
           <TaskSectionHeader content="Submission" />
           <form onSubmit={handleSubmit(submitForm)}>
@@ -137,7 +137,7 @@ export function ProgrammingSubmitForm({
                 </SelectContent>
               </Select>
             )}
-            {submit && selectedAttempt && (
+            {canSubmit && selectedAttempt && (
               <Button onClick={() => rerunAttemptMutation.mutate(selectedAttempt.id)}>
                 <RefreshCcw />
                 Rerun

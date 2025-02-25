@@ -1,19 +1,21 @@
-import { MultipleChoiceTask, MultipleResponseTask, ProgrammingTask, ShortAnswerTask } from "@/api";
+import { MultipleChoiceTask, MultipleResponseTask, ProgrammingTask, ShortAnswerTask, TaskAttemptPublic } from "@/api";
 import { MultipleChoice } from "@/components/tasks/multiple-choice";
 import { MultipleResponse } from "@/components/tasks/multiple-response";
 import { Programming } from "@/components/tasks/programming";
 import { ShortAnswer } from "@/components/tasks/short-answer";
 
 export function Task({
-  submit,
-  edit,
   problemId,
   task,
+  canSubmit,
+  canEdit,
+  submissionAttempt,
 }: {
-  submit: boolean;
-  edit: boolean;
   problemId: number;
   task: MultipleChoiceTask | MultipleResponseTask | ProgrammingTask | ShortAnswerTask;
+  canSubmit: boolean;
+  canEdit: boolean;
+  submissionAttempt?: TaskAttemptPublic;
 }) {
   // Based on the task type, render the appropriate component
   switch (task.type) {
@@ -24,7 +26,15 @@ export function Task({
     case "SHORT_ANSWER_TASK":
       return <ShortAnswer task={task} />;
     case "PROGRAMMING_TASK":
-      return <Programming submit={submit} problemId={problemId} task={task} edit={edit} />;
+      return (
+        <Programming
+          problemId={problemId}
+          task={task}
+          canSubmit={canSubmit}
+          canEdit={canEdit}
+          submissionAttempt={submissionAttempt}
+        />
+      );
     default:
       return <div className="font-mono text-red-400">Task type not supported</div>;
   }

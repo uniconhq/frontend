@@ -4,6 +4,7 @@ import { Pencil } from "lucide-react";
 import { DynamicIcon, IconName } from "lucide-react/dynamic";
 import { Link, useNavigate } from "react-router-dom";
 
+import { TaskAttemptPublic } from "@/api";
 import ConfirmationDialog from "@/components/confirmation-dialog";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -12,17 +13,7 @@ import { getProblemById, useCreateProblemSubmission } from "@/features/problems/
 import { useProblemId, useProjectId } from "@/features/projects/hooks/use-id";
 import TaskCard from "@/features/tasks/components/task-card";
 
-const TimeDisplay = ({
-  label,
-  datetime,
-  overColour,
-  iconName,
-}: {
-  label: string;
-  datetime: Date;
-  overColour: string;
-  iconName: IconName;
-}) => {
+const TimeDisplay = ({ label, datetime, iconName }: { label: string; datetime: Date; iconName: IconName }) => {
   const now = new Date();
   const isOver = datetime < now;
   return (
@@ -32,9 +23,7 @@ const TimeDisplay = ({
           <DynamicIcon name={iconName} className="h-5 w-5" />
           <div className="flex flex-col gap-1">
             <span className="text-xs text-zinc-400">{label}</span>
-            <span className={`text-sm font-medium ${isOver ? overColour : "text-white"}`}>
-              {format(datetime, "MMM d yyyy, hh:mm a")}
-            </span>
+            <span className={`text-sm font-medium`}>{format(datetime, "MMM d yyyy, hh:mm a")}</span>
           </div>
         </div>
       </TooltipTrigger>
@@ -53,14 +42,25 @@ const TimeDisplay = ({
   );
 };
 
-const Problem = () => {
+type ProblemProps = {
+  id?: number;
+  submissionId?: number;
+  submissionAttempts?: TaskAttemptPublic[];
+  submittedAt?: string;
+};
+
+const Problem = ({ id, submissionId, submissionAttempts, submittedAt }: ProblemProps) => {
+  const isSubmissionView = submissionId !== undefined;
+
   const projectId = useProjectId();
   const problemId = useProblemId();
-  const navigate = useNavigate();
-  const createSubmission = useCreateProblemSubmission(problemId);
 
-  const { data: problem } = useQuery(getProblemById(problemId));
+  const navigate = useNavigate();
+
+  const createSubmission = useCreateProblemSubmission(id ?? problemId);
+  const { data: problem } = useQuery(getProblemById(id ?? problemId));
   if (!problem) return;
+
   const {
     edit: canEdit,
     make_submission: canSubmit,
@@ -85,57 +85,43 @@ const Problem = () => {
       <div className="flex flex-wrap items-center justify-between gap-4">
         <h1 className="flex items-center gap-4 text-3xl font-medium">
           <span>
-            {problem.name} (<code>#{problemId}</code>)
+            {problem.name} (<code>#{id ?? problemId}</code>)
           </span>
           {restricted && <RestrictedBadge />}
           {!published && <DraftBadge />}
         </h1>
-        <div className="flex items-center gap-2">
-          {canEdit && (
-            <Link to={`/projects/${projectId}/problems/${problemId}/edit`}>
-              <Button variant="outline">
-                <Pencil /> Edit problem
-              </Button>
-            </Link>
-          )}
-          {canSubmit && (
-            <ConfirmationDialog
-              onConfirm={handleSubmit}
-              title="Confirm Submission"
-              description="Are you sure you want to submit?"
-            >
-              <Button variant="primary">Submit</Button>
-            </ConfirmationDialog>
-          )}
-        </div>
+        {!isSubmissionView && (
+          <div className="flex items-center gap-2">
+            {canEdit && (
+              <Link to={`/projects/${projectId}/problems/${problemId}/edit`}>
+                <Button variant="outline">
+                  <Pencil /> Edit problem
+                </Button>
+              </Link>
+            )}
+            {canSubmit && (
+              <ConfirmationDialog
+                onConfirm={handleSubmit}
+                title="Confirm Submission"
+                description="Are you sure you want to submit?"
+              >
+                <Button variant="primary">Submit</Button>
+              </ConfirmationDialog>
+            )}
+          </div>
+        )}
       </div>
+      {isSubmissionView && (
+        <div className="flex text-green-400">
+          <TimeDisplay label="Submitted At" datetime={parseISO(submittedAt!)} iconName="circle-check-big" />
+        </div>
+      )}
       <div className="flex flex-col gap-4">
         <div className="text-lg font-medium">Timeline</div>
         <div className="flex flex-wrap items-center gap-2">
-          {started_at && (
-            <TimeDisplay
-              label="Release Date"
-              datetime={parseISO(started_at)}
-              overColour="text-green-400"
-              iconName="calendar"
-            />
-          )}
-          {ended_at && (
-            <TimeDisplay
-              label="Due Date"
-              datetime={parseISO(ended_at)}
-              overColour="text-red-400"
-              iconName="alarm-clock"
-            />
-          )}
-          {closed_at && (
-            <TimeDisplay
-              label="Lock Date"
-              datetime={parseISO(closed_at)}
-              overColour="text-orange-400"
-              iconName="lock-keyhole"
-            />
-          )}
+          {started_at && <TimeDisplay label="Release Date" datetime={parseISO(started_at)} iconName="calendar" />}
+          {ended_at && <TimeDisplay label="Due Date" datetime={parseISO(ended_at)} iconName="alarm-clock" />}
+          {closed_at && <TimeDisplay label="Lock Date" datetime={parseISO(closed_at)} iconName="lock-keyhole" />}
         </div>
       </div>
       {description.length > 0 && (
@@ -147,13 +133,14 @@ const Problem = () => {
       <div className="flex flex-col gap-8">
         {problem.tasks.map((task, index) => (
           <TaskCard
-            index={index}
             key={task.id}
+            index={index}
             task={task}
-            problemId={problemId}
+            problemId={id ?? problemId}
             projectId={projectId}
-            edit={false}
-            submit={canSubmit}
+            canEdit={false}
+            canSubmit={!isSubmissionView && canSubmit}
+            submissionAttempt={submissionAttempts?.find((attempt) => attempt.task_id === task.id)}
           />
         ))}
       </div>
