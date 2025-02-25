@@ -12,7 +12,7 @@ const ProblemsTable: React.FC<OwnProps> = ({ data }) => {
     // Sort by ascending start date, end date, id.
     return (
       new Date(a.started_at).getTime() - new Date(b.started_at).getTime() ||
-      new Date(a.ended_at).getTime() - new Date(b.ended_at).getTime() ||
+      new Date(a.ended_at ?? 0).getTime() - new Date(b.ended_at ?? 0).getTime() ||
       a.id - b.id
     );
   });
