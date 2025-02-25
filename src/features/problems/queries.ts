@@ -3,6 +3,7 @@ import { queryOptions, useMutation, useQueryClient } from "@tanstack/react-query
 import {
   addTaskToProblem,
   createProblem,
+  deleteFileFromProblem,
   deleteTask,
   getProblem,
   getProblemTaskAttemptResults,
@@ -66,6 +67,28 @@ export const useAddFilesToProblem = (problemId: number) => {
           files,
         },
       }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: [ProblemQueryKeys.Problem, problemId],
+      });
+    },
+  });
+};
+
+export const useDeleteProblemFiles = (problemId: number) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (fileIds: number[]) =>
+      Promise.all(
+        fileIds.map((fileId) =>
+          deleteFileFromProblem({
+            path: {
+              id: problemId,
+              file_id: fileId,
+            },
+          }),
+        ),
+      ),
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: [ProblemQueryKeys.Problem, problemId],

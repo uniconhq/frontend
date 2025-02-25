@@ -143,7 +143,7 @@ const EditProblemForm: React.FC<OwnProps> = ({ id, problem }) => {
               </div>
             </div>
           </div>
-          <EditProblemFilesSection problemId={id} supportingFiles={problem.supporting_files} />
+          <EditProblemFilesSection problemId={id} supportingFiles={problem.supporting_files!} />
           <EditTasksDisplay tasks={sortedTasks} problemId={id} projectId={projectId} handleUpdateOrder={setTaskOrder} />
         </div>
       </form>

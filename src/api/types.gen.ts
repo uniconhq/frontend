@@ -312,7 +312,7 @@ export type Problem = {
     restricted: boolean;
     published?: boolean;
     description: string;
-    supporting_files: Array<FileOrm>;
+    supporting_files?: Array<FileOrm>;
     tasks: Array<({
         type?: 'PROGRAMMING_TASK';
     } & ProgrammingTask) | ({
@@ -359,7 +359,7 @@ export type ProblemPublic = {
     restricted: boolean;
     published?: boolean;
     description: string;
-    supporting_files: Array<FileOrm>;
+    supporting_files?: Array<FileOrm>;
     tasks: Array<({
         type?: 'PROGRAMMING_TASK';
     } & ProgrammingTask) | ({
@@ -1027,6 +1027,32 @@ export type UploadFilesToProblemErrors = {
 export type UploadFilesToProblemError = UploadFilesToProblemErrors[keyof UploadFilesToProblemErrors];
 
 export type UploadFilesToProblemResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
+
+export type DeleteFileFromProblemData = {
+    body?: never;
+    path: {
+        file_id: number;
+        id: number;
+    };
+    query?: never;
+    url: '/problems/{id}/files/{file_id}';
+};
+
+export type DeleteFileFromProblemErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type DeleteFileFromProblemError = DeleteFileFromProblemErrors[keyof DeleteFileFromProblemErrors];
+
+export type DeleteFileFromProblemResponses = {
     /**
      * Successful Response
      */

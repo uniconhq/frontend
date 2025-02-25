@@ -3,12 +3,13 @@ import { useState } from "react";
 
 import { FileOrm } from "@/api";
 import FileInputButton from "@/components/form/inputs/file-input-button";
+import EmptyPlaceholder from "@/components/layout/empty-placeholder";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatDateShort } from "@/utils/date";
 
-import { useAddFilesToProblem } from "../queries";
+import { useAddFilesToProblem, useDeleteProblemFiles } from "../queries";
 
 type OwnProps = {
   problemId: number;
@@ -19,6 +20,7 @@ const EditProblemFilesSection: React.FC<OwnProps> = ({ problemId, supportingFile
   const [selectedFileIds, setSelectedFileIds] = useState<number[]>([]);
   const hasSelectedFiles = selectedFileIds.length > 0;
   const addFilesToProblemMutation = useAddFilesToProblem(problemId);
+  const deleteFilesFromProblemMutation = useDeleteProblemFiles(problemId);
 
   return (
     <div className="flex w-full flex-col items-start gap-6 lg:flex-row lg:gap-0">
@@ -36,58 +38,67 @@ const EditProblemFilesSection: React.FC<OwnProps> = ({ problemId, supportingFile
             multiple
           />
           {hasSelectedFiles && (
-            <Button type="button" variant="destructive">
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={() =>
+                deleteFilesFromProblemMutation.mutate(selectedFileIds, { onSuccess: () => setSelectedFileIds([]) })
+              }
+            >
               <Trash />
-              Delete files
+              Delete selected
             </Button>
           )}
         </div>
         {/* File table */}
-        <Table hideOverflow>
-          <TableHeader>
-            <TableRow>
-              <TableHead>
-                <Checkbox
-                  checked={hasSelectedFiles}
-                  onClick={() => {
-                    setSelectedFileIds(hasSelectedFiles ? [] : supportingFiles.map((file) => file.id!));
-                  }}
-                />
-              </TableHead>
-              <TableHead>File name</TableHead>
-              <TableHead>Date added</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {supportingFiles
-              // This should never happen.
-              .filter((file) => file.id !== null && file.id !== undefined)
-              .map((file) => (
-                <TableRow key={file.id}>
-                  <TableCell>
-                    <Checkbox
-                      checked={file.id ? selectedFileIds.includes(file.id) : false}
-                      onClick={() => {
-                        setSelectedFileIds((prev) =>
-                          prev.includes(file.id!) ? prev.filter((id) => id !== file.id) : [...prev, file.id!],
-                        );
-                      }}
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <a
-                      className="underline decoration-gray-500 hover:decoration-white"
-                      href={import.meta.env.VITE_BACKEND_URL + "/files/" + file.key}
-                      download={file.path.split("/").pop()!}
-                    >
-                      {file.path}
-                    </a>
-                  </TableCell>
-                  <TableCell>{formatDateShort(file.created_at)}</TableCell>
-                </TableRow>
-              ))}
-          </TableBody>
-        </Table>
+        {supportingFiles.length > 0 && (
+          <Table hideOverflow>
+            <TableHeader>
+              <TableRow>
+                <TableHead>
+                  <Checkbox
+                    checked={hasSelectedFiles}
+                    onClick={() => {
+                      setSelectedFileIds(hasSelectedFiles ? [] : supportingFiles.map((file) => file.id!));
+                    }}
+                  />
+                </TableHead>
+                <TableHead>File name</TableHead>
+                <TableHead>Date added</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {supportingFiles
+                // This should never happen.
+                .filter((file) => file.id !== null && file.id !== undefined)
+                .map((file) => (
+                  <TableRow key={file.id}>
+                    <TableCell>
+                      <Checkbox
+                        checked={file.id ? selectedFileIds.includes(file.id) : false}
+                        onClick={() => {
+                          setSelectedFileIds((prev) =>
+                            prev.includes(file.id!) ? prev.filter((id) => id !== file.id) : [...prev, file.id!],
+                          );
+                        }}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <a
+                        className="underline decoration-gray-500 hover:decoration-white"
+                        href={import.meta.env.VITE_BACKEND_URL + "/files/" + file.key}
+                        download={file.path.split("/").pop()!}
+                      >
+                        {file.path}
+                      </a>
+                    </TableCell>
+                    <TableCell>{formatDateShort(file.created_at)}</TableCell>
+                  </TableRow>
+                ))}
+            </TableBody>
+          </Table>
+        )}
+        {supportingFiles.length === 0 && <EmptyPlaceholder description="No files uploaded." />}
       </div>
     </div>
   );
