@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { differenceInDays, differenceInHours, format, parseISO } from "date-fns";
-import { AlarmClockIcon, CalendarIcon, LockKeyholeIcon, Pencil } from "lucide-react";
-import React from "react";
+import { Pencil } from "lucide-react";
+import { DynamicIcon, IconName } from "lucide-react/dynamic";
 import { Link, useNavigate } from "react-router-dom";
 
 import ConfirmationDialog from "@/components/confirmation-dialog";
@@ -16,12 +16,12 @@ const TimeDisplay = ({
   label,
   datetime,
   overColour,
-  children,
+  iconName,
 }: {
   label: string;
   datetime: Date;
   overColour: string;
-  children?: React.ReactNode;
+  iconName: IconName;
 }) => {
   const now = new Date();
   const isOver = datetime < now;
@@ -29,7 +29,7 @@ const TimeDisplay = ({
     <Tooltip>
       <TooltipTrigger asChild className="cursor-default">
         <div className="flex items-center gap-3 rounded-md bg-zinc-900 p-4">
-          {children}
+          <DynamicIcon name={iconName} className="h-5 w-5" />
           <div className="flex flex-col gap-1">
             <span className="text-xs text-zinc-400">{label}</span>
             <span className={`text-sm font-medium ${isOver ? overColour : "text-white"}`}>
@@ -45,7 +45,7 @@ const TimeDisplay = ({
           </span>
         ) : (
           <span>
-            {differenceInDays(datetime, now)} day(s), {differenceInHours(datetime, new Date()) % 24} hour(s) left
+            {differenceInDays(datetime, now)} day(s), {differenceInHours(datetime, now) % 24} hour(s) left
           </span>
         )}
       </TooltipContent>
@@ -82,7 +82,7 @@ const Problem = () => {
 
   return (
     <div className="flex flex-col gap-8 px-8 py-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <h1 className="flex items-center gap-4 text-3xl font-medium">
           <span>
             {problem.name} (<code>#{problemId}</code>)
@@ -111,21 +111,30 @@ const Problem = () => {
       </div>
       <div className="flex flex-col gap-4">
         <div className="text-lg font-medium">Timeline</div>
-        <div className="flex w-1/2 items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {started_at && (
-            <TimeDisplay label="Release Date" datetime={parseISO(started_at)} overColour="text-green-400">
-              <CalendarIcon className="h-5 w-5" />
-            </TimeDisplay>
+            <TimeDisplay
+              label="Release Date"
+              datetime={parseISO(started_at)}
+              overColour="text-green-400"
+              iconName="calendar"
+            />
           )}
           {ended_at && (
-            <TimeDisplay label="Due Date" datetime={parseISO(ended_at)} overColour="text-red-400">
-              <AlarmClockIcon className="h-5 w-5" />
-            </TimeDisplay>
+            <TimeDisplay
+              label="Due Date"
+              datetime={parseISO(ended_at)}
+              overColour="text-red-400"
+              iconName="alarm-clock"
+            />
           )}
           {closed_at && (
-            <TimeDisplay label="Lock Date" datetime={parseISO(closed_at)} overColour="text-orange-400">
-              <LockKeyholeIcon className="h-5 w-5" />
-            </TimeDisplay>
+            <TimeDisplay
+              label="Lock Date"
+              datetime={parseISO(closed_at)}
+              overColour="text-orange-400"
+              iconName="lock-keyhole"
+            />
           )}
         </div>
       </div>
