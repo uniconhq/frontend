@@ -4,7 +4,7 @@ import { RefreshCcw } from "lucide-react";
 import { useEffect, useState } from "react";
 import { SubmitHandler, useForm } from "react-hook-form";
 
-import { ProgrammingTask } from "@/api";
+import { File, ProgrammingTask } from "@/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -52,7 +52,7 @@ export function ProgrammingSubmitForm({
   // NOTE: Assume that all required inputs are files
   const requiredInputs: { id: string; name: string }[] = task.required_inputs.map((input) => ({
     id: input.id,
-    name: (input.data as unknown as File).name,
+    name: (input.data as unknown as File).path,
   }));
 
   const submitForm: SubmitHandler<Record<string, FileList>> = (formData) => {

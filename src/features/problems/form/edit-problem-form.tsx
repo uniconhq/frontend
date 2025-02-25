@@ -13,6 +13,7 @@ import { useProjectId } from "@/features/projects/hooks/use-id";
 import { useToast } from "@/hooks/use-toast";
 
 import { useUpdateProblem } from "../queries";
+import EditProblemFilesSection from "./edit-problem-files";
 import EditTasksDisplay from "./edit-tasks-display";
 
 type OwnProps = {
@@ -118,6 +119,7 @@ const EditProblemForm: React.FC<OwnProps> = ({ id, problem }) => {
             <Button variant="primary">Save</Button>
           </div>
           {error && <ErrorAlert message={error} />}
+          {/* Problem details */}
           <div className="flex w-full flex-col items-start gap-6 lg:flex-row lg:gap-0">
             <div className="sticky top-0">
               <h2 className="min-w-[200px] text-lg font-medium">Problem details</h2>
@@ -141,6 +143,7 @@ const EditProblemForm: React.FC<OwnProps> = ({ id, problem }) => {
               </div>
             </div>
           </div>
+          <EditProblemFilesSection problemId={id} supportingFiles={problem.supporting_files} />
           <EditTasksDisplay tasks={sortedTasks} problemId={id} projectId={projectId} handleUpdateOrder={setTaskOrder} />
         </div>
       </form>
