@@ -8,14 +8,17 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatDateShort } from "@/utils/date";
 
+import { useAddFilesToProblem } from "../queries";
+
 type OwnProps = {
   problemId: number;
   supportingFiles: FileOrm[];
 };
 
-const EditProblemFilesSection: React.FC<OwnProps> = ({ supportingFiles }) => {
+const EditProblemFilesSection: React.FC<OwnProps> = ({ problemId, supportingFiles }) => {
   const [selectedFileIds, setSelectedFileIds] = useState<number[]>([]);
   const hasSelectedFiles = selectedFileIds.length > 0;
+  const addFilesToProblemMutation = useAddFilesToProblem(problemId);
 
   return (
     <div className="flex w-full flex-col items-start gap-6 lg:flex-row lg:gap-0">
@@ -25,11 +28,12 @@ const EditProblemFilesSection: React.FC<OwnProps> = ({ supportingFiles }) => {
       <div className="flex w-full flex-col gap-4">
         <div className="flex gap-2">
           <FileInputButton
-            onFileChange={() => {}}
+            onFileChange={(filelist) => filelist && addFilesToProblemMutation.mutate(Array.from(filelist))}
             buttonText="Add file"
             buttonSize="default"
             className=""
             iconClassName=""
+            multiple
           />
           {hasSelectedFiles && (
             <Button type="button" variant="destructive">
