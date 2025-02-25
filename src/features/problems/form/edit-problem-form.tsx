@@ -1,4 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
+import { parseISO } from "date-fns";
 import { useEffect, useState } from "react";
 import { SubmitHandler, useForm } from "react-hook-form";
 import { z } from "zod";
@@ -9,12 +10,12 @@ import ErrorAlert from "@/components/form/fields/error-alert";
 import UnsavedChangesHandler from "@/components/form/unsaved-changes-handler";
 import { Button } from "@/components/ui/button";
 import { Form } from "@/components/ui/form";
+import EditTasksDisplay from "@/features/problems/form/edit-tasks-display";
+import { useUpdateProblem } from "@/features/problems/queries";
 import { useProjectId } from "@/features/projects/hooks/use-id";
 import { useToast } from "@/hooks/use-toast";
 
-import { useUpdateProblem } from "../queries";
 import EditProblemFilesSection from "./edit-problem-files";
-import EditTasksDisplay from "./edit-tasks-display";
 
 type OwnProps = {
   id: number;
@@ -27,19 +28,22 @@ const problemFormSchema = z
     description: z.string().min(1, "Description cannot be empty"),
     restricted: z.boolean(),
     published: z.boolean(),
-    started_at: z.string(),
-    ended_at: z.string(),
+    started_at: z.string().nullable(),
+    ended_at: z.string().nullable(),
     closed_at: z.string().nullable(),
   })
   .superRefine(({ started_at, ended_at, closed_at }, ctx) => {
-    if (ended_at < started_at) {
+    const startedDate = started_at ? parseISO(started_at) : new Date(0);
+    const endedDate = ended_at ? parseISO(ended_at) : new Date(8.64e15);
+    const closedDate = closed_at ? parseISO(closed_at) : new Date(8.64e15);
+    if (endedDate < startedDate) {
       return ctx.addIssue({
         code: "custom",
         message: "End date cannot be before start date",
         path: ["ended_at"],
       });
     }
-    if (closed_at && closed_at < ended_at) {
+    if (closedDate < endedDate) {
       return ctx.addIssue({
         code: "custom",
         message: "Close date cannot be before end date",
@@ -81,9 +85,11 @@ const EditProblemForm: React.FC<OwnProps> = ({ id, problem }) => {
   const sortedTasks = taskOrder.map((order) => problem.tasks.find((task) => task.id === order.id)!);
 
   const onSubmit: SubmitHandler<ProblemFormType> = async (data) => {
+    const now = new Date();
     updateProblemMutation.mutate(
       {
         ...data,
+        started_at: data.started_at ?? now.toISOString(),
         task_order: taskOrder.map((order) => ({
           id: order.id,
           order_index: order.orderIndex,
@@ -128,9 +134,9 @@ const EditProblemForm: React.FC<OwnProps> = ({ id, problem }) => {
               <TextField label="Title" name="name" />
               <TextAreaField label="Description" name="description" rows={5} />
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-                <DateTimeField name="started_at" label="Starts at" />
-                <DateTimeField name="ended_at" label="Ends at" />
-                <DateTimeField name="closed_at" label="Closes at" />
+                <DateTimeField name="started_at" label="Release Date" />
+                <DateTimeField name="ended_at" label="Due Date" />
+                <DateTimeField name="closed_at" label="Lock Date" />
               </div>
               <div className="grid grid-cols-2">
                 <RadioBooleanField

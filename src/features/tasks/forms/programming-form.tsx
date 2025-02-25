@@ -8,7 +8,7 @@ import { SubmitHandler, useFieldArray, useForm } from "react-hook-form";
 
 import { File as ApiFile, InputStep } from "@/api";
 import ConfirmationDialog from "@/components/confirmation-dialog";
-import { NumberField, SelectField, TextAreaField, TextField } from "@/components/form/fields";
+import { CheckboxField, NumberField, SelectField, TextAreaField, TextField } from "@/components/form/fields";
 import FormSection from "@/components/form/form-section";
 import UnsavedChangesHandler from "@/components/form/unsaved-changes-handler";
 import NodeInput from "@/components/node-graph/components/step/node-input";
@@ -310,6 +310,12 @@ const ProgrammingForm: React.FC<OwnProps> = ({ title, initialValue, onSubmit }) 
               </div>
             </div>
             {/* Slurm options */}
+            <FormLabel>
+              <div className="flex items-center gap-4">
+                Slurm
+                <CheckboxField name="environment.slurm" />
+              </div>
+            </FormLabel>
             <div className="flex flex-col gap-4">
               <div className="flex items-center justify-between">
                 <FormLabel>

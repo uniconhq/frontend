@@ -1,4 +1,5 @@
-import { ProgrammingTask } from "@/api";
+import { ProgrammingTask, TaskAttemptPublic } from "@/api";
+import TaskResultCard from "@/components/tasks/submission-results/task-result";
 import TestcaseTabs from "@/features/problems/components/tasks/testcase-tabs";
 import TaskContainer from "@/features/tasks/components/task-container";
 import TaskSection from "@/features/tasks/components/task-section";
@@ -8,15 +9,17 @@ import { ProgrammingEnvironment } from "./programming-environment";
 import ProgrammingSubmitForm from "./programming-submit";
 
 export function Programming({
-  submit,
-  edit,
   problemId,
   task,
+  canSubmit,
+  canEdit,
+  submissionAttempt,
 }: {
-  submit: boolean;
-  edit: boolean;
   problemId: number;
   task: ProgrammingTask;
+  canSubmit: boolean;
+  canEdit: boolean;
+  submissionAttempt?: TaskAttemptPublic;
 }) {
   return (
     <TaskContainer title={task.title} description={task.description}>
@@ -30,7 +33,10 @@ export function Programming({
           <TestcaseTabs testcases={task.testcases} edit={false} taskFiles={task.files} />
         </div>
       </TaskSection>
-      {!edit && <ProgrammingSubmitForm problemId={problemId} task={task} submit={submit} />}
+      {!canEdit && !submissionAttempt && (
+        <ProgrammingSubmitForm problemId={problemId} task={task} canSubmit={canSubmit} />
+      )}
+      {submissionAttempt && <TaskResultCard title="Submission" taskAttempt={submissionAttempt} problemId={problemId} />}
     </TaskContainer>
   );
 }

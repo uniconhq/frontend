@@ -1,5 +1,6 @@
 "use client";
 
+import { TooltipTrigger } from "@radix-ui/react-tooltip";
 import {
   ColumnDef,
   flexRender,
@@ -9,11 +10,12 @@ import {
   SortingState,
   useReactTable,
 } from "@tanstack/react-table";
+import { InfoIcon } from "lucide-react";
 import { useState } from "react";
 
+import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-
-import { Button } from "./button";
+import { Tooltip, TooltipContent } from "@/components/ui/tooltip";
 
 interface DataWithOptionalClassname {
   className?: string;
@@ -21,8 +23,12 @@ interface DataWithOptionalClassname {
 
 type ExtendedData<T = object> = T & Partial<DataWithOptionalClassname>;
 
+export type ExtendedColumnDef<TData extends ExtendedData, TValue = unknown> = ColumnDef<TData, TValue> & {
+  tooltip?: string;
+};
+
 interface DataTableProps<TData extends ExtendedData, TValue> {
-  columns: ColumnDef<TData, TValue>[];
+  columns: ExtendedColumnDef<TData, TValue>[];
   data: TData[];
   hidePagination?: boolean;
   hideOverflow?: boolean;
@@ -55,7 +61,19 @@ export function DataTable<TData extends ExtendedData, TValue>({
                 {headerGroup.headers.map((header) => {
                   return (
                     <TableHead key={header.id}>
-                      {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
+                      <div className="flex items-center gap-2">
+                        {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
+                        {(header.column.columnDef as ExtendedColumnDef<TData, unknown>).tooltip && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <InfoIcon size={15} />
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              {(header.column.columnDef as ExtendedColumnDef<TData, unknown>).tooltip}
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
+                      </div>
                     </TableHead>
                   );
                 })}

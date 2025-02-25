@@ -18,8 +18,7 @@ export const ProgrammingEnvironment = ({ environment }: { environment: ComputeCo
           </Badge>
         )}
       </div>
-
-      {slurmOptions.length > 0 && <SlurmBadge options={slurmOptions} />}
+      {environment.slurm && <SlurmBadge options={slurmOptions} />}
 
       <div className="flex flex-wrap gap-3">
         <div className="flex items-center gap-3 rounded-md bg-zinc-800 p-4 transition-colors duration-100 hover:bg-zinc-700">
@@ -45,7 +44,7 @@ export const ProgrammingEnvironment = ({ environment }: { environment: ComputeCo
               <span className="text-xs text-zinc-400">Dependencies</span>
               <div className="flex flex-wrap gap-2">
                 {dependencies.map((req) => (
-                  <Badge className="py-1 font-mono text-xs font-medium" variant="outline">
+                  <Badge key={req} className="py-1 font-mono text-xs font-medium" variant="outline">
                     {req}
                   </Badge>
                 ))}
@@ -63,10 +62,10 @@ const SlurmBadge = ({ options }: { options?: string[] }) => (
     <Badge className="flex overflow-hidden bg-transparent p-0 text-sm" variant="outline">
       <div className="flex h-full items-center gap-1 bg-sky-400 px-2 py-1 text-slate-800">
         <ServerIcon className="h-4 w-4" />
-        <span className="font-semibold">Slurm</span>
+        <span className="font-medium">Slurm</span>
       </div>
-      {options && (
-        <div className="flex h-full items-center gap-2 break-all px-2 py-1 font-mono text-white">
+      {options && options.length > 0 && (
+        <div className="flex h-full items-center gap-2 break-all px-2 py-1 font-mono font-medium">
           {options.join(" ")}
         </div>
       )}

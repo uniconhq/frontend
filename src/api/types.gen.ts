@@ -323,7 +323,7 @@ export type Problem = {
         type?: 'SHORT_ANSWER_TASK';
     } & ShortAnswerTask)>;
     started_at: string;
-    ended_at: string;
+    ended_at?: string | null;
     closed_at?: string | null;
 };
 
@@ -335,7 +335,7 @@ export type ProblemBaseWithPermissions = {
     restricted: boolean;
     published: boolean;
     started_at: string;
-    ended_at: string;
+    ended_at: string | null;
     closed_at: string | null;
     view: boolean;
     edit: boolean;
@@ -347,7 +347,7 @@ export type ProblemOrm = {
     description: string;
     restricted?: boolean;
     started_at: string;
-    ended_at: string;
+    ended_at: string | null;
     closed_at: string | null;
     published?: boolean;
     project_id: number;
@@ -370,7 +370,7 @@ export type ProblemPublic = {
         type?: 'SHORT_ANSWER_TASK';
     } & ShortAnswerTask)>;
     started_at: string;
-    ended_at: string;
+    ended_at?: string | null;
     closed_at?: string | null;
     edit: boolean;
     make_submission: boolean;
@@ -384,7 +384,7 @@ export type ProblemUpdate = {
     description: string;
     task_order: Array<TaskOrder>;
     started_at: string;
-    ended_at: string;
+    ended_at: string | null;
     closed_at: string | null;
 };
 

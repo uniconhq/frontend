@@ -231,6 +231,16 @@ export const useCreateSubmission = (problemId: number) => {
   });
 };
 
+export const useCreateProblemSubmission = (problemId: number) => {
+  return useMutation({
+    mutationFn: () =>
+      makeSubmission({
+        body: [],
+        path: { id: problemId },
+      }),
+  });
+};
+
 export const getFunctions = (content: string) => {
   return queryOptions({
     queryKey: [ProblemQueryKeys.File, content],
