@@ -83,10 +83,11 @@ const EditProblemForm: React.FC<OwnProps> = ({ id, problem }) => {
   const sortedTasks = taskOrder.map((order) => problem.tasks.find((task) => task.id === order.id)!);
 
   const onSubmit: SubmitHandler<ProblemFormType> = async (data) => {
+    const now = new Date();
     updateProblemMutation.mutate(
       {
         ...data,
-        started_at: (new Date()).toISOString(),
+        started_at: data.started_at ?? now.toISOString(),
         task_order: taskOrder.map((order) => ({
           id: order.id,
           order_index: order.orderIndex,
