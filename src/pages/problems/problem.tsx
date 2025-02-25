@@ -139,8 +139,24 @@ const Problem = ({ id, submissionId, submissionAttempts, submittedAt }: ProblemP
               <a
                 key={file.id}
                 className="flex w-fit items-center gap-2 rounded-md bg-zinc-800 p-4 px-8 transition-colors hover:bg-zinc-700 hover:underline"
-                href={import.meta.env.VITE_BACKEND_URL + "/files/" + file.key}
                 download={file.path}
+                onClick={() => {
+                  fetch(import.meta.env.VITE_BACKEND_URL + "/files/" + file.key, {
+                    credentials: "include",
+                  })
+                    .then((response) => response.blob())
+                    .then((blob) => {
+                      const url = window.URL.createObjectURL(blob);
+                      const a = document.createElement("a");
+                      a.style.display = "none";
+                      a.href = url;
+                      a.download = file.path;
+                      document.body.appendChild(a);
+                      a.click();
+                      window.URL.revokeObjectURL(url);
+                    })
+                    .catch((err) => console.error("Error downloading file:", err));
+                }}
               >
                 <FileIcon className="h-4 w-4" />
                 {file.path}
