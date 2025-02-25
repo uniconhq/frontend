@@ -23,6 +23,10 @@ export type BodyLoginAuthTokenPost = {
     client_secret?: string | null;
 };
 
+export type BodyUploadFilesToProblemProblemsIdFilesPost = {
+    files: Array<Blob | File>;
+};
+
 export type Choice = {
     id: string;
     order_index: number;
@@ -56,6 +60,17 @@ export type File = {
     on_minio?: boolean;
     key?: string | null;
     trusted?: boolean;
+};
+
+export type FileOrm = {
+    id?: number | null;
+    path: string;
+    created_at: string;
+    parent_id: number;
+    parent_type: string;
+    on_minio?: boolean;
+    key: string;
+    content: string;
 };
 
 export type GraphEdgeStr = {
@@ -297,6 +312,7 @@ export type Problem = {
     restricted: boolean;
     published?: boolean;
     description: string;
+    supporting_files: Array<FileOrm>;
     tasks: Array<({
         type?: 'PROGRAMMING_TASK';
     } & ProgrammingTask) | ({
@@ -343,6 +359,7 @@ export type ProblemPublic = {
     restricted: boolean;
     published?: boolean;
     description: string;
+    supporting_files: Array<FileOrm>;
     tasks: Array<({
         type?: 'PROGRAMMING_TASK';
     } & ProgrammingTask) | ({
@@ -985,6 +1002,31 @@ export type UpdateTaskErrors = {
 export type UpdateTaskError = UpdateTaskErrors[keyof UpdateTaskErrors];
 
 export type UpdateTaskResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
+
+export type UploadFilesToProblemData = {
+    body: BodyUploadFilesToProblemProblemsIdFilesPost;
+    path: {
+        id: number;
+    };
+    query?: never;
+    url: '/problems/{id}/files';
+};
+
+export type UploadFilesToProblemErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type UploadFilesToProblemError = UploadFilesToProblemErrors[keyof UploadFilesToProblemErrors];
+
+export type UploadFilesToProblemResponses = {
     /**
      * Successful Response
      */
