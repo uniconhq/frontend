@@ -33,20 +33,20 @@ const problemFormSchema = z
     closed_at: z.string().nullable(),
   })
   .superRefine(({ started_at, ended_at, closed_at }, ctx) => {
-    const startedDate = started_at ? parseISO(started_at) : new Date(0);
+    const startedDate = started_at ? parseISO(started_at) : new Date();
     const endedDate = ended_at ? parseISO(ended_at) : new Date(8.64e15);
     const closedDate = closed_at ? parseISO(closed_at) : new Date(8.64e15);
     if (endedDate < startedDate) {
       return ctx.addIssue({
         code: "custom",
-        message: "End date cannot be before start date",
+        message: "Due date cannot be before release date (defaults to now if not set)",
         path: ["ended_at"],
       });
     }
     if (closedDate < endedDate) {
       return ctx.addIssue({
         code: "custom",
-        message: "Close date cannot be before end date",
+        message: "Lock date cannot be before due date",
       });
     }
   });

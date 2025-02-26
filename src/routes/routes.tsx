@@ -12,7 +12,6 @@ import CreateOrganisation from "@/pages/organisations/create-organisation";
 import Organisation from "@/pages/organisations/organisation";
 import OrganisationUsers from "@/pages/organisations/organisation-users";
 import Organisations from "@/pages/organisations/organisations";
-import CreateProblem from "@/pages/problems/create-problem";
 import EditProblem from "@/pages/problems/edit-problem";
 import Problem from "@/pages/problems/problem";
 import CreateProject from "@/pages/projects/create-project";
@@ -202,7 +201,6 @@ export const routes = [
                       },
                     },
                     children: [
-                      { path: "new", element: <CreateProblem /> },
                       {
                         path: ":problemId",
                         children: [

@@ -1,5 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { AxiosError } from "axios";
+import { parseISO } from "date-fns";
 import { useState } from "react";
 import { SubmitHandler, useForm } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
@@ -10,22 +11,40 @@ import ErrorAlert from "@/components/form/fields/error-alert";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Form } from "@/components/ui/form";
+import { useCreateProblem } from "@/features/problems/queries";
 import { useProjectId } from "@/features/projects/hooks/use-id";
-
-import { useCreateProblem } from "../../queries";
 
 type OwnProps = {
   setOpen: (active: boolean) => void;
 };
 
-const problemFormSchema = z.object({
-  name: z.string().min(1, "Title cannot be empty"),
-  description: z.string().min(1, "Description cannot be empty"),
-  restricted: z.boolean(),
-  started_at: z.string().datetime({ offset: true }),
-  ended_at: z.string().datetime({ offset: true }),
-  closed_at: z.string().datetime({ offset: true }).optional(),
-});
+const problemFormSchema = z
+  .object({
+    name: z.string().min(1, "Title cannot be empty"),
+    description: z.string().min(1, "Description cannot be empty"),
+    restricted: z.boolean(),
+    started_at: z.string().datetime({ offset: true }).optional().nullable(),
+    ended_at: z.string().datetime({ offset: true }).optional().nullable(),
+    closed_at: z.string().datetime({ offset: true }).optional().nullable(),
+  })
+  .superRefine(({ started_at, ended_at, closed_at }, ctx) => {
+    const startedDate = started_at ? parseISO(started_at) : new Date();
+    const endedDate = ended_at ? parseISO(ended_at) : new Date(8.64e15);
+    const closedDate = closed_at ? parseISO(closed_at) : new Date(8.64e15);
+    if (endedDate < startedDate) {
+      return ctx.addIssue({
+        code: "custom",
+        message: "Due date cannot be before release date (defaults to now if not set)",
+        path: ["ended_at"],
+      });
+    }
+    if (closedDate < endedDate) {
+      return ctx.addIssue({
+        code: "custom",
+        message: "Lock date cannot be before due date",
+      });
+    }
+  });
 
 type ProblemFormType = z.infer<typeof problemFormSchema>;
 
@@ -49,8 +68,9 @@ const CreateProblemModal: React.FC<OwnProps> = ({ setOpen }) => {
   const navigate = useNavigate();
 
   const onSubmit: SubmitHandler<ProblemFormType> = async (data) => {
+    const now = new Date();
     createProblemMutation.mutate(
-      { ...data, tasks: [] },
+      { ...data, started_at: data.started_at ?? now.toISOString(), tasks: [] },
       {
         onError: (error) => {
           if ((error as AxiosError).status === 403) {
@@ -80,9 +100,9 @@ const CreateProblemModal: React.FC<OwnProps> = ({ setOpen }) => {
               <TextAreaField label="Description" name="description" rows={5} />
 
               <div className="my-2 grid grid-cols-1 gap-4 lg:grid-cols-3">
-                <DateTimeField name="started_at" label="Starts at" />
-                <DateTimeField name="ended_at" label="Ends at" />
-                <DateTimeField name="closed_at" label="Closes at" />
+                <DateTimeField name="started_at" label="Release Date" />
+                <DateTimeField name="ended_at" label="Due Date" />
+                <DateTimeField name="closed_at" label="Lock Date" />
               </div>
               <RadioBooleanField
                 label="Access control"
