@@ -1,0 +1,48 @@
+.sessions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--unicon-border);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--unicon-border);
+}
+
+.details {
+  min-width: 0;
+}
+
+.action {
+  flex: none;
+}
+
+.device {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--unicon-text-primary);
+}
+
+.current {
+  padding: 1px 8px;
+  border-radius: 20px;
+  background: var(--unicon-hover);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--unicon-text-secondary);
+}

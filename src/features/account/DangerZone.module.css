@@ -1,0 +1,30 @@
+.zone {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.problem {
+  padding: 12px;
+  border-radius: var(--mantine-radius-sm);
+  background: var(--unicon-hover);
+}
+
+.scopes {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  font-size: 13px;
+  color: var(--unicon-text-body);
+}
