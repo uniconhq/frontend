@@ -1,0 +1,36 @@
+.shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.main {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.content {
+  flex: 1;
+  min-width: 0;
+  padding: 24px 28px;
+  background: var(--unicon-canvas);
+}
+
+.skip {
+  position: absolute;
+  top: -100px;
+  left: 8px;
+  z-index: 100;
+  padding: 8px 12px;
+  border: 1px solid var(--unicon-border-strong);
+  border-radius: var(--mantine-radius-sm);
+  background: var(--unicon-body);
+  color: var(--unicon-text-primary);
+  font-size: 13px;
+  text-decoration: none;
+}
+
+.skip:focus {
+  top: 8px;
+}

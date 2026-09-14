@@ -1,0 +1,21 @@
+.trail {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--mantine-font-family-monospace);
+  font-size: 12px;
+}
+
+.segment {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: var(--mantine-radius-xs);
+  background: var(--unicon-hover);
+  color: var(--unicon-text-body);
+}
+
+.caret {
+  color: var(--unicon-text-faint);
+}

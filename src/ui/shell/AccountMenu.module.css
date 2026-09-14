@@ -1,0 +1,34 @@
+.signIn {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--unicon-text-accent);
+  text-decoration: none;
+}
+
+.trigger {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 8px 3px 3px;
+  border-radius: 20px;
+  color: var(--unicon-text-primary);
+  font-size: 13px;
+}
+
+.trigger:hover {
+  background: var(--unicon-hover);
+}
+
+.username {
+  font-weight: 500;
+}
+
+.unknown {
+  font-size: 13px;
+  color: var(--unicon-text-secondary);
+}
+
+.signOutError {
+  padding: 6px 12px 4px;
+  border-top: 1px solid var(--unicon-border);
+}

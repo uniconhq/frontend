@@ -1,0 +1,47 @@
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  width: var(--unicon-sidebar-width);
+  flex: none;
+  padding: 14px 10px;
+  background: var(--unicon-chrome);
+  border-right: 1px solid var(--unicon-border);
+}
+
+.groupLabel {
+  padding: 0 8px;
+  margin-bottom: 6px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--unicon-text-meta);
+}
+
+.item {
+  display: block;
+  padding: 6px 8px;
+  border-radius: var(--mantine-radius-xs);
+  font-size: 13px;
+  color: var(--unicon-text-body);
+  text-decoration: none;
+}
+
+.item:hover {
+  background: var(--unicon-hover);
+}
+
+.active {
+  background: var(--unicon-hover);
+  color: var(--unicon-text-primary);
+}
+
+.upcoming {
+  color: var(--unicon-text-faint);
+  cursor: default;
+}
+
+.upcoming:hover {
+  background: transparent;
+}
