@@ -1,0 +1,2 @@
+import '@fontsource-variable/manrope';
+import '@fontsource-variable/jetbrains-mono';

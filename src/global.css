@@ -1,0 +1,16 @@
+body {
+  margin: 0;
+  background: var(--unicon-canvas);
+  color: var(--unicon-text-primary);
+  font-size: 14px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: inherit;
+}
+
+:root {
+  color-scheme: light dark;
+}
