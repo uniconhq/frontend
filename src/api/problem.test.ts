@@ -6,19 +6,19 @@ describe('apiErrorFromResponse', () => {
     const response = new Response(
       JSON.stringify({
         type: 'about:blank',
-        title: 'You are the last admin',
+        title: 'You are the only admin',
         status: 409,
         detail: 'Promote someone else first.',
-        code: 'last_admin',
+        code: 'sole_admin',
       }),
       { status: 409, headers: { 'content-type': 'application/problem+json' } },
     );
 
     const error = await apiErrorFromResponse(response);
 
-    expect(error.code).toBe('last_admin');
+    expect(error.code).toBe('sole_admin');
     expect(error.status).toBe(409);
-    expect(error.title).toBe('You are the last admin');
+    expect(error.title).toBe('You are the only admin');
     expect(error.detail).toBe('Promote someone else first.');
   });
 

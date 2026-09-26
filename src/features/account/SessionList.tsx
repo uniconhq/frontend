@@ -67,9 +67,8 @@ export function SessionList() {
                 )}
               </div>
               <BodyText tone="secondary" mono>
-                {session.ip ?? t('no address')} · {t('signed in')}{' '}
-                {formatDateTime(new Date(session.created_at))} · {t('last seen')}{' '}
-                {formatDateTime(new Date(session.last_seen_at))}
+                {t('signed in')} {formatDateTime(new Date(session.created_at))} ·{' '}
+                {t('last seen')} {formatDateTime(new Date(session.last_seen_at))}
               </BodyText>
             </div>
             <span className={classes.action}>

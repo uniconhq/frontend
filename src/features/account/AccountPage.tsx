@@ -8,11 +8,13 @@ import { forgeUrl } from '@/lib/config';
 import { t } from '@/lib/t';
 import { SessionList } from './SessionList';
 import { DangerZone } from './DangerZone';
+import { scopeName } from './scope-name';
 import classes from './AccountPage.module.css';
 
 /**
- * Forgejo owns the account; Unicon owns the sessions. Everything here is either
- * read-only with a link into Forgejo, or a session this app issued.
+ * Forgejo owns the account; Unicon owns the sessions and the roles. Everything
+ * here is either read-only with a link into Forgejo, a role Unicon granted, or
+ * a session this app issued.
  */
 export function AccountPage() {
   const me = useMe();
@@ -46,17 +48,34 @@ export function AccountPage() {
         </div>
       </Card>
 
+      {me.roles.length > 0 && (
+        <Card>
+          <div className={classes.stack}>
+            <SectionTitle>{t('Roles')}</SectionTitle>
+            <ul className={classes.roles}>
+              {me.roles.map(({ scope, role }) => (
+                <li key={`${scope.kind}:${scopeName(scope)}`} className={classes.role}>
+                  <span className={classes.scope}>{scopeName(scope)}</span>
+                  <span className={classes.roleName}>{role}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </Card>
+      )}
+
       <Card>
         <div className={classes.stack}>
           <SectionTitle>{t('Security')}</SectionTitle>
           <BodyText size="md">
             {t(
-              'Forgejo owns your account. Your password, two-factor settings, email addresses and SSH keys all live there.',
+              'Forgejo owns your account. Your password, email addresses, avatar, two-factor settings and SSH keys all live there.',
             )}
           </BodyText>
           <div className={classes.forgeLinks}>
             <a href={forgeUrl('/user/settings/account')}>{t('Password')}</a>
             <a href={forgeUrl('/user/settings/account')}>{t('Email addresses')}</a>
+            <a href={forgeUrl('/user/settings')}>{t('Avatar')}</a>
             <a href={forgeUrl('/user/settings/security')}>{t('Two-factor')}</a>
             <a href={forgeUrl('/user/settings/keys')}>{t('SSH keys')}</a>
           </div>

@@ -4,11 +4,16 @@
  * describeError, which would fall back to a server title and detail that do not
  * exist here.
  */
-const KNOWN = ['login_denied', 'login_state_invalid', 'forge_unreachable'] as const;
+const KNOWN = [
+  'sign_in_denied',
+  'sign_in_invalid',
+  'forge_unavailable',
+  'forge_misconfigured',
+] as const;
 
-export type LoginErrorCode = (typeof KNOWN)[number] | 'login_failed';
+export type LoginErrorCode = (typeof KNOWN)[number] | 'sign_in_failed';
 
 export function loginErrorCode(fromUrl: string | null): LoginErrorCode | null {
   if (fromUrl === null) return null;
-  return KNOWN.find((code) => code === fromUrl) ?? 'login_failed';
+  return KNOWN.find((code) => code === fromUrl) ?? 'sign_in_failed';
 }

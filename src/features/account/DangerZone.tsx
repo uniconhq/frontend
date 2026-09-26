@@ -9,16 +9,17 @@ import { LinkButton } from '@/ui/LinkButton';
 import { SectionTitle } from '@/ui/SectionTitle';
 import { loginHref, useEndSession } from '@/session';
 import { t } from '@/lib/t';
-import { lastAdminScopes } from './last-admin';
+import { soleAdminScopes } from './sole-admin';
+import { sharedWorkflows } from './shared-workflows';
 import classes from './DangerZone.module.css';
 
 type Action = 'deactivate' | 'delete';
 
 const EXPLANATION: Record<Action, string> = {
   deactivate:
-    'Your account is switched off in Forgejo: you cannot sign in or push until a platform admin turns it back on. Nothing is removed.',
+    'Your account is switched off in Forgejo, so you cannot sign in or push until a platform admin turns it back on. A platform admin can undo this.',
   delete:
-    'Your Forgejo account is removed. Your results stay on the leaderboards, attributed to "Deleted user", and your commits keep the name they were made with — git cannot scrub an author after the fact.',
+    'Your Forgejo account is removed. Your results stay on the leaderboards as "Deleted user" and your commits keep the name they were made with. This cannot be undone.',
 };
 
 const CONFIRM: Record<Action, string> = {
@@ -27,10 +28,12 @@ const CONFIRM: Record<Action, string> = {
 };
 
 /**
- * Both are Forgejo operations underneath and both are irreversible from here,
- * so each states what survives before it asks. The backend demands a recent
- * sign in; that answer arrives as `reauth_required` and turns the dialog into a
- * second sign-in button rather than an error.
+ * Both are Forgejo operations underneath, so each states what it does and
+ * whether it can be undone before it asks. A refusal is shown as it came: the
+ * scopes where this person is the only admin, or the workflows other people
+ * still use. The backend demands a recent sign in; that answer arrives as
+ * `fresh_sign_in_required` and turns the dialog into a second sign-in button
+ * rather than an error.
  */
 export function DangerZone() {
   const [action, setAction] = useState<Action | null>(null);
@@ -46,7 +49,9 @@ export function DangerZone() {
   const mutation = action === 'delete' ? remove : deactivate;
   const error = action === null ? null : mutation.error;
   const apiError = error === null || error === undefined ? null : toApiError(error);
-  const scopes = apiError?.code === 'last_admin' ? lastAdminScopes(apiError) : [];
+  const scopes = apiError?.code === 'sole_admin' ? soleAdminScopes(apiError) : [];
+  const workflows =
+    apiError?.code === 'shared_workflow_owner' ? sharedWorkflows(apiError) : [];
 
   const close = () => {
     setAction(null);
@@ -58,7 +63,7 @@ export function DangerZone() {
     <div className={classes.zone}>
       <SectionTitle>{t('Leaving')}</SectionTitle>
       <BodyText size="md">
-        {t('Deactivating is reversible by a platform admin. Deleting is not.')}
+        {t('Deactivating can be undone by a platform admin. Deleting cannot.')}
       </BodyText>
       <div className={classes.actions}>
         <Button variant="secondary" onClick={() => setAction('deactivate')}>
@@ -82,11 +87,18 @@ export function DangerZone() {
               <BodyText tone="secondary">{describeError(apiError).title}</BodyText>
               <BodyText tone="secondary">{describeError(apiError).message}</BodyText>
               {scopes.length > 0 && (
-                <ul className={classes.scopes}>
+                <ul className={classes.named}>
                   {scopes.map((scope) => (
-                    <li key={`${scope.org}/${scope.team}`}>
-                      {scope.org} · {scope.team}
+                    <li key={`${scope.kind}:${scope.name}`}>
+                      {scope.name} ({scope.kind})
                     </li>
+                  ))}
+                </ul>
+              )}
+              {workflows.length > 0 && (
+                <ul className={classes.named}>
+                  {workflows.map((workflow) => (
+                    <li key={workflow}>{workflow}</li>
                   ))}
                 </ul>
               )}
@@ -94,7 +106,7 @@ export function DangerZone() {
           )}
 
           <div className={classes.actions}>
-            {apiError?.code === 'reauth_required' ? (
+            {apiError?.code === 'fresh_sign_in_required' ? (
               <LinkButton href={loginHref('/account')}>{t('Sign in again')}</LinkButton>
             ) : (
               <Button

@@ -15,9 +15,10 @@ describe('LoginPage', () => {
   });
 
   it.each([
-    ['login_denied', 'You did not approve the sign in.'],
-    ['login_state_invalid', 'The sign in took too long or was started in another tab.'],
-    ['forge_unreachable', 'Forgejo did not answer'],
+    ['sign_in_denied', 'You did not approve the sign in.'],
+    ['sign_in_invalid', 'The sign in took too long or was started in another tab.'],
+    ['forge_unavailable', 'Forgejo did not answer'],
+    ['forge_misconfigured', 'Forgejo is not set up for Unicon'],
     ['something_new', 'Something went wrong on the way back from Forgejo.'],
   ])('explains ?error=%s in words', async (code, message) => {
     renderApp(`/login?error=${code}`);

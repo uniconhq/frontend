@@ -7,8 +7,7 @@ import classes from './Header.module.css';
 /**
  * Lockup on the left, clicking it goes to browse; then the breadcrumb, which is
  * also the sideways switcher once there is a contest in context. On the right
- * the account slot: a sign-in link or the avatar menu. Task 5 adds the contest
- * timer and the LIVE pill between them.
+ * the account slot: a sign-in link or the avatar menu.
  */
 export function Header() {
   return (
