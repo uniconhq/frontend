@@ -4,7 +4,7 @@ import classes from './Breadcrumb.module.css';
  * Filesystem-style trail: org / contest / current, each segment a pill with a
  * dropdown that switches sideways at that level. Static until there is a
  * contest to name, since the segments come from the route params once contest
- * routes exist (Task 5).
+ * routes exist.
  */
 export function Breadcrumb() {
   return (

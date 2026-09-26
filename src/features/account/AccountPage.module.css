@@ -30,3 +30,28 @@
   flex-wrap: wrap;
   font-size: 13px;
 }
+
+.roles {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.role {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font-size: 13px;
+}
+
+.scope {
+  font-family: var(--mantine-font-family-monospace);
+  color: var(--unicon-text-primary);
+}
+
+.roleName {
+  color: var(--unicon-text-secondary);
+}
