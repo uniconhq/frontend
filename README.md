@@ -101,8 +101,7 @@ pnpm gen:api --from ../backend/openapi.json     # a sibling checkout
 pnpm gen:api --from http://localhost:8080/openapi.json   # a running stack
 ```
 
-`api-version` holds a backend git ref, currently `main` — it becomes a commit
-SHA as soon as the backend has one worth pinning, which is what makes the build
+`api-version` holds one backend commit SHA, which is what makes the build
 reproducible. The pin is the point:
 the frontend builds against a known backend rather than whatever landed on the
 backend's `main` an hour ago, and bumping it is a deliberate pull request — the
