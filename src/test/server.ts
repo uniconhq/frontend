@@ -31,7 +31,6 @@ export const sessions: SessionInfo[] = [
     id: '0f3a9c2e6b1d4e7f8a9b0c1d2e3f4a5b',
     created_at: '2026-09-12T08:00:00Z',
     last_seen_at: '2026-09-12T09:30:00Z',
-    ip: '10.0.0.4',
     user_agent:
       'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0 Safari/537.36',
     current: true,
@@ -40,7 +39,6 @@ export const sessions: SessionInfo[] = [
     id: '7d2c1b0a9f8e4d3c2b1a0f9e8d7c6b5a',
     created_at: '2026-09-11T12:00:00Z',
     last_seen_at: '2026-09-11T13:00:00Z',
-    ip: '10.0.0.9',
     user_agent: 'Mozilla/5.0 (X11; Linux x86_64) Firefox/144.0',
     current: false,
   },

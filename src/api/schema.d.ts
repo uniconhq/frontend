@@ -296,7 +296,12 @@ export interface components {
              */
             now: string;
         };
-        /** SessionInfo */
+        /**
+         * SessionInfo
+         * @description One place this user is signed in, described by its device and its
+         *     times. The address a session came from is kept for the record and stays
+         *     out of the answer.
+         */
         SessionInfo: {
             /**
              * Created At
@@ -307,8 +312,6 @@ export interface components {
             current: boolean;
             /** Id */
             id: string;
-            /** Ip */
-            ip: string | null;
             /**
              * Last Seen At
              * Format: date-time

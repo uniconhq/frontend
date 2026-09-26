@@ -61,7 +61,7 @@ describe('AccountPage', () => {
     expect(screen.queryByRole('heading', { name: 'Roles' })).not.toBeInTheDocument();
   });
 
-  it('lists the sessions with address and last seen, and marks the one in use', async () => {
+  it('lists the sessions with device and last seen, and marks the one in use', async () => {
     server.use(signedIn, sessionList);
     renderApp('/account');
 
@@ -71,7 +71,6 @@ describe('AccountPage', () => {
     const current = screen.getByText('Chrome on Windows').closest('li');
     const other = screen.getByText('Firefox on Linux').closest('li');
     expect(current).toHaveTextContent('This device');
-    expect(current).toHaveTextContent('10.0.0.4');
     expect(current).toHaveTextContent('last seen');
     expect(other).not.toHaveTextContent('This device');
     expect(screen.getAllByRole('button', { name: 'Revoke' })).toHaveLength(1);
