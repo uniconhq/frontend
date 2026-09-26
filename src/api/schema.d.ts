@@ -25,7 +25,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Start a login through the forge */
+        /** Start a sign-in through the forge */
         get: operations["startLogin"];
         put?: never;
         post?: never;
@@ -59,7 +59,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Where to create a forge account, if it is open */
+        /** Where to create a forge account, when sign-up is open */
         get: operations["getRegisterUrl"];
         put?: never;
         post?: never;
@@ -76,11 +76,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The signed-in person */
+        /** The signed-in user and their roles */
         get: operations["getMe"];
         put?: never;
         post?: never;
-        /** Delete the forge account */
+        /** Delete the account at the forge */
         delete: operations["deleteMe"];
         options?: never;
         head?: never;
@@ -96,7 +96,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Deactivate the forge account */
+        /** Deactivate the account at the forge */
         post: operations["deactivateMe"];
         delete?: never;
         options?: never;
@@ -111,7 +111,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** This person's sessions */
+        /** Where this user is signed in */
         get: operations["listMySessions"];
         put?: never;
         post?: never;
@@ -180,7 +180,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Is Postgres reachable */
+        /** Is the database reachable */
         get: operations["getReadiness"];
         put?: never;
         post?: never;
@@ -202,7 +202,11 @@ export interface components {
              */
             status: "ok";
         };
-        /** Me */
+        /**
+         * Me
+         * @description The signed-in user and their roles at every scope. `degraded` is set
+         *     when the forge did not answer and the identity comes from the session.
+         */
         Me: {
             /** Avatar Url */
             avatar_url: string | null;
@@ -212,6 +216,8 @@ export interface components {
             email: string | null;
             /** Name */
             name: string | null;
+            /** Roles */
+            roles: components["schemas"]["Role"][];
             /** User Id */
             user_id: number;
             /** Username */
@@ -233,7 +239,7 @@ export interface components {
         };
         /**
          * Problem
-         * @description Extra members are allowed: `last_admin` carries `scopes`, for instance.
+         * @description Extra members are allowed: `sole_admin` carries `scopes`, for instance.
          */
         Problem: {
             /** Code */
@@ -264,6 +270,23 @@ export interface components {
         RegisterUrl: {
             /** Url */
             url: string | null;
+        };
+        /** Role */
+        Role: {
+            /** Role */
+            role: string;
+            scope: components["schemas"]["Scope"];
+        };
+        /** Scope */
+        Scope: {
+            /** Contest */
+            contest: string | null;
+            /** Kind */
+            kind: string;
+            /** Org */
+            org: string;
+            /** Task */
+            task: string | null;
         };
         /** ServerTime */
         ServerTime: {
@@ -664,7 +687,7 @@ export interface operations {
                     "application/json": components["schemas"]["Ready"];
                 };
             };
-            /** @description Postgres did not answer */
+            /** @description The database did not answer */
             503: {
                 headers: {
                     [name: string]: unknown;
