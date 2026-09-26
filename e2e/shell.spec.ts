@@ -31,6 +31,7 @@ async function stubApi(page: Page, options: { signedIn?: boolean } = {}) {
             name: 'Kenny Lewi',
             avatar_url: null,
             email: 'kenny@example.org',
+            roles: [],
             degraded: false,
           }),
         })
@@ -96,7 +97,7 @@ test('a signed-in person sees their account page', async ({ page }) => {
       contentType: 'application/json',
       body: JSON.stringify([
         {
-          id: 'sess-1',
+          id: '0f3a9c2e6b1d4e7f8a9b0c1d2e3f4a5b',
           created_at: '2026-09-12T08:00:00Z',
           last_seen_at: '2026-09-12T09:30:00Z',
           ip: '10.0.0.4',

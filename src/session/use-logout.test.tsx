@@ -49,7 +49,7 @@ describe('signing out', () => {
   });
 
   it('keeps you signed in when the sign-out is refused, and keeps the reason up', async () => {
-    statefulBackend({ logout: () => problem(503, 'forge_unreachable') });
+    statefulBackend({ logout: () => problem(503, 'forge_unavailable') });
     const { router } = renderApp('/account');
 
     await signOutFromTheHeader();
@@ -66,7 +66,7 @@ describe('signing out', () => {
   });
 
   it('brings the reason back if the menu was dismissed while the answer was on its way', async () => {
-    statefulBackend({ logout: () => problem(503, 'forge_unreachable'), slow: true });
+    statefulBackend({ logout: () => problem(503, 'forge_unavailable'), slow: true });
     renderApp('/account');
 
     await signOutFromTheHeader();
