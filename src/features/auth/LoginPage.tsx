@@ -2,11 +2,9 @@ import { Navigate, useSearchParams } from 'react-router';
 import { UniconLockup } from '@/ui/brand/UniconLockup';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
-import { TextLink } from '@/ui/TextLink';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
-import { $api } from '@/api/query';
 import { ApiError } from '@/api/problem';
-import { loginHref, safeNext, useSession } from '@/session';
+import { CreateAccountLink, loginHref, safeNext, useSession } from '@/session';
 import { FORGE_HOST, FORGE_URL } from '@/lib/config';
 import { t } from '@/lib/t';
 import { loginErrorCode } from './login-errors';
@@ -23,9 +21,6 @@ export function LoginPage() {
   const session = useSession();
   const next = safeNext(params.get('next'));
   const errorCode = loginErrorCode(params.get('error'));
-
-  const register = $api.useQuery('get', '/api/v1/auth/register-url');
-  const registerUrl = register.data?.url ?? null;
 
   if (session.status === 'signed-in') return <Navigate to={next} replace />;
 
@@ -49,9 +44,7 @@ export function LoginPage() {
         <Button href={loginHref(next)}>
           {errorCode === null ? t('Sign in with Forgejo') : t('Try again')}
         </Button>
-        {registerUrl !== null && (
-          <TextLink href={registerUrl}>{t('Create account')}</TextLink>
-        )}
+        <CreateAccountLink />
       </div>
 
       <BodyText tone="secondary">
