@@ -100,7 +100,6 @@ test('a signed-in person sees their account page', async ({ page }) => {
           id: '0f3a9c2e6b1d4e7f8a9b0c1d2e3f4a5b',
           created_at: '2026-09-12T08:00:00Z',
           last_seen_at: '2026-09-12T09:30:00Z',
-          ip: '10.0.0.4',
           user_agent: 'Mozilla/5.0 (Windows NT 10.0) Chrome/153.0',
           current: true,
         },
