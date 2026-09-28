@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { $api } from '@/api/query';
 import { toApiError } from '@/api/problem';
-import { describeError } from '@/api/describe-error';
 import { Button } from '@/ui/Button';
 import { Modal } from '@/ui/Modal';
 import { BodyText } from '@/ui/BodyText';
+import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { SectionTitle } from '@/ui/SectionTitle';
 import { loginHref, useEndSession } from '@/session';
 import { t } from '@/lib/t';
@@ -83,8 +83,7 @@ export function DangerZone() {
 
           {apiError !== null && (
             <div className={classes.problem}>
-              <BodyText tone="secondary">{describeError(apiError).title}</BodyText>
-              <BodyText tone="secondary">{describeError(apiError).message}</BodyText>
+              <ErrorBlock error={apiError} compact />
               {scopes.length > 0 && (
                 <ul className={classes.named}>
                   {scopes.map((scope) => (
