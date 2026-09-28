@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from 'react';
 import { useLocation } from 'react-router';
 import { Modal } from '@/ui/Modal';
-import { LinkButton } from '@/ui/LinkButton';
+import { Button } from '@/ui/Button';
 import { BodyText } from '@/ui/BodyText';
 import { t } from '@/lib/t';
 import { isSessionExpired, subscribe } from './expired';
@@ -30,9 +30,7 @@ export function SessionExpiredModal() {
         )}
       </BodyText>
       <div style={{ marginTop: 14 }}>
-        <LinkButton href={loginHref(currentPath(location))}>
-          {t('Sign in again')}
-        </LinkButton>
+        <Button href={loginHref(currentPath(location))}>{t('Sign in again')}</Button>
       </div>
     </Modal>
   );

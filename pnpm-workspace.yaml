@@ -1,3 +1,10 @@
 allowBuilds:
   esbuild: true
   msw: false
+
+# openapi-typescript 7.13 still declares `typescript: ^5.x`. Its own tests pass
+# on 6 (openapi-ts/openapi-typescript#2723); the range just has not been
+# widened in a release yet. Drop this once one ships.
+peerDependencyRules:
+  allowedVersions:
+    'openapi-typescript>typescript': '6'

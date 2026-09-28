@@ -5,7 +5,6 @@ import { describeError } from '@/api/describe-error';
 import { Button } from '@/ui/Button';
 import { Modal } from '@/ui/Modal';
 import { BodyText } from '@/ui/BodyText';
-import { LinkButton } from '@/ui/LinkButton';
 import { SectionTitle } from '@/ui/SectionTitle';
 import { loginHref, useEndSession } from '@/session';
 import { t } from '@/lib/t';
@@ -107,7 +106,7 @@ export function DangerZone() {
 
           <div className={classes.actions}>
             {apiError?.code === 'fresh_sign_in_required' ? (
-              <LinkButton href={loginHref('/account')}>{t('Sign in again')}</LinkButton>
+              <Button href={loginHref('/account')}>{t('Sign in again')}</Button>
             ) : (
               <Button
                 variant="danger"
