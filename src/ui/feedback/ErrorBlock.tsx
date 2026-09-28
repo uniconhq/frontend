@@ -1,4 +1,5 @@
-import { Button, Code, Stack, Text } from '@mantine/core';
+import { Code, Stack } from '@mantine/core';
+import { Button } from '@/ui/Button';
 import { SectionTitle } from '@/ui/SectionTitle';
 import { BodyText } from '@/ui/BodyText';
 import { toApiError } from '@/api/problem';
@@ -38,15 +39,13 @@ export function ErrorBlock({
   return (
     <Stack gap="xs" align="flex-start" py="lg">
       <SectionTitle>{title}</SectionTitle>
-      <Text size="sm" c="var(--unicon-text-body)">
-        {message}
-      </Text>
+      <BodyText>{message}</BodyText>
       <Code c="var(--unicon-text-secondary)" bg="transparent">
         {apiError.code}
         {apiError.status > 0 ? ` · ${String(apiError.status)}` : ''}
       </Code>
       {onRetry !== undefined && (
-        <Button size="xs" variant="default" onClick={onRetry}>
+        <Button size="xs" variant="secondary" onClick={onRetry}>
           {t('Try again')}
         </Button>
       )}
