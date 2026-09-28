@@ -42,7 +42,7 @@ export function AccountPage() {
             )}
           </BodyText>
         )}
-        <div style={{ marginTop: 12 }}>
+        <div className={classes.change}>
           <TextLink href={forgeUrl('/user/settings')}>
             {t('Change in Forgejo')}
           </TextLink>
