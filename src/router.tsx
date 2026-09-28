@@ -7,7 +7,7 @@ import {
 import { AppShell } from '@/ui/shell/AppShell';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { NotFound } from '@/ui/feedback/NotFound';
-import { HomePage } from '@/features/home/HomePage';
+import { HomePage } from '@/features/home';
 import { LoginPage } from '@/features/auth';
 import { AccountPage } from '@/features/account';
 import { RequireSession, SessionExpiredModal, SessionProvider } from '@/session';

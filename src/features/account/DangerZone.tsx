@@ -1,11 +1,10 @@
 import { useState } from 'react';
 import { $api } from '@/api/query';
 import { toApiError } from '@/api/problem';
-import { describeError } from '@/api/describe-error';
 import { Button } from '@/ui/Button';
 import { Modal } from '@/ui/Modal';
 import { BodyText } from '@/ui/BodyText';
-import { LinkButton } from '@/ui/LinkButton';
+import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { SectionTitle } from '@/ui/SectionTitle';
 import { loginHref, useEndSession } from '@/session';
 import { t } from '@/lib/t';
@@ -74,55 +73,52 @@ export function DangerZone() {
         </Button>
       </div>
 
-      <Modal
-        opened={action !== null}
-        onClose={close}
-        title={t(CONFIRM[action ?? 'deactivate'])}
-      >
-        <div className={classes.dialog}>
-          <BodyText size="md">{t(EXPLANATION[action ?? 'deactivate'])}</BodyText>
+      {action !== null && (
+        <Modal opened onClose={close} title={t(CONFIRM[action])}>
+          <div className={classes.dialog}>
+            <BodyText size="md">{t(EXPLANATION[action])}</BodyText>
 
-          {apiError !== null && (
-            <div className={classes.problem}>
-              <BodyText tone="secondary">{describeError(apiError).title}</BodyText>
-              <BodyText tone="secondary">{describeError(apiError).message}</BodyText>
-              {scopes.length > 0 && (
-                <ul className={classes.named}>
-                  {scopes.map((scope) => (
-                    <li key={`${scope.kind}:${scope.name}`}>
-                      {scope.name} ({scope.kind})
-                    </li>
-                  ))}
-                </ul>
-              )}
-              {workflows.length > 0 && (
-                <ul className={classes.named}>
-                  {workflows.map((workflow) => (
-                    <li key={workflow}>{workflow}</li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          )}
-
-          <div className={classes.actions}>
-            {apiError?.code === 'fresh_sign_in_required' ? (
-              <LinkButton href={loginHref('/account')}>{t('Sign in again')}</LinkButton>
-            ) : (
-              <Button
-                variant="danger"
-                loading={mutation.isPending}
-                onClick={() => mutation.mutate({})}
-              >
-                {t(CONFIRM[action ?? 'deactivate'])}
-              </Button>
+            {apiError !== null && (
+              <div className={classes.problem}>
+                <ErrorBlock error={apiError} compact />
+                {scopes.length > 0 && (
+                  <ul className={classes.named}>
+                    {scopes.map((scope) => (
+                      <li key={`${scope.kind}:${scope.name}`}>
+                        {scope.name} ({scope.kind})
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {workflows.length > 0 && (
+                  <ul className={classes.named}>
+                    {workflows.map((workflow) => (
+                      <li key={workflow}>{workflow}</li>
+                    ))}
+                  </ul>
+                )}
+              </div>
             )}
-            <Button variant="secondary" onClick={close}>
-              {t('Cancel')}
-            </Button>
+
+            <div className={classes.actions}>
+              {apiError?.code === 'fresh_sign_in_required' ? (
+                <Button href={loginHref('/account')}>{t('Sign in again')}</Button>
+              ) : (
+                <Button
+                  variant="danger"
+                  loading={mutation.isPending}
+                  onClick={() => mutation.mutate({})}
+                >
+                  {t(CONFIRM[action])}
+                </Button>
+              )}
+              <Button variant="secondary" onClick={close}>
+                {t('Cancel')}
+              </Button>
+            </div>
           </div>
-        </div>
-      </Modal>
+        </Modal>
+      )}
     </div>
   );
 }

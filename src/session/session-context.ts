@@ -1,8 +1,6 @@
 import { createContext, useContext } from 'react';
 import type { ApiError } from '@/api/problem';
-import type { components } from '@/api/schema';
-
-export type Me = components['schemas']['Me'];
+import type { Me } from '@/api/types';
 
 /**
  * Four states, because that is all a page can do about it: wait, offer a way

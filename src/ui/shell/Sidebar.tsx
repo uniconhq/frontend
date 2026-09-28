@@ -32,7 +32,7 @@ const GROUPS: Group[] = [
 
 export function Sidebar() {
   return (
-    <nav className={classes.sidebar} aria-label="Sections">
+    <nav className={classes.sidebar} aria-label={t('Sections')}>
       {GROUPS.map((group) => (
         <div key={group.label}>
           <div className={classes.groupLabel}>{t(group.label)}</div>

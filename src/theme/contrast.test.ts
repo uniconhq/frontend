@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { uniconTokens, type ColorSchemeName } from './theme';
+import { theme, uniconTokens, type ColorSchemeName } from './theme';
 
 /**
  * Contrast was checked at 4.5:1 for body text and 3:1 for headline-scale type
@@ -29,7 +29,7 @@ type Ground = (typeof GROUNDS)[number];
 
 type Rule = {
   /** The --unicon-text-* token, without the prefix. */
-  token: 'body' | 'secondary' | 'accent' | 'meta';
+  token: 'body' | 'secondary' | 'accent' | 'meta' | 'danger';
   /** Where it is allowed to appear. */
   on: readonly Ground[];
   floor: number;
@@ -66,6 +66,12 @@ const RULES: Rule[] = [
     floor: 3,
     why: '10px uppercase labels only',
   },
+  {
+    token: 'danger',
+    on: GROUNDS,
+    floor: 4.5,
+    why: 'the label of a destructive button',
+  },
 ];
 
 const SCHEMES: ColorSchemeName[] = ['light', 'dark'];
@@ -85,5 +91,17 @@ describe('text on surfaces', () => {
         }
       });
     }
+  }
+});
+
+describe('ink on the accent fill', () => {
+  const shade = theme.primaryShade as Record<ColorSchemeName, number>;
+
+  for (const scheme of SCHEMES) {
+    it(`--unicon-text-on-accent clears 4.5:1 on the ${scheme} primary button`, () => {
+      const fill = theme.colors?.sunset?.[shade[scheme]] ?? '';
+      const ratio = contrastRatio(uniconTokens.text[scheme].onAccent, fill);
+      expect(ratio, `on ${fill}: ${ratio.toFixed(2)}:1`).toBeGreaterThanOrEqual(4.5);
+    });
   }
 });

@@ -1,3 +1,4 @@
+import { t } from '@/lib/t';
 import classes from './Breadcrumb.module.css';
 
 /**
@@ -8,9 +9,9 @@ import classes from './Breadcrumb.module.css';
  */
 export function Breadcrumb() {
   return (
-    <nav className={classes.trail} aria-label="Breadcrumb">
+    <nav className={classes.trail} aria-label={t('Breadcrumb')}>
       <span className={classes.segment}>
-        browse
+        {t('browse')}
         <span className={classes.caret} aria-hidden="true">
           ▾
         </span>
