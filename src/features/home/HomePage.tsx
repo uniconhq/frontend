@@ -2,6 +2,7 @@ import { useLocation } from 'react-router';
 import { PageTitle } from '@/ui/PageTitle';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
+import { TextLink } from '@/ui/TextLink';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
 import { $api } from '@/api/query';
 import { currentPath, loginHref, useSession } from '@/session';
@@ -37,9 +38,7 @@ export function HomePage() {
         <div className={classes.actions}>
           <Button href={loginHref(currentPath(location))}>{t('Sign in')}</Button>
           {registerUrl !== null && (
-            <a href={registerUrl}>
-              <BodyText tone="secondary">{t('Create account')}</BodyText>
-            </a>
+            <TextLink href={registerUrl}>{t('Create account')}</TextLink>
           )}
         </div>
       )}

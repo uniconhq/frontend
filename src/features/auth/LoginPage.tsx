@@ -2,6 +2,7 @@ import { Navigate, useSearchParams } from 'react-router';
 import { UniconLockup } from '@/ui/brand/UniconLockup';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
+import { TextLink } from '@/ui/TextLink';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { $api } from '@/api/query';
 import { ApiError } from '@/api/problem';
@@ -49,9 +50,7 @@ export function LoginPage() {
           {errorCode === null ? t('Sign in with Forgejo') : t('Try again')}
         </Button>
         {registerUrl !== null && (
-          <a href={registerUrl}>
-            <BodyText tone="secondary">{t('Create account')}</BodyText>
-          </a>
+          <TextLink href={registerUrl}>{t('Create account')}</TextLink>
         )}
       </div>
 
