@@ -1,5 +1,6 @@
 import { useId } from 'react';
 import { useMantineTheme } from '@mantine/core';
+import { t } from '@/lib/t';
 
 /**
  * Unicon mark: the JetBrains Mono ">" glyph rotated 45deg, outline extracted
@@ -31,7 +32,7 @@ export function UniconMark({ size = 24, fill, gradient, ...rest }: Props) {
       height={size}
       viewBox="0 0 1000 1000"
       role="img"
-      aria-label="Unicon"
+      aria-label={t('Unicon')}
       {...rest}
     >
       {useGradient && (
