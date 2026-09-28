@@ -6,10 +6,7 @@
  */
 
 export type ApiErrorCode =
-  | 'unexpected_response'
-  | 'network_error'
-  | 'unexpected_error'
-  | (string & {});
+  'unexpected_response' | 'network_error' | 'unexpected_error' | (string & {});
 
 export class ApiError extends Error {
   readonly code: ApiErrorCode;
