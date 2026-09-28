@@ -1,15 +1,12 @@
 import { setupServer } from 'msw/node';
 import { http, HttpResponse } from 'msw';
-import type { components } from '@/api/schema';
+import type { Me, SessionInfo } from '@/api/types';
 
 /**
  * A fake backend for the tests, so they exercise the real client, the real
  * error parsing and the real query cache. Mocking our own fetch wrapper would
  * only prove that the mock was called.
  */
-type Me = components['schemas']['Me'];
-type SessionInfo = components['schemas']['SessionInfo'];
-
 export const someone: Me = {
   user_id: 7,
   username: 'kenny',

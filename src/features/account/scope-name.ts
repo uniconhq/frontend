@@ -1,6 +1,4 @@
-import type { components } from '@/api/schema';
-
-export type Scope = components['schemas']['Scope'];
+import type { Scope } from '@/api/types';
 
 /**
  * A scope as one readable path: the org, then the contest and the task when
