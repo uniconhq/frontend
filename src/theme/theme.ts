@@ -115,6 +115,10 @@ export type TextColors = {
    * so light grounds take the next rung down.
    */
   accent: string;
+  /** Labels of destructive actions. */
+  danger: string;
+  /** Ink on the accent fill. Dark in both schemes: white fails on the pink. */
+  onAccent: string;
 };
 
 export type VerdictName =
@@ -180,6 +184,8 @@ export const uniconTokens: UniconThemeOther = {
       meta: '#7d7d7d',
       faint: '#5a5a5a',
       accent: '#f78ca8',
+      danger: '#f4676a',
+      onAccent: '#2a0f16',
     },
     light: {
       primary: '#1c1c1c',
@@ -188,6 +194,8 @@ export const uniconTokens: UniconThemeOther = {
       meta: '#8f8f8f',
       faint: '#a8a8a8',
       accent: '#c4426a',
+      danger: '#a81f1f',
+      onAccent: '#2a0f16',
     },
   },
 

@@ -19,6 +19,8 @@ const vars = (surfaces: Surfaces, text: TextColors) => ({
   '--unicon-text-meta': text.meta,
   '--unicon-text-faint': text.faint,
   '--unicon-text-accent': text.accent,
+  '--unicon-text-danger': text.danger,
+  '--unicon-text-on-accent': text.onAccent,
 });
 
 export const cssVariablesResolver: CSSVariablesResolver = (theme) => ({

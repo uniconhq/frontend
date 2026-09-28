@@ -1,8 +1,4 @@
-import {
-  Button as MantineButton,
-  useComputedColorScheme,
-  useMantineTheme,
-} from '@mantine/core';
+import { Button as MantineButton } from '@mantine/core';
 import type { CSSProperties, ReactNode } from 'react';
 
 /**
@@ -36,15 +32,11 @@ export function Button({
   loading?: boolean;
   type?: 'button' | 'submit';
 }) {
-  const theme = useMantineTheme();
-  const scheme = useComputedColorScheme('dark');
-  const [, rejectedForeground] = theme.other.verdict.rejected[scheme];
-
   const color =
     variant === 'primary'
-      ? '#2a0f16'
+      ? 'var(--unicon-text-on-accent)'
       : variant === 'danger'
-        ? rejectedForeground
+        ? 'var(--unicon-text-danger)'
         : 'var(--unicon-text-body)';
 
   const outline = {
