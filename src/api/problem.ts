@@ -5,7 +5,8 @@
  * an ApiError too, so callers have one shape to handle.
  */
 
-export type ApiErrorCode = 'unexpected_response' | 'network_error' | (string & {});
+export type ApiErrorCode =
+  'unexpected_response' | 'network_error' | 'unexpected_error' | (string & {});
 
 export class ApiError extends Error {
   readonly code: ApiErrorCode;

@@ -115,6 +115,10 @@ export type TextColors = {
    * so light grounds take the next rung down.
    */
   accent: string;
+  /** Labels of destructive actions. */
+  danger: string;
+  /** Ink on the accent fill. Dark in both schemes: white fails on the pink. */
+  onAccent: string;
 };
 
 export type VerdictName =
@@ -127,9 +131,10 @@ export type UniconThemeOther = {
   verdict: VerdictColors;
   surface: Record<ColorSchemeName, Surfaces>;
   text: Record<ColorSchemeName, TextColors>;
-  scoreBands: { max: number; color: string }[];
-  sunsetGradient: string;
-  lockup: { markScale: number; gapScale: number; minWordmarkPx: number };
+  /** The mark's gradient, bottom-left to top-right. */
+  sunsetStops: string[];
+  /** The mark's size and the gap after it, as fractions of the wordmark size. */
+  lockup: { markScale: number; gapScale: number };
   shell: { headerHeight: number; sidebarWidth: number };
 };
 
@@ -179,6 +184,8 @@ export const uniconTokens: UniconThemeOther = {
       meta: '#7d7d7d',
       faint: '#5a5a5a',
       accent: '#f78ca8',
+      danger: '#f4676a',
+      onAccent: '#2a0f16',
     },
     light: {
       primary: '#1c1c1c',
@@ -187,18 +194,14 @@ export const uniconTokens: UniconThemeOther = {
       meta: '#8f8f8f',
       faint: '#a8a8a8',
       accent: '#c4426a',
+      danger: '#a81f1f',
+      onAccent: '#2a0f16',
     },
   },
 
-  scoreBands: [
-    { max: 0.4, color: '#f4676a' },
-    { max: 0.8, color: '#ffc93c' },
-    { max: Infinity, color: '#6ede9b' },
-  ],
+  sunsetStops: [lilac[4], sunset[4], gold[4]],
 
-  sunsetGradient: 'linear-gradient(135deg,#c9a4e2,#f78ca8 45%,#ffc93c)',
-
-  lockup: { markScale: 0.525, gapScale: 0.1, minWordmarkPx: 16 },
+  lockup: { markScale: 0.525, gapScale: 0.1 },
 
   shell: { headerHeight: 48, sidebarWidth: 178 },
 };

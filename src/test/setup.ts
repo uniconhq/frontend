@@ -2,6 +2,7 @@ import '@testing-library/jest-dom/vitest';
 import { afterAll, afterEach, beforeAll } from 'vitest';
 import { cleanup } from '@testing-library/react';
 import { resetSessionExpiry } from '@/session/expired';
+import { resetServerClock } from '@/lib/time';
 import { server } from './server';
 
 window.matchMedia = (query: string) => ({
@@ -29,6 +30,7 @@ afterEach(() => {
   cleanup();
   server.resetHandlers();
   resetSessionExpiry();
+  resetServerClock();
 });
 
 afterAll(() => {

@@ -1,10 +1,9 @@
 import { useLocation } from 'react-router';
 import { PageTitle } from '@/ui/PageTitle';
 import { BodyText } from '@/ui/BodyText';
-import { LinkButton } from '@/ui/LinkButton';
+import { Button } from '@/ui/Button';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
-import { $api } from '@/api/query';
-import { currentPath, loginHref, useSession } from '@/session';
+import { CreateAccountLink, currentPath, loginHref, useSession } from '@/session';
 import { t } from '@/lib/t';
 import { ServerClock } from './ServerClock';
 import classes from './HomePage.module.css';
@@ -16,11 +15,6 @@ import classes from './HomePage.module.css';
 export function HomePage() {
   const session = useSession();
   const location = useLocation();
-
-  const register = $api.useQuery('get', '/api/v1/auth/register-url', undefined, {
-    enabled: session.status === 'signed-out',
-  });
-  const registerUrl = register.data?.url ?? null;
 
   return (
     <div className={classes.page}>
@@ -35,14 +29,8 @@ export function HomePage() {
 
       {session.status === 'signed-out' && (
         <div className={classes.actions}>
-          <LinkButton href={loginHref(currentPath(location))}>
-            {t('Sign in')}
-          </LinkButton>
-          {registerUrl !== null && (
-            <a href={registerUrl}>
-              <BodyText tone="secondary">{t('Create account')}</BodyText>
-            </a>
-          )}
+          <Button href={loginHref(currentPath(location))}>{t('Sign in')}</Button>
+          <CreateAccountLink />
         </div>
       )}
 

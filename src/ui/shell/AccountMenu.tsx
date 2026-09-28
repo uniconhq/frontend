@@ -2,8 +2,7 @@ import { useState } from 'react';
 import { Menu, UnstyledButton } from '@mantine/core';
 import { Link, useLocation } from 'react-router';
 import { Avatar } from '@/ui/Avatar';
-import { BodyText } from '@/ui/BodyText';
-import { describeError } from '@/api/describe-error';
+import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { currentPath, loginHref, useLogout, useSession } from '@/session';
 import { forgeUrl } from '@/lib/config';
 import { t } from '@/lib/t';
@@ -77,8 +76,7 @@ export function AccountMenu() {
         </Menu.Item>
         {error !== null && (
           <div className={classes.signOutError} role="alert">
-            <BodyText tone="secondary">{describeError(error).title}</BodyText>
-            <BodyText tone="secondary">{describeError(error).message}</BodyText>
+            <ErrorBlock error={error} compact />
           </div>
         )}
       </Menu.Dropdown>

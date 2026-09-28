@@ -3,6 +3,7 @@ import { Avatar } from '@/ui/Avatar';
 import { SectionTitle } from '@/ui/SectionTitle';
 import { PageTitle } from '@/ui/PageTitle';
 import { BodyText } from '@/ui/BodyText';
+import { TextLink } from '@/ui/TextLink';
 import { useMe } from '@/session';
 import { forgeUrl } from '@/lib/config';
 import { t } from '@/lib/t';
@@ -41,10 +42,10 @@ export function AccountPage() {
             )}
           </BodyText>
         )}
-        <div style={{ marginTop: 12 }}>
-          <a href={forgeUrl('/user/settings')}>
-            <BodyText tone="secondary">{t('Change in Forgejo')}</BodyText>
-          </a>
+        <div className={classes.change}>
+          <TextLink href={forgeUrl('/user/settings')}>
+            {t('Change in Forgejo')}
+          </TextLink>
         </div>
       </Card>
 

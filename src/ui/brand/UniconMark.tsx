@@ -1,4 +1,6 @@
 import { useId } from 'react';
+import { useMantineTheme } from '@mantine/core';
+import { t } from '@/lib/t';
 
 /**
  * Unicon mark: the JetBrains Mono ">" glyph rotated 45deg, outline extracted
@@ -8,8 +10,6 @@ import { useId } from 'react';
  *   <UniconMark fill="currentColor" />         inherits text colour
  *   <UniconMark gradient={['#0af', '#0fa']} /> custom stops
  */
-
-const UNICON_SUNSET = ['#c9a4e2', '#f78ca8', '#ffc93c'];
 
 const GLYPH =
   'M708.22 1000L583.55 875.33L793.1 275.86Q806.37 238.73 820.29 207.56Q834.22 176.39 843.5 161.8Q828.91 171.09 796.42 186.34Q763.93 201.59 729.44 212.2L128.65 420.42L0 291.78L859.42 0L1000 140.58L708.22 1000Z';
@@ -22,7 +22,8 @@ type Props = {
 
 export function UniconMark({ size = 24, fill, gradient, ...rest }: Props) {
   const id = useId();
-  const stops = gradient ?? UNICON_SUNSET;
+  const theme = useMantineTheme();
+  const stops = gradient ?? theme.other.sunsetStops;
   const useGradient = !fill;
 
   return (
@@ -31,7 +32,7 @@ export function UniconMark({ size = 24, fill, gradient, ...rest }: Props) {
       height={size}
       viewBox="0 0 1000 1000"
       role="img"
-      aria-label="Unicon"
+      aria-label={t('Unicon')}
       {...rest}
     >
       {useGradient && (

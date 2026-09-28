@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { apiErrorFromResponse, apiErrorFromTransportFailure } from './problem';
+import {
+  ApiError,
+  apiErrorFromResponse,
+  apiErrorFromTransportFailure,
+  toApiError,
+} from './problem';
 
 describe('apiErrorFromResponse', () => {
   it('keeps the stable code from a problem document', async () => {
@@ -52,5 +57,21 @@ describe('apiErrorFromTransportFailure', () => {
 
     expect(error.code).toBe('network_error');
     expect(error.status).toBe(0);
+  });
+});
+
+describe('toApiError', () => {
+  it('passes an ApiError through untouched', () => {
+    const error = new ApiError({ code: 'sole_admin', status: 409, title: 'x' });
+
+    expect(toApiError(error)).toBe(error);
+  });
+
+  it('wraps anything else as unexpected_error, keeping its message', () => {
+    const error = toApiError(new Error('render blew up'));
+
+    expect(error.code).toBe('unexpected_error');
+    expect(error.status).toBe(0);
+    expect(error.detail).toBe('render blew up');
   });
 });
