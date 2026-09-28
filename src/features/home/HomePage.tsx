@@ -1,7 +1,7 @@
 import { useLocation } from 'react-router';
 import { PageTitle } from '@/ui/PageTitle';
 import { BodyText } from '@/ui/BodyText';
-import { LinkButton } from '@/ui/LinkButton';
+import { Button } from '@/ui/Button';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
 import { $api } from '@/api/query';
 import { currentPath, loginHref, useSession } from '@/session';
@@ -35,9 +35,7 @@ export function HomePage() {
 
       {session.status === 'signed-out' && (
         <div className={classes.actions}>
-          <LinkButton href={loginHref(currentPath(location))}>
-            {t('Sign in')}
-          </LinkButton>
+          <Button href={loginHref(currentPath(location))}>{t('Sign in')}</Button>
           {registerUrl !== null && (
             <a href={registerUrl}>
               <BodyText tone="secondary">{t('Create account')}</BodyText>

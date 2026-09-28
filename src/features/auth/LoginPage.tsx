@@ -1,7 +1,7 @@
 import { Navigate, useSearchParams } from 'react-router';
 import { UniconLockup } from '@/ui/brand/UniconLockup';
 import { BodyText } from '@/ui/BodyText';
-import { LinkButton } from '@/ui/LinkButton';
+import { Button } from '@/ui/Button';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { $api } from '@/api/query';
 import { ApiError } from '@/api/problem';
@@ -45,9 +45,9 @@ export function LoginPage() {
       )}
 
       <div className={classes.actions}>
-        <LinkButton href={loginHref(next)}>
+        <Button href={loginHref(next)}>
           {errorCode === null ? t('Sign in with Forgejo') : t('Try again')}
-        </LinkButton>
+        </Button>
         {registerUrl !== null && (
           <a href={registerUrl}>
             <BodyText tone="secondary">{t('Create account')}</BodyText>
