@@ -31,6 +31,11 @@ export function serverNow(): Date {
   return new Date(Date.now() + offsetMs);
 }
 
+/** Only for tests: the offset otherwise lives as long as the page. */
+export function resetServerClock(): void {
+  offsetMs = 0;
+}
+
 /** Wall clock in the viewer's own timezone, seconds included. */
 export function formatTimeOfDay(date: Date): string {
   return new Intl.DateTimeFormat(undefined, {
