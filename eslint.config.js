@@ -83,7 +83,7 @@ export default tseslint.config(
   },
 
   {
-    files: ['scripts/**/*.ts', 'e2e/**/*.ts', '*.config.ts'],
+    files: ['scripts/**/*.ts', 'e2e/**/*.ts', '*.config.ts', 'vitest.setup.ts'],
     languageOptions: { globals: globals.node },
   },
 
