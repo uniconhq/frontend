@@ -18,6 +18,10 @@
   min-width: 0;
 }
 
+.change {
+  margin-top: 12px;
+}
+
 .stack {
   display: flex;
   flex-direction: column;

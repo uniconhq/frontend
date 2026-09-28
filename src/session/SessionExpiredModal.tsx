@@ -6,6 +6,7 @@ import { BodyText } from '@/ui/BodyText';
 import { t } from '@/lib/t';
 import { isSessionExpired, subscribe } from './expired';
 import { currentPath, loginHref } from './login-href';
+import classes from './SessionExpiredModal.module.css';
 
 /**
  * Rendered once, in the root layout. The page underneath stays mounted, so an
@@ -29,7 +30,7 @@ export function SessionExpiredModal() {
           'This page and anything you have typed are still here. Sign in again to save it.',
         )}
       </BodyText>
-      <div style={{ marginTop: 14 }}>
+      <div className={classes.actions}>
         <Button href={loginHref(currentPath(location))}>{t('Sign in again')}</Button>
       </div>
     </Modal>
