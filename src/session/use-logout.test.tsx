@@ -1,12 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { delay, http, HttpResponse } from 'msw';
+import { http, HttpResponse } from 'msw';
 import { renderApp } from '@/test/render';
 import { problem, server, sessionList, someone } from '@/test/server';
 
-/** A backend that remembers whether this person's session is still alive. */
-function statefulBackend(options: { logout: () => Response; slow?: boolean }) {
+/**
+ * A backend that remembers whether this person's session is still alive. With
+ * `held`, the sign-out is answered only once that promise settles, so a test
+ * can act while the answer is on its way.
+ */
+function statefulBackend(options: { logout: () => Response; held?: Promise<void> }) {
   let live = true;
   server.use(
     http.get('/api/v1/me', () =>
@@ -14,7 +18,7 @@ function statefulBackend(options: { logout: () => Response; slow?: boolean }) {
     ),
     sessionList,
     http.post('/api/v1/auth/logout', async () => {
-      if (options.slow === true) await delay(40);
+      await options.held;
       const answer = options.logout();
       if (answer.status === 204) live = false;
       return answer;
@@ -66,12 +70,17 @@ describe('signing out', () => {
   });
 
   it('brings the reason back if the menu was dismissed while the answer was on its way', async () => {
-    statefulBackend({ logout: () => problem(503, 'forge_unavailable'), slow: true });
+    let answer = () => {};
+    const held = new Promise<void>((resolve) => {
+      answer = resolve;
+    });
+    statefulBackend({ logout: () => problem(503, 'forge_unavailable'), held });
     renderApp('/account');
 
     await signOutFromTheHeader();
     await userEvent.keyboard('{Escape}');
     expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+    answer();
 
     const menu = await screen.findByRole('menu');
     expect(within(menu).getByText('Forgejo did not answer')).toBeInTheDocument();
