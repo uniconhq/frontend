@@ -139,21 +139,78 @@ sentence for a stable `code`, never the code itself, and an unknown code falls
 back to the server's own title and detail so a frontend that lags the backend by
 a release still says something true.
 
+## The organiser pages
+
+An organiser makes an org, a contest and a task and watches each one
+provisioned, then opens any file of a contest or a task as text and saves it.
+Saving a task's file is the save of the task, which publishes it or keeps it
+as a draft.
+
+| Address                                    | Page                                                          |
+| ------------------------------------------ | ------------------------------------------------------------- |
+| `/orgs`                                    | the orgs your roles reach, and New org                        |
+| `/orgs/new`                                | the new org form, then its provisioning                       |
+| `/orgs/:org`                               | the org's contests, and New contest                           |
+| `/orgs/:org/contests/:contest`             | the contest's tasks, New task, and the contest repo's files   |
+| `/orgs/:org/contests/:contest/tasks/:task` | the task's state, its publications, and the task repo's files |
+
+**Every organiser page lives under `/orgs`.** The proxy in `deploy` sends
+exactly `/orgs` and `/orgs/...` to this app, so a page anywhere else loads in
+the dev server and answers 404 behind the proxy. A new organiser page goes
+under `/orgs` or the proxy changes first. Every address above is built in one
+place, `src/lib/organiser-paths.ts`, which the pages and the breadcrumb share.
+
+The pages live in `src/features/organise/`: a sub-folder for each page
+(`orgs/` holds `/orgs` and `/orgs/new`, then `org/`, `contest/` and `task/`),
+one for the provisioning progress the three create forms share
+(`provisioning/`), and one for the file tree and editor the contest and task
+pages share (`files/`). The pieces more than one of those use sit at its top:
+the create form, the list of links, the definition errors, the route params,
+and what a person's roles reach.
+
+All of them are behind `RequireSession`. The org list is read from the roles
+the session already has, since there is no route that lists orgs. An org or a
+contest page whose list is refused shows the contests or tasks the person's
+own roles reach, so someone with a role at one task can still walk down to it.
+
+A create answers with a provisioning record at once, and
+`provisioning/FollowProvisioning.tsx` polls the status until it is `ready`:
+about once a second while it is pending or running, and every five seconds
+while it is `failed`, since forge tries a failed one again on its own. The
+record says everything shown: the steps of its kind in order, the last one
+completed, the step a failure stopped at, the reason, and when it is tried
+again, shown as a time of day read against the server's clock.
+`provisioning/steps.ts` only puts the step ids the app knows into words, and
+a step it does not know shows under its own id. An org's description takes at
+most 255 characters, the most the forge takes.
+
+The open file is `?file=<path>` on the contest or task page, so a link to a
+file opens it, and a reload or the back button comes back to it. The editor
+reads a file once and saves with the token it was read at, so a background
+refetch never swaps the token under someone's text. From Save until the file
+has been read again the text is read-only, and the answer takes the focus. A
+`conflict` keeps the text and offers to reload; `confirmation_required` offers
+to publish the same save confirmed or to keep it as a draft; every other
+refusal shows its own detail and what it names.
+
 ## Layout
 
 ```
 src/
   main.tsx  app.tsx  router.tsx  global.css
   api/       generated types, the fetch client, the query wrapper, error shapes
-  lib/       server clock, build settings, the t() every string goes through
+  lib/       server clock, build settings, the organiser addresses, the t()
+             every string goes through
   session/   who is signed in: the boot query, the guard, sign-out, the
              expired-session modal. Not a feature, because the shell, the
              router and three features all read it
   theme/     the design handoff's tokens, the fonts, the CSS variables
   ui/        shell (header, sidebar, breadcrumb, account menu), feedback, brand
-  features/  home (landing), auth (login page), account (profile, sessions)
-  test/      Vitest setup, the MSW server, the provider-aware render helpers
-e2e/         Playwright smoke test, run against the dev server with /time stubbed
+  features/  home (landing), auth (login page), account (profile, sessions),
+             organise (the organiser pages)
+  test/      Vitest setup, the MSW server and the organiser's fixtures, the
+             provider-aware render helpers, the fake timers polling tests use
+e2e/         Playwright, run against the dev server with the API stubbed
 ```
 
 The design tokens — colours, type scale, radii, the verdict colour pairs — come
