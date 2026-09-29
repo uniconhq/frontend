@@ -19,3 +19,17 @@
 .caret {
   color: var(--unicon-text-faint);
 }
+
+.step {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.link {
+  text-decoration: none;
+}
+
+.link:hover {
+  color: var(--unicon-text-primary);
+}
