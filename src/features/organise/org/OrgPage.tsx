@@ -11,7 +11,7 @@ import { contestPath } from '@/lib/organiser-paths';
 import { t } from '@/lib/t';
 import { CreateForm } from '../CreateForm';
 import { LinkList } from '../LinkList';
-import { useOrgParam } from '../params';
+import { useOrgParam } from '@/lib/route-params';
 import { FollowProvisioning } from '../provisioning/FollowProvisioning';
 import { pageOf, type Following } from '../provisioning/target';
 import { contestsReached } from '../roles';
