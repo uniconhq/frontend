@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { screen } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { renderApp } from '@/test/render';
 import { server, sessionList, signedIn } from '@/test/server';
+import { publicContest } from '@/test/contestant';
 
 describe('HomePage', () => {
   it('offers Sign in as a link that comes back here, never a form', async () => {
@@ -29,6 +30,57 @@ describe('HomePage', () => {
       'href',
       'http://localhost:3300/user/sign_up',
     );
+  });
+
+  it('lists the public contests for a visitor, each a link to its page', async () => {
+    server.use(
+      http.get('/api/v1/public/contests', () =>
+        HttpResponse.json([{ ...publicContest, tasks: [] }]),
+      ),
+    );
+    renderApp('/');
+
+    const list = await screen.findByRole('list', { name: 'Public contests' });
+    expect(within(list).getByRole('link', { name: 'Spring 2026' })).toHaveAttribute(
+      'href',
+      '/contests/acme/spring',
+    );
+  });
+
+  it('lists a signed-in person’s contests with where they stand in each', async () => {
+    server.use(
+      signedIn,
+      sessionList,
+      http.get('/api/v1/contests', () =>
+        HttpResponse.json([
+          {
+            org: 'acme',
+            name: 'spring',
+            title: 'Spring 2026',
+            start: '2026-09-12T09:00:00Z',
+            end: '2026-09-12T10:30:00Z',
+            visibility: 'signed-in',
+            status: 'pending',
+          },
+          {
+            org: 'acme',
+            name: 'autumn',
+            title: 'Autumn 2026',
+            start: '2026-10-12T09:00:00Z',
+            end: '2026-10-12T10:30:00Z',
+            visibility: 'public',
+            status: null,
+          },
+        ]),
+      ),
+    );
+    renderApp('/');
+
+    const list = await screen.findByRole('list', { name: 'Contests' });
+    const [spring, autumn] = within(list).getAllByRole('listitem');
+    expect(spring).toHaveTextContent('Registration waiting');
+    expect(autumn).not.toHaveTextContent('Registration');
+    expect(screen.queryByRole('list', { name: 'Public contests' })).toBeNull();
   });
 
   it('greets a signed-in person instead', async () => {

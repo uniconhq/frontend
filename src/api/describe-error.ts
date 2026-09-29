@@ -108,6 +108,59 @@ export function describeError(error: ApiError): ErrorDescription {
         title: 'That path cannot be used',
         message: error.detail ?? 'A path stays inside the repo and names a file.',
       };
+    case 'registration_closed':
+      return {
+        title: 'Registration is closed',
+        message: error.detail ?? 'This contest is not taking registrations right now.',
+      };
+    case 'is_staff':
+      return {
+        title: 'You organise this contest',
+        message: 'Someone with a role in a contest cannot also enter it.',
+      };
+    case 'invite_required':
+      return {
+        title: 'This contest is by invitation',
+        message: 'Only people the organisers invite may register.',
+      };
+    case 'wrong_invite_code':
+      return {
+        title: 'That code is not right',
+        message: 'Check the code the organisers gave you and try again.',
+      };
+    case 'domain_not_allowed':
+      return {
+        title: 'Your email address is not accepted',
+        message:
+          'This contest takes only some email addresses. Change yours in your account if you have another.',
+      };
+    case 'already_registered':
+      return {
+        title: 'You have registered already',
+        message: 'Reload the page to see where your registration stands.',
+      };
+    case 'contest_full':
+      return {
+        title: 'The contest is full',
+        message: 'Every place is taken.',
+      };
+    case 'wrong_status':
+      return {
+        title: 'That registration has moved on',
+        message: error.detail ?? 'Reload the list to see where it stands now.',
+      };
+    case 'invalid_reason':
+      return {
+        title: 'That reason will not do',
+        message:
+          error.detail ??
+          'The person reads it, so give one of at most 1000 characters.',
+      };
+    case 'invalid_extension':
+      return {
+        title: 'That extension will not do',
+        message: error.detail ?? 'Give between no time and a year.',
+      };
     case 'not_found':
       return {
         title: 'Not found',
