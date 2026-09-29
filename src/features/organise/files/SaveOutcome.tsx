@@ -19,10 +19,10 @@ export type Outcome =
   | { kind: 'saved'; result: SaveResult }
   | { kind: 'refused'; error: ApiError; body: WriteFile };
 
-const REGISTRATION: Record<'done' | 'pending' | 'not_needed', string> = {
-  done: 'This save registered the task for grading.',
-  pending: 'Registering the task for grading is under way.',
-  not_needed: 'The task was already registered for grading.',
+const ACTIVATION: Record<'done' | 'pending' | 'not_needed', string> = {
+  done: 'This save switched grading on for the task.',
+  pending: 'Switching grading on for the task is under way.',
+  not_needed: 'Grading was already on for the task.',
 };
 
 /** The member each refusal names what stands in the way with. */
@@ -95,7 +95,7 @@ export function SaveOutcome({
           ) : (
             <BodyText>{t('It does not change how the task grades.')}</BodyText>
           )}
-          <BodyText tone="secondary">{t(REGISTRATION[result.registration])}</BodyText>
+          <BodyText tone="secondary">{t(ACTIVATION[result.activation])}</BodyText>
         </Panel>
       );
     }

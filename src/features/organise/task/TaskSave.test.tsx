@@ -52,7 +52,7 @@ async function editAndSave(path = 'statement.md') {
 }
 
 describe('saving a task file', () => {
-  it('shows the publication, what changed in grading and the registration, then refetches the task', async () => {
+  it('shows the publication, what changed in grading and the activation, then refetches the task', async () => {
     const { reads, sent } = taskBackend(() =>
       HttpResponse.json({
         outcome: 'published',
@@ -60,7 +60,7 @@ describe('saving a task file', () => {
         number: 3,
         grading_changed: true,
         changes: ['plans/default.json changed'],
-        registration: 'done',
+        activation: 'done',
       }),
     );
 
@@ -72,7 +72,7 @@ describe('saving a task file', () => {
     expect(
       within(outcome).getByRole('list', { name: 'What changed' }),
     ).toHaveTextContent('plans/default.json changed');
-    expect(outcome).toHaveTextContent('This save registered the task for grading.');
+    expect(outcome).toHaveTextContent('This save switched grading on for the task.');
     expect(sent).toEqual([
       {
         content: 'Write the sum of two numbers.\n Now.',
@@ -93,7 +93,7 @@ describe('saving a task file', () => {
         number: 3,
         grading_changed: false,
         changes: [],
-        registration: 'not_needed',
+        activation: 'not_needed',
       }),
     );
 
@@ -102,7 +102,7 @@ describe('saving a task file', () => {
     const outcome = (await screen.findByText('Published as publication 3.'))
       .parentElement as HTMLElement;
     expect(outcome).toHaveTextContent('It does not change how the task grades.');
-    expect(outcome).toHaveTextContent('The task was already registered for grading.');
+    expect(outcome).toHaveTextContent('Grading was already on for the task.');
   });
 
   it('shows a draft with its errors at their paths, and that the last publication keeps grading', async () => {
@@ -139,7 +139,7 @@ describe('saving a task file', () => {
                 number: 3,
                 grading_changed: true,
                 changes: ['plans/default.json changed'],
-                registration: 'not_needed',
+                activation: 'not_needed',
               })
             : problem(409, 'confirmation_required', {
                 detail: 'The contest is running and this changes how the task grades.',
