@@ -10,6 +10,13 @@ import { NotFound } from '@/ui/feedback/NotFound';
 import { HomePage } from '@/features/home';
 import { LoginPage } from '@/features/auth';
 import { AccountPage } from '@/features/account';
+import {
+  ContestPage,
+  NewOrgPage,
+  OrgPage,
+  OrgsPage,
+  TaskPage,
+} from '@/features/organise';
 import { RequireSession, SessionExpiredModal, SessionProvider } from '@/session';
 
 /**
@@ -64,7 +71,26 @@ export const routes: RouteObject[] = [
           { path: 'login', element: <LoginPage /> },
           {
             element: <RequireSession />,
-            children: [{ path: 'account', element: <AccountPage /> }],
+            children: [
+              { path: 'account', element: <AccountPage /> },
+              /**
+               * Every organiser page is under /orgs, because the proxy in
+               * deploy sends exactly /orgs and /orgs/... to this app.
+               */
+              {
+                path: 'orgs',
+                children: [
+                  { index: true, element: <OrgsPage /> },
+                  { path: 'new', element: <NewOrgPage /> },
+                  { path: ':org', element: <OrgPage /> },
+                  { path: ':org/contests/:contest', element: <ContestPage /> },
+                  {
+                    path: ':org/contests/:contest/tasks/:task',
+                    element: <TaskPage />,
+                  },
+                ],
+              },
+            ],
           },
           { path: '*', element: <NotFound /> },
         ],
