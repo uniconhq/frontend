@@ -22,6 +22,7 @@ export function Button({
   disabled = false,
   loading = false,
   type = 'button',
+  label,
 }: {
   children: ReactNode;
   onClick?: () => void;
@@ -31,6 +32,8 @@ export function Button({
   disabled?: boolean;
   loading?: boolean;
   type?: 'button' | 'submit';
+  /** A fuller name for a screen reader, when the text alone is one of many alike. */
+  label?: string;
 }) {
   const color =
     variant === 'primary'
@@ -51,6 +54,7 @@ export function Button({
     <MantineButton
       {...asAnchor}
       {...(href === undefined ? { type, onClick } : {})}
+      aria-label={label}
       disabled={disabled}
       loading={loading}
       size={size}

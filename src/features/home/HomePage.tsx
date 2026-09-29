@@ -5,12 +5,15 @@ import { Button } from '@/ui/Button';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
 import { CreateAccountLink, currentPath, loginHref, useSession } from '@/session';
 import { t } from '@/lib/t';
+import { MyContests, PublicContests } from './ContestList';
 import { ServerClock } from './ServerClock';
 import classes from './HomePage.module.css';
 
 /**
  * The landing page, and never blank: signed out it is the door, with a way to
- * create an account when the instance is open; signed in it says who you are.
+ * create an account when the instance is open, and the public contests, which
+ * is everything a visitor may read; signed in it says who you are and lists
+ * every contest you see, with where your registration for each stands.
  */
 export function HomePage() {
   const session = useSession();
@@ -28,19 +31,25 @@ export function HomePage() {
       {session.status === 'loading' && <PageSkeleton rows={1} />}
 
       {session.status === 'signed-out' && (
-        <div className={classes.actions}>
-          <Button href={loginHref(currentPath(location))}>{t('Sign in')}</Button>
-          <CreateAccountLink />
-        </div>
+        <>
+          <div className={classes.actions}>
+            <Button href={loginHref(currentPath(location))}>{t('Sign in')}</Button>
+            <CreateAccountLink />
+          </div>
+          <PublicContests />
+        </>
       )}
 
       {session.status === 'signed-in' && (
-        <BodyText>
-          {t('Signed in as')} {session.me.username}
-          {session.me.degraded
-            ? t('. Forgejo is not answering, so your name and avatar are missing.')
-            : ''}
-        </BodyText>
+        <>
+          <BodyText>
+            {t('Signed in as')} {session.me.username}
+            {session.me.degraded
+              ? t('. Forgejo is not answering, so your name and avatar are missing.')
+              : ''}
+          </BodyText>
+          <MyContests />
+        </>
       )}
 
       <ServerClock />

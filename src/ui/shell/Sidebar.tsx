@@ -1,13 +1,16 @@
-import { NavLink } from 'react-router';
+import { NavLink, useLocation, useParams } from 'react-router';
 import { useSession } from '@/session';
+import { contestHomePath, isContestantPath } from '@/lib/contest-paths';
 import { t } from '@/lib/t';
 import classes from './Sidebar.module.css';
 
 /**
- * Quick jumps within whatever is in context. Most items need a contest, and no
- * contestant routes exist yet, so those render as plain text: the shape of the
- * product is part of the first screen a person sees. Text rather than a
- * disabled control, since there is nothing to disable.
+ * Quick jumps within whatever is in context. The contest items need a contest
+ * page open, and the pages some of them lead to do not exist yet, so an item
+ * with nowhere to go renders as plain text: the shape of the product is part
+ * of the first screen a person sees. Text rather than a disabled control,
+ * since there is nothing to disable. On a contest's pages, Tasks leads to the
+ * contest's own page, where its tasks are listed.
  *
  * `signedIn` items are for someone with an account, so a visitor does not see
  * them. `section` items stay marked on every page below their address.
@@ -15,11 +18,21 @@ import classes from './Sidebar.module.css';
 type Item = { label: string; to?: string; signedIn?: boolean; section?: boolean };
 type Group = { label: string; items: Item[] };
 
-const GROUPS: Group[] = [
-  {
-    label: 'Contest',
-    items: [{ label: 'Tasks' }, { label: 'Leaderboard' }, { label: 'Submissions' }],
-  },
+function groups(contestHome: string | undefined): Group[] {
+  return [
+    {
+      label: 'Contest',
+      items: [
+        { label: 'Tasks', to: contestHome },
+        { label: 'Leaderboard' },
+        { label: 'Submissions' },
+      ],
+    },
+    ...OTHER_GROUPS,
+  ];
+}
+
+const OTHER_GROUPS: Group[] = [
   {
     label: 'Admin',
     items: [
@@ -38,10 +51,16 @@ const GROUPS: Group[] = [
 export function Sidebar() {
   const session = useSession();
   const signedIn = session.status === 'signed-in';
+  const { pathname } = useLocation();
+  const { org, contest } = useParams();
+  const contestHome =
+    isContestantPath(pathname) && org !== undefined && contest !== undefined
+      ? contestHomePath(org, contest)
+      : undefined;
 
   return (
     <nav className={classes.sidebar} aria-label={t('Sections')}>
-      {GROUPS.map((group) => (
+      {groups(contestHome).map((group) => (
         <div key={group.label}>
           <div className={classes.groupLabel}>{t(group.label)}</div>
           {group.items

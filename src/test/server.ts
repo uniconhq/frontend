@@ -73,8 +73,14 @@ const serverTime = http.get('/api/v1/time', () =>
   HttpResponse.json({ now: '2026-09-12T10:00:00Z' }),
 );
 
+/** No contest to list yet, public or otherwise, until a test says there is. */
+const noContests = [
+  http.get('/api/v1/public/contests', () => HttpResponse.json([])),
+  http.get('/api/v1/contests', () => HttpResponse.json([])),
+];
+
 /**
  * The default world every test starts in: nobody signed in, a backend that
  * answers. `server.resetHandlers()` returns to exactly this after each test.
  */
-export const server = setupServer(signedOut, noRegistration, serverTime);
+export const server = setupServer(signedOut, noRegistration, serverTime, ...noContests);

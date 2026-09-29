@@ -36,3 +36,31 @@ export function tasksReached(roles: Roles, org: string, contest: string): string
     ),
   );
 }
+
+type RoleName = 'admin' | 'manager' | 'observer';
+
+const RANK: Record<RoleName, number> = { admin: 3, manager: 2, observer: 1 };
+
+function rankOf(role: string): number {
+  return Object.hasOwn(RANK, role) ? RANK[role as RoleName] : 0;
+}
+
+/**
+ * Whether the roles amount to at least `role` at the contest, counting one
+ * held at its org. The routes check again underneath; this only decides what
+ * a page offers.
+ */
+export function holdsAtContest(
+  roles: Roles,
+  org: string,
+  contest: string,
+  role: RoleName,
+): boolean {
+  return roles.some(
+    ({ scope, role: held }) =>
+      scope.org === org &&
+      scope.task === null &&
+      (scope.contest === null || scope.contest === contest) &&
+      rankOf(held) >= RANK[role],
+  );
+}
