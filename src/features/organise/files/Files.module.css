@@ -1,0 +1,71 @@
+.browser {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.panes {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+}
+
+.tree {
+  flex: none;
+  width: 220px;
+  font-family: var(--mantine-font-family-monospace);
+  font-size: 12px;
+}
+
+.pane {
+  flex: 1;
+  min-width: 0;
+}
+
+.entries {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.nested {
+  padding-left: 14px;
+}
+
+.folder,
+.file {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  padding: 3px 6px;
+  border: 0;
+  border-radius: var(--mantine-radius-xs);
+  background: transparent;
+  color: var(--unicon-text-body);
+  font: inherit;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.folder:hover,
+.file:hover {
+  background: var(--unicon-hover);
+}
+
+.file[aria-current='page'] {
+  background: var(--unicon-hover);
+  color: var(--unicon-text-primary);
+}
+
+.caret {
+  width: 10px;
+  color: var(--unicon-text-faint);
+}
+
+.editor {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
