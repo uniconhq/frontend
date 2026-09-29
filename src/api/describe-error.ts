@@ -76,6 +76,38 @@ export function describeError(error: ApiError): ErrorDescription {
         title: 'That clashes with something already there',
         message: error.detail ?? 'Reload the page to see the current state.',
       };
+    case 'invalid_name':
+      return {
+        title: 'That name will not do',
+        message: error.detail ?? 'Pick a different name.',
+      };
+    case 'confirmation_required':
+      return {
+        title: 'This changes how the task grades',
+        message:
+          error.detail ??
+          'The contest is running, so a change to grading has to be confirmed.',
+      };
+    case 'admin_only':
+      return {
+        title: 'Only an admin can change that',
+        message: error.detail ?? 'Ask an admin of this scope to make the change.',
+      };
+    case 'reserved_path':
+      return {
+        title: 'Unicon writes those files itself',
+        message: error.detail ?? 'Files under plans/ come from the save, not by hand.',
+      };
+    case 'invalid_definition':
+      return {
+        title: 'The settings file has errors',
+        message: error.detail ?? 'Nothing was saved. Fix the errors and save again.',
+      };
+    case 'invalid_path':
+      return {
+        title: 'That path cannot be used',
+        message: error.detail ?? 'A path stays inside the repo and names a file.',
+      };
     case 'not_found':
       return {
         title: 'Not found',
