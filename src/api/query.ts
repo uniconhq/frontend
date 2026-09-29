@@ -24,7 +24,7 @@ export function widenQuery<TData, TKey extends QueryKey>(options: {
   return { queryKey, queryFn: (context) => queryFn({ ...context, queryKey }) };
 }
 
-type QueryView<T> =
+export type QueryView<T> =
   | { state: 'loading' }
   | { state: 'error'; error: ApiError; retry: () => void }
   | { state: 'ready'; data: T };
@@ -32,10 +32,13 @@ type QueryView<T> =
 /**
  * Three states a page has to render, from the dozen React Query exposes. It
  * also corrects the error type: the middleware in client.ts turns every failure
- * into an ApiError, which is not what the document declares.
+ * into an ApiError, which is not what the document declares. A refetch that
+ * fails after an answer arrived keeps showing that answer, so a page that
+ * polls does not swap itself for an error over one missed poll.
  */
 export function queryView<T>(query: UseQueryResult<T, unknown>): QueryView<T> {
   if (query.isPending) return { state: 'loading' };
+  if (query.data !== undefined) return { state: 'ready', data: query.data };
   if (query.isError) {
     return {
       state: 'error',
