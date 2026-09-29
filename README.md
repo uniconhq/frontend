@@ -152,12 +152,14 @@ as a draft.
 | `/orgs/new`                                | the new org form, then its provisioning                       |
 | `/orgs/:org`                               | the org's contests, and New contest                           |
 | `/orgs/:org/contests/:contest`             | the contest's tasks, New task, and the contest repo's files   |
+| `/orgs/:org/contests/:contest/contestants` | every registration, with approve, reject, remove and extend   |
 | `/orgs/:org/contests/:contest/tasks/:task` | the task's state, its publications, and the task repo's files |
 
 **Every organiser page lives under `/orgs`.** The proxy in `deploy` sends
-exactly `/orgs` and `/orgs/...` to this app, so a page anywhere else loads in
-the dev server and answers 404 behind the proxy. A new organiser page goes
-under `/orgs` or the proxy changes first. Every address above is built in one
+exactly `/orgs` and `/orgs/...` to this app, and `/contests/...` for the
+contestant pages below, so a page anywhere else loads in the dev server and
+answers 404 behind the proxy. A new organiser page goes under `/orgs` or the
+proxy changes first. Every address above is built in one
 place, `src/lib/organiser-paths.ts`, which the pages and the breadcrumb share.
 
 The pages live in `src/features/organise/`: a sub-folder for each page
@@ -165,8 +167,9 @@ The pages live in `src/features/organise/`: a sub-folder for each page
 one for the provisioning progress the three create forms share
 (`provisioning/`), and one for the file tree and editor the contest and task
 pages share (`files/`). The pieces more than one of those use sit at its top:
-the create form, the list of links, the definition errors, the route params,
-and what a person's roles reach.
+the create form, the list of links, the definition errors, and what a
+person's roles reach. The route params every page reads are in
+`src/lib/route-params.ts`.
 
 All of them are behind `RequireSession`. The org list is read from the roles
 the session already has, since there is no route that lists orgs. An org or a
@@ -193,22 +196,55 @@ has been read again the text is read-only, and the answer takes the focus. A
 to publish the same save confirmed or to keep it as a draft; every other
 refusal shows its own detail and what it names.
 
+The contestants page shows an observer the table and a manager its actions
+too, which the routes check again underneath. Each action's answer replaces
+its row and takes the focus back to it; a refusal shows on the row, or inside
+the confirmation for a removal, and a registration that moved on under the
+organiser is read again. The table is read every three seconds while a
+workspace is being made.
+
+## The contestant pages
+
+| Address                               | Page                                                            |
+| ------------------------------------- | --------------------------------------------------------------- |
+| `/`                                   | the public contests for a visitor; your contests once signed in |
+| `/contests/:org/:contest`             | a contest's dates, countdown, registration and released tasks   |
+| `/contests/:org/:contest/tasks/:task` | a released task's statement, and its limits once signed in      |
+
+One address serves a visitor and a signed-in person, so a contest's link can
+be shared before anyone has an account; the page reads the public routes or
+the contestant's by the session. For a visitor, a contest or task that is not
+public offers sign in, since it may be one they see with an account. Signed
+in, the contest page follows the registration: the register form, with a
+field for the contest's code when it asks for one, then pending, rejected
+with the organisers' reason, preparing while the workspace is made, and the
+contest. It reads the home again every ten seconds while pending, every two
+while preparing, every minute otherwise, and at once as the countdown crosses
+the start or the person's deadline. The countdown runs on the server's clock
+and counts to the person's own deadline, the end plus any extension. Every
+refusal code has its own sentence in `src/api/describe-error.ts`. A statement
+is Markdown, rendered by `src/ui/Markdown.tsx` with raw HTML dropped, links
+out of the site opened apart, images shown as links, and headings one level
+down. The addresses are built in `src/lib/contest-paths.ts`.
+
 ## Layout
 
 ```
 src/
   main.tsx  app.tsx  router.tsx  global.css
   api/       generated types, the fetch client, the query wrapper, error shapes
-  lib/       server clock, build settings, the organiser addresses, the t()
-             every string goes through
+  lib/       server clock, build settings, the organiser and contest addresses,
+             the route params, the t() every string goes through
   session/   who is signed in: the boot query, the guard, sign-out, the
              expired-session modal. Not a feature, because the shell, the
              router and three features all read it
   theme/     the design handoff's tokens, the fonts, the CSS variables
   ui/        shell (header, sidebar, breadcrumb, account menu), feedback, brand
-  features/  home (landing), auth (login page), account (profile, sessions),
-             organise (the organiser pages)
-  test/      Vitest setup, the MSW server and the organiser's fixtures, the
+  features/  home (landing and the contest lists), auth (login page), account
+             (profile, sessions), contest (the contestant pages), organise (the
+             organiser pages)
+  test/      Vitest setup, the MSW server and the organiser's and contestant's
+             fixtures, the
              provider-aware render helpers, the fake timers polling tests use
 e2e/         Playwright, run against the dev server with the API stubbed
 ```

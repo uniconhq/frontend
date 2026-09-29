@@ -9,7 +9,7 @@ import { formatDateTime } from '@/lib/time';
 import { t } from '@/lib/t';
 import { DefinitionErrors } from '../DefinitionErrors';
 import { FileBrowser } from '../files/FileBrowser';
-import { useTaskParams } from '../params';
+import { useTaskParams } from '@/lib/route-params';
 import classes from '../organise.module.css';
 
 /**
