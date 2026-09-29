@@ -11,6 +11,11 @@ const mantineOnlyInUi = {
     'Import the wrapper from src/ui instead. Only src/ui, src/theme, src/app.tsx and src/test use @mantine/core directly.',
 };
 
+const markdownOnlyInUi = ['react-markdown', 'remark-gfm'].map((name) => ({
+  name,
+  message: 'Render Markdown with src/ui/Markdown instead.',
+}));
+
 const crossFeature = (escapePrefix) => ({
   patterns: [
     {
@@ -24,7 +29,7 @@ const crossFeature = (escapePrefix) => ({
         'A feature may not import from another feature. Move the shared piece into ui/, lib/, api/ or theme/.',
     },
   ],
-  paths: [mantineOnlyInUi],
+  paths: [mantineOnlyInUi, ...markdownOnlyInUi],
 });
 
 export default tseslint.config(
@@ -65,7 +70,12 @@ export default tseslint.config(
   {
     files: ['src/**/*.{ts,tsx}'],
     ignores: ['src/ui/**', 'src/theme/**', 'src/app.tsx', 'src/test/**'],
-    rules: { 'no-restricted-imports': ['error', { paths: [mantineOnlyInUi] }] },
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        { paths: [mantineOnlyInUi, ...markdownOnlyInUi] },
+      ],
+    },
   },
 
   {

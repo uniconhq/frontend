@@ -7,12 +7,14 @@ import { SectionTitle } from '@/ui/SectionTitle';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
 import { useMe } from '@/session';
-import { taskPath } from '@/lib/organiser-paths';
+import { contestHomePath } from '@/lib/contest-paths';
+import { contestantsPath, taskPath } from '@/lib/organiser-paths';
+import { PageLink } from '@/ui/PageLink';
 import { t } from '@/lib/t';
 import { CreateForm } from '../CreateForm';
 import { LinkList } from '../LinkList';
 import { FileBrowser } from '../files/FileBrowser';
-import { useContestParams } from '../params';
+import { useContestParams } from '@/lib/route-params';
 import { FollowProvisioning } from '../provisioning/FollowProvisioning';
 import { pageOf, type Following } from '../provisioning/target';
 import { tasksReached } from '../roles';
@@ -20,7 +22,8 @@ import classes from '../organise.module.css';
 
 /**
  * A contest's tasks, the form for a new one, and the contest repo's files,
- * `contest.yaml` among them. Each part loads and fails on its own, so a
+ * `contest.yaml` among them, with the way to its registrations and to the
+ * page its contestants see. Each part loads and fails on its own, so a
  * refused task list still leaves the files readable. Listing needs the
  * observer role at the contest; someone who holds a role only at one of its
  * tasks is refused the list, so the refusal comes with the tasks their own
@@ -46,6 +49,12 @@ export function ContestPage() {
   return (
     <div className={classes.page}>
       <PageTitle>{contest}</PageTitle>
+      <div className={classes.actions}>
+        <PageLink to={contestantsPath(org, contest)}>{t('Contestants')}</PageLink>
+        <PageLink to={contestHomePath(org, contest)}>
+          {t('The page contestants see')}
+        </PageLink>
+      </div>
       <Card>
         <div className={classes.stack}>
           <SectionTitle>{t('Tasks')}</SectionTitle>

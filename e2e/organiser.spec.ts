@@ -113,7 +113,7 @@ async function stubOrganiserApi(page: Page) {
           number: state.published,
           grading_changed: false,
           changes: [],
-          registration: 'not_needed',
+          activation: 'not_needed',
         });
       }
       return json(route, {

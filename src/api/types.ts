@@ -18,3 +18,11 @@ export type FileContent = Schemas['FileContent'];
 export type WriteFile = Schemas['WriteFile'];
 /** A task save's answer, told apart by `outcome`: published, or kept as a draft. */
 export type SaveResult = Schemas['PublishedSave'] | Schemas['DraftSave'];
+
+export type TaskRelease = Schemas['TaskRelease'];
+export type MyRegistration = Schemas['MyRegistration'];
+export type Contestant = Schemas['Contestant'];
+export type ContestSummary = Schemas['ContestSummary'];
+export type ContestHome = Schemas['ContestHome'];
+export type Limits = Schemas['Limits'];
+export type PublicTask = Schemas['PublicTask'];
