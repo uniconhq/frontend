@@ -10,7 +10,9 @@ import { NotFound } from '@/ui/feedback/NotFound';
 import { HomePage } from '@/features/home';
 import { LoginPage } from '@/features/auth';
 import { AccountPage } from '@/features/account';
+import { ContestHomePage, TaskStatementPage } from '@/features/contest';
 import {
+  ContestantsPage,
   ContestPage,
   NewOrgPage,
   OrgPage,
@@ -69,6 +71,15 @@ export const routes: RouteObject[] = [
         children: [
           { index: true, element: <HomePage /> },
           { path: 'login', element: <LoginPage /> },
+          /**
+           * A contest and its tasks at one address for a visitor and for a
+           * signed-in person, each page reading what the caller may see.
+           */
+          { path: 'contests/:org/:contest', element: <ContestHomePage /> },
+          {
+            path: 'contests/:org/:contest/tasks/:task',
+            element: <TaskStatementPage />,
+          },
           {
             element: <RequireSession />,
             children: [
@@ -84,6 +95,10 @@ export const routes: RouteObject[] = [
                   { path: 'new', element: <NewOrgPage /> },
                   { path: ':org', element: <OrgPage /> },
                   { path: ':org/contests/:contest', element: <ContestPage /> },
+                  {
+                    path: ':org/contests/:contest/contestants',
+                    element: <ContestantsPage />,
+                  },
                   {
                     path: ':org/contests/:contest/tasks/:task',
                     element: <TaskPage />,
