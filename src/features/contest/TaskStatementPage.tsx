@@ -10,24 +10,16 @@ import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
 import { contestHomePath } from '@/lib/contest-paths';
 import { useTaskParams } from '@/lib/route-params';
+import { formatLimit } from '@/lib/size';
 import { t } from '@/lib/t';
 import { BySession } from './BySession';
 import { SignInPrompt } from './SignInPrompt';
+import { TaskSubmissions } from './submit/TaskSubmissions';
 import { headingOf } from './task-names';
 import classes from './contest.module.css';
 
 /** How often the page is read again, so a closing reaches it. */
 const MEANWHILE_MS = 60_000;
-
-const KIB = 1024;
-const MIB = KIB * KIB;
-
-/** A size as a limit is written: whole MiB or KiB when it is one, else bytes. */
-function size(bytes: number): string {
-  if (bytes >= MIB && bytes % MIB === 0) return `${bytes / MIB} ${t('MB')}`;
-  if (bytes >= KIB && bytes % KIB === 0) return `${bytes / KIB} ${t('KB')}`;
-  return `${bytes} ${t('bytes')}`;
-}
 
 /** At most `count` in any window of `seconds`, in words. */
 function rate(count: number, seconds: number): string {
@@ -53,7 +45,7 @@ function LimitList({ limits }: { limits: Limits }) {
       <dt>{t('How often')}</dt>
       <dd>{rate(limits.rate_count, limits.rate_seconds)}</dd>
       <dt>{t('Largest submission')}</dt>
-      <dd>{size(limits.max_size)}</dd>
+      <dd>{formatLimit(limits.max_size)}</dd>
     </dl>
   );
 }
@@ -64,7 +56,10 @@ function Back({ org, contest }: { org: string; contest: string }) {
   );
 }
 
-/** A released task as a signed-in person reads it: the statement and the limits. */
+/**
+ * A released task as a signed-in person reads it: the statement, the limits,
+ * the panel they submit from while the task is open, and their submissions.
+ */
 function SignedInTask({
   org,
   contest,
@@ -104,6 +99,7 @@ function SignedInTask({
           <LimitList limits={page.limits} />
         </div>
       </Card>
+      <TaskSubmissions org={org} contest={contest} task={task} page={page} />
     </div>
   );
 }
@@ -155,7 +151,8 @@ function PublicTask({
 /**
  * A task's page for a contestant or a visitor, at one address for both: the
  * statement, and for a signed-in person the limits a submit is checked
- * against and why they may not submit now, when they may not.
+ * against, why they may not submit now, when they may not, and their own
+ * submissions, with the panel to make another while the task is open.
  */
 export function TaskStatementPage() {
   const { org, contest, task } = useTaskParams();
