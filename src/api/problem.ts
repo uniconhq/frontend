@@ -6,7 +6,14 @@
  */
 
 export type ApiErrorCode =
-  'unexpected_response' | 'network_error' | 'unexpected_error' | (string & {});
+  | 'unexpected_response'
+  | 'network_error'
+  | 'unexpected_error'
+  /** A file the object store did not take, which gives no reason of its own. */
+  | 'upload_failed'
+  /** A file whose measured size is not the size it was sent as. */
+  | 'upload_rejected'
+  | (string & {});
 
 export class ApiError extends Error {
   readonly code: ApiErrorCode;

@@ -1,3 +1,5 @@
+import { formatLimit } from '@/lib/size';
+import { formatTimeOfDay, serverNow } from '@/lib/time';
 import type { ApiError } from './problem';
 
 /**
@@ -5,6 +7,50 @@ import type { ApiError } from './problem';
  * sentence, never the code: `session_expired` means nothing to a contestant.
  */
 export type ErrorDescription = { title: string; message: string };
+
+/** A member of the refusal that is a number, such as a limit. */
+function numberOf(error: ApiError, member: string): number | null {
+  const value = error.extensions[member];
+  return typeof value === 'number' ? value : null;
+}
+
+/** A member of the refusal that is text, such as a reason. */
+function textOf(error: ApiError, member: string): string | null {
+  const value = error.extensions[member];
+  return typeof value === 'string' && value !== '' ? value : null;
+}
+
+/**
+ * When a rate-limited submit may be sent again, read against the server's
+ * clock, since `retry_at` is the server's time.
+ */
+function againAt(error: ApiError): string {
+  const at = textOf(error, 'retry_at');
+  const due = at === null ? Number.NaN : Date.parse(at);
+  if (Number.isNaN(due)) return 'Wait a little and submit again.';
+  if (due <= serverNow().getTime()) return 'You can submit again now.';
+  return `You can submit again at ${formatTimeOfDay(new Date(due))}.`;
+}
+
+function tooLarge(error: ApiError): ErrorDescription {
+  const limit = numberOf(error, 'limit');
+  if (textOf(error, 'input') !== null) {
+    return {
+      title: 'That file is too large',
+      message:
+        limit === null
+          ? 'A file for this input is larger than it takes.'
+          : `A file for this input may be at most ${formatLimit(limit)}.`,
+    };
+  }
+  return {
+    title: 'That submission is too large',
+    message:
+      limit === null
+        ? 'The files together are larger than the task takes.'
+        : `A submission may be at most ${formatLimit(limit)} in all.`,
+  };
+}
 
 export function describeError(error: ApiError): ErrorDescription {
   switch (error.code) {
@@ -160,6 +206,91 @@ export function describeError(error: ApiError): ErrorDescription {
       return {
         title: 'That extension will not do',
         message: error.detail ?? 'Give between no time and a year.',
+      };
+    case 'task_closed':
+      return textOf(error, 'reason') === 'submissions_closed'
+        ? {
+            title: 'Submissions are closed',
+            message: 'The organisers have closed submissions for this contest.',
+          }
+        : {
+            title: 'The contest has ended for you',
+            message: 'This task takes no more submissions from you.',
+          };
+    case 'archived':
+      return {
+        title: 'The contest is archived',
+        message: 'Its tasks can still be read, and they take no submissions.',
+      };
+    case 'not_approved':
+      return {
+        title: 'You are not a contestant here yet',
+        message:
+          "Only an approved contestant submits. The contest's page says where your registration stands.",
+      };
+    case 'workspace_not_ready':
+      return {
+        title: 'Your workspace is still being made',
+        message: 'It takes a moment. Submit again once it is ready.',
+      };
+    case 'submission_limit': {
+      const limit = numberOf(error, 'limit');
+      return {
+        title: 'You have used every submission',
+        message:
+          limit === null
+            ? 'You have made every submission this task takes.'
+            : `This task takes ${limit} submissions in all, and you have made them.`,
+      };
+    }
+    case 'rate_limited':
+      return {
+        title: 'That is too soon after your last submission',
+        message: againAt(error),
+      };
+    case 'too_large':
+      return tooLarge(error);
+    case 'upload_not_yours':
+      return {
+        title: 'A file is not one you uploaded',
+        message: 'Nothing was submitted. Choose the files again and submit.',
+      };
+    case 'upload_not_ready':
+      return {
+        title: 'A file did not arrive whole',
+        message: 'Nothing was submitted. Submit again and the files are sent again.',
+      };
+    case 'upload_limit':
+      return {
+        title: 'Too many files are waiting to be submitted',
+        message:
+          'Files you uploaded and did not submit count until they are cleared, two days after they were sent. Submit what you have, or try again later.',
+      };
+    case 'log_too_large':
+      return {
+        title: 'The log is too large to show',
+        message: 'The verdict above is what the grading found.',
+      };
+    case 'invalid_inputs':
+      return {
+        title: 'The submission does not fit the task',
+        message: 'Nothing was submitted. Fix what is listed and submit again.',
+      };
+    case 'invalid_idempotency_key':
+      return {
+        title: 'That submit could not be sent',
+        message: 'Reload the page and submit again.',
+      };
+    case 'upload_failed':
+      return {
+        title: 'The upload did not go through',
+        message:
+          'The file may be larger than the store takes, or the connection dropped. Nothing was submitted.',
+      };
+    case 'upload_rejected':
+      return {
+        title: 'A file did not arrive as it was sent',
+        message: 'What arrived is not the size of the file. Nothing was submitted.',
       };
     case 'not_found':
       return {
