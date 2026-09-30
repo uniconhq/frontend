@@ -106,8 +106,8 @@ reproducible. The pin is the point:
 the frontend builds against a known backend rather than whatever landed on the
 backend's `main` an hour ago, and bumping it is a deliberate pull request — the
 one moment a renamed field shows up, as a type error rather than a broken page.
-There is no nightly drift check; drift surfaces at the bump or in the
-end-to-end run in `deploy`.
+CI regenerates the client from the pin and fails when the committed
+`src/api/schema.d.ts` differs, so the client is always the one its pin names.
 
 The document spells out whole paths (`/api/v1/time`, `/healthz`), so the client
 has an empty base URL and call sites pass the path exactly as the document
