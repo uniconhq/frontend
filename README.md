@@ -18,9 +18,9 @@ pnpm install
 pnpm dev            # http://localhost:5173
 ```
 
-`/api` and `/healthz` are proxied to `http://localhost:8080`, which is where the
-compose stack in `deploy` publishes its proxy. Point somewhere else with
-`VITE_API_PROXY=http://localhost:8000 pnpm dev`. Without a backend the landing
+`/api`, `/healthz` and `/unicon-uploads` are proxied to `http://localhost:8080`,
+which is where the compose stack in `deploy` publishes its proxy. Point
+somewhere else with `VITE_API_PROXY=http://localhost:8000 pnpm dev`. Without a backend the landing
 page renders its error block, which is the error path working, not a crash.
 
 Three settings, all with dev defaults, all listed in `.env.example`.
@@ -58,11 +58,11 @@ built without it links to the dev stack's `http://localhost:3300`.
 
 ## Ports
 
-| Where          | Port | What answers                                                 |
-| -------------- | ---- | ------------------------------------------------------------ |
-| `pnpm dev`     | 5173 | Vite, proxying `/api`, `/healthz` and `/readyz` to the stack |
-| `pnpm preview` | 4173 | the built bundle                                             |
-| the container  | 8080 | nginx, static files and the SPA fallback                     |
+| Where          | Port | What answers                                             |
+| -------------- | ---- | -------------------------------------------------------- |
+| `pnpm dev`     | 5173 | Vite, proxying `/api`, `/healthz`, `/readyz` and uploads |
+| `pnpm preview` | 4173 | the built bundle                                         |
+| the container  | 8080 | nginx, static files and the SPA fallback                 |
 
 The container listens on 8080 and not 80 because it runs as an unprivileged
 user (`nginxinc/nginx-unprivileged`), and a process that is not root cannot
@@ -205,11 +205,11 @@ workspace is being made.
 
 ## The contestant pages
 
-| Address                               | Page                                                            |
-| ------------------------------------- | --------------------------------------------------------------- |
-| `/`                                   | the public contests for a visitor; your contests once signed in |
-| `/contests/:org/:contest`             | a contest's dates, countdown, registration and released tasks   |
-| `/contests/:org/:contest/tasks/:task` | a released task's statement, and its limits once signed in      |
+| Address                               | Page                                                                                      |
+| ------------------------------------- | ----------------------------------------------------------------------------------------- |
+| `/`                                   | the public contests for a visitor; your contests once signed in                           |
+| `/contests/:org/:contest`             | a contest's dates, countdown, registration and released tasks                             |
+| `/contests/:org/:contest/tasks/:task` | a released task's statement; signed in, its limits, the submit panel and your submissions |
 
 One address serves a visitor and a signed-in person, so a contest's link can
 be shared before anyone has an account; the page reads the public routes or
@@ -227,6 +227,78 @@ is Markdown, rendered by `src/ui/Markdown.tsx` with raw HTML dropped, links
 out of the site opened apart, images shown as links, and headings one level
 down. The addresses are built in `src/lib/contest-paths.ts`.
 
+### Submitting
+
+The submit panel on the task page is built from the task's contestant
+inputs, which the task page's answer carries: a drop zone for each `code`,
+`file` and `file[]` input, with a language to choose when a code input lists
+more than one, and a field for each `text`, `number` and `boolean` input,
+starting at its default. A `jupyter` input is not submitted from the browser,
+so the panel says so and leaves it out. The panel shows only while the task is
+open; the list below it shows either way.
+
+A drop zone is the browser's own file input, hidden inside the zone that
+shows it, so Tab reaches it, Enter or Space opens the picker, and a screen
+reader names it by the input's label. Its `accept` only narrows the picker;
+the panel checks every file itself.
+
+Submit runs in this order, in `src/features/contest/submit/use-submit.ts`:
+
+1. The browser's own checks: every input filled, each file one its input
+   takes, a language chosen, a number in range, and every size, each file
+   against its input's `max_size` and the task's, and all of them together
+   against the task's. The store gives no usable error for a file over its
+   signed size, so a file too large is caught here, before any upload starts.
+2. For each file, a slot (`POST .../uploads`), the bytes straight to the store,
+   and `POST .../uploads/{id}/complete`. A form slot is one POST of exactly the
+   slot's `fields`, in their order, then the file last; any other field, such
+   as a Content-Type, and Garage's policy refuses it. A slot in parts, for a
+   file larger than the server takes in one request, is one PUT per part of exactly its length, since each URL
+   is signed for that length, and completing names every part's ETag. Sends go
+   by `XMLHttpRequest`, for the progress each file shows. A send the store
+   drops, answers with anything but a 2xx, or that sends nothing for 30
+   seconds, is reported as a file that may be too large, since that is how
+   the store answers one.
+3. `POST .../submissions` with every upload and one idempotency key.
+
+A slot's URL is sent to as a path on this origin, so a file never goes
+anywhere else, and from `pnpm dev` it goes through the dev server's proxy
+with the Host the URL was signed for.
+
+The idempotency key is made once per attempt, and an attempt is one set of
+panel contents: a second click while one runs does nothing, and sending the
+same contents again, after a lost answer or a refusal, sends the same key, so
+the server answers with the submission it already made instead of making a
+second. Files that went up and checked out are not sent again within the
+attempt unless a refusal says they cannot be used. Changing anything in the
+panel starts a new attempt. The key is `crypto.randomUUID()`, or 32 random hex
+digits on a plain-http origin, where that is missing.
+
+A refusal is said in words from its code, with what it names: when the task
+closed and why, the submission limit, when a rate-limited submit can be sent
+again (by the server's clock), the size limit and whose it is, and each
+problem with the input it is about. Whatever stage it came at, the progress
+goes and the files stay in the panel, ready to send again.
+
+Below the panel are the contestant's own submissions, newest first, with each
+stage's verdict and metrics. They are read every two seconds while any
+grading is still to finish, and every minute otherwise, until live updates
+replace the polling. A verdict is the outcome once the task shows one, and
+where the grading stands until then, or for good when the task keeps the
+outcome hidden, as `GRADED`. `src/ui/VerdictBadge.tsx` has a label for every
+outcome and status and puts each in one of the handoff's six colour pairs; an
+outcome it does not know shows under its own name in the neutral one.
+
+`?submission=<n>` opens one submission above the list: each stage's verdict,
+and its summary, metrics, a row per test and its log where the task shows
+them. The route leaves out what the task withholds, and the page puts nothing
+in its place; the log is read only when the grading says there is one.
+
+Restore, on a row or an open submission, reads that submission's files and
+values back into the panel, ready to change and submit as a new submission.
+Nothing about the old one changes. Only the inputs the task takes now are
+filled.
+
 ## Layout
 
 ```
@@ -239,9 +311,11 @@ src/
              expired-session modal. Not a feature, because the shell, the
              router and three features all read it
   theme/     the design handoff's tokens, the fonts, the CSS variables
-  ui/        shell (header, sidebar, breadcrumb, account menu), feedback, brand
+  ui/        shell (header, sidebar, breadcrumb, account menu), feedback, brand,
+             and the wrappers: buttons, fields, the file drop zone, verdicts
   features/  home (landing and the contest lists), auth (login page), account
-             (profile, sessions), contest (the contestant pages), organise (the
+             (profile, sessions), contest (the contestant pages, with submit/
+             for the submit panel and the submissions), organise (the
              organiser pages)
   test/      Vitest setup, the MSW server and the organiser's and contestant's
              fixtures, the
