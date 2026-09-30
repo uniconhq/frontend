@@ -26,3 +26,17 @@ export type ContestSummary = Schemas['ContestSummary'];
 export type ContestHome = Schemas['ContestHome'];
 export type Limits = Schemas['Limits'];
 export type PublicTask = Schemas['PublicTask'];
+export type TaskPage = Schemas['TaskPage'];
+export type ContestantInput = Schemas['ContestantInput'];
+
+export type UploadSlot = Schemas['PostUploadSlot'] | Schemas['MultipartUploadSlot'];
+export type Upload = Schemas['Upload'];
+export type FinishedPart = Schemas['FinishedPart'];
+export type SubmittedInput = Schemas['SubmittedInput'];
+export type Submission = Schemas['Submission'];
+export type GradingResult = Schemas['GradingResult'];
+export type GradingStatus = GradingResult['status'];
+export type SubmittedFiles = Schemas['SubmittedFiles'];
+
+/** The runner's list of outcomes, which a run and each of its tests take one of. */
+export type Outcome = Schemas['GradedTest']['outcome'];

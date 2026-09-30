@@ -5,7 +5,8 @@ import { expect, test, type Page, type Route } from '@playwright/test';
  * needs no backend: a visitor finds a public contest on the landing page and
  * reads a released statement; signed in, they register, wait for an
  * organiser, watch their workspace being prepared and land in the contest,
- * with a countdown by the server's clock and the task's limits.
+ * with a countdown by the server's clock, and the task's limits and the panel
+ * to submit from.
  * The stub keeps just enough state for each answer to follow from the last.
  */
 const CONTEST = {
@@ -126,9 +127,23 @@ async function stubContestantApi(page: Page, signedIn: boolean) {
           rate_seconds: 30,
           max_size: 10485760,
         },
+        inputs: [
+          {
+            id: 'submission',
+            type: 'code',
+            label: 'Your solution',
+            language: ['python'],
+            min: null,
+            max: null,
+            accept: null,
+            max_size: null,
+            default: null,
+          },
+        ],
         release: OPEN,
       });
     }
+    if (path.endsWith('/tasks/sum/submissions')) return json(route, []);
     return route.fulfill({ status: 404, body: 'not stubbed' });
   });
   return state;
@@ -179,4 +194,8 @@ test('a contestant registers, waits, is let in and reads the task', async ({
 
   await page.getByRole('link', { name: 'Sum of Two' }).click();
   await expect(page.getByLabel('Limits')).toContainText('1 in any 30 seconds');
+  await expect(page.getByRole('form', { name: 'Submit' })).toBeVisible();
+  await expect(
+    page.getByText('You have not submitted to this task yet.'),
+  ).toBeVisible();
 });

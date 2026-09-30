@@ -1,0 +1,89 @@
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.zone {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 16px;
+  border: 1px dashed var(--unicon-border-strong);
+  border-radius: var(--mantine-radius-sm);
+  background: var(--unicon-chrome);
+  cursor: pointer;
+}
+
+.zone:hover,
+.zone[data-dragging] {
+  background: var(--unicon-hover);
+}
+
+.zone[data-dragging] {
+  border-style: solid;
+}
+
+/* The input is hidden, so the zone shows where the keyboard is. */
+.zone:focus-within {
+  outline: 2px solid var(--unicon-text-accent);
+  outline-offset: 2px;
+}
+
+.zone[data-disabled] {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--unicon-text-primary);
+}
+
+.hint {
+  font-size: 13px;
+  color: var(--unicon-text-secondary);
+}
+
+/* Out of sight and still in the tab order, the way screen-reader-only text is hidden. */
+.input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+.files {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.file {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  font-size: 13px;
+  color: var(--unicon-text-body);
+}
+
+.name {
+  font-family: var(--mantine-font-family-monospace);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.progress {
+  flex: 1;
+  max-width: 240px;
+}
