@@ -3,7 +3,7 @@ import { screen, within } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { renderApp } from '@/test/render';
 import { problem, server, signedIn } from '@/test/server';
-import { PUBLIC_API, TASK_API, taskPage } from '@/test/contestant';
+import { noSubmissions, PUBLIC_API, TASK_API, taskPage } from '@/test/contestant';
 
 const PAGE = '/contests/acme/spring/tasks/sum';
 
@@ -11,6 +11,7 @@ describe('a task page for a signed-in person', () => {
   it('renders the statement as Markdown and lists the limits', async () => {
     server.use(
       signedIn,
+      noSubmissions,
       http.get(`${TASK_API}/page`, () => HttpResponse.json(taskPage)),
     );
     renderApp(PAGE);
@@ -33,6 +34,7 @@ describe('a task page for a signed-in person', () => {
   it('says why the task takes no submission now', async () => {
     server.use(
       signedIn,
+      noSubmissions,
       http.get(`${TASK_API}/page`, () =>
         HttpResponse.json({
           ...taskPage,
@@ -48,6 +50,7 @@ describe('a task page for a signed-in person', () => {
   it('leaves out raw HTML an organiser wrote into the statement', async () => {
     server.use(
       signedIn,
+      noSubmissions,
       http.get(`${TASK_API}/page`, () =>
         HttpResponse.json({
           ...taskPage,
@@ -64,6 +67,7 @@ describe('a task page for a signed-in person', () => {
   it('shows an image as a link to it and opens links out of the site apart', async () => {
     server.use(
       signedIn,
+      noSubmissions,
       http.get(`${TASK_API}/page`, () =>
         HttpResponse.json({
           ...taskPage,
@@ -85,6 +89,7 @@ describe('a task page for a signed-in person', () => {
   it('answers not found for a task that is not released', async () => {
     server.use(
       signedIn,
+      noSubmissions,
       http.get(`${TASK_API}/page`, () => problem(404, 'not_found')),
     );
     renderApp(PAGE);

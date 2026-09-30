@@ -21,6 +21,18 @@ const presentDevServerAsApiOrigin: ProxyOptions['configure'] = (proxy) => {
   });
 };
 
+/**
+ * A file goes to the object store under `/unicon-uploads/`, which the proxy in
+ * `deploy` passes to Garage with the Host header unchanged. Each URL of a file
+ * sent in parts is signed for the backend's public host, so from the dev
+ * server the request carries that host, as it would arriving there directly.
+ */
+const presentAsApiHost: ProxyOptions['configure'] = (proxy) => {
+  proxy.on('proxyReq', (proxyRequest) => {
+    proxyRequest.setHeader('host', new URL(apiPublicOrigin).host);
+  });
+};
+
 export default defineConfig({
   plugins: [react()],
   resolve: {
@@ -35,6 +47,11 @@ export default defineConfig({
         target: apiProxyTarget,
         changeOrigin: false,
         configure: presentDevServerAsApiOrigin,
+      },
+      '/unicon-uploads': {
+        target: apiProxyTarget,
+        changeOrigin: false,
+        configure: presentAsApiHost,
       },
       '/healthz': { target: apiProxyTarget, changeOrigin: false },
       '/readyz': { target: apiProxyTarget, changeOrigin: false },
