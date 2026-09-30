@@ -13,7 +13,7 @@ import { useEndSession } from './use-end-session';
  * request is the answer we asked for.
  */
 export function useLogout(): {
-  signOut: (to?: string) => Promise<void>;
+  signOut: () => Promise<void>;
   clearError: () => void;
   pending: boolean;
   error: ApiError | null;
@@ -27,7 +27,7 @@ export function useLogout(): {
     clearError: () => {
       mutation.reset();
     },
-    signOut: async (to = '/') => {
+    signOut: async () => {
       armSessionExpiry(false);
       try {
         await mutation.mutateAsync({});
@@ -37,7 +37,7 @@ export function useLogout(): {
           return;
         }
       }
-      await endSession(to);
+      await endSession();
     },
   };
 }
