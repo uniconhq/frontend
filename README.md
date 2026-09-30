@@ -133,6 +133,13 @@ Contestant laptops are wrong by minutes often enough to matter.
 navigation to `/api/v1/auth/login`, built in one place (`session/login-href.ts`);
 Forgejo does the rest and the backend sets a cookie this code cannot read.
 Anything that renders a sign-in control links there — it is never a fetch.
+Every way out of a session (sign out, sign out everywhere, revoking this
+session, deactivating or deleting the account) ends the same way, in
+`session/use-end-session.ts`: after the backend has ended the session, the
+browser goes to the forge's `/-/sign-out`, which clears Forgejo's own sign-in
+and comes back to the front page. Otherwise the next person at the browser
+would be signed straight back in as this one, since the app signs people in
+through Forgejo.
 
 **Every error message comes from `api/describe-error.ts`.** Pages render the
 sentence for a stable `code`, never the code itself, and an unknown code falls

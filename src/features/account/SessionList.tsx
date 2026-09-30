@@ -34,7 +34,7 @@ export function SessionList() {
       return;
     }
     if (isCurrent) {
-      await endSession('/');
+      await endSession();
       return;
     }
     await queryClient.invalidateQueries({ queryKey: SESSIONS_KEY });
@@ -46,7 +46,7 @@ export function SessionList() {
     } catch {
       return;
     }
-    await endSession('/');
+    await endSession();
   };
 
   if (view.state === 'loading') return <PageSkeleton rows={2} />;
