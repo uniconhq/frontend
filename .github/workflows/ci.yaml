@@ -22,6 +22,12 @@ jobs:
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile
+
+      # The API client is generated from the backend commit `api-version`
+      # names, so a client that is stale or edited by hand fails here.
+      - run: pnpm gen:api
+      - run: git diff --exit-code src/api/schema.d.ts
+
       - run: pnpm lint
       - run: pnpm format:check
       - run: pnpm typecheck
