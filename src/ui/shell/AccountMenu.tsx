@@ -70,7 +70,7 @@ export function AccountMenu() {
         <Menu.Item
           closeMenuOnClick={false}
           disabled={pending}
-          onClick={() => void signOut('/')}
+          onClick={() => void signOut()}
         >
           {t('Sign out')}
         </Menu.Item>

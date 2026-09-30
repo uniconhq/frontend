@@ -38,7 +38,7 @@ export function DangerZone() {
   const [action, setAction] = useState<Action | null>(null);
   const endSession = useEndSession();
 
-  const finish = () => endSession('/');
+  const finish = () => endSession();
 
   const deactivate = $api.useMutation('post', '/api/v1/me/deactivate', {
     onSuccess: finish,

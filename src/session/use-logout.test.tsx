@@ -1,7 +1,9 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
+import { leaveFor } from '@/lib/leave';
+import { forgeUrl } from '@/lib/config';
 import { renderApp } from '@/test/render';
 import { problem, server, sessionList, someone } from '@/test/server';
 
@@ -41,6 +43,9 @@ describe('signing out', () => {
 
     await screen.findAllByRole('link', { name: 'Sign in' });
     expect(router.state.location.pathname).toBe('/');
+    expect(vi.mocked(leaveFor)).toHaveBeenCalledExactlyOnceWith(
+      forgeUrl('/-/sign-out'),
+    );
   });
 
   it('treats an already-dead session as signed out', async () => {
@@ -67,6 +72,7 @@ describe('signing out', () => {
     expect(screen.getByRole('button', { name: 'Account menu' })).toHaveTextContent(
       'kenny',
     );
+    expect(vi.mocked(leaveFor)).not.toHaveBeenCalled();
   });
 
   it('brings the reason back if the menu was dismissed while the answer was on its way', async () => {
