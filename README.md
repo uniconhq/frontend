@@ -174,8 +174,10 @@ The pages live in `src/features/organise/`: a sub-folder for each page
 one for the provisioning progress the three create forms share
 (`provisioning/`), and one for the file tree and editor the contest and task
 pages share (`files/`). The pieces more than one of those use sit at its top:
-the create form, the list of links, the definition errors, and what a
-person's roles reach. The route params every page reads are in
+the create form and `Create`, which keeps it behind a New button and swaps
+it for the progress once a create is accepted, so only one is made at a
+time; the list of links, the definition errors, and what a person's roles
+reach. The route params every page reads are in
 `src/lib/route-params.ts`.
 
 All of them are behind `RequireSession`. The org list is read from the roles

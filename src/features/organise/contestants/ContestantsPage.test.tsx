@@ -95,6 +95,37 @@ describe('the contestants page', () => {
     expect(sent).toEqual({ reason: 'Not a student.' });
   });
 
+  it('undoes a rejection, leaving the registration pending to decide again', async () => {
+    let reopened = false;
+    server.use(
+      signedIn,
+      http.get(ROWS, () =>
+        HttpResponse.json([
+          contestant({ status: 'rejected', reason: 'Not a student.' }),
+        ]),
+      ),
+      http.post(`${ROWS}/:user/reopen`, () => {
+        reopened = true;
+        return HttpResponse.json(contestant());
+      }),
+    );
+    renderApp(PAGE);
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Undo rejection of carol' }),
+    );
+
+    expect(await within(row('carol')).findByText('Pending')).toBeVisible();
+    expect(reopened).toBe(true);
+    expect(row('carol')).not.toHaveTextContent('Not a student.');
+    expect(
+      within(row('carol')).getByRole('button', { name: 'Approve carol' }),
+    ).toBeVisible();
+    expect(
+      within(row('carol')).queryByRole('button', { name: 'Undo rejection of carol' }),
+    ).toBeNull();
+  });
+
   it('removes an approved contestant once it is confirmed', async () => {
     server.use(
       signedIn,

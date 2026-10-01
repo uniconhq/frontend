@@ -49,7 +49,23 @@ describe('the org page', () => {
     renderApp('/orgs/acme');
 
     expect(await screen.findByText('No contests yet.')).toBeVisible();
-    expect(screen.getByRole('form', { name: 'New contest' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'New contest' })).toBeVisible();
+    expect(screen.queryByRole('form', { name: 'New contest' })).not.toBeInTheDocument();
+  });
+
+  it('opens the form from its button and closes it again on Cancel', async () => {
+    server.use(signedIn, contestList);
+    const user = userEvent.setup();
+    renderApp('/orgs/acme');
+
+    await user.click(await screen.findByRole('button', { name: 'New contest' }));
+    const form = screen.getByRole('form', { name: 'New contest' });
+    expect(within(form).getByRole('textbox', { name: /^Name/ })).toHaveFocus();
+    expect(within(form).getByRole('button', { name: 'Create contest' })).toBeDisabled();
+
+    await user.click(within(form).getByRole('button', { name: 'Cancel' }));
+    expect(form).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'New contest' })).toHaveFocus();
   });
 
   it('shows the refusal to someone who is not an observer, with the contests they can reach', async () => {
@@ -120,7 +136,8 @@ describe('creating a contest', () => {
     const user = fakeTimerUser();
     renderApp('/orgs/acme');
 
-    const form = await screen.findByRole('form', { name: 'New contest' });
+    await user.click(await screen.findByRole('button', { name: 'New contest' }));
+    const form = screen.getByRole('form', { name: 'New contest' });
     await user.type(within(form).getByRole('textbox', { name: /^Name/ }), 'summer');
     await user.type(
       within(form).getByRole('textbox', { name: /^Title/ }),
@@ -133,7 +150,10 @@ describe('creating a contest', () => {
     });
     expect(sent).toEqual({ name: 'summer', title: 'Summer Cup' });
     expect(within(progress).getByText('Waiting to start.')).toBeVisible();
-    expect(within(form).getByRole('textbox', { name: /^Name/ })).toHaveValue('');
+    expect(form).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'New contest' }),
+    ).not.toBeInTheDocument();
 
     await passTime(1_000);
     const repo = await within(progress).findByText(
@@ -150,6 +170,7 @@ describe('creating a contest', () => {
     ).toHaveAttribute('href', '/orgs/acme/contests/summer');
     const list = screen.getByRole('list', { name: 'Contests' });
     expect(await within(list).findByRole('link', { name: 'summer' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'New contest' })).toBeVisible();
   });
 
   it('sends no title when none was given, and names the step a failure stopped at', async () => {
@@ -178,7 +199,8 @@ describe('creating a contest', () => {
     const user = fakeTimerUser();
     renderApp('/orgs/acme');
 
-    const form = await screen.findByRole('form', { name: 'New contest' });
+    await user.click(await screen.findByRole('button', { name: 'New contest' }));
+    const form = screen.getByRole('form', { name: 'New contest' });
     await user.type(within(form).getByRole('textbox', { name: /^Name/ }), 'summer');
     await user.click(within(form).getByRole('button', { name: 'Create contest' }));
     await passTime(1_000);
@@ -210,7 +232,8 @@ describe('creating a contest', () => {
     const user = fakeTimerUser();
     renderApp('/orgs/acme');
 
-    const form = await screen.findByRole('form', { name: 'New contest' });
+    await user.click(await screen.findByRole('button', { name: 'New contest' }));
+    const form = screen.getByRole('form', { name: 'New contest' });
     await user.type(within(form).getByRole('textbox', { name: /^Name/ }), 'summer');
     await user.click(within(form).getByRole('button', { name: 'Create contest' }));
 
