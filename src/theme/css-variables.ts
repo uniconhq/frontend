@@ -4,7 +4,9 @@ import type { Surfaces, TextColors } from './theme';
 /**
  * Surfaces and text colours as CSS custom properties, so component CSS can say
  * `var(--unicon-chrome)` instead of reading the theme in JavaScript and
- * re-rendering on a colour scheme change.
+ * re-rendering on a colour scheme change. Mantine's own disabled colours,
+ * which every disabled button and field reads, are set from the same
+ * surfaces and text, so a disabled control sits on the page's greys.
  */
 const vars = (surfaces: Surfaces, text: TextColors) => ({
   '--unicon-canvas': surfaces.canvas,
@@ -21,6 +23,9 @@ const vars = (surfaces: Surfaces, text: TextColors) => ({
   '--unicon-text-accent': text.accent,
   '--unicon-text-danger': text.danger,
   '--unicon-text-on-accent': text.onAccent,
+  '--mantine-color-disabled': surfaces.hover,
+  '--mantine-color-disabled-color': text.meta,
+  '--mantine-color-disabled-border': surfaces.border,
 });
 
 export const cssVariablesResolver: CSSVariablesResolver = (theme) => ({
