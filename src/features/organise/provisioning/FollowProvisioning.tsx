@@ -43,9 +43,14 @@ function followEvery(record: Provisioning | undefined): number | false {
  * the record the create answered with, until it is ready: about once a second
  * while it is pending or running, and every five seconds while it is failed,
  * since forge tries a failed one again on its own. On ready, whatever lists
- * the new thing is fetched again, so it shows up without a reload.
+ * the new thing is fetched again, so it shows up without a reload, and
+ * `onReady` is called once.
  */
-export function FollowProvisioning({ target, initial }: Following) {
+export function FollowProvisioning({
+  target,
+  initial,
+  onReady,
+}: Following & { onReady?: () => void }) {
   const queryClient = useQueryClient();
   const query = useQuery({
     ...provisioningQuery(target),
@@ -60,7 +65,8 @@ export function FollowProvisioning({ target, initial }: Following) {
     if (status !== 'ready' || announced.current) return;
     announced.current = true;
     void queryClient.invalidateQueries({ queryKey: staleOnceReady(target) });
-  }, [status, queryClient, target]);
+    onReady?.();
+  }, [status, queryClient, target, onReady]);
 
   if (view.state === 'loading') return <PageSkeleton rows={2} />;
   if (view.state === 'error')

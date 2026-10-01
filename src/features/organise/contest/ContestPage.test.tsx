@@ -109,7 +109,8 @@ describe('creating a task', () => {
 
   async function submitTask(name: string) {
     const user = fakeTimerUser();
-    const form = await screen.findByRole('form', { name: 'New task' });
+    await user.click(await screen.findByRole('button', { name: 'New task' }));
+    const form = screen.getByRole('form', { name: 'New task' });
     await user.type(within(form).getByRole('textbox', { name: /^Name/ }), name);
     await user.click(within(form).getByRole('button', { name: 'Create task' }));
   }
@@ -137,7 +138,7 @@ describe('creating a task', () => {
         provisioning({
           kind: 'task',
           status: 'ready',
-          last_step: 'roles',
+          last_step: 'contest_entry',
           attempts: 1,
         }),
       ]),
@@ -148,6 +149,8 @@ describe('creating a task', () => {
 
     const progress = await screen.findByRole('region', { name: 'Making the task max' });
     expect(within(progress).getByText('Waiting to start.')).toBeVisible();
+    expect(screen.queryByRole('form', { name: 'New task' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'New task' })).not.toBeInTheDocument();
     await passTime(1_000);
     expect(await within(progress).findByText(/Working on it/)).toBeVisible();
     expect(
@@ -159,8 +162,12 @@ describe('creating a task', () => {
     expect(
       await within(progress).findByRole('link', { name: 'Open the task max' }),
     ).toHaveAttribute('href', '/orgs/acme/contests/spring/tasks/max');
+    expect(
+      within(progress).getByText("the task's entry in contest.yaml").closest('li'),
+    ).toHaveAttribute('data-state', 'done');
     const list = screen.getByRole('list', { name: 'Tasks' });
     expect(await within(list).findByRole('link', { name: 'max' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'New task' })).toBeVisible();
   });
 
   it('names the step a failure stopped at', async () => {
