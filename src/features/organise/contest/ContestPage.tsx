@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { $api, queryView } from '@/api/query';
 import { Card } from '@/ui/Card';
 import { BodyText } from '@/ui/BodyText';
@@ -11,17 +10,16 @@ import { contestHomePath } from '@/lib/contest-paths';
 import { contestantsPath, taskPath } from '@/lib/organiser-paths';
 import { PageLink } from '@/ui/PageLink';
 import { t } from '@/lib/t';
-import { CreateForm } from '../CreateForm';
+import { Create } from '../Create';
 import { LinkList } from '../LinkList';
 import { FileBrowser } from '../files/FileBrowser';
 import { useContestParams } from '@/lib/route-params';
-import { FollowProvisioning } from '../provisioning/FollowProvisioning';
-import { pageOf, type Following } from '../provisioning/target';
 import { tasksReached } from '../roles';
 import classes from '../organise.module.css';
 
 /**
- * A contest's tasks, the form for a new one, and the contest repo's files,
+ * A contest's tasks, the button that opens the form for a new one, which
+ * also adds it to `contest.yaml`'s tasks, and the contest repo's files,
  * `contest.yaml` among them, with the way to its registrations and to the
  * page its contestants see. Each part loads and fails on its own, so a
  * refused task list still leaves the files readable. Listing needs the
@@ -41,7 +39,6 @@ export function ContestPage() {
     'post',
     '/api/v1/orgs/{org}/contests/{contest}/tasks',
   );
-  const [following, setFollowing] = useState<Following | null>(null);
 
   const links = (names: string[]) =>
     names.map((name) => ({ name, to: taskPath(org, contest, name) }));
@@ -80,7 +77,8 @@ export function ContestPage() {
                   links={links(view.data.map((task) => task.name))}
                 />
               )}
-              <CreateForm
+              <Create
+                openLabel={t('New task')}
                 title={t('New task')}
                 second={{
                   label: t('Title'),
@@ -94,19 +92,16 @@ export function ContestPage() {
                     params: { path: { org, contest } },
                     body: { name, title: title === '' ? null : title },
                   });
-                  setFollowing({
+                  return {
                     target: { kind: 'task', org, contest, task: name },
                     initial,
-                  });
+                  };
                 }}
               />
             </>
           )}
         </div>
       </Card>
-      {following !== null && (
-        <FollowProvisioning key={pageOf(following.target)} {...following} />
-      )}
       <Card>
         <FileBrowser place={{ kind: 'contest', org, contest }} />
       </Card>

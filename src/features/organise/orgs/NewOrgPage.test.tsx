@@ -40,6 +40,8 @@ describe('creating an org', () => {
     const progress = await screen.findByRole('region', { name: 'Making the org acme' });
     expect(within(progress).getByRole('status')).toHaveTextContent('Waiting to start.');
     expect(sent).toEqual({ name: 'acme', description: 'Acme contests' });
+    expect(screen.queryByRole('form', { name: 'The org' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'New org' })).not.toBeInTheDocument();
 
     await passTime(1_000);
     expect(await within(progress).findByText(/Working on it/)).toBeVisible();
@@ -63,6 +65,7 @@ describe('creating an org', () => {
     });
     expect(open).toHaveAttribute('href', '/orgs/acme');
     expect(within(progress).getByText(/Ready\./)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'New org' })).toBeVisible();
   });
 
   it('fetches the roles again once ready, so the new org is in the list', async () => {
