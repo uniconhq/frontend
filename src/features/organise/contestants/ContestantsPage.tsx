@@ -58,8 +58,9 @@ function checkedMinutes(typed: string): number | null {
 
 /**
  * One registration and, for a manager, the actions its status allows: approve
- * or reject one that is pending, remove one that is approved, and give either
- * extra time. Each answer replaces the row with what the server now holds and
+ * or reject one that is pending, undo the rejection of one that is rejected,
+ * which leaves it pending again, remove one that is approved, and give
+ * either extra time. Each answer replaces the row with what the server now holds and
  * puts the focus back on the row. A refusal is shown where the action was
  * taken, and a registration that moved on under the organiser is read again.
  */
@@ -90,6 +91,10 @@ function Row({
   const reject = $api.useMutation(
     'post',
     '/api/v1/orgs/{org}/contests/{contest}/contestants/{user_id}/reject',
+  );
+  const reopen = $api.useMutation(
+    'post',
+    '/api/v1/orgs/{org}/contests/{contest}/contestants/{user_id}/reopen',
   );
   const remove = $api.useMutation(
     'post',
@@ -150,6 +155,7 @@ function Row({
   };
 
   const decidable = contestant.status === 'pending';
+  const rejected = contestant.status === 'rejected';
   const current = contestant.status === 'approved';
   const extensible = decidable || current;
 
@@ -212,6 +218,20 @@ function Row({
                 onClick={() => show('reject')}
               >
                 {t('Reject')}
+              </Button>
+            )}
+            {rejected && (
+              <Button
+                size="xs"
+                variant="secondary"
+                label={`${t('Undo rejection of')} ${name}`}
+                loading={reopen.isPending}
+                onClick={() => {
+                  setError(null);
+                  void run(() => reopen.mutateAsync({ params: { path } }));
+                }}
+              >
+                {t('Undo rejection')}
               </Button>
             )}
             {current && (

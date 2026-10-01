@@ -9,7 +9,10 @@ import type { CSSProperties, ReactNode } from 'react';
  * click through it.
  *
  * The outline is set as Mantine's own button variables rather than as a
- * background and a border, so the hover rule still fires. `href` turns the
+ * background and a border, so the hover rule still fires. A disabled button
+ * drops its variant's text colour and takes the theme's disabled one, the
+ * same grey for every variant, so it never reads as a pink button with its
+ * fill taken away. `href` turns the
  * button into a real anchor, for the trips out of the app the browser has to
  * perform.
  */
@@ -62,7 +65,7 @@ export function Button({
       fz={13}
       variant={variant === 'primary' ? 'filled' : 'default'}
       style={variant === 'primary' ? undefined : outline}
-      c={color}
+      c={disabled && !loading ? undefined : color}
     >
       {children}
     </MantineButton>

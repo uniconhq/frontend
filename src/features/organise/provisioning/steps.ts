@@ -25,6 +25,7 @@ const LABELS: Record<Provisioning['kind'], Record<string, string>> = {
   task: {
     repo: 'the task repo with its starter files',
     roles: "the task repo's teams and protection",
+    contest_entry: "the task's entry in contest.yaml",
   },
 };
 

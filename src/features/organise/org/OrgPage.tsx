@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { $api, queryView } from '@/api/query';
 import { Card } from '@/ui/Card';
 import { BodyText } from '@/ui/BodyText';
@@ -9,16 +8,15 @@ import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
 import { useMe } from '@/session';
 import { contestPath } from '@/lib/organiser-paths';
 import { t } from '@/lib/t';
-import { CreateForm } from '../CreateForm';
+import { Create } from '../Create';
 import { LinkList } from '../LinkList';
 import { useOrgParam } from '@/lib/route-params';
-import { FollowProvisioning } from '../provisioning/FollowProvisioning';
-import { pageOf, type Following } from '../provisioning/target';
 import { contestsReached } from '../roles';
 import classes from '../organise.module.css';
 
 /**
- * An org's contests, each linking to its page, and the form for a new one.
+ * An org's contests, each linking to its page, and the button that opens the
+ * form for a new one.
  * Listing needs the observer role at the org. Someone who holds a role only
  * at one of its contests or tasks is refused the list, so the refusal comes
  * with the contests their own roles reach, and the path through the org still
@@ -31,7 +29,6 @@ export function OrgPage() {
     $api.useQuery('get', '/api/v1/orgs/{org}/contests', { params: { path: { org } } }),
   );
   const create = $api.useMutation('post', '/api/v1/orgs/{org}/contests');
-  const [following, setFollowing] = useState<Following | null>(null);
 
   const links = (names: string[]) =>
     names.map((name) => ({ name, to: contestPath(org, name) }));
@@ -64,7 +61,8 @@ export function OrgPage() {
                   links={links(view.data.map((contest) => contest.name))}
                 />
               )}
-              <CreateForm
+              <Create
+                openLabel={t('New contest')}
                 title={t('New contest')}
                 second={{
                   label: t('Title'),
@@ -78,19 +76,13 @@ export function OrgPage() {
                     params: { path: { org } },
                     body: { name, title: title === '' ? null : title },
                   });
-                  setFollowing({
-                    target: { kind: 'contest', org, contest: name },
-                    initial,
-                  });
+                  return { target: { kind: 'contest', org, contest: name }, initial };
                 }}
               />
             </>
           )}
         </div>
       </Card>
-      {following !== null && (
-        <FollowProvisioning key={pageOf(following.target)} {...following} />
-      )}
     </div>
   );
 }
