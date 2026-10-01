@@ -49,7 +49,7 @@ const STEPS: Record<Provisioning['kind'], string[]> = {
     'ci_login',
   ],
   contest: ['repo', 'roles'],
-  task: ['repo', 'roles'],
+  task: ['repo', 'roles', 'contest_entry'],
 };
 
 /**
