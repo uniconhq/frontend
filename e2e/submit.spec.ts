@@ -5,8 +5,8 @@ import { expect, test, type Page, type Route } from '@playwright/test';
  * API and the object store stubbed, so it needs no backend: the panel shows a
  * drop zone per file input, a file goes to the store as the slot says and
  * one submission comes of it, the list follows it from queued to its outcome,
- * a submission opens with what the task shows of it, restore puts an earlier
- * submission's files back, and each refusal is said in words.
+ * a submission opens with what the task shows of it and the files it was
+ * made with to download, and each refusal is said in words.
  * The stub keeps just enough state for each answer to follow from the last.
  */
 const TASK = '/api/v1/orgs/acme/contests/spring/tasks/sum';
@@ -234,13 +234,6 @@ async function stubApi(page: Page, overrides: Partial<State> = {}): Promise<Stat
         },
       });
     }
-    if (path === '/submissions/1/files/files%2Fsubmission%2Fmain.cpp') {
-      return route.fulfill({
-        status: 200,
-        contentType: 'application/octet-stream',
-        body: 'int main() { return 0; }\n',
-      });
-    }
     return route.fulfill({ status: 404, body: 'not stubbed' });
   });
   return state;
@@ -377,31 +370,20 @@ test('a submission whose task hides the result shows its status alone', async ({
   await expect(detail.getByLabel('Summary default')).toHaveCount(0);
 });
 
-test('restore fills the panel with an earlier submission to submit again', async ({
+test('an earlier submission lists its files, each a download through the door', async ({
   page,
 }) => {
-  const state = await stubApi(page, {
+  await stubApi(page, {
     submissions: [
       { number: 1, submitted_at: '2026-09-29T09:30:00Z', gradings: [accepted] },
     ],
   });
-  await page.goto(PAGE);
+  await page.goto(`${PAGE}?submission=1`);
 
-  await page.getByRole('button', { name: 'Restore the files of submission 1' }).click();
-  await expect(
-    page.getByText(/The files of submission #1 are in the panel/),
-  ).toBeVisible();
-  await expect(page.getByLabel('Your solution: files chosen')).toContainText(
-    'main.cpp',
+  await expect(page.getByRole('link', { name: 'main.cpp' })).toHaveAttribute(
+    'href',
+    '/-/downloads/acme/spring/sum/1/files/submission/main.cpp',
   );
-  await expect(
-    page.getByRole('combobox', { name: 'Language of Your solution' }),
-  ).toHaveValue('cpp');
-
-  await page.getByRole('button', { name: 'Submit' }).click();
-  await expect(page.getByText('Submitted as #2.')).toBeVisible();
-  expect(state.sent[0]).toContain('int main() { return 0; }');
-  expect(state.submissions).toHaveLength(2);
 });
 
 const REFUSALS: [string, number, Record<string, unknown>, string][] = [
