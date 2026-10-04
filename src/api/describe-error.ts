@@ -273,11 +273,6 @@ export function describeError(error: ApiError): ErrorDescription {
         title: 'The log is too large to show',
         message: 'The verdict above is what the grading found.',
       };
-    case 'file_too_large':
-      return {
-        title: 'That file is too large to load back',
-        message: 'Choose it again from your own copy to submit it.',
-      };
     case 'invalid_inputs':
       return {
         title: 'The submission does not fit the task',

@@ -276,6 +276,5 @@ export function useSubmit({
     /** How much of each file has been sent, from 0 to 100, while a submit sends. */
     sentOf: (file: File): number | null => sent.get(file) ?? null,
     refusal,
-    clearRefusal: () => setRefusal(null),
   };
 }

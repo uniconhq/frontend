@@ -44,6 +44,12 @@ export default defineConfig({
         changeOrigin: false,
         configure: presentDevServerAsApiOrigin,
       },
+      // A submitted file comes back through the download door the same way.
+      '/-/downloads': {
+        target: apiProxyTarget,
+        changeOrigin: false,
+        configure: presentDevServerAsApiOrigin,
+      },
       '/healthz': { target: apiProxyTarget, changeOrigin: false },
       '/readyz': { target: apiProxyTarget, changeOrigin: false },
     },
