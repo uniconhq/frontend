@@ -11,6 +11,9 @@ import { $api } from '@/api/query';
 const forgeUrl = () =>
   $api.queryOptions('get', '/api/v1/auth/forge-url', undefined, {
     staleTime: Infinity,
+    // Not retried: a sign-out that needs the address joins whatever request
+    // for it is already on its way, and must not wait out retries for it.
+    retry: false,
   });
 
 /** Forgejo's address, or null until the backend has answered. */
@@ -18,6 +21,7 @@ export function useForgeUrl(): string | null {
   return (
     $api.useQuery('get', '/api/v1/auth/forge-url', undefined, {
       staleTime: Infinity,
+      retry: false,
     }).data?.url ?? null
   );
 }
@@ -39,7 +43,7 @@ export function forgePage(forge: string | null, path: string): string | undefine
  */
 export async function fetchForgeUrl(queryClient: QueryClient): Promise<string | null> {
   try {
-    return (await queryClient.fetchQuery({ ...forgeUrl(), retry: false })).url;
+    return (await queryClient.fetchQuery(forgeUrl())).url;
   } catch {
     return null;
   }
