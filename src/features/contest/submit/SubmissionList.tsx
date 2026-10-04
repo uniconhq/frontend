@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { $api, queryView, type QueryView } from '@/api/query';
 import type { Submission } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
-import { Button } from '@/ui/Button';
 import { PageLink } from '@/ui/PageLink';
 import { verdictLabel } from '@/ui/verdicts';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
@@ -18,9 +17,7 @@ import classes from './submit.module.css';
  * The caller's own submissions of the task, newest first, each with where its
  * grading stands or what came back: read every two seconds while any is still
  * being graded, so a queued one moves on to its outcome without a reload.
- * The server answers with the caller's own alone. `onRestore`, when given,
- * offers to put a submission's files back into the panel; `restoring` is the
- * one being read back.
+ * The server answers with the caller's own alone.
  */
 /**
  * What a screen reader is told as the list is read again: each submission
@@ -55,14 +52,10 @@ export function SubmissionList({
   org,
   contest,
   task,
-  onRestore,
-  restoring,
 }: {
   org: string;
   contest: string;
   task: string;
-  onRestore?: (number: number) => void;
-  restoring: number | null;
 }) {
   const view = queryView(
     $api.useQuery(
@@ -80,20 +73,12 @@ export function SubmissionList({
       <div role="status" className={classes.announce}>
         {said}
       </div>
-      <Listed view={view} onRestore={onRestore} restoring={restoring} />
+      <Listed view={view} />
     </>
   );
 }
 
-function Listed({
-  view,
-  onRestore,
-  restoring,
-}: {
-  view: QueryView<Submission[]>;
-  onRestore?: (number: number) => void;
-  restoring: number | null;
-}) {
+function Listed({ view }: { view: QueryView<Submission[]> }) {
   if (view.state === 'loading') return <PageSkeleton rows={2} />;
   if (view.state === 'error')
     return <ErrorBlock error={view.error} onRetry={view.retry} />;
@@ -114,7 +99,6 @@ function Listed({
           <th scope="col">{t('Submitted')}</th>
           <th scope="col">{t('Result')}</th>
           <th scope="col">{t('Metrics')}</th>
-          {onRestore !== undefined && <th scope="col">{t('Files')}</th>}
         </tr>
       </thead>
       <tbody>
@@ -138,20 +122,6 @@ function Listed({
                 />
               ))}
             </td>
-            {onRestore !== undefined && (
-              <td>
-                <Button
-                  size="xs"
-                  variant="secondary"
-                  label={`${t('Restore the files of submission')} ${submission.number}`}
-                  loading={restoring === submission.number}
-                  disabled={restoring !== null}
-                  onClick={() => onRestore(submission.number)}
-                >
-                  {t('Restore')}
-                </Button>
-              </td>
-            )}
           </tr>
         ))}
       </tbody>
