@@ -16,11 +16,9 @@ const EVERY: [Verdict, string][] = [
   ['skipped', 'SKIPPED'],
   ['system_error', 'SYSTEM ERR'],
   ['queued', 'QUEUED'],
-  ['dispatching', 'STARTING'],
   ['dispatched', 'STARTING'],
   ['running', 'RUNNING'],
   ['done', 'GRADED'],
-  ['failed', 'FAILED'],
   ['cancelled', 'CANCELLED'],
 ];
 

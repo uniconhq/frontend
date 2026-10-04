@@ -1,3 +1,4 @@
+import { useQueryClient } from '@tanstack/react-query';
 import { $api, queryView } from '@/api/query';
 import { Card } from '@/ui/Card';
 import { BodyText } from '@/ui/BodyText';
@@ -9,6 +10,7 @@ import { useMe } from '@/session';
 import { contestPath } from '@/lib/organiser-paths';
 import { t } from '@/lib/t';
 import { Create } from '../Create';
+import { PeopleSection } from '../people/PeopleSection';
 import { LinkList } from '../LinkList';
 import { useOrgParam } from '@/lib/route-params';
 import { contestsReached } from '../roles';
@@ -29,6 +31,7 @@ export function OrgPage() {
     $api.useQuery('get', '/api/v1/orgs/{org}/contests', { params: { path: { org } } }),
   );
   const create = $api.useMutation('post', '/api/v1/orgs/{org}/contests');
+  const queryClient = useQueryClient();
 
   const links = (names: string[]) =>
     names.map((name) => ({ name, to: contestPath(org, name) }));
@@ -72,16 +75,23 @@ export function OrgPage() {
                 pending={create.isPending}
                 error={create.error}
                 onSubmit={async (name, title) => {
-                  const initial = await create.mutateAsync({
+                  await create.mutateAsync({
                     params: { path: { org } },
                     body: { name, title: title === '' ? null : title },
                   });
-                  return { target: { kind: 'contest', org, contest: name }, initial };
+                  await queryClient.invalidateQueries({
+                    queryKey: $api.queryOptions('get', '/api/v1/orgs/{org}/contests', {
+                      params: { path: { org } },
+                    }).queryKey,
+                  });
                 }}
               />
             </>
           )}
         </div>
+      </Card>
+      <Card>
+        <PeopleSection place={{ kind: 'org', org }} />
       </Card>
     </div>
   );

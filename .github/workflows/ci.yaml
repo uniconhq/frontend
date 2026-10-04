@@ -72,8 +72,8 @@ jobs:
             type=raw,value=main
             type=sha
 
-      # The published image is the dev-stack image. The URL is baked into the
-      # bundle, so a deployment with its own Forgejo builds its own.
+      # One image fits every deployment: the bundle carries no forge address
+      # and asks the backend for it (GET /api/v1/auth/forge-url).
       - uses: docker/build-push-action@v7
         with:
           context: .

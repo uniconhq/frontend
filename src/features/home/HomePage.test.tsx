@@ -54,18 +54,16 @@ describe('HomePage', () => {
       http.get('/api/v1/contests', () =>
         HttpResponse.json([
           {
-            org: 'acme',
-            name: 'spring',
-            title: 'Spring 2026',
+            where: { org: 'acme', contest: 'spring' },
+            name: 'Spring 2026',
             start: '2026-09-12T09:00:00Z',
             end: '2026-09-12T10:30:00Z',
             visibility: 'signed-in',
             status: 'pending',
           },
           {
-            org: 'acme',
-            name: 'autumn',
-            title: 'Autumn 2026',
+            where: { org: 'acme', contest: 'autumn' },
+            name: 'Autumn 2026',
             start: '2026-10-12T09:00:00Z',
             end: '2026-10-12T10:30:00Z',
             visibility: 'public',

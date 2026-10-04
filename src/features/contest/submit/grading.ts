@@ -9,12 +9,7 @@ import type { GradingResult, GradingStatus, Submission } from '@/api/types';
 const GRADING_MS = 2_000;
 const MEANWHILE_MS = 60_000;
 
-const UNFINISHED = new Set<GradingStatus>([
-  'queued',
-  'dispatching',
-  'dispatched',
-  'running',
-]);
+const UNFINISHED = new Set<GradingStatus>(['queued', 'dispatched', 'running']);
 
 function unfinished(submission: Submission): boolean {
   return submission.gradings.some((grading) => UNFINISHED.has(grading.status));

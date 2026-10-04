@@ -2,11 +2,6 @@
 # puts this container and the backend on one origin.
 FROM node:24.13.1-alpine AS build
 
-# A build argument, not a run-time variable: a static file cannot read the
-# container's environment.
-ARG VITE_FORGE_URL=http://localhost:3300
-ENV VITE_FORGE_URL=$VITE_FORGE_URL
-
 WORKDIR /app
 RUN corepack enable
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
