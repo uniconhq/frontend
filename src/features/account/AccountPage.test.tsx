@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { screen, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { renderApp } from '@/test/render';
-import { server, sessionList, signedIn, someone } from '@/test/server';
+import { FORGE, server, sessionList, signedIn, someone } from '@/test/server';
 
 describe('AccountPage', () => {
   it('shows the Forgejo-owned profile read-only, with a way to change it', async () => {
@@ -11,9 +11,11 @@ describe('AccountPage', () => {
 
     expect(await screen.findByText('Kenny Lewi')).toBeInTheDocument();
     expect(screen.getByText('kenny@example.org')).toBeInTheDocument();
-    expect(screen.getByText('Change in Forgejo').closest('a')).toHaveAttribute(
-      'href',
-      'http://localhost:3300/user/settings',
+    await waitFor(() =>
+      expect(screen.getByText('Change in Forgejo').closest('a')).toHaveAttribute(
+        'href',
+        `${FORGE}/user/settings`,
+      ),
     );
     expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
   });
@@ -22,19 +24,22 @@ describe('AccountPage', () => {
     server.use(signedIn, sessionList);
     renderApp('/account');
     await screen.findByText('Kenny Lewi');
+    await waitFor(() =>
+      expect(screen.getByRole('link', { name: 'Password' })).toHaveAttribute('href'),
+    );
 
     for (const [name, path] of [
       ['Password', '/user/settings/account'],
       ['Email addresses', '/user/settings/account'],
       ['Avatar', '/user/settings'],
       ['Two-factor', '/user/settings/security'],
-      ['SSH keys', '/user/settings/keys'],
     ]) {
       expect(screen.getByRole('link', { name })).toHaveAttribute(
         'href',
-        `http://localhost:3300${path}`,
+        `${FORGE}${path}`,
       );
     }
+    expect(screen.queryByRole('link', { name: 'SSH keys' })).not.toBeInTheDocument();
   });
 
   it('lists the roles by scope name', async () => {

@@ -95,7 +95,12 @@ describe('the file tree', () => {
     renderApp(`${TASK}?file=data/testcases/logo.png`);
 
     expect(await screen.findByText(/Binary, 11 bytes/)).toBeVisible();
-    expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('textbox', { name: /data\/testcases\/logo\.png/ }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryAllByRole('textbox').map((box) => box.closest('form')?.ariaLabel),
+    ).toEqual(['Add someone']);
     expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument();
   });
 

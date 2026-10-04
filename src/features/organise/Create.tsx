@@ -1,17 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/ui/Button';
 import { CreateForm, type SecondField } from './CreateForm';
-import { FollowProvisioning } from './provisioning/FollowProvisioning';
-import { pageOf, type Following } from './provisioning/target';
 import classes from './organise.module.css';
 
 /**
- * Making one org, contest or task at a time. The form is behind a button
- * that opens it, or open from the start on a page that is only the form.
- * Once the create is accepted the form is replaced by the progress of what
- * was asked for, so a second one cannot be started beside it; the button to
- * start another comes back when that one is ready. A refusal keeps the form
- * open with what was typed.
+ * Making one org, contest or task. The form is behind a button that opens
+ * it, or open from the start on a page that is only the form. The thing is
+ * made before the create answers, so the form closes as soon as it has, and
+ * the new thing is in the list above; a refusal keeps the form open with
+ * what was typed and says why, for the person to try again.
  */
 export function Create({
   openLabel,
@@ -32,12 +29,10 @@ export function Create({
   error: unknown;
   /** Open the form at once, with no way to close it, for a page that is only the form. */
   startOpen?: boolean;
-  /** Resolves with what to follow once the create was accepted. */
-  onSubmit: (name: string, second: string) => Promise<Following>;
+  /** Resolves once the thing is made. */
+  onSubmit: (name: string, second: string) => Promise<void>;
 }) {
   const [open, setOpen] = useState(startOpen);
-  const [following, setFollowing] = useState<Following | null>(null);
-  const [ready, setReady] = useState(false);
   const opener = useRef<HTMLDivElement>(null);
   const moveFocus = useRef(false);
 
@@ -46,12 +41,6 @@ export function Create({
     moveFocus.current = false;
     opener.current?.querySelector('button')?.focus();
   }, [open]);
-
-  const start = () => {
-    setFollowing(null);
-    setReady(false);
-    setOpen(true);
-  };
 
   const close = () => {
     moveFocus.current = true;
@@ -68,31 +57,18 @@ export function Create({
         error={error}
         onCancel={startOpen ? undefined : close}
         onSubmit={async (name, other) => {
-          const accepted = await onSubmit(name, other);
-          setFollowing(accepted);
-          setReady(false);
-          setOpen(false);
+          await onSubmit(name, other);
+          if (!startOpen) close();
         }}
       />
     );
   }
 
   return (
-    <div className={classes.stack}>
-      {following !== null && (
-        <FollowProvisioning
-          key={pageOf(following.target)}
-          {...following}
-          onReady={() => setReady(true)}
-        />
-      )}
-      {(following === null || ready) && (
-        <div ref={opener} className={classes.actions}>
-          <Button variant="secondary" onClick={start}>
-            {openLabel}
-          </Button>
-        </div>
-      )}
+    <div ref={opener} className={classes.actions}>
+      <Button variant="secondary" onClick={() => setOpen(true)}>
+        {openLabel}
+      </Button>
     </div>
   );
 }

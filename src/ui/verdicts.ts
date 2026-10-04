@@ -21,11 +21,9 @@ const LOOK: Record<Verdict, { label: string; colors: VerdictName }> = {
   skipped: { label: 'SKIPPED', colors: 'queued' },
   system_error: { label: 'SYSTEM ERR', colors: 'error' },
   queued: { label: 'QUEUED', colors: 'queued' },
-  dispatching: { label: 'STARTING', colors: 'queued' },
   dispatched: { label: 'STARTING', colors: 'queued' },
   running: { label: 'RUNNING', colors: 'running' },
   done: { label: 'GRADED', colors: 'queued' },
-  failed: { label: 'FAILED', colors: 'error' },
   cancelled: { label: 'CANCELLED', colors: 'queued' },
 };
 

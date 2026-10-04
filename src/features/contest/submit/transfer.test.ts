@@ -1,88 +1,48 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { http, HttpResponse } from 'msw';
 import { isApiError } from '@/api/problem';
 import { server } from '@/test/server';
 import { passTime, withFakeTimers } from '@/test/timers';
-import { sendToStore } from './transfer';
+import { digestOf } from './digest';
+import { sendToForge } from './transfer';
 
-const PARTS = '/unicon-uploads/uploads/abc';
+const DOOR = '/-/uploads/abc';
 
-/**
- * The size of each piece the file was cut into for sending. The request
- * stand-in the tests run on does not carry a Blob's bytes, so the length each
- * part goes with is read where it is cut; the end-to-end run sees the bytes
- * themselves.
- */
-function piecesCut(): () => number[] {
-  const cut = vi.spyOn(Blob.prototype, 'slice');
-  return () => cut.mock.results.map((result) => (result.value as Blob).size);
-}
-
-afterEach(() => {
-  vi.restoreAllMocks();
-});
-
-describe('sending a file in parts', () => {
-  it('puts each part at exactly its length and answers with the ETags', async () => {
-    const numbers: (string | null)[] = [];
+describe('sending a file through the door', () => {
+  it('puts the file itself, once, and reports it as sent', async () => {
+    // The request stand-in these tests run on does not carry a Blob's bytes,
+    // so what is checked here is that one PUT went to the slot's address and
+    // that progress reached the end; the end-to-end run sees the bytes.
+    const methods: string[] = [];
     server.use(
-      http.put(PARTS, ({ request }) => {
-        const number = new URL(request.url).searchParams.get('partNumber');
-        numbers.push(number);
-        return new HttpResponse(null, { headers: { ETag: `"etag-${number ?? ''}"` } });
+      http.put(DOOR, ({ request }) => {
+        methods.push(request.method);
+        return new HttpResponse(null, { status: 200 });
       }),
     );
-    const lengths = piecesCut();
     const shares: number[] = [];
 
-    const parts = await sendToStore(
-      {
-        id: 'abc',
-        method: 'multipart',
-        part_size: 4,
-        parts: [
-          {
-            number: 1,
-            url: `http://localhost:8080${PARTS}?partNumber=1&X-Amz-Signature=s`,
-          },
-          {
-            number: 2,
-            url: `http://localhost:8080${PARTS}?partNumber=2&X-Amz-Signature=s`,
-          },
-        ],
-        expires_at: '2026-09-12T12:00:00Z',
-      },
-      new File(['123456'], 'model.bin'),
-      (share) => shares.push(share),
+    await sendToForge(DOOR, new File(['123456'], 'model.bin'), (share) =>
+      shares.push(share),
     );
 
-    expect(numbers).toEqual(['1', '2']);
-    expect(lengths()).toEqual([4, 2]);
-    expect(parts).toEqual([
-      { number: 1, etag: '"etag-1"' },
-      { number: 2, etag: '"etag-2"' },
-    ]);
+    expect(methods).toEqual(['PUT']);
     expect(shares.at(-1)).toBe(1);
   });
 
-  it('fails a part the store answers without an ETag', async () => {
-    server.use(http.put(PARTS, () => new HttpResponse(null)));
+  it('fails whatever the forge says, since none of it is a contestant’s to act on', async () => {
+    // The door refuses before it reads the body, and the forge refuses a body
+    // that is not what the address named. Either way the panel reads the
+    // upload back rather than showing what came out of the forge.
+    for (const status of [403, 422, 500]) {
+      server.use(http.put(DOOR, () => new HttpResponse('<Error/>', { status })));
 
-    const sent = sendToStore(
-      {
-        id: 'abc',
-        method: 'multipart',
-        part_size: 4,
-        parts: [{ number: 1, url: `${PARTS}?partNumber=1` }],
-        expires_at: '2026-09-12T12:00:00Z',
-      },
-      new File(['12'], 'model.bin'),
-      () => {},
-    );
+      const sent = sendToForge(DOOR, new File(['12'], 'model.bin'), () => {});
 
-    await expect(sent).rejects.toSatisfy(
-      (error) => isApiError(error) && error.code === 'upload_failed',
-    );
+      await expect(sent).rejects.toSatisfy(
+        (error) => isApiError(error) && error.code === 'upload_failed',
+      );
+    }
   });
 });
 
@@ -90,23 +50,40 @@ describe('a stalled upload', () => {
   withFakeTimers();
 
   it('is given up after half a minute of sending nothing', async () => {
-    server.use(http.post('/unicon-uploads/', () => new Promise<never>(() => {})));
+    server.use(http.put(DOOR, () => new Promise<never>(() => {})));
 
-    const sent = sendToStore(
-      {
-        id: 'abc',
-        method: 'post',
-        url: '/unicon-uploads/',
-        fields: { key: 'uploads/abc' },
-        expires_at: '2026-09-12T12:00:00Z',
-      },
-      new File(['1'], 'main.py'),
-      () => {},
-    );
+    const sent = sendToForge(DOOR, new File(['1'], 'main.py'), () => {});
     const outcome = sent.catch((error: unknown) => error);
     await passTime(30_000);
 
     const error = await outcome;
     expect(isApiError(error) && error.code).toBe('upload_failed');
+  });
+});
+
+describe('working out what a file hashes to', () => {
+  it('reads it in slices and never holds it whole', async () => {
+    // Four slices of eight megabytes would be read for a file this size were
+    // it larger; what matters here is that the answer is the file's SHA-256
+    // and that progress reaches the end.
+    const content = 'print(1)\n';
+    const shares: number[] = [];
+
+    const digest = await digestOf(new File([content], 'main.py'), (share) =>
+      shares.push(share),
+    );
+
+    expect(digest).toBe(
+      'cc42155088fca5730758db72b2a5bca33112a941dfaa2d43098ec422ce4ea213',
+    );
+    expect(shares.at(-1)).toBe(1);
+  });
+
+  it('gives an empty file its own digest rather than nothing', async () => {
+    const digest = await digestOf(new File([], 'empty.bin'), () => {});
+
+    expect(digest).toBe(
+      'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+    );
   });
 });

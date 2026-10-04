@@ -112,6 +112,13 @@ export function describeError(error: ApiError): ErrorDescription {
         title: 'You are the only admin somewhere',
         message: 'Someone else has to take the role before you can do this.',
       };
+    case 'contestant_conflict':
+      return {
+        title: 'They are a contestant here',
+        message:
+          error.detail ??
+          'Nobody can organise a contest they are registered in. Their registration has to go first.',
+      };
     case 'shared_workflow_owner':
       return {
         title: 'You own workflows other people use',
@@ -228,11 +235,6 @@ export function describeError(error: ApiError): ErrorDescription {
         message:
           "Only an approved contestant submits. The contest's page says where your registration stands.",
       };
-    case 'workspace_not_ready':
-      return {
-        title: 'Your workspace is still being made',
-        message: 'It takes a moment. Submit again once it is ready.',
-      };
     case 'submission_limit': {
       const limit = numberOf(error, 'limit');
       return {
@@ -271,6 +273,11 @@ export function describeError(error: ApiError): ErrorDescription {
         title: 'The log is too large to show',
         message: 'The verdict above is what the grading found.',
       };
+    case 'file_too_large':
+      return {
+        title: 'That file is too large to load back',
+        message: 'Choose it again from your own copy to submit it.',
+      };
     case 'invalid_inputs':
       return {
         title: 'The submission does not fit the task',
@@ -285,12 +292,13 @@ export function describeError(error: ApiError): ErrorDescription {
       return {
         title: 'The upload did not go through',
         message:
-          'The file may be larger than the store takes, or the connection dropped. Nothing was submitted.',
+          'The file may have changed since it was chosen, or the connection dropped. Nothing was submitted.',
       };
     case 'upload_rejected':
       return {
         title: 'A file did not arrive as it was sent',
-        message: 'What arrived is not the size of the file. Nothing was submitted.',
+        message:
+          'The forge has not got the file. Send it again. Nothing was submitted.',
       };
     case 'not_found':
       return {

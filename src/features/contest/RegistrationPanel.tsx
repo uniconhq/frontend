@@ -25,17 +25,10 @@ function standing(registration: MyRegistration): Standing {
         message: registration.reason ?? t('The organisers gave no reason.'),
       };
     case 'approved':
-      return registration.workspace === 'ready'
-        ? {
-            title: t('You are in'),
-            message: t('Your place to work and to submit is ready.'),
-          }
-        : {
-            title: t('Preparing your workspace'),
-            message: t(
-              'You are in. The place you work and submit in is being made, which takes a moment.',
-            ),
-          };
+      return {
+        title: t('You are in'),
+        message: t('Submit to any task that is open.'),
+      };
     case 'removed':
       return {
         title: t('You were removed from this contest'),

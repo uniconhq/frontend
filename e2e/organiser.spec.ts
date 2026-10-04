@@ -2,13 +2,13 @@ import { expect, test, type Page, type Route } from '@playwright/test';
 
 /**
  * The organiser path against the dev server with the API stubbed, so it needs
- * no backend: make an org and watch it provisioned, walk down to a task, open
- * a file and save it, and see the publication number the save answers with,
+ * no backend: make an org and land on its page, walk down to a task, open a
+ * file and save it, and see the publication number the save answers with,
  * with the focus on that answer.
  * The stub keeps just enough state for each answer to follow from the last.
  */
 async function stubOrganiserApi(page: Page) {
-  const state = { orgReady: false, polls: 0, published: 1, saved: null as unknown };
+  const state = { orgMade: false, published: 1, saved: null as unknown };
 
   const json = (route: Route, body: unknown, status = 200) =>
     route.fulfill({
@@ -17,44 +17,22 @@ async function stubOrganiserApi(page: Page) {
       body: JSON.stringify(body),
     });
 
-  const record = (status: string, lastStep: string | null) => ({
-    kind: 'org',
-    target: 'acme',
-    status,
-    steps: [
-      'account_row',
-      'org',
-      'roles',
-      'labels',
-      'event_push',
-      'first_admin',
-      'service_account',
-      'service_token',
-      'ci_user',
-      'ci_login',
-    ],
-    last_step: lastStep,
-    failed_step: null,
-    error: null,
-    retry_at: null,
-    attempts: status === 'pending' ? 0 : 1,
-    ready_at: status === 'ready' ? '2026-09-29T10:00:05Z' : null,
-  });
-
   await page.route('**/api/v1/time', (route) =>
     json(route, { now: '2026-09-29T10:00:00Z' }),
   );
   await page.route('**/api/v1/me', (route) =>
     json(route, {
-      user_id: 7,
-      username: 'kenny',
-      name: 'Kenny Lewi',
-      avatar_url: null,
-      email: 'kenny@example.org',
-      roles: state.orgReady
+      user: {
+        id: 7,
+        username: 'kenny',
+        name: 'Kenny Lewi',
+        avatar_url: null,
+        email: 'kenny@example.org',
+      },
+      roles: state.orgMade
         ? [
             {
-              scope: { kind: 'org', org: 'acme', contest: null, task: null },
+              names: { org: 'acme', contest: null, task: null },
               role: 'admin',
             },
           ]
@@ -69,14 +47,10 @@ async function stubOrganiserApi(page: Page) {
     const task = '/api/v1/orgs/acme/contests/spring/tasks/sum';
 
     if (request.method() === 'POST' && path === '/api/v1/orgs') {
-      return json(route, record('pending', null), 202);
+      state.orgMade = true;
+      return json(route, { name: 'acme' }, 201);
     }
-    if (path === '/api/v1/orgs/acme/provisioning') {
-      state.polls += 1;
-      if (state.polls < 2) return json(route, record('running', 'labels'));
-      state.orgReady = true;
-      return json(route, record('ready', 'ci_login'));
-    }
+    if (path.endsWith('/roles')) return json(route, []);
     if (path === '/api/v1/orgs/acme/contests') return json(route, [{ name: 'spring' }]);
     if (path === '/api/v1/orgs/acme/contests/spring/tasks') {
       return json(route, [{ name: 'sum' }]);
@@ -108,12 +82,10 @@ async function stubOrganiserApi(page: Page) {
         state.saved = request.postDataJSON();
         state.published += 1;
         return json(route, {
-          outcome: 'published',
           publication: `pub-${String(state.published)}`,
           number: state.published,
           grading_changed: false,
           changes: [],
-          activation: 'not_needed',
         });
       }
       return json(route, {
@@ -141,13 +113,8 @@ test('an organiser makes an org, walks to a task and publishes a file', async ({
   await page.getByRole('textbox', { name: /^Name/ }).fill('acme');
   await page.getByRole('button', { name: 'Create org' }).click();
 
-  const progress = page.getByRole('region', { name: 'Making the org acme' });
-  await expect(progress).toBeVisible();
-  await progress
-    .getByRole('link', { name: 'Open the org acme' })
-    .click({ timeout: 10_000 });
-
-  await expect(page).toHaveURL(/\/orgs\/acme$/);
+  await expect(page).toHaveURL(/\/orgs\/acme$/, { timeout: 10_000 });
+  await expect(page.getByRole('heading', { name: 'acme', level: 1 })).toBeVisible();
   await page.getByRole('link', { name: 'spring' }).click();
   await page.getByRole('link', { name: 'sum' }).click();
 

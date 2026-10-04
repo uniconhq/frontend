@@ -50,8 +50,7 @@ describe('the contest page for a signed-in person', () => {
           home({
             registration: registration({
               status: 'approved',
-              workspace: 'ready',
-              time_extension_seconds: 1800,
+              time_extension: 1800,
             }),
             deadline: '2026-09-12T11:00:00Z',
           }),
@@ -179,26 +178,38 @@ describe('the contest page for a signed-in person', () => {
 describe('the contest page while the person waits', () => {
   withFakeTimers();
 
-  it('moves from pending to preparing to the contest as the status changes', async () => {
+  it('moves from pending to the contest once an organiser approves', async () => {
     server.use(
       signedIn,
       homesInTurn([
         home({ registration: registration() }),
-        home({
-          registration: registration({ status: 'approved', workspace: 'preparing' }),
-        }),
-        home({
-          registration: registration({ status: 'approved', workspace: 'ready' }),
-        }),
+        home({ registration: registration({ status: 'approved' }) }),
       ]),
     );
     renderApp(PAGE);
 
     expect(await screen.findByText('Your registration is waiting')).toBeVisible();
     await passTime(10_000);
-    expect(await screen.findByText('Preparing your workspace')).toBeVisible();
-    await passTime(2_000);
+    const status = await screen.findByRole('status', { name: 'Registration' });
+    expect(await within(status).findByText('You are in')).toBeVisible();
+    expect(status).toHaveTextContent('Submit to any task that is open.');
+  });
+
+  it('reads the home only now and then once the person is in', async () => {
+    server.use(
+      signedIn,
+      homesInTurn([
+        home({ registration: registration({ status: 'approved' }) }),
+        home({ registration: registration({ status: 'removed' }) }),
+      ]),
+    );
+    renderApp(PAGE);
+
     expect(await screen.findByText('You are in')).toBeVisible();
+    await passTime(10_000);
+    expect(screen.getByText('You are in')).toBeVisible();
+    await passTime(50_000);
+    expect(await screen.findByText('You were removed from this contest')).toBeVisible();
   });
 });
 

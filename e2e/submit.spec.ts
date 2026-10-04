@@ -69,12 +69,13 @@ type State = {
   submissions: Submission[];
   /** How often each submission has been read, so its grading can move on. */
   reads: number;
-  forms: string[];
-  parts: number[];
+  /** Each file put through the upload door, as its bytes arrived. */
+  sent: string[];
   completed: unknown[];
   submits: { idempotency_key: string; inputs: unknown }[];
   refusal: { status: number; code: string; extra: Record<string, unknown> } | null;
-  multipart: boolean;
+  /** The forge already holds the file, so the slot has nothing to send. */
+  alreadyHeld: boolean;
 };
 
 async function stubApi(page: Page, overrides: Partial<State> = {}): Promise<State> {
@@ -82,12 +83,11 @@ async function stubApi(page: Page, overrides: Partial<State> = {}): Promise<Stat
     inputs: [input({})],
     submissions: [],
     reads: 0,
-    forms: [],
-    parts: [],
+    sent: [],
     completed: [],
     submits: [],
     refusal: null,
-    multipart: false,
+    alreadyHeld: false,
     ...overrides,
   };
   const json = (route: Route, body: unknown, status = 200) =>
@@ -103,29 +103,26 @@ async function stubApi(page: Page, overrides: Partial<State> = {}): Promise<Stat
   await page.route('**/api/v1/auth/register-url', (route) =>
     json(route, { url: null }),
   );
+  await page.route('**/api/v1/auth/forge-url', (route) =>
+    json(route, { url: 'http://forge.localhost:8080' }),
+  );
   await page.route('**/api/v1/me', (route) =>
     json(route, {
-      user_id: 20,
-      username: 'carol',
-      name: 'Carol',
-      avatar_url: null,
-      email: 'carol@example.org',
+      user: {
+        id: 20,
+        username: 'carol',
+        name: 'Carol',
+        avatar_url: null,
+        email: 'carol@example.org',
+      },
       roles: [],
       degraded: false,
     }),
   );
 
-  await page.route('**/unicon-uploads/**', async (route) => {
-    const request = route.request();
-    if (request.method() === 'POST') {
-      state.forms.push(request.postData() ?? '');
-      return route.fulfill({ status: 204 });
-    }
-    state.parts.push(request.postDataBuffer()?.length ?? 0);
-    return route.fulfill({
-      status: 200,
-      headers: { ETag: `"part-${state.parts.length}"` },
-    });
+  await page.route('**/-/uploads/*', async (route) => {
+    state.sent.push(route.request().postData() ?? '');
+    return route.fulfill({ status: 200 });
   });
 
   /** Each submission's grading moves on as it is read: queued, then accepted. */
@@ -145,8 +142,7 @@ async function stubApi(page: Page, overrides: Partial<State> = {}): Promise<Stat
         statement: '# Sum\n\nPrint the sum of two numbers.\n',
         limits: {
           submissions: 50,
-          rate_count: 1,
-          rate_seconds: 30,
+          rate: { count: 1, per: 30 },
           max_size: 10485760,
         },
         inputs: state.inputs,
@@ -156,33 +152,12 @@ async function stubApi(page: Page, overrides: Partial<State> = {}): Promise<Stat
     if (path === '/uploads') {
       const number = state.completed.length + 1;
       const id = `00000000-0000-4000-8000-00000000000${number}`;
-      if (state.multipart) {
-        return json(
-          route,
-          {
-            id,
-            method: 'multipart',
-            part_size: 4,
-            parts: [1, 2, 3].map((part) => ({
-              number: part,
-              url: `http://localhost:8080/unicon-uploads/uploads/${id}?partNumber=${part}&X-Amz-Signature=s`,
-            })),
-            expires_at: '2026-09-29T12:00:00Z',
-          },
-          201,
-        );
-      }
       return json(
         route,
         {
           id,
-          method: 'post',
-          url: 'http://localhost:8080/unicon-uploads/',
-          fields: {
-            bucket: 'unicon-uploads',
-            key: `uploads/${id}`,
-            policy: 'cG9saWN5',
-          },
+          url: state.alreadyHeld ? null : `/-/uploads/${id}`,
+          ready: state.alreadyHeld,
           expires_at: '2026-09-29T10:15:00Z',
         },
         201,
@@ -331,12 +306,8 @@ test('a full pass sends the files as the slot says and makes one submission', as
     },
   });
 
-  expect(state.forms).toHaveLength(3);
-  const first = state.forms[0] ?? '';
-  const names = [...first.matchAll(/; name="([^"]+)"/g)].map((found) => found[1]);
-  expect(names).toEqual(['bucket', 'key', 'policy', 'file']);
-  expect(first).toContain('filename="main.py"');
-  expect(first).not.toMatch(/name="Content-Type"/i);
+  // One PUT per file, the file itself as the body and nothing around it.
+  expect(state.sent).toHaveLength(3);
 
   const list = page.getByRole('table', { name: 'Your submissions' });
   await expect(list.getByText('QUEUED')).toBeVisible();
@@ -344,10 +315,12 @@ test('a full pass sends the files as the slot says and makes one submission', as
   await expect(list.getByLabel('Metrics')).toContainText('100');
 });
 
-test('a file sent in parts puts each part at its length and completes with the ETags', async ({
+test('a file the forge already holds is submitted without being sent', async ({
   page,
 }) => {
-  const state = await stubApi(page, { multipart: true });
+  // The commit names bytes by their hash, so a file the forge has is one it
+  // needs no copy of: the slot comes back ready and the browser sends nothing.
+  const state = await stubApi(page, { alreadyHeld: true });
   await page.goto(PAGE);
 
   await page.getByLabel('Your solution', { exact: true }).setInputFiles({
@@ -361,16 +334,8 @@ test('a file sent in parts puts each part at its length and completes with the E
   await page.getByRole('button', { name: 'Submit' }).click();
 
   await expect(page.getByText('Submitted as #1.')).toBeVisible();
-  expect(state.parts).toEqual([4, 4, 2]);
-  expect(state.completed).toEqual([
-    {
-      parts: [
-        { number: 1, etag: '"part-1"' },
-        { number: 2, etag: '"part-2"' },
-        { number: 3, etag: '"part-3"' },
-      ],
-    },
-  ]);
+  expect(state.sent).toEqual([]);
+  expect(state.completed).toHaveLength(1);
 });
 
 test('a submission opens with its summary, tests and log', async ({ page }) => {
@@ -435,7 +400,7 @@ test('restore fills the panel with an earlier submission to submit again', async
 
   await page.getByRole('button', { name: 'Submit' }).click();
   await expect(page.getByText('Submitted as #2.')).toBeVisible();
-  expect(state.forms[0]).toContain('int main() { return 0; }');
+  expect(state.sent[0]).toContain('int main() { return 0; }');
   expect(state.submissions).toHaveLength(2);
 });
 
@@ -443,7 +408,6 @@ const REFUSALS: [string, number, Record<string, unknown>, string][] = [
   ['task_closed', 403, { reason: 'ended' }, 'The contest has ended for you'],
   ['archived', 403, {}, 'The contest is archived'],
   ['not_approved', 403, {}, 'You are not a contestant here yet'],
-  ['workspace_not_ready', 409, {}, 'Your workspace is still being made'],
   ['submission_limit', 409, { limit: 50 }, 'This task takes 50 submissions in all'],
   [
     'rate_limited',

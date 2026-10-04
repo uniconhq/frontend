@@ -122,13 +122,14 @@ function Field({
   busy: boolean;
   sentOf: (file: File) => number | null;
 }) {
+  const label = input.label ?? input.id;
   switch (entry.kind) {
     case 'files': {
       const languages = input.type === 'code' ? (input.language ?? []) : [];
       return (
         <div className={shared.stack}>
           <FileDrop
-            label={input.label}
+            label={label}
             description={fileHint(input, taskMaxSize)}
             accept={htmlAccept(input)}
             multiple={input.type === 'file[]'}
@@ -140,7 +141,7 @@ function Field({
           {languages.length > 1 && (
             <div className={classes.narrow}>
               <Select
-                label={`${t('Language of')} ${input.label}`}
+                label={`${t('Language of')} ${label}`}
                 value={entry.language}
                 options={languages.map((language) => ({
                   value: language,
@@ -159,7 +160,7 @@ function Field({
     case 'flag':
       return (
         <Checkbox
-          label={input.label}
+          label={label}
           checked={entry.checked}
           onChange={(checked) => onChange({ kind: 'flag', checked })}
           disabled={busy}
@@ -169,7 +170,7 @@ function Field({
       return input.type === 'number' ? (
         <div className={classes.narrow}>
           <TextInput
-            label={input.label}
+            label={label}
             description={numberHint(input)}
             value={entry.text}
             onChange={(text) => onChange({ kind: 'text', text })}
@@ -179,7 +180,7 @@ function Field({
         </div>
       ) : (
         <Textarea
-          label={input.label}
+          label={label}
           value={entry.text}
           onChange={(text) => onChange({ kind: 'text', text })}
           readOnly={busy}
@@ -190,6 +191,7 @@ function Field({
 }
 
 const PHASE: Record<Exclude<Phase, 'idle'>, string> = {
+  hashing: 'Reading your files.',
   uploading: 'Sending your files.',
   submitting: 'Submitting.',
 };

@@ -52,15 +52,12 @@ async function editAndSave(path = 'statement.md') {
 }
 
 describe('saving a task file', () => {
-  it('shows the publication, what changed in grading and the activation, then refetches the task', async () => {
+  it('shows the publication and what changed in grading, then refetches the task', async () => {
     const { reads, sent } = taskBackend(() =>
       HttpResponse.json({
-        outcome: 'published',
-        publication: 'pub-3',
         number: 3,
         grading_changed: true,
         changes: ['plans/default.json changed'],
-        activation: 'done',
       }),
     );
 
@@ -72,7 +69,6 @@ describe('saving a task file', () => {
     expect(
       within(outcome).getByRole('list', { name: 'What changed' }),
     ).toHaveTextContent('plans/default.json changed');
-    expect(outcome).toHaveTextContent('This save switched grading on for the task.');
     expect(sent).toEqual([
       {
         content: 'Write the sum of two numbers.\n Now.',
@@ -88,12 +84,9 @@ describe('saving a task file', () => {
   it('says when a publication leaves grading as it was', async () => {
     taskBackend(() =>
       HttpResponse.json({
-        outcome: 'published',
-        publication: 'pub-3',
         number: 3,
         grading_changed: false,
         changes: [],
-        activation: 'not_needed',
       }),
     );
 
@@ -102,13 +95,11 @@ describe('saving a task file', () => {
     const outcome = (await screen.findByText('Published as publication 3.'))
       .parentElement as HTMLElement;
     expect(outcome).toHaveTextContent('It does not change how the task grades.');
-    expect(outcome).toHaveTextContent('Grading was already on for the task.');
   });
 
   it('shows a draft with its errors at their paths, and that the last publication keeps grading', async () => {
     const { reads } = taskBackend(() =>
       HttpResponse.json({
-        outcome: 'draft',
         version: '4d5e6f',
         errors: draftTask.errors,
         held_back: [],
@@ -134,12 +125,9 @@ describe('saving a task file', () => {
         .then((body) =>
           (body as { confirm: boolean }).confirm
             ? HttpResponse.json({
-                outcome: 'published',
-                publication: 'pub-3',
                 number: 3,
                 grading_changed: true,
                 changes: ['plans/default.json changed'],
-                activation: 'not_needed',
               })
             : problem(409, 'confirmation_required', {
                 detail: 'The contest is running and this changes how the task grades.',
@@ -179,7 +167,6 @@ describe('saving a task file', () => {
         .then((body) =>
           (body as { keep_as_draft: boolean }).keep_as_draft
             ? HttpResponse.json({
-                outcome: 'draft',
                 version: '4d5e6f',
                 errors: [],
                 held_back: ['plans/default.json changed'],
