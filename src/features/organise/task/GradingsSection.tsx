@@ -38,7 +38,8 @@ type TaskPath = { org: string; contest: string; task: string };
  * One grading and, for a manager, what its status allows: cancel one still to
  * finish, retry one that is finished. A grading whose run is overdue or that
  * the grading machine lost reads as a system error with the reason, and retry
- * is the one click that grades it again, cancelling the old run. Each answer
+ * is the one click that grades it again, cancelling the old run; it is the
+ * one retry drawn as the thing to do, since grading a verdict again is not. Each answer
  * reads the list again, and a refusal is shown on the row.
  */
 function Row({
@@ -115,6 +116,7 @@ function Row({
             ) : (
               <Button
                 size="xs"
+                variant={grading.status === 'system_error' ? 'primary' : 'secondary'}
                 label={`${t('Retry')} ${name}`}
                 loading={retry.isPending}
                 onClick={() => void run(() => retry.mutateAsync({ params }))}
