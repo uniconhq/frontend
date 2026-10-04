@@ -4,14 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { delay, http, HttpResponse } from 'msw';
 import { renderApp } from '@/test/render';
 import { problem, server, signedIn, someone } from '@/test/server';
-import {
-  ORG_API,
-  contestList,
-  contests,
-  provisioning,
-  provisioningInTurn,
-} from '@/test/organiser';
-import { fakeTimerUser, passTime, withFakeTimers } from '@/test/timers';
+import { ORG_API, contestList, contests, listAndCreate } from '@/test/organiser';
 
 describe('the org page', () => {
   it('lists the contests, each linking to its page', async () => {
@@ -37,8 +30,12 @@ describe('the org page', () => {
     );
     renderApp('/orgs/acme');
 
-    await screen.findByRole('heading', { name: 'acme', level: 1 });
-    expect(screen.getByRole('status', { name: 'Loading' })).toBeInTheDocument();
+    const heading = await screen.findByRole('heading', { name: 'Contests' });
+    expect(
+      within(heading.parentElement as HTMLElement).getByRole('status', {
+        name: 'Loading',
+      }),
+    ).toBeInTheDocument();
   });
 
   it('says there are none yet rather than showing an empty box', async () => {
@@ -106,119 +103,54 @@ describe('the org page', () => {
 });
 
 describe('creating a contest', () => {
-  withFakeTimers();
-
-  it('sends the name and title, follows it to ready and lists it', async () => {
-    let made = false;
-    let sent: unknown = null;
-    server.use(
-      signedIn,
-      http.get(`${ORG_API}/contests`, () =>
-        HttpResponse.json(made ? [...contests, { name: 'summer' }] : contests),
-      ),
-      http.post('/api/v1/orgs/acme/contests', async ({ request }) => {
-        sent = await request.json();
-        return HttpResponse.json(
-          provisioning({ kind: 'contest', target: 'acme/summer' }),
-          { status: 202 },
-        );
-      }),
-      provisioningInTurn('/api/v1/orgs/acme/contests/summer/provisioning', [
-        provisioning({ kind: 'contest', status: 'running', attempts: 1 }),
-        provisioning({
-          kind: 'contest',
-          status: 'ready',
-          last_step: 'roles',
-          attempts: 1,
-        }),
-      ]),
-    );
-    const user = fakeTimerUser();
-    renderApp('/orgs/acme');
-
+  async function submitContest(name: string, title = '') {
+    const user = userEvent.setup();
     await user.click(await screen.findByRole('button', { name: 'New contest' }));
     const form = screen.getByRole('form', { name: 'New contest' });
-    await user.type(within(form).getByRole('textbox', { name: /^Name/ }), 'summer');
-    await user.type(
-      within(form).getByRole('textbox', { name: /^Title/ }),
-      'Summer Cup',
-    );
+    await user.type(within(form).getByRole('textbox', { name: /^Name/ }), name);
+    if (title !== '') {
+      await user.type(within(form).getByRole('textbox', { name: /^Title/ }), title);
+    }
     await user.click(within(form).getByRole('button', { name: 'Create contest' }));
+    return form;
+  }
 
-    const progress = await screen.findByRole('region', {
-      name: 'Making the contest summer',
-    });
-    expect(sent).toEqual({ name: 'summer', title: 'Summer Cup' });
-    expect(within(progress).getByText('Waiting to start.')).toBeVisible();
-    expect(form).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole('button', { name: 'New contest' }),
-    ).not.toBeInTheDocument();
+  it('sends the name and title, closes the form and lists the new contest', async () => {
+    const { handlers, sent } = listAndCreate('/api/v1/orgs/acme/contests', contests);
+    server.use(signedIn, ...handlers);
+    renderApp('/orgs/acme');
 
-    await passTime(1_000);
-    const repo = await within(progress).findByText(
-      'the contest repo with its starter settings',
-    );
-    await expect
-      .poll(() => repo.closest('li')?.getAttribute('data-state'))
-      .toBe('working');
+    const form = await submitContest('summer', 'Summer Cup');
 
-    made = true;
-    await passTime(1_000);
-    expect(
-      await within(progress).findByRole('link', { name: 'Open the contest summer' }),
-    ).toHaveAttribute('href', '/orgs/acme/contests/summer');
     const list = screen.getByRole('list', { name: 'Contests' });
-    expect(await within(list).findByRole('link', { name: 'summer' })).toBeVisible();
-    expect(screen.getByRole('button', { name: 'New contest' })).toBeVisible();
+    expect(await within(list).findByRole('link', { name: 'summer' })).toHaveAttribute(
+      'href',
+      '/orgs/acme/contests/summer',
+    );
+    expect(sent).toEqual([{ name: 'summer', title: 'Summer Cup' }]);
+    expect(form).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'New contest' })).toHaveFocus();
   });
 
-  it('sends no title when none was given, and names the step a failure stopped at', async () => {
-    let sent: unknown = null;
-    server.use(
-      signedIn,
-      contestList,
-      http.post('/api/v1/orgs/acme/contests', async ({ request }) => {
-        sent = await request.json();
-        return HttpResponse.json(provisioning({ kind: 'contest' }), { status: 202 });
-      }),
-      http.get('/api/v1/orgs/acme/contests/summer/provisioning', () =>
-        HttpResponse.json(
-          provisioning({
-            kind: 'contest',
-            status: 'failed',
-            last_step: 'repo',
-            attempts: 1,
-            failed_step: 'roles',
-            error: 'the forge or the CI did not answer',
-            retry_at: '2026-09-29T10:00:08Z',
-          }),
-        ),
-      ),
-    );
-    const user = fakeTimerUser();
+  it('sends no title when none was given', async () => {
+    const { handlers, sent } = listAndCreate('/api/v1/orgs/acme/contests', contests);
+    server.use(signedIn, ...handlers);
     renderApp('/orgs/acme');
 
-    await user.click(await screen.findByRole('button', { name: 'New contest' }));
-    const form = screen.getByRole('form', { name: 'New contest' });
-    await user.type(within(form).getByRole('textbox', { name: /^Name/ }), 'summer');
-    await user.click(within(form).getByRole('button', { name: 'Create contest' }));
-    await passTime(1_000);
+    await submitContest('summer');
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(
-      "It stopped at the contest repo's teams and protection. The forge or the CI did not answer.",
-    );
-    expect(sent).toEqual({ name: 'summer', title: null });
+    expect(await screen.findByRole('button', { name: 'New contest' })).toBeVisible();
+    expect(sent).toEqual([{ name: 'summer', title: null }]);
   });
 
-  it('shows a refusal beside the form', async () => {
+  it('shows a refusal beside the form, keeping what was typed', async () => {
     server.use(
       http.get('/api/v1/me', () =>
         HttpResponse.json({
           ...someone,
           roles: [
             {
-              scope: { kind: 'org', org: 'acme', contest: null, task: null },
+              names: { org: 'acme', contest: null, task: null },
               role: 'observer',
             },
           ],
@@ -229,16 +161,13 @@ describe('creating a contest', () => {
         problem(403, 'forbidden', { detail: 'You need the manager role at acme.' }),
       ),
     );
-    const user = fakeTimerUser();
     renderApp('/orgs/acme');
 
-    await user.click(await screen.findByRole('button', { name: 'New contest' }));
-    const form = screen.getByRole('form', { name: 'New contest' });
-    await user.type(within(form).getByRole('textbox', { name: /^Name/ }), 'summer');
-    await user.click(within(form).getByRole('button', { name: 'Create contest' }));
+    const form = await submitContest('summer');
 
     expect(await within(form).findByRole('alert')).toHaveTextContent(
       'You need the manager role at acme.',
     );
+    expect(within(form).getByRole('textbox', { name: /^Name/ })).toHaveValue('summer');
   });
 });

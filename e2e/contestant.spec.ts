@@ -4,15 +4,14 @@ import { expect, test, type Page, type Route } from '@playwright/test';
  * The contestant path against the dev server with the API stubbed, so it
  * needs no backend: a visitor finds a public contest on the landing page and
  * reads a released statement; signed in, they register, wait for an
- * organiser, watch their workspace being prepared and land in the contest,
+ * organiser and land in the contest once approved,
  * with a countdown by the server's clock, and the task's limits and the panel
  * to submit from.
  * The stub keeps just enough state for each answer to follow from the last.
  */
 const CONTEST = {
-  org: 'acme',
-  name: 'spring',
-  title: 'Spring 2026',
+  where: { org: 'acme', contest: 'spring' },
+  name: 'Spring 2026',
   description: 'Four tasks, five hours.',
   start: '2026-09-29T09:00:00Z',
   end: '2026-09-29T12:00:00Z',
@@ -34,14 +33,19 @@ async function stubContestantApi(page: Page, signedIn: boolean) {
   await page.route('**/api/v1/auth/register-url', (route) =>
     json(route, { url: null }),
   );
+  await page.route('**/api/v1/auth/forge-url', (route) =>
+    json(route, { url: 'http://forge.localhost:8080' }),
+  );
   await page.route('**/api/v1/me', (route) =>
     signedIn
       ? json(route, {
-          user_id: 20,
-          username: 'carol',
-          name: 'Carol',
-          avatar_url: null,
-          email: 'carol@example.org',
+          user: {
+            id: 20,
+            username: 'carol',
+            name: 'Carol',
+            avatar_url: null,
+            email: 'carol@example.org',
+          },
           roles: [],
           degraded: false,
         })
@@ -83,12 +87,10 @@ async function stubContestantApi(page: Page, signedIn: boolean) {
       reason: null,
       registered_at: '2026-09-29T10:00:00Z',
       decided_at: null,
-      time_extension_seconds: 0,
+      time_extension: 0,
     };
-    if (state.homeReads < 2) return { ...base, status: 'pending', workspace: null };
-    if (state.homeReads < 3)
-      return { ...base, status: 'approved', workspace: 'preparing' };
-    return { ...base, status: 'approved', workspace: 'ready' };
+    if (state.homeReads < 2) return { ...base, status: 'pending' };
+    return { ...base, status: 'approved' };
   };
 
   await page.route('**/api/v1/orgs/acme/contests/spring/**', (route) => {
@@ -123,8 +125,7 @@ async function stubContestantApi(page: Page, signedIn: boolean) {
         statement: '# Sum\n\nPrint the sum of two numbers.\n',
         limits: {
           submissions: 50,
-          rate_count: 1,
-          rate_seconds: 30,
+          rate: { count: 1, per: 30 },
           max_size: 10485760,
         },
         inputs: [
@@ -187,10 +188,7 @@ test('a contestant registers, waits, is let in and reads the task', async ({
 
   await expect(page.getByText('Your registration is waiting')).toBeVisible();
   expect(state.registered).toBe(true);
-  await expect(page.getByText('Preparing your workspace')).toBeVisible({
-    timeout: 15_000,
-  });
-  await expect(page.getByText('You are in')).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByText('You are in')).toBeVisible({ timeout: 15_000 });
 
   await page.getByRole('link', { name: 'Sum of Two' }).click();
   await expect(page.getByLabel('Limits')).toContainText('1 in any 30 seconds');

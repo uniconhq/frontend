@@ -43,7 +43,7 @@ export function HomePage() {
       {session.status === 'signed-in' && (
         <>
           <BodyText>
-            {t('Signed in as')} {session.me.username}
+            {t('Signed in as')} {session.me.user.username}
             {session.me.degraded
               ? t('. Forgejo is not answering, so your name and avatar are missing.')
               : ''}

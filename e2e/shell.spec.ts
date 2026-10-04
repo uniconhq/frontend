@@ -20,17 +20,26 @@ async function stubApi(page: Page, options: { signedIn?: boolean } = {}) {
       body: JSON.stringify({ url: null }),
     }),
   );
+  await page.route('**/api/v1/auth/forge-url', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ url: 'http://forge.localhost:8080' }),
+    }),
+  );
   await page.route('**/api/v1/me', (route) =>
     options.signedIn === true
       ? route.fulfill({
           status: 200,
           contentType: 'application/json',
           body: JSON.stringify({
-            user_id: 7,
-            username: 'kenny',
-            name: 'Kenny Lewi',
-            avatar_url: null,
-            email: 'kenny@example.org',
+            user: {
+              id: 7,
+              username: 'kenny',
+              name: 'Kenny Lewi',
+              avatar_url: null,
+              email: 'kenny@example.org',
+            },
             roles: [],
             degraded: false,
           }),
@@ -97,7 +106,7 @@ test('a signed-in person sees their account page', async ({ page }) => {
       contentType: 'application/json',
       body: JSON.stringify([
         {
-          id: '0f3a9c2e6b1d4e7f8a9b0c1d2e3f4a5b',
+          id: '0f3a9c2e-6b1d-4e7f-8a9b-0c1d2e3f4a5b',
           created_at: '2026-09-12T08:00:00Z',
           last_seen_at: '2026-09-12T09:30:00Z',
           user_agent: 'Mozilla/5.0 (Windows NT 10.0) Chrome/153.0',

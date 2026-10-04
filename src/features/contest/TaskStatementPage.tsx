@@ -43,7 +43,7 @@ function LimitList({ limits }: { limits: Limits }) {
         {limits.submissions} {t('in all')}
       </dd>
       <dt>{t('How often')}</dt>
-      <dd>{rate(limits.rate_count, limits.rate_seconds)}</dd>
+      <dd>{rate(limits.rate.count, limits.rate.per)}</dd>
       <dt>{t('Largest submission')}</dt>
       <dd>{formatLimit(limits.max_size)}</dd>
     </dl>

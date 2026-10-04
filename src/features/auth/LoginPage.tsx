@@ -4,8 +4,13 @@ import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { ApiError } from '@/api/problem';
-import { CreateAccountLink, loginHref, safeNext, useSession } from '@/session';
-import { FORGE_HOST, FORGE_URL } from '@/lib/config';
+import {
+  CreateAccountLink,
+  loginHref,
+  safeNext,
+  useForgeUrl,
+  useSession,
+} from '@/session';
 import { t } from '@/lib/t';
 import { loginErrorCode } from './login-errors';
 import classes from './LoginPage.module.css';
@@ -21,6 +26,7 @@ export function LoginPage() {
   const session = useSession();
   const next = safeNext(params.get('next'));
   const errorCode = loginErrorCode(params.get('error'));
+  const forge = useForgeUrl();
 
   if (session.status === 'signed-in') return <Navigate to={next} replace />;
 
@@ -48,7 +54,8 @@ export function LoginPage() {
       </div>
 
       <BodyText tone="secondary">
-        {t('You will sign in through')} <a href={FORGE_URL}>{FORGE_HOST}</a>
+        {t('You will sign in through')}{' '}
+        {forge === null ? t('Forgejo') : <a href={forge}>{new URL(forge).host}</a>}
         {t(', where your account, your repositories and your submissions live.')}
       </BodyText>
 

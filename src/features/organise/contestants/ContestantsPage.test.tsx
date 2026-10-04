@@ -17,7 +17,7 @@ function row(name: string): HTMLElement {
 }
 
 describe('the contestants page', () => {
-  it('lists each registration with its status, workspace and extension', async () => {
+  it('lists each registration with its status, reason and extension', async () => {
     server.use(
       signedIn,
       http.get(ROWS, () =>
@@ -25,17 +25,19 @@ describe('the contestants page', () => {
           contestant(),
           contestant({
             user_id: 21,
-            username: 'dee',
-            name: null,
-            email: null,
+            user: {
+              id: 21,
+              username: 'dee',
+              name: null,
+              email: null,
+              avatar_url: null,
+            },
             status: 'approved',
-            workspace: 'preparing',
-            workspace_error: 'the forge or the CI did not answer',
-            time_extension_seconds: 1800,
+            time_extension: 1800,
           }),
           contestant({
             user_id: 22,
-            username: null,
+            user: null,
             status: 'rejected',
             reason: 'No.',
           }),
@@ -45,10 +47,12 @@ describe('the contestants page', () => {
     renderApp(PAGE);
 
     await screen.findByRole('table', { name: 'Registrations' });
+    expect(
+      screen.getAllByRole('columnheader').map((header) => header.textContent),
+    ).toEqual(['Person', 'Registration', 'Extension', 'Actions']);
     expect(row('carol')).toHaveTextContent('Pending');
     expect(row('carol')).toHaveTextContent('carol@example.org');
-    expect(row('dee')).toHaveTextContent('Preparing');
-    expect(row('dee')).toHaveTextContent('the forge or the CI did not answer');
+    expect(row('dee')).toHaveTextContent('Approved');
     expect(row('dee')).toHaveTextContent('30 min');
     expect(row('Deleted user')).toHaveTextContent('No.');
   });
@@ -58,7 +62,7 @@ describe('the contestants page', () => {
       signedIn,
       http.get(ROWS, () => HttpResponse.json([contestant()])),
       http.post(`${ROWS}/:user/approve`, () =>
-        HttpResponse.json(contestant({ status: 'approved', workspace: 'preparing' })),
+        HttpResponse.json(contestant({ status: 'approved' })),
       ),
     );
     renderApp(PAGE);
@@ -66,7 +70,6 @@ describe('the contestants page', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Approve carol' }));
 
     expect(await within(row('carol')).findByText('Approved')).toBeVisible();
-    expect(row('carol')).toHaveTextContent('Preparing');
     expect(
       within(row('carol')).queryByRole('button', { name: 'Approve carol' }),
     ).toBeNull();
@@ -129,9 +132,7 @@ describe('the contestants page', () => {
   it('removes an approved contestant once it is confirmed', async () => {
     server.use(
       signedIn,
-      http.get(ROWS, () =>
-        HttpResponse.json([contestant({ status: 'approved', workspace: 'ready' })]),
-      ),
+      http.get(ROWS, () => HttpResponse.json([contestant({ status: 'approved' })])),
       http.post(`${ROWS}/:user/remove`, () =>
         HttpResponse.json(contestant({ status: 'removed' })),
       ),
@@ -155,7 +156,7 @@ describe('the contestants page', () => {
       http.put(`${ROWS}/:user/extension`, async ({ request }) => {
         sent = await request.json();
         return HttpResponse.json(
-          contestant({ status: 'approved', time_extension_seconds: 2700 }),
+          contestant({ status: 'approved', time_extension: 2700 }),
         );
       }),
     );
@@ -176,9 +177,7 @@ describe('the contestants page', () => {
     server.use(
       signedIn,
       http.get(ROWS, () =>
-        HttpResponse.json([
-          contestant({ status: 'approved', time_extension_seconds: 1800 }),
-        ]),
+        HttpResponse.json([contestant({ status: 'approved', time_extension: 1800 })]),
       ),
     );
     renderApp(PAGE);
@@ -217,9 +216,7 @@ describe('the contestants page', () => {
   it('shows a refused removal inside its dialog', async () => {
     server.use(
       signedIn,
-      http.get(ROWS, () =>
-        HttpResponse.json([contestant({ status: 'approved', workspace: 'ready' })]),
-      ),
+      http.get(ROWS, () => HttpResponse.json([contestant({ status: 'approved' })])),
       http.post(`${ROWS}/:user/remove`, () => problem(503, 'forge_unavailable')),
     );
     renderApp(PAGE);
@@ -282,7 +279,7 @@ describe('the contestants page', () => {
           ...someone,
           roles: [
             {
-              scope: { kind: 'contest', org: 'acme', contest: 'spring', task: null },
+              names: { org: 'acme', contest: 'spring', task: null },
               role: 'observer',
             },
           ],

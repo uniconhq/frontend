@@ -9,6 +9,7 @@ import { formatDateTime } from '@/lib/time';
 import { t } from '@/lib/t';
 import { DefinitionErrors } from '../DefinitionErrors';
 import { FileBrowser } from '../files/FileBrowser';
+import { PeopleSection } from '../people/PeopleSection';
 import { useTaskParams } from '@/lib/route-params';
 import classes from '../organise.module.css';
 
@@ -33,6 +34,9 @@ export function TaskPage() {
       </Card>
       <Card>
         <FileBrowser place={{ kind: 'task', ...path }} />
+      </Card>
+      <Card>
+        <PeopleSection place={{ kind: 'task', ...path }} />
       </Card>
     </div>
   );
@@ -110,7 +114,7 @@ function PublicationList({ path }: { path: TaskPath }) {
         ) : (
           <ol className={classes.list} aria-label={t('Publications')}>
             {[...view.data].reverse().map((publication) => (
-              <li key={publication.id}>
+              <li key={publication.number}>
                 <BodyText>
                   <strong>
                     {t('Publication')} {publication.number}

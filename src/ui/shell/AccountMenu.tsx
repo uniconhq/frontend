@@ -3,8 +3,14 @@ import { Menu, UnstyledButton } from '@mantine/core';
 import { Link, useLocation } from 'react-router';
 import { Avatar } from '@/ui/Avatar';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
-import { currentPath, loginHref, useLogout, useSession } from '@/session';
-import { forgeUrl } from '@/lib/config';
+import {
+  currentPath,
+  forgePage,
+  loginHref,
+  useForgeUrl,
+  useLogout,
+  useSession,
+} from '@/session';
 import { t } from '@/lib/t';
 import classes from './AccountMenu.module.css';
 
@@ -23,6 +29,7 @@ export function AccountMenu() {
   const location = useLocation();
   const { signOut, clearError, pending, error } = useLogout();
   const [opened, setOpened] = useState(false);
+  const forge = useForgeUrl();
 
   if (session.status === 'loading') return null;
 
@@ -38,8 +45,8 @@ export function AccountMenu() {
     );
   }
 
-  const { me } = session;
-  const label = me.name ?? me.username;
+  const { user } = session.me;
+  const label = user.name ?? user.username;
 
   const setOpen = (next: boolean) => {
     setOpened(next);
@@ -56,15 +63,15 @@ export function AccountMenu() {
     >
       <Menu.Target>
         <UnstyledButton className={classes.trigger} aria-label={t('Account menu')}>
-          <Avatar src={me.avatar_url} name={label} size={24} />
-          <span className={classes.username}>{me.username}</span>
+          <Avatar src={user.avatar_url} name={label} size={24} />
+          <span className={classes.username}>{user.username}</span>
         </UnstyledButton>
       </Menu.Target>
       <Menu.Dropdown>
         <Menu.Item component={Link} to="/account">
           {t('Account')}
         </Menu.Item>
-        <Menu.Item component="a" href={forgeUrl(`/${me.username}`)}>
+        <Menu.Item component="a" href={forgePage(forge, '/user/settings')}>
           {t('Forgejo')}
         </Menu.Item>
         <Menu.Item
