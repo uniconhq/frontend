@@ -13,7 +13,7 @@ import {
   submission,
   TASK_API,
   taskPage,
-  UPLOADS_URL,
+  DOOR_URL,
   uploadStore,
 } from '@/test/contestant';
 
@@ -54,6 +54,10 @@ function submissions(start: Submission[] = []) {
 }
 
 const python = () => new File(['print(1)\n'], 'main.py', { type: 'text/x-python' });
+
+/** What the panel should have worked the file above's digest out to. */
+const PYTHON_SHA256 =
+  'cc42155088fca5730758db72b2a5bca33112a941dfaa2d43098ec422ce4ea213';
 
 describe('the submit panel', () => {
   it('shows one drop zone per file input and a field for each value', async () => {
@@ -136,12 +140,15 @@ describe('the submit panel', () => {
         input: 'submission',
         filename: 'main.py',
         size: 9,
+        // The browser works the digest out itself, and the forge checks the
+        // bytes against it as they arrive.
+        sha256: PYTHON_SHA256,
         content_type: 'text/x-python',
       },
     ]);
-    const form = store.seen.forms[0];
-    expect([...(form?.keys() ?? [])]).toEqual(['bucket', 'key', 'policy', 'file']);
-    expect((form?.get('file') as Blob | null)?.size).toBe(9);
+    expect(store.seen.sent).toEqual([
+      { id: '00000000-0000-4000-8000-000000000001', bytes: 9 },
+    ]);
     expect(store.seen.completed).toEqual(['00000000-0000-4000-8000-000000000001']);
     expect(made.bodies).toHaveLength(1);
     expect(made.bodies[0]?.idempotency_key).toMatch(/^[A-Za-z0-9_-]{8,128}$/);
@@ -240,7 +247,7 @@ describe('the submit panel', () => {
     server.use(
       signedIn,
       withPage({}),
-      http.post(UPLOADS_URL, () => new HttpResponse('<Error/>', { status: 400 })),
+      http.put(`${DOOR_URL}:upload`, () => new HttpResponse(null, { status: 403 })),
       ...store.handlers,
       ...made.handlers,
     );
@@ -252,7 +259,7 @@ describe('the submit panel', () => {
 
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent('The upload did not go through');
-    expect(alert).toHaveTextContent('may be larger than the store takes');
+    expect(alert).toHaveTextContent('may have changed since it was chosen');
     expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Remove main.py' })).toBeVisible();
     expect(store.seen.completed).toHaveLength(0);
@@ -278,12 +285,6 @@ describe('the submit panel', () => {
       {},
       'You are not a contestant here yet',
       'Only an approved contestant',
-    ],
-    [
-      'workspace_not_ready',
-      {},
-      'Your workspace is still being made',
-      'Submit again once',
     ],
     [
       'submission_limit',
@@ -392,21 +393,20 @@ describe('the submit panel', () => {
       'Submit again and the files are sent again.',
     ],
     [
-      'a measured size',
+      'an upload the forge does not hold',
       http.post(`${TASK_API}/uploads/:upload/complete`, ({ params }) =>
         HttpResponse.json({
           id: String(params['upload']),
           input: 'submission',
           filename: 'main.py',
           content_type: null,
-          declared_size: 9,
-          size: 8,
-          sha256: 'ab',
-          status: 'rejected',
+          size: 9,
+          sha256: 'a'.repeat(64),
+          status: 'waiting',
         }),
       ),
       'A file did not arrive as it was sent',
-      'What arrived is not the size of the file.',
+      'The forge has not got the file.',
     ],
   ];
 
@@ -749,7 +749,13 @@ describe('restoring an earlier submission', () => {
     await user.click(screen.getByRole('button', { name: 'Submit' }));
     expect(await screen.findByText('Submitted as #2.')).toBeVisible();
     expect(store.seen.slots).toEqual([
-      { input: 'submission', filename: 'main.cpp', size: 14, content_type: null },
+      {
+        input: 'submission',
+        filename: 'main.cpp',
+        size: 14,
+        sha256: 'bc8bb8e433bf65214540115414c821c904b2a30d60a3ac0424bf9b77a00024b7',
+        content_type: null,
+      },
     ]);
     expect(made.bodies[0]?.inputs).toEqual({
       submission: {
@@ -778,11 +784,11 @@ describe('the submit panel with fake timers', () => {
     server.use(
       signedIn,
       withPage({}),
-      http.post(UPLOADS_URL, async () => {
+      http.put(`${DOOR_URL}:upload`, async () => {
         await new Promise<void>((resolve) => {
           release = resolve;
         });
-        return new HttpResponse(null, { status: 204 });
+        return new HttpResponse(null, { status: 200 });
       }),
       ...store.handlers,
       ...made.handlers,

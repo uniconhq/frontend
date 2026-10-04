@@ -1,10 +1,8 @@
 import { http, HttpResponse } from 'msw';
 import type {
-  Contest,
   FileContent,
-  Provisioning,
+  Named,
   Publication,
-  Task,
   TaskState,
   TreeEntry,
 } from '@/api/types';
@@ -22,8 +20,8 @@ export const TASK_API = `${CONTEST_API}/tasks/:task`;
 
 // Lists
 
-export const contests: Contest[] = [{ name: 'autumn' }, { name: 'spring' }];
-export const tasks: Task[] = [{ name: 'sort' }, { name: 'sum' }];
+export const contests: Named[] = [{ name: 'autumn' }, { name: 'spring' }];
+export const tasks: Named[] = [{ name: 'sort' }, { name: 'sum' }];
 
 export const contestList = http.get(`${ORG_API}/contests`, () =>
   HttpResponse.json(contests),
@@ -32,65 +30,32 @@ export const taskList = http.get(`${CONTEST_API}/tasks`, () =>
   HttpResponse.json(tasks),
 );
 
-// Provisioning
-
-/** The steps forge names for each kind, in its order, as a record carries them. */
-const STEPS: Record<Provisioning['kind'], string[]> = {
-  org: [
-    'account_row',
-    'org',
-    'roles',
-    'labels',
-    'event_push',
-    'first_admin',
-    'service_account',
-    'service_token',
-    'ci_user',
-    'ci_login',
-  ],
-  contest: ['repo', 'roles'],
-  task: ['repo', 'roles', 'contest_entry'],
-};
+// Making one
 
 /**
- * A provisioning record, pending and untouched unless told otherwise, carrying
- * the steps of its kind.
+ * A list and the create beside it, as the backend keeps them: the create
+ * makes the thing before it answers, 201 with its name, and the list carries
+ * the new name from then on. `sent` holds each create's body, in turn.
  */
-export function provisioning(overrides: Partial<Provisioning> = {}): Provisioning {
-  const kind = overrides.kind ?? 'org';
-  return {
-    kind,
-    target: 'acme',
-    status: 'pending',
-    steps: STEPS[kind],
-    last_step: null,
-    failed_step: null,
-    error: null,
-    retry_at: null,
-    attempts: 0,
-    ready_at: null,
-    ...overrides,
-  };
-}
-
-/**
- * Answers each record in turn, one per request, and then the last one for
- * good: provisioning moving on between one poll and the next.
- */
-export function provisioningInTurn(path: string, records: Provisioning[]) {
-  let asked = 0;
-  return http.get(path, () => {
-    const record = records[Math.min(asked, records.length - 1)];
-    asked += 1;
-    return HttpResponse.json(record);
-  });
+export function listAndCreate(path: string, existing: { name: string }[]) {
+  const listed = [...existing];
+  const sent: unknown[] = [];
+  const handlers = [
+    http.get(path, () => HttpResponse.json(listed)),
+    http.post(path, async ({ request }) => {
+      const body = (await request.json()) as { name: string };
+      sent.push(body);
+      listed.push({ name: body.name });
+      return HttpResponse.json({ name: body.name }, { status: 201 });
+    }),
+  ];
+  return { handlers, sent };
 }
 
 // A task's state and publications
 
 export const publications: Publication[] = [
   {
-    id: 'pub-1',
     number: 1,
     version: '1a2b3c4d5e6f7a8b9c0d',
     grading_changed: true,
@@ -98,7 +63,6 @@ export const publications: Publication[] = [
     at: '2026-09-20T10:00:00Z',
   },
   {
-    id: 'pub-2',
     number: 2,
     version: '2b3c4d5e6f7a8b9c0d1e',
     grading_changed: false,

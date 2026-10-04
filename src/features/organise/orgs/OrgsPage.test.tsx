@@ -14,7 +14,7 @@ describe('the org list', () => {
           roles: [
             ...someone.roles,
             {
-              scope: { kind: 'task', org: 'beta', contest: 'cup', task: 'sum' },
+              names: { org: 'beta', contest: 'cup', task: 'sum' },
               role: 'observer',
             },
           ],

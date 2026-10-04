@@ -22,20 +22,15 @@ import classes from './contest.module.css';
 
 /**
  * How often the home is read again: soon while the caller waits on an
- * organiser or on their workspace, and now and then otherwise, so an
- * extension or a task released by its own time reaches the page. Crossing the
- * start or the deadline reads it again at once.
+ * organiser, and now and then otherwise, so an extension or a task released
+ * by its own time reaches the page. Crossing the start or the deadline reads
+ * it again at once.
  */
 const WAITING_ON_ORGANISER_MS = 10_000;
-const WAITING_ON_WORKSPACE_MS = 2_000;
 const MEANWHILE_MS = 60_000;
 
 function pollEvery(registration: MyRegistration | null | undefined): number {
-  if (registration?.status === 'pending') return WAITING_ON_ORGANISER_MS;
-  if (registration?.status === 'approved' && registration.workspace !== 'ready') {
-    return WAITING_ON_WORKSPACE_MS;
-  }
-  return MEANWHILE_MS;
+  return registration?.status === 'pending' ? WAITING_ON_ORGANISER_MS : MEANWHILE_MS;
 }
 
 /** A contest's released tasks, each a link to its page. */
@@ -118,7 +113,7 @@ function Home({
   const extended = Date.parse(home.deadline) !== Date.parse(home.end);
   return (
     <div className={classes.page}>
-      <PageTitle>{home.title}</PageTitle>
+      <PageTitle>{home.name}</PageTitle>
       {home.state === 'draft' && (
         <BodyText tone="secondary">
           {t('This contest is a draft, so only its organisers see it.')}
@@ -175,7 +170,7 @@ function PublicHome({ org, contest }: { org: string; contest: string }) {
   const found = view.data;
   return (
     <div className={classes.page}>
-      <PageTitle>{found.title}</PageTitle>
+      <PageTitle>{found.name}</PageTitle>
       {found.description !== '' && <BodyText size="md">{found.description}</BodyText>}
       <Card>
         <div className={classes.stack}>
@@ -197,8 +192,8 @@ function PublicHome({ org, contest }: { org: string; contest: string }) {
 /**
  * A contest's page for a contestant or a visitor, at one address for both.
  * A signed-in person reads the home, which follows their registration from
- * the register button through pending and preparing to the contest itself,
- * read again while they wait on an organiser or on their workspace. A visitor
+ * the register button through pending to the contest itself, read again
+ * while they wait on an organiser. A visitor
  * reads the public contest.
  */
 export function ContestHomePage() {

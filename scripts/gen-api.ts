@@ -3,7 +3,7 @@
  *
  *   pnpm gen:api                                  the ref in ./api-version
  *   pnpm gen:api --from ../backend/openapi.json   a sibling checkout
- *   pnpm gen:api --from http://localhost:8080/openapi.json   a running stack
+ *   pnpm gen:api --from http://localhost:8000/openapi.json   a backend run on its own
  *
  * The pin keeps the frontend building against a known backend, so bumping
  * ./api-version is a deliberate change.

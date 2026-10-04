@@ -3,9 +3,8 @@ import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { leaveFor } from '@/lib/leave';
-import { forgeUrl } from '@/lib/config';
 import { renderApp } from '@/test/render';
-import { problem, server, sessionList, someone } from '@/test/server';
+import { FORGE, problem, server, sessionList, someone } from '@/test/server';
 
 /**
  * A backend that remembers whether this person's session is still alive. With
@@ -43,9 +42,21 @@ describe('signing out', () => {
 
     await screen.findAllByRole('link', { name: 'Sign in' });
     expect(router.state.location.pathname).toBe('/');
-    expect(vi.mocked(leaveFor)).toHaveBeenCalledExactlyOnceWith(
-      forgeUrl('/-/sign-out'),
+    expect(vi.mocked(leaveFor)).toHaveBeenCalledExactlyOnceWith(`${FORGE}/-/sign-out`);
+  });
+
+  it('stays on the front page when the backend cannot say where Forgejo is', async () => {
+    statefulBackend({ logout: () => new HttpResponse(null, { status: 204 }) });
+    server.use(
+      http.get('/api/v1/auth/forge-url', () => problem(503, 'service_unavailable')),
     );
+    const { router } = renderApp('/account');
+
+    await signOutFromTheHeader();
+
+    await screen.findAllByRole('link', { name: 'Sign in' });
+    expect(router.state.location.pathname).toBe('/');
+    expect(vi.mocked(leaveFor)).not.toHaveBeenCalled();
   });
 
   it('treats an already-dead session as signed out', async () => {

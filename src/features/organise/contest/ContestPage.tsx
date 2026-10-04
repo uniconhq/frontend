@@ -1,3 +1,4 @@
+import { useQueryClient } from '@tanstack/react-query';
 import { $api, queryView } from '@/api/query';
 import { Card } from '@/ui/Card';
 import { BodyText } from '@/ui/BodyText';
@@ -11,6 +12,7 @@ import { contestantsPath, taskPath } from '@/lib/organiser-paths';
 import { PageLink } from '@/ui/PageLink';
 import { t } from '@/lib/t';
 import { Create } from '../Create';
+import { PeopleSection } from '../people/PeopleSection';
 import { LinkList } from '../LinkList';
 import { FileBrowser } from '../files/FileBrowser';
 import { useContestParams } from '@/lib/route-params';
@@ -35,6 +37,7 @@ export function ContestPage() {
       params: { path: { org, contest } },
     }),
   );
+  const queryClient = useQueryClient();
   const create = $api.useMutation(
     'post',
     '/api/v1/orgs/{org}/contests/{contest}/tasks',
@@ -88,14 +91,17 @@ export function ContestPage() {
                 pending={create.isPending}
                 error={create.error}
                 onSubmit={async (name, title) => {
-                  const initial = await create.mutateAsync({
+                  await create.mutateAsync({
                     params: { path: { org, contest } },
                     body: { name, title: title === '' ? null : title },
                   });
-                  return {
-                    target: { kind: 'task', org, contest, task: name },
-                    initial,
-                  };
+                  await queryClient.invalidateQueries({
+                    queryKey: $api.queryOptions(
+                      'get',
+                      '/api/v1/orgs/{org}/contests/{contest}/tasks',
+                      { params: { path: { org, contest } } },
+                    ).queryKey,
+                  });
                 }}
               />
             </>
@@ -104,6 +110,9 @@ export function ContestPage() {
       </Card>
       <Card>
         <FileBrowser place={{ kind: 'contest', org, contest }} />
+      </Card>
+      <Card>
+        <PeopleSection place={{ kind: 'contest', org, contest }} />
       </Card>
     </div>
   );

@@ -20,7 +20,6 @@ import { t } from '@/lib/t';
 import { holdsAtContest } from '../roles';
 import classes from './contestants.module.css';
 
-const PREPARING_POLL_MS = 3_000;
 const REASON_MAX = 1000;
 const LONGEST_EXTENSION_MINUTES = 365 * 24 * 60;
 
@@ -35,12 +34,7 @@ const STATUS: Record<Contestant['status'], string> = {
 type Action = 'reject' | 'remove' | 'extension';
 
 function who(contestant: Contestant): string {
-  return contestant.username ?? t('Deleted user');
-}
-
-function workspace(contestant: Contestant): string {
-  if (contestant.workspace === null) return '—';
-  return contestant.workspace === 'ready' ? t('Ready') : t('Preparing');
+  return contestant.user?.username ?? t('Deleted user');
 }
 
 /** An extension in whole minutes, as the table shows it and the form starts from. */
@@ -154,6 +148,7 @@ function Row({
     );
   };
 
+  const { user } = contestant;
   const decidable = contestant.status === 'pending';
   const rejected = contestant.status === 'rejected';
   const current = contestant.status === 'approved';
@@ -164,12 +159,12 @@ function Row({
       <th scope="row">
         <div className={classes.person}>
           <span>{name}</span>
-          {contestant.name !== null && (
-            <BodyText tone="secondary">{contestant.name}</BodyText>
+          {user !== null && user.name !== null && (
+            <BodyText tone="secondary">{user.name}</BodyText>
           )}
-          {contestant.email !== null && (
+          {user !== null && user.email !== null && (
             <BodyText tone="secondary" mono>
-              {contestant.email}
+              {user.email}
             </BodyText>
           )}
         </div>
@@ -184,14 +179,8 @@ function Row({
         </BodyText>
       </td>
       <td>
-        <span>{workspace(contestant)}</span>
-        {contestant.workspace_error !== null && (
-          <BodyText tone="secondary">{contestant.workspace_error}</BodyText>
-        )}
-      </td>
-      <td>
-        {contestant.time_extension_seconds > 0
-          ? `${minutesOf(contestant.time_extension_seconds)} ${t('min')}`
+        {contestant.time_extension > 0
+          ? `${minutesOf(contestant.time_extension)} ${t('min')}`
           : '—'}
       </td>
       {manages && (
@@ -250,7 +239,7 @@ function Row({
                 variant="secondary"
                 label={`${t('Extend')} ${name}`}
                 onClick={() => {
-                  setMinutes(String(minutesOf(contestant.time_extension_seconds)));
+                  setMinutes(String(minutesOf(contestant.time_extension)));
                   show('extension');
                 }}
               >
@@ -355,26 +344,17 @@ function Row({
 
 /**
  * Every registration of one contest, for its organisers: who, where their
- * registration stands with the reason for a rejection, whether their
- * workspace is ready, and any extension they have. A manager also gets each
- * row's actions; an observer reads the table alone. The table is read again
- * every few seconds while a workspace is being made.
+ * registration stands with the reason for a rejection, and any extension
+ * they have. A manager also gets each row's actions; an observer reads the
+ * table alone.
  */
 export function ContestantsPage() {
   const { org, contest } = useContestParams();
   const manages = holdsAtContest(useMe().roles, org, contest, 'manager');
   const view = queryView(
-    $api.useQuery(
-      'get',
-      '/api/v1/orgs/{org}/contests/{contest}/contestants',
-      { params: { path: { org, contest } } },
-      {
-        refetchInterval: (query) =>
-          query.state.data?.some((row) => row.workspace === 'preparing')
-            ? PREPARING_POLL_MS
-            : false,
-      },
-    ),
+    $api.useQuery('get', '/api/v1/orgs/{org}/contests/{contest}/contestants', {
+      params: { path: { org, contest } },
+    }),
   );
 
   return (
@@ -395,7 +375,6 @@ export function ContestantsPage() {
                 <tr>
                   <th scope="col">{t('Person')}</th>
                   <th scope="col">{t('Registration')}</th>
-                  <th scope="col">{t('Workspace')}</th>
                   <th scope="col">{t('Extension')}</th>
                   {manages && <th scope="col">{t('Actions')}</th>}
                 </tr>

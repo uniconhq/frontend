@@ -18,18 +18,19 @@ pnpm install
 pnpm dev            # http://localhost:5173
 ```
 
-`/api`, `/healthz` and `/unicon-uploads` are proxied to `http://localhost:8080`,
+`/api`, `/healthz`, `/readyz` and `/-/uploads` are proxied to `http://localhost:8080`,
 which is where the compose stack in `deploy` publishes its proxy. Point
 somewhere else with `VITE_API_PROXY=http://localhost:8000 pnpm dev`. Without a backend the landing
 page renders its error block, which is the error path working, not a crash.
 
-Three settings, all with dev defaults, all listed in `.env.example`.
-`VITE_API_PROXY` is where the dev server forwards `/api`; `VITE_API_ORIGIN` is
-what the backend believes its own public URL is (`UNICON_PUBLIC_URL`), which is
-not always the same host; and `VITE_FORGE_URL` is the browser-facing Forgejo
-URL the login and account pages link to. The first two are read by
-`vite.config.ts`, the third is baked into the bundle at build time and read in
-one place, `src/lib/config.ts`.
+Two settings, both with dev defaults, both listed in `.env.example` and both
+read by `vite.config.ts`, not by the app: `VITE_API_PROXY` is where the dev
+server forwards `/api`, and `VITE_API_ORIGIN` is what the backend believes its
+own public URL is (`UNICON_PUBLIC_URL`), which is not always the same host.
+Where Forgejo is, which the sign-in, account and header menu link to and every
+sign-out leaves through, the backend answers at `GET /api/v1/auth/forge-url`;
+`session/forge.ts` asks it once and keeps the answer. Nothing about the
+deployment is in the bundle.
 
 For requests that arrive with the dev server's own `Origin`, the dev proxy
 replaces it with `VITE_API_ORIGIN`. The backend refuses a state-changing request
@@ -48,13 +49,11 @@ the host and not the port, so going back to `:5173` is still signed in.
 pnpm build          # type check, then bundle into dist/
 pnpm preview        # serve dist/ on http://localhost:4173
 docker build -t unicon-frontend .
-docker build --build-arg VITE_FORGE_URL=https://forge.example.org -t unicon-frontend .
 docker run --rm -p 8081:8080 unicon-frontend
 ```
 
-The Forgejo URL is a build argument, not a runtime variable: it is baked into
-the bundle, and a static file cannot read a container's environment. An image
-built without it links to the dev stack's `http://localhost:3300`.
+The image takes no build argument: one image serves every deployment, since
+the one address that differs, Forgejo's, comes from the backend.
 
 ## Ports
 
@@ -73,10 +72,8 @@ JavaScript, CSS, SVG and JSON come back gzipped above a kilobyte.
 
 CI pushes `ghcr.io/uniconhq/frontend:main` and
 `ghcr.io/uniconhq/frontend:sha-<short sha>` on every push to `main`; a pull
-request builds the image but pushes nothing. Both tags are built with
-`VITE_FORGE_URL` at its default, so they are the dev stack's image — a
-deployment with its own Forgejo builds its own, because that URL is in the
-bundle rather than in the environment.
+request builds the image but pushes nothing. The same image runs on the dev
+stack and on any deployment, since nothing about either is in the bundle.
 
 ## Checks
 
@@ -98,7 +95,7 @@ committed, and so is the ref it came from:
 ```sh
 pnpm gen:api                                    # the ref named in ./api-version
 pnpm gen:api --from ../backend/openapi.json     # a sibling checkout
-pnpm gen:api --from http://localhost:8080/openapi.json   # a running stack
+pnpm gen:api --from http://localhost:8000/openapi.json   # a backend run on its own
 ```
 
 `api-version` holds one backend commit SHA, which is what makes the build
@@ -109,9 +106,9 @@ one moment a renamed field shows up, as a type error rather than a broken page.
 CI regenerates the client from the pin and fails when the committed
 `src/api/schema.d.ts` differs, so the client is always the one its pin names.
 
-The document spells out whole paths (`/api/v1/time`, `/healthz`), so the client
-has an empty base URL and call sites pass the path exactly as the document
-names it: `$api.useQuery('get', '/api/v1/time')`.
+The document spells out whole paths (`/api/v1/time`, `/healthz`), so the client's
+base URL is the page's own origin with no prefix, and call sites pass the path
+exactly as the document names it: `$api.useQuery('get', '/api/v1/time')`.
 
 ## The rules that are cheap now and expensive later
 
@@ -148,19 +145,18 @@ a release still says something true.
 
 ## The organiser pages
 
-An organiser makes an org, a contest and a task and watches each one
-provisioned, then opens any file of a contest or a task as text and saves it.
-Saving a task's file is the save of the task, which publishes it or keeps it
-as a draft.
+An organiser makes an org, a contest and a task, then opens any file of a
+contest or a task as text and saves it. Saving a task's file is the save of
+the task, which publishes it or keeps it as a draft.
 
-| Address                                    | Page                                                          |
-| ------------------------------------------ | ------------------------------------------------------------- |
-| `/orgs`                                    | the orgs your roles reach, and New org                        |
-| `/orgs/new`                                | the new org form, then its provisioning                       |
-| `/orgs/:org`                               | the org's contests, and New contest                           |
-| `/orgs/:org/contests/:contest`             | the contest's tasks, New task, and the contest repo's files   |
-| `/orgs/:org/contests/:contest/contestants` | every registration, with approve, reject, remove and extend   |
-| `/orgs/:org/contests/:contest/tasks/:task` | the task's state, its publications, and the task repo's files |
+| Address                                    | Page                                                                          |
+| ------------------------------------------ | ----------------------------------------------------------------------------- |
+| `/orgs`                                    | the orgs your roles reach, and New org                                        |
+| `/orgs/new`                                | the new org form, then the new org                                            |
+| `/orgs/:org`                               | the org's contests, New contest, and its organisers                           |
+| `/orgs/:org/contests/:contest`             | the contest's tasks, New task, the contest repo's files, and its organisers   |
+| `/orgs/:org/contests/:contest/contestants` | every registration, with approve, reject, undo a rejection, remove and extend |
+| `/orgs/:org/contests/:contest/tasks/:task` | the task's state, its publications, the task repo's files, and its organisers |
 
 **Every organiser page lives under `/orgs`.** The proxy in `deploy` sends
 exactly `/orgs` and `/orgs/...` to this app, and `/contests/...` for the
@@ -170,13 +166,12 @@ proxy changes first. Every address above is built in one
 place, `src/lib/organiser-paths.ts`, which the pages and the breadcrumb share.
 
 The pages live in `src/features/organise/`: a sub-folder for each page
-(`orgs/` holds `/orgs` and `/orgs/new`, then `org/`, `contest/` and `task/`),
-one for the provisioning progress the three create forms share
-(`provisioning/`), and one for the file tree and editor the contest and task
-pages share (`files/`). The pieces more than one of those use sit at its top:
-the create form and `Create`, which keeps it behind a New button and swaps
-it for the progress once a create is accepted, so only one is made at a
-time; the list of links, the definition errors, and what a person's roles
+(`orgs/` holds `/orgs` and `/orgs/new`, then `org/`, `contest/`, `contestants/`
+and `task/`), one for the file tree and editor the contest and task pages
+share (`files/`), and one for the organisers section all three pages
+share (`people/`). The pieces more than one of those use sit at its top:
+the create form and `Create`, which keeps it behind a New button and
+closes it once the thing is made; the list of links, the definition errors, and what a person's roles
 reach. The route params every page reads are in
 `src/lib/route-params.ts`.
 
@@ -185,15 +180,21 @@ the session already has, since there is no route that lists orgs. An org or a
 contest page whose list is refused shows the contests or tasks the person's
 own roles reach, so someone with a role at one task can still walk down to it.
 
-A create answers with a provisioning record at once, and
-`provisioning/FollowProvisioning.tsx` polls the status until it is `ready`:
-about once a second while it is pending or running, and every five seconds
-while it is `failed`, since forge tries a failed one again on its own. The
-record says everything shown: the steps of its kind in order, the last one
-completed, the step a failure stopped at, the reason, and when it is tried
-again, shown as a time of day read against the server's clock.
-`provisioning/steps.ts` only puts the step ids the app knows into words, and
-a step it does not know shows under its own id. An org's description takes at
+The organisers section lists everyone holding a role at the org, contest or
+task, with the highest role they hold there and where they hold it: here, or
+at a broader scope, whose page is where that role is changed. A manager adds
+someone by their Forgejo username, changes a role and removes one; only an
+admin is offered the admin role or may change an admin. Granting a role to
+someone who holds one here moves them to it. The rules are the forge's, so
+each refusal is shown where it happened, the last admin of a scope and a
+contestant of the contest among them, and a change to the person's own roles
+reads the session again, since those decide what every page offers. Someone
+who does not observe the place is not shown the section.
+
+A create makes the org, contest or task before it answers, so the form
+closes as soon as it has and the new thing is in the list above; the new org
+form opens the new org. A refusal keeps the form open with what was typed
+and its reason, and asking again is safe. An org's description takes at
 most 255 characters, the most the forge takes.
 
 The open file is `?file=<path>` on the contest or task page, so a link to a
@@ -209,8 +210,8 @@ The contestants page shows an observer the table and a manager its actions
 too, which the routes check again underneath. Each action's answer replaces
 its row and takes the focus back to it; a refusal shows on the row, or inside
 the confirmation for a removal, and a registration that moved on under the
-organiser is read again. The table is read every three seconds while a
-workspace is being made.
+organiser is read again. A rejected registration offers Undo rejection, which
+leaves it pending again.
 
 ## The contestant pages
 
@@ -226,9 +227,8 @@ the contestant's by the session. For a visitor, a contest or task that is not
 public offers sign in, since it may be one they see with an account. Signed
 in, the contest page follows the registration: the register form, with a
 field for the contest's code when it asks for one, then pending, rejected
-with the organisers' reason, preparing while the workspace is made, and the
-contest. It reads the home again every ten seconds while pending, every two
-while preparing, every minute otherwise, and at once as the countdown crosses
+with the organisers' reason, and the contest. It reads the home again every
+ten seconds while pending, every minute otherwise, and at once as the countdown crosses
 the start or the person's deadline. The countdown runs on the server's clock
 and counts to the person's own deadline, the end plus any extension. Every
 refusal code has its own sentence in `src/api/describe-error.ts`. A statement
@@ -314,9 +314,10 @@ filled.
 src/
   main.tsx  app.tsx  router.tsx  global.css
   api/       generated types, the fetch client, the query wrapper, error shapes
-  lib/       server clock, build settings, the organiser and contest addresses,
-             the route params, the t() every string goes through
-  session/   who is signed in: the boot query, the guard, sign-out, the
+  lib/       server clock, the organiser and contest addresses,
+             the route params, scope names, sizes, the full-page way out
+             to Forgejo, the t() every string goes through
+  session/   who is signed in: the boot query, the guard, sign-out, where Forgejo is, the
              expired-session modal. Not a feature, because the shell, the
              router and three features all read it
   theme/     the design handoff's tokens, the fonts, the CSS variables

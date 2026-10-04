@@ -19,12 +19,6 @@ export type Outcome =
   | { kind: 'saved'; result: SaveResult }
   | { kind: 'refused'; error: ApiError; body: WriteFile };
 
-const ACTIVATION: Record<'done' | 'pending' | 'not_needed', string> = {
-  done: 'This save switched grading on for the task.',
-  pending: 'Switching grading on for the task is under way.',
-  not_needed: 'Grading was already on for the task.',
-};
-
 /** The member each refusal names what stands in the way with. */
 const NAMED_BY: Partial<Record<string, string>> = {
   admin_only: 'keys',
@@ -77,7 +71,7 @@ export function SaveOutcome({
 
   if (outcome.kind === 'saved') {
     const { result } = outcome;
-    if (result.outcome === 'published') {
+    if ('number' in result) {
       return (
         <Panel role="status">
           <BodyText>
@@ -95,7 +89,6 @@ export function SaveOutcome({
           ) : (
             <BodyText>{t('It does not change how the task grades.')}</BodyText>
           )}
-          <BodyText tone="secondary">{t(ACTIVATION[result.activation])}</BodyText>
         </Panel>
       );
     }

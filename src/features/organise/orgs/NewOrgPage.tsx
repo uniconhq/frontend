@@ -1,4 +1,7 @@
+import { useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router';
 import { $api } from '@/api/query';
+import { orgPath } from '@/lib/organiser-paths';
 import { Card } from '@/ui/Card';
 import { BodyText } from '@/ui/BodyText';
 import { PageTitle } from '@/ui/PageTitle';
@@ -10,14 +13,16 @@ import classes from '../organise.module.css';
 const DESCRIPTION_MAX = 255;
 
 /**
- * Asks for an org and follows it until it is made. The create answers at
- * once with a pending record; the org, its teams, its event push and its
- * service account are made in the background, and the progress that takes
- * the form's place shows each step as it completes. The person who asked
- * becomes its first admin.
+ * Makes an org and goes to its page. The org, its teams, its event push and
+ * its service account are made before the create answers, which takes a few
+ * seconds, so the button stays busy until then. The person who asked becomes
+ * its first admin, so their roles are read again before the org's page needs
+ * them.
  */
 export function NewOrgPage() {
   const create = $api.useMutation('post', '/api/v1/orgs');
+  const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   return (
     <div className={classes.page}>
@@ -42,8 +47,11 @@ export function NewOrgPage() {
             pending={create.isPending}
             error={create.error}
             onSubmit={async (name, description) => {
-              const initial = await create.mutateAsync({ body: { name, description } });
-              return { target: { kind: 'org', org: name }, initial };
+              const made = await create.mutateAsync({ body: { name, description } });
+              await queryClient.invalidateQueries({
+                queryKey: $api.queryOptions('get', '/api/v1/me').queryKey,
+              });
+              await navigate(orgPath(made.name));
             }}
           />
         </div>

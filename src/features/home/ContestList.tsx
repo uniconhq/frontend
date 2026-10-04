@@ -13,9 +13,8 @@ import classes from './HomePage.module.css';
 type Status = NonNullable<ContestSummary['status']>;
 
 type Listed = {
-  org: string;
+  where: { org: string; contest: string };
   name: string;
-  title: string;
   start: string;
   end: string;
   status?: Status | null;
@@ -37,9 +36,12 @@ function Contests({ label, contests }: { label: string; contests: Listed[] }) {
   return (
     <ul className={classes.contests} aria-label={label}>
       {contests.map((contest) => (
-        <li key={`${contest.org}/${contest.name}`} className={classes.contest}>
-          <PageLink to={contestHomePath(contest.org, contest.name)}>
-            {contest.title}
+        <li
+          key={`${contest.where.org}/${contest.where.contest}`}
+          className={classes.contest}
+        >
+          <PageLink to={contestHomePath(contest.where.org, contest.where.contest)}>
+            {contest.name}
           </PageLink>
           <BodyText tone="secondary">
             {formatDateTime(new Date(contest.start))} –{' '}

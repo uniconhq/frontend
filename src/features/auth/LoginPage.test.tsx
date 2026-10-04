@@ -11,7 +11,9 @@ describe('LoginPage', () => {
     const button = await screen.findByRole('link', { name: 'Sign in with Forgejo' });
     expect(button).toHaveAttribute('href', '/api/v1/auth/login?next=%2Faccount');
     expect(screen.getByText(/You will sign in through/)).toBeInTheDocument();
-    expect(screen.getByText(/localhost:3300/)).toBeInTheDocument();
+    expect(
+      await screen.findByRole('link', { name: 'forge.localhost:8080' }),
+    ).toHaveAttribute('href', 'http://forge.localhost:8080');
   });
 
   it.each([

@@ -8,24 +8,23 @@ import type { Me, SessionInfo } from '@/api/types';
  * only prove that the mock was called.
  */
 export const someone: Me = {
-  user_id: 7,
-  username: 'kenny',
-  name: 'Kenny Lewi',
-  avatar_url: 'http://localhost:3300/avatars/7',
-  email: 'kenny@example.org',
+  user: {
+    id: 7,
+    username: 'kenny',
+    name: 'Kenny Lewi',
+    avatar_url: 'http://localhost:3300/avatars/7',
+    email: 'kenny@example.org',
+  },
   roles: [
-    { scope: { kind: 'org', org: 'acme', contest: null, task: null }, role: 'admin' },
-    {
-      scope: { kind: 'contest', org: 'acme', contest: 'spring', task: null },
-      role: 'manager',
-    },
+    { names: { org: 'acme', contest: null, task: null }, role: 'admin' },
+    { names: { org: 'acme', contest: 'spring', task: null }, role: 'manager' },
   ],
   degraded: false,
 };
 
 export const sessions: SessionInfo[] = [
   {
-    id: '0f3a9c2e6b1d4e7f8a9b0c1d2e3f4a5b',
+    id: '0f3a9c2e-6b1d-4e7f-8a9b-0c1d2e3f4a5b',
     created_at: '2026-09-12T08:00:00Z',
     last_seen_at: '2026-09-12T09:30:00Z',
     user_agent:
@@ -33,7 +32,7 @@ export const sessions: SessionInfo[] = [
     current: true,
   },
   {
-    id: '7d2c1b0a9f8e4d3c2b1a0f9e8d7c6b5a',
+    id: '7d2c1b0a-9f8e-4d3c-2b1a-0f9e8d7c6b5a',
     created_at: '2026-09-11T12:00:00Z',
     last_seen_at: '2026-09-11T13:00:00Z',
     user_agent: 'Mozilla/5.0 (X11; Linux x86_64) Firefox/144.0',
@@ -65,6 +64,11 @@ export const signedIn = http.get('/api/v1/me', () => HttpResponse.json(someone))
 const noRegistration = http.get('/api/v1/auth/register-url', () =>
   HttpResponse.json({ url: null }),
 );
+/** Where the backend says Forgejo is. */
+export const FORGE = 'http://forge.localhost:8080';
+const forgeAddress = http.get('/api/v1/auth/forge-url', () =>
+  HttpResponse.json({ url: FORGE }),
+);
 export const sessionList = http.get('/api/v1/me/sessions', () =>
   HttpResponse.json(sessions),
 );
@@ -72,6 +76,15 @@ export const sessionList = http.get('/api/v1/me/sessions', () =>
 const serverTime = http.get('/api/v1/time', () =>
   HttpResponse.json({ now: '2026-09-12T10:00:00Z' }),
 );
+
+/** Nobody listed as holding a role anywhere, until a test says who does. */
+const noHolders = [
+  http.get('/api/v1/orgs/:org/roles', () => HttpResponse.json([])),
+  http.get('/api/v1/orgs/:org/contests/:contest/roles', () => HttpResponse.json([])),
+  http.get('/api/v1/orgs/:org/contests/:contest/tasks/:task/roles', () =>
+    HttpResponse.json([]),
+  ),
+];
 
 /** No contest to list yet, public or otherwise, until a test says there is. */
 const noContests = [
@@ -83,4 +96,11 @@ const noContests = [
  * The default world every test starts in: nobody signed in, a backend that
  * answers. `server.resetHandlers()` returns to exactly this after each test.
  */
-export const server = setupServer(signedOut, noRegistration, serverTime, ...noContests);
+export const server = setupServer(
+  signedOut,
+  noRegistration,
+  forgeAddress,
+  serverTime,
+  ...noContests,
+  ...noHolders,
+);

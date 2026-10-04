@@ -1,8 +1,8 @@
 import { http, HttpResponse } from 'msw';
 import type {
-  Contestant,
   ContestantInput,
   ContestHome,
+  Contestant,
   GradingResult,
   MyRegistration,
   Submission,
@@ -30,17 +30,15 @@ export function registration(overrides: Partial<MyRegistration> = {}): MyRegistr
     reason: null,
     registered_at: '2026-09-12T09:00:00Z',
     decided_at: null,
-    time_extension_seconds: 0,
-    workspace: null,
+    time_extension: 0,
     ...overrides,
   };
 }
 
 export function home(overrides: Partial<ContestHome> = {}): ContestHome {
   return {
-    org: 'acme',
-    name: 'spring',
-    title: 'Spring 2026',
+    where: { org: 'acme', contest: 'spring' },
+    name: 'Spring 2026',
     description: 'Four tasks, five hours.',
     start: '2026-09-12T09:00:00Z',
     end: '2026-09-12T10:30:00Z',
@@ -86,8 +84,7 @@ export const taskPage: TaskPage = {
   statement: '# Sum\n\nRead two numbers and print their **sum**.\n',
   limits: {
     submissions: 50,
-    rate_count: 1,
-    rate_seconds: 30,
+    rate: { count: 1, per: 30 },
     max_size: 10 * 1024 * 1024,
   },
   inputs: [contestantInput()],
@@ -95,9 +92,8 @@ export const taskPage: TaskPage = {
 };
 
 export const publicContest: components['schemas']['PublicContest'] = {
-  org: 'acme',
-  name: 'spring',
-  title: 'Spring 2026',
+  where: { org: 'acme', contest: 'spring' },
+  name: 'Spring 2026',
   description: 'Four tasks, five hours.',
   start: '2026-09-12T09:00:00Z',
   end: '2026-09-12T10:30:00Z',
@@ -106,18 +102,15 @@ export const publicContest: components['schemas']['PublicContest'] = {
 
 export function contestant(overrides: Partial<Contestant> = {}): Contestant {
   return {
+    ...registration(),
     user_id: 20,
-    username: 'carol',
-    name: 'Carol',
-    email: 'carol@example.org',
-    avatar_url: null,
-    status: 'pending',
-    reason: null,
-    registered_at: '2026-09-12T09:00:00Z',
-    decided_at: null,
-    time_extension_seconds: 0,
-    workspace: null,
-    workspace_error: null,
+    user: {
+      id: 20,
+      username: 'carol',
+      name: 'Carol',
+      email: 'carol@example.org',
+      avatar_url: null,
+    },
     ...overrides,
   };
 }
@@ -134,7 +127,7 @@ export function homesInTurn(records: ContestHome[]) {
 
 // Submitting
 
-export const UPLOADS_URL = '/unicon-uploads/';
+export const DOOR_URL = '/-/uploads/';
 
 /** A contestant who has not submitted to the task yet. */
 export const noSubmissions = http.get(`${TASK_API}/submissions`, () =>
@@ -201,7 +194,7 @@ export function submission(number: number, gradings: GradingResult[]): Submissio
 export function uploadStore() {
   const seen = {
     slots: [] as unknown[],
-    forms: [] as FormData[],
+    sent: [] as { id: string; bytes: number }[],
     completed: [] as string[],
     submits: [] as unknown[],
   };
@@ -215,20 +208,21 @@ export function uploadStore() {
       };
       seen.slots.push(body);
       made += 1;
+      const id = `00000000-0000-4000-8000-00000000000${made}`;
       return HttpResponse.json(
         {
-          id: `00000000-0000-4000-8000-00000000000${made}`,
-          method: 'post',
-          url: `http://localhost:8080${UPLOADS_URL}`,
-          fields: { bucket: 'unicon-uploads', key: `uploads/${made}`, policy: 'p' },
+          id,
+          url: `${DOOR_URL}${id}`,
+          ready: false,
           expires_at: '2026-09-12T10:15:00Z',
         },
         { status: 201 },
       );
     }),
-    http.post(UPLOADS_URL, async ({ request }) => {
-      seen.forms.push(await request.formData());
-      return new HttpResponse(null, { status: 204 });
+    http.put(`${DOOR_URL}:upload`, async ({ request, params }) => {
+      const body = await request.arrayBuffer();
+      seen.sent.push({ id: String(params['upload']), bytes: body.byteLength });
+      return new HttpResponse(null, { status: 200 });
     }),
     http.post(`${TASK_API}/uploads/:upload/complete`, ({ params }) => {
       const id = String(params['upload']);
@@ -238,9 +232,8 @@ export function uploadStore() {
         input: 'submission',
         filename: 'main.py',
         content_type: null,
-        declared_size: 1,
         size: 1,
-        sha256: 'ab',
+        sha256: 'a'.repeat(64),
         status: 'verified',
       };
       return HttpResponse.json(upload);
