@@ -199,7 +199,7 @@ export function describeError(error: ApiError): ErrorDescription {
       };
     case 'wrong_status':
       return {
-        title: 'That registration has moved on',
+        title: 'That has moved on',
         message: error.detail ?? 'Reload the list to see where it stands now.',
       };
     case 'invalid_reason':
