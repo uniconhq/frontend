@@ -17,10 +17,9 @@ import shared from '../contest.module.css';
 import classes from './submit.module.css';
 
 /**
- * What the panel says about itself: the submission just made, or the one
- * whose files were just put back into it.
+ * What the panel says about itself: the submission just made.
  */
-export type Notice = { kind: 'submitted' | 'restored'; number: number };
+export type Notice = { kind: 'submitted'; number: number };
 
 /**
  * A panel that takes the focus as it appears, so the answer to the person's
@@ -199,7 +198,7 @@ const PHASE: Record<Exclude<Phase, 'idle'>, string> = {
 /**
  * The form a contestant submits from: one field per input the task takes
  * from them, in the task's order, and Submit. `draft` is what is in it,
- * owned by the page so an earlier submission can be put back into it.
+ * owned by the page, which empties it once a submit has gone through.
  * `notice` is what it says about the last thing it did; `refusal` is why the
  * last submit was turned away.
  */
@@ -283,16 +282,6 @@ export function SubmitPanel({
           </BodyText>
           <BodyText tone="secondary">
             {t('It is in your submissions below, and graded there.')}
-          </BodyText>
-        </Said>
-      )}
-      {refusal === null && !busy && notice?.kind === 'restored' && (
-        <Said key={`restored ${notice.number}`} role="status">
-          <BodyText>
-            {t('The files of submission')} #{notice.number} {t('are in the panel.')}
-          </BodyText>
-          <BodyText tone="secondary">
-            {t('Submitting them makes a new submission and leaves that one as it is.')}
           </BodyText>
         </Said>
       )}

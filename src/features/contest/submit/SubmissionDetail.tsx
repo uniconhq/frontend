@@ -2,8 +2,8 @@ import { useQuery } from '@tanstack/react-query';
 import { $api, queryView, widenQuery } from '@/api/query';
 import type { GradingResult } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
-import { Button } from '@/ui/Button';
 import { PageLink } from '@/ui/PageLink';
+import { TextLink } from '@/ui/TextLink';
 import { SectionTitle } from '@/ui/SectionTitle';
 import { VerdictBadge } from '@/ui/VerdictBadge';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
@@ -11,6 +11,7 @@ import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
 import { formatSize } from '@/lib/size';
 import { formatDateTime } from '@/lib/time';
 import { t } from '@/lib/t';
+import { downloadHref, nameOf } from './download';
 import { metricValue, pollEvery, verdictOf } from './grading';
 import { Metrics } from './Results';
 import shared from '../contest.module.css';
@@ -141,10 +142,36 @@ function Stage({
 }
 
 /**
- * One of the caller's submissions, opened from the list: when it was made and
- * its grading at each stage, read again every two seconds while any is still
- * to finish. `onRestore`, when given, offers to put its files back into the
- * panel.
+ * The files the submission was made with, each a download of the file as it
+ * was submitted, whatever its size.
+ */
+function Files({ where }: { where: Where }) {
+  const view = queryView(
+    $api.useQuery(
+      'get',
+      '/api/v1/orgs/{org}/contests/{contest}/tasks/{task}/submissions/{number}/files',
+      { params: { path: where } },
+    ),
+  );
+  if (view.state === 'loading') return <PageSkeleton rows={1} />;
+  if (view.state === 'error') return <ErrorBlock error={view.error} compact />;
+  const paths = Object.values(view.data.inputs).flatMap((input) => input.files);
+  if (paths.length === 0) return null;
+  return (
+    <ul className={classes.files} aria-label={t('Files')}>
+      {paths.map((path) => (
+        <li key={path}>
+          <TextLink href={downloadHref(where, path)}>{nameOf(path)}</TextLink>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/**
+ * One of the caller's submissions, opened from the list: when it was made,
+ * the files it was made with, and its grading at each stage, read again every
+ * two seconds while any is still to finish.
  */
 export function SubmissionDetail({
   org,
@@ -152,13 +179,9 @@ export function SubmissionDetail({
   task,
   number,
   closeTo,
-  onRestore,
-  restoring,
 }: Where & {
   /** Where closing it goes: the task page without the submission open. */
   closeTo: string;
-  onRestore?: (number: number) => void;
-  restoring: boolean;
 }) {
   const view = queryView(
     $api.useQuery(
@@ -182,22 +205,10 @@ export function SubmissionDetail({
       {view.state === 'error' && <ErrorBlock error={view.error} onRetry={view.retry} />}
       {view.state === 'ready' && (
         <>
-          <div className={classes.heading}>
-            <BodyText tone="secondary">
-              {t('Submitted')} {formatDateTime(new Date(view.data.submitted_at))}
-            </BodyText>
-            {onRestore !== undefined && (
-              <Button
-                size="xs"
-                variant="secondary"
-                label={`${t('Restore the files of submission')} ${number}`}
-                loading={restoring}
-                onClick={() => onRestore(number)}
-              >
-                {t('Restore')}
-              </Button>
-            )}
-          </div>
+          <BodyText tone="secondary">
+            {t('Submitted')} {formatDateTime(new Date(view.data.submitted_at))}
+          </BodyText>
+          <Files where={where} />
           {view.data.gradings.length === 0 && (
             <BodyText tone="secondary">{t('Not graded on submit')}</BodyText>
           )}

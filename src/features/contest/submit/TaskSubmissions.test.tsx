@@ -471,7 +471,6 @@ describe('the submit panel', () => {
       await screen.findByRole('table', { name: 'Your submissions' }),
     ).toBeVisible();
     expect(screen.queryByRole('form', { name: 'Submit' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /^Restore/ })).not.toBeInTheDocument();
   });
 });
 
@@ -578,6 +577,39 @@ describe('a submission opened from the list', () => {
     expect(await within(detail).findByLabelText('Log default')).toHaveTextContent(
       'step compile: ok',
     );
+  });
+
+  it('lists the files it was made with, each a download through the door', async () => {
+    server.use(
+      signedIn,
+      withPage({}),
+      listing([submission(1, [accepted])]),
+      http.get(`${TASK_API}/submissions/:number`, () =>
+        HttpResponse.json(submission(1, [accepted])),
+      ),
+      http.get(`${TASK_API}/submissions/:number/files`, () =>
+        HttpResponse.json({
+          number: 1,
+          inputs: {
+            submission: {
+              files: ['files/submission/my main.py'],
+              language: 'python',
+              value: null,
+            },
+            alpha: { files: [], language: null, value: 0.5 },
+          },
+        }),
+      ),
+    );
+    renderApp(`${PAGE}?submission=1`);
+
+    const detail = await screen.findByRole('region', { name: 'Submission 1' });
+    const files = await within(detail).findByRole('list', { name: 'Files' });
+    expect(within(files).getByRole('link', { name: 'my main.py' })).toHaveAttribute(
+      'href',
+      '/-/downloads/acme/spring/sum/1/files/submission/my%20main.py',
+    );
+    expect(within(files).getAllByRole('link')).toHaveLength(1);
   });
 
   it('says so when the log is too large to show, and keeps the verdict', async () => {
@@ -696,81 +728,6 @@ describe('a submission opened from the list', () => {
     expect(within(detail).queryByRole('table')).not.toBeInTheDocument();
     expect(within(detail).queryByLabelText('Log default')).not.toBeInTheDocument();
     expect(logs).toBe(0);
-  });
-});
-
-describe('restoring an earlier submission', () => {
-  it('fills the panel with its files and submits them as a new one', async () => {
-    const store = uploadStore();
-    const made = submissions([submission(1, [accepted])]);
-    server.use(
-      signedIn,
-      withPage({ inputs: [contestantInput({ language: ['python', 'cpp'] })] }),
-      ...store.handlers,
-      ...made.handlers,
-      http.get(`${TASK_API}/submissions/:number/files`, () =>
-        HttpResponse.json({
-          number: 1,
-          inputs: {
-            submission: {
-              files: ['files/submission/main.cpp'],
-              language: 'cpp',
-              value: null,
-            },
-            gone: { files: [], language: null, value: 3 },
-          },
-        }),
-      ),
-      http.get(`${TASK_API}/submissions/:number/files/:path`, ({ params }) =>
-        decodeURIComponent(String(params['path'])) === 'files/submission/main.cpp'
-          ? new HttpResponse('int main() {}\n', {
-              headers: { 'content-type': 'application/octet-stream' },
-            })
-          : problem(404, 'not_found'),
-      ),
-    );
-    const user = userEvent.setup();
-    renderApp(PAGE);
-
-    await user.click(
-      await screen.findByRole('button', { name: 'Restore the files of submission 1' }),
-    );
-
-    expect(
-      await screen.findByText(/The files of submission #1 are in the panel/),
-    ).toBeVisible();
-    expect(screen.getByLabelText('Your solution: files chosen')).toHaveTextContent(
-      'main.cpp',
-    );
-    expect(
-      screen.getByRole('combobox', { name: 'Language of Your solution' }),
-    ).toHaveValue('cpp');
-
-    await user.click(screen.getByRole('button', { name: 'Submit' }));
-    expect(await screen.findByText('Submitted as #2.')).toBeVisible();
-    expect(store.seen.slots).toEqual([
-      {
-        input: 'submission',
-        filename: 'main.cpp',
-        size: 14,
-        sha256: 'bc8bb8e433bf65214540115414c821c904b2a30d60a3ac0424bf9b77a00024b7',
-        content_type: null,
-      },
-    ]);
-    expect(made.bodies[0]?.inputs).toEqual({
-      submission: {
-        uploads: ['00000000-0000-4000-8000-000000000001'],
-        language: 'cpp',
-      },
-    });
-    await waitFor(() =>
-      expect(
-        within(screen.getByRole('table', { name: 'Your submissions' })).getAllByRole(
-          'row',
-        ),
-      ).toHaveLength(3),
-    );
-    expect(made.made[0]).toEqual(submission(1, [accepted]));
   });
 });
 

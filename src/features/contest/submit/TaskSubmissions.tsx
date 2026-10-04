@@ -3,14 +3,11 @@ import { useLocation, useSearchParams } from 'react-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { $api } from '@/api/query';
 import type { Submission, TaskPage } from '@/api/types';
-import { BodyText } from '@/ui/BodyText';
 import { Card } from '@/ui/Card';
 import { SectionTitle } from '@/ui/SectionTitle';
-import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { t } from '@/lib/t';
 import { emptyDraft, isPanelInput, type Draft } from './draft';
 import { newestFirst } from './grading';
-import { useRestore } from './restore';
 import { SubmissionDetail } from './SubmissionDetail';
 import { SubmissionList } from './SubmissionList';
 import { openSubmission } from './submission-param';
@@ -47,9 +44,6 @@ export function TaskSubmissions({
 
   const [draft, setDraft] = useState<Draft>(() => emptyDraft(inputs));
   const [notice, setNotice] = useState<Notice | null>(null);
-  const [restoring, setRestoring] = useState<number | null>(null);
-  const [restoreError, setRestoreError] = useState<unknown>(null);
-  const restore = useRestore(org, contest, task);
   const submitter = useSubmit({
     org,
     contest,
@@ -67,7 +61,6 @@ export function TaskSubmissions({
   const change = (next: Draft) => {
     setDraft(next);
     setNotice(null);
-    setRestoreError(null);
   };
 
   const submit = async () => {
@@ -84,23 +77,6 @@ export function TaskSubmissions({
     setDraft(emptyDraft(inputs));
     setNotice({ kind: 'submitted', number: made.number });
   };
-
-  const restoreFrom = async (number: number) => {
-    if (submitter.phase !== 'idle') return;
-    setRestoring(number);
-    setRestoreError(null);
-    try {
-      setDraft(await restore(number, inputs));
-      submitter.clearRefusal();
-      setNotice({ kind: 'restored', number });
-    } catch (error) {
-      setRestoreError(error);
-    } finally {
-      setRestoring(null);
-    }
-  };
-
-  const onRestore = open ? (number: number) => void restoreFrom(number) : undefined;
 
   return (
     <>
@@ -123,12 +99,6 @@ export function TaskSubmissions({
           </div>
         </Card>
       )}
-      {restoreError !== null && (
-        <div role="alert" className={shared.panel}>
-          <BodyText>{t('The files could not be put back into the panel.')}</BodyText>
-          <ErrorBlock error={restoreError} compact />
-        </div>
-      )}
       {opened !== null && (
         <Card>
           <SubmissionDetail
@@ -137,21 +107,13 @@ export function TaskSubmissions({
             task={task}
             number={opened}
             closeTo={pathname}
-            onRestore={onRestore}
-            restoring={restoring === opened}
           />
         </Card>
       )}
       <Card>
         <div className={shared.stack}>
           <SectionTitle>{t('Your submissions')}</SectionTitle>
-          <SubmissionList
-            org={org}
-            contest={contest}
-            task={task}
-            onRestore={onRestore}
-            restoring={restoring}
-          />
+          <SubmissionList org={org} contest={contest} task={task} />
         </div>
       </Card>
     </>
