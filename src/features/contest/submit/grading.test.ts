@@ -37,6 +37,12 @@ describe('how often submissions are read again', () => {
     ).toBe(2_000);
   });
 
+  it('waits at least five seconds while the live stream is refused', () => {
+    expect(pollEvery(submitted(5, 'dispatched'), NOW, false, true)).toBe(5_000);
+    expect(pollEvery(submitted(600, 'dispatched'), NOW, false, true)).toBe(15_000);
+    expect(pollEvery([submitted(3, 'done')], NOW, false, true)).toBe(60_000);
+  });
+
   it('is once a minute when nothing is being graded', () => {
     expect(pollEvery([submitted(3, 'done')], NOW)).toBe(60_000);
     expect(pollEvery(undefined, NOW)).toBe(60_000);
