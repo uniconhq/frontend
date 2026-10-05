@@ -1,0 +1,39 @@
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  color: var(--unicon-text-body);
+}
+
+.table th {
+  text-align: left;
+  font-weight: 600;
+  color: var(--unicon-text-secondary);
+  padding: 6px 10px 8px 0;
+  border-bottom: 1px solid var(--unicon-border);
+}
+
+.table td,
+.table tbody th {
+  vertical-align: top;
+  padding: 10px 10px 10px 0;
+  border-bottom: 1px solid var(--unicon-border);
+}
+
+/* Each row is named by its submission, as a row header that reads like a cell. */
+.table tbody th {
+  font-weight: 400;
+  color: var(--unicon-text-body);
+}
+
+.actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}

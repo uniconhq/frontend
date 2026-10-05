@@ -26,6 +26,10 @@ export function taskPath(org: string, contest: string, task: string): string {
   return `${contestPath(org, contest)}/tasks/${part(task)}`;
 }
 
+export function clarificationsPath(org: string): string {
+  return `${orgPath(org)}/clarifications`;
+}
+
 export function contestantsPath(org: string, contest: string): string {
   return `${contestPath(org, contest)}/contestants`;
 }

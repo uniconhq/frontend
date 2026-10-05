@@ -5,6 +5,7 @@ import {
   type RouteObject,
 } from 'react-router';
 import { AppShell } from '@/ui/shell/AppShell';
+import { LiveProvider } from '@/live';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { NotFound } from '@/ui/feedback/NotFound';
 import { HomePage } from '@/features/home';
@@ -14,6 +15,7 @@ import { ContestHomePage, TaskStatementPage } from '@/features/contest';
 import {
   ContestantsPage,
   ContestPage,
+  InboxPage,
   NewOrgPage,
   OrgPage,
   OrgsPage,
@@ -29,8 +31,10 @@ import { RequireSession, SessionExpiredModal, SessionProvider } from '@/session'
 function SessionRoot() {
   return (
     <SessionProvider>
-      <Outlet />
-      <SessionExpiredModal />
+      <LiveProvider>
+        <Outlet />
+        <SessionExpiredModal />
+      </LiveProvider>
     </SessionProvider>
   );
 }
@@ -94,6 +98,7 @@ export const routes: RouteObject[] = [
                   { index: true, element: <OrgsPage /> },
                   { path: 'new', element: <NewOrgPage /> },
                   { path: ':org', element: <OrgPage /> },
+                  { path: ':org/clarifications', element: <InboxPage /> },
                   { path: ':org/contests/:contest', element: <ContestPage /> },
                   {
                     path: ':org/contests/:contest/contestants',
