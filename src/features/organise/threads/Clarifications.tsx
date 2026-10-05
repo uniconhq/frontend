@@ -26,10 +26,18 @@ const OF_CONTEST = '/api/v1/orgs/{org}/contests/{contest}/clarifications';
 const QUESTION =
   '/api/v1/orgs/{org}/contests/{contest}/clarifications/{asker}/{number}';
 
-/** Every read a change to one question can move: the inbox and the contest's list. */
-function isClarificationRead(path: unknown): boolean {
-  return typeof path === 'string' && path.includes('/clarifications');
+/**
+ * Every read a change to one question can move: the inbox and the contest's
+ * list, and the announcement lists, which an answer made public joins.
+ */
+function isThreadRead(path: unknown): boolean {
+  return (
+    typeof path === 'string' &&
+    (path.includes('/clarifications') || path.includes('/announcements'))
+  );
 }
+
+type Action = 'reply' | 'mark' | 'unmark' | 'publish';
 
 /**
  * One question for an organiser and, for a manager of its contest, what can
@@ -56,6 +64,7 @@ function ClarificationCard({
   const [title, setTitle] = useState(clarification.title);
   const [answer, setAnswer] = useState('');
   const [error, setError] = useState<unknown>(null);
+  const [busy, setBusy] = useState<Action | null>(null);
   const { org, contest } = clarification.contest;
   const path = {
     org,
@@ -65,30 +74,41 @@ function ClarificationCard({
   };
   const name = clarification.title;
 
-  const run = async (action: () => Promise<unknown>) => {
+  /**
+   * One change at a time, until the lists have been read again, so a second
+   * click while the page catches up never sends a reply or an announcement
+   * twice.
+   */
+  const run = async (name: Action, action: () => Promise<unknown>) => {
+    if (busy !== null) return false;
     setError(null);
+    setBusy(name);
     try {
       await action();
       await queryClient.invalidateQueries({
-        predicate: (query) => isClarificationRead(query.queryKey[1]),
+        predicate: (query) => isThreadRead(query.queryKey[1]),
       });
       return true;
     } catch (refused) {
       setError(refused);
       return false;
+    } finally {
+      setBusy(null);
     }
   };
 
   const sendReply = async (event: FormEvent) => {
     event.preventDefault();
-    if (await run(() => reply.mutateAsync({ params: { path }, body: { body } })))
+    if (
+      await run('reply', () => reply.mutateAsync({ params: { path }, body: { body } }))
+    )
       setBody('');
   };
 
   const sendAnswer = async (event: FormEvent) => {
     event.preventDefault();
     if (
-      await run(() =>
+      await run('publish', () =>
         publish.mutateAsync({ params: { path }, body: { title, body: answer } }),
       )
     ) {
@@ -110,13 +130,19 @@ function ClarificationCard({
             onSubmit={(event) => void sendReply(event)}
             aria-label={`${t('Reply to')} ${name}`}
           >
-            <Textarea label={t('Reply')} value={body} onChange={setBody} rows={2} />
+            <Textarea
+              label={t('Reply')}
+              value={body}
+              onChange={setBody}
+              rows={2}
+              required
+            />
             <div className={classes.actions}>
               <Button
                 type="submit"
                 size="xs"
                 variant="secondary"
-                loading={reply.isPending}
+                loading={busy === 'reply'}
               >
                 {t('Reply')}
               </Button>
@@ -125,9 +151,9 @@ function ClarificationCard({
                   size="xs"
                   variant="secondary"
                   label={`${t('Unmark')} ${name}`}
-                  loading={unmark.isPending}
+                  loading={busy === 'unmark'}
                   onClick={() =>
-                    void run(() => unmark.mutateAsync({ params: { path } }))
+                    void run('unmark', () => unmark.mutateAsync({ params: { path } }))
                   }
                 >
                   {t('Unmark')}
@@ -136,8 +162,10 @@ function ClarificationCard({
                 <Button
                   size="xs"
                   label={`${t('Mark as answered')} ${name}`}
-                  loading={mark.isPending}
-                  onClick={() => void run(() => mark.mutateAsync({ params: { path } }))}
+                  loading={busy === 'mark'}
+                  onClick={() =>
+                    void run('mark', () => mark.mutateAsync({ params: { path } }))
+                  }
                 >
                   {t('Mark as answered')}
                 </Button>
@@ -168,15 +196,17 @@ function ClarificationCard({
                 value={title}
                 onChange={setTitle}
                 maxLength={200}
+                required
               />
               <Textarea
                 label={t('Answer')}
                 value={answer}
                 onChange={setAnswer}
                 rows={3}
+                required
               />
               <div className={classes.actions}>
-                <Button type="submit" size="xs" loading={publish.isPending}>
+                <Button type="submit" size="xs" loading={busy === 'publish'}>
                   {t('Post announcement')}
                 </Button>
               </div>

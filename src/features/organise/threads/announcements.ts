@@ -71,12 +71,5 @@ export function useAnnouncementChanges(place: AnnouncementPlace) {
       : closeTask.mutateAsync({
           params: { path: { ...contestPath, task: place.task, number } },
         });
-  const pending =
-    postContest.isPending ||
-    postTask.isPending ||
-    editContest.isPending ||
-    editTask.isPending ||
-    closeContest.isPending ||
-    closeTask.isPending;
-  return { post, edit, close, pending };
+  return { post, edit, close };
 }

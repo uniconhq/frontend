@@ -32,10 +32,13 @@ function FollowUp({
   const followUp = $api.useMutation('post', `${QUESTIONS}/{number}/comments`);
   const [body, setBody] = useState('');
   const [error, setError] = useState<unknown>(null);
+  const [sending, setSending] = useState(false);
 
   const send = async (event: FormEvent) => {
     event.preventDefault();
+    if (sending) return;
     setError(null);
+    setSending(true);
     try {
       await followUp.mutateAsync({
         params: { path: { org, contest, number: clarification.number } },
@@ -45,6 +48,8 @@ function FollowUp({
       await onSent();
     } catch (refused) {
       setError(refused);
+    } finally {
+      setSending(false);
     }
   };
 
@@ -54,7 +59,13 @@ function FollowUp({
       onSubmit={(event) => void send(event)}
       aria-label={`${t('Follow up')} ${clarification.title}`}
     >
-      <Textarea label={t('Follow up')} value={body} onChange={setBody} rows={2} />
+      <Textarea
+        label={t('Follow up')}
+        value={body}
+        onChange={setBody}
+        rows={2}
+        required
+      />
       {clarification.answered && (
         <BodyText tone="secondary">
           {t('Sending this opens the question again for the organisers.')}
@@ -62,12 +73,7 @@ function FollowUp({
       )}
       {error !== null && <ErrorBlock error={error} compact />}
       <div className={classes.actions}>
-        <Button
-          type="submit"
-          size="xs"
-          variant="secondary"
-          loading={followUp.isPending}
-        >
+        <Button type="submit" size="xs" variant="secondary" loading={sending}>
           {t('Send')}
         </Button>
       </div>
@@ -92,10 +98,13 @@ function AskForm({
   const [body, setBody] = useState('');
   const [task, setTask] = useState('');
   const [error, setError] = useState<unknown>(null);
+  const [sending, setSending] = useState(false);
 
   const send = async (event: FormEvent) => {
     event.preventDefault();
+    if (sending) return;
     setError(null);
+    setSending(true);
     try {
       await ask.mutateAsync({
         params: { path: { org, contest } },
@@ -107,6 +116,8 @@ function AskForm({
       await onAsked();
     } catch (refused) {
       setError(refused);
+    } finally {
+      setSending(false);
     }
   };
 
@@ -123,7 +134,13 @@ function AskForm({
         maxLength={200}
         required
       />
-      <Textarea label={t('Details')} value={body} onChange={setBody} rows={3} />
+      <Textarea
+        label={t('Details')}
+        value={body}
+        onChange={setBody}
+        rows={3}
+        required
+      />
       {tasks.length > 0 && (
         <Select
           label={t('About the task')}
@@ -135,7 +152,7 @@ function AskForm({
       )}
       {error !== null && <ErrorBlock error={error} compact />}
       <div className={classes.actions}>
-        <Button type="submit" size="xs" loading={ask.isPending}>
+        <Button type="submit" size="xs" loading={sending}>
           {t('Ask')}
         </Button>
       </div>
