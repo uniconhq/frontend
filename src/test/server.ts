@@ -92,6 +92,12 @@ const noContests = [
   http.get('/api/v1/contests', () => HttpResponse.json([])),
 ];
 
+/** No grading of any task yet, until a test says there is one. */
+const noGradings = http.get(
+  '/api/v1/orgs/:org/contests/:contest/tasks/:task/gradings',
+  () => HttpResponse.json([]),
+);
+
 /**
  * The default world every test starts in: nobody signed in, a backend that
  * answers. `server.resetHandlers()` returns to exactly this after each test.
@@ -103,4 +109,5 @@ export const server = setupServer(
   serverTime,
   ...noContests,
   ...noHolders,
+  noGradings,
 );

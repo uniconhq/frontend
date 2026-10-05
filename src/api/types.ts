@@ -34,6 +34,7 @@ export type Upload = Schemas['Upload'];
 export type SubmittedInput = Schemas['SubmittedInput'];
 export type Submission = Schemas['Submission'];
 export type GradingResult = Schemas['Result'];
+export type Grading = Schemas['Grading'];
 export type GradingStatus = GradingResult['status'];
 
 /** The runner's list of outcomes, which a run and each of its tests take one of. */
