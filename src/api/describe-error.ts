@@ -202,6 +202,21 @@ export function describeError(error: ApiError): ErrorDescription {
         title: 'That has moved on',
         message: error.detail ?? 'Reload the list to see where it stands now.',
       };
+    case 'invalid_invite':
+      return {
+        title: 'That invite cannot be made',
+        message: error.detail ?? 'Check who it is for and what it grants.',
+      };
+    case 'already_invited':
+      return {
+        title: 'They have this invite already',
+        message: 'It is in the list of invites, where it can be sent again.',
+      };
+    case 'invite_expired':
+      return {
+        title: 'This invite has lapsed',
+        message: 'Ask the organisers to send a new one.',
+      };
     case 'invalid_reason':
       return {
         title: 'That reason will not do',

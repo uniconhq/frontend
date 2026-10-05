@@ -102,7 +102,7 @@ describe('the file tree', () => {
       new Set(
         screen.queryAllByRole('textbox').map((box) => box.closest('form')?.ariaLabel),
       ),
-    ).toEqual(new Set(['Add someone', 'Post announcement']));
+    ).toEqual(new Set(['Add someone', 'Invite someone', 'Post announcement']));
     expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument();
   });
 
