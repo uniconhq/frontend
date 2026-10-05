@@ -1,12 +1,19 @@
 import type { GradingResult, GradingStatus, Submission } from '@/api/types';
+import { serverNow } from '@/lib/time';
 
 /**
- * How often a contestant's submissions are read again: soon while any grading
- * is still to finish, since one usually takes seconds, and now and then
+ * How often a contestant's submissions are read again: soon while a grading
+ * is still to finish, since one usually takes seconds, less often the longer
+ * it has waited, since one waiting for a machine at a contest's start can
+ * wait minutes and every read costs the forge several calls, and now and then
  * otherwise, so an organiser's rejudge reaches the page. Live updates replace
  * this in a later feature.
  */
-const GRADING_MS = 2_000;
+const WAITING: [olderThanMs: number, everyMs: number][] = [
+  [120_000, 15_000],
+  [30_000, 5_000],
+  [0, 2_000],
+];
 const MEANWHILE_MS = 60_000;
 
 const UNFINISHED = new Set<GradingStatus>(['queued', 'dispatched', 'running']);
@@ -15,10 +22,22 @@ function unfinished(submission: Submission): boolean {
   return submission.gradings.some((grading) => UNFINISHED.has(grading.status));
 }
 
-export function pollEvery(submissions: Submission[] | Submission | undefined): number {
+/**
+ * The wait before the next read: by the newest submission still being graded,
+ * so a fresh submit is followed closely whatever an older one is doing.
+ */
+export function pollEvery(
+  submissions: Submission[] | Submission | undefined,
+  now: Date = serverNow(),
+): number {
   if (submissions === undefined) return MEANWHILE_MS;
   const all = Array.isArray(submissions) ? submissions : [submissions];
-  return all.some(unfinished) ? GRADING_MS : MEANWHILE_MS;
+  const waited = all
+    .filter(unfinished)
+    .map((found) => now.getTime() - Date.parse(found.submitted_at));
+  if (waited.length === 0) return MEANWHILE_MS;
+  const newest = Math.min(...waited);
+  return WAITING.find(([olderThan]) => newest >= olderThan)?.[1] ?? MEANWHILE_MS;
 }
 
 /**
