@@ -98,6 +98,29 @@ const noGradings = http.get(
   () => HttpResponse.json([]),
 );
 
+/** No announcement or question anywhere, until a test says there is one. */
+const noThreads = [
+  http.get('/api/v1/orgs/:org/contests/:contest/home/announcements', () =>
+    HttpResponse.json([]),
+  ),
+  http.get('/api/v1/orgs/:org/contests/:contest/tasks/:task/page/announcements', () =>
+    HttpResponse.json([]),
+  ),
+  http.get('/api/v1/orgs/:org/contests/:contest/announcements', () =>
+    HttpResponse.json([]),
+  ),
+  http.get('/api/v1/orgs/:org/contests/:contest/tasks/:task/announcements', () =>
+    HttpResponse.json([]),
+  ),
+  http.get('/api/v1/orgs/:org/contests/:contest/questions', () =>
+    HttpResponse.json([]),
+  ),
+  http.get('/api/v1/orgs/:org/contests/:contest/clarifications', () =>
+    HttpResponse.json([]),
+  ),
+  http.get('/api/v1/orgs/:org/clarifications', () => HttpResponse.json([])),
+];
+
 /**
  * The default world every test starts in: nobody signed in, a backend that
  * answers. `server.resetHandlers()` returns to exactly this after each test.
@@ -110,4 +133,5 @@ export const server = setupServer(
   ...noContests,
   ...noHolders,
   noGradings,
+  ...noThreads,
 );

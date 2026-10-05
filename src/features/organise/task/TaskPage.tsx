@@ -9,6 +9,7 @@ import { formatDateTime } from '@/lib/time';
 import { t } from '@/lib/t';
 import { DefinitionErrors } from '../DefinitionErrors';
 import { FileBrowser } from '../files/FileBrowser';
+import { AnnouncementsSection } from '../threads/AnnouncementsSection';
 import { GradingsSection } from './GradingsSection';
 import { PeopleSection } from '../people/PeopleSection';
 import { useTaskParams } from '@/lib/route-params';
@@ -35,6 +36,9 @@ export function TaskPage() {
       </Card>
       <Card>
         <GradingsSection path={path} />
+      </Card>
+      <Card>
+        <AnnouncementsSection place={{ kind: 'task', ...path }} />
       </Card>
       <Card>
         <FileBrowser place={{ kind: 'task', ...path }} />
