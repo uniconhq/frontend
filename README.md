@@ -156,6 +156,7 @@ the task, which publishes it or keeps it as a draft.
 | `/orgs/:org`                               | the org's contests, New contest, and its organisers                           |
 | `/orgs/:org/contests/:contest`             | the contest's tasks, New task, the contest repo's files, and its organisers   |
 | `/orgs/:org/contests/:contest/contestants` | every registration, with approve, reject, undo a rejection, remove and extend |
+| `/orgs/:org/contests/:contest/teams`       | every team, with make, delete, add, move, remove and change the leader        |
 | `/orgs/:org/contests/:contest/tasks/:task` | the task's state, its publications, the task repo's files, and its organisers |
 
 **Every organiser page lives under `/orgs`.** The proxy in `deploy` sends
@@ -166,8 +167,8 @@ proxy changes first. Every address above is built in one
 place, `src/lib/organiser-paths.ts`, which the pages and the breadcrumb share.
 
 The pages live in `src/features/organise/`: a sub-folder for each page
-(`orgs/` holds `/orgs` and `/orgs/new`, then `org/`, `contest/`, `contestants/`
-and `task/`), one for the file tree and editor the contest and task pages
+(`orgs/` holds `/orgs` and `/orgs/new`, then `org/`, `contest/`, `contestants/`,
+`teams/` and `task/`), one for the file tree and editor the contest and task pages
 share (`files/`), and one for the organisers section all three pages
 share (`people/`). The pieces more than one of those use sit at its top:
 the create form and `Create`, which keeps it behind a New button and
@@ -223,12 +224,25 @@ the confirmation for a removal, and a registration that moved on under the
 organiser is read again. A rejected registration offers Undo rejection, which
 leaves it pending again.
 
+The teams page lists every team of a contest with its leader, its members
+and the people asked in or asking, for anyone who observes the contest. A
+manager makes a team, empty or led by an approved contestant named by
+username, deletes one that has submitted nothing, adds an approved
+contestant, moves a member to another team, removes one, turns down a
+request, takes back an invitation and makes a member the leader. Adding,
+moving, removing and deleting each ask first, naming the team, since they
+change who reaches that team's work. The list is read again every half minute
+and whenever a confirmation opens. The routes give the page no team size,
+so a move into a full team is refused by the server and the refusal stays in
+the dialog. A contest has teams only when its `contest.yaml` turns them on;
+until it does, a new team is refused with `teams_off`.
+
 ## The contestant pages
 
 | Address                               | Page                                                                                      |
 | ------------------------------------- | ----------------------------------------------------------------------------------------- |
 | `/`                                   | the public contests for a visitor; your contests once signed in                           |
-| `/contests/:org/:contest`             | a contest's dates, countdown, registration and released tasks                             |
+| `/contests/:org/:contest`             | a contest's dates, countdown, registration, your team and released tasks                  |
 | `/contests/:org/:contest/tasks/:task` | a released task's statement; signed in, its limits, the submit panel and your submissions |
 | `/invites`                            | your invites, with Accept and Decline; an invite mail links here                          |
 
@@ -261,6 +275,35 @@ never carries it in its `?next=`, which the backend and the proxy would log;
 back from Forgejo, the page opens that invite first. A link that is not the
 signed-in account's says so and to sign in with the account it was sent to.
 The proxy in `deploy` has to send `/invites` to this app as well.
+
+### Teams
+
+For a contest whose settings turn teams on, an approved contestant's
+contest page has a team section (`features/contest/teams/`). The home does
+not say whether a contest has teams, so the section reads `my-team` and is
+not there at all when it answers `teams_off`, nor while the first answer is
+on its way, and it is not read again after that answer. Someone in no team
+sees their invitations, with Accept and Decline, their requests, with
+Withdraw, a form to make a team they then lead, and every team with how
+many places it has taken, with Ask to join. Someone in a team sees its
+members and the people waiting, and Leave, which says first who leads next
+or that the team goes with nobody left. The leader also approves or refuses
+a request, takes back an invitation, removes a member and invites by
+username; inviting someone who had asked to join lets them in at once, and
+the form says so. A full team's Accept, Ask to join, Approve and Invite are
+off, with the reason beside them. A team's name is checked once trimmed, at
+most 60 characters, and a username field takes at most 40, Forgejo's limit.
+
+Once in a team, a person's submissions, limits and questions are the
+team's, and every member sees all of them on the existing pages. Nothing
+pushes a change of team, so the section is read again every ten seconds
+while someone waits on an answer and every thirty otherwise. When the team
+the person is in changes between two reads, by their own hand or by a
+leader's or an organiser's, every read of the contest is read again, so the
+submissions and questions shown follow the team. From the contest's end, or
+once it is archived, the forge refuses every contestant's change of team,
+so the section shows the team as it stands and says teams stand as they
+are. A refusal stays in the section until it is dismissed.
 
 ### Submitting
 
@@ -342,7 +385,8 @@ A contest's home shows its open announcements and those of every task
 released to the contestant, each task's named, and a task's page shows its
 own. An approved contestant also gets a form to ask the organisers a
 question, optionally about one task, and their own questions with every
-reply under them; commenting on an answered one opens it again. The
+reply under them; commenting on an answered one opens it again. In a team
+the questions are the team's, marked as the team's on both sides. The
 organiser's contest and task pages have an announcements card with a
 composer, Edit and Close, and no delete; the contest page lists its
 questions, and the org page links to the inbox, `/orgs/<org>/clarifications`,

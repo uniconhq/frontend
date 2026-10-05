@@ -33,3 +33,7 @@ export function clarificationsPath(org: string): string {
 export function contestantsPath(org: string, contest: string): string {
   return `${contestPath(org, contest)}/contestants`;
 }
+
+export function teamsPath(org: string, contest: string): string {
+  return `${contestPath(org, contest)}/teams`;
+}

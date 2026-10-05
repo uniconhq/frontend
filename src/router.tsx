@@ -20,6 +20,7 @@ import {
   OrgPage,
   OrgsPage,
   TaskPage,
+  TeamsPage,
 } from '@/features/organise';
 import { RequireSession, SessionExpiredModal, SessionProvider } from '@/session';
 
@@ -118,6 +119,10 @@ export const routes: RouteObject[] = [
                   {
                     path: ':org/contests/:contest/contestants',
                     element: <ContestantsPage />,
+                  },
+                  {
+                    path: ':org/contests/:contest/teams',
+                    element: <TeamsPage />,
                   },
                   {
                     path: ':org/contests/:contest/tasks/:task',
