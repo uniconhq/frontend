@@ -16,26 +16,17 @@ import { useMe } from '@/session';
 import { contestPath, orgPath, taskPath } from '@/lib/organiser-paths';
 import { scopeName } from '@/lib/scope-name';
 import { t } from '@/lib/t';
-import { holdsAt, isPlace, type RolePlace } from '../roles';
+import {
+  holdsAt,
+  isPlace,
+  offered,
+  ROLE_LABEL,
+  ROLE_MEANS,
+  type RolePlace,
+} from '../roles';
+import { InvitesSection } from '../invites/InvitesSection';
 import { holdersQuery, useHolders, useRoleChanges } from './holders';
 import classes from './people.module.css';
-
-const ROLE_LABEL: Record<RoleName, string> = {
-  admin: 'Admin',
-  manager: 'Manager',
-  observer: 'Observer',
-};
-
-const ROLE_MEANS: Record<RoleName, string> = {
-  admin: 'Everything a manager does, and gives or takes the admin role.',
-  manager: 'Edits, publishes, decides registrations and gives the roles below admin.',
-  observer: 'Reads everything here and changes nothing.',
-};
-
-/** The roles a person may hand out here: admin only by an admin. */
-function offered(administers: boolean): RoleName[] {
-  return administers ? ['admin', 'manager', 'observer'] : ['manager', 'observer'];
-}
 
 function roleOptions(administers: boolean) {
   return offered(administers).map((role) => ({
@@ -332,7 +323,9 @@ function AddPerson({ place, administers }: { place: RolePlace; administers: bool
  * role held at a broader scope is changed on that scope's page. Only an
  * admin is offered the admin role, or may change or remove an admin. The
  * rules are the forge's, and each refusal is shown where the change was
- * tried. Someone who does not observe the place is not shown the section.
+ * tried. Below them are the invites to a role here, which a manager makes by
+ * username or email address. Someone who does not observe the place is not
+ * shown the section.
  */
 export function PeopleSection({ place }: { place: RolePlace }) {
   const me = useMe();
@@ -373,6 +366,13 @@ export function PeopleSection({ place }: { place: RolePlace }) {
         </table>
       )}
       {manages && <AddPerson place={place} administers={administers} />}
+      <SectionTitle order={3}>{t('Invites')}</SectionTitle>
+      <InvitesSection
+        place={place}
+        audience="organisers"
+        manages={manages}
+        administers={administers}
+      />
     </div>
   );
 }

@@ -6,14 +6,16 @@ import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
 import { CreateAccountLink, currentPath, loginHref, useSession } from '@/session';
 import { t } from '@/lib/t';
 import { MyContests, PublicContests } from './ContestList';
+import { PendingInvites } from './MyInvites';
 import { ServerClock } from './ServerClock';
 import classes from './HomePage.module.css';
 
 /**
  * The landing page, and never blank: signed out it is the door, with a way to
  * create an account when the instance is open, and the public contests, which
- * is everything a visitor may read; signed in it says who you are and lists
- * every contest you see, with where your registration for each stands.
+ * is everything a visitor may read; signed in it says who you are, shows any
+ * invites waiting for you, and lists every contest you see, with where your
+ * registration for each stands.
  */
 export function HomePage() {
   const session = useSession();
@@ -48,6 +50,7 @@ export function HomePage() {
               ? t('. Forgejo is not answering, so your name and avatar are missing.')
               : ''}
           </BodyText>
+          <PendingInvites />
           <MyContests />
         </>
       )}

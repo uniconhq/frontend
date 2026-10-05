@@ -86,6 +86,16 @@ const noHolders = [
   ),
 ];
 
+/** No invite made anywhere, nor waiting for anyone, until a test says there is one. */
+const noInvites = [
+  http.get('/api/v1/me/invites', () => HttpResponse.json([])),
+  http.get('/api/v1/orgs/:org/invites', () => HttpResponse.json([])),
+  http.get('/api/v1/orgs/:org/contests/:contest/invites', () => HttpResponse.json([])),
+  http.get('/api/v1/orgs/:org/contests/:contest/tasks/:task/invites', () =>
+    HttpResponse.json([]),
+  ),
+];
+
 /** No contest to list yet, public or otherwise, until a test says there is. */
 const noContests = [
   http.get('/api/v1/public/contests', () => HttpResponse.json([])),
@@ -132,6 +142,7 @@ export const server = setupServer(
   serverTime,
   ...noContests,
   ...noHolders,
+  ...noInvites,
   noGradings,
   ...noThreads,
 );
