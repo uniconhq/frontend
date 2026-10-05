@@ -15,6 +15,7 @@ import { formatDateTime } from '@/lib/time';
 import { t } from '@/lib/t';
 import { ContestAnnouncements } from './threads/AnnouncementList';
 import { QuestionsSection } from './threads/QuestionsSection';
+import { TeamSection } from './teams/TeamSection';
 import { BySession } from './BySession';
 import { Countdown } from './Countdown';
 import { RegistrationPanel } from './RegistrationPanel';
@@ -139,6 +140,9 @@ function Home({
           <RegistrationPanel org={org} contest={contest} home={home} />
         </div>
       </Card>
+      {home.registration?.status === 'approved' && (
+        <TeamSection org={org} contest={contest} />
+      )}
       <Card>
         <div className={classes.stack}>
           <SectionTitle>{t('Tasks')}</SectionTitle>

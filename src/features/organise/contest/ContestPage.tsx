@@ -8,7 +8,7 @@ import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
 import { useMe } from '@/session';
 import { contestHomePath } from '@/lib/contest-paths';
-import { contestantsPath, taskPath } from '@/lib/organiser-paths';
+import { contestantsPath, taskPath, teamsPath } from '@/lib/organiser-paths';
 import { PageLink } from '@/ui/PageLink';
 import { t } from '@/lib/t';
 import { Create } from '../Create';
@@ -24,8 +24,8 @@ import classes from '../organise.module.css';
 /**
  * A contest's tasks, the button that opens the form for a new one, which
  * also adds it to `contest.yaml`'s tasks, and the contest repo's files,
- * `contest.yaml` among them, with the way to its registrations and to the
- * page its contestants see. Each part loads and fails on its own, so a
+ * `contest.yaml` among them, with the way to its registrations, its teams
+ * and the page its contestants see. Each part loads and fails on its own, so a
  * refused task list still leaves the files readable. Listing needs the
  * observer role at the contest; someone who holds a role only at one of its
  * tasks is refused the list, so the refusal comes with the tasks their own
@@ -53,6 +53,7 @@ export function ContestPage() {
       <PageTitle>{contest}</PageTitle>
       <div className={classes.actions}>
         <PageLink to={contestantsPath(org, contest)}>{t('Contestants')}</PageLink>
+        <PageLink to={teamsPath(org, contest)}>{t('Teams')}</PageLink>
         <PageLink to={contestHomePath(org, contest)}>
           {t('The page contestants see')}
         </PageLink>

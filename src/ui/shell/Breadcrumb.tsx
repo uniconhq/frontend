@@ -7,6 +7,7 @@ import {
   isOrganiserPath,
   orgPath,
   taskPath,
+  teamsPath,
 } from '@/lib/organiser-paths';
 import { t } from '@/lib/t';
 import classes from './Breadcrumb.module.css';
@@ -82,6 +83,8 @@ function organiserTrail(
         segments.push({ label: task, to: taskPath(org, contest, task) });
       } else if (pathname === contestantsPath(org, contest)) {
         segments.push({ label: t('contestants'), to: pathname });
+      } else if (pathname === teamsPath(org, contest)) {
+        segments.push({ label: t('teams'), to: pathname });
       }
     }
   }

@@ -13,6 +13,7 @@ import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
 import { useFallbackPoll } from '@/live';
 import { t } from '@/lib/t';
 import { QuestionThread } from '@/ui/threads/ThreadParts';
+import { isTeams } from '@/ui/threads/asker';
 import classes from '@/ui/threads/threads.module.css';
 
 const QUESTIONS = '/api/v1/orgs/{org}/contests/{contest}/questions';
@@ -195,7 +196,9 @@ export function QuestionsSection({
     <div className={classes.stack}>
       <SectionTitle>{t('Questions to the organisers')}</SectionTitle>
       <BodyText tone="secondary">
-        {t('Only you and the organisers see what you ask.')}
+        {t(
+          'Only you and the organisers see what you ask. In a team, everyone in it sees it too.',
+        )}
       </BodyText>
       <AskForm org={org} contest={contest} tasks={tasks} onAsked={readAgain} />
       {view.state === 'loading' && <PageSkeleton rows={2} />}
@@ -204,7 +207,10 @@ export function QuestionsSection({
         <ol className={classes.list} aria-label={t('Your questions')}>
           {[...view.data].reverse().map((clarification) => (
             <li key={clarification.number} className={classes.item}>
-              <QuestionThread clarification={clarification} asker={t('You')} />
+              <QuestionThread
+                clarification={clarification}
+                asker={isTeams(clarification) ? t('Your team') : t('You')}
+              />
               <FollowUp
                 org={org}
                 contest={contest}

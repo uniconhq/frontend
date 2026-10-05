@@ -26,7 +26,7 @@ function announcement(overrides: Partial<Announcement> = {}): Announcement {
 function question(overrides: Partial<Clarification> = {}): Clarification {
   return {
     contest: { org: 'acme', contest: 'spring', task: null },
-    asker: 20,
+    asker: '20',
     number: 1,
     task: null,
     title: 'Input size?',
@@ -120,6 +120,27 @@ describe('questions', () => {
     const list = await screen.findByRole('list', { name: 'Your questions' });
     expect(await within(list).findByText('And m?')).toBeVisible();
     expect(within(list).getByText('Up to 10^5.')).toBeVisible();
+  });
+
+  it('marks a team’s messages as the team’s', async () => {
+    server.use(
+      signedIn,
+      approvedHome,
+      http.get(`${CONTEST_API}/questions`, () =>
+        HttpResponse.json([
+          question({
+            asker: 'team.0b9d6a52-0000-4000-8000-000000000001',
+            messages: [
+              { from_asker: true, body: 'And m?', at: '2026-09-12T09:15:00Z' },
+            ],
+          }),
+        ]),
+      ),
+    );
+    renderApp(HOME);
+
+    const list = await screen.findByRole('list', { name: 'Your questions' });
+    expect(await within(list).findByText(/Your team/)).toBeVisible();
   });
 
   it('offers no questions to someone who is not an approved contestant', async () => {

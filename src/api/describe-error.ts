@@ -229,6 +229,49 @@ export function describeError(error: ApiError): ErrorDescription {
         title: 'That extension will not do',
         message: error.detail ?? 'Give between no time and a year.',
       };
+    case 'teams_off':
+      return {
+        title: 'This contest has no teams',
+        message: 'The contest’s settings do not turn teams on.',
+      };
+    case 'invalid_team_name':
+      return {
+        title: 'That team name will not do',
+        message:
+          error.detail ?? 'A team’s name is one to 60 characters that can be printed.',
+      };
+    case 'team_name_taken':
+      return {
+        title: 'That team name is taken',
+        message: 'Another team in this contest has it. Pick a different name.',
+      };
+    case 'team_full': {
+      const limit = numberOf(error, 'limit');
+      return {
+        title: 'The team is full',
+        message:
+          limit === null
+            ? 'The team holds as many people as the contest allows.'
+            : `A team in this contest holds at most ${limit}.`,
+      };
+    }
+    case 'in_team':
+      return {
+        title: 'Already in a team',
+        message: error.detail ?? 'Someone is in one team at most in a contest.',
+      };
+    case 'submitted_alone':
+      return {
+        title: 'Submitted on their own',
+        message:
+          'Someone who has submitted on their own cannot join a team, since those results are theirs.',
+      };
+    case 'team_has_submissions':
+      return {
+        title: 'This team has submitted',
+        message:
+          'A team that has submitted stays with its results, so it is not deleted.',
+      };
     case 'task_closed':
       return textOf(error, 'reason') === 'submissions_closed'
         ? {

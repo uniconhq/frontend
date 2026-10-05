@@ -26,6 +26,10 @@ export type RoleName = Holder['role'];
 export type Invite = Schemas['Invite'];
 /** What an invite gives once accepted: a contestant's place, or a role. */
 export type Grant = Invite['grants'];
+export type Team = Schemas['Team'];
+export type TeamMember = Schemas['Member'];
+export type ListedTeam = Schemas['ListedTeam'];
+export type MyTeams = Schemas['MyTeams'];
 export type ContestSummary = Schemas['ContestSummary'];
 export type ContestHome = Schemas['ContestHome'];
 export type Limits = Schemas['Limits'];
