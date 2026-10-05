@@ -99,8 +99,10 @@ describe('the file tree', () => {
       screen.queryByRole('textbox', { name: /data\/testcases\/logo\.png/ }),
     ).not.toBeInTheDocument();
     expect(
-      screen.queryAllByRole('textbox').map((box) => box.closest('form')?.ariaLabel),
-    ).toEqual(['Add someone']);
+      new Set(
+        screen.queryAllByRole('textbox').map((box) => box.closest('form')?.ariaLabel),
+      ),
+    ).toEqual(new Set(['Add someone', 'Post announcement']));
     expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument();
   });
 
