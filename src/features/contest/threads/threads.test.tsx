@@ -135,7 +135,10 @@ describe('questions', () => {
 });
 
 class FakeSource {
+  static readonly CLOSED = 2;
   static last: FakeSource | null = null;
+  static made = 0;
+  readyState = 0;
   onopen: (() => void) | null = null;
   onerror: (() => void) | null = null;
   listeners = new Map<string, () => void>();
@@ -145,6 +148,7 @@ class FakeSource {
   constructor(url: string) {
     this.url = url;
     FakeSource.last = this;
+    FakeSource.made += 1;
   }
 
   addEventListener(kind: string, listener: () => void) {
@@ -153,6 +157,7 @@ class FakeSource {
 
   close() {
     this.closed = true;
+    this.readyState = FakeSource.CLOSED;
   }
 
   emit(kind: string) {
@@ -167,28 +172,75 @@ describe('live updates', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
     FakeSource.last = null;
+    FakeSource.made = 0;
+    setVisibility('visible');
   });
 
-  it('opens one stream per session and refetches what an arriving id names', async () => {
-    let asked = 0;
+  function counted() {
+    const asked = { count: 0 };
     server.use(
       signedIn,
       approvedHome,
       http.get(`${CONTEST_API}/home/announcements`, () => {
-        asked += 1;
+        asked.count += 1;
         return HttpResponse.json([]);
       }),
     );
+    return asked;
+  }
+
+  function setVisibility(state: 'visible' | 'hidden') {
+    Object.defineProperty(document, 'visibilityState', {
+      value: state,
+      configurable: true,
+    });
+    document.dispatchEvent(new Event('visibilitychange'));
+  }
+
+  it('opens one stream and refetches only what an arriving id names', async () => {
+    const asked = counted();
     renderApp(HOME);
 
     await screen.findByRole('heading', { name: 'Tasks' });
-    await waitFor(() => expect(asked).toBe(1));
+    await waitFor(() => expect(asked.count).toBe(1));
     const source = FakeSource.last;
     expect(source?.url).toBe('/api/v1/live');
+    expect(FakeSource.made).toBe(1);
     source?.onopen?.();
     source?.emit('grading');
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    expect(asked.count).toBe(1);
     source?.emit('announcement');
 
-    await waitFor(() => expect(asked).toBe(2));
+    await waitFor(() => expect(asked.count).toBe(2));
+  });
+
+  it('opens a refused stream again later and refetches everything once it opens', async () => {
+    const asked = counted();
+    renderApp(HOME);
+    await screen.findByRole('heading', { name: 'Tasks' });
+    await waitFor(() => expect(asked.count).toBe(1));
+    const first = FakeSource.last;
+    first?.onopen?.();
+
+    if (first) first.readyState = FakeSource.CLOSED;
+    first?.onerror?.();
+
+    await waitFor(() => expect(FakeSource.made).toBe(2), { timeout: 8000 });
+    FakeSource.last?.onopen?.();
+    await waitFor(() => expect(asked.count).toBe(2));
+  }, 15_000);
+
+  it('closes the stream while the tab is hidden and opens it again in front', async () => {
+    counted();
+    renderApp(HOME);
+    await screen.findByRole('heading', { name: 'Tasks' });
+    const first = FakeSource.last;
+
+    setVisibility('hidden');
+    await waitFor(() => expect(first?.closed).toBe(true));
+    setVisibility('visible');
+
+    await waitFor(() => expect(FakeSource.made).toBe(2));
   });
 });

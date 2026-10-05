@@ -290,9 +290,12 @@ problem with the input it is about. Whatever stage it came at, the progress
 goes and the files stay in the panel, ready to send again.
 
 Below the panel are the contestant's own submissions, newest first, with each
-stage's verdict and metrics. They are read every two seconds while any
-grading is still to finish, and every minute otherwise, until live updates
-replace the polling. A verdict is the outcome once the task shows one, and
+stage's verdict and metrics. While the live stream is open (below) a
+nudge says when a grading moves, and the list is read again then and once a
+minute besides. While it is not, the list is read by how long the newest
+grading still to finish has waited: every two seconds for its first half
+minute, every five to two minutes, every fifteen after, and every minute
+when nothing is being graded. A verdict is the outcome once the task shows one, and
 where the grading stands until then, or for good when the task keeps the
 outcome hidden, as `GRADED`. `src/ui/VerdictBadge.tsx` has a label for every
 outcome and status and puts each in one of the handoff's six colour pairs; an
@@ -303,10 +306,40 @@ and its summary, metrics, a row per test and its log where the task shows
 them. The route leaves out what the task withholds, and the page puts nothing
 in its place; the log is read only when the grading says there is one.
 
-Restore, on a row or an open submission, reads that submission's files and
-values back into the panel, ready to change and submit as a new submission.
-Nothing about the old one changes. Only the inputs the task takes now are
-filled.
+An open submission lists the files it was made with, each a download
+through the proxy's download door, `/-/downloads/...`, which streams the
+file from the forge.
+
+## Announcements, questions and live updates
+
+A contest's home shows its open announcements and those of every task
+released to the contestant, each task's named, and a task's page shows its
+own. An approved contestant also gets a form to ask the organisers a
+question, optionally about one task, and their own questions with every
+reply under them; commenting on an answered one opens it again. The
+organiser's contest and task pages have an announcements card with a
+composer, Edit and Close, and no delete; the contest page lists its
+questions, and the org page links to the inbox, `/orgs/<org>/clarifications`,
+every question still open across the org with Reply, Mark as answered,
+Unmark and Answer publicly. Each form sends once at a time, until the list
+has been read again, so a second click never posts twice. The parts both
+sides show are in `src/ui/threads/`; the contestant's pages are in
+`features/contest/threads/` and the organiser's in
+`features/organise/threads/`, since a feature does not import another.
+
+`src/live/` keeps one Server-Sent Events stream, `/api/v1/live`, per
+signed-in tab, open while the tab is in front, since a browser holds few
+connections to one host and a stream in every background tab would use
+them up. Each event names a kind of thing that changed and its id, never
+what changed. The events of a moment are gathered, and each kind marks
+stale the reads whose route shows it: a grading the submissions and
+gradings lists and a submission, but not its files or log; an announcement
+every announcements list; a clarification the questions and the inbox.
+`resync`, and every opening of the stream after the tab's first, marks
+everything stale. A stream the server refused is opened again after five
+seconds, doubling to a minute, and the session is read again so a
+signed-out tab stops. `useLiveConnected` says whether the stream is open,
+and pages poll while it is not (`useFallbackPoll`).
 
 ## Layout
 
@@ -320,9 +353,11 @@ src/
   session/   who is signed in: the boot query, the guard, sign-out, where Forgejo is, the
              expired-session modal. Not a feature, because the shell, the
              router and three features all read it
+  live/      the live stream and whether it is open
   theme/     the design handoff's tokens, the fonts, the CSS variables
   ui/        shell (header, sidebar, breadcrumb, account menu), feedback, brand,
-             and the wrappers: buttons, fields, the file drop zone, verdicts
+             the wrappers: buttons, fields, the file drop zone, verdicts, and
+             the parts of announcements and questions both sides show
   features/  home (landing and the contest lists), auth (login page), account
              (profile, sessions), contest (the contestant pages, with submit/
              for the submit panel and the submissions), organise (the

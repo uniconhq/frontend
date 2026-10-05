@@ -81,6 +81,40 @@ describe("a contest's announcements, for its organisers", () => {
   });
 });
 
+describe('posting an announcement', () => {
+  it('sends once however often Post is clicked while the list catches up', async () => {
+    let posted = 0;
+    let release: () => void = () => undefined;
+    const slowList = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    server.use(
+      signedIn,
+      http.get(`${CONTEST_API}/announcements`, async () => {
+        if (posted > 0) await slowList;
+        return HttpResponse.json([]);
+      }),
+      http.post(`${CONTEST_API}/announcements`, () => {
+        posted += 1;
+        return HttpResponse.json(announcement({ number: 2 }), { status: 201 });
+      }),
+    );
+    renderApp('/orgs/acme/contests/spring');
+
+    const form = await screen.findByRole('form', { name: 'Post announcement' });
+    await userEvent.type(within(form).getByLabelText(/Title/), 'Lunch');
+    await userEvent.type(within(form).getByLabelText(/Text/), 'At noon.');
+    const post = within(form).getByRole('button', { name: 'Post announcement' });
+    await userEvent.click(post);
+    await waitFor(() => expect(posted).toBe(1));
+    await userEvent.click(post);
+    release();
+
+    await waitFor(() => expect(within(form).getByLabelText(/Title/)).toHaveValue(''));
+    expect(posted).toBe(1);
+  });
+});
+
 describe('the inbox', () => {
   it('lists the open questions, and only marking takes one off', async () => {
     let open = [question()];
