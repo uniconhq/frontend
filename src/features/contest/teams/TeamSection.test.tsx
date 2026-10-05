@@ -166,9 +166,66 @@ describe('the team section on the contest page', () => {
     await userEvent.type(within(found).getByLabelText(/Team name/), 'Red');
     await userEvent.click(within(found).getByRole('button', { name: 'Make the team' }));
 
-    expect(await within(found).findByRole('alert')).toHaveTextContent(
-      'That team name is taken',
+    const alert = await within(found).findByRole('alert');
+    expect(alert).toHaveTextContent('That team name is taken');
+    await userEvent.click(within(alert).getByRole('button', { name: 'Dismiss' }));
+    expect(within(found).queryByRole('alert')).toBeNull();
+  });
+
+  it('checks a team name once trimmed before sending it', async () => {
+    let sent = false;
+    server.use(
+      signedIn,
+      approved,
+      mineInTurn([myTeams()]),
+      teamList([]),
+      http.post(TEAMS, () => {
+        sent = true;
+        return problem(422, 'invalid_team_name');
+      }),
     );
+    renderApp(PAGE);
+
+    const found = await section();
+    await userEvent.type(
+      within(found).getByLabelText(/Team name/),
+      `  ${'x'.repeat(61)}  `,
+    );
+    await userEvent.click(within(found).getByRole('button', { name: 'Make the team' }));
+
+    expect(await within(found).findByRole('alert')).toHaveTextContent(
+      'A team’s name is at most 60 characters.',
+    );
+    expect(sent).toBe(false);
+  });
+
+  it('reads every read of the contest again when the caller’s team changes', async () => {
+    let questionReads = 0;
+    const joined = team({ members: [member('carol'), member('kenny')] });
+    server.use(
+      signedIn,
+      approved,
+      // An invitation the page has not read yet: asking to join accepts it.
+      mineInTurn([myTeams(), myTeams({ team: joined })]),
+      teamList(),
+      http.get(`${CONTEST_API}/questions`, () => {
+        questionReads += 1;
+        return HttpResponse.json([]);
+      }),
+      http.post(`${TEAMS}/:team/request`, () => HttpResponse.json(joined)),
+    );
+    renderApp(PAGE);
+
+    const found = await section();
+    await waitFor(() => expect(questionReads).toBe(1));
+    await userEvent.click(
+      within(found).getByRole('button', { name: 'Ask to join Red' }),
+    );
+
+    expect(
+      await within(found).findByRole('heading', { name: 'Your team' }),
+    ).toBeVisible();
+    await waitFor(() => expect(questionReads).toBe(2));
   });
 
   it('accepts an invitation, which puts the caller in the team', async () => {
@@ -444,6 +501,46 @@ describe('the team section for its leader', () => {
     expect(body).toEqual({ username: 'finn' });
   });
 
+  it('says when the person invited had asked already and is now in', async () => {
+    server.use(
+      signedIn,
+      approved,
+      mineInTurn([myTeams({ team: leading })]),
+      http.post(`${TEAMS}/:team/invite`, () =>
+        HttpResponse.json({ ...leading, members: [...leading.members, member('dee')] }),
+      ),
+    );
+    renderApp(PAGE);
+
+    const found = await section();
+    await userEvent.type(within(found).getByLabelText(/Username/), 'dee');
+    await userEvent.click(within(found).getByRole('button', { name: 'Invite' }));
+
+    expect(await within(found).findByRole('status')).toHaveTextContent(
+      'dee had asked to join, so they are in the team now.',
+    );
+  });
+
+  it('says the team is gone when the invite finds no such team', async () => {
+    server.use(
+      signedIn,
+      approved,
+      mineInTurn([myTeams({ team: leading })]),
+      http.post(`${TEAMS}/:team/invite`, () =>
+        problem(404, 'not_found', { detail: 'There is no such team in this contest.' }),
+      ),
+    );
+    renderApp(PAGE);
+
+    const found = await section();
+    await userEvent.type(within(found).getByLabelText(/Username/), 'zed');
+    await userEvent.click(within(found).getByRole('button', { name: 'Invite' }));
+
+    const alert = await within(found).findByRole('alert');
+    expect(alert).toHaveTextContent('There is no such team in this contest.');
+    expect(alert).not.toHaveTextContent('Nobody has the username');
+  });
+
   it.each([
     ['not_found', 404, 'Nobody has the username zed.'],
     [
@@ -466,5 +563,61 @@ describe('the team section for its leader', () => {
     await userEvent.click(within(found).getByRole('button', { name: 'Invite' }));
 
     expect(await within(found).findByRole('alert')).toHaveTextContent(sentence);
+  });
+});
+
+describe('the team section once the contest is over', () => {
+  const ended = http.get(`${CONTEST_API}/home`, () =>
+    HttpResponse.json(
+      home({
+        registration: registration({ status: 'approved' }),
+        end: '2026-09-12T09:30:00Z',
+        deadline: '2026-09-12T09:30:00Z',
+      }),
+    ),
+  );
+
+  it('shows the team as it stands, with nothing to change', async () => {
+    server.use(signedIn, ended, mineInTurn([myTeams({ team: leading })]));
+    renderApp(PAGE);
+
+    const found = await section();
+    expect(found).toHaveTextContent(
+      'The contest has ended, so teams stand as they are.',
+    );
+    const members = within(found).getByRole('list', { name: 'Members' });
+    expect(item(members, 'carol')).toBeVisible();
+    expect(within(found).queryByRole('button')).toBeNull();
+    expect(within(found).queryByRole('list', { name: 'Waiting to join' })).toBeNull();
+    expect(within(found).queryByRole('form')).toBeNull();
+  });
+
+  it('says someone in no team entered alone, and lists no teams', async () => {
+    let listed = false;
+    server.use(
+      signedIn,
+      http.get(`${CONTEST_API}/home`, () =>
+        HttpResponse.json(
+          home({
+            registration: registration({ status: 'approved' }),
+            state: 'archived',
+          }),
+        ),
+      ),
+      mineInTurn([myTeams()]),
+      http.get(TEAMS, () => {
+        listed = true;
+        return HttpResponse.json([]);
+      }),
+    );
+    renderApp(PAGE);
+
+    const found = await section();
+    expect(found).toHaveTextContent('You are in no team, so you entered on your own.');
+    expect(found).toHaveTextContent(
+      'The contest is archived, so teams stand as they are.',
+    );
+    expect(within(found).queryByRole('form', { name: 'Make a team' })).toBeNull();
+    expect(listed).toBe(false);
   });
 });

@@ -1,6 +1,6 @@
 import { useRef, useState, type FormEvent } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { $api, queryView } from '@/api/query';
+import { $api, queryView, type QueryView } from '@/api/query';
 import { isApiError } from '@/api/problem';
 import type { Contestant, Team, TeamMember } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
@@ -17,6 +17,7 @@ import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
 import { useMe } from '@/session';
 import { contestPath } from '@/lib/organiser-paths';
 import { useContestParams } from '@/lib/route-params';
+import { teamNameProblem, USERNAME_MAX } from '@/lib/team-fields';
 import { formatDateTime } from '@/lib/time';
 import { t } from '@/lib/t';
 import { holdsAtContest } from '../roles';
@@ -24,9 +25,10 @@ import classes from './teams.module.css';
 
 const EVERY = '/api/v1/orgs/{org}/contests/{contest}/organise/teams';
 const ONE = '/api/v1/orgs/{org}/contests/{contest}/organise/teams/{team_id}';
+const CONTESTANTS = '/api/v1/orgs/{org}/contests/{contest}/contestants';
 
-/** The most characters a team's name takes, as the forge has it. */
-const NAME_MAX = 60;
+/** How often the list is read again, since nothing pushes a change of team. */
+const POLL_MS = 30_000;
 
 /** Refusals that mean the list is behind: a person or a team moved on. */
 const BEHIND = new Set(['not_found', 'in_team', 'team_full', 'team_has_submissions']);
@@ -45,8 +47,8 @@ function nameOf(member: TeamMember): string {
 }
 
 /** The approved contestants, the people a manager may add to a team. */
-function approvedOf(contestants: Contestant[] | undefined): Contestant[] {
-  return (contestants ?? []).filter((found) => found.status === 'approved');
+function approvedOf(contestants: Contestant[]): Contestant[] {
+  return contestants.filter((found) => found.status === 'approved');
 }
 
 /** What removing someone does beyond taking them out, said before it is done. */
@@ -69,7 +71,8 @@ function removeOutcome(team: Team, member: TeamMember): string {
  * contestant, turns down a request or takes back an invitation, and deletes
  * a team that has submitted nothing. Each change that moves someone in or
  * out asks first, naming the team, since it changes who reaches that team's
- * work. A refusal shows where it was made, and one that shows the list was
+ * work. Opening one reads the list again, so it asks about the team as it
+ * is. A refusal shows where it was made, and one that shows the list was
  * behind reads it again.
  */
 function TeamCard({
@@ -83,7 +86,7 @@ function TeamCard({
   path: Path;
   team: Team;
   teams: Team[];
-  contestants: Contestant[];
+  contestants: QueryView<Contestant[]>;
   manages: boolean;
   onGone: () => void;
 }) {
@@ -108,14 +111,24 @@ function TeamCard({
       found.members.map((member) => [member.user_id, found] as const),
     ),
   );
-  const addable = contestants.filter(
-    (found) => teamOf.get(found.user_id)?.id !== team.id,
-  );
+  const addable =
+    contestants.state === 'ready'
+      ? approvedOf(contestants.data).filter(
+          (found) => teamOf.get(found.user_id)?.id !== team.id,
+        )
+      : [];
 
   const ask = (next: Confirm | null) => {
     setError(null);
     setTarget('');
     setConfirm(next);
+    if (next === null) return;
+    void queryClient.invalidateQueries({ queryKey: listKey });
+    if (next.kind === 'add') {
+      void queryClient.invalidateQueries({
+        queryKey: $api.queryOptions('get', CONTESTANTS, { params: { path } }).queryKey,
+      });
+    }
   };
 
   const run = async (key: string, change: () => Promise<unknown>, gone = false) => {
@@ -428,11 +441,16 @@ function TeamCard({
         >
           {confirm?.kind === 'add' && (
             <div className={classes.form}>
-              {addable.length === 0 ? (
+              {contestants.state === 'loading' && <PageSkeleton rows={2} />}
+              {contestants.state === 'error' && (
+                <ErrorBlock error={contestants.error} onRetry={contestants.retry} />
+              )}
+              {contestants.state === 'ready' && addable.length === 0 && (
                 <BodyText>
                   {t('Every approved contestant is in this team already.')}
                 </BodyText>
-              ) : (
+              )}
+              {addable.length > 0 && (
                 <Select
                   label={t('Contestant')}
                   value={target}
@@ -520,6 +538,31 @@ function TeamCard({
 }
 
 /**
+ * A refused team in words, a leader nobody has or who is not yet an approved
+ * contestant said with their username.
+ */
+function CreateRefusal({ error, leader }: { error: unknown; leader: string }) {
+  if (isApiError(error) && error.code === 'not_found' && leader !== '') {
+    return (
+      <BodyText tone="secondary">
+        {t('Nobody has the username')} {leader}.
+      </BodyText>
+    );
+  }
+  if (isApiError(error) && error.code === 'not_approved' && leader !== '') {
+    return (
+      <BodyText tone="secondary">
+        {leader}{' '}
+        {t(
+          'is not an approved contestant of this contest, so they cannot lead a team yet.',
+        )}
+      </BodyText>
+    );
+  }
+  return <ErrorBlock error={error} compact />;
+}
+
+/**
  * A new team's name and, if it is to have one, the username of the approved
  * contestant who leads it. The form keeps what was typed and says why when
  * the team is refused.
@@ -529,12 +572,18 @@ function CreateTeam({ path }: { path: Path }) {
   const create = $api.useMutation('post', EVERY);
   const [name, setName] = useState('');
   const [leader, setLeader] = useState('');
+  const [tried, setTried] = useState('');
+  const [problem, setProblem] = useState<string | null>(null);
   const [made, setMade] = useState<string | null>(null);
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     setMade(null);
+    const found = teamNameProblem(name);
+    setProblem(found);
+    if (found !== null) return;
     const trimmed = leader.trim();
+    setTried(trimmed);
     try {
       const team = await create.mutateAsync({
         params: { path },
@@ -559,13 +608,12 @@ function CreateTeam({ path }: { path: Path }) {
       onSubmit={(event) => void submit(event)}
     >
       <SectionTitle order={3}>{t('Make a team')}</SectionTitle>
-      <TextInput
-        label={t('Team name')}
-        value={name}
-        onChange={setName}
-        maxLength={NAME_MAX}
-        required
-      />
+      <TextInput label={t('Team name')} value={name} onChange={setName} required />
+      {problem !== null && (
+        <div role="alert">
+          <BodyText tone="secondary">{problem}</BodyText>
+        </div>
+      )}
       <TextInput
         label={t('Leader')}
         description={t(
@@ -573,6 +621,7 @@ function CreateTeam({ path }: { path: Path }) {
         )}
         value={leader}
         onChange={setLeader}
+        maxLength={USERNAME_MAX}
       />
       <div className={classes.actions}>
         <Button size="xs" type="submit" loading={create.isPending}>
@@ -588,7 +637,7 @@ function CreateTeam({ path }: { path: Path }) {
       )}
       {create.error !== null && (
         <div role="alert">
-          <ErrorBlock error={create.error} compact />
+          <CreateRefusal error={create.error} leader={tried} />
         </div>
       )}
     </form>
@@ -599,21 +648,20 @@ function CreateTeam({ path }: { path: Path }) {
  * Every team of one contest, for its organisers: each team's leader, its
  * members and the people asked in or asking. A manager also makes, mends and
  * deletes teams; an observer reads the list alone. The routes check each
- * role again underneath.
+ * role again underneath. Nothing pushes a change of team, so the list is read
+ * again every half minute.
  */
 export function TeamsPage() {
   const { org, contest } = useContestParams();
   const path = { org, contest };
   const manages = holdsAtContest(useMe().roles, org, contest, 'manager');
-  const list = useRef<HTMLDivElement>(null);
-  const view = queryView($api.useQuery('get', EVERY, { params: { path } }));
-  const contestants = $api.useQuery(
-    'get',
-    '/api/v1/orgs/{org}/contests/{contest}/contestants',
-    { params: { path } },
-    { enabled: manages },
+  const list = useRef<HTMLElement>(null);
+  const view = queryView(
+    $api.useQuery('get', EVERY, { params: { path } }, { refetchInterval: POLL_MS }),
   );
-  const approved = approvedOf(contestants.data);
+  const contestants = queryView(
+    $api.useQuery('get', CONTESTANTS, { params: { path } }, { enabled: manages }),
+  );
 
   return (
     <div className={classes.page}>
@@ -629,7 +677,12 @@ export function TeamsPage() {
           {manages && <CreateTeam path={path} />}
         </div>
       </Card>
-      <div ref={list} className={classes.stack} tabIndex={-1} aria-label={t('Teams')}>
+      <section
+        ref={list}
+        className={classes.stack}
+        tabIndex={-1}
+        aria-label={t('Teams')}
+      >
         {view.state === 'loading' && <PageSkeleton rows={4} />}
         {view.state === 'error' && (
           <Card>
@@ -648,13 +701,13 @@ export function TeamsPage() {
                 path={path}
                 team={team}
                 teams={view.data}
-                contestants={approved}
+                contestants={contestants}
                 manages={manages}
                 onGone={() => list.current?.focus()}
               />
             ))
           ))}
-      </div>
+      </section>
     </div>
   );
 }

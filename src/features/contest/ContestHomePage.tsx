@@ -141,7 +141,7 @@ function Home({
         </div>
       </Card>
       {home.registration?.status === 'approved' && (
-        <TeamSection org={org} contest={contest} />
+        <TeamSection org={org} contest={contest} end={home.end} state={home.state} />
       )}
       <Card>
         <div className={classes.stack}>

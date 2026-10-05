@@ -266,6 +266,11 @@ export function describeError(error: ApiError): ErrorDescription {
         message:
           'Someone who has submitted on their own cannot join a team, since those results are theirs.',
       };
+    case 'team_changed':
+      return {
+        title: 'Your team changed',
+        message: 'Your team changed while this was being done; do it again.',
+      };
     case 'team_has_submissions':
       return {
         title: 'This team has submitted',
@@ -291,6 +296,7 @@ export function describeError(error: ApiError): ErrorDescription {
       return {
         title: 'You are not a contestant here yet',
         message:
+          error.detail ??
           "Only an approved contestant submits. The contest's page says where your registration stands.",
       };
     case 'submission_limit': {

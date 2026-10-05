@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { http, HttpResponse } from 'msw';
+import { delay, http, HttpResponse } from 'msw';
 import { renderApp } from '@/test/render';
 import { problem, server, signedIn, someone } from '@/test/server';
 import { CONTEST_API, contestant } from '@/test/contestant';
@@ -344,5 +344,101 @@ describe('the teams page', () => {
       expect(screen.queryByRole('region', { name: 'Blue' })).toBeNull(),
     );
     expect(deleted).toBe(BLUE);
+  });
+});
+
+describe('the teams page’s forms', () => {
+  it.each([
+    ['not_found', 404, 'Nobody has the username zed.'],
+    [
+      'not_approved',
+      403,
+      'zed is not an approved contestant of this contest, so they cannot lead a team yet.',
+    ],
+  ])('says a %s refusal of the leader in words', async (code, status, sentence) => {
+    server.use(
+      signedIn,
+      teamsAre([red]),
+      http.post(TEAMS, () => problem(status, code)),
+    );
+    renderApp(PAGE);
+
+    const form = await screen.findByRole('form', { name: 'Make a team' });
+    await userEvent.type(within(form).getByLabelText(/Team name/), 'Blue');
+    await userEvent.type(within(form).getByLabelText(/Leader/), 'zed');
+    await userEvent.click(within(form).getByRole('button', { name: 'Make the team' }));
+
+    expect(await within(form).findByRole('alert')).toHaveTextContent(sentence);
+  });
+
+  it('shows the contestants loading in the add dialog', async () => {
+    server.use(
+      signedIn,
+      teamsAre(),
+      http.get(`${CONTEST_API}/contestants`, async () => {
+        await delay('infinite');
+        return HttpResponse.json([]);
+      }),
+    );
+    renderApp(PAGE);
+
+    await userEvent.click(
+      within(await card('Blue')).getByRole('button', {
+        name: 'Add a contestant to Blue',
+      }),
+    );
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Add a contestant to Blue?',
+    });
+    expect(within(dialog).getByRole('status', { name: 'Loading' })).toBeVisible();
+    expect(dialog).not.toHaveTextContent('Every approved contestant');
+  });
+
+  it('shows why the contestants would not load in the add dialog, with a retry', async () => {
+    let failing = true;
+    server.use(
+      signedIn,
+      teamsAre(),
+      http.get(`${CONTEST_API}/contestants`, () =>
+        failing
+          ? problem(403, 'forbidden')
+          : HttpResponse.json([contestant({ status: 'approved' })]),
+      ),
+    );
+    renderApp(PAGE);
+
+    await userEvent.click(
+      within(await card('Blue')).getByRole('button', {
+        name: 'Add a contestant to Blue',
+      }),
+    );
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Add a contestant to Blue?',
+    });
+    expect(await within(dialog).findByText('You cannot do that')).toBeVisible();
+    expect(dialog).not.toHaveTextContent('Every approved contestant');
+
+    failing = false;
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Try again' }));
+    expect(await within(dialog).findByLabelText('Contestant')).toBeVisible();
+  });
+
+  it('reads the list again when a confirmation opens', async () => {
+    let reads = 0;
+    server.use(
+      signedIn,
+      http.get(TEAMS, () => {
+        reads += 1;
+        return HttpResponse.json([red, blue]);
+      }),
+    );
+    renderApp(PAGE);
+
+    const found = await card('Red');
+    await waitFor(() => expect(reads).toBe(1));
+    await userEvent.click(within(found).getByRole('button', { name: 'Remove carol' }));
+
+    await screen.findByRole('dialog', { name: 'Remove carol from Red?' });
+    await waitFor(() => expect(reads).toBe(2));
   });
 });

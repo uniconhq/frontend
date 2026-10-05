@@ -231,7 +231,8 @@ username, deletes one that has submitted nothing, adds an approved
 contestant, moves a member to another team, removes one, turns down a
 request, takes back an invitation and makes a member the leader. Adding,
 moving, removing and deleting each ask first, naming the team, since they
-change who reaches that team's work. The routes give the page no team size,
+change who reaches that team's work. The list is read again every half minute
+and whenever a confirmation opens. The routes give the page no team size,
 so a move into a full team is refused by the server and the refusal stays in
 the dialog. A contest has teams only when its `contest.yaml` turns them on;
 until it does, a new team is refused with `teams_off`.
@@ -241,7 +242,7 @@ until it does, a new team is refused with `teams_off`.
 | Address                               | Page                                                                                      |
 | ------------------------------------- | ----------------------------------------------------------------------------------------- |
 | `/`                                   | the public contests for a visitor; your contests once signed in                           |
-| `/contests/:org/:contest`             | a contest's dates, countdown, registration and released tasks                             |
+| `/contests/:org/:contest`             | a contest's dates, countdown, registration, your team and released tasks                  |
 | `/contests/:org/:contest/tasks/:task` | a released task's statement; signed in, its limits, the submit panel and your submissions |
 | `/invites`                            | your invites, with Accept and Decline; an invite mail links here                          |
 
@@ -281,17 +282,28 @@ For a contest whose settings turn teams on, an approved contestant's
 contest page has a team section (`features/contest/teams/`). The home does
 not say whether a contest has teams, so the section reads `my-team` and is
 not there at all when it answers `teams_off`, nor while the first answer is
-on its way. Someone in no team sees their invitations, with Accept and
-Decline, their requests, with Withdraw, a form to make a team they then
-lead, and every team with how many places it has taken, with Ask to join.
-Someone in a team sees its members and the people waiting, and Leave, which
-says first who leads next or that the team goes with nobody left. The
-leader also approves or refuses a request, takes back an invitation,
-removes a member and invites by username. A full team's Accept, Ask to join,
-Approve and Invite are off, with the reason beside them. Nothing pushes a change of team, so the section is read again
-every ten seconds while someone waits on an answer and every thirty
-otherwise. Joining or leaving changes whose submissions and questions the
-person reaches, so every read of the contest is read again then.
+on its way, and it is not read again after that answer. Someone in no team
+sees their invitations, with Accept and Decline, their requests, with
+Withdraw, a form to make a team they then lead, and every team with how
+many places it has taken, with Ask to join. Someone in a team sees its
+members and the people waiting, and Leave, which says first who leads next
+or that the team goes with nobody left. The leader also approves or refuses
+a request, takes back an invitation, removes a member and invites by
+username; inviting someone who had asked to join lets them in at once, and
+the form says so. A full team's Accept, Ask to join, Approve and Invite are
+off, with the reason beside them. A team's name is checked once trimmed, at
+most 60 characters, and a username field takes at most 40, Forgejo's limit.
+
+Once in a team, a person's submissions, limits and questions are the
+team's, and every member sees all of them on the existing pages. Nothing
+pushes a change of team, so the section is read again every ten seconds
+while someone waits on an answer and every thirty otherwise. When the team
+the person is in changes between two reads, by their own hand or by a
+leader's or an organiser's, every read of the contest is read again, so the
+submissions and questions shown follow the team. From the contest's end, or
+once it is archived, the forge refuses every contestant's change of team,
+so the section shows the team as it stands and says teams stand as they
+are. A refusal stays in the section until it is dismissed.
 
 ### Submitting
 
