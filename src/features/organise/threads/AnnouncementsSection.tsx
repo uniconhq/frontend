@@ -26,34 +26,39 @@ import classes from '@/ui/threads/threads.module.css';
 /**
  * A title and a text, the one form for posting an announcement and for
  * editing one. It keeps what was typed when the server refuses it, and the
- * refusal says which field it was about.
+ * refusal says which field it was about. It sends once at a time, until
+ * the list has been read again, so a second click while the page catches up
+ * never posts the same announcement twice.
  */
 function Composer({
   label,
   initial,
-  pending,
   onSend,
   onCancel,
 }: {
   label: string;
   initial: { title: string; body: string };
-  pending: boolean;
   onSend: (text: { title: string; body: string }) => Promise<void>;
   onCancel?: () => void;
 }) {
   const [title, setTitle] = useState(initial.title);
   const [body, setBody] = useState(initial.body);
   const [error, setError] = useState<unknown>(null);
+  const [sending, setSending] = useState(false);
 
   const send = async (event: FormEvent) => {
     event.preventDefault();
+    if (sending) return;
     setError(null);
+    setSending(true);
     try {
       await onSend({ title, body });
       setTitle(initial.title);
       setBody(initial.body);
     } catch (refused) {
       setError(refused);
+    } finally {
+      setSending(false);
     }
   };
 
@@ -70,10 +75,10 @@ function Composer({
         maxLength={200}
         required
       />
-      <Textarea label={t('Text')} value={body} onChange={setBody} rows={4} />
+      <Textarea label={t('Text')} value={body} onChange={setBody} rows={4} required />
       {error !== null && <ErrorBlock error={error} compact />}
       <div className={classes.actions}>
-        <Button type="submit" size="xs" loading={pending}>
+        <Button type="submit" size="xs" loading={sending}>
           {label}
         </Button>
         {onCancel !== undefined && (
@@ -99,6 +104,7 @@ function Managed({
   onChanged: () => Promise<void>;
 }) {
   const [editing, setEditing] = useState(false);
+  const [closing, setClosing] = useState(false);
   const [error, setError] = useState<unknown>(null);
   const name = announcement.title;
 
@@ -108,7 +114,6 @@ function Managed({
         <Composer
           label={`${t('Save')} ${name}`}
           initial={{ title: announcement.title, body: announcement.body }}
-          pending={changes.pending}
           onSend={async (text) => {
             await changes.edit(announcement.number, text);
             setEditing(false);
@@ -136,13 +141,15 @@ function Managed({
             size="xs"
             variant="secondary"
             label={`${t('Close')} ${name}`}
-            loading={changes.pending}
+            loading={closing}
             onClick={() => {
               setError(null);
+              setClosing(true);
               changes
                 .close(announcement.number)
                 .then(onChanged)
-                .catch((refused: unknown) => setError(refused));
+                .catch((refused: unknown) => setError(refused))
+                .finally(() => setClosing(false));
             }}
           >
             {t('Close')}
@@ -175,7 +182,6 @@ export function AnnouncementsSection({ place }: { place: AnnouncementPlace }) {
         <Composer
           label={t('Post announcement')}
           initial={{ title: '', body: '' }}
-          pending={changes.pending}
           onSend={async (text) => {
             await changes.post(text);
             await readAgain();
