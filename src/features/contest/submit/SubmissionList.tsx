@@ -8,7 +8,7 @@ import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
 import { formatDateTime } from '@/lib/time';
 import { t } from '@/lib/t';
-import { useLiveConnected } from '@/live';
+import { useLiveConnected, useLiveRefused } from '@/live';
 import { serverNow } from '@/lib/time';
 import { justFinished, newestFirst, pollEvery, verdictOf } from './grading';
 import { Metrics, Verdicts } from './Results';
@@ -60,12 +60,16 @@ export function SubmissionList({
   task: string;
 }) {
   const live = useLiveConnected();
+  const refused = useLiveRefused();
   const view = queryView(
     $api.useQuery(
       'get',
       '/api/v1/orgs/{org}/contests/{contest}/tasks/{task}/submissions',
       { params: { path: { org, contest, task } } },
-      { refetchInterval: (query) => pollEvery(query.state.data, serverNow(), live) },
+      {
+        refetchInterval: (query) =>
+          pollEvery(query.state.data, serverNow(), live, refused),
+      },
     ),
   );
 
