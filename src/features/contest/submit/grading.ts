@@ -15,6 +15,12 @@ const WAITING: [olderThanMs: number, everyMs: number][] = [
   [0, 2_000],
 ];
 const MEANWHILE_MS = 60_000;
+/**
+ * The shortest wait while the live stream is refused: a crowd too large for
+ * the proxy's streams is the crowd a read every two seconds would cost the
+ * forge most.
+ */
+const REFUSED_MS = 5_000;
 
 const UNFINISHED = new Set<GradingStatus>(['queued', 'dispatched', 'running']);
 
@@ -26,12 +32,14 @@ function unfinished(submission: Submission): boolean {
  * The wait before the next read: by the newest submission still being graded,
  * so a fresh submit is followed closely whatever an older one is doing. While
  * the live stream is open it says when a grading moves, so the page reads
- * again only now and then, in case a nudge was lost on the way.
+ * again only now and then, in case a nudge was lost on the way. While it is
+ * `refused`, no wait is shorter than `REFUSED_MS`.
  */
 export function pollEvery(
   submissions: Submission[] | Submission | undefined,
   now: Date = serverNow(),
   live = false,
+  refused = false,
 ): number {
   if (live || submissions === undefined) return MEANWHILE_MS;
   const all = Array.isArray(submissions) ? submissions : [submissions];
@@ -40,7 +48,8 @@ export function pollEvery(
     .map((found) => now.getTime() - Date.parse(found.submitted_at));
   if (waited.length === 0) return MEANWHILE_MS;
   const newest = Math.min(...waited);
-  return WAITING.find(([olderThan]) => newest >= olderThan)?.[1] ?? MEANWHILE_MS;
+  const every = WAITING.find(([olderThan]) => newest >= olderThan)?.[1] ?? MEANWHILE_MS;
+  return refused ? Math.max(every, REFUSED_MS) : every;
 }
 
 /**

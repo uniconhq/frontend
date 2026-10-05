@@ -12,7 +12,7 @@ import { formatSize } from '@/lib/size';
 import { formatDateTime } from '@/lib/time';
 import { t } from '@/lib/t';
 import { downloadHref, nameOf } from './download';
-import { useLiveConnected } from '@/live';
+import { useLiveConnected, useLiveRefused } from '@/live';
 import { serverNow } from '@/lib/time';
 import { metricValue, pollEvery, verdictOf } from './grading';
 import { Metrics } from './Results';
@@ -186,12 +186,16 @@ export function SubmissionDetail({
   closeTo: string;
 }) {
   const live = useLiveConnected();
+  const refused = useLiveRefused();
   const view = queryView(
     $api.useQuery(
       'get',
       '/api/v1/orgs/{org}/contests/{contest}/tasks/{task}/submissions/{number}',
       { params: { path: { org, contest, task, number } } },
-      { refetchInterval: (query) => pollEvery(query.state.data, serverNow(), live) },
+      {
+        refetchInterval: (query) =>
+          pollEvery(query.state.data, serverNow(), live, refused),
+      },
     ),
   );
   const where = { org, contest, task, number };
