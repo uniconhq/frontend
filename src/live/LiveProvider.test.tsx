@@ -68,6 +68,48 @@ describe('where the live stream stands', () => {
     expect(screen.getByText('down')).toBeVisible();
   });
 
+  it('is refused when the browser opens a dropped stream again and is turned away', () => {
+    renderProvider();
+    const source = FakeSource.last;
+    act(() => source?.onopen?.());
+    act(() => source?.onerror?.());
+    expect(screen.getByText('down')).toBeVisible();
+
+    act(() => {
+      if (source) source.readyState = FakeSource.CLOSED;
+      source?.onerror?.();
+    });
+
+    expect(screen.getByText('refused')).toBeVisible();
+  });
+
+  it('is down again once a refused tab is hidden', () => {
+    renderProvider();
+    const source = FakeSource.last;
+    act(() => {
+      if (source) source.readyState = FakeSource.CLOSED;
+      source?.onerror?.();
+    });
+    expect(screen.getByText('refused')).toBeVisible();
+
+    act(() => {
+      Object.defineProperty(document, 'visibilityState', {
+        value: 'hidden',
+        configurable: true,
+      });
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+
+    expect(screen.getByText('down')).toBeVisible();
+    act(() => {
+      Object.defineProperty(document, 'visibilityState', {
+        value: 'visible',
+        configurable: true,
+      });
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+  });
+
   it('is refused once the stream is turned away, until one opens again', () => {
     vi.useFakeTimers();
     try {
