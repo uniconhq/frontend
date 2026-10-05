@@ -24,13 +24,16 @@ function unfinished(submission: Submission): boolean {
 
 /**
  * The wait before the next read: by the newest submission still being graded,
- * so a fresh submit is followed closely whatever an older one is doing.
+ * so a fresh submit is followed closely whatever an older one is doing. While
+ * the live stream is open it says when a grading moves, so the page reads
+ * again only now and then, in case a nudge was lost on the way.
  */
 export function pollEvery(
   submissions: Submission[] | Submission | undefined,
   now: Date = serverNow(),
+  live = false,
 ): number {
-  if (submissions === undefined) return MEANWHILE_MS;
+  if (live || submissions === undefined) return MEANWHILE_MS;
   const all = Array.isArray(submissions) ? submissions : [submissions];
   const waited = all
     .filter(unfinished)

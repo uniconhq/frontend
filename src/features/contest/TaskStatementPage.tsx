@@ -12,6 +12,7 @@ import { contestHomePath } from '@/lib/contest-paths';
 import { useTaskParams } from '@/lib/route-params';
 import { formatLimit } from '@/lib/size';
 import { t } from '@/lib/t';
+import { TaskAnnouncements } from './threads/AnnouncementList';
 import { BySession } from './BySession';
 import { SignInPrompt } from './SignInPrompt';
 import { TaskSubmissions } from './submit/TaskSubmissions';
@@ -90,6 +91,7 @@ function SignedInTask({
       {page.release.closed !== null && (
         <BodyText tone="secondary">{t(CLOSED[page.release.closed])}</BodyText>
       )}
+      <TaskAnnouncements org={org} contest={contest} task={task} />
       <Card>
         <Markdown>{page.statement}</Markdown>
       </Card>

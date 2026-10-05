@@ -8,6 +8,7 @@ import { SectionTitle } from '@/ui/SectionTitle';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
 import { useMe } from '@/session';
+import { useLiveConnected } from '@/live';
 import { formatDateTime } from '@/lib/time';
 import { t } from '@/lib/t';
 import { holdsAt } from '../roles';
@@ -139,6 +140,7 @@ function Row({
  */
 export function GradingsSection({ path }: { path: TaskPath }) {
   const manages = holdsAt(useMe().roles, { kind: 'task', ...path }, 'manager');
+  const live = useLiveConnected();
   const view = queryView(
     $api.useQuery(
       'get',
@@ -146,7 +148,7 @@ export function GradingsSection({ path }: { path: TaskPath }) {
       { params: { path } },
       {
         refetchInterval: (query) =>
-          query.state.data?.some((grading) => UNFINISHED.has(grading.status))
+          !live && query.state.data?.some((grading) => UNFINISHED.has(grading.status))
             ? WAITING_MS
             : MEANWHILE_MS,
       },
