@@ -19,6 +19,7 @@ import { useOrgParam } from '@/lib/route-params';
 import { t } from '@/lib/t';
 import { holdsAtContest } from '../roles';
 import { QuestionThread } from '@/ui/threads/ThreadParts';
+import { isTeams } from '@/ui/threads/asker';
 import classes from '@/ui/threads/threads.module.css';
 
 const INBOX = '/api/v1/orgs/{org}/clarifications';
@@ -122,7 +123,10 @@ function ClarificationCard({
       <BodyText tone="meta">
         {org}/{contest}
       </BodyText>
-      <QuestionThread clarification={clarification} asker={t('Contestant')} />
+      <QuestionThread
+        clarification={clarification}
+        asker={isTeams(clarification) ? t('Team') : t('Contestant')}
+      />
       {manages && (
         <>
           <form
@@ -257,7 +261,7 @@ export function InboxPage() {
             <ol className={classes.list} aria-label={t('Open questions')}>
               {view.data.map((clarification) => (
                 <ClarificationCard
-                  key={`${clarification.contest.contest ?? ''}/${String(clarification.asker)}/${String(clarification.number)}`}
+                  key={`${clarification.contest.contest ?? ''}/${clarification.asker}/${String(clarification.number)}`}
                   clarification={clarification}
                   manages={holdsAtContest(
                     roles,
@@ -310,7 +314,7 @@ export function ContestClarifications({
           <ol className={classes.list} aria-label={t('Questions')}>
             {[...view.data].reverse().map((clarification) => (
               <ClarificationCard
-                key={`${String(clarification.asker)}/${String(clarification.number)}`}
+                key={`${clarification.asker}/${String(clarification.number)}`}
                 clarification={clarification}
                 manages={manages}
               />

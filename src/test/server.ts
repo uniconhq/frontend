@@ -131,6 +131,16 @@ const noThreads = [
   http.get('/api/v1/orgs/:org/clarifications', () => HttpResponse.json([])),
 ];
 
+/** A contest whose settings leave teams off, until a test turns them on. */
+const noTeams = [
+  http.get('/api/v1/orgs/:org/contests/:contest/my-team', () =>
+    problem(409, 'teams_off'),
+  ),
+  http.get('/api/v1/orgs/:org/contests/:contest/organise/teams', () =>
+    HttpResponse.json([]),
+  ),
+];
+
 /**
  * The default world every test starts in: nobody signed in, a backend that
  * answers. `server.resetHandlers()` returns to exactly this after each test.
@@ -145,4 +155,5 @@ export const server = setupServer(
   ...noInvites,
   noGradings,
   ...noThreads,
+  ...noTeams,
 );
