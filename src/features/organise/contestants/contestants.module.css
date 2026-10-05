@@ -5,6 +5,12 @@
   max-width: 1120px;
 }
 
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
 .table {
   width: 100%;
   border-collapse: collapse;

@@ -1,0 +1,51 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 640px;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 12px;
+  border: 1px solid var(--unicon-border);
+  border-radius: 8px;
+  background: var(--unicon-body);
+}
+
+/* The invite the mail's link opened, set apart from the rest by its border. */
+.highlighted {
+  border-color: var(--unicon-text-accent);
+}
+
+.offer {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--unicon-text-body);
+  overflow-wrap: anywhere;
+}
+
+.actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}

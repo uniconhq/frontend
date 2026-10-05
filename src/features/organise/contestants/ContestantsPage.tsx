@@ -9,6 +9,7 @@ import { Card } from '@/ui/Card';
 import { Modal } from '@/ui/Modal';
 import { PageLink } from '@/ui/PageLink';
 import { PageTitle } from '@/ui/PageTitle';
+import { SectionTitle } from '@/ui/SectionTitle';
 import { TextInput } from '@/ui/TextInput';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
@@ -18,6 +19,7 @@ import { useContestParams } from '@/lib/route-params';
 import { formatDateTime } from '@/lib/time';
 import { t } from '@/lib/t';
 import { holdsAtContest } from '../roles';
+import { InvitesSection } from '../invites/InvitesSection';
 import classes from './contestants.module.css';
 
 const REASON_MAX = 1000;
@@ -346,7 +348,8 @@ function Row({
  * Every registration of one contest, for its organisers: who, where their
  * registration stands with the reason for a rejection, and any extension
  * they have. A manager also gets each row's actions; an observer reads the
- * table alone.
+ * table alone. Below it are the invites to a place in the contest, which a
+ * manager makes and an observer reads.
  */
 export function ContestantsPage() {
   const { org, contest } = useContestParams();
@@ -392,6 +395,22 @@ export function ContestantsPage() {
               </tbody>
             </table>
           ))}
+      </Card>
+      <Card>
+        <div className={classes.stack}>
+          <SectionTitle>{t('Invites')}</SectionTitle>
+          <BodyText tone="secondary">
+            {t(
+              'An invite offers someone a place in this contest. Once they accept it, they may register even when the contest takes only the people it invites, and see it while it is hidden.',
+            )}
+          </BodyText>
+          <InvitesSection
+            place={{ kind: 'contest', org, contest }}
+            audience="contestants"
+            manages={manages}
+            administers={false}
+          />
+        </div>
       </Card>
     </div>
   );
