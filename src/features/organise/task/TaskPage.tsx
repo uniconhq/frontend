@@ -9,13 +9,14 @@ import { formatDateTime } from '@/lib/time';
 import { t } from '@/lib/t';
 import { DefinitionErrors } from '../DefinitionErrors';
 import { FileBrowser } from '../files/FileBrowser';
+import { GradingsSection } from './GradingsSection';
 import { PeopleSection } from '../people/PeopleSection';
 import { useTaskParams } from '@/lib/route-params';
 import classes from '../organise.module.css';
 
 /**
  * A task as its organiser sees it: where its files stand, every publication,
- * and the files themselves. There is no publish button; saving a file is
+ * its gradings with their controls, and the files themselves. There is no publish button; saving a file is
  * the save, and the save's answer is shown beside the file. Every save
  * fetches the state and the publications again.
  */
@@ -31,6 +32,9 @@ export function TaskPage() {
       </Card>
       <Card>
         <PublicationList path={path} />
+      </Card>
+      <Card>
+        <GradingsSection path={path} />
       </Card>
       <Card>
         <FileBrowser place={{ kind: 'task', ...path }} />
