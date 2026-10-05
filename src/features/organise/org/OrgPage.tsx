@@ -2,12 +2,13 @@ import { useQueryClient } from '@tanstack/react-query';
 import { $api, queryView } from '@/api/query';
 import { Card } from '@/ui/Card';
 import { BodyText } from '@/ui/BodyText';
+import { PageLink } from '@/ui/PageLink';
 import { PageTitle } from '@/ui/PageTitle';
 import { SectionTitle } from '@/ui/SectionTitle';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
 import { useMe } from '@/session';
-import { contestPath } from '@/lib/organiser-paths';
+import { clarificationsPath, contestPath } from '@/lib/organiser-paths';
 import { t } from '@/lib/t';
 import { Create } from '../Create';
 import { PeopleSection } from '../people/PeopleSection';
@@ -39,6 +40,9 @@ export function OrgPage() {
   return (
     <div className={classes.page}>
       <PageTitle>{org}</PageTitle>
+      <div className={classes.actions}>
+        <PageLink to={clarificationsPath(org)}>{t('Open questions')}</PageLink>
+      </div>
       <Card>
         <div className={classes.stack}>
           <SectionTitle>{t('Contests')}</SectionTitle>

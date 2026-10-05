@@ -5,8 +5,9 @@ import { Textarea as MantineTextarea } from '@mantine/core';
  * a stray space has to be visible, so lines do not wrap. It is `rows` tall and
  * the person can drag it taller; it does not grow on its own, so a long file
  * scrolls inside it and the save button stays in place. `readOnly` keeps the
- * text as it is while something is working on it, and `autoFocus` takes the
- * focus as the field appears.
+ * text as it is while something is working on it, `autoFocus` takes the
+ * focus as the field appears, and `required` will not let a form send it
+ * empty.
  */
 export function Textarea({
   label,
@@ -15,6 +16,7 @@ export function Textarea({
   mono = false,
   readOnly = false,
   autoFocus = false,
+  required = false,
   rows = 4,
 }: {
   label: string;
@@ -23,6 +25,7 @@ export function Textarea({
   mono?: boolean;
   readOnly?: boolean;
   autoFocus?: boolean;
+  required?: boolean;
   rows?: number;
 }) {
   return (
@@ -32,6 +35,7 @@ export function Textarea({
       onChange={(event) => onChange(event.currentTarget.value)}
       readOnly={readOnly}
       autoFocus={autoFocus}
+      required={required}
       rows={rows}
       resize="vertical"
       radius="sm"

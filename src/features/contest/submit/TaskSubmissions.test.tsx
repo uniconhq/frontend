@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
-import type { Submission, TaskPage } from '@/api/types';
+import type { GradingResult, Submission, TaskPage } from '@/api/types';
+import { serverNow } from '@/lib/time';
 import { renderApp } from '@/test/render';
 import { problem, server, signedIn } from '@/test/server';
 import { fakeTimerUser, passTime, withFakeTimers } from '@/test/timers';
@@ -478,10 +479,14 @@ describe('the submissions list', () => {
   withFakeTimers();
 
   it('follows a queued submission until its outcome and metrics come back', async () => {
+    const fresh = (gradings: GradingResult[]) => ({
+      ...submission(1, gradings),
+      submitted_at: new Date(serverNow().getTime() - 2_000).toISOString(),
+    });
     const turns = [
-      [submission(1, [grading()])],
-      [submission(1, [grading({ status: 'running' })])],
-      [submission(1, [accepted])],
+      [fresh([grading()])],
+      [fresh([grading({ status: 'running' })])],
+      [fresh([accepted])],
     ];
     let asked = 0;
     server.use(
