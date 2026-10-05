@@ -195,9 +195,11 @@ async function stubApi(page: Page, overrides: Partial<State> = {}): Promise<Stat
           }),
         });
       }
+      // Made now, as the backend would: the page asks for a verdict more
+      // often the newer the submission waiting on one is.
       const made = {
         number: state.submissions.length + 1,
-        submitted_at: '2026-09-29T10:00:00Z',
+        submitted_at: new Date().toISOString(),
         gradings: [queued],
       };
       state.submissions.push(made);
