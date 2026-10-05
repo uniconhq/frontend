@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useQueryClient, type Query, type QueryClient } from '@tanstack/react-query';
 import { useSession } from '@/session';
-import { LiveContext } from './live-context';
+import { LiveContext, type LiveState } from './live-context';
 
 const LIVE_PATH = '/api/v1/live';
 const SESSION_PATH = '/api/v1/me';
@@ -64,13 +64,14 @@ function refetchAll(client: QueryClient) {
  * dropped on its own; one that was refused, a deploy's moment of errors or a
  * session that ended, it gives up on, so it is opened again after a wait that
  * grows, and the session is read again so a signed-out tab stops. While no
- * stream is open, `useLiveConnected` is false and pages poll.
+ * stream is open, `useLiveConnected` is false and pages poll, and while one
+ * waits after a refusal `useLiveRefused` is true and they poll less often.
  */
 export function LiveProvider({ children }: { children: ReactNode }) {
   const session = useSession();
   const client = useQueryClient();
   const visible = useVisible();
-  const [connected, setConnected] = useState(false);
+  const [state, setState] = useState<LiveState>('down');
   const everOpened = useRef(false);
   const signedIn = session.status === 'signed-in';
 
@@ -102,13 +103,16 @@ export function LiveProvider({ children }: { children: ReactNode }) {
       source = next;
       next.onopen = () => {
         refused = 0;
-        setConnected(true);
+        setState('open');
         if (everOpened.current) refetchAll(client);
         everOpened.current = true;
       };
       next.onerror = () => {
-        setConnected(false);
-        if (next.readyState !== EventSource.CLOSED) return;
+        if (next.readyState !== EventSource.CLOSED) {
+          setState('down');
+          return;
+        }
+        setState('refused');
         void client.invalidateQueries({
           predicate: (query) => readAt(query) === SESSION_PATH,
         });
@@ -130,9 +134,9 @@ export function LiveProvider({ children }: { children: ReactNode }) {
       clearTimeout(reopen);
       clearTimeout(gather);
       source?.close();
-      setConnected(false);
+      setState('down');
     };
   }, [signedIn, visible, client]);
 
-  return <LiveContext value={signedIn && connected}>{children}</LiveContext>;
+  return <LiveContext value={signedIn ? state : 'down'}>{children}</LiveContext>;
 }

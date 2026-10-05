@@ -1,2 +1,2 @@
 export { LiveProvider } from './LiveProvider';
-export { useFallbackPoll, useLiveConnected } from './live-context';
+export { useFallbackPoll, useLiveConnected, useLiveRefused } from './live-context';
