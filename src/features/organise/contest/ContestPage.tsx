@@ -12,6 +12,8 @@ import { contestantsPath, taskPath } from '@/lib/organiser-paths';
 import { PageLink } from '@/ui/PageLink';
 import { t } from '@/lib/t';
 import { Create } from '../Create';
+import { AnnouncementsSection } from '../threads/AnnouncementsSection';
+import { ContestClarifications } from '../threads/Clarifications';
 import { PeopleSection } from '../people/PeopleSection';
 import { LinkList } from '../LinkList';
 import { FileBrowser } from '../files/FileBrowser';
@@ -107,6 +109,12 @@ export function ContestPage() {
             </>
           )}
         </div>
+      </Card>
+      <Card>
+        <AnnouncementsSection place={{ kind: 'contest', org, contest }} />
+      </Card>
+      <Card>
+        <ContestClarifications org={org} contest={contest} />
       </Card>
       <Card>
         <FileBrowser place={{ kind: 'contest', org, contest }} />

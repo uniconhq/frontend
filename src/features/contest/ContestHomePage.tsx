@@ -13,6 +13,8 @@ import { taskPagePath } from '@/lib/contest-paths';
 import { useContestParams } from '@/lib/route-params';
 import { formatDateTime } from '@/lib/time';
 import { t } from '@/lib/t';
+import { ContestAnnouncements } from './threads/AnnouncementList';
+import { QuestionsSection } from './threads/QuestionsSection';
 import { BySession } from './BySession';
 import { Countdown } from './Countdown';
 import { RegistrationPanel } from './RegistrationPanel';
@@ -143,6 +145,18 @@ function Home({
           <TaskList org={org} contest={contest} tasks={home.tasks} />
         </div>
       </Card>
+      <Card>
+        <ContestAnnouncements org={org} contest={contest} />
+      </Card>
+      {home.registration?.status === 'approved' && (
+        <Card>
+          <QuestionsSection
+            org={org}
+            contest={contest}
+            tasks={home.tasks.map((task) => ({ name: task.name, title: task.title }))}
+          />
+        </Card>
+      )}
     </div>
   );
 }
