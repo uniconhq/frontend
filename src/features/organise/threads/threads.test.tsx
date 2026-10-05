@@ -25,7 +25,7 @@ function announcement(overrides: Partial<Announcement> = {}): Announcement {
 function question(overrides: Partial<Clarification> = {}): Clarification {
   return {
     contest: { org: 'acme', contest: 'spring', task: null },
-    asker: 20,
+    asker: '20',
     number: 1,
     task: null,
     title: 'Input size?',

@@ -283,7 +283,7 @@ describe('the submit panel', () => {
     ['archived', {}, 'The contest is archived', 'they take no submissions'],
     [
       'not_approved',
-      {},
+      { detail: 'Only an approved contestant of the contest submits to it.' },
       'You are not a contestant here yet',
       'Only an approved contestant',
     ],
