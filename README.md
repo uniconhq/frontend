@@ -191,6 +191,16 @@ contestant of the contest among them, and a change to the person's own roles
 reads the session again, since those decide what every page offers. Someone
 who does not observe the place is not shown the section.
 
+Below the organisers are the invites to a role there, and the contestants
+page has the invites to a place in the contest: who each is for, what it
+grants, whether it is pending, lapsed, accepted, declined or withdrawn, and
+what became of its mail. A manager invites by username or by email address,
+in one field, since a Forgejo username has no `@`; it stands for 14 days. A
+manager also sends a pending invite again, which mails a new link, and
+withdraws one; an observer reads the list. While a mail waits to go out the
+list is read again every five seconds. The pieces are in
+`src/features/organise/invites/`.
+
 A create makes the org, contest or task before it answers, so the form
 closes as soon as it has and the new thing is in the list above; the new org
 form opens the new org. A refusal keeps the form open with what was typed
@@ -220,6 +230,7 @@ leaves it pending again.
 | `/`                                   | the public contests for a visitor; your contests once signed in                           |
 | `/contests/:org/:contest`             | a contest's dates, countdown, registration and released tasks                             |
 | `/contests/:org/:contest/tasks/:task` | a released task's statement; signed in, its limits, the submit panel and your submissions |
+| `/invites`                            | your invites, with Accept and Decline; an invite mail links here                          |
 
 One address serves a visitor and a signed-in person, so a contest's link can
 be shared before anyone has an account; the page reads the public routes or
@@ -235,6 +246,21 @@ refusal code has its own sentence in `src/api/describe-error.ts`. A statement
 is Markdown, rendered by `src/ui/Markdown.tsx` with raw HTML dropped, links
 out of the site opened apart, images shown as links, and headings one level
 down. The addresses are built in `src/lib/contest-paths.ts`.
+
+### Invites
+
+The home page shows the invites waiting for a signed-in person, when there
+are any, and `/invites` lists them all: what each offers and where, who sent
+it and when it lapses, with Accept and Decline. An invite decided there stays
+in place and says what came of it: an accepted role reads the session again,
+so the new role shows, and links to its page; an accepted place links to the
+contest's page, where the person registers. An invite's mail links to
+`/invites#<token>`. The token moves out of the address into the tab's storage
+before the session guard reads it (`InviteLink`), so a sign-in on the way
+never carries it in its `?next=`, which the backend and the proxy would log;
+back from Forgejo, the page opens that invite first. A link that is not the
+signed-in account's says so and to sign in with the account it was sent to.
+The proxy in `deploy` has to send `/invites` to this app as well.
 
 ### Submitting
 
@@ -358,7 +384,7 @@ src/
   ui/        shell (header, sidebar, breadcrumb, account menu), feedback, brand,
              the wrappers: buttons, fields, the file drop zone, verdicts, and
              the parts of announcements and questions both sides show
-  features/  home (landing and the contest lists), auth (login page), account
+  features/  home (landing, the contest lists, your invites), auth (login page), account
              (profile, sessions), contest (the contestant pages, with submit/
              for the submit panel and the submissions), organise (the
              organiser pages)

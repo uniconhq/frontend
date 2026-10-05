@@ -37,6 +37,25 @@ export function tasksReached(roles: Roles, org: string, contest: string): string
   );
 }
 
+/** Each role's name, as a page shows it. */
+export const ROLE_LABEL: Record<RoleName, string> = {
+  admin: 'Admin',
+  manager: 'Manager',
+  observer: 'Observer',
+};
+
+/** What each role lets its holder do, under a choice of role. */
+export const ROLE_MEANS: Record<RoleName, string> = {
+  admin: 'Everything a manager does, and gives or takes the admin role.',
+  manager: 'Edits, publishes, decides registrations and gives the roles below admin.',
+  observer: 'Reads everything here and changes nothing.',
+};
+
+/** The roles a person may hand out, or invite someone to: admin only by an admin. */
+export function offered(administers: boolean): RoleName[] {
+  return administers ? ['admin', 'manager', 'observer'] : ['manager', 'observer'];
+}
+
 const RANK: Record<RoleName, number> = { admin: 3, manager: 2, observer: 1 };
 
 function rankOf(role: string): number {

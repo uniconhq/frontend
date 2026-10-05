@@ -8,7 +8,7 @@ import { AppShell } from '@/ui/shell/AppShell';
 import { LiveProvider } from '@/live';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { NotFound } from '@/ui/feedback/NotFound';
-import { HomePage } from '@/features/home';
+import { HomePage, InviteLink, InvitesPage } from '@/features/home';
 import { LoginPage } from '@/features/auth';
 import { AccountPage } from '@/features/account';
 import { ContestHomePage, TaskStatementPage } from '@/features/contest';
@@ -83,6 +83,21 @@ export const routes: RouteObject[] = [
           {
             path: 'contests/:org/:contest/tasks/:task',
             element: <TaskStatementPage />,
+          },
+          /**
+           * Where an invite's mail links to, with its token after the `#`,
+           * which InviteLink moves into the tab before the guard reads the
+           * address for a sign-in's `?next=`.
+           */
+          {
+            path: 'invites',
+            element: <InviteLink />,
+            children: [
+              {
+                element: <RequireSession />,
+                children: [{ index: true, element: <InvitesPage /> }],
+              },
+            ],
           },
           {
             element: <RequireSession />,
