@@ -5,7 +5,6 @@ import { $api } from '@/api/query';
 import type { Submission, TaskPage } from '@/api/types';
 import { Card } from '@/ui/Card';
 import { SectionTitle } from '@/ui/SectionTitle';
-import { t } from '@/lib/t';
 import { emptyDraft, isPanelInput, type Draft } from './draft';
 import { newestFirst } from './grading';
 import { SubmissionDetail } from './SubmissionDetail';
@@ -83,7 +82,7 @@ export function TaskSubmissions({
       {open && (
         <Card>
           <div className={shared.stack}>
-            <SectionTitle>{t('Submit')}</SectionTitle>
+            <SectionTitle>Submit</SectionTitle>
             <SubmitPanel
               inputs={inputs}
               notebook={notebook}
@@ -112,7 +111,7 @@ export function TaskSubmissions({
       )}
       <Card>
         <div className={shared.stack}>
-          <SectionTitle>{t('Your submissions')}</SectionTitle>
+          <SectionTitle>Your submissions</SectionTitle>
           <SubmissionList org={org} contest={contest} task={task} />
         </div>
       </Card>

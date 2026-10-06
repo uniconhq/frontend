@@ -110,6 +110,16 @@ The document spells out whole paths (`/api/v1/time`, `/healthz`), so the client'
 base URL is the page's own origin with no prefix, and call sites pass the path
 exactly as the document names it: `$api.useQuery('get', '/api/v1/time')`.
 
+A change is a mutation from `$api.useMutation`. What it leaves stale is read
+again from the hook's own `onSuccess`, which TanStack Query waits for, so a
+form stays busy until the page shows the answer and a second click cannot
+send the change twice; the form shows the mutation's own `isPending` and
+`error`. A change whose refusal also leaves the page stale, such as cancelling
+or retrying a grading, reads it again from `onSettled` instead. A part of a page that makes several changes under one busy flag and
+one refusal, such as a team card, runs them through `useChange`
+(`api/change.ts`), which also reads the page again after a refusal that shows
+it was behind and moves the focus once a change has gone through.
+
 ## The rules that are cheap now and expensive later
 
 **Application code imports Mantine through `src/ui`, never directly.** The
@@ -416,10 +426,11 @@ and pages poll while it is not (`useFallbackPoll`).
 ```
 src/
   main.tsx  app.tsx  router.tsx  global.css
-  api/       generated types, the fetch client, the query wrapper, error shapes
+  api/       generated types, the fetch client, the query wrapper, the change
+             runner, error shapes
   lib/       server clock, the organiser and contest addresses,
              the route params, scope names, sizes, the full-page way out
-             to Forgejo, the t() every string goes through
+             to Forgejo
   session/   who is signed in: the boot query, the guard, sign-out, where Forgejo is, the
              expired-session modal. Not a feature, because the shell, the
              router and three features all read it

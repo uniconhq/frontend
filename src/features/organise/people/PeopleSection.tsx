@@ -1,5 +1,6 @@
 import { useRef, useState, type FormEvent } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { useChange } from '@/api/change';
 import { $api, queryView } from '@/api/query';
 import { isApiError } from '@/api/problem';
 import type { Holder, RoleName, ScopeNames } from '@/api/types';
@@ -15,7 +16,6 @@ import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
 import { useMe } from '@/session';
 import { contestPath, orgPath, taskPath } from '@/lib/organiser-paths';
 import { scopeName } from '@/lib/scope-name';
-import { t } from '@/lib/t';
 import {
   holdsAt,
   isPlace,
@@ -31,7 +31,7 @@ import classes from './people.module.css';
 function roleOptions(administers: boolean) {
   return offered(administers).map((role) => ({
     value: role,
-    label: t(ROLE_LABEL[role]),
+    label: ROLE_LABEL[role],
   }));
 }
 
@@ -50,9 +50,9 @@ function Refusal({ error, username }: { error: unknown; username?: string }) {
   if (isApiError(error) && error.code === 'sole_admin') {
     return (
       <div role="alert">
-        <BodyText tone="secondary">{t('That would leave no admin')}</BodyText>
+        <BodyText tone="secondary">That would leave no admin</BodyText>
         <BodyText tone="secondary">
-          {error.detail ?? t('Someone else has to be an admin here first.')}
+          {error.detail ?? 'Someone else has to be an admin here first.'}
         </BodyText>
       </div>
     );
@@ -61,8 +61,8 @@ function Refusal({ error, username }: { error: unknown; username?: string }) {
     return (
       <div role="alert">
         <BodyText tone="secondary">
-          {t('Nobody has the username')} {username}.{' '}
-          {t('They need an account first, and the name as they sign in with it.')}
+          Nobody has the username {username}. They need an account first, and the name
+          as they sign in with it.
         </BodyText>
       </div>
     );
@@ -107,33 +107,23 @@ function HolderRow({
   const afterChange = useAfterChange(place);
   const [open, setOpen] = useState<'role' | 'remove' | null>(null);
   const [role, setRole] = useState<RoleName>(holder.role);
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState<unknown>(null);
   const row = useRef<HTMLTableRowElement>(null);
   const isMe = holder.user.id === me;
+  const change = useChange({ reread: () => afterChange(isMe), focus: row });
+  const { error } = change;
+  const pending = change.pending !== null;
   const name = holder.user.username;
   const inherited = !isPlace(holder.at_names, place);
   const changeable = manages && !inherited && (holder.role !== 'admin' || administers);
 
   const show = (next: 'role' | 'remove' | null) => {
-    setError(null);
+    change.dismiss();
     setRole(holder.role);
     setOpen(next);
   };
 
-  const run = async (change: () => Promise<void>) => {
-    setPending(true);
-    setError(null);
-    try {
-      await change();
-      setOpen(null);
-      await afterChange(isMe);
-      row.current?.focus();
-    } catch (refused) {
-      setError(refused);
-    } finally {
-      setPending(false);
-    }
+  const run = async (key: string, made: () => Promise<void>) => {
+    if ((await change.run(key, made)).ok) setOpen(null);
   };
 
   const submitRole = (event: FormEvent) => {
@@ -142,7 +132,7 @@ function HolderRow({
       show(null);
       return;
     }
-    void run(() => grant(holder.user.username, role));
+    void run('role', () => grant(holder.user.username, role));
   };
 
   return (
@@ -151,24 +141,24 @@ function HolderRow({
         <div className={classes.person}>
           <span>
             {name}
-            {isMe && ` (${t('you')})`}
+            {isMe && ' (you)'}
           </span>
           {holder.user.name !== null && (
             <BodyText tone="secondary">{holder.user.name}</BodyText>
           )}
         </div>
       </th>
-      <td>{t(ROLE_LABEL[holder.role])}</td>
+      <td>{ROLE_LABEL[holder.role]}</td>
       <td>
         {inherited ? (
           <div className={classes.person}>
             <span className={classes.mono}>{scopeName(holder.at_names)}</span>
             {manages && (
-              <PageLink to={pagePath(holder.at_names)}>{t('Change it there')}</PageLink>
+              <PageLink to={pagePath(holder.at_names)}>Change it there</PageLink>
             )}
           </div>
         ) : (
-          t('Here')
+          'Here'
         )}
       </td>
       {manages && (
@@ -178,18 +168,18 @@ function HolderRow({
               <Button
                 size="xs"
                 variant="secondary"
-                label={`${t('Change role of')} ${name}`}
+                label={`Change role of ${name}`}
                 onClick={() => show('role')}
               >
-                {t('Change role')}
+                Change role
               </Button>
               <Button
                 size="xs"
                 variant="danger"
-                label={`${t('Remove')} ${name}`}
+                label={`Remove ${name}`}
                 onClick={() => show('remove')}
               >
-                {t('Remove')}
+                Remove
               </Button>
             </div>
           )}
@@ -197,21 +187,21 @@ function HolderRow({
             <form
               className={classes.inline}
               onSubmit={submitRole}
-              aria-label={`${t('Change role of')} ${name}`}
+              aria-label={`Change role of ${name}`}
             >
               <Select
-                label={t('Role')}
+                label="Role"
                 value={role}
                 options={roleOptions(administers)}
                 onChange={(value) => setRole(value as RoleName)}
               />
-              <BodyText tone="secondary">{t(ROLE_MEANS[role])}</BodyText>
+              <BodyText tone="secondary">{ROLE_MEANS[role]}</BodyText>
               <div className={classes.actions}>
                 <Button size="xs" type="submit" loading={pending}>
-                  {t('Save')}
+                  Save
                 </Button>
                 <Button size="xs" variant="secondary" onClick={() => show(null)}>
-                  {t('Cancel')}
+                  Cancel
                 </Button>
               </div>
             </form>
@@ -220,27 +210,25 @@ function HolderRow({
           <Modal
             opened={open === 'remove'}
             onClose={() => show(null)}
-            title={isMe ? t('Give up your role here?') : t('Remove this role?')}
+            title={isMe ? 'Give up your role here?' : 'Remove this role?'}
           >
             <div className={classes.inline}>
               <BodyText>
                 {isMe
-                  ? t(
-                      'You will no longer see or change this unless a role elsewhere covers it.',
-                    )
-                  : `${name} ${t('will no longer see or change this, unless a role elsewhere covers it.')}`}
+                  ? 'You will no longer see or change this unless a role elsewhere covers it.'
+                  : `${name} will no longer see or change this, unless a role elsewhere covers it.`}
               </BodyText>
               {error !== null && <Refusal error={error} />}
               <div className={classes.actions}>
                 <Button
                   variant="danger"
                   loading={pending}
-                  onClick={() => void run(() => revoke(holder.user.id))}
+                  onClick={() => void run('remove', () => revoke(holder.user.id))}
                 >
-                  {t('Remove')}
+                  Remove
                 </Button>
                 <Button variant="secondary" onClick={() => show(null)}>
-                  {t('Cancel')}
+                  Cancel
                 </Button>
               </div>
             </div>
@@ -261,56 +249,47 @@ function AddPerson({ place, administers }: { place: RolePlace; administers: bool
   const me = useMe();
   const [username, setUsername] = useState('');
   const [role, setRole] = useState<RoleName>('manager');
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState<unknown>(null);
   const [tried, setTried] = useState('');
+  const change = useChange({
+    reread: () => afterChange(username.trim() === me.user.username),
+  });
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     const name = username.trim();
     if (name === '') return;
-    setPending(true);
-    setError(null);
     setTried(name);
-    try {
-      await grant(name, role);
-      setUsername('');
-      await afterChange(name === me.user.username);
-    } catch (refused) {
-      setError(refused);
-    } finally {
-      setPending(false);
-    }
+    if ((await change.run('add', () => grant(name, role))).ok) setUsername('');
   };
 
   return (
     <form
       className={classes.add}
       onSubmit={(event) => void submit(event)}
-      aria-label={t('Add someone')}
+      aria-label="Add someone"
     >
       <div className={classes.addFields}>
         <TextInput
-          label={t('Username')}
-          description={t('Their username at Forgejo, as they sign in with it.')}
+          label="Username"
+          description="Their username at Forgejo, as they sign in with it."
           value={username}
           onChange={setUsername}
           required
         />
         <Select
-          label={t('Role')}
+          label="Role"
           value={role}
           options={roleOptions(administers)}
           onChange={(value) => setRole(value as RoleName)}
         />
       </div>
-      <BodyText tone="secondary">{t(ROLE_MEANS[role])}</BodyText>
+      <BodyText tone="secondary">{ROLE_MEANS[role]}</BodyText>
       <div className={classes.actions}>
-        <Button size="xs" type="submit" loading={pending}>
-          {t('Add')}
+        <Button size="xs" type="submit" loading={change.pending !== null}>
+          Add
         </Button>
       </div>
-      {error !== null && <Refusal error={error} username={tried} />}
+      {change.error !== null && <Refusal error={change.error} username={tried} />}
     </form>
   );
 }
@@ -338,17 +317,17 @@ export function PeopleSection({ place }: { place: RolePlace }) {
 
   return (
     <div className={classes.stack}>
-      <SectionTitle>{t('Organisers')}</SectionTitle>
+      <SectionTitle>Organisers</SectionTitle>
       {view.state === 'loading' && <PageSkeleton rows={3} />}
       {view.state === 'error' && <ErrorBlock error={view.error} onRetry={view.retry} />}
       {view.state === 'ready' && (
-        <table className={classes.table} aria-label={t('Organisers')}>
+        <table className={classes.table} aria-label="Organisers">
           <thead>
             <tr>
-              <th scope="col">{t('Person')}</th>
-              <th scope="col">{t('Role')}</th>
-              <th scope="col">{t('Held at')}</th>
-              {manages && <th scope="col">{t('Actions')}</th>}
+              <th scope="col">Person</th>
+              <th scope="col">Role</th>
+              <th scope="col">Held at</th>
+              {manages && <th scope="col">Actions</th>}
             </tr>
           </thead>
           <tbody>
@@ -366,7 +345,7 @@ export function PeopleSection({ place }: { place: RolePlace }) {
         </table>
       )}
       {manages && <AddPerson place={place} administers={administers} />}
-      <SectionTitle order={3}>{t('Invites')}</SectionTitle>
+      <SectionTitle order={3}>Invites</SectionTitle>
       <InvitesSection
         place={place}
         audience="organisers"

@@ -4,7 +4,6 @@ import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
 import { PageTitle } from '@/ui/PageTitle';
 import { CreateAccountLink, currentPath, loginHref } from '@/session';
-import { t } from '@/lib/t';
 import classes from './contest.module.css';
 
 /** The way in, back to this page: sign in, and create an account where open. */
@@ -12,7 +11,7 @@ export function SignInButtons() {
   const location = useLocation();
   return (
     <div className={classes.actions}>
-      <Button href={loginHref(currentPath(location))}>{t('Sign in')}</Button>
+      <Button href={loginHref(currentPath(location))}>Sign in</Button>
       <CreateAccountLink />
     </div>
   );
@@ -28,9 +27,7 @@ export function SignInPrompt({ title, back }: { title: string; back?: ReactNode 
     <div className={classes.page}>
       {back}
       <PageTitle>{title}</PageTitle>
-      <BodyText>
-        {t('It is open to people with an account, or it is not there.')}
-      </BodyText>
+      <BodyText>It is open to people with an account, or it is not there.</BodyText>
       <SignInButtons />
     </div>
   );

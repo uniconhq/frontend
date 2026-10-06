@@ -9,7 +9,6 @@ import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
 import { useMe } from '@/session';
 import { clarificationsPath, contestPath } from '@/lib/organiser-paths';
-import { t } from '@/lib/t';
 import { Create } from '../Create';
 import { PeopleSection } from '../people/PeopleSection';
 import { LinkList } from '../LinkList';
@@ -31,8 +30,15 @@ export function OrgPage() {
   const view = queryView(
     $api.useQuery('get', '/api/v1/orgs/{org}/contests', { params: { path: { org } } }),
   );
-  const create = $api.useMutation('post', '/api/v1/orgs/{org}/contests');
   const queryClient = useQueryClient();
+  const create = $api.useMutation('post', '/api/v1/orgs/{org}/contests', {
+    onSuccess: () =>
+      queryClient.invalidateQueries({
+        queryKey: $api.queryOptions('get', '/api/v1/orgs/{org}/contests', {
+          params: { path: { org } },
+        }).queryKey,
+      }),
+  });
 
   const links = (names: string[]) =>
     names.map((name) => ({ name, to: contestPath(org, name) }));
@@ -41,19 +47,19 @@ export function OrgPage() {
     <div className={classes.page}>
       <PageTitle>{org}</PageTitle>
       <div className={classes.actions}>
-        <PageLink to={clarificationsPath(org)}>{t('Open questions')}</PageLink>
+        <PageLink to={clarificationsPath(org)}>Open questions</PageLink>
       </div>
       <Card>
         <div className={classes.stack}>
-          <SectionTitle>{t('Contests')}</SectionTitle>
+          <SectionTitle>Contests</SectionTitle>
           {view.state === 'loading' && <PageSkeleton rows={3} />}
           {view.state === 'error' && (
             <>
               <ErrorBlock error={view.error} onRetry={view.retry} />
               {reached.length > 0 && (
                 <>
-                  <BodyText>{t('Contests of this org you hold a role at:')}</BodyText>
-                  <LinkList label={t('Your contests')} links={links(reached)} />
+                  <BodyText>Contests of this org you hold a role at:</BodyText>
+                  <LinkList label="Your contests" links={links(reached)} />
                 </>
               )}
             </>
@@ -61,32 +67,27 @@ export function OrgPage() {
           {view.state === 'ready' && (
             <>
               {view.data.length === 0 ? (
-                <BodyText>{t('No contests yet.')}</BodyText>
+                <BodyText>No contests yet.</BodyText>
               ) : (
                 <LinkList
-                  label={t('Contests')}
+                  label="Contests"
                   links={links(view.data.map((contest) => contest.name))}
                 />
               )}
               <Create
-                openLabel={t('New contest')}
-                title={t('New contest')}
+                openLabel="New contest"
+                title="New contest"
                 second={{
-                  label: t('Title'),
-                  description: t('Optional. The name is used when there is none.'),
+                  label: 'Title',
+                  description: 'Optional. The name is used when there is none.',
                 }}
-                submitLabel={t('Create contest')}
+                submitLabel="Create contest"
                 pending={create.isPending}
                 error={create.error}
                 onSubmit={async (name, title) => {
                   await create.mutateAsync({
                     params: { path: { org } },
                     body: { name, title: title === '' ? null : title },
-                  });
-                  await queryClient.invalidateQueries({
-                    queryKey: $api.queryOptions('get', '/api/v1/orgs/{org}/contests', {
-                      params: { path: { org } },
-                    }).queryKey,
                   });
                 }}
               />

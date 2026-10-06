@@ -5,7 +5,6 @@ import { orgPath } from '@/lib/organiser-paths';
 import { Card } from '@/ui/Card';
 import { BodyText } from '@/ui/BodyText';
 import { PageTitle } from '@/ui/PageTitle';
-import { t } from '@/lib/t';
 import { Create } from '../Create';
 import classes from '../organise.module.css';
 
@@ -20,37 +19,38 @@ const DESCRIPTION_MAX = 255;
  * them.
  */
 export function NewOrgPage() {
-  const create = $api.useMutation('post', '/api/v1/orgs');
   const queryClient = useQueryClient();
+  const create = $api.useMutation('post', '/api/v1/orgs', {
+    onSuccess: () =>
+      queryClient.invalidateQueries({
+        queryKey: $api.queryOptions('get', '/api/v1/me').queryKey,
+      }),
+  });
   const navigate = useNavigate();
 
   return (
     <div className={classes.page}>
-      <PageTitle>{t('New org')}</PageTitle>
+      <PageTitle>New org</PageTitle>
       <Card>
         <div className={classes.stack}>
           <BodyText size="md">
-            {t(
-              'An org holds contests and the people who run them. You become its first admin.',
-            )}
+            An org holds contests and the people who run them. You become its first
+            admin.
           </BodyText>
           <Create
-            openLabel={t('New org')}
-            title={t('The org')}
+            openLabel="New org"
+            title="The org"
             second={{
-              label: t('Description'),
-              description: `${t('Optional, at most')} ${String(DESCRIPTION_MAX)} ${t('characters.')}`,
+              label: 'Description',
+              description: `Optional, at most ${String(DESCRIPTION_MAX)} characters.`,
               maxLength: DESCRIPTION_MAX,
             }}
-            submitLabel={t('Create org')}
+            submitLabel="Create org"
             startOpen
             pending={create.isPending}
             error={create.error}
             onSubmit={async (name, description) => {
               const made = await create.mutateAsync({ body: { name, description } });
-              await queryClient.invalidateQueries({
-                queryKey: $api.queryOptions('get', '/api/v1/me').queryKey,
-              });
               await navigate(orgPath(made.name));
             }}
           />
