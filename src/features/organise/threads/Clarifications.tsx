@@ -16,7 +16,6 @@ import { useMe } from '@/session';
 import { useFallbackPoll } from '@/live';
 import { clarificationsPath, orgPath } from '@/lib/organiser-paths';
 import { useOrgParam } from '@/lib/route-params';
-import { t } from '@/lib/t';
 import { holdsAtContest } from '../roles';
 import { QuestionThread } from '@/ui/threads/ThreadParts';
 import { isTeams } from '@/ui/threads/asker';
@@ -125,22 +124,16 @@ function ClarificationCard({
       </BodyText>
       <QuestionThread
         clarification={clarification}
-        asker={isTeams(clarification) ? t('Team') : t('Contestant')}
+        asker={isTeams(clarification) ? 'Team' : 'Contestant'}
       />
       {manages && (
         <>
           <form
             className={classes.form}
             onSubmit={(event) => void sendReply(event)}
-            aria-label={`${t('Reply to')} ${name}`}
+            aria-label={`Reply to ${name}`}
           >
-            <Textarea
-              label={t('Reply')}
-              value={body}
-              onChange={setBody}
-              rows={2}
-              required
-            />
+            <Textarea label="Reply" value={body} onChange={setBody} rows={2} required />
             <div className={classes.actions}>
               <Button
                 type="submit"
@@ -148,39 +141,39 @@ function ClarificationCard({
                 variant="secondary"
                 loading={busy === 'reply'}
               >
-                {t('Reply')}
+                Reply
               </Button>
               {clarification.answered ? (
                 <Button
                   size="xs"
                   variant="secondary"
-                  label={`${t('Unmark')} ${name}`}
+                  label={`Unmark ${name}`}
                   loading={busy === 'unmark'}
                   onClick={() =>
                     void run('unmark', () => unmark.mutateAsync({ params: { path } }))
                   }
                 >
-                  {t('Unmark')}
+                  Unmark
                 </Button>
               ) : (
                 <Button
                   size="xs"
-                  label={`${t('Mark as answered')} ${name}`}
+                  label={`Mark as answered ${name}`}
                   loading={busy === 'mark'}
                   onClick={() =>
                     void run('mark', () => mark.mutateAsync({ params: { path } }))
                   }
                 >
-                  {t('Mark as answered')}
+                  Mark as answered
                 </Button>
               )}
               <Button
                 size="xs"
                 variant="secondary"
-                label={`${t('Answer publicly')} ${name}`}
+                label={`Answer publicly ${name}`}
                 onClick={() => setPublishing(!publishing)}
               >
-                {t('Answer publicly')}
+                Answer publicly
               </Button>
             </div>
           </form>
@@ -188,22 +181,21 @@ function ClarificationCard({
             <form
               className={classes.form}
               onSubmit={(event) => void sendAnswer(event)}
-              aria-label={`${t('Answer publicly')} ${name}`}
+              aria-label={`Answer publicly ${name}`}
             >
               <BodyText tone="secondary">
-                {t(
-                  'Every contestant reads this announcement. The question itself stays private.',
-                )}
+                Every contestant reads this announcement. The question itself stays
+                private.
               </BodyText>
               <TextInput
-                label={t('Title')}
+                label="Title"
                 value={title}
                 onChange={setTitle}
                 maxLength={200}
                 required
               />
               <Textarea
-                label={t('Answer')}
+                label="Answer"
                 value={answer}
                 onChange={setAnswer}
                 rows={3}
@@ -211,7 +203,7 @@ function ClarificationCard({
               />
               <div className={classes.actions}>
                 <Button type="submit" size="xs" loading={busy === 'publish'}>
-                  {t('Post announcement')}
+                  Post announcement
                 </Button>
               </div>
             </form>
@@ -242,12 +234,11 @@ export function InboxPage() {
 
   return (
     <div className={classes.stack}>
-      <PageLink to={orgPath(org)}>{t('Back to the org')}</PageLink>
-      <PageTitle>{t('Questions')}</PageTitle>
+      <PageLink to={orgPath(org)}>Back to the org</PageLink>
+      <PageTitle>Questions</PageTitle>
       <BodyText tone="secondary">
-        {t(
-          'Every question still open across the org. A reply keeps a question here; only Mark as answered takes it off.',
-        )}
+        Every question still open across the org. A reply keeps a question here; only
+        Mark as answered takes it off.
       </BodyText>
       <Card>
         {view.state === 'loading' && <PageSkeleton rows={3} />}
@@ -256,9 +247,9 @@ export function InboxPage() {
         )}
         {view.state === 'ready' &&
           (view.data.length === 0 ? (
-            <BodyText>{t('No question is waiting.')}</BodyText>
+            <BodyText>No question is waiting.</BodyText>
           ) : (
-            <ol className={classes.list} aria-label={t('Open questions')}>
+            <ol className={classes.list} aria-label="Open questions">
               {view.data.map((clarification) => (
                 <ClarificationCard
                   key={`${clarification.contest.contest ?? ''}/${clarification.asker}/${String(clarification.number)}`}
@@ -301,17 +292,15 @@ export function ContestClarifications({
 
   return (
     <div className={classes.stack}>
-      <SectionTitle>{t('Questions')}</SectionTitle>
-      <PageLink to={clarificationsPath(org)}>
-        {t('Open questions across the org')}
-      </PageLink>
+      <SectionTitle>Questions</SectionTitle>
+      <PageLink to={clarificationsPath(org)}>Open questions across the org</PageLink>
       {view.state === 'loading' && <PageSkeleton rows={2} />}
       {view.state === 'error' && <ErrorBlock error={view.error} onRetry={view.retry} />}
       {view.state === 'ready' &&
         (view.data.length === 0 ? (
-          <BodyText tone="secondary">{t('Nobody has asked anything yet.')}</BodyText>
+          <BodyText tone="secondary">Nobody has asked anything yet.</BodyText>
         ) : (
-          <ol className={classes.list} aria-label={t('Questions')}>
+          <ol className={classes.list} aria-label="Questions">
             {[...view.data].reverse().map((clarification) => (
               <ClarificationCard
                 key={`${clarification.asker}/${String(clarification.number)}`}

@@ -3,7 +3,6 @@ import { useLocation } from 'react-router';
 import { Modal } from '@/ui/Modal';
 import { Button } from '@/ui/Button';
 import { BodyText } from '@/ui/BodyText';
-import { t } from '@/lib/t';
 import { isSessionExpired, subscribe } from './expired';
 import { currentPath, loginHref } from './login-href';
 import classes from './SessionExpiredModal.module.css';
@@ -22,16 +21,14 @@ export function SessionExpiredModal() {
     <Modal
       opened={expired}
       onClose={() => {}}
-      title={t('Your session ended')}
+      title="Your session ended"
       dismissable={false}
     >
       <BodyText size="md">
-        {t(
-          'This page and anything you have typed are still here. Sign in again to save it.',
-        )}
+        This page and anything you have typed are still here. Sign in again to save it.
       </BodyText>
       <div className={classes.actions}>
-        <Button href={loginHref(currentPath(location))}>{t('Sign in again')}</Button>
+        <Button href={loginHref(currentPath(location))}>Sign in again</Button>
       </div>
     </Modal>
   );

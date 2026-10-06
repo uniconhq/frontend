@@ -10,7 +10,6 @@ import { contestHomePath } from '@/lib/contest-paths';
 import { contestPath, orgPath, taskPath } from '@/lib/organiser-paths';
 import { scopeName } from '@/lib/scope-name';
 import { formatDateTime } from '@/lib/time';
-import { t } from '@/lib/t';
 import { useDecide, useMyInvites } from './my-invites';
 import classes from './invites.module.css';
 
@@ -30,8 +29,8 @@ const NOW_HOLDS: Record<Exclude<Invite['grants'], 'contestant'>, string> = {
 function offer(invite: Invite): string {
   const where = scopeName(invite.where);
   return invite.grants === 'contestant'
-    ? `${t('A place in the contest')} ${where}`
-    : `${t(ROLE[invite.grants])} ${t('at')} ${where}`;
+    ? `A place in the contest ${where}`
+    : `${ROLE[invite.grants]} at ${where}`;
 }
 
 /** The organiser's page of the place a role was accepted at. */
@@ -49,12 +48,11 @@ function Outcome({ invite }: { invite: Invite }) {
     return (
       <>
         <BodyText>
-          {t('You have a place in')} {where}.{' '}
-          {t('Register on the contest’s page to take part.')}
+          You have a place in {where}. Register on the contest’s page to take part.
         </BodyText>
         {invite.where.contest !== null && (
           <PageLink to={contestHomePath(invite.where.org, invite.where.contest)}>
-            {t('Go to the contest')}
+            Go to the contest
           </PageLink>
         )}
       </>
@@ -64,18 +62,16 @@ function Outcome({ invite }: { invite: Invite }) {
     return (
       <>
         <BodyText>
-          {t(NOW_HOLDS[grants])} {where}.
+          {NOW_HOLDS[grants]} {where}.
         </BodyText>
-        <PageLink to={placePath(invite)}>
-          {t('Open')} {where}
-        </PageLink>
+        <PageLink to={placePath(invite)}>Open {where}</PageLink>
       </>
     );
   }
   if (invite.status === 'declined') {
-    return <BodyText>{t('You declined this invite.')}</BodyText>;
+    return <BodyText>You declined this invite.</BodyText>;
   }
-  return <BodyText>{t('The organisers withdrew this invite.')}</BodyText>;
+  return <BodyText>The organisers withdrew this invite.</BodyText>;
 }
 
 /**
@@ -121,34 +117,34 @@ export function InviteCard({
       <span className={classes.offer}>{name}</span>
       <BodyText tone="secondary">
         {invite.invited_by === null
-          ? t('Sent by an organiser.')
-          : `${t('Sent by')} ${invite.invited_by.username}.`}{' '}
+          ? 'Sent by an organiser.'
+          : `Sent by ${invite.invited_by.username}.`}{' '}
         {invite.status === 'pending' &&
           (invite.expired
-            ? `${t('It lapsed on')} ${formatDateTime(new Date(invite.expires_at))}. ${t('Ask the organisers for a new one.')}`
-            : `${t('It lapses on')} ${formatDateTime(new Date(invite.expires_at))}.`)}
+            ? `It lapsed on ${formatDateTime(new Date(invite.expires_at))}. Ask the organisers for a new one.`
+            : `It lapses on ${formatDateTime(new Date(invite.expires_at))}.`)}
       </BodyText>
       {invite.status !== 'pending' && <Outcome invite={invite} />}
       {open && (
         <div className={classes.actions}>
           <Button
             size="xs"
-            label={`${t('Accept')}: ${name}`}
+            label={`Accept: ${name}`}
             loading={pending === 'accept'}
             disabled={pending === 'decline'}
             onClick={() => void choose('accept')}
           >
-            {t('Accept')}
+            Accept
           </Button>
           <Button
             size="xs"
             variant="secondary"
-            label={`${t('Decline')}: ${name}`}
+            label={`Decline: ${name}`}
             loading={pending === 'decline'}
             disabled={pending === 'accept'}
             onClick={() => void choose('decline')}
           >
-            {t('Decline')}
+            Decline
           </Button>
         </div>
       )}
@@ -182,8 +178,8 @@ export function PendingInvites() {
   if (view.state !== 'ready' || view.data.length === 0) return null;
   return (
     <section className={classes.section}>
-      <SectionTitle>{t('Invites for you')}</SectionTitle>
-      <InviteList label={t('Invites for you')} invites={view.data} />
+      <SectionTitle>Invites for you</SectionTitle>
+      <InviteList label="Invites for you" invites={view.data} />
     </section>
   );
 }

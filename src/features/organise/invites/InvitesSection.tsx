@@ -10,7 +10,6 @@ import { TextInput } from '@/ui/TextInput';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
 import { formatDateTime } from '@/lib/time';
-import { t } from '@/lib/t';
 import { offered, ROLE_LABEL, ROLE_MEANS, type RolePlace } from '../roles';
 import { invitesQuery, useInviteChanges, useInvites, type Target } from './invites';
 import classes from './invites.module.css';
@@ -55,13 +54,13 @@ function standing(invite: Invite): string {
 function standingDate(invite: Invite): string {
   if (invite.status === 'pending') {
     const at = formatDateTime(new Date(invite.expires_at));
-    return invite.expired ? `${t('Lapsed')} ${at}` : `${t('Lapses')} ${at}`;
+    return invite.expired ? `Lapsed ${at}` : `Lapses ${at}`;
   }
   return invite.decided_at === null ? '' : formatDateTime(new Date(invite.decided_at));
 }
 
 function who(invite: Invite): string {
-  return invite.username ?? invite.email ?? t('Nobody named');
+  return invite.username ?? invite.email ?? 'Nobody named';
 }
 
 /** A username, or an email address when what was typed has an `@`. */
@@ -83,8 +82,8 @@ function Refusal({ error, typed }: { error: unknown; typed?: string }) {
     return (
       <div role="alert">
         <BodyText tone="secondary">
-          {t('Nobody has the username')} {typed}.{' '}
-          {t('Invite their email address instead, and they can make an account.')}
+          Nobody has the username {typed}. Invite their email address instead, and they
+          can make an account.
         </BodyText>
       </div>
     );
@@ -152,20 +151,20 @@ function InviteRow({
           <BodyText tone="secondary">
             {invite.invited_by === null
               ? formatDateTime(new Date(invite.created_at))
-              : `${t('By')} ${invite.invited_by.username}, ${formatDateTime(new Date(invite.created_at))}`}
+              : `By ${invite.invited_by.username}, ${formatDateTime(new Date(invite.created_at))}`}
           </BodyText>
         </div>
       </th>
-      {audience === 'organisers' && <td>{t(GRANT_LABEL[invite.grants])}</td>}
+      {audience === 'organisers' && <td>{GRANT_LABEL[invite.grants]}</td>}
       <td>
         <div className={classes.cell}>
-          <span>{t(standing(invite))}</span>
+          <span>{standing(invite)}</span>
           <BodyText tone="secondary">{standingDate(invite)}</BodyText>
         </div>
       </td>
       <td>
         <div className={classes.cell}>
-          <span>{t(MAIL[invite.mail_status])}</span>
+          <span>{MAIL[invite.mail_status]}</span>
           {invite.mail_status === 'sent' && invite.mailed_at !== null && (
             <BodyText tone="secondary">
               {formatDateTime(new Date(invite.mailed_at))}
@@ -181,21 +180,21 @@ function InviteRow({
                 <Button
                   size="xs"
                   variant="secondary"
-                  label={`${t('Send again to')} ${name}`}
+                  label={`Send again to ${name}`}
                   loading={pending === 'again'}
                   onClick={() => void run('again', () => sendAgain(invite.id))}
                 >
-                  {t('Send again')}
+                  Send again
                 </Button>
               )}
               <Button
                 size="xs"
                 variant="danger"
-                label={`${t('Withdraw the invite for')} ${name}`}
+                label={`Withdraw the invite for ${name}`}
                 loading={pending === 'withdraw'}
                 onClick={() => void run('withdraw', () => withdraw(invite.id))}
               >
-                {t('Withdraw')}
+                Withdraw
               </Button>
             </div>
           )}
@@ -245,50 +244,46 @@ function InviteForm({ place, grants }: { place: RolePlace; grants: Grant[] }) {
 
   const means =
     grant === 'contestant'
-      ? t('They get a place in this contest and register from its page.')
-      : t(ROLE_MEANS[grant]);
+      ? 'They get a place in this contest and register from its page.'
+      : ROLE_MEANS[grant];
 
   return (
     <form
       className={classes.form}
       onSubmit={(event) => void submit(event)}
-      aria-label={t('Invite someone')}
+      aria-label="Invite someone"
     >
       <div className={classes.fields}>
         <TextInput
-          label={t('Username or email address')}
-          description={t(
-            'A username for someone with an account, an email address for anyone.',
-          )}
+          label="Username or email address"
+          description="A username for someone with an account, an email address for anyone."
           value={typed}
           onChange={setTyped}
           required
         />
         {grants.length > 1 && (
           <Select
-            label={t('Role')}
+            label="Role"
             value={grant}
             options={grants.map((value) => ({
               value,
-              label: t(GRANT_LABEL[value]),
+              label: GRANT_LABEL[value],
             }))}
             onChange={(value) => setGrant(value as Grant)}
           />
         )}
       </div>
       <BodyText tone="secondary">
-        {means} {t('The invite stands for')} {STANDS_DAYS} {t('days.')}
+        {means} The invite stands for {STANDS_DAYS} days.
       </BodyText>
       <div className={classes.actions}>
         <Button size="xs" type="submit" loading={pending}>
-          {t('Invite')}
+          Invite
         </Button>
       </div>
       {made !== null && (
         <div role="status">
-          <BodyText tone="secondary">
-            {t('Invited')} {made}.
-          </BodyText>
+          <BodyText tone="secondary">Invited {made}.</BodyText>
         </div>
       )}
       {error !== null && <Refusal error={error} typed={tried} />}
@@ -351,17 +346,17 @@ function InviteTable({
   administers: boolean;
 }) {
   if (invites.length === 0) {
-    return <BodyText tone="secondary">{t('No invites yet.')}</BodyText>;
+    return <BodyText tone="secondary">No invites yet.</BodyText>;
   }
   return (
-    <table className={classes.table} aria-label={t('Invites')}>
+    <table className={classes.table} aria-label="Invites">
       <thead>
         <tr>
-          <th scope="col">{t('Invited')}</th>
-          {audience === 'organisers' && <th scope="col">{t('Grants')}</th>}
-          <th scope="col">{t('Status')}</th>
-          <th scope="col">{t('Mail')}</th>
-          {manages && <th scope="col">{t('Actions')}</th>}
+          <th scope="col">Invited</th>
+          {audience === 'organisers' && <th scope="col">Grants</th>}
+          <th scope="col">Status</th>
+          <th scope="col">Mail</th>
+          {manages && <th scope="col">Actions</th>}
         </tr>
       </thead>
       <tbody>

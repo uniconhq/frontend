@@ -11,7 +11,6 @@ import {
   useForgeUrl,
   useSession,
 } from '@/session';
-import { t } from '@/lib/t';
 import { loginErrorCode } from './login-errors';
 import classes from './LoginPage.module.css';
 
@@ -40,7 +39,7 @@ export function LoginPage() {
             new ApiError({
               code: errorCode,
               status: 400,
-              title: t('Sign in failed'),
+              title: 'Sign in failed',
             })
           }
         />
@@ -48,18 +47,18 @@ export function LoginPage() {
 
       <div className={classes.actions}>
         <Button href={loginHref(next)}>
-          {errorCode === null ? t('Sign in with Forgejo') : t('Try again')}
+          {errorCode === null ? 'Sign in with Forgejo' : 'Try again'}
         </Button>
         <CreateAccountLink />
       </div>
 
       <BodyText tone="secondary">
-        {t('You will sign in through')}{' '}
-        {forge === null ? t('Forgejo') : <a href={forge}>{new URL(forge).host}</a>}
-        {t(', where your account, your repositories and your submissions live.')}
+        You will sign in through{' '}
+        {forge === null ? 'Forgejo' : <a href={forge}>{new URL(forge).host}</a>}, where
+        your account, your repositories and your submissions live.
       </BodyText>
 
-      <BodyText tone="secondary">{t('Unicon never sees your password.')}</BodyText>
+      <BodyText tone="secondary">Unicon never sees your password.</BodyText>
     </div>
   );
 }

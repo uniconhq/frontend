@@ -11,7 +11,6 @@ import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
 import { useMe } from '@/session';
 import { useFallbackPoll } from '@/live';
-import { t } from '@/lib/t';
 import { holdsAt } from '../roles';
 import { AnnouncementContent } from '@/ui/threads/ThreadParts';
 import { itemClass } from '@/ui/threads/item-class';
@@ -69,13 +68,13 @@ function Composer({
       aria-label={label}
     >
       <TextInput
-        label={t('Title')}
+        label="Title"
         value={title}
         onChange={setTitle}
         maxLength={200}
         required
       />
-      <Textarea label={t('Text')} value={body} onChange={setBody} rows={4} required />
+      <Textarea label="Text" value={body} onChange={setBody} rows={4} required />
       {error !== null && <ErrorBlock error={error} compact />}
       <div className={classes.actions}>
         <Button type="submit" size="xs" loading={sending}>
@@ -83,7 +82,7 @@ function Composer({
         </Button>
         {onCancel !== undefined && (
           <Button size="xs" variant="secondary" onClick={onCancel}>
-            {t('Cancel')}
+            Cancel
           </Button>
         )}
       </div>
@@ -112,7 +111,7 @@ function Managed({
     return (
       <li className={classes.item}>
         <Composer
-          label={`${t('Save')} ${name}`}
+          label={`Save ${name}`}
           initial={{ title: announcement.title, body: announcement.body }}
           onSend={async (text) => {
             await changes.edit(announcement.number, text);
@@ -132,15 +131,15 @@ function Managed({
           <Button
             size="xs"
             variant="secondary"
-            label={`${t('Edit')} ${name}`}
+            label={`Edit ${name}`}
             onClick={() => setEditing(true)}
           >
-            {t('Edit')}
+            Edit
           </Button>
           <Button
             size="xs"
             variant="secondary"
-            label={`${t('Close')} ${name}`}
+            label={`Close ${name}`}
             loading={closing}
             onClick={() => {
               setError(null);
@@ -152,7 +151,7 @@ function Managed({
                 .finally(() => setClosing(false));
             }}
           >
-            {t('Close')}
+            Close
           </Button>
         </div>
       )}
@@ -177,10 +176,10 @@ export function AnnouncementsSection({ place }: { place: AnnouncementPlace }) {
 
   return (
     <div className={classes.stack}>
-      <SectionTitle>{t('Announcements')}</SectionTitle>
+      <SectionTitle>Announcements</SectionTitle>
       {manages && (
         <Composer
-          label={t('Post announcement')}
+          label="Post announcement"
           initial={{ title: '', body: '' }}
           onSend={async (text) => {
             await changes.post(text);
@@ -192,9 +191,9 @@ export function AnnouncementsSection({ place }: { place: AnnouncementPlace }) {
       {view.state === 'error' && <ErrorBlock error={view.error} onRetry={view.retry} />}
       {view.state === 'ready' &&
         (view.data.length === 0 ? (
-          <BodyText tone="secondary">{t('No announcements yet.')}</BodyText>
+          <BodyText tone="secondary">No announcements yet.</BodyText>
         ) : (
-          <ol className={classes.list} aria-label={t('Announcements')}>
+          <ol className={classes.list} aria-label="Announcements">
             {[...view.data].reverse().map((announcement) => (
               <Managed
                 key={announcement.number}

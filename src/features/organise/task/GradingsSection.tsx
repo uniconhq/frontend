@@ -10,7 +10,6 @@ import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
 import { useMe } from '@/session';
 import { useLiveConnected } from '@/live';
 import { formatDateTime } from '@/lib/time';
-import { t } from '@/lib/t';
 import { holdsAt } from '../roles';
 import classes from './gradings.module.css';
 
@@ -68,7 +67,7 @@ function Row({
   );
   const [error, setError] = useState<unknown>(null);
   const params = { path: { ...path, grading: grading.id } };
-  const name = `${t('submission')} ${String(grading.submission_number)}, ${grading.stage}, ${t('attempt')} ${String(grading.attempt)}`;
+  const name = `submission ${String(grading.submission_number)}, ${grading.stage}, attempt ${String(grading.attempt)}`;
 
   const run = async (action: () => Promise<unknown>) => {
     setError(null);
@@ -85,7 +84,7 @@ function Row({
   return (
     <tr>
       <th scope="row">
-        {t('Submission')} {grading.submission_number}
+        Submission {grading.submission_number}
         <BodyText tone="meta">
           {formatDateTime(new Date(grading.submitted_at))}
         </BodyText>
@@ -93,7 +92,7 @@ function Row({
       <td>{grading.stage}</td>
       <td>{grading.attempt}</td>
       <td>
-        <span>{t(STATUS[grading.status])}</span>
+        <span>{STATUS[grading.status]}</span>
         {grading.error !== null && (
           <BodyText tone="secondary">{grading.error}</BodyText>
         )}
@@ -108,21 +107,21 @@ function Row({
               <Button
                 size="xs"
                 variant="secondary"
-                label={`${t('Cancel')} ${name}`}
+                label={`Cancel ${name}`}
                 loading={cancel.isPending}
                 onClick={() => void run(() => cancel.mutateAsync({ params }))}
               >
-                {t('Cancel')}
+                Cancel
               </Button>
             ) : (
               <Button
                 size="xs"
                 variant={grading.status === 'system_error' ? 'primary' : 'secondary'}
-                label={`${t('Retry')} ${name}`}
+                label={`Retry ${name}`}
                 loading={retry.isPending}
                 onClick={() => void run(() => retry.mutateAsync({ params }))}
               >
-                {t('Retry')}
+                Retry
               </Button>
             )}
           </div>
@@ -157,21 +156,21 @@ export function GradingsSection({ path }: { path: TaskPath }) {
 
   return (
     <div className={classes.stack}>
-      <SectionTitle>{t('Gradings')}</SectionTitle>
+      <SectionTitle>Gradings</SectionTitle>
       {view.state === 'loading' && <PageSkeleton rows={3} />}
       {view.state === 'error' && <ErrorBlock error={view.error} onRetry={view.retry} />}
       {view.state === 'ready' &&
         (view.data.length === 0 ? (
-          <BodyText>{t('Nothing has been graded yet.')}</BodyText>
+          <BodyText>Nothing has been graded yet.</BodyText>
         ) : (
-          <table className={classes.table} aria-label={t('Gradings')}>
+          <table className={classes.table} aria-label="Gradings">
             <thead>
               <tr>
-                <th scope="col">{t('Submission')}</th>
-                <th scope="col">{t('Stage')}</th>
-                <th scope="col">{t('Attempt')}</th>
-                <th scope="col">{t('Status')}</th>
-                {manages && <th scope="col">{t('Actions')}</th>}
+                <th scope="col">Submission</th>
+                <th scope="col">Stage</th>
+                <th scope="col">Attempt</th>
+                <th scope="col">Status</th>
+                {manages && <th scope="col">Actions</th>}
               </tr>
             </thead>
             <tbody>

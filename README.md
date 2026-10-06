@@ -419,7 +419,7 @@ src/
   api/       generated types, the fetch client, the query wrapper, error shapes
   lib/       server clock, the organiser and contest addresses,
              the route params, scope names, sizes, the full-page way out
-             to Forgejo, the t() every string goes through
+             to Forgejo
   session/   who is signed in: the boot query, the guard, sign-out, where Forgejo is, the
              expired-session modal. Not a feature, because the shell, the
              router and three features all read it

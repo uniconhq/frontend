@@ -10,7 +10,6 @@ import { useMe } from '@/session';
 import { contestHomePath } from '@/lib/contest-paths';
 import { contestantsPath, taskPath, teamsPath } from '@/lib/organiser-paths';
 import { PageLink } from '@/ui/PageLink';
-import { t } from '@/lib/t';
 import { Create } from '../Create';
 import { AnnouncementsSection } from '../threads/AnnouncementsSection';
 import { ContestClarifications } from '../threads/Clarifications';
@@ -52,23 +51,21 @@ export function ContestPage() {
     <div className={classes.page}>
       <PageTitle>{contest}</PageTitle>
       <div className={classes.actions}>
-        <PageLink to={contestantsPath(org, contest)}>{t('Contestants')}</PageLink>
-        <PageLink to={teamsPath(org, contest)}>{t('Teams')}</PageLink>
-        <PageLink to={contestHomePath(org, contest)}>
-          {t('The page contestants see')}
-        </PageLink>
+        <PageLink to={contestantsPath(org, contest)}>Contestants</PageLink>
+        <PageLink to={teamsPath(org, contest)}>Teams</PageLink>
+        <PageLink to={contestHomePath(org, contest)}>The page contestants see</PageLink>
       </div>
       <Card>
         <div className={classes.stack}>
-          <SectionTitle>{t('Tasks')}</SectionTitle>
+          <SectionTitle>Tasks</SectionTitle>
           {view.state === 'loading' && <PageSkeleton rows={3} />}
           {view.state === 'error' && (
             <>
               <ErrorBlock error={view.error} onRetry={view.retry} />
               {reached.length > 0 && (
                 <>
-                  <BodyText>{t('Tasks of this contest you hold a role at:')}</BodyText>
-                  <LinkList label={t('Your tasks')} links={links(reached)} />
+                  <BodyText>Tasks of this contest you hold a role at:</BodyText>
+                  <LinkList label="Your tasks" links={links(reached)} />
                 </>
               )}
             </>
@@ -76,21 +73,21 @@ export function ContestPage() {
           {view.state === 'ready' && (
             <>
               {view.data.length === 0 ? (
-                <BodyText>{t('No tasks yet.')}</BodyText>
+                <BodyText>No tasks yet.</BodyText>
               ) : (
                 <LinkList
-                  label={t('Tasks')}
+                  label="Tasks"
                   links={links(view.data.map((task) => task.name))}
                 />
               )}
               <Create
-                openLabel={t('New task')}
-                title={t('New task')}
+                openLabel="New task"
+                title="New task"
                 second={{
-                  label: t('Title'),
-                  description: t('Optional. The name is used when there is none.'),
+                  label: 'Title',
+                  description: 'Optional. The name is used when there is none.',
                 }}
-                submitLabel={t('Create task')}
+                submitLabel="Create task"
                 pending={create.isPending}
                 error={create.error}
                 onSubmit={async (name, title) => {

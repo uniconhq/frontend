@@ -6,7 +6,6 @@ import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
 import { TextInput } from '@/ui/TextInput';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
-import { t } from '@/lib/t';
 import classes from './contest.module.css';
 
 type Standing = { title: string; message: string };
@@ -16,28 +15,28 @@ function standing(registration: MyRegistration): Standing {
   switch (registration.status) {
     case 'pending':
       return {
-        title: t('Your registration is waiting'),
-        message: t('An organiser decides it. This page moves on when they do.'),
+        title: 'Your registration is waiting',
+        message: 'An organiser decides it. This page moves on when they do.',
       };
     case 'rejected':
       return {
-        title: t('Your registration was not accepted'),
-        message: registration.reason ?? t('The organisers gave no reason.'),
+        title: 'Your registration was not accepted',
+        message: registration.reason ?? 'The organisers gave no reason.',
       };
     case 'approved':
       return {
-        title: t('You are in'),
-        message: t('Submit to any task that is open.'),
+        title: 'You are in',
+        message: 'Submit to any task that is open.',
       };
     case 'removed':
       return {
-        title: t('You were removed from this contest'),
-        message: t('Your submissions stay, and you can no longer add to them.'),
+        title: 'You were removed from this contest',
+        message: 'Your submissions stay, and you can no longer add to them.',
       };
     case 'withdrawn':
       return {
-        title: t('You withdrew from this contest'),
-        message: t('Your submissions stay, and you can no longer add to them.'),
+        title: 'You withdrew from this contest',
+        message: 'Your submissions stay, and you can no longer add to them.',
       };
   }
 }
@@ -57,7 +56,7 @@ function Status({ title, message, focused }: Standing & { focused: boolean }) {
       ref={panel}
       className={classes.panel}
       role="status"
-      aria-label={t('Registration')}
+      aria-label="Registration"
       tabIndex={-1}
     >
       <BodyText>{title}</BodyText>
@@ -95,8 +94,8 @@ export function RegistrationPanel({
   if (home.organises) {
     return (
       <Status
-        title={t('You organise this contest')}
-        message={t('Someone with a role in a contest cannot also enter it.')}
+        title="You organise this contest"
+        message="Someone with a role in a contest cannot also enter it."
         focused={false}
       />
     );
@@ -104,8 +103,8 @@ export function RegistrationPanel({
   if (!home.registration_open) {
     return (
       <Status
-        title={t('Registration is closed')}
-        message={t('This contest is not taking registrations right now.')}
+        title="Registration is closed"
+        message="This contest is not taking registrations right now."
         focused={false}
       />
     );
@@ -145,18 +144,18 @@ export function RegistrationPanel({
   return (
     <form
       className={classes.form}
-      aria-label={t('Register')}
+      aria-label="Register"
       onSubmit={(event) => void submit(event)}
     >
       {home.invite_only && (
         <BodyText tone="secondary">
-          {t('This contest takes only the people its organisers invite.')}
+          This contest takes only the people its organisers invite.
         </BodyText>
       )}
       {home.asks_code && (
         <TextInput
-          label={t('Contest code')}
-          description={t('The code the organisers gave you.')}
+          label="Contest code"
+          description="The code the organisers gave you."
           value={code}
           onChange={setCode}
           required
@@ -164,7 +163,7 @@ export function RegistrationPanel({
       )}
       <div>
         <Button type="submit" loading={register.isPending}>
-          {t('Register')}
+          Register
         </Button>
       </div>
       {register.error !== null && (

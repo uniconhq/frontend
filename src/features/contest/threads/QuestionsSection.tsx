@@ -11,7 +11,6 @@ import { Textarea } from '@/ui/Textarea';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
 import { useFallbackPoll } from '@/live';
-import { t } from '@/lib/t';
 import { QuestionThread } from '@/ui/threads/ThreadParts';
 import { isTeams } from '@/ui/threads/asker';
 import classes from '@/ui/threads/threads.module.css';
@@ -58,24 +57,18 @@ function FollowUp({
     <form
       className={classes.form}
       onSubmit={(event) => void send(event)}
-      aria-label={`${t('Follow up')} ${clarification.title}`}
+      aria-label={`Follow up ${clarification.title}`}
     >
-      <Textarea
-        label={t('Follow up')}
-        value={body}
-        onChange={setBody}
-        rows={2}
-        required
-      />
+      <Textarea label="Follow up" value={body} onChange={setBody} rows={2} required />
       {clarification.answered && (
         <BodyText tone="secondary">
-          {t('Sending this opens the question again for the organisers.')}
+          Sending this opens the question again for the organisers.
         </BodyText>
       )}
       {error !== null && <ErrorBlock error={error} compact />}
       <div className={classes.actions}>
         <Button type="submit" size="xs" variant="secondary" loading={sending}>
-          {t('Send')}
+          Send
         </Button>
       </div>
     </form>
@@ -126,27 +119,21 @@ function AskForm({
     <form
       className={classes.form}
       onSubmit={(event) => void send(event)}
-      aria-label={t('Ask')}
+      aria-label="Ask"
     >
       <TextInput
-        label={t('Question')}
+        label="Question"
         value={title}
         onChange={setTitle}
         maxLength={200}
         required
       />
-      <Textarea
-        label={t('Details')}
-        value={body}
-        onChange={setBody}
-        rows={3}
-        required
-      />
+      <Textarea label="Details" value={body} onChange={setBody} rows={3} required />
       {tasks.length > 0 && (
         <Select
-          label={t('About the task')}
+          label="About the task"
           value={task}
-          placeholder={t('The contest as a whole')}
+          placeholder="The contest as a whole"
           options={tasks.map((found) => ({ value: found.name, label: found.title }))}
           onChange={setTask}
         />
@@ -154,7 +141,7 @@ function AskForm({
       {error !== null && <ErrorBlock error={error} compact />}
       <div className={classes.actions}>
         <Button type="submit" size="xs" loading={sending}>
-          {t('Ask')}
+          Ask
         </Button>
       </div>
     </form>
@@ -194,22 +181,21 @@ export function QuestionsSection({
 
   return (
     <div className={classes.stack}>
-      <SectionTitle>{t('Questions to the organisers')}</SectionTitle>
+      <SectionTitle>Questions to the organisers</SectionTitle>
       <BodyText tone="secondary">
-        {t(
-          'Only you and the organisers see what you ask. In a team, everyone in it sees it too.',
-        )}
+        Only you and the organisers see what you ask. In a team, everyone in it sees it
+        too.
       </BodyText>
       <AskForm org={org} contest={contest} tasks={tasks} onAsked={readAgain} />
       {view.state === 'loading' && <PageSkeleton rows={2} />}
       {view.state === 'error' && <ErrorBlock error={view.error} onRetry={view.retry} />}
       {view.state === 'ready' && view.data.length > 0 && (
-        <ol className={classes.list} aria-label={t('Your questions')}>
+        <ol className={classes.list} aria-label="Your questions">
           {[...view.data].reverse().map((clarification) => (
             <li key={clarification.number} className={classes.item}>
               <QuestionThread
                 clarification={clarification}
-                asker={isTeams(clarification) ? t('Your team') : t('You')}
+                asker={isTeams(clarification) ? 'Your team' : 'You'}
               />
               <FollowUp
                 org={org}

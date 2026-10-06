@@ -4,7 +4,6 @@ import { SectionTitle } from '@/ui/SectionTitle';
 import { BodyText } from '@/ui/BodyText';
 import { toApiError } from '@/api/problem';
 import { describeError } from '@/api/describe-error';
-import { t } from '@/lib/t';
 
 /**
  * What a page shows when its data would not load. Inside the shell, never a
@@ -46,7 +45,7 @@ export function ErrorBlock({
       </Code>
       {onRetry !== undefined && (
         <Button size="xs" variant="secondary" onClick={onRetry}>
-          {t('Try again')}
+          Try again
         </Button>
       )}
     </Stack>

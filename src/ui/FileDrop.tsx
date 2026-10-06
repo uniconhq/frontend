@@ -1,7 +1,6 @@
 import { useId, useState, type DragEvent } from 'react';
 import { Button } from './Button';
 import { Progress } from './Progress';
-import { t } from '@/lib/t';
 import classes from './FileDrop.module.css';
 
 /**
@@ -73,8 +72,8 @@ export function FileDrop({
         <span className={classes.label}>{label}</span>
         <span id={hint} className={classes.hint}>
           {multiple
-            ? t('Drop files here or choose them.')
-            : t('Drop a file here or choose one.')}
+            ? 'Drop files here or choose them.'
+            : 'Drop a file here or choose one.'}
           {description !== undefined && ` ${description}`}
         </span>
         <input
@@ -92,7 +91,7 @@ export function FileDrop({
         />
       </label>
       {files.length > 0 && (
-        <ul className={classes.files} aria-label={`${label}: ${t('files chosen')}`}>
+        <ul className={classes.files} aria-label={`${label}: files chosen`}>
           {files.map((file) => {
             const progress = progressOf?.(file) ?? null;
             return (
@@ -100,17 +99,17 @@ export function FileDrop({
                 <span className={classes.name}>{file.name}</span>
                 {progress !== null ? (
                   <div className={classes.progress}>
-                    <Progress value={progress} label={`${file.name} ${t('sent')}`} />
+                    <Progress value={progress} label={`${file.name} sent`} />
                   </div>
                 ) : (
                   <Button
                     size="xs"
                     variant="secondary"
-                    label={`${t('Remove')} ${file.name}`}
+                    label={`Remove ${file.name}`}
                     disabled={disabled}
                     onClick={() => onChange(files.filter((kept) => kept !== file))}
                   >
-                    {t('Remove')}
+                    Remove
                   </Button>
                 )}
               </li>

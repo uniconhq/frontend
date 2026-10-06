@@ -1,7 +1,6 @@
 import { useSearchParams } from 'react-router';
 import { BodyText } from '@/ui/BodyText';
 import { SectionTitle } from '@/ui/SectionTitle';
-import { t } from '@/lib/t';
 import { FILE_PARAM } from './file-param';
 import { FileEditor } from './FileEditor';
 import { FileTree } from './FileTree';
@@ -19,12 +18,12 @@ export function FileBrowser({ place }: { place: Place }) {
 
   return (
     <div className={classes.browser}>
-      <SectionTitle>{t('Files')}</SectionTitle>
+      <SectionTitle>Files</SectionTitle>
       <div className={classes.panes}>
         <FileTree place={place} open={open} />
         <div className={classes.pane}>
           {open === null ? (
-            <BodyText tone="secondary">{t('Pick a file to open it.')}</BodyText>
+            <BodyText tone="secondary">Pick a file to open it.</BodyText>
           ) : (
             <FileEditor key={open} place={place} path={open} />
           )}

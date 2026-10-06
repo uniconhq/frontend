@@ -19,7 +19,6 @@ import { contestPath } from '@/lib/organiser-paths';
 import { useContestParams } from '@/lib/route-params';
 import { teamNameProblem, USERNAME_MAX } from '@/lib/team-fields';
 import { formatDateTime } from '@/lib/time';
-import { t } from '@/lib/t';
 import { holdsAtContest } from '../roles';
 import classes from './teams.module.css';
 
@@ -43,7 +42,7 @@ type Confirm =
   | { kind: 'delete' };
 
 function nameOf(member: TeamMember): string {
-  return member.user?.username ?? t('Deleted user');
+  return member.user?.username ?? 'Deleted user';
 }
 
 /** The approved contestants, the people a manager may add to a team. */
@@ -56,11 +55,11 @@ function removeOutcome(team: Team, member: TeamMember): string {
   const others = team.members.filter((found) => found.user_id !== member.user_id);
   if (others.length === 0) {
     return team.submitted
-      ? t('Nobody is left in it, and the team stays with its results.')
-      : t('Nobody is left in it, so the team is deleted.');
+      ? 'Nobody is left in it, and the team stays with its results.'
+      : 'Nobody is left in it, so the team is deleted.';
   }
   return team.leader === member.user_id
-    ? t('The lead passes to the member who joined earliest.')
+    ? 'The lead passes to the member who joined earliest.'
     : '';
 }
 
@@ -183,11 +182,9 @@ function TeamCard({
           <div className={classes.person}>
             <SectionTitle>{team.name}</SectionTitle>
             <BodyText tone="secondary">
-              {leader === undefined
-                ? t('No leader.')
-                : `${t('Led by')} ${nameOf(leader)}.`}{' '}
-              {team.members.length} {t('in it.')}{' '}
-              {team.submitted ? t('It has submitted.') : t('It has not submitted yet.')}
+              {leader === undefined ? 'No leader.' : `Led by ${nameOf(leader)}.`}{' '}
+              {team.members.length} in it.{' '}
+              {team.submitted ? 'It has submitted.' : 'It has not submitted yet.'}
             </BodyText>
           </div>
           {manages && (
@@ -195,43 +192,38 @@ function TeamCard({
               <Button
                 size="xs"
                 variant="secondary"
-                label={`${t('Add a contestant to')} ${team.name}`}
+                label={`Add a contestant to ${team.name}`}
                 disabled={busy}
                 onClick={() => ask({ kind: 'add' })}
               >
-                {t('Add a contestant')}
+                Add a contestant
               </Button>
               <Button
                 size="xs"
                 variant="danger"
-                label={`${t('Delete')} ${team.name}`}
+                label={`Delete ${team.name}`}
                 disabled={busy || team.submitted}
                 onClick={() => ask({ kind: 'delete' })}
               >
-                {t('Delete')}
+                Delete
               </Button>
             </div>
           )}
         </div>
         {manages && team.submitted && (
           <BodyText tone="secondary">
-            {t(
-              'A team that has submitted stays with its results, so it is not deleted.',
-            )}
+            A team that has submitted stays with its results, so it is not deleted.
           </BodyText>
         )}
         {team.members.length === 0 ? (
-          <BodyText tone="secondary">{t('Nobody is in this team.')}</BodyText>
+          <BodyText tone="secondary">Nobody is in this team.</BodyText>
         ) : (
-          <table
-            className={classes.table}
-            aria-label={`${t('Members of')} ${team.name}`}
-          >
+          <table className={classes.table} aria-label={`Members of ${team.name}`}>
             <thead>
               <tr>
-                <th scope="col">{t('Member')}</th>
-                <th scope="col">{t('Joined')}</th>
-                {manages && <th scope="col">{t('Actions')}</th>}
+                <th scope="col">Member</th>
+                <th scope="col">Joined</th>
+                {manages && <th scope="col">Actions</th>}
               </tr>
             </thead>
             <tbody>
@@ -246,7 +238,7 @@ function TeamCard({
                         {member.user !== null && member.user.name !== null && (
                           <BodyText tone="secondary">{member.user.name}</BodyText>
                         )}
-                        {leads && <BodyText tone="secondary">{t('Leader')}</BodyText>}
+                        {leads && <BodyText tone="secondary">Leader</BodyText>}
                       </div>
                     </th>
                     <td>{formatDateTime(new Date(member.since))}</td>
@@ -257,7 +249,7 @@ function TeamCard({
                             <Button
                               size="xs"
                               variant="secondary"
-                              label={`${t('Make')} ${name} ${t('the leader')}`}
+                              label={`Make ${name} the leader`}
                               loading={pending === `lead:${member.user_id}`}
                               disabled={busy}
                               onClick={() =>
@@ -269,28 +261,28 @@ function TeamCard({
                                 )
                               }
                             >
-                              {t('Make leader')}
+                              Make leader
                             </Button>
                           )}
                           {others.length > 0 && (
                             <Button
                               size="xs"
                               variant="secondary"
-                              label={`${t('Move')} ${name}`}
+                              label={`Move ${name}`}
                               disabled={busy}
                               onClick={() => ask({ kind: 'move', member })}
                             >
-                              {t('Move')}
+                              Move
                             </Button>
                           )}
                           <Button
                             size="xs"
                             variant="danger"
-                            label={`${t('Remove')} ${name}`}
+                            label={`Remove ${name}`}
                             disabled={busy}
                             onClick={() => ask({ kind: 'remove', member })}
                           >
-                            {t('Remove')}
+                            Remove
                           </Button>
                         </div>
                       </td>
@@ -302,15 +294,12 @@ function TeamCard({
           </table>
         )}
         {team.pending.length > 0 && (
-          <table
-            className={classes.table}
-            aria-label={`${t('Waiting to join')} ${team.name}`}
-          >
+          <table className={classes.table} aria-label={`Waiting to join ${team.name}`}>
             <thead>
               <tr>
-                <th scope="col">{t('Waiting to join')}</th>
-                <th scope="col">{t('Since')}</th>
-                {manages && <th scope="col">{t('Actions')}</th>}
+                <th scope="col">Waiting to join</th>
+                <th scope="col">Since</th>
+                {manages && <th scope="col">Actions</th>}
               </tr>
             </thead>
             <tbody>
@@ -323,7 +312,7 @@ function TeamCard({
                       <div className={classes.person}>
                         <span>{name}</span>
                         <BodyText tone="secondary">
-                          {asked ? t('Asked to join') : t('Invited')}
+                          {asked ? 'Asked to join' : 'Invited'}
                         </BodyText>
                       </div>
                     </th>
@@ -335,8 +324,8 @@ function TeamCard({
                           variant="secondary"
                           label={
                             asked
-                              ? `${t('Turn down the request of')} ${name}`
-                              : `${t('Withdraw the invitation for')} ${name}`
+                              ? `Turn down the request of ${name}`
+                              : `Withdraw the invitation for ${name}`
                           }
                           loading={pending === `drop:${member.user_id}`}
                           disabled={busy}
@@ -344,7 +333,7 @@ function TeamCard({
                             void run(`drop:${member.user_id}`, takeOut(member))
                           }
                         >
-                          {asked ? t('Turn down') : t('Withdraw invitation')}
+                          {asked ? 'Turn down' : 'Withdraw invitation'}
                         </Button>
                       </td>
                     )}
@@ -358,14 +347,14 @@ function TeamCard({
         <Modal
           opened={confirm?.kind === 'move'}
           onClose={() => ask(null)}
-          title={`${t('Move')} ${confirm?.kind === 'move' ? nameOf(confirm.member) : ''} ${t('out of')} ${team.name}?`}
+          title={`Move ${confirm?.kind === 'move' ? nameOf(confirm.member) : ''} out of ${team.name}?`}
         >
           {confirm?.kind === 'move' && (
             <div className={classes.form}>
               <Select
-                label={t('Move to')}
+                label="Move to"
                 value={target}
-                placeholder={t('Choose a team')}
+                placeholder="Choose a team"
                 options={others.map((found) => ({
                   value: found.id,
                   label: found.name,
@@ -373,11 +362,11 @@ function TeamCard({
                 onChange={setTarget}
               />
               <BodyText>
-                {nameOf(confirm.member)}{' '}
-                {t('stops reaching the submissions and questions of')} {team.name}
+                {nameOf(confirm.member)} stops reaching the submissions and questions of{' '}
+                {team.name}
                 {chosenTeam === undefined
                   ? '.'
-                  : ` ${t('and reaches those of')} ${chosenTeam.name} ${t('instead.')}`}
+                  : ` and reaches those of ${chosenTeam.name} instead.`}
               </BodyText>
               {refusal}
               <div className={classes.actions}>
@@ -390,12 +379,10 @@ function TeamCard({
                     void run('move', putIn(chosenTeam.id, confirm.member.user_id));
                   }}
                 >
-                  {chosenTeam === undefined
-                    ? t('Move')
-                    : `${t('Move to')} ${chosenTeam.name}`}
+                  {chosenTeam === undefined ? 'Move' : `Move to ${chosenTeam.name}`}
                 </Button>
                 <Button variant="secondary" onClick={() => ask(null)}>
-                  {t('Cancel')}
+                  Cancel
                 </Button>
               </div>
             </div>
@@ -404,16 +391,14 @@ function TeamCard({
         <Modal
           opened={confirm?.kind === 'remove'}
           onClose={() => ask(null)}
-          title={`${t('Remove')} ${confirm?.kind === 'remove' ? nameOf(confirm.member) : ''} ${t('from')} ${team.name}?`}
+          title={`Remove ${confirm?.kind === 'remove' ? nameOf(confirm.member) : ''} from ${team.name}?`}
         >
           {confirm?.kind === 'remove' && (
             <div className={classes.form}>
               <BodyText>
-                {nameOf(confirm.member)}{' '}
-                {t('stops reaching the submissions and questions of')} {team.name}{' '}
-                {t(
-                  'and submits on their own from then. What the team made stays the team’s.',
-                )}
+                {nameOf(confirm.member)} stops reaching the submissions and questions of{' '}
+                {team.name} and submits on their own from then. What the team made stays
+                the team’s.
               </BodyText>
               {removeOutcome(team, confirm.member) !== '' && (
                 <BodyText>{removeOutcome(team, confirm.member)}</BodyText>
@@ -425,10 +410,10 @@ function TeamCard({
                   loading={pending === 'remove'}
                   onClick={() => void run('remove', takeOut(confirm.member))}
                 >
-                  {`${t('Remove from')} ${team.name}`}
+                  {`Remove from ${team.name}`}
                 </Button>
                 <Button variant="secondary" onClick={() => ask(null)}>
-                  {t('Cancel')}
+                  Cancel
                 </Button>
               </div>
             </div>
@@ -437,7 +422,7 @@ function TeamCard({
         <Modal
           opened={confirm?.kind === 'add'}
           onClose={() => ask(null)}
-          title={`${t('Add a contestant to')} ${team.name}?`}
+          title={`Add a contestant to ${team.name}?`}
         >
           {confirm?.kind === 'add' && (
             <div className={classes.form}>
@@ -446,24 +431,22 @@ function TeamCard({
                 <ErrorBlock error={contestants.error} onRetry={contestants.retry} />
               )}
               {contestants.state === 'ready' && addable.length === 0 && (
-                <BodyText>
-                  {t('Every approved contestant is in this team already.')}
-                </BodyText>
+                <BodyText>Every approved contestant is in this team already.</BodyText>
               )}
               {addable.length > 0 && (
                 <Select
-                  label={t('Contestant')}
+                  label="Contestant"
                   value={target}
-                  placeholder={t('Choose an approved contestant')}
+                  placeholder="Choose an approved contestant"
                   options={addable.map((found) => {
                     const theirs = teamOf.get(found.user_id);
-                    const username = found.user?.username ?? t('Deleted user');
+                    const username = found.user?.username ?? 'Deleted user';
                     return {
                       value: String(found.user_id),
                       label:
                         theirs === undefined
                           ? username
-                          : `${username} (${t('in')} ${theirs.name})`,
+                          : `${username} (in ${theirs.name})`,
                     };
                   })}
                   onChange={setTarget}
@@ -471,11 +454,11 @@ function TeamCard({
               )}
               {chosenPerson !== undefined && (
                 <BodyText>
-                  {chosenPerson.user?.username ?? t('Deleted user')}{' '}
-                  {t('reaches the submissions and questions of')} {team.name}
+                  {chosenPerson.user?.username ?? 'Deleted user'} reaches the
+                  submissions and questions of {team.name}
                   {personsTeam === undefined
                     ? '.'
-                    : ` ${t('and stops reaching those of')} ${personsTeam.name}.`}
+                    : ` and stops reaching those of ${personsTeam.name}.`}
                 </BodyText>
               )}
               {refusal}
@@ -489,10 +472,10 @@ function TeamCard({
                     void run('add', putIn(team.id, chosenPerson.user_id));
                   }}
                 >
-                  {`${t('Add to')} ${team.name}`}
+                  {`Add to ${team.name}`}
                 </Button>
                 <Button variant="secondary" onClick={() => ask(null)}>
-                  {t('Cancel')}
+                  Cancel
                 </Button>
               </div>
             </div>
@@ -501,15 +484,13 @@ function TeamCard({
         <Modal
           opened={confirm?.kind === 'delete'}
           onClose={() => ask(null)}
-          title={`${t('Delete')} ${team.name}?`}
+          title={`Delete ${team.name}?`}
         >
           <div className={classes.form}>
             <BodyText>
               {team.members.length === 0
-                ? t('Nobody is in it, and its invitations and requests go with it.')
-                : t(
-                    'Everyone in it stops reaching its work and submits on their own from then.',
-                  )}
+                ? 'Nobody is in it, and its invitations and requests go with it.'
+                : 'Everyone in it stops reaching its work and submits on their own from then.'}
             </BodyText>
             {refusal}
             <div className={classes.actions}>
@@ -524,10 +505,10 @@ function TeamCard({
                   )
                 }
               >
-                {`${t('Delete')} ${team.name}`}
+                {`Delete ${team.name}`}
               </Button>
               <Button variant="secondary" onClick={() => ask(null)}>
-                {t('Cancel')}
+                Cancel
               </Button>
             </div>
           </div>
@@ -543,19 +524,13 @@ function TeamCard({
  */
 function CreateRefusal({ error, leader }: { error: unknown; leader: string }) {
   if (isApiError(error) && error.code === 'not_found' && leader !== '') {
-    return (
-      <BodyText tone="secondary">
-        {t('Nobody has the username')} {leader}.
-      </BodyText>
-    );
+    return <BodyText tone="secondary">Nobody has the username {leader}.</BodyText>;
   }
   if (isApiError(error) && error.code === 'not_approved' && leader !== '') {
     return (
       <BodyText tone="secondary">
-        {leader}{' '}
-        {t(
-          'is not an approved contestant of this contest, so they cannot lead a team yet.',
-        )}
+        {leader} is not an approved contestant of this contest, so they cannot lead a
+        team yet.
       </BodyText>
     );
   }
@@ -604,35 +579,31 @@ function CreateTeam({ path }: { path: Path }) {
   return (
     <form
       className={classes.form}
-      aria-label={t('Make a team')}
+      aria-label="Make a team"
       onSubmit={(event) => void submit(event)}
     >
-      <SectionTitle order={3}>{t('Make a team')}</SectionTitle>
-      <TextInput label={t('Team name')} value={name} onChange={setName} required />
+      <SectionTitle order={3}>Make a team</SectionTitle>
+      <TextInput label="Team name" value={name} onChange={setName} required />
       {problem !== null && (
         <div role="alert">
           <BodyText tone="secondary">{problem}</BodyText>
         </div>
       )}
       <TextInput
-        label={t('Leader')}
-        description={t(
-          'Optional. The username of an approved contestant who is in no team. Without one, the team starts empty.',
-        )}
+        label="Leader"
+        description="Optional. The username of an approved contestant who is in no team. Without one, the team starts empty."
         value={leader}
         onChange={setLeader}
         maxLength={USERNAME_MAX}
       />
       <div className={classes.actions}>
         <Button size="xs" type="submit" loading={create.isPending}>
-          {t('Make the team')}
+          Make the team
         </Button>
       </div>
       {made !== null && (
         <div role="status">
-          <BodyText tone="secondary">
-            {t('Made the team')} {made}.
-          </BodyText>
+          <BodyText tone="secondary">Made the team {made}.</BodyText>
         </div>
       )}
       {create.error !== null && (
@@ -665,24 +636,20 @@ export function TeamsPage() {
 
   return (
     <div className={classes.page}>
-      <PageLink to={contestPath(org, contest)}>{t('Back to the contest')}</PageLink>
-      <PageTitle>{t('Teams')}</PageTitle>
+      <PageLink to={contestPath(org, contest)}>Back to the contest</PageLink>
+      <PageTitle>Teams</PageTitle>
       <Card>
         <div className={classes.stack}>
           <BodyText tone="secondary">
-            {t(
-              'A contest has teams when its contest.yaml turns them on under teams, with enabled: true, and max_size says how many a team holds, three unless it says otherwise. Everyone in a team is an approved contestant first, and the team’s submissions, limits and questions are shared by everyone in it.',
-            )}
+            A contest has teams when its contest.yaml turns them on under teams, with
+            enabled: true, and max_size says how many a team holds, three unless it says
+            otherwise. Everyone in a team is an approved contestant first, and the
+            team’s submissions, limits and questions are shared by everyone in it.
           </BodyText>
           {manages && <CreateTeam path={path} />}
         </div>
       </Card>
-      <section
-        ref={list}
-        className={classes.stack}
-        tabIndex={-1}
-        aria-label={t('Teams')}
-      >
+      <section ref={list} className={classes.stack} tabIndex={-1} aria-label="Teams">
         {view.state === 'loading' && <PageSkeleton rows={4} />}
         {view.state === 'error' && (
           <Card>
@@ -692,7 +659,7 @@ export function TeamsPage() {
         {view.state === 'ready' &&
           (view.data.length === 0 ? (
             <Card>
-              <BodyText>{t('Nobody has made a team yet.')}</BodyText>
+              <BodyText>Nobody has made a team yet.</BodyText>
             </Card>
           ) : (
             view.data.map((team) => (

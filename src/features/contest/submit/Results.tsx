@@ -1,7 +1,6 @@
 import type { GradingResult } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { VerdictBadge } from '@/ui/VerdictBadge';
-import { t } from '@/lib/t';
 import { metricValue, verdictOf } from './grading';
 import classes from './submit.module.css';
 
@@ -11,7 +10,7 @@ import classes from './submit.module.css';
  */
 export function Verdicts({ gradings }: { gradings: GradingResult[] }) {
   if (gradings.length === 0) {
-    return <BodyText tone="secondary">{t('Not graded on submit')}</BodyText>;
+    return <BodyText tone="secondary">Not graded on submit</BodyText>;
   }
   const named = gradings.length > 1;
   return (
@@ -43,7 +42,7 @@ export function Metrics({
   return (
     <dl
       className={classes.metrics}
-      aria-label={stage === undefined ? t('Metrics') : `${t('Metrics')} ${stage}`}
+      aria-label={stage === undefined ? 'Metrics' : `Metrics ${stage}`}
     >
       {named.map(([name, value]) => (
         <div key={name} className={classes.metric}>

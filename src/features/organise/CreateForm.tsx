@@ -3,7 +3,6 @@ import { Button } from '@/ui/Button';
 import { SectionTitle } from '@/ui/SectionTitle';
 import { TextInput } from '@/ui/TextInput';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
-import { t } from '@/lib/t';
 import classes from './organise.module.css';
 
 /** The second line, with the most characters it takes when there is a limit. */
@@ -65,8 +64,8 @@ export function CreateForm({
       <SectionTitle order={3}>{title}</SectionTitle>
       <TextInput
         ref={nameField}
-        label={t('Name')}
-        description={t('Part of every address, so it cannot change later.')}
+        label="Name"
+        description="Part of every address, so it cannot change later."
         value={name}
         onChange={setName}
         required
@@ -89,7 +88,7 @@ export function CreateForm({
         </Button>
         {onCancel !== undefined && (
           <Button variant="secondary" onClick={onCancel} disabled={pending}>
-            {t('Cancel')}
+            Cancel
           </Button>
         )}
       </div>

@@ -3,7 +3,6 @@ import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
 import { BodyText } from '@/ui/BodyText';
 import { formatTimeOfDay, serverClockOffsetMs } from '@/lib/time';
-import { t } from '@/lib/t';
 
 /**
  * Proves the whole chain end to end against the one endpoint that needs no
@@ -21,8 +20,8 @@ export function ServerClock() {
 
   return (
     <BodyText tone="secondary" mono>
-      {t('server time')} {formatTimeOfDay(new Date(view.data.now))} ·{' '}
-      {t('this browser is off by')} {Math.round(-serverClockOffsetMs())} ms
+      server time {formatTimeOfDay(new Date(view.data.now))} · this browser is off by{' '}
+      {Math.round(-serverClockOffsetMs())} ms
     </BodyText>
   );
 }

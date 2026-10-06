@@ -1,5 +1,4 @@
 import { Skeleton, Stack } from '@mantine/core';
-import { t } from '@/lib/t';
 
 /**
  * Shaped like the content it replaces, so the page does not jump when the data
@@ -8,7 +7,7 @@ import { t } from '@/lib/t';
  */
 export function PageSkeleton({ rows = 3 }: { rows?: number }) {
   return (
-    <Stack gap="sm" py="md" role="status" aria-label={t('Loading')}>
+    <Stack gap="sm" py="md" role="status" aria-label="Loading">
       <Skeleton height={21} width="40%" radius="sm" />
       {Array.from({ length: rows }, (_, index) => (
         <Skeleton key={index} height={14} radius="sm" />

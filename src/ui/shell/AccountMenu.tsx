@@ -11,7 +11,6 @@ import {
   useLogout,
   useSession,
 } from '@/session';
-import { t } from '@/lib/t';
 import classes from './AccountMenu.module.css';
 
 /**
@@ -34,13 +33,13 @@ export function AccountMenu() {
   if (session.status === 'loading') return null;
 
   if (session.status === 'unavailable') {
-    return <span className={classes.unknown}>{t('Account unavailable')}</span>;
+    return <span className={classes.unknown}>Account unavailable</span>;
   }
 
   if (session.status === 'signed-out') {
     return (
       <a href={loginHref(currentPath(location))} className={classes.signIn}>
-        {t('Sign in')}
+        Sign in
       </a>
     );
   }
@@ -62,24 +61,24 @@ export function AccountMenu() {
       withinPortal
     >
       <Menu.Target>
-        <UnstyledButton className={classes.trigger} aria-label={t('Account menu')}>
+        <UnstyledButton className={classes.trigger} aria-label="Account menu">
           <Avatar src={user.avatar_url} name={label} size={24} />
           <span className={classes.username}>{user.username}</span>
         </UnstyledButton>
       </Menu.Target>
       <Menu.Dropdown>
         <Menu.Item component={Link} to="/account">
-          {t('Account')}
+          Account
         </Menu.Item>
         <Menu.Item component="a" href={forgePage(forge, '/user/settings')}>
-          {t('Forgejo')}
+          Forgejo
         </Menu.Item>
         <Menu.Item
           closeMenuOnClick={false}
           disabled={pending}
           onClick={() => void signOut()}
         >
-          {t('Sign out')}
+          Sign out
         </Menu.Item>
         {error !== null && (
           <div className={classes.signOutError} role="alert">

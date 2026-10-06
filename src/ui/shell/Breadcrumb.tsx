@@ -9,7 +9,6 @@ import {
   taskPath,
   teamsPath,
 } from '@/lib/organiser-paths';
-import { t } from '@/lib/t';
 import classes from './Breadcrumb.module.css';
 
 type Segment = { label: string; to: string };
@@ -35,9 +34,9 @@ export function Breadcrumb() {
 
   if (segments === null) {
     return (
-      <nav className={classes.trail} aria-label={t('Breadcrumb')}>
+      <nav className={classes.trail} aria-label="Breadcrumb">
         <span className={classes.segment}>
-          {t('browse')}
+          browse
           <span className={classes.caret} aria-hidden="true">
             ▾
           </span>
@@ -47,7 +46,7 @@ export function Breadcrumb() {
   }
 
   return (
-    <nav className={classes.trail} aria-label={t('Breadcrumb')}>
+    <nav className={classes.trail} aria-label="Breadcrumb">
       {segments.map((segment, index) => (
         <span key={segment.to} className={classes.step}>
           {index > 0 && (
@@ -74,7 +73,7 @@ function organiserTrail(
   contest?: string,
   task?: string,
 ): Segment[] {
-  const segments: Segment[] = [{ label: t('orgs'), to: ORGS_PATH }];
+  const segments: Segment[] = [{ label: 'orgs', to: ORGS_PATH }];
   if (org !== undefined) {
     segments.push({ label: org, to: orgPath(org) });
     if (contest !== undefined) {
@@ -82,9 +81,9 @@ function organiserTrail(
       if (task !== undefined) {
         segments.push({ label: task, to: taskPath(org, contest, task) });
       } else if (pathname === contestantsPath(org, contest)) {
-        segments.push({ label: t('contestants'), to: pathname });
+        segments.push({ label: 'contestants', to: pathname });
       } else if (pathname === teamsPath(org, contest)) {
-        segments.push({ label: t('teams'), to: pathname });
+        segments.push({ label: 'teams', to: pathname });
       }
     }
   }
@@ -92,7 +91,7 @@ function organiserTrail(
 }
 
 function contestantTrail(org?: string, contest?: string, task?: string): Segment[] {
-  const segments: Segment[] = [{ label: t('contests'), to: '/' }];
+  const segments: Segment[] = [{ label: 'contests', to: '/' }];
   if (org !== undefined && contest !== undefined) {
     segments.push({ label: contest, to: contestHomePath(org, contest) });
     if (task !== undefined) {

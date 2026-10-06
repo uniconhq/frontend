@@ -5,7 +5,6 @@ import { PageTitle } from '@/ui/PageTitle';
 import { BodyText } from '@/ui/BodyText';
 import { TextLink } from '@/ui/TextLink';
 import { forgePage, useForgeUrl, useMe } from '@/session';
-import { t } from '@/lib/t';
 import { SessionList } from './SessionList';
 import { DangerZone } from './DangerZone';
 import { scopeName } from '@/lib/scope-name';
@@ -23,7 +22,7 @@ export function AccountPage() {
 
   return (
     <div className={classes.page}>
-      <PageTitle>{t('Account')}</PageTitle>
+      <PageTitle>Account</PageTitle>
 
       <Card>
         <div className={classes.profile}>
@@ -33,23 +32,17 @@ export function AccountPage() {
             <BodyText tone="secondary" mono>
               {user.username}
             </BodyText>
-            <BodyText tone="secondary">
-              {user.email ?? t('No email on record')}
-            </BodyText>
+            <BodyText tone="secondary">{user.email ?? 'No email on record'}</BodyText>
           </div>
         </div>
         {me.degraded && (
           <BodyText tone="secondary">
-            {t(
-              'Forgejo is not answering, so your name, avatar and email may be missing.',
-            )}
+            Forgejo is not answering, so your name, avatar and email may be missing.
           </BodyText>
         )}
         {forge !== null && (
           <div className={classes.change}>
-            <TextLink href={`${forge}/user/settings`}>
-              {t('Change in Forgejo')}
-            </TextLink>
+            <TextLink href={`${forge}/user/settings`}>Change in Forgejo</TextLink>
           </div>
         )}
       </Card>
@@ -57,7 +50,7 @@ export function AccountPage() {
       {me.roles.length > 0 && (
         <Card>
           <div className={classes.stack}>
-            <SectionTitle>{t('Roles')}</SectionTitle>
+            <SectionTitle>Roles</SectionTitle>
             <ul className={classes.roles}>
               {me.roles.map(({ names, role }) => (
                 <li key={`${scopeName(names)}:${role}`} className={classes.role}>
@@ -72,19 +65,16 @@ export function AccountPage() {
 
       <Card>
         <div className={classes.stack}>
-          <SectionTitle>{t('Security')}</SectionTitle>
+          <SectionTitle>Security</SectionTitle>
           <BodyText size="md">
-            {t(
-              'Forgejo owns your account. Your password, email addresses, avatar, and two-factor settings all live there.',
-            )}
+            Forgejo owns your account. Your password, email addresses, avatar, and
+            two-factor settings all live there.
           </BodyText>
           <div className={classes.forgeLinks}>
-            <a href={forgePage(forge, '/user/settings/account')}>{t('Password')}</a>
-            <a href={forgePage(forge, '/user/settings/account')}>
-              {t('Email addresses')}
-            </a>
-            <a href={forgePage(forge, '/user/settings')}>{t('Avatar')}</a>
-            <a href={forgePage(forge, '/user/settings/security')}>{t('Two-factor')}</a>
+            <a href={forgePage(forge, '/user/settings/account')}>Password</a>
+            <a href={forgePage(forge, '/user/settings/account')}>Email addresses</a>
+            <a href={forgePage(forge, '/user/settings')}>Avatar</a>
+            <a href={forgePage(forge, '/user/settings/security')}>Two-factor</a>
           </div>
           <SessionList />
         </div>

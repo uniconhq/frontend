@@ -17,7 +17,6 @@ import { useMe } from '@/session';
 import { contestPath } from '@/lib/organiser-paths';
 import { useContestParams } from '@/lib/route-params';
 import { formatDateTime } from '@/lib/time';
-import { t } from '@/lib/t';
 import { holdsAtContest } from '../roles';
 import { InvitesSection } from '../invites/InvitesSection';
 import classes from './contestants.module.css';
@@ -36,7 +35,7 @@ const STATUS: Record<Contestant['status'], string> = {
 type Action = 'reject' | 'remove' | 'extension';
 
 function who(contestant: Contestant): string {
-  return contestant.user?.username ?? t('Deleted user');
+  return contestant.user?.username ?? 'Deleted user';
 }
 
 /** An extension in whole minutes, as the table shows it and the form starts from. */
@@ -172,7 +171,7 @@ function Row({
         </div>
       </th>
       <td>
-        <span>{t(STATUS[contestant.status])}</span>
+        <span>{STATUS[contestant.status]}</span>
         {contestant.reason !== null && (
           <BodyText tone="secondary">{contestant.reason}</BodyText>
         )}
@@ -182,7 +181,7 @@ function Row({
       </td>
       <td>
         {contestant.time_extension > 0
-          ? `${minutesOf(contestant.time_extension)} ${t('min')}`
+          ? `${minutesOf(contestant.time_extension)} min`
           : '—'}
       </td>
       {manages && (
@@ -191,61 +190,61 @@ function Row({
             {decidable && (
               <Button
                 size="xs"
-                label={`${t('Approve')} ${name}`}
+                label={`Approve ${name}`}
                 loading={approve.isPending}
                 onClick={() => {
                   setError(null);
                   void run(() => approve.mutateAsync({ params: { path } }));
                 }}
               >
-                {t('Approve')}
+                Approve
               </Button>
             )}
             {decidable && (
               <Button
                 size="xs"
                 variant="secondary"
-                label={`${t('Reject')} ${name}`}
+                label={`Reject ${name}`}
                 onClick={() => show('reject')}
               >
-                {t('Reject')}
+                Reject
               </Button>
             )}
             {rejected && (
               <Button
                 size="xs"
                 variant="secondary"
-                label={`${t('Undo rejection of')} ${name}`}
+                label={`Undo rejection of ${name}`}
                 loading={reopen.isPending}
                 onClick={() => {
                   setError(null);
                   void run(() => reopen.mutateAsync({ params: { path } }));
                 }}
               >
-                {t('Undo rejection')}
+                Undo rejection
               </Button>
             )}
             {current && (
               <Button
                 size="xs"
                 variant="danger"
-                label={`${t('Remove')} ${name}`}
+                label={`Remove ${name}`}
                 onClick={() => show('remove')}
               >
-                {t('Remove')}
+                Remove
               </Button>
             )}
             {extensible && (
               <Button
                 size="xs"
                 variant="secondary"
-                label={`${t('Extend')} ${name}`}
+                label={`Extend ${name}`}
                 onClick={() => {
                   setMinutes(String(minutesOf(contestant.time_extension)));
                   show('extension');
                 }}
               >
-                {t('Extend')}
+                Extend
               </Button>
             )}
           </div>
@@ -253,12 +252,12 @@ function Row({
             <form
               className={classes.inline}
               onSubmit={submitReason}
-              aria-label={`${t('Reject')} ${name}`}
+              aria-label={`Reject ${name}`}
             >
               <TextInput
                 ref={field}
-                label={t('Reason')}
-                description={t('The person reads this on their own page.')}
+                label="Reason"
+                description="The person reads this on their own page."
                 value={reason}
                 onChange={setReason}
                 maxLength={REASON_MAX}
@@ -266,10 +265,10 @@ function Row({
               />
               <div className={classes.actions}>
                 <Button size="xs" type="submit" loading={reject.isPending}>
-                  {t('Reject')}
+                  Reject
                 </Button>
                 <Button size="xs" variant="secondary" onClick={() => show(null)}>
-                  {t('Cancel')}
+                  Cancel
                 </Button>
               </div>
             </form>
@@ -278,29 +277,29 @@ function Row({
             <form
               className={classes.inline}
               onSubmit={submitExtension}
-              aria-label={`${t('Extend')} ${name}`}
+              aria-label={`Extend ${name}`}
             >
               <TextInput
                 ref={field}
-                label={t('Extra minutes')}
-                description={t('In place of any extension they have. 0 takes it away.')}
+                label="Extra minutes"
+                description="In place of any extension they have. 0 takes it away."
                 value={minutes}
                 onChange={setMinutes}
                 required
               />
               <div className={classes.actions}>
                 <Button size="xs" type="submit" loading={extend.isPending}>
-                  {t('Save')}
+                  Save
                 </Button>
                 <Button size="xs" variant="secondary" onClick={() => show(null)}>
-                  {t('Cancel')}
+                  Cancel
                 </Button>
               </div>
             </form>
           )}
           {unreadable && open === 'extension' && (
             <div role="alert">
-              <BodyText>{t('Give a whole number of minutes, up to a year.')}</BodyText>
+              <BodyText>Give a whole number of minutes, up to a year.</BodyText>
             </div>
           )}
           {error !== null && open !== 'remove' && (
@@ -311,11 +310,11 @@ function Row({
           <Modal
             opened={open === 'remove'}
             onClose={() => show(null)}
-            title={t('Remove this contestant?')}
+            title="Remove this contestant?"
           >
             <div className={classes.inline}>
               <BodyText>
-                {name} {t('can no longer submit or ask. What they submitted stays.')}
+                {name} can no longer submit or ask. What they submitted stays.
               </BodyText>
               {error !== null && (
                 <div role="alert">
@@ -330,10 +329,10 @@ function Row({
                     void run(() => remove.mutateAsync({ params: { path } }))
                   }
                 >
-                  {t('Remove')}
+                  Remove
                 </Button>
                 <Button variant="secondary" onClick={() => show(null)}>
-                  {t('Cancel')}
+                  Cancel
                 </Button>
               </div>
             </div>
@@ -362,8 +361,8 @@ export function ContestantsPage() {
 
   return (
     <div className={classes.page}>
-      <PageLink to={contestPath(org, contest)}>{t('Back to the contest')}</PageLink>
-      <PageTitle>{t('Contestants')}</PageTitle>
+      <PageLink to={contestPath(org, contest)}>Back to the contest</PageLink>
+      <PageTitle>Contestants</PageTitle>
       <Card>
         {view.state === 'loading' && <PageSkeleton rows={4} />}
         {view.state === 'error' && (
@@ -371,15 +370,15 @@ export function ContestantsPage() {
         )}
         {view.state === 'ready' &&
           (view.data.length === 0 ? (
-            <BodyText>{t('Nobody has registered yet.')}</BodyText>
+            <BodyText>Nobody has registered yet.</BodyText>
           ) : (
-            <table className={classes.table} aria-label={t('Registrations')}>
+            <table className={classes.table} aria-label="Registrations">
               <thead>
                 <tr>
-                  <th scope="col">{t('Person')}</th>
-                  <th scope="col">{t('Registration')}</th>
-                  <th scope="col">{t('Extension')}</th>
-                  {manages && <th scope="col">{t('Actions')}</th>}
+                  <th scope="col">Person</th>
+                  <th scope="col">Registration</th>
+                  <th scope="col">Extension</th>
+                  {manages && <th scope="col">Actions</th>}
                 </tr>
               </thead>
               <tbody>
@@ -398,11 +397,11 @@ export function ContestantsPage() {
       </Card>
       <Card>
         <div className={classes.stack}>
-          <SectionTitle>{t('Invites')}</SectionTitle>
+          <SectionTitle>Invites</SectionTitle>
           <BodyText tone="secondary">
-            {t(
-              'An invite offers someone a place in this contest. Once they accept it, they may register even when the contest takes only the people it invites, and see it while it is hidden.',
-            )}
+            An invite offers someone a place in this contest. Once they accept it, they
+            may register even when the contest takes only the people it invites, and see
+            it while it is hidden.
           </BodyText>
           <InvitesSection
             place={{ kind: 'contest', org, contest }}

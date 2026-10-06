@@ -12,7 +12,6 @@ import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
 import { taskPagePath } from '@/lib/contest-paths';
 import { useContestParams } from '@/lib/route-params';
 import { formatDateTime } from '@/lib/time';
-import { t } from '@/lib/t';
 import { ContestAnnouncements } from './threads/AnnouncementList';
 import { QuestionsSection } from './threads/QuestionsSection';
 import { TeamSection } from './teams/TeamSection';
@@ -47,10 +46,10 @@ function TaskList({
   tasks: PublicTask[];
 }) {
   if (tasks.length === 0) {
-    return <BodyText tone="secondary">{t('No task is released yet.')}</BodyText>;
+    return <BodyText tone="secondary">No task is released yet.</BodyText>;
   }
   return (
-    <ul className={classes.tasks} aria-label={t('Tasks')}>
+    <ul className={classes.tasks} aria-label="Tasks">
       {tasks.map((task) => {
         const label = labelOf(task);
         return (
@@ -67,12 +66,8 @@ function TaskList({
 function Dates({ start, end }: { start: string; end: string }) {
   return (
     <div className={classes.dates}>
-      <BodyText tone="secondary">
-        {t('Starts')} {formatDateTime(new Date(start))}
-      </BodyText>
-      <BodyText tone="secondary">
-        {t('Ends')} {formatDateTime(new Date(end))}
-      </BodyText>
+      <BodyText tone="secondary">Starts {formatDateTime(new Date(start))}</BodyText>
+      <BodyText tone="secondary">Ends {formatDateTime(new Date(end))}</BodyText>
     </div>
   );
 }
@@ -119,7 +114,7 @@ function Home({
       <PageTitle>{home.name}</PageTitle>
       {home.state === 'draft' && (
         <BodyText tone="secondary">
-          {t('This contest is a draft, so only its organisers see it.')}
+          This contest is a draft, so only its organisers see it.
         </BodyText>
       )}
       {home.description !== '' && <BodyText size="md">{home.description}</BodyText>}
@@ -133,8 +128,8 @@ function Home({
           />
           {extended && (
             <BodyText tone="secondary">
-              {t('Your time runs until')} {formatDateTime(new Date(home.deadline))}
-              {t(', with the extra time the organisers gave you.')}
+              Your time runs until {formatDateTime(new Date(home.deadline))}, with the
+              extra time the organisers gave you.
             </BodyText>
           )}
           <RegistrationPanel org={org} contest={contest} home={home} />
@@ -145,7 +140,7 @@ function Home({
       )}
       <Card>
         <div className={classes.stack}>
-          <SectionTitle>{t('Tasks')}</SectionTitle>
+          <SectionTitle>Tasks</SectionTitle>
           <TaskList org={org} contest={contest} tasks={home.tasks} />
         </div>
       </Card>
@@ -180,7 +175,7 @@ function PublicHome({ org, contest }: { org: string; contest: string }) {
   if (view.state === 'loading') return <PageSkeleton rows={4} />;
   if (view.state === 'error') {
     if (view.error.status === 404) {
-      return <SignInPrompt title={t('Sign in to see this contest')} />;
+      return <SignInPrompt title="Sign in to see this contest" />;
     }
     return <ErrorBlock error={view.error} onRetry={view.retry} />;
   }
@@ -193,13 +188,13 @@ function PublicHome({ org, contest }: { org: string; contest: string }) {
       <Card>
         <div className={classes.stack}>
           <Dates start={found.start} end={found.end} />
-          <BodyText>{t('Sign in to register for this contest.')}</BodyText>
+          <BodyText>Sign in to register for this contest.</BodyText>
           <SignInButtons />
         </div>
       </Card>
       <Card>
         <div className={classes.stack}>
-          <SectionTitle>{t('Tasks')}</SectionTitle>
+          <SectionTitle>Tasks</SectionTitle>
           <TaskList org={org} contest={contest} tasks={found.tasks} />
         </div>
       </Card>
