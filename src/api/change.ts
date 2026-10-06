@@ -58,17 +58,21 @@ export function useChange({
     setError(null);
     let outcome: Outcome<T>;
     try {
-      outcome = { ok: true, value: await change() };
-    } catch (refused) {
-      outcome = { ok: false, error: refused };
+      try {
+        outcome = { ok: true, value: await change() };
+      } catch (refused) {
+        outcome = { ok: false, error: refused };
+      }
+      if (!outcome.ok && options.own !== true) setError(outcome.error);
+      const stale = outcome.ok
+        ? rereadDone
+        : isApiError(outcome.error) && behind.has(outcome.error.code);
+      if (stale) await reread?.();
+    } finally {
+      // A read that throws must not leave the part of the page busy for good.
+      running.current = false;
+      setPending(null);
     }
-    if (!outcome.ok && options.own !== true) setError(outcome.error);
-    const stale = outcome.ok
-      ? rereadDone
-      : isApiError(outcome.error) && behind.has(outcome.error.code);
-    if (stale) await reread?.();
-    running.current = false;
-    setPending(null);
     if (outcome.ok && options.own !== true) focus?.current?.focus();
     return outcome;
   };

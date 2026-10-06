@@ -114,7 +114,8 @@ A change is a mutation from `$api.useMutation`. What it leaves stale is read
 again from the hook's own `onSuccess`, which TanStack Query waits for, so a
 form stays busy until the page shows the answer and a second click cannot
 send the change twice; the form shows the mutation's own `isPending` and
-`error`. A part of a page that makes several changes under one busy flag and
+`error`. A change whose refusal also leaves the page stale, such as cancelling
+or retrying a grading, reads it again from `onSettled` instead. A part of a page that makes several changes under one busy flag and
 one refusal, such as a team card, runs them through `useChange`
 (`api/change.ts`), which also reads the page again after a refusal that shows
 it was behind and moves the focus once a change has gone through.
