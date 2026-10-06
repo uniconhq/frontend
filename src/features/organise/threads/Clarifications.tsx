@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { useChange } from '@/api/change';
 import { $api, queryView } from '@/api/query';
 import type { Clarification } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
@@ -37,8 +38,6 @@ function isThreadRead(path: unknown): boolean {
   );
 }
 
-type Action = 'reply' | 'mark' | 'unmark' | 'publish';
-
 /**
  * One question for an organiser and, for a manager of its contest, what can
  * be done with it: Reply, which leaves it open and so still in the inbox;
@@ -63,8 +62,13 @@ function ClarificationCard({
   const [publishing, setPublishing] = useState(false);
   const [title, setTitle] = useState(clarification.title);
   const [answer, setAnswer] = useState('');
-  const [error, setError] = useState<unknown>(null);
-  const [busy, setBusy] = useState<Action | null>(null);
+  const change = useChange({
+    reread: () =>
+      queryClient.invalidateQueries({
+        predicate: (query) => isThreadRead(query.queryKey[1]),
+      }),
+  });
+  const busy = change.pending;
   const { org, contest } = clarification.contest;
   const path = {
     org,
@@ -74,44 +78,20 @@ function ClarificationCard({
   };
   const name = clarification.title;
 
-  /**
-   * One change at a time, until the lists have been read again, so a second
-   * click while the page catches up never sends a reply or an announcement
-   * twice.
-   */
-  const run = async (name: Action, action: () => Promise<unknown>) => {
-    if (busy !== null) return false;
-    setError(null);
-    setBusy(name);
-    try {
-      await action();
-      await queryClient.invalidateQueries({
-        predicate: (query) => isThreadRead(query.queryKey[1]),
-      });
-      return true;
-    } catch (refused) {
-      setError(refused);
-      return false;
-    } finally {
-      setBusy(null);
-    }
-  };
-
   const sendReply = async (event: FormEvent) => {
     event.preventDefault();
-    if (
-      await run('reply', () => reply.mutateAsync({ params: { path }, body: { body } }))
-    )
-      setBody('');
+    const outcome = await change.run('reply', () =>
+      reply.mutateAsync({ params: { path }, body: { body } }),
+    );
+    if (outcome.ok) setBody('');
   };
 
   const sendAnswer = async (event: FormEvent) => {
     event.preventDefault();
-    if (
-      await run('publish', () =>
-        publish.mutateAsync({ params: { path }, body: { title, body: answer } }),
-      )
-    ) {
+    const outcome = await change.run('publish', () =>
+      publish.mutateAsync({ params: { path }, body: { title, body: answer } }),
+    );
+    if (outcome.ok) {
       setPublishing(false);
       setAnswer('');
     }
@@ -150,7 +130,9 @@ function ClarificationCard({
                   label={`Unmark ${name}`}
                   loading={busy === 'unmark'}
                   onClick={() =>
-                    void run('unmark', () => unmark.mutateAsync({ params: { path } }))
+                    void change.run('unmark', () =>
+                      unmark.mutateAsync({ params: { path } }),
+                    )
                   }
                 >
                   Unmark
@@ -161,7 +143,9 @@ function ClarificationCard({
                   label={`Mark as answered ${name}`}
                   loading={busy === 'mark'}
                   onClick={() =>
-                    void run('mark', () => mark.mutateAsync({ params: { path } }))
+                    void change.run('mark', () =>
+                      mark.mutateAsync({ params: { path } }),
+                    )
                   }
                 >
                   Mark as answered
@@ -210,7 +194,7 @@ function ClarificationCard({
           )}
         </>
       )}
-      {error !== null && <ErrorBlock error={error} compact />}
+      {change.error !== null && <ErrorBlock error={change.error} compact />}
     </li>
   );
 }

@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useRef } from 'react';
 import { queryView } from '@/api/query';
 import type { Invite } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
@@ -87,25 +87,10 @@ export function InviteCard({
   invite: Invite;
   highlighted?: boolean;
 }) {
-  const decide = useDecide();
-  const [pending, setPending] = useState<'accept' | 'decline' | null>(null);
-  const [error, setError] = useState<unknown>(null);
   const card = useRef<HTMLLIElement>(null);
+  const { pending, error, decide } = useDecide(card);
   const name = offer(invite);
   const open = invite.status === 'pending' && !invite.expired;
-
-  const choose = async (choice: 'accept' | 'decline') => {
-    setPending(choice);
-    setError(null);
-    try {
-      await decide(invite, choice);
-      card.current?.focus();
-    } catch (refused) {
-      setError(refused);
-    } finally {
-      setPending(null);
-    }
-  };
 
   return (
     <li
@@ -132,7 +117,7 @@ export function InviteCard({
             label={`Accept: ${name}`}
             loading={pending === 'accept'}
             disabled={pending === 'decline'}
-            onClick={() => void choose('accept')}
+            onClick={() => void decide(invite, 'accept')}
           >
             Accept
           </Button>
@@ -142,7 +127,7 @@ export function InviteCard({
             label={`Decline: ${name}`}
             loading={pending === 'decline'}
             disabled={pending === 'accept'}
-            onClick={() => void choose('decline')}
+            onClick={() => void decide(invite, 'decline')}
           >
             Decline
           </Button>

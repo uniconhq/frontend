@@ -82,9 +82,29 @@ export function RegistrationPanel({
   home: ContestHome;
 }) {
   const queryClient = useQueryClient();
+  const homeKey = $api.queryOptions(
+    'get',
+    '/api/v1/orgs/{org}/contests/{contest}/home',
+    {
+      params: { path: { org, contest } },
+    },
+  ).queryKey;
   const register = $api.useMutation(
     'post',
     '/api/v1/orgs/{org}/contests/{contest}/registration',
+    {
+      onSuccess: (registration) => {
+        queryClient.setQueryData<ContestHome>(homeKey, (current) =>
+          current === undefined ? current : { ...current, registration },
+        );
+        return Promise.all([
+          queryClient.invalidateQueries({ queryKey: homeKey }),
+          queryClient.invalidateQueries({
+            queryKey: $api.queryOptions('get', '/api/v1/contests').queryKey,
+          }),
+        ]);
+      },
+    },
   );
   const [code, setCode] = useState('');
 
@@ -110,43 +130,18 @@ export function RegistrationPanel({
     );
   }
 
-  const homeKey = $api.queryOptions(
-    'get',
-    '/api/v1/orgs/{org}/contests/{contest}/home',
-    {
-      params: { path: { org, contest } },
-    },
-  ).queryKey;
-
-  const submit = async (event: FormEvent) => {
+  const submit = (event: FormEvent) => {
     event.preventDefault();
-    let registration: MyRegistration;
-    try {
-      registration = await register.mutateAsync({
-        params: { path: { org, contest } },
-        body: { invite_code: home.asks_code ? code : null },
-      });
-    } catch {
-      // The refusal is the mutation's `error`, shown below the button.
-      return;
-    }
-    queryClient.setQueryData<ContestHome>(homeKey, (current) =>
-      current === undefined ? current : { ...current, registration },
-    );
-    await Promise.all([
-      queryClient.invalidateQueries({ queryKey: homeKey }),
-      queryClient.invalidateQueries({
-        queryKey: $api.queryOptions('get', '/api/v1/contests').queryKey,
-      }),
-    ]);
+    if (register.isPending) return;
+    // The refusal is the mutation's `error`, shown below the button.
+    register.mutate({
+      params: { path: { org, contest } },
+      body: { invite_code: home.asks_code ? code : null },
+    });
   };
 
   return (
-    <form
-      className={classes.form}
-      aria-label="Register"
-      onSubmit={(event) => void submit(event)}
-    >
+    <form className={classes.form} aria-label="Register" onSubmit={submit}>
       {home.invite_only && (
         <BodyText tone="secondary">
           This contest takes only the people its organisers invite.

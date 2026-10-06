@@ -30,8 +30,15 @@ export function OrgPage() {
   const view = queryView(
     $api.useQuery('get', '/api/v1/orgs/{org}/contests', { params: { path: { org } } }),
   );
-  const create = $api.useMutation('post', '/api/v1/orgs/{org}/contests');
   const queryClient = useQueryClient();
+  const create = $api.useMutation('post', '/api/v1/orgs/{org}/contests', {
+    onSuccess: () =>
+      queryClient.invalidateQueries({
+        queryKey: $api.queryOptions('get', '/api/v1/orgs/{org}/contests', {
+          params: { path: { org } },
+        }).queryKey,
+      }),
+  });
 
   const links = (names: string[]) =>
     names.map((name) => ({ name, to: contestPath(org, name) }));
@@ -81,11 +88,6 @@ export function OrgPage() {
                   await create.mutateAsync({
                     params: { path: { org } },
                     body: { name, title: title === '' ? null : title },
-                  });
-                  await queryClient.invalidateQueries({
-                    queryKey: $api.queryOptions('get', '/api/v1/orgs/{org}/contests', {
-                      params: { path: { org } },
-                    }).queryKey,
                   });
                 }}
               />

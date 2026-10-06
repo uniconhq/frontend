@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { useChange } from '@/api/change';
 import { queryView } from '@/api/query';
 import type { Announcement } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
@@ -42,22 +43,13 @@ function Composer({
 }) {
   const [title, setTitle] = useState(initial.title);
   const [body, setBody] = useState(initial.body);
-  const [error, setError] = useState<unknown>(null);
-  const [sending, setSending] = useState(false);
+  const change = useChange();
 
   const send = async (event: FormEvent) => {
     event.preventDefault();
-    if (sending) return;
-    setError(null);
-    setSending(true);
-    try {
-      await onSend({ title, body });
+    if ((await change.run('send', () => onSend({ title, body }))).ok) {
       setTitle(initial.title);
       setBody(initial.body);
-    } catch (refused) {
-      setError(refused);
-    } finally {
-      setSending(false);
     }
   };
 
@@ -75,9 +67,9 @@ function Composer({
         required
       />
       <Textarea label="Text" value={body} onChange={setBody} rows={4} required />
-      {error !== null && <ErrorBlock error={error} compact />}
+      {change.error !== null && <ErrorBlock error={change.error} compact />}
       <div className={classes.actions}>
-        <Button type="submit" size="xs" loading={sending}>
+        <Button type="submit" size="xs" loading={change.pending !== null}>
           {label}
         </Button>
         {onCancel !== undefined && (
@@ -103,8 +95,7 @@ function Managed({
   onChanged: () => Promise<void>;
 }) {
   const [editing, setEditing] = useState(false);
-  const [closing, setClosing] = useState(false);
-  const [error, setError] = useState<unknown>(null);
+  const change = useChange({ reread: onChanged });
   const name = announcement.title;
 
   if (editing) {
@@ -140,22 +131,16 @@ function Managed({
             size="xs"
             variant="secondary"
             label={`Close ${name}`}
-            loading={closing}
-            onClick={() => {
-              setError(null);
-              setClosing(true);
-              changes
-                .close(announcement.number)
-                .then(onChanged)
-                .catch((refused: unknown) => setError(refused))
-                .finally(() => setClosing(false));
-            }}
+            loading={change.pending === 'close'}
+            onClick={() =>
+              void change.run('close', () => changes.close(announcement.number))
+            }
           >
             Close
           </Button>
         </div>
       )}
-      {error !== null && <ErrorBlock error={error} compact />}
+      {change.error !== null && <ErrorBlock error={change.error} compact />}
     </li>
   );
 }

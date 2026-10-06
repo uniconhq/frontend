@@ -1,5 +1,6 @@
 import { useRef, useState, type FormEvent } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { useChange } from '@/api/change';
 import { $api, queryView, type QueryView } from '@/api/query';
 import { isApiError } from '@/api/problem';
 import type { Contestant, Team, TeamMember } from '@/api/types';
@@ -96,10 +97,14 @@ function TeamCard({
   const drop = $api.useMutation('delete', ONE);
   const [confirm, setConfirm] = useState<Confirm | null>(null);
   const [target, setTarget] = useState('');
-  const [pending, setPending] = useState<string | null>(null);
-  const [error, setError] = useState<unknown>(null);
   const card = useRef<HTMLElement>(null);
   const listKey = $api.queryOptions('get', EVERY, { params: { path } }).queryKey;
+  const change = useChange({
+    reread: () => queryClient.invalidateQueries({ queryKey: listKey }),
+    behind: BEHIND,
+    focus: card,
+  });
+  const { pending, error } = change;
   const here = { ...path, team_id: team.id };
   const busy = pending !== null;
   const others = teams.filter((found) => found.id !== team.id);
@@ -118,7 +123,7 @@ function TeamCard({
       : [];
 
   const ask = (next: Confirm | null) => {
-    setError(null);
+    change.dismiss();
     setTarget('');
     setConfirm(next);
     if (next === null) return;
@@ -130,25 +135,11 @@ function TeamCard({
     }
   };
 
-  const run = async (key: string, change: () => Promise<unknown>, gone = false) => {
-    if (busy) return;
-    setPending(key);
-    setError(null);
-    try {
-      await change();
-    } catch (refused) {
-      setError(refused);
-      if (isApiError(refused) && BEHIND.has(refused.code)) {
-        await queryClient.invalidateQueries({ queryKey: listKey });
-      }
-      setPending(null);
-      return;
-    }
-    await queryClient.invalidateQueries({ queryKey: listKey });
-    setPending(null);
+  const run = async (key: string, made: () => Promise<unknown>, gone = false) => {
+    const outcome = await change.run(key, made);
+    if (!outcome.ok) return;
     setConfirm(null);
     if (gone) onGone();
-    else card.current?.focus();
   };
 
   const takeOut = (member: TeamMember) => () =>
@@ -544,44 +535,45 @@ function CreateRefusal({ error, leader }: { error: unknown; leader: string }) {
  */
 function CreateTeam({ path }: { path: Path }) {
   const queryClient = useQueryClient();
-  const create = $api.useMutation('post', EVERY);
+  const create = $api.useMutation('post', EVERY, {
+    onSuccess: () =>
+      queryClient.invalidateQueries({
+        queryKey: $api.queryOptions('get', EVERY, { params: { path } }).queryKey,
+      }),
+  });
   const [name, setName] = useState('');
   const [leader, setLeader] = useState('');
   const [tried, setTried] = useState('');
   const [problem, setProblem] = useState<string | null>(null);
   const [made, setMade] = useState<string | null>(null);
 
-  const submit = async (event: FormEvent) => {
+  const submit = (event: FormEvent) => {
     event.preventDefault();
+    if (create.isPending) return;
     setMade(null);
     const found = teamNameProblem(name);
     setProblem(found);
     if (found !== null) return;
     const trimmed = leader.trim();
     setTried(trimmed);
-    try {
-      const team = await create.mutateAsync({
+    // The refusal is the mutation's `error`, shown below the button.
+    create.mutate(
+      {
         params: { path },
         body: { name: name.trim(), leader: trimmed === '' ? null : trimmed },
-      });
-      setName('');
-      setLeader('');
-      setMade(team.name);
-    } catch {
-      // The refusal is the mutation's `error`, shown below the button.
-      return;
-    }
-    await queryClient.invalidateQueries({
-      queryKey: $api.queryOptions('get', EVERY, { params: { path } }).queryKey,
-    });
+      },
+      {
+        onSuccess: (team) => {
+          setName('');
+          setLeader('');
+          setMade(team.name);
+        },
+      },
+    );
   };
 
   return (
-    <form
-      className={classes.form}
-      aria-label="Make a team"
-      onSubmit={(event) => void submit(event)}
-    >
+    <form className={classes.form} aria-label="Make a team" onSubmit={submit}>
       <SectionTitle order={3}>Make a team</SectionTitle>
       <TextInput label="Team name" value={name} onChange={setName} required />
       {problem !== null && (

@@ -42,6 +42,18 @@ export function ContestPage() {
   const create = $api.useMutation(
     'post',
     '/api/v1/orgs/{org}/contests/{contest}/tasks',
+    {
+      onSuccess: () =>
+        queryClient.invalidateQueries({
+          queryKey: $api.queryOptions(
+            'get',
+            '/api/v1/orgs/{org}/contests/{contest}/tasks',
+            {
+              params: { path: { org, contest } },
+            },
+          ).queryKey,
+        }),
+    },
   );
 
   const links = (names: string[]) =>
@@ -94,13 +106,6 @@ export function ContestPage() {
                   await create.mutateAsync({
                     params: { path: { org, contest } },
                     body: { name, title: title === '' ? null : title },
-                  });
-                  await queryClient.invalidateQueries({
-                    queryKey: $api.queryOptions(
-                      'get',
-                      '/api/v1/orgs/{org}/contests/{contest}/tasks',
-                      { params: { path: { org, contest } } },
-                    ).queryKey,
                   });
                 }}
               />

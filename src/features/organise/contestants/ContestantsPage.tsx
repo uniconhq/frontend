@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { useChange } from '@/api/change';
 import { $api, queryView } from '@/api/query';
-import { isApiError } from '@/api/problem';
 import type { Contestant } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
@@ -33,6 +33,9 @@ const STATUS: Record<Contestant['status'], string> = {
 };
 
 type Action = 'reject' | 'remove' | 'extension';
+
+/** The refusal that means the registration moved on under the organiser. */
+const BEHIND = new Set(['wrong_status']);
 
 function who(contestant: Contestant): string {
   return contestant.user?.username ?? 'Deleted user';
@@ -102,10 +105,16 @@ function Row({
   const [open, setOpen] = useState<Action | null>(null);
   const [reason, setReason] = useState('');
   const [minutes, setMinutes] = useState('');
-  const [error, setError] = useState<unknown>(null);
   const [unreadable, setUnreadable] = useState(false);
   const row = useRef<HTMLTableRowElement>(null);
   const field = useRef<HTMLInputElement>(null);
+  const change = useChange({
+    reread: () => queryClient.invalidateQueries({ queryKey: listKey }),
+    rereadDone: false,
+    behind: BEHIND,
+    focus: row,
+  });
+  const { pending, error } = change;
   const name = who(contestant);
 
   useEffect(() => {
@@ -113,30 +122,26 @@ function Row({
   }, [open]);
 
   const show = (action: Action | null) => {
-    setError(null);
+    change.dismiss();
     setUnreadable(false);
     setOpen(action);
   };
 
-  const run = async (action: () => Promise<Contestant>) => {
-    try {
-      const updated = await action();
+  const run = async (key: string, made: () => Promise<Contestant>) => {
+    const outcome = await change.run(key, async () => {
+      const updated = await made();
       queryClient.setQueryData<Contestant[]>(listKey, (rows) =>
         rows?.map((found) => (found.user_id === updated.user_id ? updated : found)),
       );
-      show(null);
-      row.current?.focus();
-    } catch (refused) {
-      setError(refused);
-      if (isApiError(refused) && refused.code === 'wrong_status') {
-        await queryClient.invalidateQueries({ queryKey: listKey });
-      }
-    }
+    });
+    if (outcome.ok) show(null);
   };
 
   const submitReason = (event: FormEvent) => {
     event.preventDefault();
-    void run(() => reject.mutateAsync({ params: { path }, body: { reason } }));
+    void run('reject', () =>
+      reject.mutateAsync({ params: { path }, body: { reason } }),
+    );
   };
 
   const submitExtension = (event: FormEvent) => {
@@ -144,7 +149,7 @@ function Row({
     const checked = checkedMinutes(minutes);
     setUnreadable(checked === null);
     if (checked === null) return;
-    void run(() =>
+    void run('extension', () =>
       extend.mutateAsync({ params: { path }, body: { seconds: checked * 60 } }),
     );
   };
@@ -191,11 +196,10 @@ function Row({
               <Button
                 size="xs"
                 label={`Approve ${name}`}
-                loading={approve.isPending}
-                onClick={() => {
-                  setError(null);
-                  void run(() => approve.mutateAsync({ params: { path } }));
-                }}
+                loading={pending === 'approve'}
+                onClick={() =>
+                  void run('approve', () => approve.mutateAsync({ params: { path } }))
+                }
               >
                 Approve
               </Button>
@@ -215,11 +219,10 @@ function Row({
                 size="xs"
                 variant="secondary"
                 label={`Undo rejection of ${name}`}
-                loading={reopen.isPending}
-                onClick={() => {
-                  setError(null);
-                  void run(() => reopen.mutateAsync({ params: { path } }));
-                }}
+                loading={pending === 'reopen'}
+                onClick={() =>
+                  void run('reopen', () => reopen.mutateAsync({ params: { path } }))
+                }
               >
                 Undo rejection
               </Button>
@@ -264,7 +267,7 @@ function Row({
                 required
               />
               <div className={classes.actions}>
-                <Button size="xs" type="submit" loading={reject.isPending}>
+                <Button size="xs" type="submit" loading={pending === 'reject'}>
                   Reject
                 </Button>
                 <Button size="xs" variant="secondary" onClick={() => show(null)}>
@@ -288,7 +291,7 @@ function Row({
                 required
               />
               <div className={classes.actions}>
-                <Button size="xs" type="submit" loading={extend.isPending}>
+                <Button size="xs" type="submit" loading={pending === 'extension'}>
                   Save
                 </Button>
                 <Button size="xs" variant="secondary" onClick={() => show(null)}>
@@ -324,9 +327,9 @@ function Row({
               <div className={classes.actions}>
                 <Button
                   variant="danger"
-                  loading={remove.isPending}
+                  loading={pending === 'remove'}
                   onClick={() =>
-                    void run(() => remove.mutateAsync({ params: { path } }))
+                    void run('remove', () => remove.mutateAsync({ params: { path } }))
                   }
                 >
                   Remove

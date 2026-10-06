@@ -29,34 +29,27 @@ function FollowUp({
   clarification: Clarification;
   onSent: () => Promise<void>;
 }) {
-  const followUp = $api.useMutation('post', `${QUESTIONS}/{number}/comments`);
+  const followUp = $api.useMutation('post', `${QUESTIONS}/{number}/comments`, {
+    onSuccess: () => onSent(),
+  });
   const [body, setBody] = useState('');
-  const [error, setError] = useState<unknown>(null);
-  const [sending, setSending] = useState(false);
 
-  const send = async (event: FormEvent) => {
+  const send = (event: FormEvent) => {
     event.preventDefault();
-    if (sending) return;
-    setError(null);
-    setSending(true);
-    try {
-      await followUp.mutateAsync({
+    if (followUp.isPending) return;
+    followUp.mutate(
+      {
         params: { path: { org, contest, number: clarification.number } },
         body: { body },
-      });
-      setBody('');
-      await onSent();
-    } catch (refused) {
-      setError(refused);
-    } finally {
-      setSending(false);
-    }
+      },
+      { onSuccess: () => setBody('') },
+    );
   };
 
   return (
     <form
       className={classes.form}
-      onSubmit={(event) => void send(event)}
+      onSubmit={send}
       aria-label={`Follow up ${clarification.title}`}
     >
       <Textarea label="Follow up" value={body} onChange={setBody} rows={2} required />
@@ -65,9 +58,14 @@ function FollowUp({
           Sending this opens the question again for the organisers.
         </BodyText>
       )}
-      {error !== null && <ErrorBlock error={error} compact />}
+      {followUp.error !== null && <ErrorBlock error={followUp.error} compact />}
       <div className={classes.actions}>
-        <Button type="submit" size="xs" variant="secondary" loading={sending}>
+        <Button
+          type="submit"
+          size="xs"
+          variant="secondary"
+          loading={followUp.isPending}
+        >
           Send
         </Button>
       </div>
@@ -87,40 +85,31 @@ function AskForm({
   tasks: { name: string; title: string }[];
   onAsked: () => Promise<void>;
 }) {
-  const ask = $api.useMutation('post', QUESTIONS);
+  const ask = $api.useMutation('post', QUESTIONS, { onSuccess: () => onAsked() });
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [task, setTask] = useState('');
-  const [error, setError] = useState<unknown>(null);
-  const [sending, setSending] = useState(false);
 
-  const send = async (event: FormEvent) => {
+  const send = (event: FormEvent) => {
     event.preventDefault();
-    if (sending) return;
-    setError(null);
-    setSending(true);
-    try {
-      await ask.mutateAsync({
+    if (ask.isPending) return;
+    ask.mutate(
+      {
         params: { path: { org, contest } },
         body: { title, body, task: task === '' ? null : task },
-      });
-      setTitle('');
-      setBody('');
-      setTask('');
-      await onAsked();
-    } catch (refused) {
-      setError(refused);
-    } finally {
-      setSending(false);
-    }
+      },
+      {
+        onSuccess: () => {
+          setTitle('');
+          setBody('');
+          setTask('');
+        },
+      },
+    );
   };
 
   return (
-    <form
-      className={classes.form}
-      onSubmit={(event) => void send(event)}
-      aria-label="Ask"
-    >
+    <form className={classes.form} onSubmit={send} aria-label="Ask">
       <TextInput
         label="Question"
         value={title}
@@ -138,9 +127,9 @@ function AskForm({
           onChange={setTask}
         />
       )}
-      {error !== null && <ErrorBlock error={error} compact />}
+      {ask.error !== null && <ErrorBlock error={ask.error} compact />}
       <div className={classes.actions}>
-        <Button type="submit" size="xs" loading={sending}>
+        <Button type="submit" size="xs" loading={ask.isPending}>
           Ask
         </Button>
       </div>

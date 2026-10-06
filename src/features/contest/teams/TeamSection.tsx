@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState, type FormEvent, type RefObject } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useQueryClient, type Query } from '@tanstack/react-query';
+import { useChange, type Change } from '@/api/change';
 import { $api, queryView } from '@/api/query';
 import { isApiError } from '@/api/problem';
 import type { ContestHome, ListedTeam, MyTeams, Team, TeamMember } from '@/api/types';
@@ -50,73 +51,6 @@ function ofContest(query: Query, { org, contest }: Path): boolean {
   const params = (init as { params?: { path?: Partial<Path> } } | undefined)?.params
     ?.path;
   return params?.org === org && params.contest === contest;
-}
-
-/** How a change went: its answer, or the refusal, or null when another was under way. */
-type Outcome<T> = { ok: true; value: T } | { ok: false; error: unknown };
-
-type Change = {
-  /** Which change is under way, such as `approve:20`, while one is. */
-  pending: string | null;
-  /** The last refusal, shown once for the section until it is dismissed. */
-  error: unknown;
-  dismiss: () => void;
-  /**
-   * Make one change at a time, then read the team again. The section takes
-   * the focus once it has, since the button that was clicked has usually
-   * gone, and shows a refusal. `own` is for a form that keeps the focus and
-   * says its own refusals.
-   */
-  run: <T>(
-    key: string,
-    change: () => Promise<T>,
-    options?: { own?: boolean },
-  ) => Promise<Outcome<T>>;
-};
-
-function useChange(path: Path, section: RefObject<HTMLElement | null>): Change {
-  const queryClient = useQueryClient();
-  const [pending, setPending] = useState<string | null>(null);
-  const [error, setError] = useState<unknown>(null);
-  const running = useRef(false);
-  const init = { params: { path } };
-
-  const readTeams = () =>
-    Promise.all([
-      queryClient.invalidateQueries({
-        queryKey: $api.queryOptions('get', MY_TEAM, init).queryKey,
-      }),
-      queryClient.invalidateQueries({
-        queryKey: $api.queryOptions('get', TEAMS, init).queryKey,
-      }),
-    ]);
-
-  const run = async <T,>(
-    key: string,
-    change: () => Promise<T>,
-    options: { own?: boolean } = {},
-  ): Promise<Outcome<T>> => {
-    if (running.current) return { ok: false, error: null };
-    running.current = true;
-    setPending(key);
-    setError(null);
-    let outcome: Outcome<T>;
-    try {
-      outcome = { ok: true, value: await change() };
-    } catch (refused) {
-      outcome = { ok: false, error: refused };
-    }
-    if (!outcome.ok && options.own !== true) setError(outcome.error);
-    if (outcome.ok || (isApiError(outcome.error) && BEHIND.has(outcome.error.code))) {
-      await readTeams();
-    }
-    running.current = false;
-    setPending(null);
-    if (outcome.ok && options.own !== true) section.current?.focus();
-    return outcome;
-  };
-
-  return { pending, error, dismiss: () => setError(null), run };
 }
 
 function nameOf(member: TeamMember): string {
@@ -801,7 +735,19 @@ export function TeamSection({
   const path = { org, contest };
   const queryClient = useQueryClient();
   const section = useRef<HTMLElement>(null);
-  const change = useChange(path, section);
+  const change = useChange({
+    reread: () =>
+      Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: $api.queryOptions('get', MY_TEAM, { params: { path } }).queryKey,
+        }),
+        queryClient.invalidateQueries({
+          queryKey: $api.queryOptions('get', TEAMS, { params: { path } }).queryKey,
+        }),
+      ]),
+    behind: BEHIND,
+    focus: section,
+  });
   const view = queryView(
     $api.useQuery(
       'get',

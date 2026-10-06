@@ -1,5 +1,6 @@
 import { useRef, useState, type FormEvent } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { useChange } from '@/api/change';
 import { queryView } from '@/api/query';
 import { isApiError } from '@/api/problem';
 import type { Grant, Invite } from '@/api/types';
@@ -32,6 +33,9 @@ const MAIL: Record<Invite['mail_status'], string> = {
   failed: 'Failed to send',
   off: 'No mail server',
 };
+
+/** Refusals that mean the list is behind: the invite was decided or lapsed. */
+const BEHIND = new Set(['wrong_status', 'invite_expired']);
 
 /** How long an invite stands, the backend's default, since the form sets none. */
 const STANDS_DAYS = 14;
@@ -110,36 +114,28 @@ function InviteRow({
 }) {
   const queryClient = useQueryClient();
   const { sendAgain, withdraw } = useInviteChanges(place);
-  const [pending, setPending] = useState<'again' | 'withdraw' | null>(null);
-  const [error, setError] = useState<unknown>(null);
   const row = useRef<HTMLTableRowElement>(null);
   const listKey = invitesQuery(place).queryKey;
+  const change = useChange({
+    reread: () => queryClient.invalidateQueries({ queryKey: listKey }),
+    rereadDone: false,
+    behind: BEHIND,
+    focus: row,
+  });
+  const { pending, error } = change;
   const name = who(invite);
   const open = invite.status === 'pending';
   const changeable = manages && open && (invite.grants !== 'admin' || administers);
   const mailable = !invite.expired && invite.mail_status !== 'off';
 
-  const run = async (action: 'again' | 'withdraw', change: () => Promise<Invite>) => {
-    setPending(action);
-    setError(null);
-    try {
-      const updated = await change();
+  /** Each change answers with the invite as it now stands, which replaces its row. */
+  const run = (key: 'again' | 'withdraw', made: () => Promise<Invite>) =>
+    change.run(key, async () => {
+      const updated = await made();
       queryClient.setQueryData<Invite[]>(listKey, (rows) =>
         rows?.map((found) => (found.id === updated.id ? updated : found)),
       );
-      row.current?.focus();
-    } catch (refused) {
-      setError(refused);
-      if (
-        isApiError(refused) &&
-        (refused.code === 'wrong_status' || refused.code === 'invite_expired')
-      ) {
-        await queryClient.invalidateQueries({ queryKey: listKey });
-      }
-    } finally {
-      setPending(null);
-    }
-  };
+    });
 
   return (
     <tr ref={row} tabIndex={-1}>
@@ -217,28 +213,22 @@ function InviteForm({ place, grants }: { place: RolePlace; grants: Grant[] }) {
   const [grant, setGrant] = useState<Grant>(
     grants.includes('manager') ? 'manager' : (grants[0] ?? 'contestant'),
   );
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState<unknown>(null);
   const [tried, setTried] = useState('');
   const [made, setMade] = useState<string | null>(null);
+  const change = useChange({
+    reread: () =>
+      queryClient.invalidateQueries({ queryKey: invitesQuery(place).queryKey }),
+  });
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     const target = typed.trim();
     if (target === '') return;
-    setPending(true);
-    setError(null);
     setMade(null);
     setTried(target);
-    try {
-      await create(grant, targetOf(target));
+    if ((await change.run('invite', () => create(grant, targetOf(target)))).ok) {
       setTyped('');
       setMade(target);
-      await queryClient.invalidateQueries({ queryKey: invitesQuery(place).queryKey });
-    } catch (refused) {
-      setError(refused);
-    } finally {
-      setPending(false);
     }
   };
 
@@ -277,7 +267,7 @@ function InviteForm({ place, grants }: { place: RolePlace; grants: Grant[] }) {
         {means} The invite stands for {STANDS_DAYS} days.
       </BodyText>
       <div className={classes.actions}>
-        <Button size="xs" type="submit" loading={pending}>
+        <Button size="xs" type="submit" loading={change.pending !== null}>
           Invite
         </Button>
       </div>
@@ -286,7 +276,7 @@ function InviteForm({ place, grants }: { place: RolePlace; grants: Grant[] }) {
           <BodyText tone="secondary">Invited {made}.</BodyText>
         </div>
       )}
-      {error !== null && <Refusal error={error} typed={tried} />}
+      {change.error !== null && <Refusal error={change.error} typed={tried} />}
     </form>
   );
 }

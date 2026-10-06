@@ -1,5 +1,6 @@
 import { useRef, useState, type FormEvent } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { useChange } from '@/api/change';
 import { $api, queryView } from '@/api/query';
 import { isApiError } from '@/api/problem';
 import type { Holder, RoleName, ScopeNames } from '@/api/types';
@@ -106,33 +107,23 @@ function HolderRow({
   const afterChange = useAfterChange(place);
   const [open, setOpen] = useState<'role' | 'remove' | null>(null);
   const [role, setRole] = useState<RoleName>(holder.role);
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState<unknown>(null);
   const row = useRef<HTMLTableRowElement>(null);
   const isMe = holder.user.id === me;
+  const change = useChange({ reread: () => afterChange(isMe), focus: row });
+  const { error } = change;
+  const pending = change.pending !== null;
   const name = holder.user.username;
   const inherited = !isPlace(holder.at_names, place);
   const changeable = manages && !inherited && (holder.role !== 'admin' || administers);
 
   const show = (next: 'role' | 'remove' | null) => {
-    setError(null);
+    change.dismiss();
     setRole(holder.role);
     setOpen(next);
   };
 
-  const run = async (change: () => Promise<void>) => {
-    setPending(true);
-    setError(null);
-    try {
-      await change();
-      setOpen(null);
-      await afterChange(isMe);
-      row.current?.focus();
-    } catch (refused) {
-      setError(refused);
-    } finally {
-      setPending(false);
-    }
+  const run = async (key: string, made: () => Promise<void>) => {
+    if ((await change.run(key, made)).ok) setOpen(null);
   };
 
   const submitRole = (event: FormEvent) => {
@@ -141,7 +132,7 @@ function HolderRow({
       show(null);
       return;
     }
-    void run(() => grant(holder.user.username, role));
+    void run('role', () => grant(holder.user.username, role));
   };
 
   return (
@@ -232,7 +223,7 @@ function HolderRow({
                 <Button
                   variant="danger"
                   loading={pending}
-                  onClick={() => void run(() => revoke(holder.user.id))}
+                  onClick={() => void run('remove', () => revoke(holder.user.id))}
                 >
                   Remove
                 </Button>
@@ -258,26 +249,17 @@ function AddPerson({ place, administers }: { place: RolePlace; administers: bool
   const me = useMe();
   const [username, setUsername] = useState('');
   const [role, setRole] = useState<RoleName>('manager');
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState<unknown>(null);
   const [tried, setTried] = useState('');
+  const change = useChange({
+    reread: () => afterChange(username.trim() === me.user.username),
+  });
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     const name = username.trim();
     if (name === '') return;
-    setPending(true);
-    setError(null);
     setTried(name);
-    try {
-      await grant(name, role);
-      setUsername('');
-      await afterChange(name === me.user.username);
-    } catch (refused) {
-      setError(refused);
-    } finally {
-      setPending(false);
-    }
+    if ((await change.run('add', () => grant(name, role))).ok) setUsername('');
   };
 
   return (
@@ -303,11 +285,11 @@ function AddPerson({ place, administers }: { place: RolePlace; administers: bool
       </div>
       <BodyText tone="secondary">{ROLE_MEANS[role]}</BodyText>
       <div className={classes.actions}>
-        <Button size="xs" type="submit" loading={pending}>
+        <Button size="xs" type="submit" loading={change.pending !== null}>
           Add
         </Button>
       </div>
-      {error !== null && <Refusal error={error} username={tried} />}
+      {change.error !== null && <Refusal error={change.error} username={tried} />}
     </form>
   );
 }

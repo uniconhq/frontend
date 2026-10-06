@@ -19,8 +19,13 @@ const DESCRIPTION_MAX = 255;
  * them.
  */
 export function NewOrgPage() {
-  const create = $api.useMutation('post', '/api/v1/orgs');
   const queryClient = useQueryClient();
+  const create = $api.useMutation('post', '/api/v1/orgs', {
+    onSuccess: () =>
+      queryClient.invalidateQueries({
+        queryKey: $api.queryOptions('get', '/api/v1/me').queryKey,
+      }),
+  });
   const navigate = useNavigate();
 
   return (
@@ -46,9 +51,6 @@ export function NewOrgPage() {
             error={create.error}
             onSubmit={async (name, description) => {
               const made = await create.mutateAsync({ body: { name, description } });
-              await queryClient.invalidateQueries({
-                queryKey: $api.queryOptions('get', '/api/v1/me').queryKey,
-              });
               await navigate(orgPath(made.name));
             }}
           />

@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { $api, queryView } from '@/api/query';
 import type { Grading, GradingStatus } from '@/api/types';
@@ -57,27 +56,23 @@ function Row({
     '/api/v1/orgs/{org}/contests/{contest}/tasks/{task}/gradings',
     { params: { path } },
   ).queryKey;
+  // Answered or refused, the list is read again before the row is done.
+  const readAgain = {
+    onSettled: () => queryClient.invalidateQueries({ queryKey: listKey }),
+  };
   const cancel = $api.useMutation(
     'post',
     '/api/v1/orgs/{org}/contests/{contest}/tasks/{task}/gradings/{grading}/cancel',
+    readAgain,
   );
   const retry = $api.useMutation(
     'post',
     '/api/v1/orgs/{org}/contests/{contest}/tasks/{task}/gradings/{grading}/retry',
+    readAgain,
   );
-  const [error, setError] = useState<unknown>(null);
+  const error = cancel.error ?? retry.error;
   const params = { path: { ...path, grading: grading.id } };
   const name = `submission ${String(grading.submission_number)}, ${grading.stage}, attempt ${String(grading.attempt)}`;
-
-  const run = async (action: () => Promise<unknown>) => {
-    setError(null);
-    try {
-      await action();
-    } catch (refused) {
-      setError(refused);
-    }
-    await queryClient.invalidateQueries({ queryKey: listKey });
-  };
 
   const unfinished = UNFINISHED.has(grading.status);
 
@@ -109,7 +104,10 @@ function Row({
                 variant="secondary"
                 label={`Cancel ${name}`}
                 loading={cancel.isPending}
-                onClick={() => void run(() => cancel.mutateAsync({ params }))}
+                onClick={() => {
+                  retry.reset();
+                  cancel.mutate({ params });
+                }}
               >
                 Cancel
               </Button>
@@ -119,7 +117,10 @@ function Row({
                 variant={grading.status === 'system_error' ? 'primary' : 'secondary'}
                 label={`Retry ${name}`}
                 loading={retry.isPending}
-                onClick={() => void run(() => retry.mutateAsync({ params }))}
+                onClick={() => {
+                  cancel.reset();
+                  retry.mutate({ params });
+                }}
               >
                 Retry
               </Button>
