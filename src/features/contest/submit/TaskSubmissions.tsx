@@ -5,7 +5,7 @@ import { $api } from '@/api/query';
 import type { Submission, TaskPage } from '@/api/types';
 import { Card } from '@/ui/Card';
 import { SectionTitle } from '@/ui/SectionTitle';
-import { emptyDraft, isPanelInput, type Draft } from './draft';
+import { emptyDraft, type Draft } from './draft';
 import { newestFirst } from './grading';
 import { SubmissionDetail } from './SubmissionDetail';
 import { SubmissionList } from './SubmissionList';
@@ -37,8 +37,7 @@ export function TaskSubmissions({
   const [search] = useSearchParams();
   const opened = openSubmission(search);
 
-  const inputs = page.inputs.filter(isPanelInput);
-  const notebook = page.inputs.some((input) => input.type === 'jupyter');
+  const inputs = page.inputs;
   const open = page.release.open;
 
   const [draft, setDraft] = useState<Draft>(() => emptyDraft(inputs));
@@ -48,7 +47,6 @@ export function TaskSubmissions({
     contest,
     task,
     inputs,
-    maxSize: page.limits.max_size,
   });
 
   const listKey = $api.queryOptions(
@@ -85,8 +83,6 @@ export function TaskSubmissions({
             <SectionTitle>Submit</SectionTitle>
             <SubmitPanel
               inputs={inputs}
-              notebook={notebook}
-              taskMaxSize={page.limits.max_size}
               draft={draft}
               onDraftChange={change}
               onSubmit={() => void submit()}
