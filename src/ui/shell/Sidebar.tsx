@@ -1,7 +1,6 @@
 import { NavLink, useLocation, useParams } from 'react-router';
 import { useSession } from '@/session';
 import { contestHomePath, isContestantPath } from '@/lib/contest-paths';
-import { t } from '@/lib/t';
 import classes from './Sidebar.module.css';
 
 /**
@@ -59,10 +58,10 @@ export function Sidebar() {
       : undefined;
 
   return (
-    <nav className={classes.sidebar} aria-label={t('Sections')}>
+    <nav className={classes.sidebar} aria-label="Sections">
       {groups(contestHome).map((group) => (
         <div key={group.label}>
-          <div className={classes.groupLabel}>{t(group.label)}</div>
+          <div className={classes.groupLabel}>{group.label}</div>
           {group.items
             .filter((item) => item.signedIn !== true || signedIn)
             .map((item) =>
@@ -71,7 +70,7 @@ export function Sidebar() {
                   key={item.label}
                   className={`${classes.item} ${classes.upcoming}`}
                 >
-                  {t(item.label)}
+                  {item.label}
                 </span>
               ) : (
                 <NavLink
@@ -82,7 +81,7 @@ export function Sidebar() {
                     isActive ? `${classes.item} ${classes.active}` : classes.item
                   }
                 >
-                  {t(item.label)}
+                  {item.label}
                 </NavLink>
               ),
             )}

@@ -7,7 +7,6 @@ import { verdictLabel } from '@/ui/verdicts';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
 import { formatDateTime } from '@/lib/time';
-import { t } from '@/lib/t';
 import { useLiveConnected, useLiveRefused } from '@/live';
 import { serverNow } from '@/lib/time';
 import { justFinished, newestFirst, pollEvery, verdictOf } from './grading';
@@ -39,7 +38,7 @@ function useJustFinished(submissions: Submission[] | undefined): string {
         finished
           .map(
             (found) =>
-              `${t('Submission')} #${found.number}: ${found.gradings
+              `Submission #${found.number}: ${found.gradings
                 .map((grading) => verdictLabel(verdictOf(grading)))
                 .join(', ')}.`,
           )
@@ -91,21 +90,19 @@ function Listed({ view }: { view: QueryView<Submission[]> }) {
     return <ErrorBlock error={view.error} onRetry={view.retry} />;
   if (view.data.length === 0) {
     return (
-      <BodyText tone="secondary">
-        {t('You have not submitted to this task yet.')}
-      </BodyText>
+      <BodyText tone="secondary">You have not submitted to this task yet.</BodyText>
     );
   }
 
   const named = (submission: Submission) => submission.gradings.length > 1;
   return (
-    <table className={classes.table} aria-label={t('Your submissions')}>
+    <table className={classes.table} aria-label="Your submissions">
       <thead>
         <tr>
-          <th scope="col">{t('Submission')}</th>
-          <th scope="col">{t('Submitted')}</th>
-          <th scope="col">{t('Result')}</th>
-          <th scope="col">{t('Metrics')}</th>
+          <th scope="col">Submission</th>
+          <th scope="col">Submitted</th>
+          <th scope="col">Result</th>
+          <th scope="col">Metrics</th>
         </tr>
       </thead>
       <tbody>

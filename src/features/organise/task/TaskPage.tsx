@@ -6,7 +6,6 @@ import { SectionTitle } from '@/ui/SectionTitle';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
 import { formatDateTime } from '@/lib/time';
-import { t } from '@/lib/t';
 import { DefinitionErrors } from '../DefinitionErrors';
 import { FileBrowser } from '../files/FileBrowser';
 import { AnnouncementsSection } from '../threads/AnnouncementsSection';
@@ -61,39 +60,37 @@ function TaskStatus({ path }: { path: TaskPath }) {
 
   return (
     <div className={classes.stack}>
-      <SectionTitle>{t('State')}</SectionTitle>
+      <SectionTitle>State</SectionTitle>
       {view.state === 'loading' && <PageSkeleton rows={2} />}
       {view.state === 'error' && <ErrorBlock error={view.error} onRetry={view.retry} />}
       {view.state === 'ready' && (
         <>
           <BodyText>
             {view.data.latest === null
-              ? t('Not published yet.')
-              : `${t('Latest publication')}: ${String(view.data.latest.number)}.`}
+              ? 'Not published yet.'
+              : `Latest publication: ${String(view.data.latest.number)}.`}
           </BodyText>
           {view.data.draft ? (
             <>
               <BodyText>
-                {t(
-                  'The files as they stand are a draft. They do not grade; the latest publication does.',
-                )}
+                The files as they stand are a draft. They do not grade; the latest
+                publication does.
               </BodyText>
               {view.data.errors.length > 0 ? (
                 <>
-                  <BodyText>{t('What keeps the draft from publishing:')}</BodyText>
+                  <BodyText>What keeps the draft from publishing:</BodyText>
                   <DefinitionErrors errors={view.data.errors} />
                 </>
               ) : (
                 <BodyText tone="secondary">
-                  {t(
-                    'It has no errors: it was held back, or it has not been saved since the task was made.',
-                  )}
+                  It has no errors: it was held back, or it has not been saved since the
+                  task was made.
                 </BodyText>
               )}
             </>
           ) : (
             <BodyText tone="secondary">
-              {t('The files as they stand are the latest publication.')}
+              The files as they stand are the latest publication.
             </BodyText>
           )}
         </>
@@ -113,24 +110,22 @@ function PublicationList({ path }: { path: TaskPath }) {
 
   return (
     <div className={classes.stack}>
-      <SectionTitle>{t('Publications')}</SectionTitle>
+      <SectionTitle>Publications</SectionTitle>
       {view.state === 'loading' && <PageSkeleton rows={2} />}
       {view.state === 'error' && <ErrorBlock error={view.error} onRetry={view.retry} />}
       {view.state === 'ready' &&
         (view.data.length === 0 ? (
-          <BodyText>{t('None yet. The first valid save publishes.')}</BodyText>
+          <BodyText>None yet. The first valid save publishes.</BodyText>
         ) : (
-          <ol className={classes.list} aria-label={t('Publications')}>
+          <ol className={classes.list} aria-label="Publications">
             {[...view.data].reverse().map((publication) => (
               <li key={publication.number}>
                 <BodyText>
-                  <strong>
-                    {t('Publication')} {publication.number}
-                  </strong>{' '}
-                  · {formatDateTime(new Date(publication.at))} ·{' '}
+                  <strong>Publication {publication.number}</strong> ·{' '}
+                  {formatDateTime(new Date(publication.at))} ·{' '}
                   {publication.grading_changed
-                    ? t('changed how the task grades')
-                    : t('grading unchanged')}
+                    ? 'changed how the task grades'
+                    : 'grading unchanged'}
                 </BodyText>
                 {publication.changes.length > 0 && (
                   <ul className={classes.named}>

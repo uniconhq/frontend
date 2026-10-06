@@ -1,6 +1,5 @@
 import { $api } from '@/api/query';
 import { TextLink } from '@/ui/TextLink';
-import { t } from '@/lib/t';
 import { useSession } from './session-context';
 
 /**
@@ -17,5 +16,5 @@ export function CreateAccountLink() {
   const url = register.data?.url ?? null;
 
   if (url === null) return null;
-  return <TextLink href={url}>{t('Create account')}</TextLink>;
+  return <TextLink href={url}>Create account</TextLink>;
 }

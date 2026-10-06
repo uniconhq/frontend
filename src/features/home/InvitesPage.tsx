@@ -9,7 +9,6 @@ import { SectionTitle } from '@/ui/SectionTitle';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
 import { useMe } from '@/session';
-import { t } from '@/lib/t';
 import { forgetInviteToken, keepInviteToken, readInviteToken } from './invite-token';
 import { InviteCard, InviteList } from './MyInvites';
 import { useMyInvites } from './my-invites';
@@ -41,23 +40,23 @@ function OpenedInvite({ view }: { view: QueryView<Invite> }) {
 
   return (
     <section className={classes.section}>
-      <SectionTitle>{t('The invite from your link')}</SectionTitle>
+      <SectionTitle>The invite from your link</SectionTitle>
       {view.state === 'loading' && <PageSkeleton rows={1} />}
       {view.state === 'error' &&
         (isApiError(view.error) && view.error.code === 'not_found' ? (
           <div role="alert">
             <BodyText>
-              {t('This link does not open an invite for')} {me.user.username}.{' '}
-              {t(
-                'It may have been sent to another account, or a newer mail may have replaced it. Sign in with the account the invite was sent to, or use the link in the newest mail.',
-              )}
+              This link does not open an invite for {me.user.username}. It may have been
+              sent to another account, or a newer mail may have replaced it. Sign in
+              with the account the invite was sent to, or use the link in the newest
+              mail.
             </BodyText>
           </div>
         ) : (
           <ErrorBlock error={view.error} onRetry={view.retry} />
         ))}
       {view.state === 'ready' && (
-        <ul className={classes.list} aria-label={t('The invite from your link')}>
+        <ul className={classes.list} aria-label="The invite from your link">
           <InviteCard invite={view.data} highlighted />
         </ul>
       )}
@@ -89,15 +88,15 @@ export function InvitesPage() {
 
   const others = (invites: Invite[]) =>
     invites.filter((invite) => invite.id !== openedId);
-  const listed = token === null ? t('Invites for you') : t('Your other invites');
+  const listed = token === null ? 'Invites for you' : 'Your other invites';
 
   return (
     <div className={classes.page}>
-      <PageTitle>{t('Invites')}</PageTitle>
+      <PageTitle>Invites</PageTitle>
       <BodyText>
-        {t(
-          'Organisers invite people to a role at an org, a contest or a task, or to a place in a contest. Accepting takes what the invite offers; declining leaves things as they are.',
-        )}
+        Organisers invite people to a role at an org, a contest or a task, or to a place
+        in a contest. Accepting takes what the invite offers; declining leaves things as
+        they are.
       </BodyText>
       {token !== null && <OpenedInvite view={opened} />}
       <section className={classes.section}>
@@ -108,7 +107,7 @@ export function InvitesPage() {
         )}
         {view.state === 'ready' &&
           (others(view.data).length === 0 ? (
-            <BodyText tone="secondary">{t('No invites are waiting for you.')}</BodyText>
+            <BodyText tone="secondary">No invites are waiting for you.</BodyText>
           ) : (
             <InviteList label={listed} invites={others(view.data)} />
           ))}

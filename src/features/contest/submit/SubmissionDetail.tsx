@@ -10,7 +10,6 @@ import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
 import { formatSize } from '@/lib/size';
 import { formatDateTime } from '@/lib/time';
-import { t } from '@/lib/t';
 import { downloadHref, nameOf } from './download';
 import { useLiveConnected, useLiveRefused } from '@/live';
 import { serverNow } from '@/lib/time';
@@ -31,19 +30,19 @@ function Tests({ grading }: { grading: GradingResult }) {
   const names = [...new Set(rows.flatMap((row) => Object.keys(row.metrics)))];
   const notes = rows.some((row) => row.message !== null && row.message !== '');
   return (
-    <table className={classes.table} aria-label={`${t('Tests')} ${grading.stage}`}>
+    <table className={classes.table} aria-label={`Tests ${grading.stage}`}>
       <thead>
         <tr>
-          <th scope="col">{t('Test')}</th>
-          <th scope="col">{t('Outcome')}</th>
-          <th scope="col">{t('Time')}</th>
-          <th scope="col">{t('Memory')}</th>
+          <th scope="col">Test</th>
+          <th scope="col">Outcome</th>
+          <th scope="col">Time</th>
+          <th scope="col">Memory</th>
           {names.map((name) => (
             <th key={name} scope="col">
               {name}
             </th>
           ))}
-          {notes && <th scope="col">{t('Note')}</th>}
+          {notes && <th scope="col">Note</th>}
         </tr>
       </thead>
       <tbody>
@@ -55,7 +54,7 @@ function Tests({ grading }: { grading: GradingResult }) {
             <td>
               <VerdictBadge verdict={row.outcome} />
             </td>
-            <td>{row.time_ms === null ? '—' : `${row.time_ms} ${t('ms')}`}</td>
+            <td>{row.time_ms === null ? '—' : `${row.time_ms} ms`}</td>
             <td>{row.memory_kb === null ? '—' : formatSize(row.memory_kb * 1024)}</td>
             {names.map((name) => {
               const value = row.metrics[name];
@@ -90,11 +89,7 @@ function Log({ where, grading }: { where: Where; grading: GradingResult }) {
   if (view.state === 'loading') return <PageSkeleton rows={2} />;
   if (view.state === 'error') return <ErrorBlock error={view.error} compact />;
   return (
-    <pre
-      className={classes.pre}
-      aria-label={`${t('Log')} ${grading.stage}`}
-      tabIndex={0}
-    >
+    <pre className={classes.pre} aria-label={`Log ${grading.stage}`} tabIndex={0}>
       {view.data}
     </pre>
   );
@@ -117,20 +112,18 @@ function Stage({
 }) {
   const summary = grading.summary ?? '';
   return (
-    <section className={shared.stack} aria-label={`${t('Stage')} ${grading.stage}`}>
+    <section className={shared.stack} aria-label={`Stage ${grading.stage}`}>
       {named && <SectionTitle order={3}>{grading.stage}</SectionTitle>}
       <div className={classes.verdict}>
         <VerdictBadge verdict={verdictOf(grading)} />
         {grading.attempt > 1 && (
-          <BodyText tone="secondary">
-            {t('Attempt')} {grading.attempt}
-          </BodyText>
+          <BodyText tone="secondary">Attempt {grading.attempt}</BodyText>
         )}
       </div>
       {summary !== '' && (
         <pre
           className={classes.pre}
-          aria-label={`${t('Summary')} ${grading.stage}`}
+          aria-label={`Summary ${grading.stage}`}
           tabIndex={0}
         >
           {summary}
@@ -160,7 +153,7 @@ function Files({ where }: { where: Where }) {
   const paths = Object.values(view.data.inputs).flatMap((input) => input.files);
   if (paths.length === 0) return null;
   return (
-    <ul className={classes.files} aria-label={t('Files')}>
+    <ul className={classes.files} aria-label="Files">
       {paths.map((path) => (
         <li key={path}>
           <TextLink href={downloadHref(where, path)}>{nameOf(path)}</TextLink>
@@ -201,23 +194,21 @@ export function SubmissionDetail({
   const where = { org, contest, task, number };
 
   return (
-    <section className={shared.stack} aria-label={`${t('Submission')} ${number}`}>
+    <section className={shared.stack} aria-label={`Submission ${number}`}>
       <div className={classes.heading}>
-        <SectionTitle>
-          {t('Submission')} #{number}
-        </SectionTitle>
-        <PageLink to={closeTo}>{t('Close')}</PageLink>
+        <SectionTitle>Submission #{number}</SectionTitle>
+        <PageLink to={closeTo}>Close</PageLink>
       </div>
       {view.state === 'loading' && <PageSkeleton rows={3} />}
       {view.state === 'error' && <ErrorBlock error={view.error} onRetry={view.retry} />}
       {view.state === 'ready' && (
         <>
           <BodyText tone="secondary">
-            {t('Submitted')} {formatDateTime(new Date(view.data.submitted_at))}
+            Submitted {formatDateTime(new Date(view.data.submitted_at))}
           </BodyText>
           <Files where={where} />
           {view.data.gradings.length === 0 && (
-            <BodyText tone="secondary">{t('Not graded on submit')}</BodyText>
+            <BodyText tone="secondary">Not graded on submit</BodyText>
           )}
           {view.data.gradings.map((grading) => (
             <Stage

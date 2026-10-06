@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react';
 import { $api } from '@/api/query';
 import { BodyText } from '@/ui/BodyText';
 import { formatDuration, serverNow } from '@/lib/time';
-import { t } from '@/lib/t';
 
 const TICK_MS = 1000;
 
@@ -53,13 +52,13 @@ export function Countdown({
 
   const text =
     phase === 'before'
-      ? `${t('Starts in')} ${formatDuration(startsAt - at)}`
+      ? `Starts in ${formatDuration(startsAt - at)}`
       : phase === 'running'
-        ? `${t('Time left')} ${formatDuration(endsAt - at)}`
-        : t('Ended');
+        ? `Time left ${formatDuration(endsAt - at)}`
+        : 'Ended';
 
   return (
-    <div role="timer" aria-label={t('Countdown')}>
+    <div role="timer" aria-label="Countdown">
       <BodyText size="md" mono>
         {text}
       </BodyText>

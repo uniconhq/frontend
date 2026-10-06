@@ -7,7 +7,6 @@ import { BodyText } from '@/ui/BodyText';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { SectionTitle } from '@/ui/SectionTitle';
 import { loginHref, useEndSession } from '@/session';
-import { t } from '@/lib/t';
 import { soleAdminScopes } from './sole-admin';
 import { sharedWorkflows } from './shared-workflows';
 import classes from './DangerZone.module.css';
@@ -60,23 +59,23 @@ export function DangerZone() {
 
   return (
     <div className={classes.zone}>
-      <SectionTitle>{t('Leaving')}</SectionTitle>
+      <SectionTitle>Leaving</SectionTitle>
       <BodyText size="md">
-        {t('Deactivating can be undone by a platform admin. Deleting cannot.')}
+        Deactivating can be undone by a platform admin. Deleting cannot.
       </BodyText>
       <div className={classes.actions}>
         <Button variant="secondary" onClick={() => setAction('deactivate')}>
-          {t('Deactivate account')}
+          Deactivate account
         </Button>
         <Button variant="danger" onClick={() => setAction('delete')}>
-          {t('Delete account')}
+          Delete account
         </Button>
       </div>
 
       {action !== null && (
-        <Modal opened onClose={close} title={t(CONFIRM[action])}>
+        <Modal opened onClose={close} title={CONFIRM[action]}>
           <div className={classes.dialog}>
-            <BodyText size="md">{t(EXPLANATION[action])}</BodyText>
+            <BodyText size="md">{EXPLANATION[action]}</BodyText>
 
             {apiError !== null && (
               <div className={classes.problem}>
@@ -102,18 +101,18 @@ export function DangerZone() {
 
             <div className={classes.actions}>
               {apiError?.code === 'fresh_sign_in_required' ? (
-                <Button href={loginHref('/account')}>{t('Sign in again')}</Button>
+                <Button href={loginHref('/account')}>Sign in again</Button>
               ) : (
                 <Button
                   variant="danger"
                   loading={mutation.isPending}
                   onClick={() => mutation.mutate({})}
                 >
-                  {t(CONFIRM[action])}
+                  {CONFIRM[action]}
                 </Button>
               )}
               <Button variant="secondary" onClick={close}>
-                {t('Cancel')}
+                Cancel
               </Button>
             </div>
           </div>
