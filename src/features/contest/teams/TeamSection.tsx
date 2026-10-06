@@ -284,8 +284,9 @@ function YourTeam({
       <div className={classes.panel}>
         <BodyText>{team.name}</BodyText>
         <BodyText tone="secondary">
-          {team.members.length} of {maxSize} places taken. Your submissions, limits and
-          questions are the team’s, and everyone in it sees them.
+          {team.members.length} of {maxSize} places taken. Your submissions, the caps
+          they count against, your extra time and your questions are the team’s, and
+          everyone in it sees them.
         </BodyText>
       </div>
       <ul className={classes.list} aria-label="Members">
@@ -715,7 +716,7 @@ function overBecause(end: string, state: ContestHome['state']): string | null {
  * on an answer, and now and then otherwise. When the team the person is in
  * changes between two reads, by their own hand or by a leader's or an
  * organiser's, every read of the contest is read again, since submissions,
- * limits and questions are the team's. After the contest's end the section
+ * their caps, extra time and questions are the team's. After the contest's end the section
  * shows the team as it stands, with nothing to change. Each refusal is said
  * in words until it is dismissed, and one that shows the page was behind
  * reads the team again.
