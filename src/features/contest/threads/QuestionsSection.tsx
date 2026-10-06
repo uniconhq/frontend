@@ -11,7 +11,6 @@ import { Textarea } from '@/ui/Textarea';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
 import { useFallbackPoll } from '@/live';
-import { t } from '@/lib/t';
 import { QuestionThread } from '@/ui/threads/ThreadParts';
 import { isTeams } from '@/ui/threads/asker';
 import classes from '@/ui/threads/threads.module.css';
@@ -30,52 +29,44 @@ function FollowUp({
   clarification: Clarification;
   onSent: () => Promise<void>;
 }) {
-  const followUp = $api.useMutation('post', `${QUESTIONS}/{number}/comments`);
+  const followUp = $api.useMutation('post', `${QUESTIONS}/{number}/comments`, {
+    onSuccess: () => onSent(),
+  });
   const [body, setBody] = useState('');
-  const [error, setError] = useState<unknown>(null);
-  const [sending, setSending] = useState(false);
 
-  const send = async (event: FormEvent) => {
+  const send = (event: FormEvent) => {
     event.preventDefault();
-    if (sending) return;
-    setError(null);
-    setSending(true);
-    try {
-      await followUp.mutateAsync({
+    if (followUp.isPending) return;
+    followUp.mutate(
+      {
         params: { path: { org, contest, number: clarification.number } },
         body: { body },
-      });
-      setBody('');
-      await onSent();
-    } catch (refused) {
-      setError(refused);
-    } finally {
-      setSending(false);
-    }
+      },
+      { onSuccess: () => setBody('') },
+    );
   };
 
   return (
     <form
       className={classes.form}
-      onSubmit={(event) => void send(event)}
-      aria-label={`${t('Follow up')} ${clarification.title}`}
+      onSubmit={send}
+      aria-label={`Follow up ${clarification.title}`}
     >
-      <Textarea
-        label={t('Follow up')}
-        value={body}
-        onChange={setBody}
-        rows={2}
-        required
-      />
+      <Textarea label="Follow up" value={body} onChange={setBody} rows={2} required />
       {clarification.answered && (
         <BodyText tone="secondary">
-          {t('Sending this opens the question again for the organisers.')}
+          Sending this opens the question again for the organisers.
         </BodyText>
       )}
-      {error !== null && <ErrorBlock error={error} compact />}
+      {followUp.error !== null && <ErrorBlock error={followUp.error} compact />}
       <div className={classes.actions}>
-        <Button type="submit" size="xs" variant="secondary" loading={sending}>
-          {t('Send')}
+        <Button
+          type="submit"
+          size="xs"
+          variant="secondary"
+          loading={followUp.isPending}
+        >
+          Send
         </Button>
       </div>
     </form>
@@ -94,67 +85,52 @@ function AskForm({
   tasks: { name: string; title: string }[];
   onAsked: () => Promise<void>;
 }) {
-  const ask = $api.useMutation('post', QUESTIONS);
+  const ask = $api.useMutation('post', QUESTIONS, { onSuccess: () => onAsked() });
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [task, setTask] = useState('');
-  const [error, setError] = useState<unknown>(null);
-  const [sending, setSending] = useState(false);
 
-  const send = async (event: FormEvent) => {
+  const send = (event: FormEvent) => {
     event.preventDefault();
-    if (sending) return;
-    setError(null);
-    setSending(true);
-    try {
-      await ask.mutateAsync({
+    if (ask.isPending) return;
+    ask.mutate(
+      {
         params: { path: { org, contest } },
         body: { title, body, task: task === '' ? null : task },
-      });
-      setTitle('');
-      setBody('');
-      setTask('');
-      await onAsked();
-    } catch (refused) {
-      setError(refused);
-    } finally {
-      setSending(false);
-    }
+      },
+      {
+        onSuccess: () => {
+          setTitle('');
+          setBody('');
+          setTask('');
+        },
+      },
+    );
   };
 
   return (
-    <form
-      className={classes.form}
-      onSubmit={(event) => void send(event)}
-      aria-label={t('Ask')}
-    >
+    <form className={classes.form} onSubmit={send} aria-label="Ask">
       <TextInput
-        label={t('Question')}
+        label="Question"
         value={title}
         onChange={setTitle}
         maxLength={200}
         required
       />
-      <Textarea
-        label={t('Details')}
-        value={body}
-        onChange={setBody}
-        rows={3}
-        required
-      />
+      <Textarea label="Details" value={body} onChange={setBody} rows={3} required />
       {tasks.length > 0 && (
         <Select
-          label={t('About the task')}
+          label="About the task"
           value={task}
-          placeholder={t('The contest as a whole')}
+          placeholder="The contest as a whole"
           options={tasks.map((found) => ({ value: found.name, label: found.title }))}
           onChange={setTask}
         />
       )}
-      {error !== null && <ErrorBlock error={error} compact />}
+      {ask.error !== null && <ErrorBlock error={ask.error} compact />}
       <div className={classes.actions}>
-        <Button type="submit" size="xs" loading={sending}>
-          {t('Ask')}
+        <Button type="submit" size="xs" loading={ask.isPending}>
+          Ask
         </Button>
       </div>
     </form>
@@ -194,22 +170,21 @@ export function QuestionsSection({
 
   return (
     <div className={classes.stack}>
-      <SectionTitle>{t('Questions to the organisers')}</SectionTitle>
+      <SectionTitle>Questions to the organisers</SectionTitle>
       <BodyText tone="secondary">
-        {t(
-          'Only you and the organisers see what you ask. In a team, everyone in it sees it too.',
-        )}
+        Only you and the organisers see what you ask. In a team, everyone in it sees it
+        too.
       </BodyText>
       <AskForm org={org} contest={contest} tasks={tasks} onAsked={readAgain} />
       {view.state === 'loading' && <PageSkeleton rows={2} />}
       {view.state === 'error' && <ErrorBlock error={view.error} onRetry={view.retry} />}
       {view.state === 'ready' && view.data.length > 0 && (
-        <ol className={classes.list} aria-label={t('Your questions')}>
+        <ol className={classes.list} aria-label="Your questions">
           {[...view.data].reverse().map((clarification) => (
             <li key={clarification.number} className={classes.item}>
               <QuestionThread
                 clarification={clarification}
-                asker={isTeams(clarification) ? t('Your team') : t('You')}
+                asker={isTeams(clarification) ? 'Your team' : 'You'}
               />
               <FollowUp
                 org={org}

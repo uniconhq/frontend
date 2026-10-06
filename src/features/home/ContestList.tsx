@@ -7,7 +7,6 @@ import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
 import { contestHomePath } from '@/lib/contest-paths';
 import { formatDateTime } from '@/lib/time';
-import { t } from '@/lib/t';
 import classes from './HomePage.module.css';
 
 type Status = NonNullable<ContestSummary['status']>;
@@ -31,7 +30,7 @@ const STATUS: Record<Status, string> = {
 
 function Contests({ label, contests }: { label: string; contests: Listed[] }) {
   if (contests.length === 0) {
-    return <BodyText tone="secondary">{t('No contest to show yet.')}</BodyText>;
+    return <BodyText tone="secondary">No contest to show yet.</BodyText>;
   }
   return (
     <ul className={classes.contests} aria-label={label}>
@@ -46,7 +45,7 @@ function Contests({ label, contests }: { label: string; contests: Listed[] }) {
           <BodyText tone="secondary">
             {formatDateTime(new Date(contest.start))} –{' '}
             {formatDateTime(new Date(contest.end))}
-            {contest.status != null && ` · ${t(STATUS[contest.status])}`}
+            {contest.status != null && ` · ${STATUS[contest.status]}`}
           </BodyText>
         </li>
       ))}
@@ -69,11 +68,11 @@ function ContestSection({ title, view }: { title: string; view: QueryView<Listed
 /** The contests whose visibility is public, read with no session. */
 export function PublicContests() {
   const view = queryView($api.useQuery('get', '/api/v1/public/contests'));
-  return <ContestSection title={t('Public contests')} view={view} />;
+  return <ContestSection title="Public contests" view={view} />;
 }
 
 /** Every contest the signed-in person may enter or has, with their own registration. */
 export function MyContests() {
   const view = queryView($api.useQuery('get', '/api/v1/contests'));
-  return <ContestSection title={t('Contests')} view={view} />;
+  return <ContestSection title="Contests" view={view} />;
 }

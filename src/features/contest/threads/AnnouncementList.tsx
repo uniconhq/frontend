@@ -6,7 +6,6 @@ import { SectionTitle } from '@/ui/SectionTitle';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
 import { useFallbackPoll } from '@/live';
-import { t } from '@/lib/t';
 import { AnnouncementContent } from '@/ui/threads/ThreadParts';
 import { itemClass } from '@/ui/threads/item-class';
 import classes from '@/ui/threads/threads.module.css';
@@ -34,10 +33,10 @@ function Listed({
   showPlace: boolean;
 }) {
   if (announcements.length === 0) {
-    return <BodyText tone="secondary">{t('No announcements.')}</BodyText>;
+    return <BodyText tone="secondary">No announcements.</BodyText>;
   }
   return (
-    <ol className={classes.list} aria-label={t('Announcements')}>
+    <ol className={classes.list} aria-label="Announcements">
       {[...announcements].reverse().map((announcement) => (
         <AnnouncementItem
           key={`${announcement.where.task ?? ''}#${String(announcement.number)}`}
@@ -71,7 +70,7 @@ export function ContestAnnouncements({
   );
   return (
     <div className={classes.stack}>
-      <SectionTitle>{t('Announcements')}</SectionTitle>
+      <SectionTitle>Announcements</SectionTitle>
       {view.state === 'loading' && <PageSkeleton rows={2} />}
       {view.state === 'error' && <ErrorBlock error={view.error} onRetry={view.retry} />}
       {view.state === 'ready' && <Listed announcements={view.data} showPlace />}
@@ -105,7 +104,7 @@ export function TaskAnnouncements({
   return (
     <Card>
       <div className={classes.stack}>
-        <SectionTitle>{t('Announcements')}</SectionTitle>
+        <SectionTitle>Announcements</SectionTitle>
         {view.state === 'error' && (
           <ErrorBlock error={view.error} onRetry={view.retry} />
         )}

@@ -4,7 +4,6 @@ import type { SaveResult, WriteFile } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
-import { t } from '@/lib/t';
 import { DefinitionErrors } from '../DefinitionErrors';
 import classes from '../organise.module.css';
 import { definitionErrorsOf, stringsOf } from './refusals';
@@ -63,7 +62,7 @@ export function SaveOutcome({
     return (
       <Panel role="status">
         <BodyText>
-          {t('Saved as version')} <code>{short(outcome.version)}</code>.
+          Saved as version <code>{short(outcome.version)}</code>.
         </BodyText>
       </Panel>
     );
@@ -74,20 +73,18 @@ export function SaveOutcome({
     if ('number' in result) {
       return (
         <Panel role="status">
-          <BodyText>
-            {t('Published as publication')} {result.number}.
-          </BodyText>
+          <BodyText>Published as publication {result.number}.</BodyText>
           {result.grading_changed ? (
             <>
-              <BodyText>{t('It changes how the task grades:')}</BodyText>
-              <ul className={classes.named} aria-label={t('What changed')}>
+              <BodyText>It changes how the task grades:</BodyText>
+              <ul className={classes.named} aria-label="What changed">
                 {result.changes.map((change) => (
                   <li key={change}>{change}</li>
                 ))}
               </ul>
             </>
           ) : (
-            <BodyText>{t('It does not change how the task grades.')}</BodyText>
+            <BodyText>It does not change how the task grades.</BodyText>
           )}
         </Panel>
       );
@@ -95,20 +92,18 @@ export function SaveOutcome({
     return (
       <Panel role="status">
         <BodyText>
-          {t(
-            'Saved as a draft. Nothing was published; the last publication keeps grading.',
-          )}
+          Saved as a draft. Nothing was published; the last publication keeps grading.
         </BodyText>
         {result.errors.length > 0 && (
           <>
-            <BodyText>{t('What keeps it from publishing:')}</BodyText>
+            <BodyText>What keeps it from publishing:</BodyText>
             <DefinitionErrors errors={result.errors} />
           </>
         )}
         {result.held_back.length > 0 && (
           <>
-            <BodyText>{t('Held back from grading until it is confirmed:')}</BodyText>
-            <ul className={classes.named} aria-label={t('Held back')}>
+            <BodyText>Held back from grading until it is confirmed:</BodyText>
+            <ul className={classes.named} aria-label="Held back">
               {result.held_back.map((change) => (
                 <li key={change}>{change}</li>
               ))}
@@ -124,15 +119,14 @@ export function SaveOutcome({
   if (error.code === 'conflict') {
     return (
       <Panel role="alert">
-        <BodyText>{t('Someone else changed this file since you opened it.')}</BodyText>
+        <BodyText>Someone else changed this file since you opened it.</BodyText>
         <BodyText tone="secondary">
-          {t(
-            'Nothing was saved, and your text is still here. Reloading shows their version and replaces your text, so copy anything you want to keep first.',
-          )}
+          Nothing was saved, and your text is still here. Reloading shows their version
+          and replaces your text, so copy anything you want to keep first.
         </BodyText>
         <div className={classes.actions}>
           <Button size="xs" variant="secondary" onClick={onReload}>
-            {t('Reload the file')}
+            Reload the file
           </Button>
         </div>
       </Panel>
@@ -143,23 +137,22 @@ export function SaveOutcome({
     return (
       <Panel role="alert">
         <ErrorBlock error={error} compact />
-        <BodyText>{t('What would change:')}</BodyText>
-        <ul className={classes.named} aria-label={t('What would change')}>
+        <BodyText>What would change:</BodyText>
+        <ul className={classes.named} aria-label="What would change">
           {stringsOf(error, 'changes').map((change) => (
             <li key={change}>{change}</li>
           ))}
         </ul>
         <BodyText tone="secondary">
-          {t(
-            'Publishing changes the grading of a running contest. Keeping it as a draft writes the files and publishes nothing.',
-          )}
+          Publishing changes the grading of a running contest. Keeping it as a draft
+          writes the files and publishes nothing.
         </BodyText>
         <div className={classes.actions}>
           <Button size="xs" onClick={() => onConfirm(body)}>
-            {t('Publish the change')}
+            Publish the change
           </Button>
           <Button size="xs" variant="secondary" onClick={() => onKeepAsDraft(body)}>
-            {t('Keep as draft')}
+            Keep as draft
           </Button>
         </div>
       </Panel>
@@ -173,7 +166,7 @@ export function SaveOutcome({
     <Panel role="alert">
       <ErrorBlock error={error} compact />
       {named.length > 0 && (
-        <ul className={classes.named} aria-label={t('What stands in the way')}>
+        <ul className={classes.named} aria-label="What stands in the way">
           {named.map((item) => (
             <li key={item} className={classes.mono}>
               {item}

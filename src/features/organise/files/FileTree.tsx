@@ -6,7 +6,6 @@ import type { TreeEntry } from '@/api/types';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
 import { BodyText } from '@/ui/BodyText';
-import { t } from '@/lib/t';
 import { fileHref } from './file-param';
 import { treeQuery, type Place } from './place';
 import classes from './Files.module.css';
@@ -50,7 +49,7 @@ export function FileTree({ place, open }: { place: Place; open: string | null })
     });
 
   return (
-    <nav aria-label={t('Files')} className={classes.tree}>
+    <nav aria-label="Files" className={classes.tree}>
       <Folder place={place} folder="" expanded={expanded} toggle={toggle} open={open} />
     </nav>
   );
@@ -75,7 +74,7 @@ function Folder({
   if (view.state === 'error')
     return <ErrorBlock error={view.error} onRetry={view.retry} />;
   if (view.data.length === 0) {
-    return <BodyText tone="secondary">{t('Empty folder')}</BodyText>;
+    return <BodyText tone="secondary">Empty folder</BodyText>;
   }
 
   return (

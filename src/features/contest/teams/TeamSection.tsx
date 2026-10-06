@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState, type FormEvent, type RefObject } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useQueryClient, type Query } from '@tanstack/react-query';
+import { useChange, type Change } from '@/api/change';
 import { $api, queryView } from '@/api/query';
 import { isApiError } from '@/api/problem';
 import type { ContestHome, ListedTeam, MyTeams, Team, TeamMember } from '@/api/types';
@@ -14,7 +15,6 @@ import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
 import { useMe } from '@/session';
 import { teamNameProblem, USERNAME_MAX } from '@/lib/team-fields';
 import { formatDateTime, serverNow } from '@/lib/time';
-import { t } from '@/lib/t';
 import classes from './teams.module.css';
 
 const MY_TEAM = '/api/v1/orgs/{org}/contests/{contest}/my-team';
@@ -53,75 +53,8 @@ function ofContest(query: Query, { org, contest }: Path): boolean {
   return params?.org === org && params.contest === contest;
 }
 
-/** How a change went: its answer, or the refusal, or null when another was under way. */
-type Outcome<T> = { ok: true; value: T } | { ok: false; error: unknown };
-
-type Change = {
-  /** Which change is under way, such as `approve:20`, while one is. */
-  pending: string | null;
-  /** The last refusal, shown once for the section until it is dismissed. */
-  error: unknown;
-  dismiss: () => void;
-  /**
-   * Make one change at a time, then read the team again. The section takes
-   * the focus once it has, since the button that was clicked has usually
-   * gone, and shows a refusal. `own` is for a form that keeps the focus and
-   * says its own refusals.
-   */
-  run: <T>(
-    key: string,
-    change: () => Promise<T>,
-    options?: { own?: boolean },
-  ) => Promise<Outcome<T>>;
-};
-
-function useChange(path: Path, section: RefObject<HTMLElement | null>): Change {
-  const queryClient = useQueryClient();
-  const [pending, setPending] = useState<string | null>(null);
-  const [error, setError] = useState<unknown>(null);
-  const running = useRef(false);
-  const init = { params: { path } };
-
-  const readTeams = () =>
-    Promise.all([
-      queryClient.invalidateQueries({
-        queryKey: $api.queryOptions('get', MY_TEAM, init).queryKey,
-      }),
-      queryClient.invalidateQueries({
-        queryKey: $api.queryOptions('get', TEAMS, init).queryKey,
-      }),
-    ]);
-
-  const run = async <T,>(
-    key: string,
-    change: () => Promise<T>,
-    options: { own?: boolean } = {},
-  ): Promise<Outcome<T>> => {
-    if (running.current) return { ok: false, error: null };
-    running.current = true;
-    setPending(key);
-    setError(null);
-    let outcome: Outcome<T>;
-    try {
-      outcome = { ok: true, value: await change() };
-    } catch (refused) {
-      outcome = { ok: false, error: refused };
-    }
-    if (!outcome.ok && options.own !== true) setError(outcome.error);
-    if (outcome.ok || (isApiError(outcome.error) && BEHIND.has(outcome.error.code))) {
-      await readTeams();
-    }
-    running.current = false;
-    setPending(null);
-    if (outcome.ok && options.own !== true) section.current?.focus();
-    return outcome;
-  };
-
-  return { pending, error, dismiss: () => setError(null), run };
-}
-
 function nameOf(member: TeamMember): string {
-  return member.user?.username ?? t('Deleted user');
+  return member.user?.username ?? 'Deleted user';
 }
 
 /** Who someone is, with what they are to the team and to the reader. */
@@ -143,10 +76,8 @@ function Listed({ team }: { team: ListedTeam }) {
     <div className={classes.who}>
       <span className={classes.name}>{team.name}</span>
       <BodyText tone="secondary">
-        {team.leader === null
-          ? t('No leader')
-          : `${t('Led by')} ${team.leader.username}`}{' '}
-        · {team.size} {t('of')} {team.max_size} {t('places taken')}
+        {team.leader === null ? 'No leader' : `Led by ${team.leader.username}`} ·{' '}
+        {team.size} of {team.max_size} places taken
       </BodyText>
     </div>
   );
@@ -172,11 +103,11 @@ function leaveOutcome(team: Team, me: number): string {
   const next = nextLeader(team, me);
   if (next === null) {
     return team.submitted
-      ? t('Nobody is left in it, and the team stays with its results.')
-      : t('Nobody is left in it, so the team is deleted.');
+      ? 'Nobody is left in it, and the team stays with its results.'
+      : 'Nobody is left in it, so the team is deleted.';
   }
   if (team.leader === me) {
-    return `${nameOf(next)} ${t('becomes the leader, as the member who joined earliest.')}`;
+    return `${nameOf(next)} becomes the leader, as the member who joined earliest.`;
   }
   return '';
 }
@@ -188,17 +119,15 @@ function InviteRefusal({ error, tried }: { error: unknown; tried: string }) {
       <BodyText tone="secondary">
         {error.detail === NO_SUCH_TEAM
           ? error.detail
-          : `${t('Nobody has the username')} ${tried}.`}
+          : `Nobody has the username ${tried}.`}
       </BodyText>
     );
   }
   if (isApiError(error) && error.code === 'not_approved') {
     return (
       <BodyText tone="secondary">
-        {tried}{' '}
-        {t(
-          'is not an approved contestant of this contest, so they cannot join a team yet.',
-        )}
+        {tried} is not an approved contestant of this contest, so they cannot join a
+        team yet.
       </BodyText>
     );
   }
@@ -253,8 +182,8 @@ function InviteForm({
       setTyped('');
       setMade(
         joined
-          ? `${username} ${t('had asked to join, so they are in the team now.')}`
-          : `${t('Invited')} ${username}. ${t('They join once they accept.')}`,
+          ? `${username} had asked to join, so they are in the team now.`
+          : `Invited ${username}. They join once they accept.`,
       );
     } else if (outcome.error !== null) {
       setError(outcome.error);
@@ -264,12 +193,12 @@ function InviteForm({
   return (
     <form
       className={classes.form}
-      aria-label={t('Invite someone to your team')}
+      aria-label="Invite someone to your team"
       onSubmit={(event) => void submit(event)}
     >
       <TextInput
-        label={t('Username')}
-        description={t('Someone already approved as a contestant of this contest.')}
+        label="Username"
+        description="Someone already approved as a contestant of this contest."
         value={typed}
         onChange={setTyped}
         maxLength={USERNAME_MAX}
@@ -283,7 +212,7 @@ function InviteForm({
           loading={change.pending === 'invite'}
           disabled={full || (change.pending !== null && change.pending !== 'invite')}
         >
-          {t('Invite')}
+          Invite
         </Button>
       </div>
       {made !== null && (
@@ -345,23 +274,21 @@ function YourTeam({
   const outcome = leaveOutcome(team, me);
 
   const notes = (person: TeamMember) => [
-    ...(person.user_id === team.leader ? [t('Leader')] : []),
-    ...(person.user_id === me ? [t('You')] : []),
+    ...(person.user_id === team.leader ? ['Leader'] : []),
+    ...(person.user_id === me ? ['You'] : []),
   ];
 
   return (
     <>
-      <SectionTitle>{t('Your team')}</SectionTitle>
+      <SectionTitle>Your team</SectionTitle>
       <div className={classes.panel}>
         <BodyText>{team.name}</BodyText>
         <BodyText tone="secondary">
-          {team.members.length} {t('of')} {maxSize} {t('places taken.')}{' '}
-          {t(
-            'Your submissions, limits and questions are the team’s, and everyone in it sees them.',
-          )}
+          {team.members.length} of {maxSize} places taken. Your submissions, limits and
+          questions are the team’s, and everyone in it sees them.
         </BodyText>
       </div>
-      <ul className={classes.list} aria-label={t('Members')}>
+      <ul className={classes.list} aria-label="Members">
         {team.members.map((person) => (
           <li key={person.user_id} className={classes.item}>
             <Who member={person} notes={notes(person)} />
@@ -370,11 +297,11 @@ function YourTeam({
                 <Button
                   size="xs"
                   variant="danger"
-                  label={`${t('Remove')} ${nameOf(person)}`}
+                  label={`Remove ${nameOf(person)}`}
                   disabled={busy}
                   onClick={() => setRemoving(person)}
                 >
-                  {t('Remove')}
+                  Remove
                 </Button>
               </div>
             )}
@@ -384,8 +311,8 @@ function YourTeam({
       {over !== null && <BodyText tone="secondary">{over}</BodyText>}
       {over === null && team.pending.length > 0 && (
         <>
-          <SectionTitle order={3}>{t('Waiting to join')}</SectionTitle>
-          <ul className={classes.list} aria-label={t('Waiting to join')}>
+          <SectionTitle order={3}>Waiting to join</SectionTitle>
+          <ul className={classes.list} aria-label="Waiting to join">
             {team.pending.map((person) => {
               const name = nameOf(person);
               const asked = person.status === 'requested';
@@ -394,18 +321,14 @@ function YourTeam({
                 <li key={person.user_id} className={classes.item}>
                   <Who
                     member={person}
-                    notes={[
-                      asked
-                        ? `${t('Asked to join')} ${since}`
-                        : `${t('Invited')} ${since}`,
-                    ]}
+                    notes={[asked ? `Asked to join ${since}` : `Invited ${since}`]}
                   />
                   {leads && (
                     <div className={classes.actions}>
                       {asked && (
                         <Button
                           size="xs"
-                          label={`${t('Approve')} ${name}`}
+                          label={`Approve ${name}`}
                           loading={change.pending === `approve:${person.user_id}`}
                           disabled={full || busy}
                           onClick={() =>
@@ -414,7 +337,7 @@ function YourTeam({
                             )
                           }
                         >
-                          {t('Approve')}
+                          Approve
                         </Button>
                       )}
                       <Button
@@ -422,8 +345,8 @@ function YourTeam({
                         variant="secondary"
                         label={
                           asked
-                            ? `${t('Refuse')} ${name}`
-                            : `${t('Withdraw the invitation for')} ${name}`
+                            ? `Refuse ${name}`
+                            : `Withdraw the invitation for ${name}`
                         }
                         loading={change.pending === `drop:${person.user_id}`}
                         disabled={busy}
@@ -433,7 +356,7 @@ function YourTeam({
                           )
                         }
                       >
-                        {asked ? t('Refuse') : t('Withdraw invitation')}
+                        {asked ? 'Refuse' : 'Withdraw invitation'}
                       </Button>
                     </div>
                   )}
@@ -445,8 +368,8 @@ function YourTeam({
       )}
       {leads && full && (
         <BodyText tone="secondary">
-          {t('Your team is full, since a team in this contest holds at most')} {maxSize}
-          {t('. Nobody else can join until someone leaves.')}
+          Your team is full, since a team in this contest holds at most {maxSize}.
+          Nobody else can join until someone leaves.
         </BodyText>
       )}
       {leads && <InviteForm path={path} team={team} full={full} change={change} />}
@@ -459,20 +382,19 @@ function YourTeam({
             loading={change.pending === 'leave'}
             onClick={() => setLeaving(true)}
           >
-            {t('Leave the team')}
+            Leave the team
           </Button>
         </div>
       )}
       <Modal
         opened={leaving}
         onClose={() => setLeaving(false)}
-        title={`${t('Leave')} ${team.name}?`}
+        title={`Leave ${team.name}?`}
       >
         <div className={classes.form}>
           <BodyText>
-            {t(
-              'You stop reaching the team’s submissions and questions, and submit on your own from then. What the team made stays the team’s.',
-            )}
+            You stop reaching the team’s submissions and questions, and submit on your
+            own from then. What the team made stays the team’s.
           </BodyText>
           {outcome !== '' && <BodyText>{outcome}</BodyText>}
           <div className={classes.actions}>
@@ -483,10 +405,10 @@ function YourTeam({
                 void change.run('leave', () => leave.mutateAsync({ params: { path } }));
               }}
             >
-              {t('Leave')}
+              Leave
             </Button>
             <Button variant="secondary" onClick={() => setLeaving(false)}>
-              {t('Cancel')}
+              Cancel
             </Button>
           </div>
         </div>
@@ -494,13 +416,12 @@ function YourTeam({
       <Modal
         opened={removing !== null}
         onClose={() => setRemoving(null)}
-        title={`${t('Remove')} ${removing === null ? '' : nameOf(removing)} ${t('from')} ${team.name}?`}
+        title={`Remove ${removing === null ? '' : nameOf(removing)} from ${team.name}?`}
       >
         <div className={classes.form}>
           <BodyText>
-            {t(
-              'They stop reaching the team’s submissions and questions, and submit on their own from then. What the team made stays the team’s.',
-            )}
+            They stop reaching the team’s submissions and questions, and submit on their
+            own from then. What the team made stays the team’s.
           </BodyText>
           <div className={classes.actions}>
             <Button
@@ -514,10 +435,10 @@ function YourTeam({
                 );
               }}
             >
-              {t('Remove')}
+              Remove
             </Button>
             <Button variant="secondary" onClick={() => setRemoving(null)}>
-              {t('Cancel')}
+              Cancel
             </Button>
           </div>
         </div>
@@ -546,10 +467,10 @@ function CreateTeam({ path, change }: { path: Path; change: Change }) {
   };
 
   return (
-    <form className={classes.form} aria-label={t('Make a team')} onSubmit={submit}>
+    <form className={classes.form} aria-label="Make a team" onSubmit={submit}>
       <TextInput
-        label={t('Team name')}
-        description={t('You lead the team you make, and invite the others.')}
+        label="Team name"
+        description="You lead the team you make, and invite the others."
         value={name}
         onChange={setName}
         required
@@ -566,7 +487,7 @@ function CreateTeam({ path, change }: { path: Path; change: Change }) {
           loading={change.pending === 'create'}
           disabled={change.pending !== null && change.pending !== 'create'}
         >
-          {t('Make the team')}
+          Make the team
         </Button>
       </div>
     </form>
@@ -606,23 +527,23 @@ function TeamList({
   if (view.state === 'error')
     return <ErrorBlock error={view.error} onRetry={view.retry} />;
   if (view.data.length === 0) {
-    return <BodyText tone="secondary">{t('Nobody has made a team yet.')}</BodyText>;
+    return <BodyText tone="secondary">Nobody has made a team yet.</BodyText>;
   }
   return (
-    <ul className={classes.list} aria-label={t('Teams')}>
+    <ul className={classes.list} aria-label="Teams">
       {view.data.map((team) => {
         const key = `ask:${team.id}`;
         let note: string | null = null;
-        if (asked.has(team.id)) note = t('You have asked to join.');
-        else if (invited.has(team.id)) note = t('You are invited. Answer above.');
-        else if (team.size >= team.max_size) note = t('This team is full.');
+        if (asked.has(team.id)) note = 'You have asked to join.';
+        else if (invited.has(team.id)) note = 'You are invited. Answer above.';
+        else if (team.size >= team.max_size) note = 'This team is full.';
         return (
           <li key={team.id} className={classes.item}>
             <Listed team={team} />
             {note === null ? (
               <Button
                 size="xs"
-                label={`${t('Ask to join')} ${team.name}`}
+                label={`Ask to join ${team.name}`}
                 loading={change.pending === key}
                 disabled={change.pending !== null && change.pending !== key}
                 onClick={() =>
@@ -633,7 +554,7 @@ function TeamList({
                   )
                 }
               >
-                {t('Ask to join')}
+                Ask to join
               </Button>
             ) : (
               <BodyText tone="secondary">{note}</BodyText>
@@ -676,37 +597,33 @@ function NoTeam({
   if (over !== null) {
     return (
       <>
-        <SectionTitle>{t('Team')}</SectionTitle>
-        <BodyText>{t('You are in no team, so you entered on your own.')}</BodyText>
+        <SectionTitle>Team</SectionTitle>
+        <BodyText>You are in no team, so you entered on your own.</BodyText>
         <BodyText tone="secondary">{over}</BodyText>
       </>
     );
   }
   return (
     <>
-      <SectionTitle>{t('Team')}</SectionTitle>
+      <SectionTitle>Team</SectionTitle>
       <BodyText tone="secondary">
-        {t('This contest is entered in teams of up to')} {mine.max_size}
-        {t(
-          '. Make a team, or ask to join one. Once you submit on your own, you cannot join a team.',
-        )}
+        This contest is entered in teams of up to {mine.max_size}. Make a team, or ask
+        to join one. Once you submit on your own, you cannot join a team.
       </BodyText>
       {mine.invited_to.length > 0 && (
         <>
-          <SectionTitle order={3}>{t('Invitations for you')}</SectionTitle>
-          <ul className={classes.list} aria-label={t('Invitations for you')}>
+          <SectionTitle order={3}>Invitations for you</SectionTitle>
+          <ul className={classes.list} aria-label="Invitations for you">
             {mine.invited_to.map((invited) => {
               const full = invited.size >= invited.max_size;
               return (
                 <li key={invited.id} className={classes.item}>
                   <Listed team={invited} />
                   <div className={classes.actions}>
-                    {full && (
-                      <BodyText tone="secondary">{t('This team is full.')}</BodyText>
-                    )}
+                    {full && <BodyText tone="secondary">This team is full.</BodyText>}
                     <Button
                       size="xs"
-                      label={`${t('Accept the invitation to')} ${invited.name}`}
+                      label={`Accept the invitation to ${invited.name}`}
                       loading={change.pending === `accept:${invited.id}`}
                       disabled={full || busy}
                       onClick={() =>
@@ -715,12 +632,12 @@ function NoTeam({
                         )
                       }
                     >
-                      {t('Accept')}
+                      Accept
                     </Button>
                     <Button
                       size="xs"
                       variant="secondary"
-                      label={`${t('Decline the invitation to')} ${invited.name}`}
+                      label={`Decline the invitation to ${invited.name}`}
                       loading={change.pending === `decline:${invited.id}`}
                       disabled={busy}
                       onClick={() =>
@@ -729,7 +646,7 @@ function NoTeam({
                         )
                       }
                     >
-                      {t('Decline')}
+                      Decline
                     </Button>
                   </div>
                 </li>
@@ -740,18 +657,18 @@ function NoTeam({
       )}
       {mine.requested.length > 0 && (
         <>
-          <SectionTitle order={3}>{t('Your requests')}</SectionTitle>
+          <SectionTitle order={3}>Your requests</SectionTitle>
           <BodyText tone="secondary">
-            {t('Each team’s leader decides. You join the first that lets you in.')}
+            Each team’s leader decides. You join the first that lets you in.
           </BodyText>
-          <ul className={classes.list} aria-label={t('Your requests')}>
+          <ul className={classes.list} aria-label="Your requests">
             {mine.requested.map((requested) => (
               <li key={requested.id} className={classes.item}>
                 <Listed team={requested} />
                 <Button
                   size="xs"
                   variant="secondary"
-                  label={`${t('Withdraw the request to join')} ${requested.name}`}
+                  label={`Withdraw the request to join ${requested.name}`}
                   loading={change.pending === `withdraw:${requested.id}`}
                   disabled={busy}
                   onClick={() =>
@@ -760,16 +677,16 @@ function NoTeam({
                     )
                   }
                 >
-                  {t('Withdraw')}
+                  Withdraw
                 </Button>
               </li>
             ))}
           </ul>
         </>
       )}
-      <SectionTitle order={3}>{t('Make a team')}</SectionTitle>
+      <SectionTitle order={3}>Make a team</SectionTitle>
       <CreateTeam path={path} change={change} />
-      <SectionTitle order={3}>{t('Join a team')}</SectionTitle>
+      <SectionTitle order={3}>Join a team</SectionTitle>
       <TeamList path={path} mine={mine} change={change} />
     </>
   );
@@ -782,9 +699,9 @@ function NoTeam({
  */
 function overBecause(end: string, state: ContestHome['state']): string | null {
   if (state === 'archived')
-    return t('The contest is archived, so teams stand as they are.');
+    return 'The contest is archived, so teams stand as they are.';
   if (serverNow().getTime() >= Date.parse(end)) {
-    return t('The contest has ended, so teams stand as they are.');
+    return 'The contest has ended, so teams stand as they are.';
   }
   return null;
 }
@@ -818,7 +735,19 @@ export function TeamSection({
   const path = { org, contest };
   const queryClient = useQueryClient();
   const section = useRef<HTMLElement>(null);
-  const change = useChange(path, section);
+  const change = useChange({
+    reread: () =>
+      Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: $api.queryOptions('get', MY_TEAM, { params: { path } }).queryKey,
+        }),
+        queryClient.invalidateQueries({
+          queryKey: $api.queryOptions('get', TEAMS, { params: { path } }).queryKey,
+        }),
+      ]),
+    behind: BEHIND,
+    focus: section,
+  });
   const view = queryView(
     $api.useQuery(
       'get',
@@ -856,11 +785,11 @@ export function TeamSection({
         ref={section}
         className={classes.section}
         tabIndex={-1}
-        aria-label={t('Team')}
+        aria-label="Team"
       >
         {view.state === 'error' && (
           <>
-            <SectionTitle>{t('Team')}</SectionTitle>
+            <SectionTitle>Team</SectionTitle>
             <ErrorBlock error={view.error} onRetry={view.retry} />
           </>
         )}
@@ -882,7 +811,7 @@ export function TeamSection({
             <ErrorBlock error={change.error} compact />
             <div className={classes.actions}>
               <Button size="xs" variant="secondary" onClick={change.dismiss}>
-                {t('Dismiss')}
+                Dismiss
               </Button>
             </div>
           </div>

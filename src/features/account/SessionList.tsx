@@ -7,7 +7,6 @@ import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
 import { useEndSession } from '@/session';
 import { formatDateTime } from '@/lib/time';
-import { t } from '@/lib/t';
 import { describeUserAgent } from './user-agent';
 import classes from './SessionList.module.css';
 
@@ -55,7 +54,7 @@ export function SessionList() {
 
   return (
     <div className={classes.sessions}>
-      <SectionTitle order={3}>{t('Signed in on')}</SectionTitle>
+      <SectionTitle order={3}>Signed in on</SectionTitle>
       <ul className={classes.list}>
         {view.data.map((session) => (
           <li key={session.id} className={classes.row}>
@@ -63,12 +62,12 @@ export function SessionList() {
               <div className={classes.device}>
                 {describeUserAgent(session.user_agent)}
                 {session.current && (
-                  <span className={classes.current}>{t('This device')}</span>
+                  <span className={classes.current}>This device</span>
                 )}
               </div>
               <BodyText tone="secondary" mono>
-                {t('signed in')} {formatDateTime(new Date(session.created_at))} ·{' '}
-                {t('last seen')} {formatDateTime(new Date(session.last_seen_at))}
+                signed in {formatDateTime(new Date(session.created_at))} · last seen{' '}
+                {formatDateTime(new Date(session.last_seen_at))}
               </BodyText>
             </div>
             <span className={classes.action}>
@@ -78,7 +77,7 @@ export function SessionList() {
                 disabled={revoke.isPending}
                 onClick={() => void revokeOne(session.id, session.current)}
               >
-                {session.current ? t('Sign out') : t('Revoke')}
+                {session.current ? 'Sign out' : 'Revoke'}
               </Button>
             </span>
           </li>
@@ -94,7 +93,7 @@ export function SessionList() {
           disabled={revokeAll.isPending}
           onClick={() => void revokeEverything()}
         >
-          {t('Sign out everywhere')}
+          Sign out everywhere
         </Button>
       </div>
     </div>

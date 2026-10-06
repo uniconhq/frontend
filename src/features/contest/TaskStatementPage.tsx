@@ -11,7 +11,6 @@ import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
 import { contestHomePath } from '@/lib/contest-paths';
 import { useTaskParams } from '@/lib/route-params';
 import { formatLimit } from '@/lib/size';
-import { t } from '@/lib/t';
 import { TaskAnnouncements } from './threads/AnnouncementList';
 import { BySession } from './BySession';
 import { SignInPrompt } from './SignInPrompt';
@@ -24,8 +23,8 @@ const MEANWHILE_MS = 60_000;
 
 /** At most `count` in any window of `seconds`, in words. */
 function rate(count: number, seconds: number): string {
-  const window = seconds === 1 ? t('second') : `${seconds} ${t('seconds')}`;
-  return `${count} ${t('in any')} ${window}`;
+  const window = seconds === 1 ? 'second' : `${seconds} seconds`;
+  return `${count} in any ${window}`;
 }
 
 /** Why a released task takes no submission from this person now. */
@@ -38,23 +37,19 @@ const CLOSED: Record<NonNullable<TaskRelease['closed']>, string> = {
 
 function LimitList({ limits }: { limits: Limits }) {
   return (
-    <dl className={classes.limits} aria-label={t('Limits')}>
-      <dt>{t('Submissions')}</dt>
-      <dd>
-        {limits.submissions} {t('in all')}
-      </dd>
-      <dt>{t('How often')}</dt>
+    <dl className={classes.limits} aria-label="Limits">
+      <dt>Submissions</dt>
+      <dd>{limits.submissions} in all</dd>
+      <dt>How often</dt>
       <dd>{rate(limits.rate.count, limits.rate.per)}</dd>
-      <dt>{t('Largest submission')}</dt>
+      <dt>Largest submission</dt>
       <dd>{formatLimit(limits.max_size)}</dd>
     </dl>
   );
 }
 
 function Back({ org, contest }: { org: string; contest: string }) {
-  return (
-    <PageLink to={contestHomePath(org, contest)}>{t('Back to the contest')}</PageLink>
-  );
+  return <PageLink to={contestHomePath(org, contest)}>Back to the contest</PageLink>;
 }
 
 /**
@@ -89,7 +84,7 @@ function SignedInTask({
       <Back org={org} contest={contest} />
       <PageTitle>{headingOf(page)}</PageTitle>
       {page.release.closed !== null && (
-        <BodyText tone="secondary">{t(CLOSED[page.release.closed])}</BodyText>
+        <BodyText tone="secondary">{CLOSED[page.release.closed]}</BodyText>
       )}
       <TaskAnnouncements org={org} contest={contest} task={task} />
       <Card>
@@ -97,7 +92,7 @@ function SignedInTask({
       </Card>
       <Card>
         <div className={classes.stack}>
-          <SectionTitle>{t('Limits')}</SectionTitle>
+          <SectionTitle>Limits</SectionTitle>
           <LimitList limits={page.limits} />
         </div>
       </Card>
@@ -130,7 +125,7 @@ function PublicTask({
     if (view.error.status === 404) {
       return (
         <SignInPrompt
-          title={t('Sign in to see this task')}
+          title="Sign in to see this task"
           back={<Back org={org} contest={contest} />}
         />
       );

@@ -8,7 +8,6 @@ import { Button } from '@/ui/Button';
 import { Textarea } from '@/ui/Textarea';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
-import { t } from '@/lib/t';
 import { fileQuery, staleAfterWrite, type Place } from './place';
 import { SaveOutcome, type Outcome } from './SaveOutcome';
 import shared from '../organise.module.css';
@@ -109,8 +108,7 @@ export function FileEditor({ place, path }: { place: Place; path: string }) {
         <>
           <BodyText mono>{file.path}</BodyText>
           <BodyText tone="secondary">
-            {t('Binary')}, {decodedSize(file.content)} {t('bytes')}.{' '}
-            {t('It cannot be edited as text.')}
+            Binary, {decodedSize(file.content)} bytes. It cannot be edited as text.
           </BodyText>
         </>
       ) : (
@@ -174,9 +172,9 @@ function TextEditor({
       />
       <div className={shared.actions}>
         <Button loading={busy} disabled={!changed} onClick={() => onSave(text)}>
-          {t('Save')}
+          Save
         </Button>
-        {changed && <BodyText tone="secondary">{t('Unsaved changes')}</BodyText>}
+        {changed && <BodyText tone="secondary">Unsaved changes</BodyText>}
       </div>
     </>
   );

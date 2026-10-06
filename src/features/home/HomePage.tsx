@@ -4,7 +4,6 @@ import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
 import { CreateAccountLink, currentPath, loginHref, useSession } from '@/session';
-import { t } from '@/lib/t';
 import { MyContests, PublicContests } from './ContestList';
 import { PendingInvites } from './MyInvites';
 import { ServerClock } from './ServerClock';
@@ -23,11 +22,10 @@ export function HomePage() {
 
   return (
     <div className={classes.page}>
-      <PageTitle>{t('Unicon')}</PageTitle>
+      <PageTitle>Unicon</PageTitle>
       <BodyText size="md">
-        {t(
-          'Run a contest of any shape, whether algorithms, models or notebooks, on repos, pipelines and verdicts you can inspect.',
-        )}
+        Run a contest of any shape, whether algorithms, models or notebooks, on repos,
+        pipelines and verdicts you can inspect.
       </BodyText>
 
       {session.status === 'loading' && <PageSkeleton rows={1} />}
@@ -35,7 +33,7 @@ export function HomePage() {
       {session.status === 'signed-out' && (
         <>
           <div className={classes.actions}>
-            <Button href={loginHref(currentPath(location))}>{t('Sign in')}</Button>
+            <Button href={loginHref(currentPath(location))}>Sign in</Button>
             <CreateAccountLink />
           </div>
           <PublicContests />
@@ -45,9 +43,9 @@ export function HomePage() {
       {session.status === 'signed-in' && (
         <>
           <BodyText>
-            {t('Signed in as')} {session.me.user.username}
+            Signed in as {session.me.user.username}
             {session.me.degraded
-              ? t('. Forgejo is not answering, so your name and avatar are missing.')
+              ? '. Forgejo is not answering, so your name and avatar are missing.'
               : ''}
           </BodyText>
           <PendingInvites />

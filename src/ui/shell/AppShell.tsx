@@ -1,5 +1,4 @@
 import type { ReactNode } from 'react';
-import { t } from '@/lib/t';
 import { Header } from './Header';
 import { Sidebar } from './Sidebar';
 import classes from './AppShell.module.css';
@@ -13,7 +12,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className={classes.shell}>
       <a href="#main" className={classes.skip}>
-        {t('Skip to content')}
+        Skip to content
       </a>
       <Header />
       <div className={classes.main}>

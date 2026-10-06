@@ -2,7 +2,6 @@ import type { Announcement, Clarification } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { Markdown } from '@/ui/Markdown';
 import { formatDateTime } from '@/lib/time';
-import { t } from '@/lib/t';
 import classes from './threads.module.css';
 
 /**
@@ -23,9 +22,9 @@ export function AnnouncementContent({
       <strong>{announcement.title}</strong>
       <BodyText tone="meta">
         {formatDateTime(new Date(announcement.posted_at))}
-        {place !== null && ` · ${t('task')} ${place}`}
-        {announcement.closed && ` · ${t('closed')}`}
-        {announcement.answers_question && ` · ${t('answers a question')}`}
+        {place !== null && ` · task ${place}`}
+        {announcement.closed && ' · closed'}
+        {announcement.answers_question && ' · answers a question'}
       </BodyText>
       <Markdown>{announcement.body}</Markdown>
     </>
@@ -49,20 +48,20 @@ export function QuestionThread({
       <strong>{clarification.title}</strong>
       <BodyText tone="meta">
         {formatDateTime(new Date(clarification.asked_at))}
-        {clarification.task !== null && ` · ${t('task')} ${clarification.task}`}
+        {clarification.task !== null && ` · task ${clarification.task}`}
         {' · '}
-        {clarification.answered ? t('Answered') : t('Open')}
+        {clarification.answered ? 'Answered' : 'Open'}
       </BodyText>
       <Markdown>{clarification.body}</Markdown>
       {clarification.messages.length > 0 && (
         <ol
           className={classes.messages}
-          aria-label={`${t('Messages on')} ${clarification.title}`}
+          aria-label={`Messages on ${clarification.title}`}
         >
           {clarification.messages.map((message, index) => (
             <li key={index}>
               <BodyText tone="meta">
-                {message.from_asker ? asker : t('Organisers')} ·{' '}
+                {message.from_asker ? asker : 'Organisers'} ·{' '}
                 {formatDateTime(new Date(message.at))}
               </BodyText>
               <Markdown>{message.body}</Markdown>
