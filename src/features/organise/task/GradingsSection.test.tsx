@@ -14,11 +14,10 @@ const stuck: Grading = {
   submission_number: 3,
   submitted_at: '2026-09-26T10:00:00Z',
   publication: 2,
-  stage: 'default',
   attempt: 1,
   status: 'system_error',
   error: 'The grading machine lost its run before it began.',
-  verdict: null,
+  result: null,
   log: false,
   progress: null,
   queued_at: '2026-09-26T10:00:00Z',
@@ -57,6 +56,57 @@ describe("the task's gradings", () => {
     );
   });
 
+  it('shows what a finished grading came to', async () => {
+    const result = (overrides: Partial<NonNullable<Grading['result']>>) => ({
+      stopped: null,
+      tests: [
+        { test: 'main/1', outcome: 'accepted' as const, values: { time_ms: 12 } },
+        { test: 'main/2', outcome: 'accepted' as const, values: { time_ms: 30 } },
+      ],
+      values: {},
+      error: null,
+      ...overrides,
+    });
+    const done = (number: number, made: NonNullable<Grading['result']>): Grading => ({
+      ...stuck,
+      id: `0199a2c1-6b7e-7c3a-9f10-5d2e4b8a6c4${String(number)}`,
+      submission_number: number,
+      status: 'done',
+      error: null,
+      result: made,
+    });
+    server.use(
+      signedIn,
+      taskState,
+      publicationList,
+      ...repoFiles,
+      http.get(`${TASK_API}/gradings`, () =>
+        HttpResponse.json([
+          done(7, result({ stopped: 'compile_error', tests: [] })),
+          done(6, result({})),
+          done(
+            5,
+            result({
+              tests: [
+                { test: 'main/1', outcome: 'accepted', values: {} },
+                { test: 'main/2', outcome: 'time_limit', values: {} },
+                { test: 'main/3', outcome: 'wrong_answer', values: {} },
+              ],
+            }),
+          ),
+        ]),
+      ),
+    );
+    renderApp(TASK);
+
+    const table = await screen.findByRole('table', { name: 'Gradings' });
+    const [, stopped, passed, failed] = within(table).getAllByRole('row');
+    expect(stopped).toHaveTextContent('compile_error');
+    expect(passed).toHaveTextContent('accepted');
+    expect(failed).toHaveTextContent('time_limit');
+    expect(within(table).queryByRole('columnheader', { name: 'Stage' })).toBeNull();
+  });
+
   it('retries a stuck grading in one click and reads the list again', async () => {
     let listed = [stuck];
     const retried: string[] = [];
@@ -83,14 +133,14 @@ describe("the task's gradings", () => {
 
     await userEvent.click(
       await screen.findByRole('button', {
-        name: 'Retry submission 3, default, attempt 1',
+        name: 'Retry submission 3, attempt 1',
       }),
     );
 
     expect(retried).toEqual([stuck.id]);
     expect(await screen.findByText('Queued')).toBeVisible();
     expect(
-      screen.getByRole('button', { name: 'Cancel submission 3, default, attempt 2' }),
+      screen.getByRole('button', { name: 'Cancel submission 3, attempt 2' }),
     ).toBeVisible();
   });
 
@@ -109,7 +159,7 @@ describe("the task's gradings", () => {
 
     await userEvent.click(
       await screen.findByRole('button', {
-        name: 'Cancel submission 4, default, attempt 1',
+        name: 'Cancel submission 4, attempt 1',
       }),
     );
 

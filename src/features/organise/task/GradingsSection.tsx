@@ -31,6 +31,18 @@ const STATUS: Record<GradingStatus, string> = {
 
 const UNFINISHED = new Set<GradingStatus>(['queued', 'dispatched', 'running']);
 
+/**
+ * What a finished grading's result comes to: what stopped the run, or the
+ * first test that did not pass, or accepted when every one did.
+ */
+function resultOf(result: NonNullable<Grading['result']>): string {
+  return (
+    result.stopped ??
+    result.tests.find((test) => test.outcome !== 'accepted')?.outcome ??
+    'accepted'
+  );
+}
+
 type TaskPath = { org: string; contest: string; task: string };
 
 /**
@@ -72,7 +84,7 @@ function Row({
   );
   const error = cancel.error ?? retry.error;
   const params = { path: { ...path, grading: grading.id } };
-  const name = `submission ${String(grading.submission_number)}, ${grading.stage}, attempt ${String(grading.attempt)}`;
+  const name = `submission ${String(grading.submission_number)}, attempt ${String(grading.attempt)}`;
 
   const unfinished = UNFINISHED.has(grading.status);
 
@@ -84,15 +96,14 @@ function Row({
           {formatDateTime(new Date(grading.submitted_at))}
         </BodyText>
       </th>
-      <td>{grading.stage}</td>
       <td>{grading.attempt}</td>
       <td>
         <span>{STATUS[grading.status]}</span>
         {grading.error !== null && (
           <BodyText tone="secondary">{grading.error}</BodyText>
         )}
-        {grading.status === 'done' && grading.verdict !== null && (
-          <BodyText tone="secondary">{grading.verdict.outcome}</BodyText>
+        {grading.status === 'done' && grading.result !== null && (
+          <BodyText tone="secondary">{resultOf(grading.result)}</BodyText>
         )}
       </td>
       {manages && (
@@ -134,9 +145,10 @@ function Row({
 }
 
 /**
- * The task's gradings, newest first, for its organisers: which submission,
- * stage and attempt, where each stands and why one failed. A manager also
- * gets each row's cancel or retry; an observer reads the table alone.
+ * The task's gradings, newest first, for its organisers: which submission
+ * and attempt, where each stands, what it came to and why one failed. A
+ * manager also gets each row's cancel or retry; an observer reads the table
+ * alone.
  */
 export function GradingsSection({ path }: { path: TaskPath }) {
   const manages = holdsAt(useMe().roles, { kind: 'task', ...path }, 'manager');
@@ -168,7 +180,6 @@ export function GradingsSection({ path }: { path: TaskPath }) {
             <thead>
               <tr>
                 <th scope="col">Submission</th>
-                <th scope="col">Stage</th>
                 <th scope="col">Attempt</th>
                 <th scope="col">Status</th>
                 {manages && <th scope="col">Actions</th>}

@@ -633,10 +633,10 @@ export function TeamsPage() {
       <Card>
         <div className={classes.stack}>
           <BodyText tone="secondary">
-            A contest has teams when its contest.yaml turns them on under teams, with
-            enabled: true, and max_size says how many a team holds, three unless it says
-            otherwise. Everyone in a team is an approved contestant first, and the
-            team’s submissions, limits and questions are shared by everyone in it.
+            A contest has teams when its contest.yaml sets team_size, the most people a
+            team holds, such as team_size: 3. Everyone in a team is an approved
+            contestant first, and the team’s submissions, the caps they count against,
+            its extra time and its questions are shared by everyone in it.
           </BodyText>
           {manages && <CreateTeam path={path} />}
         </div>

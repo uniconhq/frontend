@@ -1,26 +1,25 @@
 import { describe, expect, it } from 'vitest';
-import type { Submission } from '@/api/types';
-import { pollEvery } from './grading';
+import type { GradingResult, Submission } from '@/api/types';
+import { pollEvery, verdictOf } from './grading';
 
 const NOW = new Date('2026-09-26T10:10:00Z');
+
+const done: GradingResult = {
+  id: 'g',
+  attempt: 1,
+  status: 'done',
+  stopped: null,
+  outcome: null,
+  groups: [],
+  values: {},
+};
 
 function submitted(secondsAgo: number, status: 'dispatched' | 'done'): Submission {
   return {
     number: 1,
     submitted_at: new Date(NOW.getTime() - secondsAgo * 1000).toISOString(),
-    gradings: [
-      {
-        id: 'g',
-        stage: 'default',
-        attempt: 1,
-        status,
-        show: 'full',
-        outcome: null,
-        metrics: null,
-        summary: null,
-        tests: null,
-      } as Submission['gradings'][number],
-    ],
+    late_days: 0,
+    grading: { ...done, status },
   };
 }
 
@@ -46,5 +45,21 @@ describe('how often submissions are read again', () => {
   it('is once a minute when nothing is being graded', () => {
     expect(pollEvery([submitted(3, 'done')], NOW)).toBe(60_000);
     expect(pollEvery(undefined, NOW)).toBe(60_000);
+  });
+});
+
+describe('the verdict a grading shows', () => {
+  it('is where the grading stands until it is done', () => {
+    expect(verdictOf({ ...done, status: 'running', outcome: 'accepted' })).toBe(
+      'running',
+    );
+  });
+
+  it('is what stopped the run, else the outcome, else that it is graded', () => {
+    expect(verdictOf({ ...done, stopped: 'compile_error', outcome: 'accepted' })).toBe(
+      'compile_error',
+    );
+    expect(verdictOf({ ...done, outcome: 'wrong_answer' })).toBe('wrong_answer');
+    expect(verdictOf(done)).toBe('done');
   });
 });

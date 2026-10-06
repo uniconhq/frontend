@@ -1,9 +1,9 @@
 import { http, HttpResponse } from 'msw';
 import type {
-  ContestantInput,
   ContestHome,
   Contestant,
   GradingResult,
+  InputField,
   MyRegistration,
   Submission,
   TaskPage,
@@ -31,6 +31,7 @@ export function registration(overrides: Partial<MyRegistration> = {}): MyRegistr
     registered_at: '2026-09-12T09:00:00Z',
     decided_at: null,
     time_extension: 0,
+    extension_tasks: null,
     ...overrides,
   };
 }
@@ -43,52 +44,62 @@ export function home(overrides: Partial<ContestHome> = {}): ContestHome {
     start: '2026-09-12T09:00:00Z',
     end: '2026-09-12T10:30:00Z',
     state: 'published',
-    submissions_closed: false,
     registration: null,
     organises: false,
     registration_open: true,
     invite_only: false,
     asks_code: false,
-    deadline: '2026-09-12T10:30:00Z',
     now: '2026-09-12T10:00:00Z',
     tasks: [
-      { name: 'sum', label: 'A', title: 'Sum of Two', points: 100, release: OPEN },
+      {
+        name: 'sum',
+        label: 'A',
+        title: 'Sum of Two',
+        worth: 100,
+        release: OPEN,
+        due: null,
+        closes: '2026-09-12T10:30:00Z',
+      },
     ],
     ...overrides,
   };
 }
 
-/** A contestant input, a code input in Python unless told otherwise. */
-export function contestantInput(
-  overrides: Partial<ContestantInput> = {},
-): ContestantInput {
+/** A contestant input, a file input for the solution unless told otherwise. */
+export function inputField(overrides: Partial<InputField> = {}): InputField {
   return {
     id: 'submission',
-    type: 'code',
+    type: 'file',
     label: 'Your solution',
-    language: ['python'],
+    options: null,
+    per_test: false,
+    default: null,
     min: null,
     max: null,
-    accept: null,
-    max_size: null,
-    default: null,
+    max_size: 10 * 1024 * 1024,
     ...overrides,
   };
 }
+
+/** The language of the solution, as an enum input with Python alone. */
+export const languageField = inputField({
+  id: 'language',
+  type: 'enum',
+  label: 'language',
+  options: ['python'],
+});
 
 export const taskPage: TaskPage = {
   name: 'sum',
   label: 'A',
   title: 'Sum of Two',
-  points: 100,
+  worth: 100,
   statement: '# Sum\n\nRead two numbers and print their **sum**.\n',
-  limits: {
-    submissions: 50,
-    rate: { count: 1, per: 30 },
-    max_size: 10 * 1024 * 1024,
-  },
-  inputs: [contestantInput()],
+  submissions: { max: 50, rate: { count: 1, per: 30 } },
+  inputs: [inputField(), languageField],
   release: OPEN,
+  due: null,
+  closes: '2026-09-12T10:30:00Z',
 };
 
 export const publicContest: components['schemas']['PublicContest'] = {
@@ -134,55 +145,64 @@ export const noSubmissions = http.get(`${TASK_API}/submissions`, () =>
   HttpResponse.json([]),
 );
 
-/** One stage's grading as the contestant sees it: queued, nothing shown yet. */
+/** A submission's grading as the contestant sees it: queued, nothing shown yet. */
 export function grading(overrides: Partial<GradingResult> = {}): GradingResult {
   return {
     id: '5d2f0c1e-0000-4000-8000-000000000001',
-    stage: 'default',
     attempt: 1,
     status: 'queued',
-    show: 'full',
+    stopped: null,
     outcome: null,
-    metrics: null,
-    summary: null,
-    tests: null,
-    log: false,
+    groups: [],
+    values: {},
     ...overrides,
   };
 }
 
-/** A graded one: accepted with its points, two tests and a log. */
+/**
+ * A graded one: accepted, with its compile log, the samples shown with their
+ * tests, and a group whose tests are shown at the reveal.
+ */
 export const accepted = grading({
   status: 'done',
   outcome: 'accepted',
-  metrics: { points: 100 },
-  summary: 'Compiled cleanly.',
-  tests: [
+  values: { log: 'Compiled cleanly.' },
+  groups: [
     {
-      id: '1',
+      group: 'samples',
+      show: 'always',
       outcome: 'accepted',
-      time_ms: 12,
-      memory_kb: 2048,
-      metrics: { points: 1 },
-      message: null,
+      tests: [
+        {
+          test: 'samples/1',
+          outcome: 'accepted',
+          values: { time_ms: 12, memory_kb: 2048 },
+        },
+        { test: 'samples/2', outcome: 'accepted', values: {} },
+      ],
+      shown_at: null,
     },
     {
-      id: '2',
+      group: 'main',
+      show: 'verdict',
       outcome: 'accepted',
-      time_ms: null,
-      memory_kb: null,
-      metrics: { points: 1 },
-      message: null,
+      tests: null,
+      shown_at: '2026-09-12T11:00:00Z',
     },
   ],
-  log: true,
 });
 
-export function submission(number: number, gradings: GradingResult[]): Submission {
+export function submission(
+  number: number,
+  graded: GradingResult | null,
+  overrides: Partial<Submission> = {},
+): Submission {
   return {
     number,
     submitted_at: `2026-09-12T09:${String(number).padStart(2, '0')}:00Z`,
-    gradings,
+    late_days: 0,
+    grading: graded,
+    ...overrides,
   };
 }
 

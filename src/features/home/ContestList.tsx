@@ -65,7 +65,7 @@ function ContestSection({ title, view }: { title: string; view: QueryView<Listed
   );
 }
 
-/** The contests whose visibility is public, read with no session. */
+/** The contests whose visibility is everyone, read with no session. */
 export function PublicContests() {
   const view = queryView($api.useQuery('get', '/api/v1/public/contests'));
   return <ContestSection title="Public contests" view={view} />;

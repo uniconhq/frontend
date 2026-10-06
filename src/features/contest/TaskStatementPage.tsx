@@ -1,5 +1,5 @@
 import { $api, queryView } from '@/api/query';
-import type { Limits, TaskRelease } from '@/api/types';
+import type { TaskPage, TaskRelease } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { Card } from '@/ui/Card';
 import { Markdown } from '@/ui/Markdown';
@@ -10,7 +10,7 @@ import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
 import { contestHomePath } from '@/lib/contest-paths';
 import { useTaskParams } from '@/lib/route-params';
-import { formatLimit } from '@/lib/size';
+import { formatDateTime } from '@/lib/time';
 import { TaskAnnouncements } from './threads/AnnouncementList';
 import { BySession } from './BySession';
 import { SignInPrompt } from './SignInPrompt';
@@ -31,19 +31,33 @@ function rate(count: number, seconds: number): string {
 const CLOSED: Record<NonNullable<TaskRelease['closed']>, string> = {
   not_released: 'This task is not released yet.',
   archived: 'The contest is archived.',
-  ended: 'The contest has ended for you.',
-  submissions_closed: 'The organisers have closed submissions.',
+  closed: 'This task has closed for you.',
 };
 
-function LimitList({ limits }: { limits: Limits }) {
+/**
+ * When the task falls due, if it does, and closes for this person, their
+ * extension included, and the caps a submit is counted against.
+ */
+function LimitList({ page }: { page: TaskPage }) {
+  const { submissions } = page;
   return (
     <dl className={classes.limits} aria-label="Limits">
+      {page.due !== null && (
+        <>
+          <dt>Due</dt>
+          <dd>{formatDateTime(new Date(page.due))}</dd>
+        </>
+      )}
+      {page.closes !== null && (
+        <>
+          <dt>Closes</dt>
+          <dd>{formatDateTime(new Date(page.closes))}</dd>
+        </>
+      )}
       <dt>Submissions</dt>
-      <dd>{limits.submissions} in all</dd>
+      <dd>{submissions.max} in all</dd>
       <dt>How often</dt>
-      <dd>{rate(limits.rate.count, limits.rate.per)}</dd>
-      <dt>Largest submission</dt>
-      <dd>{formatLimit(limits.max_size)}</dd>
+      <dd>{rate(submissions.rate.count, submissions.rate.per)}</dd>
     </dl>
   );
 }
@@ -53,8 +67,9 @@ function Back({ org, contest }: { org: string; contest: string }) {
 }
 
 /**
- * A released task as a signed-in person reads it: the statement, the limits,
- * the panel they submit from while the task is open, and their submissions.
+ * A released task as a signed-in person reads it: the statement, its times
+ * and limits, the panel they submit from while the task is open, and their
+ * submissions.
  */
 function SignedInTask({
   org,
@@ -93,7 +108,7 @@ function SignedInTask({
       <Card>
         <div className={classes.stack}>
           <SectionTitle>Limits</SectionTitle>
-          <LimitList limits={page.limits} />
+          <LimitList page={page} />
         </div>
       </Card>
       <TaskSubmissions org={org} contest={contest} task={task} page={page} />
@@ -147,8 +162,8 @@ function PublicTask({
 
 /**
  * A task's page for a contestant or a visitor, at one address for both: the
- * statement, and for a signed-in person the limits a submit is checked
- * against, why they may not submit now, when they may not, and their own
+ * statement, and for a signed-in person when it falls due and closes and the
+ * caps a submit is counted against, why they may not submit now, when they may not, and their own
  * submissions, with the panel to make another while the task is open.
  */
 export function TaskStatementPage() {
