@@ -8,23 +8,21 @@ const TICK_MS = 1000;
 type Phase = 'before' | 'running' | 'ended';
 
 /**
- * How long until the contest starts, or until this person's own deadline, by
- * the server's clock and never the browser's. `deadline` is the contest's end
- * plus any extension the organisers gave this person, as the server works it
- * out, so the count reaches nothing at the moment the server stops taking
- * submissions from them. Asking for the server's time is what measures how
- * far this browser's clock is out, so nothing is counted until that answer
- * is in; a server that did not answer leaves the browser's clock to count by.
- * `onBoundary` is called as the count crosses the start or the deadline,
- * which is when what the page shows changes on the server too.
+ * How long until the contest starts, or until it ends, by the server's clock
+ * and never the browser's. Each task closes at its own time, which its entry
+ * says; this counts the contest as a whole. Asking for the server's time is
+ * what measures how far this browser's clock is out, so nothing is counted
+ * until that answer is in; a server that did not answer leaves the browser's
+ * clock to count by. `onBoundary` is called as the count crosses the start
+ * or the end, which is when what the page shows changes on the server too.
  */
 export function Countdown({
   start,
-  deadline,
+  end,
   onBoundary,
 }: {
   start: string;
-  deadline: string;
+  end: string;
   onBoundary?: () => void;
 }) {
   const measured = $api.useQuery('get', '/api/v1/time').isFetched;
@@ -38,7 +36,7 @@ export function Countdown({
 
   const at = serverNow().getTime();
   const startsAt = Date.parse(start);
-  const endsAt = Date.parse(deadline);
+  const endsAt = Date.parse(end);
   const phase: Phase = at < startsAt ? 'before' : at < endsAt ? 'running' : 'ended';
 
   const last = useRef<Phase | null>(null);

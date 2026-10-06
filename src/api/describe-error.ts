@@ -34,21 +34,12 @@ function againAt(error: ApiError): string {
 
 function tooLarge(error: ApiError): ErrorDescription {
   const limit = numberOf(error, 'limit');
-  if (textOf(error, 'input') !== null) {
-    return {
-      title: 'That file is too large',
-      message:
-        limit === null
-          ? 'A file for this input is larger than it takes.'
-          : `A file for this input may be at most ${formatLimit(limit)}.`,
-    };
-  }
   return {
-    title: 'That submission is too large',
+    title: 'Too large for this input',
     message:
       limit === null
-        ? 'The files together are larger than the task takes.'
-        : `A submission may be at most ${formatLimit(limit)} in all.`,
+        ? 'The files for this input are larger than it takes.'
+        : `The files for this input may be at most ${formatLimit(limit)} in all.`,
   };
 }
 
@@ -278,15 +269,10 @@ export function describeError(error: ApiError): ErrorDescription {
           'A team that has submitted stays with its results, so it is not deleted.',
       };
     case 'task_closed':
-      return textOf(error, 'reason') === 'submissions_closed'
-        ? {
-            title: 'Submissions are closed',
-            message: 'The organisers have closed submissions for this contest.',
-          }
-        : {
-            title: 'The contest has ended for you',
-            message: 'This task takes no more submissions from you.',
-          };
+      return {
+        title: 'This task has closed for you',
+        message: 'It takes no more submissions from you.',
+      };
     case 'archived':
       return {
         title: 'The contest is archived',
@@ -331,11 +317,6 @@ export function describeError(error: ApiError): ErrorDescription {
         title: 'Too many files are waiting to be submitted',
         message:
           'Files you uploaded and did not submit count until they are cleared, two days after they were sent. Submit what you have, or try again later.',
-      };
-    case 'log_too_large':
-      return {
-        title: 'The log is too large to show',
-        message: 'The verdict above is what the grading found.',
       };
     case 'invalid_inputs':
       return {
