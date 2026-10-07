@@ -239,10 +239,11 @@ describe("the contest's gradings feed", () => {
       expect(asked.at(-1)).toBe('task=sort&team=team-1&status=cancelled'),
     );
 
-    await user.type(
-      screen.getByRole('textbox', { name: "Contestant's username" }),
-      'ada',
+    const username = screen.getByRole('textbox', { name: "Contestant's username" });
+    expect(username).toHaveAccessibleDescription(
+      "Finds their own submissions and their team's, by the team they were in when each was made.",
     );
+    await user.type(username, 'ada');
     expect(asked.at(-1)).toBe('task=sort&team=team-1&status=cancelled');
     await user.click(screen.getByRole('button', { name: 'Filter' }));
     await waitFor(() =>
@@ -265,6 +266,9 @@ describe("the contest's gradings feed", () => {
     renderApp(`${FEED}?user=ada&status=system_error&status=bogus`);
 
     expect(await screen.findByText('No grading matches these filters.')).toBeVisible();
+    expect(
+      screen.getByRole('textbox', { name: "Contestant's username" }),
+    ).not.toHaveAccessibleDescription();
     expect(asked).toEqual(['user=ada&status=system_error']);
     expect(screen.getByRole('textbox', { name: "Contestant's username" })).toHaveValue(
       'ada',

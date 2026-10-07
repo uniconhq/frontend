@@ -167,6 +167,11 @@ function FilterBar({
       <form className={classes.user} onSubmit={submitUser} aria-label="By contestant">
         <TextInput
           label="Contestant's username"
+          description={
+            teams.length > 0
+              ? "Finds their own submissions and their team's, by the team they were in when each was made."
+              : undefined
+          }
           value={user}
           onChange={setUser}
           maxLength={USERNAME_MAX}

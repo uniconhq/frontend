@@ -355,7 +355,9 @@ told the contestant, what a
 finished run came to, its log, and when it was queued, started and finished.
 Above it are how many gradings wait, queued and waiting for a machine, and
 filters by task, status, team and a contestant's username, kept in the
-address so a link or a reload keeps them; a username applies once sent. Each
+address so a link or a reload keeps them; a username applies once sent and
+finds the user's own submissions and their team's, by the team they were in
+when each was made, which the field says in a contest with teams. Each
 row carries its task's letter, so the page reads no task's standing for one;
 the task filter lists the contest's tasks by name (`GET <contest>/tasks`). The
 live stream marks the feed and the queue stale as gradings move; while it is
