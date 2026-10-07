@@ -42,6 +42,10 @@ export type ContestHome = Schemas['ContestHome'];
 export type PublicTask = Schemas['PublicTask'];
 export type TaskPage = Schemas['TaskPage'];
 export type InputField = Schemas['InputField'];
+/** What the task form is built from: the inputs and test fields its workflow declares. */
+export type WorkflowForm = Schemas['WorkflowForm'];
+export type DeclaredInput = Schemas['DeclaredInput'];
+export type DeclaredField = Schemas['DeclaredField'];
 export type TaskEntry = Schemas['TaskEntry'];
 
 export type Upload = Schemas['Upload'];

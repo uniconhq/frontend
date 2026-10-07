@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { $api } from '@/api/query';
+import type { DeclaredField, DeclaredInput, WorkflowForm } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
 import { Checkbox } from '@/ui/Checkbox';
@@ -13,6 +15,7 @@ import { Fieldset, NumberField } from './fields';
 import { numberProblem } from './yaml-doc';
 import {
   emptyInput,
+  heldTheOtherWay,
   readTask,
   writeTask,
   type GroupValues,
@@ -32,7 +35,10 @@ const TESTS = 'tests';
 /**
  * `task.yaml` as fields, with the file as text in the next tab. The test
  * groups are the folders under `tests/`, read beside the file, so a folder
- * with no entry yet shows up to be given one.
+ * with no entry yet shows up to be given one. The inputs are the ones the
+ * task's workflow declares, read beside the file too, each as the kind and
+ * type the workflow gives it; when the workflow cannot be read, the form
+ * says why and edits the entries the file has.
  */
 export function TaskSettings({ place, admin }: { place: Place; admin: boolean }) {
   return (
@@ -43,12 +49,38 @@ export function TaskSettings({ place, admin }: { place: Place; admin: boolean })
 }
 
 function WithFolders(props: FormProps & { place: Place; admin: boolean }) {
-  const tree = useQuery({ ...treeQuery(props.place, TESTS), retry: false });
-  if (tree.isPending) return <PageSkeleton rows={6} />;
+  const { place } = props;
+  const tree = useQuery({ ...treeQuery(place, TESTS), retry: false });
+  // Read afresh each time the form opens, which includes after each save,
+  // since a save may name another workflow.
+  const workflow = $api.useQuery(
+    'get',
+    '/api/v1/orgs/{org}/contests/{contest}/tasks/{task}/workflow-form',
+    {
+      params: {
+        path: {
+          org: place.org,
+          contest: place.contest,
+          task: place.kind === 'task' ? place.task : '',
+        },
+      },
+    },
+    { enabled: place.kind === 'task', retry: false, gcTime: 0 },
+  );
+  if (tree.isPending || (place.kind === 'task' && workflow.isPending)) {
+    return <PageSkeleton rows={6} />;
+  }
   const folders = (tree.data ?? [])
     .filter((entry) => entry.kind === 'directory')
     .map((entry) => entry.path.slice(TESTS.length + 1));
-  return <TaskForm {...props} folders={folders} treeFailed={tree.isError} />;
+  return (
+    <TaskForm
+      {...props}
+      folders={folders}
+      treeFailed={tree.isError}
+      workflowForm={workflow.data ?? null}
+    />
+  );
 }
 
 function TaskForm({
@@ -58,8 +90,15 @@ function TaskForm({
   admin,
   folders,
   treeFailed,
-}: FormProps & { admin: boolean; folders: string[]; treeFailed: boolean }) {
-  const [read] = useState(() => readTask(doc, folders));
+  workflowForm,
+}: FormProps & {
+  admin: boolean;
+  folders: string[];
+  treeFailed: boolean;
+  workflowForm: WorkflowForm | null;
+}) {
+  const declared = workflowForm?.problem === null ? workflowForm : null;
+  const [read] = useState(() => readTask(doc, folders, declared?.inputs ?? null));
   const [values, setValues] = useState<TaskValues>(read.values);
   const [newInput, setNewInput] = useState('');
   const set = <K extends keyof TaskValues>(key: K, value: TaskValues[K]) =>
@@ -80,7 +119,9 @@ function TaskForm({
     }));
 
   const unreadable = (key: string) => read.unreadable.includes(key);
-  const changed = JSON.stringify(values) !== JSON.stringify(read.values);
+  const changed =
+    JSON.stringify(values) !== JSON.stringify(read.values) ||
+    values.inputs.some(heldTheOtherWay);
   const problems = [
     numberProblem(values.max, true),
     numberProblem(values.rateCount, true),
@@ -88,6 +129,9 @@ function TaskForm({
     ...values.inputs.flatMap((input) => [
       numberProblem(input.min),
       numberProblem(input.max),
+      input.type === 'number'
+        ? numberProblem(input.kind === 'value' ? input.value : input.default)
+        : undefined,
     ]),
     ...values.groups.flatMap((group) => [
       numberProblem(group.each),
@@ -104,6 +148,11 @@ function TaskForm({
     set('inputs', [...values.inputs, emptyInput(newId, kind)]);
     setNewInput('');
   };
+  const removeInput = (id: string) =>
+    set(
+      'inputs',
+      values.inputs.filter((kept) => kept.id !== id),
+    );
 
   return (
     <form
@@ -132,60 +181,75 @@ function TaskForm({
         />
       </Fieldset>
 
-      <Fieldset
-        legend="Inputs"
-        note={
-          unreadable('inputs')
-            ? 'inputs is not a mapping the form can read; edit it as text.'
-            : 'The workflow declares the inputs. One the contestant gives takes form details; any other takes its value. The save checks them against the workflow.'
-        }
-      >
-        {values.inputs.length > 0 && (
-          <ul className={classes.entries} aria-label="Inputs">
-            {values.inputs.map((input) => (
-              <InputEntry
-                key={input.id}
-                input={input}
-                onChange={(change) => setInput(input.id, change)}
-                onRemove={() =>
-                  set(
-                    'inputs',
-                    values.inputs.filter((kept) => kept.id !== input.id),
-                  )
-                }
+      {declared !== null && !unreadable('inputs') ? (
+        <DeclaredInputs
+          form={declared}
+          inputs={values.inputs}
+          workflowChanged={values.workflow !== read.values.workflow}
+          onChange={setInput}
+          onAdd={(input) =>
+            set('inputs', [
+              ...values.inputs,
+              emptyInput(input.id, input.contestant ? 'details' : 'value', input.type),
+            ])
+          }
+          onRemove={removeInput}
+        />
+      ) : (
+        <Fieldset
+          legend="Inputs"
+          note={
+            unreadable('inputs')
+              ? 'inputs is not a mapping the form can read; edit it as text.'
+              : workflowForm?.problem
+                ? `The workflow's inputs could not be read: ${workflowForm.problem} The form edits the entries task.yaml has; the save checks them against the workflow.`
+                : workflowForm === null
+                  ? "The workflow's inputs could not be read, so the form edits the entries task.yaml has; the save checks them against the workflow."
+                  : 'The workflow declares the inputs. One the contestant gives takes form details; any other takes its value. The save checks them against the workflow.'
+          }
+        >
+          {values.inputs.length > 0 && (
+            <ul className={classes.entries} aria-label="Inputs">
+              {values.inputs.map((input) => (
+                <InputEntry
+                  key={input.id}
+                  input={input}
+                  onChange={(change) => setInput(input.id, change)}
+                  onRemove={() => removeInput(input.id)}
+                />
+              ))}
+            </ul>
+          )}
+          {!unreadable('inputs') && (
+            <div className={classes.grid}>
+              <TextInput
+                label="New input's id"
+                value={newInput}
+                onChange={setNewInput}
+                description={idTaken ? 'There is an input with this id.' : undefined}
               />
-            ))}
-          </ul>
-        )}
-        {!unreadable('inputs') && (
-          <div className={classes.grid}>
-            <TextInput
-              label="New input's id"
-              value={newInput}
-              onChange={setNewInput}
-              description={idTaken ? 'There is an input with this id.' : undefined}
-            />
-            <div className={shared.actions}>
-              <Button
-                size="xs"
-                variant="secondary"
-                disabled={newId === '' || idTaken}
-                onClick={() => addInput('value')}
-              >
-                Add with a value
-              </Button>
-              <Button
-                size="xs"
-                variant="secondary"
-                disabled={newId === '' || idTaken}
-                onClick={() => addInput('details')}
-              >
-                Add the contestant's
-              </Button>
+              <div className={shared.actions}>
+                <Button
+                  size="xs"
+                  variant="secondary"
+                  disabled={newId === '' || idTaken}
+                  onClick={() => addInput('value')}
+                >
+                  Add with a value
+                </Button>
+                <Button
+                  size="xs"
+                  variant="secondary"
+                  disabled={newId === '' || idTaken}
+                  onClick={() => addInput('details')}
+                >
+                  Add the contestant's
+                </Button>
+              </div>
             </div>
-          </div>
-        )}
-      </Fieldset>
+          )}
+        </Fieldset>
+      )}
 
       <Fieldset
         legend="Credit"
@@ -233,6 +297,11 @@ function TaskForm({
               : 'One group per folder under tests/. The weights are relative: a group earns its share of the task. Empty fields are not set.'
         }
       >
+        {declared !== null && declared.test.length > 0 && (
+          <BodyText tone="secondary">
+            Each test holds: {declared.test.map(fieldText).join(', ')}.
+          </BodyText>
+        )}
         {values.groups.length === 0 ? (
           <BodyText tone="secondary">No folder under tests/ and no group yet.</BodyText>
         ) : (
@@ -299,6 +368,349 @@ function TaskForm({
         {changed && <BodyText tone="secondary">Unsaved changes</BodyText>}
       </div>
     </form>
+  );
+}
+
+/** A test field as the form names it: its name, its type and an enum's options. */
+function fieldText(field: DeclaredField): string {
+  const options = field.options === null ? '' : `: ${field.options.join(', ')}`;
+  return `${field.name} (${field.type}${options})`;
+}
+
+/** What an input's type takes, said under its value. */
+const VALUE_HINT: Partial<Record<string, string>> = {
+  number: 'A number.',
+  file: "A file's path in the task, such as checker/checker.cpp.",
+  folder: "A folder's path in the task; every file under it goes in.",
+  text: 'Text.',
+};
+
+/**
+ * The inputs the workflow declares, one entry each in its order, as the kind
+ * it gives each: form details for the contestant's, a value for the rest.
+ * One the file leaves out offers to be given; one the contestant gives, or
+ * that is optional, may be left out again. An entry the workflow does not
+ * declare is shown to be removed, since the save refuses it.
+ */
+function DeclaredInputs({
+  form,
+  inputs,
+  workflowChanged,
+  onChange,
+  onAdd,
+  onRemove,
+}: {
+  form: WorkflowForm;
+  inputs: InputValues[];
+  workflowChanged: boolean;
+  onChange: (id: string, change: Partial<InputValues>) => void;
+  onAdd: (input: DeclaredInput) => void;
+  onRemove: (id: string) => void;
+}) {
+  const undeclared = inputs.filter(
+    (input) => !form.inputs.some((declared) => declared.id === input.id),
+  );
+  const workflow = form.workflow ?? 'The workflow';
+  return (
+    <Fieldset
+      legend="Inputs"
+      note={
+        workflowChanged
+          ? `These are the inputs ${workflow} declares. Save the change of workflow to see the new one's.`
+          : `The inputs ${workflow} declares. The contestant gives the ones marked so, which take form details; the task gives the rest a value.`
+      }
+    >
+      {form.inputs.length === 0 && undeclared.length === 0 ? (
+        <BodyText tone="secondary">The workflow declares no inputs.</BodyText>
+      ) : (
+        <ul className={classes.entries} aria-label="Inputs">
+          {form.inputs.map((declared) => {
+            const input = inputs.find((found) => found.id === declared.id);
+            return (
+              <DeclaredEntry
+                key={declared.id}
+                declared={declared}
+                input={input}
+                onChange={(change) => onChange(declared.id, change)}
+                onAdd={() => onAdd(declared)}
+                onRemove={() => onRemove(declared.id)}
+              />
+            );
+          })}
+          {undeclared.map((input) => (
+            <li key={input.id}>
+              <Fieldset
+                legend={`${input.id}: not declared`}
+                note="The workflow declares no input with this id, so the save refuses the task until it is removed."
+              >
+                <div className={shared.actions}>
+                  <Button
+                    size="xs"
+                    variant="danger"
+                    onClick={() => onRemove(input.id)}
+                    label={`Remove ${input.id}`}
+                  >
+                    Remove
+                  </Button>
+                </div>
+              </Fieldset>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Fieldset>
+  );
+}
+
+function DeclaredEntry({
+  declared,
+  input,
+  onChange,
+  onAdd,
+  onRemove,
+}: {
+  declared: DeclaredInput;
+  input: InputValues | undefined;
+  onChange: (change: Partial<InputValues>) => void;
+  onAdd: () => void;
+  onRemove: () => void;
+}) {
+  const { id, contestant, optional } = declared;
+  const legend = `${id}: ${contestant ? "the contestant's" : 'a value'}, ${declared.type}${declared.per_test ? ', one per test' : ''}`;
+
+  if (input === undefined) {
+    const note = contestant
+      ? 'Not in task.yaml, so the contestant gets the defaults.'
+      : optional
+        ? 'Optional, and not given.'
+        : 'Not given, and the workflow needs it: the save refuses the task until it has a value.';
+    return (
+      <li>
+        <Fieldset legend={legend} note={note}>
+          <div className={shared.actions}>
+            <Button
+              size="xs"
+              variant="secondary"
+              onClick={onAdd}
+              label={contestant ? `Give ${id} form details` : `Give ${id} a value`}
+            >
+              {contestant ? 'Give it form details' : 'Give it a value'}
+            </Button>
+          </div>
+        </Fieldset>
+      </li>
+    );
+  }
+
+  const note = heldTheOtherWay(input)
+    ? contestant
+      ? 'task.yaml gives it a value, but the contestant gives this one: saving writes its form details in its place.'
+      : 'task.yaml gives it form details, but the task gives this one a value: saving writes the value in their place.'
+    : undefined;
+  return (
+    <li>
+      <Fieldset legend={legend} note={note}>
+        {contestant ? (
+          <DetailsFields declared={declared} input={input} onChange={onChange} />
+        ) : (
+          <ValueField declared={declared} input={input} onChange={onChange} />
+        )}
+        {(contestant || optional) && (
+          <div className={shared.actions}>
+            <Button
+              size="xs"
+              variant="secondary"
+              onClick={onRemove}
+              label={`Leave ${id} out`}
+            >
+              Leave it out
+            </Button>
+          </div>
+        )}
+      </Fieldset>
+    </li>
+  );
+}
+
+/** A choice of `options`, keeping a value the file has that is not one of them. */
+function choices(options: string[], value: string) {
+  const all = value === '' || options.includes(value) ? options : [value, ...options];
+  return all.map((option) => ({ value: option, label: option }));
+}
+
+/** The value of an input the task gives, as a field for its type. */
+function ValueField({
+  declared,
+  input,
+  onChange,
+}: {
+  declared: DeclaredInput;
+  input: InputValues;
+  onChange: (change: Partial<InputValues>) => void;
+}) {
+  const label = `${input.id} value`;
+  const { type } = declared;
+  if (type === 'number') {
+    return (
+      <NumberField
+        label={label}
+        value={input.value}
+        onChange={(value) => onChange({ value })}
+        hint={VALUE_HINT['number']}
+      />
+    );
+  }
+  if (type === 'boolean' || type === 'enum') {
+    const options = type === 'boolean' ? ['true', 'false'] : (declared.options ?? []);
+    return (
+      <Select
+        label={label}
+        value={input.value}
+        options={choices(options, input.value)}
+        placeholder="Not set"
+        onChange={(value) => onChange({ value })}
+      />
+    );
+  }
+  const secrets = type === 'text' || VALUE_HINT[type] === undefined;
+  return (
+    <div className={classes.grid}>
+      <TextInput
+        label={label}
+        value={input.value}
+        onChange={(value) => onChange({ value })}
+        description={
+          input.secret
+            ? "The name of one of the org's secrets."
+            : (VALUE_HINT[type] ?? `A value of type ${type}.`)
+        }
+      />
+      {secrets && (
+        <Checkbox
+          label={`${input.id}: a secret of the org`}
+          checked={input.secret}
+          onChange={(secret) => onChange({ secret })}
+        />
+      )}
+    </div>
+  );
+}
+
+/** Each option chosen, in the order the workflow declares them. */
+function chosenOf(text: string): string[] {
+  return text
+    .split(',')
+    .map((option) => option.trim())
+    .filter((option) => option !== '');
+}
+
+/**
+ * The form details of an input the contestant gives, as its type takes
+ * them: a label for any; the options offered, out of the workflow's, and a
+ * default for a choice; a default for text or true-or-false; a default, a
+ * least and a most for a number; and the most a file or folder may hold.
+ */
+function DetailsFields({
+  declared,
+  input,
+  onChange,
+}: {
+  declared: DeclaredInput;
+  input: InputValues;
+  onChange: (change: Partial<InputValues>) => void;
+}) {
+  const { id } = input;
+  const { type } = declared;
+  const options = declared.options ?? [];
+  const chosen = chosenOf(input.options);
+  const offered =
+    chosen.length === 0 ? options : options.filter((o) => chosen.includes(o));
+  const strays = chosen.filter((option) => !options.includes(option));
+  const toggle = (option: string, on: boolean) =>
+    onChange({
+      options: options
+        .filter((kept) => (kept === option ? on : chosen.includes(kept)))
+        .join(', '),
+    });
+
+  return (
+    <>
+      <div className={classes.grid}>
+        <TextInput
+          label={`${id} label`}
+          value={input.label}
+          onChange={(label) => onChange({ label })}
+          description="Empty: the id."
+        />
+        {(type === 'text' || type === 'boolean' || type === 'enum') &&
+          (type === 'text' ? (
+            <TextInput
+              label={`${id} default`}
+              value={input.default}
+              onChange={(value) => onChange({ default: value })}
+            />
+          ) : (
+            <Select
+              label={`${id} default`}
+              value={input.default}
+              options={choices(
+                type === 'boolean' ? ['true', 'false'] : offered,
+                input.default,
+              )}
+              placeholder="Not set"
+              onChange={(value) => onChange({ default: value })}
+            />
+          ))}
+        {type === 'number' && (
+          <>
+            <NumberField
+              label={`${id} default`}
+              value={input.default}
+              onChange={(value) => onChange({ default: value })}
+            />
+            <NumberField
+              label={`${id} min`}
+              value={input.min}
+              onChange={(min) => onChange({ min })}
+            />
+            <NumberField
+              label={`${id} max`}
+              value={input.max}
+              onChange={(max) => onChange({ max })}
+            />
+          </>
+        )}
+        {(type === 'file' || type === 'folder') && (
+          <TextInput
+            label={`${id} max size`}
+            value={input.maxSize}
+            onChange={(maxSize) => onChange({ maxSize })}
+            description="Such as 1MB. Empty: 10MB."
+          />
+        )}
+      </div>
+      {type === 'enum' && (
+        <Fieldset
+          legend={`${id} options`}
+          note={
+            strays.length > 0
+              ? `task.yaml also offers ${strays.join(', ')}, which the workflow does not declare; choosing here leaves those out.`
+              : 'The ones the contestant picks from. None ticked: every one the workflow declares.'
+          }
+        >
+          <div className={classes.grid}>
+            {options.map((option) => (
+              <Checkbox
+                key={option}
+                label={option}
+                checked={chosen.includes(option)}
+                onChange={(on) => toggle(option, on)}
+              />
+            ))}
+          </div>
+        </Fieldset>
+      )}
+    </>
   );
 }
 

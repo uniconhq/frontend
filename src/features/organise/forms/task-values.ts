@@ -1,3 +1,4 @@
+import type { DeclaredInput } from '@/api/types';
 import {
   isRecord,
   numberOf,
@@ -12,10 +13,13 @@ import {
  * `task.yaml` as the form's fields. Every field is text, so an empty one is
  * "not set". The form writes only what changed from what it read.
  *
- * The API names no workflow's inputs, so the form edits the `inputs` entries
- * the file has, and adds or removes one by its id. An entry is the
- * contestant's when it holds form details (a mapping, other than a secret),
- * and a value otherwise; the save checks both against the workflow.
+ * The workflow's declarations, when they can be read, say which inputs there
+ * are, which the contestant gives (form details) and which the task gives (a
+ * value), and each one's type, so a value is written as its type. When they
+ * cannot be read, the form edits the `inputs` entries the file has, and adds
+ * or removes one by its id; an entry is then the contestant's when it holds
+ * form details (a mapping, other than a secret), and a value otherwise. The
+ * save checks both against the workflow.
  */
 export type TaskValues = {
   name: string;
@@ -33,6 +37,14 @@ export type InputValues = {
   /** Whether the entry was in the file as read. */
   read: boolean;
   kind: 'details' | 'value';
+  /**
+   * How the file holds the entry: form details or a value. It differs from
+   * `kind` when the workflow declares the input the other way, and a save
+   * then writes the entry afresh as `kind`.
+   */
+  shape: 'details' | 'value';
+  /** The type the workflow declares for the input, or null when it is not known. */
+  type: string | null;
   label: string;
   /** The enum's options the contestant picks from, comma-separated. */
   options: string;
@@ -65,11 +77,17 @@ export type TaskRead = {
   unreadable: string[];
 };
 
-export function emptyInput(id: string, kind: InputValues['kind']): InputValues {
+export function emptyInput(
+  id: string,
+  kind: InputValues['kind'],
+  type: string | null = null,
+): InputValues {
   return {
     id,
     read: false,
     kind,
+    shape: kind,
+    type,
     label: '',
     options: '',
     default: '',
@@ -81,13 +99,34 @@ export function emptyInput(id: string, kind: InputValues['kind']): InputValues {
   };
 }
 
-function readInput(id: string, entry: unknown): InputValues {
+/** Whether the file holds an input the other way from how the workflow declares it. */
+export function heldTheOtherWay(input: InputValues): boolean {
+  return input.read && input.shape !== input.kind;
+}
+
+/**
+ * An entry as the form shows it. With its declaration, it is the kind the
+ * workflow says, whatever the file holds; a field of the other kind reads
+ * as empty, and the save writes the entry afresh.
+ */
+function readInput(id: string, entry: unknown, declared?: DeclaredInput): InputValues {
+  const read = readEntry(id, entry);
+  if (declared === undefined) return read;
+  const kind = declared.contestant ? 'details' : 'value';
+  const typed = { ...read, type: declared.type };
+  return kind === read.shape
+    ? typed
+    : { ...emptyInput(id, kind, declared.type), read: true, shape: read.shape };
+}
+
+function readEntry(id: string, entry: unknown): InputValues {
   const input = { ...emptyInput(id, 'value'), read: true };
   if (isRecord(entry) && !Object.hasOwn(entry, 'secret')) {
     const options = entry['options'];
     return {
       ...input,
       kind: 'details',
+      shape: 'details',
       label: textOf(entry['label']),
       options: Array.isArray(options)
         ? options.map(textOf).join(', ')
@@ -124,8 +163,15 @@ function readGroup(name: string, entry: unknown, folder: boolean): GroupValues {
   };
 }
 
-/** `folders` are the names of the folders under `tests/`, each a test group. */
-export function readTask(doc: Doc, folders: string[]): TaskRead {
+/**
+ * `folders` are the names of the folders under `tests/`, each a test group;
+ * `declared` the inputs the workflow declares, when they could be read.
+ */
+export function readTask(
+  doc: Doc,
+  folders: string[],
+  declared: DeclaredInput[] | null = null,
+): TaskRead {
   const unreadable: string[] = [];
   const at = (...path: string[]) => textOf(valueAt(doc, path));
 
@@ -177,7 +223,13 @@ export function readTask(doc: Doc, folders: string[]): TaskRead {
       name: at('name'),
       workflow: at('workflow'),
       inputs: isRecord(inputs)
-        ? Object.entries(inputs).map(([id, entry]) => readInput(id, entry))
+        ? Object.entries(inputs).map(([id, entry]) =>
+            readInput(
+              id,
+              entry,
+              declared?.find((input) => input.id === id),
+            ),
+          )
         : [],
       credit: creditValues,
       groups: groupValues,
@@ -197,11 +249,33 @@ const optionsOf = (value: string) => {
   return options.length === 0 ? undefined : options;
 };
 
+/**
+ * A value typed into a field as its declared type: a number, true or false,
+ * or text as it is (an enum's option, a path, a sentence), even when it reads
+ * as a number. With no type known, whatever it reads as. Empty is no value.
+ */
+function typedValue(type: string | null, text: string): unknown {
+  if (text.trim() === '') return undefined;
+  switch (type) {
+    case 'number':
+      return numberOf(text);
+    case 'boolean':
+      return text.trim() === 'true' ? true : text.trim() === 'false' ? false : text;
+    case 'text':
+    case 'enum':
+    case 'file':
+    case 'folder':
+      return text;
+    default:
+      return scalarOf(text);
+  }
+}
+
 /** An input entry as the file holds it, for one added or turned the other way. */
 function inputEntry(input: InputValues): unknown {
   if (input.kind === 'value') {
     if (input.secret) return { secret: input.value };
-    return scalarOf(input.value) ?? null;
+    return typedValue(input.type, input.value) ?? null;
   }
   const details: Record<string, unknown> = {};
   const add = (key: string, value: unknown) => {
@@ -209,7 +283,7 @@ function inputEntry(input: InputValues): unknown {
   };
   add('label', text(input.label));
   add('options', optionsOf(input.options));
-  add('default', scalarOf(input.default));
+  add('default', typedValue(input.type, input.default));
   add('min', numberOf(input.min));
   add('max', numberOf(input.max));
   add('max_size', text(input.maxSize));
@@ -310,7 +384,7 @@ export function writeTask(
       const was = before.inputs.find((old) => old.id === input.id);
       const path = (key?: string) =>
         key === undefined ? ['inputs', input.id] : ['inputs', input.id, key];
-      if (was === undefined || was.kind !== input.kind) {
+      if (was === undefined || was.shape !== input.kind) {
         writeAt(doc, path(), inputEntry(input));
       } else if (input.kind === 'value') {
         if (was.value !== input.value || was.secret !== input.secret) {
@@ -319,7 +393,9 @@ export function writeTask(
       } else {
         put(path('label'), was.label, input.label, text);
         put(path('options'), was.options, input.options, optionsOf);
-        put(path('default'), was.default, input.default, scalarOf);
+        put(path('default'), was.default, input.default, (value) =>
+          typedValue(input.type, value),
+        );
         put(path('min'), was.min, input.min, numberOf);
         put(path('max'), was.max, input.max, numberOf);
         put(path('max_size'), was.maxSize, input.maxSize, text);
