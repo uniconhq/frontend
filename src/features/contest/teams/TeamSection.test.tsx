@@ -572,7 +572,6 @@ describe('the team section once the contest is over', () => {
       home({
         registration: registration({ status: 'approved' }),
         end: '2026-09-12T09:30:00Z',
-        deadline: '2026-09-12T09:30:00Z',
       }),
     ),
   );

@@ -9,14 +9,15 @@ import { problem, server, signedIn } from '@/test/server';
 import { fakeTimerUser, passTime, withFakeTimers } from '@/test/timers';
 import {
   accepted,
-  contestantInput,
   grading,
+  inputField,
   submission,
   TASK_API,
   taskPage,
   DOOR_URL,
   uploadStore,
 } from '@/test/contestant';
+import { valueText } from './grading';
 
 const PAGE = '/contests/acme/spring/tasks/sum';
 
@@ -45,7 +46,7 @@ function submissions(start: Submission[] = []) {
       bodies.push(body);
       const earlier = byKey.get(body.idempotency_key);
       if (earlier !== undefined) return HttpResponse.json(earlier, { status: 201 });
-      const created = submission(made.length + 1, [grading()]);
+      const created = submission(made.length + 1, grading());
       made.push(created);
       byKey.set(body.idempotency_key, created);
       return HttpResponse.json(created, { status: 201 });
@@ -56,53 +57,60 @@ function submissions(start: Submission[] = []) {
 
 const python = () => new File(['print(1)\n'], 'main.py', { type: 'text/x-python' });
 
+/** A file as a folder picker gives it: with its path inside the folder chosen. */
+function inFolder(path: string, content: string): File {
+  const found = new File([content], path.slice(path.lastIndexOf('/') + 1));
+  Object.defineProperty(found, 'webkitRelativePath', { value: path });
+  return found;
+}
+
 /** What the panel should have worked the file above's digest out to. */
 const PYTHON_SHA256 =
   'cc42155088fca5730758db72b2a5bca33112a941dfaa2d43098ec422ce4ea213';
 
 describe('the submit panel', () => {
-  it('shows one drop zone per file input and a field for each value', async () => {
+  it('shows a drop zone per file input, a choice for an enum and a field for each value', async () => {
     server.use(
       signedIn,
       listing([]),
       withPage({
         inputs: [
-          contestantInput({ language: ['python', 'cpp'] }),
-          contestantInput({
-            id: 'weights',
-            type: 'file[]',
-            label: 'Model weights',
-            language: null,
-            accept: ['.bin', 'npz'],
+          inputField(),
+          inputField({
+            id: 'program',
+            type: 'folder',
+            label: 'Your program',
+            max_size: 5 * 1024 * 1024,
+          }),
+          inputField({
+            id: 'answers',
+            type: 'file',
+            label: 'Your answers',
+            per_test: true,
             max_size: 1024 * 1024,
           }),
-          contestantInput({
-            id: 'notes',
-            type: 'text',
-            label: 'Notes',
-            language: null,
+          inputField({
+            id: 'language',
+            type: 'enum',
+            label: 'language',
+            options: ['python'],
           }),
-          contestantInput({
+          inputField({
+            id: 'level',
+            type: 'enum',
+            label: 'Level',
+            options: ['easy', 'hard'],
+          }),
+          inputField({ id: 'notes', type: 'text', label: 'Notes' }),
+          inputField({
             id: 'alpha',
             type: 'number',
             label: 'Alpha',
-            language: null,
             min: 0,
             max: 1,
             default: 0.5,
           }),
-          contestantInput({
-            id: 'fast',
-            type: 'boolean',
-            label: 'Fast',
-            language: null,
-          }),
-          contestantInput({
-            id: 'book',
-            type: 'jupyter',
-            label: 'Book',
-            language: null,
-          }),
+          inputField({ id: 'fast', type: 'boolean', label: 'Fast' }),
         ],
       }),
     );
@@ -110,19 +118,26 @@ describe('the submit panel', () => {
 
     const form = await screen.findByRole('form', { name: 'Submit' });
     const solution = within(form).getByLabelText('Your solution');
-    const weights = within(form).getByLabelText('Model weights');
-    expect(form.querySelectorAll('input[type="file"]')).toHaveLength(2);
+    const program = within(form).getByLabelText('Your program');
+    expect(form.querySelectorAll('input[type="file"]')).toHaveLength(5);
     expect(solution).not.toHaveAttribute('multiple');
-    expect(weights).toHaveAttribute('multiple');
-    expect(weights).toHaveAttribute('accept', '.bin,.npz');
-    expect(within(form).getByText(/Takes \.bin, npz\. At most 1 MB\./)).toBeVisible();
     expect(
-      within(form).getByRole('combobox', { name: 'Language of Your solution' }),
+      within(form).getByText(/Drop a file here or choose one\. At most 10 MB\./),
     ).toBeVisible();
+    expect(program).toHaveAttribute('multiple');
+    expect(within(form).getByLabelText('Your program: a folder')).toHaveProperty(
+      'webkitdirectory',
+      true,
+    );
+    expect(within(form).getByText(/At most 5 MB in all\./)).toBeVisible();
+    expect(within(form).getByLabelText('Your answers: a folder')).toBeInTheDocument();
+    expect(within(form).getByText(/One file for each test/)).toBeVisible();
+    expect(within(form).getByText('language: python')).toBeVisible();
+    expect(within(form).queryByRole('combobox', { name: 'language' })).toBeNull();
+    expect(within(form).getByRole('combobox', { name: 'Level' })).toHaveValue('');
     expect(within(form).getByRole('textbox', { name: 'Notes' })).toBeVisible();
     expect(within(form).getByRole('textbox', { name: 'Alpha' })).toHaveValue('0.5');
     expect(within(form).getByRole('checkbox', { name: 'Fast' })).not.toBeChecked();
-    expect(within(form).getByText(/also takes a notebook/)).toBeVisible();
   });
 
   it('sends each file to its slot, completes it and makes one submission', async () => {
@@ -154,10 +169,8 @@ describe('the submit panel', () => {
     expect(made.bodies).toHaveLength(1);
     expect(made.bodies[0]?.idempotency_key).toMatch(/^[A-Za-z0-9_-]{8,128}$/);
     expect(made.bodies[0]?.inputs).toEqual({
-      submission: {
-        uploads: ['00000000-0000-4000-8000-000000000001'],
-        language: 'python',
-      },
+      submission: { uploads: ['00000000-0000-4000-8000-000000000001'] },
+      language: { uploads: [], value: 'python' },
     });
 
     const list = await screen.findByRole('table', { name: 'Your submissions' });
@@ -201,12 +214,22 @@ describe('the submit panel', () => {
     expect(store.seen.slots).toHaveLength(1);
   });
 
-  it('asks for a language before sending anything', async () => {
+  it('asks for a choice before sending anything', async () => {
     const store = uploadStore();
     server.use(
       signedIn,
       listing([]),
-      withPage({ inputs: [contestantInput({ language: ['python', 'cpp'] })] }),
+      withPage({
+        inputs: [
+          inputField(),
+          inputField({
+            id: 'language',
+            type: 'enum',
+            label: 'Language',
+            options: ['python', 'cpp'],
+          }),
+        ],
+      }),
       ...store.handlers,
     );
     const user = userEvent.setup();
@@ -217,16 +240,16 @@ describe('the submit panel', () => {
 
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent('The submission does not fit the task');
-    expect(alert).toHaveTextContent('Your solution: Choose a language.');
+    expect(alert).toHaveTextContent('Language: Choose one of python, cpp.');
     expect(store.seen.slots).toHaveLength(0);
   });
 
-  it('refuses a file over its input’s size in the browser, before any upload', async () => {
+  it('refuses files over their input’s size in the browser, before any upload', async () => {
     const store = uploadStore();
     server.use(
       signedIn,
       listing([]),
-      withPage({ inputs: [contestantInput({ max_size: 4 })] }),
+      withPage({ inputs: [inputField({ max_size: 4 })] }),
       ...store.handlers,
     );
     const user = userEvent.setup();
@@ -236,10 +259,92 @@ describe('the submit panel', () => {
     await user.click(screen.getByRole('button', { name: 'Submit' }));
 
     const alert = await screen.findByRole('alert');
-    expect(alert).toHaveTextContent('That file is too large');
-    expect(alert).toHaveTextContent('A file for this input may be at most 4 bytes.');
+    expect(alert).toHaveTextContent('Too large for this input');
+    expect(alert).toHaveTextContent(
+      'The files for this input may be at most 4 bytes in all.',
+    );
     expect(alert).toHaveTextContent('The input: Your solution');
     expect(store.seen.slots).toHaveLength(0);
+  });
+
+  it('sends a folder’s files by their paths inside it', async () => {
+    const store = uploadStore();
+    const made = submissions();
+    server.use(
+      signedIn,
+      withPage({
+        inputs: [inputField({ id: 'program', type: 'folder', label: 'Your program' })],
+      }),
+      ...store.handlers,
+      ...made.handlers,
+    );
+    const user = userEvent.setup();
+    renderApp(PAGE);
+
+    await user.upload(await screen.findByLabelText('Your program: a folder'), [
+      inFolder('mine/Main.java', 'class Main {}'),
+      inFolder('mine/lib/Util.java', 'class Util {}'),
+    ]);
+    expect(screen.getByLabelText('Your program: files chosen')).toHaveTextContent(
+      'lib/Util.java',
+    );
+    await user.click(screen.getByRole('button', { name: 'Submit' }));
+
+    expect(await screen.findByText('Submitted as #1.')).toBeVisible();
+    expect(
+      store.seen.slots.map((slot) => (slot as { filename: string }).filename),
+    ).toEqual(['Main.java', 'lib/Util.java']);
+    expect(made.bodies[0]?.inputs).toEqual({
+      program: {
+        uploads: [
+          '00000000-0000-4000-8000-000000000001',
+          '00000000-0000-4000-8000-000000000002',
+        ],
+      },
+    });
+  });
+
+  it('sends a file per test by its name, and says why the server turns one away', async () => {
+    const slots: unknown[] = [];
+    server.use(
+      signedIn,
+      listing([]),
+      withPage({
+        inputs: [
+          inputField({
+            id: 'answers',
+            type: 'file',
+            label: 'Your answers',
+            per_test: true,
+          }),
+        ],
+      }),
+      http.post(`${TASK_API}/uploads`, async ({ request }) => {
+        slots.push(await request.json());
+        return problem(422, 'invalid_inputs', {
+          errors: [
+            {
+              input: 'answers',
+              message: '1.txt is not named for a test, as <group>/<test>.',
+            },
+          ],
+        });
+      }),
+    );
+    const user = userEvent.setup();
+    renderApp(PAGE);
+
+    await user.upload(
+      await screen.findByLabelText('Your answers'),
+      new File(['3'], '1.txt', { type: 'text/plain' }),
+    );
+    await user.click(screen.getByRole('button', { name: 'Submit' }));
+
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent(
+      'Your answers: 1.txt is not named for a test, as <group>/<test>.',
+    );
+    expect(slots).toEqual([expect.objectContaining({ filename: '1.txt' })]);
   });
 
   it('reports a failed upload as possibly too large, with nothing half sent', async () => {
@@ -270,15 +375,9 @@ describe('the submit panel', () => {
   const REFUSALS: [string, Record<string, unknown>, string, string][] = [
     [
       'task_closed',
-      { reason: 'ended' },
-      'The contest has ended for you',
-      'This task takes no more submissions from you.',
-    ],
-    [
-      'task_closed',
-      { reason: 'submissions_closed' },
-      'Submissions are closed',
-      'The organisers have closed submissions for this contest.',
+      { reason: 'closed' },
+      'This task has closed for you',
+      'It takes no more submissions from you.',
     ],
     ['archived', {}, 'The contest is archived', 'they take no submissions'],
     [
@@ -301,9 +400,9 @@ describe('the submit panel', () => {
     ],
     [
       'too_large',
-      { limit: 10 * 1024 * 1024, input: null },
-      'That submission is too large',
-      'A submission may be at most 10 MB in all.',
+      { limit: 10 * 1024 * 1024, input: 'submission' },
+      'Too large for this input',
+      'The files for this input may be at most 10 MB in all.',
     ],
     [
       'upload_not_yours',
@@ -332,12 +431,10 @@ describe('the submit panel', () => {
     [
       'invalid_inputs',
       {
-        errors: [
-          { input: 'submission', message: 'Choose one of the languages python.' },
-        ],
+        errors: [{ input: 'language', message: 'Must be one of python.' }],
       },
       'The submission does not fit the task',
-      'Your solution: Choose one of the languages python.',
+      'language: Must be one of python.',
     ],
   ];
 
@@ -382,8 +479,8 @@ describe('the submit panel', () => {
       http.post(`${TASK_API}/uploads`, () =>
         problem(413, 'too_large', { limit: 1024, input: 'submission' }),
       ),
-      'That file is too large',
-      'A file for this input may be at most 1 KB.',
+      'Too large for this input',
+      'The files for this input may be at most 1 KB in all.',
     ],
     [
       'the completion',
@@ -433,27 +530,12 @@ describe('the submit panel', () => {
     },
   );
 
-  it('offers no submit on a task that takes only a notebook', async () => {
-    server.use(
-      signedIn,
-      listing([]),
-      withPage({
-        inputs: [
-          contestantInput({
-            id: 'book',
-            type: 'jupyter',
-            label: 'Book',
-            language: null,
-          }),
-        ],
-      }),
-    );
+  it('offers no submit on a task that takes nothing from the contestant', async () => {
+    server.use(signedIn, listing([]), withPage({ inputs: [] }));
     renderApp(PAGE);
 
     expect(
-      await screen.findByText(
-        'This task takes a notebook, which is not submitted from this page.',
-      ),
+      await screen.findByText('This task takes nothing to submit from this page.'),
     ).toBeVisible();
     expect(screen.queryByRole('button', { name: 'Submit' })).not.toBeInTheDocument();
   });
@@ -461,9 +543,9 @@ describe('the submit panel', () => {
   it('offers no panel on a task that is closed, and still lists the submissions', async () => {
     server.use(
       signedIn,
-      listing([submission(1, [accepted])]),
+      listing([submission(1, accepted)]),
       withPage({
-        release: { released: true, visible: true, open: false, closed: 'ended' },
+        release: { released: true, visible: true, open: false, closed: 'closed' },
       }),
     );
     renderApp(PAGE);
@@ -478,15 +560,15 @@ describe('the submit panel', () => {
 describe('the submissions list', () => {
   withFakeTimers();
 
-  it('follows a queued submission until its outcome and metrics come back', async () => {
-    const fresh = (gradings: GradingResult[]) => ({
-      ...submission(1, gradings),
+  it('follows a queued submission until its outcome comes back', async () => {
+    const fresh = (graded: GradingResult) => ({
+      ...submission(1, graded),
       submitted_at: new Date(serverNow().getTime() - 2_000).toISOString(),
     });
     const turns = [
-      [fresh([grading()])],
-      [fresh([grading({ status: 'running' })])],
-      [fresh([accepted])],
+      [fresh(grading())],
+      [fresh(grading({ status: 'running' }))],
+      [fresh(accepted)],
     ];
     let asked = 0;
     server.use(
@@ -506,7 +588,6 @@ describe('the submissions list', () => {
     expect(await within(list).findByText('RUNNING')).toBeVisible();
     await passTime(2_000);
     expect(await within(list).findByText('ACCEPTED')).toBeVisible();
-    expect(within(list).getByLabelText('Metrics')).toHaveTextContent('points100');
     expect(
       screen
         .getAllByRole('status')
@@ -518,48 +599,62 @@ describe('the submissions list', () => {
     expect(asked).toBe(settled);
   });
 
-  it('lists the newest first, each stage by name when there are several', async () => {
+  it('lists the newest first, each with its verdict and how late it was', async () => {
     server.use(
       signedIn,
       withPage({}),
       listing([
-        submission(1, [accepted]),
-        submission(2, [
-          grading({ stage: 'public', status: 'done', outcome: 'wrong_answer' }),
-          grading({
-            id: '5d2f0c1e-0000-4000-8000-000000000002',
-            stage: 'hidden',
-            show: 'hidden',
-          }),
-        ]),
+        submission(1, accepted),
+        submission(2, grading({ status: 'done', stopped: 'compile_error' })),
+        submission(3, grading({ status: 'done', outcome: 'wrong_answer' }), {
+          late_days: 2,
+        }),
+        submission(4, grading({ status: 'running' })),
       ]),
     );
     renderApp(PAGE);
 
     const list = await screen.findByRole('table', { name: 'Your submissions' });
     const rows = within(list).getAllByRole('row').slice(1);
-    expect(rows[0]).toHaveTextContent('#2');
-    expect(rows[0]).toHaveTextContent('publicWRONG ANSWER');
-    expect(rows[0]).toHaveTextContent('hiddenQUEUED');
-    expect(rows[1]).toHaveTextContent('#1');
+    expect(rows.map((row) => row.textContent)).toEqual([
+      expect.stringMatching(/^#4.*RUNNING$/),
+      expect.stringMatching(/^#3.*2 days lateWRONG ANSWER$/),
+      expect.stringMatching(/^#2.*COMPILE ERR$/),
+      expect.stringMatching(/^#1.*ACCEPTED$/),
+    ]);
   });
 });
 
 describe('a submission opened from the list', () => {
-  it('shows the summary, metrics, tests and log the task shows', async () => {
+  it('shows what the run reported once and each group as the task shows it, or that it did not run', async () => {
+    const graded = grading({
+      ...accepted,
+      groups: [
+        ...accepted.groups,
+        {
+          group: 'large',
+          show: 'after_close',
+          outcome: null,
+          tests: null,
+          shown_at: '2026-09-12T11:00:00Z',
+          ran: true,
+        },
+        {
+          group: 'extra',
+          show: 'always',
+          outcome: null,
+          tests: [],
+          shown_at: null,
+          ran: false,
+        },
+      ],
+    });
     server.use(
       signedIn,
       withPage({}),
-      listing([submission(1, [accepted])]),
+      listing([submission(1, graded)]),
       http.get(`${TASK_API}/submissions/:number`, () =>
-        HttpResponse.json(submission(1, [accepted])),
-      ),
-      http.get(`${TASK_API}/submissions/:number/log`, ({ request }) =>
-        new URL(request.url).searchParams.get('stage') === 'default'
-          ? new HttpResponse('step compile: ok\n', {
-              headers: { 'content-type': 'text/plain; charset=utf-8' },
-            })
-          : problem(404, 'not_found'),
+        HttpResponse.json(submission(1, graded)),
       ),
     );
     const user = userEvent.setup();
@@ -568,40 +663,48 @@ describe('a submission opened from the list', () => {
     await user.click(await screen.findByRole('link', { name: '#1' }));
 
     const detail = await screen.findByRole('region', { name: 'Submission 1' });
-    expect(await within(detail).findByLabelText('Summary default')).toHaveTextContent(
+    expect(await within(detail).findByLabelText('log')).toHaveTextContent(
       'Compiled cleanly.',
     );
-    expect(within(detail).getByLabelText('Metrics default')).toHaveTextContent(
-      'points100',
-    );
-    const tests = within(detail).getByRole('table', { name: 'Tests default' });
+
+    const samples = within(detail).getByRole('region', { name: 'Group samples' });
+    const tests = within(samples).getByRole('table', { name: 'Tests samples' });
+    expect(within(tests).getByRole('columnheader', { name: 'time_ms' })).toBeVisible();
     const rows = within(tests).getAllByRole('row');
     expect(rows).toHaveLength(3);
-    expect(rows[1]).toHaveTextContent('1ACCEPTED12 ms2.0 MB1');
-    expect(rows[2]).toHaveTextContent('2ACCEPTED——1');
-    expect(await within(detail).findByLabelText('Log default')).toHaveTextContent(
-      'step compile: ok',
-    );
+    expect(rows[1]).toHaveTextContent(`samples/1ACCEPTED12${valueText(2048)}`);
+    expect(rows[2]).toHaveTextContent('samples/2ACCEPTED——');
+
+    const main = within(detail).getByRole('region', { name: 'Group main' });
+    expect(within(main).getByText('ACCEPTED')).toBeVisible();
+    expect(within(main).getByText(/^Shown at /)).toBeVisible();
+    expect(within(main).queryByRole('table')).toBeNull();
+
+    const large = within(detail).getByRole('region', { name: 'Group large' });
+    expect(within(large).getByText(/^Shown at /)).toBeVisible();
+    expect(within(large).queryByText('ACCEPTED')).toBeNull();
+    expect(within(large).queryByRole('table')).toBeNull();
+    expect(within(large).queryByText('Not run on this grading')).toBeNull();
+
+    const extra = within(detail).getByRole('region', { name: 'Group extra' });
+    expect(within(extra).getByText('Not run on this grading')).toBeVisible();
+    expect(within(extra).queryByRole('table')).toBeNull();
   });
 
   it('lists the files it was made with, each a download through the door', async () => {
     server.use(
       signedIn,
       withPage({}),
-      listing([submission(1, [accepted])]),
+      listing([submission(1, accepted)]),
       http.get(`${TASK_API}/submissions/:number`, () =>
-        HttpResponse.json(submission(1, [accepted])),
+        HttpResponse.json(submission(1, accepted)),
       ),
       http.get(`${TASK_API}/submissions/:number/files`, () =>
         HttpResponse.json({
           number: 1,
           inputs: {
-            submission: {
-              files: ['files/submission/my main.py'],
-              language: 'python',
-              value: null,
-            },
-            alpha: { files: [], language: null, value: 0.5 },
+            submission: { files: ['files/submission/my main.py'], value: null },
+            language: { files: [], value: 'python' },
           },
         }),
       ),
@@ -617,122 +720,30 @@ describe('a submission opened from the list', () => {
     expect(within(files).getAllByRole('link')).toHaveLength(1);
   });
 
-  it('says so when the log is too large to show, and keeps the verdict', async () => {
-    server.use(
-      signedIn,
-      withPage({}),
-      listing([submission(1, [accepted])]),
-      http.get(`${TASK_API}/submissions/:number`, () =>
-        HttpResponse.json(submission(1, [accepted])),
-      ),
-      http.get(`${TASK_API}/submissions/:number/log`, () =>
-        problem(409, 'log_too_large', { limit: 9 * 1024 * 1024 }),
-      ),
-    );
-    renderApp(`${PAGE}?submission=1`);
-
-    const detail = await screen.findByRole('region', { name: 'Submission 1' });
-    expect(
-      await within(detail).findByText('The log is too large to show'),
-    ).toBeVisible();
-    expect(within(detail).getByLabelText('Summary default')).toHaveTextContent(
-      'Compiled cleanly.',
-    );
-  });
-
-  it('shows the outcome and metrics alone where the task shows metrics', async () => {
-    const metrics = grading({
+  it('shows what stopped the run as its verdict, and its log as text, never as markup', async () => {
+    const stopped = grading({
       status: 'done',
-      show: 'metrics',
-      outcome: 'wrong_answer',
-      metrics: { points: 40 },
+      stopped: 'compile_error',
+      values: { log: '<img src=x onerror="alert(1)">' },
     });
-    let logs = 0;
     server.use(
       signedIn,
       withPage({}),
-      listing([submission(1, [metrics])]),
+      listing([submission(1, stopped, { late_days: 1 })]),
       http.get(`${TASK_API}/submissions/:number`, () =>
-        HttpResponse.json(submission(1, [metrics])),
+        HttpResponse.json(submission(1, stopped, { late_days: 1 })),
       ),
-      http.get(`${TASK_API}/submissions/:number/log`, () => {
-        logs += 1;
-        return problem(404, 'not_found');
-      }),
     );
     renderApp(`${PAGE}?submission=1`);
 
     const detail = await screen.findByRole('region', { name: 'Submission 1' });
-    expect(await within(detail).findByText('WRONG ANSWER')).toBeVisible();
-    expect(within(detail).getByLabelText('Metrics default')).toHaveTextContent(
-      'points40',
-    );
-    expect(within(detail).queryByLabelText('Summary default')).not.toBeInTheDocument();
-    expect(within(detail).queryByRole('table')).not.toBeInTheDocument();
-    expect(within(detail).queryByLabelText('Log default')).not.toBeInTheDocument();
-    expect(logs).toBe(0);
-  });
-
-  it('shows the checker’s note and the summary as text, never as markup', async () => {
-    const noted = grading({
-      ...accepted,
-      tests: [
-        {
-          id: '1',
-          outcome: 'wrong_answer',
-          time_ms: 3,
-          memory_kb: 1024,
-          metrics: {},
-          message: '<b>line 2</b> differs',
-        },
-      ],
-      summary: '<img src=x onerror="alert(1)">',
-      log: false,
-    });
-    server.use(
-      signedIn,
-      withPage({}),
-      listing([submission(1, [noted])]),
-      http.get(`${TASK_API}/submissions/:number`, () =>
-        HttpResponse.json(submission(1, [noted])),
-      ),
-    );
-    renderApp(`${PAGE}?submission=1`);
-
-    const tests = await screen.findByRole('table', { name: 'Tests default' });
-    expect(within(tests).getByRole('columnheader', { name: 'Note' })).toBeVisible();
-    expect(within(tests).getByText('<b>line 2</b> differs')).toBeVisible();
-    expect(tests.querySelector('b')).toBeNull();
-    expect(screen.getByLabelText('Summary default')).toHaveTextContent(
+    expect(await within(detail).findByText('COMPILE ERR')).toBeVisible();
+    expect(within(detail).getByText(/, 1 day late$/)).toBeVisible();
+    expect(within(detail).getByLabelText('log')).toHaveTextContent(
       '<img src=x onerror="alert(1)">',
     );
     expect(document.querySelector('img[src="x"]')).toBeNull();
-  });
-
-  it('shows only the status where the task hides the rest, and reads no log', async () => {
-    const hidden = grading({ status: 'done', show: 'hidden' });
-    let logs = 0;
-    server.use(
-      signedIn,
-      withPage({}),
-      listing([submission(1, [hidden])]),
-      http.get(`${TASK_API}/submissions/:number`, () =>
-        HttpResponse.json(submission(1, [hidden])),
-      ),
-      http.get(`${TASK_API}/submissions/:number/log`, () => {
-        logs += 1;
-        return problem(404, 'not_found');
-      }),
-    );
-    renderApp(`${PAGE}?submission=1`);
-
-    const detail = await screen.findByRole('region', { name: 'Submission 1' });
-    expect(await within(detail).findByText('GRADED')).toBeVisible();
-    expect(within(detail).queryByLabelText('Summary default')).not.toBeInTheDocument();
-    expect(within(detail).queryByLabelText('Metrics default')).not.toBeInTheDocument();
-    expect(within(detail).queryByRole('table')).not.toBeInTheDocument();
-    expect(within(detail).queryByLabelText('Log default')).not.toBeInTheDocument();
-    expect(logs).toBe(0);
+    expect(within(detail).queryByRole('table')).toBeNull();
   });
 });
 

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
+import { formatDateTime } from '@/lib/time';
 import { renderApp } from '@/test/render';
 import { problem, server, signedIn } from '@/test/server';
 import {
@@ -27,9 +28,9 @@ describe('the contest page for a signed-in person', () => {
     expect(
       await screen.findByRole('heading', { name: 'Spring 2026', level: 1 }),
     ).toBeVisible();
-    expect(await screen.findByRole('timer', { name: 'Countdown' })).toHaveTextContent(
-      /Time left (29m 5\ds|30m 00s)/,
-    );
+    expect(
+      await screen.findByRole('timer', { name: 'Contest countdown' }),
+    ).toHaveTextContent(/Contest ends in (29m 5\ds|30m 00s)/);
     const tasks = screen.getByRole('list', { name: 'Tasks' });
     expect(within(tasks).getByRole('link', { name: 'Sum of Two' })).toHaveAttribute(
       'href',
@@ -42,29 +43,49 @@ describe('the contest page for a signed-in person', () => {
     );
   });
 
-  it('counts down to the person’s own deadline when they have extra time', async () => {
+  it('says when each task falls due and closes for the person', async () => {
     server.use(
       signedIn,
       http.get(`${CONTEST_API}/home`, () =>
         HttpResponse.json(
           home({
-            registration: registration({
-              status: 'approved',
-              time_extension: 1800,
-            }),
-            deadline: '2026-09-12T11:00:00Z',
+            registration: registration({ status: 'approved', time_extension: 1800 }),
+            tasks: [
+              {
+                name: 'sum',
+                label: 'A',
+                title: 'Sum of Two',
+                worth: 100,
+                release: { released: true, visible: true, open: true, closed: null },
+                due: '2026-09-12T10:45:00Z',
+                closes: '2026-09-12T11:00:00Z',
+              },
+              {
+                name: 'max',
+                label: 'B',
+                title: 'Maximum',
+                worth: null,
+                release: { released: true, visible: true, open: true, closed: null },
+                due: null,
+                closes: '2026-09-12T11:00:00Z',
+              },
+            ],
           }),
         ),
       ),
     );
     renderApp(PAGE);
 
-    expect(await screen.findByRole('timer', { name: 'Countdown' })).toHaveTextContent(
-      /Time left (59m 5\ds|1h 00m 00s)/,
+    const tasks = await screen.findByRole('list', { name: 'Tasks' });
+    const [sum, max] = within(tasks).getAllByRole('listitem');
+    expect(sum).toHaveTextContent(
+      `Due ${formatDateTime(new Date('2026-09-12T10:45:00Z'))}`,
     );
-    expect(
-      screen.getByText(/with the extra time the organisers gave you/),
-    ).toBeVisible();
+    expect(sum).toHaveTextContent(
+      `Closes ${formatDateTime(new Date('2026-09-12T11:00:00Z'))}`,
+    );
+    expect(max).not.toHaveTextContent('Due');
+    expect(max).toHaveTextContent('Closes');
   });
 
   it('registers and then shows the registration waiting', async () => {
@@ -263,7 +284,7 @@ describe('the contest page for its own organiser', () => {
 });
 
 describe('the contest page at its start', () => {
-  it('reads the home again as the contest starts', async () => {
+  it('counts to the start, then to the end, reading the home again as the contest starts', async () => {
     const starting = new Date(Date.parse('2026-09-12T10:00:00Z') + 1_500).toISOString();
     server.use(
       signedIn,
@@ -273,7 +294,13 @@ describe('the contest page at its start', () => {
 
     expect(await screen.findByText('No task is released yet.')).toBeVisible();
     expect(
+      await screen.findByRole('timer', { name: 'Contest countdown' }),
+    ).toHaveTextContent(/^Contest starts in /);
+    expect(
       await screen.findByRole('link', { name: 'Sum of Two' }, { timeout: 5_000 }),
     ).toBeVisible();
+    expect(screen.getByRole('timer', { name: 'Contest countdown' })).toHaveTextContent(
+      /^Contest ends in /,
+    );
   });
 });

@@ -1,12 +1,15 @@
+import { mkdir, writeFile } from 'node:fs/promises';
+import { dirname } from 'node:path';
 import { expect, test, type Page, type Route } from '@playwright/test';
 
 /**
  * The contestant submitting from a task page against the dev server with the
  * API and the object store stubbed, so it needs no backend: the panel shows a
- * drop zone per file input, a file goes to the store as the slot says and
- * one submission comes of it, the list follows it from queued to its outcome,
- * a submission opens with what the task shows of it and the files it was
- * made with to download, and each refusal is said in words.
+ * drop zone per file input and a choice per enum, a file goes to the store as
+ * the slot says, a folder's files by their paths in it, and one submission
+ * comes of them, the list follows it from queued to its outcome, a submission
+ * opens with what the task shows of it and the files it was made with to
+ * download, and each refusal is said in words.
  * The stub keeps just enough state for each answer to follow from the last.
  */
 const TASK = '/api/v1/orgs/acme/contests/spring/tasks/sum';
@@ -14,61 +17,82 @@ const OPEN = { released: true, visible: true, open: true, closed: null };
 
 const input = (overrides: Record<string, unknown>) => ({
   id: 'submission',
-  type: 'code',
+  type: 'file',
   label: 'Your solution',
-  language: ['python', 'cpp'],
+  options: null,
+  per_test: false,
+  default: null,
   min: null,
   max: null,
-  accept: null,
-  max_size: null,
-  default: null,
+  max_size: 10485760,
   ...overrides,
 });
 
-const TWO_INPUTS = [
+const LANGUAGE = input({
+  id: 'language',
+  type: 'enum',
+  label: 'Language',
+  options: ['python', 'cpp'],
+});
+
+const THREE_INPUTS = [
   input({}),
-  input({
-    id: 'weights',
-    type: 'file[]',
-    label: 'Model weights',
-    language: null,
-    accept: ['.bin'],
-  }),
+  LANGUAGE,
+  input({ id: 'program', type: 'folder', label: 'Your program' }),
 ];
 
 const queued = {
   id: '5d2f0c1e-0000-4000-8000-000000000001',
-  stage: 'default',
   attempt: 1,
   status: 'queued',
-  show: 'full',
+  stopped: null,
   outcome: null,
-  metrics: null,
-  summary: null,
-  tests: null,
-  log: false,
+  groups: [],
+  values: {},
 };
 
-const accepted = {
+const graded = {
   ...queued,
   status: 'done',
-  outcome: 'accepted',
-  metrics: { points: 100 },
-  summary: 'Compiled cleanly.',
-  tests: [
-    { id: '1', outcome: 'accepted', time_ms: 12, memory_kb: 2048, metrics: {} },
-    { id: '2', outcome: 'wrong_answer', time_ms: 30, memory_kb: 1024, metrics: {} },
+  outcome: 'wrong_answer',
+  values: { log: 'Compiled cleanly.' },
+  groups: [
+    {
+      group: 'samples',
+      show: 'always',
+      outcome: 'wrong_answer',
+      tests: [
+        { test: 'samples/1', outcome: 'accepted', values: { time_ms: 12 } },
+        { test: 'samples/2', outcome: 'wrong_answer', values: { time_ms: 30 } },
+      ],
+      shown_at: null,
+      ran: true,
+    },
+    {
+      group: 'main',
+      show: 'after_close',
+      outcome: null,
+      tests: null,
+      shown_at: '2026-09-29T12:00:00Z',
+      ran: true,
+    },
   ],
-  log: true,
 };
 
-type Submission = { number: number; submitted_at: string; gradings: unknown[] };
+type Submission = {
+  number: number;
+  submitted_at: string;
+  late_days: number;
+  grading: unknown;
+};
 
 type State = {
   inputs: unknown[];
   submissions: Submission[];
   /** How often each submission has been read, so its grading can move on. */
   reads: number;
+  /** Each slot asked for, as the browser described its file. */
+  slots: { input: string; filename: string }[];
   /** Each file put through the upload door, as its bytes arrived. */
   sent: string[];
   completed: unknown[];
@@ -80,9 +104,10 @@ type State = {
 
 async function stubApi(page: Page, overrides: Partial<State> = {}): Promise<State> {
   const state: State = {
-    inputs: [input({})],
+    inputs: [input({}), LANGUAGE],
     submissions: [],
     reads: 0,
+    slots: [],
     sent: [],
     completed: [],
     submits: [],
@@ -125,9 +150,9 @@ async function stubApi(page: Page, overrides: Partial<State> = {}): Promise<Stat
     return route.fulfill({ status: 200 });
   });
 
-  /** Each submission's grading moves on as it is read: queued, then accepted. */
-  const graded = (submission: Submission): Submission =>
-    state.reads < 3 ? submission : { ...submission, gradings: [accepted] };
+  /** Each submission's grading moves on as it is read: queued, then graded. */
+  const movedOn = (submission: Submission): Submission =>
+    state.reads < 3 ? submission : { ...submission, grading: graded };
 
   await page.route(`**${TASK}/**`, async (route) => {
     const request = route.request();
@@ -138,18 +163,17 @@ async function stubApi(page: Page, overrides: Partial<State> = {}): Promise<Stat
         name: 'sum',
         label: 'A',
         title: 'Sum of Two',
-        points: 100,
+        worth: 100,
         statement: '# Sum\n\nPrint the sum of two numbers.\n',
-        limits: {
-          submissions: 50,
-          rate: { count: 1, per: 30 },
-          max_size: 10485760,
-        },
+        submissions: { max: 50, rate: { count: 1, per: 30 } },
         inputs: state.inputs,
         release: OPEN,
+        due: null,
+        closes: '2026-09-29T12:00:00Z',
       });
     }
     if (path === '/uploads') {
+      state.slots.push(request.postDataJSON() as State['slots'][number]);
       const number = state.completed.length + 1;
       const id = `00000000-0000-4000-8000-00000000000${number}`;
       return json(
@@ -200,7 +224,8 @@ async function stubApi(page: Page, overrides: Partial<State> = {}): Promise<Stat
       const made = {
         number: state.submissions.length + 1,
         submitted_at: new Date().toISOString(),
-        gradings: [queued],
+        late_days: 0,
+        grading: queued,
       };
       state.submissions.push(made);
       state.reads = 0;
@@ -208,7 +233,7 @@ async function stubApi(page: Page, overrides: Partial<State> = {}): Promise<Stat
     }
     if (path === '/submissions') {
       state.reads += 1;
-      return json(route, [...state.submissions].reverse().map(graded));
+      return json(route, [...state.submissions].reverse().map(movedOn));
     }
     const one = /^\/submissions\/(\d+)$/.exec(path);
     if (one !== null) {
@@ -217,22 +242,12 @@ async function stubApi(page: Page, overrides: Partial<State> = {}): Promise<Stat
         ? route.fulfill({ status: 404, body: 'not stubbed' })
         : json(route, found);
     }
-    if (/^\/submissions\/\d+\/log$/.test(path)) {
-      return route.fulfill({
-        status: 200,
-        contentType: 'text/plain; charset=utf-8',
-        body: 'step compile: ok\nstep run: 2 tests\n',
-      });
-    }
     if (/^\/submissions\/\d+\/files$/.test(path)) {
       return json(route, {
         number: 1,
         inputs: {
-          submission: {
-            files: ['files/submission/main.cpp'],
-            language: 'cpp',
-            value: null,
-          },
+          submission: { files: ['files/submission/main.cpp'], value: null },
+          language: { files: [], value: 'cpp' },
         },
       });
     }
@@ -243,26 +258,50 @@ async function stubApi(page: Page, overrides: Partial<State> = {}): Promise<Stat
 
 const PAGE = '/contests/acme/spring/tasks/sum';
 
-test('a task with two file inputs shows two drop zones', async ({ page }) => {
-  await stubApi(page, { inputs: TWO_INPUTS });
+test('a task with a file, a choice and a folder shows a field for each', async ({
+  page,
+}) => {
+  await stubApi(page, { inputs: THREE_INPUTS });
   await page.goto(PAGE);
 
   const form = page.getByRole('form', { name: 'Submit' });
-  await expect(form.locator('input[type="file"]')).toHaveCount(2);
+  await expect(form.locator('input[type="file"]')).toHaveCount(3);
   await expect(form.getByLabel('Your solution', { exact: true })).toBeAttached();
-  await expect(form.getByLabel('Model weights', { exact: true })).toHaveAttribute(
-    'accept',
-    '.bin',
+  await expect(form.getByLabel('Your program', { exact: true })).toHaveAttribute(
+    'multiple',
   );
   await expect(
-    form.getByRole('combobox', { name: 'Language of Your solution' }),
-  ).toBeVisible();
+    form.getByLabel('Your program: a folder', { exact: true }),
+  ).toHaveAttribute('webkitdirectory');
+  await expect(form.getByRole('combobox', { name: 'Language' })).toBeVisible();
+});
+
+test('a task whose enum has one option says which, with nothing to choose', async ({
+  page,
+}) => {
+  await stubApi(page, {
+    inputs: [input({}), { ...LANGUAGE, label: 'language', options: ['python'] }],
+  });
+  await page.goto(PAGE);
+
+  const form = page.getByRole('form', { name: 'Submit' });
+  await expect(form.getByText('language: python')).toBeVisible();
+  await expect(form.getByRole('combobox')).toHaveCount(0);
 });
 
 test('a full pass sends the files as the slot says and makes one submission', async ({
   page,
-}) => {
-  const state = await stubApi(page, { inputs: TWO_INPUTS });
+}, testInfo) => {
+  const folder = testInfo.outputPath('program');
+  for (const [path, content] of [
+    ['Main.java', 'class Main {}\n'],
+    ['lib/Util.java', 'class Util {}\n'],
+  ] as const) {
+    const file = `${folder}/${path}`;
+    await mkdir(dirname(file), { recursive: true });
+    await writeFile(file, content);
+  }
+  const state = await stubApi(page, { inputs: THREE_INPUTS });
   await page.goto(PAGE);
 
   const form = page.getByRole('form', { name: 'Submit' });
@@ -271,33 +310,31 @@ test('a full pass sends the files as the slot says and makes one submission', as
     mimeType: 'text/x-python',
     buffer: Buffer.from('print(sum(map(int, input().split())))\n'),
   });
-  await form.getByLabel('Model weights', { exact: true }).setInputFiles([
-    { name: 'a.bin', mimeType: 'application/octet-stream', buffer: Buffer.from('abc') },
-    {
-      name: 'b.bin',
-      mimeType: 'application/octet-stream',
-      buffer: Buffer.from('defg'),
-    },
-  ]);
   await form
-    .getByRole('combobox', { name: 'Language of Your solution' })
-    .selectOption('python');
+    .getByLabel('Your program: a folder', { exact: true })
+    .setInputFiles(folder);
+  await expect(form.getByLabel('Your program: files chosen')).toContainText(
+    'lib/Util.java',
+  );
+  await form.getByRole('combobox', { name: 'Language' }).selectOption('python');
   await form.getByRole('button', { name: 'Submit' }).dblclick();
 
   await expect(page.getByText('Submitted as #1.')).toBeVisible();
+  expect(state.slots.map((slot) => `${slot.input}:${slot.filename}`).sort()).toEqual([
+    'program:Main.java',
+    'program:lib/Util.java',
+    'submission:main.py',
+  ]);
   expect(state.submits).toHaveLength(1);
   expect(state.submits[0]?.idempotency_key).toMatch(/^[A-Za-z0-9_-]{8,128}$/);
   expect(state.submits[0]?.inputs).toEqual({
-    submission: {
-      uploads: ['00000000-0000-4000-8000-000000000001'],
-      language: 'python',
-    },
-    weights: {
+    submission: { uploads: ['00000000-0000-4000-8000-000000000001'] },
+    language: { uploads: [], value: 'python' },
+    program: {
       uploads: [
         '00000000-0000-4000-8000-000000000002',
         '00000000-0000-4000-8000-000000000003',
       ],
-      language: null,
     },
   });
 
@@ -306,8 +343,7 @@ test('a full pass sends the files as the slot says and makes one submission', as
 
   const list = page.getByRole('table', { name: 'Your submissions' });
   await expect(list.getByText('QUEUED')).toBeVisible();
-  await expect(list.getByText('ACCEPTED')).toBeVisible({ timeout: 15_000 });
-  await expect(list.getByLabel('Metrics')).toContainText('100');
+  await expect(list.getByText('WRONG ANSWER')).toBeVisible({ timeout: 15_000 });
 });
 
 test('a file the forge already holds is submitted without being sent', async ({
@@ -323,9 +359,7 @@ test('a file the forge already holds is submitted without being sent', async ({
     mimeType: 'text/x-python',
     buffer: Buffer.from('0123456789'),
   });
-  await page
-    .getByRole('combobox', { name: 'Language of Your solution' })
-    .selectOption('cpp');
+  await page.getByRole('combobox', { name: 'Language' }).selectOption('cpp');
   await page.getByRole('button', { name: 'Submit' }).click();
 
   await expect(page.getByText('Submitted as #1.')).toBeVisible();
@@ -333,25 +367,7 @@ test('a file the forge already holds is submitted without being sent', async ({
   expect(state.completed).toHaveLength(1);
 });
 
-test('a submission opens with its summary, tests and log', async ({ page }) => {
-  await stubApi(page, {
-    submissions: [
-      { number: 1, submitted_at: '2026-09-29T09:30:00Z', gradings: [accepted] },
-    ],
-  });
-  await page.goto(PAGE);
-
-  await page.getByRole('link', { name: '#1' }).click();
-  await expect(page).toHaveURL(/\?submission=1$/);
-  const detail = page.getByRole('region', { name: 'Submission 1' });
-  await expect(detail.getByLabel('Summary default')).toHaveText('Compiled cleanly.');
-  const rows = detail.getByRole('table', { name: 'Tests default' }).getByRole('row');
-  await expect(rows).toHaveCount(3);
-  await expect(rows.nth(2)).toContainText('WRONG ANSWER');
-  await expect(detail.getByLabel('Log default')).toContainText('step run: 2 tests');
-});
-
-test('a submission whose task hides the result shows its status alone', async ({
+test('a submission opens with its log, its groups and their tests', async ({
   page,
 }) => {
   await stubApi(page, {
@@ -359,17 +375,56 @@ test('a submission whose task hides the result shows its status alone', async ({
       {
         number: 1,
         submitted_at: '2026-09-29T09:30:00Z',
-        gradings: [{ ...queued, status: 'done', show: 'hidden' }],
+        late_days: 0,
+        grading: graded,
+      },
+    ],
+  });
+  await page.goto(PAGE);
+
+  await page.getByRole('link', { name: '#1' }).click();
+  await expect(page).toHaveURL(/\?submission=1$/);
+  const detail = page.getByRole('region', { name: 'Submission 1' });
+  await expect(detail.getByLabel('log', { exact: true })).toHaveText(
+    'Compiled cleanly.',
+  );
+  const rows = detail.getByRole('table', { name: 'Tests samples' }).getByRole('row');
+  await expect(rows).toHaveCount(3);
+  await expect(rows.nth(2)).toContainText('WRONG ANSWER');
+  const main = detail.getByRole('region', { name: 'Group main' });
+  await expect(main.getByText(/^Shown at /)).toBeVisible();
+  await expect(main.getByRole('table')).toHaveCount(0);
+});
+
+test('a submission that did not compile shows that as its verdict', async ({
+  page,
+}) => {
+  await stubApi(page, {
+    submissions: [
+      {
+        number: 1,
+        submitted_at: '2026-09-29T09:30:00Z',
+        late_days: 0,
+        grading: {
+          ...queued,
+          status: 'done',
+          stopped: 'compile_error',
+          values: { log: 'main.cpp:1: error' },
+        },
       },
     ],
   });
   await page.goto(`${PAGE}?submission=1`);
 
+  await expect(
+    page.getByRole('table', { name: 'Your submissions' }).getByText('COMPILE ERR'),
+  ).toBeVisible();
   const detail = page.getByRole('region', { name: 'Submission 1' });
-  await expect(detail.getByText('GRADED')).toBeVisible();
+  await expect(detail.getByText('COMPILE ERR')).toBeVisible();
+  await expect(detail.getByLabel('log', { exact: true })).toHaveText(
+    'main.cpp:1: error',
+  );
   await expect(detail.getByRole('table')).toHaveCount(0);
-  await expect(detail.getByLabel('Log default')).toHaveCount(0);
-  await expect(detail.getByLabel('Summary default')).toHaveCount(0);
 });
 
 test('an earlier submission lists its files, each a download through the door', async ({
@@ -377,7 +432,12 @@ test('an earlier submission lists its files, each a download through the door', 
 }) => {
   await stubApi(page, {
     submissions: [
-      { number: 1, submitted_at: '2026-09-29T09:30:00Z', gradings: [accepted] },
+      {
+        number: 1,
+        submitted_at: '2026-09-29T09:30:00Z',
+        late_days: 0,
+        grading: graded,
+      },
     ],
   });
   await page.goto(`${PAGE}?submission=1`);
@@ -389,7 +449,7 @@ test('an earlier submission lists its files, each a download through the door', 
 });
 
 const REFUSALS: [string, number, Record<string, unknown>, string][] = [
-  ['task_closed', 403, { reason: 'ended' }, 'The contest has ended for you'],
+  ['task_closed', 403, { reason: 'closed' }, 'This task has closed for you'],
   ['archived', 403, {}, 'The contest is archived'],
   ['not_approved', 403, {}, 'You are not a contestant here yet'],
   ['submission_limit', 409, { limit: 50 }, 'This task takes 50 submissions in all'],
@@ -399,7 +459,12 @@ const REFUSALS: [string, number, Record<string, unknown>, string][] = [
     { rate: '1 per 30s', retry_at: '2999-09-29T10:00:30Z' },
     'You can submit again at',
   ],
-  ['too_large', 413, { limit: 1048576, input: 'submission' }, 'may be at most 1 MB'],
+  [
+    'too_large',
+    413,
+    { limit: 1048576, input: 'submission' },
+    'may be at most 1 MB in all',
+  ],
   ['upload_not_yours', 404, { uploads: [] }, 'A file is not one you uploaded'],
   ['upload_not_ready', 409, { uploads: [] }, 'A file did not arrive whole'],
   [
@@ -422,9 +487,7 @@ test('each refusal is said in words, and the files stay to send again', async ({
     mimeType: 'text/x-python',
     buffer: Buffer.from('print(1)\n'),
   });
-  await page
-    .getByRole('combobox', { name: 'Language of Your solution' })
-    .selectOption('python');
+  await page.getByRole('combobox', { name: 'Language' }).selectOption('python');
 
   for (const [code, status, extra, sentence] of REFUSALS) {
     state.refusal = { status, code, extra };

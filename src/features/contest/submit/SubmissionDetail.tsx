@@ -1,6 +1,5 @@
-import { useQuery } from '@tanstack/react-query';
-import { $api, queryView, widenQuery } from '@/api/query';
-import type { GradingResult } from '@/api/types';
+import { $api, queryView } from '@/api/query';
+import type { GradingResult, GroupShown } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { PageLink } from '@/ui/PageLink';
 import { TextLink } from '@/ui/TextLink';
@@ -8,61 +7,51 @@ import { SectionTitle } from '@/ui/SectionTitle';
 import { VerdictBadge } from '@/ui/VerdictBadge';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
-import { formatSize } from '@/lib/size';
 import { formatDateTime } from '@/lib/time';
 import { downloadHref, nameOf } from './download';
 import { useLiveConnected, useLiveRefused } from '@/live';
 import { serverNow } from '@/lib/time';
-import { metricValue, pollEvery, verdictOf } from './grading';
-import { Metrics } from './Results';
+import { lateness, pollEvery, valueText, verdictOf } from './grading';
+import { OnceValues } from './Results';
 import shared from '../contest.module.css';
 import classes from './submit.module.css';
 
 type Where = { org: string; contest: string; task: string; number: number };
 
 /**
- * One row per test, with its own outcome, time, memory and metrics, and the
- * checker's note on it where any row has one.
+ * One row per test of a group, with its own outcome and each value its steps
+ * reported for it, such as its time and memory, a column per value.
  */
-function Tests({ grading }: { grading: GradingResult }) {
-  const rows = grading.tests ?? [];
+function Tests({ group }: { group: GroupShown }) {
+  const rows = group.tests ?? [];
   if (rows.length === 0) return null;
-  const names = [...new Set(rows.flatMap((row) => Object.keys(row.metrics)))];
-  const notes = rows.some((row) => row.message !== null && row.message !== '');
+  const names = [...new Set(rows.flatMap((row) => Object.keys(row.values)))];
   return (
-    <table className={classes.table} aria-label={`Tests ${grading.stage}`}>
+    <table className={classes.table} aria-label={`Tests ${group.group}`}>
       <thead>
         <tr>
           <th scope="col">Test</th>
           <th scope="col">Outcome</th>
-          <th scope="col">Time</th>
-          <th scope="col">Memory</th>
           {names.map((name) => (
             <th key={name} scope="col">
               {name}
             </th>
           ))}
-          {notes && <th scope="col">Note</th>}
         </tr>
       </thead>
       <tbody>
         {rows.map((row) => (
-          <tr key={row.id}>
+          <tr key={row.test}>
             <th scope="row" className={classes.mono}>
-              {row.id}
+              {row.test}
             </th>
             <td>
               <VerdictBadge verdict={row.outcome} />
             </td>
-            <td>{row.time_ms === null ? '—' : `${row.time_ms} ms`}</td>
-            <td>{row.memory_kb === null ? '—' : formatSize(row.memory_kb * 1024)}</td>
             {names.map((name) => {
-              const value = row.metrics[name];
-              return (
-                <td key={name}>{value === undefined ? '—' : metricValue(value)}</td>
-              );
+              const value = row.values[name];
+              return <td key={name}>{value === undefined ? '—' : valueText(value)}</td>;
             })}
-            {notes && <td>{row.message ?? ''}</td>}
           </tr>
         ))}
       </tbody>
@@ -71,68 +60,52 @@ function Tests({ grading }: { grading: GradingResult }) {
 }
 
 /**
- * The run log of one stage, read only once the grading says there is one.
- * It is kept by the grading it is of, so a rejudge's new attempt reads its
- * own log rather than showing the last one's.
+ * One test group as the task shows it now: its outcome once its verdict is
+ * shown, its tests once they are, and when the rest is shown while some is
+ * held back. The route leaves out what the task withholds, so what is
+ * missing is simply not shown, with nothing in its place. A group that did
+ * not run on this grading says so where its outcome would be.
  */
-function Log({ where, grading }: { where: Where; grading: GradingResult }) {
-  const options = widenQuery(
-    $api.queryOptions(
-      'get',
-      '/api/v1/orgs/{org}/contests/{contest}/tasks/{task}/submissions/{number}/log',
-      { params: { path: where, query: { stage: grading.stage } }, parseAs: 'text' },
-    ),
-  );
-  const view = queryView(
-    useQuery({ ...options, queryKey: [...options.queryKey, grading.id] }),
-  );
-  if (view.state === 'loading') return <PageSkeleton rows={2} />;
-  if (view.state === 'error') return <ErrorBlock error={view.error} compact />;
+function Group({ group }: { group: GroupShown }) {
   return (
-    <pre className={classes.pre} aria-label={`Log ${grading.stage}`} tabIndex={0}>
-      {view.data}
-    </pre>
+    <section className={shared.stack} aria-label={`Group ${group.group}`}>
+      <div className={classes.verdict}>
+        <span className={classes.group}>{group.group}</span>
+        {!group.ran ? (
+          <BodyText tone="secondary">Not run on this grading</BodyText>
+        ) : (
+          group.outcome !== null && <VerdictBadge verdict={group.outcome} />
+        )}
+      </div>
+      {group.shown_at !== null && (
+        <BodyText tone="secondary">
+          Shown at {formatDateTime(new Date(group.shown_at))}
+        </BodyText>
+      )}
+      <Tests group={group} />
+    </section>
   );
 }
 
 /**
- * What one stage's grading holds for the contestant: its verdict, and the
- * summary, the metrics, the tests and the log where the task shows them. The
- * route leaves out what the task withholds, so what is missing is simply not
- * shown, with nothing in its place.
+ * What the grading holds for the contestant: its verdict, what the run
+ * reported once, such as a compile log, and each test group as the task
+ * shows it.
  */
-function Stage({
-  where,
-  grading,
-  named,
-}: {
-  where: Where;
-  grading: GradingResult;
-  named: boolean;
-}) {
-  const summary = grading.summary ?? '';
+function Grading({ grading }: { grading: GradingResult }) {
   return (
-    <section className={shared.stack} aria-label={`Stage ${grading.stage}`}>
-      {named && <SectionTitle order={3}>{grading.stage}</SectionTitle>}
+    <>
       <div className={classes.verdict}>
         <VerdictBadge verdict={verdictOf(grading)} />
         {grading.attempt > 1 && (
           <BodyText tone="secondary">Attempt {grading.attempt}</BodyText>
         )}
       </div>
-      {summary !== '' && (
-        <pre
-          className={classes.pre}
-          aria-label={`Summary ${grading.stage}`}
-          tabIndex={0}
-        >
-          {summary}
-        </pre>
-      )}
-      <Metrics metrics={grading.metrics} stage={grading.stage} />
-      <Tests grading={grading} />
-      {grading.log && <Log where={where} grading={grading} />}
-    </section>
+      <OnceValues values={grading.values} />
+      {grading.groups.map((group) => (
+        <Group key={group.group} group={group} />
+      ))}
+    </>
   );
 }
 
@@ -164,9 +137,9 @@ function Files({ where }: { where: Where }) {
 }
 
 /**
- * One of the caller's submissions, opened from the list: when it was made,
- * the files it was made with, and its grading at each stage, read again every
- * two seconds while any is still to finish.
+ * One of the caller's submissions, opened from the list: when it was made and
+ * how late, the files it was made with, and its grading, read again every two
+ * seconds while it is still to finish.
  */
 export function SubmissionDetail({
   org,
@@ -205,19 +178,14 @@ export function SubmissionDetail({
         <>
           <BodyText tone="secondary">
             Submitted {formatDateTime(new Date(view.data.submitted_at))}
+            {view.data.late_days > 0 && `, ${lateness(view.data.late_days)}`}
           </BodyText>
           <Files where={where} />
-          {view.data.gradings.length === 0 && (
-            <BodyText tone="secondary">Not graded on submit</BodyText>
+          {view.data.grading === null ? (
+            <BodyText tone="secondary">Not graded</BodyText>
+          ) : (
+            <Grading grading={view.data.grading} />
           )}
-          {view.data.gradings.map((grading) => (
-            <Stage
-              key={grading.id}
-              where={where}
-              grading={grading}
-              named={view.data.gradings.length > 1}
-            />
-          ))}
         </>
       )}
     </section>

@@ -1,183 +1,171 @@
 import { describe, expect, it } from 'vitest';
-import { contestantInput } from '@/test/contestant';
-import {
-  checkDraft,
-  emptyDraft,
-  htmlAccept,
-  isPanelInput,
-  submittedInputs,
-  type Draft,
-  type PanelInput,
-} from './draft';
+import { inputField, languageField } from '@/test/contestant';
+import { checkDraft, emptyDraft, pathOf, submittedInputs, type Draft } from './draft';
 
 const MB = 1024 * 1024;
-
-function panel(...inputs: ReturnType<typeof contestantInput>[]): PanelInput[] {
-  return inputs.filter(isPanelInput);
-}
 
 function file(name: string, size: number, type = ''): File {
   return new File([new Uint8Array(size)], name, { type });
 }
 
-const code = contestantInput();
-const weights = contestantInput({
-  id: 'weights',
-  type: 'file[]',
-  label: 'Weights',
-  language: null,
-  accept: ['.bin', 'image/*'],
-  max_size: MB,
+/** A file as a folder picker gives it: with its path inside the folder chosen. */
+function inFolder(path: string, size = 1): File {
+  const found = file(path.slice(path.lastIndexOf('/') + 1), size);
+  Object.defineProperty(found, 'webkitRelativePath', { value: path });
+  return found;
+}
+
+const solution = inputField();
+const program = inputField({
+  id: 'program',
+  type: 'folder',
+  label: 'Your program',
+  max_size: 20,
 });
-const alpha = contestantInput({
+const answers = inputField({
+  id: 'answers',
+  type: 'file',
+  label: 'Your answers',
+  per_test: true,
+});
+const alpha = inputField({
   id: 'alpha',
   type: 'number',
   label: 'Alpha',
-  language: null,
   min: 0,
   max: 1,
 });
+const language = inputField({
+  id: 'language',
+  type: 'enum',
+  label: 'Language',
+  options: ['c', 'cpp'],
+});
 
 describe('the panel inputs', () => {
-  it('leaves out what is not submitted from the browser', () => {
-    const inputs = [
-      code,
-      contestantInput({ id: 'book', type: 'jupyter', language: null }),
-      contestantInput({ id: 'data', type: 'dataset', language: null }),
-    ];
-    expect(panel(...inputs).map((input) => input.id)).toEqual(['submission']);
-  });
-
   it('starts each input empty or at its default', () => {
-    const draft = emptyDraft(
-      panel(
-        code,
-        contestantInput({ id: 'two', language: ['c', 'cpp'] }),
-        contestantInput({ id: 'alpha', type: 'number', language: null, default: 0.5 }),
-        contestantInput({ id: 'fast', type: 'boolean', language: null, default: true }),
-      ),
-    );
+    const draft = emptyDraft([
+      solution,
+      program,
+      language,
+      inputField({ id: 'level', type: 'enum', options: ['a', 'b'], default: 'b' }),
+      inputField({ id: 'alpha', type: 'number', default: 0.5 }),
+      inputField({ id: 'fast', type: 'boolean', default: true }),
+    ]);
     expect(draft).toEqual({
-      submission: { kind: 'files', files: [], language: 'python' },
-      two: { kind: 'files', files: [], language: '' },
+      submission: { kind: 'files', files: [] },
+      program: { kind: 'files', files: [] },
+      language: { kind: 'choice', option: '' },
+      level: { kind: 'choice', option: 'b' },
       alpha: { kind: 'text', text: '0.5' },
       fast: { kind: 'flag', checked: true },
+    });
+    expect(emptyDraft([languageField])).toEqual({
+      language: { kind: 'choice', option: 'python' },
     });
   });
 });
 
-describe('the accept attribute', () => {
-  it('writes a bare ending with its dot and keeps content types', () => {
-    expect(htmlAccept(contestantInput({ accept: ['py', '.txt', 'image/*'] }))).toBe(
-      '.py,.txt,image/*',
-    );
-    expect(htmlAccept(code)).toBeUndefined();
+describe('where each file goes under its input', () => {
+  it('keeps a folder’s layout, the chosen folder’s own name left off', () => {
+    expect(pathOf(program, inFolder('mine/src/Main.java'))).toBe('src/Main.java');
+    expect(pathOf(program, file('Main.java', 1))).toBe('Main.java');
+  });
+
+  it('names a file per test by where it sits, or by its name as given', () => {
+    expect(pathOf(answers, inFolder('out/main/1.txt'))).toBe('main/1.txt');
+    expect(pathOf(answers, file('1.txt', 1))).toBe('1.txt');
+  });
+
+  it('names the one file of a file input by its name', () => {
+    expect(pathOf(solution, inFolder('mine/main.py'))).toBe('main.py');
   });
 });
 
 describe('the checks before anything is sent', () => {
-  const inputs = panel(code, weights, alpha);
+  const inputs = [solution, program, alpha, language];
   const full: Draft = {
-    submission: { kind: 'files', files: [file('main.py', 10)], language: 'python' },
-    weights: {
-      kind: 'files',
-      files: [file('model.bin', 10), file('x.png', 5, 'image/png')],
-      language: '',
-    },
+    submission: { kind: 'files', files: [file('main.py', 10)] },
+    program: { kind: 'files', files: [inFolder('p/a.c', 5), inFolder('p/b/c.h', 5)] },
     alpha: { kind: 'text', text: '0.25' },
+    language: { kind: 'choice', option: 'cpp' },
   };
 
   it('passes a draft that fits', () => {
-    expect(checkDraft(inputs, full, 10 * MB)).toBeNull();
+    expect(checkDraft(inputs, full)).toBeNull();
   });
 
-  it('names every input that is empty, refused or out of range', () => {
-    const refused = checkDraft(
-      inputs,
-      {
-        submission: { kind: 'files', files: [], language: 'python' },
-        weights: { kind: 'files', files: [file('notes.txt', 1)], language: '' },
-        alpha: { kind: 'text', text: '2' },
-      },
-      10 * MB,
-    );
+  it('names every input that is empty, unchosen or out of range', () => {
+    const refused = checkDraft(inputs, {
+      submission: { kind: 'files', files: [] },
+      program: { kind: 'files', files: [] },
+      alpha: { kind: 'text', text: '2' },
+      language: { kind: 'choice', option: '' },
+    });
     expect(refused?.code).toBe('invalid_inputs');
     expect(refused?.extensions['errors']).toEqual([
       { input: 'submission', message: 'This input needs a file.' },
-      {
-        input: 'weights',
-        message: 'notes.txt is not a file this input takes: .bin, image/*.',
-      },
+      { input: 'program', message: 'This input needs at least one file.' },
       { input: 'alpha', message: 'Must be at most 1.' },
+      { input: 'language', message: 'Choose one of c, cpp.' },
     ]);
   });
 
-  it('asks for a number and a language', () => {
-    const refused = checkDraft(
-      panel(contestantInput({ language: ['c', 'cpp'] }), alpha),
-      {
-        submission: { kind: 'files', files: [file('a.c', 1)], language: '' },
-        alpha: { kind: 'text', text: ' ' },
-      },
-      MB,
-    );
+  it('asks for a number', () => {
+    const refused = checkDraft([alpha], { alpha: { kind: 'text', text: ' ' } });
     expect(refused?.extensions['errors']).toEqual([
-      { input: 'submission', message: 'Choose a language.' },
       { input: 'alpha', message: 'Give a number.' },
     ]);
   });
 
-  it('holds a file to its input’s size, naming the input', () => {
-    const refused = checkDraft(
-      inputs,
-      {
-        ...full,
-        weights: { kind: 'files', files: [file('big.bin', MB + 1)], language: '' },
+  it('holds an input’s files together to its size, naming the input', () => {
+    const refused = checkDraft(inputs, {
+      ...full,
+      program: {
+        kind: 'files',
+        files: [inFolder('p/a.c', 15), inFolder('p/b.c', 6)],
       },
-      10 * MB,
-    );
+    });
     expect(refused?.code).toBe('too_large');
-    expect(refused?.extensions).toEqual({ limit: MB, input: 'weights' });
+    expect(refused?.extensions).toEqual({ limit: 20, input: 'program' });
   });
 
-  it('holds a file to the task’s size when that is the smaller', () => {
-    const refused = checkDraft(inputs, full, 8);
-    expect(refused?.extensions).toEqual({ limit: 8, input: null });
-  });
-
-  it('holds the files together to the task’s size', () => {
-    const refused = checkDraft(inputs, full, 20);
-    expect(refused?.code).toBe('too_large');
-    expect(refused?.extensions).toEqual({ limit: 20, input: null });
+  it('holds one file to its input’s size', () => {
+    const refused = checkDraft([inputField({ max_size: MB })], {
+      submission: { kind: 'files', files: [file('big.py', MB + 1)] },
+    });
+    expect(refused?.extensions).toEqual({ limit: MB, input: 'submission' });
   });
 });
 
 describe('what a submit sends', () => {
-  it('names the uploads and the language, or the value', () => {
+  it('names the uploads of each file input, or the value', () => {
     const main = file('main.py', 1);
-    const inputs = panel(
-      code,
-      contestantInput({ id: 'data', type: 'file', language: null }),
-      alpha,
-      contestantInput({ id: 'fast', type: 'boolean', language: null }),
-      contestantInput({ id: 'notes', type: 'text', language: null }),
-    );
-    const data = file('in.txt', 1);
+    const header = inFolder('p/b/c.h');
     const sent = submittedInputs(
-      inputs,
+      [
+        solution,
+        program,
+        alpha,
+        languageField,
+        inputField({ id: 'fast', type: 'boolean' }),
+        inputField({ id: 'notes', type: 'text' }),
+      ],
       {
-        submission: { kind: 'files', files: [main], language: 'python' },
-        data: { kind: 'files', files: [data], language: '' },
+        submission: { kind: 'files', files: [main] },
+        program: { kind: 'files', files: [header] },
         alpha: { kind: 'text', text: ' 0.5 ' },
+        language: { kind: 'choice', option: 'python' },
         fast: { kind: 'flag', checked: false },
         notes: { kind: 'text', text: 'hello' },
       },
-      (input, chosen) => `${input}:${chosen === main ? 'u-main' : 'u-data'}`,
+      (input, chosen) => `${input}:${chosen === main ? 'u-main' : 'u-header'}`,
     );
     expect(sent).toEqual({
-      submission: { uploads: ['submission:u-main'], language: 'python' },
-      data: { uploads: ['data:u-data'], language: null },
+      submission: { uploads: ['submission:u-main'] },
+      program: { uploads: ['program:u-header'] },
       alpha: { uploads: [], value: 0.5 },
+      language: { uploads: [], value: 'python' },
       fast: { uploads: [], value: false },
       notes: { uploads: [], value: 'hello' },
     });

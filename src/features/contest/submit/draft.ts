@@ -1,59 +1,70 @@
 import { ApiError } from '@/api/problem';
-import type { ContestantInput, SubmittedInput } from '@/api/types';
+import type { InputField, SubmittedInput } from '@/api/types';
 
 /**
- * What the panel holds for one input before it is sent: the files of a code,
- * file or file[] input, with a code input's language; the text of a text or
- * number input as typed; or whether a true-or-false input is ticked.
+ * What the panel holds for one input before it is sent: the files of a file
+ * or folder input; the text of a text or number input as typed; whether a
+ * true-or-false input is ticked; or the option chosen of an enum input.
  */
 export type Entry =
-  | { kind: 'files'; files: File[]; language: string }
+  | { kind: 'files'; files: File[] }
   | { kind: 'text'; text: string }
-  | { kind: 'flag'; checked: boolean };
+  | { kind: 'flag'; checked: boolean }
+  | { kind: 'choice'; option: string };
 
 /** Everything in the panel, by input id. Replaced whole on every change. */
 export type Draft = Readonly<Record<string, Entry>>;
 
-type PanelType = 'code' | 'file' | 'file[]' | 'text' | 'number' | 'boolean';
-
-/** An input the panel shows a field for. */
-export type PanelInput = ContestantInput & { type: PanelType };
-
-const PANEL_TYPES = new Set<string>([
-  'code',
-  'file',
-  'file[]',
-  'text',
-  'number',
-  'boolean',
-]);
-const FILE_TYPES = new Set<string>(['code', 'file', 'file[]']);
-
 /** The most a text input takes, in bytes of UTF-8, as forge counts it. */
 const TEXT_MAX = 64 * 1024;
 
-export function isPanelInput(input: ContestantInput): input is PanelInput {
-  return PANEL_TYPES.has(input.type);
+export function takesFiles(input: InputField): boolean {
+  return input.type === 'file' || input.type === 'folder';
 }
 
-export function takesFiles(input: ContestantInput): boolean {
-  return FILE_TYPES.has(input.type);
+/**
+ * Whether the input takes several files that keep where they sit: a
+ * folder, or a file per test, which is named `<group>/<test>`.
+ */
+export function takesPaths(input: InputField): boolean {
+  return input.type === 'folder' || (input.type === 'file' && input.per_test);
 }
 
-/** The language a code input starts with: its only one, or none chosen yet. */
-function firstLanguage(input: ContestantInput): string {
-  return input.language?.length === 1 ? (input.language[0] ?? '') : '';
+/**
+ * Where a file goes under its input. A file of a folder input, or of one
+ * that takes a file per test, keeps its path inside the folder it was chosen
+ * from, the folder's own name left off; a file chosen alone, and the one
+ * file of a file input, goes by its name.
+ */
+export function pathOf(input: InputField, file: File): string {
+  // A browser without folder picking gives no path at all.
+  const relative: string | undefined = file.webkitRelativePath;
+  if (!takesPaths(input) || relative === undefined || relative === '') {
+    return file.name;
+  }
+  const slash = relative.indexOf('/');
+  return slash === -1 ? relative : relative.slice(slash + 1);
+}
+
+/** The option an enum input starts with: its default, its only one, or none chosen yet. */
+function firstOption(input: InputField): string {
+  const options = input.options ?? [];
+  if (typeof input.default === 'string' && options.includes(input.default)) {
+    return input.default;
+  }
+  return options.length === 1 ? (options[0] ?? '') : '';
 }
 
 /** An input as the panel starts it: no files, or the input's default. */
-function emptyEntry(input: PanelInput): Entry {
+function emptyEntry(input: InputField): Entry {
   switch (input.type) {
-    case 'code':
     case 'file':
-    case 'file[]':
-      return { kind: 'files', files: [], language: firstLanguage(input) };
+    case 'folder':
+      return { kind: 'files', files: [] };
     case 'boolean':
       return { kind: 'flag', checked: input.default === true };
+    case 'enum':
+      return { kind: 'choice', option: firstOption(input) };
     case 'text':
     case 'number':
       return {
@@ -63,83 +74,43 @@ function emptyEntry(input: PanelInput): Entry {
   }
 }
 
-export function emptyDraft(inputs: PanelInput[]): Draft {
+export function emptyDraft(inputs: InputField[]): Draft {
   return Object.fromEntries(inputs.map((input) => [input.id, emptyEntry(input)]));
 }
 
 /** The entry for `input`, or its empty one when the draft has none of the right kind. */
-export function entryOf(draft: Draft, input: PanelInput): Entry {
+export function entryOf(draft: Draft, input: InputField): Entry {
   const entry = draft[input.id];
   const empty = emptyEntry(input);
   return entry !== undefined && entry.kind === empty.kind ? entry : empty;
 }
 
-export function filesOf(draft: Draft, input: PanelInput): File[] {
+export function filesOf(draft: Draft, input: InputField): File[] {
   const entry = entryOf(draft, input);
   return entry.kind === 'files' ? entry.files : [];
-}
-
-/**
- * The input's `accept` as the file input's attribute: a bare ending such as
- * `py` is written `.py` there, as forge reads it.
- */
-export function htmlAccept(input: ContestantInput): string | undefined {
-  if (input.accept === null) return undefined;
-  return input.accept
-    .map((entry) => entry.trim())
-    .map((entry) =>
-      entry.startsWith('.') || entry.includes('/') ? entry : `.${entry}`,
-    )
-    .join(',');
-}
-
-/**
- * Whether the input takes a file of that name and content type, by the rule
- * forge checks a slot against: an entry starting with a dot, or a bare word,
- * is an ending of the name, ignoring case; one with a slash a content type,
- * where `image/*` takes every image. A code input takes any file.
- */
-function accepts(input: ContestantInput, file: File): boolean {
-  if (input.accept === null || input.type === 'code') return true;
-  const name = file.name.toLowerCase();
-  const kind = file.type.split(';', 1)[0]?.trim().toLowerCase() ?? '';
-  return input.accept.some((entry) => {
-    const wanted = entry.trim().toLowerCase();
-    if (wanted.startsWith('.')) return name.endsWith(wanted);
-    if (wanted.includes('/')) {
-      return wanted.endsWith('/*')
-        ? kind.startsWith(wanted.slice(0, -1))
-        : kind === wanted;
-    }
-    return name.endsWith(`.${wanted}`);
-  });
 }
 
 type Problem = { input: string; message: string };
 
 /** What is wrong with one input's entry, as forge would word it, if anything. */
-function problemOf(input: PanelInput, entry: Entry): string | null {
-  if (entry.kind === 'files') {
-    if (entry.files.length === 0) {
-      return input.type === 'file[]'
+function problemOf(input: InputField, entry: Entry): string | null {
+  switch (entry.kind) {
+    case 'files':
+      if (entry.files.length > 0) return null;
+      return takesPaths(input)
         ? 'This input needs at least one file.'
         : 'This input needs a file.';
+    case 'flag':
+      return null;
+    case 'choice': {
+      const options = input.options ?? [];
+      return options.includes(entry.option)
+        ? null
+        : `Choose one of ${options.join(', ')}.`;
     }
-    const refused = entry.files.find((file) => !accepts(input, file));
-    if (refused !== undefined) {
-      return `${refused.name} is not a file this input takes: ${(input.accept ?? []).join(', ')}.`;
-    }
-    const languages = input.language ?? [];
-    if (
-      input.type === 'code' &&
-      languages.length > 0 &&
-      !languages.includes(entry.language)
-    ) {
-      return 'Choose a language.';
-    }
-    return null;
+    case 'text':
+      break;
   }
-  if (entry.kind === 'flag') return null;
   if (input.type === 'text') {
     return new TextEncoder().encode(entry.text).length > TEXT_MAX
       ? `Must be at most ${TEXT_MAX} bytes.`
@@ -157,17 +128,13 @@ function problemOf(input: PanelInput, entry: Entry): string | null {
 /**
  * The refusals the browser can tell before anything is sent, as the same
  * errors the server would answer, so the panel says them the same way: an
- * input left empty or holding a file it does not take, a language not
- * chosen or a number out of range, as `invalid_inputs`; and a file larger
- * than its input or the task takes, or files larger together than the task
+ * input left empty, an option not chosen or a number out of range, as
+ * `invalid_inputs`; and an input whose files together are larger than it
  * takes, as `too_large`. The object store gives no usable error for a file
  * over its limit, so the sizes are checked here, before any upload starts.
+ * Whether a path is one the input takes is the server's to say.
  */
-export function checkDraft(
-  inputs: PanelInput[],
-  draft: Draft,
-  taskMaxSize: number,
-): ApiError | null {
+export function checkDraft(inputs: InputField[], draft: Draft): ApiError | null {
   const problems: Problem[] = [];
   for (const input of inputs) {
     const problem = problemOf(input, entryOf(draft, input));
@@ -182,39 +149,27 @@ export function checkDraft(
     });
   }
 
-  let total = 0;
   for (const input of inputs) {
-    const limit = Math.min(input.max_size ?? taskMaxSize, taskMaxSize);
-    for (const file of filesOf(draft, input)) {
-      total += file.size;
-      if (file.size > limit) {
-        return new ApiError({
-          code: 'too_large',
-          status: 0,
-          title: 'That file is too large',
-          extensions: { limit, input: limit < taskMaxSize ? input.id : null },
-        });
-      }
+    const total = filesOf(draft, input).reduce((sum, file) => sum + file.size, 0);
+    if (total > input.max_size) {
+      return new ApiError({
+        code: 'too_large',
+        status: 0,
+        title: 'Too large for this input',
+        extensions: { limit: input.max_size, input: input.id },
+      });
     }
-  }
-  if (total > taskMaxSize) {
-    return new ApiError({
-      code: 'too_large',
-      status: 0,
-      title: 'That submission is too large',
-      extensions: { limit: taskMaxSize, input: null },
-    });
   }
   return null;
 }
 
 /**
- * The submit's `inputs`: for each input, the uploads of its files and a code
- * input's language, or its value. `uploadOf` is the upload each file went up
- * as for the input it was sent for.
+ * The submit's `inputs`: for each input, the uploads of its files, or its
+ * value. `uploadOf` is the upload each file went up as for the input it was
+ * sent for.
  */
 export function submittedInputs(
-  inputs: PanelInput[],
+  inputs: InputField[],
   draft: Draft,
   uploadOf: (input: string, file: File) => string,
 ): Record<string, SubmittedInput> {
@@ -225,14 +180,12 @@ export function submittedInputs(
         case 'files':
           return [
             input.id,
-            {
-              uploads: entry.files.map((file) => uploadOf(input.id, file)),
-              language:
-                input.type === 'code' && entry.language !== '' ? entry.language : null,
-            },
+            { uploads: entry.files.map((file) => uploadOf(input.id, file)) },
           ];
         case 'flag':
           return [input.id, { uploads: [], value: entry.checked }];
+        case 'choice':
+          return [input.id, { uploads: [], value: entry.option }];
         case 'text':
           return [
             input.id,

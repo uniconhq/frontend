@@ -6,7 +6,6 @@ import type { Verdict } from './verdicts';
 
 const EVERY: [Verdict, string][] = [
   ['accepted', 'ACCEPTED'],
-  ['partial', 'PARTIAL'],
   ['wrong_answer', 'WRONG ANSWER'],
   ['time_limit', 'TIME LIMIT'],
   ['memory_limit', 'MEMORY LIMIT'],

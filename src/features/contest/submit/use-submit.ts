@@ -1,14 +1,14 @@
 import { useRef, useState } from 'react';
 import { $api } from '@/api/query';
 import { ApiError, toApiError } from '@/api/problem';
-import type { ContestantInput, Submission } from '@/api/types';
+import type { InputField, Submission } from '@/api/types';
 import {
   checkDraft,
   filesOf,
+  pathOf,
   submittedInputs,
   takesFiles,
   type Draft,
-  type PanelInput,
 } from './draft';
 import { digestOf } from './digest';
 import { sendToForge } from './transfer';
@@ -82,13 +82,11 @@ export function useSubmit({
   contest,
   task,
   inputs,
-  maxSize,
 }: {
   org: string;
   contest: string;
   task: string;
-  inputs: PanelInput[];
-  maxSize: number;
+  inputs: InputField[];
 }) {
   const requestSlot = $api.useMutation(
     'post',
@@ -120,7 +118,7 @@ export function useSubmit({
   const progress = (file: File, share: number) =>
     setSent((current) => new Map(current).set(file, Math.round(share * 100)));
 
-  const newSlot = async (input: ContestantInput, file: File): Promise<Slot> => {
+  const newSlot = async (input: InputField, file: File): Promise<Slot> => {
     setPhase('hashing');
     let sha256: string;
     try {
@@ -134,7 +132,7 @@ export function useSubmit({
       params: { path },
       body: {
         input: input.id,
-        filename: file.name,
+        filename: pathOf(input, file),
         size: file.size,
         sha256,
         content_type: file.type === '' ? null : file.type,
@@ -158,7 +156,7 @@ export function useSubmit({
     }
   };
 
-  const upload = async (input: ContestantInput, file: File): Promise<string> => {
+  const upload = async (input: InputField, file: File): Promise<string> => {
     const kept = pending.current.get(input.id)?.get(file);
     const slot = kept ?? (await newSlot(input, file));
     setPhase('uploading');
@@ -215,7 +213,7 @@ export function useSubmit({
     busy.current = true;
     setRefusal(null);
     try {
-      const local = checkDraft(inputs, draft, maxSize);
+      const local = checkDraft(inputs, draft);
       if (local !== null) {
         setRefusal(local);
         return null;

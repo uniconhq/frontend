@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { $api, queryView } from '@/api/query';
-import type { ContestHome, MyRegistration, PublicTask } from '@/api/types';
+import type { ContestHome, MyRegistration, PublicTask, TaskEntry } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { Card } from '@/ui/Card';
 import { PageLink } from '@/ui/PageLink';
@@ -25,8 +25,8 @@ import classes from './contest.module.css';
 /**
  * How often the home is read again: soon while the caller waits on an
  * organiser, and now and then otherwise, so an extension or a task released
- * by its own time reaches the page. Crossing the start or the deadline reads
- * it again at once.
+ * by its own time reaches the page. Crossing the start or the end reads it
+ * again at once.
  */
 const WAITING_ON_ORGANISER_MS = 10_000;
 const MEANWHILE_MS = 60_000;
@@ -35,7 +35,10 @@ function pollEvery(registration: MyRegistration | null | undefined): number {
   return registration?.status === 'pending' ? WAITING_ON_ORGANISER_MS : MEANWHILE_MS;
 }
 
-/** A contest's released tasks, each a link to its page. */
+/**
+ * A contest's released tasks, each a link to its page, and for a signed-in
+ * person when each falls due, if it does, and closes for them.
+ */
 function TaskList({
   org,
   contest,
@@ -43,7 +46,7 @@ function TaskList({
 }: {
   org: string;
   contest: string;
-  tasks: PublicTask[];
+  tasks: (PublicTask | TaskEntry)[];
 }) {
   if (tasks.length === 0) {
     return <BodyText tone="secondary">No task is released yet.</BodyText>;
@@ -56,6 +59,14 @@ function TaskList({
           <li key={task.name} className={classes.task}>
             {label !== null && <span className={classes.label}>{label}</span>}
             <PageLink to={taskPagePath(org, contest, task.name)}>{task.title}</PageLink>
+            {'due' in task && task.due !== null && (
+              <BodyText tone="meta">Due {formatDateTime(new Date(task.due))}</BodyText>
+            )}
+            {'closes' in task && task.closes !== null && (
+              <BodyText tone="meta">
+                Closes {formatDateTime(new Date(task.closes))}
+              </BodyText>
+            )}
           </li>
         );
       })}
@@ -108,7 +119,6 @@ function Home({
   home: ContestHome;
   onBoundary: () => void;
 }) {
-  const extended = Date.parse(home.deadline) !== Date.parse(home.end);
   return (
     <div className={classes.page}>
       <PageTitle>{home.name}</PageTitle>
@@ -121,17 +131,7 @@ function Home({
       <Card>
         <div className={classes.stack}>
           <Dates start={home.start} end={home.end} />
-          <Countdown
-            start={home.start}
-            deadline={home.deadline}
-            onBoundary={onBoundary}
-          />
-          {extended && (
-            <BodyText tone="secondary">
-              Your time runs until {formatDateTime(new Date(home.deadline))}, with the
-              extra time the organisers gave you.
-            </BodyText>
-          )}
+          <Countdown start={home.start} end={home.end} onBoundary={onBoundary} />
           <RegistrationPanel org={org} contest={contest} home={home} />
         </div>
       </Card>
