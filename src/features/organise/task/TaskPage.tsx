@@ -8,6 +8,7 @@ import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
 import { formatDateTime } from '@/lib/time';
 import { DefinitionErrors } from '../DefinitionErrors';
 import { FileBrowser } from '../files/FileBrowser';
+import { TaskSettingsSection } from '../forms/task-sections';
 import { AnnouncementsSection } from '../threads/AnnouncementsSection';
 import { GradingsSection } from './GradingsSection';
 import { PeopleSection } from '../people/PeopleSection';
@@ -38,6 +39,9 @@ export function TaskPage() {
       </Card>
       <Card>
         <AnnouncementsSection place={{ kind: 'task', ...path }} />
+      </Card>
+      <Card>
+        <TaskSettingsSection place={{ kind: 'task', ...path }} />
       </Card>
       <Card>
         <FileBrowser place={{ kind: 'task', ...path }} />
