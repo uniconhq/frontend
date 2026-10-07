@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { $api, queryView, type QueryView } from '@/api/query';
 import type { Submission } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
+import { Checkbox } from '@/ui/Checkbox';
 import { PageLink } from '@/ui/PageLink';
 import { verdictLabel } from '@/ui/verdicts';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
@@ -12,13 +13,15 @@ import { serverNow } from '@/lib/time';
 import { justFinished, lateness, newestFirst, pollEvery, verdictOf } from './grading';
 import { Verdict } from './Results';
 import { submissionHref } from './submission-param';
+import { useMarks, type MarkState } from './use-marks';
 import classes from './submit.module.css';
 
 /**
  * The caller's own submissions of the task, newest first, each with where its
  * grading stands or what came back: read every two seconds while any is still
  * being graded, so a queued one moves on to its outcome without a reload.
- * The server answers with the caller's own alone.
+ * The server answers with the caller's own alone. On a task a `marked` board
+ * covers, each also has the row's mark on it, a toggle until the row's close.
  */
 /**
  * What a screen reader is told as the list is read again: each submission
@@ -75,18 +78,63 @@ export function SubmissionList({
   );
 
   const said = useJustFinished(view.state === 'ready' ? view.data : undefined);
+  const marks = useMarks({ org, contest, task });
 
   return (
     <>
       <div role="status" className={classes.announce}>
         {said}
       </div>
-      <Listed view={view} />
+      {marks.kind === 'held' && <MarksSummary state={marks} />}
+      <Listed view={view} marks={marks} />
     </>
   );
 }
 
-function Listed({ view }: { view: QueryView<Submission[]> }) {
+/**
+ * How many submissions the row has marked of the most it may, until when,
+ * and why a mark was refused. A team's members share the one set.
+ */
+function MarksSummary({ state }: { state: Extract<MarkState, { kind: 'held' }> }) {
+  const { marks, refusal } = state;
+  const until = formatDateTime(new Date(marks.closes_at));
+  return (
+    <>
+      <BodyText tone="secondary">
+        {marks.frozen
+          ? `Your marks are final: ${marks.numbers.length} of ${marks.most} marked.`
+          : `Marked ${marks.numbers.length} of ${marks.most}. The boards that count marks count the best of those you mark, and you may change them until ${until}.`}
+      </BodyText>
+      {refusal !== null && (
+        <div role="alert">
+          <ErrorBlock error={refusal} compact />
+        </div>
+      )}
+    </>
+  );
+}
+
+/** A submission's mark: a toggle until the row's close, then whether it is marked. */
+function MarkCell({
+  state,
+  number,
+}: {
+  state: Extract<MarkState, { kind: 'held' }>;
+  number: number;
+}) {
+  const marked = state.marks.numbers.includes(number);
+  if (state.marks.frozen) return <>{marked ? 'Marked' : ''}</>;
+  return (
+    <Checkbox
+      label={`Mark #${number}`}
+      checked={marked}
+      disabled={state.busy}
+      onChange={(checked) => state.toggle(number, checked)}
+    />
+  );
+}
+
+function Listed({ view, marks }: { view: QueryView<Submission[]>; marks: MarkState }) {
   if (view.state === 'loading') return <PageSkeleton rows={2} />;
   if (view.state === 'error')
     return <ErrorBlock error={view.error} onRetry={view.retry} />;
@@ -103,6 +151,7 @@ function Listed({ view }: { view: QueryView<Submission[]> }) {
           <th scope="col">Submission</th>
           <th scope="col">Submitted</th>
           <th scope="col">Result</th>
+          {marks.kind === 'held' && <th scope="col">Mark</th>}
         </tr>
       </thead>
       <tbody>
@@ -122,6 +171,11 @@ function Listed({ view }: { view: QueryView<Submission[]> }) {
             <td>
               <Verdict grading={submission.grading} />
             </td>
+            {marks.kind === 'held' && (
+              <td>
+                <MarkCell state={marks} number={submission.number} />
+              </td>
+            )}
           </tr>
         ))}
       </tbody>
