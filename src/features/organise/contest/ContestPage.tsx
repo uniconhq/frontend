@@ -17,6 +17,8 @@ import {
 } from '@/lib/organiser-paths';
 import { PageLink } from '@/ui/PageLink';
 import { Create } from '../Create';
+import { DefinitionErrors } from '../DefinitionErrors';
+import { definitionErrorsOf } from '../files/refusals';
 import { AnnouncementsSection } from '../threads/AnnouncementsSection';
 import { ContestClarifications } from '../threads/Clarifications';
 import { PeopleSection } from '../people/PeopleSection';
@@ -70,8 +72,9 @@ function useStandingsFollowContestWrites(org: string, contest: string) {
  * the files readable. Listing needs the observer role at the contest;
  * someone who holds a role only at one of its tasks is refused the list, so
  * the refusal comes with the tasks their own roles reach. A `contest.yaml`
- * that does not read leaves the tasks by name alone, so the way to each
- * still works while it is mended.
+ * that does not pass validation shows its errors, each at its YAML path,
+ * and leaves the tasks by name alone, so the way to each still works while
+ * it is mended.
  */
 export function ContestPage() {
   const { org, contest } = useContestParams();
@@ -88,7 +91,9 @@ export function ContestPage() {
   );
   const view = queryView(standings);
   useStandingsFollowContestWrites(org, contest);
-  const unreadable = view.state === 'error' && view.error.code === 'not_found';
+  // `contest.yaml` that does not pass validation is refused as
+  // `invalid_definition`, naming each error at its YAML path.
+  const unreadable = view.state === 'error' && view.error.code === 'invalid_definition';
   const names = queryView(
     $api.useQuery(
       'get',
@@ -158,10 +163,16 @@ export function ContestPage() {
                 <div className={classes.panel} role="alert">
                   <BodyText>The contest&apos;s settings do not read</BodyText>
                   <BodyText tone="secondary">
-                    {view.error.detail ??
-                      'Where each task stands comes from contest.yaml, which could not be read.'}{' '}
-                    Mend it under Settings or Files below.
+                    Where each task stands comes from contest.yaml, which does not pass
+                    validation. Mend it under Settings or Files below.
                   </BodyText>
+                  {definitionErrorsOf(view.error).length > 0 ? (
+                    <DefinitionErrors errors={definitionErrorsOf(view.error)} />
+                  ) : (
+                    view.error.detail !== undefined && (
+                      <BodyText tone="secondary">{view.error.detail}</BodyText>
+                    )
+                  )}
                 </div>
               ) : (
                 <ErrorBlock error={view.error} onRetry={view.retry} />

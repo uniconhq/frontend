@@ -336,8 +336,9 @@ what a started late day takes off, closes and worth, each at its default
 where the entry gives none, as the route resolves them. The list is read
 again on every visit, since a save on a task's page moves its state, and
 whenever one of the contest's files is written on the page, since
-`contest.yaml` holds the times. A `contest.yaml` that does not read leaves
-the tasks by name alone, with the reason.
+`contest.yaml` holds the times. A `contest.yaml` that does not pass
+validation, which the route refuses as `invalid_definition`, shows each of its
+errors at its YAML path and leaves the tasks by name alone.
 
 The contest's Gradings page (`gradings/`) lists every grading of its tasks
 newest first, each submission once by its task, who made it and its number,

@@ -199,22 +199,38 @@ describe('the contest page', () => {
     expect(await screen.findByRole('link', { name: 'contest.yaml' })).toBeVisible();
   });
 
-  it('lists the tasks by name when the settings do not read', async () => {
+  it("shows the settings' errors at their paths and lists the tasks by name when the settings do not read", async () => {
     server.use(
       signedIn,
       ...repoFiles,
       taskList,
+      // As the backend answers the forge's InvalidDefinition naming contest.yaml.
       http.get(`${CONTEST_API}/organise/tasks`, () =>
-        problem(404, 'not_found', { detail: 'contest.yaml does not read.' }),
+        problem(422, 'invalid_definition', {
+          title: 'Unprocessable Content',
+          detail:
+            'contest.yaml has 2 problems; the first is at tasks[0].due: It is not a time with an offset.',
+          errors: [
+            { path: 'tasks[0].due', message: 'It is not a time with an offset.' },
+            { path: '', message: 'end comes before start.' },
+          ],
+        }),
       ),
     );
     renderApp(CONTEST);
 
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent("The contest's settings do not read");
-    expect(alert).toHaveTextContent(
-      'contest.yaml does not read. Mend it under Settings or Files below.',
-    );
+    expect(alert).toHaveTextContent('Mend it under Settings or Files below.');
+    const errors = within(alert).getByRole('list', { name: 'Errors' });
+    expect(
+      within(errors)
+        .getAllByRole('listitem')
+        .map((item) => item.textContent),
+    ).toEqual([
+      'tasks[0].due: It is not a time with an offset.',
+      'the whole file: end comes before start.',
+    ]);
     const list = await screen.findByRole('list', { name: 'Tasks by name' });
     expect(within(list).getByRole('link', { name: 'sum' })).toHaveAttribute(
       'href',
