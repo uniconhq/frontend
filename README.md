@@ -160,15 +160,16 @@ the task's settings as forms, or opens any file of either as text and saves
 it. Saving a task's file is the save of the task, which publishes it or keeps
 it as a draft.
 
-| Address                                    | Page                                                                          |
-| ------------------------------------------ | ----------------------------------------------------------------------------- |
-| `/orgs`                                    | the orgs your roles reach, and New org                                        |
-| `/orgs/new`                                | the new org form, then the new org                                            |
-| `/orgs/:org`                               | the org's contests, New contest, and its organisers                           |
-| `/orgs/:org/contests/:contest`             | the contest's tasks, New task, the contest repo's files, and its organisers   |
-| `/orgs/:org/contests/:contest/contestants` | every registration, with approve, reject, undo a rejection, remove and extend |
-| `/orgs/:org/contests/:contest/teams`       | every team, with make, delete, add, move, remove and change the leader        |
-| `/orgs/:org/contests/:contest/tasks/:task` | the task's state, its publications, the task repo's files, and its organisers |
+| Address                                    | Page                                                                                  |
+| ------------------------------------------ | ------------------------------------------------------------------------------------- |
+| `/orgs`                                    | the orgs your roles reach, and New org                                                |
+| `/orgs/new`                                | the new org form, then the new org                                                    |
+| `/orgs/:org`                               | the org's display name and description, its contests, New contest, and its organisers |
+| `/orgs/:org/contests/:contest`             | where each task stands, New task, the contest repo's files, and its organisers        |
+| `/orgs/:org/contests/:contest/contestants` | every registration, with approve, reject, undo a rejection, remove and extend         |
+| `/orgs/:org/contests/:contest/teams`       | every team, with make, delete, add, move, remove and change the leader                |
+| `/orgs/:org/contests/:contest/gradings`    | every grading of the contest, its queue, and retry, cancel and rejudge                |
+| `/orgs/:org/contests/:contest/tasks/:task` | the task's state, its publications, the task repo's files, and its organisers         |
 
 **Every organiser page lives under `/orgs`.** The proxy in `deploy` sends
 exactly `/orgs` and `/orgs/...` to this app, and `/contests/...` for the
@@ -179,7 +180,7 @@ place, `src/lib/organiser-paths.ts`, which the pages and the breadcrumb share.
 
 The pages live in `src/features/organise/`: a sub-folder for each page
 (`orgs/` holds `/orgs` and `/orgs/new`, then `org/`, `contest/`, `contestants/`,
-`teams/` and `task/`), one for the file tree and editor the contest and task pages
+`teams/`, `gradings/` and `task/`), one for the file tree and editor the contest and task pages
 share (`files/`), one for the settings forms and the statement (`forms/`),
 and one for the organisers section all three pages share (`people/`). The pieces more than one of those use sit at its top:
 the create form and `Create`, which keeps it behind a New button and
@@ -280,6 +281,41 @@ retries a finished attempt and cancels one still to finish, and rejudges the
 whole task, which grades every submission's latest attempt again against the
 current publication as a new attempt; each asks first in a dialog, which
 keeps a refusal and closes once the change has gone through.
+
+The contest page lists its tasks in the contest's order, each by its letter
+and name, with where it stands (`GET <contest>/organise/tasks`): its latest
+publication, when it was made and whether it changed how the task grades, or
+that it has never published; a draft on top of it with the draft's errors at
+their YAML paths; and its timeline from `contest.yaml`, released, due with
+what a started late day takes off, closes and worth, each at its default
+where the entry gives none, as the route resolves them. The list is read
+again on every visit, since a save on a task's page moves its state, and
+whenever one of the contest's files is written on the page, since
+`contest.yaml` holds the times. A `contest.yaml` that does not read leaves
+the tasks by name alone, with the reason.
+
+The contest's Gradings page (`gradings/`) lists every grading of its tasks
+newest first, each submission once by its task, who made it and its number,
+headed by its latest attempt, with its earlier attempts opening below it: the
+attempt, the publication it graded against, the status with the reason a
+system error gave and the sentence a cancel told the contestant, what a
+finished run came to, its log, and when it was queued, started and finished.
+Above it are how many gradings wait, queued and waiting for a machine, and
+filters by task, status, team and a contestant's username, kept in the
+address so a link or a reload keeps them; a username applies once sent. The
+live stream marks the feed and the queue stale as gradings move; while it is
+not open both are read again every ten seconds while one is still to finish.
+A manager of a row's task retries its latest attempt once finished and
+cancels one reading as a system error, with a sentence of at most 500
+characters its contestant reads; with the feed filtered to a task they
+manage, they rejudge it. Each goes through the task's own routes after a
+confirmation that keeps a refusal. An observer reads the page alone. The
+feed shows the newest 100; a filter reaches older ones.
+
+The org page shows the org's display name and description as the forge
+holds them. An admin of the org edits both in place; an emptied display name
+is sent as empty, which leaves the org showing its name. A manager or an
+observer reads them with no edit control.
 
 The contestants page shows an observer the table and a manager its actions
 too, which the routes check again underneath. Each action's answer replaces
@@ -489,7 +525,7 @@ connections to one host and a stream in every background tab would use
 them up. Each event names a kind of thing that changed and its id, never
 what changed. The events of a moment are gathered, and each kind marks
 stale the reads whose route shows it: a grading the submissions and
-gradings lists and a submission, but not its files; an announcement
+gradings lists, a contest's queue and a submission, but not its files; an announcement
 every announcements list; a clarification the questions and the inbox.
 `resync`, and every opening of the stream after the tab's first, marks
 everything stale. A stream the server refused is opened again after five
