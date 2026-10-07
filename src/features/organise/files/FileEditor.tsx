@@ -5,7 +5,7 @@ import { toApiError } from '@/api/problem';
 import type { FileContent, WriteFile } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
-import { Textarea } from '@/ui/Textarea';
+import { CodeEditor, type CodeLanguage } from '@/ui/CodeEditor';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
 import { fileQuery, staleAfterWrite, type Place } from './place';
@@ -19,8 +19,15 @@ function decodedSize(base64: string): number {
   return Math.max(0, Math.floor((base64.length * 3) / 4) - padding);
 }
 
+/** What a file is highlighted as, by its ending. */
+function languageOf(path: string): CodeLanguage {
+  if (/\.ya?ml$/i.test(path)) return 'yaml';
+  if (/\.md$/i.test(path)) return 'markdown';
+  return 'plain';
+}
+
 /**
- * One file, open as plain text. The text is saved with the token it was read
+ * One file, open as text in the code editor. The text is saved with the token it was read
  * with, so a file someone else changed in the meantime comes back as a
  * conflict and nothing is overwritten. That is why the file is read once and
  * never refetched behind the organiser's back: a background refetch would
@@ -161,11 +168,11 @@ function TextEditor({
 
   return (
     <>
-      <Textarea
+      <CodeEditor
         label={file.path}
         value={text}
         onChange={setText}
-        mono
+        language={languageOf(file.path)}
         rows={18}
         readOnly={busy}
         autoFocus={autoFocus}
