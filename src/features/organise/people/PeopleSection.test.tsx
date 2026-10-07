@@ -203,7 +203,33 @@ describe('the organisers section', () => {
     expect(alert).toHaveTextContent('Someone else has to be an admin of acme first.');
   });
 
-  it('offers a manager no admin role and no change to an admin', async () => {
+  it('keeps the last admin from stepping down to another role, and says why', async () => {
+    orgWith([kennyAdmin, holder()]);
+    server.use(
+      http.post(ORG_ROLES, () =>
+        problem(409, 'sole_admin', {
+          detail: 'Someone else has to be an admin of acme first.',
+          scopes: [{ kind: 'org', name: 'acme' }],
+        }),
+      ),
+    );
+    const user = userEvent.setup();
+    renderApp('/orgs/acme');
+
+    await screen.findByRole('table', { name: 'Organisers' });
+    await user.click(screen.getByRole('button', { name: 'Change role of kenny' }));
+    const form = screen.getByRole('form', { name: 'Change role of kenny' });
+    await user.selectOptions(within(form).getByLabelText('Role'), 'manager');
+    await user.click(within(form).getByRole('button', { name: 'Save' }));
+
+    const alert = await within(row('kenny')).findByRole('alert');
+    expect(alert).toHaveTextContent('That would leave no admin');
+    expect(alert).toHaveTextContent('Someone else has to be an admin of acme first.');
+    expect(within(row('kenny')).getByRole('cell', { name: 'Admin' })).toBeVisible();
+  });
+
+  it('offers a manager the admin role, and shows why the forge refuses it', async () => {
+    const sent: unknown[] = [];
     server.use(
       signedInAs([
         { names: { org: 'acme', contest: 'spring', task: null }, role: 'manager' },
@@ -221,18 +247,37 @@ describe('the organisers section', () => {
           ),
         ]),
       ),
+      http.post(CONTEST_ROLES, async ({ request }) => {
+        sent.push(await request.json());
+        return problem(403, 'forbidden', {
+          detail: 'Only an admin of acme/spring may grant admin there.',
+        });
+      }),
     );
+    const user = userEvent.setup();
     renderApp('/orgs/acme/contests/spring');
 
     await screen.findByRole('table', { name: 'Organisers' });
     expect(within(row('lee')).getByText('acme')).toBeVisible();
     expect(within(row('lee')).queryByRole('button')).not.toBeInTheDocument();
     const form = screen.getByRole('form', { name: 'Add someone' });
-    const options = within(within(form).getByLabelText('Role')).getAllByRole('option');
-    expect(options.map((option) => option.textContent)).toEqual([
-      'Manager',
-      'Observer',
-    ]);
+    const roles = within(form).getByLabelText('Role');
+    expect(
+      within(roles)
+        .getAllByRole('option')
+        .map((option) => option.textContent),
+    ).toEqual(['Admin', 'Manager', 'Observer']);
+
+    await user.type(within(form).getByLabelText(/Username/), 'dee');
+    await user.selectOptions(roles, 'admin');
+    await user.click(within(form).getByRole('button', { name: 'Add' }));
+
+    const alert = await within(form).findByRole('alert');
+    expect(alert).toHaveTextContent('Only an admin gives the admin role');
+    expect(alert).toHaveTextContent(
+      'Only an admin of acme/spring may grant admin there.',
+    );
+    expect(sent).toEqual([{ username: 'dee', role: 'admin' }]);
   });
 
   it('shows an observer the list and nothing to change', async () => {
