@@ -42,7 +42,12 @@ const TESTS = 'tests';
  */
 export function TaskSettings({ place, admin }: { place: Place; admin: boolean }) {
   return (
-    <DefinitionFile place={place} path="task.yaml" label="The task's settings">
+    <DefinitionFile
+      place={place}
+      path="task.yaml"
+      admin={admin}
+      label="The task's settings"
+    >
       {(props) => <WithFolders {...props} place={place} admin={admin} />}
     </DefinitionFile>
   );

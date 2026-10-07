@@ -32,12 +32,15 @@ export function DefinitionFile({
   place,
   path,
   label,
+  admin,
   children,
 }: {
   place: Place;
   path: string;
   /** What the tabs are views of, such as "The contest's settings". */
   label: string;
+  /** Whether the organiser is an admin at the scope, which the merge view needs. */
+  admin: boolean;
   children: (props: FormProps) => ReactNode;
 }) {
   return (
@@ -48,7 +51,7 @@ export function DefinitionFile({
           value: 'form',
           label: 'Form',
           panel: (
-            <FormView place={place} path={path}>
+            <FormView place={place} path={path} admin={admin}>
               {children}
             </FormView>
           ),
@@ -68,10 +71,12 @@ type Merge = { base: string; mine: string };
 function FormView({
   place,
   path,
+  admin,
   children,
 }: {
   place: Place;
   path: string;
+  admin: boolean;
   children: (props: FormProps) => ReactNode;
 }) {
   const query = useOwnFile(place, path);
@@ -120,6 +125,8 @@ function FormView({
       {merge !== null ? (
         <MergeView
           key={file.token}
+          file={path}
+          admin={admin}
           baseText={merge.base}
           mineText={merge.mine}
           currentText={file.content}

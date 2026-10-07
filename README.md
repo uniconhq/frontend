@@ -299,7 +299,13 @@ as a `conflict` reads the file again and shows the organiser's version and the
 current one field by field, with a choice per field that starts on the side
 that changed it; nothing is written until they save, which writes the chosen fields
 into the current file with its token (`forms/merge.ts`, over any YAML
-document). The statement is edited beside `ui/Markdown`, the renderer the
+document). A keyed list (`contest.yaml`'s `tasks` by `id`, `leaderboards` by
+`name`, a table in `merge.ts`) is compared item by item, each item matched and
+named by its key (`tasks[sum].due`); an item only one side has, and the list's
+order, are fields of their own, and the merge finds each item in the current
+file by its key before writing. Any other list is one field. Times compare as
+the moments they name and show in local time, and a manager's admin-only keys
+stay as they are now. The statement is edited beside `ui/Markdown`, the renderer the
 contestant's task page uses, and is read-only to a manager.
 
 The task page's gradings list each submission once, headed by its latest
