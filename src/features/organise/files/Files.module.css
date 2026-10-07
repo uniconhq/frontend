@@ -69,3 +69,84 @@
   flex-direction: column;
   gap: 12px;
 }
+
+.history {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.version {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--unicon-border);
+}
+
+.upload {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--unicon-border);
+}
+
+/* The uploads waiting to be saved, one a line: path, size, Discard. */
+.waiting {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.waiting li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.folder[data-picked] {
+  color: var(--unicon-text-primary);
+}
+
+.mark {
+  margin-left: auto;
+  padding-left: 8px;
+  color: var(--unicon-text-faint);
+  white-space: nowrap;
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 4px 12px;
+  margin: 0;
+  font-size: 13px;
+  color: var(--unicon-text-body);
+}
+
+.facts dt {
+  color: var(--unicon-text-secondary);
+}
+
+.facts dd {
+  margin: 0;
+}
+
+.digest {
+  font-family: var(--mantine-font-family-monospace);
+  overflow-wrap: anywhere;
+}

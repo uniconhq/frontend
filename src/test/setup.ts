@@ -12,6 +12,13 @@ import { server } from './server';
  */
 vi.mock('@/lib/leave', () => ({ leaveFor: vi.fn() }));
 
+/**
+ * CodeMirror measures a layout jsdom does not have, so pages are tested with
+ * a plain text field standing in for the code editor; `CodeEditor.test.tsx`
+ * takes the stand-in away and tests the editor itself.
+ */
+vi.mock('@/ui/CodeEditor', () => import('./code-editor'));
+
 window.matchMedia = (query: string) => ({
   matches: false,
   media: query,

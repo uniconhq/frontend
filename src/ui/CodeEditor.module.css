@@ -1,0 +1,22 @@
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+/*
+ * The editor fills the frame, which the person can drag taller; a long file
+ * scrolls inside it, so what sits under the editor stays in place.
+ */
+.frame {
+  min-height: 120px;
+  overflow: hidden;
+  resize: vertical;
+  border: 1px solid var(--unicon-border-strong);
+  border-radius: var(--mantine-radius-sm);
+}
+
+.frame:focus-within {
+  border-color: var(--mantine-primary-color-filled);
+}

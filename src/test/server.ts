@@ -108,6 +108,22 @@ const noGradings = http.get(
   () => HttpResponse.json([]),
 );
 
+/** Contests with no gradings, nothing waiting and no tasks, until a test says otherwise. */
+const emptyOrganising = [
+  http.get('/api/v1/orgs/:org/contests/:contest/gradings', () => HttpResponse.json([])),
+  http.get('/api/v1/orgs/:org/contests/:contest/gradings/queue', () =>
+    HttpResponse.json({ queued: 0, dispatched: 0 }),
+  ),
+  /** No task standing in any contest, until a test lists some. */
+  http.get('/api/v1/orgs/:org/contests/:contest/organise/tasks', () =>
+    HttpResponse.json([]),
+  ),
+  /** An org with no display name of its own nor description, until a test gives one. */
+  http.get('/api/v1/orgs/:org', () =>
+    HttpResponse.json({ display_name: null, description: '' }),
+  ),
+];
+
 /** No announcement or question anywhere, until a test says there is one. */
 const noThreads = [
   http.get('/api/v1/orgs/:org/contests/:contest/home/announcements', () =>
@@ -154,6 +170,7 @@ export const server = setupServer(
   ...noHolders,
   ...noInvites,
   noGradings,
+  ...emptyOrganising,
   ...noThreads,
   ...noTeams,
 );

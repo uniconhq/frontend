@@ -54,7 +54,8 @@ export function fileQuery(place: Place, path: string) {
 /**
  * What a write leaves stale. Any folder of the place may list a changed size;
  * a key without the folder matches every folder of this place and no other.
- * A task's write is a save, so its state and its publications move too.
+ * A task's write is a save, so its state, its publications and the history
+ * of every file move too.
  */
 export function staleAfterWrite(place: Place): QueryKey[] {
   if (place.kind === 'contest') {
@@ -71,6 +72,13 @@ export function staleAfterWrite(place: Place): QueryKey[] {
       'get',
       '/api/v1/orgs/{org}/contests/{contest}/tasks/{task}/publications',
       { params: { path } },
+    ).queryKey,
+    $api.queryOptions(
+      'get',
+      '/api/v1/orgs/{org}/contests/{contest}/tasks/{task}/history',
+      {
+        params: { path },
+      },
     ).queryKey,
   ];
 }

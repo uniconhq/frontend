@@ -16,24 +16,20 @@ import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
 import { useMe } from '@/session';
 import { contestPath, orgPath, taskPath } from '@/lib/organiser-paths';
 import { scopeName } from '@/lib/scope-name';
-import {
-  holdsAt,
-  isPlace,
-  offered,
-  ROLE_LABEL,
-  ROLE_MEANS,
-  type RolePlace,
-} from '../roles';
+import { holdsAt, isPlace, ROLE_LABEL, ROLE_MEANS, type RolePlace } from '../roles';
 import { InvitesSection } from '../invites/InvitesSection';
 import { holdersQuery, useHolders, useRoleChanges } from './holders';
 import classes from './people.module.css';
 
-function roleOptions(administers: boolean) {
-  return offered(administers).map((role) => ({
-    value: role,
-    label: ROLE_LABEL[role],
-  }));
-}
+/**
+ * Every role, to a manager as well as an admin: only an admin may give the
+ * admin role, and a manager who tries is told so by the forge's refusal
+ * rather than finding the choice missing.
+ */
+const ROLE_OPTIONS = (['admin', 'manager', 'observer'] as const).map((role) => ({
+  value: role,
+  label: ROLE_LABEL[role],
+}));
 
 function pagePath(names: ScopeNames): string {
   if (names.contest === null) return orgPath(names.org);
@@ -42,11 +38,29 @@ function pagePath(names: ScopeNames): string {
 }
 
 /**
- * A refusal in words. Two read better here than the general sentence: the
- * last admin of a scope, whose reason names the scope, and a username nobody
- * has.
+ * A refusal in words. Three read better here than the general sentence: the
+ * admin role asked for by someone who is not an admin here, the last admin of
+ * a scope, whose reason names the scope, and a username nobody has.
  */
-function Refusal({ error, username }: { error: unknown; username?: string }) {
+function Refusal({
+  error,
+  username,
+  role,
+}: {
+  error: unknown;
+  username?: string;
+  role?: RoleName;
+}) {
+  if (isApiError(error) && error.code === 'forbidden' && role === 'admin') {
+    return (
+      <div role="alert">
+        <BodyText tone="secondary">Only an admin gives the admin role</BodyText>
+        <BodyText tone="secondary">
+          {error.detail ?? 'Ask an admin here to give it.'}
+        </BodyText>
+      </div>
+    );
+  }
   if (isApiError(error) && error.code === 'sole_admin') {
     return (
       <div role="alert">
@@ -107,6 +121,8 @@ function HolderRow({
   const afterChange = useAfterChange(place);
   const [open, setOpen] = useState<'role' | 'remove' | null>(null);
   const [role, setRole] = useState<RoleName>(holder.role);
+  /** The role last sent, which a refusal is about, whatever is picked since. */
+  const [tried, setTried] = useState<RoleName | null>(null);
   const row = useRef<HTMLTableRowElement>(null);
   const isMe = holder.user.id === me;
   const change = useChange({ reread: () => afterChange(isMe), focus: row });
@@ -119,6 +135,7 @@ function HolderRow({
   const show = (next: 'role' | 'remove' | null) => {
     change.dismiss();
     setRole(holder.role);
+    setTried(null);
     setOpen(next);
   };
 
@@ -132,6 +149,7 @@ function HolderRow({
       show(null);
       return;
     }
+    setTried(role);
     void run('role', () => grant(holder.user.username, role));
   };
 
@@ -192,7 +210,7 @@ function HolderRow({
               <Select
                 label="Role"
                 value={role}
-                options={roleOptions(administers)}
+                options={ROLE_OPTIONS}
                 onChange={(value) => setRole(value as RoleName)}
               />
               <BodyText tone="secondary">{ROLE_MEANS[role]}</BodyText>
@@ -206,7 +224,9 @@ function HolderRow({
               </div>
             </form>
           )}
-          {error !== null && open !== 'remove' && <Refusal error={error} />}
+          {error !== null && open !== 'remove' && (
+            <Refusal error={error} role={tried ?? undefined} />
+          )}
           <Modal
             opened={open === 'remove'}
             onClose={() => show(null)}
@@ -243,13 +263,13 @@ function HolderRow({
  * Someone new, or someone already here moved to another role: granting a
  * role to a person who holds one directly here replaces it.
  */
-function AddPerson({ place, administers }: { place: RolePlace; administers: boolean }) {
+function AddPerson({ place }: { place: RolePlace }) {
   const { grant } = useRoleChanges(place);
   const afterChange = useAfterChange(place);
   const me = useMe();
   const [username, setUsername] = useState('');
   const [role, setRole] = useState<RoleName>('manager');
-  const [tried, setTried] = useState('');
+  const [tried, setTried] = useState<{ username: string; role: RoleName } | null>(null);
   const change = useChange({
     reread: () => afterChange(username.trim() === me.user.username),
   });
@@ -258,7 +278,7 @@ function AddPerson({ place, administers }: { place: RolePlace; administers: bool
     event.preventDefault();
     const name = username.trim();
     if (name === '') return;
-    setTried(name);
+    setTried({ username: name, role });
     if ((await change.run('add', () => grant(name, role))).ok) setUsername('');
   };
 
@@ -279,7 +299,7 @@ function AddPerson({ place, administers }: { place: RolePlace; administers: bool
         <Select
           label="Role"
           value={role}
-          options={roleOptions(administers)}
+          options={ROLE_OPTIONS}
           onChange={(value) => setRole(value as RoleName)}
         />
       </div>
@@ -289,7 +309,9 @@ function AddPerson({ place, administers }: { place: RolePlace; administers: bool
           Add
         </Button>
       </div>
-      {change.error !== null && <Refusal error={change.error} username={tried} />}
+      {change.error !== null && (
+        <Refusal error={change.error} username={tried?.username} role={tried?.role} />
+      )}
     </form>
   );
 }
@@ -300,9 +322,12 @@ function AddPerson({ place, administers }: { place: RolePlace; administers: bool
  * where they hold it, here or at a broader scope that reaches here. A
  * manager also adds someone by username, changes a role and removes one; a
  * role held at a broader scope is changed on that scope's page. Only an
- * admin is offered the admin role, or may change or remove an admin. The
+ * admin may change or remove an admin. The admin role is offered to a
+ * manager too, and the forge refuses it from one, which the section says,
+ * as it says why the last admin of a scope cannot be removed or demoted. The
  * rules are the forge's, and each refusal is shown where the change was
- * tried. Below them are the invites to a role here, which a manager makes by
+ * tried. The forge leaves the orgs' service accounts out of every list, so
+ * they are not shown here. Below them are the invites to a role here, which a manager makes by
  * username or email address. Someone who does not observe the place is not
  * shown the section.
  */
@@ -344,7 +369,7 @@ export function PeopleSection({ place }: { place: RolePlace }) {
           </tbody>
         </table>
       )}
-      {manages && <AddPerson place={place} administers={administers} />}
+      {manages && <AddPerson place={place} />}
       <SectionTitle order={3}>Invites</SectionTitle>
       <InvitesSection
         place={place}

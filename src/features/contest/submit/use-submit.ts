@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { $api } from '@/api/query';
-import { ApiError, toApiError } from '@/api/problem';
+import { type ApiError, toApiError } from '@/api/problem';
+import { arrival, hashOf, mustBeVerified, sendAndComplete } from '@/api/upload/door';
 import type { InputField, Submission } from '@/api/types';
 import {
   checkDraft,
@@ -10,8 +11,6 @@ import {
   takesFiles,
   type Draft,
 } from './draft';
-import { digestOf } from './digest';
-import { sendToForge } from './transfer';
 
 /**
  * A fresh idempotency key. `randomUUID` is there only on a secure origin, and
@@ -47,14 +46,6 @@ type ByInput<T> = Map<string, Map<File, T>>;
 
 function put<T>(by: ByInput<T>, input: string, file: File, value: T) {
   by.set(input, (by.get(input) ?? new Map<File, T>()).set(file, value));
-}
-
-function unreadable(): ApiError {
-  return new ApiError({
-    code: 'upload_failed',
-    status: 0,
-    title: 'The file could not be read',
-  });
 }
 
 /**
@@ -120,12 +111,7 @@ export function useSubmit({
 
   const newSlot = async (input: InputField, file: File): Promise<Slot> => {
     setPhase('hashing');
-    let sha256: string;
-    try {
-      sha256 = await digestOf(file, (share) => progress(file, share));
-    } catch {
-      throw unreadable();
-    }
+    const sha256 = await hashOf(file, (share) => progress(file, share));
     setPhase('uploading');
     progress(file, 0);
     const made = await requestSlot.mutateAsync({
@@ -143,18 +129,8 @@ export function useSubmit({
     return slot;
   };
 
-  /** Where the slot's upload stands, or null while its bytes are not there. */
-  const arrival = async (slot: Slot): Promise<string | null> => {
-    try {
-      const arrived = await complete.mutateAsync({
-        params: { path: { ...path, upload: slot.id } },
-      });
-      return arrived.status;
-    } catch (error) {
-      if (toApiError(error).code === 'upload_not_ready') return null;
-      throw error;
-    }
-  };
+  const completeSlot = (slot: Slot) => () =>
+    complete.mutateAsync({ params: { path: { ...path, upload: slot.id } } });
 
   const upload = async (input: InputField, file: File): Promise<string> => {
     const kept = pending.current.get(input.id)?.get(file);
@@ -163,30 +139,22 @@ export function useSubmit({
     // A kept slot's bytes may have arrived after all, and the forge may
     // already hold a new slot's file, from an earlier submit or someone
     // else's: then there is nothing to send.
-    let status = kept === undefined ? null : await arrival(slot);
+    let status = kept === undefined ? null : await arrival(completeSlot(slot));
     if (status === null) {
       try {
-        if (slot.url !== null) {
-          await sendToForge(slot.url, file, (share) => progress(file, share));
-        }
-        progress(file, 1);
-        const arrived = await complete.mutateAsync({
-          params: { path: { ...path, upload: slot.id } },
-        });
-        status = arrived.status;
+        status = await sendAndComplete(
+          slot,
+          file,
+          (share) => progress(file, share),
+          completeSlot(slot),
+        );
       } catch (error) {
         if (kept !== undefined) pending.current.get(input.id)?.delete(file);
         throw error;
       }
     }
     pending.current.get(input.id)?.delete(file);
-    if (status !== 'verified') {
-      throw new ApiError({
-        code: 'upload_rejected',
-        status: 0,
-        title: 'A file did not arrive as it was sent',
-      });
-    }
+    mustBeVerified(status);
     progress(file, 1);
     return slot.id;
   };

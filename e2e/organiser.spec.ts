@@ -10,6 +10,20 @@ import { expect, test, type Page, type Route } from '@playwright/test';
 async function stubOrganiserApi(page: Page) {
   const state = { orgMade: false, published: 1, saved: null as unknown };
 
+  const taskState = () => ({
+    head: `head-${String(state.published)}`,
+    latest: {
+      id: `pub-${String(state.published)}`,
+      number: state.published,
+      version: `head-${String(state.published)}`,
+      grading_changed: state.published === 1,
+      changes: [],
+      at: '2026-09-29T09:00:00Z',
+    },
+    draft: false,
+    errors: [],
+  });
+
   const json = (route: Route, body: unknown, status = 200) =>
     route.fulfill({
       status,
@@ -51,31 +65,40 @@ async function stubOrganiserApi(page: Page) {
       return json(route, { name: 'acme' }, 201);
     }
     if (path.endsWith('/roles')) return json(route, []);
+    if (path === '/api/v1/orgs/acme') {
+      return json(route, { display_name: '', description: '' });
+    }
     if (path === '/api/v1/orgs/acme/contests') return json(route, [{ name: 'spring' }]);
     if (path === '/api/v1/orgs/acme/contests/spring/tasks') {
       return json(route, [{ name: 'sum' }]);
     }
-    if (path === '/api/v1/orgs/acme/contests/spring/tree') {
-      return json(route, [{ path: 'contest.yaml', kind: 'file', size: 40 }]);
-    }
-    if (path === task) {
-      return json(route, {
-        head: `head-${String(state.published)}`,
-        latest: {
-          id: `pub-${String(state.published)}`,
-          number: state.published,
-          version: `head-${String(state.published)}`,
-          grading_changed: state.published === 1,
-          changes: [],
-          at: '2026-09-29T09:00:00Z',
+    if (path === '/api/v1/orgs/acme/contests/spring/organise/tasks') {
+      return json(route, [
+        {
+          task: { name: 'sum' },
+          label: 'A',
+          state: taskState(),
+          timeline: {
+            release_at: '2026-10-01T09:00:00Z',
+            due: null,
+            late_per_day: null,
+            closes: '2026-10-01T14:00:00Z',
+            worth: 100,
+          },
         },
-        draft: false,
-        errors: [],
-      });
+      ]);
     }
+    if (path === '/api/v1/orgs/acme/contests/spring/tree') {
+      return json(route, [
+        { path: 'contest.yaml', kind: 'file', size: 40, upload: null },
+      ]);
+    }
+    if (path === task) return json(route, taskState());
     if (path === `${task}/publications`) return json(route, []);
     if (path === `${task}/tree`) {
-      return json(route, [{ path: 'statement.md', kind: 'file', size: 30 }]);
+      return json(route, [
+        { path: 'statement.md', kind: 'file', size: 30, upload: null },
+      ]);
     }
     if (path === `${task}/files/statement.md`) {
       if (request.method() === 'PUT') {
@@ -86,6 +109,8 @@ async function stubOrganiserApi(page: Page) {
           number: state.published,
           grading_changed: false,
           changes: [],
+          notes: [],
+          regraded: 0,
         });
       }
       return json(route, {
@@ -93,6 +118,7 @@ async function stubOrganiserApi(page: Page) {
         encoding: 'utf-8',
         content: 'Write the sum.\n',
         token: `token-${String(state.published)}`,
+        upload: null,
       });
     }
     return route.fulfill({ status: 404, body: 'not stubbed' });

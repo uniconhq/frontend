@@ -3,6 +3,7 @@ import type {
   FileContent,
   Named,
   Publication,
+  TaskStanding,
   TaskState,
   TreeEntry,
 } from '@/api/types';
@@ -21,7 +22,7 @@ export const TASK_API = `${CONTEST_API}/tasks/:task`;
 // Lists
 
 export const contests: Named[] = [{ name: 'autumn' }, { name: 'spring' }];
-export const tasks: Named[] = [{ name: 'sort' }, { name: 'sum' }];
+const tasks: Named[] = [{ name: 'sort' }, { name: 'sum' }];
 
 export const contestList = http.get(`${ORG_API}/contests`, () =>
   HttpResponse.json(contests),
@@ -95,24 +96,63 @@ export const publicationList = http.get(`${TASK_API}/publications`, () =>
   HttpResponse.json(publications),
 );
 
+// Where each of the spring contest's tasks stands
+
+/**
+ * The spring contest's tasks in its order: sort, on its first publication,
+ * due a week after its release with a tenth off per late day and worth 100,
+ * and sum, with no due, whose last save left a draft with errors on its
+ * second publication.
+ */
+export const standings: TaskStanding[] = [
+  {
+    task: { name: 'sort' },
+    label: 'A',
+    state: { ...publishedTask, latest: publications[0] ?? null },
+    timeline: {
+      release_at: '2026-10-01T09:00:00Z',
+      due: '2026-10-08T09:00:00Z',
+      late_per_day: 0.1,
+      closes: '2026-10-15T09:00:00Z',
+      worth: 100,
+    },
+  },
+  {
+    task: { name: 'sum' },
+    label: 'B',
+    state: draftTask,
+    timeline: {
+      release_at: '2026-10-01T09:00:00Z',
+      due: null,
+      late_per_day: null,
+      closes: '2026-10-15T09:00:00Z',
+      worth: null,
+    },
+  },
+];
+
+export const standingList = http.get(`${CONTEST_API}/organise/tasks`, () =>
+  HttpResponse.json(standings),
+);
+
 // Repo files
 
 /** Folder by folder, as `GET <place>/tree?path=` answers. */
 const taskTree: Record<string, TreeEntry[]> = {
   '': [
-    { path: 'task.yaml', kind: 'file', size: 120 },
-    { path: 'data', kind: 'directory', size: null },
-    { path: 'statement.md', kind: 'file', size: 40 },
+    { path: 'task.yaml', kind: 'file', size: 120, upload: null },
+    { path: 'data', kind: 'directory', size: null, upload: null },
+    { path: 'statement.md', kind: 'file', size: 40, upload: null },
   ],
-  data: [{ path: 'data/testcases', kind: 'directory', size: null }],
+  data: [{ path: 'data/testcases', kind: 'directory', size: null, upload: null }],
   'data/testcases': [
-    { path: 'data/testcases/1.in', kind: 'file', size: 4 },
-    { path: 'data/testcases/logo.png', kind: 'file', size: 11 },
+    { path: 'data/testcases/1.in', kind: 'file', size: 4, upload: null },
+    { path: 'data/testcases/logo.png', kind: 'file', size: 11, upload: null },
   ],
 };
 
 const contestTree: Record<string, TreeEntry[]> = {
-  '': [{ path: 'contest.yaml', kind: 'file', size: 80 }],
+  '': [{ path: 'contest.yaml', kind: 'file', size: 80, upload: null }],
 };
 
 export const files: Record<string, FileContent> = {
@@ -121,30 +161,35 @@ export const files: Record<string, FileContent> = {
     encoding: 'utf-8',
     content: 'name: sum\nworkflow: unicon/classic@v1\n',
     token: 'token-task-yaml',
+    upload: null,
   },
   'statement.md': {
     path: 'statement.md',
     encoding: 'utf-8',
     content: 'Write the sum of two numbers.\n',
     token: 'token-statement',
+    upload: null,
   },
   'data/testcases/1.in': {
     path: 'data/testcases/1.in',
     encoding: 'utf-8',
     content: '1 2\n',
     token: 'token-1-in',
+    upload: null,
   },
   'data/testcases/logo.png': {
     path: 'data/testcases/logo.png',
     encoding: 'base64',
     content: 'iVBORw0KGgoA//4=',
     token: 'token-logo',
+    upload: null,
   },
   'contest.yaml': {
     path: 'contest.yaml',
     encoding: 'utf-8',
     content: 'name: Spring\nvisibility: signed-in\n',
     token: 'token-contest-yaml',
+    upload: null,
   },
 };
 
