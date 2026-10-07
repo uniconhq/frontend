@@ -626,7 +626,7 @@ describe('the submissions list', () => {
 });
 
 describe('a submission opened from the list', () => {
-  it('shows what the run reported once and each group as the task shows it', async () => {
+  it('shows what the run reported once and each group as the task shows it, or that it did not run', async () => {
     const graded = grading({
       ...accepted,
       groups: [
@@ -637,6 +637,15 @@ describe('a submission opened from the list', () => {
           outcome: null,
           tests: null,
           shown_at: '2026-09-12T11:00:00Z',
+          ran: true,
+        },
+        {
+          group: 'extra',
+          show: 'always',
+          outcome: null,
+          tests: [],
+          shown_at: null,
+          ran: false,
         },
       ],
     });
@@ -675,6 +684,11 @@ describe('a submission opened from the list', () => {
     expect(within(large).getByText(/^Shown at /)).toBeVisible();
     expect(within(large).queryByText('ACCEPTED')).toBeNull();
     expect(within(large).queryByRole('table')).toBeNull();
+    expect(within(large).queryByText('Not run on this grading')).toBeNull();
+
+    const extra = within(detail).getByRole('region', { name: 'Group extra' });
+    expect(within(extra).getByText('Not run on this grading')).toBeVisible();
+    expect(within(extra).queryByRole('table')).toBeNull();
   });
 
   it('lists the files it was made with, each a download through the door', async () => {

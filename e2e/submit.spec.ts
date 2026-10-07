@@ -66,6 +66,7 @@ const graded = {
         { test: 'samples/2', outcome: 'wrong_answer', values: { time_ms: 30 } },
       ],
       shown_at: null,
+      ran: true,
     },
     {
       group: 'main',
@@ -73,6 +74,7 @@ const graded = {
       outcome: null,
       tests: null,
       shown_at: '2026-09-29T12:00:00Z',
+      ran: true,
     },
   ],
 };
