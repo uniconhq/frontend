@@ -6,7 +6,7 @@ import type { TreeEntry } from '@/api/types';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
 import { BodyText } from '@/ui/BodyText';
-import { fileHref } from './file-param';
+import { fileHref, folderOf } from './file-param';
 import { treeQuery, type Place } from './place';
 import classes from './Files.module.css';
 
@@ -34,23 +34,47 @@ function foldersAbove(path: string | null): string[] {
  * looked at. Opening a file is a link that sets `?file=`, so it can be copied,
  * opened in a new tab and come back with the browser's back button. The
  * folders above a linked file start open.
+ *
+ * The folder picked last, `folder`, is where an upload goes by default:
+ * opening a folder picks it, closing one picks the folder it is in, and
+ * opening a file picks the file's folder.
  */
-export function FileTree({ place, open }: { place: Place; open: string | null }) {
+export function FileTree({
+  place,
+  open,
+  folder = '',
+  onFolder = () => undefined,
+}: {
+  place: Place;
+  open: string | null;
+  folder?: string;
+  onFolder?: (folder: string) => void;
+}) {
   const [expanded, setExpanded] = useState<Set<string>>(
     () => new Set(foldersAbove(open)),
   );
 
-  const toggle = (folder: string) =>
+  const toggle = (path: string) => {
+    onFolder(expanded.has(path) ? folderOf(path) : path);
     setExpanded((current) => {
       const next = new Set(current);
-      if (next.has(folder)) next.delete(folder);
-      else next.add(folder);
+      if (next.has(path)) next.delete(path);
+      else next.add(path);
       return next;
     });
+  };
 
   return (
     <nav aria-label="Files" className={classes.tree}>
-      <Folder place={place} folder="" expanded={expanded} toggle={toggle} open={open} />
+      <Folder
+        place={place}
+        folder=""
+        expanded={expanded}
+        toggle={toggle}
+        open={open}
+        picked={folder}
+        onFolder={onFolder}
+      />
     </nav>
   );
 }
@@ -61,12 +85,16 @@ function Folder({
   expanded,
   toggle,
   open,
+  picked,
+  onFolder,
 }: {
   place: Place;
   folder: string;
   expanded: Set<string>;
   toggle: (folder: string) => void;
   open: string | null;
+  picked: string;
+  onFolder: (folder: string) => void;
 }) {
   const view = queryView(useQuery(treeQuery(place, folder)));
 
@@ -85,6 +113,7 @@ function Folder({
             <button
               type="button"
               className={classes.folder}
+              data-picked={entry.path === picked || undefined}
               aria-expanded={expanded.has(entry.path)}
               onClick={() => toggle(entry.path)}
             >
@@ -101,6 +130,8 @@ function Folder({
                   expanded={expanded}
                   toggle={toggle}
                   open={open}
+                  picked={picked}
+                  onFolder={onFolder}
                 />
               </div>
             )}
@@ -111,6 +142,7 @@ function Folder({
               to={fileHref(entry.path)}
               className={classes.file}
               aria-current={entry.path === open ? 'page' : undefined}
+              onClick={() => onFolder(folderOf(entry.path))}
             >
               {nameOf(entry.path)}
             </Link>

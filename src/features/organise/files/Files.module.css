@@ -85,3 +85,22 @@
   padding: 10px 0;
   border-bottom: 1px solid var(--unicon-border);
 }
+
+.upload {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--unicon-border);
+}
+
+.heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.folder[data-picked] {
+  color: var(--unicon-text-primary);
+}
