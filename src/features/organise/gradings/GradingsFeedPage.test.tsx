@@ -90,7 +90,13 @@ const cancelled: FeedEntry = {
   },
 };
 
-const feed = [retried, sortByTeam, stuckFirst, cancelled];
+/** The first attempt once its retry is the latest. */
+const superseded: FeedEntry = {
+  ...stuckFirst,
+  grading: { ...stuckFirst.grading, latest: false },
+};
+
+const feed = [retried, sortByTeam, superseded, cancelled];
 
 /** The feed's requests, each by its query, and the answer it gives. */
 function feedAnswering(answer: (query: URLSearchParams) => FeedEntry[]) {
@@ -282,9 +288,14 @@ describe('acting on the feed', () => {
   it('retries a finished latest attempt through its task, after asking', async () => {
     let now: FeedEntry[] = [sortByTeam];
     const retriedAt: string[] = [];
+    let queueReads = 0;
     server.use(
       signedIn,
       standingList,
+      http.get(`${CONTEST_API}/gradings/queue`, () => {
+        queueReads += 1;
+        return HttpResponse.json({ queued: 0, dispatched: 0 });
+      }),
       http.post(`${CONTEST_API}/tasks/:task/gradings/:grading/retry`, ({ params }) => {
         retriedAt.push(`${String(params.task)}/${String(params.grading)}`);
         const again = {
@@ -293,7 +304,10 @@ describe('acting on the feed', () => {
           attempt: 2,
           status: 'queued' as const,
         };
-        now = [{ ...sortByTeam, grading: again }, sortByTeam];
+        now = [
+          { ...sortByTeam, grading: again },
+          { ...sortByTeam, grading: { ...sortByTeam.grading, latest: false } },
+        ];
         return HttpResponse.json(again);
       }),
     );
@@ -317,6 +331,7 @@ describe('acting on the feed', () => {
     await waitFor(() => expect(group).toHaveTextContent('Queued'));
     expect(retriedAt).toEqual(['sort/g-sort-1']);
     expect(screen.queryByRole('dialog')).toBeNull();
+    await waitFor(() => expect(queueReads).toBe(2));
     expect(
       within(group).getByRole('button', { name: 'Show earlier attempts (1)' }),
     ).toBeVisible();
@@ -453,13 +468,66 @@ describe('acting on the feed', () => {
     const user = userEvent.setup();
     renderApp(`${FEED}?task=sort`);
 
-    await user.click(await screen.findByRole('button', { name: 'Rejudge A · sort' }));
+    await user.click(await screen.findByRole('button', { name: 'Rejudge sort' }));
     const dialog = await screen.findByRole('dialog');
     await user.click(within(dialog).getByRole('button', { name: 'Rejudge' }));
 
     expect(await within(dialog).findByRole('alert')).toHaveTextContent(
       'Nothing to rejudge against',
     );
+  });
+
+  it('offers nothing on an earlier attempt a status filter shows alone, and marks it earlier', async () => {
+    server.use(signedIn, standingList);
+    const asked = feedAnswering((query) =>
+      feed.filter((entry) => entry.grading.status === query.get('status')),
+    );
+    renderApp(`${FEED}?status=system_error`);
+
+    const sum = await screen.findByRole('rowgroup', { name: 'B submission 3 by ada' });
+    expect(asked).toEqual(['status=system_error']);
+    expect(sum).toHaveTextContent('An earlier attempt; the latest is not among these.');
+    expect(within(sum).queryByRole('button', { name: /^(Retry|Cancel)/ })).toBeNull();
+  });
+
+  it('offers no Retry on a submission staff cancelled, since a cancel is final', async () => {
+    server.use(signedIn, standingList);
+    feedAnswering(() => [cancelled, sortByTeam]);
+    renderApp(FEED);
+
+    expect(
+      await screen.findByRole('button', {
+        name: 'Retry A submission 1 by Lovelaces (team), attempt 1',
+      }),
+    ).toBeVisible();
+    expect(
+      screen.queryByRole('button', { name: 'Retry A submission 1 by ada, attempt 1' }),
+    ).toBeNull();
+  });
+
+  it('keeps a refused retry in the dialog with its sentence', async () => {
+    server.use(
+      signedIn,
+      standingList,
+      http.post(`${CONTEST_API}/tasks/:task/gradings/:grading/retry`, () =>
+        problem(409, 'conflict', { detail: 'A later attempt of it is there.' }),
+      ),
+    );
+    feedAnswering(() => [sortByTeam]);
+    const user = userEvent.setup();
+    renderApp(FEED);
+
+    await user.click(
+      await screen.findByRole('button', {
+        name: 'Retry A submission 1 by Lovelaces (team), attempt 1',
+      }),
+    );
+    const dialog = await screen.findByRole('dialog', { name: 'Retry this grading?' });
+    await user.click(within(dialog).getByRole('button', { name: 'Retry' }));
+
+    const alert = await within(dialog).findByRole('alert');
+    expect(alert).toHaveTextContent('Not the attempt to retry');
+    expect(alert).toHaveTextContent('A later attempt of it is there.');
   });
 
   it('offers an observer nothing to do', async () => {
