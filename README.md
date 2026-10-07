@@ -229,8 +229,12 @@ reads a file once and saves with the token it was read at, so a background
 refetch never swaps the token under someone's text. From Save until the file
 has been read again the text is read-only, and the answer takes the focus. A
 `conflict` keeps the text and offers to reload; `confirmation_required` offers
-to publish the same save confirmed or to keep it as a draft; every other
-refusal shows its own detail and what it names.
+to publish the same save confirmed, which grades every submission to the task
+again, or to keep it as a draft; every other refusal shows its own detail and
+what it names. A save that publishes says what changed in grading, how many
+submissions it queued to be graded again (`regraded`), and lists the notes
+the forge makes of the task beside publishing, such as the steps it seals
+until the reveal; every save path ends in this one answer (`SaveOutcome`).
 
 The editor is CodeMirror, wrapped in `src/ui/CodeEditor.tsx`: line numbers,
 undo, search and bracket matching, YAML highlighted in a `.yaml` or `.yml`
