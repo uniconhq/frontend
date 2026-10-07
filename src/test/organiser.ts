@@ -3,6 +3,7 @@ import type {
   FileContent,
   Named,
   Publication,
+  TaskStanding,
   TaskState,
   TreeEntry,
 } from '@/api/types';
@@ -93,6 +94,44 @@ export const draftTask: TaskState = {
 export const taskState = http.get(TASK_API, () => HttpResponse.json(publishedTask));
 export const publicationList = http.get(`${TASK_API}/publications`, () =>
   HttpResponse.json(publications),
+);
+
+// Where each of the spring contest's tasks stands
+
+/**
+ * The spring contest's tasks in its order: sort, published and with every
+ * time at its default but a due, and sum, whose last save left a draft with
+ * errors on its second publication.
+ */
+const standings: TaskStanding[] = [
+  {
+    task: { name: 'sort' },
+    label: 'A',
+    state: { ...publishedTask, latest: publications[0] ?? null },
+    timeline: {
+      release_at: '2026-10-01T09:00:00Z',
+      due: '2026-10-08T09:00:00Z',
+      late_per_day: 0.1,
+      closes: '2026-10-15T09:00:00Z',
+      worth: 100,
+    },
+  },
+  {
+    task: { name: 'sum' },
+    label: 'B',
+    state: draftTask,
+    timeline: {
+      release_at: '2026-10-01T09:00:00Z',
+      due: null,
+      late_per_day: null,
+      closes: '2026-10-15T09:00:00Z',
+      worth: null,
+    },
+  },
+];
+
+export const standingList = http.get(`${CONTEST_API}/organise/tasks`, () =>
+  HttpResponse.json(standings),
 );
 
 // Repo files

@@ -4,6 +4,7 @@ import {
   ORGS_PATH,
   contestPath,
   contestantsPath,
+  gradingsPath,
   isOrganiserPath,
   orgPath,
   taskPath,
@@ -84,6 +85,8 @@ function organiserTrail(
         segments.push({ label: 'contestants', to: pathname });
       } else if (pathname === teamsPath(org, contest)) {
         segments.push({ label: 'teams', to: pathname });
+      } else if (pathname === gradingsPath(org, contest)) {
+        segments.push({ label: 'gradings', to: pathname });
       }
     }
   }
