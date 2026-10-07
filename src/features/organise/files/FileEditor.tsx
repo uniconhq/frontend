@@ -2,12 +2,13 @@ import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { $api, queryView } from '@/api/query';
 import { toApiError } from '@/api/problem';
-import type { FileContent, WriteFile } from '@/api/types';
+import type { FileContent, RollbackFile, WriteFile } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
 import { CodeEditor, type CodeLanguage } from '@/ui/CodeEditor';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
+import { FileHistory } from './FileHistory';
 import { fileQuery, staleAfterWrite, type Place } from './place';
 import { SaveOutcome, type Outcome } from './SaveOutcome';
 import shared from '../organise.module.css';
@@ -27,6 +28,12 @@ function languageOf(path: string): CodeLanguage {
 }
 
 /**
+ * What a save sends: the file's text, or at a task, a rollback to one of its
+ * versions. A refusal keeps it, so a confirmation sends the same again.
+ */
+type Sent = WriteFile | RollbackFile;
+
+/**
  * One file, open as text in the code editor. The text is saved with the token it was read
  * with, so a file someone else changed in the meantime comes back as a
  * conflict and nothing is overwritten. That is why the file is read once and
@@ -40,7 +47,10 @@ function languageOf(path: string): CodeLanguage {
  *
  * At a contest a save answers with the new version. At a task it is a save of
  * the task, which publishes or keeps a draft; the answer and the refusals are
- * SaveOutcome's, and the answer takes the focus.
+ * SaveOutcome's, and the answer takes the focus. A task's file also has its
+ * history below, from which a manager rolls it back to an older version; the
+ * rollback is a save like any other, with the same token, answer and
+ * refusals.
  */
 export function FileEditor({ place, path }: { place: Place; path: string }) {
   const queryClient = useQueryClient();
@@ -61,24 +71,33 @@ export function FileEditor({ place, path }: { place: Place; path: string }) {
     'put',
     '/api/v1/orgs/{org}/contests/{contest}/tasks/{task}/files/{path}',
   );
-  const busy = writeContest.isPending || writeTask.isPending || query.isFetching;
-  const [outcome, setOutcome] = useState<Outcome | null>(null);
+  const rollBackTask = $api.useMutation(
+    'post',
+    '/api/v1/orgs/{org}/contests/{contest}/tasks/{task}/files/{path}/rollback',
+  );
+  const busy =
+    writeContest.isPending ||
+    writeTask.isPending ||
+    rollBackTask.isPending ||
+    query.isFetching;
+  const [outcome, setOutcome] = useState<Outcome<Sent> | null>(null);
   /** Set by Reload, so the text read again takes the focus. */
   const [focusText, setFocusText] = useState(false);
 
-  const save = async (body: WriteFile) => {
+  const save = async (body: Sent) => {
     setOutcome(null);
     setFocusText(false);
     try {
       if (place.kind === 'task') {
-        const result = await writeTask.mutateAsync({
-          params: {
-            path: { org: place.org, contest: place.contest, task: place.task, path },
-          },
-          body,
-        });
+        const params = {
+          path: { org: place.org, contest: place.contest, task: place.task, path },
+        };
+        const result =
+          'version' in body
+            ? await rollBackTask.mutateAsync({ params, body })
+            : await writeTask.mutateAsync({ params, body });
         setOutcome({ kind: 'saved', result });
-      } else {
+      } else if (!('version' in body)) {
         const written = await writeContest.mutateAsync({
           params: { path: { org: place.org, contest: place.contest, path } },
           body,
@@ -141,6 +160,17 @@ export function FileEditor({ place, path }: { place: Place; path: string }) {
           onConfirm={(body) => void save({ ...body, confirm: true })}
           onKeepAsDraft={(body) => void save({ ...body, keep_as_draft: true })}
           onReload={() => void reload()}
+        />
+      )}
+      {place.kind === 'task' && (
+        <FileHistory
+          place={place}
+          path={path}
+          language={languageOf(path)}
+          busy={busy}
+          onRollBack={(version) =>
+            save({ version, token: file.token, confirm: false, keep_as_draft: false })
+          }
         />
       )}
     </div>

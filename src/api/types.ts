@@ -15,6 +15,7 @@ export type DefinitionError = Schemas['DefinitionError'];
 export type TreeEntry = Schemas['TreeEntry'];
 export type FileContent = Schemas['FileContent'];
 export type WriteFile = Schemas['WriteFile'];
+export type RollbackFile = Schemas['RollbackFile'];
 /** A task save's answer: published, or kept as a draft. */
 export type SaveResult = Schemas['Published'] | Schemas['Draft'];
 
