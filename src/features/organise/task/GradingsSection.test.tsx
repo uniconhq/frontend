@@ -139,7 +139,7 @@ describe("the task's gradings", () => {
     ).toBeNull();
   });
 
-  it('retries a stuck grading in one click and reads the list again', async () => {
+  it('retries a stuck grading after asking, and reads the list again', async () => {
     let listed = [stuck];
     const retried: string[] = [];
     server.use(
@@ -164,19 +164,59 @@ describe("the task's gradings", () => {
     renderApp(TASK);
 
     await userEvent.click(
-      await screen.findByRole('button', {
-        name: 'Retry submission 3, attempt 1',
-      }),
+      await screen.findByRole('button', { name: 'Retry submission 3, attempt 1' }),
     );
+    const dialog = await screen.findByRole('dialog', { name: 'Retry this grading?' });
+    expect(dialog).toHaveTextContent(
+      'Submission 3 is graded again as a new attempt, against publication 2, as attempt 1 was.',
+    );
+    expect(retried).toEqual([]);
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Retry' }));
 
-    expect(retried).toEqual([stuck.id]);
     expect(await screen.findByText('Queued')).toBeVisible();
+    expect(retried).toEqual([stuck.id]);
+    expect(screen.queryByRole('dialog')).toBeNull();
     expect(
       screen.getByRole('button', { name: 'Cancel submission 3, attempt 2' }),
     ).toBeVisible();
   });
 
-  it('shows a refusal on the row', async () => {
+  it('cancels only once asked, and sends nothing on Not now', async () => {
+    const cancelled: string[] = [];
+    server.use(
+      signedIn,
+      taskState,
+      publicationList,
+      ...repoFiles,
+      http.get(`${TASK_API}/gradings`, () => HttpResponse.json([waiting])),
+      http.post(`${TASK_API}/gradings/:grading/cancel`, ({ params }) => {
+        cancelled.push(String(params.grading));
+        return HttpResponse.json({ ...waiting, status: 'cancelled' });
+      }),
+    );
+    renderApp(TASK);
+
+    const cancel = await screen.findByRole('button', {
+      name: 'Cancel submission 4, attempt 1',
+    });
+    await userEvent.click(cancel);
+    const first = await screen.findByRole('dialog', { name: 'Cancel this grading?' });
+    await userEvent.click(within(first).getByRole('button', { name: 'Not now' }));
+    expect(cancelled).toEqual([]);
+
+    await userEvent.click(cancel);
+    const dialog = await screen.findByRole('dialog', { name: 'Cancel this grading?' });
+    expect(dialog).toHaveTextContent(
+      'Attempt 1 of submission 4 stops and ends as cancelled.',
+    );
+    await userEvent.click(
+      within(dialog).getByRole('button', { name: 'Cancel the grading' }),
+    );
+
+    await expect.poll(() => cancelled).toEqual([waiting.id]);
+  });
+
+  it('shows a refusal in the dialog', async () => {
     server.use(
       signedIn,
       taskState,
@@ -190,13 +230,133 @@ describe("the task's gradings", () => {
     renderApp(TASK);
 
     await userEvent.click(
-      await screen.findByRole('button', {
-        name: 'Cancel submission 4, attempt 1',
-      }),
+      await screen.findByRole('button', { name: 'Cancel submission 4, attempt 1' }),
+    );
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.click(
+      within(dialog).getByRole('button', { name: 'Cancel the grading' }),
     );
 
-    expect(await screen.findByText('That has moved on')).toBeVisible();
-    expect(screen.getByText('wrong_status detail')).toBeVisible();
+    const alert = await within(dialog).findByRole('alert');
+    expect(alert).toHaveTextContent('That has moved on');
+    expect(alert).toHaveTextContent('wrong_status detail');
+  });
+
+  it("lists a submission's attempts together, the earlier ones to read", async () => {
+    const second: Grading = {
+      ...stuck,
+      id: '0199a2c1-6b7e-7c3a-9f10-5d2e4b8a6c50',
+      attempt: 2,
+      publication: 3,
+      status: 'done',
+      error: null,
+      result: { stopped: 'compile_error', tests: [], values: {}, error: null },
+    };
+    server.use(
+      signedIn,
+      taskState,
+      publicationList,
+      ...repoFiles,
+      http.get(`${TASK_API}/gradings`, () =>
+        HttpResponse.json([second, waiting, stuck]),
+      ),
+    );
+    renderApp(TASK);
+
+    const table = await screen.findByRole('table', { name: 'Gradings' });
+    const groups = within(table).getAllByRole('rowgroup').slice(1);
+    expect(groups.map((group) => group.getAttribute('aria-label'))).toEqual([
+      'Submission 3',
+      'Submission 4',
+    ]);
+    const third = within(table).getByRole('rowgroup', { name: 'Submission 3' });
+    expect(within(third).getAllByRole('row')).toHaveLength(1);
+    expect(third).toHaveTextContent('compile_error');
+    expect(third).toHaveTextContent('publication 3');
+
+    const toggle = within(third).getByRole('button', {
+      name: 'Show earlier attempts (1)',
+    });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await userEvent.click(toggle);
+
+    const earlier = within(third).getAllByRole('row')[1];
+    if (earlier === undefined) throw new Error('no earlier attempt shown');
+    expect(earlier).toHaveTextContent('Submission 3, earlier');
+    expect(earlier).toHaveTextContent('System error');
+    expect(earlier).toHaveTextContent(
+      'The grading machine lost its run before it began.',
+    );
+    expect(within(earlier).queryByRole('button')).toBeNull();
+    expect(
+      within(third).getByRole('button', { name: 'Hide earlier attempts (1)' }),
+    ).toHaveAttribute('aria-expanded', 'true');
+  });
+
+  it('rejudges the whole task after saying what that does', async () => {
+    let reads = 0;
+    let rejudged = 0;
+    server.use(
+      signedIn,
+      taskState,
+      publicationList,
+      ...repoFiles,
+      http.get(`${TASK_API}/gradings`, () => {
+        reads += 1;
+        return HttpResponse.json([stuck]);
+      }),
+      http.post(`${TASK_API}/rejudge`, () => {
+        rejudged += 1;
+        return HttpResponse.json({
+          publication: 2,
+          queued: 3,
+          cancelled: 1,
+          left_running: 0,
+        });
+      }),
+    );
+    renderApp(TASK);
+
+    await screen.findByRole('table', { name: 'Gradings' });
+    await userEvent.click(screen.getByRole('button', { name: 'Rejudge' }));
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Rejudge every submission?',
+    });
+    expect(dialog).toHaveTextContent(
+      "Every submission's latest attempt is graded again against the current publication, as a new attempt.",
+    );
+    expect(rejudged).toBe(0);
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Rejudge' }));
+
+    const status = await screen.findByText(/Rejudged against publication 2/);
+    expect(status).toHaveTextContent(
+      'Rejudged against publication 2: 3 attempts queued.',
+    );
+    expect(
+      screen.getByText('1 attempt against an older publication cancelled first.'),
+    ).toBeVisible();
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(rejudged).toBe(1);
+    await expect.poll(() => reads).toBe(2);
+  });
+
+  it('says why a task with nothing published cannot be rejudged', async () => {
+    server.use(
+      signedIn,
+      taskState,
+      publicationList,
+      ...repoFiles,
+      http.post(`${TASK_API}/rejudge`, () => problem(404, 'not_found')),
+    );
+    renderApp(TASK);
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Rejudge' }));
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Rejudge' }));
+
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent(
+      'Nothing to rejudge against',
+    );
   });
 
   it('offers an observer no controls', async () => {
@@ -221,5 +381,6 @@ describe("the task's gradings", () => {
 
     expect(await screen.findByText('System error')).toBeVisible();
     expect(screen.queryByRole('button', { name: /Retry/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Rejudge' })).toBeNull();
   });
 });

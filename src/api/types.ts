@@ -44,6 +44,7 @@ export type Submission = Schemas['Submission'];
 export type GradingResult = Schemas['Result'];
 export type GroupShown = Schemas['GroupShown'];
 export type Grading = Schemas['Grading'];
+export type Rejudged = Schemas['Rejudged'];
 export type Announcement = Schemas['Announcement'];
 export type Clarification = Schemas['Clarification'];
 export type GradingStatus = GradingResult['status'];
