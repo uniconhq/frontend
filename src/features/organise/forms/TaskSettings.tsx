@@ -115,6 +115,8 @@ function TaskForm({
   workflowForm: WorkflowForm | null;
 }) {
   const declared = workflowForm?.problem === null ? workflowForm : null;
+  /** Whether a group the save adds must say what it shows (T10). */
+  const graded = workflowForm?.graded ?? false;
   const [read] = useState(() => readTask(doc, folders, declared?.inputs ?? null));
   const [values, setValues] = useState<TaskValues>(read.values);
   const [newInput, setNewInput] = useState('');
@@ -156,6 +158,7 @@ function TaskForm({
       numberProblem(group.pass),
       numberProblem(group.passAt),
       ...group.weights.map((row) => numberProblem(row.weight)),
+      showRequired(graded, group) && group.show === '' ? 'Required.' : undefined,
     ]),
   ].filter((problem) => problem !== undefined);
   const newId = newInput.trim();
@@ -328,6 +331,7 @@ function TaskForm({
                 key={group.name}
                 group={group}
                 treeKnown={!treeFailed}
+                graded={graded}
                 onChange={(change) => setGroup(group.name, change)}
                 onRemove={() =>
                   set(
@@ -823,18 +827,31 @@ function InputEntry({
   );
 }
 
+/**
+ * Whether a group's `show` must be set: once the task has a graded
+ * submission, the save refuses a group it adds without one (T10). A group the
+ * save adds is a folder with no entry yet; a group already in the file is
+ * left as it is.
+ */
+function showRequired(graded: boolean, group: GroupValues): boolean {
+  return graded && !group.read;
+}
+
 function GroupEntry({
   group,
   treeKnown,
+  graded,
   onChange,
   onRemove,
 }: {
   group: GroupValues;
   treeKnown: boolean;
+  graded: boolean;
   onChange: (change: Partial<GroupValues>) => void;
   onRemove: () => void;
 }) {
   const name = group.name;
+  const required = showRequired(graded, group);
   const note = !group.read
     ? 'A folder under tests/ with no entry in task.yaml yet; saving adds one.'
     : treeKnown && !group.folder
@@ -883,7 +900,13 @@ function GroupEntry({
                 ? SHOWS
                 : [{ value: group.show, label: group.show }, ...SHOWS]
             }
-            placeholder="Not set (always)"
+            placeholder={required ? 'Not set' : 'Not set (always)'}
+            description={
+              required
+                ? 'Required: the task has graded submissions, so a group the save adds must say what it shows.'
+                : undefined
+            }
+            required={required}
             onChange={(show) => onChange({ show })}
           />
         </div>

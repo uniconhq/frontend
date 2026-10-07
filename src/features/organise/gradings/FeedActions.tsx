@@ -5,8 +5,8 @@ import { Button } from '@/ui/Button';
 import { Modal } from '@/ui/Modal';
 import { TextInput } from '@/ui/TextInput';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
-import { STATUS, UNFINISHED } from './feed';
-import type { Asking } from './use-feed-actions';
+import { STATUS, UNFINISHED, submitterOf } from './feed';
+import type { Asking } from './use-grading-actions';
 import shared from '../organise.module.css';
 import classes from './feed.module.css';
 
@@ -16,7 +16,8 @@ const REASON_MAX = 500;
 /**
  * What a latest attempt offers a manager of its task: Retry once it has
  * finished, drawn as the thing to do for a system error, and Cancel for a
- * system error alone.
+ * system error alone. A submission staff cancelled is offered neither, since
+ * a cancel is final.
  */
 export function AttemptActions({
   task,
@@ -32,7 +33,7 @@ export function AttemptActions({
   const { status } = entry.grading;
   return (
     <div className={classes.actions}>
-      {!UNFINISHED.has(status) && (
+      {!UNFINISHED.has(status) && status !== 'cancelled' && (
         <Button
           size="xs"
           variant={status === 'system_error' ? 'primary' : 'secondary'}
@@ -69,7 +70,7 @@ const CONFIRM: Record<Asking['kind'], string> = {
 };
 
 /** What confirming does, in words. */
-function Consequence({ asking, who }: { asking: Asking; who: string }) {
+function Consequence({ asking }: { asking: Asking }) {
   if (asking.kind === 'rejudge') {
     return (
       <>
@@ -86,7 +87,7 @@ function Consequence({ asking, who }: { asking: Asking; who: string }) {
     );
   }
   const { grading } = asking.entry;
-  const submission = `${who}'s submission ${String(grading.submission_number)}`;
+  const submission = `${submitterOf(asking.entry.by)}'s submission ${String(grading.submission_number)}`;
   if (asking.kind === 'retry') {
     return (
       <>
@@ -108,17 +109,19 @@ function Consequence({ asking, who }: { asking: Asking; who: string }) {
         the task&apos;s limit.
       </BodyText>
       <BodyText tone="secondary">
-        A rejudge leaves it cancelled; a retry grades it again.
+        A cancel is final: neither a retry nor a rejudge grades it again.
       </BodyText>
     </>
   );
 }
 
+type Words = Partial<Record<string, { title: string; fallback: string }>>;
+
 /**
- * Why a cancel was refused, in the dialog's own words, the backend's sentence
- * in place of the fallback when it gives one.
+ * Why a cancel or a retry was refused, in the dialog's own words, the
+ * backend's sentence in place of the fallback when it gives one.
  */
-const CANCEL_REFUSED: Partial<Record<string, { title: string; fallback: string }>> = {
+const CANCEL_REFUSED: Words = {
   invalid_reason: {
     title: 'That sentence will not do',
     fallback: `Give the contestant a sentence of 1 to ${String(REASON_MAX)} characters.`,
@@ -131,6 +134,25 @@ const CANCEL_REFUSED: Partial<Record<string, { title: string; fallback: string }
     title: 'A later attempt is there',
     fallback: 'Only the latest attempt of a submission can be cancelled.',
   },
+};
+
+const RETRY_REFUSED: Words = {
+  wrong_status: {
+    title: 'It cannot be retried',
+    fallback:
+      'Only a finished grading can be retried, and never a submission staff cancelled.',
+  },
+  conflict: {
+    title: 'Not the attempt to retry',
+    fallback:
+      'Only the latest attempt of a submission can be retried, once no attempt of it is being graded.',
+  },
+};
+
+const REFUSED: Record<Asking['kind'], Words> = {
+  cancel: CANCEL_REFUSED,
+  retry: RETRY_REFUSED,
+  rejudge: {},
 };
 
 /** A status a refusal names, in the feed's words when it is one of them. */
@@ -153,7 +175,7 @@ function Refusal({ asking, error }: { asking: Asking; error: unknown }) {
     );
   }
   const refused = toApiError(error);
-  const words = asking.kind === 'cancel' ? CANCEL_REFUSED[refused.code] : undefined;
+  const words = REFUSED[asking.kind][refused.code];
   if (words !== undefined) {
     const current = refused.extensions['current'];
     return (
@@ -179,7 +201,6 @@ function Refusal({ asking, error }: { asking: Asking; error: unknown }) {
  */
 export function ConfirmDialog({
   asking,
-  who,
   pending,
   error,
   onChange,
@@ -187,7 +208,6 @@ export function ConfirmDialog({
   onClose,
 }: {
   asking: Asking | null;
-  who: string;
   pending: boolean;
   error: unknown;
   onChange: (asking: Asking) => void;
@@ -202,7 +222,7 @@ export function ConfirmDialog({
     >
       {asking !== null && (
         <div className={shared.stack}>
-          <Consequence asking={asking} who={who} />
+          <Consequence asking={asking} />
           {asking.kind === 'cancel' && (
             <TextInput
               label="What the contestant reads"

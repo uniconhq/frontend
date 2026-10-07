@@ -4,6 +4,7 @@ import { NativeSelect } from '@mantine/core';
  * A choice from a short list, as the browser's own select: it opens with the
  * keyboard, reads out as a list and works on a phone without any help.
  * `placeholder` is an empty first option, for a choice nobody has made yet.
+ * `description` reads under the label.
  */
 export function Select({
   label,
@@ -11,6 +12,7 @@ export function Select({
   options,
   onChange,
   placeholder,
+  description,
   required = false,
   disabled = false,
 }: {
@@ -19,6 +21,7 @@ export function Select({
   options: { value: string; label: string }[];
   onChange: (value: string) => void;
   placeholder?: string;
+  description?: string;
   required?: boolean;
   disabled?: boolean;
 }) {
@@ -29,6 +32,7 @@ export function Select({
   return (
     <NativeSelect
       label={label}
+      description={description}
       value={value}
       data={data}
       onChange={(event) => onChange(event.currentTarget.value)}

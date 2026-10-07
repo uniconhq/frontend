@@ -5,7 +5,7 @@ import { http, HttpResponse } from 'msw';
 import type { FeedEntry, Grading } from '@/api/types';
 import { renderApp } from '@/test/render';
 import { problem, server, signedIn, someone } from '@/test/server';
-import { CONTEST_API, standingList } from '@/test/organiser';
+import { CONTEST_API, standingList, taskList } from '@/test/organiser';
 import { passTime, withFakeTimers } from '@/test/timers';
 
 const FEED = '/orgs/acme/contests/spring/gradings';
@@ -90,7 +90,13 @@ const cancelled: FeedEntry = {
   },
 };
 
-const feed = [retried, sortByTeam, stuckFirst, cancelled];
+/** The first attempt once its retry is the latest. */
+const superseded: FeedEntry = {
+  ...stuckFirst,
+  grading: { ...stuckFirst.grading, latest: false },
+};
+
+const feed = [retried, sortByTeam, superseded, cancelled];
 
 /** The feed's requests, each by its query, and the answer it gives. */
 function feedAnswering(answer: (query: URLSearchParams) => FeedEntry[]) {
@@ -107,9 +113,14 @@ function feedAnswering(answer: (query: URLSearchParams) => FeedEntry[]) {
 
 describe("the contest's gradings feed", () => {
   it('lists every submission with its task, who made it, where it stands and when', async () => {
+    let standingsRead = false;
     server.use(
       signedIn,
-      standingList,
+      taskList,
+      http.get(`${CONTEST_API}/organise/tasks`, () => {
+        standingsRead = true;
+        return HttpResponse.json([]);
+      }),
       http.get(`${CONTEST_API}/gradings/queue`, () =>
         HttpResponse.json({ queued: 4, dispatched: 2 }),
       ),
@@ -144,6 +155,7 @@ describe("the contest's gradings feed", () => {
       '/api/v1/orgs/acme/contests/spring/tasks/sort/gradings/g-sort-1/log',
     );
 
+    expect(standingsRead).toBe(false);
     expect(sortAda).toHaveTextContent('Cancelled');
     expect(sortAda).toHaveTextContent('The run did not report by its deadline.');
     expect(sortAda).toHaveTextContent(
@@ -152,7 +164,7 @@ describe("the contest's gradings feed", () => {
   });
 
   it("opens a submission's earlier attempts below its latest", async () => {
-    server.use(signedIn, standingList);
+    server.use(signedIn, taskList);
     feedAnswering(() => feed);
     renderApp(FEED);
 
@@ -175,7 +187,7 @@ describe("the contest's gradings feed", () => {
   it('narrows the feed by task, status, team and username, keeping each in the address', async () => {
     server.use(
       signedIn,
-      standingList,
+      taskList,
       http.get(`${CONTEST_API}/organise/teams`, () =>
         HttpResponse.json([
           {
@@ -227,10 +239,11 @@ describe("the contest's gradings feed", () => {
       expect(asked.at(-1)).toBe('task=sort&team=team-1&status=cancelled'),
     );
 
-    await user.type(
-      screen.getByRole('textbox', { name: "Contestant's username" }),
-      'ada',
+    const username = screen.getByRole('textbox', { name: "Contestant's username" });
+    expect(username).toHaveAccessibleDescription(
+      "Finds their own submissions and their team's, by the team they were in when each was made.",
     );
+    await user.type(username, 'ada');
     expect(asked.at(-1)).toBe('task=sort&team=team-1&status=cancelled');
     await user.click(screen.getByRole('button', { name: 'Filter' }));
     await waitFor(() =>
@@ -248,11 +261,14 @@ describe("the contest's gradings feed", () => {
   });
 
   it('reads the filters from the address it was opened at', async () => {
-    server.use(signedIn, standingList);
+    server.use(signedIn, taskList);
     const asked = feedAnswering(() => []);
     renderApp(`${FEED}?user=ada&status=system_error&status=bogus`);
 
     expect(await screen.findByText('No grading matches these filters.')).toBeVisible();
+    expect(
+      screen.getByRole('textbox', { name: "Contestant's username" }),
+    ).not.toHaveAccessibleDescription();
     expect(asked).toEqual(['user=ada&status=system_error']);
     expect(screen.getByRole('textbox', { name: "Contestant's username" })).toHaveValue(
       'ada',
@@ -282,9 +298,14 @@ describe('acting on the feed', () => {
   it('retries a finished latest attempt through its task, after asking', async () => {
     let now: FeedEntry[] = [sortByTeam];
     const retriedAt: string[] = [];
+    let queueReads = 0;
     server.use(
       signedIn,
-      standingList,
+      taskList,
+      http.get(`${CONTEST_API}/gradings/queue`, () => {
+        queueReads += 1;
+        return HttpResponse.json({ queued: 0, dispatched: 0 });
+      }),
       http.post(`${CONTEST_API}/tasks/:task/gradings/:grading/retry`, ({ params }) => {
         retriedAt.push(`${String(params.task)}/${String(params.grading)}`);
         const again = {
@@ -293,7 +314,10 @@ describe('acting on the feed', () => {
           attempt: 2,
           status: 'queued' as const,
         };
-        now = [{ ...sortByTeam, grading: again }, sortByTeam];
+        now = [
+          { ...sortByTeam, grading: again },
+          { ...sortByTeam, grading: { ...sortByTeam.grading, latest: false } },
+        ];
         return HttpResponse.json(again);
       }),
     );
@@ -317,6 +341,7 @@ describe('acting on the feed', () => {
     await waitFor(() => expect(group).toHaveTextContent('Queued'));
     expect(retriedAt).toEqual(['sort/g-sort-1']);
     expect(screen.queryByRole('dialog')).toBeNull();
+    await waitFor(() => expect(queueReads).toBe(2));
     expect(
       within(group).getByRole('button', { name: 'Show earlier attempts (1)' }),
     ).toBeVisible();
@@ -326,7 +351,7 @@ describe('acting on the feed', () => {
     const sent: unknown[] = [];
     server.use(
       signedIn,
-      standingList,
+      taskList,
       http.post(
         `${CONTEST_API}/tasks/:task/gradings/:grading/cancel`,
         async ({ request, params }) => {
@@ -368,7 +393,7 @@ describe('acting on the feed', () => {
   it('keeps a refused cancel in the dialog with its sentence', async () => {
     server.use(
       signedIn,
-      standingList,
+      taskList,
       http.post(`${CONTEST_API}/tasks/:task/gradings/:grading/cancel`, () =>
         problem(409, 'wrong_status', {
           detail: 'The grading is no longer a system error.',
@@ -406,7 +431,7 @@ describe('acting on the feed', () => {
     const rejudgedAt: string[] = [];
     server.use(
       signedIn,
-      standingList,
+      taskList,
       http.post(`${CONTEST_API}/tasks/:task/rejudge`, ({ params }) => {
         rejudgedAt.push(String(params.task));
         return HttpResponse.json({
@@ -446,14 +471,14 @@ describe('acting on the feed', () => {
   it('says so when the task has nothing published to rejudge against', async () => {
     server.use(
       signedIn,
-      standingList,
+      taskList,
       http.post(`${CONTEST_API}/tasks/:task/rejudge`, () => problem(404, 'not_found')),
     );
     feedAnswering(() => []);
     const user = userEvent.setup();
     renderApp(`${FEED}?task=sort`);
 
-    await user.click(await screen.findByRole('button', { name: 'Rejudge A · sort' }));
+    await user.click(await screen.findByRole('button', { name: 'Rejudge sort' }));
     const dialog = await screen.findByRole('dialog');
     await user.click(within(dialog).getByRole('button', { name: 'Rejudge' }));
 
@@ -462,12 +487,65 @@ describe('acting on the feed', () => {
     );
   });
 
+  it('offers nothing on an earlier attempt a status filter shows alone, and marks it earlier', async () => {
+    server.use(signedIn, taskList);
+    const asked = feedAnswering((query) =>
+      feed.filter((entry) => entry.grading.status === query.get('status')),
+    );
+    renderApp(`${FEED}?status=system_error`);
+
+    const sum = await screen.findByRole('rowgroup', { name: 'B submission 3 by ada' });
+    expect(asked).toEqual(['status=system_error']);
+    expect(sum).toHaveTextContent('An earlier attempt; the latest is not among these.');
+    expect(within(sum).queryByRole('button', { name: /^(Retry|Cancel)/ })).toBeNull();
+  });
+
+  it('offers no Retry on a submission staff cancelled, since a cancel is final', async () => {
+    server.use(signedIn, taskList);
+    feedAnswering(() => [cancelled, sortByTeam]);
+    renderApp(FEED);
+
+    expect(
+      await screen.findByRole('button', {
+        name: 'Retry A submission 1 by Lovelaces (team), attempt 1',
+      }),
+    ).toBeVisible();
+    expect(
+      screen.queryByRole('button', { name: 'Retry A submission 1 by ada, attempt 1' }),
+    ).toBeNull();
+  });
+
+  it('keeps a refused retry in the dialog with its sentence', async () => {
+    server.use(
+      signedIn,
+      taskList,
+      http.post(`${CONTEST_API}/tasks/:task/gradings/:grading/retry`, () =>
+        problem(409, 'conflict', { detail: 'A later attempt of it is there.' }),
+      ),
+    );
+    feedAnswering(() => [sortByTeam]);
+    const user = userEvent.setup();
+    renderApp(FEED);
+
+    await user.click(
+      await screen.findByRole('button', {
+        name: 'Retry A submission 1 by Lovelaces (team), attempt 1',
+      }),
+    );
+    const dialog = await screen.findByRole('dialog', { name: 'Retry this grading?' });
+    await user.click(within(dialog).getByRole('button', { name: 'Retry' }));
+
+    const alert = await within(dialog).findByRole('alert');
+    expect(alert).toHaveTextContent('Not the attempt to retry');
+    expect(alert).toHaveTextContent('A later attempt of it is there.');
+  });
+
   it('offers an observer nothing to do', async () => {
     server.use(
       signedInAs([
         { names: { org: 'acme', contest: null, task: null }, role: 'observer' },
       ]),
-      standingList,
+      taskList,
     );
     feedAnswering(() => [stuckFirst, sortByTeam]);
     renderApp(`${FEED}?task=sum`);
@@ -485,7 +563,7 @@ describe('acting on the feed', () => {
         { names: { org: 'acme', contest: 'spring', task: null }, role: 'observer' },
         { names: { org: 'acme', contest: 'spring', task: 'sum' }, role: 'manager' },
       ]),
-      standingList,
+      taskList,
     );
     feedAnswering(() => [stuckFirst, sortByTeam]);
     renderApp(FEED);
@@ -511,7 +589,7 @@ describe('the feed without the stream', () => {
     let depth = { queued: 1, dispatched: 0 };
     server.use(
       signedIn,
-      standingList,
+      taskList,
       http.get(`${CONTEST_API}/gradings/queue`, () => HttpResponse.json(depth)),
     );
     feedAnswering(() => now);
@@ -568,7 +646,7 @@ describe('the feed kept up to date', () => {
     let depth = { queued: 1, dispatched: 0 };
     server.use(
       signedIn,
-      standingList,
+      taskList,
       http.get(`${CONTEST_API}/gradings/queue`, () => HttpResponse.json(depth)),
     );
     feedAnswering(() => now);

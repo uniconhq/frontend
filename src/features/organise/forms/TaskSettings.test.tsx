@@ -541,6 +541,50 @@ size 120
     expect(screen.queryByRole('form', { name: 'Task settings' })).toBeNull();
   });
 
+  it('requires the show of a group the save adds once the task is graded, and of no other', async () => {
+    const { sent } = taskBackend(
+      () =>
+        HttpResponse.json({
+          number: 4,
+          grading_changed: true,
+          changes: [],
+          notes: [],
+          regraded: 0,
+        }),
+      undefined,
+      { ...UNREAD, graded: true },
+    );
+    const form = await openForm();
+    const show = (group: string) =>
+      within(form).getByRole('combobox', { name: new RegExp(`^${group} show`) });
+    const [added, kept, empty] = [show('large'), show('small'), show('samples')];
+    expect(added).toBeRequired();
+    expect(added).toHaveAccessibleDescription(
+      'Required: the task has graded submissions, so a group the save adds must say what it shows.',
+    );
+    expect(kept).not.toBeRequired();
+    expect(empty).not.toBeRequired();
+    expect(
+      within(empty).getByRole('option', { name: 'Not set (always)' }),
+    ).toBeVisible();
+
+    fill(within(form).getByLabelText('small pass at'), '0.5');
+    const save = within(form).getByRole('button', { name: 'Save settings' });
+    expect(save).toBeDisabled();
+    fill(added, 'verdict');
+    expect(save).toBeEnabled();
+    fireEvent.click(save);
+
+    expect(await screen.findByText('Published as publication 4.')).toBeVisible();
+    const written = parse(sent[0]?.content ?? '') as { test_groups: object };
+    expect(written.test_groups).toEqual({
+      samples: {},
+      small: { pass: 30, show: 'verdict', pass_at: 0.5 },
+      old: { each: 5 },
+      large: { show: 'verdict' },
+    });
+  });
+
   it('will not save a number field that holds no number', async () => {
     taskBackend(() => HttpResponse.json({}));
     const form = await openForm();

@@ -87,6 +87,23 @@ export function SaveOutcome<Body = WriteFile>({
           ) : (
             <BodyText>It does not change how the task grades.</BodyText>
           )}
+          {result.regraded > 0 && (
+            <BodyText>
+              {result.regraded === 1
+                ? '1 submission is graded again.'
+                : `${String(result.regraded)} submissions are graded again.`}
+            </BodyText>
+          )}
+          {result.notes.length > 0 && (
+            <>
+              <BodyText>Of note:</BodyText>
+              <ul className={classes.named} aria-label="Notes">
+                {result.notes.map((note) => (
+                  <li key={note}>{note}</li>
+                ))}
+              </ul>
+            </>
+          )}
         </Panel>
       );
     }
@@ -145,8 +162,9 @@ export function SaveOutcome<Body = WriteFile>({
           ))}
         </ul>
         <BodyText tone="secondary">
-          Publishing changes the grading of a running contest. Keeping it as a draft
-          writes the files and publishes nothing.
+          Publishing changes the grading of a running contest: every submission to the
+          task is graded again against the new publication. Keeping it as a draft writes
+          the files and publishes nothing.
         </BodyText>
         <div className={classes.actions}>
           <Button size="xs" onClick={() => onConfirm(body)}>

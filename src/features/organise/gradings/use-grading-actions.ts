@@ -14,20 +14,26 @@ export type Asking =
   | { kind: 'cancel'; task: string; entry: FeedEntry; reason: string }
   | { kind: 'rejudge'; task: string; title: string };
 
+/** Every read a grading's change can move: a task's gradings, the feed and the queue. */
+const READS = [
+  '/api/v1/orgs/{org}/contests/{contest}/tasks/{task}/gradings',
+  '/api/v1/orgs/{org}/contests/{contest}/gradings',
+  '/api/v1/orgs/{org}/contests/{contest}/gradings/queue',
+] as const;
+
 /**
- * The three changes, through the task's own routes, each reading the feed
- * and the queue again once answered or refused, since a refusal here usually
- * means the grading moved on.
+ * The three changes, through the task's own routes, each making a task's
+ * gradings, the feed and the queue stale once answered or refused, since a
+ * refusal here usually means the grading moved on.
  */
-export function useFeedActions(path: ContestPath) {
+export function useGradingActions(path: ContestPath) {
   const queryClient = useQueryClient();
   const readAgain = {
     onSettled: () =>
       Promise.all(
-        [
-          '/api/v1/orgs/{org}/contests/{contest}/gradings',
-          '/api/v1/orgs/{org}/contests/{contest}/gradings/queue',
-        ].map((route) => queryClient.invalidateQueries({ queryKey: ['get', route] })),
+        READS.map((route) =>
+          queryClient.invalidateQueries({ queryKey: ['get', route] }),
+        ),
       ),
   };
   const cancel = $api.useMutation(

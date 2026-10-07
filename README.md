@@ -229,8 +229,12 @@ reads a file once and saves with the token it was read at, so a background
 refetch never swaps the token under someone's text. From Save until the file
 has been read again the text is read-only, and the answer takes the focus. A
 `conflict` keeps the text and offers to reload; `confirmation_required` offers
-to publish the same save confirmed or to keep it as a draft; every other
-refusal shows its own detail and what it names.
+to publish the same save confirmed, which grades every submission to the task
+again, or to keep it as a draft; every other refusal shows its own detail and
+what it names. A save that publishes says what changed in grading, how many
+submissions it queued to be graded again (`regraded`), and lists the notes
+the forge makes of the task beside publishing, such as the steps it seals
+until the reveal; every save path ends in this one answer (`SaveOutcome`).
 
 The editor is CodeMirror, wrapped in `src/ui/CodeEditor.tsx`: line numbers,
 undo, search and bracket matching, YAML highlighted in a `.yaml` or `.yml`
@@ -305,7 +309,11 @@ removing one by id and taking an entry holding a mapping (other than
 `{secret: ...}`) as the contestant's form details and anything else as a
 value. Its test groups are the folders under `tests/` and
 the groups the file names: a folder with no entry is added at the next save,
-and an entry with no folder is marked and may be removed. A form save refused
+and an entry with no folder is marked and may be removed. Once the task has
+a graded submission (`graded` from `GET <task>/workflow-form`), a group the
+save adds must say its `show`, which the save refuses otherwise (T10): the
+field is required and says so, and the groups already in the file are left
+as they are. A form save refused
 as a `conflict` reads the file again and shows the organiser's version and the
 current one field by field, with a choice per field that starts on the side
 that changed it; nothing is written until they save, which writes the chosen fields
@@ -319,13 +327,11 @@ the moments they name and show in local time, and a manager's admin-only keys
 stay as they are now. The statement is edited beside `ui/Markdown`, the renderer the
 contestant's task page uses, and is read-only to a manager.
 
-The task page's gradings list each submission once, headed by its latest
-attempt, with its earlier attempts opening below it to be read. A manager
-retries a finished attempt, cancels the latest attempt of one reading as a
-system error with a sentence of at most 500 characters its contestant reads,
-shown on the row once cancelled, and rejudges the whole task, which grades every submission's latest attempt again against the
-current publication as a new attempt; each asks first in a dialog, which
-keeps a refusal and closes once the change has gone through.
+The task page's gradings are the contest's Gradings page (below) narrowed to
+the task, read from the task's own route (`GET <task>/gradings`, whose rows
+are the feed's, with who submitted), without the task column and with
+Rejudge for the whole task. Both are `gradings/GradingsList`: one table, one
+row, one set of dialogs and one actions hook.
 
 The contest page lists its tasks in the contest's order, each by its letter
 and name, with where it stands (`GET <contest>/organise/tasks`): its latest
@@ -342,26 +348,38 @@ errors at its YAML path and leaves the tasks by name alone.
 
 The contest's Gradings page (`gradings/`) lists every grading of its tasks
 newest first, each submission once by its task, who made it and its number,
-headed by its latest attempt, with its earlier attempts opening below it: the
-attempt, the publication it graded against, the status with the reason a
-system error gave and the sentence a cancel told the contestant, what a
+never by when it was made, headed by its highest attempt, with its earlier
+attempts opening below it: the attempt, the publication it graded against,
+the status with the reason a system error gave and the sentence a cancel
+told the contestant, what a
 finished run came to, its log, and when it was queued, started and finished.
 Above it are how many gradings wait, queued and waiting for a machine, and
 filters by task, status, team and a contestant's username, kept in the
-address so a link or a reload keeps them; a username applies once sent. The
+address so a link or a reload keeps them; a username applies once sent and
+finds the user's own submissions and their team's, by the team they were in
+when each was made, which the field says in a contest with teams. Each
+row carries its task's letter, so the page reads no task's standing for one;
+the task filter lists the contest's tasks by name (`GET <contest>/tasks`). The
 live stream marks the feed and the queue stale as gradings move; while it is
 not open both are read again every ten seconds while one is still to finish.
-A manager of a row's task retries its latest attempt once finished and
-cancels one reading as a system error, with a sentence of at most 500
-characters its contestant reads; with the feed filtered to a task they
-manage, they rejudge it. Each goes through the task's own routes after a
-confirmation that keeps a refusal. An observer reads the page alone. The
-feed shows the newest 100; a filter reaches older ones.
+A manager of a row's task acts only on the submission's latest attempt, as
+each row's `latest` says over all its attempts: an earlier attempt a status
+filter shows alone is marked as earlier and offers nothing. They retry it
+once finished, unless staff cancelled the submission, since a cancel is
+final, and cancel one reading as a system error, with a sentence of at most
+500 characters its contestant reads; with the feed filtered to a task they
+manage, they rejudge it, which grades every submission's latest attempt
+again against the current publication as a new attempt. Each goes through
+the task's own routes after a confirmation that keeps a refusal and closes
+once the change has gone through, and then marks every task's gradings, the
+feed and the queue stale. An observer reads the page alone. The feed shows
+the newest 100; a filter reaches older ones.
 
 The org page shows the org's display name and description as the forge
 holds them. An admin of the org edits both in place; an emptied display name
-is sent as empty, which leaves the org showing its name. A manager or an
-observer reads them with no edit control.
+is sent as empty, which leaves the org showing its name. Anyone else with a
+role in the org, at the org or at one of its contests or tasks, reads them
+with no edit control, also when the contest list refuses them.
 
 The contestants page shows an observer the table and a manager its actions
 too, which the routes check again underneath. Each action's answer replaces

@@ -232,6 +232,35 @@ describe("the org's display name and description", () => {
       expect(screen.getByText('Only an admin of the org changes these.')).toBeVisible();
     },
   );
+
+  it('shows them to an organiser of one of its contests alone, refused the list', async () => {
+    server.use(
+      http.get('/api/v1/me', () =>
+        HttpResponse.json({
+          ...someone,
+          roles: [
+            { names: { org: 'acme', contest: 'spring', task: null }, role: 'admin' },
+          ],
+        }),
+      ),
+      http.get(`${ORG_API}/contests`, () =>
+        problem(403, 'forbidden', { detail: 'You need the observer role at acme.' }),
+      ),
+    );
+    profileAt();
+    renderApp('/orgs/acme');
+
+    const fields = await screen.findByLabelText('About the org');
+    expect(fields).toHaveTextContent('Display nameAcme Contests');
+    expect(fields).toHaveTextContent('DescriptionContests for Acme engineers.');
+    expect(screen.queryByRole('button', { name: 'Edit' })).toBeNull();
+    expect(screen.getByText('Only an admin of the org changes these.')).toBeVisible();
+    expect(
+      within(screen.getByRole('list', { name: 'Your contests' })).getByRole('link', {
+        name: 'spring',
+      }),
+    ).toBeVisible();
+  });
 });
 
 describe('creating a contest', () => {

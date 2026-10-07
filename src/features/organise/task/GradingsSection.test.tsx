@@ -2,23 +2,23 @@ import { describe, expect, it } from 'vitest';
 import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
-import type { Grading } from '@/api/types';
+import type { FeedEntry, Grading, Submitter } from '@/api/types';
 import { renderApp } from '@/test/render';
 import { problem, server, signedIn, someone } from '@/test/server';
 import { TASK_API, publicationList, repoFiles, taskState } from '@/test/organiser';
 
 const TASK = '/orgs/acme/contests/spring/tasks/sum';
 
+const ada: Submitter = { user_id: 11, name: 'ada', team: null };
+
+/** A grading of sum, the contest's task B, as the route answers it. */
+function entry(grading: Grading, by: Submitter = ada): FeedEntry {
+  return { task: 'sum', label: 'B', by, grading };
+}
+
 /** The task's gradings as the route answers them, each by ada. */
 function asEntries(gradings: Grading[]) {
-  return HttpResponse.json(
-    gradings.map((grading) => ({
-      task: 'sum',
-      label: 'B',
-      by: { user_id: 11, name: 'ada', team: null },
-      grading,
-    })),
-  );
+  return HttpResponse.json(gradings.map((grading) => entry(grading)));
 }
 
 const stuck: Grading = {
@@ -140,7 +140,7 @@ describe("the task's gradings", () => {
     renderApp(TASK);
 
     const link = await screen.findByRole('link', {
-      name: 'Log of submission 5, attempt 1',
+      name: 'Log of B submission 5 by ada, attempt 1',
     });
     expect(link).toHaveAttribute(
       'href',
@@ -149,7 +149,7 @@ describe("the task's gradings", () => {
     expect(link).toHaveAttribute('target', '_blank');
     expect(link).toHaveAttribute('rel', 'noopener noreferrer');
     expect(
-      screen.queryByRole('link', { name: 'Log of submission 4, attempt 1' }),
+      screen.queryByRole('link', { name: 'Log of B submission 4 by ada, attempt 1' }),
     ).toBeNull();
   });
 
@@ -171,27 +171,34 @@ describe("the task's gradings", () => {
           status: 'queued' as const,
           error: null,
         };
-        listed = [again, { ...stuck, finished_at: '2026-09-26T10:05:00Z' }];
+        listed = [
+          again,
+          { ...stuck, latest: false, finished_at: '2026-09-26T10:05:00Z' },
+        ];
         return HttpResponse.json(again);
       }),
     );
     renderApp(TASK);
 
     await userEvent.click(
-      await screen.findByRole('button', { name: 'Retry submission 3, attempt 1' }),
+      await screen.findByRole('button', {
+        name: 'Retry B submission 3 by ada, attempt 1',
+      }),
     );
     const dialog = await screen.findByRole('dialog', { name: 'Retry this grading?' });
     expect(dialog).toHaveTextContent(
-      'Submission 3 is graded again as a new attempt, against publication 2, as attempt 1 was.',
+      "ada's submission 3 to sum is graded again as a new attempt, against publication 2, as attempt 1 was.",
     );
     expect(retried).toEqual([]);
     await userEvent.click(within(dialog).getByRole('button', { name: 'Retry' }));
 
-    expect(await screen.findByText('Queued')).toBeVisible();
+    expect(
+      await screen.findByRole('button', { name: 'Show earlier attempts (1)' }),
+    ).toBeVisible();
     expect(retried).toEqual([stuck.id]);
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(
-      screen.queryByRole('button', { name: 'Cancel submission 3, attempt 2' }),
+      screen.queryByRole('button', { name: 'Cancel B submission 3 by ada, attempt 2' }),
     ).toBeNull();
   });
 
@@ -213,13 +220,15 @@ describe("the task's gradings", () => {
     renderApp(TASK);
 
     expect(
-      await screen.findByRole('button', { name: 'Cancel submission 3, attempt 1' }),
+      await screen.findByRole('button', {
+        name: 'Cancel B submission 3 by ada, attempt 1',
+      }),
     ).toBeVisible();
     expect(
-      screen.queryByRole('button', { name: 'Cancel submission 4, attempt 1' }),
+      screen.queryByRole('button', { name: 'Cancel B submission 4 by ada, attempt 1' }),
     ).toBeNull();
     expect(
-      screen.queryByRole('button', { name: 'Cancel submission 5, attempt 1' }),
+      screen.queryByRole('button', { name: 'Cancel B submission 5 by ada, attempt 1' }),
     ).toBeNull();
   });
 
@@ -243,17 +252,23 @@ describe("the task's gradings", () => {
     renderApp(TASK);
 
     const cancel = await screen.findByRole('button', {
-      name: 'Cancel submission 3, attempt 1',
+      name: 'Cancel B submission 3 by ada, attempt 1',
     });
     await userEvent.click(cancel);
-    const first = await screen.findByRole('dialog', { name: 'Cancel this grading?' });
+    const first = await screen.findByRole('dialog', {
+      name: 'Cancel this submission?',
+    });
     await userEvent.click(within(first).getByRole('button', { name: 'Not now' }));
     expect(cancelled).toEqual([]);
 
     await userEvent.click(cancel);
-    const dialog = await screen.findByRole('dialog', { name: 'Cancel this grading?' });
-    expect(dialog).toHaveTextContent('Attempt 1 of submission 3 ends as cancelled.');
-    const confirm = within(dialog).getByRole('button', { name: 'Cancel the grading' });
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Cancel this submission?',
+    });
+    expect(dialog).toHaveTextContent("ada's submission 3 to sum ends as cancelled.");
+    const confirm = within(dialog).getByRole('button', {
+      name: 'Cancel the submission',
+    });
     expect(confirm).toBeDisabled();
     const field = within(dialog).getByRole('textbox', {
       name: /What the contestant reads/,
@@ -286,7 +301,7 @@ describe("the task's gradings", () => {
 
     const table = await screen.findByRole('table', { name: 'Gradings' });
     expect(table).toHaveTextContent('Cancelled');
-    expect(table).toHaveTextContent('Told the contestant: The checker crashed.');
+    expect(table).toHaveTextContent('Told the contestant: “The checker crashed.”');
   });
 
   it.each([
@@ -309,7 +324,9 @@ describe("the task's gradings", () => {
       renderApp(TASK);
 
       await userEvent.click(
-        await screen.findByRole('button', { name: 'Cancel submission 3, attempt 1' }),
+        await screen.findByRole('button', {
+          name: 'Cancel B submission 3 by ada, attempt 1',
+        }),
       );
       const dialog = await screen.findByRole('dialog');
       await userEvent.type(
@@ -317,7 +334,7 @@ describe("the task's gradings", () => {
         'The checker crashed.',
       );
       await userEvent.click(
-        within(dialog).getByRole('button', { name: 'Cancel the grading' }),
+        within(dialog).getByRole('button', { name: 'Cancel the submission' }),
       );
 
       const alert = await within(dialog).findByRole('alert');
@@ -342,17 +359,21 @@ describe("the task's gradings", () => {
       taskState,
       publicationList,
       ...repoFiles,
-      http.get(`${TASK_API}/gradings`, () => asEntries([second, waiting, stuck])),
+      http.get(`${TASK_API}/gradings`, () =>
+        asEntries([second, waiting, { ...stuck, latest: false }]),
+      ),
     );
     renderApp(TASK);
 
     const table = await screen.findByRole('table', { name: 'Gradings' });
     const groups = within(table).getAllByRole('rowgroup').slice(1);
     expect(groups.map((group) => group.getAttribute('aria-label'))).toEqual([
-      'Submission 3',
-      'Submission 4',
+      'B submission 3 by ada',
+      'B submission 4 by ada',
     ]);
-    const third = within(table).getByRole('rowgroup', { name: 'Submission 3' });
+    const third = within(table).getByRole('rowgroup', {
+      name: 'B submission 3 by ada',
+    });
     expect(within(third).getAllByRole('row')).toHaveLength(1);
     expect(third).toHaveTextContent('compile_error');
     expect(third).toHaveTextContent('publication 3');
@@ -376,19 +397,18 @@ describe("the task's gradings", () => {
     ).toHaveAttribute('aria-expanded', 'true');
   });
 
-  it("keeps two submitters' submission 1 apart", async () => {
+  it("keeps two submitters' submission 1 apart, made in the same second", async () => {
     const theirs: Grading = {
       ...stuck,
       id: '0199a2c1-6b7e-7c3a-9f10-5d2e4b8a6c60',
       submission_number: 1,
-      submitted_at: '2026-09-26T11:00:00Z',
       status: 'done',
       error: null,
     };
     const ours: Grading = {
       ...theirs,
       id: '0199a2c1-6b7e-7c3a-9f10-5d2e4b8a6c61',
-      submitted_at: '2026-09-26T10:30:00Z',
+      latest: false,
       status: 'system_error',
       error: 'The grading machine lost its run before it began.',
     };
@@ -396,23 +416,29 @@ describe("the task's gradings", () => {
       ...ours,
       id: '0199a2c1-6b7e-7c3a-9f10-5d2e4b8a6c62',
       attempt: 2,
+      latest: true,
       status: 'queued',
       error: null,
     };
+    const grace: Submitter = { user_id: 12, name: 'grace', team: null };
     server.use(
       signedIn,
       taskState,
       publicationList,
       ...repoFiles,
-      http.get(`${TASK_API}/gradings`, () => asEntries([theirs, oursAgain, ours])),
+      http.get(`${TASK_API}/gradings`, () =>
+        HttpResponse.json([entry(theirs, grace), entry(oursAgain), entry(ours)]),
+      ),
     );
     renderApp(TASK);
 
     const table = await screen.findByRole('table', { name: 'Gradings' });
-    const groups = within(table).getAllByRole('rowgroup', { name: 'Submission 1' });
-    expect(groups).toHaveLength(2);
-    const [first, second] = groups;
-    if (first === undefined || second === undefined) throw new Error('no groups');
+    const first = within(table).getByRole('rowgroup', {
+      name: 'B submission 1 by grace',
+    });
+    const second = within(table).getByRole('rowgroup', {
+      name: 'B submission 1 by ada',
+    });
     expect(within(first).getAllByRole('row')).toHaveLength(1);
     expect(
       within(first).queryByRole('button', { name: /earlier attempts/ }),
@@ -450,17 +476,17 @@ describe("the task's gradings", () => {
     await screen.findByRole('table', { name: 'Gradings' });
     await userEvent.click(screen.getByRole('button', { name: 'Rejudge' }));
     const dialog = await screen.findByRole('dialog', {
-      name: 'Rejudge every submission?',
+      name: 'Rejudge every submission of this task?',
     });
     expect(dialog).toHaveTextContent(
-      "Every submission's latest attempt is graded again against the current publication, as a new attempt.",
+      "Every submission of B · sum has its latest attempt graded again against the task's current publication, as a new attempt.",
     );
     expect(rejudged).toBe(0);
     await userEvent.click(within(dialog).getByRole('button', { name: 'Rejudge' }));
 
-    const status = await screen.findByText(/Rejudged against publication 2/);
+    const status = await screen.findByText(/rejudged against publication 2/);
     expect(status).toHaveTextContent(
-      'Rejudged against publication 2: 3 attempts queued.',
+      'B · sum rejudged against publication 2: 3 attempts queued.',
     );
     expect(
       screen.getByText('1 attempt against an older publication cancelled first.'),
