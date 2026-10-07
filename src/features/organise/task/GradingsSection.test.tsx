@@ -367,6 +367,55 @@ describe("the task's gradings", () => {
     ).toHaveAttribute('aria-expanded', 'true');
   });
 
+  it("keeps two submitters' submission 1 apart", async () => {
+    const theirs: Grading = {
+      ...stuck,
+      id: '0199a2c1-6b7e-7c3a-9f10-5d2e4b8a6c60',
+      submission_number: 1,
+      submitted_at: '2026-09-26T11:00:00Z',
+      status: 'done',
+      error: null,
+    };
+    const ours: Grading = {
+      ...theirs,
+      id: '0199a2c1-6b7e-7c3a-9f10-5d2e4b8a6c61',
+      submitted_at: '2026-09-26T10:30:00Z',
+      status: 'system_error',
+      error: 'The grading machine lost its run before it began.',
+    };
+    const oursAgain: Grading = {
+      ...ours,
+      id: '0199a2c1-6b7e-7c3a-9f10-5d2e4b8a6c62',
+      attempt: 2,
+      status: 'queued',
+      error: null,
+    };
+    server.use(
+      signedIn,
+      taskState,
+      publicationList,
+      ...repoFiles,
+      http.get(`${TASK_API}/gradings`, () =>
+        HttpResponse.json([theirs, oursAgain, ours]),
+      ),
+    );
+    renderApp(TASK);
+
+    const table = await screen.findByRole('table', { name: 'Gradings' });
+    const groups = within(table).getAllByRole('rowgroup', { name: 'Submission 1' });
+    expect(groups).toHaveLength(2);
+    const [first, second] = groups;
+    if (first === undefined || second === undefined) throw new Error('no groups');
+    expect(within(first).getAllByRole('row')).toHaveLength(1);
+    expect(
+      within(first).queryByRole('button', { name: /earlier attempts/ }),
+    ).toBeNull();
+    expect(
+      within(second).getByRole('button', { name: 'Show earlier attempts (1)' }),
+    ).toBeVisible();
+    expect(second).toHaveTextContent('Queued');
+  });
+
   it('rejudges the whole task after saying what that does', async () => {
     let reads = 0;
     let rejudged = 0;
