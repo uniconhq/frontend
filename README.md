@@ -240,6 +240,21 @@ layout for CodeMirror to measure, so the test setup stands a plain text field
 with the same props in for it (`src/test/code-editor.tsx`), and
 `CodeEditor.test.tsx` tests the editor itself.
 
+A file that is an upload is marked in the tree with the size of what it
+holds, and opens as its size and SHA-256, never in the editor, since its
+commit holds a pointer to the bytes. A manager of the task uploads a file
+from the tree, into the folder last opened there or the open file's by
+default, at a path they can change, and changes an uploaded one with Upload
+again: the browser works out the SHA-256, asks `POST <task>/organise/uploads`
+for a slot, sends the file through the upload door and completes it, each with
+its progress, and a send the connection cuts is sent again from the start, up
+to three times, to the same slot; a slot for a file the forge holds already
+needs nothing sent. The upload is not in the task until the organiser saves
+it, which writes the file by its upload id with the token of the file there
+when the upload began, or none for a new file: a save like Save, with its
+answers and refusals, and a `conflict` offers to save over the other version.
+The door's steps, shared with a contestant's submit, are in `src/api/upload/`.
+
 Under a task's file, History lists the file's versions newest first, each
 with its author, its message and when, and the publication that froze it,
 with whether that publication changed how the task grades. A publication
@@ -262,10 +277,22 @@ the reason. Times show in the organiser's own zone and a changed one is written
 back with their offset. The admin's keys (`TASK-FORMAT.md` section 1.1 and 1.2)
 are shown to a manager disabled, read from the session's roles as the
 organisers section reads them; the forge refuses a manager's change anyway.
-The routes name no workflow's inputs, so the task form edits the `inputs`
-entries the file has, adds or removes one by id, and takes an entry holding
-a mapping (other than `{secret: ...}`) as the contestant's form details and
-anything else as a value. Its test groups are the folders under `tests/` and
+The task form's inputs are the ones the task's workflow declares, read with
+`GET <task>/workflow-form` each time the form opens: one entry each, in the
+workflow's order. A contestant's input takes form details its type has, a
+label for any, the options offered out of the workflow's own and a default
+for a choice, a default, a least and a most for a number, and `max_size` for
+a file or folder; any other input takes a value of its type, a number, true
+or false, one of an enum's options, a path for a file or folder, or text or
+`{secret: <name>}`, written as that type. One the file leaves out offers to
+be given; a contestant's or an optional one may be left out again; one the
+file holds the other way is written afresh at the save, and one the workflow
+does not declare is marked to be removed. The test fields each test holds
+are listed under the test groups. When the workflow cannot be read, the form
+shows the `problem` and edits the `inputs` entries the file has, adding or
+removing one by id and taking an entry holding a mapping (other than
+`{secret: ...}`) as the contestant's form details and anything else as a
+value. Its test groups are the folders under `tests/` and
 the groups the file names: a folder with no entry is added at the next save,
 and an entry with no folder is marked and may be removed. A form save refused
 as a `conflict` reads the file again and shows the organiser's version and the
@@ -277,8 +304,9 @@ contestant's task page uses, and is read-only to a manager.
 
 The task page's gradings list each submission once, headed by its latest
 attempt, with its earlier attempts opening below it to be read. A manager
-retries a finished attempt and cancels one still to finish, and rejudges the
-whole task, which grades every submission's latest attempt again against the
+retries a finished attempt, cancels the latest attempt of one reading as a
+system error with a sentence of at most 500 characters its contestant reads,
+shown on the row once cancelled, and rejudges the whole task, which grades every submission's latest attempt again against the
 current publication as a new attempt; each asks first in a dialog, which
 keeps a refusal and closes once the change has gone through.
 
@@ -480,7 +508,8 @@ and every minute when nothing is being graded. A verdict is where the
 grading stands until it is done, then what stopped the run when something
 did, such as a compile error, else the outcome over the test groups the task
 shows now, and `GRADED` when it shows none yet. A run that failed on the
-platform's side is served as running until staff end it.
+platform's side is served as running until staff end it; then it reads
+`CANCELLED` with the sentence they gave, and is no longer read again.
 `src/ui/VerdictBadge.tsx` has a label for every outcome and status and puts
 each in one of the handoff's six colour pairs; an outcome it does not know
 shows under its own name in the neutral one.
