@@ -108,11 +108,15 @@ const noGradings = http.get(
   () => HttpResponse.json([]),
 );
 
-/** A contest's gradings feed empty and nothing waiting, until a test says otherwise. */
+/** A contest with no gradings, nothing waiting and no tasks, until a test says otherwise. */
 const noFeed = [
   http.get('/api/v1/orgs/:org/contests/:contest/gradings', () => HttpResponse.json([])),
   http.get('/api/v1/orgs/:org/contests/:contest/gradings/queue', () =>
     HttpResponse.json({ queued: 0, dispatched: 0 }),
+  ),
+  /** No task standing in any contest, until a test lists some. */
+  http.get('/api/v1/orgs/:org/contests/:contest/organise/tasks', () =>
+    HttpResponse.json([]),
   ),
 ];
 

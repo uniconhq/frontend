@@ -1,0 +1,59 @@
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* One task, its name over where it stands, a rule between tasks. */
+.task {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--unicon-border);
+}
+
+.task:first-child {
+  padding-top: 0;
+}
+
+.name {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+}
+
+.letter {
+  font-weight: 700;
+  color: var(--unicon-text-primary);
+}
+
+/* A draft with errors stands out from the rest of the task's lines. */
+.draft {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 10px;
+  border-radius: var(--mantine-radius-sm);
+  background: var(--unicon-hover);
+}
+
+.timeline {
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 6px 16px;
+  font-size: 13px;
+}
+
+.timeline dt {
+  font-size: 12px;
+  color: var(--unicon-text-secondary);
+}
+
+.timeline dd {
+  margin: 0;
+  color: var(--unicon-text-body);
+}

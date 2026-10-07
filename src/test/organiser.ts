@@ -22,7 +22,7 @@ export const TASK_API = `${CONTEST_API}/tasks/:task`;
 // Lists
 
 export const contests: Named[] = [{ name: 'autumn' }, { name: 'spring' }];
-export const tasks: Named[] = [{ name: 'sort' }, { name: 'sum' }];
+const tasks: Named[] = [{ name: 'sort' }, { name: 'sum' }];
 
 export const contestList = http.get(`${ORG_API}/contests`, () =>
   HttpResponse.json(contests),
@@ -99,11 +99,12 @@ export const publicationList = http.get(`${TASK_API}/publications`, () =>
 // Where each of the spring contest's tasks stands
 
 /**
- * The spring contest's tasks in its order: sort, published and with every
- * time at its default but a due, and sum, whose last save left a draft with
- * errors on its second publication.
+ * The spring contest's tasks in its order: sort, on its first publication,
+ * due a week after its release with a tenth off per late day and worth 100,
+ * and sum, with no due, whose last save left a draft with errors on its
+ * second publication.
  */
-const standings: TaskStanding[] = [
+export const standings: TaskStanding[] = [
   {
     task: { name: 'sort' },
     label: 'A',
