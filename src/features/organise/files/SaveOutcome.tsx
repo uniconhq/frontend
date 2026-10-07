@@ -11,12 +11,13 @@ import { definitionErrorsOf, stringsOf } from './refusals';
 /**
  * What a save came back with: a contest file's new version, a task save that
  * published or was kept as a draft, or a refusal, which carries the body that
- * was sent so a confirmation can send the same save again.
+ * was sent so a confirmation can send the same save again. The body is a
+ * file's write unless the save was another kind, such as a rollback.
  */
-export type Outcome =
+export type Outcome<Body = WriteFile> =
   | { kind: 'written'; version: string }
   | { kind: 'saved'; result: SaveResult }
-  | { kind: 'refused'; error: ApiError; body: WriteFile };
+  | { kind: 'refused'; error: ApiError; body: Body };
 
 /** The member each refusal names what stands in the way with. */
 const NAMED_BY: Partial<Record<string, string>> = {
@@ -47,15 +48,15 @@ function Panel({ role, children }: { role: 'status' | 'alert'; children: ReactNo
   );
 }
 
-export function SaveOutcome({
+export function SaveOutcome<Body = WriteFile>({
   outcome,
   onConfirm,
   onKeepAsDraft,
   onReload,
 }: {
-  outcome: Outcome;
-  onConfirm: (body: WriteFile) => void;
-  onKeepAsDraft: (body: WriteFile) => void;
+  outcome: Outcome<Body>;
+  onConfirm: (body: Body) => void;
+  onKeepAsDraft: (body: Body) => void;
   onReload: () => void;
 }) {
   if (outcome.kind === 'written') {

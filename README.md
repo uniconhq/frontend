@@ -195,10 +195,13 @@ The organisers section lists everyone holding a role at the org, contest or
 task, with the highest role they hold there and where they hold it: here, or
 at a broader scope, whose page is where that role is changed. A manager adds
 someone by their Forgejo username, changes a role and removes one; only an
-admin is offered the admin role or may change an admin. Granting a role to
+admin may change an admin. Every role is offered to a manager too, admin
+included: the forge refuses admin from a manager, and the section says so
+with the forge's reason rather than leaving the choice out. Granting a role to
 someone who holds one here moves them to it. The rules are the forge's, so
-each refusal is shown where it happened, the last admin of a scope and a
-contestant of the contest among them, and a change to the person's own roles
+each refusal is shown where it happened, the last admin of a scope removed or
+demoted and a contestant of the contest among them. The forge leaves the
+orgs' service accounts out of every list, so they never show. A change to the person's own roles
 reads the session again, since those decide what every page offers. Someone
 who does not observe the place is not shown the section.
 
@@ -226,6 +229,30 @@ has been read again the text is read-only, and the answer takes the focus. A
 `conflict` keeps the text and offers to reload; `confirmation_required` offers
 to publish the same save confirmed or to keep it as a draft; every other
 refusal shows its own detail and what it names.
+
+The editor is CodeMirror, wrapped in `src/ui/CodeEditor.tsx`: line numbers,
+undo, search and bracket matching, YAML highlighted in a `.yaml` or `.yml`
+file and Markdown in a `.md`, everything else plain, in the theme's own
+colours. Its label names the editing area for a screen reader. jsdom has no
+layout for CodeMirror to measure, so the test setup stands a plain text field
+with the same props in for it (`src/test/code-editor.tsx`), and
+`CodeEditor.test.tsx` tests the editor itself.
+
+Under a task's file, History lists the file's versions newest first, each
+with its author, its message and when, and the publication that froze it,
+with whether that publication changed how the task grades. A publication
+is joined to the version it points at, so one that froze a later change to
+another file is marked on that file. An older version opens below, read-only,
+and a manager rolls the file back to it after a confirmation: the forge writes
+the old content as a new version, and the rollback is a save of the task with
+the same token, answers and refusals as Save.
+
+The task page's gradings list each submission once, headed by its latest
+attempt, with its earlier attempts opening below it to be read. A manager
+retries a finished attempt and cancels one still to finish, and rejudges the
+whole task, which grades every submission's latest attempt again against the
+current publication as a new attempt; each asks first in a dialog, which
+keeps a refusal and closes once the change has gone through.
 
 The contestants page shows an observer the table and a manager its actions
 too, which the routes check again underneath. Each action's answer replaces

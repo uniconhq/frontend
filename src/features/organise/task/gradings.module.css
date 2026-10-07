@@ -37,3 +37,34 @@
   gap: 6px;
   flex-wrap: wrap;
 }
+
+/* An earlier attempt reads under its submission's latest one, quieter. */
+.earlier td,
+.earlier th {
+  color: var(--unicon-text-secondary);
+}
+
+.earlier th {
+  padding-left: 14px;
+}
+
+.earlierName {
+  font-size: 12px;
+}
+
+.toggle {
+  display: block;
+  margin-top: 4px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--unicon-text-accent);
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.toggle:hover {
+  text-decoration: underline;
+}
