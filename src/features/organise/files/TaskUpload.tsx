@@ -1,18 +1,15 @@
-import { useState, type FormEvent } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
-import { $api } from '@/api/query';
-import { toApiError, type ApiError } from '@/api/problem';
-import type { WriteTaskFile } from '@/api/types';
+import { useEffect, useState, type FormEvent } from 'react';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
 import { FileDrop } from '@/ui/FileDrop';
 import { Progress } from '@/ui/Progress';
 import { TextInput } from '@/ui/TextInput';
-import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { formatSize } from '@/lib/size';
-import { fileQuery, staleAfterWrite, type Place } from './place';
-import { SaveOutcome, type Outcome } from './SaveOutcome';
-import { tokenNow, useTaskUpload, type UploadState } from './use-task-upload';
+import type { Place } from './place';
+import { useSaveUploads, type ArrivedUpload } from './upload-save';
+import { Refused, UploadSaveAnswer } from './UploadSaveAnswer';
+import { useTaskUpload, type UploadState } from './use-task-upload';
+import { useWaitingUploads } from './waiting-uploads';
 import shared from '../organise.module.css';
 import classes from './Files.module.css';
 
@@ -26,43 +23,6 @@ function pathIn(folder: string, name: string): string {
 /** A path as typed, without the slashes around it that name no folder. */
 function cleanPath(path: string): string {
   return path.trim().replace(/^\/+|\/+$/g, '');
-}
-
-/**
- * The words for a refusal an organiser's upload or its save can meet that
- * the app otherwise words for a contestant: an upload the forge would not
- * take for this path, or one whose bytes it has not got.
- */
-const UPLOAD_REFUSED: Partial<Record<string, { title: string; message: string }>> = {
-  invalid_inputs: {
-    title: 'The upload does not fit this path',
-    message: 'Nothing was saved. Upload the file again for the path it is to go to.',
-  },
-  upload_not_ready: {
-    title: 'The file has not arrived whole',
-    message: 'Nothing was saved. Upload it again and it is sent again.',
-  },
-  upload_failed: {
-    title: 'The upload did not go through',
-    message:
-      'It was sent again from the start and still did not arrive, or the file changed since it was chosen. Nothing was saved; upload it again.',
-  },
-};
-
-function Refused({ error }: { error: ApiError }) {
-  const words = UPLOAD_REFUSED[error.code];
-  return (
-    <div className={shared.panel} role="alert">
-      {words === undefined ? (
-        <ErrorBlock error={error} compact />
-      ) : (
-        <>
-          <BodyText tone="secondary">{words.title}</BodyText>
-          <BodyText tone="secondary">{error.detail ?? words.message}</BodyText>
-        </>
-      )}
-    </div>
-  );
 }
 
 /** How far the file has got, while it is being read or sent. */
@@ -105,6 +65,10 @@ function UnderWay({ state }: { state: UploadState }) {
  * publishes or keeps a draft and answers as a file's save does. Discarding
  * it, or leaving, changes nothing.
  *
+ * Where the page keeps waiting uploads (the file panel), an arrived upload
+ * may instead be kept waiting, to be saved later together with others, and
+ * its own Save takes every waiting one with it: several files, one save.
+ *
  * `again` is a file that is an upload already, replaced by uploading it
  * again: its path is fixed, and the save presents the token it was read
  * with. Otherwise the token is the one of the file at the path when the
@@ -121,25 +85,41 @@ export function TaskUpload({
   again?: { path: string; token: string };
   onClose: () => void;
 }) {
-  const queryClient = useQueryClient();
   const upload = useTaskUpload(place);
-  const write = $api.useMutation(
-    'put',
-    '/api/v1/orgs/{org}/contests/{contest}/tasks/{task}/files/{path}',
-  );
+  const waiting = useWaitingUploads();
   const [file, setFile] = useState<File | null>(null);
   const [path, setPath] = useState(again?.path ?? '');
   const [typed, setTyped] = useState(false);
-  const [outcome, setOutcome] = useState<Outcome<WriteTaskFile> | null>(null);
 
   const { state } = upload;
   const working = state.stage === 'hashing' || state.stage === 'sending';
   const target = cleanPath(path);
+  const arrived = state.stage === 'arrived' ? state : null;
+  const others = (waiting?.uploads ?? []).filter((kept) => kept.path !== arrived?.path);
+
+  const forget = () => {
+    upload.reset();
+    setFile(null);
+  };
+  const saving = useSaveUploads(place, (paths) => {
+    waiting?.saved(paths);
+    forget();
+  });
+
+  // While it holds an arrived upload, its Save is the one that takes the
+  // waiting uploads with it, so the waiting list's own Save steps aside.
+  const holding = arrived !== null && saving.outcome === null;
+  const hold = waiting?.hold;
+  useEffect(() => {
+    if (!holding || hold === undefined) return;
+    hold(true);
+    return () => hold(false);
+  }, [holding, hold]);
 
   const choose = (chosen: File[]) => {
     const next = chosen[0] ?? null;
     setFile(next);
-    setOutcome(null);
+    saving.forget();
     upload.reset();
     if (again === undefined && !typed)
       setPath(next === null ? '' : pathIn(folder, next.name));
@@ -148,57 +128,19 @@ export function TaskUpload({
   const start = (event: FormEvent) => {
     event.preventDefault();
     if (file === null || target === '') return;
-    setOutcome(null);
+    saving.forget();
     void upload.start(file, target, again?.token);
   };
 
-  const save = async (body: WriteTaskFile, at: string) => {
-    setOutcome(null);
-    try {
-      const result = await write.mutateAsync({
-        params: {
-          path: { org: place.org, contest: place.contest, task: place.task, path: at },
-        },
-        body,
-      });
-      setOutcome({ kind: 'saved', result });
-      upload.reset();
-      setFile(null);
-    } catch (caught) {
-      setOutcome({ kind: 'refused', error: toApiError(caught), body });
-      return;
-    }
-    await Promise.all(
-      [...staleAfterWrite(place), fileQuery(place, at).queryKey].map((queryKey) =>
-        queryClient.invalidateQueries({ queryKey }),
-      ),
-    );
-  };
-
-  const arrived = state.stage === 'arrived' ? state : null;
-  const firstSave = (): WriteTaskFile | null =>
+  const own = (): ArrivedUpload | null =>
     arrived === null
       ? null
       : {
           upload: arrived.upload,
+          path: arrived.path,
           token: arrived.token,
-          encoding: 'utf-8',
-          confirm: false,
-          keep_as_draft: false,
+          size: file?.size ?? null,
         };
-  const savedAt = arrived?.path ?? target;
-
-  /** Saves the same upload again, presenting the token the file has now. */
-  const saveOver = async (body: WriteTaskFile) => {
-    let token: string | null;
-    try {
-      token = await tokenNow(place, savedAt);
-    } catch (error) {
-      setOutcome({ kind: 'refused', error: toApiError(error), body });
-      return;
-    }
-    await save({ ...body, token }, savedAt);
-  };
 
   return (
     <section
@@ -211,7 +153,7 @@ export function TaskUpload({
           description="Any size; it goes to the forge's own store, not through the editor."
           files={file === null ? [] : [file]}
           onChange={choose}
-          disabled={working || write.isPending}
+          disabled={working || saving.pending}
         />
         <TextInput
           label="Path in the task"
@@ -225,7 +167,7 @@ export function TaskUpload({
               ? 'Where the file goes, such as data/train.csv. A file there now is replaced.'
               : 'Uploading again replaces the file at this path.'
           }
-          disabled={again !== undefined || working || write.isPending}
+          disabled={again !== undefined || working || saving.pending}
           required
         />
         <div className={shared.actions}>
@@ -247,7 +189,7 @@ export function TaskUpload({
       </div>
       {state.stage === 'refused' && <Refused error={state.error} />}
 
-      {arrived !== null && outcome === null && (
+      {arrived !== null && saving.outcome === null && (
         <div className={shared.panel} role="status">
           <BodyText>
             <span className={shared.mono}>{arrived.path}</span> has arrived
@@ -257,65 +199,41 @@ export function TaskUpload({
             It is not in the task yet. Saving puts it there, as a save of the task that
             publishes or keeps a draft
             {arrived.token === null ? '' : ', and replaces the file there now'}.
+            {others.length > 0 &&
+              ` The ${others.length === 1 ? 'upload' : `${String(others.length)} uploads`} waiting to be saved go in the same save.`}
           </BodyText>
           <div className={shared.actions}>
             <Button
-              loading={write.isPending}
+              loading={saving.pending}
               onClick={() => {
-                const body = firstSave();
-                if (body !== null) void save(body, arrived.path);
+                const mine = own();
+                if (mine !== null) void saving.save([...others, mine]);
               }}
             >
               Save into the task
             </Button>
-            <Button
-              variant="secondary"
-              disabled={write.isPending}
-              onClick={() => {
-                upload.reset();
-                setFile(null);
-              }}
-            >
+            {waiting !== null && (
+              <Button
+                variant="secondary"
+                disabled={saving.pending}
+                onClick={() => {
+                  const mine = own();
+                  if (mine !== null) waiting.keep(mine);
+                  forget();
+                  if (again !== undefined) onClose();
+                }}
+              >
+                Keep it waiting
+              </Button>
+            )}
+            <Button variant="secondary" disabled={saving.pending} onClick={forget}>
               Discard
             </Button>
           </div>
         </div>
       )}
 
-      {outcome !== null &&
-        (outcome.kind === 'refused' &&
-        UPLOAD_REFUSED[outcome.error.code] !== undefined ? (
-          <Refused error={outcome.error} />
-        ) : outcome.kind === 'refused' && outcome.error.code === 'conflict' ? (
-          <div className={shared.panel} role="alert">
-            <BodyText>
-              Someone else changed <span className={shared.mono}>{savedAt}</span> since
-              the upload began.
-            </BodyText>
-            <BodyText tone="secondary">
-              Nothing was saved. Saving again replaces their version with this upload.
-            </BodyText>
-            <div className={shared.actions}>
-              <Button
-                size="xs"
-                variant="secondary"
-                loading={write.isPending}
-                onClick={() => void saveOver(outcome.body)}
-              >
-                Save over their version
-              </Button>
-            </div>
-          </div>
-        ) : (
-          <SaveOutcome
-            outcome={outcome}
-            onConfirm={(body) => void save({ ...body, confirm: true }, savedAt)}
-            onKeepAsDraft={(body) =>
-              void save({ ...body, keep_as_draft: true }, savedAt)
-            }
-            onReload={() => undefined}
-          />
-        ))}
+      <UploadSaveAnswer saving={saving} />
     </section>
   );
 }

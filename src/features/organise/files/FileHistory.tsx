@@ -13,6 +13,7 @@ import { useMe } from '@/session';
 import { holdsAt } from '../roles';
 import { useHolders } from '../people/holders';
 import type { Place } from './place';
+import { UploadedFile } from './UploadedFile';
 import shared from '../organise.module.css';
 import classes from './Files.module.css';
 
@@ -260,6 +261,16 @@ function OldVersion({
   if (view.state === 'loading') return <PageSkeleton rows={4} />;
   if (view.state === 'error')
     return <ErrorBlock error={view.error} onRetry={view.retry} />;
+  if (view.data.upload)
+    return (
+      <UploadedFile
+        place={place}
+        path={path}
+        upload={view.data.upload}
+        token={null}
+        label={`${path} at ${short(version)}`}
+      />
+    );
   if (view.data.encoding === 'base64')
     return (
       <BodyText tone="secondary">

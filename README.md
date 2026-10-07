@@ -241,8 +241,10 @@ with the same props in for it (`src/test/code-editor.tsx`), and
 `CodeEditor.test.tsx` tests the editor itself.
 
 A file that is an upload is marked in the tree with the size of what it
-holds, and opens as its size and SHA-256, never in the editor, since its
-commit holds a pointer to the bytes. A manager of the task uploads a file
+holds, and opens as its size and SHA-256 (`files/UploadedFile.tsx`), never as
+text, since its commit holds a pointer to the bytes: in the file editor, as an
+older version in its history, and as a `statement.md` or `task.yaml` in the
+statement editor and the settings forms. A manager of the task uploads a file
 from the tree, into the folder last opened there or the open file's by
 default, at a path they can change, and changes an uploaded one with Upload
 again: the browser works out the SHA-256, asks `POST <task>/organise/uploads`
@@ -251,8 +253,15 @@ its progress, and a send the connection cuts is sent again from the start, up
 to three times, to the same slot; a slot for a file the forge holds already
 needs nothing sent. The upload is not in the task until the organiser saves
 it, which writes the file by its upload id with the token of the file there
-when the upload began, or none for a new file: a save like Save, with its
-answers and refusals, and a `conflict` offers to save over the other version.
+when the upload began, or none for a new file, through `POST <task>/save`: a
+save like Save, with its answers and refusals, and a `conflict` offers to save
+over the other version, each path with its token read afresh. In the file
+panel an arrived upload may instead be kept waiting, listed under "Waiting to
+be saved" with a Discard each; the next upload's Save, or the list's own, saves
+every waiting one with it in one save, so replacing a test's input and answer
+is one commit, one publication and one confirmation (`files/upload-save.ts`,
+`files/WaitingUploads.tsx`). Only the page keeps the waiting uploads, and it
+says so: leaving or reloading it drops them.
 The door's steps, shared with a contestant's submit, are in `src/api/upload/`.
 
 Under a task's file, History lists the file's versions newest first, each
@@ -278,13 +287,15 @@ back with their offset. The admin's keys (`TASK-FORMAT.md` section 1.1 and 1.2)
 are shown to a manager disabled, read from the session's roles as the
 organisers section reads them; the forge refuses a manager's change anyway.
 The task form's inputs are the ones the task's workflow declares, read with
-`GET <task>/workflow-form` each time the form opens: one entry each, in the
-workflow's order. A contestant's input takes form details its type has, a
+`GET <task>/workflow-form` each time the form opens, after a save too, and
+built only once that read is in, so a save naming another workflow reopens
+on that workflow's declarations: one entry each, in the workflow's order. A contestant's input takes form details its type has, a
 label for any, the options offered out of the workflow's own and a default
 for a choice, a default, a least and a most for a number, and `max_size` for
 a file or folder; any other input takes a value of its type, a number, true
 or false, one of an enum's options, a path for a file or folder, or text or
-`{secret: <name>}`, written as that type. One the file leaves out offers to
+`{secret: <name>}`, written as that type; a value cleared takes the key out.
+One the file leaves out offers to
 be given; a contestant's or an optional one may be left out again; one the
 file holds the other way is written afresh at the save, and one the workflow
 does not declare is marked to be removed. The test fields each test holds
@@ -325,8 +336,9 @@ what a started late day takes off, closes and worth, each at its default
 where the entry gives none, as the route resolves them. The list is read
 again on every visit, since a save on a task's page moves its state, and
 whenever one of the contest's files is written on the page, since
-`contest.yaml` holds the times. A `contest.yaml` that does not read leaves
-the tasks by name alone, with the reason.
+`contest.yaml` holds the times. A `contest.yaml` that does not pass
+validation, which the route refuses as `invalid_definition`, shows each of its
+errors at its YAML path and leaves the tasks by name alone.
 
 The contest's Gradings page (`gradings/`) lists every grading of its tasks
 newest first, each submission once by its task, who made it and its number,

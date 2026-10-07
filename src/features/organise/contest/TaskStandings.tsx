@@ -36,7 +36,9 @@ function Draft({ standing }: { standing: TaskStanding }) {
   if (state.errors.length === 0) {
     return (
       <BodyText tone="secondary">
-        A draft sits on top of it, kept back from contestants.
+        {state.latest === null
+          ? 'Its files are saved as a draft, kept back from contestants.'
+          : 'A draft sits on top of it, kept back from contestants.'}
       </BodyText>
     );
   }

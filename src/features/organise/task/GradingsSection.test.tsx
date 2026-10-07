@@ -9,12 +9,25 @@ import { TASK_API, publicationList, repoFiles, taskState } from '@/test/organise
 
 const TASK = '/orgs/acme/contests/spring/tasks/sum';
 
+/** The task's gradings as the route answers them, each by ada. */
+function asEntries(gradings: Grading[]) {
+  return HttpResponse.json(
+    gradings.map((grading) => ({
+      task: 'sum',
+      label: 'B',
+      by: { user_id: 11, name: 'ada', team: null },
+      grading,
+    })),
+  );
+}
+
 const stuck: Grading = {
   id: '0199a2c1-6b7e-7c3a-9f10-5d2e4b8a6c31',
   submission_number: 3,
   submitted_at: '2026-09-26T10:00:00Z',
   publication: 2,
   attempt: 1,
+  latest: true,
   status: 'system_error',
   error: 'The grading machine lost its run before it began.',
   result: null,
@@ -43,7 +56,7 @@ describe("the task's gradings", () => {
       taskState,
       publicationList,
       ...repoFiles,
-      http.get(`${TASK_API}/gradings`, () => HttpResponse.json([waiting, stuck])),
+      http.get(`${TASK_API}/gradings`, () => asEntries([waiting, stuck])),
     );
     renderApp(TASK);
 
@@ -82,7 +95,7 @@ describe("the task's gradings", () => {
       publicationList,
       ...repoFiles,
       http.get(`${TASK_API}/gradings`, () =>
-        HttpResponse.json([
+        asEntries([
           done(7, result({ stopped: 'compile_error', tests: [] })),
           done(6, result({})),
           done(
@@ -122,7 +135,7 @@ describe("the task's gradings", () => {
       taskState,
       publicationList,
       ...repoFiles,
-      http.get(`${TASK_API}/gradings`, () => HttpResponse.json([logged, waiting])),
+      http.get(`${TASK_API}/gradings`, () => asEntries([logged, waiting])),
     );
     renderApp(TASK);
 
@@ -148,7 +161,7 @@ describe("the task's gradings", () => {
       taskState,
       publicationList,
       ...repoFiles,
-      http.get(`${TASK_API}/gradings`, () => HttpResponse.json(listed)),
+      http.get(`${TASK_API}/gradings`, () => asEntries(listed)),
       http.post(`${TASK_API}/gradings/:grading/retry`, ({ params }) => {
         retried.push(String(params.grading));
         const again = {
@@ -195,9 +208,7 @@ describe("the task's gradings", () => {
       taskState,
       publicationList,
       ...repoFiles,
-      http.get(`${TASK_API}/gradings`, () =>
-        HttpResponse.json([finished, waiting, stuck]),
-      ),
+      http.get(`${TASK_API}/gradings`, () => asEntries([finished, waiting, stuck])),
     );
     renderApp(TASK);
 
@@ -219,7 +230,7 @@ describe("the task's gradings", () => {
       taskState,
       publicationList,
       ...repoFiles,
-      http.get(`${TASK_API}/gradings`, () => HttpResponse.json([stuck])),
+      http.get(`${TASK_API}/gradings`, () => asEntries([stuck])),
       http.post(`${TASK_API}/gradings/:grading/cancel`, async ({ params, request }) => {
         cancelled.push({ grading: String(params.grading), body: await request.json() });
         return HttpResponse.json({
@@ -266,7 +277,7 @@ describe("the task's gradings", () => {
       publicationList,
       ...repoFiles,
       http.get(`${TASK_API}/gradings`, () =>
-        HttpResponse.json([
+        asEntries([
           { ...stuck, status: 'cancelled', cancel_reason: 'The checker crashed.' },
         ]),
       ),
@@ -290,7 +301,7 @@ describe("the task's gradings", () => {
         taskState,
         publicationList,
         ...repoFiles,
-        http.get(`${TASK_API}/gradings`, () => HttpResponse.json([stuck])),
+        http.get(`${TASK_API}/gradings`, () => asEntries([stuck])),
         http.post(`${TASK_API}/gradings/:grading/cancel`, () =>
           problem(status, code, extra),
         ),
@@ -331,9 +342,7 @@ describe("the task's gradings", () => {
       taskState,
       publicationList,
       ...repoFiles,
-      http.get(`${TASK_API}/gradings`, () =>
-        HttpResponse.json([second, waiting, stuck]),
-      ),
+      http.get(`${TASK_API}/gradings`, () => asEntries([second, waiting, stuck])),
     );
     renderApp(TASK);
 
@@ -395,9 +404,7 @@ describe("the task's gradings", () => {
       taskState,
       publicationList,
       ...repoFiles,
-      http.get(`${TASK_API}/gradings`, () =>
-        HttpResponse.json([theirs, oursAgain, ours]),
-      ),
+      http.get(`${TASK_API}/gradings`, () => asEntries([theirs, oursAgain, ours])),
     );
     renderApp(TASK);
 
@@ -426,7 +433,7 @@ describe("the task's gradings", () => {
       ...repoFiles,
       http.get(`${TASK_API}/gradings`, () => {
         reads += 1;
-        return HttpResponse.json([stuck]);
+        return asEntries([stuck]);
       }),
       http.post(`${TASK_API}/rejudge`, () => {
         rejudged += 1;
@@ -498,7 +505,7 @@ describe("the task's gradings", () => {
       taskState,
       publicationList,
       ...repoFiles,
-      http.get(`${TASK_API}/gradings`, () => HttpResponse.json([stuck])),
+      http.get(`${TASK_API}/gradings`, () => asEntries([stuck])),
     );
     renderApp(TASK);
 

@@ -58,6 +58,8 @@ describe('saving a task file', () => {
         number: 3,
         grading_changed: true,
         changes: ['plans/default.json changed'],
+        notes: [],
+        regraded: 0,
       }),
     );
 
@@ -87,6 +89,8 @@ describe('saving a task file', () => {
         number: 3,
         grading_changed: false,
         changes: [],
+        notes: [],
+        regraded: 0,
       }),
     );
 
@@ -128,6 +132,8 @@ describe('saving a task file', () => {
                 number: 3,
                 grading_changed: true,
                 changes: ['plans/default.json changed'],
+                notes: [],
+                regraded: 0,
               })
             : problem(409, 'confirmation_required', {
                 detail: 'The contest is running and this changes how the task grades.',

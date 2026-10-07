@@ -94,6 +94,23 @@
   border-bottom: 1px solid var(--unicon-border);
 }
 
+/* The uploads waiting to be saved, one a line: path, size, Discard. */
+.waiting {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.waiting li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
 .heading {
   display: flex;
   align-items: center;

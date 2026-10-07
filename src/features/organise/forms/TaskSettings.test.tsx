@@ -45,6 +45,7 @@ const UNREAD: WorkflowForm = {
   inputs: [],
   test: [],
   problem: 'The workflow unicon/checked@v1 cannot be read.',
+  graded: false,
 };
 
 function declared(
@@ -67,6 +68,7 @@ function declared(
 const CHECKED: WorkflowForm = {
   workflow: 'unicon/checked@v1',
   problem: null,
+  graded: false,
   inputs: [
     declared('submission', 'file', { contestant: true }),
     declared('language', 'enum', {
@@ -171,6 +173,7 @@ describe('the task settings form', { timeout: 20_000 }, () => {
         grading_changed: true,
         changes: ['the plan'],
         notes: [],
+        regraded: 0,
       }),
     );
     asManager();
@@ -303,6 +306,7 @@ describe('the task settings form', { timeout: 20_000 }, () => {
           grading_changed: false,
           changes: [],
           notes: [],
+          regraded: 0,
         }),
       undefined,
       CHECKED,
@@ -369,6 +373,7 @@ describe('the task settings form', { timeout: 20_000 }, () => {
           grading_changed: false,
           changes: [],
           notes: [],
+          regraded: 0,
         }),
       undefined,
       { ...CHECKED, inputs: CHECKED.inputs.filter((input) => input.id !== 'token') },
@@ -403,6 +408,7 @@ describe('the task settings form', { timeout: 20_000 }, () => {
           grading_changed: false,
           changes: [],
           notes: [],
+          regraded: 0,
         }),
       undefined,
       {
@@ -430,6 +436,71 @@ describe('the task settings form', { timeout: 20_000 }, () => {
     expect(saved.inputs['time_limit']).toEqual({ max: 10 });
   });
 
+  it('builds the form after a save from the workflow the save named', async () => {
+    const published = () =>
+      HttpResponse.json({
+        number: 4,
+        grading_changed: true,
+        changes: [],
+        notes: [],
+        regraded: 0,
+      });
+    const { sent } = taskBackend(published, undefined, CHECKED);
+    // The new workflow takes the time limit from the contestant.
+    const tunable: WorkflowForm = {
+      ...CHECKED,
+      workflow: 'my-org/tunable@v1',
+      inputs: CHECKED.inputs.map((input) =>
+        input.id === 'time_limit' ? { ...input, contestant: true } : input,
+      ),
+    };
+    server.use(
+      http.get(`${TASK_API}/workflow-form`, () =>
+        HttpResponse.json(sent.length === 0 ? CHECKED : tunable),
+      ),
+    );
+    asManager();
+    const form = await openForm();
+    expect(within(form).getByLabelText('time_limit value')).toBeVisible();
+
+    fill(within(form).getByLabelText('Workflow'), 'my-org/tunable@v1');
+    fireEvent.click(within(form).getByRole('button', { name: 'Save settings' }));
+    expect(await screen.findByText('Published as publication 4.')).toBeVisible();
+
+    const after = await screen.findByRole('form', { name: 'Task settings' });
+    expect(
+      await within(after).findByText(
+        /task.yaml gives it a value, but the contestant gives this one/,
+      ),
+    ).toBeVisible();
+    expect(within(after).queryByLabelText('time_limit value')).toBeNull();
+    expect(within(after).getByLabelText('time_limit max')).toBeVisible();
+  });
+
+  it("removes a declared input's key when its value is cleared", async () => {
+    const { sent } = taskBackend(
+      () =>
+        HttpResponse.json({
+          number: 4,
+          grading_changed: true,
+          changes: [],
+          notes: [],
+          regraded: 0,
+        }),
+      undefined,
+      CHECKED,
+    );
+    asManager();
+    const form = await openForm();
+
+    fill(within(form).getByLabelText('time_limit value'), '');
+    fireEvent.click(within(form).getByRole('button', { name: 'Save settings' }));
+
+    expect(await screen.findByText('Published as publication 4.')).toBeVisible();
+    const saved = parse(sent[0]?.content ?? '') as { inputs: Record<string, unknown> };
+    expect(saved.inputs).not.toHaveProperty('time_limit');
+  });
+
   it("says why the workflow's inputs could not be read, and edits the entries there are", async () => {
     taskBackend(() => HttpResponse.json({}));
     const form = await openForm();
@@ -438,6 +509,36 @@ describe('the task settings form', { timeout: 20_000 }, () => {
       within(form).getByText(/The workflow unicon\/checked@v1 cannot be read\./),
     ).toBeVisible();
     expect(within(form).getByLabelText("New input's id")).toBeVisible();
+  });
+
+  it('shows a task.yaml that is an upload by its size and digest, not as a form', async () => {
+    taskBackend(() => HttpResponse.json({}));
+    server.use(
+      http.get(`${TASK_API}/files/:path`, ({ params }) =>
+        params['path'] === 'task.yaml'
+          ? HttpResponse.json({
+              path: 'task.yaml',
+              encoding: 'utf-8',
+              content: `version https://git-lfs.github.com/spec/v1
+oid sha256:${'d'.repeat(64)}
+size 120
+`,
+              token: 'token-task',
+              upload: { size: 120, digest: 'd'.repeat(64) },
+            })
+          : undefined,
+      ),
+    );
+    renderApp('/orgs/acme/contests/spring/tasks/sum');
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Edit the settings' }),
+    );
+
+    const [shown] = await screen.findAllByRole('region', {
+      name: 'Uploaded task.yaml',
+    });
+    expect(within(shown!).getByText('d'.repeat(64))).toBeVisible();
+    expect(screen.queryByRole('form', { name: 'Task settings' })).toBeNull();
   });
 
   it('will not save a number field that holds no number', async () => {
@@ -459,6 +560,7 @@ describe('the task settings form', { timeout: 20_000 }, () => {
           grading_changed: false,
           changes: [],
           notes: [],
+          regraded: 0,
         }),
       theirs,
     );

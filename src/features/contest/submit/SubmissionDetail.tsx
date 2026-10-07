@@ -91,7 +91,9 @@ function Group({ group }: { group: GroupShown }) {
  * What the grading holds for the contestant: its verdict, what the run
  * reported once, such as a compile log, and each test group as the task
  * shows it. A grading the organisers cancelled holds their sentence instead,
- * and says the submission no longer counts against the task's limit.
+ * and says the submission no longer counts against the task's limit: a cancel
+ * with a sentence is the one the forge leaves out of the limit, so one
+ * without (made before cancels carried one) says nothing about the limit.
  */
 function Grading({ grading }: { grading: GradingResult }) {
   if (grading.status === 'cancelled') {
@@ -104,10 +106,12 @@ function Grading({ grading }: { grading: GradingResult }) {
         <BodyText>
           Cancelled by the organisers{reason === null ? '.' : `: ${reason}`}
         </BodyText>
-        <BodyText tone="secondary">
-          It is not graded, and it does not count against the task&apos;s limit on
-          submissions.
-        </BodyText>
+        {reason !== null && (
+          <BodyText tone="secondary">
+            It is not graded, and it does not count against the task&apos;s limit on
+            submissions.
+          </BodyText>
+        )}
       </>
     );
   }

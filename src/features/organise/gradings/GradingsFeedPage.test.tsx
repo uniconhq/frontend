@@ -16,6 +16,7 @@ const grading: Grading = {
   submitted_at: '2026-10-05T10:00:00Z',
   publication: 2,
   attempt: 1,
+  latest: true,
   status: 'done',
   error: null,
   result: {
@@ -40,6 +41,7 @@ const lovelaces = { user_id: null, name: 'Lovelaces', team: 'team-1' };
 /** A first attempt that hit a system error, then its retry, still queued. */
 const stuckFirst: FeedEntry = {
   task: 'sum',
+  label: 'B',
   by: ada,
   grading: {
     ...grading,
@@ -54,6 +56,7 @@ const stuckFirst: FeedEntry = {
 };
 const retried: FeedEntry = {
   task: 'sum',
+  label: 'B',
   by: ada,
   grading: {
     ...stuckFirst.grading,
@@ -67,11 +70,13 @@ const retried: FeedEntry = {
 };
 const sortByTeam: FeedEntry = {
   task: 'sort',
+  label: 'A',
   by: lovelaces,
   grading: { ...grading, id: 'g-sort-1', submission_number: 1 },
 };
 const cancelled: FeedEntry = {
   task: 'sort',
+  label: 'A',
   by: ada,
   grading: {
     ...grading,

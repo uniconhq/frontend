@@ -480,7 +480,8 @@ export function GradingsSection({ path }: { path: TaskPath }) {
       { params: { path } },
       {
         refetchInterval: (query) =>
-          !live && query.state.data?.some((grading) => UNFINISHED.has(grading.status))
+          !live &&
+          query.state.data?.some((entry) => UNFINISHED.has(entry.grading.status))
             ? WAITING_MS
             : MEANWHILE_MS,
       },
@@ -536,7 +537,7 @@ export function GradingsSection({ path }: { path: TaskPath }) {
                 {manages && <th scope="col">Actions</th>}
               </tr>
             </thead>
-            {bySubmission(view.data).map((attempts) => (
+            {bySubmission(view.data.map((entry) => entry.grading)).map((attempts) => (
               <Submission
                 key={attempts[0] === undefined ? '' : submissionKey(attempts[0])}
                 path={path}

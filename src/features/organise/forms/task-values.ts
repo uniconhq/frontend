@@ -271,11 +271,15 @@ function typedValue(type: string | null, text: string): unknown {
   }
 }
 
-/** An input entry as the file holds it, for one added or turned the other way. */
+/**
+ * An input entry as the file holds it, for one added or turned the other way.
+ * A value left empty is no entry, so the save names the input as missing
+ * rather than as the wrong type.
+ */
 function inputEntry(input: InputValues): unknown {
   if (input.kind === 'value') {
     if (input.secret) return { secret: input.value };
-    return typedValue(input.type, input.value) ?? null;
+    return typedValue(input.type, input.value);
   }
   const details: Record<string, unknown> = {};
   const add = (key: string, value: unknown) => {
@@ -385,10 +389,10 @@ export function writeTask(
       const path = (key?: string) =>
         key === undefined ? ['inputs', input.id] : ['inputs', input.id, key];
       if (was === undefined || was.shape !== input.kind) {
-        writeAt(doc, path(), inputEntry(input));
+        writeAt(doc, path(), inputEntry(input), { prune: true });
       } else if (input.kind === 'value') {
         if (was.value !== input.value || was.secret !== input.secret) {
-          writeAt(doc, path(), inputEntry(input));
+          writeAt(doc, path(), inputEntry(input), { prune: true });
         }
       } else {
         put(path('label'), was.label, input.label, text);

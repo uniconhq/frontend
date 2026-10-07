@@ -280,6 +280,46 @@ describe('the organisers section', () => {
     expect(sent).toEqual([{ username: 'dee', role: 'admin' }]);
   });
 
+  it('keeps a refusal about the role that was sent while another is picked', async () => {
+    server.use(
+      signedInAs([
+        { names: { org: 'acme', contest: 'spring', task: null }, role: 'manager' },
+      ]),
+      taskList,
+      http.get(CONTEST_ROLES, () =>
+        HttpResponse.json([
+          holder(
+            { id: 41, username: 'kim' },
+            {
+              role: 'manager',
+              at_names: { org: 'acme', contest: 'spring', task: null },
+            },
+          ),
+        ]),
+      ),
+      http.post(CONTEST_ROLES, () =>
+        problem(403, 'forbidden', {
+          detail: 'Only an admin of acme/spring may grant admin there.',
+        }),
+      ),
+    );
+    const user = userEvent.setup();
+    renderApp('/orgs/acme/contests/spring');
+
+    await screen.findByRole('table', { name: 'Organisers' });
+    await user.click(screen.getByRole('button', { name: 'Change role of kim' }));
+    const form = screen.getByRole('form', { name: 'Change role of kim' });
+    await user.selectOptions(within(form).getByLabelText('Role'), 'admin');
+    await user.click(within(form).getByRole('button', { name: 'Save' }));
+
+    const alert = await within(row('kim')).findByRole('alert');
+    expect(alert).toHaveTextContent('Only an admin gives the admin role');
+    await user.selectOptions(within(form).getByLabelText('Role'), 'observer');
+    expect(within(row('kim')).getByRole('alert')).toHaveTextContent(
+      'Only an admin gives the admin role',
+    );
+  });
+
   it('shows an observer the list and nothing to change', async () => {
     server.use(
       signedInAs([
