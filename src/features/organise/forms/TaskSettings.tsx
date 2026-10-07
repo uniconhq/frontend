@@ -57,7 +57,10 @@ function WithFolders(props: FormProps & { place: Place; admin: boolean }) {
   const { place } = props;
   const tree = useQuery({ ...treeQuery(place, TESTS), retry: false });
   // Read afresh each time the form opens, which includes after each save,
-  // since a save may name another workflow.
+  // since a save may name another workflow: the form waits for that read and
+  // is built from it, never from what was cached before. It is not read again
+  // while the organiser types, so the form is never rebuilt under them; a
+  // workflow someone else changes meanwhile comes back as a conflict.
   const workflow = $api.useQuery(
     'get',
     '/api/v1/orgs/{org}/contests/{contest}/tasks/{task}/workflow-form',
@@ -70,9 +73,17 @@ function WithFolders(props: FormProps & { place: Place; admin: boolean }) {
         },
       },
     },
-    { enabled: place.kind === 'task', retry: false, gcTime: 0 },
+    {
+      enabled: place.kind === 'task',
+      retry: false,
+      gcTime: 0,
+      staleTime: 0,
+      refetchOnMount: 'always',
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: false,
+    },
   );
-  if (tree.isPending || (place.kind === 'task' && workflow.isPending)) {
+  if (tree.isPending || (place.kind === 'task' && !workflow.isFetchedAfterMount)) {
     return <PageSkeleton rows={6} />;
   }
   const folders = (tree.data ?? [])
@@ -80,10 +91,11 @@ function WithFolders(props: FormProps & { place: Place; admin: boolean }) {
     .map((entry) => entry.path.slice(TESTS.length + 1));
   return (
     <TaskForm
+      key={workflow.dataUpdatedAt}
       {...props}
       folders={folders}
       treeFailed={tree.isError}
-      workflowForm={workflow.data ?? null}
+      workflowForm={workflow.isError ? null : (workflow.data ?? null)}
     />
   );
 }

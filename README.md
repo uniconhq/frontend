@@ -278,13 +278,15 @@ back with their offset. The admin's keys (`TASK-FORMAT.md` section 1.1 and 1.2)
 are shown to a manager disabled, read from the session's roles as the
 organisers section reads them; the forge refuses a manager's change anyway.
 The task form's inputs are the ones the task's workflow declares, read with
-`GET <task>/workflow-form` each time the form opens: one entry each, in the
-workflow's order. A contestant's input takes form details its type has, a
+`GET <task>/workflow-form` each time the form opens, after a save too, and
+built only once that read is in, so a save naming another workflow reopens
+on that workflow's declarations: one entry each, in the workflow's order. A contestant's input takes form details its type has, a
 label for any, the options offered out of the workflow's own and a default
 for a choice, a default, a least and a most for a number, and `max_size` for
 a file or folder; any other input takes a value of its type, a number, true
 or false, one of an enum's options, a path for a file or folder, or text or
-`{secret: <name>}`, written as that type. One the file leaves out offers to
+`{secret: <name>}`, written as that type; a value cleared takes the key out.
+One the file leaves out offers to
 be given; a contestant's or an optional one may be left out again; one the
 file holds the other way is written afresh at the save, and one the workflow
 does not declare is marked to be removed. The test fields each test holds

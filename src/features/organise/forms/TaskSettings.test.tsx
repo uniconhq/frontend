@@ -430,6 +430,59 @@ describe('the task settings form', { timeout: 20_000 }, () => {
     expect(saved.inputs['time_limit']).toEqual({ max: 10 });
   });
 
+  it('builds the form after a save from the workflow the save named', async () => {
+    const published = () =>
+      HttpResponse.json({ number: 4, grading_changed: true, changes: [], notes: [] });
+    const { sent } = taskBackend(published, undefined, CHECKED);
+    // The new workflow takes the time limit from the contestant.
+    const tunable: WorkflowForm = {
+      ...CHECKED,
+      workflow: 'my-org/tunable@v1',
+      inputs: CHECKED.inputs.map((input) =>
+        input.id === 'time_limit' ? { ...input, contestant: true } : input,
+      ),
+    };
+    server.use(
+      http.get(`${TASK_API}/workflow-form`, () =>
+        HttpResponse.json(sent.length === 0 ? CHECKED : tunable),
+      ),
+    );
+    asManager();
+    const form = await openForm();
+    expect(within(form).getByLabelText('time_limit value')).toBeVisible();
+
+    fill(within(form).getByLabelText('Workflow'), 'my-org/tunable@v1');
+    fireEvent.click(within(form).getByRole('button', { name: 'Save settings' }));
+    expect(await screen.findByText('Published as publication 4.')).toBeVisible();
+
+    const after = await screen.findByRole('form', { name: 'Task settings' });
+    expect(
+      await within(after).findByText(
+        /task.yaml gives it a value, but the contestant gives this one/,
+      ),
+    ).toBeVisible();
+    expect(within(after).queryByLabelText('time_limit value')).toBeNull();
+    expect(within(after).getByLabelText('time_limit max')).toBeVisible();
+  });
+
+  it("removes a declared input's key when its value is cleared", async () => {
+    const { sent } = taskBackend(
+      () =>
+        HttpResponse.json({ number: 4, grading_changed: true, changes: [], notes: [] }),
+      undefined,
+      CHECKED,
+    );
+    asManager();
+    const form = await openForm();
+
+    fill(within(form).getByLabelText('time_limit value'), '');
+    fireEvent.click(within(form).getByRole('button', { name: 'Save settings' }));
+
+    expect(await screen.findByText('Published as publication 4.')).toBeVisible();
+    const saved = parse(sent[0]?.content ?? '') as { inputs: Record<string, unknown> };
+    expect(saved.inputs).not.toHaveProperty('time_limit');
+  });
+
   it("says why the workflow's inputs could not be read, and edits the entries there are", async () => {
     taskBackend(() => HttpResponse.json({}));
     const form = await openForm();
