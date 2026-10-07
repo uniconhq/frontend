@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { $api, queryView } from '@/api/query';
-import { isApiError } from '@/api/problem';
+import { isApiError, toApiError } from '@/api/problem';
 import type { Grading, GradingStatus, Rejudged } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
 import { Modal } from '@/ui/Modal';
+import { TextInput } from '@/ui/TextInput';
 import { TextLink } from '@/ui/TextLink';
 import { SectionTitle } from '@/ui/SectionTitle';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
@@ -37,13 +38,17 @@ const STATUS: Record<GradingStatus, string> = {
 const UNFINISHED = new Set<GradingStatus>(['queued', 'dispatched', 'running']);
 
 /**
- * Which gradings are offered Cancel: one still to finish. Kept in this one
- * place, beside the call in `useActions`, since what cancel applies to and
- * what it sends are about to change.
+ * Which gradings are offered Cancel: the latest attempt of a submission whose
+ * grading reads as a system error, stored or because its run is overdue or
+ * lost. Cancel ends the submission for good, with a sentence its contestant
+ * reads, when a retry would only repeat the fault.
  */
 function cancellable(grading: Grading): boolean {
-  return UNFINISHED.has(grading.status);
+  return grading.status === 'system_error';
 }
+
+/** The most characters the sentence a cancel gives its contestant may run to. */
+const REASON_MAX = 500;
 
 /**
  * What a finished grading's result comes to: what stopped the run, or the
@@ -90,10 +95,13 @@ function bySubmission(gradings: Grading[]): Grading[][] {
   );
 }
 
-/** What a manager is being asked to confirm. */
+/**
+ * What a manager is being asked to confirm. A cancel carries the sentence
+ * its contestant will read.
+ */
 type Asking =
   | { kind: 'retry'; grading: Grading }
-  | { kind: 'cancel'; grading: Grading }
+  | { kind: 'cancel'; grading: Grading; reason: string }
   | { kind: 'rejudge' };
 
 /**
@@ -139,7 +147,7 @@ function useActions(path: TaskPath) {
         return await rejudge.mutateAsync({ params: { path } });
       const params = { path: { ...path, grading: asking.grading.id } };
       if (asking.kind === 'retry') await retry.mutateAsync({ params });
-      else await cancel.mutateAsync({ params });
+      else await cancel.mutateAsync({ params, body: { reason: asking.reason.trim() } });
       return true;
     } catch {
       return false;
@@ -156,8 +164,9 @@ function useActions(path: TaskPath) {
 
 /**
  * One attempt as a row. The latest attempt of a submission is headed by the
- * submission and, for a manager, carries what its status allows: Cancel for
- * one still to finish and Retry for one that is finished. A grading whose run
+ * submission and, for a manager, carries what its status allows: Retry for
+ * one that is finished, and Cancel as well for a system error. A cancelled
+ * one shows the sentence its contestant was given. A grading whose run
  * is overdue or that the grading machine lost reads as a system error with
  * the reason, and its Retry is drawn as the thing to do, since grading a
  * verdict again is not. An earlier attempt is there to be read.
@@ -214,6 +223,11 @@ function AttemptRow({
         {grading.error !== null && (
           <BodyText tone="secondary">{grading.error}</BodyText>
         )}
+        {grading.cancel_reason !== null && (
+          <BodyText tone="secondary">
+            Told the contestant: {grading.cancel_reason}
+          </BodyText>
+        )}
         {grading.status === 'done' && grading.result !== null && (
           <BodyText tone="secondary">{resultOf(grading.result)}</BodyText>
         )}
@@ -242,7 +256,7 @@ function AttemptRow({
                   size="xs"
                   variant="secondary"
                   label={`Cancel ${name}`}
-                  onClick={() => onAsk({ kind: 'cancel', grading })}
+                  onClick={() => onAsk({ kind: 'cancel', grading, reason: '' })}
                 >
                   Cancel
                 </Button>
@@ -341,12 +355,38 @@ function Consequence({ asking }: { asking: Asking }) {
     );
   }
   return (
-    <BodyText>
-      Attempt {grading.attempt} of {submission.toLowerCase()} stops and ends as
-      cancelled. Nothing grades the submission again until it is retried.
-    </BodyText>
+    <>
+      <BodyText>
+        Attempt {grading.attempt} of {submission.toLowerCase()} ends as cancelled. Its
+        contestant reads the sentence below in place of a result, and the submission no
+        longer counts against the task&apos;s limit.
+      </BodyText>
+      <BodyText tone="secondary">
+        A rejudge leaves it cancelled; a retry grades it again.
+      </BodyText>
+    </>
   );
 }
+
+/**
+ * Why a cancel was refused, in the dialog's own words: the sentence would not
+ * do, the grading is no longer a system error, or a later attempt has
+ * started. The backend's sentence follows when it gives one.
+ */
+const CANCEL_REFUSED: Partial<Record<string, { title: string; fallback: string }>> = {
+  invalid_reason: {
+    title: 'That sentence will not do',
+    fallback: `Give the contestant a sentence of 1 to ${String(REASON_MAX)} characters.`,
+  },
+  wrong_status: {
+    title: 'It is no longer a system error',
+    fallback: 'Only a grading that reads as a system error can be cancelled.',
+  },
+  conflict: {
+    title: 'A later attempt is there',
+    fallback: 'Only the latest attempt of a submission can be cancelled.',
+  },
+};
 
 /** A refusal in the dialog. A rejudge with nothing published to grade against says so. */
 function Refusal({ asking, error }: { asking: Asking; error: unknown }) {
@@ -360,11 +400,32 @@ function Refusal({ asking, error }: { asking: Asking; error: unknown }) {
       </div>
     );
   }
+  const refused = toApiError(error);
+  const words = asking.kind === 'cancel' ? CANCEL_REFUSED[refused.code] : undefined;
+  if (words !== undefined) {
+    const current = refused.extensions['current'];
+    return (
+      <div role="alert">
+        <BodyText tone="secondary">{words.title}</BodyText>
+        <BodyText tone="secondary">{refused.detail ?? words.fallback}</BodyText>
+        {refused.code === 'wrong_status' && typeof current === 'string' && (
+          <BodyText tone="secondary">It is {statusNow(current)} now.</BodyText>
+        )}
+      </div>
+    );
+  }
   return (
     <div role="alert">
       <ErrorBlock error={error} compact />
     </div>
   );
+}
+
+/** A status a refusal names, in the list's words when it is one of them. */
+function statusNow(status: string): string {
+  return Object.hasOwn(STATUS, status)
+    ? STATUS[status as GradingStatus].toLowerCase()
+    : status;
 }
 
 /** What a rejudge did, said once it has. */
@@ -486,6 +547,16 @@ export function GradingsSection({ path }: { path: TaskPath }) {
         {asking !== null && (
           <div className={shared.stack}>
             <Consequence asking={asking} />
+            {asking.kind === 'cancel' && (
+              <TextInput
+                label="What the contestant reads"
+                description={`One sentence, at most ${String(REASON_MAX)} characters, shown with the submission.`}
+                value={asking.reason}
+                onChange={(reason) => setAsking({ ...asking, reason })}
+                maxLength={REASON_MAX}
+                required
+              />
+            )}
             {actions.error !== null && (
               <Refusal asking={asking} error={actions.error} />
             )}
@@ -493,6 +564,7 @@ export function GradingsSection({ path }: { path: TaskPath }) {
               <Button
                 variant={asking.kind === 'cancel' ? 'danger' : 'primary'}
                 loading={actions.pending}
+                disabled={asking.kind === 'cancel' && asking.reason.trim() === ''}
                 onClick={() => void confirm()}
               >
                 {CONFIRM[asking.kind]}

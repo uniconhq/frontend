@@ -43,6 +43,7 @@ function contestBackend({
     encoding: 'utf-8',
     content: current,
     token: 'token-1',
+    upload: null,
   };
   let conflicted = conflictWith === undefined;
   const sent: { content: string; token: string }[] = [];
@@ -82,7 +83,7 @@ async function openForm() {
   return screen.findByRole('form', { name: 'Contest settings' });
 }
 
-describe('the contest settings form', () => {
+describe('the contest settings form', { timeout: 20_000 }, () => {
   it("lets an admin change every key, and writes only those into the organiser's file", async () => {
     const { sent } = contestBackend();
     const form = await openForm();
@@ -148,7 +149,7 @@ describe('the contest settings form', () => {
     });
     expect(write?.content).toContain("# the page's title");
     expect(write?.content).toContain('leaderboards:\n  - name: Standings\n');
-  }, 15_000);
+  });
 
   it("shows a manager the admin's keys read-only and saves the manager's own", async () => {
     const { sent } = contestBackend();

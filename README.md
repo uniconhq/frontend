@@ -155,9 +155,10 @@ a release still says something true.
 
 ## The organiser pages
 
-An organiser makes an org, a contest and a task, then opens any file of a
-contest or a task as text and saves it. Saving a task's file is the save of
-the task, which publishes it or keeps it as a draft.
+An organiser makes an org, a contest and a task, then edits the contest's and
+the task's settings as forms, or opens any file of either as text and saves
+it. Saving a task's file is the save of the task, which publishes it or keeps
+it as a draft.
 
 | Address                                    | Page                                                                          |
 | ------------------------------------------ | ----------------------------------------------------------------------------- |
@@ -179,8 +180,8 @@ place, `src/lib/organiser-paths.ts`, which the pages and the breadcrumb share.
 The pages live in `src/features/organise/`: a sub-folder for each page
 (`orgs/` holds `/orgs` and `/orgs/new`, then `org/`, `contest/`, `contestants/`,
 `teams/` and `task/`), one for the file tree and editor the contest and task pages
-share (`files/`), and one for the organisers section all three pages
-share (`people/`). The pieces more than one of those use sit at its top:
+share (`files/`), one for the settings forms and the statement (`forms/`),
+and one for the organisers section all three pages share (`people/`). The pieces more than one of those use sit at its top:
 the create form and `Create`, which keeps it behind a New button and
 closes it once the thing is made; the list of links, the definition errors, and what a person's roles
 reach. The route params every page reads are in
@@ -246,6 +247,32 @@ another file is marked on that file. An older version opens below, read-only,
 and a manager rolls the file back to it after a confirmation: the forge writes
 the old content as a new version, and the rollback is a save of the task with
 the same token, answers and refusals as Save.
+
+The contest page's Settings and the task page's Settings and Statement read
+their file when opened, under a query key of their own, so a save there never
+swaps the token under the same file open in the editor. Settings is a form
+over `contest.yaml` or `task.yaml`, with the file as text in a tab beside it
+for the keys that have no field, such as the leaderboards. The form parses
+the file with `yaml`'s `parseDocument`, writes only the nodes whose fields
+changed, and saves `String(doc)` through the same write as the editor, so
+comments, key order and every untouched key stay as they were, and the answer
+is the editor's. A file that is not YAML, or not a mapping, opens as text with
+the reason. Times show in the organiser's own zone and a changed one is written
+back with their offset. The admin's keys (`TASK-FORMAT.md` section 1.1 and 1.2)
+are shown to a manager disabled, read from the session's roles as the
+organisers section reads them; the forge refuses a manager's change anyway.
+The routes name no workflow's inputs, so the task form edits the `inputs`
+entries the file has, adds or removes one by id, and takes an entry holding
+a mapping (other than `{secret: ...}`) as the contestant's form details and
+anything else as a value. Its test groups are the folders under `tests/` and
+the groups the file names: a folder with no entry is added at the next save,
+and an entry with no folder is marked and may be removed. A form save refused
+as a `conflict` reads the file again and shows the organiser's version and the
+current one field by field, with a choice per field that starts on the side
+that changed it; nothing is written until they save, which writes the chosen fields
+into the current file with its token (`forms/merge.ts`, over any YAML
+document). The statement is edited beside `ui/Markdown`, the renderer the
+contestant's task page uses, and is read-only to a manager.
 
 The task page's gradings list each submission once, headed by its latest
 attempt, with its earlier attempts opening below it to be read. A manager

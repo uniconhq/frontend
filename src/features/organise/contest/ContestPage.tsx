@@ -8,7 +8,12 @@ import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
 import { useMe } from '@/session';
 import { contestHomePath } from '@/lib/contest-paths';
-import { contestantsPath, taskPath, teamsPath } from '@/lib/organiser-paths';
+import {
+  contestantsPath,
+  gradingsPath,
+  taskPath,
+  teamsPath,
+} from '@/lib/organiser-paths';
 import { PageLink } from '@/ui/PageLink';
 import { Create } from '../Create';
 import { AnnouncementsSection } from '../threads/AnnouncementsSection';
@@ -66,6 +71,7 @@ export function ContestPage() {
       <div className={classes.actions}>
         <PageLink to={contestantsPath(org, contest)}>Contestants</PageLink>
         <PageLink to={teamsPath(org, contest)}>Teams</PageLink>
+        <PageLink to={gradingsPath(org, contest)}>Gradings</PageLink>
         <PageLink to={contestHomePath(org, contest)}>The page contestants see</PageLink>
       </div>
       <Card>

@@ -36,6 +36,7 @@ const TESTS: TreeEntry[] = ['samples', 'small', 'large'].map((group) => ({
   path: `tests/${group}`,
   kind: 'directory',
   size: null,
+  upload: null,
 }));
 
 /**
@@ -49,6 +50,7 @@ function taskBackend(answer: () => Response, conflictWith?: string) {
     encoding: 'utf-8',
     content: TASK,
     token: 'token-task',
+    upload: null,
   };
   const sent: { content: string; token: string }[] = [];
   server.use(

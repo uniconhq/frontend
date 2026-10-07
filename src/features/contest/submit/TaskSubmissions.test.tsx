@@ -599,6 +599,45 @@ describe('the submissions list', () => {
     expect(asked).toBe(settled);
   });
 
+  it('shows a cancelled submission with the organisers’ sentence and stops following it', async () => {
+    const fresh = (graded: GradingResult) => ({
+      ...submission(1, graded),
+      submitted_at: new Date(serverNow().getTime() - 2_000).toISOString(),
+    });
+    const turns = [
+      [fresh(grading({ status: 'running' }))],
+      [
+        fresh(
+          grading({
+            status: 'cancelled',
+            reason: 'The checker crashed on every test.',
+          }),
+        ),
+      ],
+    ];
+    let asked = 0;
+    server.use(
+      signedIn,
+      withPage({}),
+      http.get(`${TASK_API}/submissions`, () => {
+        const answer = turns[Math.min(asked, turns.length - 1)];
+        asked += 1;
+        return HttpResponse.json(answer);
+      }),
+    );
+    renderApp(PAGE);
+
+    const list = await screen.findByRole('table', { name: 'Your submissions' });
+    expect(await within(list).findByText('RUNNING')).toBeVisible();
+    await passTime(2_000);
+    expect(await within(list).findByText('CANCELLED')).toBeVisible();
+    expect(within(list).getByText('The checker crashed on every test.')).toBeVisible();
+
+    const settled = asked;
+    await passTime(10_000);
+    expect(asked).toBe(settled);
+  });
+
   it('lists the newest first, each with its verdict and how late it was', async () => {
     server.use(
       signedIn,
@@ -689,6 +728,33 @@ describe('a submission opened from the list', () => {
     const extra = within(detail).getByRole('region', { name: 'Group extra' });
     expect(within(extra).getByText('Not run on this grading')).toBeVisible();
     expect(within(extra).queryByRole('table')).toBeNull();
+  });
+
+  it('shows a cancelled one as cancelled, in the organisers’ words', async () => {
+    const cancelled = grading({
+      status: 'cancelled',
+      reason: 'The checker crashed on every test.',
+    });
+    server.use(
+      signedIn,
+      withPage({}),
+      listing([submission(1, cancelled)]),
+      http.get(`${TASK_API}/submissions/:number`, () =>
+        HttpResponse.json(submission(1, cancelled)),
+      ),
+    );
+    const user = userEvent.setup();
+    renderApp(PAGE);
+
+    await user.click(await screen.findByRole('link', { name: '#1' }));
+
+    const detail = await screen.findByRole('region', { name: 'Submission 1' });
+    expect(
+      await within(detail).findByText(
+        'Cancelled by the organisers: The checker crashed on every test.',
+      ),
+    ).toBeVisible();
+    expect(within(detail).getByText('CANCELLED')).toBeVisible();
   });
 
   it('lists the files it was made with, each a download through the door', async () => {
