@@ -25,6 +25,7 @@ const stuck: Grading = {
   started_at: null,
   finished_at: null,
   deadline_at: null,
+  cancel_reason: null,
 };
 
 const waiting: Grading = {

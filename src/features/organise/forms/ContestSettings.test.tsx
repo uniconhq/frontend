@@ -43,6 +43,7 @@ function contestBackend({
     encoding: 'utf-8',
     content: current,
     token: 'token-1',
+    upload: null,
   };
   let conflicted = conflictWith === undefined;
   const sent: { content: string; token: string }[] = [];

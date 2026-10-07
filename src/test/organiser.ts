@@ -100,19 +100,19 @@ export const publicationList = http.get(`${TASK_API}/publications`, () =>
 /** Folder by folder, as `GET <place>/tree?path=` answers. */
 const taskTree: Record<string, TreeEntry[]> = {
   '': [
-    { path: 'task.yaml', kind: 'file', size: 120 },
-    { path: 'data', kind: 'directory', size: null },
-    { path: 'statement.md', kind: 'file', size: 40 },
+    { path: 'task.yaml', kind: 'file', size: 120, upload: null },
+    { path: 'data', kind: 'directory', size: null, upload: null },
+    { path: 'statement.md', kind: 'file', size: 40, upload: null },
   ],
-  data: [{ path: 'data/testcases', kind: 'directory', size: null }],
+  data: [{ path: 'data/testcases', kind: 'directory', size: null, upload: null }],
   'data/testcases': [
-    { path: 'data/testcases/1.in', kind: 'file', size: 4 },
-    { path: 'data/testcases/logo.png', kind: 'file', size: 11 },
+    { path: 'data/testcases/1.in', kind: 'file', size: 4, upload: null },
+    { path: 'data/testcases/logo.png', kind: 'file', size: 11, upload: null },
   ],
 };
 
 const contestTree: Record<string, TreeEntry[]> = {
-  '': [{ path: 'contest.yaml', kind: 'file', size: 80 }],
+  '': [{ path: 'contest.yaml', kind: 'file', size: 80, upload: null }],
 };
 
 export const files: Record<string, FileContent> = {
@@ -121,30 +121,35 @@ export const files: Record<string, FileContent> = {
     encoding: 'utf-8',
     content: 'name: sum\nworkflow: unicon/classic@v1\n',
     token: 'token-task-yaml',
+    upload: null,
   },
   'statement.md': {
     path: 'statement.md',
     encoding: 'utf-8',
     content: 'Write the sum of two numbers.\n',
     token: 'token-statement',
+    upload: null,
   },
   'data/testcases/1.in': {
     path: 'data/testcases/1.in',
     encoding: 'utf-8',
     content: '1 2\n',
     token: 'token-1-in',
+    upload: null,
   },
   'data/testcases/logo.png': {
     path: 'data/testcases/logo.png',
     encoding: 'base64',
     content: 'iVBORw0KGgoA//4=',
     token: 'token-logo',
+    upload: null,
   },
   'contest.yaml': {
     path: 'contest.yaml',
     encoding: 'utf-8',
     content: 'name: Spring\nvisibility: signed-in\n',
     token: 'token-contest-yaml',
+    upload: null,
   },
 };
 

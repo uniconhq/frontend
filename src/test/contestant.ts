@@ -155,6 +155,7 @@ export function grading(overrides: Partial<GradingResult> = {}): GradingResult {
     outcome: null,
     groups: [],
     values: {},
+    reason: null,
     ...overrides,
   };
 }
