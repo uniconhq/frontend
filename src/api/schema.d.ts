@@ -4015,7 +4015,7 @@ export interface components {
             /** Title */
             title: string;
             /** Worth */
-            worth: number | null;
+            worth: string | null;
         };
         /**
          * TaskFileUploadRequest
@@ -4057,7 +4057,7 @@ export interface components {
             /** Title */
             title: string;
             /** Worth */
-            worth: number | null;
+            worth: string | null;
         };
         /**
          * TaskRelease

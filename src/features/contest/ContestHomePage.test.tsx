@@ -55,7 +55,7 @@ describe('the contest page for a signed-in person', () => {
                 name: 'sum',
                 label: 'A',
                 title: 'Sum of Two',
-                worth: 100,
+                worth: '100',
                 release: { released: true, visible: true, open: true, closed: null },
                 due: '2026-09-12T10:45:00Z',
                 closes: '2026-09-12T11:00:00Z',
