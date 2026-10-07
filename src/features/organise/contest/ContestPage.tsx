@@ -16,6 +16,7 @@ import { ContestClarifications } from '../threads/Clarifications';
 import { PeopleSection } from '../people/PeopleSection';
 import { LinkList } from '../LinkList';
 import { FileBrowser } from '../files/FileBrowser';
+import { ContestSettingsSection } from '../forms/sections';
 import { useContestParams } from '@/lib/route-params';
 import { tasksReached } from '../roles';
 import classes from '../organise.module.css';
@@ -118,6 +119,9 @@ export function ContestPage() {
       </Card>
       <Card>
         <ContestClarifications org={org} contest={contest} />
+      </Card>
+      <Card>
+        <ContestSettingsSection place={{ kind: 'contest', org, contest }} />
       </Card>
       <Card>
         <FileBrowser place={{ kind: 'contest', org, contest }} />
