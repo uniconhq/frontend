@@ -7,11 +7,19 @@ import { SectionTitle } from '@/ui/SectionTitle';
 import { VerdictBadge } from '@/ui/VerdictBadge';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
+import { formatExact } from '@/lib/exact';
 import { formatDateTime } from '@/lib/time';
 import { downloadHref, nameOf } from './download';
 import { useLiveConnected, useLiveRefused } from '@/live';
 import { serverNow } from '@/lib/time';
-import { cancelReason, lateness, pollEvery, valueText, verdictOf } from './grading';
+import {
+  cancelReason,
+  lateness,
+  pointsText,
+  pollEvery,
+  valueText,
+  verdictOf,
+} from './grading';
 import { OnceValues } from './Results';
 import shared from '../contest.module.css';
 import classes from './submit.module.css';
@@ -25,7 +33,14 @@ type Where = { org: string; contest: string; task: string; number: number };
 function Tests({ group }: { group: GroupShown }) {
   const rows = group.tests ?? [];
   if (rows.length === 0) return null;
-  const names = [...new Set(rows.flatMap((row) => Object.keys(row.values)))];
+  const names = [
+    ...new Set(
+      rows.flatMap((row) => [
+        ...Object.keys(row.values.numbers),
+        ...Object.keys(row.values.texts),
+      ]),
+    ),
+  ];
   return (
     <table className={classes.table} aria-label={`Tests ${group.group}`}>
       <thead>
@@ -48,10 +63,9 @@ function Tests({ group }: { group: GroupShown }) {
             <td>
               <VerdictBadge verdict={row.outcome} />
             </td>
-            {names.map((name) => {
-              const value = row.values[name];
-              return <td key={name}>{value === undefined ? '—' : valueText(value)}</td>;
-            })}
+            {names.map((name) => (
+              <td key={name}>{valueText(row.values, name) ?? '—'}</td>
+            ))}
           </tr>
         ))}
       </tbody>
@@ -67,6 +81,7 @@ function Tests({ group }: { group: GroupShown }) {
  * not run on this grading says so where its outcome would be.
  */
 function Group({ group }: { group: GroupShown }) {
+  const points = pointsText(group);
   return (
     <section className={shared.stack} aria-label={`Group ${group.group}`}>
       <div className={classes.verdict}>
@@ -75,6 +90,11 @@ function Group({ group }: { group: GroupShown }) {
           <BodyText tone="secondary">Not run on this grading</BodyText>
         ) : (
           group.outcome !== null && <VerdictBadge verdict={group.outcome} />
+        )}
+        {points !== null && (
+          <BodyText tone="secondary" mono>
+            {points} points
+          </BodyText>
         )}
       </div>
       {group.shown_at !== null && (
@@ -123,6 +143,16 @@ function Grading({ grading }: { grading: GradingResult }) {
           <BodyText tone="secondary">Attempt {grading.attempt}</BodyText>
         )}
       </div>
+      {grading.points !== null && (
+        <BodyText>
+          {formatExact(grading.points.shown, 2)} points
+          {grading.points.pending_until !== null &&
+            `, and up to ${formatExact(grading.points.pending, 2)} more shown at ${formatDateTime(new Date(grading.points.pending_until))}`}
+          {grading.factor !== null &&
+            grading.factor !== '1' &&
+            `, at ${formatExact(grading.factor, 4)} for lateness`}
+        </BodyText>
+      )}
       <OnceValues values={grading.values} />
       {grading.groups.map((group) => (
         <Group key={group.group} group={group} />

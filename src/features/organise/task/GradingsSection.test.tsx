@@ -5,6 +5,7 @@ import { http, HttpResponse } from 'msw';
 import type { FeedEntry, Grading, Submitter } from '@/api/types';
 import { renderApp } from '@/test/render';
 import { problem, server, signedIn, someone } from '@/test/server';
+import { graded, reported } from '@/test/contestant';
 import { TASK_API, publicationList, repoFiles, taskState } from '@/test/organiser';
 
 const TASK = '/orgs/acme/contests/spring/tasks/sum';
@@ -71,13 +72,15 @@ describe("the task's gradings", () => {
   });
 
   it('shows what a finished grading came to', async () => {
-    const result = (overrides: Partial<NonNullable<Grading['result']>>) => ({
+    const result = (
+      overrides: Partial<NonNullable<Grading['result']>>,
+    ): NonNullable<Grading['result']> => ({
       stopped: null,
       tests: [
-        { test: 'main/1', outcome: 'accepted' as const, values: { time_ms: 12 } },
-        { test: 'main/2', outcome: 'accepted' as const, values: { time_ms: 30 } },
+        graded('main/1', 'accepted', reported({ time_ms: '12' })),
+        graded('main/2', 'accepted', reported({ time_ms: '30' })),
       ],
-      values: {},
+      values: reported(),
       error: null,
       ...overrides,
     });
@@ -102,9 +105,9 @@ describe("the task's gradings", () => {
             5,
             result({
               tests: [
-                { test: 'main/1', outcome: 'accepted', values: {} },
-                { test: 'main/2', outcome: 'time_limit', values: {} },
-                { test: 'main/3', outcome: 'wrong_answer', values: {} },
+                graded('main/1', 'accepted'),
+                graded('main/2', 'time_limit'),
+                graded('main/3', 'wrong_answer'),
               ],
             }),
           ),
@@ -352,7 +355,7 @@ describe("the task's gradings", () => {
       publication: 3,
       status: 'done',
       error: null,
-      result: { stopped: 'compile_error', tests: [], values: {}, error: null },
+      result: { stopped: 'compile_error', tests: [], values: reported(), error: null },
     };
     server.use(
       signedIn,

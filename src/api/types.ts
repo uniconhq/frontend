@@ -53,6 +53,10 @@ export type SubmittedInput = Schemas['SubmittedInput'];
 export type Submission = Schemas['Submission'];
 export type GradingResult = Schemas['Result'];
 export type GroupShown = Schemas['GroupShown'];
+/** A run's reported values by name, its numbers exact and its texts apart. */
+export type Reported = Schemas['Reported'];
+/** One test's row of a result, with its credit once scored. */
+export type GradedTest = Schemas['GradedTest'];
 export type Grading = Schemas['Grading'];
 export type Rejudged = Schemas['Rejudged'];
 /** One attempt in a contest's gradings feed, with its task and who submitted. */

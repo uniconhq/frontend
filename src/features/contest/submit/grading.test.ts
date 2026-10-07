@@ -11,8 +11,10 @@ const done: GradingResult = {
   stopped: null,
   outcome: null,
   groups: [],
-  values: {},
+  values: { numbers: {}, texts: {} },
   reason: null,
+  points: null,
+  factor: null,
 };
 
 function submitted(secondsAgo: number, status: 'dispatched' | 'done'): Submission {
