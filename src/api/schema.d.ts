@@ -783,11 +783,13 @@ export interface paths {
         };
         /**
          * The contest's gradings as one feed, newest first
-         * @description At most `limit` gradings of the contest's tasks, newest first, every
-         *     attempt a row of its own, so a submission graded again shows more than
-         *     once. One whose run is overdue or lost reads as `system_error` with the
-         *     reason, and a filter by status takes it as it reads. A task, username or
-         *     team the contest does not have gives no rows.
+         * @description At most `limit` gradings of the contest's tasks the caller observes,
+         *     newest first, every attempt a row of its own, so a submission graded
+         *     again shows more than once. One whose run is overdue or lost reads as
+         *     `system_error` with the reason, and a filter by status takes it as it
+         *     reads. A task, username or team the contest does not have, or a task
+         *     the caller does not observe, gives no rows; a username that breaks the
+         *     forge's rule for one is a `validation_error`.
          */
         get: operations["listContestGradings"];
         put?: never;
@@ -808,8 +810,9 @@ export interface paths {
         /**
          * How many of the contest's gradings wait for a machine
          * @description `queued`, whose run is not started yet, and `dispatched`, whose run
-         *     the CI holds until a machine takes it, counted when asked. One that is
-         *     overdue or lost reads as a system error and is not counted.
+         *     the CI holds until a machine takes it, counted when asked over the
+         *     contest's tasks the caller observes. One that is overdue or lost reads
+         *     as a system error and is not counted.
          */
         get: operations["getContestQueueDepth"];
         put?: never;
@@ -991,7 +994,8 @@ export interface paths {
          * @description Every task the contest's `tasks` lists, in that order, each with its
          *     letter, its latest publication, whether a draft sits on it and the
          *     draft's errors, and its timeline. A task the contest does not list is
-         *     not here. Settings that do not read are `not_found`.
+         *     not here. Settings that do not read are `invalid_definition`, naming
+         *     `contest.yaml`, with every one of its `errors` at its path.
          */
         get: operations["listTaskStandings"];
         put?: never;
@@ -1393,9 +1397,10 @@ export interface paths {
         };
         /**
          * The task's gradings, newest first
-         * @description At most `limit` of the task's gradings, newest first. One whose run did
-         *     not begin, did not report by its deadline, or was lost by the CI reads as
-         *     `system_error` with the reason in `error`, whatever its row still says.
+         * @description At most `limit` of the task's gradings, newest first, each as the feed
+         *     gives it, with who submitted it. One whose run did not begin, did not
+         *     report by its deadline, or was lost by the CI reads as `system_error`
+         *     with the reason in `error`, whatever its row still says.
          */
         get: operations["listGradings"];
         put?: never;
@@ -1468,8 +1473,11 @@ export interface paths {
          * @description The new attempt, queued. The old one is kept as it was, unless it reads
          *     as a system error only because its run is overdue or lost: then it is
          *     ended with that reason, and its run cancelled at the CI. One that is not
-         *     finished is `wrong_status`, and `conflict` while another attempt of it
-         *     is being graded.
+         *     finished is `wrong_status` with its status as `current`, and so is a
+         *     submission staff cancelled, which that ended, as `cancelled`; an earlier
+         *     attempt of a submission graded again is `conflict`, since the latest is
+         *     the one to retry, and so is one while another attempt of it is being
+         *     graded.
          */
         post: operations["retryGrading"];
         delete?: never;
@@ -1897,7 +1905,9 @@ export interface paths {
          *     workflow's order. A workflow declares no defaults; a contestant input's
          *     `default` is the task's own. A `task.yaml` that is missing or does not
          *     read, names no workflow or one that cannot be read answers with
-         *     `problem`, the reason, and no inputs, so the form can mend it.
+         *     `problem`, the reason, and no inputs, so the form can mend it. Either
+         *     way `graded` says whether the task has a graded submission, from when
+         *     on a save refuses a test group it adds without its `show`.
          */
         get: operations["getTaskWorkflowForm"];
         put?: never;
@@ -2634,15 +2644,19 @@ export interface components {
         };
         /**
          * FeedEntry
-         * @description One grading in a contest's feed: the grading as an organiser reads it,
-         *     its task by name, null when the forge no longer lists the task, and
-         *     `by`, who made the submission: a contestant by `user_id` and username as
-         *     `name`, or a team by its id as `team` and its `name`, the name null once
-         *     the account or the team is gone.
+         * @description One grading among a task's or a contest's: the grading as an
+         *     organiser reads it, its task by name, null for a task the platform has
+         *     no name for, its `label`, the letter of its place in the contest's
+         *     `tasks`, null once the contest no longer lists it or its settings do
+         *     not read, and `by`, who made the submission: a contestant by `user_id`
+         *     and username as `name`, or a team by its id as `team` and its `name`,
+         *     the name null once the account or the team is gone.
          */
         FeedEntry: {
             by: components["schemas"]["Submitter"];
             grading: components["schemas"]["Grading"];
+            /** Label */
+            label: string | null;
             /** Task */
             task: string | null;
         };
@@ -2719,9 +2733,10 @@ export interface components {
          * Grading
          * @description One grading as an organiser managing its task reads it: the
          *     submission by its number, the publication it grades against, its
-         *     attempt, where it stands, the reason it failed, the sentence staff
-         *     cancelled it with, its result, whether its log was written, the last
-         *     progress its run reported, and its times.
+         *     attempt and whether that is the submission's `latest`, the one staff
+         *     cancel or retry, where it stands, the reason it failed, the sentence
+         *     staff cancelled it with, its result, whether its log was written, the
+         *     last progress its run reported, and its times.
          */
         Grading: {
             /** Attempt */
@@ -2741,6 +2756,8 @@ export interface components {
              * Format: uuid
              */
             id: string;
+            /** Latest */
+            latest: boolean;
             /** Log */
             log: boolean;
             progress: components["schemas"]["GradingProgress"] | null;
@@ -3235,9 +3252,10 @@ export interface components {
         /**
          * Published
          * @description A save that published: the new publication's number among the task's,
-         *     whether it changed how the task grades, and what, and the notes the save
+         *     whether it changed how the task grades, and what, the notes the save
          *     makes of the task beside publishing it, such as which steps it seals
-         *     until the reveal.
+         *     until the reveal, and how many submissions it `regraded`, queued to be
+         *     graded again against it.
          */
         Published: {
             /** Changes */
@@ -3248,6 +3266,8 @@ export interface components {
             notes: string[];
             /** Number */
             number: number;
+            /** Regraded */
+            regraded: number;
         };
         /**
          * QuestionRequest
@@ -3909,9 +3929,16 @@ export interface components {
          *     names, as written, the inputs it declares and its test fields, in the
          *     order the workflow gives them, or `problem`, the reason there are none:
          *     no `task.yaml` or one that does not read as YAML, no workflow named, or
-         *     one that cannot be read or is in an old format.
+         *     one that cannot be read or is in an old format; and `graded`, whether
+         *     the task has a graded submission, from when on a save refuses a test
+         *     group it adds without its `show` (T10).
          */
         WorkflowForm: {
+            /**
+             * Graded
+             * @default false
+             */
+            graded: boolean;
             /**
              * Inputs
              * @default []
@@ -5468,7 +5495,7 @@ export interface operations {
                 task?: string | null;
                 /** @description One team's submissions */
                 team?: string | null;
-                /** @description One contestant's own submissions, by username */
+                /** @description One contestant's submissions, their own and their teams', by username */
                 user?: string | null;
             };
             header?: never;
@@ -6750,7 +6777,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Grading"][];
+                    "application/json": components["schemas"]["FeedEntry"][];
                 };
             };
             /** @description An error, as an RFC 9457 problem document. `code` names it. */

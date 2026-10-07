@@ -75,6 +75,8 @@ function uploadRoutes({
         version: 'abc1234def',
         grading_changed: false,
         changes: [],
+        notes: [],
+        regraded: 0,
       });
     }),
   ];
@@ -245,6 +247,8 @@ describe("uploading a file into a task's tree", () => {
           version: 'def5678abc',
           grading_changed: false,
           changes: [],
+          notes: [],
+          regraded: 0,
         });
       }),
     );
@@ -283,6 +287,8 @@ describe("uploading a file into a task's tree", () => {
           version: 'abc1234def',
           grading_changed: true,
           changes: ['the tests'],
+          notes: [],
+          regraded: 0,
         });
       }),
     );

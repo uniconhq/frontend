@@ -45,6 +45,7 @@ const UNREAD: WorkflowForm = {
   inputs: [],
   test: [],
   problem: 'The workflow unicon/checked@v1 cannot be read.',
+  graded: false,
 };
 
 function declared(
@@ -67,6 +68,7 @@ function declared(
 const CHECKED: WorkflowForm = {
   workflow: 'unicon/checked@v1',
   problem: null,
+  graded: false,
   inputs: [
     declared('submission', 'file', { contestant: true }),
     declared('language', 'enum', {
@@ -171,6 +173,7 @@ describe('the task settings form', { timeout: 20_000 }, () => {
         grading_changed: true,
         changes: ['the plan'],
         notes: [],
+        regraded: 0,
       }),
     );
     asManager();
@@ -303,6 +306,7 @@ describe('the task settings form', { timeout: 20_000 }, () => {
           grading_changed: false,
           changes: [],
           notes: [],
+          regraded: 0,
         }),
       undefined,
       CHECKED,
@@ -369,6 +373,7 @@ describe('the task settings form', { timeout: 20_000 }, () => {
           grading_changed: false,
           changes: [],
           notes: [],
+          regraded: 0,
         }),
       undefined,
       { ...CHECKED, inputs: CHECKED.inputs.filter((input) => input.id !== 'token') },
@@ -403,6 +408,7 @@ describe('the task settings form', { timeout: 20_000 }, () => {
           grading_changed: false,
           changes: [],
           notes: [],
+          regraded: 0,
         }),
       undefined,
       {
@@ -432,7 +438,13 @@ describe('the task settings form', { timeout: 20_000 }, () => {
 
   it('builds the form after a save from the workflow the save named', async () => {
     const published = () =>
-      HttpResponse.json({ number: 4, grading_changed: true, changes: [], notes: [] });
+      HttpResponse.json({
+        number: 4,
+        grading_changed: true,
+        changes: [],
+        notes: [],
+        regraded: 0,
+      });
     const { sent } = taskBackend(published, undefined, CHECKED);
     // The new workflow takes the time limit from the contestant.
     const tunable: WorkflowForm = {
@@ -468,7 +480,13 @@ describe('the task settings form', { timeout: 20_000 }, () => {
   it("removes a declared input's key when its value is cleared", async () => {
     const { sent } = taskBackend(
       () =>
-        HttpResponse.json({ number: 4, grading_changed: true, changes: [], notes: [] }),
+        HttpResponse.json({
+          number: 4,
+          grading_changed: true,
+          changes: [],
+          notes: [],
+          regraded: 0,
+        }),
       undefined,
       CHECKED,
     );
@@ -542,6 +560,7 @@ size 120
           grading_changed: false,
           changes: [],
           notes: [],
+          regraded: 0,
         }),
       theirs,
     );

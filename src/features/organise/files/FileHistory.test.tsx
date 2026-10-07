@@ -171,6 +171,7 @@ describe("a task file's history", () => {
           grading_changed: false,
           changes: [],
           notes: [],
+          regraded: 0,
         });
       }),
     );
@@ -212,6 +213,7 @@ describe("a task file's history", () => {
               grading_changed: true,
               changes: ['limits changed'],
               notes: [],
+              regraded: 0,
             })
           : problem(409, 'confirmation_required', { changes: ['limits changed'] });
       }),

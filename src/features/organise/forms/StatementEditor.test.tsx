@@ -52,7 +52,13 @@ describe('the statement beside its preview', { timeout: 20_000 }, () => {
 
   it('lets an admin edit the statement and shows it as contestants will', async () => {
     const { sent } = statementBackend(() =>
-      HttpResponse.json({ number: 3, grading_changed: false, changes: [], notes: [] }),
+      HttpResponse.json({
+        number: 3,
+        grading_changed: false,
+        changes: [],
+        notes: [],
+        regraded: 0,
+      }),
     );
     renderApp('/orgs/acme/contests/spring/tasks/sum');
     await userEvent.click(
