@@ -1,0 +1,82 @@
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* A group of related fields, under a small heading. */
+.fieldset {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 12px;
+  border: 1px solid var(--unicon-border);
+  border-radius: var(--mantine-radius-sm);
+}
+
+.legend {
+  padding: 0 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--unicon-text-primary);
+}
+
+/* Fields side by side where there is room, one under the other on a phone. */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 10px;
+}
+
+.entries {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.note {
+  font-size: 12px;
+  color: var(--unicon-text-secondary);
+}
+
+.merge {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.merge label {
+  overflow-wrap: anywhere;
+}
+
+/* The statement's source beside what contestants see. */
+.split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  align-items: start;
+}
+
+.preview {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--unicon-border);
+  border-radius: var(--mantine-radius-sm);
+}
+
+@media (max-width: 720px) {
+  .split {
+    grid-template-columns: 1fr;
+  }
+}
+
+.flush {
+  margin: 0;
+}

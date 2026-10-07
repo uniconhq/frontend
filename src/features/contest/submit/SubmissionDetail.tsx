@@ -11,7 +11,7 @@ import { formatDateTime } from '@/lib/time';
 import { downloadHref, nameOf } from './download';
 import { useLiveConnected, useLiveRefused } from '@/live';
 import { serverNow } from '@/lib/time';
-import { lateness, pollEvery, valueText, verdictOf } from './grading';
+import { cancelReason, lateness, pollEvery, valueText, verdictOf } from './grading';
 import { OnceValues } from './Results';
 import shared from '../contest.module.css';
 import classes from './submit.module.css';
@@ -90,9 +90,31 @@ function Group({ group }: { group: GroupShown }) {
 /**
  * What the grading holds for the contestant: its verdict, what the run
  * reported once, such as a compile log, and each test group as the task
- * shows it.
+ * shows it. A grading the organisers cancelled holds their sentence instead,
+ * and says the submission no longer counts against the task's limit: a cancel
+ * with a sentence is the one the forge leaves out of the limit, so one
+ * without (made before cancels carried one) says nothing about the limit.
  */
 function Grading({ grading }: { grading: GradingResult }) {
+  if (grading.status === 'cancelled') {
+    const reason = cancelReason(grading);
+    return (
+      <>
+        <div className={classes.verdict}>
+          <VerdictBadge verdict="cancelled" />
+        </div>
+        <BodyText>
+          Cancelled by the organisers{reason === null ? '.' : `: ${reason}`}
+        </BodyText>
+        {reason !== null && (
+          <BodyText tone="secondary">
+            It is not graded, and it does not count against the task&apos;s limit on
+            submissions.
+          </BodyText>
+        )}
+      </>
+    );
+  }
   return (
     <>
       <div className={classes.verdict}>

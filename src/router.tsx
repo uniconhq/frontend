@@ -15,6 +15,7 @@ import { ContestHomePage, TaskStatementPage } from '@/features/contest';
 import {
   ContestantsPage,
   ContestPage,
+  GradingsFeedPage,
   InboxPage,
   NewOrgPage,
   OrgPage,
@@ -123,6 +124,10 @@ export const routes: RouteObject[] = [
                   {
                     path: ':org/contests/:contest/teams',
                     element: <TeamsPage />,
+                  },
+                  {
+                    path: ':org/contests/:contest/gradings',
+                    element: <GradingsFeedPage />,
                   },
                   {
                     path: ':org/contests/:contest/tasks/:task',

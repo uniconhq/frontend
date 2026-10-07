@@ -58,6 +58,8 @@ describe('saving a task file', () => {
         number: 3,
         grading_changed: true,
         changes: ['plans/default.json changed'],
+        notes: [],
+        regraded: 0,
       }),
     );
 
@@ -87,6 +89,8 @@ describe('saving a task file', () => {
         number: 3,
         grading_changed: false,
         changes: [],
+        notes: [],
+        regraded: 0,
       }),
     );
 
@@ -95,6 +99,54 @@ describe('saving a task file', () => {
     const outcome = (await screen.findByText('Published as publication 3.'))
       .parentElement as HTMLElement;
     expect(outcome).toHaveTextContent('It does not change how the task grades.');
+  });
+
+  it('shows how many submissions a publication grades again, and the notes it makes', async () => {
+    taskBackend(() =>
+      HttpResponse.json({
+        number: 3,
+        grading_changed: true,
+        changes: ['plans/default.json changed'],
+        notes: [
+          'step run is sealed: its values and stop wait for the reveal',
+          'test group main shows its outcomes after the reveal',
+        ],
+        regraded: 12,
+      }),
+    );
+
+    await editAndSave();
+
+    const outcome = (await screen.findByText('Published as publication 3.'))
+      .parentElement as HTMLElement;
+    expect(outcome).toHaveTextContent('12 submissions are graded again.');
+    expect(
+      within(within(outcome).getByRole('list', { name: 'Notes' }))
+        .getAllByRole('listitem')
+        .map((item) => item.textContent),
+    ).toEqual([
+      'step run is sealed: its values and stop wait for the reveal',
+      'test group main shows its outcomes after the reveal',
+    ]);
+  });
+
+  it('says nothing of notes or regrading when a publication has none', async () => {
+    taskBackend(() =>
+      HttpResponse.json({
+        number: 3,
+        grading_changed: false,
+        changes: [],
+        notes: [],
+        regraded: 0,
+      }),
+    );
+
+    await editAndSave();
+
+    const outcome = (await screen.findByText('Published as publication 3.'))
+      .parentElement as HTMLElement;
+    expect(within(outcome).queryByRole('list', { name: 'Notes' })).toBeNull();
+    expect(outcome).not.toHaveTextContent('graded again');
   });
 
   it('shows a draft with its errors at their paths, and that the last publication keeps grading', async () => {
@@ -128,6 +180,8 @@ describe('saving a task file', () => {
                 number: 3,
                 grading_changed: true,
                 changes: ['plans/default.json changed'],
+                notes: [],
+                regraded: 0,
               })
             : problem(409, 'confirmation_required', {
                 detail: 'The contest is running and this changes how the task grades.',
@@ -141,6 +195,9 @@ describe('saving a task file', () => {
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent(
       'The contest is running and this changes how the task grades.',
+    );
+    expect(alert).toHaveTextContent(
+      'every submission to the task is graded again against the new publication.',
     );
     const changes = within(alert).getByRole('list', { name: 'What would change' });
     expect(

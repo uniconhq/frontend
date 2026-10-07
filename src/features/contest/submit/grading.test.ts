@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { GradingResult, Submission } from '@/api/types';
-import { pollEvery, verdictOf } from './grading';
+import { justFinished, pollEvery, verdictOf } from './grading';
 
 const NOW = new Date('2026-09-26T10:10:00Z');
 
@@ -12,6 +12,7 @@ const done: GradingResult = {
   outcome: null,
   groups: [],
   values: {},
+  reason: null,
 };
 
 function submitted(secondsAgo: number, status: 'dispatched' | 'done'): Submission {
@@ -40,6 +41,19 @@ describe('how often submissions are read again', () => {
     expect(pollEvery(submitted(5, 'dispatched'), NOW, false, true)).toBe(5_000);
     expect(pollEvery(submitted(600, 'dispatched'), NOW, false, true)).toBe(15_000);
     expect(pollEvery([submitted(3, 'done')], NOW, false, true)).toBe(60_000);
+  });
+
+  it('does not follow a cancelled grading, which is finished', () => {
+    const cancelled: Submission = {
+      ...submitted(3, 'dispatched'),
+      grading: { ...done, status: 'cancelled', reason: 'The checker crashed.' },
+    };
+    expect(pollEvery([cancelled], NOW)).toBe(60_000);
+    expect(
+      justFinished([submitted(3, 'dispatched')], [cancelled]).map(
+        (found) => found.number,
+      ),
+    ).toEqual([1]);
   });
 
   it('is once a minute when nothing is being graded', () => {

@@ -63,6 +63,15 @@ export function verdictOf(grading: GradingResult): string {
   return grading.stopped ?? grading.outcome ?? grading.status;
 }
 
+/**
+ * Why the organisers cancelled the grading, in their words: the sentence a
+ * cancelled grading carries, or null on any other status or with none given.
+ */
+export function cancelReason(grading: GradingResult): string | null {
+  if (grading.status !== 'cancelled') return null;
+  return grading.reason === null || grading.reason === '' ? null : grading.reason;
+}
+
 const numbers = new Intl.NumberFormat(undefined, { maximumFractionDigits: 4 });
 
 /** A reported value as read: a number to at most four decimals, or the text. */

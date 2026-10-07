@@ -43,7 +43,7 @@ function onThisOrigin(url: string): string {
  * The forge hashes the body as it stores it and keeps nothing that is not the
  * digest and length the address names, so a file that changed since it was
  * read is refused there. Every refusal fails this the same way: what the
- * forge says about it is not something a contestant can use, and where the
+ * forge says about it is not something the sender can use, and where the
  * upload stands is read back from the platform afterwards.
  */
 export function sendToForge(

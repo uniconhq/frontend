@@ -30,7 +30,7 @@ describe('sending a file through the door', () => {
     expect(shares.at(-1)).toBe(1);
   });
 
-  it('fails whatever the forge says, since none of it is a contestant’s to act on', async () => {
+  it('fails whatever the forge says, since none of it is the sender’s to act on', async () => {
     // The door refuses before it reads the body, and the forge refuses a body
     // that is not what the address named. Either way the panel reads the
     // upload back rather than showing what came out of the forge.

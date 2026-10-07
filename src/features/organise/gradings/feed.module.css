@@ -1,0 +1,140 @@
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* How many wait, side by side, each a number over its label. */
+.queue {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+  margin: 0;
+}
+
+.queue dt {
+  font-size: 12px;
+  color: var(--unicon-text-secondary);
+}
+
+.queue dd {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--unicon-text-primary);
+}
+
+.filters {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+
+.user {
+  display: flex;
+  gap: 6px;
+  align-items: flex-end;
+}
+
+/* The table is wider than a phone; it scrolls inside its card, not the page. */
+.scroll {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  color: var(--unicon-text-body);
+}
+
+.table th {
+  text-align: left;
+  font-weight: 600;
+  color: var(--unicon-text-secondary);
+  padding: 6px 10px 8px 0;
+  border-bottom: 1px solid var(--unicon-border);
+  white-space: nowrap;
+}
+
+.table td,
+.table tbody th {
+  vertical-align: top;
+  padding: 10px 10px 10px 0;
+  border-bottom: 1px solid var(--unicon-border);
+}
+
+/* Each row is named by its submission, as a row header that reads like a cell. */
+.table tbody th {
+  font-weight: 400;
+  color: var(--unicon-text-body);
+  white-space: normal;
+}
+
+.task {
+  display: inline-flex;
+  gap: 6px;
+  align-items: baseline;
+}
+
+.letter {
+  font-weight: 700;
+  color: var(--unicon-text-primary);
+}
+
+.times {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.times div {
+  display: flex;
+  gap: 4px;
+}
+
+.times dt {
+  color: var(--unicon-text-secondary);
+}
+
+.times dd {
+  margin: 0;
+}
+
+.actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+/* An earlier attempt reads under its submission's latest one, quieter. */
+.earlier td,
+.earlier th {
+  color: var(--unicon-text-secondary);
+}
+
+.earlierName {
+  font-size: 12px;
+  padding-left: 14px;
+}
+
+.toggle {
+  display: block;
+  margin-top: 4px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--unicon-text-accent);
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.toggle:hover {
+  text-decoration: underline;
+}
