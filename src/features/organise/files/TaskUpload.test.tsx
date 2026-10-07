@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
-import type { Upload } from '@/api/types';
+import type { SaveRequest, Upload } from '@/api/types';
 import { renderApp } from '@/test/render';
 import { problem, server, signedIn, someone } from '@/test/server';
 import { TASK_API, publicationList, repoFiles, taskState } from '@/test/organiser';
@@ -33,7 +33,7 @@ function uploadRoutes({
     slots: [] as unknown[],
     puts: 0,
     completes: 0,
-    writes: [] as { path: string; body: unknown }[],
+    saves: [] as SaveRequest[],
   };
   const verified: Upload = {
     id: UPLOAD,
@@ -68,11 +68,8 @@ function uploadRoutes({
       seen.completes += 1;
       return held ? HttpResponse.json(verified) : problem(409, 'upload_not_ready');
     }),
-    http.put(`${TASK_API}/files/:path`, async ({ params, request }) => {
-      seen.writes.push({
-        path: decodeURIComponent(String(params['path'])),
-        body: await request.json(),
-      });
+    http.post(`${TASK_API}/save`, async ({ request }) => {
+      seen.saves.push((await request.json()) as SaveRequest);
       return HttpResponse.json({
         number: 3,
         version: 'abc1234def',
@@ -143,23 +140,20 @@ describe("uploading a file into a task's tree", () => {
       },
     ]);
     expect(routes.seen.puts).toBe(1);
-    expect(routes.seen.writes).toEqual([]);
+    expect(routes.seen.saves).toEqual([]);
 
     await userEvent.click(
       within(panel).getByRole('button', { name: 'Save into the task' }),
     );
 
     expect(await within(panel).findByText('Published as publication 3.')).toBeVisible();
-    expect(routes.seen.writes).toEqual([
+    expect(routes.seen.saves).toEqual([
       {
-        path: 'data/train.csv',
-        body: {
-          upload: UPLOAD,
-          token: null,
-          encoding: 'utf-8',
-          confirm: false,
-          keep_as_draft: false,
-        },
+        changes: [
+          { path: 'data/train.csv', upload: UPLOAD, token: null, encoding: 'utf-8' },
+        ],
+        confirm: false,
+        keep_as_draft: false,
       },
     ]);
   });
@@ -210,7 +204,7 @@ describe("uploading a file into a task's tree", () => {
     const alert = await within(panel).findByRole('alert');
     expect(alert).toHaveTextContent('The upload did not go through');
     expect(routes.seen.puts).toBe(3);
-    expect(routes.seen.writes).toEqual([]);
+    expect(routes.seen.saves).toEqual([]);
   });
 
   it('saves over a file at the path with the token it had as the upload began', async () => {
@@ -231,8 +225,10 @@ describe("uploading a file into a task's tree", () => {
     );
 
     await within(panel).findByText('Published as publication 3.');
-    expect(routes.seen.writes).toMatchObject([
-      { path: 'data/testcases/1.in', body: { upload: UPLOAD, token: 'token-1-in' } },
+    expect(routes.seen.saves).toMatchObject([
+      {
+        changes: [{ path: 'data/testcases/1.in', upload: UPLOAD, token: 'token-1-in' }],
+      },
     ]);
   });
 
@@ -241,15 +237,14 @@ describe("uploading a file into a task's tree", () => {
     let writes = 0;
     server.use(signedIn, taskState, publicationList, ...repoFiles, ...routes.handlers);
     server.use(
-      http.put(`${TASK_API}/files/:path`, async ({ request }) => {
+      http.post(`${TASK_API}/save`, () => {
         writes += 1;
-        const body = (await request.json()) as { token: string | null };
         if (writes === 1) return problem(409, 'conflict');
         return HttpResponse.json({
           number: 4,
           version: 'def5678abc',
           grading_changed: false,
-          changes: [body.token ?? 'none'],
+          changes: [],
         });
       }),
     );
@@ -272,6 +267,111 @@ describe("uploading a file into a task's tree", () => {
 
     expect(await within(panel).findByText('Published as publication 4.')).toBeVisible();
     expect(writes).toBe(2);
+  });
+
+  it('keeps uploads waiting and saves them with the next one, in one save and one confirmation', async () => {
+    const routes = uploadRoutes();
+    server.use(signedIn, taskState, publicationList, ...repoFiles, ...routes.handlers);
+    server.use(
+      http.post(`${TASK_API}/save`, async ({ request }) => {
+        const body = (await request.json()) as SaveRequest;
+        routes.seen.saves.push(body);
+        if (!body.confirm)
+          return problem(409, 'confirmation_required', { changes: ['the tests'] });
+        return HttpResponse.json({
+          number: 5,
+          version: 'abc1234def',
+          grading_changed: true,
+          changes: ['the tests'],
+        });
+      }),
+    );
+    renderApp(TASK);
+
+    const panel = await openUpload();
+    const upload = async (path: string) => {
+      await userEvent.upload(within(panel).getByLabelText('File to upload'), dataset());
+      const field = within(panel).getByRole('textbox', { name: /Path in the task/ });
+      await userEvent.clear(field);
+      await userEvent.type(field, path);
+      await userEvent.click(within(panel).getByRole('button', { name: 'Upload' }));
+      await within(panel).findByText(/has arrived/);
+    };
+    await upload('tests/main/1/input');
+    await userEvent.click(
+      within(panel).getByRole('button', { name: 'Keep it waiting' }),
+    );
+
+    const waiting = screen.getByRole('region', { name: 'Waiting to be saved' });
+    expect(
+      within(waiting).getByRole('list', { name: 'Uploads waiting to be saved' }),
+    ).toHaveTextContent('tests/main/1/input');
+    expect(within(waiting).getByText(/kept on this page only/)).toBeVisible();
+    expect(routes.seen.saves).toEqual([]);
+
+    await upload('tests/main/1/answer');
+    expect(
+      within(panel).getByText(/waiting to be saved go in the same save/),
+    ).toBeVisible();
+    expect(
+      within(waiting).queryByRole('button', { name: 'Save into the task' }),
+    ).toBeNull();
+    await userEvent.click(
+      within(panel).getByRole('button', { name: 'Save into the task' }),
+    );
+    await userEvent.click(
+      await within(panel).findByRole('button', { name: 'Publish the change' }),
+    );
+
+    expect(await within(panel).findByText('Published as publication 5.')).toBeVisible();
+    expect(routes.seen.saves).toHaveLength(2);
+    expect(routes.seen.saves[1]).toEqual({
+      changes: [
+        { path: 'tests/main/1/input', upload: UPLOAD, token: null, encoding: 'utf-8' },
+        { path: 'tests/main/1/answer', upload: UPLOAD, token: null, encoding: 'utf-8' },
+      ],
+      confirm: true,
+      keep_as_draft: false,
+    });
+    expect(screen.queryByRole('region', { name: 'Waiting to be saved' })).toBeNull();
+  });
+
+  it('saves the waiting uploads from their list, leaving out one discarded', async () => {
+    const routes = uploadRoutes();
+    server.use(signedIn, taskState, publicationList, ...repoFiles, ...routes.handlers);
+    renderApp(TASK);
+
+    const panel = await openUpload();
+    for (const path of ['data/a.csv', 'data/b.csv']) {
+      await userEvent.upload(within(panel).getByLabelText('File to upload'), dataset());
+      const field = within(panel).getByRole('textbox', { name: /Path in the task/ });
+      await userEvent.clear(field);
+      await userEvent.type(field, path);
+      await userEvent.click(within(panel).getByRole('button', { name: 'Upload' }));
+      await userEvent.click(
+        await within(panel).findByRole('button', { name: 'Keep it waiting' }),
+      );
+    }
+    await userEvent.click(within(panel).getByRole('button', { name: 'Close' }));
+
+    const waiting = screen.getByRole('region', { name: 'Waiting to be saved' });
+    expect(within(waiting).getByText(/2 uploads are waiting/)).toBeVisible();
+    await userEvent.click(
+      within(waiting).getByRole('button', { name: 'Discard data/a.csv' }),
+    );
+    await userEvent.click(
+      within(waiting).getByRole('button', { name: 'Save into the task' }),
+    );
+
+    expect(
+      await within(waiting).findByText('Published as publication 3.'),
+    ).toBeVisible();
+    expect(routes.seen.saves).toMatchObject([
+      { changes: [{ path: 'data/b.csv', upload: UPLOAD, token: null }] },
+    ]);
+    expect(
+      within(waiting).queryByRole('list', { name: 'Uploads waiting to be saved' }),
+    ).toBeNull();
   });
 
   it('shows a refused slot in words for the organiser', async () => {
@@ -334,8 +434,8 @@ describe("uploading a file into a task's tree", () => {
     );
 
     await within(panel).findByText('Published as publication 3.');
-    expect(routes.seen.writes).toMatchObject([
-      { path: 'train.csv', body: { upload: UPLOAD, token: 'token-train' } },
+    expect(routes.seen.saves).toMatchObject([
+      { changes: [{ path: 'train.csv', upload: UPLOAD, token: 'token-train' }] },
     ]);
   });
 

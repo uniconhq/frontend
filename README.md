@@ -253,8 +253,15 @@ its progress, and a send the connection cuts is sent again from the start, up
 to three times, to the same slot; a slot for a file the forge holds already
 needs nothing sent. The upload is not in the task until the organiser saves
 it, which writes the file by its upload id with the token of the file there
-when the upload began, or none for a new file: a save like Save, with its
-answers and refusals, and a `conflict` offers to save over the other version.
+when the upload began, or none for a new file, through `POST <task>/save`: a
+save like Save, with its answers and refusals, and a `conflict` offers to save
+over the other version, each path with its token read afresh. In the file
+panel an arrived upload may instead be kept waiting, listed under "Waiting to
+be saved" with a Discard each; the next upload's Save, or the list's own, saves
+every waiting one with it in one save, so replacing a test's input and answer
+is one commit, one publication and one confirmation (`files/upload-save.ts`,
+`files/WaitingUploads.tsx`). Only the page keeps the waiting uploads, and it
+says so: leaving or reloading it drops them.
 The door's steps, shared with a contestant's submit, are in `src/api/upload/`.
 
 Under a task's file, History lists the file's versions newest first, each

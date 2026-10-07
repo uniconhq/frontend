@@ -17,11 +17,11 @@ export type DefinitionError = Schemas['DefinitionError'];
 export type TreeEntry = Schemas['TreeEntry'];
 export type FileContent = Schemas['FileContent'];
 export type WriteFile = Schemas['WriteFile'];
-/** A task's file written as a save: typed content, or an upload made for its path. */
-export type WriteTaskFile = Schemas['WriteTaskFile'];
 /** What a file that is an upload holds: its size and SHA-256. */
 export type UploadInfo = Schemas['UploadInfo'];
 export type RollbackFile = Schemas['RollbackFile'];
+/** A save of several of a task's files at once, in one commit. */
+export type SaveRequest = Schemas['SaveRequest'];
 /** A task save's answer: published, or kept as a draft. */
 export type SaveResult = Schemas['Published'] | Schemas['Draft'];
 

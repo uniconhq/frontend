@@ -10,6 +10,7 @@ import { FileEditor } from './FileEditor';
 import { FileTree } from './FileTree';
 import type { Place } from './place';
 import { TaskUpload } from './TaskUpload';
+import { WaitingUploads, WaitingUploadsProvider } from './WaitingUploads';
 import classes from './Files.module.css';
 
 /**
@@ -20,7 +21,8 @@ import classes from './Files.module.css';
  *
  * At a task, a manager also uploads a file into it, by default into the
  * folder last picked in the tree: the folder last opened or closed there, or
- * the open file's.
+ * the open file's. Uploads kept waiting are listed under the heading, to be
+ * saved into the task together; only the page keeps them.
  */
 export function FileBrowser({ place }: { place: Place }) {
   const [search] = useSearchParams();
@@ -31,28 +33,35 @@ export function FileBrowser({ place }: { place: Place }) {
   const [uploading, setUploading] = useState(false);
 
   return (
-    <div className={classes.browser}>
-      <div className={classes.heading}>
-        <SectionTitle>Files</SectionTitle>
-        {uploads && !uploading && (
-          <Button size="xs" variant="secondary" onClick={() => setUploading(true)}>
-            Upload a file
-          </Button>
-        )}
-      </div>
-      {place.kind === 'task' && uploading && (
-        <TaskUpload place={place} folder={folder} onClose={() => setUploading(false)} />
-      )}
-      <div className={classes.panes}>
-        <FileTree place={place} open={open} folder={folder} onFolder={setFolder} />
-        <div className={classes.pane}>
-          {open === null ? (
-            <BodyText tone="secondary">Pick a file to open it.</BodyText>
-          ) : (
-            <FileEditor key={open} place={place} path={open} />
+    <WaitingUploadsProvider>
+      <div className={classes.browser}>
+        <div className={classes.heading}>
+          <SectionTitle>Files</SectionTitle>
+          {uploads && !uploading && (
+            <Button size="xs" variant="secondary" onClick={() => setUploading(true)}>
+              Upload a file
+            </Button>
           )}
         </div>
+        {place.kind === 'task' && uploading && (
+          <TaskUpload
+            place={place}
+            folder={folder}
+            onClose={() => setUploading(false)}
+          />
+        )}
+        {place.kind === 'task' && <WaitingUploads place={place} />}
+        <div className={classes.panes}>
+          <FileTree place={place} open={open} folder={folder} onFolder={setFolder} />
+          <div className={classes.pane}>
+            {open === null ? (
+              <BodyText tone="secondary">Pick a file to open it.</BodyText>
+            ) : (
+              <FileEditor key={open} place={place} path={open} />
+            )}
+          </div>
+        </div>
       </div>
-    </div>
+    </WaitingUploadsProvider>
   );
 }
