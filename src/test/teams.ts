@@ -32,6 +32,8 @@ export function team(overrides: Partial<Team> = {}): Team {
     members: [member('carol')],
     pending: [],
     submitted: false,
+    time_extension: 0,
+    extension_tasks: null,
     ...overrides,
   };
 }

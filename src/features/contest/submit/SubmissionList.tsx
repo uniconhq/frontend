@@ -9,8 +9,8 @@ import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
 import { formatDateTime } from '@/lib/time';
 import { useLiveConnected, useLiveRefused } from '@/live';
 import { serverNow } from '@/lib/time';
-import { justFinished, newestFirst, pollEvery, verdictOf } from './grading';
-import { Metrics, Verdicts } from './Results';
+import { justFinished, lateness, newestFirst, pollEvery, verdictOf } from './grading';
+import { Verdict } from './Results';
 import { submissionHref } from './submission-param';
 import classes from './submit.module.css';
 
@@ -38,9 +38,11 @@ function useJustFinished(submissions: Submission[] | undefined): string {
         finished
           .map(
             (found) =>
-              `Submission #${found.number}: ${found.gradings
-                .map((grading) => verdictLabel(verdictOf(grading)))
-                .join(', ')}.`,
+              `Submission #${found.number}: ${
+                found.grading === null
+                  ? 'Not graded'
+                  : verdictLabel(verdictOf(found.grading))
+              }.`,
           )
           .join(' '),
       );
@@ -94,7 +96,6 @@ function Listed({ view }: { view: QueryView<Submission[]> }) {
     );
   }
 
-  const named = (submission: Submission) => submission.gradings.length > 1;
   return (
     <table className={classes.table} aria-label="Your submissions">
       <thead>
@@ -102,7 +103,6 @@ function Listed({ view }: { view: QueryView<Submission[]> }) {
           <th scope="col">Submission</th>
           <th scope="col">Submitted</th>
           <th scope="col">Result</th>
-          <th scope="col">Metrics</th>
         </tr>
       </thead>
       <tbody>
@@ -113,18 +113,14 @@ function Listed({ view }: { view: QueryView<Submission[]> }) {
                 #{submission.number}
               </PageLink>
             </th>
-            <td>{formatDateTime(new Date(submission.submitted_at))}</td>
             <td>
-              <Verdicts gradings={submission.gradings} />
+              {formatDateTime(new Date(submission.submitted_at))}
+              {submission.late_days > 0 && (
+                <BodyText tone="secondary">{lateness(submission.late_days)}</BodyText>
+              )}
             </td>
             <td>
-              {submission.gradings.map((grading) => (
-                <Metrics
-                  key={grading.id}
-                  metrics={grading.metrics}
-                  stage={named(submission) ? grading.stage : undefined}
-                />
-              ))}
+              <Verdict grading={submission.grading} />
             </td>
           </tr>
         ))}

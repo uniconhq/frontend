@@ -244,17 +244,18 @@ moving, removing and deleting each ask first, naming the team, since they
 change who reaches that team's work. The list is read again every half minute
 and whenever a confirmation opens. The routes give the page no team size,
 so a move into a full team is refused by the server and the refusal stays in
-the dialog. A contest has teams only when its `contest.yaml` turns them on;
-until it does, a new team is refused with `teams_off`.
+the dialog. A contest has teams only when its `contest.yaml` sets
+`team_size`, the most people a team holds; until it does, a new team is
+refused with `teams_off`.
 
 ## The contestant pages
 
-| Address                               | Page                                                                                      |
-| ------------------------------------- | ----------------------------------------------------------------------------------------- |
-| `/`                                   | the public contests for a visitor; your contests once signed in                           |
-| `/contests/:org/:contest`             | a contest's dates, countdown, registration, your team and released tasks                  |
-| `/contests/:org/:contest/tasks/:task` | a released task's statement; signed in, its limits, the submit panel and your submissions |
-| `/invites`                            | your invites, with Accept and Decline; an invite mail links here                          |
+| Address                               | Page                                                                                              |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `/`                                   | the public contests for a visitor; your contests once signed in                                   |
+| `/contests/:org/:contest`             | a contest's dates, countdown, registration, your team and released tasks                          |
+| `/contests/:org/:contest/tasks/:task` | a released task's statement; signed in, its times and caps, the submit panel and your submissions |
+| `/invites`                            | your invites, with Accept and Decline; an invite mail links here                                  |
 
 One address serves a visitor and a signed-in person, so a contest's link can
 be shared before anyone has an account; the page reads the public routes or
@@ -264,8 +265,11 @@ in, the contest page follows the registration: the register form, with a
 field for the contest's code when it asks for one, then pending, rejected
 with the organisers' reason, and the contest. It reads the home again every
 ten seconds while pending, every minute otherwise, and at once as the countdown crosses
-the start or the person's deadline. The countdown runs on the server's clock
-and counts to the person's own deadline, the end plus any extension. Every
+the start or the end. The countdown runs on the server's clock and says what
+it counts to: "Contest starts in", then "Contest ends in". Each task closes at its own time: signed in, the task list
+says when each falls due, if it does, and closes for the person, any
+extension they have on it included, and the task page says the same with
+the task's caps, the most submissions in all and how often. Every
 refusal code has its own sentence in `src/api/describe-error.ts`. A statement
 is Markdown, rendered by `src/ui/Markdown.tsx` with raw HTML dropped, links
 out of the site opened apart, images shown as links, and headings one level
@@ -288,7 +292,7 @@ The proxy in `deploy` has to send `/invites` to this app as well.
 
 ### Teams
 
-For a contest whose settings turn teams on, an approved contestant's
+For a contest whose `contest.yaml` sets `team_size`, an approved contestant's
 contest page has a team section (`features/contest/teams/`). The home does
 not say whether a contest has teams, so the section reads `my-team` and is
 not there at all when it answers `teams_off`, nor while the first answer is
@@ -304,8 +308,9 @@ the form says so. A full team's Accept, Ask to join, Approve and Invite are
 off, with the reason beside them. A team's name is checked once trimmed, at
 most 60 characters, and a username field takes at most 40, Forgejo's limit.
 
-Once in a team, a person's submissions, limits and questions are the
-team's, and every member sees all of them on the existing pages. Nothing
+Once in a team, a person's submissions, the caps they count against, their
+extra time and their questions are the team's, and every member sees all of
+them on the existing pages. Nothing
 pushes a change of team, so the section is read again every ten seconds
 while someone waits on an answer and every thirty otherwise. When the team
 the person is in changes between two reads, by their own hand or by a
@@ -318,26 +323,32 @@ are. A refusal stays in the section until it is dismissed.
 ### Submitting
 
 The submit panel on the task page is built from the task's contestant
-inputs, which the task page's answer carries: a drop zone for each `code`,
-`file` and `file[]` input, with a language to choose when a code input lists
-more than one, and a field for each `text`, `number` and `boolean` input,
-starting at its default. A `jupyter` input is not submitted from the browser,
-so the panel says so and leaves it out. The panel shows only while the task is
-open; the list below it shows either way.
+inputs, which the task page's answer carries, each by its label: a drop zone
+for a `file` input, a field for each `text`, `number` and `boolean` input,
+starting at its default, and a choice of an `enum` input's options, starting
+at its default. An enum with one option has nothing to choose, so the panel
+says which in a line, such as `language: python`, and sends it. A `folder`
+input, and a `file` input that takes a file per test, take several files and
+offer a second picker that chooses a whole folder. A folder's files keep
+their paths inside it, its own name left off, and a file per test is named
+for its test as `<group>/<test>`, with or without an ending, so a folder
+holding a folder per test group gives each file its name. A file chosen
+alone goes by its name, and the server says which names it does not take.
+The panel shows only while the task is open; the list below it shows either
+way.
 
 A drop zone is the browser's own file input, hidden inside the zone that
 shows it, so Tab reaches it, Enter or Space opens the picker, and a screen
-reader names it by the input's label. Its `accept` only narrows the picker;
-the panel checks every file itself.
+reader names it by the input's label, and the folder picker as
+`<label>: a folder`.
 
 Submit runs in this order, in `src/features/contest/submit/use-submit.ts`:
 
-1. The browser's own checks: every input filled, each file one its input
-   takes, a language chosen, a number in range, and every size, each file
-   against its input's `max_size` and the task's, and all of them together
-   against the task's. The store gives no usable error for a file over its
-   signed size, so a file too large is caught here, before any upload starts.
-2. For each file, a slot (`POST .../uploads`), the bytes straight to the store,
+1. The browser's own checks: every input filled, an option chosen, a number
+   in range, and the files of each input together against its `max_size`.
+   A file too large is caught here, before any upload starts.
+2. For each file, a slot (`POST .../uploads`) naming the input and the
+   file's path under it, the bytes straight to the store,
    and `POST .../uploads/{id}/complete`. A form slot is one POST of exactly the
    slot's `fields`, in their order, then the file last; any other field, such
    as a Content-Type, and Garage's policy refuses it. A slot in parts, for a
@@ -362,28 +373,39 @@ attempt unless a refusal says they cannot be used. Changing anything in the
 panel starts a new attempt. The key is `crypto.randomUUID()`, or 32 random hex
 digits on a plain-http origin, where that is missing.
 
-A refusal is said in words from its code, with what it names: when the task
-closed and why, the submission limit, when a rate-limited submit can be sent
-again (by the server's clock), the size limit and whose it is, and each
-problem with the input it is about. Whatever stage it came at, the progress
+A refusal is said in words from its code, with what it names: that the task
+has closed for the person, the submission limit, when a rate-limited submit
+can be sent again (by the server's clock), the size limit and whose it is,
+and each problem with the input it is about, such as a file per test named
+for no test. Whatever stage it came at, the progress
 goes and the files stay in the panel, ready to send again.
 
-Below the panel are the contestant's own submissions, newest first, with each
-stage's verdict and metrics. While the live stream is open (below) a
-nudge says when a grading moves, and the list is read again then and once a
-minute besides. While it is not, the list is read by how long the newest
-grading still to finish has waited: every two seconds for its first half
-minute, every five to two minutes, every fifteen after, and every minute
-when nothing is being graded. A verdict is the outcome once the task shows one, and
-where the grading stands until then, or for good when the task keeps the
-outcome hidden, as `GRADED`. `src/ui/VerdictBadge.tsx` has a label for every
-outcome and status and puts each in one of the handoff's six colour pairs; an
-outcome it does not know shows under its own name in the neutral one.
+Below the panel are the contestant's own submissions, newest first, each
+with its verdict and how many days late it was, if it was. While the live
+stream is open (below) a nudge says when a grading moves, and the list is
+read again then and once a minute besides. While it is not, the list is read
+by how long the newest grading still to finish has waited: every two seconds
+for its first half minute, every five to two minutes, every fifteen after,
+and every minute when nothing is being graded. A verdict is where the
+grading stands until it is done, then what stopped the run when something
+did, such as a compile error, else the outcome over the test groups the task
+shows now, and `GRADED` when it shows none yet. A run that failed on the
+platform's side is served as running until staff end it.
+`src/ui/VerdictBadge.tsx` has a label for every outcome and status and puts
+each in one of the handoff's six colour pairs; an outcome it does not know
+shows under its own name in the neutral one.
 
-`?submission=<n>` opens one submission above the list: each stage's verdict,
-and its summary, metrics, a row per test and its log where the task shows
-them. The route leaves out what the task withholds, and the page puts nothing
-in its place; the log is read only when the grading says there is one.
+`?submission=<n>` opens one submission above the list: its verdict, the
+values the run reported once, a number in a list and a text such as the
+compile log as a block of its own, and each test group as the task shows it
+now: its outcome, its tests with each one's outcome and values, such as
+`time_ms` and `memory_kb`, and when the rest is shown while some is held
+back. A group that did not run on the grading reads "Not run on this
+grading" where its outcome would be. The route leaves out what the task
+withholds, and the page puts nothing in its place. A run's log names every
+test, hidden ones too, so no contestant reads it; on a task's organiser
+page, each grading whose run wrote one has a Log link that opens it as
+plain text in a tab of its own.
 
 An open submission lists the files it was made with, each a download
 through the proxy's download door, `/-/downloads/...`, which streams the
@@ -413,7 +435,7 @@ connections to one host and a stream in every background tab would use
 them up. Each event names a kind of thing that changed and its id, never
 what changed. The events of a moment are gathered, and each kind marks
 stale the reads whose route shows it: a grading the submissions and
-gradings lists and a submission, but not its files or log; an announcement
+gradings lists and a submission, but not its files; an announcement
 every announcements list; a clarification the questions and the inbox.
 `resync`, and every opening of the stream after the tab's first, marks
 everything stale. A stream the server refused is opened again after five

@@ -11,7 +11,6 @@ export type Verdict = Outcome | GradingStatus;
 
 const LOOK: Record<Verdict, { label: string; colors: VerdictName }> = {
   accepted: { label: 'ACCEPTED', colors: 'accepted' },
-  partial: { label: 'PARTIAL', colors: 'limit' },
   wrong_answer: { label: 'WRONG ANSWER', colors: 'rejected' },
   time_limit: { label: 'TIME LIMIT', colors: 'limit' },
   memory_limit: { label: 'MEMORY LIMIT', colors: 'limit' },

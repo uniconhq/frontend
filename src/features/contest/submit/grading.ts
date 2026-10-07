@@ -25,7 +25,7 @@ const REFUSED_MS = 5_000;
 const UNFINISHED = new Set<GradingStatus>(['queued', 'dispatched', 'running']);
 
 function unfinished(submission: Submission): boolean {
-  return submission.gradings.some((grading) => UNFINISHED.has(grading.status));
+  return submission.grading !== null && UNFINISHED.has(submission.grading.status);
 }
 
 /**
@@ -53,21 +53,21 @@ export function pollEvery(
 }
 
 /**
- * What a grading shows as its verdict: its outcome once it has one the task
- * lets the contestant see, and where it stands until then, or for good when
- * the outcome is withheld or the grading never finished.
+ * What a grading shows as its verdict once it is done: what stopped the run,
+ * when something did, or the outcome over the groups the task shows now;
+ * where it stands until then, or for good when nothing is shown yet or the
+ * grading never finished.
  */
 export function verdictOf(grading: GradingResult): string {
-  return grading.status === 'done' && grading.outcome !== null
-    ? grading.outcome
-    : grading.status;
+  if (grading.status !== 'done') return grading.status;
+  return grading.stopped ?? grading.outcome ?? grading.status;
 }
 
 const numbers = new Intl.NumberFormat(undefined, { maximumFractionDigits: 4 });
 
-/** A metric's value as read: a number to at most four decimals. */
-export function metricValue(value: number): string {
-  return numbers.format(value);
+/** A reported value as read: a number to at most four decimals, or the text. */
+export function valueText(value: number | string): string {
+  return typeof value === 'number' ? numbers.format(value) : value;
 }
 
 /**
@@ -82,6 +82,11 @@ export function justFinished(
   if (before === undefined || after === undefined) return [];
   const waiting = new Set(before.filter(unfinished).map((found) => found.number));
   return after.filter((found) => waiting.has(found.number) && !unfinished(found));
+}
+
+/** How late a submission was, in started days after the person's due. */
+export function lateness(days: number): string {
+  return days === 1 ? '1 day late' : `${days} days late`;
 }
 
 /** Newest first, whatever order they arrived in. */

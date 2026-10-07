@@ -66,7 +66,7 @@ describe('HomePage', () => {
             name: 'Autumn 2026',
             start: '2026-10-12T09:00:00Z',
             end: '2026-10-12T10:30:00Z',
-            visibility: 'public',
+            visibility: 'everyone',
             status: null,
           },
         ]),

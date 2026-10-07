@@ -1,6 +1,6 @@
 import { useEffect, useRef, type FormEvent, type ReactNode } from 'react';
 import type { ApiError } from '@/api/problem';
-import type { ContestantInput } from '@/api/types';
+import type { InputField } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
 import { Checkbox } from '@/ui/Checkbox';
@@ -10,7 +10,7 @@ import { TextInput } from '@/ui/TextInput';
 import { Textarea } from '@/ui/Textarea';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { formatLimit } from '@/lib/size';
-import { entryOf, htmlAccept, type Draft, type Entry, type PanelInput } from './draft';
+import { entryOf, pathOf, takesPaths, type Draft, type Entry } from './draft';
 import type { Phase } from './use-submit';
 import shared from '../contest.module.css';
 import classes from './submit.module.css';
@@ -56,7 +56,7 @@ function problemsOf(error: ApiError): Problem[] {
  * input it is about, for `invalid_inputs`, and the input whose limit a file
  * broke, for `too_large`.
  */
-function Refusal({ error, inputs }: { error: ApiError; inputs: ContestantInput[] }) {
+function Refusal({ error, inputs }: { error: ApiError; inputs: InputField[] }) {
   const labelOf = (id: string) => inputs.find((input) => input.id === id)?.label ?? id;
   const problems = error.code === 'invalid_inputs' ? problemsOf(error) : [];
   const input = error.extensions['input'];
@@ -79,21 +79,19 @@ function Refusal({ error, inputs }: { error: ApiError; inputs: ContestantInput[]
   );
 }
 
-/** The helper line under a file input: what it takes and how large. */
-function fileHint(input: PanelInput, taskMaxSize: number): string {
-  const parts: string[] = [];
-  if (input.type === 'code' && input.language?.length === 1) {
-    parts.push(`In ${input.language[0] ?? ''}.`);
+/**
+ * The helper line under a file input: how its files are named, for one that
+ * takes a file per test, and how large they may be together.
+ */
+function fileHint(input: InputField): string {
+  const limit = formatLimit(input.max_size);
+  if (input.per_test) {
+    return `One file for each test, named for it as <group>/<test>, such as main/1.txt: choose a folder that holds a folder for each test group. At most ${limit} in all.`;
   }
-  if (input.accept !== null && input.type !== 'code') {
-    parts.push(`Takes ${input.accept.join(', ')}.`);
-  }
-  const limit = Math.min(input.max_size ?? taskMaxSize, taskMaxSize);
-  parts.push(`At most ${formatLimit(limit)}.`);
-  return parts.join(' ');
+  return input.type === 'folder' ? `At most ${limit} in all.` : `At most ${limit}.`;
 }
 
-function numberHint(input: PanelInput): string | undefined {
+function numberHint(input: InputField): string | undefined {
   if (input.min !== null && input.max !== null) {
     return `From ${input.min} to ${input.max}.`;
   }
@@ -102,54 +100,58 @@ function numberHint(input: PanelInput): string | undefined {
   return undefined;
 }
 
-/** One input's field: a drop zone, with a language to choose for code, or a value. */
+/**
+ * One input's field: a drop zone, a choice, or a value. An enum with only
+ * one option has nothing to choose, so it is a line saying which.
+ */
 function Field({
   input,
   entry,
   onChange,
-  taskMaxSize,
   busy,
   sentOf,
 }: {
-  input: PanelInput;
+  input: InputField;
   entry: Entry;
   onChange: (entry: Entry) => void;
-  taskMaxSize: number;
   busy: boolean;
   sentOf: (file: File) => number | null;
 }) {
-  const label = input.label ?? input.id;
+  const { label } = input;
   switch (entry.kind) {
-    case 'files': {
-      const languages = input.type === 'code' ? (input.language ?? []) : [];
+    case 'files':
       return (
-        <div className={shared.stack}>
-          <FileDrop
+        <FileDrop
+          label={label}
+          description={fileHint(input)}
+          folder={takesPaths(input)}
+          pathOf={(file) => pathOf(input, file)}
+          files={entry.files}
+          onChange={(files) => onChange({ kind: 'files', files })}
+          progressOf={sentOf}
+          disabled={busy}
+        />
+      );
+    case 'choice': {
+      const options = input.options ?? [];
+      if (options.length === 1) {
+        return (
+          <BodyText>
+            {label}: {options[0]}
+          </BodyText>
+        );
+      }
+      return (
+        <div className={classes.narrow}>
+          <Select
             label={label}
-            description={fileHint(input, taskMaxSize)}
-            accept={htmlAccept(input)}
-            multiple={input.type === 'file[]'}
-            files={entry.files}
-            onChange={(files) => onChange({ ...entry, files })}
-            progressOf={sentOf}
+            value={entry.option}
+            options={options.map((option) => ({ value: option, label: option }))}
+            placeholder="Choose one"
+            onChange={(option) => onChange({ kind: 'choice', option })}
+            required
             disabled={busy}
           />
-          {languages.length > 1 && (
-            <div className={classes.narrow}>
-              <Select
-                label={`Language of ${label}`}
-                value={entry.language}
-                options={languages.map((language) => ({
-                  value: language,
-                  label: language,
-                }))}
-                placeholder="Choose a language"
-                onChange={(language) => onChange({ ...entry, language })}
-                required
-                disabled={busy}
-              />
-            </div>
-          )}
         </div>
       );
     }
@@ -201,8 +203,6 @@ const PHASE: Record<Exclude<Phase, 'idle'>, string> = {
  */
 export function SubmitPanel({
   inputs,
-  notebook,
-  taskMaxSize,
   draft,
   onDraftChange,
   onSubmit,
@@ -211,10 +211,7 @@ export function SubmitPanel({
   refusal,
   notice,
 }: {
-  inputs: PanelInput[];
-  /** Whether the task also takes a notebook, which is not sent from here. */
-  notebook: boolean;
-  taskMaxSize: number;
+  inputs: InputField[];
   draft: Draft;
   onDraftChange: (draft: Draft) => void;
   onSubmit: () => void;
@@ -233,27 +230,19 @@ export function SubmitPanel({
   if (inputs.length === 0) {
     return (
       <BodyText tone="secondary">
-        {notebook
-          ? 'This task takes a notebook, which is not submitted from this page.'
-          : 'This task takes nothing to submit from this page.'}
+        This task takes nothing to submit from this page.
       </BodyText>
     );
   }
 
   return (
     <form className={shared.stack} aria-label="Submit" onSubmit={submit} noValidate>
-      {notebook && (
-        <BodyText tone="secondary">
-          This task also takes a notebook, which is not submitted from this page.
-        </BodyText>
-      )}
       {inputs.map((input) => (
         <Field
           key={input.id}
           input={input}
           entry={entryOf(draft, input)}
           onChange={(entry) => onDraftChange({ ...draft, [input.id]: entry })}
-          taskMaxSize={taskMaxSize}
           busy={busy}
           sentOf={sentOf}
         />

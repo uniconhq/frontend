@@ -5,8 +5,8 @@ import { expect, test, type Page, type Route } from '@playwright/test';
  * needs no backend: a visitor finds a public contest on the landing page and
  * reads a released statement; signed in, they register, wait for an
  * organiser and land in the contest once approved,
- * with a countdown by the server's clock, and the task's limits and the panel
- * to submit from.
+ * with a countdown by the server's clock, and the task's times, its limits
+ * and the panel to submit from.
  * The stub keeps just enough state for each answer to follow from the last.
  */
 const CONTEST = {
@@ -74,7 +74,7 @@ async function stubContestantApi(page: Page, signedIn: boolean) {
     json(route, [
       {
         ...CONTEST,
-        visibility: 'public',
+        visibility: 'everyone',
         status: state.registered ? 'pending' : null,
       },
     ]),
@@ -88,6 +88,7 @@ async function stubContestantApi(page: Page, signedIn: boolean) {
       registered_at: '2026-09-29T10:00:00Z',
       decided_at: null,
       time_extension: 0,
+      extension_tasks: null,
     };
     if (state.homeReads < 2) return { ...base, status: 'pending' };
     return { ...base, status: 'approved' };
@@ -104,15 +105,21 @@ async function stubContestantApi(page: Page, signedIn: boolean) {
       return json(route, {
         ...CONTEST,
         state: 'published',
-        submissions_closed: false,
         registration: registration(),
         registration_open: true,
         invite_only: false,
         asks_code: false,
-        deadline: CONTEST.end,
         now: '2026-09-29T10:00:00Z',
         tasks: [
-          { name: 'sum', label: 'A', title: 'Sum of Two', points: 100, release: OPEN },
+          {
+            name: 'sum',
+            label: 'A',
+            title: 'Sum of Two',
+            worth: 100,
+            release: OPEN,
+            due: null,
+            closes: CONTEST.end,
+          },
         ],
       });
     }
@@ -121,27 +128,36 @@ async function stubContestantApi(page: Page, signedIn: boolean) {
         name: 'sum',
         label: 'A',
         title: 'Sum of Two',
-        points: 100,
+        worth: 100,
         statement: '# Sum\n\nPrint the sum of two numbers.\n',
-        limits: {
-          submissions: 50,
-          rate: { count: 1, per: 30 },
-          max_size: 10485760,
-        },
+        submissions: { max: 50, rate: { count: 1, per: 30 } },
         inputs: [
           {
             id: 'submission',
-            type: 'code',
+            type: 'file',
             label: 'Your solution',
-            language: ['python'],
+            options: null,
+            per_test: false,
+            default: null,
             min: null,
             max: null,
-            accept: null,
-            max_size: null,
+            max_size: 10485760,
+          },
+          {
+            id: 'language',
+            type: 'enum',
+            label: 'language',
+            options: ['python'],
+            per_test: false,
             default: null,
+            min: null,
+            max: null,
+            max_size: 10485760,
           },
         ],
         release: OPEN,
+        due: null,
+        closes: CONTEST.end,
       });
     }
     if (path.endsWith('/tasks/sum/submissions')) return json(route, []);
@@ -181,8 +197,8 @@ test('a contestant registers, waits, is let in and reads the task', async ({
     .getByRole('list', { name: 'Contests' })
     .getByRole('link', { name: 'Spring 2026' })
     .click();
-  await expect(page.getByRole('timer', { name: 'Countdown' })).toContainText(
-    'Time left',
+  await expect(page.getByRole('timer', { name: 'Contest countdown' })).toContainText(
+    'Contest ends in',
   );
   await page.getByRole('button', { name: 'Register' }).click();
 
@@ -192,7 +208,10 @@ test('a contestant registers, waits, is let in and reads the task', async ({
 
   await page.getByRole('link', { name: 'Sum of Two' }).click();
   await expect(page.getByLabel('Limits')).toContainText('1 in any 30 seconds');
-  await expect(page.getByRole('form', { name: 'Submit' })).toBeVisible();
+  await expect(page.getByLabel('Limits')).toContainText('Closes');
+  const form = page.getByRole('form', { name: 'Submit' });
+  await expect(form).toBeVisible();
+  await expect(form.getByText('language: python')).toBeVisible();
   await expect(
     page.getByText('You have not submitted to this task yet.'),
   ).toBeVisible();

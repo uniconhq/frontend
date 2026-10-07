@@ -11,9 +11,8 @@ import { lookOf, type Verdict } from './verdicts';
  *
  * A verdict is an outcome the run gave, or where a grading stands while it has
  * none to show. The six colour pairs are the handoff's, so every outcome and
- * status takes one of them: passing, failing, a limit (and a partial pass,
- * which is between the two), a build or platform error, under way, and
- * waiting or neutral. `done` is neutral, because a grading whose outcome the
+ * status takes one of them: passing, failing, a limit, a build or platform
+ * error, under way, and waiting or neutral. `done` is neutral, because a grading whose outcome the
  * task keeps hidden says nothing about whether it passed.
  */
 

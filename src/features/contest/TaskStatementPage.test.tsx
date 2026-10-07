@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { screen, within } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
+import { formatDateTime } from '@/lib/time';
 import { renderApp } from '@/test/render';
 import { problem, server, signedIn } from '@/test/server';
 import { noSubmissions, PUBLIC_API, TASK_API, taskPage } from '@/test/contestant';
@@ -8,11 +9,13 @@ import { noSubmissions, PUBLIC_API, TASK_API, taskPage } from '@/test/contestant
 const PAGE = '/contests/acme/spring/tasks/sum';
 
 describe('a task page for a signed-in person', () => {
-  it('renders the statement as Markdown and lists the limits', async () => {
+  it('renders the statement as Markdown and lists its times and limits', async () => {
     server.use(
       signedIn,
       noSubmissions,
-      http.get(`${TASK_API}/page`, () => HttpResponse.json(taskPage)),
+      http.get(`${TASK_API}/page`, () =>
+        HttpResponse.json({ ...taskPage, due: '2026-09-12T10:15:00Z' }),
+      ),
     );
     renderApp(PAGE);
 
@@ -24,7 +27,14 @@ describe('a task page for a signed-in person', () => {
     const list = screen.getByLabelText('Limits');
     expect(within(list).getByText('50 in all')).toBeVisible();
     expect(within(list).getByText('1 in any 30 seconds')).toBeVisible();
-    expect(within(list).getByText('10 MB')).toBeVisible();
+    expect(
+      within(list).getByText(formatDateTime(new Date('2026-09-12T10:15:00Z'))),
+    ).toBeVisible();
+    expect(
+      within(list).getByText(formatDateTime(new Date('2026-09-12T10:30:00Z'))),
+    ).toBeVisible();
+    expect(within(list).getByText('Due')).toBeVisible();
+    expect(within(list).getByText('Closes')).toBeVisible();
     expect(screen.getByRole('link', { name: 'Back to the contest' })).toHaveAttribute(
       'href',
       '/contests/acme/spring',
@@ -38,13 +48,13 @@ describe('a task page for a signed-in person', () => {
       http.get(`${TASK_API}/page`, () =>
         HttpResponse.json({
           ...taskPage,
-          release: { released: true, visible: true, open: false, closed: 'ended' },
+          release: { released: true, visible: true, open: false, closed: 'closed' },
         }),
       ),
     );
     renderApp(PAGE);
 
-    expect(await screen.findByText('The contest has ended for you.')).toBeVisible();
+    expect(await screen.findByText('This task has closed for you.')).toBeVisible();
   });
 
   it('leaves out raw HTML an organiser wrote into the statement', async () => {
