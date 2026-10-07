@@ -1348,6 +1348,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/orgs/{org}/contests/{contest}/tasks/{task}/gradings/{grading}/log": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The run log of one of the task's gradings
+         * @description The log of the grading's run. A grading with no log is `not_found`,
+         *     the same as one that is not there, and a log larger than the platform
+         *     reads back is `log_too_large` with the `limit` in bytes.
+         */
+        get: operations["readGradingLog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/orgs/{org}/contests/{contest}/tasks/{task}/gradings/{grading}/retry": {
         parameters: {
             query?: never;
@@ -2556,7 +2578,7 @@ export interface components {
          * @description Where one grading stands. `queued` waits for its run to be started,
          *     which happens as soon as the request that made it commits; `dispatched`
          *     is held by the CI, waiting for a machine or checking out; `running` has
-         *     had its envelope fetched by the harness. It ends `done` with a verdict,
+         *     had its envelope fetched by the harness. It ends `done` with a result,
          *     `cancelled` by an organiser, or `system_error`, a grading that failed for
          *     a reason of the platform's, never a grade: its run could not be started,
          *     or did not report before its deadline.
@@ -2584,14 +2606,18 @@ export interface components {
         /**
          * GroupShown
          * @description One test group as the contestant sees it now: its name, its `show`,
-         *     its outcome once its verdict is shown, its tests once they are, and when
-         *     what is held back is shown, null once nothing is.
+         *     its outcome once its verdict is shown, its tests once they are, when
+         *     what is held back is shown, null once nothing is, and whether it ran on
+         *     this grading. A group that did not run has no outcome, no tests and
+         *     nothing held back.
          */
         GroupShown: {
             /** Group */
             group: string;
             /** Outcome */
             outcome: ("accepted" | "wrong_answer" | "time_limit" | "memory_limit" | "output_limit" | "runtime_error" | "compile_error" | "skipped" | "system_error") | null;
+            /** Ran */
+            ran: boolean;
             show: components["schemas"]["Show"];
             /** Shown At */
             shown_at: string | null;
@@ -6240,6 +6266,40 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Grading"];
+                };
+            };
+            /** @description An error, as an RFC 9457 problem document. `code` names it. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    readGradingLog: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                contest: string;
+                grading: string;
+                org: string;
+                task: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The log, as the run wrote it. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain; charset=utf-8": string;
                 };
             };
             /** @description An error, as an RFC 9457 problem document. `code` names it. */
