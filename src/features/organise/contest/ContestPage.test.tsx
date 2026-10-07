@@ -109,7 +109,17 @@ describe('the contest page', () => {
     server.use(
       signedIn,
       ...repoFiles,
-      http.get(`${CONTEST_API}/organise/tasks`, () => HttpResponse.json([fresh])),
+      http.get(`${CONTEST_API}/organise/tasks`, () =>
+        HttpResponse.json([
+          fresh,
+          {
+            ...fresh,
+            task: { name: 'min' },
+            label: 'D',
+            state: { ...fresh.state, errors: [] },
+          },
+        ]),
+      ),
     );
     renderApp(CONTEST);
 
@@ -120,6 +130,13 @@ describe('the contest page', () => {
       'the whole file: task.yaml is missing.',
     );
     expect(max).toHaveTextContent('Not known until published');
+
+    const min = screen.getByRole('listitem', { name: 'D · min' });
+    expect(min).toHaveTextContent('Never published');
+    expect(min).toHaveTextContent(
+      'Its files are saved as a draft, kept back from contestants.',
+    );
+    expect(min).not.toHaveTextContent('sits on top of it');
   });
 
   it("reads the tasks again once the contest's file is saved, since it holds their times", async () => {
