@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { useLocation, useSearchParams } from 'react-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { $api } from '@/api/query';
-import type { Submission, TaskPage } from '@/api/types';
+import type { Submission, TaskPage, TaskRelease } from '@/api/types';
+import { BodyText } from '@/ui/BodyText';
 import { Card } from '@/ui/Card';
 import { SectionTitle } from '@/ui/SectionTitle';
 import { emptyDraft, type Draft } from './draft';
@@ -15,8 +16,24 @@ import { useSubmit } from './use-submit';
 import shared from '../contest.module.css';
 
 /**
+ * Why a task takes no submission from this person now, said where the panel
+ * would be: a task is open to a row only while it is released, its contest
+ * is not archived, and the row's close of it has not passed.
+ */
+const CLOSED: Record<NonNullable<TaskRelease['closed']>, string> = {
+  not_released: 'This task is not released yet.',
+  archived: 'The contest is archived, so its tasks take no submissions.',
+  closed: 'This task has closed for you, so it takes no more submissions from you.',
+};
+
+function closedReason(closed: TaskRelease['closed']): string {
+  return closed === null ? 'This task takes no submission now.' : CLOSED[closed];
+}
+
+/**
  * The contestant's half of a task page below its statement: the panel they
- * submit from while the task is open, the submission the address opens, and
+ * submit from while the task is open or why it is not in its place, the
+ * submission the address opens, and
  * the list of their own submissions. The panel's contents live here, so
  * restoring an earlier submission can fill it; a submission that goes
  * through empties it and joins the top of the list at once.
@@ -77,10 +94,10 @@ export function TaskSubmissions({
 
   return (
     <>
-      {open && (
-        <Card>
-          <div className={shared.stack}>
-            <SectionTitle>Submit</SectionTitle>
+      <Card>
+        <div className={shared.stack}>
+          <SectionTitle>Submit</SectionTitle>
+          {open ? (
             <SubmitPanel
               inputs={inputs}
               draft={draft}
@@ -91,9 +108,13 @@ export function TaskSubmissions({
               refusal={submitter.refusal}
               notice={notice}
             />
-          </div>
-        </Card>
-      )}
+          ) : (
+            <div role="status" aria-label="Why you cannot submit">
+              <BodyText>{closedReason(page.release.closed)}</BodyText>
+            </div>
+          )}
+        </div>
+      </Card>
       {opened !== null && (
         <Card>
           <SubmissionDetail

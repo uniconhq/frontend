@@ -128,6 +128,12 @@ function Home({
           This contest is a draft, so only its organisers see it.
         </BodyText>
       )}
+      {home.state === 'archived' && (
+        <BodyText tone="secondary">
+          This contest is archived: its tasks can still be read, and they take no
+          submissions.
+        </BodyText>
+      )}
       {home.description !== '' && <BodyText size="md">{home.description}</BodyText>}
       <Card>
         <div className={classes.stack}>

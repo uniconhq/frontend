@@ -5,6 +5,7 @@ import { formatDateTime } from '@/lib/time';
 import { renderApp } from '@/test/render';
 import { problem, server, signedIn } from '@/test/server';
 import { noSubmissions, PUBLIC_API, TASK_API, taskPage } from '@/test/contestant';
+import { passTime, withFakeTimers } from '@/test/timers';
 
 const PAGE = '/contests/acme/spring/tasks/sum';
 
@@ -41,21 +42,39 @@ describe('a task page for a signed-in person', () => {
     );
   });
 
-  it('says why the task takes no submission now', async () => {
-    server.use(
-      signedIn,
-      noSubmissions,
-      http.get(`${TASK_API}/page`, () =>
-        HttpResponse.json({
-          ...taskPage,
-          release: { released: true, visible: true, open: false, closed: 'closed' },
-        }),
-      ),
-    );
-    renderApp(PAGE);
+  it.each([
+    ['not_released', 'This task is not released yet.'],
+    ['archived', 'The contest is archived, so its tasks take no submissions.'],
+    [
+      'closed',
+      'This task has closed for you, so it takes no more submissions from you.',
+    ],
+  ] as const)(
+    'says in the panel’s place why it takes nothing, %s',
+    async (closed, said) => {
+      server.use(
+        signedIn,
+        noSubmissions,
+        http.get(`${TASK_API}/page`, () =>
+          HttpResponse.json({
+            ...taskPage,
+            release: {
+              released: closed !== 'not_released',
+              visible: true,
+              open: false,
+              closed,
+            },
+          }),
+        ),
+      );
+      renderApp(PAGE);
 
-    expect(await screen.findByText('This task has closed for you.')).toBeVisible();
-  });
+      expect(
+        await screen.findByRole('status', { name: 'Why you cannot submit' }),
+      ).toHaveTextContent(said);
+      expect(screen.queryByRole('form', { name: 'Submit' })).not.toBeInTheDocument();
+    },
+  );
 
   it('leaves out raw HTML an organiser wrote into the statement', async () => {
     server.use(
@@ -105,6 +124,44 @@ describe('a task page for a signed-in person', () => {
     renderApp(PAGE);
 
     expect(await screen.findByRole('heading', { name: 'Not found' })).toBeVisible();
+  });
+});
+
+describe('a task page as the task opens', () => {
+  withFakeTimers();
+
+  it('brings the panel back once the task is open', async () => {
+    let asked = 0;
+    server.use(
+      signedIn,
+      noSubmissions,
+      http.get(`${TASK_API}/page`, () => {
+        asked += 1;
+        return HttpResponse.json(
+          asked === 1
+            ? {
+                ...taskPage,
+                release: {
+                  released: false,
+                  visible: true,
+                  open: false,
+                  closed: 'not_released',
+                },
+              }
+            : taskPage,
+        );
+      }),
+    );
+    renderApp(PAGE);
+
+    expect(
+      await screen.findByRole('status', { name: 'Why you cannot submit' }),
+    ).toHaveTextContent('This task is not released yet.');
+
+    await passTime(60_000);
+
+    expect(await screen.findByRole('form', { name: 'Submit' })).toBeVisible();
+    expect(screen.queryByRole('status', { name: 'Why you cannot submit' })).toBeNull();
   });
 });
 

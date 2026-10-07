@@ -1,6 +1,5 @@
 import { $api, queryView } from '@/api/query';
-import type { TaskPage, TaskRelease } from '@/api/types';
-import { BodyText } from '@/ui/BodyText';
+import type { TaskPage } from '@/api/types';
 import { Card } from '@/ui/Card';
 import { Markdown } from '@/ui/Markdown';
 import { PageLink } from '@/ui/PageLink';
@@ -26,13 +25,6 @@ function rate(count: number, seconds: number): string {
   const window = seconds === 1 ? 'second' : `${seconds} seconds`;
   return `${count} in any ${window}`;
 }
-
-/** Why a released task takes no submission from this person now. */
-const CLOSED: Record<NonNullable<TaskRelease['closed']>, string> = {
-  not_released: 'This task is not released yet.',
-  archived: 'The contest is archived.',
-  closed: 'This task has closed for you.',
-};
 
 /**
  * When the task falls due, if it does, and closes for this person, their
@@ -68,8 +60,8 @@ function Back({ org, contest }: { org: string; contest: string }) {
 
 /**
  * A released task as a signed-in person reads it: the statement, its times
- * and limits, the panel they submit from while the task is open, and their
- * submissions.
+ * and limits, the panel they submit from while the task is open, or why it
+ * is not, and their submissions.
  */
 function SignedInTask({
   org,
@@ -98,9 +90,6 @@ function SignedInTask({
     <div className={classes.page}>
       <Back org={org} contest={contest} />
       <PageTitle>{headingOf(page)}</PageTitle>
-      {page.release.closed !== null && (
-        <BodyText tone="secondary">{CLOSED[page.release.closed]}</BodyText>
-      )}
       <TaskAnnouncements org={org} contest={contest} task={task} />
       <Card>
         <Markdown>{page.statement}</Markdown>

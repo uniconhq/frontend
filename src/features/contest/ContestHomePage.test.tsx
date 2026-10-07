@@ -44,6 +44,22 @@ describe('the contest page for a signed-in person', () => {
     );
   });
 
+  it('says an archived contest is still read and takes no submissions', async () => {
+    server.use(
+      signedIn,
+      http.get(`${CONTEST_API}/home`, () =>
+        HttpResponse.json({ ...home(), state: 'archived' }),
+      ),
+    );
+    renderApp(PAGE);
+
+    expect(
+      await screen.findByText(
+        'This contest is archived: its tasks can still be read, and they take no submissions.',
+      ),
+    ).toBeVisible();
+  });
+
   it('says when each task falls due and closes for the person', async () => {
     server.use(
       signedIn,
