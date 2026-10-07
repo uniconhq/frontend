@@ -2,15 +2,19 @@ import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { $api, queryView } from '@/api/query';
 import { toApiError } from '@/api/problem';
-import type { FileContent, RollbackFile, WriteFile } from '@/api/types';
+import type { FileContent, RollbackFile, UploadInfo, WriteFile } from '@/api/types';
+import { useMe } from '@/session';
+import { formatSize } from '@/lib/size';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
 import { CodeEditor, type CodeLanguage } from '@/ui/CodeEditor';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
+import { holdsAt } from '../roles';
 import { FileHistory } from './FileHistory';
 import { fileQuery, staleAfterWrite, type Place } from './place';
 import { SaveOutcome, type Outcome } from './SaveOutcome';
+import { TaskUpload } from './TaskUpload';
 import shared from '../organise.module.css';
 import classes from './Files.module.css';
 
@@ -34,7 +38,8 @@ function languageOf(path: string): CodeLanguage {
 type Sent = WriteFile | RollbackFile;
 
 /**
- * One file, open as text in the code editor. The text is saved with the token it was read
+ * One file, open as text in the code editor, or, for a file that is an
+ * upload, shown as what it holds. The text is saved with the token it was read
  * with, so a file someone else changed in the meantime comes back as a
  * conflict and nothing is overwritten. That is why the file is read once and
  * never refetched behind the organiser's back: a background refetch would
@@ -130,7 +135,9 @@ export function FileEditor({ place, path }: { place: Place; path: string }) {
 
   return (
     <div className={classes.editor}>
-      {file.encoding === 'base64' ? (
+      {file.upload ? (
+        <UploadedFile place={place} file={file} upload={file.upload} />
+      ) : file.encoding === 'base64' ? (
         <>
           <BodyText mono>{file.path}</BodyText>
           <BodyText tone="secondary">
@@ -174,6 +181,60 @@ export function FileEditor({ place, path }: { place: Place; path: string }) {
         />
       )}
     </div>
+  );
+}
+
+/**
+ * A file that is an upload: what it holds, its size and SHA-256, and never
+ * an editor, since its commit holds a pointer to the bytes and typing over it
+ * would commit text where the pointer belongs. A manager of the task changes
+ * it by uploading it again, at the same path, with the token it was read
+ * with.
+ */
+function UploadedFile({
+  place,
+  file,
+  upload,
+}: {
+  place: Place;
+  file: FileContent;
+  upload: UploadInfo;
+}) {
+  const roles = useMe().roles;
+  const [again, setAgain] = useState(false);
+  const manages = place.kind === 'task' && holdsAt(roles, place, 'manager');
+
+  return (
+    <section className={classes.editor} aria-label={`Uploaded ${file.path}`}>
+      <BodyText mono>{file.path}</BodyText>
+      <dl className={classes.facts}>
+        <dt>Uploaded file</dt>
+        <dd>
+          {formatSize(upload.size)}
+          {upload.size >= 1024 && ` (${upload.size.toLocaleString()} bytes)`}
+        </dd>
+        <dt>SHA-256</dt>
+        <dd className={classes.digest}>{upload.digest}</dd>
+      </dl>
+      <BodyText tone="secondary">
+        Its bytes are in the forge&apos;s store and its commit holds a pointer to them,
+        so it does not open in the editor. To change it, upload it again.
+      </BodyText>
+      {manages && place.kind === 'task' && !again && (
+        <div className={shared.actions}>
+          <Button size="xs" variant="secondary" onClick={() => setAgain(true)}>
+            Upload again
+          </Button>
+        </div>
+      )}
+      {place.kind === 'task' && again && (
+        <TaskUpload
+          place={place}
+          again={{ path: file.path, token: file.token }}
+          onClose={() => setAgain(false)}
+        />
+      )}
+    </section>
   );
 }
 

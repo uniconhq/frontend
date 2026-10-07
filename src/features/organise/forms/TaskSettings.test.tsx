@@ -3,7 +3,7 @@ import { fireEvent, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { parse } from 'yaml';
-import type { FileContent, TreeEntry } from '@/api/types';
+import type { DeclaredInput, FileContent, TreeEntry, WorkflowForm } from '@/api/types';
 import { renderApp } from '@/test/render';
 import { problem, server, signedIn, someone } from '@/test/server';
 import {
@@ -39,12 +39,64 @@ const TESTS: TreeEntry[] = ['samples', 'small', 'large'].map((group) => ({
   upload: null,
 }));
 
+/** A workflow form whose workflow cannot be read, so the form edits the entries there are. */
+const UNREAD: WorkflowForm = {
+  workflow: 'unicon/checked@v1',
+  inputs: [],
+  test: [],
+  problem: 'The workflow unicon/checked@v1 cannot be read.',
+};
+
+function declared(
+  id: string,
+  type: string,
+  more: Partial<DeclaredInput> = {},
+): DeclaredInput {
+  return {
+    id,
+    type,
+    contestant: false,
+    options: null,
+    per_test: false,
+    optional: false,
+    ...more,
+  };
+}
+
+/** What unicon/checked@v1 declares, as the form reads it. */
+const CHECKED: WorkflowForm = {
+  workflow: 'unicon/checked@v1',
+  problem: null,
+  inputs: [
+    declared('submission', 'file', { contestant: true }),
+    declared('language', 'enum', {
+      contestant: true,
+      options: ['cpp', 'python', 'java'],
+    }),
+    declared('checker', 'file'),
+    declared('time_limit', 'number'),
+    declared('memory_limit', 'number', { optional: true }),
+    declared('strict', 'boolean'),
+    declared('greeting', 'text', { optional: true }),
+    declared('token', 'text'),
+  ],
+  test: [
+    { name: 'input', type: 'file', options: null },
+    { name: 'answer', type: 'file', options: null },
+  ],
+};
+
 /**
- * The sum task with `task.yaml` as above and three folders under `tests/`.
- * With `conflictWith`, the first write is refused as a conflict and the file
- * becomes that text, as if someone else had saved it.
+ * The sum task with `task.yaml` as above and three folders under `tests/`,
+ * its workflow declaring what `form` says. With `conflictWith`, the first
+ * write is refused as a conflict and the file becomes that text, as if
+ * someone else had saved it.
  */
-function taskBackend(answer: () => Response, conflictWith?: string) {
+function taskBackend(
+  answer: () => Response,
+  conflictWith?: string,
+  form: WorkflowForm = UNREAD,
+) {
   let file: FileContent = {
     path: 'task.yaml',
     encoding: 'utf-8',
@@ -65,6 +117,7 @@ function taskBackend(answer: () => Response, conflictWith?: string) {
     http.get(`${TASK_API}/files/:path`, ({ params }) =>
       params['path'] === 'task.yaml' ? HttpResponse.json(file) : undefined,
     ),
+    http.get(`${TASK_API}/workflow-form`, () => HttpResponse.json(form)),
     http.put(`${TASK_API}/files/:path`, async ({ request }) => {
       const body = (await request.json()) as { content: string; token: string };
       sent.push(body);
@@ -240,6 +293,151 @@ describe('the task settings form', { timeout: 20_000 }, () => {
     const saved = parse(sent[0]?.content ?? '') as Record<string, unknown>;
     expect(saved['name']).toBe('Shortest Paths');
     expect(saved['submissions']).toEqual({ max: 20, rate: { count: 2, per: 60 } });
+  });
+
+  it("builds the inputs from the workflow's declarations and writes each as its type", async () => {
+    const { sent } = taskBackend(
+      () =>
+        HttpResponse.json({
+          number: 4,
+          grading_changed: false,
+          changes: [],
+          notes: [],
+        }),
+      undefined,
+      CHECKED,
+    );
+    asManager();
+    const form = await openForm();
+    const inputs = within(form).getByRole('list', { name: 'Inputs' });
+
+    expect(within(form).queryByLabelText("New input's id")).toBeNull();
+    expect(
+      within(form).queryByRole('button', { name: /Make .* the contestant's/ }),
+    ).toBeNull();
+    expect(
+      within(form).getByText('Each test holds: input (file), answer (file).'),
+    ).toBeVisible();
+    expect(within(inputs).getByLabelText('submission max size')).toBeVisible();
+    expect(within(inputs).queryByLabelText('submission default')).toBeNull();
+    expect(within(inputs).queryByLabelText('time_limit min')).toBeNull();
+    expect(
+      within(inputs).getByText(/the save refuses the task until it has a value/),
+    ).toBeVisible();
+
+    const options = within(inputs).getByRole('group', { name: 'language options' });
+    expect(within(options).getByRole('checkbox', { name: 'cpp' })).toBeChecked();
+    expect(within(options).getByRole('checkbox', { name: 'java' })).not.toBeChecked();
+    fireEvent.click(within(options).getByRole('checkbox', { name: 'java' }));
+    fill(within(inputs).getByLabelText('time_limit value'), '3');
+    fireEvent.click(
+      within(inputs).getByRole('button', { name: 'Give memory_limit a value' }),
+    );
+    fireEvent.click(
+      within(inputs).getByRole('button', { name: 'Give strict a value' }),
+    );
+    fireEvent.click(
+      within(inputs).getByRole('button', { name: 'Give greeting a value' }),
+    );
+    fill(within(inputs).getByLabelText('memory_limit value'), '256');
+    fill(within(inputs).getByLabelText('strict value'), 'true');
+    fill(within(inputs).getByLabelText('greeting value'), '42');
+    expect(
+      within(inputs).getByRole('checkbox', { name: 'token: a secret of the org' }),
+    ).toBeChecked();
+    fireEvent.click(within(form).getByRole('button', { name: 'Save settings' }));
+
+    expect(await screen.findByText('Published as publication 4.')).toBeVisible();
+    const saved = parse(sent[0]?.content ?? '') as { inputs: Record<string, unknown> };
+    expect(saved.inputs).toEqual({
+      submission: { label: 'Your solution', max_size: '1MB' },
+      language: { options: ['cpp', 'python', 'java'], default: 'cpp' },
+      checker: 'checker/checker.cpp',
+      time_limit: 3,
+      token: { secret: 'judge-token' },
+      memory_limit: 256,
+      strict: true,
+      greeting: '42',
+    });
+  });
+
+  it('leaves out a contestant input, and offers to remove one the workflow does not declare', async () => {
+    const { sent } = taskBackend(
+      () =>
+        HttpResponse.json({
+          number: 4,
+          grading_changed: false,
+          changes: [],
+          notes: [],
+        }),
+      undefined,
+      { ...CHECKED, inputs: CHECKED.inputs.filter((input) => input.id !== 'token') },
+    );
+    asManager();
+    const form = await openForm();
+    const inputs = within(form).getByRole('list', { name: 'Inputs' });
+
+    expect(within(inputs).getByText(/declares no input with this id/)).toBeVisible();
+    expect(
+      within(inputs).queryByRole('button', { name: 'Leave checker out' }),
+    ).toBeNull();
+    fireEvent.click(within(inputs).getByRole('button', { name: 'Remove token' }));
+    fireEvent.click(
+      within(inputs).getByRole('button', { name: 'Leave submission out' }),
+    );
+    expect(
+      within(inputs).getByRole('button', { name: 'Give submission form details' }),
+    ).toBeVisible();
+    fireEvent.click(within(form).getByRole('button', { name: 'Save settings' }));
+
+    expect(await screen.findByText('Published as publication 4.')).toBeVisible();
+    const saved = parse(sent[0]?.content ?? '') as { inputs: Record<string, unknown> };
+    expect(Object.keys(saved.inputs)).toEqual(['language', 'checker', 'time_limit']);
+  });
+
+  it('writes an input the file holds the other way as the workflow declares it', async () => {
+    const { sent } = taskBackend(
+      () =>
+        HttpResponse.json({
+          number: 4,
+          grading_changed: false,
+          changes: [],
+          notes: [],
+        }),
+      undefined,
+      {
+        ...CHECKED,
+        inputs: CHECKED.inputs.map((input) =>
+          input.id === 'time_limit' ? { ...input, contestant: true } : input,
+        ),
+      },
+    );
+    asManager();
+    const form = await openForm();
+
+    expect(
+      within(form).getByText(
+        /task.yaml gives it a value, but the contestant gives this one/,
+      ),
+    ).toBeVisible();
+    const save = within(form).getByRole('button', { name: 'Save settings' });
+    expect(save).toBeEnabled();
+    fill(within(form).getByLabelText('time_limit max'), '10');
+    fireEvent.click(save);
+
+    expect(await screen.findByText('Published as publication 4.')).toBeVisible();
+    const saved = parse(sent[0]?.content ?? '') as { inputs: Record<string, unknown> };
+    expect(saved.inputs['time_limit']).toEqual({ max: 10 });
+  });
+
+  it("says why the workflow's inputs could not be read, and edits the entries there are", async () => {
+    taskBackend(() => HttpResponse.json({}));
+    const form = await openForm();
+
+    expect(
+      within(form).getByText(/The workflow unicon\/checked@v1 cannot be read\./),
+    ).toBeVisible();
+    expect(within(form).getByLabelText("New input's id")).toBeVisible();
   });
 
   it('will not save a number field that holds no number', async () => {

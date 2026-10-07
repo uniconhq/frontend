@@ -79,16 +79,24 @@ function nameOf(grading: Grading): string {
 }
 
 /**
+ * Which submission a grading is of. A submission's number counts per
+ * contestant or team, so two of them each have a submission 1, and a grading
+ * names no submitter; every attempt of one submission carries the time it
+ * was made, so the number and that time together tell submissions apart.
+ */
+function submissionKey(grading: Grading): string {
+  return `${String(grading.submission_number)} ${grading.submitted_at}`;
+}
+
+/**
  * A submission's attempts together, the latest first, in the order the list
  * gives the submissions, which is newest first.
  */
 function bySubmission(gradings: Grading[]): Grading[][] {
-  const groups = new Map<number, Grading[]>();
+  const groups = new Map<string, Grading[]>();
   for (const grading of gradings) {
-    groups.set(grading.submission_number, [
-      ...(groups.get(grading.submission_number) ?? []),
-      grading,
-    ]);
+    const key = submissionKey(grading);
+    groups.set(key, [...(groups.get(key) ?? []), grading]);
   }
   return [...groups.values()].map((attempts) =>
     [...attempts].sort((a, b) => b.attempt - a.attempt),
@@ -530,7 +538,7 @@ export function GradingsSection({ path }: { path: TaskPath }) {
             </thead>
             {bySubmission(view.data).map((attempts) => (
               <Submission
-                key={attempts[0]?.submission_number}
+                key={attempts[0] === undefined ? '' : submissionKey(attempts[0])}
                 path={path}
                 attempts={attempts}
                 manages={manages}

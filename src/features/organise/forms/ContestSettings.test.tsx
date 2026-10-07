@@ -236,6 +236,50 @@ describe('the contest settings form', { timeout: 20_000 }, () => {
     });
   });
 
+  it("holds a manager's admin-only fields to the current version in the merge", async () => {
+    const theirs = CONTEST.replace('name: Spring', 'name: Their spring').replace(
+      'start: 2026-06-01T09:00:00Z',
+      'start: 2026-06-01T17:00:00+08:00',
+    );
+    const { sent } = contestBackend({ conflictWith: theirs });
+    server.use(
+      http.get('/api/v1/me', () =>
+        HttpResponse.json({
+          ...someone,
+          roles: [
+            { names: { org: 'acme', contest: 'spring', task: null }, role: 'manager' },
+          ],
+        }),
+      ),
+    );
+    const form = await openForm();
+    fill(within(form).getByLabelText('B worth'), '70');
+    await userEvent.click(within(form).getByRole('button', { name: 'Save settings' }));
+
+    const merge = await screen.findByRole('list', { name: 'Fields that differ' });
+    // The start names the same moment on both sides, so it is no row.
+    expect(within(merge).getAllByRole('radiogroup')).toHaveLength(2);
+    const name = within(merge).getByRole('radiogroup', { name: 'name' });
+    expect(
+      within(name).getByRole('radio', { name: 'Now: Their spring' }),
+    ).toBeChecked();
+    expect(within(name).getByRole('radio', { name: 'Yours: Spring' })).toBeDisabled();
+    const worth = within(merge).getByRole('radiogroup', { name: 'tasks[sort].worth' });
+    expect(within(worth).getByRole('radio', { name: 'Yours: 70' })).toBeChecked();
+
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Save the merged version' }),
+    );
+    await screen.findByText(/Saved as version/);
+    expect(parse(sent[1]?.content ?? '')).toEqual({
+      ...(parse(theirs) as object),
+      tasks: [
+        { id: 'sum', worth: 100 },
+        { id: 'sort', worth: 70 },
+      ],
+    });
+  });
+
   it('falls back to the text with the reason when the file is not YAML', async () => {
     contestBackend({ current: 'name: [Spring\n' });
     renderApp('/orgs/acme/contests/spring');

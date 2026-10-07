@@ -12,13 +12,15 @@ import { clarificationsPath, contestPath } from '@/lib/organiser-paths';
 import { Create } from '../Create';
 import { PeopleSection } from '../people/PeopleSection';
 import { LinkList } from '../LinkList';
+import { OrgProfile } from './OrgProfile';
 import { useOrgParam } from '@/lib/route-params';
 import { contestsReached } from '../roles';
 import classes from '../organise.module.css';
 
 /**
- * An org's contests, each linking to its page, and the button that opens the
- * form for a new one.
+ * An org's display name and description, which its admin edits in place, its
+ * contests, each linking to its page, and the button that opens the form for
+ * a new one.
  * Listing needs the observer role at the org. Someone who holds a role only
  * at one of its contests or tasks is refused the list, so the refusal comes
  * with the contests their own roles reach, and the path through the org still
@@ -49,6 +51,9 @@ export function OrgPage() {
       <div className={classes.actions}>
         <PageLink to={clarificationsPath(org)}>Open questions</PageLink>
       </div>
+      <Card>
+        <OrgProfile org={org} />
+      </Card>
       <Card>
         <div className={classes.stack}>
           <SectionTitle>Contests</SectionTitle>

@@ -31,6 +31,11 @@ export function localOf(value: unknown): string {
   return `${day}T${time}${seconds === 0 ? '' : `:${two(seconds)}`}`;
 }
 
+/** The moment a time in the file names, or null for anything that is not one. */
+export function instantOf(value: unknown): number | null {
+  return localOf(value) === '' ? null : new Date(value as string).getTime();
+}
+
 /** Whether a value read from the file is a time the field could not show. */
 export function unreadableTime(value: unknown): boolean {
   return value !== undefined && value !== null && localOf(value) === '';

@@ -17,6 +17,10 @@ export type DefinitionError = Schemas['DefinitionError'];
 export type TreeEntry = Schemas['TreeEntry'];
 export type FileContent = Schemas['FileContent'];
 export type WriteFile = Schemas['WriteFile'];
+/** A task's file written as a save: typed content, or an upload made for its path. */
+export type WriteTaskFile = Schemas['WriteTaskFile'];
+/** What a file that is an upload holds: its size and SHA-256. */
+export type UploadInfo = Schemas['UploadInfo'];
 export type RollbackFile = Schemas['RollbackFile'];
 /** A task save's answer: published, or kept as a draft. */
 export type SaveResult = Schemas['Published'] | Schemas['Draft'];
@@ -38,6 +42,10 @@ export type ContestHome = Schemas['ContestHome'];
 export type PublicTask = Schemas['PublicTask'];
 export type TaskPage = Schemas['TaskPage'];
 export type InputField = Schemas['InputField'];
+/** What the task form is built from: the inputs and test fields its workflow declares. */
+export type WorkflowForm = Schemas['WorkflowForm'];
+export type DeclaredInput = Schemas['DeclaredInput'];
+export type DeclaredField = Schemas['DeclaredField'];
 export type TaskEntry = Schemas['TaskEntry'];
 
 export type Upload = Schemas['Upload'];

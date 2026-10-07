@@ -160,15 +160,16 @@ the task's settings as forms, or opens any file of either as text and saves
 it. Saving a task's file is the save of the task, which publishes it or keeps
 it as a draft.
 
-| Address                                    | Page                                                                          |
-| ------------------------------------------ | ----------------------------------------------------------------------------- |
-| `/orgs`                                    | the orgs your roles reach, and New org                                        |
-| `/orgs/new`                                | the new org form, then the new org                                            |
-| `/orgs/:org`                               | the org's contests, New contest, and its organisers                           |
-| `/orgs/:org/contests/:contest`             | the contest's tasks, New task, the contest repo's files, and its organisers   |
-| `/orgs/:org/contests/:contest/contestants` | every registration, with approve, reject, undo a rejection, remove and extend |
-| `/orgs/:org/contests/:contest/teams`       | every team, with make, delete, add, move, remove and change the leader        |
-| `/orgs/:org/contests/:contest/tasks/:task` | the task's state, its publications, the task repo's files, and its organisers |
+| Address                                    | Page                                                                                  |
+| ------------------------------------------ | ------------------------------------------------------------------------------------- |
+| `/orgs`                                    | the orgs your roles reach, and New org                                                |
+| `/orgs/new`                                | the new org form, then the new org                                                    |
+| `/orgs/:org`                               | the org's display name and description, its contests, New contest, and its organisers |
+| `/orgs/:org/contests/:contest`             | where each task stands, New task, the contest repo's files, and its organisers        |
+| `/orgs/:org/contests/:contest/contestants` | every registration, with approve, reject, undo a rejection, remove and extend         |
+| `/orgs/:org/contests/:contest/teams`       | every team, with make, delete, add, move, remove and change the leader                |
+| `/orgs/:org/contests/:contest/gradings`    | every grading of the contest, its queue, and retry, cancel and rejudge                |
+| `/orgs/:org/contests/:contest/tasks/:task` | the task's state, its publications, the task repo's files, and its organisers         |
 
 **Every organiser page lives under `/orgs`.** The proxy in `deploy` sends
 exactly `/orgs` and `/orgs/...` to this app, and `/contests/...` for the
@@ -179,7 +180,7 @@ place, `src/lib/organiser-paths.ts`, which the pages and the breadcrumb share.
 
 The pages live in `src/features/organise/`: a sub-folder for each page
 (`orgs/` holds `/orgs` and `/orgs/new`, then `org/`, `contest/`, `contestants/`,
-`teams/` and `task/`), one for the file tree and editor the contest and task pages
+`teams/`, `gradings/` and `task/`), one for the file tree and editor the contest and task pages
 share (`files/`), one for the settings forms and the statement (`forms/`),
 and one for the organisers section all three pages share (`people/`). The pieces more than one of those use sit at its top:
 the create form and `Create`, which keeps it behind a New button and
@@ -239,6 +240,21 @@ layout for CodeMirror to measure, so the test setup stands a plain text field
 with the same props in for it (`src/test/code-editor.tsx`), and
 `CodeEditor.test.tsx` tests the editor itself.
 
+A file that is an upload is marked in the tree with the size of what it
+holds, and opens as its size and SHA-256, never in the editor, since its
+commit holds a pointer to the bytes. A manager of the task uploads a file
+from the tree, into the folder last opened there or the open file's by
+default, at a path they can change, and changes an uploaded one with Upload
+again: the browser works out the SHA-256, asks `POST <task>/organise/uploads`
+for a slot, sends the file through the upload door and completes it, each with
+its progress, and a send the connection cuts is sent again from the start, up
+to three times, to the same slot; a slot for a file the forge holds already
+needs nothing sent. The upload is not in the task until the organiser saves
+it, which writes the file by its upload id with the token of the file there
+when the upload began, or none for a new file: a save like Save, with its
+answers and refusals, and a `conflict` offers to save over the other version.
+The door's steps, shared with a contestant's submit, are in `src/api/upload/`.
+
 Under a task's file, History lists the file's versions newest first, each
 with its author, its message and when, and the publication that froze it,
 with whether that publication changed how the task grades. A publication
@@ -261,25 +277,79 @@ the reason. Times show in the organiser's own zone and a changed one is written
 back with their offset. The admin's keys (`TASK-FORMAT.md` section 1.1 and 1.2)
 are shown to a manager disabled, read from the session's roles as the
 organisers section reads them; the forge refuses a manager's change anyway.
-The routes name no workflow's inputs, so the task form edits the `inputs`
-entries the file has, adds or removes one by id, and takes an entry holding
-a mapping (other than `{secret: ...}`) as the contestant's form details and
-anything else as a value. Its test groups are the folders under `tests/` and
+The task form's inputs are the ones the task's workflow declares, read with
+`GET <task>/workflow-form` each time the form opens: one entry each, in the
+workflow's order. A contestant's input takes form details its type has, a
+label for any, the options offered out of the workflow's own and a default
+for a choice, a default, a least and a most for a number, and `max_size` for
+a file or folder; any other input takes a value of its type, a number, true
+or false, one of an enum's options, a path for a file or folder, or text or
+`{secret: <name>}`, written as that type. One the file leaves out offers to
+be given; a contestant's or an optional one may be left out again; one the
+file holds the other way is written afresh at the save, and one the workflow
+does not declare is marked to be removed. The test fields each test holds
+are listed under the test groups. When the workflow cannot be read, the form
+shows the `problem` and edits the `inputs` entries the file has, adding or
+removing one by id and taking an entry holding a mapping (other than
+`{secret: ...}`) as the contestant's form details and anything else as a
+value. Its test groups are the folders under `tests/` and
 the groups the file names: a folder with no entry is added at the next save,
 and an entry with no folder is marked and may be removed. A form save refused
 as a `conflict` reads the file again and shows the organiser's version and the
 current one field by field, with a choice per field that starts on the side
 that changed it; nothing is written until they save, which writes the chosen fields
 into the current file with its token (`forms/merge.ts`, over any YAML
-document). The statement is edited beside `ui/Markdown`, the renderer the
+document). A keyed list (`contest.yaml`'s `tasks` by `id`, `leaderboards` by
+`name`, a table in `merge.ts`) is compared item by item, each item matched and
+named by its key (`tasks[sum].due`); an item only one side has, and the list's
+order, are fields of their own, and the merge finds each item in the current
+file by its key before writing. Any other list is one field. Times compare as
+the moments they name and show in local time, and a manager's admin-only keys
+stay as they are now. The statement is edited beside `ui/Markdown`, the renderer the
 contestant's task page uses, and is read-only to a manager.
 
 The task page's gradings list each submission once, headed by its latest
 attempt, with its earlier attempts opening below it to be read. A manager
-retries a finished attempt and cancels one still to finish, and rejudges the
-whole task, which grades every submission's latest attempt again against the
+retries a finished attempt, cancels the latest attempt of one reading as a
+system error with a sentence of at most 500 characters its contestant reads,
+shown on the row once cancelled, and rejudges the whole task, which grades every submission's latest attempt again against the
 current publication as a new attempt; each asks first in a dialog, which
 keeps a refusal and closes once the change has gone through.
+
+The contest page lists its tasks in the contest's order, each by its letter
+and name, with where it stands (`GET <contest>/organise/tasks`): its latest
+publication, when it was made and whether it changed how the task grades, or
+that it has never published; a draft on top of it with the draft's errors at
+their YAML paths; and its timeline from `contest.yaml`, released, due with
+what a started late day takes off, closes and worth, each at its default
+where the entry gives none, as the route resolves them. The list is read
+again on every visit, since a save on a task's page moves its state, and
+whenever one of the contest's files is written on the page, since
+`contest.yaml` holds the times. A `contest.yaml` that does not read leaves
+the tasks by name alone, with the reason.
+
+The contest's Gradings page (`gradings/`) lists every grading of its tasks
+newest first, each submission once by its task, who made it and its number,
+headed by its latest attempt, with its earlier attempts opening below it: the
+attempt, the publication it graded against, the status with the reason a
+system error gave and the sentence a cancel told the contestant, what a
+finished run came to, its log, and when it was queued, started and finished.
+Above it are how many gradings wait, queued and waiting for a machine, and
+filters by task, status, team and a contestant's username, kept in the
+address so a link or a reload keeps them; a username applies once sent. The
+live stream marks the feed and the queue stale as gradings move; while it is
+not open both are read again every ten seconds while one is still to finish.
+A manager of a row's task retries its latest attempt once finished and
+cancels one reading as a system error, with a sentence of at most 500
+characters its contestant reads; with the feed filtered to a task they
+manage, they rejudge it. Each goes through the task's own routes after a
+confirmation that keeps a refusal. An observer reads the page alone. The
+feed shows the newest 100; a filter reaches older ones.
+
+The org page shows the org's display name and description as the forge
+holds them. An admin of the org edits both in place; an emptied display name
+is sent as empty, which leaves the org showing its name. A manager or an
+observer reads them with no edit control.
 
 The contestants page shows an observer the table and a manager its actions
 too, which the routes check again underneath. Each action's answer replaces
@@ -444,7 +514,8 @@ and every minute when nothing is being graded. A verdict is where the
 grading stands until it is done, then what stopped the run when something
 did, such as a compile error, else the outcome over the test groups the task
 shows now, and `GRADED` when it shows none yet. A run that failed on the
-platform's side is served as running until staff end it.
+platform's side is served as running until staff end it; then it reads
+`CANCELLED` with the sentence they gave, and is no longer read again.
 `src/ui/VerdictBadge.tsx` has a label for every outcome and status and puts
 each in one of the handoff's six colour pairs; an outcome it does not know
 shows under its own name in the neutral one.
@@ -489,7 +560,7 @@ connections to one host and a stream in every background tab would use
 them up. Each event names a kind of thing that changed and its id, never
 what changed. The events of a moment are gathered, and each kind marks
 stale the reads whose route shows it: a grading the submissions and
-gradings lists and a submission, but not its files; an announcement
+gradings lists, a contest's queue and a submission, but not its files; an announcement
 every announcements list; a clarification the questions and the inbox.
 `resync`, and every opening of the stream after the tab's first, marks
 everything stale. A stream the server refused is opened again after five

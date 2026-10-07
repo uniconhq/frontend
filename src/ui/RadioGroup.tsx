@@ -10,17 +10,32 @@ export function RadioGroup({
   value,
   options,
   onChange,
+  description,
+  disabled = false,
 }: {
   label: string;
   value: string;
   options: { value: string; label: string }[];
   onChange: (value: string) => void;
+  /** A line under the label, such as why the choice is held. */
+  description?: string;
+  disabled?: boolean;
 }) {
   return (
-    <Radio.Group label={label} value={value} onChange={onChange}>
+    <Radio.Group
+      label={label}
+      description={description}
+      value={value}
+      onChange={onChange}
+    >
       <Group gap="md" mt={4}>
         {options.map((option) => (
-          <Radio key={option.value} value={option.value} label={option.label} />
+          <Radio
+            key={option.value}
+            value={option.value}
+            label={option.label}
+            disabled={disabled}
+          />
         ))}
       </Group>
     </Radio.Group>

@@ -44,7 +44,12 @@ function choices(
  */
 export function ContestSettings({ place, admin }: { place: Place; admin: boolean }) {
   return (
-    <DefinitionFile place={place} path="contest.yaml" label="The contest's settings">
+    <DefinitionFile
+      place={place}
+      path="contest.yaml"
+      admin={admin}
+      label="The contest's settings"
+    >
       {(props) => <ContestForm {...props} admin={admin} />}
     </DefinitionFile>
   );
