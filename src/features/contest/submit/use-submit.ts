@@ -2,7 +2,8 @@ import { useRef, useState } from 'react';
 import { $api } from '@/api/query';
 import { type ApiError, toApiError } from '@/api/problem';
 import { arrival, hashOf, mustBeVerified, sendAndComplete } from '@/api/upload/door';
-import type { InputField, Submission } from '@/api/types';
+import { wasCut } from '@/api/upload/transfer';
+import type { InputField, Submission, Upload } from '@/api/types';
 import {
   checkDraft,
   filesOf,
@@ -29,7 +30,14 @@ function newKey(): string {
  * large file takes seconds to read through and the panel has to say so rather
  * than look stuck.
  */
-export type Phase = 'idle' | 'hashing' | 'uploading' | 'submitting';
+export type Phase = 'idle' | 'hashing' | 'uploading' | 'resending' | 'submitting';
+
+/**
+ * How many times one file is sent before a broken connection is given up
+ * on, as the organiser's upload does: each send after the first starts the
+ * file again from its first byte.
+ */
+const SEND_TRIES = 3;
 
 /**
  * Refusals of a submit after which the uploads it names cannot be used
@@ -58,7 +66,9 @@ function put<T>(by: ByInput<T>, input: string, file: File, value: T) {
  * server answers with the submission it made, if it made one, and makes no
  * second. Any change to the draft is a new attempt with a new key. Files that
  * went up and checked out are not sent again within the attempt, unless a
- * refusal says they cannot be used. A file whose sending failed keeps its
+ * refusal says they cannot be used. A file whose connection is cut while it
+ * goes is sent again from the start at once, a few times, with its
+ * progress starting over. A file whose sending failed even so keeps its
  * slot, and the next attempt asks whether the bytes arrived after all and
  * otherwise sends them to the same slot, so a retry takes nothing more from
  * the person's allowance; only when that slot fails as well is a new one
@@ -132,26 +142,42 @@ export function useSubmit({
   const completeSlot = (slot: Slot) => () =>
     complete.mutateAsync({ params: { path: { ...path, upload: slot.id } } });
 
-  const upload = async (input: InputField, file: File): Promise<string> => {
-    const kept = pending.current.get(input.id)?.get(file);
-    const slot = kept ?? (await newSlot(input, file));
-    setPhase('uploading');
-    // A kept slot's bytes may have arrived after all, and the forge may
-    // already hold a new slot's file, from an earlier submit or someone
-    // else's: then there is nothing to send.
-    let status = kept === undefined ? null : await arrival(completeSlot(slot));
-    if (status === null) {
+  /**
+   * Sends one file to its slot until it arrives: when the connection is cut,
+   * the file goes again from the start, up to `SEND_TRIES` sends.
+   */
+  const sendUntilThere = async (slot: Slot, file: File, kept: boolean) => {
+    for (let send = 1; ; send += 1) {
+      // A kept slot's bytes, or a cut send's, may have arrived after all,
+      // and the forge may already hold a new slot's file, from an earlier
+      // submit or someone else's: then there is nothing to send.
+      const arrived = kept || send > 1 ? await arrival(completeSlot(slot)) : null;
+      if (arrived !== null) return arrived;
+      progress(file, 0);
       try {
-        status = await sendAndComplete(
+        return await sendAndComplete(
           slot,
           file,
           (share) => progress(file, share),
           completeSlot(slot),
         );
       } catch (error) {
-        if (kept !== undefined) pending.current.get(input.id)?.delete(file);
-        throw error;
+        if (!wasCut(error) || send >= SEND_TRIES) throw error;
+        setPhase('resending');
       }
+    }
+  };
+
+  const upload = async (input: InputField, file: File): Promise<string> => {
+    const kept = pending.current.get(input.id)?.get(file);
+    const slot = kept ?? (await newSlot(input, file));
+    setPhase('uploading');
+    let status: Upload['status'];
+    try {
+      status = await sendUntilThere(slot, file, kept !== undefined);
+    } catch (error) {
+      if (kept !== undefined) pending.current.get(input.id)?.delete(file);
+      throw error;
     }
     pending.current.get(input.id)?.delete(file);
     mustBeVerified(status);

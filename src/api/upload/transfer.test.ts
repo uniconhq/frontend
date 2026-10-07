@@ -4,7 +4,7 @@ import { isApiError } from '@/api/problem';
 import { server } from '@/test/server';
 import { passTime, withFakeTimers } from '@/test/timers';
 import { digestOf } from './digest';
-import { sendToForge } from './transfer';
+import { sendToForge, wasCut } from './transfer';
 
 const DOOR = '/-/uploads/abc';
 
@@ -40,9 +40,18 @@ describe('sending a file through the door', () => {
       const sent = sendToForge(DOOR, new File(['12'], 'model.bin'), () => {});
 
       await expect(sent).rejects.toSatisfy(
-        (error) => isApiError(error) && error.code === 'upload_failed',
+        (error) =>
+          isApiError(error) && error.code === 'upload_failed' && !wasCut(error),
       );
     }
+  });
+
+  it('fails as cut when the connection breaks, so it can be sent again', async () => {
+    server.use(http.put(DOOR, () => HttpResponse.error()));
+
+    const sent = sendToForge(DOOR, new File(['12'], 'model.bin'), () => {});
+
+    await expect(sent).rejects.toSatisfy(wasCut);
   });
 });
 
@@ -58,6 +67,7 @@ describe('a stalled upload', () => {
 
     const error = await outcome;
     expect(isApiError(error) && error.code).toBe('upload_failed');
+    expect(wasCut(error)).toBe(false);
   });
 });
 

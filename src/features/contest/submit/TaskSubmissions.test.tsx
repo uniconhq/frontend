@@ -355,13 +355,96 @@ describe('the submit panel', () => {
     expect(slots).toEqual([expect.objectContaining({ filename: '1.txt' })]);
   });
 
-  it('reports a failed upload as possibly too large, with nothing half sent', async () => {
+  it('sends a file again from the start when its connection is cut, then submits it', async () => {
     const store = uploadStore();
     const made = submissions();
+    let puts = 0;
+    let release = () => {};
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
     server.use(
       signedIn,
       withPage({}),
-      http.put(`${DOOR_URL}:upload`, () => new HttpResponse(null, { status: 403 })),
+      http.put(`${DOOR_URL}:upload`, async () => {
+        puts += 1;
+        if (puts === 1) return HttpResponse.error();
+        await held;
+        return undefined;
+      }),
+      http.post(`${TASK_API}/uploads/:upload/complete`, ({ params }) =>
+        store.seen.sent.some((sent) => sent.id === params['upload'])
+          ? undefined
+          : problem(409, 'upload_not_ready'),
+      ),
+      ...store.handlers,
+      ...made.handlers,
+    );
+    const user = userEvent.setup();
+    renderApp(PAGE);
+
+    await user.upload(await screen.findByLabelText('Your solution'), python());
+    await user.click(screen.getByRole('button', { name: 'Submit' }));
+
+    expect(await screen.findByRole('status', { name: 'Sending' })).toHaveTextContent(
+      'The connection was cut, so the file is being sent again from the start.',
+    );
+    expect(screen.getByRole('progressbar')).toBeVisible();
+    release();
+
+    expect(await screen.findByText('Submitted as #1.')).toBeVisible();
+    expect(puts).toBe(2);
+    expect(store.seen.slots).toHaveLength(1);
+    expect(store.seen.sent).toEqual([
+      { id: '00000000-0000-4000-8000-000000000001', bytes: 9 },
+    ]);
+    expect(made.bodies[0]?.inputs).toMatchObject({
+      submission: { uploads: ['00000000-0000-4000-8000-000000000001'] },
+    });
+  });
+
+  it('gives a cut upload up after three sends, and keeps the file', async () => {
+    const store = uploadStore();
+    const made = submissions();
+    let puts = 0;
+    server.use(
+      signedIn,
+      withPage({}),
+      http.put(`${DOOR_URL}:upload`, () => {
+        puts += 1;
+        return HttpResponse.error();
+      }),
+      http.post(`${TASK_API}/uploads/:upload/complete`, () =>
+        problem(409, 'upload_not_ready'),
+      ),
+      ...store.handlers,
+      ...made.handlers,
+    );
+    const user = userEvent.setup();
+    renderApp(PAGE);
+
+    await user.upload(await screen.findByLabelText('Your solution'), python());
+    await user.click(screen.getByRole('button', { name: 'Submit' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'The upload did not go through',
+    );
+    expect(puts).toBe(3);
+    expect(screen.getByRole('button', { name: 'Remove main.py' })).toBeVisible();
+    expect(made.bodies).toHaveLength(0);
+  });
+
+  it('reports a failed upload as possibly too large, with nothing half sent', async () => {
+    const store = uploadStore();
+    const made = submissions();
+    let puts = 0;
+    server.use(
+      signedIn,
+      withPage({}),
+      http.put(`${DOOR_URL}:upload`, () => {
+        puts += 1;
+        return new HttpResponse(null, { status: 403 });
+      }),
       ...store.handlers,
       ...made.handlers,
     );
@@ -378,6 +461,7 @@ describe('the submit panel', () => {
     expect(screen.getByRole('button', { name: 'Remove main.py' })).toBeVisible();
     expect(store.seen.completed).toHaveLength(0);
     expect(made.bodies).toHaveLength(0);
+    expect(puts).toBe(1);
   });
 
   const REFUSALS: [string, Record<string, unknown>, string, string][] = [
