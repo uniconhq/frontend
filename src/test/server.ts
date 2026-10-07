@@ -157,6 +157,18 @@ const noTeams = [
   ),
 ];
 
+/** A contest with no boards, so no task takes marks, until a test gives some. */
+const noBoards = [
+  http.get('/api/v1/public/contests/:org/:contest/boards', () => HttpResponse.json([])),
+  http.get('/api/v1/orgs/:org/contests/:contest/boards', () => HttpResponse.json([])),
+  http.get('/api/v1/orgs/:org/contests/:contest/organise/boards', () =>
+    HttpResponse.json([]),
+  ),
+  http.get('/api/v1/orgs/:org/contests/:contest/tasks/:task/marks', () =>
+    problem(409, 'marks_off'),
+  ),
+];
+
 /**
  * The default world every test starts in: nobody signed in, a backend that
  * answers. `server.resetHandlers()` returns to exactly this after each test.
@@ -173,4 +185,5 @@ export const server = setupServer(
   ...emptyOrganising,
   ...noThreads,
   ...noTeams,
+  ...noBoards,
 );

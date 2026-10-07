@@ -19,3 +19,7 @@ export function contestHomePath(org: string, contest: string): string {
 export function taskPagePath(org: string, contest: string, task: string): string {
   return `${contestHomePath(org, contest)}/tasks/${part(task)}`;
 }
+
+export function boardsPagePath(org: string, contest: string): string {
+  return `${contestHomePath(org, contest)}/boards`;
+}
