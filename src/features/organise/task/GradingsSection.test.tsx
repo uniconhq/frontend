@@ -178,27 +178,61 @@ describe("the task's gradings", () => {
     expect(retried).toEqual([stuck.id]);
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(
-      screen.getByRole('button', { name: 'Cancel submission 3, attempt 2' }),
-    ).toBeVisible();
+      screen.queryByRole('button', { name: 'Cancel submission 3, attempt 2' }),
+    ).toBeNull();
   });
 
-  it('cancels only once asked, and sends nothing on Not now', async () => {
-    const cancelled: string[] = [];
+  it('offers Cancel on a system error alone', async () => {
+    const finished: Grading = {
+      ...stuck,
+      id: '0199a2c1-6b7e-7c3a-9f10-5d2e4b8a6c35',
+      submission_number: 5,
+      status: 'done',
+      error: null,
+    };
     server.use(
       signedIn,
       taskState,
       publicationList,
       ...repoFiles,
-      http.get(`${TASK_API}/gradings`, () => HttpResponse.json([waiting])),
-      http.post(`${TASK_API}/gradings/:grading/cancel`, ({ params }) => {
-        cancelled.push(String(params.grading));
-        return HttpResponse.json({ ...waiting, status: 'cancelled' });
+      http.get(`${TASK_API}/gradings`, () =>
+        HttpResponse.json([finished, waiting, stuck]),
+      ),
+    );
+    renderApp(TASK);
+
+    expect(
+      await screen.findByRole('button', { name: 'Cancel submission 3, attempt 1' }),
+    ).toBeVisible();
+    expect(
+      screen.queryByRole('button', { name: 'Cancel submission 4, attempt 1' }),
+    ).toBeNull();
+    expect(
+      screen.queryByRole('button', { name: 'Cancel submission 5, attempt 1' }),
+    ).toBeNull();
+  });
+
+  it('cancels only once asked, with the sentence the contestant reads', async () => {
+    const cancelled: { grading: string; body: unknown }[] = [];
+    server.use(
+      signedIn,
+      taskState,
+      publicationList,
+      ...repoFiles,
+      http.get(`${TASK_API}/gradings`, () => HttpResponse.json([stuck])),
+      http.post(`${TASK_API}/gradings/:grading/cancel`, async ({ params, request }) => {
+        cancelled.push({ grading: String(params.grading), body: await request.json() });
+        return HttpResponse.json({
+          ...stuck,
+          status: 'cancelled',
+          cancel_reason: 'The checker crashed.',
+        });
       }),
     );
     renderApp(TASK);
 
     const cancel = await screen.findByRole('button', {
-      name: 'Cancel submission 4, attempt 1',
+      name: 'Cancel submission 3, attempt 1',
     });
     await userEvent.click(cancel);
     const first = await screen.findByRole('dialog', { name: 'Cancel this grading?' });
@@ -207,41 +241,80 @@ describe("the task's gradings", () => {
 
     await userEvent.click(cancel);
     const dialog = await screen.findByRole('dialog', { name: 'Cancel this grading?' });
-    expect(dialog).toHaveTextContent(
-      'Attempt 1 of submission 4 stops and ends as cancelled.',
-    );
-    await userEvent.click(
-      within(dialog).getByRole('button', { name: 'Cancel the grading' }),
-    );
+    expect(dialog).toHaveTextContent('Attempt 1 of submission 3 ends as cancelled.');
+    const confirm = within(dialog).getByRole('button', { name: 'Cancel the grading' });
+    expect(confirm).toBeDisabled();
+    const field = within(dialog).getByRole('textbox', {
+      name: /What the contestant reads/,
+    });
+    expect(field).toBeRequired();
+    expect(field).toHaveAttribute('maxlength', '500');
+    await userEvent.type(field, '   ');
+    expect(confirm).toBeDisabled();
+    await userEvent.type(field, 'The checker crashed. ');
+    await userEvent.click(confirm);
 
-    await expect.poll(() => cancelled).toEqual([waiting.id]);
+    await expect
+      .poll(() => cancelled)
+      .toEqual([{ grading: stuck.id, body: { reason: 'The checker crashed.' } }]);
   });
 
-  it('shows a refusal in the dialog', async () => {
+  it("shows a cancelled grading's sentence", async () => {
     server.use(
       signedIn,
       taskState,
       publicationList,
       ...repoFiles,
-      http.get(`${TASK_API}/gradings`, () => HttpResponse.json([waiting])),
-      http.post(`${TASK_API}/gradings/:grading/cancel`, () =>
-        problem(409, 'wrong_status', { current: 'done' }),
+      http.get(`${TASK_API}/gradings`, () =>
+        HttpResponse.json([
+          { ...stuck, status: 'cancelled', cancel_reason: 'The checker crashed.' },
+        ]),
       ),
     );
     renderApp(TASK);
 
-    await userEvent.click(
-      await screen.findByRole('button', { name: 'Cancel submission 4, attempt 1' }),
-    );
-    const dialog = await screen.findByRole('dialog');
-    await userEvent.click(
-      within(dialog).getByRole('button', { name: 'Cancel the grading' }),
-    );
-
-    const alert = await within(dialog).findByRole('alert');
-    expect(alert).toHaveTextContent('That has moved on');
-    expect(alert).toHaveTextContent('wrong_status detail');
+    const table = await screen.findByRole('table', { name: 'Gradings' });
+    expect(table).toHaveTextContent('Cancelled');
+    expect(table).toHaveTextContent('Told the contestant: The checker crashed.');
   });
+
+  it.each([
+    ['invalid_reason', 422, {}, 'That sentence will not do'],
+    ['wrong_status', 409, { current: 'done' }, 'It is no longer a system error'],
+    ['conflict', 409, {}, 'A later attempt is there'],
+  ])(
+    'shows a refused cancel, %s, with its sentence',
+    async (code, status, extra, title) => {
+      server.use(
+        signedIn,
+        taskState,
+        publicationList,
+        ...repoFiles,
+        http.get(`${TASK_API}/gradings`, () => HttpResponse.json([stuck])),
+        http.post(`${TASK_API}/gradings/:grading/cancel`, () =>
+          problem(status, code, extra),
+        ),
+      );
+      renderApp(TASK);
+
+      await userEvent.click(
+        await screen.findByRole('button', { name: 'Cancel submission 3, attempt 1' }),
+      );
+      const dialog = await screen.findByRole('dialog');
+      await userEvent.type(
+        within(dialog).getByRole('textbox', { name: /What the contestant reads/ }),
+        'The checker crashed.',
+      );
+      await userEvent.click(
+        within(dialog).getByRole('button', { name: 'Cancel the grading' }),
+      );
+
+      const alert = await within(dialog).findByRole('alert');
+      expect(alert).toHaveTextContent(title);
+      expect(alert).toHaveTextContent(`${code} detail`);
+      if (code === 'wrong_status') expect(alert).toHaveTextContent('It is done now.');
+    },
+  );
 
   it("lists a submission's attempts together, the earlier ones to read", async () => {
     const second: Grading = {
