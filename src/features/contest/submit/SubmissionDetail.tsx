@@ -63,14 +63,19 @@ function Tests({ group }: { group: GroupShown }) {
  * One test group as the task shows it now: its outcome once its verdict is
  * shown, its tests once they are, and when the rest is shown while some is
  * held back. The route leaves out what the task withholds, so what is
- * missing is simply not shown, with nothing in its place.
+ * missing is simply not shown, with nothing in its place. A group that did
+ * not run on this grading says so where its outcome would be.
  */
 function Group({ group }: { group: GroupShown }) {
   return (
     <section className={shared.stack} aria-label={`Group ${group.group}`}>
       <div className={classes.verdict}>
         <span className={classes.group}>{group.group}</span>
-        {group.outcome !== null && <VerdictBadge verdict={group.outcome} />}
+        {!group.ran ? (
+          <BodyText tone="secondary">Not run on this grading</BodyText>
+        ) : (
+          group.outcome !== null && <VerdictBadge verdict={group.outcome} />
+        )}
       </div>
       {group.shown_at !== null && (
         <BodyText tone="secondary">

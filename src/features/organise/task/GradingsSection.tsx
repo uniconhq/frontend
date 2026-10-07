@@ -3,6 +3,7 @@ import { $api, queryView } from '@/api/query';
 import type { Grading, GradingStatus } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
+import { TextLink } from '@/ui/TextLink';
 import { SectionTitle } from '@/ui/SectionTitle';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
@@ -44,6 +45,16 @@ function resultOf(result: NonNullable<Grading['result']>): string {
 }
 
 type TaskPath = { org: string; contest: string; task: string };
+
+/**
+ * Where a grading's run log is read: the API route itself, on this origin,
+ * which answers plain text the browser shows as it is and runs nothing in.
+ */
+function logHref(path: TaskPath, grading: string): string {
+  const part = encodeURIComponent;
+  const task = `/api/v1/orgs/${part(path.org)}/contests/${part(path.contest)}/tasks/${part(path.task)}`;
+  return `${task}/gradings/${part(grading)}/log`;
+}
 
 /**
  * One grading and, for a manager, what its status allows: cancel one still to
@@ -105,6 +116,11 @@ function Row({
         {grading.status === 'done' && grading.result !== null && (
           <BodyText tone="secondary">{resultOf(grading.result)}</BodyText>
         )}
+        {grading.log && (
+          <TextLink href={logHref(path, grading.id)} label={`Log of ${name}`} newTab>
+            Log
+          </TextLink>
+        )}
       </td>
       {manages && (
         <td>
@@ -146,7 +162,8 @@ function Row({
 
 /**
  * The task's gradings, newest first, for its organisers: which submission
- * and attempt, where each stands, what it came to and why one failed. A
+ * and attempt, where each stands, what it came to, why one failed and, where
+ * its run wrote one, a link to its log, which opens in a tab of its own. A
  * manager also gets each row's cancel or retry; an observer reads the table
  * alone.
  */

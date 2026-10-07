@@ -107,6 +107,38 @@ describe("the task's gradings", () => {
     expect(within(table).queryByRole('columnheader', { name: 'Stage' })).toBeNull();
   });
 
+  it('links each grading whose run wrote a log to it, in a tab of its own', async () => {
+    const logged: Grading = {
+      ...stuck,
+      id: '0199a2c1-6b7e-7c3a-9f10-5d2e4b8a6c33',
+      submission_number: 5,
+      status: 'done',
+      error: null,
+      log: true,
+    };
+    server.use(
+      signedIn,
+      taskState,
+      publicationList,
+      ...repoFiles,
+      http.get(`${TASK_API}/gradings`, () => HttpResponse.json([logged, waiting])),
+    );
+    renderApp(TASK);
+
+    const link = await screen.findByRole('link', {
+      name: 'Log of submission 5, attempt 1',
+    });
+    expect(link).toHaveAttribute(
+      'href',
+      `/api/v1/orgs/acme/contests/spring/tasks/sum/gradings/${logged.id}/log`,
+    );
+    expect(link).toHaveAttribute('target', '_blank');
+    expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+    expect(
+      screen.queryByRole('link', { name: 'Log of submission 4, attempt 1' }),
+    ).toBeNull();
+  });
+
   it('retries a stuck grading in one click and reads the list again', async () => {
     let listed = [stuck];
     const retried: string[] = [];

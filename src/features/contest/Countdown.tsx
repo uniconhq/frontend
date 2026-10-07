@@ -9,7 +9,7 @@ type Phase = 'before' | 'running' | 'ended';
 
 /**
  * How long until the contest starts, or until it ends, by the server's clock
- * and never the browser's. Each task closes at its own time, which its entry
+ * and never the browser's, each said with what it counts to. Each task closes at its own time, which its entry
  * says; this counts the contest as a whole. Asking for the server's time is
  * what measures how far this browser's clock is out, so nothing is counted
  * until that answer is in; a server that did not answer leaves the browser's
@@ -50,13 +50,13 @@ export function Countdown({
 
   const text =
     phase === 'before'
-      ? `Starts in ${formatDuration(startsAt - at)}`
+      ? `Contest starts in ${formatDuration(startsAt - at)}`
       : phase === 'running'
-        ? `Time left ${formatDuration(endsAt - at)}`
-        : 'Ended';
+        ? `Contest ends in ${formatDuration(endsAt - at)}`
+        : 'Contest ended';
 
   return (
-    <div role="timer" aria-label="Countdown">
+    <div role="timer" aria-label="Contest countdown">
       <BodyText size="md" mono>
         {text}
       </BodyText>

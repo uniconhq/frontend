@@ -181,6 +181,7 @@ export const accepted = grading({
         { test: 'samples/2', outcome: 'accepted', values: {} },
       ],
       shown_at: null,
+      ran: true,
     },
     {
       group: 'main',
@@ -188,6 +189,7 @@ export const accepted = grading({
       outcome: 'accepted',
       tests: null,
       shown_at: '2026-09-12T11:00:00Z',
+      ran: true,
     },
   ],
 });

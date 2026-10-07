@@ -265,8 +265,8 @@ in, the contest page follows the registration: the register form, with a
 field for the contest's code when it asks for one, then pending, rejected
 with the organisers' reason, and the contest. It reads the home again every
 ten seconds while pending, every minute otherwise, and at once as the countdown crosses
-the start or the end. The countdown runs on the server's clock and counts to
-the contest's end. Each task closes at its own time: signed in, the task list
+the start or the end. The countdown runs on the server's clock and says what
+it counts to: "Contest starts in", then "Contest ends in". Each task closes at its own time: signed in, the task list
 says when each falls due, if it does, and closes for the person, any
 extension they have on it included, and the task page says the same with
 the task's caps, the most submissions in all and how often. Every
@@ -400,9 +400,12 @@ values the run reported once, a number in a list and a text such as the
 compile log as a block of its own, and each test group as the task shows it
 now: its outcome, its tests with each one's outcome and values, such as
 `time_ms` and `memory_kb`, and when the rest is shown while some is held
-back. The route leaves out what the task withholds, and the page puts
-nothing in its place. A run's log names every test, hidden ones too, so no
-contestant reads it.
+back. A group that did not run on the grading reads "Not run on this
+grading" where its outcome would be. The route leaves out what the task
+withholds, and the page puts nothing in its place. A run's log names every
+test, hidden ones too, so no contestant reads it; on a task's organiser
+page, each grading whose run wrote one has a Log link that opens it as
+plain text in a tab of its own.
 
 An open submission lists the files it was made with, each a download
 through the proxy's download door, `/-/downloads/...`, which streams the

@@ -197,8 +197,8 @@ test('a contestant registers, waits, is let in and reads the task', async ({
     .getByRole('list', { name: 'Contests' })
     .getByRole('link', { name: 'Spring 2026' })
     .click();
-  await expect(page.getByRole('timer', { name: 'Countdown' })).toContainText(
-    'Time left',
+  await expect(page.getByRole('timer', { name: 'Contest countdown' })).toContainText(
+    'Contest ends in',
   );
   await page.getByRole('button', { name: 'Register' }).click();
 

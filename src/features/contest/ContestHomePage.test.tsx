@@ -28,9 +28,9 @@ describe('the contest page for a signed-in person', () => {
     expect(
       await screen.findByRole('heading', { name: 'Spring 2026', level: 1 }),
     ).toBeVisible();
-    expect(await screen.findByRole('timer', { name: 'Countdown' })).toHaveTextContent(
-      /Time left (29m 5\ds|30m 00s)/,
-    );
+    expect(
+      await screen.findByRole('timer', { name: 'Contest countdown' }),
+    ).toHaveTextContent(/Contest ends in (29m 5\ds|30m 00s)/);
     const tasks = screen.getByRole('list', { name: 'Tasks' });
     expect(within(tasks).getByRole('link', { name: 'Sum of Two' })).toHaveAttribute(
       'href',
@@ -284,7 +284,7 @@ describe('the contest page for its own organiser', () => {
 });
 
 describe('the contest page at its start', () => {
-  it('reads the home again as the contest starts', async () => {
+  it('counts to the start, then to the end, reading the home again as the contest starts', async () => {
     const starting = new Date(Date.parse('2026-09-12T10:00:00Z') + 1_500).toISOString();
     server.use(
       signedIn,
@@ -294,7 +294,13 @@ describe('the contest page at its start', () => {
 
     expect(await screen.findByText('No task is released yet.')).toBeVisible();
     expect(
+      await screen.findByRole('timer', { name: 'Contest countdown' }),
+    ).toHaveTextContent(/^Contest starts in /);
+    expect(
       await screen.findByRole('link', { name: 'Sum of Two' }, { timeout: 5_000 }),
     ).toBeVisible();
+    expect(screen.getByRole('timer', { name: 'Contest countdown' })).toHaveTextContent(
+      /^Contest ends in /,
+    );
   });
 });
