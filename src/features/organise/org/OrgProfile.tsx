@@ -104,7 +104,8 @@ function EditForm({
  * The org's display name and description as the forge holds them. An admin
  * of the org edits both in place; the forge lets only an owner change them,
  * so the backend writes them as the platform once it has checked the admin
- * role. Anyone else holding a role in the org reads them with no way to edit.
+ * role. Anyone else holding a role in the org, at the org or at one of its
+ * contests or tasks, reads them with no way to edit.
  */
 export function OrgProfile({ org }: { org: string }) {
   const administers = holdsAt(useMe().roles, { kind: 'org', org }, 'admin');

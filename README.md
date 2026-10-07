@@ -377,8 +377,9 @@ the newest 100; a filter reaches older ones.
 
 The org page shows the org's display name and description as the forge
 holds them. An admin of the org edits both in place; an emptied display name
-is sent as empty, which leaves the org showing its name. A manager or an
-observer reads them with no edit control.
+is sent as empty, which leaves the org showing its name. Anyone else with a
+role in the org, at the org or at one of its contests or tasks, reads them
+with no edit control, also when the contest list refuses them.
 
 The contestants page shows an observer the table and a manager its actions
 too, which the routes check again underneath. Each action's answer replaces
