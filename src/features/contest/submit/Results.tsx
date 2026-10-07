@@ -1,4 +1,4 @@
-import type { GradingResult } from '@/api/types';
+import type { GradingResult, Reported } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { VerdictBadge } from '@/ui/VerdictBadge';
 import { cancelReason, valueText, verdictOf } from './grading';
@@ -25,22 +25,17 @@ export function Verdict({ grading }: { grading: GradingResult | null }) {
  * list of names and values, and each text as a block of its own, kept as the
  * run wrote it and never read as markup. Nothing when there are none.
  */
-export function OnceValues({ values }: { values: Record<string, number | string> }) {
-  const named = Object.entries(values);
-  const numbers = named.filter(
-    (entry): entry is [string, number] => typeof entry[1] === 'number',
-  );
-  const texts = named.filter(
-    (entry): entry is [string, string] => typeof entry[1] === 'string',
-  );
+export function OnceValues({ values }: { values: Reported }) {
+  const numbers = Object.keys(values.numbers);
+  const texts = Object.entries(values.texts);
   return (
     <>
       {numbers.length > 0 && (
         <dl className={classes.metrics} aria-label="Values">
-          {numbers.map(([name, value]) => (
+          {numbers.map((name) => (
             <div key={name} className={classes.metric}>
               <dt>{name}</dt>
-              <dd>{valueText(value)}</dd>
+              <dd>{valueText(values, name)}</dd>
             </div>
           ))}
         </dl>

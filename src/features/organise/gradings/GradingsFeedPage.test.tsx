@@ -21,8 +21,16 @@ const grading: Grading = {
   error: null,
   result: {
     stopped: null,
-    tests: [{ test: 'main/1', outcome: 'wrong_answer', values: {} }],
-    values: {},
+    tests: [
+      {
+        test: 'main/1',
+        outcome: 'wrong_answer',
+        values: { numbers: {}, texts: {} },
+        credit: null,
+        best: null,
+      },
+    ],
+    values: { numbers: {}, texts: {} },
     error: null,
   },
   log: true,

@@ -6,4 +6,5 @@ export { TaskPage } from './task/TaskPage';
 export { ContestantsPage } from './contestants/ContestantsPage';
 export { TeamsPage } from './teams/TeamsPage';
 export { GradingsFeedPage } from './gradings/GradingsFeedPage';
+export { OrganisedBoardsPage } from './boards/OrganisedBoardsPage';
 export { InboxPage } from './threads/Clarifications';

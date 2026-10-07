@@ -1,0 +1,69 @@
+.board {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* A board as wide as its tasks: it scrolls inside itself rather than the page. */
+.scroll {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  color: var(--unicon-text-body);
+}
+
+.table th {
+  text-align: left;
+  font-weight: 600;
+  color: var(--unicon-text-secondary);
+  padding: 6px 12px 8px 0;
+  border-bottom: 1px solid var(--unicon-border);
+  white-space: nowrap;
+}
+
+.table td,
+.table tbody th {
+  vertical-align: top;
+  padding: 8px 12px 8px 0;
+  border-bottom: 1px solid var(--unicon-border);
+}
+
+/* Each row is named by whose it is, as a header that reads like a cell. */
+.table tbody th {
+  font-weight: 400;
+  color: var(--unicon-text-body);
+}
+
+/* The reader's own row, so it is found at a glance on a long board. */
+.own {
+  background: var(--unicon-hover);
+}
+
+.number {
+  font-family: var(--mantine-font-family-monospace);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  white-space: nowrap;
+}
+
+/* A cell that counts nothing, which adds nothing to any key. */
+.idle {
+  color: var(--unicon-text-secondary);
+}
+
+.pending {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13px;
+  color: var(--unicon-text-body);
+}

@@ -1,6 +1,6 @@
 import { NavLink, useLocation, useParams } from 'react-router';
 import { useSession } from '@/session';
-import { contestHomePath, isContestantPath } from '@/lib/contest-paths';
+import { boardsPagePath, contestHomePath, isContestantPath } from '@/lib/contest-paths';
 import classes from './Sidebar.module.css';
 
 /**
@@ -17,13 +17,15 @@ import classes from './Sidebar.module.css';
 type Item = { label: string; to?: string; signedIn?: boolean; section?: boolean };
 type Group = { label: string; items: Item[] };
 
-function groups(contestHome: string | undefined): Group[] {
+type ContestLinks = { home: string; boards: string };
+
+function groups(contest: ContestLinks | undefined): Group[] {
   return [
     {
       label: 'Contest',
       items: [
-        { label: 'Tasks', to: contestHome },
-        { label: 'Leaderboard' },
+        { label: 'Tasks', to: contest?.home },
+        { label: 'Leaderboard', to: contest?.boards },
         { label: 'Submissions' },
       ],
     },
@@ -52,14 +54,14 @@ export function Sidebar() {
   const signedIn = session.status === 'signed-in';
   const { pathname } = useLocation();
   const { org, contest } = useParams();
-  const contestHome =
+  const contestLinks =
     isContestantPath(pathname) && org !== undefined && contest !== undefined
-      ? contestHomePath(org, contest)
+      ? { home: contestHomePath(org, contest), boards: boardsPagePath(org, contest) }
       : undefined;
 
   return (
     <nav className={classes.sidebar} aria-label="Sections">
-      {groups(contestHome).map((group) => (
+      {groups(contestLinks).map((group) => (
         <div key={group.label}>
           <div className={classes.groupLabel}>{group.label}</div>
           {group.items

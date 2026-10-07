@@ -3,7 +3,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import type { GradingResult, Submission, TaskPage } from '@/api/types';
-import { serverNow } from '@/lib/time';
+import { formatExact } from '@/lib/exact';
 import { renderApp } from '@/test/render';
 import { problem, server, signedIn } from '@/test/server';
 import { fakeTimerUser, passTime, withFakeTimers } from '@/test/timers';
@@ -11,13 +11,13 @@ import {
   accepted,
   grading,
   inputField,
+  reported,
   submission,
   TASK_API,
   taskPage,
   DOOR_URL,
   uploadStore,
 } from '@/test/contestant';
-import { valueText } from './grading';
 
 const PAGE = '/contests/acme/spring/tasks/sum';
 
@@ -26,6 +26,14 @@ function withPage(overrides: Partial<TaskPage>) {
     HttpResponse.json({ ...taskPage, ...overrides }),
   );
 }
+
+/**
+ * The server's clock agreeing with the browser's, so a submission made
+ * `Date.now()`-relative reads as just made whichever answer comes in first.
+ */
+const agreeingClock = http.get('/api/v1/time', () =>
+  HttpResponse.json({ now: new Date().toISOString() }),
+);
 
 function listing(submissions: Submission[]) {
   return http.get(`${TASK_API}/submissions`, () => HttpResponse.json(submissions));
@@ -563,7 +571,7 @@ describe('the submissions list', () => {
   it('follows a queued submission until its outcome comes back', async () => {
     const fresh = (graded: GradingResult) => ({
       ...submission(1, graded),
-      submitted_at: new Date(serverNow().getTime() - 2_000).toISOString(),
+      submitted_at: new Date(Date.now() - 2_000).toISOString(),
     });
     const turns = [
       [fresh(grading())],
@@ -573,6 +581,7 @@ describe('the submissions list', () => {
     let asked = 0;
     server.use(
       signedIn,
+      agreeingClock,
       withPage({}),
       http.get(`${TASK_API}/submissions`, () => {
         const answer = turns[Math.min(asked, turns.length - 1)];
@@ -602,7 +611,7 @@ describe('the submissions list', () => {
   it('shows a cancelled submission with the organisers’ sentence and stops following it', async () => {
     const fresh = (graded: GradingResult) => ({
       ...submission(1, graded),
-      submitted_at: new Date(serverNow().getTime() - 2_000).toISOString(),
+      submitted_at: new Date(Date.now() - 2_000).toISOString(),
     });
     const turns = [
       [fresh(grading({ status: 'running' }))],
@@ -618,6 +627,7 @@ describe('the submissions list', () => {
     let asked = 0;
     server.use(
       signedIn,
+      agreeingClock,
       withPage({}),
       http.get(`${TASK_API}/submissions`, () => {
         const answer = turns[Math.min(asked, turns.length - 1)];
@@ -677,6 +687,8 @@ describe('a submission opened from the list', () => {
           tests: null,
           shown_at: '2026-09-12T11:00:00Z',
           ran: true,
+          points: null,
+          max: '70',
         },
         {
           group: 'extra',
@@ -685,8 +697,11 @@ describe('a submission opened from the list', () => {
           tests: [],
           shown_at: null,
           ran: false,
+          points: null,
+          max: '0',
         },
       ],
+      points: { shown: '100', pending: '70', pending_until: '2026-09-12T11:00:00Z' },
     });
     server.use(
       signedIn,
@@ -711,16 +726,21 @@ describe('a submission opened from the list', () => {
     expect(within(tests).getByRole('columnheader', { name: 'time_ms' })).toBeVisible();
     const rows = within(tests).getAllByRole('row');
     expect(rows).toHaveLength(3);
-    expect(rows[1]).toHaveTextContent(`samples/1ACCEPTED12${valueText(2048)}`);
+    expect(rows[1]).toHaveTextContent(`samples/1ACCEPTED12${formatExact('2048')}`);
     expect(rows[2]).toHaveTextContent('samples/2ACCEPTED——');
+    expect(
+      within(detail).getByText(/^100 points, and up to 70 more shown at /),
+    ).toBeVisible();
 
     const main = within(detail).getByRole('region', { name: 'Group main' });
     expect(within(main).getByText('ACCEPTED')).toBeVisible();
+    expect(within(main).getByText('100 / 100 points')).toBeVisible();
     expect(within(main).getByText(/^Shown at /)).toBeVisible();
     expect(within(main).queryByRole('table')).toBeNull();
 
     const large = within(detail).getByRole('region', { name: 'Group large' });
     expect(within(large).getByText(/^Shown at /)).toBeVisible();
+    expect(within(large).getByText('of 70 points')).toBeVisible();
     expect(within(large).queryByText('ACCEPTED')).toBeNull();
     expect(within(large).queryByRole('table')).toBeNull();
     expect(within(large).queryByText('Not run on this grading')).toBeNull();
@@ -810,7 +830,7 @@ describe('a submission opened from the list', () => {
     const stopped = grading({
       status: 'done',
       stopped: 'compile_error',
-      values: { log: '<img src=x onerror="alert(1)">' },
+      values: reported({}, { log: '<img src=x onerror="alert(1)">' }),
     });
     server.use(
       signedIn,

@@ -302,6 +302,26 @@ export function describeError(error: ApiError): ErrorDescription {
       };
     case 'too_large':
       return tooLarge(error);
+    case 'marks_off':
+      return {
+        title: 'This task takes no marks',
+        message: 'No board of the contest counts the submissions you mark on it.',
+      };
+    case 'marks_frozen':
+      return {
+        title: 'Your marks are final',
+        message: 'This task has closed for you, so its marks no longer change.',
+      };
+    case 'mark_limit': {
+      const limit = numberOf(error, 'limit');
+      return {
+        title: 'You have marked as many as you may',
+        message:
+          limit === null
+            ? 'Take a mark off another submission first.'
+            : `This task counts at most ${limit} marked ${limit === 1 ? 'submission' : 'submissions'}. Take a mark off another first.`,
+      };
+    }
     case 'upload_not_yours':
       return {
         title: 'A file is not one you uploaded',

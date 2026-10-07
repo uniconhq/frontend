@@ -41,3 +41,7 @@ export function teamsPath(org: string, contest: string): string {
 export function gradingsPath(org: string, contest: string): string {
   return `${contestPath(org, contest)}/gradings`;
 }
+
+export function boardsPath(org: string, contest: string): string {
+  return `${contestPath(org, contest)}/boards`;
+}
