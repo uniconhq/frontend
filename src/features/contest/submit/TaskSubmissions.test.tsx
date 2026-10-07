@@ -4,7 +4,6 @@ import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import type { GradingResult, Submission, TaskPage } from '@/api/types';
 import { formatExact } from '@/lib/exact';
-import { serverNow } from '@/lib/time';
 import { renderApp } from '@/test/render';
 import { problem, server, signedIn } from '@/test/server';
 import { fakeTimerUser, passTime, withFakeTimers } from '@/test/timers';
@@ -27,6 +26,14 @@ function withPage(overrides: Partial<TaskPage>) {
     HttpResponse.json({ ...taskPage, ...overrides }),
   );
 }
+
+/**
+ * The server's clock agreeing with the browser's, so a submission made
+ * `Date.now()`-relative reads as just made whichever answer comes in first.
+ */
+const agreeingClock = http.get('/api/v1/time', () =>
+  HttpResponse.json({ now: new Date().toISOString() }),
+);
 
 function listing(submissions: Submission[]) {
   return http.get(`${TASK_API}/submissions`, () => HttpResponse.json(submissions));
@@ -564,7 +571,7 @@ describe('the submissions list', () => {
   it('follows a queued submission until its outcome comes back', async () => {
     const fresh = (graded: GradingResult) => ({
       ...submission(1, graded),
-      submitted_at: new Date(serverNow().getTime() - 2_000).toISOString(),
+      submitted_at: new Date(Date.now() - 2_000).toISOString(),
     });
     const turns = [
       [fresh(grading())],
@@ -574,6 +581,7 @@ describe('the submissions list', () => {
     let asked = 0;
     server.use(
       signedIn,
+      agreeingClock,
       withPage({}),
       http.get(`${TASK_API}/submissions`, () => {
         const answer = turns[Math.min(asked, turns.length - 1)];
@@ -603,7 +611,7 @@ describe('the submissions list', () => {
   it('shows a cancelled submission with the organisers’ sentence and stops following it', async () => {
     const fresh = (graded: GradingResult) => ({
       ...submission(1, graded),
-      submitted_at: new Date(serverNow().getTime() - 2_000).toISOString(),
+      submitted_at: new Date(Date.now() - 2_000).toISOString(),
     });
     const turns = [
       [fresh(grading({ status: 'running' }))],
@@ -619,6 +627,7 @@ describe('the submissions list', () => {
     let asked = 0;
     server.use(
       signedIn,
+      agreeingClock,
       withPage({}),
       http.get(`${TASK_API}/submissions`, () => {
         const answer = turns[Math.min(asked, turns.length - 1)];

@@ -6,6 +6,7 @@ import type { Submission, TaskPage, TaskRelease } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { Card } from '@/ui/Card';
 import { SectionTitle } from '@/ui/SectionTitle';
+import { TaskCountdown } from '../TaskCountdown';
 import { emptyDraft, type Draft } from './draft';
 import { newestFirst } from './grading';
 import { SubmissionDetail } from './SubmissionDetail';
@@ -31,9 +32,9 @@ function closedReason(closed: TaskRelease['closed']): string {
 }
 
 /**
- * The contestant's half of a task page below its statement: the panel they
- * submit from while the task is open or why it is not in its place, the
- * submission the address opens, and
+ * The contestant's half of a task page below its statement: the countdowns
+ * to the row's due and close, the panel they submit from while the task is
+ * open or why it is not in its place, the submission the address opens, and
  * the list of their own submissions. The panel's contents live here, so
  * restoring an earlier submission can fill it; a submission that goes
  * through empties it and joins the top of the list at once.
@@ -43,11 +44,13 @@ export function TaskSubmissions({
   contest,
   task,
   page,
+  onBoundary,
 }: {
   org: string;
   contest: string;
   task: string;
   page: TaskPage;
+  onBoundary?: () => void;
 }) {
   const queryClient = useQueryClient();
   const { pathname } = useLocation();
@@ -97,6 +100,7 @@ export function TaskSubmissions({
       <Card>
         <div className={shared.stack}>
           <SectionTitle>Submit</SectionTitle>
+          <TaskCountdown due={page.due} closes={page.closes} onBoundary={onBoundary} />
           {open ? (
             <SubmitPanel
               inputs={inputs}

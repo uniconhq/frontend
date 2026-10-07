@@ -76,6 +76,41 @@ describe('a task page for a signed-in person', () => {
     },
   );
 
+  it("counts down to the row's due and close, extension included, by the server's clock", async () => {
+    server.use(
+      signedIn,
+      noSubmissions,
+      http.get(`${TASK_API}/page`, () =>
+        HttpResponse.json({
+          ...taskPage,
+          due: '2026-09-12T10:15:00Z',
+          closes: '2026-09-12T10:45:00Z',
+        }),
+      ),
+    );
+    renderApp(PAGE);
+
+    const timer = await screen.findByRole('timer', { name: 'Task countdown' });
+    expect(timer).toHaveTextContent(/Due in (14m 5\ds|15m 00s)/);
+    expect(timer).toHaveTextContent(/Closes in (44m 5\ds|45m 00s)/);
+  });
+
+  it('says a submission past the due is late, and still takes it', async () => {
+    server.use(
+      signedIn,
+      noSubmissions,
+      http.get(`${TASK_API}/page`, () =>
+        HttpResponse.json({ ...taskPage, due: '2026-09-12T09:50:00Z' }),
+      ),
+    );
+    renderApp(PAGE);
+
+    const timer = await screen.findByRole('timer', { name: 'Task countdown' });
+    expect(timer).toHaveTextContent('Past due: a submission now is late.');
+    expect(timer).toHaveTextContent(/Closes in (29m 5\ds|30m 00s)/);
+    expect(screen.getByRole('form', { name: 'Submit' })).toBeVisible();
+  });
+
   it('leaves out raw HTML an organiser wrote into the statement', async () => {
     server.use(
       signedIn,
