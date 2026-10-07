@@ -121,6 +121,8 @@ function HolderRow({
   const afterChange = useAfterChange(place);
   const [open, setOpen] = useState<'role' | 'remove' | null>(null);
   const [role, setRole] = useState<RoleName>(holder.role);
+  /** The role last sent, which a refusal is about, whatever is picked since. */
+  const [tried, setTried] = useState<RoleName | null>(null);
   const row = useRef<HTMLTableRowElement>(null);
   const isMe = holder.user.id === me;
   const change = useChange({ reread: () => afterChange(isMe), focus: row });
@@ -133,6 +135,7 @@ function HolderRow({
   const show = (next: 'role' | 'remove' | null) => {
     change.dismiss();
     setRole(holder.role);
+    setTried(null);
     setOpen(next);
   };
 
@@ -146,6 +149,7 @@ function HolderRow({
       show(null);
       return;
     }
+    setTried(role);
     void run('role', () => grant(holder.user.username, role));
   };
 
@@ -220,7 +224,9 @@ function HolderRow({
               </div>
             </form>
           )}
-          {error !== null && open !== 'remove' && <Refusal error={error} role={role} />}
+          {error !== null && open !== 'remove' && (
+            <Refusal error={error} role={tried ?? undefined} />
+          )}
           <Modal
             opened={open === 'remove'}
             onClose={() => show(null)}
