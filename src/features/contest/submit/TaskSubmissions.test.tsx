@@ -755,6 +755,26 @@ describe('a submission opened from the list', () => {
       ),
     ).toBeVisible();
     expect(within(detail).getByText('CANCELLED')).toBeVisible();
+    expect(within(detail).getByText(/does not count against the task/)).toBeVisible();
+  });
+
+  it('says nothing of the limit for a cancel that carries no sentence', async () => {
+    const cancelled = grading({ status: 'cancelled', reason: null });
+    server.use(
+      signedIn,
+      withPage({}),
+      listing([submission(1, cancelled)]),
+      http.get(`${TASK_API}/submissions/:number`, () =>
+        HttpResponse.json(submission(1, cancelled)),
+      ),
+    );
+    renderApp(`${PAGE}?submission=1`);
+
+    const detail = await screen.findByRole('region', { name: 'Submission 1' });
+    expect(
+      await within(detail).findByText('Cancelled by the organisers.'),
+    ).toBeVisible();
+    expect(within(detail).queryByText(/does not count against/)).toBeNull();
   });
 
   it('lists the files it was made with, each a download through the door', async () => {
