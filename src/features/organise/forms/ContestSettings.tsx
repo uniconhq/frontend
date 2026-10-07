@@ -7,6 +7,8 @@ import { Textarea } from '@/ui/Textarea';
 import { TextInput } from '@/ui/TextInput';
 import type { Place } from '../files/place';
 import shared from '../organise.module.css';
+import { boardProblems } from './board-values';
+import { BoardFields } from './BoardFields';
 import {
   letterOf,
   readContest,
@@ -38,9 +40,9 @@ function choices(
 }
 
 /**
- * `contest.yaml` as fields, with the file as text in the next tab for the
- * leaderboards and anything else the form does not show. A manager sees the
- * admin's keys and cannot change them.
+ * `contest.yaml` as fields, with the file as text in the next tab for
+ * anything the form does not show. A manager sees the admin's keys and
+ * cannot change them; the leaderboards are a manager's, like the tasks.
  */
 export function ContestSettings({ place, admin }: { place: Place; admin: boolean }) {
   return (
@@ -55,7 +57,13 @@ export function ContestSettings({ place, admin }: { place: Place; admin: boolean
   );
 }
 
-function ContestForm({ doc, busy, onSave, admin }: FormProps & { admin: boolean }) {
+function ContestForm({
+  doc,
+  busy,
+  onSave,
+  refused,
+  admin,
+}: FormProps & { admin: boolean }) {
   const [read] = useState(() => readContest(doc));
   const [values, setValues] = useState<ContestValues>(read.values);
   const set = <K extends keyof ContestValues>(key: K, value: ContestValues[K]) =>
@@ -86,6 +94,7 @@ function ContestForm({ doc, busy, onSave, admin }: FormProps & { admin: boolean 
       numberProblem(entry.latePerDay),
       numberProblem(entry.marks, true),
     ]),
+    ...values.boards.flatMap(boardProblems),
   ].filter((problem) => problem !== undefined);
 
   return (
@@ -255,10 +264,24 @@ function ContestForm({ doc, busy, onSave, admin }: FormProps & { admin: boolean 
         )}
       </Fieldset>
 
-      <BodyText tone="secondary">
-        The leaderboards are edited in the contest.yaml tab; this form leaves them as
-        they are.
-      </BodyText>
+      <Fieldset
+        legend="Leaderboards"
+        note={
+          read.unreadable.includes('leaderboards')
+            ? 'leaderboards is not a list of boards the form can read; edit it as text.'
+            : 'Each board ranks rows on its keys in turn, counting only what is shown. Empty fields are the defaults.'
+        }
+      >
+        {!read.unreadable.includes('leaderboards') && (
+          <BoardFields
+            boards={values.boards}
+            taskIds={values.tasks.map((entry) => entry.id)}
+            refused={refused}
+            onChange={(boards) => set('boards', boards)}
+          />
+        )}
+      </Fieldset>
+
       <div className={shared.actions}>
         <Button type="submit" loading={busy} disabled={!changed || problems.length > 0}>
           Save settings

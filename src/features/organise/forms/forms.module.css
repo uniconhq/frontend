@@ -80,3 +80,18 @@
 .flush {
   margin: 0;
 }
+
+/* What a save was refused for, said where a field-level error cannot go. */
+.refused {
+  margin: 0;
+  font-size: 12px;
+  color: var(--unicon-text-danger);
+}
+
+/* One key of a board's order: its kind, its setting and its buttons. */
+.orderKey {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px;
+}

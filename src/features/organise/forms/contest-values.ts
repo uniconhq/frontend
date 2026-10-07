@@ -1,4 +1,5 @@
 import { isSeq } from 'yaml';
+import { readBoards, writeBoards, type BoardValues } from './board-values';
 import { isoOf, localOf, unreadableTime } from './times';
 import { isRecord, numberOf, textOf, valueAt, writeAt, type Doc } from './yaml-doc';
 
@@ -24,6 +25,7 @@ export type ContestValues = {
   teamSize: string;
   /** The task entries in the order the form shows them. */
   tasks: TaskEntryValues[];
+  boards: BoardValues[];
 };
 
 export type TaskEntryValues = {
@@ -75,6 +77,8 @@ export function readContest(doc: Doc): ContestRead {
   if (!listOk) unreadable.push('tasks');
   const entries =
     listOk && Array.isArray(list) ? (list as Record<string, unknown>[]) : [];
+  const boards = readBoards(valueAt(doc, ['leaderboards']));
+  if (boards === null) unreadable.push('leaderboards');
 
   const at = (...path: (string | number)[]) => textOf(valueAt(doc, path));
   const time = (...path: (string | number)[]) => localOf(valueAt(doc, path));
@@ -114,6 +118,7 @@ export function readContest(doc: Doc): ContestRead {
         closes: time('tasks', index, 'closes'),
         marks: at('tasks', index, 'marks'),
       })),
+      boards: boards ?? [],
     },
   };
 }
@@ -185,6 +190,8 @@ export function writeContest(
     put(field('closes'), was.closes, entry.closes, time);
     put(field('marks'), was.marks, entry.marks, number);
   });
+
+  writeBoards(doc, before.boards, after.boards);
 }
 
 /** A task's label: its place in the list as a letter, A to Z, then AA. */
