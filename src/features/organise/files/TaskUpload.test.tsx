@@ -84,6 +84,33 @@ function uploadRoutes({
   return { seen, handlers };
 }
 
+/** A task whose top folder holds `train.csv`, an upload of 300 MB. */
+const DIGEST = 'b'.repeat(64);
+const withUploadedFile = [
+  http.get(`${TASK_API}/tree`, ({ request }) =>
+    new URL(request.url).searchParams.get('path') === ''
+      ? HttpResponse.json([
+          { path: 'task.yaml', kind: 'file', size: 120, upload: null },
+          {
+            path: 'train.csv',
+            kind: 'file',
+            size: 130,
+            upload: { size: 314_572_800, digest: DIGEST },
+          },
+        ])
+      : undefined,
+  ),
+  http.get(`${TASK_API}/files/train.csv`, () =>
+    HttpResponse.json({
+      path: 'train.csv',
+      encoding: 'utf-8',
+      content: `version https://git-lfs.github.com/spec/v1\noid sha256:${DIGEST}\nsize 314572800\n`,
+      token: 'token-train',
+      upload: { size: 314_572_800, digest: DIGEST },
+    }),
+  ),
+];
+
 async function openUpload() {
   await userEvent.click(await screen.findByRole('button', { name: 'Upload a file' }));
   return screen.getByRole('region', { name: 'Upload a file' });
@@ -264,6 +291,52 @@ describe("uploading a file into a task's tree", () => {
     expect(await within(panel).findByRole('alert')).toHaveTextContent(
       'That path cannot be used',
     );
+  });
+
+  it('tells an uploaded file from a typed one in the tree', async () => {
+    server.use(signedIn, taskState, publicationList, ...withUploadedFile, ...repoFiles);
+    renderApp(TASK);
+
+    const tree = await screen.findByRole('navigation', { name: 'Files' });
+    expect(
+      await within(tree).findByRole('link', { name: 'train.csv uploaded, 300 MB' }),
+    ).toBeVisible();
+    expect(within(tree).getByRole('link', { name: 'task.yaml' })).toBeVisible();
+  });
+
+  it('shows an uploaded file as its size and digest, never in the editor, and uploads it again', async () => {
+    const routes = uploadRoutes();
+    server.use(
+      signedIn,
+      taskState,
+      publicationList,
+      ...withUploadedFile,
+      ...repoFiles,
+      ...routes.handlers,
+    );
+    renderApp(`${TASK}?file=train.csv`);
+
+    const shown = await screen.findByRole('region', { name: 'Uploaded train.csv' });
+    expect(shown).toHaveTextContent('300 MB');
+    expect(shown).toHaveTextContent(DIGEST);
+    expect(within(shown).queryByRole('textbox')).toBeNull();
+    expect(screen.queryByRole('textbox', { name: 'train.csv' })).toBeNull();
+
+    await userEvent.click(within(shown).getByRole('button', { name: 'Upload again' }));
+    const panel = within(shown).getByRole('region', { name: 'Upload train.csv again' });
+    const path = within(panel).getByRole('textbox', { name: /Path in the task/ });
+    expect(path).toHaveValue('train.csv');
+    expect(path).toBeDisabled();
+    await userEvent.upload(within(panel).getByLabelText('New train.csv'), dataset());
+    await userEvent.click(within(panel).getByRole('button', { name: 'Upload' }));
+    await userEvent.click(
+      await within(panel).findByRole('button', { name: 'Save into the task' }),
+    );
+
+    await within(panel).findByText('Published as publication 3.');
+    expect(routes.seen.writes).toMatchObject([
+      { path: 'train.csv', body: { upload: UPLOAD, token: 'token-train' } },
+    ]);
   });
 
   it('offers an observer no upload', async () => {

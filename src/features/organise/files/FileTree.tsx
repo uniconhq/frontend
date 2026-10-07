@@ -6,6 +6,7 @@ import type { TreeEntry } from '@/api/types';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
 import { BodyText } from '@/ui/BodyText';
+import { formatSize } from '@/lib/size';
 import { fileHref, folderOf } from './file-param';
 import { treeQuery, type Place } from './place';
 import classes from './Files.module.css';
@@ -29,7 +30,8 @@ function foldersAbove(path: string | null): string[] {
 }
 
 /**
- * The repo as a tree. Each folder is listed when it is opened, with
+ * The repo as a tree. A file that is an upload says so beside its name, with
+ * the size of what it holds. Each folder is listed when it is opened, with
  * `GET <place>/tree?path=`, so a large repo costs one request per folder
  * looked at. Opening a file is a link that sets `?file=`, so it can be copied,
  * opened in a new tab and come back with the browser's back button. The
@@ -145,6 +147,14 @@ function Folder({
               onClick={() => onFolder(folderOf(entry.path))}
             >
               {nameOf(entry.path)}
+              {entry.upload ? (
+                <>
+                  {' '}
+                  <span className={classes.mark}>
+                    uploaded, {formatSize(entry.upload.size)}
+                  </span>
+                </>
+              ) : null}
             </Link>
           </li>
         ),

@@ -104,3 +104,32 @@
 .folder[data-picked] {
   color: var(--unicon-text-primary);
 }
+
+.mark {
+  margin-left: auto;
+  padding-left: 8px;
+  color: var(--unicon-text-faint);
+  white-space: nowrap;
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 4px 12px;
+  margin: 0;
+  font-size: 13px;
+  color: var(--unicon-text-body);
+}
+
+.facts dt {
+  color: var(--unicon-text-secondary);
+}
+
+.facts dd {
+  margin: 0;
+}
+
+.digest {
+  font-family: var(--mantine-font-family-monospace);
+  overflow-wrap: anywhere;
+}

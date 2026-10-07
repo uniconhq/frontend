@@ -15,7 +15,8 @@ import classes from './Files.module.css';
 /**
  * A contest's or a task's files: the tree on one side and the open file on
  * the other. Which file is open is `?file=` on the page's own address, so a
- * link to a file opens it. Every file opens as text.
+ * link to a file opens it. A typed file opens as text, and an uploaded one
+ * as what it holds.
  *
  * At a task, a manager also uploads a file into it, by default into the
  * folder last picked in the tree: the folder last opened or closed there, or
