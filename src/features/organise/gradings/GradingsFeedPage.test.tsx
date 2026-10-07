@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import type { FeedEntry, Grading } from '@/api/types';
 import { renderApp } from '@/test/render';
-import { server, signedIn } from '@/test/server';
+import { problem, server, signedIn, someone } from '@/test/server';
 import { CONTEST_API, standingList } from '@/test/organiser';
 import { passTime, withFakeTimers } from '@/test/timers';
 
@@ -265,6 +265,236 @@ describe("the contest's gradings feed", () => {
       'href',
       FEED,
     );
+  });
+});
+
+/** Signed in with these roles alone. */
+function signedInAs(roles: typeof someone.roles) {
+  return http.get('/api/v1/me', () => HttpResponse.json({ ...someone, roles }));
+}
+
+describe('acting on the feed', () => {
+  it('retries a finished latest attempt through its task, after asking', async () => {
+    let now: FeedEntry[] = [sortByTeam];
+    const retriedAt: string[] = [];
+    server.use(
+      signedIn,
+      standingList,
+      http.post(`${CONTEST_API}/tasks/:task/gradings/:grading/retry`, ({ params }) => {
+        retriedAt.push(`${String(params.task)}/${String(params.grading)}`);
+        const again = {
+          ...sortByTeam.grading,
+          id: 'g-sort-2',
+          attempt: 2,
+          status: 'queued' as const,
+        };
+        now = [{ ...sortByTeam, grading: again }, sortByTeam];
+        return HttpResponse.json(again);
+      }),
+    );
+    feedAnswering(() => now);
+    renderApp(FEED);
+
+    const name = 'A submission 1 by Lovelaces (team), attempt 1';
+    expect(await screen.findByRole('button', { name: `Retry ${name}` })).toBeVisible();
+    expect(screen.queryByRole('button', { name: `Cancel ${name}` })).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: `Retry ${name}` }));
+    const dialog = await screen.findByRole('dialog', { name: 'Retry this grading?' });
+    expect(dialog).toHaveTextContent(
+      "Lovelaces (team)'s submission 1 to sort is graded again as a new attempt, against publication 2, as attempt 1 was.",
+    );
+    expect(retriedAt).toEqual([]);
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Retry' }));
+
+    const group = await screen.findByRole('rowgroup', {
+      name: 'A submission 1 by Lovelaces (team)',
+    });
+    await waitFor(() => expect(group).toHaveTextContent('Queued'));
+    expect(retriedAt).toEqual(['sort/g-sort-1']);
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(
+      within(group).getByRole('button', { name: 'Show earlier attempts (1)' }),
+    ).toBeVisible();
+  });
+
+  it('cancels a system error with the sentence the contestant reads, once given', async () => {
+    const sent: unknown[] = [];
+    server.use(
+      signedIn,
+      standingList,
+      http.post(
+        `${CONTEST_API}/tasks/:task/gradings/:grading/cancel`,
+        async ({ request, params }) => {
+          sent.push([params.task, params.grading, await request.json()]);
+          return HttpResponse.json({ ...stuckFirst.grading, status: 'cancelled' });
+        },
+      ),
+    );
+    feedAnswering(() => [stuckFirst, sortByTeam]);
+    const user = userEvent.setup();
+    renderApp(FEED);
+
+    await user.click(
+      await screen.findByRole('button', {
+        name: 'Cancel B submission 3 by ada, attempt 1',
+      }),
+    );
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Cancel this submission?',
+    });
+    expect(dialog).toHaveTextContent("ada's submission 3 to sum ends as cancelled.");
+    const confirm = within(dialog).getByRole('button', {
+      name: 'Cancel the submission',
+    });
+    expect(confirm).toBeDisabled();
+    const field = within(dialog).getByRole('textbox', {
+      name: /^What the contestant reads/,
+    });
+    expect(field).toHaveAttribute('maxlength', '500');
+    await user.type(field, '  Our grader broke.  ');
+    await user.click(confirm);
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(sent).toEqual([
+      ['sum', stuckFirst.grading.id, { reason: 'Our grader broke.' }],
+    ]);
+  });
+
+  it('keeps a refused cancel in the dialog with its sentence', async () => {
+    server.use(
+      signedIn,
+      standingList,
+      http.post(`${CONTEST_API}/tasks/:task/gradings/:grading/cancel`, () =>
+        problem(409, 'wrong_status', {
+          detail: 'The grading is no longer a system error.',
+          current: 'queued',
+        }),
+      ),
+    );
+    feedAnswering(() => [stuckFirst]);
+    const user = userEvent.setup();
+    renderApp(FEED);
+
+    await user.click(
+      await screen.findByRole('button', {
+        name: 'Cancel B submission 3 by ada, attempt 1',
+      }),
+    );
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Cancel this submission?',
+    });
+    await user.type(
+      within(dialog).getByRole('textbox', { name: /^What the contestant reads/ }),
+      'Sorry.',
+    );
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Cancel the submission' }),
+    );
+
+    const alert = await within(dialog).findByRole('alert');
+    expect(alert).toHaveTextContent('It is no longer a system error');
+    expect(alert).toHaveTextContent('The grading is no longer a system error.');
+    expect(alert).toHaveTextContent('It is queued now.');
+  });
+
+  it('rejudges the task the feed is filtered to, after saying what it does', async () => {
+    const rejudgedAt: string[] = [];
+    server.use(
+      signedIn,
+      standingList,
+      http.post(`${CONTEST_API}/tasks/:task/rejudge`, ({ params }) => {
+        rejudgedAt.push(String(params.task));
+        return HttpResponse.json({
+          publication: 2,
+          queued: 3,
+          cancelled: 1,
+          left_running: 0,
+        });
+      }),
+    );
+    feedAnswering(() => [stuckFirst]);
+    const user = userEvent.setup();
+    renderApp(FEED);
+
+    await screen.findByRole('table', { name: 'Gradings' });
+    expect(screen.queryByRole('button', { name: /^Rejudge/ })).toBeNull();
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Task' }), 'sum');
+    await user.click(await screen.findByRole('button', { name: 'Rejudge B · sum' }));
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Rejudge every submission of this task?',
+    });
+    expect(dialog).toHaveTextContent(
+      "Every submission of B · sum has its latest attempt graded again against the task's current publication, as a new attempt.",
+    );
+    await user.click(within(dialog).getByRole('button', { name: 'Rejudge' }));
+
+    const outcome = await screen.findByText(/rejudged against publication 2/);
+    expect(outcome).toHaveTextContent(
+      'B · sum rejudged against publication 2: 3 attempts queued.',
+    );
+    expect(
+      screen.getByText('1 attempt against an older publication cancelled first.'),
+    ).toBeVisible();
+    expect(rejudgedAt).toEqual(['sum']);
+  });
+
+  it('says so when the task has nothing published to rejudge against', async () => {
+    server.use(
+      signedIn,
+      standingList,
+      http.post(`${CONTEST_API}/tasks/:task/rejudge`, () => problem(404, 'not_found')),
+    );
+    feedAnswering(() => []);
+    const user = userEvent.setup();
+    renderApp(`${FEED}?task=sort`);
+
+    await user.click(await screen.findByRole('button', { name: 'Rejudge A · sort' }));
+    const dialog = await screen.findByRole('dialog');
+    await user.click(within(dialog).getByRole('button', { name: 'Rejudge' }));
+
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent(
+      'Nothing to rejudge against',
+    );
+  });
+
+  it('offers an observer nothing to do', async () => {
+    server.use(
+      signedInAs([
+        { names: { org: 'acme', contest: null, task: null }, role: 'observer' },
+      ]),
+      standingList,
+    );
+    feedAnswering(() => [stuckFirst, sortByTeam]);
+    renderApp(`${FEED}?task=sum`);
+
+    const table = await screen.findByRole('table', { name: 'Gradings' });
+    expect(within(table).queryByRole('columnheader', { name: 'Actions' })).toBeNull();
+    expect(
+      screen.queryByRole('button', { name: /^(Retry|Cancel|Rejudge)/ }),
+    ).toBeNull();
+  });
+
+  it("offers a task's manager the actions on that task's rows alone", async () => {
+    server.use(
+      signedInAs([
+        { names: { org: 'acme', contest: 'spring', task: null }, role: 'observer' },
+        { names: { org: 'acme', contest: 'spring', task: 'sum' }, role: 'manager' },
+      ]),
+      standingList,
+    );
+    feedAnswering(() => [stuckFirst, sortByTeam]);
+    renderApp(FEED);
+
+    expect(
+      await screen.findByRole('button', {
+        name: 'Retry B submission 3 by ada, attempt 1',
+      }),
+    ).toBeVisible();
+    expect(
+      screen.queryByRole('button', {
+        name: 'Retry A submission 1 by Lovelaces (team), attempt 1',
+      }),
+    ).toBeNull();
   });
 });
 

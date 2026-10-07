@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { useSearchParams } from 'react-router';
 import { $api, queryView } from '@/api/query';
-import type { Team, QueueDepth } from '@/api/types';
+import type { FeedEntry, QueueDepth, Rejudged, Team } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
 import { Card } from '@/ui/Card';
@@ -12,15 +12,20 @@ import { Select } from '@/ui/Select';
 import { TextInput } from '@/ui/TextInput';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
+import { useMe } from '@/session';
 import { useLiveConnected } from '@/live';
 import { useContestParams } from '@/lib/route-params';
 import { FeedTable } from './FeedTable';
+import { AttemptActions, ConfirmDialog, RejudgeOutcome } from './FeedActions';
+import { useFeedActions, type Asking } from './use-feed-actions';
+import { holdsAt } from '../roles';
 import {
   STATUS,
   STATUSES,
   UNFINISHED,
   feedQuery,
   readFilters,
+  submitterOf,
   withFilter,
   type FilterKey,
   type Filters,
@@ -197,9 +202,15 @@ function FilterBar({
  * earlier attempts opening below it. The live stream makes the feed and the
  * queue stale as gradings move; while it is down both are read again every
  * ten seconds while something is still to finish.
+ *
+ * A manager of a row's task also gets its latest attempt's Retry and, for a
+ * system error, Cancel, and Rejudge for the task the feed is filtered to;
+ * each asks first in a dialog through the task's own routes. An observer
+ * reads the feed alone.
  */
 export function GradingsFeedPage() {
   const path = useContestParams();
+  const roles = useMe().roles;
   const [search] = useSearchParams();
   const filters = readFilters(search);
   const live = useLiveConnected();
@@ -219,6 +230,45 @@ export function GradingsFeedPage() {
       },
     ),
   );
+  const actions = useFeedActions(path);
+  const [asking, setAsking] = useState<Asking | null>(null);
+  const [rejudged, setRejudged] = useState<{
+    title: string;
+    rejudged: Rejudged;
+  } | null>(null);
+
+  const manages = (task: string | null): task is string =>
+    task !== null && holdsAt(roles, { kind: 'task', ...path, task }, 'manager');
+  const titleOf = (task: string) => {
+    const letter = tasks.letters.get(task);
+    return letter === undefined ? task : `${letter} · ${task}`;
+  };
+
+  /** The task the feed is filtered to, when the person may rejudge it. */
+  const rejudging = manages(filters.task) ? filters.task : null;
+
+  const ask = (next: Asking | null) => {
+    actions.reset();
+    setAsking(next);
+  };
+
+  const confirm = async () => {
+    if (asking === null) return;
+    const done = await actions.run(asking);
+    if (done === false) return;
+    if (done !== true && asking.kind === 'rejudge') {
+      setRejudged({ title: asking.title, rejudged: done });
+    }
+    setAsking(null);
+  };
+
+  const rowActions =
+    view.state === 'ready' && view.data.some((entry) => manages(entry.task))
+      ? (entry: FeedEntry, name: string) =>
+          manages(entry.task) ? (
+            <AttemptActions task={entry.task} entry={entry} name={name} onAsk={ask} />
+          ) : null
+      : null;
 
   return (
     <div className={shared.page}>
@@ -230,6 +280,23 @@ export function GradingsFeedPage() {
         <div className={classes.stack}>
           <SectionTitle>Every grading</SectionTitle>
           <FilterBar filters={filters} tasks={tasks.options} teams={teams} />
+          {rejudging !== null && (
+            <div className={classes.actions}>
+              <Button
+                size="xs"
+                variant="secondary"
+                onClick={() => {
+                  setRejudged(null);
+                  ask({ kind: 'rejudge', task: rejudging, title: titleOf(rejudging) });
+                }}
+              >
+                Rejudge {titleOf(rejudging)}
+              </Button>
+            </div>
+          )}
+          {rejudged !== null && (
+            <RejudgeOutcome title={rejudged.title} rejudged={rejudged.rejudged} />
+          )}
           {view.state === 'loading' && <PageSkeleton rows={4} />}
           {view.state === 'error' && (
             <ErrorBlock error={view.error} onRetry={view.retry} />
@@ -247,7 +314,7 @@ export function GradingsFeedPage() {
                   path={path}
                   entries={view.data}
                   letters={tasks.letters}
-                  actions={null}
+                  actions={rowActions}
                 />
                 {view.data.length >= LIMIT && (
                   <BodyText tone="secondary">
@@ -258,6 +325,19 @@ export function GradingsFeedPage() {
             ))}
         </div>
       </Card>
+      <ConfirmDialog
+        asking={asking}
+        who={
+          asking !== null && asking.kind !== 'rejudge'
+            ? submitterOf(asking.entry.by)
+            : ''
+        }
+        pending={actions.pending}
+        error={actions.error}
+        onChange={setAsking}
+        onConfirm={() => void confirm()}
+        onClose={() => ask(null)}
+      />
     </div>
   );
 }
