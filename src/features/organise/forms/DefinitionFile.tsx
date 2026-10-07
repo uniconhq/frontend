@@ -7,6 +7,7 @@ import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
 import { FileEditor } from '../files/FileEditor';
 import { SaveOutcome, type Outcome } from '../files/SaveOutcome';
+import { UploadedFile } from '../files/UploadedFile';
 import type { Place } from '../files/place';
 import { useFileWrite, useOwnFile } from './file-hooks';
 import { MergeView } from './MergeView';
@@ -27,6 +28,7 @@ export type FormProps = {
  * with the reason. Saving writes the changed document with the version it
  * was read at. A save refused as a conflict opens the merge view over the file
  * as it is now; any other answer is SaveOutcome's, as in the file editor.
+ * A file that is an upload shows as one, by its size and digest, not as a form.
  */
 export function DefinitionFile({
   place,
@@ -117,6 +119,11 @@ function FormView({
     );
   }
   const file = query.data;
+  if (file.upload) {
+    return (
+      <UploadedFile place={place} path={path} upload={file.upload} token={file.token} />
+    );
+  }
 
   const read = readForm(file);
 

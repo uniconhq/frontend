@@ -493,6 +493,36 @@ describe('the task settings form', { timeout: 20_000 }, () => {
     expect(within(form).getByLabelText("New input's id")).toBeVisible();
   });
 
+  it('shows a task.yaml that is an upload by its size and digest, not as a form', async () => {
+    taskBackend(() => HttpResponse.json({}));
+    server.use(
+      http.get(`${TASK_API}/files/:path`, ({ params }) =>
+        params['path'] === 'task.yaml'
+          ? HttpResponse.json({
+              path: 'task.yaml',
+              encoding: 'utf-8',
+              content: `version https://git-lfs.github.com/spec/v1
+oid sha256:${'d'.repeat(64)}
+size 120
+`,
+              token: 'token-task',
+              upload: { size: 120, digest: 'd'.repeat(64) },
+            })
+          : undefined,
+      ),
+    );
+    renderApp('/orgs/acme/contests/spring/tasks/sum');
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Edit the settings' }),
+    );
+
+    const [shown] = await screen.findAllByRole('region', {
+      name: 'Uploaded task.yaml',
+    });
+    expect(within(shown!).getByText('d'.repeat(64))).toBeVisible();
+    expect(screen.queryByRole('form', { name: 'Task settings' })).toBeNull();
+  });
+
   it('will not save a number field that holds no number', async () => {
     taskBackend(() => HttpResponse.json({}));
     const form = await openForm();

@@ -241,8 +241,10 @@ with the same props in for it (`src/test/code-editor.tsx`), and
 `CodeEditor.test.tsx` tests the editor itself.
 
 A file that is an upload is marked in the tree with the size of what it
-holds, and opens as its size and SHA-256, never in the editor, since its
-commit holds a pointer to the bytes. A manager of the task uploads a file
+holds, and opens as its size and SHA-256 (`files/UploadedFile.tsx`), never as
+text, since its commit holds a pointer to the bytes: in the file editor, as an
+older version in its history, and as a `statement.md` or `task.yaml` in the
+statement editor and the settings forms. A manager of the task uploads a file
 from the tree, into the folder last opened there or the open file's by
 default, at a path they can change, and changes an uploaded one with Upload
 again: the browser works out the SHA-256, asks `POST <task>/organise/uploads`

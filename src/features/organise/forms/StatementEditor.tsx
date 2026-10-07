@@ -8,6 +8,7 @@ import { CodeEditor } from '@/ui/CodeEditor';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
 import { SaveOutcome, type Outcome } from '../files/SaveOutcome';
+import { UploadedFile } from '../files/UploadedFile';
 import type { Place } from '../files/place';
 import shared from '../organise.module.css';
 import { useFileWrite, useOwnFile } from './file-hooks';
@@ -19,7 +20,7 @@ const PATH = 'statement.md';
  * `statement.md`, the text contestants read, beside the same rendering their
  * task page gives it. The statement is the task admin's, so a manager reads
  * it here and changes nothing. A save is the save of the task, answered as
- * any other.
+ * any other. A statement that is an upload shows as one, never as text.
  */
 export function StatementEditor({ place, admin }: { place: Place; admin: boolean }) {
   const query = useOwnFile(place, PATH);
@@ -40,6 +41,17 @@ export function StatementEditor({ place, admin }: { place: Place; admin: boolean
       <ErrorBlock
         error={toApiError(query.error)}
         onRetry={() => void query.refetch()}
+      />
+    );
+  }
+
+  if (query.data.upload) {
+    return (
+      <UploadedFile
+        place={place}
+        path={PATH}
+        upload={query.data.upload}
+        token={query.data.token}
       />
     );
   }

@@ -8,7 +8,10 @@ import { TASK_API, publicationList, repoFiles, taskState } from '@/test/organise
 
 const STATEMENT = '# Sum\n\nWrite the sum of two numbers.\n';
 
-function statementBackend(answer: () => Response) {
+function statementBackend(
+  answer: () => Response,
+  upload: { size: number; digest: string } | null = null,
+) {
   const sent: { content: string; token: string }[] = [];
   server.use(
     signedIn,
@@ -21,6 +24,7 @@ function statementBackend(answer: () => Response) {
             encoding: 'utf-8',
             content: STATEMENT,
             token: 'token-statement',
+            upload,
           })
         : undefined,
     ),
@@ -34,6 +38,18 @@ function statementBackend(answer: () => Response) {
 }
 
 describe('the statement beside its preview', { timeout: 20_000 }, () => {
+  it('shows a statement that is an upload by its size and digest, never as text', async () => {
+    statementBackend(() => HttpResponse.json({}), { size: 40, digest: 'c'.repeat(64) });
+    renderApp('/orgs/acme/contests/spring/tasks/sum');
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Edit the statement' }),
+    );
+
+    const shown = await screen.findByRole('region', { name: 'Uploaded statement.md' });
+    expect(within(shown).getByText('c'.repeat(64))).toBeVisible();
+    expect(screen.queryByRole('textbox', { name: 'Statement source' })).toBeNull();
+  });
+
   it('lets an admin edit the statement and shows it as contestants will', async () => {
     const { sent } = statementBackend(() =>
       HttpResponse.json({ number: 3, grading_changed: false, changes: [], notes: [] }),

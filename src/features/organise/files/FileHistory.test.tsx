@@ -21,6 +21,11 @@ const LATEST = '3c4d5e6f7a8b9c0d1e2f';
 /** Publication 2's version, and publication 1's. */
 const SECOND = publications[1]?.version ?? '';
 const FIRST = publications[0]?.version ?? '';
+/** What an uploaded file's commit holds: a pointer to its bytes. */
+const POINTER = `version https://git-lfs.github.com/spec/v1
+oid sha256:${'a'.repeat(64)}
+size 2048
+`;
 
 const changes: Change[] = [
   {
@@ -126,6 +131,33 @@ describe("a task file's history", () => {
     expect(old).toHaveValue('name: sum\n');
     expect(old).toHaveAttribute('readonly');
     expect(at).toBe(SECOND);
+  });
+
+  it('shows an older version of an uploaded file by its size and digest', async () => {
+    history();
+    server.use(
+      http.get(`${TASK_API}/files/:path`, ({ request }) =>
+        new URL(request.url).searchParams.get('at') === null
+          ? undefined
+          : HttpResponse.json({
+              path: 'task.yaml',
+              encoding: 'utf-8',
+              content: POINTER,
+              token: 'token-old',
+              upload: { size: 2048, digest: 'a'.repeat(64) },
+            }),
+      ),
+    );
+    const list = await openHistory();
+    await userEvent.click(
+      list.getByRole('button', { name: 'View task.yaml at 2b3c4d5' }),
+    );
+
+    const old = await screen.findByRole('region', { name: 'task.yaml at 2b3c4d5' });
+    expect(within(old).getByText('a'.repeat(64))).toBeVisible();
+    expect(within(old).getByText(/^2 KB \(2.048 bytes\)$/)).toBeVisible();
+    expect(screen.queryByRole('textbox', { name: 'task.yaml at 2b3c4d5' })).toBeNull();
+    expect(within(old).queryByRole('button', { name: 'Upload again' })).toBeNull();
   });
 
   it('rolls back after asking, as a save whose answer the editor shows', async () => {
