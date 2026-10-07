@@ -309,7 +309,11 @@ removing one by id and taking an entry holding a mapping (other than
 `{secret: ...}`) as the contestant's form details and anything else as a
 value. Its test groups are the folders under `tests/` and
 the groups the file names: a folder with no entry is added at the next save,
-and an entry with no folder is marked and may be removed. A form save refused
+and an entry with no folder is marked and may be removed. Once the task has
+a graded submission (`graded` from `GET <task>/workflow-form`), a group the
+save adds must say its `show`, which the save refuses otherwise (T10): the
+field is required and says so, and the groups already in the file are left
+as they are. A form save refused
 as a `conflict` reads the file again and shows the organiser's version and the
 current one field by field, with a choice per field that starts on the side
 that changed it; nothing is written until they save, which writes the chosen fields
