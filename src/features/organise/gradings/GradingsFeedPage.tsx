@@ -38,17 +38,15 @@ const USERNAME_MAX = 40;
 
 type ContestPath = { org: string; contest: string };
 
-/** The contest's tasks in its order, by letter and name, for the filter. */
+/**
+ * The contest's tasks by name, for the filter. The rows carry each task's
+ * letter, so the feed reads nothing else for one.
+ */
 function useTasks(path: ContestPath) {
-  const query = $api.useQuery(
-    'get',
-    '/api/v1/orgs/{org}/contests/{contest}/organise/tasks',
-    { params: { path } },
-  );
-  return (query.data ?? []).map((standing) => ({
-    value: standing.task.name,
-    label: `${standing.label} · ${standing.task.name}`,
-  }));
+  const query = $api.useQuery('get', '/api/v1/orgs/{org}/contests/{contest}/tasks', {
+    params: { path },
+  });
+  return (query.data ?? []).map((task) => ({ value: task.name, label: task.name }));
 }
 
 /** The contest's teams, for the filter; none in a contest without teams. */

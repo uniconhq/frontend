@@ -341,13 +341,15 @@ errors at its YAML path and leaves the tasks by name alone.
 The contest's Gradings page (`gradings/`) lists every grading of its tasks
 newest first, each submission once by its task, who made it and its number,
 never by when it was made, headed by its highest attempt, with its earlier
-attempts opening below it: the
-attempt, the publication it graded against, the status with the reason a
-system error gave and the sentence a cancel told the contestant, what a
+attempts opening below it: the attempt, the publication it graded against,
+the status with the reason a system error gave and the sentence a cancel
+told the contestant, what a
 finished run came to, its log, and when it was queued, started and finished.
 Above it are how many gradings wait, queued and waiting for a machine, and
 filters by task, status, team and a contestant's username, kept in the
-address so a link or a reload keeps them; a username applies once sent. The
+address so a link or a reload keeps them; a username applies once sent. Each
+row carries its task's letter, so the page reads no task's standing for one;
+the task filter lists the contest's tasks by name (`GET <contest>/tasks`). The
 live stream marks the feed and the queue stale as gradings move; while it is
 not open both are read again every ten seconds while one is still to finish.
 A manager of a row's task acts only on the submission's latest attempt, as
