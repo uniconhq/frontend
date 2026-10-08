@@ -23,6 +23,19 @@ describe('formatExact', () => {
       new Intl.NumberFormat(undefined, { maximumFractionDigits: 4 }).format(28.3333),
     );
   });
+
+  it('groups the whole part and keeps every digit past what a float holds', () => {
+    const grouped = new Intl.NumberFormat().format(1234567);
+    expect(formatExact('1234567.25')).toBe(
+      new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(1234567.25),
+    );
+    expect(formatExact('-1234567')).toBe(`-${grouped}`);
+    expect(formatExact('100000000000000000001.25', 1)).toBe(
+      `${new Intl.NumberFormat().format(100000000000000000001n)}${
+        new Intl.NumberFormat().formatToParts(0.5)[1]?.value ?? '.'
+      }3`,
+    );
+  });
 });
 
 describe('placesToTell', () => {
