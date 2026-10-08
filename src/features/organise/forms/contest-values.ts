@@ -23,6 +23,7 @@ export type ContestValues = {
   code: string;
   capacity: string;
   teamSize: string;
+  onSystemError: string;
   /** The task entries in the order the form shows them. */
   tasks: TaskEntryValues[];
   boards: BoardValues[];
@@ -108,6 +109,7 @@ export function readContest(doc: Doc): ContestRead {
       code: isRecord(registration) ? at('registration', 'code') : '',
       capacity: isRecord(registration) ? at('registration', 'capacity') : '',
       teamSize: at('team_size'),
+      onSystemError: at('on_system_error'),
       tasks: entries.map((entry, index) => ({
         id: String(entry['id']),
         at: index,
@@ -168,6 +170,7 @@ export function writeContest(
   put(['start'], before.start, after.start, time);
   put(['end'], before.end, after.end, time);
   put(['team_size'], before.teamSize, after.teamSize, number);
+  put(['on_system_error'], before.onSystemError, after.onSystemError, text);
 
   // The list in its new order first, each entry moving with its comments;
   // then each entry's fields, at the entry's new place.

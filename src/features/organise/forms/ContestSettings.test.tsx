@@ -108,6 +108,10 @@ describe('the contest settings form', { timeout: 20_000 }, () => {
     fill(field('A marks'), '2');
     fill(field('End'), '2026-06-01T23:30');
     fill(field('Team size'), '3');
+    await userEvent.selectOptions(
+      field('A submission whose grading broke counts as'),
+      'last_result',
+    );
     fill(field('B worth'), '70');
     fill(field('B due'), '2026-06-01T20:00');
     fill(field('B taken off per late day'), '0.1');
@@ -146,6 +150,7 @@ describe('the contest settings form', { timeout: 20_000 }, () => {
         },
       ],
       team_size: 3,
+      on_system_error: 'last_result',
     });
     expect(write?.content).toContain("# the page's title");
     expect(write?.content).toContain('leaderboards:\n  - name: Standings\n');
