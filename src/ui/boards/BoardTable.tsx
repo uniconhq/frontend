@@ -64,7 +64,8 @@ function NotInView({ board }: { board: Board }) {
  * says how many of its submissions are still grading and which it counts,
  * each a link where `submissionTo` gives one, and is marked `ownLabel`.
  * `everyRow` is for organisers, whose rows all carry that, so none is marked.
- * A board whose scope shows nothing yet reads "Shown from" its time. `title`
+ * A board whose scope shows nothing yet reads "Shown from" its time, or, with
+ * none of its tasks released and so no time to name, says that. `title`
  * names the board's heading and table, its name unless given.
  */
 export function BoardTable({
@@ -89,12 +90,14 @@ export function BoardTable({
       </PageLink>
     );
 
-  if (board.shown_at !== null) {
+  if (board.nothing_shown) {
     return (
       <section className={classes.board} aria-label={title}>
         <SectionTitle>{title}</SectionTitle>
         <BodyText tone="secondary">
-          Shown from {formatDateTime(new Date(board.shown_at))}.
+          {board.shown_at === null
+            ? 'None of the tasks on this board is released yet.'
+            : `Shown from ${formatDateTime(new Date(board.shown_at))}.`}
         </BodyText>
       </section>
     );

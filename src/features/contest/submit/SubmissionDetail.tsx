@@ -20,7 +20,7 @@ import {
   valueText,
   verdictOf,
 } from './grading';
-import { OnceValues } from './Results';
+import { FoldedValues, OnceValues } from './Results';
 import shared from '../contest.module.css';
 import classes from './submit.module.css';
 
@@ -154,6 +154,7 @@ function Grading({ grading }: { grading: GradingResult }) {
         </BodyText>
       )}
       <OnceValues values={grading.values} />
+      <FoldedValues folded={grading.folded} />
       {grading.groups.map((group) => (
         <Group key={group.group} group={group} />
       ))}

@@ -6,6 +6,7 @@ import type { Marks } from '@/api/types';
 import { accepted, grading, submission, TASK_API, taskPage } from '@/test/contestant';
 import { renderApp } from '@/test/render';
 import { problem, server, signedIn } from '@/test/server';
+import { passTime, withFakeTimers } from '@/test/timers';
 
 const PAGE = '/contests/acme/spring/tasks/sum';
 
@@ -29,7 +30,9 @@ function marksHeld(start: Partial<Marks> = {}) {
   };
   const answer = () => HttpResponse.json({ ...held, numbers: [...held.numbers] });
   return [
-    http.get(`${TASK_API}/page`, () => HttpResponse.json(taskPage)),
+    http.get(`${TASK_API}/page`, () =>
+      HttpResponse.json({ ...taskPage, marks: held.most }),
+    ),
     http.get(`${TASK_API}/submissions`, () => HttpResponse.json(listed)),
     http.get(`${TASK_API}/marks`, answer),
     http.put(`${TASK_API}/marks/:number`, ({ params }) => {
@@ -104,6 +107,44 @@ describe("a contestant's marks", () => {
 
     const list = await screen.findByRole('table', { name: 'Your submissions' });
     expect(within(list).queryByRole('columnheader', { name: 'Mark' })).toBeNull();
+    expect(within(list).queryByRole('checkbox')).toBeNull();
+  });
+});
+
+describe('marks on a task no board counts them on', () => {
+  withFakeTimers();
+
+  function readsOfMarks(page: typeof taskPage) {
+    const seen = { reads: 0 };
+    server.use(
+      signedIn,
+      http.get(`${TASK_API}/page`, () => HttpResponse.json(page)),
+      http.get(`${TASK_API}/submissions`, () => HttpResponse.json(listed)),
+      http.get(`${TASK_API}/marks`, () => {
+        seen.reads += 1;
+        return problem(409, 'marks_off');
+      }),
+    );
+    return seen;
+  }
+
+  it('are not asked for where the task page says the task takes none', async () => {
+    const seen = readsOfMarks(taskPage);
+    renderApp(PAGE);
+
+    await screen.findByRole('table', { name: 'Your submissions' });
+    await passTime(120_000);
+    expect(seen.reads).toBe(0);
+  });
+
+  it('are asked for once, not again, where the settings changed under the page', async () => {
+    const seen = readsOfMarks({ ...taskPage, marks: 1 });
+    renderApp(PAGE);
+
+    const list = await screen.findByRole('table', { name: 'Your submissions' });
+    await waitFor(() => expect(seen.reads).toBe(1));
+    await passTime(120_000);
+    expect(seen.reads).toBe(1);
     expect(within(list).queryByRole('checkbox')).toBeNull();
   });
 });

@@ -32,15 +32,21 @@ export function rounded(exact: string, places: number): string {
   return rounded(negative ? `-${cut}` : cut, places);
 }
 
-const grouped = new Intl.NumberFormat(undefined, { maximumFractionDigits: 100 });
+const locale = new Intl.NumberFormat();
+const decimalSign =
+  locale.formatToParts(0.5).find((part) => part.type === 'decimal')?.value ?? '.';
 
 /**
- * `exact` for reading, rounded to at most `places` decimals and grouped the
- * way the reader's locale writes numbers. The grouping reads the rounded
- * digits as a string, so a number past what a float holds is shown whole.
+ * `exact` for reading, rounded to at most `places` decimals and written the
+ * way the reader's locale writes numbers. Its whole part is grouped as an
+ * integer and its decimals kept as digits, so a number past what a float
+ * holds is shown whole.
  */
 export function formatExact(exact: string, places = 4): string {
-  return grouped.format(rounded(exact, places) as Intl.StringNumericLiteral);
+  const { negative, whole, fraction } = partsOf(rounded(exact, places));
+  const grouped = locale.format(BigInt(whole));
+  const digits = fraction === '' ? grouped : `${grouped}${decimalSign}${fraction}`;
+  return negative ? `-${digits}` : digits;
 }
 
 /**

@@ -1,4 +1,5 @@
 import type { GradingResult, Reported } from '@/api/types';
+import { formatExact } from '@/lib/exact';
 import { BodyText } from '@/ui/BodyText';
 import { VerdictBadge } from '@/ui/VerdictBadge';
 import { cancelReason, valueText, verdictOf } from './grading';
@@ -51,5 +52,25 @@ export function OnceValues({ values }: { values: Reported }) {
           </div>
         ))}
     </>
+  );
+}
+
+/**
+ * The task's folds over what the reader is shown of the run, such as the
+ * longest time over its tests: each by name, as an exact number. Nothing
+ * when the task folds nothing or none is shown yet.
+ */
+export function FoldedValues({ folded }: { folded: Record<string, string> }) {
+  const names = Object.keys(folded);
+  if (names.length === 0) return null;
+  return (
+    <dl className={classes.metrics} aria-label="Over the tests">
+      {names.map((name) => (
+        <div key={name} className={classes.metric}>
+          <dt>{name}</dt>
+          <dd>{formatExact(folded[name] ?? '0')}</dd>
+        </div>
+      ))}
+    </dl>
   );
 }

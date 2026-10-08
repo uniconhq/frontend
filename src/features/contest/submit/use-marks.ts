@@ -17,7 +17,11 @@ const MARK = '/api/v1/orgs/{org}/contests/{contest}/tasks/{task}/marks/{number}'
  */
 const MEANWHILE_MS = 30_000;
 
-function readAgainIn(marks: Marks | undefined): number | false {
+/** The refusals that say there is nothing to mark, which no wait changes. */
+const NOTHING_TO_MARK = new Set(['marks_off', 'not_approved']);
+
+function readAgainIn(marks: Marks | undefined, error: unknown): number | false {
+  if (error !== null && NOTHING_TO_MARK.has(toApiError(error).code)) return false;
   if (marks === undefined) return MEANWHILE_MS;
   if (marks.frozen) return false;
   const left = Date.parse(marks.closes_at) - serverNow().getTime();
@@ -37,19 +41,22 @@ export type MarkState =
 
 /**
  * The marks the reader's row holds on a task its `marked` boards count, and
- * a way to set or take one off. A task no such board covers answers
- * `marks_off`, and a reader who is no approved contestant `not_approved`;
- * both mean there is nothing to mark. A refused mark, such as one past the
- * task's `marks`, is kept to be said until the next toggle.
+ * a way to set or take one off, read only where the task page says the row
+ * may mark (`marked`). Should the settings change under the page, a task no
+ * such board covers answers `marks_off`, and a reader who is no approved
+ * contestant `not_approved`; both mean there is nothing to mark. A refused
+ * mark, such as one past the task's `marks`, is kept to be said until the
+ * next toggle.
  */
-export function useMarks(path: TaskPath): MarkState {
+export function useMarks(path: TaskPath, marked: boolean): MarkState {
   const queryClient = useQueryClient();
   const [refusal, setRefusal] = useState<ApiError | null>(null);
   const options = { params: { path } };
   const view = queryView(
     $api.useQuery('get', MARKS, options, {
+      enabled: marked,
       retry: false,
-      refetchInterval: (query) => readAgainIn(query.state.data),
+      refetchInterval: (query) => readAgainIn(query.state.data, query.state.error),
     }),
   );
   const key = $api.queryOptions('get', MARKS, options).queryKey;

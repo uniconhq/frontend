@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { $api } from '@/api/query';
+import { BY_DEVICE, useServerTime } from '@/api/use-server-time';
 import { BodyText } from '@/ui/BodyText';
 import { formatDuration, serverNow } from '@/lib/time';
 
@@ -18,7 +18,8 @@ function phaseAt(at: number, due: number | null, closes: number | null): Phase {
  * them, by the server's clock: `due` and `closes` are the row's own, its
  * extension on the task included. Past the due, a submission is still taken
  * and is late, and it says so. Like the contest's countdown it counts nothing
- * until the server's time is in, and calls `onBoundary` as it crosses the due
+ * until the server's time is asked for, says so when it goes by the browser's
+ * clock because that did not come in, and calls `onBoundary` as it crosses the due
  * or the close, when what the server takes changes.
  */
 export function TaskCountdown({
@@ -30,7 +31,7 @@ export function TaskCountdown({
   closes: string | null;
   onBoundary?: () => void;
 }) {
-  const measured = $api.useQuery('get', '/api/v1/time').isFetched;
+  const { measured, byDevice } = useServerTime();
   const [, setTicks] = useState(0);
 
   useEffect(() => {
@@ -70,6 +71,7 @@ export function TaskCountdown({
           {text}
         </BodyText>
       ))}
+      {byDevice && <BodyText tone="secondary">{BY_DEVICE}</BodyText>}
     </div>
   );
 }

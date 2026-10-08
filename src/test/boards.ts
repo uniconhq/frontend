@@ -68,6 +68,7 @@ export function icpc(overrides: Partial<Board> = {}): Board {
       }),
       row(3, 30, 'carol', ['0', null], { sum: cell(), max: cell() }),
     ],
+    nothing_shown: false,
     shown_at: null,
     ...overrides,
   };
@@ -83,8 +84,12 @@ export const hiddenUntilClose: Board = {
   tasks: [],
   not_in_view: [],
   rows: [],
+  nothing_shown: true,
   shown_at: '2026-09-12T10:30:00Z',
 };
+
+/** A board none of whose tasks is released yet, so nothing names a time. */
+export const nothingReleased: Board = { ...hiddenUntilClose, shown_at: null };
 
 /** A board as organisers read it, with nothing it asks left unmet. */
 export function organised(now: Board, final: Board = now): OrganisedBoard {

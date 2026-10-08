@@ -7,12 +7,15 @@ import type { Ref } from 'react';
  * and `maxLength`, when given, is the most characters the field takes.
  * `inputMode="decimal"` asks a phone for its number keys, for a field that
  * takes a number. `ref` is the input itself, for moving the focus to it.
+ * `error`, when given, is what the server refused about the field: it reads
+ * under it and marks the field invalid.
  */
 export function TextInput({
   label,
   value,
   onChange,
   description,
+  error,
   required = false,
   maxLength,
   inputMode,
@@ -23,6 +26,7 @@ export function TextInput({
   value: string;
   onChange: (value: string) => void;
   description?: string;
+  error?: string;
   required?: boolean;
   maxLength?: number;
   inputMode?: 'decimal';
@@ -34,6 +38,7 @@ export function TextInput({
       ref={ref}
       label={label}
       description={description}
+      error={error}
       value={value}
       onChange={(event) => onChange(event.currentTarget.value)}
       required={required}
