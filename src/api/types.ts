@@ -58,6 +58,8 @@ export type Reported = Schemas['Reported'];
 /** One test's row of a result, with its credit once scored. */
 export type GradedTest = Schemas['GradedTest'];
 export type Grading = Schemas['Grading'];
+/** Who has a broken attempt count as its submission's last good result. */
+export type Fallback = NonNullable<Grading['fallback']>;
 export type Rejudged = Schemas['Rejudged'];
 /** One attempt in a contest's gradings feed, with its task and who submitted. */
 export type FeedEntry = Schemas['FeedEntry'];

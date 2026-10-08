@@ -1497,6 +1497,39 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/orgs/{org}/contests/{contest}/tasks/{task}/gradings/{grading}/fallback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Count a broken grading's submission as its last good result
+         * @description The grading as it now stands, its `fallback` `staff`: its submission
+         *     counts as `last_good`, the latest earlier attempt that finished with a
+         *     result, whatever the contest's `on_system_error` says, on the boards,
+         *     to its contestant and under the task's limit. Asked again, it changes
+         *     nothing. A grading that is neither a system error nor staff cancelled is
+         *     `wrong_status` with its status as `current`; an earlier attempt of a
+         *     submission graded again, and a submission with no earlier result, are
+         *     `conflict`.
+         */
+        put: operations["fallBackGrading"];
+        post?: never;
+        /**
+         * Take back staff's fallback on a grading
+         * @description The grading as it now stands, its submission counting as the contest's
+         *     `on_system_error` says. A grading with no fallback of staff's changes
+         *     nothing.
+         */
+        delete: operations["clearGradingFallback"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/orgs/{org}/contests/{contest}/tasks/{task}/gradings/{grading}/log": {
         parameters: {
             query?: never;
@@ -2896,6 +2929,14 @@ export interface components {
             tasks?: string[] | null;
         };
         /**
+         * Fallback
+         * @description Why a submission counts as its last good result in place of its
+         *     latest attempt, a system error or staff cancelled: staff asked so on
+         *     that attempt, or the contest's `on_system_error` says so.
+         * @enum {string}
+         */
+        Fallback: "staff" | "contest";
+        /**
          * FeedEntry
          * @description One grading among a task's or a contest's: the grading as an
          *     organiser reads it, its task by name, null for a task the platform has
@@ -2993,6 +3034,13 @@ export interface components {
          *     cancel or retry, where it stands, the reason it failed, the sentence
          *     staff cancelled it with, its result, whether its log was written, the
          *     last progress its run reported, and its times.
+         *
+         *     On a latest attempt that is a system error or staff cancelled,
+         *     `last_good` is the latest earlier attempt that finished with a result,
+         *     and `fallback` why its submission counts as that attempt now: `staff`,
+         *     who asked so on this one, or `contest`, whose `on_system_error` is
+         *     `last_result`; null while it counts as still grading, or void once
+         *     cancelled. `falls_back` is staff having asked so on this one.
          */
         Grading: {
             /** Attempt */
@@ -3005,6 +3053,9 @@ export interface components {
             dispatched_at: string | null;
             /** Error */
             error: string | null;
+            fallback: components["schemas"]["Fallback"] | null;
+            /** Falls Back */
+            falls_back: boolean;
             /** Finished At */
             finished_at: string | null;
             /**
@@ -3012,6 +3063,8 @@ export interface components {
              * Format: uuid
              */
             id: string;
+            /** Last Good */
+            last_good: number | null;
             /** Latest */
             latest: boolean;
             /** Log */
@@ -7287,6 +7340,74 @@ export interface operations {
                 "application/json": components["schemas"]["CancelRequest"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Grading"];
+                };
+            };
+            /** @description An error, as an RFC 9457 problem document. `code` names it. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    fallBackGrading: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                contest: string;
+                grading: string;
+                org: string;
+                task: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Grading"];
+                };
+            };
+            /** @description An error, as an RFC 9457 problem document. `code` names it. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    clearGradingFallback: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                contest: string;
+                grading: string;
+                org: string;
+                task: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {
