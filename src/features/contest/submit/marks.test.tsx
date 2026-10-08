@@ -30,7 +30,9 @@ function marksHeld(start: Partial<Marks> = {}) {
   };
   const answer = () => HttpResponse.json({ ...held, numbers: [...held.numbers] });
   return [
-    http.get(`${TASK_API}/page`, () => HttpResponse.json(taskPage)),
+    http.get(`${TASK_API}/page`, () =>
+      HttpResponse.json({ ...taskPage, marks: held.most }),
+    ),
     http.get(`${TASK_API}/submissions`, () => HttpResponse.json(listed)),
     http.get(`${TASK_API}/marks`, answer),
     http.put(`${TASK_API}/marks/:number`, ({ params }) => {
@@ -112,22 +114,37 @@ describe("a contestant's marks", () => {
 describe('marks on a task no board counts them on', () => {
   withFakeTimers();
 
-  it('are asked for once, not again while the page stays open', async () => {
-    let reads = 0;
+  function readsOfMarks(page: typeof taskPage) {
+    const seen = { reads: 0 };
     server.use(
       signedIn,
-      http.get(`${TASK_API}/page`, () => HttpResponse.json(taskPage)),
+      http.get(`${TASK_API}/page`, () => HttpResponse.json(page)),
       http.get(`${TASK_API}/submissions`, () => HttpResponse.json(listed)),
       http.get(`${TASK_API}/marks`, () => {
-        reads += 1;
+        seen.reads += 1;
         return problem(409, 'marks_off');
       }),
     );
+    return seen;
+  }
+
+  it('are not asked for where the task page says the task takes none', async () => {
+    const seen = readsOfMarks(taskPage);
     renderApp(PAGE);
 
     await screen.findByRole('table', { name: 'Your submissions' });
-    await waitFor(() => expect(reads).toBe(1));
     await passTime(120_000);
-    expect(reads).toBe(1);
+    expect(seen.reads).toBe(0);
+  });
+
+  it('are asked for once, not again, where the settings changed under the page', async () => {
+    const seen = readsOfMarks({ ...taskPage, marks: 1 });
+    renderApp(PAGE);
+
+    const list = await screen.findByRole('table', { name: 'Your submissions' });
+    await waitFor(() => expect(seen.reads).toBe(1));
+    await passTime(120_000);
+    expect(seen.reads).toBe(1);
+    expect(within(list).queryByRole('checkbox')).toBeNull();
   });
 });

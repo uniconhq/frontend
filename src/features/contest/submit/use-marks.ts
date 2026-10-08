@@ -41,17 +41,20 @@ export type MarkState =
 
 /**
  * The marks the reader's row holds on a task its `marked` boards count, and
- * a way to set or take one off. A task no such board covers answers
- * `marks_off`, and a reader who is no approved contestant `not_approved`;
- * both mean there is nothing to mark. A refused mark, such as one past the
- * task's `marks`, is kept to be said until the next toggle.
+ * a way to set or take one off, read only where the task page says the row
+ * may mark (`marked`). Should the settings change under the page, a task no
+ * such board covers answers `marks_off`, and a reader who is no approved
+ * contestant `not_approved`; both mean there is nothing to mark. A refused
+ * mark, such as one past the task's `marks`, is kept to be said until the
+ * next toggle.
  */
-export function useMarks(path: TaskPath): MarkState {
+export function useMarks(path: TaskPath, marked: boolean): MarkState {
   const queryClient = useQueryClient();
   const [refusal, setRefusal] = useState<ApiError | null>(null);
   const options = { params: { path } };
   const view = queryView(
     $api.useQuery('get', MARKS, options, {
+      enabled: marked,
       retry: false,
       refetchInterval: (query) => readAgainIn(query.state.data, query.state.error),
     }),

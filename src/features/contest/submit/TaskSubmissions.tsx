@@ -135,7 +135,12 @@ export function TaskSubmissions({
       <Card>
         <div className={shared.stack}>
           <SectionTitle>Your submissions</SectionTitle>
-          <SubmissionList org={org} contest={contest} task={task} />
+          <SubmissionList
+            org={org}
+            contest={contest}
+            task={task}
+            marked={page.marks !== null}
+          />
         </div>
       </Card>
     </>

@@ -58,10 +58,13 @@ export function SubmissionList({
   org,
   contest,
   task,
+  marked,
 }: {
   org: string;
   contest: string;
   task: string;
+  /** Whether the task page says the reader's row may mark submissions here. */
+  marked: boolean;
 }) {
   const live = useLiveConnected();
   const refused = useLiveRefused();
@@ -78,7 +81,7 @@ export function SubmissionList({
   );
 
   const said = useJustFinished(view.state === 'ready' ? view.data : undefined);
-  const marks = useMarks({ org, contest, task });
+  const marks = useMarks({ org, contest, task }, marked);
 
   return (
     <>
