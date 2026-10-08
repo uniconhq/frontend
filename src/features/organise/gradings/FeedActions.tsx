@@ -17,7 +17,9 @@ const REASON_MAX = 500;
  * What a latest attempt offers a manager of its task: Retry once it has
  * finished, drawn as the thing to do for a system error, and Cancel for a
  * system error alone. A submission staff cancelled is offered neither, since
- * a cancel is final.
+ * a cancel is final. A broken attempt with an earlier result offers Fall back
+ * while nothing counts that result, and Clear fallback while staff's own
+ * fallback does; the contest's own needs nothing here.
  */
 export function AttemptActions({
   task,
@@ -30,7 +32,7 @@ export function AttemptActions({
   name: string;
   onAsk: (asking: Asking) => void;
 }) {
-  const { status } = entry.grading;
+  const { status, last_good: lastGood, fallback } = entry.grading;
   return (
     <div className={classes.actions}>
       {!UNFINISHED.has(status) && status !== 'cancelled' && (
@@ -53,6 +55,26 @@ export function AttemptActions({
           Cancel
         </Button>
       )}
+      {lastGood !== null && fallback === null && (
+        <Button
+          size="xs"
+          variant="secondary"
+          label={`Fall back ${name} to attempt ${String(lastGood)}`}
+          onClick={() => onAsk({ kind: 'fallBack', task, entry })}
+        >
+          Fall back
+        </Button>
+      )}
+      {lastGood !== null && fallback === 'staff' && (
+        <Button
+          size="xs"
+          variant="secondary"
+          label={`Clear the fallback on ${name}`}
+          onClick={() => onAsk({ kind: 'clearFallback', task, entry })}
+        >
+          Clear fallback
+        </Button>
+      )}
     </div>
   );
 }
@@ -60,12 +82,16 @@ export function AttemptActions({
 const TITLE: Record<Asking['kind'], string> = {
   retry: 'Retry this grading?',
   cancel: 'Cancel this submission?',
+  fallBack: 'Fall back to the last good result?',
+  clearFallback: 'Clear the fallback?',
   rejudge: 'Rejudge every submission of this task?',
 };
 
 const CONFIRM: Record<Asking['kind'], string> = {
   retry: 'Retry',
   cancel: 'Cancel the submission',
+  fallBack: 'Fall back',
+  clearFallback: 'Clear the fallback',
   rejudge: 'Rejudge',
 };
 
@@ -88,6 +114,32 @@ function Consequence({ asking }: { asking: Asking }) {
   }
   const { grading } = asking.entry;
   const submission = `${submitterOf(asking.entry.by)}'s submission ${String(grading.submission_number)}`;
+  if (asking.kind === 'fallBack') {
+    return (
+      <>
+        <BodyText>
+          {submission} to {asking.task} counts as attempt {grading.last_good}, its last
+          attempt that finished with a result, in place of attempt {grading.attempt}: on
+          the boards, to its contestant and under the task&apos;s limit.
+        </BodyText>
+        <BodyText tone="secondary">
+          A cancel keeps that result. Clear the fallback to count the submission as the
+          contest&apos;s settings say again.
+        </BodyText>
+      </>
+    );
+  }
+  if (asking.kind === 'clearFallback') {
+    return (
+      <>
+        <BodyText>
+          {submission} to {asking.task} counts as the contest&apos;s settings say again:
+          still being graded while attempt {grading.attempt} is a system error, and void
+          once it is cancelled, unless the contest counts the last good result.
+        </BodyText>
+      </>
+    );
+  }
   if (asking.kind === 'retry') {
     return (
       <>
@@ -103,11 +155,19 @@ function Consequence({ asking }: { asking: Asking }) {
   }
   return (
     <>
-      <BodyText>
-        {submission} to {asking.task} ends as cancelled. Its contestant reads the
-        sentence below in place of a result, and the submission no longer counts against
-        the task&apos;s limit.
-      </BodyText>
+      {grading.fallback === null ? (
+        <BodyText>
+          {submission} to {asking.task} ends as cancelled. Its contestant reads the
+          sentence below in place of a result, and the submission no longer counts
+          against the task&apos;s limit.
+        </BodyText>
+      ) : (
+        <BodyText>
+          Attempt {grading.attempt} of {submission} to {asking.task} ends as cancelled.
+          While the fallback holds, the submission keeps counting as attempt{' '}
+          {grading.last_good}, its last good result, and its contestant reads that.
+        </BodyText>
+      )}
       <BodyText tone="secondary">
         A cancel is final: neither a retry nor a rejudge grades it again.
       </BodyText>
@@ -149,9 +209,24 @@ const RETRY_REFUSED: Words = {
   },
 };
 
+const FALL_BACK_REFUSED: Words = {
+  wrong_status: {
+    title: 'It is not broken',
+    fallback:
+      'Only a grading that reads as a system error, or one staff cancelled, falls back.',
+  },
+  conflict: {
+    title: 'Nothing to fall back to',
+    fallback:
+      'Only the latest attempt falls back, and only to an earlier attempt that finished with a result.',
+  },
+};
+
 const REFUSED: Record<Asking['kind'], Words> = {
   cancel: CANCEL_REFUSED,
   retry: RETRY_REFUSED,
+  fallBack: FALL_BACK_REFUSED,
+  clearFallback: {},
   rejudge: {},
 };
 

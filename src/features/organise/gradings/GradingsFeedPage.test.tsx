@@ -41,6 +41,9 @@ const grading: Grading = {
   finished_at: '2026-10-05T10:01:00Z',
   deadline_at: null,
   cancel_reason: null,
+  falls_back: false,
+  last_good: null,
+  fallback: null,
 };
 
 const ada = { user_id: 11, name: 'ada', team: null };
@@ -520,6 +523,100 @@ describe('acting on the feed', () => {
     ).toBeVisible();
     expect(
       screen.queryByRole('button', { name: 'Retry A submission 1 by ada, attempt 1' }),
+    ).toBeNull();
+  });
+
+  it('falls a broken attempt back to its last good result after asking, and clears that', async () => {
+    const broken: FeedEntry = {
+      ...retried,
+      grading: { ...stuckFirst.grading, id: 'g-sum-2', attempt: 2, last_good: 1 },
+    };
+    let now = broken;
+    const changed: string[] = [];
+    const answer = (grading: FeedEntry['grading']) => {
+      now = { ...broken, grading };
+      return HttpResponse.json(grading);
+    };
+    server.use(
+      signedIn,
+      taskList,
+      http.put(
+        `${CONTEST_API}/tasks/:task/gradings/:grading/fallback`,
+        ({ params }) => {
+          changed.push(`put ${String(params.task)}/${String(params.grading)}`);
+          return answer({ ...broken.grading, fallback: 'staff', falls_back: true });
+        },
+      ),
+      http.delete(
+        `${CONTEST_API}/tasks/:task/gradings/:grading/fallback`,
+        ({ params }) => {
+          changed.push(`delete ${String(params.task)}/${String(params.grading)}`);
+          return answer(broken.grading);
+        },
+      ),
+    );
+    feedAnswering(() => [now]);
+    const user = userEvent.setup();
+    renderApp(FEED);
+
+    const name = 'B submission 3 by ada, attempt 2';
+    await user.click(
+      await screen.findByRole('button', { name: `Fall back ${name} to attempt 1` }),
+    );
+    const asked = await screen.findByRole('dialog', {
+      name: 'Fall back to the last good result?',
+    });
+    expect(asked).toHaveTextContent(
+      "ada's submission 3 to sum counts as attempt 1, its last attempt that finished with a result, in place of attempt 2",
+    );
+    expect(changed).toEqual([]);
+    await user.click(within(asked).getByRole('button', { name: 'Fall back' }));
+
+    const group = await screen.findByRole('rowgroup', {
+      name: 'B submission 3 by ada',
+    });
+    await waitFor(() =>
+      expect(group).toHaveTextContent("Counts as attempt 1's result, as staff asked."),
+    );
+    expect(within(group).queryByRole('button', { name: /^Fall back/ })).toBeNull();
+    await user.click(
+      within(group).getByRole('button', { name: `Clear the fallback on ${name}` }),
+    );
+    const clearing = await screen.findByRole('dialog', { name: 'Clear the fallback?' });
+    await user.click(
+      within(clearing).getByRole('button', { name: 'Clear the fallback' }),
+    );
+
+    await waitFor(() => expect(group).not.toHaveTextContent('Counts as attempt 1'));
+    expect(changed).toEqual(['put sum/g-sum-2', 'delete sum/g-sum-2']);
+    expect(
+      within(group).getByRole('button', { name: `Fall back ${name} to attempt 1` }),
+    ).toBeVisible();
+  });
+
+  it("says when the contest's settings count a broken attempt's last good result", async () => {
+    server.use(signedIn, taskList);
+    feedAnswering(() => [
+      {
+        ...cancelled,
+        grading: {
+          ...cancelled.grading,
+          attempt: 2,
+          last_good: 1,
+          fallback: 'contest',
+        },
+      },
+    ]);
+    renderApp(FEED);
+
+    const group = await screen.findByRole('rowgroup', {
+      name: 'A submission 1 by ada',
+    });
+    expect(group).toHaveTextContent(
+      "Counts as attempt 1's result, as the contest's settings say.",
+    );
+    expect(
+      within(group).queryByRole('button', { name: /^(Fall back|Clear)/ }),
     ).toBeNull();
   });
 
