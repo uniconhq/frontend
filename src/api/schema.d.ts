@@ -1028,9 +1028,10 @@ export interface paths {
         };
         /**
          * Every board of the contest, now and final, with what it asks that does not hold
-         * @description Every row on both, unless a row is picked: then `now` is the board
-         *     as that row sees it, its own row and the rows its `rows` gives. A row
-         *     is a contestant or a team, never both.
+         * @description Every row on both, unless a row is picked: then only the boards that
+         *     row sees, `now` as it sees it, its own row and the rows its `rows`
+         *     gives. A row is a contestant or a team, never both; one that is not a
+         *     row of the contest is not found.
          */
         get: operations["listOrganisedBoards"];
         put?: never;
@@ -2485,8 +2486,9 @@ export interface components {
         Better: "higher" | "lower";
         /**
          * Board
-         * @description One board as the reader sees it now. `shown_at` is set, with no rows,
-         *     while its scope shows nothing yet: the time its first group is shown.
+         * @description One board as the reader sees it now. `nothing_shown` is true, with no
+         *     rows, while its scope shows nothing yet; `shown_at` is then the time its
+         *     first group is shown, null while no task it covers is released.
          */
         Board: {
             /** Board */
@@ -2495,6 +2497,8 @@ export interface components {
             keys: components["schemas"]["BoardKey"][];
             /** Not In View */
             not_in_view: components["schemas"]["NotInView"][];
+            /** Nothing Shown */
+            nothing_shown: boolean;
             over: components["schemas"]["Over"];
             /** Rows */
             rows: components["schemas"]["BoardRow"][];
@@ -2654,10 +2658,12 @@ export interface components {
         };
         /**
          * Closed
-         * @description Why a task is not open to a row, the first of these that applies.
+         * @description Why a task is not open to a row, the first of these that applies; and,
+         *     to a person who holds no approved row, `not_approved` where it is
+         *     otherwise open, as a submit would be refused.
          * @enum {string}
          */
-        Closed: "not_released" | "archived" | "closed";
+        Closed: "not_released" | "archived" | "closed" | "not_approved";
         /**
          * CommentRequest
          * @description One message under a question: a contestant's follow-up or an
@@ -3702,18 +3708,25 @@ export interface components {
          * @description The latest attempt of a submission's grading, as its contestant sees
          *     it: its id, attempt and status, and once it is done, what stopped the
          *     run, the outcome over the groups shown, each test group as its `show`
-         *     allows and the values reported once. A run that failed on the
-         *     platform's side is `running` to its contestant, with nothing else, until
-         *     staff end it: then it is `cancelled`, with `reason`, the sentence they
-         *     gave, which is null on every other status. Once done on a task that
-         *     gives points, it carries its `points` and the late `factor` they
-         *     include; both are null otherwise.
+         *     allows, the values reported once, and `folded`, each per-test value
+         *     with a fold, folded over the tests shown, a test without it counting as
+         *     its worst bound. A run that failed on the platform's side is `running`
+         *     to its contestant, with nothing else, until staff end it: then it is
+         *     `cancelled`, with `reason`, the sentence they gave, which is null on
+         *     every other status. Once done on a task that gives points, it carries
+         *     its `points` and the late `factor` they include; both are null
+         *     otherwise. While a sealed step's stop is held to the reveal, nothing of
+         *     the run is shown: every group reads as hidden.
          */
         Result: {
             /** Attempt */
             attempt: number;
             /** Factor */
             factor: string | null;
+            /** Folded */
+            folded: {
+                [key: string]: string;
+            };
             /** Groups */
             groups: components["schemas"]["GroupShown"][];
             /**
@@ -4036,8 +4049,11 @@ export interface components {
         /**
          * TaskPage
          * @description A task as the caller reads it: its statement in Markdown, the caps a
-         *     submit is counted against, the inputs a contestant gives, and when it
-         *     falls due and closes for them, and nothing else the task holds.
+         *     submit is counted against, the inputs a contestant gives, when it falls
+         *     due and closes for them, and `marks`, how many of their row's
+         *     submissions they may mark for the `marked` boards, null unless such a
+         *     board covers the task and they are an approved contestant; and nothing
+         *     else the task holds.
          */
         TaskPage: {
             /** Closes */
@@ -4048,6 +4064,8 @@ export interface components {
             inputs: components["schemas"]["InputField"][];
             /** Label */
             label: string;
+            /** Marks */
+            marks: number | null;
             /** Name */
             name: string;
             release: components["schemas"]["TaskRelease"];

@@ -647,6 +647,22 @@ describe('the submit panel', () => {
     ).toBeVisible();
     expect(screen.queryByRole('form', { name: 'Submit' })).not.toBeInTheDocument();
   });
+
+  it('says only approved contestants submit, to a reader who is not one', async () => {
+    server.use(
+      signedIn,
+      listing([]),
+      withPage({
+        release: { released: true, visible: true, open: false, closed: 'not_approved' },
+      }),
+    );
+    renderApp(PAGE);
+
+    expect(
+      await screen.findByText('Only approved contestants submit to this task.'),
+    ).toBeVisible();
+    expect(screen.queryByRole('form', { name: 'Submit' })).not.toBeInTheDocument();
+  });
 });
 
 describe('the submissions list', () => {

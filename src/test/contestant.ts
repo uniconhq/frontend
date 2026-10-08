@@ -103,6 +103,7 @@ export const taskPage: TaskPage = {
   release: OPEN,
   due: null,
   closes: '2026-09-12T10:30:00Z',
+  marks: null,
 };
 
 export const publicContest: components['schemas']['PublicContest'] = {
@@ -161,6 +162,7 @@ export function grading(overrides: Partial<GradingResult> = {}): GradingResult {
     reason: null,
     points: null,
     factor: null,
+    folded: {},
     ...overrides,
   };
 }

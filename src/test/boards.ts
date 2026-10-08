@@ -68,6 +68,7 @@ export function icpc(overrides: Partial<Board> = {}): Board {
       }),
       row(3, 30, 'carol', ['0', null], { sum: cell(), max: cell() }),
     ],
+    nothing_shown: false,
     shown_at: null,
     ...overrides,
   };
@@ -83,6 +84,7 @@ export const hiddenUntilClose: Board = {
   tasks: [],
   not_in_view: [],
   rows: [],
+  nothing_shown: true,
   shown_at: '2026-09-12T10:30:00Z',
 };
 

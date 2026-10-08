@@ -19,12 +19,14 @@ import shared from '../contest.module.css';
 /**
  * Why a task takes no submission from this person now, said where the panel
  * would be: a task is open to a row only while it is released, its contest
- * is not archived, and the row's close of it has not passed.
+ * is not archived, and the row's close of it has not passed; and only an
+ * approved contestant holds a row to submit from.
  */
 const CLOSED: Record<NonNullable<TaskRelease['closed']>, string> = {
   not_released: 'This task is not released yet.',
   archived: 'The contest is archived, so its tasks take no submissions.',
   closed: 'This task has closed for you, so it takes no more submissions from you.',
+  not_approved: 'Only approved contestants submit to this task.',
 };
 
 function closedReason(closed: TaskRelease['closed']): string {
