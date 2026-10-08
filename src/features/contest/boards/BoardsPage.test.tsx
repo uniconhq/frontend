@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { screen, within } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { formatDateTime } from '@/lib/time';
-import { hiddenUntilClose, icpc } from '@/test/boards';
+import { hiddenUntilClose, icpc, nothingReleased } from '@/test/boards';
 import { CONTEST_API, PUBLIC_API } from '@/test/contestant';
 import { renderApp } from '@/test/render';
 import { problem, server, signedIn } from '@/test/server';
@@ -114,6 +114,18 @@ describe("a contest's boards for a signed-in person", () => {
     expect(board).toHaveTextContent(
       `Shown from ${formatDateTime(new Date('2026-09-12T10:30:00Z'))}.`,
     );
+    expect(within(board).queryByRole('table')).toBeNull();
+  });
+
+  it('says when none of a board’s tasks is released yet', async () => {
+    server.use(
+      signedIn,
+      http.get(`${CONTEST_API}/boards`, () => HttpResponse.json([nothingReleased])),
+    );
+    renderApp(PAGE);
+
+    const board = await screen.findByRole('region', { name: 'Final' });
+    expect(board).toHaveTextContent('None of the tasks on this board is released yet.');
     expect(within(board).queryByRole('table')).toBeNull();
   });
 
