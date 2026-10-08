@@ -802,6 +802,7 @@ describe('a submission opened from the list', () => {
         },
       ],
       points: { shown: '100', pending: '70', pending_until: '2026-09-12T11:00:00Z' },
+      folded: { time_ms: '12.5' },
     });
     server.use(
       signedIn,
@@ -831,6 +832,9 @@ describe('a submission opened from the list', () => {
     expect(
       within(detail).getByText(/^100 points, and up to 70 more shown at /),
     ).toBeVisible();
+    expect(within(detail).getByLabelText('Over the tests')).toHaveTextContent(
+      `time_ms${formatExact('12.5')}`,
+    );
 
     const main = within(detail).getByRole('region', { name: 'Group main' });
     expect(within(main).getByText('ACCEPTED')).toBeVisible();
