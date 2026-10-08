@@ -58,7 +58,7 @@ describe('sending a file through the door', () => {
 describe('a stalled upload', () => {
   withFakeTimers();
 
-  it('is given up after half a minute of sending nothing', async () => {
+  it('is given up as cut after half a minute of sending nothing', async () => {
     server.use(http.put(DOOR, () => new Promise<never>(() => {})));
 
     const sent = sendToForge(DOOR, new File(['1'], 'main.py'), () => {});
@@ -67,7 +67,7 @@ describe('a stalled upload', () => {
 
     const error = await outcome;
     expect(isApiError(error) && error.code).toBe('upload_failed');
-    expect(wasCut(error)).toBe(false);
+    expect(wasCut(error)).toBe(true);
   });
 });
 
