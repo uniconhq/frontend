@@ -94,6 +94,22 @@ describe('a task page for a signed-in person', () => {
     const timer = await screen.findByRole('timer', { name: 'Task countdown' });
     expect(timer).toHaveTextContent(/Due in (14m 5\ds|15m 00s)/);
     expect(timer).toHaveTextContent(/Closes in (44m 5\ds|45m 00s)/);
+    expect(timer).not.toHaveTextContent("this device's clock");
+  });
+
+  it("says it counts by the device's clock when the server's time did not come in", async () => {
+    server.use(
+      signedIn,
+      noSubmissions,
+      http.get('/api/v1/time', () => problem(404, 'not_found')),
+      http.get(`${TASK_API}/page`, () => HttpResponse.json(taskPage)),
+    );
+    renderApp(PAGE);
+
+    const timer = await screen.findByRole('timer', { name: 'Task countdown' });
+    expect(timer).toHaveTextContent(
+      "Counted by this device's clock: the server's time did not come in.",
+    );
   });
 
   it('says a submission past the due is late, and still takes it', async () => {
