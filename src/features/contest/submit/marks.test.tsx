@@ -6,6 +6,7 @@ import type { Marks } from '@/api/types';
 import { accepted, grading, submission, TASK_API, taskPage } from '@/test/contestant';
 import { renderApp } from '@/test/render';
 import { problem, server, signedIn } from '@/test/server';
+import { passTime, withFakeTimers } from '@/test/timers';
 
 const PAGE = '/contests/acme/spring/tasks/sum';
 
@@ -105,5 +106,28 @@ describe("a contestant's marks", () => {
     const list = await screen.findByRole('table', { name: 'Your submissions' });
     expect(within(list).queryByRole('columnheader', { name: 'Mark' })).toBeNull();
     expect(within(list).queryByRole('checkbox')).toBeNull();
+  });
+});
+
+describe('marks on a task no board counts them on', () => {
+  withFakeTimers();
+
+  it('are asked for once, not again while the page stays open', async () => {
+    let reads = 0;
+    server.use(
+      signedIn,
+      http.get(`${TASK_API}/page`, () => HttpResponse.json(taskPage)),
+      http.get(`${TASK_API}/submissions`, () => HttpResponse.json(listed)),
+      http.get(`${TASK_API}/marks`, () => {
+        reads += 1;
+        return problem(409, 'marks_off');
+      }),
+    );
+    renderApp(PAGE);
+
+    await screen.findByRole('table', { name: 'Your submissions' });
+    await waitFor(() => expect(reads).toBe(1));
+    await passTime(120_000);
+    expect(reads).toBe(1);
   });
 });

@@ -17,7 +17,11 @@ const MARK = '/api/v1/orgs/{org}/contests/{contest}/tasks/{task}/marks/{number}'
  */
 const MEANWHILE_MS = 30_000;
 
-function readAgainIn(marks: Marks | undefined): number | false {
+/** The refusals that say there is nothing to mark, which no wait changes. */
+const NOTHING_TO_MARK = new Set(['marks_off', 'not_approved']);
+
+function readAgainIn(marks: Marks | undefined, error: unknown): number | false {
+  if (error !== null && NOTHING_TO_MARK.has(toApiError(error).code)) return false;
   if (marks === undefined) return MEANWHILE_MS;
   if (marks.frozen) return false;
   const left = Date.parse(marks.closes_at) - serverNow().getTime();
@@ -49,7 +53,7 @@ export function useMarks(path: TaskPath): MarkState {
   const view = queryView(
     $api.useQuery('get', MARKS, options, {
       retry: false,
-      refetchInterval: (query) => readAgainIn(query.state.data),
+      refetchInterval: (query) => readAgainIn(query.state.data, query.state.error),
     }),
   );
   const key = $api.queryOptions('get', MARKS, options).queryKey;
