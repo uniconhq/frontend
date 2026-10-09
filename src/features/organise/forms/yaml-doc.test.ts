@@ -114,6 +114,21 @@ describe('the scalars PyYAML reads otherwise', () => {
     expect(text).toBe('seed: number # random seed\n');
   });
 
+  it('quotes a new key PyYAML would read as a date, and escapes a break it reads', () => {
+    const text = edited('test_groups: {}\n', (doc) => {
+      writeAt(doc, ['test_groups', '2024-01-01'], { weight: 1 });
+      writeAt(doc, ['note'], 'a\u0085b c');
+    });
+
+    expect(text).toBe('test_groups:\n  "2024-01-01": {weight: 1}\nnote: "a\\Nb\\Lc"\n');
+    const parsed = parseYaml(text);
+    if ('error' in parsed) throw new Error(parsed.error);
+    expect(parsed.doc.toJS()).toEqual({
+      test_groups: { '2024-01-01': { weight: 1 } },
+      note: 'a\u0085b c',
+    });
+  });
+
   it('writes the first entry of an empty {} or [] as a block', () => {
     const text = edited('inputs: {}\nlist: []\n', (doc) => {
       writeAt(doc, ['inputs', 'seed'], 'number');

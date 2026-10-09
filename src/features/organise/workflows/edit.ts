@@ -6,7 +6,13 @@ import {
   type YAMLMap,
   type YAMLSeq,
 } from 'yaml';
-import { nodeFor, parseYaml, writeAt, writeYaml } from '../forms/yaml-doc';
+import {
+  nodeFor,
+  parseYaml,
+  quoteForPython,
+  writeAt,
+  writeYaml,
+} from '../forms/yaml-doc';
 import { readWorkflow, refText, type Ref, type Workflow } from './model';
 import type { PrimitiveInfo } from './primitives';
 import { orderAfterWire } from './rules';
@@ -126,9 +132,10 @@ function rewriteStrings(doc: Document, change: (text: string) => string): void {
   const visit = (node: unknown) => {
     if (isMap(node)) {
       for (const pair of node.items) {
-        if (isScalar(pair.value) && typeof pair.value.value === 'string')
+        if (isScalar(pair.value) && typeof pair.value.value === 'string') {
           pair.value.value = change(pair.value.value);
-        else visit(pair.value);
+          quoteForPython(pair.value);
+        } else visit(pair.value);
       }
     }
   };
@@ -136,9 +143,10 @@ function rewriteStrings(doc: Document, change: (text: string) => string): void {
   const report: unknown = (doc.contents as YAMLMap).get('report', true);
   if (isMap(report)) {
     for (const pair of report.items) {
-      if (isScalar(pair.value) && typeof pair.value.value === 'string')
+      if (isScalar(pair.value) && typeof pair.value.value === 'string') {
         pair.value.value = change(pair.value.value);
-      else visit(pair.value);
+        quoteForPython(pair.value);
+      } else visit(pair.value);
     }
   }
 }
@@ -240,14 +248,14 @@ export function renameStep(text: string, index: number, id: string): string {
   const step = workflowOf(text).steps[index];
   if (step === undefined || step.id === id) return text;
   return edited(text, (doc) => {
-    stepNode(doc, index)?.set('id', id);
+    writeAt(doc, ['steps', index, 'id'], id);
     rewriteStrings(doc, (value) => renamed(value, 'steps', step.id, id));
   });
 }
 
 /** The step's primitive at another version. */
 export function setUse(text: string, index: number, use: string): string {
-  return edited(text, (doc) => stepNode(doc, index)?.set('use', use));
+  return edited(text, (doc) => writeAt(doc, ['steps', index, 'use'], use));
 }
 
 /**
@@ -354,7 +362,10 @@ function renameKey(doc: Document, section: string, from: string, to: string): vo
   const map: unknown = (doc.contents as YAMLMap).get(section, true);
   if (!isMap(map)) return;
   for (const pair of map.items)
-    if (isScalar(pair.key) && pair.key.value === from) pair.key.value = to;
+    if (isScalar(pair.key) && pair.key.value === from) {
+      pair.key.value = to;
+      quoteForPython(pair.key);
+    }
 }
 
 /** An input renamed, every reference to it following. */

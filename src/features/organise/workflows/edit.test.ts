@@ -94,6 +94,20 @@ describe('editing the file in place', () => {
     expect(renameStep(text, 1, 'c')).toContain('id: c');
   });
 
+  it('quotes a name the forge would read as a date, as a key and as an id', () => {
+    const renamed = renameInput(
+      renameStep(COMMENTED, 0, '2024-01-01'),
+      'time_limit',
+      '2024-01-02',
+    );
+    const added = setInput(renamed, '2024-01-03', { type: 'number' });
+
+    expect(added).toContain('id: "2024-01-01"');
+    expect(added).toContain('"2024-01-02": number');
+    expect(added).toContain('"2024-01-03": number');
+    expect(added).toContain('${{ inputs.2024-01-02 }}');
+  });
+
   it('quotes text the forge would read as a date', () => {
     const text = setValue(COMMENTED, 1, 'args', '2026-10-09');
 

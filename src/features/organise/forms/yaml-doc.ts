@@ -27,6 +27,14 @@ const PYTHON_TRUE = /^(?:[Yy]es|YES|[Tt]rue|TRUE|[Oo]n|ON)$/;
 const PYTHON_FALSE = /^(?:[Nn]o|NO|[Ff]alse|FALSE|[Oo]ff|OFF)$/;
 const BOOL = 'tag:yaml.org,2002:bool';
 const MERGE = 'tag:yaml.org,2002:merge';
+const STR = 'tag:yaml.org,2002:str';
+/** Line breaks PyYAML reads that JSON leaves bare, and YAML's escapes for them. */
+const BREAKS = /[\u0085\u2028\u2029]/g;
+const BREAK_ESCAPES: Record<string, string> = {
+  '\u0085': '\\N',
+  '\u2028': '\\L',
+  '\u2029': '\\P',
+};
 /**
  * Tags of the library's 1.1 schema a definition file never holds: a time,
  * which stays text, and the ordered collections, which the library would
@@ -92,6 +100,28 @@ function pythonTag(tag: Tags[number]): Tags[number] {
     return { ...scalar, test: scalar.identify?.(true) ? PYTHON_TRUE : PYTHON_FALSE };
   if (scalar.tag === MERGE)
     return { ...scalar, identify: (value) => typeof value === 'symbol' };
+  if (scalar.tag === STR && scalar.stringify !== undefined) {
+    const { stringify } = scalar;
+    return {
+      ...scalar,
+      stringify: (item, ctx, onComment, onChompKeep) => {
+        // New text a page writes, a key or an id as much as a value, is
+        // quoted where PyYAML would read it otherwise; text the file holds
+        // keeps its own style. A line break only PyYAML takes as one is
+        // written as its escape.
+        const value: unknown = item.value;
+        if (typeof value === 'string') {
+          BREAKS.lastIndex = 0;
+          if (BREAKS.test(value) || (item.type === undefined && readOtherwise(value)))
+            item.type = 'QUOTE_DOUBLE';
+        }
+        const written = stringify(item, ctx, onComment, onChompKeep);
+        return item.type === 'QUOTE_DOUBLE'
+          ? written.replace(BREAKS, (found) => BREAK_ESCAPES[found] ?? found)
+          : written;
+      },
+    };
+  }
   const narrower = NUMBERS[scalar.tag];
   if (narrower === undefined) return tag;
   const { test, stringify } = scalar;
@@ -128,13 +158,20 @@ export function nodeFor(doc: Doc, value: unknown, { flow = false } = {}): Node {
   return node;
 }
 
-/** Every text under `node` that PyYAML would read otherwise, quoted. */
-function quoteForPython(node: unknown): void {
+/**
+ * Every text under `node`, keys too, that PyYAML would read otherwise,
+ * quoted: for a node the file held, whose text a page changed in place.
+ */
+export function quoteForPython(node: unknown): void {
   if (isScalar(node)) {
     if (readOtherwise(node.value)) node.type = 'QUOTE_DOUBLE';
     return;
   }
-  if (isMap(node)) for (const pair of node.items) quoteForPython(pair.value);
+  if (isMap(node))
+    for (const pair of node.items) {
+      quoteForPython(pair.key);
+      quoteForPython(pair.value);
+    }
   if (isSeq(node)) for (const item of node.items) quoteForPython(item);
 }
 
@@ -250,7 +287,9 @@ export function writeAt(
       if (!bareTime) quoteForPython(old);
       return;
     }
-    const node = bareTime ? doc.createNode(written) : nodeFor(doc, written);
+    const node = bareTime
+      ? Object.assign(doc.createNode(written), { type: 'PLAIN' as const })
+      : nodeFor(doc, written);
     keepComments(old, node);
     doc.setIn(path, node);
     return;
