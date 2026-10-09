@@ -6,7 +6,7 @@ import {
   type YAMLMap,
   type YAMLSeq,
 } from 'yaml';
-import { parseYaml, writeAt, writeYaml } from '../forms/yaml-doc';
+import { nodeFor, parseYaml, writeAt, writeYaml } from '../forms/yaml-doc';
 import { readWorkflow, refText, type Ref, type Workflow } from './model';
 import type { PrimitiveInfo } from './primitives';
 import { orderAfterWire } from './rules';
@@ -210,7 +210,8 @@ export function addStep(
     workflow.steps.map((step) => step.id),
   );
   return edited(text, (doc) => {
-    const node = doc.createNode(
+    const node = nodeFor(
+      doc,
       perTest
         ? { id, use: primitive.ref, per_test: true, with: {} }
         : { id, use: primitive.ref, with: {} },

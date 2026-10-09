@@ -6,6 +6,7 @@ import {
   parseDocument,
   type Document,
   type DocumentOptions,
+  type Node,
   type ParseOptions,
   type ScalarTag,
   type SchemaOptions,
@@ -35,15 +36,6 @@ const LEFT_OUT = ['timestamp', 'omap', 'pairs', 'set'].map(
   (name) => `tag:yaml.org,2002:${name}`,
 );
 
-/**
- * How every definition file is read and written: as the forge reads it,
- * PyYAML's YAML 1.1, where `on`, `yes` and `off` are true and false and
- * `1_000` is a number. A string that would read as one of those is written
- * quoted, so the file a save writes means to the forge what the page shows.
- * Two of the library's 1.1 rules are PyYAML's instead: `y` and `n` stay
- * text, a time stays the text it is written as, which the forms read, and a
- * new mapping is a plain one.
- */
 /** PyYAML's int and float, which are narrower than the library's 1.1 ones. */
 const PYTHON_INT =
   '[-+]?0b[0-1_]+|[-+]?0[0-7_]+|[-+]?(?:0|[1-9][0-9_]*)|[-+]?0x[0-9a-fA-F_]+|[-+]?[1-9][0-9_]*(?::[0-5]?[0-9])+';
@@ -70,6 +62,15 @@ function readOtherwise(value: unknown): boolean {
   );
 }
 
+/**
+ * How every definition file is read and written: as the forge reads it,
+ * PyYAML's YAML 1.1, where `on`, `yes` and `off` are true and false and
+ * `1_000` is a number. A string that would read as one of those is written
+ * quoted, so the file a save writes means to the forge what the page shows.
+ * Two of the library's 1.1 rules are PyYAML's instead: `y` and `n` stay
+ * text, a time stays the text it is written as, which the forms read, and a
+ * new mapping is a plain one.
+ */
 export const YAML_OPTIONS: ParseOptions & DocumentOptions & SchemaOptions = {
   version: '1.1',
   customTags: (tags: Tags) =>
@@ -92,12 +93,39 @@ function pythonTag(tag: Tags[number]): Tags[number] {
   if (scalar.tag === MERGE)
     return { ...scalar, identify: (value) => typeof value === 'symbol' };
   const narrower = NUMBERS[scalar.tag];
-  if (narrower === undefined || scalar.test === undefined) return tag;
-  const test = new RegExp(
-    `^(?=(?:${narrower})$)${scalar.test.source.slice(1)}`,
-    scalar.test.flags,
-  );
-  return { ...scalar, test };
+  if (narrower === undefined) return tag;
+  const { test, stringify } = scalar;
+  return {
+    ...scalar,
+    test:
+      test && new RegExp(`^(?=(?:${narrower})$)${test.source.slice(1)}`, test.flags),
+    stringify:
+      stringify &&
+      ((item, ctx, onComment, onChompKeep) =>
+        pythonNumber(stringify(item, ctx, onComment, onChompKeep))),
+  };
+}
+
+/**
+ * A number written as PyYAML reads one: an exponent only after a mantissa
+ * with a dot and with a sign of its own, so `1e-9` is written `1.0e-9`.
+ */
+function pythonNumber(text: string): string {
+  const found = /^([-+]?\d+)(?:\.(\d+))?[eE]([-+]?)(\d+)$/.exec(text);
+  if (found === null) return text;
+  const [, whole, fraction, sign, power] = found;
+  return `${whole}.${fraction ?? '0'}e${sign === '' ? '+' : sign}${power}`;
+}
+
+/**
+ * `value` as a new node of the document, every text in it that PyYAML would
+ * read otherwise quoted. Every node a page writes with values in it is
+ * made here.
+ */
+export function nodeFor(doc: Doc, value: unknown, { flow = false } = {}): Node {
+  const node = doc.createNode(value, { flow });
+  quoteForPython(node);
+  return node;
 }
 
 /** Every text under `node` that PyYAML would read otherwise, quoted. */
@@ -142,7 +170,6 @@ export function valueAt(doc: Doc, path: Path): unknown {
   return undefined;
 }
 
-/** Whether `value` is a mapping read from YAML, not a list or a scalar. */
 /**
  * A time a form writes, which the file holds bare: the forge reads a time
  * bare or quoted, and other text that looks like one only quoted.
@@ -155,6 +182,7 @@ export class Time {
   }
 }
 
+/** Whether `value` is a mapping read from YAML, not a list or a scalar. */
 export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
@@ -206,24 +234,34 @@ export function writeAt(
     typeof written === 'boolean';
   const old: unknown = doc.getIn(path, true);
   if (isPlain) {
-    // A scalar already there keeps its node, so a comment on its line stays;
-    // a new one is made a node, so it can be quoted.
-    doc.setIn(path, isScalar(old) ? written : doc.createNode(written));
     // A time stays bare when a form writes it as one, or when it replaces a
     // time the file holds bare.
     const bareTime =
       time ||
       (isScalar(old) &&
         old.type === 'PLAIN' &&
+        typeof old.value === 'string' &&
+        PYTHON_TIME.test(old.value) &&
         typeof written === 'string' &&
         PYTHON_TIME.test(written));
-    if (!bareTime) quoteForPython(doc.getIn(path, true));
+    if (isScalar(old)) {
+      // A scalar already there keeps its node, so a comment on its line stays.
+      doc.setIn(path, written);
+      if (!bareTime) quoteForPython(old);
+      return;
+    }
+    const node = bareTime ? doc.createNode(written) : nodeFor(doc, written);
+    keepComments(old, node);
+    doc.setIn(path, node);
     return;
   }
   if (isRecord(value) && isMap(old)) {
     // A mapping already there is changed key by key, keeping its style, its
-    // key order and the comments in it.
+    // key order and the comments in it. Its keys are text, as the forge reads
+    // every key a page writes, so a `1:` is the `"1"` the form names.
     for (const pair of [...old.items]) {
+      if (isScalar(pair.key) && typeof pair.key.value !== 'string')
+        pair.key.value = String(pair.key.value);
       const key = isScalar(pair.key) ? pair.key.value : pair.key;
       if (typeof key === 'string' && !(key in value)) old.delete(key);
     }
@@ -239,15 +277,19 @@ export function writeAt(
   const flow = Array.isArray(value)
     ? value.every(flat)
     : isRecord(value) && Object.values(value).every(flat);
-  const node = doc.createNode(value, { flow });
-  quoteForPython(node);
-  // The node it replaces may carry the comment on its line or the one above
-  // it; the new value keeps them, as a scalar written in place does.
-  if (isNode(old)) {
-    node.comment = old.comment;
-    node.commentBefore = old.commentBefore;
-  }
+  const node = nodeFor(doc, value, { flow });
+  keepComments(old, node);
   doc.setIn(path, node);
+}
+
+/**
+ * The node `old` replaces may carry the comment on its line or the one above
+ * it; the new one keeps them, as a scalar written in place does.
+ */
+function keepComments(old: unknown, node: Node): void {
+  if (!isNode(old)) return;
+  node.comment = old.comment;
+  node.commentBefore = old.commentBefore;
 }
 
 /**
