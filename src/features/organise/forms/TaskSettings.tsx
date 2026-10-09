@@ -199,6 +199,14 @@ function TaskForm({
           onChange={(value) => set('workflow', value)}
           description="owner/name@version, such as unicon/classic@v2. The save pins it."
         />
+        {workflowForm?.newer && workflowForm.workflow !== null && (
+          <NewerVersion
+            pinned={workflowForm.workflow}
+            newer={workflowForm.newer}
+            named={values.workflow}
+            onName={(ref) => set('workflow', ref)}
+          />
+        )}
       </Fieldset>
 
       {declared !== null && !unreadable('inputs') ? (
@@ -963,5 +971,41 @@ function GroupEntry({
         </div>
       </Fieldset>
     </li>
+  );
+}
+
+/**
+ * That the workflow the task names has a later version. The task keeps
+ * grading with the version it names until someone names another and saves,
+ * so nothing changes here until the organiser does.
+ */
+function NewerVersion({
+  pinned,
+  newer,
+  named,
+  onName,
+}: {
+  pinned: string;
+  newer: string;
+  named: string;
+  onName: (ref: string) => void;
+}) {
+  const at = pinned.lastIndexOf('@');
+  const workflow = at < 0 ? pinned : pinned.slice(0, at);
+  const ref = `${workflow}@${newer}`;
+  return (
+    <div className={classes.entries} role="status">
+      <BodyText size="sm">
+        {workflow} has a newer version, {newer}. This task grades with {pinned} until{' '}
+        {ref} is named here and the task is saved.
+      </BodyText>
+      {named.trim() !== ref && (
+        <div>
+          <Button size="xs" variant="secondary" onClick={() => onName(ref)}>
+            Name {ref}
+          </Button>
+        </div>
+      )}
+    </div>
   );
 }
