@@ -45,3 +45,15 @@ export function gradingsPath(org: string, contest: string): string {
 export function boardsPath(org: string, contest: string): string {
   return `${contestPath(org, contest)}/boards`;
 }
+
+/**
+ * The workflow pages, at `/workflows` and `/workflows/<owner>/<name>`, which
+ * the proxy sends here as well: a workflow is a person's or an org's, so it
+ * has an address of its own rather than one under an org.
+ */
+export const WORKFLOWS_PATH = '/workflows';
+
+export function workflowPath(owner: string, name: string, version?: string): string {
+  const base = `${WORKFLOWS_PATH}/${part(owner)}/${part(name)}`;
+  return version === undefined ? base : `${base}?version=${part(version)}`;
+}

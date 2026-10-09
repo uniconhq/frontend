@@ -23,6 +23,8 @@ import {
   OrgsPage,
   TaskPage,
   TeamsPage,
+  WorkflowPage,
+  WorkflowsPage,
 } from '@/features/organise';
 import { RequireSession, SessionExpiredModal, SessionProvider } from '@/session';
 
@@ -107,6 +109,12 @@ export const routes: RouteObject[] = [
             element: <RequireSession />,
             children: [
               { path: 'account', element: <AccountPage /> },
+              /**
+               * A workflow is a person's or an org's, so its pages have an
+               * address of their own, which the proxy sends here as well.
+               */
+              { path: 'workflows', element: <WorkflowsPage /> },
+              { path: 'workflows/:owner/:name', element: <WorkflowPage /> },
               /**
                * Every organiser page is under /orgs, because the proxy in
                * deploy sends exactly /orgs and /orgs/... to this app.

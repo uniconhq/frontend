@@ -32,3 +32,11 @@ export function useTaskParams(): { org: string; contest: string; task: string } 
     task: required(params.task, 'task'),
   };
 }
+
+export function useWorkflowParams(): { owner: string; name: string } {
+  const params = useParams();
+  return {
+    owner: required(params.owner, 'owner'),
+    name: required(params.name, 'name'),
+  };
+}

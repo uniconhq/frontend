@@ -14,16 +14,23 @@ export function CodeEditor({
   readOnly = false,
   autoFocus = false,
   rows = 18,
+  marked,
 }: Parameters<typeof Real>[0]) {
   return (
-    <Textarea
-      label={label}
-      value={value}
-      onChange={(next) => onChange?.(next)}
-      mono
-      rows={rows}
-      readOnly={readOnly}
-      autoFocus={autoFocus}
-    />
+    <div
+      data-marked={marked
+        ?.map((range) => `${String(range.from)}-${String(range.to)}`)
+        .join(' ')}
+    >
+      <Textarea
+        label={label}
+        value={value}
+        onChange={(next) => onChange?.(next)}
+        mono
+        rows={rows}
+        readOnly={readOnly}
+        autoFocus={autoFocus}
+      />
+    </div>
   );
 }

@@ -57,6 +57,7 @@ const FILE_RULES: Record<string, FileRules> = {
     adminOnly: ['name', 'description', 'state', 'visibility', 'registration'],
   },
   'task.yaml': { keyed: [], adminOnly: ['name', 'submissions'] },
+  'workflow.yaml': { keyed: [{ list: 'steps', key: 'id' }], adminOnly: [] },
 };
 
 function rulesOf(file: string): FileRules {
