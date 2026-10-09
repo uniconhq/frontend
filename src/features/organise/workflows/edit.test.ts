@@ -59,6 +59,54 @@ describe('editing the file in place', () => {
     expect(after).toContain('memory_limit: 512');
   });
 
+  it('keeps the comment on the line of a declaration it changes', () => {
+    const changed = setInput(COMMENTED, 'submission', {
+      type: 'folder',
+      contestant: true,
+    });
+
+    expect(changed).toContain(
+      'submission: {type: folder, contestant: true} # what they send',
+    );
+  });
+
+  it('keeps a step with no id at its own place', () => {
+    const text = [
+      'test: {a: file}',
+      'steps:',
+      '  - use: unicon/compile@v2',
+      '  - {id: b, use: unicon/compile@v2}',
+      '',
+    ].join('\n');
+
+    expect(workflowOf(text).steps.map((step) => step.id)).toEqual(['', 'b']);
+    expect(renameStep(text, 1, 'c')).toContain('id: c');
+  });
+
+  it('quotes text the forge would read as true, false or a number', () => {
+    let text = setValue(COMMENTED, 1, 'args', 'on');
+    text = setInput(text, 'mode', {
+      type: 'enum',
+      options: ['yes', 'no', 'y', '1_000'],
+    });
+
+    expect(text).toContain('args: "on"');
+    expect(text).toContain('mode: {type: enum, options: ["yes", "no", y, "1_000"]}');
+    expect(workflowOf(text).steps[1]?.with.args).toEqual({
+      kind: 'literal',
+      value: 'on',
+    });
+    const plain = [
+      'test: {a: file}',
+      'steps:',
+      '  - {id: s, use: u, with: {x: on, y: y}}',
+    ];
+    expect(workflowOf(plain.join('\n')).steps[0]?.with).toEqual({
+      x: { kind: 'literal', value: true },
+      y: { kind: 'literal', value: 'y' },
+    });
+  });
+
   it('writes the first port of a new step as a block', () => {
     const added = addStep(COMMENTED, diff!, true);
     const wired = wire(added, 2, 'actual', {

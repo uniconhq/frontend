@@ -248,7 +248,7 @@ export function Editor({
     try {
       const made = await makeVersion.mutateAsync({
         params: { path: { owner, name } },
-        body: { version: version.trim() },
+        body: { version: version.trim(), token: saved.token },
       });
       setVersioned({ kind: 'made', version: made.version });
       setVersion(`v${String(page.versions.length + 2)}`);
@@ -265,7 +265,12 @@ export function Editor({
   const refusal = (source: Ref, target: Target): string | null =>
     target.kind === 'port'
       ? wireRefusal(workflow, primitiveMap, target.step, target.port, source)
-      : reportRefusal(workflow, primitiveMap, source);
+      : reportRefusal(
+          workflow,
+          primitiveMap,
+          source,
+          workflow.report.find((entry) => entry.name === target.entry) ?? null,
+        );
 
   const connect = (source: Ref, target: Target, box: string, port: string) => {
     const refused = refusal(source, target);
@@ -518,6 +523,7 @@ export function Editor({
       <FieldsPanel
         text={text}
         workflow={workflow}
+        primitives={primitiveMap}
         pinned={pins}
         names={selected.names.length > 0 ? selected.names : null}
         change={change}
@@ -609,7 +615,13 @@ export function Editor({
         />
       )}
       <section aria-label="What a version would be refused for">
-        {check.isPending ? null : problems.length === 0 ? (
+        {check.isError ? (
+          <BodyText size="sm">
+            The check did not run, so this page cannot say what a version would be
+            refused for:{' '}
+            {toApiError(check.error).detail ?? toApiError(check.error).message}
+          </BodyText>
+        ) : check.isPending ? null : problems.length === 0 ? (
           <BodyText size="sm" tone="secondary">
             This definition passes every check a version must.
           </BodyText>

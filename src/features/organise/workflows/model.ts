@@ -234,10 +234,14 @@ function entryOf(name: string, raw: unknown, legacy: boolean): ReportEntry {
   };
 }
 
-function stepOf(raw: unknown, legacy: boolean): Step | null {
-  if (!isRecord(raw)) return null;
-  const id = text(raw.id);
-  if (id === null) return null;
+/**
+ * A step as the file holds it. One that is not a mapping, or has no id, is
+ * kept with an empty id, so every step stands at its own place in `steps:`
+ * and an edit or a problem at `steps[n]` lands on the box drawn for it.
+ */
+function stepOf(raw: unknown, legacy: boolean): Step {
+  if (!isRecord(raw)) return { id: '', use: '', perTest: false, with: {} };
+  const id = text(raw.id) ?? '';
   const given = isRecord(raw.with) ? raw.with : {};
   return {
     id,
@@ -289,9 +293,9 @@ function legacyFields(steps: Step[]): FieldDecl[] {
 export function readWorkflow(file: unknown): Workflow {
   const top = isRecord(file) ? file : {};
   const legacy = isLegacy(top);
-  const steps = (Array.isArray(top.steps) ? top.steps : [])
-    .map((raw) => stepOf(raw, legacy))
-    .filter((step): step is Step => step !== null);
+  const steps = (Array.isArray(top.steps) ? top.steps : []).map((raw) =>
+    stepOf(raw, legacy),
+  );
   if (legacy) {
     const inputs = (Array.isArray(top.inputs) ? top.inputs : [])
       .filter(isRecord)

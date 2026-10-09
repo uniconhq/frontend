@@ -5,6 +5,7 @@ import { readWorkflow, type Ref } from './model';
 import { byRef, type PrimitiveInfo } from './primitives';
 import {
   mayBeOptional,
+  newProblem,
   orderAfterWire,
   reportRefusal,
   switchRefusal,
@@ -306,5 +307,50 @@ steps:
 
     expect(mayBeOptional(workflow, primitives, 'key')).toBe(true);
     expect(mayBeOptional(workflow, primitives, 'other')).toBe(false);
+  });
+
+  it('refuses an output dropped on an entry whose meaning it cannot have', () => {
+    const workflow = readWorkflow(parse(CLASSIC_V2));
+    const time = workflow.report.find((entry) => entry.name === 'time_ms') ?? null;
+
+    expect(
+      reportRefusal(workflow, primitives, output('compile', 'compile_log'), time),
+    ).toBe('fold, better, at_least and at_most say what a number means; this is text.');
+    expect(
+      reportRefusal(workflow, primitives, output('run', 'memory_kb'), time),
+    ).toBeNull();
+  });
+
+  it('refuses running a step once while the report folds its output', () => {
+    const workflow = readWorkflow(
+      parse(`
+test: {input: file}
+steps:
+  - {id: run, use: unicon/sandbox-run@v2, per_test: true, with: {}}
+report:
+  time: {from: "\${{ steps.run.time_ms }}", fold: max}
+`),
+    );
+
+    expect(switchRefusal(workflow, 0)).toBe(
+      "The report's time folds it over tests, so it runs per test.",
+    );
+  });
+
+  it('names what a change of a declaration newly breaks', () => {
+    const before = readWorkflow(parse(CLASSIC_V2));
+    const after = readWorkflow(
+      parse(
+        CLASSIC_V2.replace(
+          'time_limit: number',
+          'time_limit: {type: number, contestant: true}',
+        ),
+      ),
+    );
+
+    expect(newProblem(before, before, primitives)).toBeNull();
+    expect(newProblem(before, after, primitives)).toBe(
+      'run.time_limit: This port raises a limit, so the task must give it, not the contestant.',
+    );
   });
 });

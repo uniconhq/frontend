@@ -1,4 +1,11 @@
-import { refLabel, refsOf, sameRef, type Ref, type Workflow } from './model';
+import {
+  refLabel,
+  refsOf,
+  sameRef,
+  type Ref,
+  type ReportEntry,
+  type Workflow,
+} from './model';
 import {
   declared,
   raisingPorts,
@@ -187,12 +194,22 @@ export function reportRefusal(
   workflow: Workflow,
   primitives: Map<string, PrimitiveInfo>,
   source: Ref,
+  entry: ReportEntry | null = null,
 ): string | null {
   if (source.kind !== 'steps') return 'A report reads a step’s output.';
   const kind = kindOf(workflow, primitives, 'report', source);
   if (typeof kind === 'string') return kind;
   if (kind.type !== 'text' && kind.type !== 'number')
     return `steps.${refLabel(source)} is ${kind.type}; a report holds text or numbers.`;
+  if (entry === null) return null;
+  const meant = [entry.fold, entry.better, entry.atLeast, entry.atMost].some(
+    (value) => value !== null,
+  );
+  if (meant && kind.type !== 'number')
+    return 'fold, better, at_least and at_most say what a number means; this is text.';
+  const step = workflow.steps.find((found) => found.id === source.name);
+  if ((entry.fold !== null || entry.better !== null) && step?.perTest !== true)
+    return 'fold and better are for a number reported per test; this step runs once.';
   return null;
 }
 
@@ -267,12 +284,29 @@ export function switchRefusal(workflow: Workflow, index: number): string | null 
             return `It reads ${ref.name}, which runs per test.`;
         }
       }
-    return null;
+    return foldedRefusal(workflow, index);
   }
   for (const [at, other] of workflow.steps.entries())
     if (!other.perTest && at !== index && stepsRead(workflow, at).has(index))
       return `${other.id} runs once and reads it.`;
   return null;
+}
+
+/**
+ * Why the step may not run once while the report folds or ranks one of its
+ * outputs over tests, which only a per-test step's output can be.
+ */
+function foldedRefusal(workflow: Workflow, index: number): string | null {
+  const step = workflow.steps[index];
+  const folded = workflow.report.find(
+    (entry) =>
+      entry.from?.kind === 'steps' &&
+      entry.from.name === step?.id &&
+      (entry.fold !== null || entry.better !== null),
+  );
+  return folded === undefined
+    ? null
+    : `The report's ${folded.name} folds it over tests, so it runs per test.`;
 }
 
 /**
@@ -343,6 +377,49 @@ export function mayBeOptional(
     if (step === undefined || value?.kind !== 'wire') return false;
     return declared(primitives, step.use)?.inputs[use.port]?.optional === true;
   });
+}
+
+/**
+ * Every wire, value and report entry a version would refuse that the
+ * primitives' declarations decide, each said where it is: what a change on
+ * a panel would newly break is refused before it is made, as a drag is.
+ */
+function wiringProblems(
+  workflow: Workflow,
+  primitives: Map<string, PrimitiveInfo>,
+): string[] {
+  const found: string[] = [];
+  workflow.steps.forEach((step, index) => {
+    for (const [port, value] of Object.entries(step.with)) {
+      const problem =
+        value.kind === 'wire'
+          ? wireRefusal(workflow, primitives, index, port, value.ref)
+          : value.kind === 'text'
+            ? valueRefusal(workflow, primitives, index, port, value.text, value.refs)
+            : value.kind === 'literal'
+              ? valueRefusal(workflow, primitives, index, port, value.value, [])
+              : null;
+      if (problem !== null) found.push(`${step.id}.${port}: ${problem}`);
+    }
+  });
+  for (const entry of workflow.report) {
+    const problem =
+      entry.from === null
+        ? null
+        : reportRefusal(workflow, primitives, entry.from, entry);
+    if (problem !== null) found.push(`report ${entry.name}: ${problem}`);
+  }
+  return found;
+}
+
+/** The first problem `after` has that `before` had not, or null. */
+export function newProblem(
+  before: Workflow,
+  after: Workflow,
+  primitives: Map<string, PrimitiveInfo>,
+): string | null {
+  const had = new Set(wiringProblems(before, primitives));
+  return wiringProblems(after, primitives).find((problem) => !had.has(problem)) ?? null;
 }
 
 /** The step outputs a report can read: a text or number output of any step. */

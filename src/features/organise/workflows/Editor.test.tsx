@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderApp } from '@/test/render';
-import { server, signedIn } from '@/test/server';
+import { http } from 'msw';
+import { problem, server, signedIn } from '@/test/server';
 import { CLASSIC_V2, workflowBackend } from '@/test/workflows';
 
 const PAGE = '/workflows/kenny/tuned';
@@ -287,5 +288,46 @@ describe('the workflow editor', () => {
     await waitFor(() =>
       expect(previewNow()).toContain('args: "--episodes ${{ test.episodes }}"'),
     );
+  });
+
+  it('says the check did not run rather than that it passed', async () => {
+    server.use(
+      http.post('/api/v1/workflows/check', () => problem(503, 'forge_unavailable')),
+      signedIn,
+      ...workflowBackend(CLASSIC_V2).handlers,
+    );
+    renderApp(PAGE);
+
+    expect(await screen.findByText(/The check did not run/)).toBeInTheDocument();
+    expect(screen.queryByText(/passes every check/)).not.toBeInTheDocument();
+  });
+
+  it('refuses on a panel a declaration a wire would refuse, saying why', async () => {
+    server.use(signedIn, ...workflowBackend(CLASSIC_V2).handlers);
+    const user = userEvent.setup();
+    renderApp(PAGE);
+
+    await user.click(await screen.findByRole('button', { name: 'Inputs' }));
+    const row = await screen.findByRole('listitem', { name: 'The input time_limit' });
+    await user.click(
+      within(row).getByRole('checkbox', { name: 'The contestant gives it' }),
+    );
+
+    expect(within(row).getByRole('alert')).toHaveTextContent(
+      'run.time_limit: This port raises a limit, so the task must give it, not the contestant.',
+    );
+    expect(previewNow()).toBe(CLASSIC_V2);
+  });
+
+  it('shows a wire the layout cannot draw on its port', async () => {
+    const backwards = CLASSIC_V2.replace(
+      'language: ${{ inputs.language }}',
+      ['language: ${{ inputs.language }}', '      entry: ${{ test.input }}'].join('\n'),
+    );
+    server.use(signedIn, ...workflowBackend(backwards).handlers);
+    renderApp(PAGE);
+
+    const step = await screen.findByRole('group', { name: 'Step compile' });
+    expect(within(step).getByText('= from test.input, not drawn')).toBeInTheDocument();
   });
 });
