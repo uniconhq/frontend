@@ -144,6 +144,22 @@ export function refsIn(text: string, legacy = false): Ref[] | null {
   return found;
 }
 
+/**
+ * Why a `${{ }}` in `text` is not a reference, in the forge's words, or null
+ * when every one is.
+ */
+export function refProblem(text: string): string | null {
+  const found = [...text.matchAll(ANY)];
+  for (const match of found) {
+    const expression = match[1] ?? '';
+    if (parseRef(expression) === null)
+      return `\${{ ${expression} }} is not a reference a workflow makes: inputs.<id>, test.<field> or steps.<id>.<output>.`;
+  }
+  if (text.split('${{').length - 1 !== found.length)
+    return 'A ${{ is not closed with }}, or holds a brace of its own.';
+  return null;
+}
+
 /** What a port is given, read from the value in the file. */
 function withValue(raw: unknown, legacy = false): WithValue {
   if (typeof raw === 'number' || typeof raw === 'boolean')

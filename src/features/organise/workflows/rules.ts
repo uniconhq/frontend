@@ -1,5 +1,6 @@
 import {
   refLabel,
+  refText,
   refsOf,
   sameRef,
   type Ref,
@@ -121,7 +122,7 @@ function kindOf(
   if (read === undefined || source === undefined)
     return `${ref.name} is not a step before this one.`;
   if (stepIndex !== 'report') {
-    if (read === stepIndex) return 'A step cannot read its own output.';
+    if (read === stepIndex) return `${ref.name} is not a step before this one.`;
     if (upstream(workflow, read).has(stepIndex))
       return `That makes a loop: ${ref.name} reads this step already.`;
   }
@@ -231,6 +232,8 @@ function betterProblem(workflow: Workflow, entry: ReportEntry): string | null {
   if (input === undefined) return `${ref.name} is not an input of the workflow.`;
   if (input.contestant || input.type !== 'enum')
     return `${ref.name} must be an enum input the task gives, not the contestant.`;
+  if (input.optional)
+    return `${ref.name} is optional, so it is given whole to optional ports, never read for which way is better.`;
   if (
     !(input.options ?? []).every((option) => option === 'higher' || option === 'lower')
   )
@@ -262,15 +265,19 @@ export function valueRefusal(
       const kind = kindOf(workflow, primitives, stepIndex, ref);
       if (typeof kind === 'string') return kind;
       if (!SCALARS.includes(kind.type))
-        return `${refLabel(ref)} is a ${kind.type}, and only text, a number, true or false or an enum is written into text.`;
+        return `${refText(ref)} is a ${kind.type}, and only text, a number, true or false or an enum is written into text.`;
       if (kind.optional)
-        return `${refLabel(ref)} is optional, so it is given whole to optional ports, never written into text.`;
+        return `${refText(ref)} is optional, so it is given whole to optional ports, never written into text.`;
     }
     if (raisingPorts(primitive).has(port))
       return 'This port raises a limit, so it must be known at the save.';
+    if (target.type === 'enum')
+      return `Takes one of ${(target.options ?? []).join(', ')}.`;
     if (target.type !== 'text') return `Takes ${target.type}, not text.`;
     return null;
   }
+  if (target.type === 'enum' && typeof value !== 'string')
+    return `Takes one of ${(target.options ?? []).join(', ')}.`;
   if (typeof value === 'boolean')
     return ['boolean', 'text'].includes(target.type)
       ? null

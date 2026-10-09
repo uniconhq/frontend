@@ -1,6 +1,6 @@
 import { isMap, isSeq, type Node } from 'yaml';
 import { instantOf } from './times';
-import { isRecord, parseYaml, writeAt, writeYaml, type Doc } from './yaml-doc';
+import { isRecord, nodeFor, parseYaml, writeAt, writeOver, type Doc } from './yaml-doc';
 
 /** An item of a keyed list, named by the value of its key: `tasks[sum]`. */
 type ItemStep = { key: string; value: string };
@@ -290,7 +290,7 @@ function putItem(doc: Doc, diff: FieldDiff) {
       break;
     }
   }
-  list.items.splice(place, 0, doc.createNode(diff.mine));
+  list.items.splice(place, 0, nodeFor(doc, diff.mine));
 }
 
 /** Put the items the order names into the places those items hold now, in its order. */
@@ -340,5 +340,5 @@ export function mergeText(
   }
   for (const diff of chosen) if (diff.kind === 'item') putItem(doc, diff);
   for (const diff of chosen) if (diff.kind === 'order') putOrder(doc, diff);
-  return writeYaml(doc);
+  return writeOver(currentText, doc);
 }

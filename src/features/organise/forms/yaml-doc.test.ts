@@ -37,3 +37,154 @@ describe('a definition file as the forge reads it', () => {
     expect(text).toBe('a: 1\nflag: "on"\nsize: "1_000"\nletter: y\n');
   });
 });
+
+describe('the scalars PyYAML reads otherwise', () => {
+  it('quotes a date, = and << wherever a value is written', () => {
+    const text = edited('a: 1\n', (doc) => {
+      writeAt(doc, ['day'], '2026-10-09');
+      writeAt(doc, ['eq'], '=');
+      writeAt(doc, ['merge'], '<<');
+      writeAt(doc, ['list'], ['2026-10-09', 'later']);
+    });
+
+    expect(text).toBe(
+      'a: 1\nday: "2026-10-09"\neq: "="\nmerge: "<<"\nlist: ["2026-10-09", later]\n',
+    );
+  });
+
+  it('keeps a merge key a file holds, and a time it holds bare', () => {
+    const text = edited(
+      'base: &b {x: 1}\nm:\n  <<: *b\n  y: 2\ndue: 2026-06-01T09:00:00Z\n',
+      (doc) => {
+        writeAt(doc, ['m', 'y'], '<<');
+        writeAt(doc, ['due'], '2026-06-02T09:00:00Z');
+      },
+    );
+
+    expect(text).toBe(
+      'base: &b {x: 1}\nm:\n  <<: *b\n  y: "<<"\ndue: 2026-06-02T09:00:00Z\n',
+    );
+    const parsed = parseYaml(text);
+    if ('error' in parsed) throw new Error(parsed.error);
+    expect(parsed.doc.toJS()).toMatchObject({ m: { x: 1, y: '<<' } });
+  });
+
+  it('quotes a time written over text, a number or nothing', () => {
+    const text = edited('a: hello # kept\nb: 5\nc:\nd: "x"\n', (doc) => {
+      writeAt(doc, ['a'], '2026-01-01');
+      writeAt(doc, ['b'], '2026-01-01');
+      writeAt(doc, ['c'], '2026-01-01T09:00:00Z');
+      writeAt(doc, ['d'], '2026-01-01');
+    });
+
+    expect(text).toBe(
+      'a: "2026-01-01" # kept\nb: "2026-01-01"\nc: "2026-01-01T09:00:00Z"\nd: "2026-01-01"\n',
+    );
+  });
+
+  it('writes a number with an exponent as PyYAML reads a number', () => {
+    const text = edited('a: 1\n', (doc) => {
+      writeAt(doc, ['tiny'], 0.000000001);
+      writeAt(doc, ['huge'], 1e21);
+      writeAt(doc, ['small'], -2.5e-7);
+    });
+
+    expect(text).toBe('a: 1\ntiny: 1.0e-9\nhuge: 1.0e+21\nsmall: -2.5e-7\n');
+    const parsed = parseYaml(text);
+    if ('error' in parsed) throw new Error(parsed.error);
+    expect(parsed.doc.toJS()).toEqual({ a: 1, tiny: 1e-9, huge: 1e21, small: -2.5e-7 });
+  });
+
+  it('writes a mapping over one whose keys are numbers as text keys', () => {
+    const text = edited('test_weights: {1: 2, 2: 3}\n', (doc) => {
+      writeAt(doc, ['test_weights'], { '1': 5 });
+    });
+
+    expect(text).toBe('test_weights: {"1": 5}\n');
+  });
+
+  it('keeps the comment of a mapping a plain value replaces', () => {
+    const text = edited(
+      'seed: {type: number, optional: true} # random seed\n',
+      (doc) => {
+        writeAt(doc, ['seed'], 'number');
+      },
+    );
+
+    expect(text).toBe('seed: number # random seed\n');
+  });
+
+  it('quotes a new key PyYAML would read as a date, and escapes a break it reads', () => {
+    const text = edited('test_groups: {}\n', (doc) => {
+      writeAt(doc, ['test_groups', '2024-01-01'], { weight: 1 });
+      writeAt(doc, ['note'], 'a\u0085b c');
+    });
+
+    expect(text).toBe('test_groups:\n  "2024-01-01": {weight: 1}\nnote: "a\\Nb\\Lc"\n');
+    const parsed = parseYaml(text);
+    if ('error' in parsed) throw new Error(parsed.error);
+    expect(parsed.doc.toJS()).toEqual({
+      test_groups: { '2024-01-01': { weight: 1 } },
+      note: 'a\u0085b c',
+    });
+  });
+
+  it('double-quotes and escapes a tab and the characters PyYAML takes only escaped', () => {
+    const text = edited('a: 1\n', (doc) => {
+      writeAt(doc, ['args'], '--seed\t${{ inputs.seed }}');
+      writeAt(doc, ['odd'], 'a\u007fb\u0090c\u0001d￾');
+    });
+
+    expect(text).toBe(
+      'a: 1\nargs: "--seed\\t${{ inputs.seed }}"\nodd: "a\\x7Fb\\x90c\\x01d\\uFFFE"\n',
+    );
+    const parsed = parseYaml(text);
+    if ('error' in parsed) throw new Error(parsed.error);
+    expect(parsed.doc.toJS()).toMatchObject({
+      args: '--seed\t${{ inputs.seed }}',
+      odd: 'a\u007fb\u0090c\u0001d￾',
+    });
+  });
+
+  it('reads an alias with no anchor as a file it cannot read', () => {
+    const parsed = parseYaml('steps:\n  - with: {actual: *x}\n');
+
+    expect(parsed).toHaveProperty('error');
+  });
+
+  it('writes the first entry of an empty {} or [] as a block', () => {
+    const text = edited('inputs: {}\nlist: []\n', (doc) => {
+      writeAt(doc, ['inputs', 'seed'], 'number');
+      writeAt(doc, ['list', 0], 'first');
+    });
+
+    expect(text).toBe('inputs:\n  seed: number\nlist:\n  - first\n');
+  });
+
+  it('reads a number only where PyYAML does', () => {
+    const parsed = parseYaml(
+      'a: 09\nb: +.5\nc: .\nd: 1e3\ne: 10\nf: 0.5\ng: 1_000\nh: 1.0e+3\n',
+    );
+    if ('error' in parsed) throw new Error(parsed.error);
+
+    expect(parsed.doc.toJS()).toEqual({
+      a: '09',
+      b: '+.5',
+      c: '.',
+      d: '1e3',
+      e: 10,
+      f: 0.5,
+      g: 1000,
+      h: 1000,
+    });
+  });
+
+  it('changes a mapping already there key by key, keeping its comments and order', () => {
+    const text = edited(
+      'time_ms:\n  from: x # CPU time\n  fold: max\n  better: lower\n',
+      (doc) => writeAt(doc, ['time_ms'], { from: 'x', fold: 'sum', at_least: 0 }),
+    );
+
+    expect(text).toBe('time_ms:\n  from: x # CPU time\n  fold: sum\n  at_least: 0\n');
+  });
+});

@@ -286,7 +286,7 @@ describe('the workflow editor', () => {
     await user.click(await screen.findByRole('menuitem', { name: 'test.episodes' }));
 
     await waitFor(() =>
-      expect(previewNow()).toContain('args: --episodes ${{ test.episodes }}'),
+      expect(previewNow()).toMatch(/args: "?--episodes \$\{\{ test\.episodes \}\}"?\n/),
     );
   });
 
@@ -305,6 +305,14 @@ describe('the workflow editor', () => {
 
     expect(
       await within(panel).findByText(/Takes text, not file\./),
+    ).toBeInTheDocument();
+    await user.clear(entry);
+    await user.paste('main ${{ inputs }}');
+    await user.keyboard('{Enter}');
+    expect(
+      await within(panel).findByText(
+        '${{ inputs }} is not a reference a workflow makes: inputs.<id>, test.<field> or steps.<id>.<output>.',
+      ),
     ).toBeInTheDocument();
     await user.clear(entry);
     await user.paste('${{ inputs.language }}');
@@ -337,6 +345,144 @@ describe('the workflow editor', () => {
     await waitFor(() => expect(previewNow()).toContain('fold: sum'));
     await user.click(screen.getByRole('button', { name: 'Undo' }));
     expect(previewNow()).toContain('args: ${{ inputs.time_limit }}');
+  });
+
+  // Tabbing to each control walks the whole page, so this takes a while.
+  it(
+    'builds three wired steps from the palette by keyboard alone',
+    { timeout: 60_000 },
+    async () => {
+      const empty = [
+        'inputs:',
+        '  submission: {type: folder, contestant: true}',
+        '  time_limit: number',
+        '  memory_limit: number',
+        'test:',
+        '  input: file',
+        '  answer: file',
+        'steps: []',
+        '',
+      ].join('\n');
+      server.use(signedIn, ...workflowBackend(empty).handlers);
+      const user = userEvent.setup();
+      renderApp(PAGE);
+
+      // Every control is reached by Tab and every menu item by the arrow keys.
+      const tabTo = async (target: HTMLElement) => {
+        for (let step = 0; step < 400 && document.activeElement !== target; step += 1)
+          await user.tab();
+        expect(target).toHaveFocus();
+      };
+      const press = async (target: HTMLElement) => {
+        await tabTo(target);
+        await user.keyboard('{Enter}');
+      };
+      const wireFrom = async (port: string, step: string, source: RegExp) => {
+        await press(
+          await screen.findByRole('button', { name: `The port ${port} of ${step}` }),
+        );
+        const menu = await screen.findByRole('menu', {
+          name: `The port ${port} of ${step}`,
+        });
+        const item = within(menu).getByRole('menuitem', { name: source });
+        for (let move = 0; move < 40 && document.activeElement !== item; move += 1)
+          await user.keyboard('{ArrowDown}');
+        expect(item).toHaveFocus();
+        await user.keyboard('{Enter}');
+      };
+      await press(
+        await screen.findByRole('button', { name: 'Add unicon/compile@v2, run once' }),
+      );
+      await press(screen.getByRole('button', { name: 'Primitives' }));
+      await press(
+        await screen.findByRole('button', {
+          name: 'Add unicon/sandbox-run@v2, run per test',
+        }),
+      );
+      await press(screen.getByRole('button', { name: 'Primitives' }));
+      await press(
+        await screen.findByRole('button', {
+          name: 'Add unicon/diff-check@v2, run per test',
+        }),
+      );
+      await wireFrom('source', 'compile', /^inputs\.submission/);
+      await wireFrom('binary', 'sandbox-run', /^compile\.binary/);
+      await wireFrom('input', 'sandbox-run', /^test\.input/);
+      await wireFrom('time_limit', 'sandbox-run', /^inputs\.time_limit/);
+      await wireFrom('memory_limit', 'sandbox-run', /^inputs\.memory_limit/);
+      await wireFrom('actual', 'diff-check', /^sandbox-run\.output/);
+      await wireFrom('expected', 'diff-check', /^test\.answer/);
+
+      const text = previewNow();
+      for (const wire of [
+        'source: ${{ inputs.submission }}',
+        'binary: ${{ steps.compile.binary }}',
+        'input: ${{ test.input }}',
+        'time_limit: ${{ inputs.time_limit }}',
+        'memory_limit: ${{ inputs.memory_limit }}',
+        'actual: ${{ steps.sandbox-run.output }}',
+        'expected: ${{ test.answer }}',
+      ])
+        expect(text).toContain(wire);
+      expect(text.match(/per_test: true/g)).toHaveLength(2);
+    },
+  );
+
+  it('offers for which way is better only an enum input the task gives whole', async () => {
+    server.use(
+      signedIn,
+      ...workflowBackend(
+        CLASSIC_V2.replace(
+          '  time_limit: number\n',
+          '  time_limit: number\n  goal: {type: enum, options: [higher, lower]}\n  maybe: {type: enum, options: [higher, lower], optional: true}\n',
+        ),
+      ).handlers,
+    );
+    const user = userEvent.setup();
+    renderApp(PAGE);
+
+    await user.click(await screen.findByRole('button', { name: 'Report' }));
+    const entry = await screen.findByRole('listitem', {
+      name: 'The report entry time_ms',
+    });
+    const better = within(entry).getByRole('combobox', { name: 'Better is' });
+
+    expect(
+      within(better).getByRole('option', { name: "as the task's goal says" }),
+    ).toBeInTheDocument();
+    expect(
+      within(better).queryByRole('option', { name: "as the task's maybe says" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('keeps a step chosen when an edit moves it in the list', async () => {
+    const two = [
+      'steps:',
+      '  - {id: first, use: unicon/compile@v2}',
+      '  - {id: second, use: unicon/compile@v2}',
+      '',
+    ].join('\n');
+    server.use(signedIn, ...workflowBackend(two).handlers);
+    const user = userEvent.setup();
+    renderApp(PAGE);
+
+    const step = await screen.findByRole('group', { name: 'Step first' });
+    await user.click(within(step).getByRole('button', { name: /^first/ }));
+    const panel = await screen.findByRole('region', { name: 'The step first' });
+    await user.click(
+      within(panel).getByRole('checkbox', { name: 'Runs once per test' }),
+    );
+
+    await waitFor(() => expect(previewNow()).toMatch(/id: second[\s\S]*id: first/));
+    expect(screen.getByRole('region', { name: 'The step first' })).toBeInTheDocument();
+    expect(
+      within(screen.getByRole('region', { name: 'The step first' })).getByRole(
+        'checkbox',
+        {
+          name: 'Runs once per test',
+        },
+      ),
+    ).toBeChecked();
   });
 
   it('says the check did not run rather than that it passed', async () => {
