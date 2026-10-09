@@ -245,7 +245,7 @@ steps:
       valueRefusal(WORKFLOW, primitives, 0, 'language', '${{ inputs.limit }}s', [
         input('limit'),
       ]),
-    ).toBe('Takes enum, not text.');
+    ).toBe('Takes one of c, cpp, java, python.');
     expect(
       valueRefusal(WORKFLOW, primitives, 0, 'entry', 'x ${{ test.episodes }}', [
         field('episodes'),
@@ -256,7 +256,7 @@ steps:
         input('key'),
       ]),
     ).toBe(
-      'inputs.key is optional, so it is given whole to optional ports, never written into text.',
+      '${{ inputs.key }} is optional, so it is given whole to optional ports, never written into text.',
     );
     expect(valueRefusal(WORKFLOW, primitives, 0, 'language', 'rust', [])).toBe(
       'Takes one of c, cpp, java, python.',
