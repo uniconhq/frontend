@@ -23,6 +23,7 @@ import {
   setPerTest,
   setUse,
   setValue,
+  wire,
   type FieldFields,
   type InputFields,
   workflowOf,
@@ -31,6 +32,7 @@ import {
   VALUE_TYPES,
   refLabel,
   refsIn,
+  wholeRef,
   refText,
   type FieldDecl,
   type InputDecl,
@@ -46,6 +48,7 @@ import {
   reportRefusal,
   switchRefusal,
   valueRefusal,
+  wireRefusal,
 } from './rules';
 import classes from './workflows.module.css';
 
@@ -165,6 +168,13 @@ function PortValue({
       change(clearPort(text, index, port));
       return null;
     }
+    const whole = typeof raw === 'string' ? wholeRef(raw) : null;
+    if (whole !== null) {
+      const refused = wireRefusal(workflow, primitives, index, port, whole);
+      if (refused !== null) return refused;
+      change(wire(text, index, port, whole));
+      return null;
+    }
     const written = typeof raw === 'string' ? refsIn(raw) : [];
     if (written === null) return 'A ${{ }} here is not an input or a test field.';
     const refused = valueRefusal(workflow, primitives, index, port, raw, written);
@@ -265,6 +275,7 @@ export function StepPanel({
   change: Change;
   onRemoved: () => void;
 }) {
+  const [versionRefused, setVersionRefused] = useState<string | null>(null);
   const step = workflow.steps[index];
   if (step === undefined) return null;
   const primitive = declared(primitives, step.use);
@@ -312,7 +323,13 @@ export function StepPanel({
           label="Primitive"
           value={step.use}
           options={versions.map((found) => ({ value: found.ref, label: found.ref }))}
-          onChange={(use) => change(setUse(text, index, use))}
+          error={versionRefused ?? undefined}
+          onChange={(use) => {
+            const written = setUse(text, index, use);
+            const broken = newProblem(workflow, workflowOf(written), primitives);
+            setVersionRefused(broken);
+            if (broken === null) change(written);
+          }}
         />
       ) : (
         <BodyText size="sm" tone="secondary">
@@ -794,6 +811,10 @@ function EntryRow({
         }
         const value = Number(written);
         if (!Number.isFinite(value)) return 'A number.';
+        const least = key === 'at_least' ? value : entry.atLeast;
+        const most = key === 'at_most' ? value : entry.atMost;
+        if (least !== null && most !== null && least > most)
+          return 'Must be at least at_least.';
         write({ [key]: value });
         return null;
       }}

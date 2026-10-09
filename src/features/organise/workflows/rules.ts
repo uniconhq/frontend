@@ -202,6 +202,10 @@ export function reportRefusal(
   if (kind.type !== 'text' && kind.type !== 'number')
     return `steps.${refLabel(source)} is ${kind.type}; a report holds text or numbers.`;
   if (entry === null) return null;
+  const better = betterProblem(workflow, entry);
+  if (better !== null) return better;
+  if (entry.atLeast !== null && entry.atMost !== null && entry.atLeast > entry.atMost)
+    return 'Must be at least at_least.';
   const meant = [entry.fold, entry.better, entry.atLeast, entry.atMost].some(
     (value) => value !== null,
   );
@@ -210,6 +214,27 @@ export function reportRefusal(
   const step = workflow.steps.find((found) => found.id === source.name);
   if ((entry.fold !== null || entry.better !== null) && step?.perTest !== true)
     return 'fold and better are for a number reported per test; this step runs once.';
+  return null;
+}
+
+/**
+ * Why an entry's `better` is not one a version takes (W3), in the forge's
+ * words: `higher`, `lower`, or a task's enum input whose options are those.
+ */
+function betterProblem(workflow: Workflow, entry: ReportEntry): string | null {
+  const { better } = entry;
+  if (better === null || better === 'higher' || better === 'lower') return null;
+  const ref = entry.betterRef;
+  if (ref === null || ref.kind !== 'inputs')
+    return "Must be higher, lower, or ${{ inputs.<id> }} naming a task's enum input.";
+  const input = workflow.inputs.find((found) => found.id === ref.name);
+  if (input === undefined) return `${ref.name} is not an input of the workflow.`;
+  if (input.contestant || input.type !== 'enum')
+    return `${ref.name} must be an enum input the task gives, not the contestant.`;
+  if (
+    !(input.options ?? []).every((option) => option === 'higher' || option === 'lower')
+  )
+    return `The options of ${ref.name} must be higher and lower.`;
   return null;
 }
 
@@ -231,8 +256,6 @@ export function valueRefusal(
   const target = primitive?.inputs[port];
   if (step === undefined || primitive === null || target === undefined) return null;
   if (written.length > 0) {
-    if (target.type !== 'text')
-      return 'Text with values written in fits only a text port.';
     for (const ref of written) {
       if (ref.kind === 'steps')
         return "A step's output is given whole, never written into text.";
@@ -243,6 +266,9 @@ export function valueRefusal(
       if (kind.optional)
         return `${refLabel(ref)} is optional, so it is given whole to optional ports, never written into text.`;
     }
+    if (raisingPorts(primitive).has(port))
+      return 'This port raises a limit, so it must be known at the save.';
+    if (target.type !== 'text') return `Takes ${target.type}, not text.`;
     return null;
   }
   if (typeof value === 'boolean')
@@ -405,7 +431,7 @@ function wiringProblems(
   for (const entry of workflow.report) {
     const problem =
       entry.from === null
-        ? null
+        ? betterProblem(workflow, entry)
         : reportRefusal(workflow, primitives, entry.from, entry);
     if (problem !== null) found.push(`report ${entry.name}: ${problem}`);
   }

@@ -240,7 +240,12 @@ steps:
       valueRefusal(WORKFLOW, primitives, 1, 'time_limit', '${{ inputs.limit }}s', [
         input('limit'),
       ]),
-    ).toBe('Text with values written in fits only a text port.');
+    ).toBe('This port raises a limit, so it must be known at the save.');
+    expect(
+      valueRefusal(WORKFLOW, primitives, 0, 'language', '${{ inputs.limit }}s', [
+        input('limit'),
+      ]),
+    ).toBe('Takes enum, not text.');
     expect(
       valueRefusal(WORKFLOW, primitives, 0, 'entry', 'x ${{ test.episodes }}', [
         field('episodes'),
@@ -335,6 +340,29 @@ report:
     expect(switchRefusal(workflow, 0)).toBe(
       "The report's time folds it over tests, so it runs per test.",
     );
+  });
+
+  it('refuses a better that is not a task enum of higher and lower, and bounds the wrong way', () => {
+    const workflow = readWorkflow(
+      parse(`
+inputs:
+  dir: {type: enum, options: [higher, lower], contestant: true}
+test: {input: file}
+steps:
+  - {id: run, use: unicon/sandbox-run@v2, per_test: true, with: {}}
+report:
+  score: {from: "\${{ steps.run.time_ms }}", fold: max, better: "\${{ inputs.dir }}"}
+  bounded: {from: "\${{ steps.run.time_ms }}", at_least: 5, at_most: 1}
+`),
+    );
+    const [score, bounded] = workflow.report;
+
+    expect(
+      reportRefusal(workflow, primitives, output('run', 'time_ms'), score ?? null),
+    ).toBe('dir must be an enum input the task gives, not the contestant.');
+    expect(
+      reportRefusal(workflow, primitives, output('run', 'time_ms'), bounded ?? null),
+    ).toBe('Must be at least at_least.');
   });
 
   it('names what a change of a declaration newly breaks', () => {

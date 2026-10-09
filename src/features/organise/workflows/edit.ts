@@ -23,6 +23,24 @@ const TOP_ORDER = ['inputs', 'test', 'steps', 'report'];
 
 type Edit = (doc: Document) => void;
 
+/** What PyYAML reads as a date or a time, which the page holds as text. */
+const PYTHON_TIME =
+  /^(?:\d{4}-\d\d-\d\d|\d{4}-\d\d?-\d\d?(?:[Tt]|[ \t]+)\d\d?:\d\d:\d\d(?:\.\d*)?(?:[ \t]*(?:Z|[-+]\d\d?(?::\d\d)?))?)$/;
+
+/**
+ * Every text under `node` that PyYAML would read as a date written quoted,
+ * so the forge reads it as the text the page shows.
+ */
+function quoteTimes(node: unknown): void {
+  if (isScalar(node)) {
+    if (typeof node.value === 'string' && PYTHON_TIME.test(node.value))
+      node.type = 'QUOTE_DOUBLE';
+    return;
+  }
+  if (isMap(node)) for (const pair of node.items) quoteTimes(pair.value);
+  if (isSeq(node)) for (const item of node.items) quoteTimes(item);
+}
+
 /** `edit` applied to the document `text` holds. */
 function edited(text: string, edit: Edit): string {
   const parsed = parseYaml(text);
@@ -302,7 +320,10 @@ export function setValue(
 ): string {
   return edited(text, (doc) => {
     const node = stepNode(doc, index);
-    if (node !== null) withOf(doc, node).set(port, value);
+    if (node === null) return;
+    const scalar = doc.createNode(value);
+    quoteTimes(scalar);
+    withOf(doc, node).set(port, scalar);
   });
 }
 
@@ -331,6 +352,7 @@ export function setInput(text: string, id: string, fields: InputFields): string 
   return edited(text, (doc) => {
     top<YAMLMap>(doc, 'inputs');
     writeAt(doc, ['inputs', id], declarationNode(fields));
+    quoteTimes(doc.getIn(['inputs', id], true));
   });
 }
 
@@ -339,6 +361,7 @@ export function setField(text: string, name: string, fields: FieldFields): strin
   return edited(text, (doc) => {
     top<YAMLMap>(doc, 'test');
     writeAt(doc, ['test', name], declarationNode(fields));
+    quoteTimes(doc.getIn(['test', name], true));
   });
 }
 

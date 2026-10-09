@@ -127,7 +127,7 @@ export function sameRef(a: Ref, b: Ref): boolean {
 }
 
 /** The one reference `text` is exactly, or null when it is anything else. */
-function wholeRef(text: string, legacy = false): Ref | null {
+export function wholeRef(text: string, legacy = false): Ref | null {
   const found = WHOLE.exec(text);
   return found?.[1] !== undefined ? parseRef(found[1], legacy) : null;
 }

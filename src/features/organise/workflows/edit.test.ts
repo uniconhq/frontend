@@ -83,6 +83,15 @@ describe('editing the file in place', () => {
     expect(renameStep(text, 1, 'c')).toContain('id: c');
   });
 
+  it('quotes text the forge would read as a date', () => {
+    const text = setValue(COMMENTED, 1, 'args', '2026-10-09');
+
+    expect(text).toContain('args: "2026-10-09"');
+    expect(
+      setInput(text, 'when', { type: 'enum', options: ['2026-10-09', 'later'] }),
+    ).toContain('when: {type: enum, options: ["2026-10-09", later]}');
+  });
+
   it('quotes text the forge would read as true, false or a number', () => {
     let text = setValue(COMMENTED, 1, 'args', 'on');
     text = setInput(text, 'mode', {

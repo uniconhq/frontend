@@ -286,8 +286,57 @@ describe('the workflow editor', () => {
     await user.click(await screen.findByRole('menuitem', { name: 'test.episodes' }));
 
     await waitFor(() =>
-      expect(previewNow()).toContain('args: "--episodes ${{ test.episodes }}"'),
+      expect(previewNow()).toContain('args: --episodes ${{ test.episodes }}'),
     );
+  });
+
+  it('wires a port given a whole reference in its field', async () => {
+    server.use(signedIn, ...workflowBackend(CLASSIC_V2).handlers);
+    const user = userEvent.setup();
+    renderApp(PAGE);
+
+    const step = await screen.findByRole('group', { name: 'Step compile' });
+    await user.click(within(step).getByRole('button', { name: /^compile/ }));
+    const panel = await screen.findByRole('region', { name: 'The step compile' });
+    const entry = within(panel).getByRole('textbox', { name: /^entry/ });
+    await user.click(entry);
+    await user.paste('${{ inputs.submission }}');
+    await user.keyboard('{Enter}');
+
+    expect(
+      await within(panel).findByText(/Takes text, not file\./),
+    ).toBeInTheDocument();
+    await user.clear(entry);
+    await user.paste('${{ inputs.language }}');
+    await user.keyboard('{Enter}');
+    await waitFor(() =>
+      expect(previewNow()).toContain('entry: ${{ inputs.language }}'),
+    );
+  });
+
+  it('takes the current file in the merge view as one step undo goes back over', async () => {
+    const backend = workflowBackend(CLASSIC_V2);
+    server.use(signedIn, ...backend.handlers);
+    const user = userEvent.setup();
+    renderApp(PAGE);
+
+    await user.click(
+      await screen.findByRole('button', { name: 'The port args of run' }),
+    );
+    await user.click(
+      await screen.findByRole('menuitem', { name: /^inputs\.time_limit/ }),
+    );
+    backend.state.draft = CLASSIC_V2.replace(
+      'fold: max, better: lower',
+      'fold: sum, better: lower',
+    );
+    backend.state.token = 'someone-else';
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    await user.click(await screen.findByRole('button', { name: 'Drop my changes' }));
+
+    await waitFor(() => expect(previewNow()).toContain('fold: sum'));
+    await user.click(screen.getByRole('button', { name: 'Undo' }));
+    expect(previewNow()).toContain('args: ${{ inputs.time_limit }}');
   });
 
   it('says the check did not run rather than that it passed', async () => {

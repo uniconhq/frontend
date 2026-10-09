@@ -609,7 +609,7 @@ export function Editor({
           }}
           onDrop={() => {
             setSaved({ text: conflict.current, token: conflict.token });
-            dispatch({ kind: 'reset', text: conflict.current });
+            dispatch({ kind: 'change', text: conflict.current });
             setConflict(null);
           }}
         />
