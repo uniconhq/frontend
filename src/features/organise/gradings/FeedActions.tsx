@@ -18,8 +18,9 @@ const REASON_MAX = 500;
  * finished, drawn as the thing to do for a system error, and Cancel for a
  * system error alone. A submission staff cancelled is offered neither, since
  * a cancel is final. A broken attempt with an earlier result offers Fall back
- * while nothing counts that result, and Clear fallback while staff's own
- * fallback does; the contest's own needs nothing here.
+ * until staff have asked for one, the contest's own fallback included, so the
+ * fallback outlasts a change to the contest's settings, and Clear fallback
+ * once they have.
  */
 export function AttemptActions({
   task,
@@ -32,7 +33,7 @@ export function AttemptActions({
   name: string;
   onAsk: (asking: Asking) => void;
 }) {
-  const { status, last_good: lastGood, fallback } = entry.grading;
+  const { status, last_good: lastGood, falls_back: fallsBack } = entry.grading;
   return (
     <div className={classes.actions}>
       {!UNFINISHED.has(status) && status !== 'cancelled' && (
@@ -55,7 +56,7 @@ export function AttemptActions({
           Cancel
         </Button>
       )}
-      {lastGood !== null && fallback === null && (
+      {lastGood !== null && !fallsBack && (
         <Button
           size="xs"
           variant="secondary"
@@ -65,7 +66,7 @@ export function AttemptActions({
           Fall back
         </Button>
       )}
-      {lastGood !== null && fallback === 'staff' && (
+      {lastGood !== null && fallsBack && (
         <Button
           size="xs"
           variant="secondary"
@@ -122,6 +123,18 @@ function Consequence({ asking }: { asking: Asking }) {
           attempt that finished with a result, in place of attempt {grading.attempt}: on
           the boards, to its contestant and under the task&apos;s limit.
         </BodyText>
+        {grading.fallback === 'contest' && (
+          <BodyText tone="secondary">
+            The contest&apos;s settings count it so already; this keeps it so if they
+            change.
+          </BodyText>
+        )}
+        {grading.status === 'cancelled' && (
+          <BodyText tone="secondary">
+            The cancel took it out of the task&apos;s limit; it takes its place there
+            again.
+          </BodyText>
+        )}
         <BodyText tone="secondary">
           A cancel keeps that result. Clear the fallback to count the submission as the
           contest&apos;s settings say again.
@@ -150,6 +163,13 @@ function Consequence({ asking }: { asking: Asking }) {
         <BodyText tone="secondary">
           Attempt {grading.attempt} stays in the list for the record.
         </BodyText>
+        {grading.falls_back && (
+          <BodyText tone="secondary">
+            The retry ends staff&apos;s fallback on attempt {grading.attempt}: the
+            submission counts as the new attempt, or as the contest&apos;s settings say
+            should that one break too.
+          </BodyText>
+        )}
       </>
     );
   }

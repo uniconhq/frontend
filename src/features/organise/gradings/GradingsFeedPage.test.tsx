@@ -615,9 +615,82 @@ describe('acting on the feed', () => {
     expect(group).toHaveTextContent(
       "Counts as attempt 1's result, as the contest's settings say.",
     );
-    expect(
-      within(group).queryByRole('button', { name: /^(Fall back|Clear)/ }),
-    ).toBeNull();
+    expect(within(group).queryByRole('button', { name: /^Clear/ })).toBeNull();
+    // Staff may still fall back, so the fallback outlasts a change to the settings.
+    await userEvent.click(
+      within(group).getByRole('button', {
+        name: 'Fall back A submission 1 by ada, attempt 2 to attempt 1',
+      }),
+    );
+    const asked = await screen.findByRole('dialog', {
+      name: 'Fall back to the last good result?',
+    });
+    expect(asked).toHaveTextContent(
+      "The contest's settings count it so already; this keeps it so if they change.",
+    );
+    expect(asked).toHaveTextContent(
+      "The cancel took it out of the task's limit; it takes its place there again.",
+    );
+  });
+
+  it('keeps a refused fallback in the dialog with its sentence', async () => {
+    server.use(
+      signedIn,
+      taskList,
+      http.put(`${CONTEST_API}/tasks/:task/gradings/:grading/fallback`, () =>
+        problem(409, 'conflict', {
+          detail: 'No earlier attempt of this submission finished with a result.',
+        }),
+      ),
+    );
+    feedAnswering(() => [
+      { ...retried, grading: { ...stuckFirst.grading, attempt: 2, last_good: 1 } },
+    ]);
+    const user = userEvent.setup();
+    renderApp(FEED);
+
+    await user.click(
+      await screen.findByRole('button', {
+        name: 'Fall back B submission 3 by ada, attempt 2 to attempt 1',
+      }),
+    );
+    const asked = await screen.findByRole('dialog', {
+      name: 'Fall back to the last good result?',
+    });
+    await user.click(within(asked).getByRole('button', { name: 'Fall back' }));
+
+    const refused = await within(asked).findByRole('alert');
+    expect(refused).toHaveTextContent('Nothing to fall back to');
+    expect(refused).toHaveTextContent(
+      'No earlier attempt of this submission finished with a result.',
+    );
+  });
+
+  it("says a retry ends staff's fallback", async () => {
+    server.use(signedIn, taskList);
+    feedAnswering(() => [
+      {
+        ...retried,
+        grading: {
+          ...stuckFirst.grading,
+          attempt: 2,
+          last_good: 1,
+          fallback: 'staff',
+          falls_back: true,
+        },
+      },
+    ]);
+    const user = userEvent.setup();
+    renderApp(FEED);
+
+    await user.click(
+      await screen.findByRole('button', {
+        name: 'Retry B submission 3 by ada, attempt 2',
+      }),
+    );
+    const asked = await screen.findByRole('dialog', { name: 'Retry this grading?' });
+
+    expect(asked).toHaveTextContent("The retry ends staff's fallback on attempt 2");
   });
 
   it('keeps a refused retry in the dialog with its sentence', async () => {
