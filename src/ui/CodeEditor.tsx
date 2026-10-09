@@ -5,10 +5,13 @@ import {
   Annotation,
   Compartment,
   EditorState,
+  RangeSetBuilder,
+  StateEffect,
+  StateField,
   Transaction,
   type Extension,
 } from '@codemirror/state';
-import { EditorView } from '@codemirror/view';
+import { Decoration, EditorView, type DecorationSet } from '@codemirror/view';
 import { HighlightStyle, syntaxHighlighting } from '@codemirror/language';
 import { yaml } from '@codemirror/lang-yaml';
 import { markdown } from '@codemirror/lang-markdown';
@@ -56,6 +59,7 @@ const look = EditorView.theme({
   '&.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection':
     { backgroundColor: 'var(--unicon-border-strong)' },
   '.cm-selectionMatch': { backgroundColor: 'var(--unicon-hover)' },
+  '.cm-marked-line': { backgroundColor: 'var(--unicon-hover)' },
   '.cm-panels': {
     backgroundColor: 'var(--unicon-chrome)',
     color: 'var(--unicon-text-body)',
@@ -91,6 +95,40 @@ const highlighting = HighlightStyle.define([
 /** Marks a change that came from `value` rather than from the person typing. */
 const fromValue = Annotation.define<boolean>();
 
+/** A run of lines, first to last, counted from 1. */
+export type LineRange = { from: number; to: number };
+
+const markLines = StateEffect.define<LineRange[]>();
+const markedLine = Decoration.line({ class: 'cm-marked-line' });
+
+/** The lines `marked` names, drawn with a band behind them. */
+const markedLines = StateField.define<DecorationSet>({
+  create: () => Decoration.none,
+  update(marks, transaction) {
+    let next = marks.map(transaction.changes);
+    for (const effect of transaction.effects) {
+      if (!effect.is(markLines)) continue;
+      const builder = new RangeSetBuilder<Decoration>();
+      const lines = transaction.state.doc.lines;
+      const wanted = new Set<number>();
+      for (const range of effect.value)
+        for (
+          let line = Math.max(1, range.from);
+          line <= Math.min(lines, range.to);
+          line += 1
+        )
+          wanted.add(line);
+      for (const line of [...wanted].sort((a, b) => a - b)) {
+        const at = transaction.state.doc.line(line).from;
+        builder.add(at, at, markedLine);
+      }
+      next = builder.finish();
+    }
+    return next;
+  },
+  provide: (field) => EditorView.decorations.from(field),
+});
+
 /**
  * A code editor: CodeMirror with its basic setup (line numbers, undo, search,
  * bracket matching, the keyboard commands people expect), highlighting YAML
@@ -98,7 +136,8 @@ const fromValue = Annotation.define<boolean>();
  * `value` is the text, and every edit the person makes comes back through
  * `onChange`; a new `value` from outside replaces the text without coming
  * back, and outside the undo history. `readOnly` keeps the text as it is but
- * still lets it be read, selected and copied. The label is shown above it and
+ * still lets it be read, selected and copied. `marked` draws a band behind
+ * the lines it names, scrolling the first into view. The label is shown above it and
  * is the editing area's accessible name, and clicking it moves the focus in.
  * It is `rows` lines tall and the person can drag it taller.
  *
@@ -114,6 +153,7 @@ export function CodeEditor({
   readOnly = false,
   autoFocus = false,
   rows = 18,
+  marked,
 }: {
   label: string;
   value: string;
@@ -122,6 +162,7 @@ export function CodeEditor({
   readOnly?: boolean;
   autoFocus?: boolean;
   rows?: number;
+  marked?: LineRange[];
 }) {
   const host = useRef<HTMLDivElement>(null);
   const view = useRef<EditorView | null>(null);
@@ -149,6 +190,7 @@ export function CodeEditor({
           syntaxHighlighting(highlighting),
           languageSlot.current.of(languageExtension(initial.language)),
           readOnlySlot.current.of(readOnlyExtension(initial.readOnly)),
+          markedLines,
           EditorView.contentAttributes.of({ 'aria-labelledby': labelId }),
           EditorView.updateListener.of((update) => {
             if (!update.docChanged) return;
@@ -189,6 +231,28 @@ export function CodeEditor({
       effects: readOnlySlot.current.reconfigure(readOnlyExtension(readOnly)),
     });
   }, [readOnly]);
+
+  const markedKey = JSON.stringify(marked ?? []);
+  useEffect(() => {
+    const current = view.current;
+    if (current === null) return;
+    const ranges = JSON.parse(markedKey) as LineRange[];
+    const first = ranges[0];
+    const lines = current.state.doc.lines;
+    current.dispatch({
+      effects: [
+        markLines.of(ranges),
+        ...(first !== undefined && first.from <= lines
+          ? [
+              EditorView.scrollIntoView(
+                current.state.doc.line(Math.max(1, first.from)).from,
+                { y: 'center' },
+              ),
+            ]
+          : []),
+      ],
+    });
+  }, [markedKey, value]);
 
   return (
     <div className={classes.field}>

@@ -1,0 +1,281 @@
+/* The editor fills the width the shell leaves it: the graph, then the
+ * selected box's panel and the file a save writes. */
+.editor {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.toolbar {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+
+.work {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 12px;
+  align-items: start;
+}
+
+@media (max-width: 1100px) {
+  .work {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.side {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.canvas {
+  height: 620px;
+  border: 1px solid var(--unicon-border);
+  border-radius: var(--mantine-radius-sm);
+  background: var(--unicon-body);
+}
+
+.band {
+  width: 100%;
+  height: 100%;
+  border-radius: var(--mantine-radius-sm);
+  background: var(--unicon-hover);
+}
+
+.box {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border: 2px solid var(--unicon-border-strong);
+  border-radius: var(--mantine-radius-sm);
+  background: var(--unicon-chrome);
+  color: var(--unicon-text-body);
+  font-size: 12px;
+}
+
+.box[data-selected] {
+  box-shadow: 0 0 0 3px var(--unicon-border-strong);
+}
+
+.box[data-dimmed] {
+  opacity: 0.55;
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 100%;
+  height: 44px;
+  padding: 4px 10px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.title {
+  font-weight: 700;
+  color: var(--unicon-text-primary);
+}
+
+.detail {
+  color: var(--unicon-text-meta);
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+/* A step's input and output rows share a line; each row lets the pointer
+ * through to the other, and only what it holds takes it. */
+.row {
+  position: absolute;
+  left: 0;
+  right: 0;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  white-space: nowrap;
+}
+
+.row[data-side='right'] {
+  justify-content: flex-end;
+}
+
+.row[data-offered] {
+  background: var(--unicon-hover);
+}
+
+.row[data-refused] {
+  opacity: 0.6;
+}
+
+.handle {
+  width: 10px;
+  height: 10px;
+}
+
+.port {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--unicon-text-primary);
+  font: inherit;
+  font-family: var(--mantine-font-family-monospace);
+  cursor: pointer;
+}
+
+.port:focus-visible {
+  outline: 2px solid var(--mantine-primary-color-filled);
+}
+
+.type,
+.marks {
+  color: var(--unicon-text-meta);
+  font-size: 11px;
+}
+
+.value {
+  color: var(--unicon-text-secondary);
+  font-family: var(--mantine-font-family-monospace);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 110px;
+}
+
+.drop {
+  color: var(--unicon-text-meta);
+  font-style: italic;
+}
+
+.problem,
+.boxProblem {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--mantine-color-red-filled);
+  color: white;
+  font-weight: 700;
+  font-size: 11px;
+}
+
+.boxProblem {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+}
+
+.refusedMark {
+  color: var(--unicon-text-danger);
+  font-weight: 700;
+}
+
+.notice {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 5;
+  padding: 4px 8px;
+  border-radius: var(--mantine-radius-sm);
+  background: var(--mantine-color-red-filled);
+  color: white;
+  white-space: normal;
+  width: 220px;
+}
+
+.slot {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.slotLabel {
+  position: absolute;
+  top: -2px;
+  left: 6px;
+  font-family: var(--mantine-font-family-monospace);
+  font-size: 10px;
+}
+
+.palette {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.primitive {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px;
+  border: 1px solid var(--unicon-border);
+  border-radius: var(--mantine-radius-sm);
+}
+
+.ports {
+  margin: 0;
+  padding-left: 16px;
+  font-family: var(--mantine-font-family-monospace);
+  font-size: 11px;
+  color: var(--unicon-text-body);
+}
+
+.problems {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13px;
+  color: var(--unicon-text-danger);
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.item {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.problemText {
+  margin: 0;
+  font-size: 13px;
+  color: var(--unicon-text-danger);
+}
+
+.note {
+  margin: 0;
+  font-size: 13px;
+  color: var(--unicon-text-body);
+}
+
+.row > * {
+  pointer-events: auto;
+}

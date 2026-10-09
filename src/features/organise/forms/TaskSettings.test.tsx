@@ -46,6 +46,7 @@ const UNREAD: WorkflowForm = {
   test: [],
   problem: 'The workflow unicon/checked@v1 cannot be read.',
   graded: false,
+  newer: null,
 };
 
 function declared(
@@ -69,6 +70,7 @@ const CHECKED: WorkflowForm = {
   workflow: 'unicon/checked@v1',
   problem: null,
   graded: false,
+  newer: null,
   inputs: [
     declared('submission', 'file', { contestant: true }),
     declared('language', 'enum', {
@@ -273,6 +275,35 @@ describe('the task settings form', { timeout: 20_000 }, () => {
     });
     expect(sent[0]?.content).toContain('name: Shortest Path # the title');
     expect(sent[0]?.content).toContain('samples: {}');
+  });
+
+  it('says a newer version of the workflow exists and names it only when asked', async () => {
+    const { sent } = taskBackend(
+      () =>
+        HttpResponse.json({
+          number: 4,
+          grading_changed: true,
+          changes: [],
+          notes: [],
+          regraded: 0,
+        }),
+      undefined,
+      { ...CHECKED, newer: 'v3' },
+    );
+    asManager();
+    const form = await openForm();
+
+    const notice = await within(form).findByRole('status');
+    expect(notice).toHaveTextContent(
+      'unicon/checked has a newer version, v3. This task grades with unicon/checked@v1 until unicon/checked@v3 is named here and the task is saved.',
+    );
+    expect(sent).toEqual([]);
+    await userEvent.click(
+      within(notice).getByRole('button', { name: 'Name unicon/checked@v3' }),
+    );
+
+    expect(within(form).getByLabelText('Workflow')).toHaveValue('unicon/checked@v3');
+    expect(sent).toEqual([]);
   });
 
   it("lets an admin change the admin's keys, and shows a draft's errors", async () => {
