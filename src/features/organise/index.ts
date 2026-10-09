@@ -8,3 +8,5 @@ export { TeamsPage } from './teams/TeamsPage';
 export { GradingsFeedPage } from './gradings/GradingsFeedPage';
 export { OrganisedBoardsPage } from './boards/OrganisedBoardsPage';
 export { InboxPage } from './threads/Clarifications';
+export { WorkflowsPage } from './workflows/WorkflowsPage';
+export { WorkflowPage } from './workflows/WorkflowPage';
