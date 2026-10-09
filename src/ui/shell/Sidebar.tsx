@@ -40,6 +40,7 @@ const OTHER_GROUPS: Group[] = [
       { label: 'Orgs', to: '/orgs', signedIn: true, section: true },
       { label: 'Contest setup' },
       { label: 'Task authoring' },
+      { label: 'Workflows', to: '/workflows', signedIn: true, section: true },
       { label: 'Runners' },
     ],
   },

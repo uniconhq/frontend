@@ -402,6 +402,79 @@ the dialog. A contest has teams only when its `contest.yaml` sets
 `team_size`, the most people a team holds; until it does, a new team is
 refused with `teams_off`.
 
+## Workflows
+
+A workflow is a person's or an org's, so its pages have addresses of their
+own, which the proxy sends here beside `/orgs`.
+
+| Address                              | Page                                                                                     |
+| ------------------------------------ | ---------------------------------------------------------------------------------------- |
+| `/workflows`                         | every workflow you may read, yours to edit first; New workflow; Combine workflows        |
+| `/workflows/:owner/:name`            | for one you may edit, the editor over its draft; otherwise its latest version, read-only |
+| `/workflows/:owner/:name?version=v1` | that version, read-only, with Copy it into a workflow of your own                        |
+
+**The editor is the only place a workflow is edited** (PROPOSAL.md section
+12, #377). `features/organise/workflows/` holds it. `model.ts` reads
+`workflow.yaml` into steps, inputs, test fields and report, forgiving a draft
+with problems, and reads a version in the format before 2026-10-07 into the
+same shape so it can be drawn. `layout.ts` works out where everything stands
+from the file alone, and nothing of it is stored: a once step one column right
+of the furthest once step it reads, per-test steps the same in a shaded band
+after them, the report last; inputs and test fields grouped by exactly the
+steps that read them, text with one written in counting, just before the
+first; a slot of its own in each column a wire skips, shared by the wires
+from one port and labelled at its first; each column sorted by where its
+wires come from and go, a few sweeps each way, keeping the fewest crossings;
+and five colours cut from the mark's gradient, the columns taking them 1 to 5
+and back. Every wire joins neighbouring columns, so none passes behind a box.
+React Flow draws the boxes and wires at those places and handles the drags;
+it places nothing, and no box can be dragged.
+
+`rules.ts` refuses at the drag whatever a version would refuse that the
+primitives' declarations decide, in the forge's own words: the type under
+the two widenings, an enum's options, an optional output into a required
+port, a test field or per-test input into a once step, a once step reading a
+per-test step, a contestant input or step output into a port a limit is
+raised from, and a loop; a refused drop says why at the port. Every port's
+name is a button whose menu does what a drag does, each wire it could take
+listed and one it may not shown with the reason, so the keyboard reaches
+everything. A drag starts at an output and ends at an input. A change on a
+panel that would newly break a wire, a value or a report entry, such as
+making an input the contestant's while it feeds a port a limit is raised
+from, is refused there with the same reason, and so is an output dropped on
+a report entry whose meaning it cannot have. `edit.ts` makes every change as an edit of the YAML document in
+place, so comments and key order survive; a wire to a step listed later
+moves the fewest steps to keep every step after what it reads, and a step
+switched between once and per test moves to keep the once steps first. Undo
+and redo step through the page's own history.
+
+Every definition file is read and written as the forge reads it, PyYAML's
+YAML 1.1 (`forms/yaml-doc.ts`): text that would read there as true, false or
+a number, such as `on`, `yes` or `1_000`, is written quoted.
+
+A moment after each change the definition goes to `POST /workflows/check`
+(a check that did not run says so, never that it passed), and each problem
+is pinned by its YAML path to the step, port, input, field
+or report entry it names; one that names nothing drawn heads the page. A
+draft with problems saves; making a version of it is refused with every
+problem listed. A save over someone else's opens the merge view with steps
+matched by `id`. Beside the graph is the file a save writes, read-only, with
+the selected box's lines marked. The panel beside it shows what is
+selected: a step's id, version, once or per test, and a value for each port
+without a wire, text taking inputs and test fields written in; the inputs,
+test fields and report entries, each declaration offering only the keys the
+format allows it; or, with nothing selected, the palette of primitives with
+their ports. Who reads the workflow is set beside the versions: private,
+shared with the people listed, or public; combine sits below, the
+workflow's latest version chosen to start with. A version is made of the
+save the page made, with its token, or not at all. A wire the layout cannot
+draw, such as a once step reading a per-test one in a draft, is shown on
+its port as text, and a step with no id keeps its place.
+
+A task whose workflow has a newer version than the one it names says so on
+its settings form, with a button that names the newer one in the field;
+nothing changes until the task is saved.
+
 ## The contestant pages
 
 | Address                               | Page                                                                                              |

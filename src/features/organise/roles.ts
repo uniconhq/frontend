@@ -105,3 +105,18 @@ export function holdsAtContest(
 ): boolean {
   return holdsAt(roles, { kind: 'contest', org, contest }, role);
 }
+
+/**
+ * Where the person may make a workflow: under their own username, in lower
+ * case, and under each org where they hold the manager role or above at the
+ * org itself.
+ */
+export function workflowOwners(me: Me): string[] {
+  const orgs = me.roles
+    .filter(
+      ({ names, role }) =>
+        names.contest === null && (role === 'manager' || role === 'admin'),
+    )
+    .map(({ names }) => names.org);
+  return [me.user.username.toLowerCase(), ...distinct(orgs)];
+}
