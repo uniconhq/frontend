@@ -2556,7 +2556,8 @@ export interface paths {
          * Freeze the saved draft under a version
          * @description Made only when the saved draft passes every check a version must;
          *     otherwise `invalid_definition` with every problem in `errors`, and no
-         *     version made.
+         *     version made. Given the token the draft was saved with, `conflict` when
+         *     someone has saved since.
          */
         post: operations["createWorkflowVersion"];
         delete?: never;
@@ -3101,9 +3102,13 @@ export interface components {
         };
         /**
          * CreateVersion
-         * @description A name to freeze the saved draft under, such as `v1`.
+         * @description A name to freeze the saved draft under, such as `v1`, and the token
+         *     the caller saved it with, so the version is of that save; with none, of
+         *     whatever is saved now.
          */
         CreateVersion: {
+            /** Token */
+            token?: string | null;
             /** Version */
             version: string;
         };
