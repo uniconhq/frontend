@@ -15,6 +15,7 @@ import { formatDateTime } from '@/lib/time';
 import { ContestAnnouncements } from './threads/AnnouncementList';
 import { QuestionsSection } from './threads/QuestionsSection';
 import { TeamSection } from './teams/TeamSection';
+import { BOARDS_EVERY_MS, BoardList } from './boards/BoardList';
 import { BySession } from './BySession';
 import { Countdown } from './Countdown';
 import { RegistrationPanel } from './RegistrationPanel';
@@ -127,6 +128,12 @@ function Home({
           This contest is a draft, so only its organisers see it.
         </BodyText>
       )}
+      {home.state === 'archived' && (
+        <BodyText tone="secondary">
+          This contest is archived: its tasks can still be read, and they take no
+          submissions.
+        </BodyText>
+      )}
       {home.description !== '' && <BodyText size="md">{home.description}</BodyText>}
       <Card>
         <div className={classes.stack}>
@@ -161,8 +168,8 @@ function Home({
 }
 
 /**
- * The contest as a visitor sees it: only a public contest and its released
- * tasks, with a way to sign in to register. A contest that is not public asks
+ * The contest as a visitor sees it: only a public contest, its released
+ * tasks and its boards shown to everyone, with a way to sign in to register. A contest that is not public asks
  * them to sign in first, since it may be one they can see with a session.
  */
 function PublicHome({ org, contest }: { org: string; contest: string }) {
@@ -198,8 +205,26 @@ function PublicHome({ org, contest }: { org: string; contest: string }) {
           <TaskList org={org} contest={contest} tasks={found.tasks} />
         </div>
       </Card>
+      <LandingBoards org={org} contest={contest} />
     </div>
   );
+}
+
+/**
+ * The contest's boards shown to everyone, read without a session, under its
+ * tasks; nothing at all when it shows none.
+ */
+function LandingBoards({ org, contest }: { org: string; contest: string }) {
+  const view = queryView(
+    $api.useQuery(
+      'get',
+      '/api/v1/public/contests/{org}/{contest}/boards',
+      { params: { path: { org, contest } } },
+      { refetchInterval: BOARDS_EVERY_MS },
+    ),
+  );
+  if (view.state === 'ready' && view.data.length === 0) return null;
+  return <BoardList view={view} empty="" />;
 }
 
 /**

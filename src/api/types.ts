@@ -53,7 +53,13 @@ export type SubmittedInput = Schemas['SubmittedInput'];
 export type Submission = Schemas['Submission'];
 export type GradingResult = Schemas['Result'];
 export type GroupShown = Schemas['GroupShown'];
+/** A run's reported values by name, its numbers exact and its texts apart. */
+export type Reported = Schemas['Reported'];
+/** One test's row of a result, with its credit once scored. */
+export type GradedTest = Schemas['GradedTest'];
 export type Grading = Schemas['Grading'];
+/** Who has a broken attempt count as its submission's last good result. */
+export type Fallback = NonNullable<Grading['fallback']>;
 export type Rejudged = Schemas['Rejudged'];
 /** One attempt in a contest's gradings feed, with its task and who submitted. */
 export type FeedEntry = Schemas['FeedEntry'];
@@ -62,6 +68,15 @@ export type QueueDepth = Schemas['QueueDepth'];
 export type Announcement = Schemas['Announcement'];
 export type Clarification = Schemas['Clarification'];
 export type GradingStatus = GradingResult['status'];
+/** A board as its reader sees it now, or the time it is shown from. */
+export type Board = Schemas['Board'];
+export type BoardKey = Schemas['BoardKey'];
+export type BoardCell = Schemas['BoardCell'];
+export type BoardRow = Schemas['BoardRow'];
+/** A board as organisers read it: `now`, `final` and what it asks that does not hold. */
+export type OrganisedBoard = Schemas['OrganisedBoard'];
+/** The marks a row holds on a task, the most it may hold, and its close. */
+export type Marks = Schemas['Marks'];
 
 /** The runner's list of outcomes, which each test and what stopped a run take one of. */
 export type Outcome = Schemas['GradedTest']['outcome'];

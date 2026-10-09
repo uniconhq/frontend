@@ -191,6 +191,7 @@ function Field({
 const PHASE: Record<Exclude<Phase, 'idle'>, string> = {
   hashing: 'Reading your files.',
   uploading: 'Sending your files.',
+  resending: 'The connection was cut, so the file is being sent again from the start.',
   submitting: 'Submitting.',
 };
 

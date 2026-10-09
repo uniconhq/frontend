@@ -48,25 +48,41 @@ const queued = {
   stopped: null,
   outcome: null,
   groups: [],
-  values: {},
+  values: { numbers: {}, texts: {} },
+  reason: null,
+  points: null,
+  factor: null,
+  folded: {},
 };
+
+const ranTest = (name: string, outcome: string, timeMs: string, credit: string) => ({
+  test: name,
+  outcome,
+  values: { numbers: { time_ms: timeMs }, texts: {} },
+  credit,
+  best: null,
+});
 
 const graded = {
   ...queued,
   status: 'done',
   outcome: 'wrong_answer',
-  values: { log: 'Compiled cleanly.' },
+  values: { numbers: {}, texts: { log: 'Compiled cleanly.' } },
+  points: { shown: '0', pending: '100', pending_until: '2026-09-29T12:00:00Z' },
+  factor: '1',
   groups: [
     {
       group: 'samples',
       show: 'always',
       outcome: 'wrong_answer',
       tests: [
-        { test: 'samples/1', outcome: 'accepted', values: { time_ms: 12 } },
-        { test: 'samples/2', outcome: 'wrong_answer', values: { time_ms: 30 } },
+        ranTest('samples/1', 'accepted', '12', '1'),
+        ranTest('samples/2', 'wrong_answer', '30', '0'),
       ],
       shown_at: null,
       ran: true,
+      points: '0',
+      max: '0',
     },
     {
       group: 'main',
@@ -75,6 +91,8 @@ const graded = {
       tests: null,
       shown_at: '2026-09-29T12:00:00Z',
       ran: true,
+      points: null,
+      max: '100',
     },
   ],
 };
@@ -163,13 +181,14 @@ async function stubApi(page: Page, overrides: Partial<State> = {}): Promise<Stat
         name: 'sum',
         label: 'A',
         title: 'Sum of Two',
-        worth: 100,
+        worth: '100',
         statement: '# Sum\n\nPrint the sum of two numbers.\n',
         submissions: { max: 50, rate: { count: 1, per: 30 } },
         inputs: state.inputs,
         release: OPEN,
         due: null,
         closes: '2026-09-29T12:00:00Z',
+        marks: null,
       });
     }
     if (path === '/uploads') {
@@ -409,7 +428,7 @@ test('a submission that did not compile shows that as its verdict', async ({
           ...queued,
           status: 'done',
           stopped: 'compile_error',
-          values: { log: 'main.cpp:1: error' },
+          values: { numbers: {}, texts: { log: 'main.cpp:1: error' } },
         },
       },
     ],

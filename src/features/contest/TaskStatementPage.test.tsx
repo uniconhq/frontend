@@ -5,6 +5,7 @@ import { formatDateTime } from '@/lib/time';
 import { renderApp } from '@/test/render';
 import { problem, server, signedIn } from '@/test/server';
 import { noSubmissions, PUBLIC_API, TASK_API, taskPage } from '@/test/contestant';
+import { passTime, withFakeTimers } from '@/test/timers';
 
 const PAGE = '/contests/acme/spring/tasks/sum';
 
@@ -41,20 +42,90 @@ describe('a task page for a signed-in person', () => {
     );
   });
 
-  it('says why the task takes no submission now', async () => {
+  it.each([
+    ['not_released', 'This task is not released yet.'],
+    ['archived', 'The contest is archived, so its tasks take no submissions.'],
+    [
+      'closed',
+      'This task has closed for you, so it takes no more submissions from you.',
+    ],
+    ['not_approved', 'Only approved contestants submit to this task.'],
+  ] as const)(
+    'says in the panel’s place why it takes nothing, %s',
+    async (closed, said) => {
+      server.use(
+        signedIn,
+        noSubmissions,
+        http.get(`${TASK_API}/page`, () =>
+          HttpResponse.json({
+            ...taskPage,
+            release: {
+              released: closed !== 'not_released',
+              visible: true,
+              open: false,
+              closed,
+            },
+          }),
+        ),
+      );
+      renderApp(PAGE);
+
+      expect(
+        await screen.findByRole('status', { name: 'Why you cannot submit' }),
+      ).toHaveTextContent(said);
+      expect(screen.queryByRole('form', { name: 'Submit' })).not.toBeInTheDocument();
+    },
+  );
+
+  it("counts down to the row's due and close, extension included, by the server's clock", async () => {
     server.use(
       signedIn,
       noSubmissions,
       http.get(`${TASK_API}/page`, () =>
         HttpResponse.json({
           ...taskPage,
-          release: { released: true, visible: true, open: false, closed: 'closed' },
+          due: '2026-09-12T10:15:00Z',
+          closes: '2026-09-12T10:45:00Z',
         }),
       ),
     );
     renderApp(PAGE);
 
-    expect(await screen.findByText('This task has closed for you.')).toBeVisible();
+    const timer = await screen.findByRole('timer', { name: 'Task countdown' });
+    expect(timer).toHaveTextContent(/Due in (14m 5\ds|15m 00s)/);
+    expect(timer).toHaveTextContent(/Closes in (44m 5\ds|45m 00s)/);
+    expect(timer).not.toHaveTextContent("this device's clock");
+  });
+
+  it("says it counts by the device's clock when the server's time did not come in", async () => {
+    server.use(
+      signedIn,
+      noSubmissions,
+      http.get('/api/v1/time', () => problem(404, 'not_found')),
+      http.get(`${TASK_API}/page`, () => HttpResponse.json(taskPage)),
+    );
+    renderApp(PAGE);
+
+    const timer = await screen.findByRole('timer', { name: 'Task countdown' });
+    expect(timer).toHaveTextContent(
+      "Counted by this device's clock: the server's time did not come in.",
+    );
+  });
+
+  it('says a submission past the due is late, and still takes it', async () => {
+    server.use(
+      signedIn,
+      noSubmissions,
+      http.get(`${TASK_API}/page`, () =>
+        HttpResponse.json({ ...taskPage, due: '2026-09-12T09:50:00Z' }),
+      ),
+    );
+    renderApp(PAGE);
+
+    const timer = await screen.findByRole('timer', { name: 'Task countdown' });
+    expect(timer).toHaveTextContent('Past due: a submission now is late.');
+    expect(timer).toHaveTextContent(/Closes in (29m 5\ds|30m 00s)/);
+    expect(screen.getByRole('form', { name: 'Submit' })).toBeVisible();
   });
 
   it('leaves out raw HTML an organiser wrote into the statement', async () => {
@@ -105,6 +176,44 @@ describe('a task page for a signed-in person', () => {
     renderApp(PAGE);
 
     expect(await screen.findByRole('heading', { name: 'Not found' })).toBeVisible();
+  });
+});
+
+describe('a task page as the task opens', () => {
+  withFakeTimers();
+
+  it('brings the panel back once the task is open', async () => {
+    let asked = 0;
+    server.use(
+      signedIn,
+      noSubmissions,
+      http.get(`${TASK_API}/page`, () => {
+        asked += 1;
+        return HttpResponse.json(
+          asked === 1
+            ? {
+                ...taskPage,
+                release: {
+                  released: false,
+                  visible: true,
+                  open: false,
+                  closed: 'not_released',
+                },
+              }
+            : taskPage,
+        );
+      }),
+    );
+    renderApp(PAGE);
+
+    expect(
+      await screen.findByRole('status', { name: 'Why you cannot submit' }),
+    ).toHaveTextContent('This task is not released yet.');
+
+    await passTime(60_000);
+
+    expect(await screen.findByRole('form', { name: 'Submit' })).toBeVisible();
+    expect(screen.queryByRole('status', { name: 'Why you cannot submit' })).toBeNull();
   });
 });
 

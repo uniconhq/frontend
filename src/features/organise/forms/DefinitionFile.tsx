@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { toApiError } from '@/api/problem';
-import type { FileContent, WriteFile } from '@/api/types';
+import type { DefinitionError, FileContent, WriteFile } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { Tabs } from '@/ui/Tabs';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
@@ -10,15 +10,21 @@ import { SaveOutcome, type Outcome } from '../files/SaveOutcome';
 import { UploadedFile } from '../files/UploadedFile';
 import type { Place } from '../files/place';
 import { useFileWrite, useOwnFile } from './file-hooks';
+import { definitionErrorsOf } from '../files/refusals';
 import { MergeView } from './MergeView';
 import { parseYaml, topMap, writeYaml, type Doc } from './yaml-doc';
 
-/** What a form is handed: the file as read, and the way to save a change to it. */
+/**
+ * What a form is handed: the file as read, the way to save a change to it,
+ * and what the last save was refused for, each at its YAML path, so a form
+ * can say it on the field that caused it.
+ */
 export type FormProps = {
   doc: Doc;
   busy: boolean;
   /** Apply the form's changes to a fresh copy of the document and save it. */
   onSave: (change: (doc: Doc) => void) => void;
+  refused: DefinitionError[];
 };
 
 /**
@@ -152,6 +158,10 @@ function FormView({
           {children({
             doc: read.doc,
             busy,
+            refused:
+              outcome?.kind === 'refused' && outcome.error.code === 'invalid_definition'
+                ? definitionErrorsOf(outcome.error)
+                : [],
             onSave: (change) => {
               const fresh = parseYaml(file.content);
               if ('error' in fresh) return;

@@ -10,6 +10,7 @@ import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
 import { useMe } from '@/session';
 import { contestHomePath } from '@/lib/contest-paths';
 import {
+  boardsPath,
   contestantsPath,
   gradingsPath,
   taskPath,
@@ -67,7 +68,8 @@ function useStandingsFollowContestWrites(org: string, contest: string) {
  * A contest's tasks and where each stands, the button that opens the form
  * for a new one, which also adds it to `contest.yaml`'s tasks, and the
  * contest repo's files, `contest.yaml` among them, with the way to its
- * registrations, its teams, its gradings and the page its contestants see.
+ * registrations, its teams, its gradings, its boards and the page its
+ * contestants see.
  * Each part loads and fails on its own, so a refused task list still leaves
  * the files readable. Listing needs the observer role at the contest;
  * someone who holds a role only at one of its tasks is refused the list, so
@@ -151,6 +153,7 @@ export function ContestPage() {
         <PageLink to={contestantsPath(org, contest)}>Contestants</PageLink>
         <PageLink to={teamsPath(org, contest)}>Teams</PageLink>
         <PageLink to={gradingsPath(org, contest)}>Gradings</PageLink>
+        <PageLink to={boardsPath(org, contest)}>Boards</PageLink>
         <PageLink to={contestHomePath(org, contest)}>The page contestants see</PageLink>
       </div>
       <Card>

@@ -3,7 +3,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import type { GradingResult, Submission, TaskPage } from '@/api/types';
-import { serverNow } from '@/lib/time';
+import { formatExact } from '@/lib/exact';
 import { renderApp } from '@/test/render';
 import { problem, server, signedIn } from '@/test/server';
 import { fakeTimerUser, passTime, withFakeTimers } from '@/test/timers';
@@ -11,13 +11,13 @@ import {
   accepted,
   grading,
   inputField,
+  reported,
   submission,
   TASK_API,
   taskPage,
   DOOR_URL,
   uploadStore,
 } from '@/test/contestant';
-import { valueText } from './grading';
 
 const PAGE = '/contests/acme/spring/tasks/sum';
 
@@ -26,6 +26,14 @@ function withPage(overrides: Partial<TaskPage>) {
     HttpResponse.json({ ...taskPage, ...overrides }),
   );
 }
+
+/**
+ * The server's clock agreeing with the browser's, so a submission made
+ * `Date.now()`-relative reads as just made whichever answer comes in first.
+ */
+const agreeingClock = http.get('/api/v1/time', () =>
+  HttpResponse.json({ now: new Date().toISOString() }),
+);
 
 function listing(submissions: Submission[]) {
   return http.get(`${TASK_API}/submissions`, () => HttpResponse.json(submissions));
@@ -347,13 +355,96 @@ describe('the submit panel', () => {
     expect(slots).toEqual([expect.objectContaining({ filename: '1.txt' })]);
   });
 
-  it('reports a failed upload as possibly too large, with nothing half sent', async () => {
+  it('sends a file again from the start when its connection is cut, then submits it', async () => {
     const store = uploadStore();
     const made = submissions();
+    let puts = 0;
+    let release = () => {};
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
     server.use(
       signedIn,
       withPage({}),
-      http.put(`${DOOR_URL}:upload`, () => new HttpResponse(null, { status: 403 })),
+      http.put(`${DOOR_URL}:upload`, async () => {
+        puts += 1;
+        if (puts === 1) return HttpResponse.error();
+        await held;
+        return undefined;
+      }),
+      http.post(`${TASK_API}/uploads/:upload/complete`, ({ params }) =>
+        store.seen.sent.some((sent) => sent.id === params['upload'])
+          ? undefined
+          : problem(409, 'upload_not_ready'),
+      ),
+      ...store.handlers,
+      ...made.handlers,
+    );
+    const user = userEvent.setup();
+    renderApp(PAGE);
+
+    await user.upload(await screen.findByLabelText('Your solution'), python());
+    await user.click(screen.getByRole('button', { name: 'Submit' }));
+
+    expect(await screen.findByRole('status', { name: 'Sending' })).toHaveTextContent(
+      'The connection was cut, so the file is being sent again from the start.',
+    );
+    expect(screen.getByRole('progressbar')).toBeVisible();
+    release();
+
+    expect(await screen.findByText('Submitted as #1.')).toBeVisible();
+    expect(puts).toBe(2);
+    expect(store.seen.slots).toHaveLength(1);
+    expect(store.seen.sent).toEqual([
+      { id: '00000000-0000-4000-8000-000000000001', bytes: 9 },
+    ]);
+    expect(made.bodies[0]?.inputs).toMatchObject({
+      submission: { uploads: ['00000000-0000-4000-8000-000000000001'] },
+    });
+  });
+
+  it('gives a cut upload up after three sends, and keeps the file', async () => {
+    const store = uploadStore();
+    const made = submissions();
+    let puts = 0;
+    server.use(
+      signedIn,
+      withPage({}),
+      http.put(`${DOOR_URL}:upload`, () => {
+        puts += 1;
+        return HttpResponse.error();
+      }),
+      http.post(`${TASK_API}/uploads/:upload/complete`, () =>
+        problem(409, 'upload_not_ready'),
+      ),
+      ...store.handlers,
+      ...made.handlers,
+    );
+    const user = userEvent.setup();
+    renderApp(PAGE);
+
+    await user.upload(await screen.findByLabelText('Your solution'), python());
+    await user.click(screen.getByRole('button', { name: 'Submit' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'The upload did not go through',
+    );
+    expect(puts).toBe(3);
+    expect(screen.getByRole('button', { name: 'Remove main.py' })).toBeVisible();
+    expect(made.bodies).toHaveLength(0);
+  });
+
+  it('reports a failed upload as possibly too large, with nothing half sent', async () => {
+    const store = uploadStore();
+    const made = submissions();
+    let puts = 0;
+    server.use(
+      signedIn,
+      withPage({}),
+      http.put(`${DOOR_URL}:upload`, () => {
+        puts += 1;
+        return new HttpResponse(null, { status: 403 });
+      }),
       ...store.handlers,
       ...made.handlers,
     );
@@ -370,6 +461,7 @@ describe('the submit panel', () => {
     expect(screen.getByRole('button', { name: 'Remove main.py' })).toBeVisible();
     expect(store.seen.completed).toHaveLength(0);
     expect(made.bodies).toHaveLength(0);
+    expect(puts).toBe(1);
   });
 
   const REFUSALS: [string, Record<string, unknown>, string, string][] = [
@@ -555,6 +647,22 @@ describe('the submit panel', () => {
     ).toBeVisible();
     expect(screen.queryByRole('form', { name: 'Submit' })).not.toBeInTheDocument();
   });
+
+  it('says only approved contestants submit, to a reader who is not one', async () => {
+    server.use(
+      signedIn,
+      listing([]),
+      withPage({
+        release: { released: true, visible: true, open: false, closed: 'not_approved' },
+      }),
+    );
+    renderApp(PAGE);
+
+    expect(
+      await screen.findByText('Only approved contestants submit to this task.'),
+    ).toBeVisible();
+    expect(screen.queryByRole('form', { name: 'Submit' })).not.toBeInTheDocument();
+  });
 });
 
 describe('the submissions list', () => {
@@ -563,7 +671,7 @@ describe('the submissions list', () => {
   it('follows a queued submission until its outcome comes back', async () => {
     const fresh = (graded: GradingResult) => ({
       ...submission(1, graded),
-      submitted_at: new Date(serverNow().getTime() - 2_000).toISOString(),
+      submitted_at: new Date(Date.now() - 2_000).toISOString(),
     });
     const turns = [
       [fresh(grading())],
@@ -573,6 +681,7 @@ describe('the submissions list', () => {
     let asked = 0;
     server.use(
       signedIn,
+      agreeingClock,
       withPage({}),
       http.get(`${TASK_API}/submissions`, () => {
         const answer = turns[Math.min(asked, turns.length - 1)];
@@ -602,7 +711,7 @@ describe('the submissions list', () => {
   it('shows a cancelled submission with the organisers’ sentence and stops following it', async () => {
     const fresh = (graded: GradingResult) => ({
       ...submission(1, graded),
-      submitted_at: new Date(serverNow().getTime() - 2_000).toISOString(),
+      submitted_at: new Date(Date.now() - 2_000).toISOString(),
     });
     const turns = [
       [fresh(grading({ status: 'running' }))],
@@ -618,6 +727,7 @@ describe('the submissions list', () => {
     let asked = 0;
     server.use(
       signedIn,
+      agreeingClock,
       withPage({}),
       http.get(`${TASK_API}/submissions`, () => {
         const answer = turns[Math.min(asked, turns.length - 1)];
@@ -677,6 +787,8 @@ describe('a submission opened from the list', () => {
           tests: null,
           shown_at: '2026-09-12T11:00:00Z',
           ran: true,
+          points: null,
+          max: '70',
         },
         {
           group: 'extra',
@@ -685,8 +797,12 @@ describe('a submission opened from the list', () => {
           tests: [],
           shown_at: null,
           ran: false,
+          points: null,
+          max: '0',
         },
       ],
+      points: { shown: '100', pending: '70', pending_until: '2026-09-12T11:00:00Z' },
+      folded: { time_ms: '12.5' },
     });
     server.use(
       signedIn,
@@ -711,16 +827,24 @@ describe('a submission opened from the list', () => {
     expect(within(tests).getByRole('columnheader', { name: 'time_ms' })).toBeVisible();
     const rows = within(tests).getAllByRole('row');
     expect(rows).toHaveLength(3);
-    expect(rows[1]).toHaveTextContent(`samples/1ACCEPTED12${valueText(2048)}`);
+    expect(rows[1]).toHaveTextContent(`samples/1ACCEPTED12${formatExact('2048')}`);
     expect(rows[2]).toHaveTextContent('samples/2ACCEPTED——');
+    expect(
+      within(detail).getByText(/^100 points, and up to 70 more shown at /),
+    ).toBeVisible();
+    expect(within(detail).getByLabelText('Over the tests')).toHaveTextContent(
+      `time_ms${formatExact('12.5')}`,
+    );
 
     const main = within(detail).getByRole('region', { name: 'Group main' });
     expect(within(main).getByText('ACCEPTED')).toBeVisible();
+    expect(within(main).getByText('100 / 100 points')).toBeVisible();
     expect(within(main).getByText(/^Shown at /)).toBeVisible();
     expect(within(main).queryByRole('table')).toBeNull();
 
     const large = within(detail).getByRole('region', { name: 'Group large' });
     expect(within(large).getByText(/^Shown at /)).toBeVisible();
+    expect(within(large).getByText('of 70 points')).toBeVisible();
     expect(within(large).queryByText('ACCEPTED')).toBeNull();
     expect(within(large).queryByRole('table')).toBeNull();
     expect(within(large).queryByText('Not run on this grading')).toBeNull();
@@ -810,7 +934,7 @@ describe('a submission opened from the list', () => {
     const stopped = grading({
       status: 'done',
       stopped: 'compile_error',
-      values: { log: '<img src=x onerror="alert(1)">' },
+      values: reported({}, { log: '<img src=x onerror="alert(1)">' }),
     });
     server.use(
       signedIn,
