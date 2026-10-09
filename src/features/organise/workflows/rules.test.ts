@@ -153,7 +153,7 @@ describe('the drag rules', () => {
       1,
       'memory_limit',
       output('run', 'time_ms'),
-      'A step cannot read its own output.',
+      'run is not a step before this one.',
     ],
     [
       'a number into an enum port',
@@ -245,7 +245,7 @@ steps:
       valueRefusal(WORKFLOW, primitives, 0, 'language', '${{ inputs.limit }}s', [
         input('limit'),
       ]),
-    ).toBe('Takes enum, not text.');
+    ).toBe('Takes one of c, cpp, java, python.');
     expect(
       valueRefusal(WORKFLOW, primitives, 0, 'entry', 'x ${{ test.episodes }}', [
         field('episodes'),
@@ -256,7 +256,7 @@ steps:
         input('key'),
       ]),
     ).toBe(
-      'inputs.key is optional, so it is given whole to optional ports, never written into text.',
+      '${{ inputs.key }} is optional, so it is given whole to optional ports, never written into text.',
     );
     expect(valueRefusal(WORKFLOW, primitives, 0, 'language', 'rust', [])).toBe(
       'Takes one of c, cpp, java, python.',

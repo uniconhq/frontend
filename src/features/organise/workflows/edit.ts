@@ -6,7 +6,14 @@ import {
   type YAMLMap,
   type YAMLSeq,
 } from 'yaml';
-import { parseYaml, writeAt, writeYaml } from '../forms/yaml-doc';
+import {
+  nodeFor,
+  parseYaml,
+  quoteForPython,
+  writeAt,
+  writeOver,
+  writeYaml,
+} from '../forms/yaml-doc';
 import { readWorkflow, refText, type Ref, type Workflow } from './model';
 import type { PrimitiveInfo } from './primitives';
 import { orderAfterWire } from './rules';
@@ -23,24 +30,6 @@ const TOP_ORDER = ['inputs', 'test', 'steps', 'report'];
 
 type Edit = (doc: Document) => void;
 
-/** What PyYAML reads as a date or a time, which the page holds as text. */
-const PYTHON_TIME =
-  /^(?:\d{4}-\d\d-\d\d|\d{4}-\d\d?-\d\d?(?:[Tt]|[ \t]+)\d\d?:\d\d:\d\d(?:\.\d*)?(?:[ \t]*(?:Z|[-+]\d\d?(?::\d\d)?))?)$/;
-
-/**
- * Every text under `node` that PyYAML would read as a date written quoted,
- * so the forge reads it as the text the page shows.
- */
-function quoteTimes(node: unknown): void {
-  if (isScalar(node)) {
-    if (typeof node.value === 'string' && PYTHON_TIME.test(node.value))
-      node.type = 'QUOTE_DOUBLE';
-    return;
-  }
-  if (isMap(node)) for (const pair of node.items) quoteTimes(pair.value);
-  if (isSeq(node)) for (const item of node.items) quoteTimes(item);
-}
-
 /** `edit` applied to the document `text` holds. */
 function edited(text: string, edit: Edit): string {
   const parsed = parseYaml(text);
@@ -48,7 +37,7 @@ function edited(text: string, edit: Edit): string {
   const { doc } = parsed;
   if (doc.contents === null || !isMap(doc.contents)) doc.contents = doc.createNode({});
   edit(doc);
-  return writeYaml(doc);
+  return writeOver(text, doc);
 }
 
 /** The workflow `text` holds now. */
@@ -61,7 +50,12 @@ export function workflowOf(text: string): Workflow {
 function top<T extends YAMLMap | YAMLSeq>(doc: Document, key: string, list = false): T {
   const root = doc.contents as YAMLMap;
   const found: unknown = root.get(key, true);
-  if ((list && isSeq(found)) || (!list && isMap(found))) return found as T;
+  if ((list && isSeq(found)) || (!list && isMap(found))) {
+    // An empty `[]` or `{}` takes its first entry as a block, an entry to a line.
+    const collection = found as T;
+    if (collection.items.length === 0) collection.flow = false;
+    return collection;
+  }
   const made = doc.createNode(list ? [] : {}) as T;
   const pair = doc.createPair(key, made);
   const existing = root.items.findIndex(
@@ -139,9 +133,10 @@ function rewriteStrings(doc: Document, change: (text: string) => string): void {
   const visit = (node: unknown) => {
     if (isMap(node)) {
       for (const pair of node.items) {
-        if (isScalar(pair.value) && typeof pair.value.value === 'string')
+        if (isScalar(pair.value) && typeof pair.value.value === 'string') {
           pair.value.value = change(pair.value.value);
-        else visit(pair.value);
+          quoteForPython(pair.value);
+        } else visit(pair.value);
       }
     }
   };
@@ -149,9 +144,10 @@ function rewriteStrings(doc: Document, change: (text: string) => string): void {
   const report: unknown = (doc.contents as YAMLMap).get('report', true);
   if (isMap(report)) {
     for (const pair of report.items) {
-      if (isScalar(pair.value) && typeof pair.value.value === 'string')
+      if (isScalar(pair.value) && typeof pair.value.value === 'string') {
         pair.value.value = change(pair.value.value);
-      else visit(pair.value);
+        quoteForPython(pair.value);
+      } else visit(pair.value);
     }
   }
 }
@@ -223,7 +219,8 @@ export function addStep(
     workflow.steps.map((step) => step.id),
   );
   return edited(text, (doc) => {
-    const node = doc.createNode(
+    const node = nodeFor(
+      doc,
       perTest
         ? { id, use: primitive.ref, per_test: true, with: {} }
         : { id, use: primitive.ref, with: {} },
@@ -252,14 +249,14 @@ export function renameStep(text: string, index: number, id: string): string {
   const step = workflowOf(text).steps[index];
   if (step === undefined || step.id === id) return text;
   return edited(text, (doc) => {
-    stepNode(doc, index)?.set('id', id);
+    writeAt(doc, ['steps', index, 'id'], id);
     rewriteStrings(doc, (value) => renamed(value, 'steps', step.id, id));
   });
 }
 
 /** The step's primitive at another version. */
 export function setUse(text: string, index: number, use: string): string {
-  return edited(text, (doc) => stepNode(doc, index)?.set('use', use));
+  return edited(text, (doc) => writeAt(doc, ['steps', index, 'use'], use));
 }
 
 /**
@@ -321,9 +318,8 @@ export function setValue(
   return edited(text, (doc) => {
     const node = stepNode(doc, index);
     if (node === null) return;
-    const scalar = doc.createNode(value);
-    quoteTimes(scalar);
-    withOf(doc, node).set(port, scalar);
+    withOf(doc, node);
+    writeAt(doc, ['steps', index, 'with', port], value);
   });
 }
 
@@ -352,7 +348,6 @@ export function setInput(text: string, id: string, fields: InputFields): string 
   return edited(text, (doc) => {
     top<YAMLMap>(doc, 'inputs');
     writeAt(doc, ['inputs', id], declarationNode(fields));
-    quoteTimes(doc.getIn(['inputs', id], true));
   });
 }
 
@@ -361,7 +356,6 @@ export function setField(text: string, name: string, fields: FieldFields): strin
   return edited(text, (doc) => {
     top<YAMLMap>(doc, 'test');
     writeAt(doc, ['test', name], declarationNode(fields));
-    quoteTimes(doc.getIn(['test', name], true));
   });
 }
 
@@ -369,7 +363,10 @@ function renameKey(doc: Document, section: string, from: string, to: string): vo
   const map: unknown = (doc.contents as YAMLMap).get(section, true);
   if (!isMap(map)) return;
   for (const pair of map.items)
-    if (isScalar(pair.key) && pair.key.value === from) pair.key.value = to;
+    if (isScalar(pair.key) && pair.key.value === from) {
+      pair.key.value = to;
+      quoteForPython(pair.key);
+    }
 }
 
 /** An input renamed, every reference to it following. */

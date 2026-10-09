@@ -31,6 +31,7 @@ import {
 import {
   VALUE_TYPES,
   refLabel,
+  refProblem,
   refsIn,
   wholeRef,
   refText,
@@ -175,8 +176,9 @@ function PortValue({
       change(wire(text, index, port, whole));
       return null;
     }
-    const written = typeof raw === 'string' ? refsIn(raw) : [];
-    if (written === null) return 'A ${{ }} here is not an input or a test field.';
+    const bad = typeof raw === 'string' ? refProblem(raw) : null;
+    if (bad !== null) return bad;
+    const written = (typeof raw === 'string' ? refsIn(raw) : []) ?? [];
     const refused = valueRefusal(workflow, primitives, index, port, raw, written);
     if (refused !== null) return refused;
     change(setValue(text, index, port, raw));
@@ -791,6 +793,7 @@ function EntryRow({
   const betterInputs = workflow.inputs.filter(
     (input) =>
       !input.contestant &&
+      !input.optional &&
       input.type === 'enum' &&
       (input.options ?? []).every(
         (option) => option === 'higher' || option === 'lower',

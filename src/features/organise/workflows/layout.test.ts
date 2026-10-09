@@ -1,41 +1,67 @@
 import { describe, expect, it } from 'vitest';
-import { parse } from 'yaml';
+import { parseYaml } from '../forms/yaml-doc';
 import { CLASSIC_FOLDER, CLASSIC_V1, CLASSIC_V2, PRIMITIVES } from '@/test/workflows';
-import { colourOf, layoutWorkflow, type Box, type Layout, type Point } from './layout';
+import {
+  colourOf,
+  layoutWorkflow,
+  wirePath,
+  type Box,
+  type Layout,
+  type Point,
+} from './layout';
 import { readWorkflow } from './model';
 import { byRef } from './primitives';
 
 const primitives = byRef(PRIMITIVES);
 
+/** The layout of a file read as the editor reads it, YAML 1.1. */
 function laid(text: string): Layout {
-  return layoutWorkflow(readWorkflow(parse(text)), primitives);
+  const parsed = parseYaml(text);
+  if ('error' in parsed) throw new Error(parsed.error);
+  return layoutWorkflow(readWorkflow(parsed.doc.toJS()), primitives);
 }
 
-/** Points along a wire as it is drawn: each level run and each curve between columns. */
+/** Points along the path `wirePath` draws for a wire: each line and each curve. */
 function along(points: Point[]): Point[] {
+  const words = wirePath(points).split(' ');
   const found: Point[] = [];
-  for (let at = 0; at + 1 < points.length; at += 1) {
-    const a = points[at];
-    const b = points[at + 1];
-    if (a === undefined || b === undefined) continue;
-    const middle = (a.x + b.x) / 2;
-    for (let step = 0; step <= 40; step += 1) {
-      const t = step / 40;
-      if (a.y === b.y) {
-        found.push({ x: a.x + (b.x - a.x) * t, y: a.y });
-        continue;
+  let at = { x: 0, y: 0 };
+  const number = (index: number) => Number(words[index]);
+  for (let index = 0; index < words.length;) {
+    const command = words[index];
+    if (command === 'M') {
+      at = { x: number(index + 1), y: number(index + 2) };
+      found.push(at);
+      index += 3;
+    } else if (command === 'L') {
+      const end = { x: number(index + 1), y: number(index + 2) };
+      for (let step = 1; step <= 40; step += 1)
+        found.push({
+          x: at.x + ((end.x - at.x) * step) / 40,
+          y: at.y + ((end.y - at.y) * step) / 40,
+        });
+      at = end;
+      index += 3;
+    } else if (command === 'C') {
+      const [x1, y1, x2, y2, x, y] = [1, 2, 3, 4, 5, 6].map((offset) =>
+        number(index + offset),
+      );
+      for (let step = 1; step <= 40; step += 1) {
+        const t = step / 40;
+        const u = 1 - t;
+        const weigh = (p0: number, p1: number, p2: number, p3: number) =>
+          u * u * u * p0 + 3 * u * u * t * p1 + 3 * u * t * t * p2 + t * t * t * p3;
+        found.push({
+          x: weigh(at.x, x1 ?? 0, x2 ?? 0, x ?? 0),
+          y: weigh(at.y, y1 ?? 0, y2 ?? 0, y ?? 0),
+        });
       }
-      const u = 1 - t;
-      found.push({
-        x:
-          u * u * u * a.x +
-          3 * u * u * t * middle +
-          3 * u * t * t * middle +
-          t * t * t * b.x,
-        y:
-          u * u * u * a.y + 3 * u * u * t * a.y + 3 * u * t * t * b.y + t * t * t * b.y,
-      });
-    }
+      at = { x: x ?? 0, y: y ?? 0 };
+      index += 7;
+    } else
+      throw new Error(
+        `wirePath wrote ${String(command)}, which this test does not read`,
+      );
   }
   return found;
 }
@@ -208,6 +234,8 @@ steps:
     expect(group?.column).toBe(columnOf(layout, 'step:0')! - 1);
     expect(layout.wires.some((wire) => wire.to.port === 'args')).toBe(false);
     expect(layout.wires.some((wire) => wire.to.port === 'time_limit')).toBe(true);
+    expect(behind(layout)).toEqual([]);
+    expect(overlaps(layout)).toEqual([]);
   });
 
   it('stands what nothing reads in the first column, and test fields in the band', () => {
