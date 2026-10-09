@@ -1,9 +1,15 @@
 import {
   isMap,
+  isNode,
   isScalar,
   isSeq,
   parseDocument,
   type Document,
+  type DocumentOptions,
+  type ParseOptions,
+  type ScalarTag,
+  type SchemaOptions,
+  type Tags,
   type YAMLMap,
 } from 'yaml';
 
@@ -16,9 +22,37 @@ import {
 export type Doc = Document;
 export type Path = (string | number)[];
 
+const PYTHON_TRUE = /^(?:[Yy]es|YES|[Tt]rue|TRUE|[Oo]n|ON)$/;
+const PYTHON_FALSE = /^(?:[Nn]o|NO|[Ff]alse|FALSE|[Oo]ff|OFF)$/;
+const BOOL = 'tag:yaml.org,2002:bool';
+const TIMESTAMP = 'tag:yaml.org,2002:timestamp';
+
+/**
+ * How every definition file is read and written: as the forge reads it,
+ * PyYAML's YAML 1.1, where `on`, `yes` and `off` are true and false and
+ * `1_000` is a number. A string that would read as one of those is written
+ * quoted, so the file a save writes means to the forge what the page shows.
+ * Two of the library's 1.1 rules are PyYAML's instead: `y` and `n` stay
+ * text, and a time stays the text it is written as, which the forms read.
+ */
+export const YAML_OPTIONS: ParseOptions & DocumentOptions & SchemaOptions = {
+  version: '1.1',
+  customTags: (tags: Tags) =>
+    tags
+      .filter((tag) => typeof tag !== 'object' || tag.tag !== TIMESTAMP)
+      .map(pythonBool),
+};
+
+/** A 1.1 bool tag narrowed to PyYAML's words; any other tag as it is. */
+function pythonBool(tag: Tags[number]): Tags[number] {
+  if (typeof tag !== 'object' || tag.tag !== BOOL || 'collection' in tag) return tag;
+  const scalar: ScalarTag = tag;
+  return { ...scalar, test: scalar.identify?.(true) ? PYTHON_TRUE : PYTHON_FALSE };
+}
+
 /** The file's text as a document, or the first reason it is not one. */
 export function parseYaml(text: string): { doc: Doc } | { error: string } {
-  const doc = parseDocument(text, { prettyErrors: true });
+  const doc = parseDocument(text, { ...YAML_OPTIONS, prettyErrors: true });
   const first = doc.errors[0];
   if (first !== undefined) return { error: first.message };
   return { doc };
@@ -102,7 +136,15 @@ export function writeAt(
   const flow = Array.isArray(value)
     ? value.every(flat)
     : isRecord(value) && Object.values(value).every(flat);
-  doc.setIn(path, doc.createNode(value, { flow }));
+  const node = doc.createNode(value, { flow });
+  // The node it replaces may carry the comment on its line or the one above
+  // it; the new value keeps them, as a scalar written in place does.
+  const old: unknown = doc.getIn(path, true);
+  if (isNode(old)) {
+    node.comment = old.comment;
+    node.commentBefore = old.commentBefore;
+  }
+  doc.setIn(path, node);
 }
 
 /**

@@ -1,5 +1,6 @@
 import { isMap, isSeq, LineCounter, parseDocument, type Node } from 'yaml';
 import type { LineRange } from '@/ui/CodeEditor';
+import { YAML_OPTIONS } from '../forms/yaml-doc';
 
 /**
  * The lines of `workflow.yaml` a box stands for, so selecting the box marks
@@ -16,7 +17,7 @@ export type Selected =
 export function linesOf(text: string, selected: Selected | null): LineRange[] {
   if (selected === null) return [];
   const counter = new LineCounter();
-  const doc = parseDocument(text, { lineCounter: counter });
+  const doc = parseDocument(text, { ...YAML_OPTIONS, lineCounter: counter });
   if (doc.errors.length > 0 || !isMap(doc.contents)) return [];
   const span = (from: number, to: number): LineRange => ({
     from: counter.linePos(from).line,
