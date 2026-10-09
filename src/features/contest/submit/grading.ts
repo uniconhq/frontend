@@ -40,7 +40,9 @@ function unfinished(submission: Submission): boolean {
  * so a fresh submit is followed closely whatever an older one is doing. While
  * the live stream is open it says when a grading moves, so the page reads
  * again only now and then, in case a nudge was lost on the way. While it is
- * `refused`, no wait is shorter than `REFUSED_MS`.
+ * `refused`, no wait is shorter than `REFUSED_MS`. The server stamps a
+ * submission by its own clock, which the page's estimate of it can trail, so
+ * one stamped ahead of `now` has waited no time at all.
  */
 export function pollEvery(
   submissions: Submission[] | Submission | undefined,
@@ -52,7 +54,7 @@ export function pollEvery(
   const all = Array.isArray(submissions) ? submissions : [submissions];
   const waited = all
     .filter(unfinished)
-    .map((found) => now.getTime() - Date.parse(found.submitted_at));
+    .map((found) => Math.max(0, now.getTime() - Date.parse(found.submitted_at)));
   if (waited.length === 0) return MEANWHILE_MS;
   const newest = Math.min(...waited);
   const every = WAITING.find(([olderThan]) => newest >= olderThan)?.[1] ?? MEANWHILE_MS;
