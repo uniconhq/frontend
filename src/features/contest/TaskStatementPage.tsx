@@ -1,6 +1,7 @@
+import { useCallback } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { $api, queryView } from '@/api/query';
-import type { TaskPage, TaskRelease } from '@/api/types';
-import { BodyText } from '@/ui/BodyText';
+import type { TaskPage } from '@/api/types';
 import { Card } from '@/ui/Card';
 import { Markdown } from '@/ui/Markdown';
 import { PageLink } from '@/ui/PageLink';
@@ -18,21 +19,16 @@ import { TaskSubmissions } from './submit/TaskSubmissions';
 import { headingOf } from './task-names';
 import classes from './contest.module.css';
 
-/** How often the page is read again, so a closing reaches it. */
+/** How often the page is read again, so a release or an extension reaches it. */
 const MEANWHILE_MS = 60_000;
+
+const PAGE = '/api/v1/orgs/{org}/contests/{contest}/tasks/{task}/page';
 
 /** At most `count` in any window of `seconds`, in words. */
 function rate(count: number, seconds: number): string {
   const window = seconds === 1 ? 'second' : `${seconds} seconds`;
   return `${count} in any ${window}`;
 }
-
-/** Why a released task takes no submission from this person now. */
-const CLOSED: Record<NonNullable<TaskRelease['closed']>, string> = {
-  not_released: 'This task is not released yet.',
-  archived: 'The contest is archived.',
-  closed: 'This task has closed for you.',
-};
 
 /**
  * When the task falls due, if it does, and closes for this person, their
@@ -68,8 +64,9 @@ function Back({ org, contest }: { org: string; contest: string }) {
 
 /**
  * A released task as a signed-in person reads it: the statement, its times
- * and limits, the panel they submit from while the task is open, and their
- * submissions.
+ * and limits, the panel they submit from while the task is open, or why it
+ * is not, with the countdowns to its due and close, and their submissions.
+ * Crossing the due or the close reads the page again at once.
  */
 function SignedInTask({
   org,
@@ -80,14 +77,22 @@ function SignedInTask({
   contest: string;
   task: string;
 }) {
+  const queryClient = useQueryClient();
   const view = queryView(
     $api.useQuery(
       'get',
-      '/api/v1/orgs/{org}/contests/{contest}/tasks/{task}/page',
+      PAGE,
       { params: { path: { org, contest, task } } },
       { refetchInterval: MEANWHILE_MS },
     ),
   );
+  const readAgain = useCallback(() => {
+    void queryClient.invalidateQueries({
+      queryKey: $api.queryOptions('get', PAGE, {
+        params: { path: { org, contest, task } },
+      }).queryKey,
+    });
+  }, [queryClient, org, contest, task]);
 
   if (view.state === 'loading') return <PageSkeleton rows={6} />;
   if (view.state === 'error')
@@ -98,9 +103,6 @@ function SignedInTask({
     <div className={classes.page}>
       <Back org={org} contest={contest} />
       <PageTitle>{headingOf(page)}</PageTitle>
-      {page.release.closed !== null && (
-        <BodyText tone="secondary">{CLOSED[page.release.closed]}</BodyText>
-      )}
       <TaskAnnouncements org={org} contest={contest} task={task} />
       <Card>
         <Markdown>{page.statement}</Markdown>
@@ -111,7 +113,13 @@ function SignedInTask({
           <LimitList page={page} />
         </div>
       </Card>
-      <TaskSubmissions org={org} contest={contest} task={task} page={page} />
+      <TaskSubmissions
+        org={org}
+        contest={contest}
+        task={task}
+        page={page}
+        onBoundary={readAgain}
+      />
     </div>
   );
 }

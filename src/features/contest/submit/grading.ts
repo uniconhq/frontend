@@ -1,4 +1,11 @@
-import type { GradingResult, GradingStatus, Submission } from '@/api/types';
+import type {
+  GradingResult,
+  GradingStatus,
+  GroupShown,
+  Reported,
+  Submission,
+} from '@/api/types';
+import { formatExact } from '@/lib/exact';
 import { serverNow } from '@/lib/time';
 
 /**
@@ -33,7 +40,9 @@ function unfinished(submission: Submission): boolean {
  * so a fresh submit is followed closely whatever an older one is doing. While
  * the live stream is open it says when a grading moves, so the page reads
  * again only now and then, in case a nudge was lost on the way. While it is
- * `refused`, no wait is shorter than `REFUSED_MS`.
+ * `refused`, no wait is shorter than `REFUSED_MS`. The server stamps a
+ * submission by its own clock, which the page's estimate of it can trail, so
+ * one stamped ahead of `now` has waited no time at all.
  */
 export function pollEvery(
   submissions: Submission[] | Submission | undefined,
@@ -45,7 +54,7 @@ export function pollEvery(
   const all = Array.isArray(submissions) ? submissions : [submissions];
   const waited = all
     .filter(unfinished)
-    .map((found) => now.getTime() - Date.parse(found.submitted_at));
+    .map((found) => Math.max(0, now.getTime() - Date.parse(found.submitted_at)));
   if (waited.length === 0) return MEANWHILE_MS;
   const newest = Math.min(...waited);
   const every = WAITING.find(([olderThan]) => newest >= olderThan)?.[1] ?? MEANWHILE_MS;
@@ -72,11 +81,25 @@ export function cancelReason(grading: GradingResult): string | null {
   return grading.reason === null || grading.reason === '' ? null : grading.reason;
 }
 
-const numbers = new Intl.NumberFormat(undefined, { maximumFractionDigits: 4 });
+/**
+ * A test's reported value by name as read: a number to at most four
+ * decimals, its text, or nothing when it reported none of that name.
+ */
+export function valueText(values: Reported, name: string): string | undefined {
+  const number = values.numbers[name];
+  return number === undefined ? values.texts[name] : formatExact(number);
+}
 
-/** A reported value as read: a number to at most four decimals, or the text. */
-export function valueText(value: number | string): string {
-  return typeof value === 'number' ? numbers.format(value) : value;
+/**
+ * A group's points out of the most it gives, as `30 / 70`; only the most
+ * while its verdict is not shown; nothing on a task that gives no points.
+ */
+export function pointsText(group: GroupShown): string | null {
+  if (group.max === null) return null;
+  const most = formatExact(group.max, 2);
+  return group.points === null
+    ? `of ${most}`
+    : `${formatExact(group.points, 2)} / ${most}`;
 }
 
 /**

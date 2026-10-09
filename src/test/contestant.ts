@@ -2,9 +2,12 @@ import { http, HttpResponse } from 'msw';
 import type {
   ContestHome,
   Contestant,
+  GradedTest,
   GradingResult,
   InputField,
   MyRegistration,
+  Outcome,
+  Reported,
   Submission,
   TaskPage,
   TaskRelease,
@@ -55,7 +58,7 @@ export function home(overrides: Partial<ContestHome> = {}): ContestHome {
         name: 'sum',
         label: 'A',
         title: 'Sum of Two',
-        worth: 100,
+        worth: '100',
         release: OPEN,
         due: null,
         closes: '2026-09-12T10:30:00Z',
@@ -93,13 +96,14 @@ export const taskPage: TaskPage = {
   name: 'sum',
   label: 'A',
   title: 'Sum of Two',
-  worth: 100,
+  worth: '100',
   statement: '# Sum\n\nRead two numbers and print their **sum**.\n',
   submissions: { max: 50, rate: { count: 1, per: 30 } },
   inputs: [inputField(), languageField],
   release: OPEN,
   due: null,
   closes: '2026-09-12T10:30:00Z',
+  marks: null,
 };
 
 export const publicContest: components['schemas']['PublicContest'] = {
@@ -154,35 +158,62 @@ export function grading(overrides: Partial<GradingResult> = {}): GradingResult {
     stopped: null,
     outcome: null,
     groups: [],
-    values: {},
+    values: reported(),
     reason: null,
+    points: null,
+    factor: null,
+    folded: {},
     ...overrides,
   };
 }
 
+/** Reported values, its numbers as the exact strings the API serves. */
+export function reported(
+  numbers: Record<string, string> = {},
+  texts: Record<string, string> = {},
+): Reported {
+  return { numbers, texts };
+}
+
+/** A test's row of a result, unscored unless its credit is given. */
+export function graded(
+  test: string,
+  outcome: Outcome,
+  values: Reported = reported(),
+  credit: string | null = null,
+): GradedTest {
+  return { test, outcome, values, credit, best: null };
+}
+
 /**
  * A graded one: accepted, with its compile log, the samples shown with their
- * tests, and a group whose tests are shown at the reveal.
+ * tests, and a group whose tests are shown at the reveal, scored on a task
+ * giving the samples nothing and main 100.
  */
 export const accepted = grading({
   status: 'done',
   outcome: 'accepted',
-  values: { log: 'Compiled cleanly.' },
+  values: reported({}, { log: 'Compiled cleanly.' }),
+  points: { shown: '100', pending: '0', pending_until: null },
+  factor: '1',
   groups: [
     {
       group: 'samples',
       show: 'always',
       outcome: 'accepted',
       tests: [
-        {
-          test: 'samples/1',
-          outcome: 'accepted',
-          values: { time_ms: 12, memory_kb: 2048 },
-        },
-        { test: 'samples/2', outcome: 'accepted', values: {} },
+        graded(
+          'samples/1',
+          'accepted',
+          reported({ time_ms: '12', memory_kb: '2048' }),
+          '1',
+        ),
+        graded('samples/2', 'accepted', reported(), '1'),
       ],
       shown_at: null,
       ran: true,
+      points: '0',
+      max: '0',
     },
     {
       group: 'main',
@@ -191,6 +222,8 @@ export const accepted = grading({
       tests: null,
       shown_at: '2026-09-12T11:00:00Z',
       ran: true,
+      points: '100',
+      max: '100',
     },
   ],
 });

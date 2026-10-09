@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { $api } from '@/api/query';
+import { BY_DEVICE, useServerTime } from '@/api/use-server-time';
 import { BodyText } from '@/ui/BodyText';
 import { formatDuration, serverNow } from '@/lib/time';
 
@@ -13,7 +13,8 @@ type Phase = 'before' | 'running' | 'ended';
  * says; this counts the contest as a whole. Asking for the server's time is
  * what measures how far this browser's clock is out, so nothing is counted
  * until that answer is in; a server that did not answer leaves the browser's
- * clock to count by. `onBoundary` is called as the count crosses the start
+ * clock to count by, and the countdown says so. `onBoundary` is called as the
+ * count crosses the start
  * or the end, which is when what the page shows changes on the server too.
  */
 export function Countdown({
@@ -25,7 +26,7 @@ export function Countdown({
   end: string;
   onBoundary?: () => void;
 }) {
-  const measured = $api.useQuery('get', '/api/v1/time').isFetched;
+  const { measured, byDevice } = useServerTime();
   const [, setTicks] = useState(0);
 
   useEffect(() => {
@@ -60,6 +61,7 @@ export function Countdown({
       <BodyText size="md" mono>
         {text}
       </BodyText>
+      {byDevice && <BodyText tone="secondary">{BY_DEVICE}</BodyText>}
     </div>
   );
 }

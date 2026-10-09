@@ -29,13 +29,14 @@ export function Fieldset({
 /**
  * A number, typed as text so an empty field means "not set" and a half-typed
  * one is not lost; what is wrong with it shows under it, and the form will
- * not save until it is right.
+ * not save until it is right. `error` is what a save was refused for there.
  */
 export function NumberField({
   label,
   value,
   onChange,
   hint,
+  error,
   whole = false,
   disabled = false,
 }: {
@@ -43,6 +44,7 @@ export function NumberField({
   value: string;
   onChange: (value: string) => void;
   hint?: string;
+  error?: string;
   whole?: boolean;
   disabled?: boolean;
 }) {
@@ -53,6 +55,7 @@ export function NumberField({
       onChange={onChange}
       inputMode="decimal"
       description={numberProblem(value, whole) ?? hint}
+      error={error}
       disabled={disabled}
     />
   );

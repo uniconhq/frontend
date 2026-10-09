@@ -11,13 +11,14 @@ import { NotFound } from '@/ui/feedback/NotFound';
 import { HomePage, InviteLink, InvitesPage } from '@/features/home';
 import { LoginPage } from '@/features/auth';
 import { AccountPage } from '@/features/account';
-import { ContestHomePage, TaskStatementPage } from '@/features/contest';
+import { BoardsPage, ContestHomePage, TaskStatementPage } from '@/features/contest';
 import {
   ContestantsPage,
   ContestPage,
   GradingsFeedPage,
   InboxPage,
   NewOrgPage,
+  OrganisedBoardsPage,
   OrgPage,
   OrgsPage,
   TaskPage,
@@ -82,6 +83,7 @@ export const routes: RouteObject[] = [
            * signed-in person, each page reading what the caller may see.
            */
           { path: 'contests/:org/:contest', element: <ContestHomePage /> },
+          { path: 'contests/:org/:contest/boards', element: <BoardsPage /> },
           {
             path: 'contests/:org/:contest/tasks/:task',
             element: <TaskStatementPage />,
@@ -128,6 +130,10 @@ export const routes: RouteObject[] = [
                   {
                     path: ':org/contests/:contest/gradings',
                     element: <GradingsFeedPage />,
+                  },
+                  {
+                    path: ':org/contests/:contest/boards',
+                    element: <OrganisedBoardsPage />,
                   },
                   {
                     path: ':org/contests/:contest/tasks/:task',

@@ -3,6 +3,7 @@ import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { formatDateTime } from '@/lib/time';
+import { icpc } from '@/test/boards';
 import { renderApp } from '@/test/render';
 import { problem, server, signedIn } from '@/test/server';
 import {
@@ -43,6 +44,22 @@ describe('the contest page for a signed-in person', () => {
     );
   });
 
+  it('says an archived contest is still read and takes no submissions', async () => {
+    server.use(
+      signedIn,
+      http.get(`${CONTEST_API}/home`, () =>
+        HttpResponse.json({ ...home(), state: 'archived' }),
+      ),
+    );
+    renderApp(PAGE);
+
+    expect(
+      await screen.findByText(
+        'This contest is archived: its tasks can still be read, and they take no submissions.',
+      ),
+    ).toBeVisible();
+  });
+
   it('says when each task falls due and closes for the person', async () => {
     server.use(
       signedIn,
@@ -55,7 +72,7 @@ describe('the contest page for a signed-in person', () => {
                 name: 'sum',
                 label: 'A',
                 title: 'Sum of Two',
-                worth: 100,
+                worth: '100',
                 release: { released: true, visible: true, open: true, closed: null },
                 due: '2026-09-12T10:45:00Z',
                 closes: '2026-09-12T11:00:00Z',
@@ -252,6 +269,22 @@ describe('the contest page for a visitor', () => {
     );
     expect(screen.getByRole('link', { name: 'Sum of Two' })).toBeVisible();
     expect(screen.queryByRole('button', { name: 'Register' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('table')).toBeNull();
+  });
+
+  it('shows the boards shown to everyone, read without a session', async () => {
+    server.use(
+      http.get(`${PUBLIC_API}/:org/:contest`, () => HttpResponse.json(publicContest)),
+      http.get(`${PUBLIC_API}/:org/:contest/boards`, () =>
+        HttpResponse.json([icpc({ who: 'everyone' })]),
+      ),
+    );
+    renderApp(PAGE);
+
+    expect(await screen.findByRole('table', { name: 'Standings' })).toBeVisible();
+    expect(
+      screen.getByRole('heading', { name: 'Spring 2026', level: 1 }),
+    ).toBeVisible();
   });
 
   it('asks a visitor to sign in for a contest that is not public', async () => {

@@ -108,6 +108,10 @@ describe('the contest settings form', { timeout: 20_000 }, () => {
     fill(field('A marks'), '2');
     fill(field('End'), '2026-06-01T23:30');
     fill(field('Team size'), '3');
+    await userEvent.selectOptions(
+      field('A submission whose grading broke counts as'),
+      'last_result',
+    );
     fill(field('B worth'), '70');
     fill(field('B due'), '2026-06-01T20:00');
     fill(field('B taken off per late day'), '0.1');
@@ -146,6 +150,7 @@ describe('the contest settings form', { timeout: 20_000 }, () => {
         },
       ],
       team_size: 3,
+      on_system_error: 'last_result',
     });
     expect(write?.content).toContain("# the page's title");
     expect(write?.content).toContain('leaderboards:\n  - name: Standings\n');
@@ -278,6 +283,107 @@ describe('the contest settings form', { timeout: 20_000 }, () => {
         { id: 'sort', worth: 70 },
       ],
     });
+  });
+
+  it('builds a board from its fields that reads as the same board written by hand', async () => {
+    const { sent } = contestBackend();
+    const form = await openForm();
+    const field = (name: string) => within(form).getByLabelText(name);
+
+    await userEvent.click(within(form).getByRole('button', { name: 'Add a board' }));
+    fill(field('Board 2 name'), 'ICPC');
+    await userEvent.selectOptions(field('Board 2 shown to'), 'everyone');
+    await userEvent.click(
+      within(form).getByRole('checkbox', { name: 'Board 2 covers every task' }),
+    );
+    await userEvent.click(
+      within(form).getByRole('checkbox', { name: 'Board 2 covers sort' }),
+    );
+    await userEvent.click(
+      within(form).getByRole('button', { name: 'Add a key to Board 2' }),
+    );
+    await userEvent.selectOptions(field('Board 2 key 2'), 'penalty');
+    fill(field('Board 2 key 2 minutes per earlier attempt'), '20');
+    await userEvent.click(within(form).getByRole('button', { name: 'Save settings' }));
+
+    expect(await screen.findByText(/Saved as version/)).toBeVisible();
+    const byHand = parse(`
+- name: Standings
+  who: contestants
+- {name: ICPC, tasks: [sum], order: [points, {by: penalty, per_attempt: 20}], who: everyone}
+`) as unknown;
+    const written = sent[0]?.content ?? '';
+    expect((parse(written) as { leaderboards: unknown }).leaderboards).toEqual(byHand);
+    expect(written).toContain('    order: [points, {by: penalty, per_attempt: 20}]\n');
+    expect(written).toContain(
+      'leaderboards:\n  - name: Standings\n    who: contestants\n',
+    );
+  });
+
+  it('says on the key itself that a save refused penalty as the first key', async () => {
+    contestBackend();
+    server.use(
+      http.put(FILE, () =>
+        problem(422, 'invalid_definition', {
+          errors: [
+            {
+              path: 'leaderboards[0].order[0]',
+              message:
+                'penalty is never the first key: it breaks ties among rows equal on the keys before it.',
+            },
+          ],
+        }),
+      ),
+    );
+    const form = await openForm();
+    const field = (name: string) => within(form).getByLabelText(name);
+
+    expect(within(form).getByText('Points alone, the default.')).toBeVisible();
+    await userEvent.click(
+      within(form).getByRole('button', { name: 'Add a key to Board 1' }),
+    );
+    await userEvent.selectOptions(field('Board 1 key 1'), 'penalty');
+    await userEvent.click(within(form).getByRole('button', { name: 'Save settings' }));
+
+    expect(await screen.findByText('leaderboards[0].order[0]')).toBeVisible();
+    const key = field('Board 1 key 1');
+    expect(key).toBeInvalid();
+    expect(key).toHaveAccessibleDescription(/penalty is never the first key/);
+    expect(field('Board 1 name')).toBeValid();
+  });
+
+  it('removes a board, and the key with the last of them', async () => {
+    const { sent } = contestBackend();
+    const form = await openForm();
+
+    await userEvent.click(within(form).getByRole('button', { name: 'Remove Board 1' }));
+    expect(within(form).getByText('No leaderboards yet.')).toBeVisible();
+    await userEvent.click(within(form).getByRole('button', { name: 'Save settings' }));
+
+    await screen.findByText(/Saved as version/);
+    const written = parse(sent[0]?.content ?? '') as Record<string, unknown>;
+    expect(written).not.toHaveProperty('leaderboards');
+    expect(written['tasks']).toEqual([
+      { id: 'sum', worth: 100 },
+      { id: 'sort', worth: 50 },
+    ]);
+  });
+
+  it('leaves boards it cannot read to the text tab', async () => {
+    contestBackend({
+      current: CONTEST.replace(
+        '  - name: Standings\n    who: contestants\n',
+        '  - name: Standings\n    order: [{metric: points}]\n',
+      ),
+    });
+    const form = await openForm();
+
+    expect(
+      within(form).getByText(
+        'leaderboards is not a list of boards the form can read; edit it as text.',
+      ),
+    ).toBeVisible();
+    expect(within(form).queryByRole('button', { name: 'Add a board' })).toBeNull();
   });
 
   it('falls back to the text with the reason when the file is not YAML', async () => {

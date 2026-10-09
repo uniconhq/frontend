@@ -11,8 +11,11 @@ const done: GradingResult = {
   stopped: null,
   outcome: null,
   groups: [],
-  values: {},
+  values: { numbers: {}, texts: {} },
   reason: null,
+  points: null,
+  factor: null,
+  folded: {},
 };
 
 function submitted(secondsAgo: number, status: 'dispatched' | 'done'): Submission {
@@ -29,6 +32,10 @@ describe('how often submissions are read again', () => {
     expect(pollEvery(submitted(5, 'dispatched'), NOW)).toBe(2_000);
     expect(pollEvery(submitted(45, 'dispatched'), NOW)).toBe(5_000);
     expect(pollEvery(submitted(600, 'dispatched'), NOW)).toBe(15_000);
+  });
+
+  it('follows closely a submission stamped after the clock it is read by', () => {
+    expect(pollEvery(submitted(-1, 'dispatched'), NOW)).toBe(2_000);
   });
 
   it('follows the newest submission still being graded', () => {

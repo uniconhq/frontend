@@ -2,9 +2,11 @@ import { useState } from 'react';
 import { useLocation, useSearchParams } from 'react-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { $api } from '@/api/query';
-import type { Submission, TaskPage } from '@/api/types';
+import type { Submission, TaskPage, TaskRelease } from '@/api/types';
+import { BodyText } from '@/ui/BodyText';
 import { Card } from '@/ui/Card';
 import { SectionTitle } from '@/ui/SectionTitle';
+import { TaskCountdown } from '../TaskCountdown';
 import { emptyDraft, type Draft } from './draft';
 import { newestFirst } from './grading';
 import { SubmissionDetail } from './SubmissionDetail';
@@ -15,8 +17,26 @@ import { useSubmit } from './use-submit';
 import shared from '../contest.module.css';
 
 /**
- * The contestant's half of a task page below its statement: the panel they
- * submit from while the task is open, the submission the address opens, and
+ * Why a task takes no submission from this person now, said where the panel
+ * would be: a task is open to a row only while it is released, its contest
+ * is not archived, and the row's close of it has not passed; and only an
+ * approved contestant holds a row to submit from.
+ */
+const CLOSED: Record<NonNullable<TaskRelease['closed']>, string> = {
+  not_released: 'This task is not released yet.',
+  archived: 'The contest is archived, so its tasks take no submissions.',
+  closed: 'This task has closed for you, so it takes no more submissions from you.',
+  not_approved: 'Only approved contestants submit to this task.',
+};
+
+function closedReason(closed: TaskRelease['closed']): string {
+  return closed === null ? 'This task takes no submission now.' : CLOSED[closed];
+}
+
+/**
+ * The contestant's half of a task page below its statement: the countdowns
+ * to the row's due and close, the panel they submit from while the task is
+ * open or why it is not in its place, the submission the address opens, and
  * the list of their own submissions. The panel's contents live here, so
  * restoring an earlier submission can fill it; a submission that goes
  * through empties it and joins the top of the list at once.
@@ -26,11 +46,13 @@ export function TaskSubmissions({
   contest,
   task,
   page,
+  onBoundary,
 }: {
   org: string;
   contest: string;
   task: string;
   page: TaskPage;
+  onBoundary?: () => void;
 }) {
   const queryClient = useQueryClient();
   const { pathname } = useLocation();
@@ -77,10 +99,11 @@ export function TaskSubmissions({
 
   return (
     <>
-      {open && (
-        <Card>
-          <div className={shared.stack}>
-            <SectionTitle>Submit</SectionTitle>
+      <Card>
+        <div className={shared.stack}>
+          <SectionTitle>Submit</SectionTitle>
+          <TaskCountdown due={page.due} closes={page.closes} onBoundary={onBoundary} />
+          {open ? (
             <SubmitPanel
               inputs={inputs}
               draft={draft}
@@ -91,9 +114,13 @@ export function TaskSubmissions({
               refusal={submitter.refusal}
               notice={notice}
             />
-          </div>
-        </Card>
-      )}
+          ) : (
+            <div role="status" aria-label="Why you cannot submit">
+              <BodyText>{closedReason(page.release.closed)}</BodyText>
+            </div>
+          )}
+        </div>
+      </Card>
       {opened !== null && (
         <Card>
           <SubmissionDetail
@@ -108,7 +135,12 @@ export function TaskSubmissions({
       <Card>
         <div className={shared.stack}>
           <SectionTitle>Your submissions</SectionTitle>
-          <SubmissionList org={org} contest={contest} task={task} />
+          <SubmissionList
+            org={org}
+            contest={contest}
+            task={task}
+            marked={page.marks !== null}
+          />
         </div>
       </Card>
     </>
