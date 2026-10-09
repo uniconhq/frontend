@@ -11,7 +11,7 @@ import {
   type Side,
 } from './merge';
 import { isoOf, localOf } from './times';
-import { parseYaml, writeAt, writeYaml } from './yaml-doc';
+import { parseYaml, Time, writeAt, writeYaml } from './yaml-doc';
 
 const BASE = `name: Spring   # shown on the page
 start: 2026-06-01T09:00:00Z
@@ -39,7 +39,7 @@ describe('editing a file as a document', () => {
   it('changes only the nodes written, keeping comments, order and flow style', () => {
     const text = edit(BASE, (doc) => {
       writeAt(doc, ['name'], 'Spring 2026');
-      writeAt(doc, ['tasks', 0, 'due'], '2026-06-01T12:00:00+08:00');
+      writeAt(doc, ['tasks', 0, 'due'], new Time('2026-06-01T12:00:00+08:00'));
     });
     expect(text).toBe(
       `name: Spring 2026 # shown on the page

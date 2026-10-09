@@ -286,7 +286,7 @@ describe('the workflow editor', () => {
     await user.click(await screen.findByRole('menuitem', { name: 'test.episodes' }));
 
     await waitFor(() =>
-      expect(previewNow()).toContain('args: --episodes ${{ test.episodes }}'),
+      expect(previewNow()).toMatch(/args: "?--episodes \$\{\{ test\.episodes \}\}"?\n/),
     );
   });
 
@@ -337,6 +337,66 @@ describe('the workflow editor', () => {
     await waitFor(() => expect(previewNow()).toContain('fold: sum'));
     await user.click(screen.getByRole('button', { name: 'Undo' }));
     expect(previewNow()).toContain('args: ${{ inputs.time_limit }}');
+  });
+
+  it('builds three wired steps from the palette by keyboard alone', async () => {
+    const empty = [
+      'inputs:',
+      '  submission: {type: folder, contestant: true}',
+      '  time_limit: number',
+      '  memory_limit: number',
+      'test:',
+      '  input: file',
+      '  answer: file',
+      'steps: []',
+      '',
+    ].join('\n');
+    server.use(signedIn, ...workflowBackend(empty).handlers);
+    const user = userEvent.setup();
+    renderApp(PAGE);
+
+    const press = async (button: HTMLElement) => {
+      button.focus();
+      await user.keyboard('{Enter}');
+    };
+    const wireFrom = async (port: string, step: string, source: RegExp) => {
+      await press(
+        await screen.findByRole('button', { name: `The port ${port} of ${step}` }),
+      );
+      const menu = await screen.findByRole('menu', {
+        name: `The port ${port} of ${step}`,
+      });
+      await press(within(menu).getByRole('menuitem', { name: source }));
+    };
+    await press(
+      await screen.findByRole('button', { name: 'Add unicon/compile@v2, run once' }),
+    );
+    await press(screen.getByRole('button', { name: 'Primitives' }));
+    await press(
+      await screen.findByRole('button', {
+        name: 'Add unicon/sandbox-run@v2, run per test',
+      }),
+    );
+    await press(screen.getByRole('button', { name: 'Primitives' }));
+    await press(
+      await screen.findByRole('button', {
+        name: 'Add unicon/diff-check@v2, run per test',
+      }),
+    );
+    await wireFrom('source', 'compile', /^inputs\.submission/);
+    await wireFrom('binary', 'sandbox-run', /^compile\.binary/);
+    await wireFrom('input', 'sandbox-run', /^test\.input/);
+    await wireFrom('time_limit', 'sandbox-run', /^inputs\.time_limit/);
+    await wireFrom('memory_limit', 'sandbox-run', /^inputs\.memory_limit/);
+    await wireFrom('actual', 'diff-check', /^sandbox-run\.output/);
+    await wireFrom('expected', 'diff-check', /^test\.answer/);
+
+    const text = previewNow();
+    expect(text).toContain('source: ${{ inputs.submission }}');
+    expect(text).toContain('binary: ${{ steps.compile.binary }}');
+    expect(text).toContain('actual: ${{ steps.sandbox-run.output }}');
+    expect(text).toContain('expected: ${{ test.answer }}');
+    expect(text.match(/per_test: true/g)).toHaveLength(2);
   });
 
   it('says the check did not run rather than that it passed', async () => {

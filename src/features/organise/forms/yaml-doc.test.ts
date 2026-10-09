@@ -37,3 +37,71 @@ describe('a definition file as the forge reads it', () => {
     expect(text).toBe('a: 1\nflag: "on"\nsize: "1_000"\nletter: y\n');
   });
 });
+
+describe('the scalars PyYAML reads otherwise', () => {
+  it('quotes a date, = and << wherever a value is written', () => {
+    const text = edited('a: 1\n', (doc) => {
+      writeAt(doc, ['day'], '2026-10-09');
+      writeAt(doc, ['eq'], '=');
+      writeAt(doc, ['merge'], '<<');
+      writeAt(doc, ['list'], ['2026-10-09', 'later']);
+    });
+
+    expect(text).toBe(
+      'a: 1\nday: "2026-10-09"\neq: "="\nmerge: "<<"\nlist: ["2026-10-09", later]\n',
+    );
+  });
+
+  it('keeps a merge key a file holds, and a time it holds bare', () => {
+    const text = edited(
+      'base: &b {x: 1}\nm:\n  <<: *b\n  y: 2\ndue: 2026-06-01T09:00:00Z\n',
+      (doc) => {
+        writeAt(doc, ['m', 'y'], '<<');
+        writeAt(doc, ['due'], '2026-06-02T09:00:00Z');
+      },
+    );
+
+    expect(text).toBe(
+      'base: &b {x: 1}\nm:\n  <<: *b\n  y: "<<"\ndue: 2026-06-02T09:00:00Z\n',
+    );
+    const parsed = parseYaml(text);
+    if ('error' in parsed) throw new Error(parsed.error);
+    expect(parsed.doc.toJS()).toMatchObject({ m: { x: 1, y: '<<' } });
+  });
+
+  it('writes the first entry of an empty {} or [] as a block', () => {
+    const text = edited('inputs: {}\nlist: []\n', (doc) => {
+      writeAt(doc, ['inputs', 'seed'], 'number');
+      writeAt(doc, ['list', 0], 'first');
+    });
+
+    expect(text).toBe('inputs:\n  seed: number\nlist:\n  - first\n');
+  });
+
+  it('reads a number only where PyYAML does', () => {
+    const parsed = parseYaml(
+      'a: 09\nb: +.5\nc: .\nd: 1e3\ne: 10\nf: 0.5\ng: 1_000\nh: 1.0e+3\n',
+    );
+    if ('error' in parsed) throw new Error(parsed.error);
+
+    expect(parsed.doc.toJS()).toEqual({
+      a: '09',
+      b: '+.5',
+      c: '.',
+      d: '1e3',
+      e: 10,
+      f: 0.5,
+      g: 1000,
+      h: 1000,
+    });
+  });
+
+  it('changes a mapping already there key by key, keeping its comments and order', () => {
+    const text = edited(
+      'time_ms:\n  from: x # CPU time\n  fold: max\n  better: lower\n',
+      (doc) => writeAt(doc, ['time_ms'], { from: 'x', fold: 'sum', at_least: 0 }),
+    );
+
+    expect(text).toBe('time_ms:\n  from: x # CPU time\n  fold: sum\n  at_least: 0\n');
+  });
+});

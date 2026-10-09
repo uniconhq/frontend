@@ -59,6 +59,17 @@ describe('editing the file in place', () => {
     expect(after).toContain('memory_limit: 512');
   });
 
+  it('keeps the comment on the line of a port it gives a value', () => {
+    const commented = COMMENTED.replace(
+      'memory_limit: 256',
+      'memory_limit: 256 # megabytes',
+    );
+
+    expect(setValue(commented, 1, 'memory_limit', 512)).toContain(
+      'memory_limit: 512 # megabytes',
+    );
+  });
+
   it('keeps the comment on the line of a declaration it changes', () => {
     const changed = setInput(COMMENTED, 'submission', {
       type: 'folder',
@@ -133,6 +144,14 @@ describe('editing the file in place', () => {
         '      actual: ${{ steps.run.output }}',
         '',
       ].join('\n'),
+    );
+  });
+
+  it('adds the first step to an empty steps: [] as a block', () => {
+    const added = addStep('steps: []\n', compile!);
+
+    expect(added).toBe(
+      'steps:\n  - id: compile\n    use: unicon/compile@v2\n    with: {}\n',
     );
   });
 

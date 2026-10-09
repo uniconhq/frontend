@@ -25,6 +25,7 @@ export type Path = (string | number)[];
 const PYTHON_TRUE = /^(?:[Yy]es|YES|[Tt]rue|TRUE|[Oo]n|ON)$/;
 const PYTHON_FALSE = /^(?:[Nn]o|NO|[Ff]alse|FALSE|[Oo]ff|OFF)$/;
 const BOOL = 'tag:yaml.org,2002:bool';
+const MERGE = 'tag:yaml.org,2002:merge';
 /**
  * Tags of the library's 1.1 schema a definition file never holds: a time,
  * which stays text, and the ordered collections, which the library would
@@ -43,19 +44,70 @@ const LEFT_OUT = ['timestamp', 'omap', 'pairs', 'set'].map(
  * text, a time stays the text it is written as, which the forms read, and a
  * new mapping is a plain one.
  */
+/** PyYAML's int and float, which are narrower than the library's 1.1 ones. */
+const PYTHON_INT =
+  '[-+]?0b[0-1_]+|[-+]?0[0-7_]+|[-+]?(?:0|[1-9][0-9_]*)|[-+]?0x[0-9a-fA-F_]+|[-+]?[1-9][0-9_]*(?::[0-5]?[0-9])+';
+const PYTHON_FLOAT =
+  '[-+]?(?:[0-9][0-9_]*)\\.[0-9_]*(?:[eE][-+][0-9]+)?|\\.[0-9_]+(?:[eE][-+][0-9]+)?|[-+]?[0-9][0-9_]*(?::[0-5]?[0-9])+\\.[0-9_]*|[-+]?\\.(?:inf|Inf|INF)|\\.(?:nan|NaN|NAN)';
+const NUMBERS: Record<string, string> = {
+  'tag:yaml.org,2002:int': PYTHON_INT,
+  'tag:yaml.org,2002:float': PYTHON_FLOAT,
+};
+
+/** A date or a time as PyYAML reads one, which the forms hold as text. */
+const PYTHON_TIME =
+  /^(?:\d{4}-\d\d-\d\d|\d{4}-\d\d?-\d\d?(?:[Tt]|[ \t]+)\d\d?:\d\d:\d\d(?:\.\d*)?(?:[ \t]*(?:Z|[-+]\d\d?(?::\d\d)?))?)$/;
+
+/**
+ * Text PyYAML reads as something else that the library's tags do not
+ * catch: a date or a time, and the `=` and `<<` PyYAML resolves to tags it
+ * then refuses. Written, it is quoted.
+ */
+function readOtherwise(value: unknown): boolean {
+  return (
+    typeof value === 'string' &&
+    (PYTHON_TIME.test(value) || value === '=' || value === '<<')
+  );
+}
+
 export const YAML_OPTIONS: ParseOptions & DocumentOptions & SchemaOptions = {
   version: '1.1',
   customTags: (tags: Tags) =>
     tags
       .filter((tag) => typeof tag !== 'object' || !LEFT_OUT.includes(tag.tag))
-      .map(pythonBool),
+      .map(pythonTag),
 };
 
-/** A 1.1 bool tag narrowed to PyYAML's words; any other tag as it is. */
-function pythonBool(tag: Tags[number]): Tags[number] {
-  if (typeof tag !== 'object' || tag.tag !== BOOL || 'collection' in tag) return tag;
+/**
+ * A 1.1 tag as PyYAML reads it: its bools narrowed to PyYAML's words, its
+ * numbers to the scalars PyYAML's patterns take as well, and its merge key
+ * to the one a file holds, so a text `<<` is written as text; any other tag
+ * as it is.
+ */
+function pythonTag(tag: Tags[number]): Tags[number] {
+  if (typeof tag !== 'object' || 'collection' in tag) return tag;
   const scalar: ScalarTag = tag;
-  return { ...scalar, test: scalar.identify?.(true) ? PYTHON_TRUE : PYTHON_FALSE };
+  if (scalar.tag === BOOL)
+    return { ...scalar, test: scalar.identify?.(true) ? PYTHON_TRUE : PYTHON_FALSE };
+  if (scalar.tag === MERGE)
+    return { ...scalar, identify: (value) => typeof value === 'symbol' };
+  const narrower = NUMBERS[scalar.tag];
+  if (narrower === undefined || scalar.test === undefined) return tag;
+  const test = new RegExp(
+    `^(?=(?:${narrower})$)${scalar.test.source.slice(1)}`,
+    scalar.test.flags,
+  );
+  return { ...scalar, test };
+}
+
+/** Every text under `node` that PyYAML would read otherwise, quoted. */
+function quoteForPython(node: unknown): void {
+  if (isScalar(node)) {
+    if (readOtherwise(node.value)) node.type = 'QUOTE_DOUBLE';
+    return;
+  }
+  if (isMap(node)) for (const pair of node.items) quoteForPython(pair.value);
+  if (isSeq(node)) for (const item of node.items) quoteForPython(item);
 }
 
 /** The file's text as a document, or the first reason it is not one. */
@@ -91,6 +143,18 @@ export function valueAt(doc: Doc, path: Path): unknown {
 }
 
 /** Whether `value` is a mapping read from YAML, not a list or a scalar. */
+/**
+ * A time a form writes, which the file holds bare: the forge reads a time
+ * bare or quoted, and other text that looks like one only quoted.
+ */
+export class Time {
+  readonly text: string;
+
+  constructor(text: string) {
+    this.text = text;
+  }
+}
+
 export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
@@ -129,13 +193,44 @@ export function writeAt(
       doc.setIn(path.slice(0, end), doc.createNode({}));
     }
   }
+  // An empty `{}` or `[]` takes its first entry as a block, an entry to a line.
+  const parent: unknown = doc.getIn(path.slice(0, -1), true);
+  if ((isMap(parent) || isSeq(parent)) && parent.items.length === 0)
+    parent.flow = false;
+  const time = value instanceof Time;
+  const written = value instanceof Time ? value.text : value;
   const isPlain =
-    value === null ||
-    typeof value === 'string' ||
-    typeof value === 'number' ||
-    typeof value === 'boolean';
+    written === null ||
+    typeof written === 'string' ||
+    typeof written === 'number' ||
+    typeof written === 'boolean';
+  const old: unknown = doc.getIn(path, true);
   if (isPlain) {
-    doc.setIn(path, value);
+    // A scalar already there keeps its node, so a comment on its line stays;
+    // a new one is made a node, so it can be quoted.
+    doc.setIn(path, isScalar(old) ? written : doc.createNode(written));
+    // A time stays bare when a form writes it as one, or when it replaces a
+    // time the file holds bare.
+    const bareTime =
+      time ||
+      (isScalar(old) &&
+        old.type === 'PLAIN' &&
+        typeof written === 'string' &&
+        PYTHON_TIME.test(written));
+    if (!bareTime) quoteForPython(doc.getIn(path, true));
+    return;
+  }
+  if (isRecord(value) && isMap(old)) {
+    // A mapping already there is changed key by key, keeping its style, its
+    // key order and the comments in it.
+    for (const pair of [...old.items]) {
+      const key = isScalar(pair.key) ? pair.key.value : pair.key;
+      if (typeof key === 'string' && !(key in value)) old.delete(key);
+    }
+    for (const [key, inner] of Object.entries(value)) {
+      if (inner === undefined) continue;
+      writeAt(doc, [...path, key], inner);
+    }
     return;
   }
   const flat = (item: unknown) =>
@@ -145,9 +240,9 @@ export function writeAt(
     ? value.every(flat)
     : isRecord(value) && Object.values(value).every(flat);
   const node = doc.createNode(value, { flow });
+  quoteForPython(node);
   // The node it replaces may carry the comment on its line or the one above
   // it; the new value keeps them, as a scalar written in place does.
-  const old: unknown = doc.getIn(path, true);
   if (isNode(old)) {
     node.comment = old.comment;
     node.commentBefore = old.commentBefore;
