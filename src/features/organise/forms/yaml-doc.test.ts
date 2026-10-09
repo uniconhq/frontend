@@ -129,6 +129,29 @@ describe('the scalars PyYAML reads otherwise', () => {
     });
   });
 
+  it('double-quotes and escapes a tab and the characters PyYAML takes only escaped', () => {
+    const text = edited('a: 1\n', (doc) => {
+      writeAt(doc, ['args'], '--seed\t${{ inputs.seed }}');
+      writeAt(doc, ['odd'], 'a\u007fb\u0090c\u0001d￾');
+    });
+
+    expect(text).toBe(
+      'a: 1\nargs: "--seed\\t${{ inputs.seed }}"\nodd: "a\\x7Fb\\x90c\\x01d\\uFFFE"\n',
+    );
+    const parsed = parseYaml(text);
+    if ('error' in parsed) throw new Error(parsed.error);
+    expect(parsed.doc.toJS()).toMatchObject({
+      args: '--seed\t${{ inputs.seed }}',
+      odd: 'a\u007fb\u0090c\u0001d￾',
+    });
+  });
+
+  it('reads an alias with no anchor as a file it cannot read', () => {
+    const parsed = parseYaml('steps:\n  - with: {actual: *x}\n');
+
+    expect(parsed).toHaveProperty('error');
+  });
+
   it('writes the first entry of an empty {} or [] as a block', () => {
     const text = edited('inputs: {}\nlist: []\n', (doc) => {
       writeAt(doc, ['inputs', 'seed'], 'number');

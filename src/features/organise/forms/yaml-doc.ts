@@ -4,6 +4,7 @@ import {
   isScalar,
   isSeq,
   parseDocument,
+  visit,
   type Document,
   type DocumentOptions,
   type Node,
@@ -13,6 +14,7 @@ import {
   type Tags,
   type YAMLMap,
 } from 'yaml';
+import { overOriginal } from './keep-lines';
 
 /**
  * A definition file as a YAML document, edited node by node so the
@@ -28,13 +30,36 @@ const PYTHON_FALSE = /^(?:[Nn]o|NO|[Ff]alse|FALSE|[Oo]ff|OFF)$/;
 const BOOL = 'tag:yaml.org,2002:bool';
 const MERGE = 'tag:yaml.org,2002:merge';
 const STR = 'tag:yaml.org,2002:str';
-/** Line breaks PyYAML reads that JSON leaves bare, and YAML's escapes for them. */
-const BREAKS = /[\u0085\u2028\u2029]/g;
-const BREAK_ESCAPES: Record<string, string> = {
+/**
+ * Characters PyYAML takes only escaped in double quotes: a tab, which it
+ * refuses in plain text, and the controls, breaks and non-characters its
+ * reader refuses anywhere.
+ */
+function escapedOnly(text: string): boolean {
+  for (const char of text) {
+    const code = char.charCodeAt(0);
+    const control = code < 0x20 && code !== 0x0a && code !== 0x0d;
+    const wide = (code >= 0x7f && code <= 0x9f) || code === 0x2028 || code === 0x2029;
+    if (control || wide || code === 0xfffe || code === 0xffff) return true;
+  }
+  return false;
+}
+/** Those JSON leaves bare inside the quotes, and YAML's escape for each. */
+const LEFT_BARE = /[\x7f-\x9f\u2028\u2029\ufffe\uffff]/g;
+const NAMED_ESCAPES: Record<string, string> = {
   '\u0085': '\\N',
   '\u2028': '\\L',
   '\u2029': '\\P',
 };
+
+function escaped(found: string): string {
+  const named = NAMED_ESCAPES[found];
+  if (named !== undefined) return named;
+  const code = found.charCodeAt(0);
+  return code <= 0xff
+    ? `\\x${code.toString(16).toUpperCase().padStart(2, '0')}`
+    : `\\u${code.toString(16).toUpperCase().padStart(4, '0')}`;
+}
 /**
  * Tags of the library's 1.1 schema a definition file never holds: a time,
  * which stays text, and the ordered collections, which the library would
@@ -107,17 +132,17 @@ function pythonTag(tag: Tags[number]): Tags[number] {
       stringify: (item, ctx, onComment, onChompKeep) => {
         // New text a page writes, a key or an id as much as a value, is
         // quoted where PyYAML would read it otherwise; text the file holds
-        // keeps its own style. A line break only PyYAML takes as one is
-        // written as its escape.
+        // keeps its own style. Text holding a character PyYAML takes only
+        // as an escape is double-quoted, the character escaped.
         const value: unknown = item.value;
-        if (typeof value === 'string') {
-          BREAKS.lastIndex = 0;
-          if (BREAKS.test(value) || (item.type === undefined && readOtherwise(value)))
-            item.type = 'QUOTE_DOUBLE';
-        }
+        if (
+          typeof value === 'string' &&
+          (escapedOnly(value) || (item.type === undefined && readOtherwise(value)))
+        )
+          item.type = 'QUOTE_DOUBLE';
         const written = stringify(item, ctx, onComment, onChompKeep);
         return item.type === 'QUOTE_DOUBLE'
-          ? written.replace(BREAKS, (found) => BREAK_ESCAPES[found] ?? found)
+          ? written.replace(LEFT_BARE, escaped)
           : written;
       },
     };
@@ -180,6 +205,12 @@ export function parseYaml(text: string): { doc: Doc } | { error: string } {
   const doc = parseDocument(text, { ...YAML_OPTIONS, prettyErrors: true });
   const first = doc.errors[0];
   if (first !== undefined) return { error: first.message };
+  try {
+    // An alias with no anchor, or one that loops, parses but reads as nothing.
+    doc.toJS();
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : String(error) };
+  }
   return { doc };
 }
 
@@ -190,6 +221,42 @@ export function parseYaml(text: string): { doc: Doc } | { error: string } {
  */
 export function writeYaml(doc: Doc): string {
   return doc.toString({ lineWidth: 0, flowCollectionPadding: false });
+}
+
+/**
+ * The document `text` held, edited, as text: every line the edit did not
+ * reach as `text` wrote it, so a save changes only what was edited.
+ */
+export function writeOver(text: string, doc: Doc): string {
+  const changed = writeYaml(doc);
+  const before = parseYaml(text);
+  if ('error' in before) return changed;
+  return overOriginal(text, writeYaml(before.doc), changed, sameMeaning);
+}
+
+/** Whether two texts hold the same values and the same comments. */
+function sameMeaning(a: string, b: string): boolean {
+  const left = parseYaml(a);
+  const right = parseYaml(b);
+  if ('error' in left || 'error' in right) return false;
+  return (
+    JSON.stringify(left.doc.toJS()) === JSON.stringify(right.doc.toJS()) &&
+    commentsOf(left.doc).join('\n') === commentsOf(right.doc).join('\n')
+  );
+}
+
+function commentsOf(doc: Doc): string[] {
+  const found: (string | null | undefined)[] = [doc.commentBefore, doc.comment];
+  visit(doc, {
+    Node: (_, node) => {
+      found.push(node.commentBefore, node.comment);
+    },
+  });
+  return found
+    .flatMap((comment) => (comment ?? '').split('\n'))
+    .map((line) => line.trim())
+    .filter((line) => line !== '')
+    .sort();
 }
 
 /** The document's top as a mapping, or null for an empty file. */
