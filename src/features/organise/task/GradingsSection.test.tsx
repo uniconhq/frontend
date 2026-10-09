@@ -40,6 +40,9 @@ const stuck: Grading = {
   finished_at: null,
   deadline_at: null,
   cancel_reason: null,
+  falls_back: false,
+  last_good: null,
+  fallback: null,
 };
 
 const waiting: Grading = {

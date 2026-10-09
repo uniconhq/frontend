@@ -238,6 +238,28 @@ function ContestForm({
       </Fieldset>
 
       <Fieldset
+        legend="Broken gradings"
+        note="A grading that fails on the platform's side, or that staff then cancel. Staff may still fall back on one grading at a time from its gradings list."
+      >
+        <Select
+          label="A submission whose grading broke counts as"
+          value={values.onSystemError}
+          options={choices(values.onSystemError, [
+            {
+              value: 'grading',
+              label: 'grading: still being graded until staff act, void once cancelled',
+            },
+            {
+              value: 'last_result',
+              label: 'last_result: its last attempt that finished with a result',
+            },
+          ])}
+          placeholder="Not set (grading)"
+          onChange={(value) => set('onSystemError', value)}
+        />
+      </Fieldset>
+
+      <Fieldset
         legend="Tasks"
         note={
           read.unreadable.includes('tasks')

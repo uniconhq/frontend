@@ -1,9 +1,12 @@
 import { ApiError, isApiError } from '@/api/problem';
 
 /**
- * How long a file may send nothing before it counts as stalled. The door
- * refuses an upload before it reads the body, often only after it has stopped
- * reading, so a stall is as much of an answer as it gives.
+ * How long a file may send nothing before it counts as stalled. A stall is
+ * either the door refusing before it reads the body, which the browser often
+ * sees only as the body no longer being read, or a connection that died
+ * without saying so. The two look alike from here, so a stall counts as cut:
+ * the sender asks where the upload stands before sending again, and a refused
+ * slot answers that with its own refusal.
  */
 const STALL_MS = 30_000;
 
@@ -24,9 +27,9 @@ function failed(cut = false): ApiError {
 }
 
 /**
- * Whether a send failed because the connection broke, rather than because
- * the door or the forge turned it away or it stalled: only then is sending
- * the same file again from the start worth doing.
+ * Whether a send failed because the connection broke or stalled, rather than
+ * because the door or the forge answered it with a refusal: only then is
+ * sending the same file again from the start worth doing.
  */
 export function wasCut(error: unknown): boolean {
   return (
@@ -56,10 +59,10 @@ function onThisOrigin(url: string): string {
  * digest and length the address names, so a file that changed since it was
  * read is refused there. Every refusal fails this the same way: what the
  * forge says about it is not something the sender can use, and where the
- * upload stands is read back from the platform afterwards. A broken
- * connection fails it too, marked so `wasCut` tells it apart: the forge
- * keeps nothing of a body that did not finish, so the same PUT can be sent
- * again from the start.
+ * upload stands is read back from the platform afterwards. A broken or
+ * stalled connection fails it too, marked so `wasCut` tells it apart: the
+ * forge keeps nothing of a body that did not finish, so the same PUT can be
+ * sent again from the start.
  */
 export function sendToForge(
   url: string,
@@ -70,10 +73,6 @@ export function sendToForge(
   return new Promise((resolve, reject) => {
     const request = new XMLHttpRequest();
     let stall: ReturnType<typeof setTimeout> | undefined;
-    const fail = () => {
-      clearTimeout(stall);
-      reject(failed());
-    };
     const cut = () => {
       clearTimeout(stall);
       reject(failed(true));
@@ -81,8 +80,8 @@ export function sendToForge(
     const watch = (ms: number = STALL_MS) => {
       clearTimeout(stall);
       stall = setTimeout(() => {
+        cut();
         request.abort();
-        fail();
       }, ms);
     };
 
@@ -99,7 +98,6 @@ export function sendToForge(
       } else reject(failed());
     };
     request.onerror = cut;
-    request.onabort = fail;
     request.ontimeout = cut;
 
     request.open('PUT', onThisOrigin(url));

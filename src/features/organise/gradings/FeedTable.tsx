@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react';
-import type { FeedEntry } from '@/api/types';
+import type { Fallback, FeedEntry } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { PageLink } from '@/ui/PageLink';
 import { TextLink } from '@/ui/TextLink';
@@ -33,10 +33,17 @@ function TaskCell({ path, entry }: { path: ContestPath; entry: FeedEntry }) {
   );
 }
 
+/** Who has a broken attempt count as its submission's last good result. */
+const FALLBACK_BY: Record<Fallback, string> = {
+  staff: 'as staff asked',
+  contest: "as the contest's settings say",
+};
+
 /**
  * Where an attempt stands: its status, the reason a system error gave staff,
- * the sentence a cancel told the contestant, what a finished run came to, and
- * its log where its run wrote one.
+ * the sentence a cancel told the contestant, the earlier result a fallback
+ * counts in its place, what a finished run came to, and its log where its
+ * run wrote one.
  */
 function StatusCell({
   path,
@@ -55,6 +62,12 @@ function StatusCell({
       {grading.cancel_reason !== null && (
         <BodyText tone="secondary">
           Told the contestant: &ldquo;{grading.cancel_reason}&rdquo;
+        </BodyText>
+      )}
+      {grading.fallback !== null && grading.last_good !== null && (
+        <BodyText tone="secondary">
+          Counts as attempt {grading.last_good}&apos;s result,{' '}
+          {FALLBACK_BY[grading.fallback]}.
         </BodyText>
       )}
       {grading.status === 'done' && grading.result !== null && (

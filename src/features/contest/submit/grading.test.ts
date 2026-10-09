@@ -34,6 +34,10 @@ describe('how often submissions are read again', () => {
     expect(pollEvery(submitted(600, 'dispatched'), NOW)).toBe(15_000);
   });
 
+  it('follows closely a submission stamped after the clock it is read by', () => {
+    expect(pollEvery(submitted(-1, 'dispatched'), NOW)).toBe(2_000);
+  });
+
   it('follows the newest submission still being graded', () => {
     expect(
       pollEvery([submitted(600, 'dispatched'), submitted(3, 'dispatched')], NOW),
