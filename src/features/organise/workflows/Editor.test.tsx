@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderApp } from '@/test/render';
-import { server, signedIn } from '@/test/server';
+import { http } from 'msw';
+import { problem, server, signedIn } from '@/test/server';
 import { CLASSIC_V2, workflowBackend } from '@/test/workflows';
 
 const PAGE = '/workflows/kenny/tuned';
@@ -285,7 +286,97 @@ describe('the workflow editor', () => {
     await user.click(await screen.findByRole('menuitem', { name: 'test.episodes' }));
 
     await waitFor(() =>
-      expect(previewNow()).toContain('args: "--episodes ${{ test.episodes }}"'),
+      expect(previewNow()).toContain('args: --episodes ${{ test.episodes }}'),
     );
+  });
+
+  it('wires a port given a whole reference in its field', async () => {
+    server.use(signedIn, ...workflowBackend(CLASSIC_V2).handlers);
+    const user = userEvent.setup();
+    renderApp(PAGE);
+
+    const step = await screen.findByRole('group', { name: 'Step compile' });
+    await user.click(within(step).getByRole('button', { name: /^compile/ }));
+    const panel = await screen.findByRole('region', { name: 'The step compile' });
+    const entry = within(panel).getByRole('textbox', { name: /^entry/ });
+    await user.click(entry);
+    await user.paste('${{ inputs.submission }}');
+    await user.keyboard('{Enter}');
+
+    expect(
+      await within(panel).findByText(/Takes text, not file\./),
+    ).toBeInTheDocument();
+    await user.clear(entry);
+    await user.paste('${{ inputs.language }}');
+    await user.keyboard('{Enter}');
+    await waitFor(() =>
+      expect(previewNow()).toContain('entry: ${{ inputs.language }}'),
+    );
+  });
+
+  it('takes the current file in the merge view as one step undo goes back over', async () => {
+    const backend = workflowBackend(CLASSIC_V2);
+    server.use(signedIn, ...backend.handlers);
+    const user = userEvent.setup();
+    renderApp(PAGE);
+
+    await user.click(
+      await screen.findByRole('button', { name: 'The port args of run' }),
+    );
+    await user.click(
+      await screen.findByRole('menuitem', { name: /^inputs\.time_limit/ }),
+    );
+    backend.state.draft = CLASSIC_V2.replace(
+      'fold: max, better: lower',
+      'fold: sum, better: lower',
+    );
+    backend.state.token = 'someone-else';
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    await user.click(await screen.findByRole('button', { name: 'Drop my changes' }));
+
+    await waitFor(() => expect(previewNow()).toContain('fold: sum'));
+    await user.click(screen.getByRole('button', { name: 'Undo' }));
+    expect(previewNow()).toContain('args: ${{ inputs.time_limit }}');
+  });
+
+  it('says the check did not run rather than that it passed', async () => {
+    server.use(
+      http.post('/api/v1/workflows/check', () => problem(503, 'forge_unavailable')),
+      signedIn,
+      ...workflowBackend(CLASSIC_V2).handlers,
+    );
+    renderApp(PAGE);
+
+    expect(await screen.findByText(/The check did not run/)).toBeInTheDocument();
+    expect(screen.queryByText(/passes every check/)).not.toBeInTheDocument();
+  });
+
+  it('refuses on a panel a declaration a wire would refuse, saying why', async () => {
+    server.use(signedIn, ...workflowBackend(CLASSIC_V2).handlers);
+    const user = userEvent.setup();
+    renderApp(PAGE);
+
+    await user.click(await screen.findByRole('button', { name: 'Inputs' }));
+    const row = await screen.findByRole('listitem', { name: 'The input time_limit' });
+    await user.click(
+      within(row).getByRole('checkbox', { name: 'The contestant gives it' }),
+    );
+
+    expect(within(row).getByRole('alert')).toHaveTextContent(
+      'run.time_limit: This port raises a limit, so the task must give it, not the contestant.',
+    );
+    expect(previewNow()).toBe(CLASSIC_V2);
+  });
+
+  it('shows a wire the layout cannot draw on its port', async () => {
+    const backwards = CLASSIC_V2.replace(
+      'language: ${{ inputs.language }}',
+      ['language: ${{ inputs.language }}', '      entry: ${{ test.input }}'].join('\n'),
+    );
+    server.use(signedIn, ...workflowBackend(backwards).handlers);
+    renderApp(PAGE);
+
+    const step = await screen.findByRole('group', { name: 'Step compile' });
+    expect(within(step).getByText('= from test.input, not drawn')).toBeInTheDocument();
   });
 });

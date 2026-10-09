@@ -274,6 +274,24 @@ export function workflowBackend(
   });
   const handlers = [
     http.get(WORKFLOW_API, () => HttpResponse.json(page())),
+    http.get('/api/v1/workflows', () =>
+      HttpResponse.json([
+        {
+          owner: 'kenny',
+          name: 'tuned',
+          visibility: state.visibility,
+          versions: state.versions,
+          editable: true,
+        },
+        {
+          owner: 'unicon',
+          name: 'classic',
+          visibility: 'public',
+          versions: ['v2'],
+          editable: false,
+        },
+      ]),
+    ),
     http.get('/api/v1/primitives', () => HttpResponse.json(PRIMITIVES)),
     http.post('/api/v1/workflows/check', async ({ request }) => {
       const { content } = (await request.json()) as { content: string };

@@ -95,10 +95,13 @@
   max-width: 100%;
 }
 
+/* A step's input and output rows share a line; each row lets the pointer
+ * through to the other, and only what it holds takes it. */
 .row {
   position: absolute;
   left: 0;
   right: 0;
+  pointer-events: none;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -271,4 +274,8 @@
   margin: 0;
   font-size: 13px;
   color: var(--unicon-text-body);
+}
+
+.row > * {
+  pointer-events: auto;
 }

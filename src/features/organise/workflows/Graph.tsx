@@ -22,7 +22,7 @@ import {
   type Point,
 } from './layout';
 import { sourceAt, targetAt, type Notice, type Target } from './ends';
-import type { Ref, Workflow } from './model';
+import { refLabel, type Ref, type Workflow } from './model';
 import type { Pinned } from './pins';
 import { declared, raisingPorts, type PrimitiveInfo } from './primitives';
 import classes from './workflows.module.css';
@@ -49,6 +49,8 @@ type GraphContext = {
   notice: Notice | null;
   menu: (box: Box, port: string, side: 'left' | 'right') => ReactNode;
   select: (key: string) => void;
+  /** The ports a drawn wire feeds, `port:<step>.<port>`. */
+  drawn: Set<string>;
 };
 
 const Context = createContext<GraphContext | null>(null);
@@ -69,10 +71,24 @@ type WireEdge = Edge<
   'wire'
 >;
 
-function shownValue(workflow: Workflow, box: Box, port: string): string | null {
+/**
+ * What a port without a drawn wire is given, as the port shows it: a value,
+ * text with values written in, or a wire the layout cannot draw, such as a
+ * once step reading a per-test one, which the file holds all the same.
+ */
+function shownValue(
+  workflow: Workflow,
+  box: Box,
+  port: string,
+  drawn: Set<string>,
+): string | null {
   if (box.step === null) return null;
   const value = workflow.steps[box.step]?.with[port];
-  if (value === undefined || value.kind === 'wire') return null;
+  if (value === undefined) return null;
+  if (value.kind === 'wire')
+    return drawn.has(`port:${String(box.step)}.${port}`)
+      ? null
+      : `from ${refLabel(value.ref)}, not drawn`;
   if (value.kind === 'literal') return JSON.stringify(value.value);
   if (value.kind === 'text') return JSON.stringify(value.text);
   return 'not a value a port takes';
@@ -118,7 +134,8 @@ function PortRow({
     graph.notice !== null && graph.notice.box === box.key && graph.notice.port === port
       ? graph.notice.reason
       : null;
-  const value = side === 'left' ? shownValue(graph.workflow, box, port) : null;
+  const value =
+    side === 'left' ? shownValue(graph.workflow, box, port, graph.drawn) : null;
   const input =
     box.kind === 'inputs'
       ? graph.workflow.inputs.find((found) => found.id === port)
@@ -164,6 +181,8 @@ function PortRow({
         id={`${side === 'left' ? 'in' : 'out'}:${port}`}
         className={classes.handle}
         isConnectable={!graph.readOnly}
+        isConnectableStart={side === 'right'}
+        isConnectableEnd={side === 'left'}
       />
       {isNew ? (
         <span className={classes.drop}>
@@ -208,7 +227,7 @@ function boxTitle(box: Box, workflow: Workflow): { title: string; detail: string
   if (box.kind === 'step' && box.step !== null) {
     const step = workflow.steps[box.step];
     return {
-      title: step?.id ?? '',
+      title: step?.id || '(no id)',
       detail: `${step?.use ?? ''}${step?.perTest ? ' · per test' : ' · once'}`,
     };
   }
@@ -453,6 +472,7 @@ export function Graph({
     notice,
     menu,
     select: (key) => onSelect(key === selected ? null : key),
+    drawn: new Set(layout.wires.map((wire) => wire.target)),
   };
   return (
     <Context value={context}>

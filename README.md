@@ -438,14 +438,23 @@ per-test step, a contestant input or step output into a port a limit is
 raised from, and a loop; a refused drop says why at the port. Every port's
 name is a button whose menu does what a drag does, each wire it could take
 listed and one it may not shown with the reason, so the keyboard reaches
-everything. `edit.ts` makes every change as an edit of the YAML document in
+everything. A drag starts at an output and ends at an input. A change on a
+panel that would newly break a wire, a value or a report entry, such as
+making an input the contestant's while it feeds a port a limit is raised
+from, is refused there with the same reason, and so is an output dropped on
+a report entry whose meaning it cannot have. `edit.ts` makes every change as an edit of the YAML document in
 place, so comments and key order survive; a wire to a step listed later
 moves the fewest steps to keep every step after what it reads, and a step
 switched between once and per test moves to keep the once steps first. Undo
 and redo step through the page's own history.
 
-A moment after each change the definition goes to `POST /workflows/check`,
-and each problem is pinned by its YAML path to the step, port, input, field
+Every definition file is read and written as the forge reads it, PyYAML's
+YAML 1.1 (`forms/yaml-doc.ts`): text that would read there as true, false or
+a number, such as `on`, `yes` or `1_000`, is written quoted.
+
+A moment after each change the definition goes to `POST /workflows/check`
+(a check that did not run says so, never that it passed), and each problem
+is pinned by its YAML path to the step, port, input, field
 or report entry it names; one that names nothing drawn heads the page. A
 draft with problems saves; making a version of it is refused with every
 problem listed. A save over someone else's opens the merge view with steps
@@ -456,7 +465,11 @@ without a wire, text taking inputs and test fields written in; the inputs,
 test fields and report entries, each declaration offering only the keys the
 format allows it; or, with nothing selected, the palette of primitives with
 their ports. Who reads the workflow is set beside the versions: private,
-shared with the people listed, or public.
+shared with the people listed, or public; combine sits below, the
+workflow's latest version chosen to start with. A version is made of the
+save the page made, with its token, or not at all. A wire the layout cannot
+draw, such as a once step reading a per-test one in a draft, is shown on
+its port as text, and a step with no id keeps its place.
 
 A task whose workflow has a newer version than the one it names says so on
 its settings form, with a button that names the newer one in the field;

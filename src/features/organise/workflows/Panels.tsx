@@ -23,13 +23,16 @@ import {
   setPerTest,
   setUse,
   setValue,
+  wire,
   type FieldFields,
   type InputFields,
+  workflowOf,
 } from './edit';
 import {
   VALUE_TYPES,
   refLabel,
   refsIn,
+  wholeRef,
   refText,
   type FieldDecl,
   type InputDecl,
@@ -40,10 +43,12 @@ import type { Pinned } from './pins';
 import { declared, raisingPorts, type PrimitiveInfo } from './primitives';
 import {
   mayBeOptional,
+  newProblem,
   reportable,
   reportRefusal,
   switchRefusal,
   valueRefusal,
+  wireRefusal,
 } from './rules';
 import classes from './workflows.module.css';
 
@@ -163,6 +168,13 @@ function PortValue({
       change(clearPort(text, index, port));
       return null;
     }
+    const whole = typeof raw === 'string' ? wholeRef(raw) : null;
+    if (whole !== null) {
+      const refused = wireRefusal(workflow, primitives, index, port, whole);
+      if (refused !== null) return refused;
+      change(wire(text, index, port, whole));
+      return null;
+    }
     const written = typeof raw === 'string' ? refsIn(raw) : [];
     if (written === null) return 'A ${{ }} here is not an input or a test field.';
     const refused = valueRefusal(workflow, primitives, index, port, raw, written);
@@ -263,6 +275,7 @@ export function StepPanel({
   change: Change;
   onRemoved: () => void;
 }) {
+  const [versionRefused, setVersionRefused] = useState<string | null>(null);
   const step = workflow.steps[index];
   if (step === undefined) return null;
   const primitive = declared(primitives, step.use);
@@ -310,7 +323,13 @@ export function StepPanel({
           label="Primitive"
           value={step.use}
           options={versions.map((found) => ({ value: found.ref, label: found.ref }))}
-          onChange={(use) => change(setUse(text, index, use))}
+          error={versionRefused ?? undefined}
+          onChange={(use) => {
+            const written = setUse(text, index, use);
+            const broken = newProblem(workflow, workflowOf(written), primitives);
+            setVersionRefused(broken);
+            if (broken === null) change(written);
+          }}
         />
       ) : (
         <BodyText size="sm" tone="secondary">
@@ -379,6 +398,7 @@ function InputRow({
   pinned: Pinned;
   change: Change;
 }) {
+  const [refused, setRefused] = useState<string | null>(null);
   const fields: InputFields = {
     type: input.type,
     contestant: input.contestant,
@@ -393,7 +413,10 @@ function InputRow({
       merged.options = ['a', 'b'];
     if (!(merged.contestant && merged.type === 'file')) merged.per_test = false;
     if (merged.contestant) merged.optional = false;
-    change(setInput(text, input.id, merged));
+    const written = setInput(text, input.id, merged);
+    const broken = newProblem(workflow, workflowOf(written), primitives);
+    setRefused(broken);
+    if (broken === null) change(written);
   };
   const problems = pinned.inputs.get(input.id) ?? [];
   return (
@@ -457,6 +480,11 @@ function InputRow({
           {problem.message}
         </p>
       ))}
+      {refused !== null && (
+        <p className={classes.problemText} role="alert">
+          {refused}
+        </p>
+      )}
       <div>
         <Button
           size="xs"
@@ -473,16 +501,19 @@ function InputRow({
 function FieldRow({
   text,
   workflow,
+  primitives,
   field,
   pinned,
   change,
 }: {
   text: string;
   workflow: Workflow;
+  primitives: Map<string, PrimitiveInfo>;
   field: FieldDecl;
   pinned: Pinned;
   change: Change;
 }) {
+  const [refused, setRefused] = useState<string | null>(null);
   const fields: FieldFields = {
     type: field.type,
     options: field.options,
@@ -494,7 +525,10 @@ function FieldRow({
     else if (merged.options === null || merged.options?.length === 0)
       merged.options = ['a', 'b'];
     if (merged.type !== 'file' && merged.type !== 'folder') merged.public = false;
-    change(setField(text, field.name, merged));
+    const written = setField(text, field.name, merged);
+    const broken = newProblem(workflow, workflowOf(written), primitives);
+    setRefused(broken);
+    if (broken === null) change(written);
   };
   const problems = pinned.fields.get(field.name) ?? [];
   return (
@@ -546,6 +580,11 @@ function FieldRow({
           {problem.message}
         </p>
       ))}
+      {refused !== null && (
+        <p className={classes.problemText} role="alert">
+          {refused}
+        </p>
+      )}
       <div>
         <Button
           size="xs"
@@ -652,12 +691,14 @@ export function InputsPanel({
 export function FieldsPanel({
   text,
   workflow,
+  primitives,
   pinned,
   names,
   change,
 }: {
   text: string;
   workflow: Workflow;
+  primitives: Map<string, PrimitiveInfo>;
   pinned: Pinned;
   names: string[] | null;
   change: Change;
@@ -677,6 +718,7 @@ export function FieldsPanel({
             key={field.name}
             text={text}
             workflow={workflow}
+            primitives={primitives}
             field={field}
             pinned={pinned}
             change={change}
@@ -714,6 +756,7 @@ function EntryRow({
   pinned: Pinned;
   change: Change;
 }) {
+  const [refused, setRefused] = useState<string | null>(null);
   const from = entry.from;
   const step =
     from?.kind === 'steps'
@@ -768,6 +811,10 @@ function EntryRow({
         }
         const value = Number(written);
         if (!Number.isFinite(value)) return 'A number.';
+        const least = key === 'at_least' ? value : entry.atLeast;
+        const most = key === 'at_most' ? value : entry.atMost;
+        if (least !== null && most !== null && least > most)
+          return 'Must be at least at_least.';
         write({ [key]: value });
         return null;
       }}
@@ -797,11 +844,14 @@ function EntryRow({
         label="Reads"
         value={from !== null ? refLabel(from) : ''}
         placeholder="Nothing yet"
+        error={refused ?? undefined}
         options={sources.map((ref) => ({ value: refLabel(ref), label: refLabel(ref) }))}
         onChange={(chosen) => {
           const ref = sources.find((found) => refLabel(found) === chosen);
-          if (ref !== undefined && reportRefusal(workflow, primitives, ref) === null)
-            write({ from: ref });
+          if (ref === undefined) return;
+          const refused = reportRefusal(workflow, primitives, ref, entry);
+          setRefused(refused);
+          if (refused === null) write({ from: ref });
         }}
       />
       {isNumber && perTest && (
