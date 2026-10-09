@@ -1,7 +1,15 @@
 import { isSeq } from 'yaml';
 import { readBoards, writeBoards, type BoardValues } from './board-values';
 import { isoOf, localOf, unreadableTime } from './times';
-import { isRecord, numberOf, textOf, valueAt, writeAt, type Doc } from './yaml-doc';
+import {
+  isRecord,
+  numberOf,
+  textOf,
+  Time,
+  valueAt,
+  writeAt,
+  type Doc,
+} from './yaml-doc';
 
 /**
  * `contest.yaml` as the form's fields: text for every field, so an empty one
@@ -128,7 +136,10 @@ export function readContest(doc: Doc): ContestRead {
 /** A text field's value as the file holds it; an empty one is no key. */
 const text = (value: string) => (value === '' ? undefined : value);
 const number = (value: string) => numberOf(value);
-const time = (value: string) => isoOf(value);
+const time = (value: string) => {
+  const iso = isoOf(value);
+  return iso === undefined ? undefined : new Time(iso);
+};
 
 /**
  * Write what changed between `before` and `after` into the document. Only

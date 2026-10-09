@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parse } from 'yaml';
+import { parseYaml } from '../forms/yaml-doc';
 import { CLASSIC_FOLDER, CLASSIC_V1, CLASSIC_V2, PRIMITIVES } from '@/test/workflows';
 import { colourOf, layoutWorkflow, type Box, type Layout, type Point } from './layout';
 import { readWorkflow } from './model';
@@ -7,8 +7,11 @@ import { byRef } from './primitives';
 
 const primitives = byRef(PRIMITIVES);
 
+/** The layout of a file read as the editor reads it, YAML 1.1. */
 function laid(text: string): Layout {
-  return layoutWorkflow(readWorkflow(parse(text)), primitives);
+  const parsed = parseYaml(text);
+  if ('error' in parsed) throw new Error(parsed.error);
+  return layoutWorkflow(readWorkflow(parsed.doc.toJS()), primitives);
 }
 
 /** Points along a wire as it is drawn: each level run and each curve between columns. */
@@ -208,6 +211,8 @@ steps:
     expect(group?.column).toBe(columnOf(layout, 'step:0')! - 1);
     expect(layout.wires.some((wire) => wire.to.port === 'args')).toBe(false);
     expect(layout.wires.some((wire) => wire.to.port === 'time_limit')).toBe(true);
+    expect(behind(layout)).toEqual([]);
+    expect(overlaps(layout)).toEqual([]);
   });
 
   it('stands what nothing reads in the first column, and test fields in the band', () => {

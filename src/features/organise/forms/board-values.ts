@@ -1,6 +1,14 @@
 import { isSeq } from 'yaml';
 import type { DefinitionError } from '@/api/types';
-import { isRecord, numberOf, scalarOf, textOf, writeAt, type Doc } from './yaml-doc';
+import {
+  isRecord,
+  nodeFor,
+  numberOf,
+  scalarOf,
+  textOf,
+  writeAt,
+  type Doc,
+} from './yaml-doc';
 
 /**
  * One key a board ranks on, in turn: `points`, `penalty` with the minutes
@@ -146,7 +154,7 @@ export function writeBoards(
       else
         doc.setIn(
           field('order'),
-          doc.createNode(board.order.map(orderItem), { flow: true }),
+          nodeFor(doc, board.order.map(orderItem), { flow: true }),
         );
     }
     put('who', was.who, board.who, text);
