@@ -8,7 +8,9 @@ import type { Ref } from 'react';
  * `inputMode="decimal"` asks a phone for its number keys, for a field that
  * takes a number. `ref` is the input itself, for moving the focus to it.
  * `error`, when given, is what the server refused about the field: it reads
- * under it and marks the field invalid.
+ * under it and marks the field invalid. `onCommit`, when given, is called
+ * when the field is left or Enter is pressed in it, for a field whose change
+ * applies once the person is done typing.
  */
 export function TextInput({
   label,
@@ -21,6 +23,7 @@ export function TextInput({
   inputMode,
   disabled = false,
   ref,
+  onCommit,
 }: {
   label: string;
   value: string;
@@ -32,6 +35,7 @@ export function TextInput({
   inputMode?: 'decimal';
   disabled?: boolean;
   ref?: Ref<HTMLInputElement>;
+  onCommit?: () => void;
 }) {
   return (
     <MantineTextInput
@@ -46,6 +50,13 @@ export function TextInput({
       inputMode={inputMode}
       disabled={disabled}
       radius="sm"
+      onBlur={onCommit}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' && onCommit !== undefined) {
+          event.preventDefault();
+          onCommit();
+        }
+      }}
     />
   );
 }

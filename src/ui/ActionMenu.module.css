@@ -1,0 +1,25 @@
+.button {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--unicon-text-primary);
+  font: inherit;
+  cursor: pointer;
+}
+
+.menu {
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.menuText {
+  display: block;
+  font-family: var(--mantine-font-family-monospace);
+  font-size: 12px;
+}
+
+.menuReason {
+  display: block;
+  font-size: 11px;
+  white-space: normal;
+}
