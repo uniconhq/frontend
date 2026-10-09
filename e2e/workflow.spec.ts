@@ -240,3 +240,26 @@ test('a step added from the palette is wired by dragging', async ({ page }) => {
 
   await expect.poll(() => preview(page)).toContain('actual: ${{ steps.run.output }}');
 });
+
+test('every port of a step opens its menu with the mouse', async ({ page }) => {
+  await stubWorkflowApi(page);
+  await page.setViewportSize({ width: 1600, height: 1000 });
+  await page.goto('/workflows/kenny/tuned');
+  await expect(page.getByRole('group', { name: 'Step run' })).toBeVisible();
+
+  for (const [step, port] of [
+    ['compile', 'source'],
+    ['compile', 'language'],
+    ['run', 'binary'],
+    ['run', 'input'],
+    ['check', 'actual'],
+  ] as const) {
+    await page.getByRole('button', { name: `The port ${port} of ${step}` }).click();
+    await expect(
+      page.getByRole('menu', { name: `The port ${port} of ${step}` }),
+    ).toBeVisible();
+    await page.keyboard.press('Escape');
+  }
+  await page.getByRole('button', { name: 'The output run.time_ms' }).click();
+  await expect(page.getByRole('menuitem', { name: 'Report it' })).toBeVisible();
+});
