@@ -450,6 +450,36 @@ describe('the workflow editor', () => {
     ).not.toBeInTheDocument();
   });
 
+  it('keeps a step chosen when an edit moves it in the list', async () => {
+    const two = [
+      'steps:',
+      '  - {id: first, use: unicon/compile@v2}',
+      '  - {id: second, use: unicon/compile@v2}',
+      '',
+    ].join('\n');
+    server.use(signedIn, ...workflowBackend(two).handlers);
+    const user = userEvent.setup();
+    renderApp(PAGE);
+
+    const step = await screen.findByRole('group', { name: 'Step first' });
+    await user.click(within(step).getByRole('button', { name: /^first/ }));
+    const panel = await screen.findByRole('region', { name: 'The step first' });
+    await user.click(
+      within(panel).getByRole('checkbox', { name: 'Runs once per test' }),
+    );
+
+    await waitFor(() => expect(previewNow()).toMatch(/id: second[\s\S]*id: first/));
+    expect(screen.getByRole('region', { name: 'The step first' })).toBeInTheDocument();
+    expect(
+      within(screen.getByRole('region', { name: 'The step first' })).getByRole(
+        'checkbox',
+        {
+          name: 'Runs once per test',
+        },
+      ),
+    ).toBeChecked();
+  });
+
   it('says the check did not run rather than that it passed', async () => {
     server.use(
       http.post('/api/v1/workflows/check', () => problem(503, 'forge_unavailable')),
