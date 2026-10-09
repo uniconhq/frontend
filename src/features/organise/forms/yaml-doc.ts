@@ -25,7 +25,14 @@ export type Path = (string | number)[];
 const PYTHON_TRUE = /^(?:[Yy]es|YES|[Tt]rue|TRUE|[Oo]n|ON)$/;
 const PYTHON_FALSE = /^(?:[Nn]o|NO|[Ff]alse|FALSE|[Oo]ff|OFF)$/;
 const BOOL = 'tag:yaml.org,2002:bool';
-const TIMESTAMP = 'tag:yaml.org,2002:timestamp';
+/**
+ * Tags of the library's 1.1 schema a definition file never holds: a time,
+ * which stays text, and the ordered collections, which the library would
+ * otherwise make of every new mapping.
+ */
+const LEFT_OUT = ['timestamp', 'omap', 'pairs', 'set'].map(
+  (name) => `tag:yaml.org,2002:${name}`,
+);
 
 /**
  * How every definition file is read and written: as the forge reads it,
@@ -33,13 +40,14 @@ const TIMESTAMP = 'tag:yaml.org,2002:timestamp';
  * `1_000` is a number. A string that would read as one of those is written
  * quoted, so the file a save writes means to the forge what the page shows.
  * Two of the library's 1.1 rules are PyYAML's instead: `y` and `n` stay
- * text, and a time stays the text it is written as, which the forms read.
+ * text, a time stays the text it is written as, which the forms read, and a
+ * new mapping is a plain one.
  */
 export const YAML_OPTIONS: ParseOptions & DocumentOptions & SchemaOptions = {
   version: '1.1',
   customTags: (tags: Tags) =>
     tags
-      .filter((tag) => typeof tag !== 'object' || tag.tag !== TIMESTAMP)
+      .filter((tag) => typeof tag !== 'object' || !LEFT_OUT.includes(tag.tag))
       .map(pythonBool),
 };
 
