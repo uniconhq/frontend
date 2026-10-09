@@ -80,3 +80,14 @@ export type Marks = Schemas['Marks'];
 
 /** The runner's list of outcomes, which each test and what stopped a run take one of. */
 export type Outcome = Schemas['GradedTest']['outcome'];
+
+/** A primitive at one version, with its declared ports. */
+export type Primitive = Schemas['Primitive'];
+export type PrimitivePort = Schemas['PrimitivePort'];
+/** A workflow a person may read, and whether they may edit it. */
+export type WorkflowItem = Schemas['WorkflowItem'];
+/** A workflow as its page shows it, with the draft for one who may edit it. */
+export type WorkflowPage = Schemas['WorkflowPage'];
+/** One problem a version would be refused for, at its YAML path. */
+export type DefinitionProblem = Schemas['DefinitionProblem'];
+export type Visibility = Schemas['Visibility'];
