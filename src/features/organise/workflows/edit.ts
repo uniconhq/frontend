@@ -11,6 +11,7 @@ import {
   parseYaml,
   quoteForPython,
   writeAt,
+  writeOver,
   writeYaml,
 } from '../forms/yaml-doc';
 import { readWorkflow, refText, type Ref, type Workflow } from './model';
@@ -36,7 +37,7 @@ function edited(text: string, edit: Edit): string {
   const { doc } = parsed;
   if (doc.contents === null || !isMap(doc.contents)) doc.contents = doc.createNode({});
   edit(doc);
-  return writeYaml(doc);
+  return writeOver(text, doc);
 }
 
 /** The workflow `text` holds now. */

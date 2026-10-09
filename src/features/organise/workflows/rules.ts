@@ -122,7 +122,7 @@ function kindOf(
   if (read === undefined || source === undefined)
     return `${ref.name} is not a step before this one.`;
   if (stepIndex !== 'report') {
-    if (read === stepIndex) return 'A step cannot read its own output.';
+    if (read === stepIndex) return `${ref.name} is not a step before this one.`;
     if (upstream(workflow, read).has(stepIndex))
       return `That makes a loop: ${ref.name} reads this step already.`;
   }

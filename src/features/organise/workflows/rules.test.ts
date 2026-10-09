@@ -153,7 +153,7 @@ describe('the drag rules', () => {
       1,
       'memory_limit',
       output('run', 'time_ms'),
-      'A step cannot read its own output.',
+      'run is not a step before this one.',
     ],
     [
       'a number into an enum port',

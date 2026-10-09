@@ -12,7 +12,7 @@ import type { Place } from '../files/place';
 import { useFileWrite, useOwnFile } from './file-hooks';
 import { definitionErrorsOf } from '../files/refusals';
 import { MergeView } from './MergeView';
-import { parseYaml, topMap, writeYaml, type Doc } from './yaml-doc';
+import { parseYaml, topMap, writeOver, type Doc } from './yaml-doc';
 
 /**
  * What a form is handed: the file as read, the way to save a change to it,
@@ -166,7 +166,7 @@ function FormView({
               const fresh = parseYaml(file.content);
               if ('error' in fresh) return;
               change(fresh.doc);
-              save(file, writeYaml(fresh.doc));
+              save(file, writeOver(file.content, fresh.doc));
             },
           })}
         </div>

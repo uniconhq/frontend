@@ -124,6 +124,21 @@ function boxOf(
   );
 }
 
+/**
+ * What the author chose, a step held by its id and its place: an edit, an
+ * undo or a merge that moves the step in the list leaves it chosen, and a
+ * rename, which keeps its place, too.
+ */
+type Chosen =
+  Exclude<Selected, { kind: 'step' }> | { kind: 'step'; id: string; index: number };
+
+function chosenStep(chosen: Chosen | null, workflow: Workflow): Selected | null {
+  if (chosen?.kind !== 'step') return chosen;
+  const found = workflow.steps.findIndex((step) => step.id === chosen.id);
+  const index = found >= 0 ? found : chosen.index;
+  return index < workflow.steps.length ? { kind: 'step', index } : null;
+}
+
 function selectionOf(box: Box | undefined): Selected | null {
   if (box === undefined) return null;
   if (box.kind === 'step' && box.step !== null)
@@ -154,7 +169,7 @@ export function Editor({
     text: page.draft.content,
     token: page.draft.token,
   });
-  const [selected, setSelected] = useState<Selected | null>(null);
+  const [chosen, setChosen] = useState<Chosen | null>(null);
   const [dragging, setDragging] = useState<Ref | null>(null);
   const [notice, setNotice] = useState<Notice | null>(null);
   const [conflict, setConflict] = useState<{
@@ -190,6 +205,20 @@ export function Editor({
       ),
     [problems, workflow],
   );
+  const selected = useMemo(() => chosenStep(chosen, workflow), [chosen, workflow]);
+  const setSelected = (next: Selected | null, steps = workflow.steps) =>
+    setChosen(
+      next?.kind === 'step'
+        ? { kind: 'step', id: steps[next.index]?.id ?? '', index: next.index }
+        : next,
+    );
+  if (chosen?.kind === 'step' && selected?.kind === 'step') {
+    // A step found again elsewhere, or renamed in its place, is held by where
+    // and what it is now.
+    const id = workflow.steps[selected.index]?.id;
+    if (id !== undefined && (id !== chosen.id || selected.index !== chosen.index))
+      setChosen({ kind: 'step', id, index: selected.index });
+  }
   const selectedKey = boxOf(layout.boxes, workflow, selected);
   const marked = useMemo(() => linesOf(text, selected), [text, selected]);
   const dirty = text !== saved.text;
@@ -490,14 +519,15 @@ export function Editor({
         primitives={primitives}
         onAdd={(primitive, perTest) => {
           const next = addStep(text, primitive, perTest);
-          const added = workflowOf(next).steps.findIndex(
+          const steps = workflowOf(next).steps;
+          const added = steps.findIndex(
             (step, at) => workflow.steps[at]?.id !== step.id,
           );
           change(next);
-          setSelected({
-            kind: 'step',
-            index: added < 0 ? workflow.steps.length : added,
-          });
+          setSelected(
+            { kind: 'step', index: added < 0 ? workflow.steps.length : added },
+            steps,
+          );
         }}
       />
     ) : selected.kind === 'step' ? (

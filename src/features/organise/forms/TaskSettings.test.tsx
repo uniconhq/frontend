@@ -273,7 +273,8 @@ describe('the task settings form', { timeout: 20_000 }, () => {
       },
       submissions: { max: 50, rate: { count: 1, per: 30 } },
     });
-    expect(sent[0]?.content).toContain('name: Shortest Path # the title');
+    // A line the save did not change stays as the file wrote it.
+    expect(sent[0]?.content).toContain('name: Shortest Path   # the title');
     expect(sent[0]?.content).toContain('samples: {}');
   });
 
