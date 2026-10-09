@@ -468,7 +468,6 @@ export function Graph({
             elementsSelectable={false}
             fitView
             minZoom={0.2}
-            proOptions={{ hideAttribution: true }}
             isValidConnection={() => true}
             onPaneClick={() => onSelect(null)}
             onNodeClick={(event, node) => {

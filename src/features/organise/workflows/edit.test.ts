@@ -59,6 +59,26 @@ describe('editing the file in place', () => {
     expect(after).toContain('memory_limit: 512');
   });
 
+  it('writes the first port of a new step as a block', () => {
+    const added = addStep(COMMENTED, diff!, true);
+    const wired = wire(added, 2, 'actual', {
+      kind: 'steps',
+      name: 'run',
+      output: 'output',
+    });
+
+    expect(wired).toContain(
+      [
+        '  - id: diff-check',
+        '    use: unicon/diff-check@v2',
+        '    per_test: true',
+        '    with:',
+        '      actual: ${{ steps.run.output }}',
+        '',
+      ].join('\n'),
+    );
+  });
+
   it('adds a step named for its primitive, a once step before every per-test one', () => {
     const once = addStep(COMMENTED, compile!);
     const perTest = addStep(COMMENTED, diff!, true);

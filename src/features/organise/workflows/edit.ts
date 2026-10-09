@@ -77,7 +77,11 @@ function stepNode(doc: Document, index: number): YAMLMap | null {
 /** The step's `with`, made a mapping when it is missing or empty. */
 function withOf(doc: Document, step: YAMLMap): YAMLMap {
   const found: unknown = step.get('with', true);
-  if (isMap(found)) return found;
+  if (isMap(found)) {
+    // An empty `with: {}` takes its first port as a block, a port to a line.
+    if (found.items.length === 0) found.flow = false;
+    return found;
+  }
   const made = doc.createNode({}) as YAMLMap;
   step.set('with', made);
   return made;
