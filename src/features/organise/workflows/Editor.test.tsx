@@ -307,6 +307,14 @@ describe('the workflow editor', () => {
       await within(panel).findByText(/Takes text, not file\./),
     ).toBeInTheDocument();
     await user.clear(entry);
+    await user.paste('main ${{ inputs }}');
+    await user.keyboard('{Enter}');
+    expect(
+      await within(panel).findByText(
+        '${{ inputs }} is not a reference a workflow makes: inputs.<id>, test.<field> or steps.<id>.<output>.',
+      ),
+    ).toBeInTheDocument();
+    await user.clear(entry);
     await user.paste('${{ inputs.language }}');
     await user.keyboard('{Enter}');
     await waitFor(() =>
@@ -355,8 +363,14 @@ describe('the workflow editor', () => {
     const user = userEvent.setup();
     renderApp(PAGE);
 
-    const press = async (button: HTMLElement) => {
-      button.focus();
+    // Every control is reached by Tab and every menu item by the arrow keys.
+    const tabTo = async (target: HTMLElement) => {
+      for (let step = 0; step < 400 && document.activeElement !== target; step += 1)
+        await user.tab();
+      expect(target).toHaveFocus();
+    };
+    const press = async (target: HTMLElement) => {
+      await tabTo(target);
       await user.keyboard('{Enter}');
     };
     const wireFrom = async (port: string, step: string, source: RegExp) => {
@@ -366,7 +380,11 @@ describe('the workflow editor', () => {
       const menu = await screen.findByRole('menu', {
         name: `The port ${port} of ${step}`,
       });
-      await press(within(menu).getByRole('menuitem', { name: source }));
+      const item = within(menu).getByRole('menuitem', { name: source });
+      for (let move = 0; move < 40 && document.activeElement !== item; move += 1)
+        await user.keyboard('{ArrowDown}');
+      expect(item).toHaveFocus();
+      await user.keyboard('{Enter}');
     };
     await press(
       await screen.findByRole('button', { name: 'Add unicon/compile@v2, run once' }),
@@ -392,11 +410,44 @@ describe('the workflow editor', () => {
     await wireFrom('expected', 'diff-check', /^test\.answer/);
 
     const text = previewNow();
-    expect(text).toContain('source: ${{ inputs.submission }}');
-    expect(text).toContain('binary: ${{ steps.compile.binary }}');
-    expect(text).toContain('actual: ${{ steps.sandbox-run.output }}');
-    expect(text).toContain('expected: ${{ test.answer }}');
+    for (const wire of [
+      'source: ${{ inputs.submission }}',
+      'binary: ${{ steps.compile.binary }}',
+      'input: ${{ test.input }}',
+      'time_limit: ${{ inputs.time_limit }}',
+      'memory_limit: ${{ inputs.memory_limit }}',
+      'actual: ${{ steps.sandbox-run.output }}',
+      'expected: ${{ test.answer }}',
+    ])
+      expect(text).toContain(wire);
     expect(text.match(/per_test: true/g)).toHaveLength(2);
+  });
+
+  it('offers for which way is better only an enum input the task gives whole', async () => {
+    server.use(
+      signedIn,
+      ...workflowBackend(
+        CLASSIC_V2.replace(
+          '  time_limit: number\n',
+          '  time_limit: number\n  goal: {type: enum, options: [higher, lower]}\n  maybe: {type: enum, options: [higher, lower], optional: true}\n',
+        ),
+      ).handlers,
+    );
+    const user = userEvent.setup();
+    renderApp(PAGE);
+
+    await user.click(await screen.findByRole('button', { name: 'Report' }));
+    const entry = await screen.findByRole('listitem', {
+      name: 'The report entry time_ms',
+    });
+    const better = within(entry).getByRole('combobox', { name: 'Better is' });
+
+    expect(
+      within(better).getByRole('option', { name: "as the task's goal says" }),
+    ).toBeInTheDocument();
+    expect(
+      within(better).queryByRole('option', { name: "as the task's maybe says" }),
+    ).not.toBeInTheDocument();
   });
 
   it('says the check did not run rather than that it passed', async () => {
