@@ -137,6 +137,16 @@ describe('the scalars as YAML 1.2 reads them', () => {
     expect(textAt(parsed.doc, ['worth'])).toBe('100.50');
   });
 
+  it('writes a number typed over one tagged !!float or !!int as its digits', () => {
+    const text = edited('a: !!float 2 # kept\nb: !!int 3\nc: !!float 4\n', (doc) => {
+      writeAt(doc, ['a'], new NumberText('2.5'));
+      writeAt(doc, ['b'], new NumberText('3.5'));
+      writeAt(doc, ['c'], new NumberText('5'));
+    });
+
+    expect(text).toBe('a: 2.5 # kept\nb: 3.5\nc: 5\n');
+  });
+
   it('keeps every digit of a number it did not change, and sees a change to the last', () => {
     const digits = '0.123456789012345678901234567891';
     const file = `bound: ${digits} # thirty digits\nname: x\n`;

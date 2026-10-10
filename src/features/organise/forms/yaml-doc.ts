@@ -366,8 +366,12 @@ export function writeAt(
   if (isPlain) {
     if (isScalar(old)) {
       // A scalar already there keeps its node, so a comment on its line stays.
-      if (written instanceof NumberText) old.value = written;
-      else doc.setIn(path, written);
+      if (written instanceof NumberText) {
+        // Written as its digits whatever tag the file gave the old value: a
+        // `!!float` or `!!int` would write a NumberText as `.nan`.
+        old.value = written;
+        old.tag = undefined;
+      } else doc.setIn(path, written);
       return;
     }
     const node = nodeFor(doc, written);
