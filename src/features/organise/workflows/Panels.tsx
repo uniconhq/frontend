@@ -6,6 +6,7 @@ import { Checkbox } from '@/ui/Checkbox';
 import { SectionTitle } from '@/ui/SectionTitle';
 import { Select } from '@/ui/Select';
 import { TextInput } from '@/ui/TextInput';
+import { compareDecimal } from '@/lib/exact';
 import { NumberText, numberText } from '../forms/yaml-doc';
 import {
   clearPort,
@@ -818,7 +819,11 @@ function EntryRow({
         if (!(value instanceof NumberText)) return 'A number.';
         const least = key === 'at_least' ? value : entry.atLeast;
         const most = key === 'at_most' ? value : entry.atMost;
-        if (least !== null && most !== null && least.value > most.value)
+        if (
+          least !== null &&
+          most !== null &&
+          compareDecimal(least.text, most.text) > 0
+        )
           return 'Must be at least at_least.';
         write({ [key]: value });
         return null;

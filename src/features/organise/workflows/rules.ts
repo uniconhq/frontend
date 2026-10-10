@@ -1,3 +1,4 @@
+import { compareDecimal } from '@/lib/exact';
 import { NumberText } from '../forms/yaml-doc';
 import {
   refLabel,
@@ -209,7 +210,7 @@ export function reportRefusal(
   if (
     entry.atLeast !== null &&
     entry.atMost !== null &&
-    entry.atLeast.value > entry.atMost.value
+    compareDecimal(entry.atLeast.text, entry.atMost.text) > 0
   )
     return 'Must be at least at_least.';
   const meant = [entry.fold, entry.better, entry.atLeast, entry.atMost].some(

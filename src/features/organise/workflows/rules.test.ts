@@ -366,6 +366,14 @@ report:
     expect(
       reportRefusal(workflow, primitives, output('run', 'time_ms'), bounded ?? null),
     ).toBe('Must be at least at_least.');
+    const close = bounded && {
+      ...bounded,
+      atLeast: new NumberText('1.00000000000000000002'),
+      atMost: new NumberText('1.00000000000000000001'),
+    };
+    expect(
+      reportRefusal(workflow, primitives, output('run', 'time_ms'), close ?? null),
+    ).toBe('Must be at least at_least.');
   });
 
   it('names what a change of a declaration newly breaks', () => {
