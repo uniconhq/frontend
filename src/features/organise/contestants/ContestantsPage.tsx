@@ -186,7 +186,11 @@ function Row({
       </td>
       <td>
         {contestant.time_extension > 0
-          ? `${minutesOf(contestant.time_extension)} min`
+          ? `${minutesOf(contestant.time_extension)} min${
+              contestant.extension_tasks === null
+                ? ''
+                : ` on ${contestant.extension_tasks.join(', ')}`
+            }`
           : '—'}
       </td>
       {manages && (

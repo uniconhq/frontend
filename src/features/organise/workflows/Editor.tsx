@@ -163,6 +163,7 @@ export function Editor({
   const [dragging, setDragging] = useState<Ref | null>(null);
   const [notice, setNotice] = useState<Notice | null>(null);
   const [conflict, setConflict] = useState<{
+    base: string;
     mine: string;
     current: string;
     token: string | null;
@@ -228,12 +229,17 @@ export function Editor({
     '/api/v1/workflows/{owner}/{name}/versions',
   );
 
-  const write = async (content: string, token: string | null) => {
+  /** Write `content` over `over`, the file as last read: on a conflict the
+   * merge view compares with what was written over. */
+  const write = async (
+    content: string,
+    over: { text: string; token: string | null },
+  ) => {
     setSaveError(null);
     try {
       const written = await save.mutateAsync({
         params: { path: { owner, name } },
-        body: { content, token },
+        body: { content, token: over.token },
       });
       setSaved({ text: written.content, token: written.token });
       setConflict(null);
@@ -250,6 +256,7 @@ export function Editor({
         const current = fresh.draft;
         if (current !== null) {
           setConflict({
+            base: over.text,
             mine: content,
             current: current.content,
             token: current.token,
@@ -556,7 +563,7 @@ export function Editor({
           size="xs"
           disabled={!dirty}
           loading={save.isPending}
-          onClick={() => void write(text, saved.token)}
+          onClick={() => void write(text, saved)}
         >
           Save
         </Button>
@@ -607,16 +614,19 @@ export function Editor({
       {saveError !== null && <ErrorBlock error={saveError} />}
       {conflict !== null && (
         <MergeView
+          key={conflict.token}
           file="workflow.yaml"
           admin
-          baseText={saved.text}
+          baseText={conflict.base}
           mineText={conflict.mine}
           currentText={conflict.current}
           busy={save.isPending}
           onSave={(merged) => {
-            void write(merged, conflict.token).then((done) => {
-              if (done) dispatch({ kind: 'change', text: merged });
-            });
+            void write(merged, { text: conflict.current, token: conflict.token }).then(
+              (done) => {
+                if (done) dispatch({ kind: 'change', text: merged });
+              },
+            );
           }}
           onDrop={() => {
             setSaved({ text: conflict.current, token: conflict.token });

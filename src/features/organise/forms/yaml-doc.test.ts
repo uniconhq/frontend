@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   NumberText,
+  numberProblem,
+  numberText,
   parseYaml,
   textAt,
   writeAt,
@@ -137,6 +139,16 @@ describe('the scalars as YAML 1.2 reads them', () => {
     expect(textAt(parsed.doc, ['worth'])).toBe('100.50');
   });
 
+  it('writes a number typed over one tagged !!float or !!int as its digits', () => {
+    const text = edited('a: !!float 2 # kept\nb: !!int 3\nc: !!float 4\n', (doc) => {
+      writeAt(doc, ['a'], new NumberText('2.5'));
+      writeAt(doc, ['b'], new NumberText('3.5'));
+      writeAt(doc, ['c'], new NumberText('5'));
+    });
+
+    expect(text).toBe('a: 2.5 # kept\nb: 3.5\nc: 5\n');
+  });
+
   it('keeps every digit of a number it did not change, and sees a change to the last', () => {
     const digits = '0.123456789012345678901234567891';
     const file = `bound: ${digits} # thirty digits\nname: x\n`;
@@ -245,5 +257,39 @@ describe('the scalars as YAML 1.2 reads them', () => {
     );
 
     expect(text).toBe('time_ms:\n  from: x # CPU time\n  fold: sum\n  at_least: 0\n');
+  });
+});
+
+describe('a number typed into a field', () => {
+  it('takes every number YAML 1.2 reads, as the forge does', () => {
+    for (const typed of ['+5', '0x10', '0o17', '+.5', '5.', '-1e3']) {
+      expect(numberProblem(typed), typed).toBeUndefined();
+      expect(numberText(typed), typed).toEqual(new NumberText(typed));
+      const read = parseYaml(`a: ${typed}`);
+      if ('error' in read) throw new Error(read.error);
+      expect(read.doc.toJS(), typed).toEqual({ a: Number(typed) });
+    }
+    expect(numberProblem('0x10', true)).toBeUndefined();
+    expect(numberProblem('0o17', true)).toBeUndefined();
+    expect(numberProblem('+.5', true)).toBe('A whole number.');
+  });
+
+  it('refuses what YAML 1.2 reads as text or as no finite number', () => {
+    for (const typed of [
+      '1_000',
+      '0b101',
+      '-0x10',
+      '0x',
+      '.inf',
+      '.nan',
+      '1:30',
+      '.',
+    ]) {
+      expect(numberProblem(typed), typed).toBe('Not a number.');
+      const read = parseYaml(`a: ${typed}`);
+      if ('error' in read) throw new Error(read.error);
+      const value: unknown = (read.doc.toJS() as { a: unknown }).a;
+      expect(typeof value === 'number' && Number.isFinite(value), typed).toBe(false);
+    }
   });
 });

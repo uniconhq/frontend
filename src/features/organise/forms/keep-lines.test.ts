@@ -34,6 +34,15 @@ describe('an edit laid over the file', () => {
     );
   });
 
+  it('changes only the lines it reaches in a file whose lines end in CRLF', () => {
+    const crlf = HAND_WRITTEN.replaceAll('\n', '\r\n');
+    const added = setInput(crlf, 'extra', { type: 'number' });
+
+    expect(added).toBe(
+      crlf.replace('  seed: number\r\n', '  seed: number\r\n  extra: number\r\n'),
+    );
+  });
+
   it('keeps every line when nothing changed', () => {
     expect(over(HAND_WRITTEN, () => undefined)).toBe(HAND_WRITTEN);
   });

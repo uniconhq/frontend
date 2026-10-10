@@ -930,6 +930,42 @@ describe('a submission opened from the list', () => {
     expect(within(files).getAllByRole('link')).toHaveLength(1);
   });
 
+  it('names each file by its path under its input, so files of one name differ', async () => {
+    server.use(
+      signedIn,
+      withPage({}),
+      listing([submission(1, accepted)]),
+      http.get(`${TASK_API}/submissions/:number`, () =>
+        HttpResponse.json(submission(1, accepted)),
+      ),
+      http.get(`${TASK_API}/submissions/:number/files`, () =>
+        HttpResponse.json({
+          number: 1,
+          inputs: {
+            out: {
+              files: ['files/out/main/1.txt', 'files/out/samples/1.txt'],
+              value: null,
+            },
+            program: { files: ['files/program/src/io.c'], value: null },
+          },
+        }),
+      ),
+    );
+    renderApp(`${PAGE}?submission=1`);
+
+    const detail = await screen.findByRole('region', { name: 'Submission 1' });
+    const files = await within(detail).findByRole('list', { name: 'Files' });
+    expect(
+      within(files)
+        .getAllByRole('link')
+        .map((link) => [link.textContent, link.getAttribute('href')]),
+    ).toEqual([
+      ['main/1.txt', '/-/downloads/acme/spring/sum/1/files/out/main/1.txt'],
+      ['samples/1.txt', '/-/downloads/acme/spring/sum/1/files/out/samples/1.txt'],
+      ['src/io.c', '/-/downloads/acme/spring/sum/1/files/program/src/io.c'],
+    ]);
+  });
+
   it('shows what stopped the run as its verdict, and its log as text, never as markup', async () => {
     const stopped = grading({
       status: 'graded',
