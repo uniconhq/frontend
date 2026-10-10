@@ -57,7 +57,7 @@ export function useFileWrite(place: Place, path: string) {
           params: { path: { org: place.org, contest: place.contest, path } },
           body,
         });
-        outcome = { kind: 'written', version: written.version };
+        outcome = { kind: 'written', version: written.version, notes: written.notes };
       }
     } catch (caught) {
       return { kind: 'refused', error: toApiError(caught), body };

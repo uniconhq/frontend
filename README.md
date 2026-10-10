@@ -234,7 +234,9 @@ again (`regrades`), or to keep it as a draft; every other refusal shows its own 
 what it names. A save that publishes says what changed in grading, how many
 submissions it queued to be graded again (`regraded`), and lists the notes
 the forge makes of the task beside publishing, such as the steps it seals
-until the reveal; every save path ends in this one answer (`SaveOutcome`).
+until the reveal. A write of the contest's settings lists, beside its
+version, the notes its boards report, such as a board that counts nothing
+from a task. Every save path ends in this one answer (`SaveOutcome`).
 
 The editor is CodeMirror, wrapped in `src/ui/CodeEditor.tsx`: line numbers,
 undo, search and bracket matching, YAML highlighted in a `.yaml` or `.yml`

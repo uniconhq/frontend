@@ -9,13 +9,14 @@ import classes from '../organise.module.css';
 import { countOf, definitionErrorsOf, stringsOf } from './refusals';
 
 /**
- * What a save came back with: a contest file's new version, a task save that
- * published or was kept as a draft, or a refusal, which carries the body that
+ * What a save came back with: a contest file's new version with what its
+ * boards report, a task save that published or was kept as a draft, or a
+ * refusal, which carries the body that
  * was sent so a confirmation can send the same save again. The body is a
  * file's write unless the save was another kind, such as a rollback.
  */
 export type Outcome<Body = WriteFile> =
-  | { kind: 'written'; version: string }
+  | { kind: 'written'; version: string; notes: string[] }
   | { kind: 'saved'; result: SaveResult }
   | { kind: 'refused'; error: ApiError; body: Body };
 
@@ -62,6 +63,21 @@ function Panel({ role, children }: { role: 'status' | 'alert'; children: ReactNo
   );
 }
 
+/** What a save reports beside what it wrote, such as a board that counts nothing. */
+function Notes({ notes }: { notes: string[] }) {
+  if (notes.length === 0) return null;
+  return (
+    <>
+      <BodyText>Of note:</BodyText>
+      <ul className={classes.named} aria-label="Notes">
+        {notes.map((note) => (
+          <li key={note}>{note}</li>
+        ))}
+      </ul>
+    </>
+  );
+}
+
 export function SaveOutcome<Body = WriteFile>({
   outcome,
   onConfirm,
@@ -79,6 +95,7 @@ export function SaveOutcome<Body = WriteFile>({
         <BodyText>
           Saved as version <code>{short(outcome.version)}</code>.
         </BodyText>
+        <Notes notes={outcome.notes} />
       </Panel>
     );
   }
@@ -108,16 +125,7 @@ export function SaveOutcome<Body = WriteFile>({
                 : `${String(result.regraded)} submissions are graded again.`}
             </BodyText>
           )}
-          {result.notes.length > 0 && (
-            <>
-              <BodyText>Of note:</BodyText>
-              <ul className={classes.named} aria-label="Notes">
-                {result.notes.map((note) => (
-                  <li key={note}>{note}</li>
-                ))}
-              </ul>
-            </>
-          )}
+          <Notes notes={result.notes} />
         </Panel>
       );
     }
