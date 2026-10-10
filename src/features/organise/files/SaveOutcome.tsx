@@ -6,7 +6,7 @@ import { Button } from '@/ui/Button';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { DefinitionErrors } from '../DefinitionErrors';
 import classes from '../organise.module.css';
-import { definitionErrorsOf, stringsOf } from './refusals';
+import { countOf, definitionErrorsOf, stringsOf } from './refusals';
 
 /**
  * What a save came back with: a contest file's new version, a task save that
@@ -36,6 +36,20 @@ function short(version: string): string {
  * the Save button that had it went busy, so the answer is what a keyboard or a
  * screen reader lands on: `status` for an answer, `alert` for a refusal.
  */
+/**
+ * What confirming a grading change costs, from the count the refusal
+ * carries: how many submissions are graded again, or every one when a
+ * backend sends no count.
+ */
+function regradedSentence(count: number | null): string {
+  if (count === null)
+    return 'every submission to the task is graded again against the new publication.';
+  if (count === 0) return 'no submission to the task is graded again.';
+  if (count === 1)
+    return '1 submission to the task is graded again against the new publication.';
+  return `${String(count)} submissions to the task are graded again against the new publication.`;
+}
+
 function Panel({ role, children }: { role: 'status' | 'alert'; children: ReactNode }) {
   const panel = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -162,8 +176,8 @@ export function SaveOutcome<Body = WriteFile>({
           ))}
         </ul>
         <BodyText tone="secondary">
-          Publishing changes the grading of a running contest: every submission to the
-          task is graded again against the new publication. Keeping it as a draft writes
+          Publishing changes the grading of a running contest:{' '}
+          {regradedSentence(countOf(error, 'regrades'))} Keeping it as a draft writes
           the files and publishes nothing.
         </BodyText>
         <div className={classes.actions}>
