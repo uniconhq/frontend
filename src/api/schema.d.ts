@@ -2860,7 +2860,9 @@ export interface components {
         /**
          * Change
          * @description One entry of a place's history: the version it made, who made it, what
-         *     they said about it and when.
+         *     they said about it and when. `author` is the username of `author_id`,
+         *     which the history names whether or not they still hold a role there, and
+         *     none when the forge knows no such account or the change has no author.
          */
         Change: {
             /**
@@ -2868,6 +2870,8 @@ export interface components {
              * Format: date-time
              */
             at: string;
+            /** Author */
+            author: string | null;
             /** Author Id */
             author_id: number | null;
             /** Message */

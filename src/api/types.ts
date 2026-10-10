@@ -66,6 +66,8 @@ export type FeedEntry = Schemas['FeedEntry'];
 export type Submitter = Schemas['Submitter'];
 export type QueueDepth = Schemas['QueueDepth'];
 export type Announcement = Schemas['Announcement'];
+/** One change in a place's history, its author named. */
+export type FileChange = Schemas['Change'];
 export type Clarification = Schemas['Clarification'];
 /** Where a grading stands, as organisers read it. */
 export type GradingStatus = Schemas['GradingStatus'];

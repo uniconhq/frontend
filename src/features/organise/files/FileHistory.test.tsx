@@ -31,18 +31,28 @@ const changes: Change[] = [
   {
     version: LATEST,
     author_id: someone.user.id,
+    author: someone.user.username,
     message: 'Raise the limits',
     at: '2026-09-22T10:00:00Z',
   },
   {
     version: SECOND,
     author_id: 9,
+    author: 'grace',
     message: 'Name the task',
     at: '2026-09-21T10:00:00Z',
   },
   {
+    version: '9e8d7c6b5a4f3e2d1c0b',
+    author_id: 12,
+    author: null,
+    message: 'Add the statement',
+    at: '2026-09-20T12:00:00Z',
+  },
+  {
     version: FIRST,
     author_id: null,
+    author: null,
     message: 'Make the task',
     at: '2026-09-20T10:00:00Z',
   },
@@ -91,15 +101,17 @@ describe("a task file's history", () => {
     const list = await openHistory();
 
     const items = list.getAllByRole('listitem');
-    expect(items).toHaveLength(3);
+    expect(items).toHaveLength(4);
     expect(items[0]).toHaveTextContent('3c4d5e6 Raise the limits');
     expect(items[0]).toHaveTextContent('kenny');
     expect(items[0]).toHaveTextContent('the file as it is now');
     expect(items[0]).not.toHaveTextContent('Publication');
-    expect(items[1]).toHaveTextContent('account 9');
+    // grace holds no role at the task any more; the history still names her.
+    expect(items[1]).toHaveTextContent('grace');
     expect(items[1]).toHaveTextContent('Publication 2 · grading unchanged');
-    expect(items[2]).toHaveTextContent('an unknown author');
-    expect(items[2]).toHaveTextContent('Publication 1 · changed how the task grades');
+    expect(items[2]).toHaveTextContent('account 12');
+    expect(items[3]).toHaveTextContent('an unknown author');
+    expect(items[3]).toHaveTextContent('Publication 1 · changed how the task grades');
     expect(asked).toEqual(['task.yaml']);
   });
 
@@ -276,8 +288,8 @@ describe("a task file's history", () => {
     );
     const list = await openHistory();
 
-    expect(list.getAllByRole('listitem')).toHaveLength(3);
-    expect(list.getAllByRole('button', { name: /^View / })).toHaveLength(2);
+    expect(list.getAllByRole('listitem')).toHaveLength(4);
+    expect(list.getAllByRole('button', { name: /^View / })).toHaveLength(3);
     expect(list.queryByRole('button', { name: /^Roll / })).toBeNull();
   });
 });
