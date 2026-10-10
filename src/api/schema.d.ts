@@ -3498,7 +3498,7 @@ export interface components {
          */
         InputField: {
             /** Default */
-            default: string | number | boolean | null;
+            default: string | boolean | null;
             /** Id */
             id: string;
             /** Label */
@@ -4431,14 +4431,15 @@ export interface components {
          * SubmittedFileInput
          * @description What one input of a submission was: the paths of its files in the
          *     submission, each a download through the download door, or the value
-         *     given. It is read leniently from the submission's `submission.json`: a
-         *     member of the wrong type is left out rather than failing the answer.
+         *     given, a number as its exact decimal digits. It is read leniently from
+         *     the submission's `submission.json`: a member of the wrong type is left
+         *     out rather than failing the answer.
          */
         SubmittedFileInput: {
             /** Files */
             files: string[];
             /** Value */
-            value: string | number | boolean | null;
+            value: string | boolean | null;
         };
         /**
          * SubmittedFiles
@@ -4455,7 +4456,10 @@ export interface components {
         /**
          * SubmittedInput
          * @description What a contestant gives for one input: the uploads of its files; or,
-         *     for a text, number, true-or-false or enum input, its value.
+         *     for a text, number, true-or-false or enum input, its value. A number is
+         *     given as the text of its plain decimal digits, `2.5`, the form every
+         *     number is served in, so it is checked and written exactly, never read
+         *     into a float on the way.
          */
         SubmittedInput: {
             /**
@@ -4464,7 +4468,7 @@ export interface components {
              */
             uploads: string[];
             /** Value */
-            value?: string | number | boolean | null;
+            value?: string | boolean | null;
         };
         /**
          * Submitter

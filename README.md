@@ -584,7 +584,9 @@ reader names it by the input's label, and the folder picker as
 Submit runs in this order, in `src/features/contest/submit/use-submit.ts`:
 
 1. The browser's own checks: every input filled, an option chosen, a number
-   in range, and the files of each input together against its `max_size`.
+   written as plain decimal digits and in range, its bounds compared digit
+   for digit, and the files of each input together against its `max_size`.
+   A number is sent as the digits it was typed as, never a JSON number.
    A file too large is caught here, before any upload starts.
 2. For each file, a slot (`POST .../uploads`) naming the input and the
    file's path under it, the bytes straight to the store,
