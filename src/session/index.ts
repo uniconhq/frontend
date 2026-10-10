@@ -7,4 +7,4 @@ export { useLogout } from './use-logout';
 export { useEndSession } from './use-end-session';
 export { useForgeUrl, forgePage } from './forge';
 export { loginHref, currentPath, safeNext } from './login-href';
-export { reportUnauthenticated } from './expired';
+export { reportUnauthenticated, useSessionExpired } from './expired';

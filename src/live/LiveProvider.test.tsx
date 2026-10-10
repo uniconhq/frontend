@@ -1,10 +1,18 @@
 import { act, render, screen } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  armSessionExpiry,
+  reportUnauthenticated,
+  resetSessionExpiry,
+} from '@/session/expired';
 import { LiveProvider } from './LiveProvider';
 import { useLiveConnected, useLiveRefused } from './live-context';
 
-vi.mock('@/session', () => ({ useSession: () => ({ status: 'signed-in' }) }));
+vi.mock('@/session', async () => ({
+  useSession: () => ({ status: 'signed-in' }),
+  useSessionExpired: (await import('@/session/expired')).useSessionExpired,
+}));
 
 class FakeSource {
   static readonly CONNECTING = 0;
@@ -108,6 +116,31 @@ describe('where the live stream stands', () => {
       });
       document.dispatchEvent(new Event('visibilitychange'));
     });
+  });
+
+  it('closes the stream and opens none again once the session has ended', () => {
+    vi.useFakeTimers();
+    try {
+      armSessionExpiry(true);
+      renderProvider();
+      const first = FakeSource.last;
+      act(() => {
+        if (first) first.readyState = FakeSource.CLOSED;
+        first?.onerror?.();
+      });
+      expect(screen.getByText('refused')).toBeVisible();
+
+      act(() => reportUnauthenticated());
+      act(() => {
+        vi.advanceTimersByTime(120_000);
+      });
+
+      expect(FakeSource.last).toBe(first);
+      expect(screen.getByText('down')).toBeVisible();
+    } finally {
+      vi.useRealTimers();
+      resetSessionExpiry();
+    }
   });
 
   it('is refused once the stream is turned away, until one opens again', () => {
