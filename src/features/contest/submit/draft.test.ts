@@ -28,6 +28,8 @@ const answers = inputField({
   label: 'Your answers',
   per_test: true,
 });
+/** A number of 30 significant digits, past what a float holds. */
+const THIRTY = '0.123456789012345678901234567891';
 const alpha = inputField({
   id: 'alpha',
   type: 'number',
@@ -49,7 +51,7 @@ describe('the panel inputs', () => {
       program,
       language,
       inputField({ id: 'level', type: 'enum', options: ['a', 'b'], default: 'b' }),
-      inputField({ id: 'alpha', type: 'number', default: 0.5 }),
+      inputField({ id: 'alpha', type: 'number', default: '0.5' }),
       inputField({ id: 'fast', type: 'boolean', default: true }),
     ]);
     expect(draft).toEqual({
@@ -118,6 +120,30 @@ describe('the checks before anything is sent', () => {
     ]);
   });
 
+  it('takes a number only as plain decimal digits', () => {
+    for (const text of ['1e3', '0x10', 'NaN', '.5', '+1', '1 000']) {
+      const refused = checkDraft([alpha], { alpha: { kind: 'text', text } });
+      expect(refused?.extensions['errors'], text).toEqual([
+        {
+          input: 'alpha',
+          message: 'Must be a number written as plain decimal digits, such as 2.5.',
+        },
+      ]);
+    }
+  });
+
+  it('checks a number against bounds of 30 digits exactly', () => {
+    const ratio = inputField({ id: 'ratio', type: 'number', max: THIRTY });
+    const at = checkDraft([ratio], { ratio: { kind: 'text', text: THIRTY } });
+    const past = checkDraft([ratio], {
+      ratio: { kind: 'text', text: `${THIRTY.slice(0, -1)}2` },
+    });
+    expect(at).toBeNull();
+    expect(past?.extensions['errors']).toEqual([
+      { input: 'ratio', message: `Must be at most ${THIRTY}.` },
+    ]);
+  });
+
   it('holds an input’s files together to its size, naming the input', () => {
     const refused = checkDraft(inputs, {
       ...full,
@@ -139,6 +165,16 @@ describe('the checks before anything is sent', () => {
 });
 
 describe('what a submit sends', () => {
+  it('sends a number as the digits it was typed as', () => {
+    const ratio = inputField({ id: 'ratio', type: 'number' });
+    const sent = submittedInputs(
+      [ratio],
+      { ratio: { kind: 'text', text: ` ${THIRTY} ` } },
+      () => '',
+    );
+    expect(sent).toEqual({ ratio: { uploads: [], value: THIRTY } });
+  });
+
   it('names the uploads of each file input, or the value', () => {
     const main = file('main.py', 1);
     const header = inFolder('p/b/c.h');
@@ -164,7 +200,7 @@ describe('what a submit sends', () => {
     expect(sent).toEqual({
       submission: { uploads: ['submission:u-main'] },
       program: { uploads: ['program:u-header'] },
-      alpha: { uploads: [], value: 0.5 },
+      alpha: { uploads: [], value: '0.5' },
       language: { uploads: [], value: 'python' },
       fast: { uploads: [], value: false },
       notes: { uploads: [], value: 'hello' },

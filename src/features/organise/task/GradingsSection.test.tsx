@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
-import type { FeedEntry, Grading, Submitter } from '@/api/types';
+import type { FeedEntry, Grading, OrganisedSubmission, Submitter } from '@/api/types';
 import { renderApp } from '@/test/render';
 import { problem, server, signedIn, someone } from '@/test/server';
 import { graded, reported } from '@/test/contestant';
@@ -544,5 +544,112 @@ describe("the task's gradings", () => {
     expect(await screen.findByText('System error')).toBeVisible();
     expect(screen.queryByRole('button', { name: /Retry/ })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Rejudge' })).toBeNull();
+  });
+});
+
+describe("the organisers' scored view of a submission", () => {
+  const done: Grading = {
+    ...stuck,
+    status: 'done',
+    error: null,
+    result: {
+      stopped: null,
+      tests: [graded('main/1', 'accepted')],
+      values: reported(),
+      error: null,
+    },
+    finished_at: '2026-09-26T10:01:00Z',
+  };
+  const filledIn: OrganisedSubmission = {
+    number: 3,
+    submitted_at: '2026-09-26T10:00:00Z',
+    late_days: 0,
+    grading: {
+      id: done.id,
+      attempt: 1,
+      status: 'done',
+      stopped: null,
+      outcome: 'accepted',
+      values: reported(),
+      folded: {},
+      reason: null,
+      points: { shown: '100', pending: '0', pending_until: null },
+      factor: '1',
+      groups: [
+        {
+          group: 'main',
+          show: 'after_close',
+          outcome: 'accepted',
+          tests: [graded('main/1', 'accepted', reported({ time_ms: '12' }), '1')],
+          shown_at: '2026-09-26T15:00:00Z',
+          ran: true,
+          points: '100',
+          max: '100',
+        },
+      ],
+    },
+  };
+
+  it('opens beside a grading, as its row reads it with everything filled in', async () => {
+    const asked: URLSearchParams[] = [];
+    server.use(
+      signedIn,
+      taskState,
+      publicationList,
+      ...repoFiles,
+      http.get(`${TASK_API}/gradings`, () => asEntries([done])),
+      http.get(`${TASK_API}/organise/submissions/:number`, ({ request, params }) => {
+        asked.push(new URL(request.url).searchParams);
+        return params['number'] === '3'
+          ? HttpResponse.json(filledIn)
+          : problem(404, 'not_found');
+      }),
+    );
+    const user = userEvent.setup();
+    renderApp(TASK);
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Scored view of submission 3' }),
+    );
+
+    const view = await screen.findByRole('region', { name: 'Submission 3, scored' });
+    expect(asked[0]?.get('user_id')).toBe('11');
+    expect(asked[0]?.has('team')).toBe(false);
+    const main = within(view).getByRole('region', { name: 'Group main' });
+    expect(main).toHaveTextContent('100 / 100 points');
+    expect(main).toHaveTextContent(/Its row sees this at/);
+    expect(within(main).getByRole('table', { name: 'Tests main' })).toHaveTextContent(
+      'main/1',
+    );
+    expect(view).toHaveTextContent('100 points');
+    expect(view).toHaveTextContent('Done');
+  });
+
+  it("asks for a team's submission by its team", async () => {
+    const asked: URLSearchParams[] = [];
+    const team = '0192f4a4-7b7e-7000-8000-000000000001';
+    server.use(
+      signedIn,
+      taskState,
+      publicationList,
+      ...repoFiles,
+      http.get(`${TASK_API}/gradings`, () =>
+        HttpResponse.json([entry(done, { user_id: null, team, name: 'Byte Me' })]),
+      ),
+      http.get(`${TASK_API}/organise/submissions/:number`, ({ request }) => {
+        asked.push(new URL(request.url).searchParams);
+        return HttpResponse.json(filledIn);
+      }),
+    );
+    const user = userEvent.setup();
+    renderApp(TASK);
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Scored view of submission 3' }),
+    );
+
+    await screen.findByRole('region', { name: 'Submission 3, scored' });
+    expect(asked[0]?.get('team')).toBe(team);
+    expect(asked[0]?.has('user_id')).toBe(false);
   });
 });

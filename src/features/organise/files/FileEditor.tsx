@@ -104,7 +104,7 @@ export function FileEditor({ place, path }: { place: Place; path: string }) {
           params: { path: { org: place.org, contest: place.contest, path } },
           body,
         });
-        setOutcome({ kind: 'written', version: written.version });
+        setOutcome({ kind: 'written', version: written.version, notes: written.notes });
       }
     } catch (caught) {
       setOutcome({ kind: 'refused', error: toApiError(caught), body });
