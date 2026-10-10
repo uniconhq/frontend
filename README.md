@@ -473,12 +473,15 @@ test fields and report entries, each declaration offering only the keys the
 format allows it; or, with nothing selected, the palette of primitives with
 their ports. Who reads the workflow is set beside the versions: private,
 shared with the people listed, or public; combine sits below, the
-workflow's latest version chosen to start with. A version is made of the
-save the page made, with its token, or not at all. A wire the layout cannot
+workflow's latest version chosen to start with. A version is named `v` and
+a whole number, and the field offers the number after the highest
+(`versions.ts`); any other name is refused in the forge's words. A version
+is made of the save the page made, with its token, or not at all. A wire the layout cannot
 draw, such as a once step reading a per-test one in a draft, is shown on
 its port as text, and a step with no id keeps its place.
 
-A task whose workflow has a newer version than the one it names says so on
+A task whose workflow has a version with a larger number than the one it
+names says so on
 its settings form, with a button that names the newer one in the field;
 nothing changes until the task is saved.
 

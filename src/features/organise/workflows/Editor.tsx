@@ -36,6 +36,7 @@ import { byRef, declared, type PrimitiveInfo } from './primitives';
 import { reportable, reportRefusal, wireRefusal } from './rules';
 import { SharePanel } from './SharePanel';
 import classes from './workflows.module.css';
+import { nextVersion } from './versions';
 
 /**
  * The page a workflow is built on, and the only place one is edited (#377).
@@ -178,7 +179,7 @@ export function Editor({
     token: string | null;
   } | null>(null);
   const [saveError, setSaveError] = useState<ApiError | null>(null);
-  const [version, setVersion] = useState(`v${String(page.versions.length + 1)}`);
+  const [version, setVersion] = useState(nextVersion(page.versions));
   const [versioned, setVersioned] = useState<
     | { kind: 'made'; version: string }
     | { kind: 'refused'; error: ApiError; problems: DefinitionProblem[] }
@@ -280,7 +281,7 @@ export function Editor({
         body: { version: version.trim(), token: saved.token },
       });
       setVersioned({ kind: 'made', version: made.version });
-      setVersion(`v${String(page.versions.length + 2)}`);
+      setVersion(nextVersion([...page.versions, made.version]));
       await queryClient.invalidateQueries({ queryKey: pageKey });
     } catch (caught) {
       const error = toApiError(caught);

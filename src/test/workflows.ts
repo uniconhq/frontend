@@ -307,6 +307,10 @@ export function workflowBackend(
     }),
     http.post(`${WORKFLOW_API}/versions`, async ({ request }) => {
       const { version } = (await request.json()) as { version: string };
+      if (!/^v[1-9][0-9]*$/.test(version))
+        return problem(422, 'invalid_name', {
+          detail: `'${version}' cannot name a version: a version is v and a whole number from 1, with no leading zero, such as v1, v2 or v10`,
+        });
       const found = options.problems?.(state.draft) ?? [];
       if (found.length > 0)
         return problem(422, 'invalid_definition', { errors: found });

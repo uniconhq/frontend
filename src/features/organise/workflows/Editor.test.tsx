@@ -175,6 +175,41 @@ describe('the workflow editor', () => {
     expect(backend.state.versions).toEqual(['v1']);
   });
 
+  it('offers the number after the highest version, whatever else is tagged', async () => {
+    const backend = workflowBackend(CLASSIC_V2, { versions: ['v1', 'beta', 'v9'] });
+    server.use(signedIn, ...backend.handlers);
+    const user = userEvent.setup();
+    renderApp(PAGE);
+
+    const field = await screen.findByRole('textbox', { name: /New version/ });
+    expect(field).toHaveValue('v10');
+    await user.click(screen.getByRole('button', { name: 'Make the version' }));
+
+    expect(await screen.findByRole('status', { name: '' })).toHaveTextContent(
+      'kenny/tuned@v10 is made.',
+    );
+    expect(backend.state.versions).toEqual(['v1', 'beta', 'v9', 'v10']);
+    expect(screen.getByRole('textbox', { name: /New version/ })).toHaveValue('v11');
+  });
+
+  it('says in the forge’s words why a name cannot be a version', async () => {
+    const backend = workflowBackend(CLASSIC_V2);
+    server.use(signedIn, ...backend.handlers);
+    const user = userEvent.setup();
+    renderApp(PAGE);
+
+    const field = await screen.findByRole('textbox', { name: /New version/ });
+    expect(field).toHaveValue('v1');
+    await user.clear(field);
+    await user.type(field, 'beta');
+    await user.click(screen.getByRole('button', { name: 'Make the version' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      "No version was made: 'beta' cannot name a version: a version is v and a whole number from 1",
+    );
+    expect(backend.state.versions).toEqual([]);
+  });
+
   it('opens the merge view on a save over someone else’s, matching steps by id', async () => {
     const backend = workflowBackend(CLASSIC_V2);
     server.use(signedIn, ...backend.handlers);
