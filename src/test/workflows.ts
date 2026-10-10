@@ -4,65 +4,10 @@ import { problem } from './server';
 
 /**
  * The seeded workflows as deploy's bootstrap writes them, and the platform's
- * primitives as the backend lists them: the v1s in the format before
- * 2026-10-07, which the platform no longer reads, and the v2s with their
+ * primitives as the backend lists them: each primitive's v1 in the format
+ * before 2026-10-07, which the platform no longer reads, and its v2 with its
  * ports.
  */
-export const CLASSIC_V1 = `# unicon/classic@v1, the built-in workflow for a task judged by comparing
-# output with an answer: compile the submission once, run the binary on
-# every testcase under the task's limits, and diff each run's output
-# against that testcase's answer. Seeded by \`uv run bootstrap\` into the
-# repository unicon/classic.workflow at the forge, at the tag v1. The
-# format is TASK-FORMAT.md section 6.3.
-#
-# Inside a foreach, steps.<id>.<output> naming another step of the same
-# foreach list means that step's output for the same testcase.
-name: unicon/classic
-version: v1
-
-inputs:
-  - id: submission
-    type: code
-  - id: testcases
-    type: file[]
-  - id: time_limit
-    type: number
-  - id: memory_limit
-    type: number
-
-steps:
-  - id: compile
-    use: unicon/compile@v1
-    with:
-      source: \${{ inputs.submission }}
-      language: \${{ inputs.submission.language }}
-
-  - id: run
-    use: unicon/sandbox-run@v1
-    foreach: \${{ inputs.testcases }}
-    with:
-      binary: \${{ steps.compile.binary }}
-      input: \${{ item.input }}
-      time_limit: \${{ inputs.time_limit }}
-      memory_limit: \${{ inputs.memory_limit }}
-
-  - id: check
-    use: unicon/diff-check@v1
-    foreach: \${{ inputs.testcases }}
-    with:
-      actual: \${{ steps.run.output }}
-      expected: \${{ item.answer }}
-
-outputs:
-  outcome: \${{ steps.check.outcome }}
-  metrics:
-    points: \${{ steps.check.points }}
-  tests:
-    time_ms: \${{ steps.run.time_ms }}
-    memory_kb: \${{ steps.run.memory_kb }}
-  summary: \${{ steps.compile.compile_log }}
-`;
-
 export const CLASSIC_V2 = `# unicon/classic@v2, the built-in workflow for a task judged by comparing
 # output with an answer: compile the submission once, run the program on
 # every test under the task's limits, and compare each run's output with

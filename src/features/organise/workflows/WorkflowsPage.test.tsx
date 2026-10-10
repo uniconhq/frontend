@@ -3,9 +3,8 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { renderApp } from '@/test/render';
-import { server, signedIn } from '@/test/server';
+import { problem, server, signedIn } from '@/test/server';
 import {
-  CLASSIC_V1,
   CLASSIC_V2,
   PRIMITIVES,
   WORKFLOW_API,
@@ -132,9 +131,23 @@ describe('a workflow one may only read', () => {
     http.get('/api/v1/workflows/unicon/classic/versions/:version', () =>
       HttpResponse.json({ content: text }),
     );
+  const check = (problems: { path: string; message: string }[] = []) =>
+    http.post('/api/v1/workflows/check', () => HttpResponse.json({ problems }));
+  /** unicon/classic@v1 as the format before 2026-10-07 wrote it, cut short. */
+  const OLD_FORMAT = [
+    'inputs:',
+    '  - {id: submission, type: code}',
+    'steps:',
+    '  - id: run',
+    '    use: unicon/sandbox-run@v1',
+    '    foreach: ${{ inputs.tests }}',
+    'outputs:',
+    '  outcome: ${{ steps.run.outcome }}',
+    '',
+  ].join('\n');
 
   it('draws its latest version, read-only, with its file', async () => {
-    server.use(signedIn, page(['v1', 'v2']), primitives, version(CLASSIC_V2));
+    server.use(signedIn, page(['v1', 'v2']), primitives, version(CLASSIC_V2), check());
     renderApp('/workflows/unicon/classic');
 
     expect(
@@ -148,17 +161,58 @@ describe('a workflow one may only read', () => {
     );
   });
 
-  it('draws a version in the format before 2026-10-07 from its old keys', async () => {
-    server.use(signedIn, page(['v1', 'v2']), primitives, version(CLASSIC_V1));
+  it('opens a version in the old format in the state of one that cannot be opened, with the forge’s reason', async () => {
+    const reason = '`outputs` is now `report`: a mapping of name to a reference.';
+    server.use(
+      signedIn,
+      page(['v1', 'v2']),
+      primitives,
+      version(OLD_FORMAT),
+      check([{ path: 'outputs', message: reason }]),
+    );
     renderApp('/workflows/unicon/classic?version=v1');
 
+    const state = await screen.findByRole('alert');
     expect(
-      await screen.findByRole('heading', { name: 'unicon/classic@v1' }),
-    ).toBeInTheDocument();
-    expect(
-      await screen.findByRole('group', { name: 'Step compile' }),
-    ).toBeInTheDocument();
-    expect(screen.getByRole('group', { name: 'Step check' })).toBeInTheDocument();
+      within(state).getByRole('heading', { name: 'unicon/classic@v1' }),
+    ).toBeVisible();
+    expect(state).toHaveTextContent('This version cannot be opened.');
+    expect(state).toHaveTextContent(`outputs: ${reason}`);
+    expect(screen.queryByRole('group', { name: /^Step/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('form', { name: 'Copy it' })).not.toBeInTheDocument();
+  });
+
+  it('opens a version the forge refuses to serve in the same state, with its reason', async () => {
+    server.use(
+      signedIn,
+      page(['v1', 'v2']),
+      primitives,
+      http.get('/api/v1/workflows/unicon/classic/versions/:version', () =>
+        problem(404, 'not_found', { detail: 'unicon/classic has no version v1.' }),
+      ),
+      check(),
+    );
+    renderApp('/workflows/unicon/classic?version=v1');
+
+    const state = await screen.findByRole('alert');
+    expect(state).toHaveTextContent('This version cannot be opened.');
+    expect(state).toHaveTextContent('unicon/classic has no version v1.');
+  });
+
+  it('opens a version whose file does not parse in the same state', async () => {
+    const reason = 'workflow.yaml is not valid YAML: a sequence is not closed.';
+    server.use(
+      signedIn,
+      page(['v1', 'v2']),
+      primitives,
+      version('steps: [\n'),
+      check([{ path: '', message: reason }]),
+    );
+    renderApp('/workflows/unicon/classic?version=v1');
+
+    const state = await screen.findByRole('alert');
+    expect(state).toHaveTextContent('This version cannot be opened.');
+    expect(state).toHaveTextContent(`the whole file: ${reason}`);
   });
 
   it('copies the version into a private workflow of one’s own', async () => {
@@ -168,6 +222,7 @@ describe('a workflow one may only read', () => {
       page(['v2']),
       primitives,
       version(CLASSIC_V2),
+      check(),
       http.post('/api/v1/workflow-copies', async ({ request }) => {
         asked = await request.json();
         return HttpResponse.json({ owner: 'kenny', name: 'tuned' }, { status: 201 });

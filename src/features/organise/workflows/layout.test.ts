@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { parseYaml } from '../forms/yaml-doc';
-import { CLASSIC_FOLDER, CLASSIC_V1, CLASSIC_V2, PRIMITIVES } from '@/test/workflows';
+import { CLASSIC_FOLDER, CLASSIC_V2, PRIMITIVES } from '@/test/workflows';
 import {
   colourOf,
   layoutWorkflow,
@@ -120,7 +120,6 @@ function columnOf(layout: Layout, key: string): number | undefined {
 }
 
 const SEEDED = [
-  ['unicon/classic@v1', CLASSIC_V1],
   ['unicon/classic@v2', CLASSIC_V2],
   ['unicon/classic-folder@v1', CLASSIC_FOLDER],
 ] as const;

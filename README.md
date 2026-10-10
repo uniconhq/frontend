@@ -418,8 +418,10 @@ own, which the proxy sends here beside `/orgs`.
 **The editor is the only place a workflow is edited** (PROPOSAL.md section
 12, #377). `features/organise/workflows/` holds it. `model.ts` reads
 `workflow.yaml` into steps, inputs, test fields and report, forgiving a draft
-with problems, and reads a version in the format before 2026-10-07 into the
-same shape so it can be drawn. `layout.ts` works out where everything stands
+with problems. A version is drawn only once the forge's check of its file
+passes: one the forge refuses to serve, one that does not parse, and one the
+check refuses, as it refuses the format before 2026-10-07, open one state,
+"This version cannot be opened", with the forge's reason. `layout.ts` works out where everything stands
 from the file alone, and nothing of it is stored: a once step one column right
 of the furthest once step it reads, per-test steps the same in a shaded band
 after them, the report last; inputs and test fields grouped by exactly the

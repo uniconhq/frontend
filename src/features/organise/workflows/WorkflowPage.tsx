@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Link, useNavigate, useSearchParams } from 'react-router';
 import { $api, queryView } from '@/api/query';
 import { toApiError, type ApiError } from '@/api/problem';
@@ -18,7 +19,9 @@ import { useMe } from '@/session';
 import { WORKFLOWS_PATH, workflowPath } from '@/lib/organiser-paths';
 import { useWorkflowParams } from '@/lib/route-params';
 import { exactJS, parseYaml } from '../forms/yaml-doc';
+import { DefinitionErrors } from '../DefinitionErrors';
 import { workflowOwners } from '../roles';
+import { checkQuery } from './check';
 import { Combine } from './Combine';
 import { Editor } from './Editor';
 import { Graph } from './Graph';
@@ -141,20 +144,44 @@ function VersionView({
       { enabled: version !== null },
     ),
   );
+  const text = read.state === 'ready' ? read.data.content : null;
+  const checked = useQuery({ ...checkQuery(text ?? ''), enabled: text !== null });
   if (version === null)
     return (
       <BodyText>
         This workflow has no version yet, so there is nothing of it to show you.
       </BodyText>
     );
+  const ref = `${owner}/${name}@${version}`;
   if (read.state === 'loading') return <PageSkeleton rows={6} />;
   if (read.state === 'error')
-    return <ErrorBlock error={read.error} onRetry={read.retry} />;
+    return (
+      <Unopenable label={ref} onRetry={read.retry}>
+        <BodyText>{read.error.detail ?? read.error.message}</BodyText>
+      </Unopenable>
+    );
+  if (checked.isPending) return <PageSkeleton rows={6} />;
+  if (checked.isError)
+    return (
+      <ErrorBlock
+        error={toApiError(checked.error)}
+        onRetry={() => void checked.refetch()}
+      />
+    );
+  const parsed = parseYaml(read.data.content);
+  if (checked.data.length > 0 || 'error' in parsed)
+    return (
+      <Unopenable label={ref}>
+        {checked.data.length > 0 ? (
+          <DefinitionErrors errors={checked.data} />
+        ) : (
+          'error' in parsed && <BodyText>{parsed.error}</BodyText>
+        )}
+      </Unopenable>
+    );
   return (
     <>
-      <SectionTitle>
-        {owner}/{name}@{version}
-      </SectionTitle>
+      <SectionTitle>{ref}</SectionTitle>
       <Drawn text={read.data.content} primitives={primitives} />
       <div className={classes.work}>
         <Card>
@@ -167,6 +194,41 @@ function VersionView({
         )}
       </div>
     </>
+  );
+}
+
+/**
+ * A version the page cannot read, whatever the reason: the forge refused to
+ * serve it, it does not parse, or the forge's check refuses it, as it refuses
+ * a version in the format before 2026-10-07. A version passed every check
+ * when it was made and never changes, so one the check refuses now is one
+ * nothing can use; the forge's reason says why, and its owner makes a new
+ * version.
+ */
+function Unopenable({
+  label,
+  onRetry,
+  children,
+}: {
+  label: string;
+  onRetry?: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <Card>
+      <div className={classes.stack} role="alert">
+        <SectionTitle>{label}</SectionTitle>
+        <BodyText>This version cannot be opened. The forge says:</BodyText>
+        {children}
+        {onRetry !== undefined && (
+          <div>
+            <Button size="xs" variant="secondary" onClick={onRetry}>
+              Try again
+            </Button>
+          </div>
+        )}
+      </div>
+    </Card>
   );
 }
 
