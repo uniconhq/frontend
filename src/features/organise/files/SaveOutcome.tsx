@@ -32,11 +32,6 @@ function short(version: string): string {
 }
 
 /**
- * The panel an outcome is shown in. It takes the focus as it appears, since
- * the Save button that had it went busy, so the answer is what a keyboard or a
- * screen reader lands on: `status` for an answer, `alert` for a refusal.
- */
-/**
  * What confirming a grading change costs, from the count the refusal
  * carries: how many submissions are graded again, or every one when a
  * backend sends no count.
@@ -50,6 +45,11 @@ function regradedSentence(count: number | null): string {
   return `${String(count)} submissions to the task are graded again against the new publication.`;
 }
 
+/**
+ * The panel an outcome is shown in. It takes the focus as it appears, since
+ * the Save button that had it went busy, so the answer is what a keyboard or a
+ * screen reader lands on: `status` for an answer, `alert` for a refusal.
+ */
 function Panel({ role, children }: { role: 'status' | 'alert'; children: ReactNode }) {
   const panel = useRef<HTMLDivElement>(null);
   useEffect(() => {

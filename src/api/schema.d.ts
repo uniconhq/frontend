@@ -3490,8 +3490,9 @@ export interface components {
          *     `type`, its `label`, the `options` of an enum, whether it takes one file
          *     per test, `per_test`, named for the test as `<group>/<test>`, the
          *     `default` a value takes when it is left out, `min` and `max` of a
-         *     number, exactly, and `max_size`, the most its files may total in bytes. The
-         *     submit panel shows one field or drop zone per input.
+         *     number, exactly, and `max_size`, the most its files may total in bytes. A
+         *     number input's default is served as its exact digits, as its bounds are.
+         *     The submit panel shows one field or drop zone per input.
          */
         InputField: {
             /** Default */
