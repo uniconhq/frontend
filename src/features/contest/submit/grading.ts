@@ -1,11 +1,4 @@
-import type {
-  GradingResult,
-  SubmissionState,
-  GroupShown,
-  Reported,
-  Submission,
-} from '@/api/types';
-import { formatExact } from '@/lib/exact';
+import type { GradingResult, SubmissionState, Submission } from '@/api/types';
 import { serverNow } from '@/lib/time';
 
 /**
@@ -79,27 +72,6 @@ export function verdictOf(grading: GradingResult): string {
 export function cancelReason(grading: GradingResult): string | null {
   if (grading.status !== 'cancelled') return null;
   return grading.reason === null || grading.reason === '' ? null : grading.reason;
-}
-
-/**
- * A test's reported value by name as read: a number to at most four
- * decimals, its text, or nothing when it reported none of that name.
- */
-export function valueText(values: Reported, name: string): string | undefined {
-  const number = values.numbers[name];
-  return number === undefined ? values.texts[name] : formatExact(number);
-}
-
-/**
- * A group's points out of the most it gives, as `30 / 70`; only the most
- * while its verdict is not shown; nothing on a task that gives no points.
- */
-export function pointsText(group: GroupShown): string | null {
-  if (group.max === null) return null;
-  const most = formatExact(group.max, 2);
-  return group.points === null
-    ? `of ${most}`
-    : `${formatExact(group.points, 2)} / ${most}`;
 }
 
 /**

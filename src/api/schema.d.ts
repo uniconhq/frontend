@@ -1699,6 +1699,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/orgs/{org}/contests/{contest}/tasks/{task}/organise/submissions/{number}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * A row's submission scored, with everything its row is not shown yet
+         * @description The row is a contestant or a team, one of the two, or `rejected`. A
+         *     row with no submission of that number is `not_found`.
+         */
+        get: operations["getOrganisedSubmission"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/orgs/{org}/contests/{contest}/tasks/{task}/organise/uploads": {
         parameters: {
             query?: never;
@@ -3799,6 +3820,60 @@ export interface components {
             /** Notes */
             notes: string[];
             now: components["schemas"]["Board"];
+        };
+        /**
+         * OrganisedResult
+         * @description A submission's grading as organisers read it beside the grading
+         *     itself: the payload its contestant reads, with everything filled in as
+         *     once the task has revealed, so every group's outcome, tests and points
+         *     and every value a sealed step reported are there, its points all shown
+         *     and none pending. Each group's `shown_at` is kept as a note of when its
+         *     contestant is shown it, null once they see its tests. `status` is the
+         *     grading's own, as in the gradings routes.
+         */
+        OrganisedResult: {
+            /** Attempt */
+            attempt: number;
+            /** Factor */
+            factor: string | null;
+            /** Folded */
+            folded: {
+                [key: string]: string;
+            };
+            /** Groups */
+            groups: components["schemas"]["GroupShown"][];
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Outcome */
+            outcome: ("accepted" | "wrong_answer" | "time_limit" | "memory_limit" | "output_limit" | "runtime_error" | "compile_error" | "skipped" | "system_error") | null;
+            points: components["schemas"]["Points"] | null;
+            /** Reason */
+            reason: string | null;
+            status: components["schemas"]["GradingStatus"];
+            /** Stopped */
+            stopped: ("accepted" | "wrong_answer" | "time_limit" | "memory_limit" | "output_limit" | "runtime_error" | "compile_error" | "skipped" | "system_error") | null;
+            values: components["schemas"]["Reported"];
+        };
+        /**
+         * OrganisedSubmission
+         * @description One submission of a contestant or a team, as organisers read it:
+         *     its number among the row's, when it was taken, how many started days
+         *     late, and its grading with everything filled in.
+         */
+        OrganisedSubmission: {
+            grading: components["schemas"]["OrganisedResult"] | null;
+            /** Late Days */
+            late_days: number;
+            /** Number */
+            number: number;
+            /**
+             * Submitted At
+             * Format: date-time
+             */
+            submitted_at: string;
         };
         /**
          * OrganiseTeamRequest
@@ -8249,6 +8324,46 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Marks"];
+                };
+            };
+            /** @description An error, as an RFC 9457 problem document. `code` names it. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    getOrganisedSubmission: {
+        parameters: {
+            query?: {
+                /** @description The team whose row it is */
+                team?: string | null;
+                /** @description The contestant whose row it is */
+                user_id?: number | null;
+            };
+            header?: never;
+            path: {
+                contest: string;
+                /** @description The submission's number */
+                number: number;
+                org: string;
+                task: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrganisedSubmission"];
                 };
             };
             /** @description An error, as an RFC 9457 problem document. `code` names it. */

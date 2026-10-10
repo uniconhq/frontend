@@ -355,7 +355,12 @@ attempts opening below it: the attempt, the publication it graded against,
 the status with the reason a system error gave and the sentence a cancel
 told the contestant, what a
 finished run came to, its log, and when it was queued, started and finished.
-Above it are how many gradings wait, queued and waiting for a machine, and
+A submission's Scored view opens under it the submission as its row reads it
+with everything filled in (`GET <task>/organise/submissions/{number}`, the
+row by its `user_id` or `team`): the contestant's own payload, drawn by the
+same `ui/scored/ScoredResult` the contestant's page draws it with, every
+group's outcome, tests and points shown, each saying when its row sees it,
+and the grading's own status. Above it are how many gradings wait, queued and waiting for a machine, and
 filters by task, status, team and a contestant's username, kept in the
 address so a link or a reload keeps them; a username applies once sent and
 finds the user's own submissions and their team's, by the team they were in
@@ -704,7 +709,8 @@ src/
   theme/     the design handoff's tokens, the fonts, the CSS variables
   ui/        shell (header, sidebar, breadcrumb, account menu), feedback, brand,
              the wrappers: buttons, fields, the file drop zone, verdicts, and
-             the parts of announcements and questions both sides show
+             the parts of announcements, questions and a scored result both
+             sides show
   features/  home (landing, the contest lists, your invites), auth (login page), account
              (profile, sessions), contest (the contestant pages, with submit/
              for the submit panel and the submissions), organise (the

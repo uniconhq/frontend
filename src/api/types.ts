@@ -52,6 +52,10 @@ export type Upload = Schemas['Upload'];
 export type SubmittedInput = Schemas['SubmittedInput'];
 export type Submission = Schemas['Submission'];
 export type GradingResult = Schemas['Result'];
+/** What a result holds beside where it stands, the contestant's and the organisers' alike. */
+export type ScoredGrading = Omit<GradingResult, 'status'>;
+/** A row's submission as organisers read it, with everything filled in. */
+export type OrganisedSubmission = Schemas['OrganisedSubmission'];
 export type GroupShown = Schemas['GroupShown'];
 /** A run's reported values by name, its numbers exact and its texts apart. */
 export type Reported = Schemas['Reported'];
