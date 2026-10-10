@@ -417,6 +417,12 @@ function keepComments(old: unknown, node: Node): void {
 }
 
 const NUMBER = /^-?(\d+\.?\d*|\.\d+)([eE][-+]?\d+)?$/;
+/**
+ * A finite number as YAML 1.2's core schema reads one, as the forge does: a
+ * decimal with an optional sign and exponent, or `0o` octal or `0x` hex.
+ */
+const CORE_NUMBER =
+  /^([-+]?(\.\d+|\d+(\.\d*)?)([eE][-+]?\d+)?|0o[0-7]+|0x[0-9a-fA-F]+)$/;
 
 /**
  * A value typed into a field, as the file should hold it: a number, as its
@@ -449,7 +455,7 @@ export function textOf(value: unknown): string {
 export function numberOf(text: string): number | undefined {
   const trimmed = text.trim();
   if (trimmed === '') return undefined;
-  if (!NUMBER.test(trimmed)) return Number.NaN;
+  if (!CORE_NUMBER.test(trimmed)) return Number.NaN;
   return Number(trimmed);
 }
 
@@ -461,7 +467,7 @@ export function numberOf(text: string): number | undefined {
 export function numberText(text: string): NumberText | number | undefined {
   const trimmed = text.trim();
   if (trimmed === '') return undefined;
-  return NUMBER.test(trimmed) ? new NumberText(trimmed) : Number.NaN;
+  return CORE_NUMBER.test(trimmed) ? new NumberText(trimmed) : Number.NaN;
 }
 
 /** Why a number field cannot be saved, or undefined when it can. */
