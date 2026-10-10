@@ -169,18 +169,21 @@ describe('merging a keyed list item by item', () => {
     ]);
   });
 
-  it('quotes text that PyYAML reads otherwise in an item it puts in', () => {
+  it('writes an item it puts in so it reads back as written', () => {
     const { theirs, diffs } = merge(
       (doc) => {
         const list = doc.get('tasks', true) as { items: unknown[] };
-        list.items.push(doc.createNode({ id: 'late', title: '2026-01-02' }));
+        list.items.push(
+          doc.createNode({ id: 'late', title: '2026-01-02', ok: 'true' }),
+        );
       },
       () => undefined,
     );
 
     const text = mergeText(theirs, diffs, ['mine']);
 
-    expect(text).toContain('title: "2026-01-02"');
+    expect(text).toContain('title: 2026-01-02');
+    expect(text).toContain('ok: "true"');
   });
 
   it("keeps the organiser's order when they pick it, every task moving whole", () => {

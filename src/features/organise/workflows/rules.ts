@@ -1,3 +1,4 @@
+import { NumberText } from '../forms/yaml-doc';
 import {
   refLabel,
   refText,
@@ -205,7 +206,11 @@ export function reportRefusal(
   if (entry === null) return null;
   const better = betterProblem(workflow, entry);
   if (better !== null) return better;
-  if (entry.atLeast !== null && entry.atMost !== null && entry.atLeast > entry.atMost)
+  if (
+    entry.atLeast !== null &&
+    entry.atMost !== null &&
+    entry.atLeast.value > entry.atMost.value
+  )
     return 'Must be at least at_least.';
   const meant = [entry.fold, entry.better, entry.atLeast, entry.atMost].some(
     (value) => value !== null,
@@ -251,7 +256,7 @@ export function valueRefusal(
   primitives: Map<string, PrimitiveInfo>,
   stepIndex: number,
   port: string,
-  value: string | number | boolean,
+  value: string | NumberText | boolean,
   written: Ref[],
 ): string | null {
   const step = workflow.steps[stepIndex];
@@ -282,7 +287,7 @@ export function valueRefusal(
     return ['boolean', 'text'].includes(target.type)
       ? null
       : `Takes ${target.type}, not boolean.`;
-  if (typeof value === 'number')
+  if (value instanceof NumberText)
     return ['number', 'text'].includes(target.type)
       ? null
       : `Takes ${target.type}, not number.`;

@@ -3,7 +3,9 @@ import type { DefinitionError } from '@/api/types';
 import {
   isRecord,
   nodeFor,
+  NumberText,
   numberOf,
+  numberText,
   scalarOf,
   textOf,
   writeAt,
@@ -59,7 +61,11 @@ function orderKeyOf(item: unknown): OrderKeyValues | null {
   if (typeof item === 'string') return { kind: 'value', name: item };
   if (isRecord(item) && item['by'] === 'penalty') {
     const minutes = item['per_attempt'];
-    if (minutes === undefined || typeof minutes === 'number') {
+    if (
+      minutes === undefined ||
+      minutes instanceof NumberText ||
+      typeof minutes === 'number'
+    ) {
       return { kind: 'penalty', perAttempt: textOf(minutes) };
     }
   }
@@ -105,7 +111,7 @@ export function readBoards(value: unknown): BoardValues[] | null {
 function orderItem(key: OrderKeyValues): unknown {
   if (key.kind === 'points') return 'points';
   if (key.kind === 'value') return key.name;
-  const minutes = numberOf(key.perAttempt);
+  const minutes = numberText(key.perAttempt);
   return minutes === undefined ? 'penalty' : { by: 'penalty', per_attempt: minutes };
 }
 

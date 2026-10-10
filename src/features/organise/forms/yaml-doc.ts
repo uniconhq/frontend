@@ -1,4 +1,5 @@
 import {
+  isAlias,
   isMap,
   isNode,
   isScalar,
@@ -25,15 +26,13 @@ import { overOriginal } from './keep-lines';
 export type Doc = Document;
 export type Path = (string | number)[];
 
-const PYTHON_TRUE = /^(?:[Yy]es|YES|[Tt]rue|TRUE|[Oo]n|ON)$/;
-const PYTHON_FALSE = /^(?:[Nn]o|NO|[Ff]alse|FALSE|[Oo]ff|OFF)$/;
-const BOOL = 'tag:yaml.org,2002:bool';
-const MERGE = 'tag:yaml.org,2002:merge';
+const FLOAT = 'tag:yaml.org,2002:float';
+const INT = 'tag:yaml.org,2002:int';
 const STR = 'tag:yaml.org,2002:str';
 /**
- * Characters PyYAML takes only escaped in double quotes: a tab, which it
- * refuses in plain text, and the controls, breaks and non-characters its
- * reader refuses anywhere.
+ * Characters the forge's reader takes only escaped in double quotes: a tab,
+ * which it refuses in plain text, and the controls, breaks and
+ * non-characters it refuses anywhere.
  */
 function escapedOnly(text: string): boolean {
   for (const char of text) {
@@ -60,144 +59,96 @@ function escaped(found: string): string {
     ? `\\x${code.toString(16).toUpperCase().padStart(2, '0')}`
     : `\\u${code.toString(16).toUpperCase().padStart(4, '0')}`;
 }
-/**
- * Tags of the library's 1.1 schema a definition file never holds: a time,
- * which stays text, and the ordered collections, which the library would
- * otherwise make of every new mapping.
- */
-const LEFT_OUT = ['timestamp', 'omap', 'pairs', 'set'].map(
-  (name) => `tag:yaml.org,2002:${name}`,
-);
 
-/** PyYAML's int and float, which are narrower than the library's 1.1 ones. */
-const PYTHON_INT =
-  '[-+]?0b[0-1_]+|[-+]?0[0-7_]+|[-+]?(?:0|[1-9][0-9_]*)|[-+]?0x[0-9a-fA-F_]+|[-+]?[1-9][0-9_]*(?::[0-5]?[0-9])+';
-const PYTHON_FLOAT =
-  '[-+]?(?:[0-9][0-9_]*)\\.[0-9_]*(?:[eE][-+][0-9]+)?|\\.[0-9_]+(?:[eE][-+][0-9]+)?|[-+]?[0-9][0-9_]*(?::[0-5]?[0-9])+\\.[0-9_]*|[-+]?\\.(?:inf|Inf|INF)|\\.(?:nan|NaN|NAN)';
-const NUMBERS: Record<string, string> = {
-  'tag:yaml.org,2002:int': PYTHON_INT,
-  'tag:yaml.org,2002:float': PYTHON_FLOAT,
+/**
+ * A number as the digits it is written with, which a form writes and reads
+ * so that no digit is lost: a JavaScript number holds about 17 significant
+ * digits, and a bound in a file may have more. It is written bare, and
+ * reads as a number.
+ */
+export class NumberText {
+  readonly text: string;
+
+  constructor(text: string) {
+    this.text = text;
+  }
+
+  /** The number as JavaScript holds it, to about 17 significant digits. */
+  get value(): number {
+    return Number(this.text);
+  }
+
+  toJSON(): number {
+    return this.value;
+  }
+}
+
+/** A `NumberText` in a document, written as its digits. */
+const NUMBER_TEXT: ScalarTag = {
+  tag: FLOAT,
+  default: true,
+  identify: (value) => value instanceof NumberText,
+  resolve: (text) => new NumberText(text),
+  stringify: (item) => (item.value as NumberText).text,
 };
 
-/** A date or a time as PyYAML reads one, which the forms hold as text. */
-const PYTHON_TIME =
-  /^(?:\d{4}-\d\d-\d\d|\d{4}-\d\d?-\d\d?(?:[Tt]|[ \t]+)\d\d?:\d\d:\d\d(?:\.\d*)?(?:[ \t]*(?:Z|[-+]\d\d?(?::\d\d)?))?)$/;
-
-/**
- * Text PyYAML reads as something else that the library's tags do not
- * catch: a date or a time, and the `=` and `<<` PyYAML resolves to tags it
- * then refuses. Written, it is quoted.
- */
-function readOtherwise(value: unknown): boolean {
-  return (
-    typeof value === 'string' &&
-    (PYTHON_TIME.test(value) || value === '=' || value === '<<')
-  );
+/** The digits a number scalar was read from, while it still holds that number. */
+function sourceOf(node: unknown): string | undefined {
+  if (!isScalar(node) || typeof node.value !== 'number') return undefined;
+  const { source } = node;
+  return typeof source === 'string' && Number(source) === node.value
+    ? source
+    : undefined;
 }
 
 /**
- * How every definition file is read and written: as the forge reads it,
- * PyYAML's YAML 1.1, where `on`, `yes` and `off` are true and false and
- * `1_000` is a number. A string that would read as one of those is written
- * quoted, so the file a save writes means to the forge what the page shows.
- * Two of the library's 1.1 rules are PyYAML's instead: `y` and `n` stay
- * text, a time stays the text it is written as, which the forms read, and a
- * new mapping is a plain one.
+ * A tag of the core schema, with two changes: a number read from the file is
+ * written back with the digits it was read from, and text holding a
+ * character the forge's reader takes only escaped is double-quoted, the
+ * character escaped.
  */
-export const YAML_OPTIONS: ParseOptions & DocumentOptions & SchemaOptions = {
-  version: '1.1',
-  customTags: (tags: Tags) =>
-    tags
-      .filter((tag) => typeof tag !== 'object' || !LEFT_OUT.includes(tag.tag))
-      .map(pythonTag),
-};
-
-/**
- * A 1.1 tag as PyYAML reads it: its bools narrowed to PyYAML's words, its
- * numbers to the scalars PyYAML's patterns take as well, and its merge key
- * to the one a file holds, so a text `<<` is written as text; any other tag
- * as it is.
- */
-function pythonTag(tag: Tags[number]): Tags[number] {
+function exactTag(tag: Tags[number]): Tags[number] {
   if (typeof tag !== 'object' || 'collection' in tag) return tag;
   const scalar: ScalarTag = tag;
-  if (scalar.tag === BOOL)
-    return { ...scalar, test: scalar.identify?.(true) ? PYTHON_TRUE : PYTHON_FALSE };
-  if (scalar.tag === MERGE)
-    return { ...scalar, identify: (value) => typeof value === 'symbol' };
-  if (scalar.tag === STR && scalar.stringify !== undefined) {
-    const { stringify } = scalar;
+  const { stringify } = scalar;
+  if (stringify === undefined) return tag;
+  if (scalar.tag === INT || scalar.tag === FLOAT)
+    return {
+      ...scalar,
+      stringify: (item, ctx, onComment, onChompKeep) =>
+        sourceOf(item) ?? stringify(item, ctx, onComment, onChompKeep),
+    };
+  if (scalar.tag === STR)
     return {
       ...scalar,
       stringify: (item, ctx, onComment, onChompKeep) => {
-        // New text a page writes, a key or an id as much as a value, is
-        // quoted where PyYAML would read it otherwise; text the file holds
-        // keeps its own style. Text holding a character PyYAML takes only
-        // as an escape is double-quoted, the character escaped.
         const value: unknown = item.value;
-        if (
-          typeof value === 'string' &&
-          (escapedOnly(value) || (item.type === undefined && readOtherwise(value)))
-        )
-          item.type = 'QUOTE_DOUBLE';
+        if (typeof value === 'string' && escapedOnly(value)) item.type = 'QUOTE_DOUBLE';
         const written = stringify(item, ctx, onComment, onChompKeep);
         return item.type === 'QUOTE_DOUBLE'
           ? written.replace(LEFT_BARE, escaped)
           : written;
       },
     };
-  }
-  const narrower = NUMBERS[scalar.tag];
-  if (narrower === undefined) return tag;
-  const { test, stringify } = scalar;
-  return {
-    ...scalar,
-    test:
-      test && new RegExp(`^(?=(?:${narrower})$)${test.source.slice(1)}`, test.flags),
-    stringify:
-      stringify &&
-      ((item, ctx, onComment, onChompKeep) =>
-        pythonNumber(stringify(item, ctx, onComment, onChompKeep))),
-  };
+  return tag;
 }
 
 /**
- * A number written as PyYAML reads one: an exponent only after a mantissa
- * with a dot and with a sign of its own, so `1e-9` is written `1.0e-9`.
+ * How every definition file is read and written: as the forge reads it,
+ * YAML 1.2's core schema, whatever `%YAML` line a file carries. Only `true`
+ * and `false` are booleans, so a group named `no` is text, and `1_000`,
+ * `1:30` and a date are text too. A string that would read as anything else
+ * is written quoted, and a number keeps the digits it is written with.
  */
-function pythonNumber(text: string): string {
-  const found = /^([-+]?\d+)(?:\.(\d+))?[eE]([-+]?)(\d+)$/.exec(text);
-  if (found === null) return text;
-  const [, whole, fraction, sign, power] = found;
-  return `${whole}.${fraction ?? '0'}e${sign === '' ? '+' : sign}${power}`;
-}
+export const YAML_OPTIONS: ParseOptions & DocumentOptions & SchemaOptions = {
+  version: '1.2',
+  schema: 'core',
+  customTags: (tags: Tags) => [...tags.map(exactTag), NUMBER_TEXT],
+};
 
-/**
- * `value` as a new node of the document, every text in it that PyYAML would
- * read otherwise quoted. Every node a page writes with values in it is
- * made here.
- */
+/** `value` as a new node of the document. */
 export function nodeFor(doc: Doc, value: unknown, { flow = false } = {}): Node {
-  const node = doc.createNode(value, { flow });
-  quoteForPython(node);
-  return node;
-}
-
-/**
- * Every text under `node`, keys too, that PyYAML would read otherwise,
- * quoted: for a node the file held, whose text a page changed in place.
- */
-export function quoteForPython(node: unknown): void {
-  if (isScalar(node)) {
-    if (readOtherwise(node.value)) node.type = 'QUOTE_DOUBLE';
-    return;
-  }
-  if (isMap(node))
-    for (const pair of node.items) {
-      quoteForPython(pair.key);
-      quoteForPython(pair.value);
-    }
-  if (isSeq(node)) for (const item of node.items) quoteForPython(item);
+  return doc.createNode(value, { flow });
 }
 
 /** The file's text as a document, or the first reason it is not one. */
@@ -234,15 +185,39 @@ export function writeOver(text: string, doc: Doc): string {
   return overOriginal(text, writeYaml(before.doc), changed, sameMeaning);
 }
 
-/** Whether two texts hold the same values and the same comments. */
+/**
+ * Whether two texts hold the same values and the same comments, each number
+ * to the digit, which a JavaScript number alone would round.
+ */
 function sameMeaning(a: string, b: string): boolean {
   const left = parseYaml(a);
   const right = parseYaml(b);
   if ('error' in left || 'error' in right) return false;
   return (
     JSON.stringify(left.doc.toJS()) === JSON.stringify(right.doc.toJS()) &&
+    numbersOf(left.doc).join('\n') === numbersOf(right.doc).join('\n') &&
     commentsOf(left.doc).join('\n') === commentsOf(right.doc).join('\n')
   );
+}
+
+/** Every number the document holds, as its digits, in the document's order. */
+function numbersOf(doc: Doc): string[] {
+  const found: string[] = [];
+  visit(doc, {
+    Scalar: (_, node) => {
+      const text = numberTextOf(node);
+      if (text !== undefined) found.push(text);
+    },
+  });
+  return found;
+}
+
+/** The digits of a number scalar, or undefined for any other node. */
+function numberTextOf(node: unknown): string | undefined {
+  if (!isScalar(node)) return undefined;
+  if (node.value instanceof NumberText) return node.value.text;
+  if (typeof node.value !== 'number') return undefined;
+  return sourceOf(node) ?? String(node.value);
 }
 
 function commentsOf(doc: Doc): string[] {
@@ -269,15 +244,60 @@ export function topMap(doc: Doc): YAMLMap | null | 'not-a-mapping' {
 export function valueAt(doc: Doc, path: Path): unknown {
   const node: unknown = doc.getIn(path, true);
   if (node === undefined || node === null) return undefined;
-  if (isScalar(node)) return node.value;
+  if (isScalar(node))
+    return node.value instanceof NumberText ? node.value.toJSON() : node.value;
   if (isMap(node) || isSeq(node)) return node.toJSON();
   return undefined;
 }
 
 /**
- * A time a form writes, which the file holds bare: the forge reads a time
- * bare or quoted, and other text that looks like one only quoted.
+ * The document as plain values, as `toJS` gives them, with every number a
+ * `NumberText` holding the digits the file writes it with.
  */
+export function exactJS(doc: Doc): unknown {
+  return exactOf(doc, doc.contents);
+}
+
+/**
+ * The value at a path as `exactJS` reads it, or undefined when nothing is
+ * there: what a form reads a field's text from, a number as its digits.
+ */
+export function exactAt(doc: Doc, path: Path): unknown {
+  const node: unknown = doc.getIn(path, true);
+  return node === undefined || node === null ? undefined : exactOf(doc, node);
+}
+
+function exactOf(doc: Doc, top: unknown): unknown {
+  const walk = (node: unknown): unknown => {
+    if (isAlias(node)) return walk(node.resolve(doc));
+    if (isScalar(node)) {
+      const digits = numberTextOf(node);
+      return digits === undefined ? node.value : new NumberText(digits);
+    }
+    if (isMap(node)) {
+      const found: Record<string, unknown> = {};
+      for (const pair of node.items) {
+        const key = isScalar(pair.key) ? pair.key.value : walk(pair.key);
+        found[typeof key === 'string' ? key : JSON.stringify(key)] = walk(pair.value);
+      }
+      return found;
+    }
+    if (isSeq(node)) return node.items.map(walk);
+    return node ?? null;
+  };
+  return walk(top);
+}
+
+/**
+ * A field's text for the value at a path: a number as the digits the file
+ * writes it with, so a field shows and saves every digit, and anything else
+ * as `textOf` gives it.
+ */
+export function textAt(doc: Doc, path: Path): string {
+  return numberTextOf(doc.getIn(path, true)) ?? textOf(valueAt(doc, path));
+}
+
+/** A time a form writes, as the text it is written as. */
 export class Time {
   readonly text: string;
 
@@ -288,7 +308,13 @@ export class Time {
 
 /** Whether `value` is a mapping read from YAML, not a list or a scalar. */
 export function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    !Array.isArray(value) &&
+    !(value instanceof NumberText) &&
+    !(value instanceof Time)
+  );
 }
 
 /**
@@ -329,34 +355,22 @@ export function writeAt(
   const parent: unknown = doc.getIn(path.slice(0, -1), true);
   if ((isMap(parent) || isSeq(parent)) && parent.items.length === 0)
     parent.flow = false;
-  const time = value instanceof Time;
   const written = value instanceof Time ? value.text : value;
   const isPlain =
     written === null ||
     typeof written === 'string' ||
     typeof written === 'number' ||
-    typeof written === 'boolean';
+    typeof written === 'boolean' ||
+    written instanceof NumberText;
   const old: unknown = doc.getIn(path, true);
   if (isPlain) {
-    // A time stays bare when a form writes it as one, or when it replaces a
-    // time the file holds bare.
-    const bareTime =
-      time ||
-      (isScalar(old) &&
-        old.type === 'PLAIN' &&
-        typeof old.value === 'string' &&
-        PYTHON_TIME.test(old.value) &&
-        typeof written === 'string' &&
-        PYTHON_TIME.test(written));
     if (isScalar(old)) {
       // A scalar already there keeps its node, so a comment on its line stays.
-      doc.setIn(path, written);
-      if (!bareTime) quoteForPython(old);
+      if (written instanceof NumberText) old.value = written;
+      else doc.setIn(path, written);
       return;
     }
-    const node = bareTime
-      ? Object.assign(doc.createNode(written), { type: 'PLAIN' as const })
-      : nodeFor(doc, written);
+    const node = nodeFor(doc, written);
     keepComments(old, node);
     doc.setIn(path, node);
     return;
@@ -398,24 +412,27 @@ function keepComments(old: unknown, node: Node): void {
   node.commentBefore = old.commentBefore;
 }
 
+const NUMBER = /^-?(\d+\.?\d*|\.\d+)([eE][-+]?\d+)?$/;
+
 /**
- * A value typed into a field, as the file should hold it: a number when it
- * reads as one, `true` or `false` as a bool, and anything else as text. An
- * empty field is no value. Used where the form cannot know the type, such as
- * an input's value, which the workflow declares.
+ * A value typed into a field, as the file should hold it: a number, as its
+ * digits, when it reads as one, `true` or `false` as a bool, and anything
+ * else as text. An empty field is no value. Used where the form cannot know
+ * the type, such as an input's value, which the workflow declares.
  */
-export function scalarOf(text: string): string | number | boolean | undefined {
+export function scalarOf(text: string): string | NumberText | boolean | undefined {
   const trimmed = text.trim();
   if (trimmed === '') return undefined;
   if (trimmed === 'true') return true;
   if (trimmed === 'false') return false;
-  if (/^-?(\d+\.?\d*|\.\d+)([eE][-+]?\d+)?$/.test(trimmed)) return Number(trimmed);
+  if (NUMBER.test(trimmed)) return new NumberText(trimmed);
   return text;
 }
 
 /** A field's text for a value read from the file. */
 export function textOf(value: unknown): string {
   if (value === undefined || value === null) return '';
+  if (value instanceof NumberText) return value.text;
   if (typeof value === 'string') return value;
   if (typeof value === 'number' || typeof value === 'boolean') return String(value);
   return JSON.stringify(value);
@@ -428,8 +445,19 @@ export function textOf(value: unknown): string {
 export function numberOf(text: string): number | undefined {
   const trimmed = text.trim();
   if (trimmed === '') return undefined;
-  if (!/^-?(\d+\.?\d*|\.\d+)([eE][-+]?\d+)?$/.test(trimmed)) return Number.NaN;
+  if (!NUMBER.test(trimmed)) return Number.NaN;
   return Number(trimmed);
+}
+
+/**
+ * A number typed into a field as the file should hold it, its digits as
+ * typed: undefined when empty, NaN when it is not a number, which the form
+ * shows as an error and will not save.
+ */
+export function numberText(text: string): NumberText | number | undefined {
+  const trimmed = text.trim();
+  if (trimmed === '') return undefined;
+  return NUMBER.test(trimmed) ? new NumberText(trimmed) : Number.NaN;
 }
 
 /** Why a number field cannot be saved, or undefined when it can. */
