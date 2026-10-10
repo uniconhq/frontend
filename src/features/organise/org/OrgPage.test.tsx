@@ -84,22 +84,28 @@ describe('the org page', () => {
     expect(screen.queryByRole('form', { name: 'New contest' })).not.toBeInTheDocument();
   });
 
-  it('offers to try again when the list failed for another reason', async () => {
-    let broken = true;
-    server.use(
-      signedIn,
-      http.get(`${ORG_API}/contests`, () =>
-        broken ? problem(503, 'forge_unavailable') : HttpResponse.json(contests),
-      ),
-    );
-    renderApp('/orgs/acme');
+  it(
+    'offers to try again when the list failed for another reason',
+    { timeout: 15_000 },
+    async () => {
+      let broken = true;
+      server.use(
+        signedIn,
+        http.get(`${ORG_API}/contests`, () =>
+          broken ? problem(503, 'forge_unavailable') : HttpResponse.json(contests),
+        ),
+      );
+      renderApp('/orgs/acme');
 
-    await screen.findByText('Forgejo did not answer', {}, { timeout: 3_000 });
-    broken = false;
-    await userEvent.click(screen.getByRole('button', { name: 'Try again' }));
+      // The client asks twice more before it shows the error, 0.3 s and then
+      // 0.9 s later, which a busy machine stretches.
+      await screen.findByText('Forgejo did not answer', {}, { timeout: 10_000 });
+      broken = false;
+      await userEvent.click(screen.getByRole('button', { name: 'Try again' }));
 
-    expect(await screen.findByRole('list', { name: 'Contests' })).toBeVisible();
-  });
+      expect(await screen.findByRole('list', { name: 'Contests' })).toBeVisible();
+    },
+  );
 });
 
 describe("the org's display name and description", () => {

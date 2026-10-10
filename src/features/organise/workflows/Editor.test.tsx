@@ -8,6 +8,8 @@ import { CLASSIC_V2, workflowBackend } from '@/test/workflows';
 
 const PAGE = '/workflows/kenny/tuned';
 const PREVIEW = 'workflow.yaml as a save writes it';
+/** The forge's check runs 400 ms after the text settles, then answers. */
+const CHECKED = { timeout: 3_000 };
 
 async function preview(): Promise<string> {
   return (await screen.findByLabelText<HTMLTextAreaElement>(PREVIEW)).value;
@@ -114,9 +116,11 @@ describe('the workflow editor', () => {
 
     const step = await screen.findByRole('group', { name: 'Step run' });
     expect(
-      await within(step).findByRole('note', {
-        name: 'compiler is not a step before this one.',
-      }),
+      await within(step).findByRole(
+        'note',
+        { name: 'compiler is not a step before this one.' },
+        CHECKED,
+      ),
     ).toBeInTheDocument();
     expect(
       screen.getByText(/One problem a version would be refused for/),
@@ -573,7 +577,9 @@ describe('the workflow editor', () => {
     );
     renderApp(PAGE);
 
-    expect(await screen.findByText(/The check did not run/)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/The check did not run/, {}, CHECKED),
+    ).toBeInTheDocument();
     expect(screen.queryByText(/passes every check/)).not.toBeInTheDocument();
   });
 
