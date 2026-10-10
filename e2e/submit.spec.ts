@@ -65,7 +65,7 @@ const ranTest = (name: string, outcome: string, timeMs: string, credit: string) 
 
 const graded = {
   ...queued,
-  status: 'done',
+  status: 'graded',
   outcome: 'wrong_answer',
   values: { numbers: {}, texts: { log: 'Compiled cleanly.' } },
   points: { shown: '0', pending: '100', pending_until: '2026-09-29T12:00:00Z' },
@@ -426,7 +426,7 @@ test('a submission that did not compile shows that as its verdict', async ({
         late_days: 0,
         grading: {
           ...queued,
-          status: 'done',
+          status: 'graded',
           stopped: 'compile_error',
           values: { numbers: {}, texts: { log: 'main.cpp:1: error' } },
         },
