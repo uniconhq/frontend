@@ -241,6 +241,51 @@ describe('the workflow editor', () => {
     expect(backend.state.draft).toContain('fold: sum');
   });
 
+  it(
+    'merges again over a second save by someone else, from the file merged over',
+    { timeout: 20_000 },
+    async () => {
+      const backend = workflowBackend(CLASSIC_V2);
+      server.use(signedIn, ...backend.handlers);
+      const user = userEvent.setup();
+      renderApp(PAGE);
+
+      await user.click(
+        await screen.findByRole('button', { name: 'The port args of run' }),
+      );
+      await user.click(
+        await screen.findByRole('menuitem', { name: /^inputs\.time_limit/ }),
+      );
+      backend.state.draft = CLASSIC_V2.replace(
+        'fold: max, better: lower',
+        'fold: sum, better: lower',
+      );
+      backend.state.token = 'someone-else';
+      await user.click(screen.getByRole('button', { name: 'Save' }));
+      await screen.findByRole('list', { name: 'Fields that differ' });
+      backend.state.draft = backend.state.draft.replace(
+        'fold: sum, better: lower',
+        'fold: min, better: lower',
+      );
+      backend.state.token = 'a-third';
+      await user.click(screen.getByRole('button', { name: 'Save the merged version' }));
+
+      await waitFor(() =>
+        expect(
+          within(screen.getByRole('list', { name: 'Fields that differ' })).getByText(
+            /time_ms\.fold/,
+          ),
+        ).toBeInTheDocument(),
+      );
+      const fields = screen.getByRole('list', { name: 'Fields that differ' });
+      expect(within(fields).queryByText(/both changed it/)).not.toBeInTheDocument();
+      await user.click(screen.getByRole('button', { name: 'Save the merged version' }));
+      await waitFor(() => expect(backend.state.token).not.toBe('a-third'));
+      expect(backend.state.draft).toContain('args: ${{ inputs.time_limit }}');
+      expect(backend.state.draft).toContain('fold: min');
+    },
+  );
+
   it('adds a step from the palette, named for its primitive', async () => {
     server.use(signedIn, ...workflowBackend(CLASSIC_V2).handlers);
     const user = userEvent.setup();
