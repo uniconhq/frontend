@@ -22,6 +22,7 @@ import {
   type Point,
 } from './layout';
 import { sourceAt, targetAt, type Notice, type Target } from './ends';
+import { NumberText } from '../forms/yaml-doc';
 import { refLabel, type Ref, type Workflow } from './model';
 import type { Pinned } from './pins';
 import { declared, raisingPorts, type PrimitiveInfo } from './primitives';
@@ -89,7 +90,10 @@ function shownValue(
     return drawn.has(`port:${String(box.step)}.${port}`)
       ? null
       : `from ${refLabel(value.ref)}, not drawn`;
-  if (value.kind === 'literal') return JSON.stringify(value.value);
+  if (value.kind === 'literal')
+    return value.value instanceof NumberText
+      ? value.value.text
+      : JSON.stringify(value.value);
   if (value.kind === 'text') return JSON.stringify(value.text);
   return 'not a value a port takes';
 }

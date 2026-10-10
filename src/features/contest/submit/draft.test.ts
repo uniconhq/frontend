@@ -32,8 +32,8 @@ const alpha = inputField({
   id: 'alpha',
   type: 'number',
   label: 'Alpha',
-  min: 0,
-  max: 1,
+  min: '0',
+  max: '1',
 });
 const language = inputField({
   id: 'language',

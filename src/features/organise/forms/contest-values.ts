@@ -2,8 +2,10 @@ import { isSeq } from 'yaml';
 import { readBoards, writeBoards, type BoardValues } from './board-values';
 import { isoOf, localOf, unreadableTime } from './times';
 import {
+  exactAt,
   isRecord,
-  numberOf,
+  numberText,
+  textAt,
   textOf,
   Time,
   valueAt,
@@ -86,10 +88,10 @@ export function readContest(doc: Doc): ContestRead {
   if (!listOk) unreadable.push('tasks');
   const entries =
     listOk && Array.isArray(list) ? (list as Record<string, unknown>[]) : [];
-  const boards = readBoards(valueAt(doc, ['leaderboards']));
+  const boards = readBoards(exactAt(doc, ['leaderboards']));
   if (boards === null) unreadable.push('leaderboards');
 
-  const at = (...path: (string | number)[]) => textOf(valueAt(doc, path));
+  const at = (...path: (string | number)[]) => textAt(doc, path);
   const time = (...path: (string | number)[]) => localOf(valueAt(doc, path));
 
   const timePaths: (string | number)[][] = [['start'], ['end']];
@@ -135,7 +137,7 @@ export function readContest(doc: Doc): ContestRead {
 
 /** A text field's value as the file holds it; an empty one is no key. */
 const text = (value: string) => (value === '' ? undefined : value);
-const number = (value: string) => numberOf(value);
+const number = (value: string) => numberText(value);
 const time = (value: string) => {
   const iso = isoOf(value);
   return iso === undefined ? undefined : new Time(iso);

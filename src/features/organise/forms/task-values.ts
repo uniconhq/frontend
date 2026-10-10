@@ -1,8 +1,10 @@
 import type { DeclaredInput } from '@/api/types';
 import {
   isRecord,
-  numberOf,
+  exactAt,
+  numberText,
   scalarOf,
+  textAt,
   textOf,
   valueAt,
   writeAt,
@@ -173,9 +175,9 @@ export function readTask(
   declared: DeclaredInput[] | null = null,
 ): TaskRead {
   const unreadable: string[] = [];
-  const at = (...path: string[]) => textOf(valueAt(doc, path));
+  const at = (...path: string[]) => textAt(doc, path);
 
-  const inputs = valueAt(doc, ['inputs']);
+  const inputs = exactAt(doc, ['inputs']);
   if (inputs !== undefined && !isRecord(inputs)) unreadable.push('inputs');
 
   const credit = valueAt(doc, ['credit']);
@@ -185,7 +187,7 @@ export function readTask(
     creditValues = { kind: 'relative', name: credit['relative'] };
   } else if (credit !== undefined) unreadable.push('credit');
 
-  const groups = valueAt(doc, ['test_groups']);
+  const groups = exactAt(doc, ['test_groups']);
   const groupsOk =
     groups === undefined ||
     (isRecord(groups) &&
@@ -258,7 +260,7 @@ function typedValue(type: string | null, text: string): unknown {
   if (text.trim() === '') return undefined;
   switch (type) {
     case 'number':
-      return numberOf(text);
+      return numberText(text);
     case 'boolean':
       return text.trim() === 'true' ? true : text.trim() === 'false' ? false : text;
     case 'text':
@@ -288,16 +290,16 @@ function inputEntry(input: InputValues): unknown {
   add('label', text(input.label));
   add('options', optionsOf(input.options));
   add('default', typedValue(input.type, input.default));
-  add('min', numberOf(input.min));
-  add('max', numberOf(input.max));
+  add('min', numberText(input.min));
+  add('max', numberText(input.max));
   add('max_size', text(input.maxSize));
   return details;
 }
 
-function weightsOf(rows: GroupValues['weights']): Record<string, number> | undefined {
-  const weights: Record<string, number> = {};
+function weightsOf(rows: GroupValues['weights']): Record<string, unknown> | undefined {
+  const weights: Record<string, unknown> = {};
   for (const row of rows) {
-    const weight = numberOf(row.weight);
+    const weight = numberText(row.weight);
     if (row.test.trim() !== '' && weight !== undefined)
       weights[row.test.trim()] = weight;
   }
@@ -310,10 +312,10 @@ function groupEntry(group: GroupValues): Record<string, unknown> {
   const add = (key: string, value: unknown) => {
     if (value !== undefined) entry[key] = value;
   };
-  add('each', numberOf(group.each));
-  add('worst', numberOf(group.worst));
-  add('pass', numberOf(group.pass));
-  add('pass_at', numberOf(group.passAt));
+  add('each', numberText(group.each));
+  add('worst', numberText(group.worst));
+  add('pass', numberText(group.pass));
+  add('pass_at', numberText(group.passAt));
   add('test_weights', weightsOf(group.weights));
   add('show', text(group.show));
   return entry;
@@ -342,19 +344,19 @@ export function writeTask(
   if (admin) {
     put(['name'], before.name, after.name, (value) => value);
     if (!unreadable.includes('submissions')) {
-      put(['submissions', 'max'], before.max, after.max, numberOf, true);
+      put(['submissions', 'max'], before.max, after.max, numberText, true);
       put(
         ['submissions', 'rate', 'count'],
         before.rateCount,
         after.rateCount,
-        numberOf,
+        numberText,
         true,
       );
       put(
         ['submissions', 'rate', 'per'],
         before.ratePer,
         after.ratePer,
-        numberOf,
+        numberText,
         true,
       );
     }
@@ -400,8 +402,8 @@ export function writeTask(
         put(path('default'), was.default, input.default, (value) =>
           typedValue(input.type, value),
         );
-        put(path('min'), was.min, input.min, numberOf);
-        put(path('max'), was.max, input.max, numberOf);
+        put(path('min'), was.min, input.min, numberText);
+        put(path('max'), was.max, input.max, numberText);
         put(path('max_size'), was.maxSize, input.maxSize, text);
       }
     }
@@ -420,10 +422,10 @@ export function writeTask(
         writeAt(doc, ['test_groups', group.name], groupEntry(group));
         continue;
       }
-      put(path('each'), was.each, group.each, numberOf);
-      put(path('worst'), was.worst, group.worst, numberOf);
-      put(path('pass'), was.pass, group.pass, numberOf);
-      put(path('pass_at'), was.passAt, group.passAt, numberOf);
+      put(path('each'), was.each, group.each, numberText);
+      put(path('worst'), was.worst, group.worst, numberText);
+      put(path('pass'), was.pass, group.pass, numberText);
+      put(path('pass_at'), was.passAt, group.passAt, numberText);
       put(path('show'), was.show, group.show, text);
       if (JSON.stringify(was.weights) !== JSON.stringify(group.weights)) {
         writeAt(doc, path('test_weights'), weightsOf(group.weights));

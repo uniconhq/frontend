@@ -11,7 +11,7 @@ import {
   type Side,
 } from './merge';
 import { isoOf, localOf } from './times';
-import { parseYaml, Time, writeAt, writeYaml } from './yaml-doc';
+import { exactJS, NumberText, parseYaml, Time, writeAt, writeYaml } from './yaml-doc';
 
 const BASE = `name: Spring   # shown on the page
 start: 2026-06-01T09:00:00Z
@@ -85,6 +85,41 @@ describe('times', () => {
   it('cannot show a time without a zone', () => {
     expect(localOf('2026-06-01')).toBe('');
     expect(localOf('2026-06-01T09:00:00')).toBe('');
+  });
+});
+
+describe('merging a number past what a float holds', () => {
+  const TASK = 'name: Sum\ntest_groups:\n  main: {pass: 0.123456789012345678901}\n';
+  const exact = (text: string) => exactJS(docOf(text));
+  const mine = edit(TASK, (doc) => {
+    writeAt(
+      doc,
+      ['test_groups', 'main', 'pass'],
+      new NumberText('0.123456789012345678902'),
+    );
+  });
+  const theirs = edit(TASK, (doc) => {
+    writeAt(doc, ['name'], 'Sums');
+  });
+
+  it("sees a change to the last digit and writes the organiser's digits", () => {
+    const diffs = differences(exact(TASK), exact(mine), exact(theirs), 'task.yaml');
+
+    expect(diffs.map((diff) => pathText(diff.path))).toEqual([
+      'name',
+      'test_groups.main.pass',
+    ]);
+    expect(mergeText(theirs, diffs, ['theirs', 'mine'])).toBe(
+      'name: Sums\ntest_groups:\n  main: {pass: 0.123456789012345678902}\n',
+    );
+  });
+
+  it('takes a number spelled another way for the same number', () => {
+    const spelled = TASK.replace('0.123456789012345678901', '0.1234567890123456789010');
+
+    expect(differences(exact(TASK), exact(spelled), exact(TASK), 'task.yaml')).toEqual(
+      [],
+    );
   });
 });
 
@@ -169,18 +204,21 @@ describe('merging a keyed list item by item', () => {
     ]);
   });
 
-  it('quotes text that PyYAML reads otherwise in an item it puts in', () => {
+  it('writes an item it puts in so it reads back as written', () => {
     const { theirs, diffs } = merge(
       (doc) => {
         const list = doc.get('tasks', true) as { items: unknown[] };
-        list.items.push(doc.createNode({ id: 'late', title: '2026-01-02' }));
+        list.items.push(
+          doc.createNode({ id: 'late', title: '2026-01-02', ok: 'true' }),
+        );
       },
       () => undefined,
     );
 
     const text = mergeText(theirs, diffs, ['mine']);
 
-    expect(text).toContain('title: "2026-01-02"');
+    expect(text).toContain('title: 2026-01-02');
+    expect(text).toContain('ok: "true"');
   });
 
   it("keeps the organiser's order when they pick it, every task moving whole", () => {

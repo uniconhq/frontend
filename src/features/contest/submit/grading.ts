@@ -1,6 +1,6 @@
 import type {
   GradingResult,
-  GradingStatus,
+  SubmissionState,
   GroupShown,
   Reported,
   Submission,
@@ -29,7 +29,7 @@ const MEANWHILE_MS = 60_000;
  */
 const REFUSED_MS = 5_000;
 
-const UNFINISHED = new Set<GradingStatus>(['queued', 'dispatched', 'running']);
+const UNFINISHED = new Set<SubmissionState>(['queued', 'grading']);
 
 function unfinished(submission: Submission): boolean {
   return submission.grading !== null && UNFINISHED.has(submission.grading.status);
@@ -68,7 +68,7 @@ export function pollEvery(
  * grading never finished.
  */
 export function verdictOf(grading: GradingResult): string {
-  if (grading.status !== 'done') return grading.status;
+  if (grading.status !== 'graded') return grading.status;
   return grading.stopped ?? grading.outcome ?? grading.status;
 }
 

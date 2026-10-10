@@ -1,5 +1,27 @@
 import { describe, expect, it } from 'vitest';
-import { formatExact, placesToTell, rounded } from './exact';
+import { compareDecimal, formatExact, placesToTell, rounded } from './exact';
+
+describe('compareDecimal', () => {
+  it('compares to the last digit, past what a float holds', () => {
+    expect(compareDecimal('1.00000000000000000001', '1.00000000000000000002')).toBe(-1);
+    expect(
+      compareDecimal(
+        '-12345678901234.5678901234567891',
+        '-12345678901234.567890123456789',
+      ),
+    ).toBe(-1);
+  });
+
+  it('takes a number spelled another way for the same number', () => {
+    expect(compareDecimal('2.5', '2.50')).toBe(0);
+    expect(compareDecimal('25e-1', '+2.5')).toBe(0);
+    expect(compareDecimal('1e3', '999.9')).toBe(1);
+  });
+
+  it('says NaN for text that is no decimal', () => {
+    expect(compareDecimal('one', '1')).toBeNaN();
+  });
+});
 
 describe('rounded', () => {
   it('rounds half away from zero and drops trailing zeros', () => {

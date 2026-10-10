@@ -4,6 +4,38 @@
  * rounded only here, for display, and compared as the digits they are.
  */
 
+const DECIMAL = /^([-+]?)(\d*)(?:\.(\d*))?(?:[eE]([-+]?\d+))?$/;
+
+/** A decimal as a whole number of units and the power of ten of a unit. */
+function scaled(text: string): { units: bigint; power: number } | null {
+  const found = DECIMAL.exec(text.trim());
+  if (found === null) return null;
+  const [, sign = '', whole = '', fraction = '', exponent = '0'] = found;
+  if (whole === '' && fraction === '') return null;
+  const units = BigInt(`${whole}${fraction}` || '0');
+  return {
+    units: sign === '-' ? -units : units,
+    power: Number(exponent) - fraction.length,
+  };
+}
+
+/**
+ * How two decimals written as text compare, digit for digit, however many
+ * digits they have and whatever way each is spelled (`2.5`, `2.50`,
+ * `25e-1`): below zero when `a` is less, zero when they are the same
+ * number, above zero when `a` is more. Text that is no decimal compares as
+ * NaN.
+ */
+export function compareDecimal(a: string, b: string): number {
+  const left = scaled(a);
+  const right = scaled(b);
+  if (left === null || right === null) return Number.NaN;
+  const power = Math.min(left.power, right.power);
+  const x = left.units * 10n ** BigInt(left.power - power);
+  const y = right.units * 10n ** BigInt(right.power - power);
+  return x < y ? -1 : x > y ? 1 : 0;
+}
+
 /** The digits of an exact number split at its point, its sign apart. */
 type Parts = { negative: boolean; whole: string; fraction: string };
 

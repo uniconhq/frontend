@@ -103,8 +103,8 @@ const PRIMITIVES = [
     network: false,
     limits: LIMITS,
     limits_from: {
-      time_ms: { input: 'time_limit', scale: 2000, add: 3000 },
-      memory_mb: { input: 'memory_limit', scale: 1, add: 256 },
+      time_ms: { input: 'time_limit', scale: '2000', add: '3000' },
+      memory_mb: { input: 'memory_limit', scale: '1', add: '256' },
     },
     inputs: {
       binary: port('file', { runs: true }),

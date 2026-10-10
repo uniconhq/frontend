@@ -186,6 +186,7 @@ describe('saving a task file', () => {
             : problem(409, 'confirmation_required', {
                 detail: 'The contest is running and this changes how the task grades.',
                 changes: ['plans/default.json changed', 'limits.time changed'],
+                regrades: 12,
               }),
         ),
     );
@@ -197,7 +198,7 @@ describe('saving a task file', () => {
       'The contest is running and this changes how the task grades.',
     );
     expect(alert).toHaveTextContent(
-      'every submission to the task is graded again against the new publication.',
+      '12 submissions to the task are graded again against the new publication.',
     );
     const changes = within(alert).getByRole('list', { name: 'What would change' });
     expect(
