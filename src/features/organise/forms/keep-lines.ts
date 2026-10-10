@@ -24,6 +24,15 @@ export function overOriginal(
   reads: (a: string, b: string) => boolean,
 ): string {
   if (unchanged === changed) return original;
+  // The library writes LF; a file whose every line ends in CRLF is laid over
+  // as LF and keeps its CRLF.
+  if (original.includes('\r\n') && !/(^|[^\r])\n/.test(original))
+    return overOriginal(
+      original.replaceAll('\r\n', '\n'),
+      unchanged,
+      changed,
+      reads,
+    ).replaceAll('\n', '\r\n');
   if (original === unchanged) return changed;
   const o = original.split('\n');
   const u = unchanged.split('\n');
