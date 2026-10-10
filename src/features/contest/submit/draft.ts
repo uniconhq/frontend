@@ -1,5 +1,6 @@
 import { ApiError } from '@/api/problem';
 import type { InputField, SubmittedInput } from '@/api/types';
+import { compareDecimal } from '@/lib/exact';
 
 /**
  * What the panel holds for one input before it is sent: the files of a file
@@ -17,6 +18,9 @@ export type Draft = Readonly<Record<string, Entry>>;
 
 /** The most a text input takes, in bytes of UTF-8, as forge counts it. */
 const TEXT_MAX = 64 * 1024;
+
+/** A number as a contestant gives it: plain decimal digits, as the forge takes one. */
+const PLAIN_DECIMAL = /^-?[0-9]+(\.[0-9]+)?$/;
 
 export function takesFiles(input: InputField): boolean {
   return input.type === 'file' || input.type === 'folder';
@@ -118,11 +122,11 @@ function problemOf(input: InputField, entry: Entry): string | null {
   }
   const trimmed = entry.text.trim();
   if (trimmed === '') return 'Give a number.';
-  const value = Number(trimmed);
-  if (!Number.isFinite(value)) return 'Must be a number.';
-  if (input.min !== null && value < Number(input.min))
+  if (!PLAIN_DECIMAL.test(trimmed))
+    return 'Must be a number written as plain decimal digits, such as 2.5.';
+  if (input.min !== null && compareDecimal(trimmed, input.min) < 0)
     return `Must be at least ${input.min}.`;
-  if (input.max !== null && value > Number(input.max))
+  if (input.max !== null && compareDecimal(trimmed, input.max) > 0)
     return `Must be at most ${input.max}.`;
   return null;
 }
@@ -167,7 +171,8 @@ export function checkDraft(inputs: InputField[], draft: Draft): ApiError | null 
 
 /**
  * The submit's `inputs`: for each input, the uploads of its files, or its
- * value. `uploadOf` is the upload each file went up as for the input it was
+ * value, a number as the digits it was typed as, the form the API serves
+ * every number in, so none is read into a float on the way. `uploadOf` is the upload each file went up as for the input it was
  * sent for.
  */
 export function submittedInputs(
@@ -193,7 +198,7 @@ export function submittedInputs(
             input.id,
             {
               uploads: [],
-              value: input.type === 'number' ? Number(entry.text.trim()) : entry.text,
+              value: input.type === 'number' ? entry.text.trim() : entry.text,
             },
           ];
       }

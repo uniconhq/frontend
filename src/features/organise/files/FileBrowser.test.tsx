@@ -128,7 +128,7 @@ describe('saving a contest file', () => {
       ...repoFiles,
       http.put(CONTEST_FILE, async ({ request }) => {
         sent = await request.json();
-        return HttpResponse.json({ version: '9f8e7d6c5b4a39281706' });
+        return HttpResponse.json({ version: '9f8e7d6c5b4a39281706', notes: [] });
       }),
     );
     renderApp(`${CONTEST}?file=contest.yaml`);
@@ -168,7 +168,7 @@ describe('saving a contest file', () => {
       }),
       ...repoFiles,
       http.put(CONTEST_FILE, () =>
-        HttpResponse.json({ version: '9f8e7d6c5b4a39281706' }),
+        HttpResponse.json({ version: '9f8e7d6c5b4a39281706', notes: [] }),
       ),
     );
     renderApp(`${CONTEST}?file=contest.yaml`);

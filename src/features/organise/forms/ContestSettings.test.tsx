@@ -32,12 +32,14 @@ const FILE = `${CONTEST_API}/files/:path`;
  * The spring contest with `contest.yaml` holding `current`. Each write is
  * taken and the file becomes it, except that with `conflictWith` the first
  * write is refused as a conflict and the file becomes that text instead, as
- * if someone else had saved it. `sent` holds each write's body.
+ * if someone else had saved it. Each write taken answers `notes`, what the
+ * boards report. `sent` holds each write's body.
  */
 function contestBackend({
   current = CONTEST,
   conflictWith,
-}: { current?: string; conflictWith?: string } = {}) {
+  notes = [],
+}: { current?: string; conflictWith?: string; notes?: string[] } = {}) {
   let file: FileContent = {
     path: 'contest.yaml',
     encoding: 'utf-8',
@@ -63,7 +65,7 @@ function contestBackend({
       }
       const token = `token-${String(sent.length + 2)}`;
       file = { ...file, content: body.content, token };
-      return HttpResponse.json({ version: `version-${token}` });
+      return HttpResponse.json({ version: `version-${token}`, notes });
     }),
     ...repoFiles,
   );
@@ -154,6 +156,31 @@ describe('the contest settings form', { timeout: 20_000 }, () => {
     });
     expect(write?.content).toContain("# the page's title");
     expect(write?.content).toContain('leaderboards:\n  - name: Standings\n');
+  });
+
+  it('shows the notes the boards report once the save is written', async () => {
+    contestBackend({ notes: ['Standings counts nothing from sort.'] });
+    const form = await openForm();
+
+    fill(within(form).getByLabelText('Name'), 'Spring 2026');
+    await userEvent.click(within(form).getByRole('button', { name: 'Save settings' }));
+
+    expect(await screen.findByText(/Saved as version/)).toBeVisible();
+    const notes = screen.getByRole('list', { name: 'Notes' });
+    expect(
+      within(notes).getByText('Standings counts nothing from sort.'),
+    ).toBeVisible();
+  });
+
+  it('shows no notes after a save the boards report nothing of', async () => {
+    contestBackend();
+    const form = await openForm();
+
+    fill(within(form).getByLabelText('Name'), 'Spring 2026');
+    await userEvent.click(within(form).getByRole('button', { name: 'Save settings' }));
+
+    expect(await screen.findByText(/Saved as version/)).toBeVisible();
+    expect(screen.queryByRole('list', { name: 'Notes' })).toBeNull();
   });
 
   it("shows a manager the admin's keys read-only and saves the manager's own", async () => {

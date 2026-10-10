@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useReducer, useState, type KeyboardEvent } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { apiClient } from '@/api/client';
 import { $api } from '@/api/query';
 import { toApiError, type ApiError } from '@/api/problem';
 import type { DefinitionProblem, WorkflowPage } from '@/api/types';
@@ -25,6 +24,7 @@ import {
   wire,
   workflowOf,
 } from './edit';
+import { checkQuery } from './check';
 import { sourceAt, targetAt, type Notice, type Target } from './ends';
 import { Graph } from './Graph';
 import { layoutWorkflow, type Box } from './layout';
@@ -36,6 +36,7 @@ import { byRef, declared, type PrimitiveInfo } from './primitives';
 import { reportable, reportRefusal, wireRefusal } from './rules';
 import { SharePanel } from './SharePanel';
 import classes from './workflows.module.css';
+import { nextVersion } from './versions';
 
 /**
  * The page a workflow is built on, and the only place one is edited (#377).
@@ -91,18 +92,7 @@ function useSettled<T>(value: T, delay: number): T {
 
 /** What a version would be refused for, checked a moment after each change. */
 function useCheck(text: string) {
-  const settled = useSettled(text, 400);
-  return useQuery({
-    queryKey: ['workflow-check', settled],
-    queryFn: async () => {
-      const { data } = await apiClient.POST('/api/v1/workflows/check', {
-        body: { content: settled },
-      });
-      return data?.problems ?? [];
-    },
-    staleTime: Infinity,
-    retry: false,
-  });
+  return useQuery(checkQuery(useSettled(text, 400)));
 }
 
 /** The box a selection stands on now, found again after the layout moved. */
@@ -178,7 +168,7 @@ export function Editor({
     token: string | null;
   } | null>(null);
   const [saveError, setSaveError] = useState<ApiError | null>(null);
-  const [version, setVersion] = useState(`v${String(page.versions.length + 1)}`);
+  const [version, setVersion] = useState(nextVersion(page.versions));
   const [versioned, setVersioned] = useState<
     | { kind: 'made'; version: string }
     | { kind: 'refused'; error: ApiError; problems: DefinitionProblem[] }
@@ -280,7 +270,7 @@ export function Editor({
         body: { version: version.trim(), token: saved.token },
       });
       setVersioned({ kind: 'made', version: made.version });
-      setVersion(`v${String(page.versions.length + 2)}`);
+      setVersion(nextVersion([...page.versions, made.version]));
       await queryClient.invalidateQueries({ queryKey: pageKey });
     } catch (caught) {
       const error = toApiError(caught);
@@ -501,15 +491,6 @@ export function Editor({
           {parsed.error}
         </BodyText>
         <CodeEditor label="workflow.yaml" value={text} readOnly language="yaml" />
-      </Card>
-    );
-  if (workflow.legacy)
-    return (
-      <Card>
-        <BodyText>
-          This draft is in the format before 2026-10-07, which the page draws but does
-          not edit. Copy a version of a current workflow, or start a new one.
-        </BodyText>
       </Card>
     );
 

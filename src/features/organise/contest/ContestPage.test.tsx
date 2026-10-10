@@ -149,7 +149,7 @@ describe('the contest page', () => {
         return HttpResponse.json(standings);
       }),
       http.put(`${CONTEST_API}/files/:path`, () =>
-        HttpResponse.json({ version: '9f8e7d6c5b4a39281706' }),
+        HttpResponse.json({ version: '9f8e7d6c5b4a39281706', notes: [] }),
       ),
     );
     renderApp(`${CONTEST}?file=contest.yaml`);

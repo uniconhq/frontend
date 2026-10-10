@@ -138,3 +138,18 @@
 .toggle:hover {
   text-decoration: underline;
 }
+
+/* A submission scored as its row reads it, opened under its grading's row. */
+.scored {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 8px 0 12px;
+}
+
+.scoredHead {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
