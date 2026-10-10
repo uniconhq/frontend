@@ -112,9 +112,9 @@ export const standings: TaskStanding[] = [
     timeline: {
       release_at: '2026-10-01T09:00:00Z',
       due: '2026-10-08T09:00:00Z',
-      late_per_day: 0.1,
+      late_per_day: '0.1',
       closes: '2026-10-15T09:00:00Z',
-      worth: 100,
+      worth: '100',
     },
   },
   {

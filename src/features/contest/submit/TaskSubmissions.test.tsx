@@ -114,8 +114,8 @@ describe('the submit panel', () => {
             id: 'alpha',
             type: 'number',
             label: 'Alpha',
-            min: 0,
-            max: 1,
+            min: '0',
+            max: '1',
             default: 0.5,
           }),
           inputField({ id: 'fast', type: 'boolean', label: 'Fast' }),
@@ -675,7 +675,7 @@ describe('the submissions list', () => {
     });
     const turns = [
       [fresh(grading())],
-      [fresh(grading({ status: 'running' }))],
+      [fresh(grading({ status: 'grading' }))],
       [fresh(accepted)],
     ];
     let asked = 0;
@@ -694,7 +694,7 @@ describe('the submissions list', () => {
     const list = await screen.findByRole('table', { name: 'Your submissions' });
     expect(await within(list).findByText('QUEUED')).toBeVisible();
     await passTime(2_000);
-    expect(await within(list).findByText('RUNNING')).toBeVisible();
+    expect(await within(list).findByText('GRADING')).toBeVisible();
     await passTime(2_000);
     expect(await within(list).findByText('ACCEPTED')).toBeVisible();
     expect(
@@ -714,7 +714,7 @@ describe('the submissions list', () => {
       submitted_at: new Date(Date.now() - 2_000).toISOString(),
     });
     const turns = [
-      [fresh(grading({ status: 'running' }))],
+      [fresh(grading({ status: 'grading' }))],
       [
         fresh(
           grading({
@@ -738,7 +738,7 @@ describe('the submissions list', () => {
     renderApp(PAGE);
 
     const list = await screen.findByRole('table', { name: 'Your submissions' });
-    expect(await within(list).findByText('RUNNING')).toBeVisible();
+    expect(await within(list).findByText('GRADING')).toBeVisible();
     await passTime(2_000);
     expect(await within(list).findByText('CANCELLED')).toBeVisible();
     expect(within(list).getByText('The checker crashed on every test.')).toBeVisible();
@@ -754,11 +754,11 @@ describe('the submissions list', () => {
       withPage({}),
       listing([
         submission(1, accepted),
-        submission(2, grading({ status: 'done', stopped: 'compile_error' })),
-        submission(3, grading({ status: 'done', outcome: 'wrong_answer' }), {
+        submission(2, grading({ status: 'graded', stopped: 'compile_error' })),
+        submission(3, grading({ status: 'graded', outcome: 'wrong_answer' }), {
           late_days: 2,
         }),
-        submission(4, grading({ status: 'running' })),
+        submission(4, grading({ status: 'grading' })),
       ]),
     );
     renderApp(PAGE);
@@ -766,7 +766,7 @@ describe('the submissions list', () => {
     const list = await screen.findByRole('table', { name: 'Your submissions' });
     const rows = within(list).getAllByRole('row').slice(1);
     expect(rows.map((row) => row.textContent)).toEqual([
-      expect.stringMatching(/^#4.*RUNNING$/),
+      expect.stringMatching(/^#4.*GRADING$/),
       expect.stringMatching(/^#3.*2 days lateWRONG ANSWER$/),
       expect.stringMatching(/^#2.*COMPILE ERR$/),
       expect.stringMatching(/^#1.*ACCEPTED$/),
@@ -932,7 +932,7 @@ describe('a submission opened from the list', () => {
 
   it('shows what stopped the run as its verdict, and its log as text, never as markup', async () => {
     const stopped = grading({
-      status: 'done',
+      status: 'graded',
       stopped: 'compile_error',
       values: reported({}, { log: '<img src=x onerror="alert(1)">' }),
     });
