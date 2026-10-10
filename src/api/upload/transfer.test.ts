@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { http, HttpResponse } from 'msw';
 import { isApiError } from '@/api/problem';
 import { server } from '@/test/server';
@@ -68,6 +68,40 @@ describe('a stalled upload', () => {
     const error = await outcome;
     expect(isApiError(error) && error.code).toBe('upload_failed');
     expect(wasCut(error)).toBe(true);
+  });
+
+  it('waits five minutes for the answer once the last byte has gone', async () => {
+    // A request whose body is all sent and whose answer never comes: the
+    // stand-in msw gives says nothing of the body going, so this one does.
+    class Sent {
+      readonly upload: {
+        onprogress?: (event: { loaded: number }) => void;
+        onload?: () => void;
+      } = {};
+      open() {}
+      setRequestHeader() {}
+      abort() {}
+      send(file: File) {
+        queueMicrotask(() => {
+          this.upload.onprogress?.({ loaded: file.size });
+          this.upload.onload?.();
+        });
+      }
+    }
+    vi.stubGlobal('XMLHttpRequest', Sent);
+    try {
+      let settled = false;
+      const outcome = sendToForge(DOOR, new File(['1'], 'main.py'), () => {})
+        .catch((error: unknown) => error)
+        .finally(() => (settled = true));
+      await passTime(299_000);
+      expect(settled).toBe(false);
+      await passTime(1_000);
+
+      expect(wasCut(await outcome)).toBe(true);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });
 
