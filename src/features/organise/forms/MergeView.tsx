@@ -13,7 +13,7 @@ import {
   type Side,
 } from './merge';
 import { localOf, zoneName } from './times';
-import { parseYaml } from './yaml-doc';
+import { exactJS, NumberText, parseYaml } from './yaml-doc';
 import shared from '../organise.module.css';
 import classes from './forms.module.css';
 
@@ -29,6 +29,17 @@ function shown(diff: FieldDiff, value: unknown): string {
   if (diff.kind === 'order') return (value as string[]).join(', ');
   if (typeof value === 'string')
     return value === '' ? '""' : (timeText(value) ?? value);
+  return digitsOf(value);
+}
+
+/** A value as JSON writes it, but each number as the digits the file holds. */
+function digitsOf(value: unknown): string {
+  if (value instanceof NumberText) return value.text;
+  if (Array.isArray(value)) return `[${value.map(digitsOf).join(',')}]`;
+  if (typeof value === 'object' && value !== null)
+    return `{${Object.entries(value)
+      .map(([key, item]) => `${JSON.stringify(key)}:${digitsOf(item)}`)
+      .join(',')}}`;
   return JSON.stringify(value);
 }
 
@@ -101,9 +112,9 @@ export function MergeView({
     'error' in current || 'error' in mine
       ? null
       : differences(
-          'error' in base ? undefined : base.doc.toJS(),
-          mine.doc.toJS(),
-          current.doc.toJS(),
+          'error' in base ? undefined : exactJS(base.doc),
+          exactJS(mine.doc),
+          exactJS(current.doc),
           file,
         );
   const locked = (diff: FieldDiff) => !admin && adminOnly(diff, file);

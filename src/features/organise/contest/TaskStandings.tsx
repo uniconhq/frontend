@@ -63,11 +63,11 @@ function Timeline({ standing }: { standing: TaskStanding }) {
       : `${when(timeline.due)}${
           timeline.late_per_day === null
             ? ''
-            : `, then ${percent(timeline.late_per_day)} off per late day started`
+            : `, then ${percent(Number(timeline.late_per_day))} off per late day started`
         }`;
   const worth =
     timeline.worth !== null
-      ? `${String(timeline.worth)} ${timeline.worth === 1 ? 'point' : 'points'}`
+      ? `${timeline.worth} ${timeline.worth === '1' ? 'point' : 'points'}`
       : state.latest === null
         ? 'Not known until published'
         : 'No points';

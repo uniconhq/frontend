@@ -12,6 +12,7 @@ import {
   valueRefusal,
   wireRefusal,
 } from './rules';
+import { NumberText } from '../forms/yaml-doc';
 
 const CHECKER: PrimitiveInfo = {
   ref: 'unicon/checker-like@v1',
@@ -261,7 +262,9 @@ steps:
     expect(valueRefusal(WORKFLOW, primitives, 0, 'language', 'rust', [])).toBe(
       'Takes one of c, cpp, java, python.',
     );
-    expect(valueRefusal(WORKFLOW, primitives, 1, 'time_limit', 2, [])).toBeNull();
+    expect(
+      valueRefusal(WORKFLOW, primitives, 1, 'time_limit', new NumberText('2'), []),
+    ).toBeNull();
   });
 
   it('refuses switching a step while a wire forbids it', () => {
@@ -362,6 +365,14 @@ report:
     ).toBe('dir must be an enum input the task gives, not the contestant.');
     expect(
       reportRefusal(workflow, primitives, output('run', 'time_ms'), bounded ?? null),
+    ).toBe('Must be at least at_least.');
+    const close = bounded && {
+      ...bounded,
+      atLeast: new NumberText('1.00000000000000000002'),
+      atMost: new NumberText('1.00000000000000000001'),
+    };
+    expect(
+      reportRefusal(workflow, primitives, output('run', 'time_ms'), close ?? null),
     ).toBe('Must be at least at_least.');
   });
 

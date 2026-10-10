@@ -1,4 +1,4 @@
-import { isRecord } from '../forms/yaml-doc';
+import { isRecord, NumberText } from '../forms/yaml-doc';
 
 /**
  * A workflow as the editor reads its `workflow.yaml` (TASK-FORMAT.md section
@@ -37,7 +37,7 @@ export type Ref =
 export type WithValue =
   | { kind: 'wire'; ref: Ref }
   | { kind: 'text'; text: string; refs: Ref[] }
-  | { kind: 'literal'; value: string | number | boolean }
+  | { kind: 'literal'; value: string | NumberText | boolean }
   | { kind: 'invalid'; raw: unknown };
 
 export type InputDecl = {
@@ -71,8 +71,8 @@ export type ReportEntry = {
   better: string | null;
   /** `better` when it is `${{ inputs.<id> }}`. */
   betterRef: Ref | null;
-  atLeast: number | null;
-  atMost: number | null;
+  atLeast: NumberText | null;
+  atMost: NumberText | null;
   /** Written as a bare reference rather than a mapping. */
   short: boolean;
 };
@@ -162,7 +162,9 @@ export function refProblem(text: string): string | null {
 
 /** What a port is given, read from the value in the file. */
 function withValue(raw: unknown, legacy = false): WithValue {
-  if (typeof raw === 'number' || typeof raw === 'boolean')
+  if (typeof raw === 'number')
+    return { kind: 'literal', value: new NumberText(String(raw)) };
+  if (raw instanceof NumberText || typeof raw === 'boolean')
     return { kind: 'literal', value: raw };
   if (typeof raw !== 'string') return { kind: 'invalid', raw };
   const whole = wholeRef(raw, legacy);
@@ -190,8 +192,11 @@ function strings(value: unknown): string[] | null {
     : null;
 }
 
-function number(value: unknown): number | null {
-  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+function number(value: unknown): NumberText | null {
+  if (value instanceof NumberText) return Number.isFinite(value.value) ? value : null;
+  return typeof value === 'number' && Number.isFinite(value)
+    ? new NumberText(String(value))
+    : null;
 }
 
 /** A declaration written short (`time_limit: number`) or as a mapping. */

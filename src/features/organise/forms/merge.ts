@@ -1,6 +1,15 @@
 import { isMap, isSeq, type Node } from 'yaml';
 import { instantOf } from './times';
-import { isRecord, nodeFor, parseYaml, writeAt, writeOver, type Doc } from './yaml-doc';
+import { compareDecimal } from '@/lib/exact';
+import {
+  isRecord,
+  nodeFor,
+  NumberText,
+  parseYaml,
+  writeAt,
+  writeOver,
+  type Doc,
+} from './yaml-doc';
 
 /** An item of a keyed list, named by the value of its key: `tasks[sum]`. */
 type ItemStep = { key: string; value: string };
@@ -64,9 +73,19 @@ function rulesOf(file: string): FileRules {
   return FILE_RULES[file] ?? { keyed: [], adminOnly: [] };
 }
 
-/** Equal as the file means them: two times naming the same moment are one. */
+/**
+ * Equal as the file means them: two times naming the same moment are one,
+ * and two numbers that are the same to the last digit, however spelled.
+ */
 function same(a: unknown, b: unknown): boolean {
   if (a === b) return true;
+  if (a instanceof NumberText || b instanceof NumberText) {
+    const left =
+      a instanceof NumberText ? a.text : typeof a === 'number' ? String(a) : null;
+    const right =
+      b instanceof NumberText ? b.text : typeof b === 'number' ? String(b) : null;
+    return left !== null && right !== null && compareDecimal(left, right) === 0;
+  }
   if (typeof a === 'string' && typeof b === 'string') {
     const at = instantOf(a);
     return at !== null && at === instantOf(b);
@@ -96,6 +115,7 @@ function shapeOf(path: MergePath): string {
 /** An item's key as text, or null when it has none a list could be keyed by. */
 function keyText(value: unknown): string | null {
   if (typeof value === 'string') return value;
+  if (value instanceof NumberText) return value.text;
   if (typeof value === 'number') return String(value);
   return null;
 }
