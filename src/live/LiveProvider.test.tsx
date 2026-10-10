@@ -26,7 +26,11 @@ class FakeSource {
     FakeSource.last = this;
   }
 
-  addEventListener() {}
+  readonly listeners = new Map<string, () => void>();
+
+  addEventListener(kind: string, listener: () => void) {
+    this.listeners.set(kind, listener);
+  }
 
   close() {
     this.readyState = FakeSource.CLOSED;
@@ -39,9 +43,9 @@ function Probe() {
   return <p>{live ? 'open' : refused ? 'refused' : 'down'}</p>;
 }
 
-function renderProvider() {
+function renderProvider(client = new QueryClient()) {
   render(
-    <QueryClientProvider client={new QueryClient()}>
+    <QueryClientProvider client={client}>
       <LiveProvider>
         <Probe />
       </LiveProvider>
@@ -161,6 +165,64 @@ describe('where the live stream stands', () => {
       expect(screen.getByText('refused')).toBeVisible();
       act(() => FakeSource.last?.onopen?.());
       expect(screen.getByText('open')).toBeVisible();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('marks stale, after a moment, the reads each kind of nudge names, and every read on resync', () => {
+    vi.useFakeTimers();
+    try {
+      const client = new QueryClient();
+      const task = '/api/v1/orgs/acme/contests/spring/tasks/sum';
+      const reads = [
+        `${task}/submissions`,
+        `${task}/submissions/{number}`,
+        `${task}/submissions/{number}/files`,
+        `${task}/submissions/{number}/log`,
+        `${task}/organise/gradings`,
+        '/api/v1/orgs/acme/contests/spring/gradings/queue',
+        '/api/v1/orgs/acme/contests/spring/announcements',
+        '/api/v1/orgs/acme/contests/spring/questions',
+        '/api/v1/orgs/acme/contests/spring/organise/clarifications',
+        '/api/v1/me',
+      ];
+      for (const path of reads) client.setQueryData(['get', path], {});
+      const stale = () =>
+        reads.filter((path) => client.getQueryState(['get', path])?.isInvalidated);
+      renderProvider(client);
+      const source = FakeSource.last;
+      act(() => source?.onopen?.());
+
+      act(() => source?.listeners.get('grading')?.());
+      expect(stale()).toEqual([]);
+      act(() => {
+        vi.advanceTimersByTime(300);
+      });
+      expect(stale()).toEqual([
+        `${task}/submissions`,
+        `${task}/submissions/{number}`,
+        `${task}/organise/gradings`,
+        '/api/v1/orgs/acme/contests/spring/gradings/queue',
+      ]);
+
+      act(() => {
+        source?.listeners.get('announcement')?.();
+        source?.listeners.get('clarification')?.();
+        vi.advanceTimersByTime(300);
+      });
+      expect(stale()).toEqual([
+        `${task}/submissions`,
+        `${task}/submissions/{number}`,
+        `${task}/organise/gradings`,
+        '/api/v1/orgs/acme/contests/spring/gradings/queue',
+        '/api/v1/orgs/acme/contests/spring/announcements',
+        '/api/v1/orgs/acme/contests/spring/questions',
+        '/api/v1/orgs/acme/contests/spring/organise/clarifications',
+      ]);
+
+      act(() => source?.listeners.get('resync')?.());
+      expect(stale()).toEqual(reads);
     } finally {
       vi.useRealTimers();
     }
