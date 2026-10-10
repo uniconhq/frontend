@@ -6,9 +6,7 @@ import { isRecord, NumberText } from '../forms/yaml-doc';
  * order with what each port is given, and what a run reports. The reading is
  * forgiving, since the page draws a draft with problems as well as a good
  * one: a key of the wrong shape is skipped and the check says why, never the
- * reader. A version in the format before 2026-10-07 (`foreach`, a list of
- * inputs, `outputs`) is read into the same shape, so it can be drawn; it is
- * never edited, and `legacy` says so.
+ * reader.
  */
 
 export type ValueType = 'text' | 'number' | 'boolean' | 'enum' | 'file' | 'folder';
@@ -82,25 +80,17 @@ export type Workflow = {
   test: FieldDecl[];
   steps: Step[];
   report: ReportEntry[];
-  legacy: boolean;
 };
 
 const WHOLE = /^\s*\$\{\{\s*([^{}]*?)\s*\}\}\s*$/;
 const ANY = /\$\{\{\s*([^{}]*?)\s*\}\}/g;
 
 /** The reference inside `${{ ... }}`, or null when it is not one. */
-function parseRef(expression: string, legacy = false): Ref | null {
+function parseRef(expression: string): Ref | null {
   const parts = expression.split('.');
   const [head, name, output] = parts;
-  if (
-    head === 'inputs' &&
-    name &&
-    (parts.length === 2 || (legacy && parts.length === 3))
-  )
-    return { kind: 'inputs', name };
+  if (head === 'inputs' && name && parts.length === 2) return { kind: 'inputs', name };
   if (head === 'test' && name && parts.length === 2) return { kind: 'test', name };
-  if (legacy && head === 'item' && name && parts.length === 2)
-    return { kind: 'test', name };
   if (head === 'steps' && name && output && parts.length === 3)
     return { kind: 'steps', name, output };
   return null;
@@ -127,16 +117,16 @@ export function sameRef(a: Ref, b: Ref): boolean {
 }
 
 /** The one reference `text` is exactly, or null when it is anything else. */
-export function wholeRef(text: string, legacy = false): Ref | null {
+export function wholeRef(text: string): Ref | null {
   const found = WHOLE.exec(text);
-  return found?.[1] !== undefined ? parseRef(found[1], legacy) : null;
+  return found?.[1] !== undefined ? parseRef(found[1]) : null;
 }
 
 /** Every reference written into `text`, or null when a `${{ }}` is not one. */
-export function refsIn(text: string, legacy = false): Ref[] | null {
+export function refsIn(text: string): Ref[] | null {
   const found: Ref[] = [];
   for (const match of text.matchAll(ANY)) {
-    const ref = parseRef(match[1] ?? '', legacy);
+    const ref = parseRef(match[1] ?? '');
     if (ref === null) return null;
     found.push(ref);
   }
@@ -161,15 +151,15 @@ export function refProblem(text: string): string | null {
 }
 
 /** What a port is given, read from the value in the file. */
-function withValue(raw: unknown, legacy = false): WithValue {
+function withValue(raw: unknown): WithValue {
   if (typeof raw === 'number')
     return { kind: 'literal', value: new NumberText(String(raw)) };
   if (raw instanceof NumberText || typeof raw === 'boolean')
     return { kind: 'literal', value: raw };
   if (typeof raw !== 'string') return { kind: 'invalid', raw };
-  const whole = wholeRef(raw, legacy);
+  const whole = wholeRef(raw);
   if (whole !== null) return { kind: 'wire', ref: whole };
-  const refs = refsIn(raw, legacy);
+  const refs = refsIn(raw);
   if (refs === null) return { kind: 'invalid', raw };
   if (refs.length === 0) return { kind: 'literal', value: raw };
   return { kind: 'text', text: raw, refs };
@@ -227,11 +217,11 @@ function fieldOf(name: string, raw: unknown): FieldDecl {
   };
 }
 
-function entryOf(name: string, raw: unknown, legacy: boolean): ReportEntry {
+function entryOf(name: string, raw: unknown): ReportEntry {
   if (typeof raw === 'string') {
     return {
       name,
-      from: wholeRef(raw, legacy),
+      from: wholeRef(raw),
       fold: null,
       better: null,
       betterRef: null,
@@ -260,88 +250,30 @@ function entryOf(name: string, raw: unknown, legacy: boolean): ReportEntry {
  * kept with an empty id, so every step stands at its own place in `steps:`
  * and an edit or a problem at `steps[n]` lands on the box drawn for it.
  */
-function stepOf(raw: unknown, legacy: boolean): Step {
+function stepOf(raw: unknown): Step {
   if (!isRecord(raw)) return { id: '', use: '', perTest: false, with: {} };
   const id = text(raw.id) ?? '';
   const given = isRecord(raw.with) ? raw.with : {};
   return {
     id,
     use: text(raw.use) ?? '',
-    perTest: raw.per_test === true || (legacy && raw.foreach !== undefined),
+    perTest: raw.per_test === true,
     with: Object.fromEntries(
-      Object.entries(given).map(([port, value]) => [port, withValue(value, legacy)]),
+      Object.entries(given).map(([port, value]) => [port, withValue(value)]),
     ),
   };
-}
-
-/** Whether the file is in the format before 2026-10-07. */
-function isLegacy(file: Record<string, unknown>): boolean {
-  return (
-    Array.isArray(file.inputs) ||
-    file.outputs !== undefined ||
-    (Array.isArray(file.steps) &&
-      file.steps.some((step) => isRecord(step) && step.foreach !== undefined))
-  );
-}
-
-/** Every leaf of an old `outputs` block that is a reference, by its last key. */
-function legacyReport(outputs: unknown): ReportEntry[] {
-  const found: ReportEntry[] = [];
-  const walk = (value: unknown, key: string) => {
-    if (typeof value === 'string') {
-      if (key !== 'outcome' && !found.some((entry) => entry.name === key))
-        found.push(entryOf(key, value, true));
-      return;
-    }
-    if (isRecord(value))
-      for (const [inner, held] of Object.entries(value)) walk(held, inner);
-  };
-  walk(outputs, '');
-  return found;
-}
-
-/** The fields an old workflow's steps read from each test, `item.<field>`. */
-function legacyFields(steps: Step[]): FieldDecl[] {
-  const names: string[] = [];
-  for (const step of steps)
-    for (const value of Object.values(step.with))
-      for (const ref of refsOf(value))
-        if (ref.kind === 'test' && !names.includes(ref.name)) names.push(ref.name);
-  return names.map((name) => ({ name, type: 'file', options: null, public: false }));
 }
 
 /** The workflow a parsed `workflow.yaml` holds, as far as it can be read. */
 export function readWorkflow(file: unknown): Workflow {
   const top = isRecord(file) ? file : {};
-  const legacy = isLegacy(top);
-  const steps = (Array.isArray(top.steps) ? top.steps : []).map((raw) =>
-    stepOf(raw, legacy),
-  );
-  if (legacy) {
-    const inputs = (Array.isArray(top.inputs) ? top.inputs : [])
-      .filter(isRecord)
-      .map((raw) => {
-        const id = text(raw.id) ?? '';
-        const type = text(raw.type) === 'code' ? 'file' : (text(raw.type) ?? '');
-        return inputOf(id, { type: type === 'file[]' ? 'folder' : type });
-      })
-      .filter((input) => input.id !== '');
-    return {
-      inputs,
-      test: legacyFields(steps),
-      steps,
-      report: legacyReport(top.outputs),
-      legacy,
-    };
-  }
   const inputs = isRecord(top.inputs) ? top.inputs : {};
   const test = isRecord(top.test) ? top.test : {};
   const report = isRecord(top.report) ? top.report : {};
   return {
     inputs: Object.entries(inputs).map(([id, raw]) => inputOf(id, raw)),
     test: Object.entries(test).map(([name, raw]) => fieldOf(name, raw)),
-    steps,
-    report: Object.entries(report).map(([name, raw]) => entryOf(name, raw, false)),
-    legacy,
+    steps: (Array.isArray(top.steps) ? top.steps : []).map(stepOf),
+    report: Object.entries(report).map(([name, raw]) => entryOf(name, raw)),
   };
 }

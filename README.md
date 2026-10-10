@@ -234,7 +234,9 @@ again (`regrades`), or to keep it as a draft; every other refusal shows its own 
 what it names. A save that publishes says what changed in grading, how many
 submissions it queued to be graded again (`regraded`), and lists the notes
 the forge makes of the task beside publishing, such as the steps it seals
-until the reveal; every save path ends in this one answer (`SaveOutcome`).
+until the reveal. A write of the contest's settings lists, beside its
+version, the notes its boards report, such as a board that counts nothing
+from a task. Every save path ends in this one answer (`SaveOutcome`).
 
 The editor is CodeMirror, wrapped in `src/ui/CodeEditor.tsx`: line numbers,
 undo, search and bracket matching, YAML highlighted in a `.yaml` or `.yml`
@@ -353,7 +355,12 @@ attempts opening below it: the attempt, the publication it graded against,
 the status with the reason a system error gave and the sentence a cancel
 told the contestant, what a
 finished run came to, its log, and when it was queued, started and finished.
-Above it are how many gradings wait, queued and waiting for a machine, and
+A submission's Scored view opens under it the submission as its row reads it
+with everything filled in (`GET <task>/organise/submissions/{number}`, the
+row by its `user_id` or `team`): the contestant's own payload, drawn by the
+same `ui/scored/ScoredResult` the contestant's page draws it with, every
+group's outcome, tests and points shown, each saying when its row sees it,
+and the grading's own status. Above it are how many gradings wait, queued and waiting for a machine, and
 filters by task, status, team and a contestant's username, kept in the
 address so a link or a reload keeps them; a username applies once sent and
 finds the user's own submissions and their team's, by the team they were in
@@ -416,8 +423,10 @@ own, which the proxy sends here beside `/orgs`.
 **The editor is the only place a workflow is edited** (PROPOSAL.md section
 12, #377). `features/organise/workflows/` holds it. `model.ts` reads
 `workflow.yaml` into steps, inputs, test fields and report, forgiving a draft
-with problems, and reads a version in the format before 2026-10-07 into the
-same shape so it can be drawn. `layout.ts` works out where everything stands
+with problems. A version is drawn only once the forge's check of its file
+passes: one the forge refuses to serve, one that does not parse, and one the
+check refuses, as it refuses the format before 2026-10-07, open one state,
+"This version cannot be opened", with the forge's reason. `layout.ts` works out where everything stands
 from the file alone, and nothing of it is stored: a once step one column right
 of the furthest once step it reads, per-test steps the same in a shaded band
 after them, the report last; inputs and test fields grouped by exactly the
@@ -471,12 +480,15 @@ test fields and report entries, each declaration offering only the keys the
 format allows it; or, with nothing selected, the palette of primitives with
 their ports. Who reads the workflow is set beside the versions: private,
 shared with the people listed, or public; combine sits below, the
-workflow's latest version chosen to start with. A version is made of the
-save the page made, with its token, or not at all. A wire the layout cannot
+workflow's latest version chosen to start with. A version is named `v` and
+a whole number, and the field offers the number after the highest
+(`versions.ts`); any other name is refused in the forge's words. A version
+is made of the save the page made, with its token, or not at all. A wire the layout cannot
 draw, such as a once step reading a per-test one in a draft, is shown on
 its port as text, and a step with no id keeps its place.
 
-A task whose workflow has a newer version than the one it names says so on
+A task whose workflow has a version with a larger number than the one it
+names says so on
 its settings form, with a button that names the newer one in the field;
 nothing changes until the task is saved.
 
@@ -577,7 +589,9 @@ reader names it by the input's label, and the folder picker as
 Submit runs in this order, in `src/features/contest/submit/use-submit.ts`:
 
 1. The browser's own checks: every input filled, an option chosen, a number
-   in range, and the files of each input together against its `max_size`.
+   written as plain decimal digits and in range, its bounds compared digit
+   for digit, and the files of each input together against its `max_size`.
+   A number is sent as the digits it was typed as, never a JSON number.
    A file too large is caught here, before any upload starts.
 2. For each file, a slot (`POST .../uploads`) naming the input and the
    file's path under it, the bytes straight to the store,
@@ -695,7 +709,8 @@ src/
   theme/     the design handoff's tokens, the fonts, the CSS variables
   ui/        shell (header, sidebar, breadcrumb, account menu), feedback, brand,
              the wrappers: buttons, fields, the file drop zone, verdicts, and
-             the parts of announcements and questions both sides show
+             the parts of announcements, questions and a scored result both
+             sides show
   features/  home (landing, the contest lists, your invites), auth (login page), account
              (profile, sessions), contest (the contestant pages, with submit/
              for the submit panel and the submissions), organise (the

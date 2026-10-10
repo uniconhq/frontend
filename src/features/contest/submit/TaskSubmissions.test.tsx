@@ -116,7 +116,7 @@ describe('the submit panel', () => {
             label: 'Alpha',
             min: '0',
             max: '1',
-            default: 0.5,
+            default: '0.5',
           }),
           inputField({ id: 'fast', type: 'boolean', label: 'Fast' }),
         ],

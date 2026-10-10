@@ -1,5 +1,5 @@
 import { $api, queryView } from '@/api/query';
-import type { GradingResult, GroupShown } from '@/api/types';
+import type { GradingResult } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { PageLink } from '@/ui/PageLink';
 import { TextLink } from '@/ui/TextLink';
@@ -7,105 +7,16 @@ import { SectionTitle } from '@/ui/SectionTitle';
 import { VerdictBadge } from '@/ui/VerdictBadge';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
-import { formatExact } from '@/lib/exact';
+import { ScoredResult } from '@/ui/scored/ScoredResult';
 import { formatDateTime } from '@/lib/time';
 import { downloadHref, nameOf } from './download';
 import { useLiveConnected, useLiveRefused } from '@/live';
 import { serverNow } from '@/lib/time';
-import {
-  cancelReason,
-  lateness,
-  pointsText,
-  pollEvery,
-  valueText,
-  verdictOf,
-} from './grading';
-import { FoldedValues, OnceValues } from './Results';
+import { cancelReason, lateness, pollEvery, verdictOf } from './grading';
 import shared from '../contest.module.css';
 import classes from './submit.module.css';
 
 type Where = { org: string; contest: string; task: string; number: number };
-
-/**
- * One row per test of a group, with its own outcome and each value its steps
- * reported for it, such as its time and memory, a column per value.
- */
-function Tests({ group }: { group: GroupShown }) {
-  const rows = group.tests ?? [];
-  if (rows.length === 0) return null;
-  const names = [
-    ...new Set(
-      rows.flatMap((row) => [
-        ...Object.keys(row.values.numbers),
-        ...Object.keys(row.values.texts),
-      ]),
-    ),
-  ];
-  return (
-    <table className={classes.table} aria-label={`Tests ${group.group}`}>
-      <thead>
-        <tr>
-          <th scope="col">Test</th>
-          <th scope="col">Outcome</th>
-          {names.map((name) => (
-            <th key={name} scope="col">
-              {name}
-            </th>
-          ))}
-        </tr>
-      </thead>
-      <tbody>
-        {rows.map((row) => (
-          <tr key={row.test}>
-            <th scope="row" className={classes.mono}>
-              {row.test}
-            </th>
-            <td>
-              <VerdictBadge verdict={row.outcome} />
-            </td>
-            {names.map((name) => (
-              <td key={name}>{valueText(row.values, name) ?? '—'}</td>
-            ))}
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  );
-}
-
-/**
- * One test group as the task shows it now: its outcome once its verdict is
- * shown, its tests once they are, and when the rest is shown while some is
- * held back. The route leaves out what the task withholds, so what is
- * missing is simply not shown, with nothing in its place. A group that did
- * not run on this grading says so where its outcome would be.
- */
-function Group({ group }: { group: GroupShown }) {
-  const points = pointsText(group);
-  return (
-    <section className={shared.stack} aria-label={`Group ${group.group}`}>
-      <div className={classes.verdict}>
-        <span className={classes.group}>{group.group}</span>
-        {!group.ran ? (
-          <BodyText tone="secondary">Not run on this grading</BodyText>
-        ) : (
-          group.outcome !== null && <VerdictBadge verdict={group.outcome} />
-        )}
-        {points !== null && (
-          <BodyText tone="secondary" mono>
-            {points} points
-          </BodyText>
-        )}
-      </div>
-      {group.shown_at !== null && (
-        <BodyText tone="secondary">
-          Shown at {formatDateTime(new Date(group.shown_at))}
-        </BodyText>
-      )}
-      <Tests group={group} />
-    </section>
-  );
-}
 
 /**
  * What the grading holds for the contestant: its verdict, what the run
@@ -143,21 +54,7 @@ function Grading({ grading }: { grading: GradingResult }) {
           <BodyText tone="secondary">Attempt {grading.attempt}</BodyText>
         )}
       </div>
-      {grading.points !== null && (
-        <BodyText>
-          {formatExact(grading.points.shown, 2)} points
-          {grading.points.pending_until !== null &&
-            `, and up to ${formatExact(grading.points.pending, 2)} more shown at ${formatDateTime(new Date(grading.points.pending_until))}`}
-          {grading.factor !== null &&
-            grading.factor !== '1' &&
-            `, at ${formatExact(grading.factor, 4)} for lateness`}
-        </BodyText>
-      )}
-      <OnceValues values={grading.values} />
-      <FoldedValues folded={grading.folded} />
-      {grading.groups.map((group) => (
-        <Group key={group.group} group={group} />
-      ))}
+      <ScoredResult grading={grading} />
     </>
   );
 }

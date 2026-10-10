@@ -6,6 +6,7 @@ import { TextLink } from '@/ui/TextLink';
 import { formatDateTime } from '@/lib/time';
 import { taskPath } from '@/lib/organiser-paths';
 import { STATUS, bySubmission, logHref, nameOf, resultOf, submitterOf } from './feed';
+import { ScoredView } from './ScoredView';
 import classes from './feed.module.css';
 
 type ContestPath = { org: string; contest: string };
@@ -118,6 +119,7 @@ function AttemptRow({
   head,
   showTask,
   earlier,
+  scored,
   actions,
 }: {
   path: ContestPath;
@@ -125,6 +127,7 @@ function AttemptRow({
   head: boolean;
   showTask: boolean;
   earlier?: { count: number; shown: boolean; toggle: () => void };
+  scored?: { shown: boolean; toggle: () => void };
   actions: RowActions | null;
 }) {
   const { grading } = entry;
@@ -157,6 +160,17 @@ function AttemptRow({
                 onClick={earlier.toggle}
               >
                 {earlier.shown ? 'Hide' : 'Show'} earlier attempts ({earlier.count})
+              </button>
+            )}
+            {scored !== undefined && (
+              <button
+                type="button"
+                className={classes.toggle}
+                aria-expanded={scored.shown}
+                aria-label={`Scored view of submission ${String(grading.submission_number)}`}
+                onClick={scored.toggle}
+              >
+                {scored.shown ? 'Hide the scored view' : 'Scored view'}
               </button>
             )}
           </>
@@ -193,8 +207,12 @@ function Submission({
   actions: RowActions | null;
 }) {
   const [shown, setShown] = useState(false);
+  const [scored, setScored] = useState(false);
   const [head, ...earlier] = attempts;
   if (head === undefined) return null;
+  const task = head.task;
+  const row = head.by.user_id !== null || head.by.team !== null;
+  const columns = (showTask ? 6 : 5) + (actions !== null ? 1 : 0);
   return (
     <tbody aria-label={nameOf(head).replace(/, attempt \d+$/, '')}>
       <AttemptRow
@@ -203,8 +221,20 @@ function Submission({
         head
         showTask={showTask}
         earlier={{ count: earlier.length, shown, toggle: () => setShown(!shown) }}
+        scored={
+          task !== null && row
+            ? { shown: scored, toggle: () => setScored(!scored) }
+            : undefined
+        }
         actions={actions}
       />
+      {scored && task !== null && (
+        <tr>
+          <td colSpan={columns}>
+            <ScoredView path={path} task={task} entry={head} />
+          </td>
+        </tr>
+      )}
       {shown &&
         earlier.map((entry) => (
           <AttemptRow
