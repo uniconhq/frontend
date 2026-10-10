@@ -7,12 +7,13 @@ import {
   type YAMLSeq,
 } from 'yaml';
 import {
+  exactJS,
   nodeFor,
   parseYaml,
-  quoteForPython,
   writeAt,
   writeOver,
   writeYaml,
+  type NumberText,
 } from '../forms/yaml-doc';
 import { readWorkflow, refText, type Ref, type Workflow } from './model';
 import type { PrimitiveInfo } from './primitives';
@@ -43,7 +44,7 @@ function edited(text: string, edit: Edit): string {
 /** The workflow `text` holds now. */
 export function workflowOf(text: string): Workflow {
   const parsed = parseYaml(text);
-  return readWorkflow('error' in parsed ? null : parsed.doc.toJS());
+  return readWorkflow('error' in parsed ? null : exactJS(parsed.doc));
 }
 
 /** The top-level mapping or list `key`, made in the format's place when missing. */
@@ -135,7 +136,6 @@ function rewriteStrings(doc: Document, change: (text: string) => string): void {
       for (const pair of node.items) {
         if (isScalar(pair.value) && typeof pair.value.value === 'string') {
           pair.value.value = change(pair.value.value);
-          quoteForPython(pair.value);
         } else visit(pair.value);
       }
     }
@@ -146,7 +146,6 @@ function rewriteStrings(doc: Document, change: (text: string) => string): void {
     for (const pair of report.items) {
       if (isScalar(pair.value) && typeof pair.value.value === 'string') {
         pair.value.value = change(pair.value.value);
-        quoteForPython(pair.value);
       } else visit(pair.value);
     }
   }
@@ -313,7 +312,7 @@ export function setValue(
   text: string,
   index: number,
   port: string,
-  value: string | number | boolean,
+  value: string | NumberText | boolean,
 ): string {
   return edited(text, (doc) => {
     const node = stepNode(doc, index);
@@ -363,10 +362,7 @@ function renameKey(doc: Document, section: string, from: string, to: string): vo
   const map: unknown = (doc.contents as YAMLMap).get(section, true);
   if (!isMap(map)) return;
   for (const pair of map.items)
-    if (isScalar(pair.key) && pair.key.value === from) {
-      pair.key.value = to;
-      quoteForPython(pair.key);
-    }
+    if (isScalar(pair.key) && pair.key.value === from) pair.key.value = to;
 }
 
 /** An input renamed, every reference to it following. */
@@ -407,8 +403,8 @@ export type EntryFields = {
   from: Ref;
   fold?: string | null;
   better?: string | null;
-  at_least?: number | null;
-  at_most?: number | null;
+  at_least?: NumberText | null;
+  at_most?: NumberText | null;
 };
 
 /** A report entry written, in the short form when it only reads an output. */

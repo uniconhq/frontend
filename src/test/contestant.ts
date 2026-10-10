@@ -191,7 +191,7 @@ export function graded(
  * giving the samples nothing and main 100.
  */
 export const accepted = grading({
-  status: 'done',
+  status: 'graded',
   outcome: 'accepted',
   values: reported({}, { log: 'Compiled cleanly.' }),
   points: { shown: '100', pending: '0', pending_until: null },

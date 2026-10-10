@@ -229,8 +229,8 @@ reads a file once and saves with the token it was read at, so a background
 refetch never swaps the token under someone's text. From Save until the file
 has been read again the text is read-only, and the answer takes the focus. A
 `conflict` keeps the text and offers to reload; `confirmation_required` offers
-to publish the same save confirmed, which grades every submission to the task
-again, or to keep it as a draft; every other refusal shows its own detail and
+to publish the same save confirmed, saying how many submissions it grades
+again (`regrades`), or to keep it as a draft; every other refusal shows its own detail and
 what it names. A save that publishes says what changed in grading, how many
 submissions it queued to be graded again (`regraded`), and lists the notes
 the forge makes of the task beside publishing, such as the steps it seals
@@ -448,9 +448,14 @@ moves the fewest steps to keep every step after what it reads, and a step
 switched between once and per test moves to keep the once steps first. Undo
 and redo step through the page's own history.
 
-Every definition file is read and written as the forge reads it, PyYAML's
-YAML 1.1 (`forms/yaml-doc.ts`): text that would read there as true, false or
-a number, such as `on`, `yes` or `1_000`, is written quoted.
+Every definition file is read and written as the forge reads it, YAML 1.2's
+core schema whatever `%YAML` line it carries (`forms/yaml-doc.ts`): `on`,
+`yes`, `no` and `1_000` are text and written plain, and only text that 1.2
+reads as something else, such as `true` or `12`, is written quoted. A number
+keeps the digits it is written with: a form's number field reads and writes
+them (`NumberText`), the workflow editor reads its bounds and values that way
+(`exactJS`), the merge view compares numbers digit for digit, and an edit to
+the last of thirty digits is an edit.
 
 A moment after each change the definition goes to `POST /workflows/check`
 (a check that did not run says so, never that it passed), and each problem
@@ -616,8 +621,10 @@ for its first half minute, every five to two minutes, every fifteen after,
 and every minute when nothing is being graded. A verdict is where the
 grading stands until it is done, then what stopped the run when something
 did, such as a compile error, else the outcome over the test groups the task
-shows now, and `GRADED` when it shows none yet. A run that failed on the
-platform's side is served as running until staff end it; then it reads
+shows now, and `GRADED` when it shows none yet. A contestant is served a
+submission's state in the format's words, `queued`, `grading`, `graded` or
+`cancelled`; a run that failed on the platform's side is served as `grading`
+until staff end it; then it reads
 `CANCELLED` with the sentence they gave, and is no longer read again.
 `src/ui/VerdictBadge.tsx` has a label for every outcome and status and puts
 each in one of the handoff's six colour pairs; an outcome it does not know

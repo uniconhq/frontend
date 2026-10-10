@@ -17,7 +17,7 @@ import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
 import { useMe } from '@/session';
 import { WORKFLOWS_PATH, workflowPath } from '@/lib/organiser-paths';
 import { useWorkflowParams } from '@/lib/route-params';
-import { parseYaml } from '../forms/yaml-doc';
+import { exactJS, parseYaml } from '../forms/yaml-doc';
 import { workflowOwners } from '../roles';
 import { Combine } from './Combine';
 import { Editor } from './Editor';
@@ -176,7 +176,7 @@ function Drawn({ text, primitives }: { text: string; primitives: Primitive[] }) 
   const map = useMemo(() => byRef(primitives), [primitives]);
   const parsed = useMemo(() => parseYaml(text), [text]);
   const workflow = useMemo(
-    () => readWorkflow('error' in parsed ? null : parsed.doc.toJS()),
+    () => readWorkflow('error' in parsed ? null : exactJS(parsed.doc)),
     [parsed],
   );
   const layout = useMemo(() => layoutWorkflow(workflow, map), [workflow, map]);

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { $api, queryView } from '@/api/query';
-import type { Holder, Publication } from '@/api/types';
+import type { FileChange, Publication } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
 import { CodeEditor, type CodeLanguage } from '@/ui/CodeEditor';
@@ -11,7 +11,6 @@ import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
 import { formatDateTime } from '@/lib/time';
 import { useMe } from '@/session';
 import { holdsAt } from '../roles';
-import { useHolders } from '../people/holders';
 import type { Place } from './place';
 import { UploadedFile } from './UploadedFile';
 import shared from '../organise.module.css';
@@ -25,15 +24,15 @@ function short(version: string): string {
 }
 
 /**
- * Who made a change, by the username of someone holding a role at the task.
- * A change by someone who holds none here any more shows their account
- * number, and one whose author the forge could not match to an account says
- * so.
+ * Who made a change, by the username the history names them by, whether or
+ * not they still hold a role at the task. One whose account the forge no
+ * longer knows shows its number, and one whose author the forge could not
+ * match to an account says so.
  */
-function authorName(authorId: number | null, holders: Holder[] | undefined): string {
-  if (authorId === null) return 'an unknown author';
-  const holder = holders?.find((each) => each.user.id === authorId);
-  return holder === undefined ? `account ${String(authorId)}` : holder.user.username;
+function authorName(change: FileChange): string {
+  if (change.author !== null) return change.author;
+  if (change.author_id === null) return 'an unknown author';
+  return `account ${String(change.author_id)}`;
 }
 
 /**
@@ -116,7 +115,6 @@ function Versions({
     '/api/v1/orgs/{org}/contests/{contest}/tasks/{task}/publications',
     { params: { path: where } },
   );
-  const holders = useHolders(place, { enabled: true });
   const [viewing, setViewing] = useState<string | null>(null);
   const [rolling, setRolling] = useState<string | null>(null);
 
@@ -152,8 +150,7 @@ function Versions({
                 <code>{label}</code> {change.message}
               </BodyText>
               <BodyText tone="secondary">
-                {authorName(change.author_id, holders.data)} ·{' '}
-                {formatDateTime(new Date(change.at))}
+                {authorName(change)} · {formatDateTime(new Date(change.at))}
                 {change.version === current && ' · the file as it is now'}
               </BodyText>
               {(byVersion.get(change.version) ?? []).map((publication) => (

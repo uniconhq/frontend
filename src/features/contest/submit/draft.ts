@@ -120,8 +120,10 @@ function problemOf(input: InputField, entry: Entry): string | null {
   if (trimmed === '') return 'Give a number.';
   const value = Number(trimmed);
   if (!Number.isFinite(value)) return 'Must be a number.';
-  if (input.min !== null && value < input.min) return `Must be at least ${input.min}.`;
-  if (input.max !== null && value > input.max) return `Must be at most ${input.max}.`;
+  if (input.min !== null && value < Number(input.min))
+    return `Must be at least ${input.min}.`;
+  if (input.max !== null && value > Number(input.max))
+    return `Must be at most ${input.max}.`;
   return null;
 }
 

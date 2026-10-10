@@ -83,7 +83,7 @@ async function stubOrganiserApi(page: Page) {
             due: null,
             late_per_day: null,
             closes: '2026-10-01T14:00:00Z',
-            worth: 100,
+            worth: '100',
           },
         },
       ]);

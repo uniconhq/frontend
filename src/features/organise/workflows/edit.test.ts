@@ -17,6 +17,7 @@ import {
   wire,
   workflowOf,
 } from './edit';
+import { NumberText } from '../forms/yaml-doc';
 
 const [, compile, , diff, , run] = PRIMITIVES;
 
@@ -50,7 +51,7 @@ const ids = (text: string) => workflowOf(text).steps.map((step) => step.id);
 
 describe('editing the file in place', () => {
   it('keeps every comment through an edit elsewhere', () => {
-    const after = setValue(COMMENTED, 1, 'memory_limit', 512);
+    const after = setValue(COMMENTED, 1, 'memory_limit', new NumberText('512'));
 
     expect(after).toContain('# A workflow with its notes kept.');
     expect(after).toContain('# what they send');
@@ -65,7 +66,7 @@ describe('editing the file in place', () => {
       'memory_limit: 256 # megabytes',
     );
 
-    expect(setValue(commented, 1, 'memory_limit', 512)).toContain(
+    expect(setValue(commented, 1, 'memory_limit', new NumberText('512'))).toContain(
       'memory_limit: 512 # megabytes',
     );
   });
@@ -94,7 +95,7 @@ describe('editing the file in place', () => {
     expect(renameStep(text, 1, 'c')).toContain('id: c');
   });
 
-  it('quotes a name the forge would read as a date, as a key and as an id', () => {
+  it('writes a name that looks like a date plain, as a key and as an id', () => {
     const renamed = renameInput(
       renameStep(COMMENTED, 0, '2024-01-01'),
       'time_limit',
@@ -102,30 +103,34 @@ describe('editing the file in place', () => {
     );
     const added = setInput(renamed, '2024-01-03', { type: 'number' });
 
-    expect(added).toContain('id: "2024-01-01"');
-    expect(added).toContain('"2024-01-02": number');
-    expect(added).toContain('"2024-01-03": number');
+    expect(added).toContain('id: 2024-01-01');
+    expect(added).toContain('2024-01-02: number');
+    expect(added).toContain('2024-01-03: number');
     expect(added).toContain('${{ inputs.2024-01-02 }}');
   });
 
-  it('quotes text the forge would read as a date', () => {
+  it('writes text that looks like a date plain', () => {
     const text = setValue(COMMENTED, 1, 'args', '2026-10-09');
 
-    expect(text).toContain('args: "2026-10-09"');
+    expect(workflowOf(text).steps[1]?.with.args).toEqual({
+      kind: 'literal',
+      value: '2026-10-09',
+    });
     expect(
       setInput(text, 'when', { type: 'enum', options: ['2026-10-09', 'later'] }),
-    ).toContain('when: {type: enum, options: ["2026-10-09", later]}');
+    ).toContain('when: {type: enum, options: [2026-10-09, later]}');
   });
 
-  it('quotes text the forge would read as true, false or a number', () => {
+  it('writes yes, no and on plain, and quotes what 1.2 reads as true, false or a number', () => {
     let text = setValue(COMMENTED, 1, 'args', 'on');
     text = setInput(text, 'mode', {
       type: 'enum',
-      options: ['yes', 'no', 'y', '1_000'],
+      options: ['yes', 'no', 'true', '1_000', '12'],
     });
 
-    expect(text).toContain('args: "on"');
-    expect(text).toContain('mode: {type: enum, options: ["yes", "no", y, "1_000"]}');
+    expect(text).toContain(
+      'mode: {type: enum, options: [yes, no, "true", 1_000, "12"]}',
+    );
     expect(workflowOf(text).steps[1]?.with.args).toEqual({
       kind: 'literal',
       value: 'on',
@@ -133,12 +138,31 @@ describe('editing the file in place', () => {
     const plain = [
       'test: {a: file}',
       'steps:',
-      '  - {id: s, use: u, with: {x: on, y: y}}',
+      '  - {id: s, use: u, with: {x: on, y: true, z: 0.123456789012345678901234567891}}',
     ];
     expect(workflowOf(plain.join('\n')).steps[0]?.with).toEqual({
-      x: { kind: 'literal', value: true },
-      y: { kind: 'literal', value: 'y' },
+      x: { kind: 'literal', value: 'on' },
+      y: { kind: 'literal', value: true },
+      z: { kind: 'literal', value: new NumberText('0.123456789012345678901234567891') },
     });
+  });
+
+  it('keeps a bound of thirty digits as written through an edit of the entry', () => {
+    const digits = '-12345678901234.5678901234567891';
+    const bounded = setEntry(COMMENTED, 'time', {
+      from: { kind: 'steps', name: 'run', output: 'time_ms' },
+      at_least: new NumberText(digits),
+    });
+    const entry = workflowOf(bounded).report.find((found) => found.name === 'time');
+
+    expect(bounded).toContain(`at_least: ${digits}`);
+    expect(entry?.atLeast?.text).toBe(digits);
+    const folded = setEntry(bounded, 'time', {
+      from: { kind: 'steps', name: 'run', output: 'time_ms' },
+      fold: 'max',
+      at_least: entry?.atLeast ?? null,
+    });
+    expect(folded).toContain(`at_least: ${digits}, fold: max`);
   });
 
   it('writes the first port of a new step as a block', () => {
@@ -276,7 +300,7 @@ describe('editing the file in place', () => {
       from: { kind: 'steps', name: 'run', output: 'time_ms' },
       fold: 'max',
       better: 'lower',
-      at_least: 0,
+      at_least: new NumberText('0'),
     });
 
     expect(short).toContain('time: ${{ steps.run.time_ms }}');

@@ -6,6 +6,8 @@ import { Checkbox } from '@/ui/Checkbox';
 import { SectionTitle } from '@/ui/SectionTitle';
 import { Select } from '@/ui/Select';
 import { TextInput } from '@/ui/TextInput';
+import { compareDecimal } from '@/lib/exact';
+import { NumberText, numberText } from '../forms/yaml-doc';
 import {
   clearPort,
   freeName,
@@ -114,10 +116,9 @@ function CommitField({
 }
 
 /** A scalar written as the file would hold it typed into a field. */
-function typed(text: string, type: string): string | number {
-  if (type === 'number' && /^-?(\d+\.?\d*|\.\d+)$/.test(text.trim()))
-    return Number(text.trim());
-  return text;
+function typed(text: string, type: string): string | NumberText {
+  const number = type === 'number' ? numberText(text) : undefined;
+  return number instanceof NumberText ? number : text;
 }
 
 function PortValue({
@@ -160,11 +161,13 @@ function PortValue({
     value === undefined
       ? ''
       : value.kind === 'literal'
-        ? String(value.value)
+        ? value.value instanceof NumberText
+          ? value.value.text
+          : String(value.value)
         : value.kind === 'text'
           ? value.text
           : JSON.stringify(value.raw);
-  const apply = (raw: string | number | boolean | undefined): string | null => {
+  const apply = (raw: string | NumberText | boolean | undefined): string | null => {
     if (raw === undefined || raw === '') {
       change(clearPort(text, index, port));
       return null;
@@ -775,8 +778,8 @@ function EntryRow({
     next: Partial<{
       fold: string | null;
       better: string | null;
-      at_least: number | null;
-      at_most: number | null;
+      at_least: NumberText | null;
+      at_most: NumberText | null;
       from: typeof from;
     }>,
   ) => {
@@ -802,21 +805,25 @@ function EntryRow({
   const bound = (
     key: 'at_least' | 'at_most',
     label: string,
-    current: number | null,
+    current: NumberText | null,
   ) => (
     <CommitField
       label={label}
-      value={current === null ? '' : String(current)}
+      value={current === null ? '' : current.text}
       apply={(written) => {
         if (written.trim() === '') {
           write({ [key]: null });
           return null;
         }
-        const value = Number(written);
-        if (!Number.isFinite(value)) return 'A number.';
+        const value = numberText(written);
+        if (!(value instanceof NumberText)) return 'A number.';
         const least = key === 'at_least' ? value : entry.atLeast;
         const most = key === 'at_most' ? value : entry.atMost;
-        if (least !== null && most !== null && least > most)
+        if (
+          least !== null &&
+          most !== null &&
+          compareDecimal(least.text, most.text) > 0
+        )
           return 'Must be at least at_least.';
         write({ [key]: value });
         return null;

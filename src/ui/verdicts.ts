@@ -1,4 +1,4 @@
-import type { GradingStatus, Outcome } from '@/api/types';
+import type { GradingStatus, Outcome, SubmissionState } from '@/api/types';
 import type { VerdictName } from '@/theme/theme';
 
 /**
@@ -7,7 +7,7 @@ import type { VerdictName } from '@/theme/theme';
  * no badge is drawn, such as to a screen reader.
  */
 
-export type Verdict = Outcome | GradingStatus;
+export type Verdict = Outcome | GradingStatus | SubmissionState;
 
 const LOOK: Record<Verdict, { label: string; colors: VerdictName }> = {
   accepted: { label: 'ACCEPTED', colors: 'accepted' },
@@ -23,6 +23,8 @@ const LOOK: Record<Verdict, { label: string; colors: VerdictName }> = {
   dispatched: { label: 'STARTING', colors: 'queued' },
   running: { label: 'RUNNING', colors: 'running' },
   done: { label: 'GRADED', colors: 'queued' },
+  grading: { label: 'GRADING', colors: 'running' },
+  graded: { label: 'GRADED', colors: 'queued' },
   cancelled: { label: 'CANCELLED', colors: 'queued' },
 };
 

@@ -66,8 +66,13 @@ export type FeedEntry = Schemas['FeedEntry'];
 export type Submitter = Schemas['Submitter'];
 export type QueueDepth = Schemas['QueueDepth'];
 export type Announcement = Schemas['Announcement'];
+/** One change in a place's history, its author named. */
+export type FileChange = Schemas['Change'];
 export type Clarification = Schemas['Clarification'];
-export type GradingStatus = GradingResult['status'];
+/** Where a grading stands, as organisers read it. */
+export type GradingStatus = Schemas['GradingStatus'];
+/** Where a submission stands, as its contestant is told. */
+export type SubmissionState = GradingResult['status'];
 /** A board as its reader sees it now, or the time it is shown from. */
 export type Board = Schemas['Board'];
 export type BoardKey = Schemas['BoardKey'];
