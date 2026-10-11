@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { $api, widenQuery } from '@/api/query';
-import type { Grant, Invite } from '@/api/types';
+import type { Invite, OfferedGrant } from '@/api/types';
 import type { RolePlace } from '../roles';
 
 /**
@@ -87,7 +87,7 @@ export function useInviteChanges(place: RolePlace) {
 
   /** `entrant`, at a contest, puts the person straight into that entrant once they accept. */
   const create = async (
-    grants: Grant,
+    grants: OfferedGrant,
     target: Target,
     entrant?: string,
   ): Promise<Invite> => {

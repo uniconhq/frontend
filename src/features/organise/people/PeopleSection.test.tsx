@@ -189,8 +189,7 @@ describe('the organisers section', () => {
     expect(within(row('kenny')).getByRole('cell', { name: 'Admin' })).toBeVisible();
   });
 
-  it('offers a manager the admin role, and shows why the forge refuses it', async () => {
-    const sent: unknown[] = [];
+  it('offers a manager only the roles a manager may give, as Invite does', async () => {
     server.use(
       signedInAs([
         { names: { org: 'acme', contest: 'spring', task: null }, role: 'manager' },
@@ -208,12 +207,6 @@ describe('the organisers section', () => {
           ),
         ]),
       ),
-      http.post(CONTEST_ROLES, async ({ request }) => {
-        sent.push(await request.json());
-        return problem(403, 'forbidden', {
-          detail: 'Only an admin of acme/spring may grant admin there.',
-        });
-      }),
     );
     const user = userEvent.setup();
     renderApp('/orgs/acme/contests/spring/organisers');
@@ -232,23 +225,14 @@ describe('the organisers section', () => {
       within(roles)
         .getAllByRole('option')
         .map((option) => option.textContent),
-    ).toEqual(['Admin', 'Manager', 'Observer']);
-
-    await user.selectOptions(roles, 'admin');
-    await user.click(within(form).getByRole('button', { name: 'Save' }));
-
-    const alert = await within(row('kenny')).findByRole('alert');
-    expect(alert).toHaveTextContent('Only an admin gives the admin role');
-    expect(alert).toHaveTextContent(
-      'Only an admin of acme/spring may grant admin there.',
-    );
-    expect(sent).toEqual([{ username: 'kenny', role: 'admin' }]);
+    ).toEqual(['Manager', 'Observer']);
   });
 
   it('keeps a refusal about the role that was sent while another is picked', async () => {
     server.use(
+      // An admin whose admin role was taken away since the page was read.
       signedInAs([
-        { names: { org: 'acme', contest: 'spring', task: null }, role: 'manager' },
+        { names: { org: 'acme', contest: 'spring', task: null }, role: 'admin' },
       ]),
       taskList,
       http.get(CONTEST_ROLES, () =>
@@ -279,6 +263,9 @@ describe('the organisers section', () => {
 
     const alert = await within(row('kim')).findByRole('alert');
     expect(alert).toHaveTextContent('Only an admin gives the admin role');
+    expect(alert).toHaveTextContent(
+      'Only an admin of acme/spring may grant admin there.',
+    );
     await user.selectOptions(within(form).getByLabelText('Role'), 'observer');
     expect(within(row('kim')).getByRole('alert')).toHaveTextContent(
       'Only an admin gives the admin role',

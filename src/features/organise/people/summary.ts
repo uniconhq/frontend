@@ -2,13 +2,10 @@ import { useQuery } from '@tanstack/react-query';
 import { queryView, type QueryView } from '@/api/query';
 import type { Invite } from '@/api/types';
 import { useMe } from '@/session';
+import { count } from '../hub/count';
 import { invitesQuery } from '../invites/invites';
 import { holdsAt, type RolePlace } from '../roles';
 import { useHolders } from './holders';
-
-function count(n: number, one: string, many: string): string {
-  return `${String(n)} ${n === 1 ? one : many}`;
-}
 
 /**
  * What an organisers card says: how many people organise here, and how many

@@ -74,7 +74,7 @@ describe('the file tree', () => {
     );
   });
 
-  it('leaves the tests and the settings out of the tree, saying where each is changed', async () => {
+  it('leaves the tests, the settings and the plans Unicon writes out of the tree, saying where each is changed', async () => {
     server.use(
       signedIn,
       taskState,
@@ -84,6 +84,7 @@ describe('the file tree', () => {
           ? HttpResponse.json([
               { path: 'task.yaml', kind: 'file', size: 120, upload: null },
               { path: 'tests', kind: 'directory', size: null, upload: null },
+              { path: 'plans', kind: 'directory', size: null, upload: null },
               { path: 'public', kind: 'directory', size: null, upload: null },
             ])
           : undefined,

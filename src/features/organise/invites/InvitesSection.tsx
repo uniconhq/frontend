@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useChange } from '@/api/change';
 import { queryView } from '@/api/query';
 import { isApiError } from '@/api/problem';
-import type { Grant, Invite } from '@/api/types';
+import type { Grant, Invite, OfferedGrant } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
 import { Select } from '@/ui/Select';
@@ -224,11 +224,17 @@ function InviteRow({
  * place in the contest. One field takes either: a Forgejo username has no
  * `@`, so what has one is an address.
  */
-function InviteForm({ place, grants }: { place: RolePlace; grants: Grant[] }) {
+function InviteForm({
+  place,
+  grants,
+}: {
+  place: RolePlace;
+  grants: OfferedGrant[];
+}) {
   const queryClient = useQueryClient();
   const { create } = useInviteChanges(place);
   const [typed, setTyped] = useState('');
-  const [grant, setGrant] = useState<Grant>(
+  const [grant, setGrant] = useState<OfferedGrant>(
     grants.includes('manager') ? 'manager' : (grants[0] ?? 'contestant'),
   );
   const [tried, setTried] = useState('');
@@ -251,7 +257,7 @@ function InviteForm({ place, grants }: { place: RolePlace; grants: Grant[] }) {
   };
 
   const means =
-    grant === 'contestant' || grant === 'member'
+    grant === 'contestant'
       ? 'Accepting registers them for this contest.'
       : ROLE_MEANS[grant];
 
@@ -277,7 +283,7 @@ function InviteForm({ place, grants }: { place: RolePlace; grants: Grant[] }) {
               value,
               label: GRANT_LABEL[value],
             }))}
-            onChange={(value) => setGrant(value as Grant)}
+            onChange={(value) => setGrant(value as OfferedGrant)}
           />
         )}
       </div>
@@ -319,7 +325,7 @@ export function InvitesSection({
   administers: boolean;
 }) {
   const view = queryView(useInvites(place));
-  const grants: Grant[] =
+  const grants: OfferedGrant[] =
     audience === 'contestants' ? ['contestant'] : offered(administers);
 
   return (

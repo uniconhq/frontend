@@ -152,10 +152,10 @@ describe("the contest's status", () => {
     const dialog = await screen.findByRole('dialog', { name: 'Back to draft?' });
     await user.click(within(dialog).getByRole('button', { name: 'Back to draft' }));
 
+    // The refusal is about this card's own setting: said on its own, here.
     const alert = await within(card).findByRole('alert');
-    expect(alert).toHaveTextContent('Nothing was saved');
     expect(alert).toHaveTextContent(
-      'Status: Open, draft or archived: The contest has started, so it can no longer go back to draft.',
+      /^The contest has started, so it can no longer go back to draft\.$/,
     );
   });
 

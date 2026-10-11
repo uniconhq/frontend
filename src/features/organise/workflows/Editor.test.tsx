@@ -535,7 +535,7 @@ describe('the workflow editor', () => {
     ).toBeInTheDocument();
   });
 
-  it('mends a draft that does not read as text, with Save and Undo', async () => {
+  it('fixes a draft that cannot be read as text, with Save and Undo', async () => {
     const backend = workflowBackend('steps: [\n');
     server.use(signedIn, ...backend.handlers);
     const user = userEvent.setup();
@@ -547,7 +547,7 @@ describe('the workflow editor', () => {
     expect(mend).toHaveTextContent(
       'This draft cannot be drawn, because its file cannot be read',
     );
-    // Not "nothing to fix", whatever the check says of a file that does not read.
+    // Not "nothing to fix", whatever the check says of a file that cannot be read.
     await waitFor(() => expect(backend.state.checks).toBeGreaterThan(0), CHECKED);
     expect(screen.queryByText(/Nothing to fix/)).toBeNull();
     expect(toolButton('Add step')).toBeDisabled();

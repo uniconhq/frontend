@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQueries, useQueryClient } from '@tanstack/react-query';
 import { isMap, isSeq } from 'yaml';
 import { $api, queryView } from '@/api/query';
 import type { TaskStanding } from '@/api/types';
@@ -17,6 +17,9 @@ import { formatDateTime } from '@/lib/time';
 import { CreateButton } from '../Create';
 import { DefinitionErrors } from '../DefinitionErrors';
 import { definitionErrorsOf } from '../files/refusals';
+import { fileQuery } from '../files/place';
+import { readTask } from '../forms/task-values';
+import { readSettings } from '../task/build-data';
 import { holdsAtContest, tasksReached } from '../roles';
 import type { ContestValues } from '../forms/contest-values';
 import type { Doc } from '../forms/yaml-doc';
@@ -65,14 +68,49 @@ function TaskState({ standing }: { standing: TaskStanding }) {
   );
 }
 
+/**
+ * Each task's title, as its settings give it, by its name: read for every
+ * task listed, as its own page reads it. A task whose settings are not read
+ * yet, or give no title, is called by its name.
+ */
+function useTaskTitles(
+  org: string,
+  contest: string,
+  names: string[],
+): ReadonlyMap<string, string> {
+  const files = useQueries({
+    queries: names.map((task) => ({
+      ...fileQuery({ kind: 'task', org, contest, task }, 'task.yaml'),
+      retry: false,
+    })),
+  });
+  return new Map(
+    names.map((task, at) => {
+      const data = files[at]?.data;
+      const read = data === undefined ? null : readSettings(data);
+      const title =
+        read === null || 'error' in read
+          ? ''
+          : readTask(read.doc, []).values.name.trim();
+      return [task, title === '' ? task : title];
+    }),
+  );
+}
+
+/** A task as its row and its timeline call it: its letter and its title. */
+function labelOf(standing: TaskStanding, titles: ReadonlyMap<string, string>): string {
+  return `${standing.label} · ${titles.get(standing.task.name) ?? standing.task.name}`;
+}
+
 function rowOf(
   org: string,
   contest: string,
   standing: TaskStanding,
   values: ContestValues | null,
   onEdit: (() => void) | null,
+  titles: ReadonlyMap<string, string>,
 ): ListRow {
-  const label = `${standing.label} · ${standing.task.name}`;
+  const label = labelOf(standing, titles);
   const entry = values?.tasks.find((found) => found.id === standing.task.name);
   const marks =
     values !== null && markedBoardCovers(values, standing.task.name)
@@ -85,7 +123,7 @@ function rowOf(
     to: taskPath(org, contest, standing.task.name),
     name: label,
     label,
-    text: label,
+    text: `${label} ${standing.task.name}`,
     detail: (
       <>
         <span className={classes.line}>
@@ -138,19 +176,20 @@ function EditTimeline({
   contest,
   standings,
   editing,
+  titles,
   onClose,
 }: {
   org: string;
   contest: string;
   standings: TaskStanding[];
   editing: number | null;
+  titles: ReadonlyMap<string, string>;
   onClose: () => void;
 }) {
   const { apply, pending } = useContestChange(org, contest);
   const [refused, setRefused] = useState<unknown>(null);
   const standing = editing === null ? undefined : standings[editing];
-  const label =
-    standing === undefined ? '' : `${standing.label} · ${standing.task.name}`;
+  const label = standing === undefined ? '' : labelOf(standing, titles);
   const move = async (by: -1 | 1) => {
     if (standing === undefined) return;
     setRefused(null);
@@ -166,7 +205,12 @@ function EditTimeline({
     >
       {standing !== undefined && editing !== null && (
         <div className={shared.stack}>
-          <TaskTimelineForm org={org} contest={contest} standing={standing} />
+          <TaskTimelineForm
+            org={org}
+            contest={contest}
+            standing={standing}
+            label={label}
+          />
           <div className={shared.actions}>
             <Button
               size="xs"
@@ -257,6 +301,11 @@ export function ContestTasks({ org, contest }: { org: string; contest: string })
       { staleTime: 0 },
     ),
   );
+  const titles = useTaskTitles(
+    org,
+    contest,
+    view.state === 'ready' ? view.data.map((standing) => standing.task.name) : [],
+  );
   const unreadable = view.state === 'error' && view.error.code === 'invalid_definition';
   const names = queryView(
     $api.useQuery('get', TASKS, { params: { path } }, { enabled: unreadable }),
@@ -282,7 +331,14 @@ export function ContestTasks({ org, contest }: { org: string; contest: string })
   const rows: ListRow[] =
     view.state === 'ready'
       ? view.data.map((standing, at) =>
-          rowOf(org, contest, standing, values, manages ? () => setEditing(at) : null),
+          rowOf(
+            org,
+            contest,
+            standing,
+            values,
+            manages ? () => setEditing(at) : null,
+            titles,
+          ),
         )
       : unreadable
         ? names.state === 'ready'
@@ -351,6 +407,7 @@ export function ContestTasks({ org, contest }: { org: string; contest: string })
         contest={contest}
         standings={view.state === 'ready' ? view.data : []}
         editing={editing}
+        titles={titles}
         onClose={closeEditing}
       />
       <ListCard

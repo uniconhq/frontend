@@ -111,6 +111,35 @@ describe("the contest's tasks", () => {
     ]);
   });
 
+  it('calls each task by its letter and its title, as its settings give it', async () => {
+    server.use(
+      signedIn,
+      standingList,
+      http.get(`${CONTEST_API}/tasks/:task/files/:path`, ({ params }) =>
+        params['path'] === 'task.yaml'
+          ? HttpResponse.json({
+              ...files['task.yaml']!,
+              content: `name: ${params['task'] === 'sort' ? 'Sorting' : 'Sum of two'}\n`,
+            })
+          : undefined,
+      ),
+      ...repoFiles,
+    );
+    renderApp(CONTEST);
+
+    const list = await screen.findByRole('list', { name: 'Tasks' });
+    await waitFor(() =>
+      expect(
+        within(list)
+          .getAllByRole('link')
+          .map((link) => [link.textContent, link.getAttribute('href')]),
+      ).toEqual([
+        ['A · Sorting', '/orgs/acme/contests/spring/tasks/sort'],
+        ['B · Sum of two', '/orgs/acme/contests/spring/tasks/sum'],
+      ]),
+    );
+  });
+
   it("says each task's latest publication and its timeline as one line, defaults resolved", async () => {
     server.use(signedIn, standingList, ...repoFiles);
     renderApp(CONTEST);

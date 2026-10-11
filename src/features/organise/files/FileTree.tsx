@@ -27,13 +27,15 @@ function ordered(entries: TreeEntry[]): TreeEntry[] {
 
 /**
  * What the tree lists of a folder: everything but what has a page of its
- * own, the settings file at the top and, at a task, its `tests/` folder.
+ * own, the settings file at the top and, at a task, its `tests/` folder, and
+ * what Unicon writes itself on each save, a task's `plans/` folder.
  */
 function listed(place: Place, entries: TreeEntry[]): TreeEntry[] {
   const settings = settingsPath(place);
   return entries.filter(
     (entry) =>
-      entry.path !== settings && !(place.kind === 'task' && entry.path === 'tests'),
+      entry.path !== settings &&
+      !(place.kind === 'task' && (entry.path === 'tests' || entry.path === 'plans')),
   );
 }
 

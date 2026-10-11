@@ -55,8 +55,8 @@ import classes from './workflows.module.css';
  * right. A moment after each change the draft is checked as a version would
  * be, and each problem is said in the banner, linked to its box, and beside
  * its mark on the box (M31). A draft with problems saves; a version of one is
- * refused. A draft whose file does not read cannot be drawn, so it is mended
- * as text, with Save and Undo, until it reads (M30). A save over someone
+ * refused. A draft whose file cannot be read cannot be drawn, so it is fixed
+ * as text, with Save and Undo, until it can be read (M30). A save over someone
  * else's opens the merge view, steps matched by id.
  */
 
