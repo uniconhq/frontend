@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { queryView } from '@/api/query';
 import { toApiError } from '@/api/problem';
 import type { FileContent, WorkflowForm } from '@/api/types';
@@ -7,6 +8,7 @@ import { formatSize } from '@/lib/size';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
 import { FilesMerge, type MovedFile } from '../files/FilesMerge';
+import { fileQuery, staleAfterWrite } from '../files/place';
 import { SaveOutcome } from '../files/SaveOutcome';
 import { UploadedFile } from '../files/UploadedFile';
 import { useOwnFile } from '../forms/file-hooks';
@@ -126,6 +128,7 @@ function BuildForm({
     readTask(doc, names, savedReadable ? form.inputs : null),
   );
   const [values, setValues] = useState<TaskValues>(read.values);
+  const queryClient = useQueryClient();
   const [staged, setStaged] = useState<Staged>(NOTHING_STAGED);
   const [advanced, setAdvanced] = useState<Set<string>>(
     () =>
@@ -450,6 +453,18 @@ function BuildForm({
             placeOf={placeOf}
             titles={titles}
             admin={admin}
+            onDiscard={() => {
+              // My changes go, and the cards read the task as it is now.
+              setValues(read.values);
+              setStaged(NOTHING_STAGED);
+              saving.drop();
+              for (const queryKey of [
+                fileQuery(place, PATH).queryKey,
+                ...staleAfterWrite(place),
+              ]) {
+                void queryClient.invalidateQueries({ queryKey });
+              }
+            }}
           />
         )}
       </SaveBar>
@@ -485,12 +500,15 @@ function SaveAnswer({
   placeOf,
   titles,
   admin,
+  onDiscard,
 }: {
   place: TaskPlace;
   saving: TaskSave;
   placeOf: ReturnType<typeof taskPlaceOf>;
   titles: ReadonlyMap<string, string>;
   admin: boolean;
+  /** Discard my changes, from a merge: the cards read the task again. */
+  onDiscard: () => void;
 }) {
   const busy = saving.state.stage !== 'idle';
   if (saving.merge !== null) {
@@ -505,7 +523,7 @@ function SaveAnswer({
         currentText={current.content}
         busy={busy}
         onSave={saving.saveMerged}
-        onDrop={saving.drop}
+        onDrop={onDiscard}
         words={taskMergeWords(titles)}
       />
     );
@@ -527,7 +545,7 @@ function SaveAnswer({
         files={files}
         busy={busy}
         onSave={saving.saveResolved}
-        onDrop={saving.drop}
+        onDrop={onDiscard}
       />
     );
   }

@@ -629,6 +629,36 @@ describe('the cards that build a task', { timeout: 30_000 }, () => {
   });
 });
 
+describe('discarding at a conflict', { timeout: 30_000 }, () => {
+  it('drops my changes and shows the settings as they are now', async () => {
+    const theirs = TASK.replace('time_limit: 2', 'time_limit: 5');
+    // A folder for each group the settings hold, so nothing else is to save.
+    taskBackend({
+      conflictWith: theirs,
+      groups: { samples: ['1', '2'], small: ['1', '2', '3'], old: ['1'] },
+    });
+    const { tests } = await openTask();
+
+    fill(fieldIn(tests, 'small', 'Points'), '40');
+    await save();
+    await screen.findByRole('list', { name: 'Fields that differ' });
+    await userEvent.click(screen.getByRole('button', { name: 'Discard my changes' }));
+
+    await waitFor(() =>
+      expect(screen.queryByRole('region', { name: 'Save the task' })).toBeNull(),
+    );
+    const inputs = await screen.findByRole('region', { name: 'Inputs' });
+    expect(await within(inputs).findByDisplayValue('5')).toBeVisible();
+    expect(
+      fieldIn(
+        screen.getByRole('region', { name: 'Tests and scoring' }),
+        'small',
+        'Points',
+      ),
+    ).toHaveValue('30');
+  });
+});
+
 /** The first save sent, once it has been. */
 async function waitForSave(sent: SaveRequest[]): Promise<SaveRequest> {
   await expect.poll(() => sent.length).toBeGreaterThan(0);
