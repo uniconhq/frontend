@@ -1,4 +1,4 @@
-import { Fragment } from 'react';
+import { Fragment, memo, useCallback, useLayoutEffect, useRef, useState } from 'react';
 import { Menu } from '@mantine/core';
 import { Button } from './Button';
 import classes from './ActionMenu.module.css';
@@ -10,6 +10,12 @@ import classes from './ActionMenu.module.css';
  * description and its reference. The workflow editor's ports use it, behind
  * a small plain button, as the keyboard's way to do what a drag does; its
  * toolbar's "Add step" uses it behind a page's button (`button`).
+ *
+ * `entries` may be a function, called only while the menu is open: a graph
+ * draws a menu on every port, and building every one's entries, and drawing
+ * every menu again, on each change made the editor slow. A menu whose
+ * entries are a function is drawn again only when its button's words change
+ * or it opens, and reads the entries as they are then.
  */
 export type MenuEntry =
   | { kind: 'heading'; text: string }
@@ -25,29 +31,64 @@ export type MenuEntry =
     }
   | { kind: 'divider' };
 
-export function ActionMenu({
-  text,
-  label,
-  entries,
-  className,
-  button = false,
-  disabled = false,
-  empty,
-}: {
+type Props = {
   /** What the button shows. */
   text: string;
   className?: string;
   /** What the button and the menu are called for a screen reader. */
   label: string;
-  entries: MenuEntry[];
+  entries: MenuEntry[] | (() => MenuEntry[]);
   /** The button is a page's secondary Button rather than a small plain one. */
   button?: boolean;
   disabled?: boolean;
   /** What the menu says when it has no entries. */
   empty?: string;
-}) {
+};
+
+export function ActionMenu({ entries, ...rest }: Props) {
+  // The latest entries, read when the menu opens, so a menu drawn once
+  // still offers what holds now.
+  const latest = useRef(entries);
+  useLayoutEffect(() => {
+    latest.current = entries;
+  });
+  const read = useCallback(
+    () => (typeof latest.current === 'function' ? latest.current() : latest.current),
+    [],
+  );
   return (
-    <Menu position="bottom-start" withinPortal shadow="md" width={button ? 380 : 300}>
+    <DrawnMenu
+      {...rest}
+      read={read}
+      entries={typeof entries === 'function' ? null : entries}
+    />
+  );
+}
+
+const DrawnMenu = memo(function DrawnMenu({
+  text,
+  label,
+  read,
+  className,
+  button = false,
+  disabled = false,
+  empty,
+}: Omit<Props, 'entries'> & {
+  read: () => MenuEntry[];
+  /** The entries when they are a list, so a new list draws the menu again. */
+  entries: MenuEntry[] | null;
+}) {
+  const [opened, setOpened] = useState(false);
+  const entries = opened ? read() : [];
+  return (
+    <Menu
+      position="bottom-start"
+      withinPortal
+      shadow="md"
+      width={button ? 380 : 300}
+      opened={opened}
+      onChange={setOpened}
+    >
       <Menu.Target>
         {button ? (
           <Button
@@ -101,4 +142,4 @@ export function ActionMenu({
       </Menu.Dropdown>
     </Menu>
   );
-}
+});

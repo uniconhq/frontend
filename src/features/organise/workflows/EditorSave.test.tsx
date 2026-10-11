@@ -7,11 +7,12 @@ import { server, signedIn } from '@/test/server';
 import { CLASSIC_V2, workflowBackend } from '@/test/workflows';
 import {
   EDITOR_PAGE,
+  part,
   barButton,
-  drawer,
   fileText,
   openMenu,
   openStep,
+  stepPanel,
   portButton,
   toolButton,
 } from '@/test/workflow-editor';
@@ -42,9 +43,7 @@ describe('saving and publishing a workflow', () => {
         name: 'Give it a value in the step’s drawer',
       }),
     );
-    const panel = within(drawer('Step run')).getByLabelText('The step run', {
-      selector: 'section',
-    });
+    const panel = stepPanel('run');
     await user.click(
       within(panel).getByRole('button', { name: 'Remove the wire to memory_limit' }),
     );
@@ -52,10 +51,16 @@ describe('saving and publishing a workflow', () => {
       within(panel).getByRole('textbox', { name: /^memory_limit/ }),
       '9{Enter}',
     );
-    expect(screen.getByText('Changes not saved yet.')).toBeInTheDocument();
+    expect(
+      within(part('[role="toolbar"]', 'The workflow')).getByText(
+        'Not saved yet: leaving this page loses these changes.',
+      ),
+    ).toBeInTheDocument();
     await user.click(barButton('Save'));
     await waitFor(() => expect(backend.state.draft).toContain('memory_limit: 9'));
-    expect(screen.getByText('All changes saved.')).toBeInTheDocument();
+    expect(
+      within(part('[role="toolbar"]', 'The workflow')).getByText('All changes saved.'),
+    ).toBeInTheDocument();
     await screen.findByText(/One problem to fix/, {}, CHECKED);
 
     await user.click(barButton('Publish version'));

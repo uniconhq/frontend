@@ -13,6 +13,7 @@ import {
   noDrawer,
   openMenu,
   openStep,
+  stepPanel,
   outputButton,
   portButton,
   stepBox,
@@ -234,16 +235,14 @@ describe('the workflow editor', () => {
     );
   });
 
-  it('declares an input, a value of each test and a report entry in place', async () => {
+  it('declares an input in place', async () => {
     server.use(signedIn, ...workflowBackend(CLASSIC_V2).handlers);
     const user = userEvent.setup();
     renderApp(EDITOR_PAGE);
 
     await stepBox('run');
     await user.click(toolButton('Inputs'));
-    const inputs = within(drawer('Inputs')).getByLabelText('Add an input', {
-      selector: 'form',
-    });
+    const inputs = within(drawer('Inputs')).getByRole('form', { name: 'Add an input' });
     await user.type(
       within(inputs).getByRole('textbox', { name: 'New input' }),
       'episodes',
@@ -254,13 +253,19 @@ describe('the workflow editor', () => {
     );
     await user.click(within(inputs).getByRole('button', { name: 'Add an input' }));
 
+    expect(await fileText(user)).toContain('episodes: number');
+  });
+
+  it('declares a value of each test in place', async () => {
+    server.use(signedIn, ...workflowBackend(CLASSIC_V2).handlers);
+    const user = userEvent.setup();
+    renderApp(EDITOR_PAGE);
+
+    await stepBox('run');
     await user.click(toolButton('Each test’s files'));
-    const fields = within(drawer('Each test’s files')).getByLabelText(
-      'Add to each test',
-      {
-        selector: 'form',
-      },
-    );
+    const fields = within(drawer('Each test’s files')).getByRole('form', {
+      name: 'Add to each test',
+    });
     await user.type(
       within(fields).getByRole('textbox', { name: 'New file or value' }),
       'seed',
@@ -271,6 +276,14 @@ describe('the workflow editor', () => {
     );
     await user.click(within(fields).getByRole('button', { name: 'Add to each test' }));
 
+    expect(await fileText(user)).toContain('seed: text');
+  });
+
+  it('declares a report entry in place', async () => {
+    server.use(signedIn, ...workflowBackend(CLASSIC_V2).handlers);
+    const user = userEvent.setup();
+    renderApp(EDITOR_PAGE);
+
     await user.click(await outputButton('run', 'time_ms'));
     await user.click(
       within(await openMenu('The output time_ms of run')).getByRole('menuitem', {
@@ -278,10 +291,7 @@ describe('the workflow editor', () => {
       }),
     );
 
-    const text = await fileText(user);
-    expect(text).toContain('episodes: number');
-    expect(text).toContain('seed: text');
-    expect(text).toContain('time_ms_2: ${{ steps.run.time_ms }}');
+    expect(await fileText(user)).toContain('time_ms_2: ${{ steps.run.time_ms }}');
   });
 
   it('names an input for the task’s form: its title, unit and help', async () => {
@@ -408,9 +418,7 @@ describe('the workflow editor', () => {
     const panel = await openStep(user, 'first');
     await user.click(within(panel).getByRole('radio', { name: 'Once for each test' }));
 
-    const kept = within(drawer('Step first')).getByLabelText('The step first', {
-      selector: 'section',
-    });
+    const kept = stepPanel('first');
     expect(
       within(kept).getByRole('radio', { name: 'Once for each test' }),
     ).toBeChecked();

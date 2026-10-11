@@ -5,6 +5,7 @@ import { $api } from '@/api/query';
 import { toApiError, type ApiError } from '@/api/problem';
 import type { WorkflowPage } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
+import { UnsavedNote } from '@/ui/UnsavedNote';
 import { Button } from '@/ui/Button';
 import { CodeEditor } from '@/ui/CodeEditor';
 import { Modal } from '@/ui/Modal';
@@ -400,15 +401,36 @@ export function Editor({
     ),
   ];
 
-  const menu = (box: Box, port: string, side: 'left' | 'right') => {
-    const entries: MenuEntry[] = [];
-    let label: string;
+  /** What a port's menu is called, or null for a port with none. */
+  const menuLabel = (box: Box, port: string, side: 'left' | 'right'): string | null => {
     if (side === 'left') {
       const target = targetAt(box, port);
-      if (target === null) return <span>{port}</span>;
+      if (target === null) return null;
+      return target.kind === 'port'
+        ? `The port ${port} of ${workflow.steps[target.step]?.id ?? ''}`
+        : `The report entry ${port}`;
+    }
+    const source = sourceAt(box, port, workflow);
+    if (source === null) return null;
+    return source.kind === 'steps'
+      ? `The output ${source.output} of ${source.name}`
+      : source.kind === 'inputs'
+        ? `The input ${source.name}`
+        : `Each test’s ${source.name}`;
+  };
+
+  /**
+   * What a port's menu offers, built only when it opens: every source or
+   * target, each checked against the rules, is too much work to do for
+   * every port on every change.
+   */
+  const menuEntries = (box: Box, port: string, side: 'left' | 'right'): MenuEntry[] => {
+    const entries: MenuEntry[] = [];
+    if (side === 'left') {
+      const target = targetAt(box, port);
+      if (target === null) return entries;
       if (target.kind === 'port') {
         const step = workflow.steps[target.step];
-        label = `The port ${port} of ${step?.id ?? ''}`;
         entries.push({ kind: 'heading', text: 'Wire from' });
         for (const source of sources())
           entries.push({
@@ -472,7 +494,6 @@ export function Editor({
             onSelect: () => change(clearPort(text, target.step, port)),
           });
       } else {
-        label = `The report entry ${port}`;
         entries.push({ kind: 'heading', text: 'Read from' });
         for (const source of reportable(workflow, primitiveMap))
           entries.push({
@@ -490,13 +511,7 @@ export function Editor({
       }
     } else {
       const source = sourceAt(box, port, workflow);
-      if (source === null) return <span>{port}</span>;
-      label =
-        source.kind === 'steps'
-          ? `The output ${source.output} of ${source.name}`
-          : source.kind === 'inputs'
-            ? `The input ${source.name}`
-            : `Each test’s ${source.name}`;
+      if (source === null) return entries;
       if (source.kind === 'steps') {
         const reported = reportRefusal(workflow, primitiveMap, source);
         entries.push({
@@ -523,11 +538,17 @@ export function Editor({
         }
       });
     }
+    return entries;
+  };
+
+  const menu = (box: Box, port: string, side: 'left' | 'right') => {
+    const label = menuLabel(box, port, side);
+    if (label === null) return <span>{port}</span>;
     return (
       <ActionMenu
         text={port}
         label={label}
-        entries={entries}
+        entries={() => menuEntries(box, port, side)}
         className={classes.port}
       />
     );
@@ -598,9 +619,13 @@ export function Editor({
         page={page}
         version={null}
         status={
-          <BodyText size="sm" tone="secondary">
-            {dirty ? 'Changes not saved yet.' : 'All changes saved.'}
-          </BodyText>
+          dirty ? (
+            <UnsavedNote />
+          ) : (
+            <BodyText size="sm" tone="secondary">
+              All changes saved.
+            </BodyText>
+          )
         }
       >
         <Button
