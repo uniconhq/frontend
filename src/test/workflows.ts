@@ -6,7 +6,8 @@ import { problem } from './server';
  * The seeded workflows as deploy's bootstrap writes them, and the platform's
  * primitives as the backend lists them: each primitive's v1 in the format
  * before 2026-10-07, which the platform no longer reads, and its v2 with its
- * ports.
+ * ports, its title and what it and each port do (#436), as each primitive's
+ * own `primitive.yaml` says them.
  */
 export const CLASSIC_V2 = `# unicon/classic@v2, the built-in workflow for a task judged by comparing
 # output with an answer: compile the submission once, run the program on
@@ -132,22 +133,34 @@ export const PRIMITIVES: PrimitiveInfo[] = [
   {
     ref: 'unicon/compile@v2',
     name: 'compile',
-    title: null,
-    description: null,
+    title: 'Compile',
+    description: "Compiles the contestant's source files into one program.",
     version: 'v2',
     batch: false,
     network: false,
     limits: { ...LIMITS, time_ms: 60000, cpu_ms: 60000, memory_mb: 1024 },
     limits_from: {},
     inputs: {
-      source: port('folder', { runs: true }),
-      language: port('enum', { options: ['c', 'cpp', 'java', 'python'] }),
-      entry: port('text', { optional: true }),
+      source: port('folder', {
+        runs: true,
+        description: 'The source files to compile, with their layout.',
+      }),
+      language: port('enum', {
+        options: ['c', 'cpp', 'java', 'python'],
+        description: 'The language the source files are written in.',
+      }),
+      entry: port('text', {
+        optional: true,
+        description: 'The file the program starts from, such as src/Main.java.',
+      }),
     },
     outputs: {
-      binary: port('file'),
-      compile_log: port('text'),
-      outcome: port('outcome'),
+      binary: port('file', { description: 'The compiled program, ready to run.' }),
+      compile_log: port('text', { description: 'Everything the compiler printed.' }),
+      outcome: port('outcome', {
+        description:
+          'Accepted when the source compiled, compile error when it did not.',
+      }),
     },
     problem: null,
   },
@@ -155,26 +168,35 @@ export const PRIMITIVES: PrimitiveInfo[] = [
   {
     ref: 'unicon/diff-check@v2',
     name: 'diff-check',
-    title: null,
-    description: null,
+    title: 'Compare with the answer',
+    description:
+      "Compares a program's output with the answer, ignoring trailing whitespace.",
     version: 'v2',
     batch: true,
     network: false,
     limits: { ...LIMITS, pids: 32, output_mb: 1 },
     limits_from: {},
     inputs: {
-      actual: port('file', { runs: false }),
-      expected: port('file', { runs: false }),
+      actual: port('file', { runs: false, description: 'What the program printed.' }),
+      expected: port('file', {
+        runs: false,
+        description: 'The expected answer, from the task.',
+      }),
     },
-    outputs: { outcome: port('outcome') },
+    outputs: {
+      outcome: port('outcome', {
+        description: 'Accepted when the two match, wrong answer when they do not.',
+      }),
+    },
     problem: null,
   },
   retired('sandbox-run'),
   {
     ref: 'unicon/sandbox-run@v2',
     name: 'sandbox-run',
-    title: null,
-    description: null,
+    title: 'Run program',
+    description:
+      "Runs a program on each test's input and records its output, time and memory.",
     version: 'v2',
     batch: true,
     network: false,
@@ -185,17 +207,36 @@ export const PRIMITIVES: PrimitiveInfo[] = [
       memory_mb: { input: 'memory_limit', scale: '1', add: '256' },
     },
     inputs: {
-      binary: port('file', { runs: true }),
-      input: port('file', { runs: false }),
-      args: port('text', { optional: true }),
-      time_limit: port('number'),
-      memory_limit: port('number'),
+      binary: port('file', { runs: true, description: 'The program to run.' }),
+      input: port('file', {
+        runs: false,
+        description: 'What the program reads on standard input.',
+      }),
+      args: port('text', {
+        optional: true,
+        description: "Arguments added to the program's command line, split on spaces.",
+      }),
+      time_limit: port('number', {
+        description: 'Seconds of CPU time the program may use on each test.',
+      }),
+      memory_limit: port('number', {
+        description: 'Megabytes of memory the program may use on each test.',
+      }),
     },
     outputs: {
-      output: port('file'),
-      time_ms: port('number'),
-      memory_kb: port('number'),
-      outcome: port('outcome'),
+      output: port('file', {
+        description: 'What the program printed on standard output.',
+      }),
+      time_ms: port('number', {
+        description: 'The CPU time the program used, in milliseconds.',
+      }),
+      memory_kb: port('number', {
+        description: 'The most memory the program used, in kilobytes.',
+      }),
+      outcome: port('outcome', {
+        description:
+          'Accepted, or the limit the program went over, or a runtime error.',
+      }),
     },
     problem: null,
   },

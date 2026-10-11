@@ -22,7 +22,7 @@ describe('the workflow editor', () => {
     expect(screen.getByRole('group', { name: 'Step check' })).toBeInTheDocument();
     expect(screen.getAllByRole('group', { name: 'Inputs' }).length).toBeGreaterThan(0);
     expect(
-      screen.getAllByRole('group', { name: 'Test fields' }).length,
+      screen.getAllByRole('group', { name: "Each test's files" }).length,
     ).toBeGreaterThan(0);
     expect(screen.getByRole('group', { name: 'Report' })).toBeInTheDocument();
     expect(await preview()).toBe(CLASSIC_V2);
@@ -113,6 +113,12 @@ describe('the workflow editor', () => {
         CHECKED,
       ),
     ).toBeInTheDocument();
+    // The message stands beside its mark, not only behind it.
+    expect(
+      within(step).getByText('compiler is not a step before this one.', {
+        selector: 'span[aria-hidden]',
+      }),
+    ).toBeVisible();
     expect(
       screen.getByText(/One problem a version would be refused for/),
     ).toBeInTheDocument();
@@ -331,6 +337,8 @@ describe('the workflow editor', () => {
     renderApp(EDITOR_PAGE);
 
     const step = await screen.findByRole('group', { name: 'Step compile' });
-    expect(within(step).getByText('= from test.input, not drawn')).toBeInTheDocument();
+    expect(
+      within(step).getByText(/input from each test, not drawn/),
+    ).toBeInTheDocument();
   });
 });

@@ -1,5 +1,6 @@
-import { refLabel, refsOf, type Ref, type Workflow } from './model';
+import { refsOf, type Ref, type Workflow } from './model';
 import type { PrimitiveInfo } from './primitives';
+import { refWords } from './words';
 
 /**
  * Where everything of a workflow's graph stands, worked out from its
@@ -16,7 +17,8 @@ import type { PrimitiveInfo } from './primitives';
  *   band's first column. One that nothing reads stands in the first column,
  *   or the band's first. Text with an input written in counts as reading it.
  * - Slots. A wire that skips columns runs through a slot of its own in each
- *   column it crosses, labelled with its source where it starts, and wires
+ *   column it crosses, labelled in words with its source where it starts
+ *   ("time_ms from run"), and wires
  *   from one port share their slots. Every wire joins neighbouring columns
  *   only, through the gap between them, so none passes behind a box.
  * - Order. Each column's boxes and slots are sorted by where their wires come
@@ -461,10 +463,14 @@ export function layoutWorkflow(
   const labelOf = (connection: Connection) => {
     if (connection.source.startsWith('steps:')) {
       const index = Number(connection.source.slice(6, connection.source.indexOf('.')));
-      return `${steps[index]?.id ?? ''}.${connection.sourcePort}`;
+      return refWords({
+        kind: 'steps',
+        name: steps[index]?.id ?? '',
+        output: connection.sourcePort,
+      });
     }
     const [kind, name] = connection.source.split(':') as ['inputs' | 'test', string];
-    return refLabel({ kind, name });
+    return refWords({ kind, name });
   };
   const chains = live.map((connection) => {
     const from = columnOfBox(connection.sourceBox);

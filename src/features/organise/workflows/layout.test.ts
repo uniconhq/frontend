@@ -184,7 +184,11 @@ describe('the layout', () => {
 
     const log = layout.slots.filter((slot) => slot.source === 'steps:0.compile_log');
     expect(log.map((slot) => slot.column)).toEqual([2, 3, 4]);
-    expect(log.map((slot) => slot.label)).toEqual(['compile.compile_log', null, null]);
+    expect(log.map((slot) => slot.label)).toEqual([
+      'compile_log from compile',
+      null,
+      null,
+    ]);
     const wire = layout.wires.find((found) => found.target === 'report:log');
     expect(wire?.points).toHaveLength(2 + 2 * 3);
   });
@@ -207,7 +211,7 @@ steps:
     ]);
     const skipped = layout.slots.filter((slot) => slot.source === 'steps:0.output');
     expect(skipped.map((slot) => slot.column)).toEqual([2, 3]);
-    expect(skipped[0]?.label).toBe('a.output');
+    expect(skipped[0]?.label).toBe('output from a');
     expect(behind(layout)).toEqual([]);
   });
 

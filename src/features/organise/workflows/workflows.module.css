@@ -75,31 +75,99 @@
   opacity: 0.55;
 }
 
+/* A box's head: its name and how often it runs, its primitive's title with
+ * the reference small beside it, and what the primitive does, or the box's
+ * problem in its place. */
 .header {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
+  padding: 6px 10px 0;
+  border-bottom: 1px solid var(--unicon-border);
+  overflow: hidden;
+}
+
+.headButton {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 1px;
   width: 100%;
-  padding: 4px 10px;
+  padding: 0;
   border: 0;
   background: transparent;
   color: inherit;
+  font: inherit;
   text-align: left;
   cursor: pointer;
 }
 
+.headButton:focus-visible {
+  outline: 2px solid var(--mantine-primary-color-filled);
+}
+
+.titleLine,
+.primitiveLine {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  white-space: nowrap;
+}
+
 .title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 13px;
   font-weight: 700;
   color: var(--unicon-text-primary);
 }
 
-.detail {
+.runs {
+  margin-left: auto;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--unicon-hover);
+  color: var(--unicon-text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.primitiveTitle {
+  color: var(--unicon-text-body);
+  font-weight: 600;
+}
+
+.ref {
+  overflow: hidden;
+  text-overflow: ellipsis;
   color: var(--unicon-text-meta);
+  font-family: var(--mantine-font-family-monospace);
+  font-size: 10px;
+}
+
+.detail {
+  color: var(--unicon-text-secondary);
   font-size: 11px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 100%;
+}
+
+.description,
+.headProblem {
+  display: -webkit-box;
+  margin: 4px 0 0;
+  overflow: hidden;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  color: var(--unicon-text-secondary);
+  font-size: 11px;
+  line-height: 15px;
+}
+
+.headProblem {
+  color: var(--unicon-text-danger);
 }
 
 /* Every port has a row of its own across the box: inputs first, outputs
@@ -148,19 +216,24 @@
   outline: 2px solid var(--mantine-primary-color-filled);
 }
 
-.type,
-.marks {
+/* What a row says of its port: its type, what it does, what it is given;
+ * cut short when it runs out of room, and whole when hovered. */
+.said {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--unicon-text-secondary);
+  font-size: 11px;
+}
+
+.optional {
   color: var(--unicon-text-meta);
   font-size: 11px;
 }
 
-.value {
-  color: var(--unicon-text-secondary);
-  font-family: var(--mantine-font-family-monospace);
-  font-size: 11px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 110px;
+/* A step's outputs, under its inputs, with a line above the first. */
+.row[data-first-output] {
+  border-top: 1px dashed var(--unicon-border);
 }
 
 .drop {
@@ -168,9 +241,9 @@
   font-style: italic;
 }
 
-.problem,
-.boxProblem {
+.problem {
   display: inline-flex;
+  flex: none;
   align-items: center;
   justify-content: center;
   width: 16px;
@@ -182,10 +255,17 @@
   font-size: 11px;
 }
 
-.boxProblem {
-  position: absolute;
-  top: 6px;
-  right: 8px;
+.problemBeside {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--unicon-text-danger);
+  font-size: 11px;
+}
+
+.headProblem .problem {
+  margin-right: 4px;
+  vertical-align: -3px;
 }
 
 .refusedMark {
