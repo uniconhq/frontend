@@ -72,7 +72,6 @@
   flex-direction: column;
   align-items: flex-start;
   width: 100%;
-  height: 44px;
   padding: 4px 10px;
   border: 0;
   background: transparent;
@@ -95,8 +94,9 @@
   max-width: 100%;
 }
 
-/* A step's input and output rows share a line; each row lets the pointer
- * through to the other, and only what it holds takes it. */
+/* Every port has a row of its own across the box: inputs first, outputs
+ * under them, their handles on the left and on the right. The row lets the
+ * pointer through to the box, and only what it holds takes it. */
 .row {
   position: absolute;
   left: 0;

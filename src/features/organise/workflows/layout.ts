@@ -25,21 +25,26 @@ import type { PrimitiveInfo } from './primitives';
  * - Colour. Five colours cut from the mark's gradient, which the columns
  *   take 1 to 5 and back down, again and again; a wire takes the colour of
  *   the column it leaves.
+ * - Rows. Every port has a row of its own across the box's whole width: a
+ *   step's inputs first, its outputs under them, so a name, its type and
+ *   what it is given never run into the port beside it.
  */
 
 export const GEOMETRY = {
   /** A box's width, and a slot's. */
-  width: 232,
+  width: 320,
   /** The space between two columns, which the wires cross. */
-  gap: 112,
-  /** A box's title rows. */
-  header: 44,
+  gap: 104,
+  /** A step's title rows: its name, its primitive and what the primitive does. */
+  header: 84,
+  /** The title rows of the inputs, a test's files and the report. */
+  groupHeader: 50,
   /** One port's row. */
-  row: 26,
+  row: 28,
   /** Below a box's last row. */
   foot: 10,
   /** Between two things in a column. */
-  space: 22,
+  space: 24,
 } as const;
 
 const SWEEPS = 4;
@@ -113,6 +118,26 @@ export function colourOf(column: number): number {
 
 export function columnX(column: number): number {
   return column * (GEOMETRY.width + GEOMETRY.gap);
+}
+
+/** The height of a box's title rows, above its first port. */
+export function headerOf(kind: BoxKind): number {
+  return kind === 'step' ? GEOMETRY.header : GEOMETRY.groupHeader;
+}
+
+/**
+ * The row a port stands on in its box: a port down the left on its own
+ * row, from the first; one down the right on the rows under every port on
+ * the left.
+ */
+export function rowOf(
+  box: Pick<Box, 'left' | 'right'>,
+  side: 'left' | 'right',
+  port: string,
+): number {
+  return side === 'left'
+    ? Math.max(box.left.indexOf(port), 0)
+    : box.left.length + Math.max(box.right.indexOf(port), 0);
 }
 
 const REPORT_BOX = 'report';
@@ -476,7 +501,7 @@ export function layoutWorkflow(
       rows:
         draft.kind === 'report'
           ? draft.left.length + 1
-          : Math.max(draft.left.length, draft.right.length, 1),
+          : Math.max(draft.left.length + draft.right.length, 1),
       base: draft.base,
     });
   for (const slot of slots.values()) items.set(slot.key, slot);
@@ -498,7 +523,7 @@ export function layoutWorkflow(
       {
         item: source.key,
         side: 'right',
-        row: source.right.indexOf(connection.sourcePort),
+        row: rowOf(source, 'right', connection.sourcePort),
       },
       ...(chains[at] ?? []).map((key): Endpoint => ({
         item: key,
@@ -612,9 +637,10 @@ export function layoutWorkflow(
     for (const key of keys) {
       const item = items.get(key);
       const isSlot = slots.has(key);
+      const kind = boxOf.get(key)?.kind ?? 'step';
       const tall = isSlot
         ? GEOMETRY.row
-        : GEOMETRY.header + (item?.rows ?? 1) * GEOMETRY.row + GEOMETRY.foot;
+        : headerOf(kind) + (item?.rows ?? 1) * GEOMETRY.row + GEOMETRY.foot;
       placed.set(key, { x: columnX(col), y, height: tall });
       y += tall + GEOMETRY.space;
     }
@@ -646,13 +672,16 @@ export function layoutWorkflow(
     const at = placed.get(key);
     if (at === undefined) return 0;
     if (slots.has(key)) return at.y + GEOMETRY.row / 2;
-    return at.y + GEOMETRY.header + Math.max(row, 0) * GEOMETRY.row + GEOMETRY.row / 2;
+    const kind = boxOf.get(key)?.kind ?? 'step';
+    return at.y + headerOf(kind) + Math.max(row, 0) * GEOMETRY.row + GEOMETRY.row / 2;
   };
   const wires: Wire[] = live.map((connection, at) => {
     const source = boxOf.get(connection.sourceBox);
     const target = boxOf.get(connection.targetBox);
-    const sourceRow = source?.right.indexOf(connection.sourcePort) ?? 0;
-    const targetRow = target?.left.indexOf(connection.targetPort) ?? 0;
+    const sourceRow =
+      source === undefined ? 0 : rowOf(source, 'right', connection.sourcePort);
+    const targetRow =
+      target === undefined ? 0 : rowOf(target, 'left', connection.targetPort);
     const points: Point[] = [
       {
         x: columnX(source?.column ?? 0) + GEOMETRY.width,

@@ -16,6 +16,8 @@ import '@xyflow/react/dist/style.css';
 import {
   GEOMETRY,
   columnX,
+  headerOf,
+  rowOf,
   wirePath,
   type Box,
   type Layout,
@@ -61,8 +63,6 @@ function useGraph(): GraphContext {
   if (found === null) throw new Error('A graph node renders inside Graph.');
   return found;
 }
-
-const rowTop = (row: number) => GEOMETRY.header + row * GEOMETRY.row + GEOMETRY.row / 2;
 
 type BoxNode = Node<{ box: Box }, 'box'>;
 type SlotNode = Node<{ label: string | null; colour: number; source: string }, 'slot'>;
@@ -176,7 +176,7 @@ function PortRow({
       data-side={side}
       data-offered={offered || undefined}
       data-refused={refused !== null || undefined}
-      style={{ top: rowTop(row) - GEOMETRY.row / 2, height: GEOMETRY.row }}
+      style={{ top: headerOf(box.kind) + row * GEOMETRY.row, height: GEOMETRY.row }}
       title={refused ?? undefined}
     >
       <Handle
@@ -263,6 +263,7 @@ function BoxView({ data }: NodeProps<BoxNode>) {
       <button
         type="button"
         className={`${classes.header} nodrag nopan`}
+        style={{ height: headerOf(box.kind) }}
         onClick={() => graph.select(box.key)}
       >
         <span className={classes.title}>{title}</span>
@@ -282,8 +283,14 @@ function BoxView({ data }: NodeProps<BoxNode>) {
       {left.map((port, row) => (
         <PortRow key={`in ${port}`} box={box} port={port} row={row} side="left" />
       ))}
-      {box.right.map((port, row) => (
-        <PortRow key={`out ${port}`} box={box} port={port} row={row} side="right" />
+      {box.right.map((port) => (
+        <PortRow
+          key={`out ${port}`}
+          box={box}
+          port={port}
+          row={rowOf(box, 'right', port)}
+          side="right"
+        />
       ))}
     </div>
   );
