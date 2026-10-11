@@ -73,7 +73,7 @@ test('an unknown address renders the 404 inside the shell', async ({ page }) => 
   await stubApi(page);
   await page.goto('/no-such-page');
 
-  await expect(page.getByRole('heading', { name: '404' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Page not found' })).toBeVisible();
   await expect(page.getByRole('navigation', { name: 'Sections' })).toBeVisible();
 });
 
