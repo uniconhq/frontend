@@ -177,7 +177,7 @@ describe("the contest's gradings feed", () => {
     expect(sortAda).toHaveTextContent('Cancelled');
     expect(sortAda).toHaveTextContent('The run did not report by its deadline.');
     expect(sortAda).toHaveTextContent(
-      'Told the contestant: “Our grader broke; this one does not count against you.”',
+      'Told the entrant: “Our grader broke; this one does not count against you.”',
     );
   });
 
@@ -363,7 +363,7 @@ describe('acting on the feed', () => {
     ).toBeVisible();
   });
 
-  it('cancels a system error with the sentence the contestant reads, once given', async () => {
+  it('cancels a system error with the sentence the entrant reads, once given', async () => {
     const sent: unknown[] = [];
     server.use(
       signedIn,
@@ -394,7 +394,7 @@ describe('acting on the feed', () => {
     });
     expect(confirm).toBeDisabled();
     const field = within(dialog).getByRole('textbox', {
-      name: /^What the contestant reads/,
+      name: /^What the entrant reads/,
     });
     expect(field).toHaveAttribute('maxlength', '500');
     await user.type(field, '  Our grader broke.  ');
@@ -430,7 +430,7 @@ describe('acting on the feed', () => {
       name: 'Cancel this submission?',
     });
     await user.type(
-      within(dialog).getByRole('textbox', { name: /^What the contestant reads/ }),
+      within(dialog).getByRole('textbox', { name: /^What the entrant reads/ }),
       'Sorry.',
     );
     await user.click(
@@ -537,7 +537,7 @@ describe('acting on the feed', () => {
     ).toBeNull();
   });
 
-  it('falls a broken attempt back to its last good result after asking, and clears that', async () => {
+  it('uses a broken attempt’s last good result after saying what it shows and how to undo it, and stops using it', async () => {
     const broken: FeedEntry = {
       ...retried,
       grading: { ...stuckFirst.grading, id: 'g-sum-2', attempt: 2, last_good: 1 },
@@ -571,38 +571,52 @@ describe('acting on the feed', () => {
     renderApp(FEED);
 
     const name = 'B submission 3 by ada, attempt 2';
-    await user.click(
-      await screen.findByRole('button', { name: `Fall back ${name} to attempt 1` }),
-    );
+    const use = `Use the last good result, attempt 1, for ${name}`;
+    await user.click(await screen.findByRole('button', { name: use }));
     const asked = await screen.findByRole('dialog', {
-      name: 'Fall back to the last good result?',
+      name: 'Use the last good result?',
     });
     expect(asked).toHaveTextContent(
-      "ada's submission 3 to sum counts as attempt 1, its last attempt that finished with a result, in place of attempt 2",
+      "The entrant and the leaderboards see ada's submission 3 to sum with the result of attempt 1, its last attempt that finished, in place of attempt 2's system error.",
+    );
+    expect(asked).toHaveTextContent(
+      'To undo it, choose Stop using the last good result on this submission.',
     );
     expect(changed).toEqual([]);
-    await user.click(within(asked).getByRole('button', { name: 'Fall back' }));
+    await user.click(
+      within(asked).getByRole('button', { name: 'Use the last good result' }),
+    );
 
     const group = await screen.findByRole('rowgroup', {
       name: 'B submission 3 by ada',
     });
     await waitFor(() =>
-      expect(group).toHaveTextContent("Counts as attempt 1's result, as staff asked."),
+      expect(group).toHaveTextContent(
+        "Uses the last good result, attempt 1's, as an organiser chose.",
+      ),
     );
-    expect(within(group).queryByRole('button', { name: /^Fall back/ })).toBeNull();
+    expect(within(group).queryByRole('button', { name: use })).toBeNull();
     await user.click(
-      within(group).getByRole('button', { name: `Clear the fallback on ${name}` }),
+      within(group).getByRole('button', {
+        name: `Stop using the last good result for ${name}`,
+      }),
     );
-    const clearing = await screen.findByRole('dialog', { name: 'Clear the fallback?' });
-    await user.click(
-      within(clearing).getByRole('button', { name: 'Clear the fallback' }),
+    const clearing = await screen.findByRole('dialog', {
+      name: 'Stop using the last good result?',
+    });
+    expect(clearing).toHaveTextContent(
+      "The entrant and the leaderboards see ada's submission 3 to sum as the contest's settings say for attempt 2's system error: still being graded, counting nothing, unless they use the last good result.",
     );
+    expect(clearing).toHaveTextContent(
+      'To undo it, choose Use the last good result again.',
+    );
+    await user.click(within(clearing).getByRole('button', { name: 'Stop using it' }));
 
-    await waitFor(() => expect(group).not.toHaveTextContent('Counts as attempt 1'));
+    await waitFor(() =>
+      expect(group).not.toHaveTextContent('Uses the last good result'),
+    );
     expect(changed).toEqual(['put sum/g-sum-2', 'delete sum/g-sum-2']);
-    expect(
-      within(group).getByRole('button', { name: `Fall back ${name} to attempt 1` }),
-    ).toBeVisible();
+    expect(within(group).getByRole('button', { name: use })).toBeVisible();
   });
 
   it("says when the contest's settings count a broken attempt's last good result", async () => {
@@ -624,33 +638,35 @@ describe('acting on the feed', () => {
       name: 'A submission 1 by ada',
     });
     expect(group).toHaveTextContent(
-      "Counts as attempt 1's result, as the contest's settings say.",
+      "Uses the last good result, attempt 1's, as the contest's settings say.",
     );
-    expect(within(group).queryByRole('button', { name: /^Clear/ })).toBeNull();
-    // Staff may still fall back, so the fallback outlasts a change to the settings.
+    expect(within(group).queryByRole('button', { name: /^Stop using/ })).toBeNull();
+    // An organiser may still choose it, so it outlasts a change to the settings.
     await userEvent.click(
       within(group).getByRole('button', {
-        name: 'Fall back A submission 1 by ada, attempt 2 to attempt 1',
+        name: 'Use the last good result, attempt 1, for A submission 1 by ada, attempt 2',
       }),
     );
     const asked = await screen.findByRole('dialog', {
-      name: 'Fall back to the last good result?',
+      name: 'Use the last good result?',
     });
+    expect(asked).toHaveTextContent("in place of attempt 2's cancel.");
     expect(asked).toHaveTextContent(
-      "The contest's settings count it so already; this keeps it so if they change.",
+      "The contest's settings use it already; choosing it here keeps it if they change.",
     );
     expect(asked).toHaveTextContent(
-      "The cancel took it out of the task's limit; it takes its place there again.",
+      "It counts against the task's limit on submissions again.",
     );
   });
 
-  it('keeps a refused fallback in the dialog with its sentence', async () => {
+  it('keeps a refused last good result in the dialog with its sentence', async () => {
     server.use(
       signedIn,
       taskList,
       http.put(`${CONTEST_API}/tasks/:task/gradings/:grading/fallback`, () =>
         problem(409, 'conflict', {
-          detail: 'No earlier attempt of this submission finished with a result.',
+          detail:
+            'No earlier attempt of this submission finished with a result to fall back to.',
         }),
       ),
     );
@@ -662,22 +678,24 @@ describe('acting on the feed', () => {
 
     await user.click(
       await screen.findByRole('button', {
-        name: 'Fall back B submission 3 by ada, attempt 2 to attempt 1',
+        name: 'Use the last good result, attempt 1, for B submission 3 by ada, attempt 2',
       }),
     );
     const asked = await screen.findByRole('dialog', {
-      name: 'Fall back to the last good result?',
+      name: 'Use the last good result?',
     });
-    await user.click(within(asked).getByRole('button', { name: 'Fall back' }));
+    await user.click(
+      within(asked).getByRole('button', { name: 'Use the last good result' }),
+    );
 
     const refused = await within(asked).findByRole('alert');
-    expect(refused).toHaveTextContent('Nothing to fall back to');
+    expect(refused).toHaveTextContent('No last good result to use');
     expect(refused).toHaveTextContent(
-      'No earlier attempt of this submission finished with a result.',
+      'No earlier attempt of this submission finished with a result to fall back to.',
     );
   });
 
-  it("says a retry ends staff's fallback", async () => {
+  it('says a retry stops using the last good result', async () => {
     server.use(signedIn, taskList);
     feedAnswering(() => [
       {
@@ -701,7 +719,7 @@ describe('acting on the feed', () => {
     );
     const asked = await screen.findByRole('dialog', { name: 'Retry this grading?' });
 
-    expect(asked).toHaveTextContent("The retry ends staff's fallback on attempt 2");
+    expect(asked).toHaveTextContent('The retry stops using the last good result');
   });
 
   it('keeps a refused retry in the dialog with its sentence', async () => {

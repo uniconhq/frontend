@@ -11,17 +11,17 @@ import type { Asking } from './use-grading-actions';
 import shared from '../organise.module.css';
 import classes from './feed.module.css';
 
-/** The most characters the sentence a cancel gives its contestant may run to. */
+/** The most characters the sentence a cancel gives its entrant may run to. */
 const REASON_MAX = 500;
 
 /**
  * What a latest attempt offers a manager of its task: Retry once it has
  * finished, drawn as the thing to do for a system error, and Cancel for a
- * system error alone. A submission staff cancelled is offered neither, since
- * a cancel is final. A broken attempt with an earlier result offers Fall back
- * until staff have asked for one, the contest's own fallback included, so the
- * fallback outlasts a change to the contest's settings, and Clear fallback
- * once they have.
+ * system error alone. A submission the organisers cancelled is offered
+ * neither, since a cancel is final. A broken attempt with an earlier result
+ * offers "Use the last good result" until an organiser has chosen it, even
+ * where the contest's settings use it already, so the choice outlasts a
+ * change to them, and "Stop using the last good result" once they have.
  */
 export function AttemptActions({
   task,
@@ -61,20 +61,20 @@ export function AttemptActions({
         <Button
           size="xs"
           variant="secondary"
-          label={`Fall back ${name} to attempt ${String(lastGood)}`}
+          label={`Use the last good result, attempt ${String(lastGood)}, for ${name}`}
           onClick={() => onAsk({ kind: 'fallBack', task, entry })}
         >
-          Fall back
+          Use the last good result
         </Button>
       )}
       {lastGood !== null && fallsBack && (
         <Button
           size="xs"
           variant="secondary"
-          label={`Clear the fallback on ${name}`}
+          label={`Stop using the last good result for ${name}`}
           onClick={() => onAsk({ kind: 'clearFallback', task, entry })}
         >
-          Clear fallback
+          Stop using the last good result
         </Button>
       )}
     </div>
@@ -84,18 +84,23 @@ export function AttemptActions({
 const TITLE: Record<Asking['kind'], string> = {
   retry: 'Retry this grading?',
   cancel: 'Cancel this submission?',
-  fallBack: 'Fall back to the last good result?',
-  clearFallback: 'Clear the fallback?',
+  fallBack: 'Use the last good result?',
+  clearFallback: 'Stop using the last good result?',
   rejudge: 'Rejudge every submission of this task?',
 };
 
 const CONFIRM: Record<Asking['kind'], string> = {
   retry: 'Retry',
   cancel: 'Cancel the submission',
-  fallBack: 'Fall back',
-  clearFallback: 'Clear the fallback',
+  fallBack: 'Use the last good result',
+  clearFallback: 'Stop using it',
   rejudge: 'Rejudge',
 };
+
+/** What went wrong with the attempt a last good result stands in for. */
+function brokenAs(status: string): string {
+  return status === 'cancelled' ? 'cancel' : 'system error';
+}
 
 /** What confirming does, in words. */
 function Consequence({ asking }: { asking: Asking }) {
@@ -128,26 +133,24 @@ function Consequence({ asking }: { asking: Asking }) {
     return (
       <>
         <BodyText>
-          {submission} to {asking.task} counts as attempt {grading.last_good}, its last
-          attempt that finished with a result, in place of attempt {grading.attempt}: on
-          the boards, to its contestant and under the task&apos;s limit.
+          The entrant and the leaderboards see {submission} to {asking.task} with the
+          result of attempt {grading.last_good}, its last attempt that finished, in
+          place of attempt {grading.attempt}&apos;s {brokenAs(grading.status)}.
+        </BodyText>
+        <BodyText>
+          To undo it, choose Stop using the last good result on this submission.
         </BodyText>
         {grading.fallback === 'contest' && (
           <BodyText tone="secondary">
-            The contest&apos;s settings count it so already; this keeps it so if they
-            change.
+            The contest&apos;s settings use it already; choosing it here keeps it if
+            they change.
           </BodyText>
         )}
         {grading.status === 'cancelled' && (
           <BodyText tone="secondary">
-            The cancel took it out of the task&apos;s limit; it takes its place there
-            again.
+            It counts against the task&apos;s limit on submissions again.
           </BodyText>
         )}
-        <BodyText tone="secondary">
-          A cancel keeps that result. Clear the fallback to count the submission as the
-          contest&apos;s settings say again.
-        </BodyText>
       </>
     );
   }
@@ -155,10 +158,15 @@ function Consequence({ asking }: { asking: Asking }) {
     return (
       <>
         <BodyText>
-          {submission} to {asking.task} counts as the contest&apos;s settings say again:
-          still being graded while attempt {grading.attempt} is a system error, and void
-          once it is cancelled, unless the contest counts the last good result.
+          The entrant and the leaderboards see {submission} to {asking.task} as the
+          contest&apos;s settings say for attempt {grading.attempt}&apos;s{' '}
+          {brokenAs(grading.status)}:{' '}
+          {grading.status === 'cancelled'
+            ? 'cancelled, counting nothing'
+            : 'still being graded, counting nothing'}
+          , unless they use the last good result.
         </BodyText>
+        <BodyText>To undo it, choose Use the last good result again.</BodyText>
       </>
     );
   }
@@ -174,9 +182,8 @@ function Consequence({ asking }: { asking: Asking }) {
         </BodyText>
         {grading.falls_back && (
           <BodyText tone="secondary">
-            The retry ends staff&apos;s fallback on attempt {grading.attempt}: the
-            submission counts as the new attempt, or as the contest&apos;s settings say
-            should that one break too.
+            The retry stops using the last good result: the submission counts as the new
+            attempt, or as the contest&apos;s settings say should that one break too.
           </BodyText>
         )}
       </>
@@ -186,15 +193,15 @@ function Consequence({ asking }: { asking: Asking }) {
     <>
       {grading.fallback === null ? (
         <BodyText>
-          {submission} to {asking.task} ends as cancelled. Its contestant reads the
+          {submission} to {asking.task} ends as cancelled. Its entrant reads the
           sentence below in place of a result, and the submission no longer counts
           against the task&apos;s limit.
         </BodyText>
       ) : (
         <BodyText>
           Attempt {grading.attempt} of {submission} to {asking.task} ends as cancelled.
-          While the fallback holds, the submission keeps counting as attempt{' '}
-          {grading.last_good}, its last good result, and its contestant reads that.
+          While the last good result is used, the submission keeps counting as attempt{' '}
+          {grading.last_good}, and its entrant sees that.
         </BodyText>
       )}
       <BodyText tone="secondary">
@@ -213,7 +220,7 @@ type Words = Partial<Record<string, { title: string; fallback: string }>>;
 const CANCEL_REFUSED: Words = {
   invalid_reason: {
     title: 'That sentence will not do',
-    fallback: `Give the contestant a sentence of 1 to ${String(REASON_MAX)} characters.`,
+    fallback: `Give the entrant a sentence of 1 to ${String(REASON_MAX)} characters.`,
   },
   wrong_status: {
     title: 'It is no longer a system error',
@@ -229,7 +236,7 @@ const RETRY_REFUSED: Words = {
   wrong_status: {
     title: 'It cannot be retried',
     fallback:
-      'Only a finished grading can be retried, and never a submission staff cancelled.',
+      'Only a finished grading can be retried, and never a submission the organisers cancelled.',
   },
   conflict: {
     title: 'Not the attempt to retry',
@@ -240,14 +247,14 @@ const RETRY_REFUSED: Words = {
 
 const FALL_BACK_REFUSED: Words = {
   wrong_status: {
-    title: 'It is not broken',
+    title: 'It did not fail',
     fallback:
-      'Only a grading that reads as a system error, or one staff cancelled, falls back.',
+      'The last good result is used only for a grading that failed with a system error, or one the organisers cancelled.',
   },
   conflict: {
-    title: 'Nothing to fall back to',
+    title: 'No last good result to use',
     fallback:
-      'Only the latest attempt falls back, and only to an earlier attempt that finished with a result.',
+      'It is used only for the latest attempt, and only when an earlier attempt finished with a result.',
   },
 };
 
@@ -351,7 +358,7 @@ export function ConfirmDialog({
           <Consequence asking={asking} />
           {asking.kind === 'cancel' && (
             <TextInput
-              label="What the contestant reads"
+              label="What the entrant reads"
               description={`One sentence, at most ${String(REASON_MAX)} characters, shown with the submission.`}
               value={asking.reason}
               onChange={(reason) => onChange({ ...asking, reason })}

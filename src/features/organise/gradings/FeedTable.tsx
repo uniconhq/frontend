@@ -32,17 +32,17 @@ function TaskCell({ path, entry }: { path: ContestPath; entry: FeedEntry }) {
   );
 }
 
-/** Who has a broken attempt count as its submission's last good result. */
+/** Who has a broken attempt use its submission's last good result. */
 const FALLBACK_BY: Record<Fallback, string> = {
-  staff: 'as staff asked',
+  staff: 'as an organiser chose',
   contest: "as the contest's settings say",
 };
 
 /**
- * Where an attempt stands: its status, the reason a system error gave staff,
- * the sentence a cancel told the contestant, the earlier result a fallback
- * counts in its place, what a finished run came to, and its log where its
- * run wrote one.
+ * Where an attempt stands: its status, the reason a system error gave the
+ * organisers, the sentence a cancel told the entrant, the last good result
+ * used in its place, what a finished run came to, and its log where its run
+ * wrote one.
  */
 function StatusCell({
   path,
@@ -60,12 +60,12 @@ function StatusCell({
       {grading.error !== null && <BodyText tone="secondary">{grading.error}</BodyText>}
       {grading.cancel_reason !== null && (
         <BodyText tone="secondary">
-          Told the contestant: &ldquo;{grading.cancel_reason}&rdquo;
+          Told the entrant: &ldquo;{grading.cancel_reason}&rdquo;
         </BodyText>
       )}
       {grading.fallback !== null && grading.last_good !== null && (
         <BodyText tone="secondary">
-          Counts as attempt {grading.last_good}&apos;s result,{' '}
+          Uses the last good result, attempt {grading.last_good}&apos;s,{' '}
           {FALLBACK_BY[grading.fallback]}.
         </BodyText>
       )}
