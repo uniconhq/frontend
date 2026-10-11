@@ -6,7 +6,11 @@ import { CONTEST_SECTIONS, orgSectionPath, sectionOf } from '@/lib/sections';
 import { FileBrowser } from '../files/FileBrowser';
 import { ContestSettings } from '../forms/ContestSettings';
 import { PeopleSection } from '../people/PeopleSection';
-import { holdsAt } from '../roles';
+import { BodyText } from '@/ui/BodyText';
+import { SectionTitle } from '@/ui/SectionTitle';
+import { InvitesSection } from '../invites/InvitesSection';
+import { holdsAt, holdsAtContest } from '../roles';
+import classes from '../organise.module.css';
 import { SectionPage } from '../SectionPage';
 import { AnnouncementsSection } from '../threads/AnnouncementsSection';
 import { ContestClarifications } from '../threads/Clarifications';
@@ -24,6 +28,35 @@ export function ContestSettingsPage() {
     <SectionPage section={sectionOf(CONTEST_SECTIONS, 'settings')}>
       <Card>
         <ContestSettings place={place} admin={admin} />
+      </Card>
+    </SectionPage>
+  );
+}
+
+/**
+ * How people enter the contest: for now the invites to a place in it, which
+ * a manager makes and an observer reads, the invites members of its teams
+ * made among them.
+ */
+export function ContestEntryPage() {
+  const { org, contest } = useContestParams();
+  const manages = holdsAtContest(useMe().roles, org, contest, 'manager');
+  return (
+    <SectionPage section={sectionOf(CONTEST_SECTIONS, 'entry')}>
+      <Card>
+        <div className={classes.stack}>
+          <SectionTitle>Invites</SectionTitle>
+          <BodyText tone="secondary">
+            An invite offers someone a place in this contest. Accepting it registers
+            them, and lets them see the contest while only its entrants do.
+          </BodyText>
+          <InvitesSection
+            place={{ kind: 'contest', org, contest }}
+            audience="contestants"
+            manages={manages}
+            administers={false}
+          />
+        </div>
       </Card>
     </SectionPage>
   );

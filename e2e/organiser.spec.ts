@@ -78,11 +78,18 @@ async function stubOrganiserApi(page: Page) {
         end: '2026-10-01T14:00:00Z',
         state: 'draft',
         now: '2026-09-29T10:00:00Z',
-        registration: null,
+        registration: {
+          entrant: null,
+          invitations: [],
+          registration_open: false,
+          can_register: false,
+          asks_code: false,
+          refused: null,
+          most: 1,
+          fewest: 1,
+          locks: 'start',
+        },
         organises: true,
-        registration_open: false,
-        invite_only: false,
-        asks_code: false,
         tasks: [],
       });
     }
@@ -99,8 +106,7 @@ async function stubOrganiserApi(page: Page) {
     const contest = '/api/v1/orgs/acme/contests/spring';
     if (
       [
-        `${contest}/contestants`,
-        `${contest}/organise/teams`,
+        `${contest}/organise/entrants`,
         `${contest}/organise/boards`,
         `${contest}/announcements`,
         `${contest}/clarifications`,

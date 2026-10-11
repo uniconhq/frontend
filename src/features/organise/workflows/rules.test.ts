@@ -17,6 +17,8 @@ import { NumberText } from '../forms/yaml-doc';
 const CHECKER: PrimitiveInfo = {
   ref: 'unicon/checker-like@v1',
   name: 'checker-like',
+  title: null,
+  description: null,
   version: 'v1',
   batch: true,
   network: false,
@@ -29,8 +31,16 @@ const CHECKER: PrimitiveInfo = {
       optional: false,
       runs: null,
       secret: false,
+      description: null,
     },
-    note: { type: 'text', optional: true, options: null, runs: null, secret: false },
+    note: {
+      type: 'text',
+      optional: true,
+      options: null,
+      runs: null,
+      secret: false,
+      description: null,
+    },
   },
   outputs: {
     fraction: {
@@ -39,6 +49,7 @@ const CHECKER: PrimitiveInfo = {
       options: null,
       runs: null,
       secret: false,
+      description: null,
     },
     outcome: {
       type: 'outcome',
@@ -46,6 +57,7 @@ const CHECKER: PrimitiveInfo = {
       options: null,
       runs: null,
       secret: false,
+      description: null,
     },
   },
   problem: null,

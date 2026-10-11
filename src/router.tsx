@@ -1,6 +1,8 @@
 import {
   createBrowserRouter,
+  Navigate,
   Outlet,
+  useLocation,
   useRouteError,
   type RouteObject,
 } from 'react-router';
@@ -25,7 +27,13 @@ import {
   WorkflowsPage,
 } from '@/features/organise';
 import { RequireSession, SessionExpiredModal, SessionProvider } from '@/session';
-import { CONTEST_SECTIONS, ORG_SECTIONS, TASK_SECTIONS } from '@/lib/sections';
+import {
+  CONTEST_SECTIONS,
+  contestSectionPath,
+  ORG_SECTIONS,
+  TASK_SECTIONS,
+} from '@/lib/sections';
+import { useContestParams } from '@/lib/route-params';
 
 const ORG = ':org';
 const CONTEST = `${ORG}/contests/:contest`;
@@ -49,6 +57,23 @@ const sectionRoutes: RouteObject[] = [
     return { path: `${TASK}/${section.segment}`, element: <Page /> };
   }),
 ];
+
+/**
+ * The contest's Contestants and Teams pages, now its one Entrants page: an
+ * old link lands there, its filters kept.
+ */
+function ToEntrants() {
+  const { org, contest } = useContestParams();
+  const { search } = useLocation();
+  return (
+    <Navigate to={`${contestSectionPath(org, contest, 'entrants')}${search}`} replace />
+  );
+}
+
+const movedRoutes: RouteObject[] = ['contestants', 'teams'].map((segment) => ({
+  path: `${CONTEST}/${segment}`,
+  element: <ToEntrants />,
+}));
 
 /**
  * Data-router mode, because the route tree is about to get deep and loaders are
@@ -150,6 +175,7 @@ export const routes: RouteObject[] = [
                   { path: CONTEST, element: <ContestPage /> },
                   { path: TASK, element: <TaskPage /> },
                   ...sectionRoutes,
+                  ...movedRoutes,
                 ],
               },
             ],

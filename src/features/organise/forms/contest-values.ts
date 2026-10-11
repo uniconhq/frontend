@@ -25,14 +25,13 @@ export type ContestValues = {
   end: string;
   state: string;
   visibility: string;
-  inviteOnly: boolean;
   opens: string;
   closes: string;
-  approval: string;
-  emailPattern: string;
-  code: string;
   capacity: string;
-  teamSize: string;
+  /** The most and the fewest people in one entrant, and when its roster locks. */
+  most: string;
+  fewest: string;
+  locks: string;
   onSystemError: string;
   /** The task entries in the order the form shows them. */
   tasks: TaskEntryValues[];
@@ -80,6 +79,8 @@ export function readContest(doc: Doc): ContestRead {
   const registration = valueAt(doc, ['registration']);
   if (registration !== undefined && !isRecord(registration))
     unreadable.push('registration');
+  const entrants = valueAt(doc, ['entrants']);
+  if (entrants !== undefined && !isRecord(entrants)) unreadable.push('entrants');
   const list = valueAt(doc, ['tasks']);
   const listOk =
     list === undefined ||
@@ -111,14 +112,12 @@ export function readContest(doc: Doc): ContestRead {
       end: time('end'),
       state: at('state'),
       visibility: at('visibility'),
-      inviteOnly: isRecord(registration) && registration['invite_only'] === true,
       opens: isRecord(registration) ? time('registration', 'opens') : '',
       closes: isRecord(registration) ? time('registration', 'closes') : '',
-      approval: isRecord(registration) ? at('registration', 'approval') : '',
-      emailPattern: isRecord(registration) ? at('registration', 'email_pattern') : '',
-      code: isRecord(registration) ? at('registration', 'code') : '',
       capacity: isRecord(registration) ? at('registration', 'capacity') : '',
-      teamSize: at('team_size'),
+      most: isRecord(entrants) ? at('entrants', 'most') : '',
+      fewest: isRecord(entrants) ? at('entrants', 'fewest') : '',
+      locks: isRecord(entrants) ? at('entrants', 'locks') : '',
       onSystemError: at('on_system_error'),
       tasks: entries.map((entry, index) => ({
         id: String(entry['id']),
@@ -170,19 +169,16 @@ export function writeContest(
     put(['state'], before.state, after.state, text);
     put(['visibility'], before.visibility, after.visibility, text);
     const reg = (key: string) => ['registration', key];
-    if (before.inviteOnly !== after.inviteOnly) {
-      writeAt(doc, reg('invite_only'), after.inviteOnly);
-    }
     put(reg('opens'), before.opens, after.opens, time, true);
     put(reg('closes'), before.closes, after.closes, time, true);
-    put(reg('approval'), before.approval, after.approval, text, true);
-    put(reg('email_pattern'), before.emailPattern, after.emailPattern, text, true);
-    put(reg('code'), before.code, after.code, text, true);
     put(reg('capacity'), before.capacity, after.capacity, number, true);
   }
   put(['start'], before.start, after.start, time);
   put(['end'], before.end, after.end, time);
-  put(['team_size'], before.teamSize, after.teamSize, number);
+  const team = (key: string) => ['entrants', key];
+  put(team('most'), before.most, after.most, number, true);
+  put(team('fewest'), before.fewest, after.fewest, number, true);
+  put(team('locks'), before.locks, after.locks, text, true);
   put(['on_system_error'], before.onSystemError, after.onSystemError, text);
 
   // The list in its new order first, each entry moving with its comments;

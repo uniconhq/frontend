@@ -90,7 +90,15 @@ report:
 `;
 
 function port(type: string, more: Partial<PortDecl> = {}): PortDecl {
-  return { type, options: null, optional: false, runs: null, secret: false, ...more };
+  return {
+    type,
+    options: null,
+    optional: false,
+    runs: null,
+    secret: false,
+    description: null,
+    ...more,
+  };
 }
 
 const LIMITS = {
@@ -106,6 +114,8 @@ function retired(name: string): PrimitiveInfo {
   return {
     ref: `unicon/${name}@v1`,
     name,
+    title: null,
+    description: null,
     version: 'v1',
     batch: false,
     network: false,
@@ -122,6 +132,8 @@ export const PRIMITIVES: PrimitiveInfo[] = [
   {
     ref: 'unicon/compile@v2',
     name: 'compile',
+    title: null,
+    description: null,
     version: 'v2',
     batch: false,
     network: false,
@@ -143,6 +155,8 @@ export const PRIMITIVES: PrimitiveInfo[] = [
   {
     ref: 'unicon/diff-check@v2',
     name: 'diff-check',
+    title: null,
+    description: null,
     version: 'v2',
     batch: true,
     network: false,
@@ -159,6 +173,8 @@ export const PRIMITIVES: PrimitiveInfo[] = [
   {
     ref: 'unicon/sandbox-run@v2',
     name: 'sandbox-run',
+    title: null,
+    description: null,
     version: 'v2',
     batch: true,
     network: false,

@@ -123,7 +123,7 @@ const emptyOrganising = [
     HttpResponse.json({ display_name: null, description: '' }),
   ),
   /** Nobody registered for any contest, until a test registers someone. */
-  http.get('/api/v1/orgs/:org/contests/:contest/contestants', () =>
+  http.get('/api/v1/orgs/:org/contests/:contest/organise/entrants', () =>
     HttpResponse.json([]),
   ),
   /**
@@ -139,11 +139,18 @@ const emptyOrganising = [
       end: '2026-10-15T09:00:00Z',
       state: 'draft',
       now: '2026-09-12T10:00:00Z',
-      registration: null,
+      registration: {
+        entrant: null,
+        invitations: [],
+        registration_open: false,
+        can_register: false,
+        asks_code: false,
+        refused: null,
+        most: 1,
+        fewest: 1,
+        locks: 'start',
+      },
       organises: true,
-      registration_open: false,
-      invite_only: false,
-      asks_code: false,
       tasks: [],
     } satisfies ContestHome),
   ),
@@ -183,16 +190,6 @@ const noThreads = [
   http.get('/api/v1/orgs/:org/clarifications', () => HttpResponse.json([])),
 ];
 
-/** A contest whose settings leave teams off, until a test turns them on. */
-const noTeams = [
-  http.get('/api/v1/orgs/:org/contests/:contest/my-team', () =>
-    problem(409, 'teams_off'),
-  ),
-  http.get('/api/v1/orgs/:org/contests/:contest/organise/teams', () =>
-    HttpResponse.json([]),
-  ),
-];
-
 /** A contest with no boards, so no task takes marks, until a test gives some. */
 const noBoards = [
   http.get('/api/v1/public/contests/:org/:contest/boards', () => HttpResponse.json([])),
@@ -220,6 +217,5 @@ export const server = setupServer(
   noGradings,
   ...emptyOrganising,
   ...noThreads,
-  ...noTeams,
   ...noBoards,
 );

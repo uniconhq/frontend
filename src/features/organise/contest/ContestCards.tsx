@@ -1,56 +1,39 @@
 import { useQuery } from '@tanstack/react-query';
 import { $api, queryView } from '@/api/query';
-import { BodyText } from '@/ui/BodyText';
 import { useFallbackPoll } from '@/live';
 import { treeQuery } from '../files/place';
 import { count } from '../hub/count';
 import { AnnouncementsLine, FilesLine, Line } from '../hub/lines';
 import { announcementsQuery } from '../threads/announcements';
-import { useContestSettings } from './settings';
+import { entrantsLine, useEntrants } from '../entrants/names';
+import { useInvites } from '../invites/invites';
 
 type Path = { org: string; contest: string };
 
-/** How many have registered, and how many wait for an organiser. */
-export function ContestantsCard({ path }: { path: Path }) {
-  const view = queryView(
-    $api.useQuery('get', '/api/v1/orgs/{org}/contests/{contest}/contestants', {
-      params: { path },
-    }),
-  );
+/** How many entrants there are, and how many wait for an organiser. */
+export function EntrantsCard({ path }: { path: Path }) {
   return (
-    <Line
-      view={view}
-      say={(contestants) => {
-        const approved = contestants.filter((one) => one.status === 'approved').length;
-        const waiting = contestants.filter((one) => one.status === 'pending').length;
-        if (approved === 0 && waiting === 0) return 'Nobody has registered yet.';
-        return waiting === 0
-          ? `${count(approved, 'contestant', 'contestants')} approved.`
-          : `${count(approved, 'contestant', 'contestants')} approved, ${String(waiting)} waiting for approval.`;
-      }}
-    />
+    <Line view={queryView(useEntrants(path.org, path.contest))} say={entrantsLine} />
   );
 }
 
-/** How many teams there are, or that everyone enters alone. */
-export function TeamsCard({ path }: { path: Path }) {
-  const settings = useContestSettings(path.org, path.contest);
-  const view = queryView(
-    $api.useQuery('get', '/api/v1/orgs/{org}/contests/{contest}/organise/teams', {
-      params: { path },
-    }),
-  );
-  const alone =
-    settings.state === 'ready' &&
-    settings.data !== null &&
-    (settings.data.teamSize === '' || settings.data.teamSize === '1');
-  if (alone) return <BodyText>Everyone enters alone in this contest.</BodyText>;
+/** How many invites to a place in the contest wait to be accepted. */
+export function EntryCard({ path }: { path: Path }) {
+  const view = queryView(useInvites({ kind: 'contest', ...path }));
   return (
     <Line
       view={view}
-      say={(teams) =>
-        teams.length === 0 ? 'No team yet.' : `${count(teams.length, 'team', 'teams')}.`
-      }
+      say={(invites) => {
+        const waiting = invites.filter(
+          (invite) =>
+            (invite.grants === 'contestant' || invite.grants === 'member') &&
+            invite.status === 'pending' &&
+            !invite.expired,
+        ).length;
+        return waiting === 0
+          ? 'No invite waits to be accepted.'
+          : `${count(waiting, 'invite waits', 'invites wait')} to be accepted.`;
+      }}
     />
   );
 }

@@ -16,7 +16,7 @@ end: 2026-06-01T14:00:00Z
 state: draft
 visibility: signed-in
 registration:
-  approval: manual
+  capacity: 100
 leaderboards:
   - name: Standings
     who: contestants
@@ -101,21 +101,15 @@ describe('the contest settings form', { timeout: 20_000 }, () => {
     fill(field('Description'), 'Two lines\nof description');
     await userEvent.selectOptions(field('State'), 'published');
     await userEvent.selectOptions(field('Who sees it'), 'everyone');
-    await userEvent.click(
-      within(form).getByRole('checkbox', { name: 'By invitation only' }),
-    );
     fill(field('Registration opens'), '2026-05-01T08:00');
-    await userEvent.selectOptions(field('Approval'), 'auto');
     fill(field('Capacity'), '500');
-    fill(field('Code'), 'olympiad');
-    fill(field('Email pattern'), '.*@u\\.nus\\.edu');
     fill(field('Registration closes'), '2026-06-01T09:00');
     fill(field('Start'), '2026-06-01T10:00');
     fill(inBox(form, 'A: sum').getByLabelText('Released at'), '2026-06-01T11:00');
     fill(inBox(form, 'A: sum').getByLabelText('Closes'), '2026-06-01T22:00');
     fill(inBox(form, 'A: sum').getByLabelText('Marks'), '2');
     fill(field('End'), '2026-06-01T23:30');
-    fill(field('Team size'), '3');
+    fill(field('Most people in a team'), '3');
     await userEvent.selectOptions(
       field('A submission whose grading broke counts as'),
       'last_result',
@@ -138,13 +132,9 @@ describe('the contest settings form', { timeout: 20_000 }, () => {
       state: 'published',
       visibility: 'everyone',
       registration: {
-        approval: 'auto',
-        invite_only: true,
+        capacity: 500,
         opens: isoOf('2026-05-01T08:00'),
         closes: isoOf('2026-06-01T09:00'),
-        code: 'olympiad',
-        email_pattern: '.*@u\\.nus\\.edu',
-        capacity: 500,
       },
       leaderboards: [{ name: 'Standings', who: 'contestants' }],
       tasks: [
@@ -157,7 +147,7 @@ describe('the contest settings form', { timeout: 20_000 }, () => {
           marks: 2,
         },
       ],
-      team_size: 3,
+      entrants: { most: 3 },
       on_system_error: 'last_result',
     });
     expect(write?.content).toContain("# the page's title");
@@ -205,12 +195,9 @@ describe('the contest settings form', { timeout: 20_000 }, () => {
     const field = (name: string) => within(form).getByLabelText(name);
 
     expect(inBox(form, 'The contest').getByLabelText('Name')).toBeDisabled();
-    for (const name of ['State', 'Who sees it', 'Approval', 'Code', 'Capacity']) {
+    for (const name of ['State', 'Who sees it', 'Capacity']) {
       expect(field(name)).toBeDisabled();
     }
-    expect(
-      within(form).getByRole('checkbox', { name: 'By invitation only' }),
-    ).toBeDisabled();
     expect(field('Description')).toHaveAttribute('readonly');
 
     await userEvent.clear(inBox(form, 'A: sum').getByLabelText('Worth'));
@@ -241,7 +228,7 @@ describe('the contest settings form', { timeout: 20_000 }, () => {
       inBox(form, 'The contest').getByLabelText('Name'),
       'My spring',
     );
-    await userEvent.type(field('Team size'), '2');
+    await userEvent.type(field('Most people in a team'), '2');
     await userEvent.click(within(form).getByRole('button', { name: 'Save settings' }));
 
     const merge = await screen.findByRole('list', { name: 'Fields that differ' });
@@ -251,8 +238,10 @@ describe('the contest settings form', { timeout: 20_000 }, () => {
     expect(within(name).getByRole('radio', { name: 'Yours: My spring' })).toBeChecked();
     const state = within(merge).getByRole('radiogroup', { name: 'state' });
     expect(within(state).getByRole('radio', { name: 'Now: published' })).toBeChecked();
-    const teams = within(merge).getByRole('radiogroup', { name: 'team_size' });
-    expect(within(teams).getByRole('radio', { name: 'Yours: 2' })).toBeChecked();
+    const teams = within(merge).getByRole('radiogroup', { name: 'entrants' });
+    expect(
+      within(teams).getByRole('radio', { name: 'Yours: {"most":2}' }),
+    ).toBeChecked();
     expect(sent).toHaveLength(1);
 
     await userEvent.click(
@@ -267,7 +256,7 @@ describe('the contest settings form', { timeout: 20_000 }, () => {
     expect(sent[1]?.token).toBe('token-2');
     expect(parse(sent[1]?.content ?? '')).toEqual({
       ...(parse(theirs) as object),
-      team_size: 2,
+      entrants: { most: 2 },
     });
   });
 

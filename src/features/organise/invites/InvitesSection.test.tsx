@@ -304,18 +304,22 @@ describe('the organisers’ invites', () => {
 });
 
 describe('the contestants’ invites', () => {
-  it('invites someone to a place in the contest, and lists only those invites', async () => {
+  it('invites someone to a place in the contest, and lists only places, into a team or not', async () => {
     let body: unknown = null;
     const spring = { org: 'acme', contest: 'spring', task: null };
     server.use(
       signedIn,
-      http.get('/api/v1/orgs/:org/contests/:contest/contestants', () =>
-        HttpResponse.json([]),
-      ),
       http.get(CONTEST_INVITES, () =>
         HttpResponse.json([
           invite({ id: 'a', username: 'cal', grants: 'contestant', where: spring }),
           invite({ id: 'b', username: 'org', grants: 'observer', where: spring }),
+          invite({
+            id: 'c',
+            username: 'dee',
+            grants: 'member',
+            where: spring,
+            entrant: { id: 'e-red', name: 'Red' },
+          }),
         ]),
       ),
       http.post(CONTEST_INVITES, async ({ request }) => {
@@ -324,17 +328,19 @@ describe('the contestants’ invites', () => {
       }),
     );
     const user = userEvent.setup();
-    renderApp('/orgs/acme/contests/spring/contestants');
+    renderApp('/orgs/acme/contests/spring/entry');
 
     const cal = await row('cal');
     expect(cal).toHaveTextContent('Pending');
+    expect(cal).toHaveTextContent('Their own');
+    expect(await row('dee')).toHaveTextContent('Red, from a member');
     const table = screen.getByRole('table', { name: 'Invites' });
     expect(within(table).queryByText('org')).toBeNull();
     expect(
       within(table)
         .getAllByRole('columnheader')
         .map((header) => header.textContent),
-    ).toEqual(['Invited', 'Status', 'Mail', 'Actions']);
+    ).toEqual(['Invited', 'Place', 'Status', 'Mail', 'Actions']);
 
     const form = screen.getByRole('form', { name: 'Invite someone' });
     expect(within(form).queryByLabelText('Role')).toBeNull();

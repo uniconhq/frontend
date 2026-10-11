@@ -56,8 +56,8 @@ describe("the contest's settings at a glance", () => {
             'end: 2026-10-01T14:00:00Z',
             'state: draft',
             'visibility: everyone',
-            'registration: {invite_only: true, approval: auto}',
-            'team_size: 3',
+            'registration: {capacity: 500}',
+            'entrants: {most: 3}',
             '',
           ].join('\n'),
         }),
@@ -73,7 +73,7 @@ describe("the contest's settings at a glance", () => {
     expect(values).toEqual([
       `${at('2026-10-01T09:00:00Z')} to ${at('2026-10-01T14:00:00Z')}`,
       'Anyone, signed in or not',
-      'By invitation only, approved straight away',
+      'At most 500 entrants',
       'Teams of up to 3',
     ]);
     const card = screen.getByRole('region', { name: 'Settings' });
@@ -397,7 +397,8 @@ describe("the contest's sections", () => {
       expect(
         await within(await screen.findByRole('region', { name })).findByText(line),
       ).toBeVisible();
-    await says('Contestants', 'Nobody has registered yet.');
+    await says('How people enter', 'No invite waits to be accepted.');
+    await says('Entrants', 'Nobody has registered yet.');
     await says('Gradings', '3 waiting to be graded, 1 being graded.');
     await says('Announcements', '2 posted; the latest is “Task B fixed”.');
     await says('Questions', 'Nobody has asked anything yet.');

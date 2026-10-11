@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
-import { Checkbox } from '@/ui/Checkbox';
 import { Select } from '@/ui/Select';
 import { Textarea } from '@/ui/Textarea';
 import { TextInput } from '@/ui/TextInput';
@@ -88,7 +87,8 @@ function ContestForm({
   const changed = JSON.stringify(values) !== JSON.stringify(read.values);
   const problems = [
     numberProblem(values.capacity, true),
-    numberProblem(values.teamSize, true),
+    numberProblem(values.most, true),
+    numberProblem(values.fewest, true),
     ...values.tasks.flatMap((entry) => [
       numberProblem(entry.worth),
       numberProblem(entry.latePerDay),
@@ -170,12 +170,6 @@ function ContestForm({
               : ADMIN_ONLY
         }
       >
-        <Checkbox
-          label="By invitation only"
-          checked={values.inviteOnly}
-          onChange={(checked) => set('inviteOnly', checked)}
-          disabled={regLocked}
-        />
         <div className={classes.grid}>
           <TimeField
             label="Registration opens"
@@ -191,17 +185,6 @@ function ContestForm({
             onChange={(value) => set('closes', value)}
             disabled={regLocked}
           />
-          <Select
-            label="Approval"
-            value={values.approval}
-            options={choices(values.approval, [
-              { value: 'auto', label: 'auto: approved when the rules pass' },
-              { value: 'manual', label: 'manual: an organiser decides' },
-            ])}
-            placeholder="Not set (manual)"
-            onChange={(value) => set('approval', value)}
-            disabled={regLocked}
-          />
           <NumberField
             label="Capacity"
             value={values.capacity}
@@ -211,32 +194,26 @@ function ContestForm({
             whole
             disabled={regLocked}
           />
-          <TextInput
-            label="Email pattern"
-            value={values.emailPattern}
-            onChange={(value) => set('emailPattern', value)}
-            description="A regular expression the email must match."
-            disabled={regLocked}
-          />
-          <TextInput
-            label="Code"
-            value={values.code}
-            onChange={(value) => set('code', value)}
-            description="What a contestant types to register."
-            disabled={regLocked}
-          />
         </div>
       </Fieldset>
 
       <Fieldset legend="Teams">
-        <NumberField
-          label="Team size"
-          value={values.teamSize}
-          onChange={(value) => set('teamSize', value)}
-          info="The most members a team may have."
-          hint="Left empty: everyone enters alone."
-          whole
-        />
+        <div className={classes.grid}>
+          <NumberField
+            label="Most people in a team"
+            value={values.most}
+            onChange={(value) => set('most', value)}
+            placeholder="1, everyone alone"
+            whole
+          />
+          <NumberField
+            label="Fewest people in a team"
+            value={values.fewest}
+            onChange={(value) => set('fewest', value)}
+            placeholder="1"
+            whole
+          />
+        </div>
       </Fieldset>
 
       <Fieldset

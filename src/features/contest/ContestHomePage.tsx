@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { $api, queryView } from '@/api/query';
-import type { ContestHome, MyRegistration, PublicTask, TaskEntry } from '@/api/types';
+import type { ContestHome, PublicTask, TaskEntry } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { Card } from '@/ui/Card';
 import { PageLink } from '@/ui/PageLink';
@@ -12,30 +12,18 @@ import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
 import { taskPagePath } from '@/lib/contest-paths';
 import { contestPath } from '@/lib/organiser-paths';
 import { useContestParams } from '@/lib/route-params';
+import { inTeams } from '@/lib/entrants';
 import { formatDateTime } from '@/lib/time';
 import { ContestAnnouncements } from './threads/AnnouncementList';
 import { QuestionsSection } from './threads/QuestionsSection';
-import { TeamSection } from './teams/TeamSection';
 import { BOARDS_EVERY_MS, BoardList } from './boards/BoardList';
 import { BySession } from './BySession';
 import { Countdown } from '@/ui/Countdown';
-import { RegistrationPanel } from './RegistrationPanel';
+import { entryPollEvery } from './entry/poll';
+import { YourEntry } from './entry/YourEntry';
 import { SignInButtons, SignInPrompt } from './SignInPrompt';
 import { labelOf } from './task-names';
 import classes from './contest.module.css';
-
-/**
- * How often the home is read again: soon while the caller waits on an
- * organiser, and now and then otherwise, so an extension or a task released
- * by its own time reaches the page. Crossing the start or the end reads it
- * again at once.
- */
-const WAITING_ON_ORGANISER_MS = 10_000;
-const MEANWHILE_MS = 60_000;
-
-function pollEvery(registration: MyRegistration | null | undefined): number {
-  return registration?.status === 'pending' ? WAITING_ON_ORGANISER_MS : MEANWHILE_MS;
-}
 
 /**
  * A contest's released tasks, each a link to its page, and for a signed-in
@@ -85,7 +73,13 @@ function Dates({ start, end }: { start: string; end: string }) {
   );
 }
 
-/** The home as a signed-in person reads it, registration and countdown included. */
+/**
+ * The home as a signed-in person reads it, their entry and the countdown
+ * included. It is read again soon while they wait on an organiser or an
+ * invite, and now and then otherwise, so an extension or a task released by
+ * its own time reaches the page; crossing the start or the end reads it
+ * again at once.
+ */
 function SignedInHome({ org, contest }: { org: string; contest: string }) {
   const queryClient = useQueryClient();
   const view = queryView(
@@ -93,7 +87,7 @@ function SignedInHome({ org, contest }: { org: string; contest: string }) {
       'get',
       '/api/v1/orgs/{org}/contests/{contest}/home',
       { params: { path: { org, contest } } },
-      { refetchInterval: (query) => pollEvery(query.state.data?.registration) },
+      { refetchInterval: (query) => entryPollEvery(query.state.data?.registration) },
     ),
   );
   const readAgain = useCallback(() => {
@@ -148,12 +142,11 @@ function Home({
         <div className={classes.stack}>
           <Dates start={home.start} end={home.end} />
           <Countdown start={home.start} end={home.end} onBoundary={onBoundary} />
-          <RegistrationPanel org={org} contest={contest} home={home} />
         </div>
       </Card>
-      {home.registration?.status === 'approved' && (
-        <TeamSection org={org} contest={contest} end={home.end} state={home.state} />
-      )}
+      <Card>
+        <YourEntry org={org} contest={contest} home={home} />
+      </Card>
       <Card>
         <div className={classes.stack}>
           <SectionTitle>Tasks</SectionTitle>
@@ -163,11 +156,12 @@ function Home({
       <Card>
         <ContestAnnouncements org={org} contest={contest} />
       </Card>
-      {home.registration?.status === 'approved' && (
+      {home.registration.entrant?.status === 'approved' && (
         <Card>
           <QuestionsSection
             org={org}
             contest={contest}
+            team={inTeams(home.registration)}
             tasks={home.tasks.map((task) => ({ name: task.name, title: task.title }))}
           />
         </Card>
@@ -239,10 +233,10 @@ function LandingBoards({ org, contest }: { org: string; contest: string }) {
 
 /**
  * A contest's page for a contestant or a visitor, at one address for both.
- * A signed-in person reads the home, which follows their registration from
- * the register button through pending to the contest itself, read again
- * while they wait on an organiser. A visitor
- * reads the public contest.
+ * A signed-in person reads the home, which follows their entry from the
+ * register button through pending to the contest itself, read again while
+ * they wait on an organiser or an invite. A visitor reads the public
+ * contest.
  */
 export function ContestHomePage() {
   const { org, contest } = useContestParams();

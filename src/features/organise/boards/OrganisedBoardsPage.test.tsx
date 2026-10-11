@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@/test/user-event';
 import { http, HttpResponse } from 'msw';
-import { icpc, organised, row, cell } from '@/test/boards';
+import { icpc, organised, row, cell, entrantOf } from '@/test/boards';
 import { CONTEST_API } from '@/test/organiser';
 import { renderApp } from '@/test/render';
 import { server, signedIn } from '@/test/server';
@@ -61,7 +61,7 @@ describe("the organisers' boards", () => {
       http.get(`${CONTEST_API}/organise/boards`, ({ request }) => {
         const query = new URL(request.url).searchParams;
         asked.push(query.toString());
-        const picked = query.get('user_id') === '30';
+        const picked = query.get('entrant') === entrantOf(30);
         const now = picked
           ? icpc({
               rows: icpc().rows.map((found) =>
@@ -91,8 +91,8 @@ describe("the organisers' boards", () => {
       'carol',
     );
 
-    await waitFor(() => expect(asked.at(-1)).toBe('user_id=30'));
-    expect(router.state.location.search).toBe('?row=user%3A30');
+    await waitFor(() => expect(asked.at(-1)).toBe(`entrant=${entrantOf(30)}`));
+    expect(router.state.location.search).toBe(`?entrant=${entrantOf(30)}`);
     const now = screen.getByRole('table', { name: 'Standings now' });
     await waitFor(() =>
       expect(within(now).getByText('The row picked').closest('tr')).toHaveTextContent(

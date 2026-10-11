@@ -15,27 +15,16 @@ import classes from '../organise.module.css';
 /** Read again now and then, since a board is computed from what is graded and shown. */
 const MEANWHILE_MS = 30_000;
 
-/**
- * The row picked to read `now` as, kept in the page's address as `row`: a
- * contestant as `user:<id>`, a team as `team:<id>`.
- */
-const ROW_PARAM = 'row';
+/** The row picked to read `now` as, kept in the page's address as `entrant`, its id. */
+const ROW_PARAM = 'entrant';
 
-type Picked = { user_id: number } | { team: string };
-
-function pickedOf(search: URLSearchParams): Picked | null {
-  const value = search.get(ROW_PARAM);
-  if (value === null) return null;
-  const [kind, id = ''] = value.split(':', 2);
-  if (kind === 'user' && /^[1-9]\d{0,9}$/.test(id)) return { user_id: Number(id) };
-  if (kind === 'team' && id !== '') return { team: id };
-  return null;
+function pickedOf(search: URLSearchParams): { entrant: string } | null {
+  const value = search.get(ROW_PARAM)?.trim() ?? '';
+  return value === '' ? null : { entrant: value };
 }
 
 function rowValue(row: BoardRow): string {
-  return row.row.team !== null
-    ? `team:${row.row.team}`
-    : `user:${String(row.row.user_id)}`;
+  return row.row.entrant;
 }
 
 /** Every row any board lists in its final state, once each, by name. */

@@ -18,11 +18,11 @@ import { OrganisersLine } from '../hub/lines';
 import {
   AnnouncementsCard,
   BoardsCard,
-  ContestantsCard,
+  EntrantsCard,
+  EntryCard,
   FilesCard,
   GradingsCard,
   QuestionsCard,
-  TeamsCard,
 } from './ContestCards';
 import { ContestSummary } from './ContestSummary';
 import { ContestTasks } from './ContestTasks';
@@ -34,8 +34,8 @@ const CARDS: Record<
   Exclude<ContestSectionKey, 'settings'>,
   (props: { path: Path }) => ReactNode
 > = {
-  contestants: ContestantsCard,
-  teams: TeamsCard,
+  entry: EntryCard,
+  entrants: EntrantsCard,
   gradings: GradingsCard,
   boards: BoardsCard,
   announcements: AnnouncementsCard,

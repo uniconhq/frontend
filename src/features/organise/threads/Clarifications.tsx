@@ -17,7 +17,7 @@ import { ORG_SECTIONS, sectionOf } from '@/lib/sections';
 import { holdsAtContest } from '../roles';
 import { SectionPage } from '../SectionPage';
 import { QuestionThread } from '@/ui/threads/ThreadParts';
-import { isTeams } from '@/ui/threads/asker';
+import { useEntrantName } from '../entrants/names';
 import classes from '@/ui/threads/threads.module.css';
 
 const INBOX = '/api/v1/orgs/{org}/clarifications';
@@ -75,6 +75,7 @@ function ClarificationCard({
     number: clarification.number,
   };
   const name = clarification.title;
+  const asker = useEntrantName(org, contest, clarification.asker);
 
   const sendReply = async (event: FormEvent) => {
     event.preventDefault();
@@ -100,10 +101,7 @@ function ClarificationCard({
       <BodyText tone="meta">
         {org}/{contest}
       </BodyText>
-      <QuestionThread
-        clarification={clarification}
-        asker={isTeams(clarification) ? 'Team' : 'Contestant'}
-      />
+      <QuestionThread clarification={clarification} asker={asker} />
       {manages && (
         <>
           <form

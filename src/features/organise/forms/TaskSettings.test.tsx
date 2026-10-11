@@ -61,6 +61,9 @@ function declared(
     options: null,
     per_test: false,
     optional: false,
+    title: null,
+    help: null,
+    unit: null,
     ...more,
   };
 }

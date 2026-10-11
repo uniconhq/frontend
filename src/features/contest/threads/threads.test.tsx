@@ -126,11 +126,15 @@ describe('questions', () => {
   it('marks a team’s messages as the team’s', async () => {
     server.use(
       signedIn,
-      approvedHome,
+      http.get(`${CONTEST_API}/home`, () =>
+        HttpResponse.json(
+          home({ registration: { ...registration({ status: 'approved' }), most: 3 } }),
+        ),
+      ),
       http.get(`${CONTEST_API}/questions`, () =>
         HttpResponse.json([
           question({
-            asker: 'team.0b9d6a52-0000-4000-8000-000000000001',
+            asker: 'entrant.0b9d6a5200004000800000000000001a',
             messages: [
               { from_asker: true, body: 'And m?', at: '2026-09-12T09:15:00Z' },
             ],

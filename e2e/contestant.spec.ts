@@ -80,35 +80,60 @@ async function stubContestantApi(page: Page, signedIn: boolean) {
     ]),
   );
 
+  /** The caller's entry: free to register, then registered alone, pending, then approved. */
   const registration = () => {
-    if (!state.registered) return null;
+    const entry = {
+      entrant: null as unknown,
+      invitations: [],
+      registration_open: true,
+      can_register: true,
+      asks_code: false,
+      refused: null,
+      most: 1,
+      fewest: 1,
+      locks: 'start',
+    };
+    if (!state.registered) return entry;
     state.homeReads += 1;
-    const base = {
-      reason: null,
+    const entrant = {
+      id: '0e000000-0000-4000-8000-000000000007',
+      name: null,
+      display_name: 'kenny',
+      status: state.homeReads < 2 ? 'pending' : 'approved',
       registered_at: '2026-09-29T10:00:00Z',
       decided_at: null,
+      reason: null,
+      invites: [],
       time_extension: 0,
       extension_tasks: null,
+      submitted: false,
+      complete: true,
+      locked: false,
+      members: [
+        {
+          user_id: 7,
+          user: { id: 7, username: 'kenny', name: null, avatar_url: null },
+          way_kind: 'signup',
+          way_name: null,
+          joined_at: '2026-09-29T10:00:00Z',
+        },
+      ],
     };
-    if (state.homeReads < 2) return { ...base, status: 'pending' };
-    return { ...base, status: 'approved' };
+    return { ...entry, entrant, can_register: false };
   };
 
   await page.route('**/api/v1/orgs/acme/contests/spring/**', (route) => {
     const request = route.request();
     const path = new URL(request.url()).pathname;
-    if (path.endsWith('/registration') && request.method() === 'POST') {
+    if (path.endsWith('/entrants') && request.method() === 'POST') {
       state.registered = true;
-      return json(route, { status: 'pending' }, 201);
+      return json(route, {}, 201);
     }
     if (path.endsWith('/home')) {
       return json(route, {
         ...CONTEST,
         state: 'published',
         registration: registration(),
-        registration_open: true,
-        invite_only: false,
-        asks_code: false,
         now: '2026-09-29T10:00:00Z',
         tasks: [
           {

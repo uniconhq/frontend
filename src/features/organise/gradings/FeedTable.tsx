@@ -209,7 +209,6 @@ function Submission({
   const [head, ...earlier] = attempts;
   if (head === undefined) return null;
   const task = head.task;
-  const row = head.by.user_id !== null || head.by.team !== null;
   const columns = (showTask ? 6 : 5) + (actions !== null ? 1 : 0);
   return (
     <tbody aria-label={nameOf(head).replace(/, attempt \d+$/, '')}>
@@ -220,7 +219,7 @@ function Submission({
         showTask={showTask}
         earlier={{ count: earlier.length, shown, toggle: () => setShown(!shown) }}
         scored={
-          task !== null && row
+          task !== null
             ? { shown: scored, toggle: () => setScored(!scored) }
             : undefined
         }

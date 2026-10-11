@@ -12,7 +12,6 @@ import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
 import { useFallbackPoll } from '@/live';
 import { QuestionThread } from '@/ui/threads/ThreadParts';
-import { isTeams } from '@/ui/threads/asker';
 import classes from '@/ui/threads/threads.module.css';
 
 const QUESTIONS = '/api/v1/orgs/{org}/contests/{contest}/questions';
@@ -143,15 +142,18 @@ function AskForm({
  * under it, newest first. Commenting again on an answered question is how
  * they follow up; it reopens the question rather than starting a new one.
  * Refetched when a nudge says one changed, and polled while the live stream
- * is closed.
+ * is closed. In a contest entered in teams, a question is the team's, and
+ * everyone in it reads it.
  */
 export function QuestionsSection({
   org,
   contest,
+  team,
   tasks,
 }: {
   org: string;
   contest: string;
+  team: boolean;
   tasks: { name: string; title: string }[];
 }) {
   const queryClient = useQueryClient();
@@ -172,8 +174,9 @@ export function QuestionsSection({
     <div className={classes.stack}>
       <SectionTitle>Questions to the organisers</SectionTitle>
       <BodyText tone="secondary">
-        Only you and the organisers see what you ask. In a team, everyone in it sees it
-        too.
+        {team
+          ? 'Only your team and the organisers see what any of you asks.'
+          : 'Only you and the organisers see what you ask.'}
       </BodyText>
       <AskForm org={org} contest={contest} tasks={tasks} onAsked={readAgain} />
       {view.state === 'loading' && <PageSkeleton rows={2} />}
@@ -184,7 +187,7 @@ export function QuestionsSection({
             <li key={clarification.number} className={classes.item}>
               <QuestionThread
                 clarification={clarification}
-                asker={isTeams(clarification) ? 'Your team' : 'You'}
+                asker={team ? 'Your team' : 'You'}
               />
               <FollowUp
                 org={org}

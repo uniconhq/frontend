@@ -12,6 +12,7 @@ export function invite(overrides: Partial<Invite> = {}): Invite {
     grants: 'manager',
     username: 'eve',
     email: null,
+    entrant: null,
     invited_by: { id: 7, username: 'kenny', name: 'Kenny Lewi', avatar_url: null },
     status: 'pending',
     expired: false,

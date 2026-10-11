@@ -470,7 +470,7 @@ test('an earlier submission lists its files, each a download through the door', 
 const REFUSALS: [string, number, Record<string, unknown>, string][] = [
   ['task_closed', 403, { reason: 'closed' }, 'This task has closed for you'],
   ['archived', 403, {}, 'The contest is archived'],
-  ['not_approved', 403, {}, 'You are not a contestant here yet'],
+  ['not_approved', 403, {}, 'Your registration is not approved yet'],
   ['submission_limit', 409, { limit: 50 }, 'This task takes 50 submissions in all'],
   [
     'rate_limited',

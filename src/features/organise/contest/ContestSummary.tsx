@@ -19,22 +19,15 @@ function when(local: string): string {
 }
 
 function registration(values: ContestValues): string {
-  const how = values.inviteOnly
-    ? 'By invitation only'
-    : values.code !== ''
-      ? 'Anyone with the code'
-      : 'Anyone may register';
-  const approval =
-    values.approval === 'auto'
-      ? 'approved straight away'
-      : 'an organiser approves each';
-  return `${how}, ${approval}`;
+  return values.capacity === ''
+    ? 'No limit on entrants'
+    : `At most ${values.capacity} entrants`;
 }
 
 function teams(values: ContestValues): string {
-  return values.teamSize === '' || values.teamSize === '1'
+  return values.most === '' || values.most === '1'
     ? 'Everyone enters alone'
-    : `Teams of up to ${values.teamSize}`;
+    : `Teams of up to ${values.most}`;
 }
 
 /**
