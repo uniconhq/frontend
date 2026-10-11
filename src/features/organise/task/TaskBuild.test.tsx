@@ -960,6 +960,35 @@ describe('the tests of a task', { timeout: 30_000 }, () => {
     ]);
   });
 
+  it('drops a removed test’s weight with it, and undo brings the weight back', async () => {
+    const { sent } = taskBackend({
+      form: { ...CHECKED, inputs: [] },
+      content: TASK.replace(
+        'small: {pass: 30, show: verdict}',
+        "small: {each: 30, test_weights: {'2': 3, '3': 2}}",
+      ),
+    });
+    const { tests } = await openTask();
+
+    const rows = within(fieldGroup(tests, 'small')).getByRole('list', {
+      name: 'Tests of small',
+    });
+    await userEvent.click(within(rows).getByRole('button', { name: 'Remove test 2' }));
+    expect(await within(rows).findByText('To be removed')).toBeVisible();
+    await userEvent.click(
+      within(rows).getByRole('button', { name: 'Undo the change to test 2' }),
+    );
+    expect(await within(rows).findByLabelText('Test weight of 2')).toHaveValue('3');
+
+    await userEvent.click(within(rows).getByRole('button', { name: 'Remove test 2' }));
+    expect(await within(rows).findByText('To be removed')).toBeVisible();
+    await save();
+
+    const body = await waitForSave(sent);
+    const groups = written(body)['test_groups'] as Record<string, unknown>;
+    expect(groups['small']).toEqual({ each: 30, test_weights: { '3': 2 } });
+  });
+
   it('shows whose a test file is when someone else changed it first, and saves over it only when chosen', async () => {
     const { sent } = taskBackend({ form: { ...CHECKED, inputs: [] } });
     let moved = false;

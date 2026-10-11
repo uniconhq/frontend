@@ -226,7 +226,20 @@ function BuildForm({
         existing: await existingOf(place, group, test),
       })),
     )
-      .then((removals) =>
+      .then((removals) => {
+        // A removed test's weight goes with it, which the save would refuse
+        // for a test the group no longer has (T2); Undo brings it back.
+        setValues((before) => ({
+          ...before,
+          groups: before.groups.map((each) =>
+            each.name === group
+              ? {
+                  ...each,
+                  weights: each.weights.filter((row) => !tests.includes(row.test)),
+                }
+              : each,
+          ),
+        }));
         setStaged((before) => ({
           tests: before.tests.filter(
             (old) => !(old.group === group && tests.includes(old.test)),
@@ -237,17 +250,34 @@ function BuildForm({
             ),
             ...removals,
           ],
-        })),
-      )
+        }));
+      })
       .catch((error: unknown) => setReading(error));
   };
-  const undoTest = (group: string, test: string) =>
+  const undoTest = (group: string, test: string) => {
+    const removed = staged.removals.some(
+      (old) => old.group === group && old.test === test,
+    );
+    const weight = read.values.groups
+      .find((each) => each.name === group)
+      ?.weights.find((row) => row.test === test);
+    if (removed && weight !== undefined) {
+      setValues((before) => ({
+        ...before,
+        groups: before.groups.map((each) =>
+          each.name === group && !each.weights.some((row) => row.test === test)
+            ? { ...each, weights: [...each.weights, weight] }
+            : each,
+        ),
+      }));
+    }
     setStaged((before) => ({
       tests: before.tests.filter((old) => !(old.group === group && old.test === test)),
       removals: before.removals.filter(
         (old) => !(old.group === group && old.test === test),
       ),
     }));
+  };
   const removeGroup = (name: string) => {
     const folder = folders.find((each) => each.name === name);
     setValues((before) => ({
