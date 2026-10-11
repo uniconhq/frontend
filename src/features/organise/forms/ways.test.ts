@@ -123,7 +123,7 @@ describe('a board in a sentence', () => {
         rows: '10',
       }),
     ).toBe(
-      'Ranks entrants by points and the minute its counted submission was made, from the best submission on each test group on tasks sum and sort, counting only the results shown during the contest. Everyone who can see the contest sees it, the top 10 rows.',
+      'Ranks entrants by points and the minute its counted submission was made, from the best submission on each test group on tasks sum and sort, counting only the results shown during the contest. Everyone who can see the contest sees it, the top 10 rows, every row tied with the last of them, and each entrant’s own row.',
     );
   });
 });

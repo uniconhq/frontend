@@ -91,14 +91,14 @@ describe("the boards' settings", { timeout: 20_000 }, () => {
     expect(
       within(form).getByRole('status', { name: 'What Standings ranks' }),
     ).toHaveTextContent(
-      'Ranks entrants by points and penalty minutes, 20 for each earlier attempt, from each entrant’s best submission on every task, counting only the results shown after the contest ends. Entrants and organisers see it, each entrant only their own row.',
+      'Ranks entrants by points and penalty minutes, 20 for each earlier attempt, from each entrant’s best submission on every task, counting only the results shown once each task closes. Entrants and organisers see it, each entrant only their own row.',
     );
     const standings = board(form, 'Standings');
     expect(standings.getByRole('combobox', { name: 'Shown to' })).toHaveDisplayValue(
       'Entrants',
     );
     expect(standings.getByRole('combobox', { name: 'Counts' })).toHaveDisplayValue(
-      'Results shown after the contest ends',
+      'Results shown once each task closes',
     );
     expect(standings.getByRole('radio', { name: 'Only their own row' })).toBeChecked();
   });
@@ -131,7 +131,7 @@ describe("the boards' settings", { timeout: 20_000 }, () => {
 
     const form = await screen.findByRole('form', { name: 'Leaderboards' });
     await user.click(within(form).getByRole('button', { name: 'Add a leaderboard' }));
-    const added = () => board(form, /^Board 2/);
+    const added = () => board(form, /^Leaderboard 2/);
     fireEvent.change(added().getByLabelText('Name'), { target: { value: 'ICPC' } });
     const icpcBoard = () => board(form, 'ICPC');
     await user.selectOptions(icpcBoard().getByLabelText('Shown to'), 'everyone');
@@ -168,8 +168,7 @@ describe("the boards' settings", { timeout: 20_000 }, () => {
           errors: [
             {
               path: 'leaderboards[0].order[0]',
-              message:
-                'penalty is never the first key: it breaks ties among rows equal on the keys before it.',
+              message: 'No covered task reports time_ms with a fold.',
             },
           ],
         }),
@@ -189,8 +188,11 @@ describe("the boards' settings", { timeout: 20_000 }, () => {
     );
     await user.selectOptions(
       board(form, 'Standings').getByRole('combobox', { name: 'Ranked first by' }),
-      'penalty',
+      'value',
     );
+    fireEvent.change(board(form, 'Standings').getByLabelText('Value'), {
+      target: { value: 'time_ms' },
+    });
     await user.click(within(form).getByRole('button', { name: 'Save leaderboards' }));
 
     expect(
@@ -202,7 +204,46 @@ describe("the boards' settings", { timeout: 20_000 }, () => {
       name: 'Ranked first by',
     });
     expect(key).toBeInvalid();
-    expect(key).toHaveAccessibleDescription(/penalty is never the first key/);
+    expect(key).toHaveAccessibleDescription(/No covered task reports time_ms/);
+  });
+
+  it('greys out a way to rank or a submission rule the save would refuse, with the reason', async () => {
+    server.use(signedIn);
+    settings(
+      CONTEST.replace(
+        '    who: contestants\n',
+        '    who: contestants\n    rows: 10\n    order: [points, time_ms]\n',
+      ),
+    );
+    renderApp(PAGE);
+
+    const form = await screen.findByRole('form', { name: 'Leaderboards' });
+    const standings = board(form, 'Standings');
+    const first = standings.getByRole('combobox', { name: 'Ranked first by' });
+    expect(
+      within(first).getByRole('option', { name: 'Penalty minutes, fewest first' }),
+    ).toBeDisabled();
+    expect(first).toHaveAccessibleDescription(
+      'Penalty minutes only break ties, so they are never the first way to rank.',
+    );
+    const second = standings.getByRole('combobox', { name: 'Then by (2)' });
+    expect(
+      within(second).getByRole('option', { name: 'Penalty minutes, fewest first' }),
+    ).toBeEnabled();
+    const select = standings.getByRole('combobox', { name: 'Which submission counts' });
+    expect(
+      within(select).getByRole('option', {
+        name: 'Best submission on each test group',
+      }),
+    ).toBeDisabled();
+    expect(select).toHaveAccessibleDescription(
+      'The best submission on each test group needs points ranked first and no value to rank by.',
+    );
+    expect(
+      within(form).getByRole('status', { name: 'What Standings ranks' }),
+    ).toHaveTextContent(
+      'Entrants and organisers see it, the top 10 rows, every row tied with the last of them, and each entrant’s own row.',
+    );
   });
 
   it('removes a board only once asked, and the key with the last of them', async () => {

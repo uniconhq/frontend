@@ -15,7 +15,15 @@ import {
   type BoardValues,
   type OrderKeyValues,
 } from './board-values';
-import { boardSentence, KINDS, OVER, SELECT, WHO } from './board-words';
+import {
+  boardSentence,
+  KINDS,
+  OVER,
+  penaltyRefusal,
+  perGroupRefusal,
+  SELECT,
+  WHO,
+} from './board-words';
 import { Fieldset, NumberField } from './fields';
 import classes from './forms.module.css';
 
@@ -120,7 +128,7 @@ function BoardEntry({
   onRemove: () => void;
 }) {
   const [removing, setRemoving] = useState(false);
-  const title = board.name === '' ? `Board ${String(index + 1)}` : board.name;
+  const title = board.name === '' ? `Leaderboard ${String(index + 1)}` : board.name;
   const said = (...keys: string[]) => {
     const messages = keys.flatMap((key) => refusals.get(key) ?? []);
     return messages.length === 0 ? undefined : messages.join(' ');
@@ -146,6 +154,7 @@ function BoardEntry({
   };
   const rows = rowsChoice(board.rows);
   const guests = board.who === 'everyone';
+  const perGroup = perGroupRefusal(board.order);
 
   return (
     <li data-item={index}>
@@ -199,7 +208,14 @@ function BoardEntry({
             <Select
               label="Which submission counts"
               value={board.select === '' ? 'best' : board.select}
-              options={choices(board.select, SELECT)}
+              options={choices(board.select, SELECT).map((option) => ({
+                ...option,
+                disabled:
+                  option.value === 'best_per_group' &&
+                  perGroup !== null &&
+                  board.select !== 'best_per_group',
+              }))}
+              description={perGroup ?? undefined}
               onChange={(select) =>
                 onChange({ select: select === 'best' ? '' : select })
               }
@@ -397,7 +413,14 @@ function OrderKey({
       <Select
         label={label}
         value={value.kind}
-        options={KINDS}
+        options={KINDS.map((option) => ({
+          ...option,
+          disabled:
+            option.value === 'penalty' &&
+            penaltyRefusal(first) !== null &&
+            value.kind !== 'penalty',
+        }))}
+        description={penaltyRefusal(first) ?? undefined}
         onChange={(kind) => onChange(keyOfKind(kind))}
         error={error}
         disabled={disabled}

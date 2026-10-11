@@ -8,7 +8,7 @@ import type { BoardValues, OrderKeyValues } from './board-values';
 export const OVER = [
   { value: 'all', label: 'Every result' },
   { value: 'live', label: 'Results shown during the contest' },
-  { value: 'after_close', label: 'Results shown after the contest ends' },
+  { value: 'after_close', label: 'Results shown once each task closes' },
 ];
 
 export const SELECT = [
@@ -28,6 +28,24 @@ export const KINDS = [
   { value: 'penalty', label: 'Penalty minutes, fewest first' },
   { value: 'value', label: 'A value the tasks report' },
 ];
+
+/** Why the save would refuse penalty minutes as the first key (C3), or null. */
+export function penaltyRefusal(first: boolean): string | null {
+  return first
+    ? 'Penalty minutes only break ties, so they are never the first way to rank.'
+    : null;
+}
+
+/**
+ * Why the save would refuse the best submission on each test group for a
+ * board ranked by `order` (C3), or null: it needs points first and no value.
+ */
+export function perGroupRefusal(order: OrderKeyValues[]): string | null {
+  const pointsFirst = order.length === 0 || order[0]?.kind === 'points';
+  return pointsFirst && !order.some((key) => key.kind === 'value')
+    ? null
+    : 'The best submission on each test group needs points ranked first and no value to rank by.';
+}
 
 function keyWords(key: OrderKeyValues): string {
   if (key.kind === 'points') return 'points';
@@ -65,7 +83,7 @@ export function boardSentence(board: BoardValues): string {
     board.over === 'live'
       ? 'counting only the results shown during the contest'
       : board.over === 'after_close'
-        ? 'counting only the results shown after the contest ends'
+        ? 'counting only the results shown once each task closes'
         : 'counting every result once it is shown';
   const who =
     board.who === 'everyone'
@@ -81,6 +99,6 @@ export function boardSentence(board: BoardValues): string {
         ? ', each entrant only their own row'
         : rows === '' || rows === 'all'
           ? ', every row'
-          : `, the top ${rows} rows`;
+          : `, the top ${rows} rows, every row tied with the last of them, and each entrant’s own row`;
   return `Ranks entrants by ${list(order)}, from ${select} on ${tasks}, ${over}. ${who}${shown}.`;
 }
