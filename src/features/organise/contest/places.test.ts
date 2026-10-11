@@ -70,7 +70,7 @@ describe('where a refused setting of the contest is changed', () => {
     ['tasks', 'Tasks', '/orgs/acme/contests/spring?part=tasks'],
     [
       'leaderboards[0].rows',
-      'Boards, board 1: Rows shown',
+      'Leaderboards, leaderboard 1: Rows shown',
       '/orgs/acme/contests/spring/boards?field=rows&item=0',
     ],
     ['', 'Settings', '/orgs/acme/contests/spring/settings'],

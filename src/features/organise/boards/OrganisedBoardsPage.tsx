@@ -70,12 +70,12 @@ function BoardsForm({
   const problems = values.boards.flatMap(boardProblems);
 
   if (read.unreadable.includes('leaderboards')) {
-    return <BodyText>The boards’ settings cannot be read here.</BodyText>;
+    return <BodyText>The leaderboards’ settings cannot be read here.</BodyText>;
   }
   return (
     <form
       className={classes.stack}
-      aria-label="Boards"
+      aria-label="Leaderboards"
       onSubmit={(event) => {
         event.preventDefault();
         onSave((fresh) => writeContest(fresh, read.values, values, { admin }));
@@ -95,7 +95,7 @@ function BoardsForm({
             loading={busy}
             disabled={!changed || problems.length > 0}
           >
-            Save boards
+            Save leaderboards
           </Button>
           {changed && <UnsavedNote />}
         </div>
@@ -131,7 +131,11 @@ function Previewed({ board, picked }: { board: OrganisedBoard; picked: boolean }
           everyRow={!picked}
           ownLabel="The entrant previewed"
         />
-        <BoardTable board={board.final} title={`${name}, once all is shown`} everyRow />
+        <BoardTable
+          board={board.final}
+          title={`${name}, once every result is shown`}
+          everyRow
+        />
       </div>
     </Card>
   );
@@ -179,14 +183,14 @@ export function OrganisedBoardsPage() {
       {view.state === 'error' && <ErrorBlock error={view.error} onRetry={view.retry} />}
       {view.state === 'ready' && view.data.length > 0 && (
         <>
-          <SectionTitle>As they read</SectionTitle>
+          <SectionTitle>How they look</SectionTitle>
           <div className={classes.form}>
             <Select
               label="Preview as an entrant"
               value={search.get(ROW_PARAM) ?? ''}
               options={rowChoices(view.data)}
               placeholder="Every row, as organisers see it"
-              description="Shows each board now as this entrant is given it."
+              description="Shows each leaderboard as this entrant sees it now."
               onChange={pick}
             />
           </div>

@@ -211,7 +211,7 @@ function Questions({
             <ErrorBlock error={view.error} onRetry={view.retry} />
           )}
           {view.state === 'ready' && view.data.length === 0 && (
-            <BodyText tone="secondary">Nothing asked yet.</BodyText>
+            <BodyText tone="secondary">No questions asked yet.</BodyText>
           )}
           {view.state === 'ready' && view.data.length > 0 && (
             <ol className={classes.list} aria-label="Your questions">

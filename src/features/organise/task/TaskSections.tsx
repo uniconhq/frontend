@@ -89,7 +89,9 @@ export function TaskPublicationsPage() {
         <Loaded view={view} rows={2}>
           {(publications) =>
             publications.length === 0 ? (
-              <BodyText>None yet. The first save without problems publishes.</BodyText>
+              <BodyText>
+                None yet. The first save without problems publishes the task.
+              </BodyText>
             ) : (
               <ol className={classes.list} aria-label="Publications">
                 {[...publications].reverse().map((publication) => (
@@ -103,7 +105,7 @@ export function TaskPublicationsPage() {
                       ·{' '}
                       {publication.grading_changed
                         ? 'changed how submissions are graded'
-                        : 'grades as the one before'}
+                        : 'grades the same as the one before'}
                     </BodyText>
                     {publication.changes.length > 0 && (
                       <ul className={classes.named}>

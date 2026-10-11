@@ -94,7 +94,7 @@ export function TimeField({
 }) {
   const description =
     raw !== undefined && value === ''
-      ? `The file has "${raw}", which is not a time with a zone.`
+      ? `The saved value “${raw}” is not a time with a time zone. Choose the time again.`
       : (hint ?? `In your time, ${zoneName()}.`);
   return (
     <DateTimeInput

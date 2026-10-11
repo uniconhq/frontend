@@ -66,7 +66,7 @@ test('the shell and the landing page render', async ({ page }) => {
   await expect(page.getByRole('navigation', { name: 'Sections' })).toContainText(
     'Browse contests',
   );
-  await expect(page.getByText('server time')).toBeVisible();
+  await expect(page.getByText(/Deadlines and countdowns follow Unicon/)).toBeVisible();
 });
 
 test('an unknown address renders the 404 inside the shell', async ({ page }) => {

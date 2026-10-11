@@ -13,7 +13,7 @@ export const OVER = [
 
 export const SELECT = [
   { value: 'best', label: 'Best submission' },
-  { value: 'best_per_group', label: 'Best submission on each group' },
+  { value: 'best_per_group', label: 'Best submission on each test group' },
   { value: 'marked', label: 'Best of the submissions an entrant marks' },
 ];
 
@@ -51,7 +51,7 @@ export function boardSentence(board: BoardValues): string {
   const order = board.order.length === 0 ? ['points'] : board.order.map(keyWords);
   const select =
     board.select === 'best_per_group'
-      ? 'the best submission on each group'
+      ? 'the best submission on each test group'
       : board.select === 'marked'
         ? 'the best of the submissions each entrant marks'
         : 'each entrant’s best submission';

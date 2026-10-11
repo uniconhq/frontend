@@ -66,7 +66,7 @@ export async function startOn(
   workflow: string,
 ): Promise<void> {
   const parts = refParts(workflow);
-  if (parts === null) throw new Error(`${workflow} names no workflow.`);
+  if (parts === null) throw new Error(`There is no workflow called ${workflow}.`);
   const { data: version } = await apiClient.GET(
     '/api/v1/workflows/{owner}/{name}/versions/{version}',
     { params: { path: parts } },

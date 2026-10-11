@@ -326,7 +326,7 @@ function BuildForm({
         <Unread
           place={place}
           admin={admin}
-          reason={`${read.unreadable.join(', ')} ${read.unreadable.length === 1 ? 'is' : 'are'} in a shape the cards cannot read.`}
+          reason={`The cards cannot read ${read.unreadable.join(', ')}.`}
           line="The cards leave that part as it is."
         />
       )}
@@ -346,7 +346,7 @@ function BuildForm({
             : picked === saved
               ? (form?.problem ?? 'The workflow cannot be read.')
               : version.state === 'loading' && refParts(picked) !== null
-                ? 'The workflow chosen is being read.'
+                ? 'Loading the chosen workflow.'
                 : 'The workflow chosen cannot be read.'
         }
         inputs={values.inputs}
@@ -528,18 +528,18 @@ function Unread({
   return (
     <div className={shared.panel} role="alert">
       <BodyText>
-        The task’s settings do not read: {reason} {line}
+        The task’s settings cannot be read: {reason} {line}
       </BodyText>
       <BodyText tone="secondary">
         {admin
-          ? 'Mend them as text in '
-          : 'An admin of the task mends them as text in '}
+          ? 'Fix them as text in '
+          : 'An admin of the task can fix them as text in '}
         <PageLink
           to={taskSectionPath(place.org, place.contest, place.task, 'settings')}
         >
           Settings
         </PageLink>
-        ; the cards come back once they read.
+        . The cards come back once the settings can be read.
       </BodyText>
     </div>
   );

@@ -14,7 +14,7 @@ import { Fieldset, NumberField, TimeField } from './fields';
 import { numberProblem } from './yaml-doc';
 import classes from './forms.module.css';
 
-const ADMIN_ONLY = 'Only an admin of the contest changes these.';
+const ADMIN_ONLY = 'Only an admin of the contest can change these.';
 
 /** Whether the contest is entered in teams, from its most people in one entrant. */
 function teamsOn(values: ContestValues): boolean {
@@ -53,7 +53,7 @@ function SettingsForm({ doc, busy, onSave, admin }: FormProps & { admin: boolean
   const problems = [
     numberProblem(values.most, true),
     numberProblem(values.fewest, true),
-    ...(fewestTooMany ? ['The fewest is more than the most.'] : []),
+    ...(fewestTooMany ? ['The fewest people in a team is more than the most.'] : []),
   ].filter((problem) => problem !== undefined);
 
   return (
@@ -90,7 +90,7 @@ function SettingsForm({ doc, busy, onSave, admin }: FormProps & { admin: boolean
 
       <Fieldset
         legend="Schedule"
-        note="When the contest runs. Each task opens at the start and closes at the end unless its row in the tasks list says otherwise."
+        note="When the contest runs. Each task opens at the start and closes at the end, unless its own timeline in the task list says otherwise."
       >
         <div className={classes.grid}>
           <FieldBox name="start">
@@ -158,7 +158,11 @@ function SettingsForm({ doc, busy, onSave, admin }: FormProps & { admin: boolean
                   value={values.fewest}
                   onChange={(value) => set('fewest', value)}
                   placeholder="1, so one person may enter alone"
-                  error={fewestTooMany ? 'More than the most.' : undefined}
+                  error={
+                    fewestTooMany
+                      ? 'This is more than the most people in a team.'
+                      : undefined
+                  }
                   whole
                 />
               </FieldBox>
@@ -166,7 +170,7 @@ function SettingsForm({ doc, busy, onSave, admin }: FormProps & { admin: boolean
             <FieldBox name="locks">
               <RadioGroup
                 label="Teams are fixed"
-                description="Until then members invite others, rename their team and leave it; after, only organisers change who is in it."
+                description="Until then, members may invite others, rename their team or leave it. After that, only organisers can change who is in it."
                 value={values.locks === '' ? 'start' : values.locks}
                 options={[
                   { value: 'start', label: 'When the contest starts' },
@@ -181,7 +185,7 @@ function SettingsForm({ doc, busy, onSave, admin }: FormProps & { admin: boolean
 
       <Fieldset
         legend="When grading fails"
-        note="A grading can fail on the platform's side, and organisers may cancel one. This is what such a submission counts as meanwhile; organisers can still choose for one submission at a time from its gradings."
+        note="A grading can fail because of a problem on Unicon’s side, and organisers can cancel one. This says what such a submission counts as until it is graded again. Organisers can still choose differently for one submission on the Gradings page."
       >
         <FieldBox name="on_system_error">
           <RadioGroup

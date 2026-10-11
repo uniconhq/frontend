@@ -58,7 +58,7 @@ function UnderWay({ state }: { state: UploadState }) {
       </BodyText>
       {state.stage === 'sending' && state.attempt > 1 && (
         <BodyText tone="secondary">
-          The connection was cut, so it is being sent again from the start (try{' '}
+          The connection was cut, so it is being sent again from the start (attempt{' '}
           {state.attempt}).
         </BodyText>
       )}
@@ -158,7 +158,7 @@ export function TaskUpload({
           disabled={busy}
         />
         <TextInput
-          label="Where it goes"
+          label="Where to save it"
           value={path}
           onChange={(value) => {
             setTyped(true);
@@ -166,7 +166,7 @@ export function TaskUpload({
           }}
           description={
             again === undefined
-              ? 'A path in the task’s files, such as public/diagram.png. A file there now is replaced.'
+              ? 'A folder and file name in the task, such as public/diagram.png. A file already there is replaced.'
               : 'Uploading again replaces the file here.'
           }
           error={other?.why}

@@ -75,13 +75,13 @@ export async function sendToTask(
       },
     },
   );
-  if (slot === undefined) throw new Error('The upload door gave no slot.');
+  if (slot === undefined) throw new Error('The upload could not be started.');
   const completeSlot = async () => {
     const { data } = await apiClient.POST(
       '/api/v1/orgs/{org}/contests/{contest}/tasks/{task}/uploads/{upload}/complete',
       { params: { path: { ...task, upload: slot.id } } },
     );
-    if (data === undefined) throw new Error('The upload door said nothing.');
+    if (data === undefined) throw new Error('The upload could not be finished.');
     return data;
   };
 

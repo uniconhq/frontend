@@ -474,7 +474,7 @@ export function numberText(text: string): NumberText | number | undefined {
 export function numberProblem(text: string, whole = false): string | undefined {
   const value = numberOf(text);
   if (value === undefined) return undefined;
-  if (Number.isNaN(value)) return 'Not a number.';
-  if (whole && !Number.isInteger(value)) return 'A whole number.';
+  if (Number.isNaN(value)) return 'Enter a number.';
+  if (whole && !Number.isInteger(value)) return 'Enter a whole number.';
   return undefined;
 }

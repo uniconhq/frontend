@@ -183,7 +183,7 @@ function Consequence({ asking }: { asking: Asking }) {
         {grading.falls_back && (
           <BodyText tone="secondary">
             The retry stops using the last good result: the submission counts as the new
-            attempt, or as the contest&apos;s settings say should that one break too.
+            attempt, or as the contest&apos;s settings say if that one fails too.
           </BodyText>
         )}
       </>
@@ -280,7 +280,8 @@ function Refusal({ asking, error }: { asking: Asking; error: unknown }) {
       <div role="alert">
         <BodyText tone="secondary">Nothing to rejudge against</BodyText>
         <BodyText tone="secondary">
-          The task has no publication yet. The first valid save publishes one.
+          The task has not been published yet. Its first save without problems publishes
+          it.
         </BodyText>
       </div>
     );

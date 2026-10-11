@@ -308,7 +308,7 @@ test('an organiser makes an org, walks to a task and publishes a file', async ({
   const state = await stubOrganiserApi(page);
   await page.goto('/orgs');
 
-  await expect(page.getByText('You do not hold a role at any org yet.')).toBeVisible();
+  await expect(page.getByText('You do not have a role at any org yet.')).toBeVisible();
   await page.getByRole('button', { name: 'New org' }).click();
 
   const form = page.getByRole('form', { name: 'New org' });
@@ -342,7 +342,7 @@ test('an organiser makes an org, walks to a task and publishes a file', async ({
   await page.getByRole('button', { name: 'Save' }).click();
 
   const outcome = page.getByRole('status').filter({
-    hasText: 'Published as publication 2.',
+    hasText: 'Saved and published as publication 2.',
   });
   await expect(outcome).toBeVisible();
   await expect(outcome).toBeFocused();
@@ -402,7 +402,7 @@ test('an organiser sets a task up on its cards and saves them in one save', asyn
   );
   await bar.getByRole('button', { name: 'Save' }).click();
 
-  await expect(page.getByText('Published as publication 2.')).toBeVisible();
+  await expect(page.getByText('Saved and published as publication 2.')).toBeVisible();
   const [saved] = state.taskSaves as { changes: { path: string; content: string }[] }[];
   expect(saved?.changes.map((change) => change.path)).toEqual(['task.yaml']);
   expect(saved?.changes[0]?.content).toContain('time_limit: 3');

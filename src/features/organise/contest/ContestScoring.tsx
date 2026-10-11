@@ -63,7 +63,7 @@ function TaskScoring({
         {(read) => {
           const settings = readSettings(read);
           if ('error' in settings) {
-            return <BodyText tone="secondary">Its settings do not read.</BodyText>;
+            return <BodyText tone="secondary">Its settings cannot be read.</BodyText>;
           }
           const { groups, credit } = readTask(settings.doc, []).values;
           const total = taskWeight(groups);
@@ -73,8 +73,8 @@ function TaskScoring({
                 {total.num === 0n
                   ? 'It gives no points: it is ranked on what its workflow reports.'
                   : worth === null
-                    ? `Worth ${pointsText(total)} points, its groups’ total.`
-                    : `Worth ${pointsText(worth)} points, as the contest sets it; its groups total ${pointsText(total)}.`}
+                    ? `Worth ${pointsText(total)} points, its test groups’ total.`
+                    : `Worth ${pointsText(worth)} points, as the contest sets it. Its test groups total ${pointsText(total)}.`}
               </li>
               {total.num !== 0n &&
                 groups.map((group) => (
@@ -94,11 +94,12 @@ function TaskScoring({
                 .
               </li>
               {boards.length === 0 ? (
-                <li>No board counts it.</li>
+                <li>No leaderboard counts it.</li>
               ) : (
                 boards.map((board) => (
                   <li key={board.name}>
-                    {board.name === '' ? 'A board' : board.name}: {boardSentence(board)}
+                    {board.name === '' ? 'A leaderboard' : board.name}:{' '}
+                    {boardSentence(board)}
                   </li>
                 ))
               )}
@@ -132,13 +133,14 @@ export function ContestScoring({ org, contest }: { org: string; contest: string 
       <section className={shared.stack} aria-label="How this contest is scored">
         <SectionTitle>How this contest is scored</SectionTitle>
         <BodyText tone="secondary">
-          Each task as entrants are told it scores: what it is worth, how its groups
-          earn points, when it opens and closes, and the boards that count it.
+          How each task scores, as entrants are told it: what it is worth, how its test
+          groups earn points, when it opens and closes, and the leaderboards that count
+          it.
         </BodyText>
         <Loaded view={view} rows={3}>
           {(standings) =>
             standings.length === 0 ? (
-              <BodyText>No tasks yet, so nothing scores.</BodyText>
+              <BodyText>There are no tasks yet, so nothing is scored.</BodyText>
             ) : (
               <div className={classes.scoring}>
                 {standings.map((standing) => (

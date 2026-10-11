@@ -374,7 +374,9 @@ describe('the cards that build a task', { timeout: 30_000 }, () => {
     );
     await save();
 
-    expect(await screen.findByText('Published as publication 4.')).toBeVisible();
+    expect(
+      await screen.findByText('Saved and published as publication 4.'),
+    ).toBeVisible();
     expect(sent).toHaveLength(1);
     expect(sent[0]?.changes.find((change) => change.path === 'task.yaml')?.token).toBe(
       'token-task',
@@ -431,7 +433,9 @@ describe('the cards that build a task', { timeout: 30_000 }, () => {
     expect(
       within(
         within(entrants).getByRole('group', { name: 'Time limit (seconds)' }),
-      ).getByText(/The settings give this a value, but entrants give it/),
+      ).getByText(
+        /The task sets a value for this, but under this workflow entrants give it/,
+      ),
     ).toBeVisible();
     fill(fieldIn(entrants, 'Time limit (seconds)', 'Largest allowed'), '10');
     await save();
@@ -555,7 +559,7 @@ describe('the cards that build a task', { timeout: 30_000 }, () => {
 
     fill(fieldIn(tests, 'small', 'Points'), 'thirty');
 
-    expect(within(tests).getByText('Not a number.')).toBeVisible();
+    expect(within(tests).getByText('Enter a number.')).toBeVisible();
     expect(
       within(screen.getByRole('region', { name: 'Save the task' })).getByRole(
         'button',
@@ -589,7 +593,9 @@ describe('the cards that build a task', { timeout: 30_000 }, () => {
       screen.getByRole('button', { name: 'Save the merged version' }),
     );
 
-    expect(await screen.findByText('Published as publication 4.')).toBeVisible();
+    expect(
+      await screen.findByText('Saved and published as publication 4.'),
+    ).toBeVisible();
     const yaml = sent[1]?.changes.find((change) => change.path === 'task.yaml');
     expect(yaml?.token).toBe('token-theirs');
     const saved = written(sent[1]) as {
@@ -668,7 +674,7 @@ describe('scoring a task', { timeout: 30_000 }, () => {
       within(rule).getByRole('option', { name: 'The lowest test score counts' }),
     ).toBeDisabled();
     expect(rule).toHaveAccessibleDescription(
-      'The lowest test score counts: Only when a test can earn part of its points: set how a test earns first.',
+      'The lowest test score counts: Only available when a test can earn part of its points. Set how a test earns first.',
     );
     fill(fieldIn(tests, 'old', 'How does this group earn points?'), 'all');
     expect(
@@ -888,7 +894,9 @@ describe('the tests of a task', { timeout: 30_000 }, () => {
       screen.getByRole('button', { name: 'Save the merged version' }),
     );
 
-    expect(await screen.findByText('Published as publication 4.')).toBeVisible();
+    expect(
+      await screen.findByText('Saved and published as publication 4.'),
+    ).toBeVisible();
     expect(sent[1]?.changes).toContainEqual({
       path: 'tests/small/2/answer',
       token: 'token-theirs',

@@ -307,8 +307,10 @@ describe('the contest page for a signed-in person', () => {
     const [a, b, c] = within(tasks).getAllByRole('listitem');
     expect(a).toHaveTextContent('Open once your registration is approved');
     await waitFor(() => expect(a).toHaveTextContent(/Closes in /));
-    await waitFor(() => expect(b).toHaveTextContent('Closed for you'));
-    expect(c).toHaveTextContent('Takes no submissions');
+    await waitFor(() =>
+      expect(b).toHaveTextContent('Closed: it takes no more submissions from you'),
+    );
+    expect(c).toHaveTextContent('No longer takes submissions');
   });
 
   it('registers and then shows the registration waiting', async () => {
@@ -355,7 +357,7 @@ describe('the contest page for a signed-in person', () => {
   it.each([
     ['registration_closed', 403, 'Registration is closed'],
     ['is_staff', 403, 'You organise this contest'],
-    ['invite_required', 403, 'This contest is by invitation'],
+    ['invite_required', 403, 'This contest is by invite only'],
     ['domain_not_allowed', 403, 'Your email address is not accepted'],
     ['already_registered', 409, 'You have registered already'],
     ['contest_full', 409, 'The contest is full'],
@@ -535,7 +537,7 @@ describe('the contest page at its start', () => {
     );
     renderApp(PAGE);
 
-    expect(await screen.findByText('No task is released yet.')).toBeVisible();
+    expect(await screen.findByText('No tasks are released yet.')).toBeVisible();
     const timer = await screen.findByRole('timer', { name: 'Contest countdown' });
     await waitFor(() => expect(timer).toHaveTextContent(/^Contest starts in /));
     expect(

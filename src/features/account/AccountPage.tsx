@@ -49,7 +49,9 @@ export function AccountPage() {
             <BodyText tone="secondary" mono>
               {user.username}
             </BodyText>
-            <BodyText tone="secondary">{user.email ?? 'No email on record'}</BodyText>
+            <BodyText tone="secondary">
+              {user.email ?? 'No email address on record'}
+            </BodyText>
           </div>
         </div>
         {me.degraded && (
@@ -84,8 +86,8 @@ export function AccountPage() {
         <div className={classes.stack}>
           <SectionTitle>Security</SectionTitle>
           <BodyText size="md">
-            Forgejo owns your account. Your password, email addresses, avatar, and
-            two-factor settings all live there.
+            Your account is kept in Forgejo, where you change your password, email
+            addresses, avatar and two-factor sign-in.
           </BodyText>
           {forge !== null && (
             <div className={classes.forgeLinks}>

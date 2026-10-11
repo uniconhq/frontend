@@ -31,7 +31,7 @@ const PAGE = '/api/v1/orgs/{org}/contests/{contest}/tasks/{task}/page';
 /** At most `count` in any window of `seconds`, in words. */
 function rate(count: number, seconds: number): string {
   const window = seconds === 1 ? 'second' : `${seconds} seconds`;
-  return `${count} in any ${window}`;
+  return `At most ${count} in any ${window}`;
 }
 
 /**
@@ -63,9 +63,9 @@ function LimitList({ page }: { page: TaskPage }) {
           <dd>{formatDateTime(new Date(page.closes))}</dd>
         </>
       )}
-      <dt>Submissions</dt>
+      <dt>Submissions allowed</dt>
       <dd>{submissions.max} in all</dd>
-      <dt>How often</dt>
+      <dt>Submission rate</dt>
       <dd>{rate(submissions.rate.count, submissions.rate.per)}</dd>
     </dl>
   );

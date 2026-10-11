@@ -16,12 +16,12 @@ import shared from '../organise.module.css';
  */
 const UPLOAD_REFUSED: Partial<Record<string, { title: string; message: string }>> = {
   invalid_inputs: {
-    title: 'The upload does not fit this path',
-    message: 'Nothing was saved. Upload the file again for the path it is to go to.',
+    title: 'The upload was made for another place',
+    message: 'Nothing was saved. Upload the file again for the place it is to go.',
   },
   upload_not_ready: {
-    title: 'The file has not arrived whole',
-    message: 'Nothing was saved. Upload it again and it is sent again.',
+    title: 'The file did not arrive in full',
+    message: 'Nothing was saved. Upload it again.',
   },
   upload_failed: {
     title: 'The upload did not go through',

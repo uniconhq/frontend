@@ -436,10 +436,10 @@ test('a submission that did not compile shows that as its verdict', async ({
   await page.goto(`${PAGE}?submission=1`);
 
   await expect(
-    page.getByRole('table', { name: 'Your submissions' }).getByText('COMPILE ERR'),
+    page.getByRole('table', { name: 'Your submissions' }).getByText('COMPILE ERROR'),
   ).toBeVisible();
   const detail = page.getByRole('region', { name: 'Submission 1' });
-  await expect(detail.getByText('COMPILE ERR')).toBeVisible();
+  await expect(detail.getByText('COMPILE ERROR')).toBeVisible();
   await expect(detail.getByLabel('log', { exact: true })).toHaveText(
     'main.cpp:1: error',
   );

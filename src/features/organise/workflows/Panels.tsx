@@ -327,9 +327,12 @@ function Details({ primitive }: { primitive: PrimitiveInfo }) {
           Primitive <code>{primitive.ref}</code>
         </li>
         {primitive.batch && (
-          <li>For each test, it runs every test in one container, not one each.</li>
+          <li>
+            When it runs for each test, it runs every test in one container rather than
+            one container per test.
+          </li>
         )}
-        {primitive.network && <li>It may reach the network.</li>}
+        {primitive.network && <li>It can reach the network.</li>}
         {outcome !== null && <li>How it went: {outcome}</li>}
         {secret.map(([name]) => (
           <li key={name}>

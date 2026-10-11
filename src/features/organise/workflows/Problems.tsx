@@ -44,7 +44,7 @@ export function Problems({
     <section className={classes.banner} aria-label="Problems" data-tone="problem">
       <BodyText size="sm">
         {one ? 'One problem' : `${String(placed.length)} problems`} to fix before
-        publishing a version. The draft saves with {one ? 'it' : 'them'}.
+        publishing a version. You can still save the draft with {one ? 'it' : 'them'}.
       </BodyText>
       <ul className={classes.problemList}>
         {placed.map(({ problem, where, opens }) => (

@@ -29,7 +29,7 @@ export function timelineSentence(
     timeline.worth !== null
       ? `${formatExact(timeline.worth)} ${timeline.worth === '1' ? 'point' : 'points'}`
       : state.latest === null
-        ? 'points known once published'
+        ? 'points known once the task is published'
         : 'gives no points';
   const opens = same(timeline.release_at, contest?.start)
     ? 'opens with the contest'

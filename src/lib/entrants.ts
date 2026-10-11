@@ -20,7 +20,7 @@ export function wayText(member: Pick<EntrantMember, 'way_kind' | 'way_name'>): s
     case 'signup':
       return member.way_name === null ? 'Signed up' : `Signed up: ${member.way_name}`;
     case 'organiser':
-      return 'Put in by an organiser';
+      return 'Added by an organiser';
   }
 }
 
@@ -41,7 +41,8 @@ export function sizeSentence({
  * member invites others, renames it or leaves it.
  */
 export function lockSentence(locks: MyEntry['locks'], locked: boolean): string {
-  if (locked) return 'Your team is fixed now: only the organisers change who is in it.';
+  if (locked)
+    return 'Your team is fixed now: only the organisers can change who is in it.';
   return locks === 'start'
     ? 'Until the contest starts, any member may invite others, rename the team or leave it. From the start, the team is fixed.'
     : 'Until your team first submits, any member may invite others, rename the team or leave it. From that submission, the team is fixed.';

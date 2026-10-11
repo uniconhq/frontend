@@ -194,7 +194,8 @@ export function boardRefusals(
 /** Why the board's own fields cannot be saved, or nothing when they can. */
 export function boardProblems(board: BoardValues): string[] {
   return board.order.flatMap((key) => {
-    if (key.kind === 'value') return key.name.trim() === '' ? ['Name the value.'] : [];
+    if (key.kind === 'value')
+      return key.name.trim() === '' ? ['Give the name of the value.'] : [];
     if (key.kind !== 'penalty') return [];
     const minutes = numberOf(key.perAttempt);
     if (minutes === undefined) return [];

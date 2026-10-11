@@ -119,7 +119,9 @@ export function writeWays(
 export function wayProblems(ways: WayValues[]): string[] {
   const problems: string[] = [];
   if (ways.filter((way) => way.kind === 'invite').length > 1) {
-    problems.push('Invites are one way in; there is already one.');
+    problems.push(
+      'There is already a way in by invite, and a contest has at most one.',
+    );
   }
   const names = ways
     .filter(
@@ -134,7 +136,7 @@ export function wayProblems(ways: WayValues[]): string[] {
     if (way.kind !== 'signup') continue;
     for (const domain of domainsOf(way.domains)) {
       if (!/^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(domain)) {
-        problems.push(`“${domain}” is not a domain, such as u.nus.edu.`);
+        problems.push(`“${domain}” is not a domain. Write one such as u.nus.edu.`);
       }
     }
   }

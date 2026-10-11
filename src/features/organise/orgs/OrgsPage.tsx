@@ -64,7 +64,7 @@ export function OrgsPage() {
           detail: rolesAt(roles, org),
           text: org,
         }))}
-        empty="You do not hold a role at any org yet."
+        empty="You do not have a role at any org yet."
         action={<NewOrg />}
       />
     </Page>

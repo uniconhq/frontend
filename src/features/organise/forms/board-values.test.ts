@@ -167,6 +167,6 @@ describe('a contest’s boards as fields', () => {
           { kind: 'penalty', perAttempt: '20' },
         ],
       }),
-    ).toEqual(['Name the value.', 'A whole number of minutes.']);
+    ).toEqual(['Give the name of the value.', 'A whole number of minutes.']);
   });
 });

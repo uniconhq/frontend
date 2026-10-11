@@ -29,7 +29,7 @@ const CLOSED: Record<NonNullable<TaskRelease['closed']>, string> = {
 };
 
 function closedReason(closed: TaskRelease['closed']): string {
-  return closed === null ? 'This task takes no submission now.' : CLOSED[closed];
+  return closed === null ? 'This task takes no submissions right now.' : CLOSED[closed];
 }
 
 /**

@@ -50,7 +50,7 @@ function enteredSentence(entered: Entered, where: string): string {
     entered.status === 'approved'
       ? ' You are in.'
       : entered.status === 'pending'
-        ? ' An organiser approves each registration; the contest’s page says when.'
+        ? ' An organiser approves each registration, and the contest’s page will say when yours is.'
         : '';
   switch (entered.how) {
     case 'joined':
@@ -156,14 +156,14 @@ export function InviteCard({
           : `Sent by ${invite.invited_by.username}.`}{' '}
         {invite.status === 'pending' &&
           (invite.expired
-            ? `It lapsed on ${formatDateTime(new Date(invite.expires_at))}. Ask the organisers for a new one.`
-            : `It lapses on ${formatDateTime(new Date(invite.expires_at))}.`)}
+            ? `It expired on ${formatDateTime(new Date(invite.expires_at))}. Ask the organisers for a new one.`
+            : `It expires on ${formatDateTime(new Date(invite.expires_at))}.`)}
       </BodyText>
       {invite.status !== 'pending' && <Outcome invite={invite} entered={entered} />}
       {open && asksCode && (
         <TextInput
           label="Contest code"
-          description="This contest asks for the code its organisers gave out."
+          description="This contest asks for the code its organisers gave you."
           value={code}
           onChange={setCode}
           required

@@ -96,7 +96,7 @@ export function BoardTable({
         <SectionTitle>{title}</SectionTitle>
         <BodyText tone="secondary">
           {board.shown_at === null
-            ? 'None of the tasks on this board is released yet.'
+            ? 'None of the tasks on this leaderboard is released yet.'
             : `Shown from ${formatDateTime(new Date(board.shown_at))}.`}
         </BodyText>
       </section>
@@ -114,7 +114,7 @@ export function BoardTable({
       <SectionTitle>{title}</SectionTitle>
       <NotInView board={board} />
       {board.rows.length === 0 ? (
-        <BodyText tone="secondary">Nobody is on this board yet.</BodyText>
+        <BodyText tone="secondary">Nobody is on this leaderboard yet.</BodyText>
       ) : (
         <div className={classes.scroll}>
           <table className={classes.table} aria-label={title}>

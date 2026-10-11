@@ -34,7 +34,7 @@ function StateChip({ state }: { state: TaskState }) {
     return <Chip tone="warn">Last save has problems</Chip>;
   }
   if (state.latest === null) return <Chip>Not published</Chip>;
-  if (state.draft) return <Chip>Draft kept back</Chip>;
+  if (state.draft) return <Chip>Draft, not published</Chip>;
   return <Chip tone="live">Published</Chip>;
 }
 
@@ -202,7 +202,7 @@ function NextStep({
       <BodyText>
         {state.latest === null
           ? 'The task is saved and has no problems, but it is not published yet.'
-          : 'The last save is kept back as a draft, so entrants are graded as before.'}
+          : 'The last save was kept as a draft, so entrants are graded as before.'}
       </BodyText>
       {manager && (
         <Button

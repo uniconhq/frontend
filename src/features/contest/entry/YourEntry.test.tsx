@@ -127,7 +127,7 @@ describe('your entry in a contest entered in teams', () => {
       ),
     ).toBeVisible();
     await user.click(
-      within(part).getByRole('button', { name: 'Withdraw the invitation for dee' }),
+      within(part).getByRole('button', { name: 'Withdraw the invite for dee' }),
     );
 
     expect(bodies).toEqual([{ email: 'eve@example.org' }]);
@@ -188,7 +188,7 @@ describe('your entry in a contest entered in teams', () => {
     await user.click(within(part).getByRole('button', { name: 'Leave the team' }));
     const dialog = await screen.findByRole('dialog', { name: 'Leave Red?' });
     expect(dialog).toHaveTextContent(
-      'You stop reaching the team’s submissions and questions.',
+      'You lose access to the team’s submissions and questions.',
     );
     await user.click(within(dialog).getByRole('button', { name: 'Leave' }));
 
@@ -206,7 +206,7 @@ describe('your entry in a contest entered in teams', () => {
 
     const part = await yourEntry();
     expect(part).toHaveTextContent(
-      'Your team is fixed now: only the organisers change who is in it.',
+      'Your team is fixed now: only the organisers can change who is in it.',
     );
     expect(
       within(part).queryByRole('form', { name: 'Invite someone to your team' }),

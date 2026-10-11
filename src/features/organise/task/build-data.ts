@@ -43,11 +43,11 @@ export function inputTitle(
 
 /** The settings file as a document the cards can show, or why it is not one. */
 export function readSettings(file: FileContent): { doc: Doc } | { error: string } {
-  if (file.encoding !== 'utf-8') return { error: 'It is not text.' };
+  if (file.encoding !== 'utf-8') return { error: 'The file is not text.' };
   const parsed = parseYaml(file.content);
   if ('error' in parsed) return parsed;
   return topMap(parsed.doc) === 'not-a-mapping'
-    ? { error: 'Its top level is not a list of settings.' }
+    ? { error: 'The file does not hold a list of settings.' }
     : parsed;
 }
 

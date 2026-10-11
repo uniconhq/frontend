@@ -118,7 +118,7 @@ export function TaskPage() {
       <BuildCard
         id="statement"
         title="Statement"
-        line="What entrants read: the task itself, written beside how they see it. It saves on its own."
+        line="What entrants read about the task, written beside a preview of how they see it. It is saved on its own."
       >
         <StatementEditor place={place} admin={admin} />
       </BuildCard>

@@ -38,7 +38,7 @@ function worthText(worth: string | null): string | null {
 /** Where a task stands for the reader, when it is not simply open. */
 const NOT_OPEN: Record<NonNullable<TaskEntry['release']['closed']>, string | null> = {
   not_released: 'Not released yet',
-  archived: 'Takes no submissions',
+  archived: 'No longer takes submissions',
   closed: null,
   not_approved: 'Open once your registration is approved',
 };
@@ -93,7 +93,7 @@ function TaskList({
 }) {
   const { at, measured } = useServerClock();
   if (tasks.length === 0) {
-    return <BodyText tone="secondary">No task is released yet.</BodyText>;
+    return <BodyText tone="secondary">No tasks are released yet.</BodyText>;
   }
   return (
     <ul className={classes.tasks} aria-label="Tasks">
@@ -120,7 +120,7 @@ function PublicTaskList({
   tasks: PublicTask[];
 }) {
   if (tasks.length === 0) {
-    return <BodyText tone="secondary">No task is released yet.</BodyText>;
+    return <BodyText tone="secondary">No tasks are released yet.</BodyText>;
   }
   return (
     <ul className={classes.tasks} aria-label="Tasks">

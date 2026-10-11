@@ -43,7 +43,7 @@ function Form({ doc, busy, onSave, admin }: FormProps & { admin: boolean }) {
           description={
             admin
               ? 'What entrants see the task called, on its pages and in the contest.'
-              : 'Only an admin of the task changes its title.'
+              : 'Only an admin of the task can change its title.'
           }
           disabled={!admin}
         />

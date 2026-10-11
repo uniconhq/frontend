@@ -36,7 +36,7 @@ export function WorkflowPicker({
   const newest = item === undefined ? null : newestOf(item.versions);
   const workflows = usable.map((each) => ({ value: named(each), label: named(each) }));
   if (chosen !== '' && !workflows.some((each) => each.value === chosen)) {
-    workflows.unshift({ value: chosen, label: `${chosen} (you may not read it)` });
+    workflows.unshift({ value: chosen, label: `${chosen} (you cannot see it)` });
   }
   return (
     <div className={classes.grid}>

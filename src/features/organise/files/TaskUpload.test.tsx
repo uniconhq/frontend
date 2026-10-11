@@ -126,14 +126,16 @@ describe("uploading a file into a task's tree", () => {
     await userEvent.click(await within(tree).findByRole('button', { name: /data\// }));
     const panel = await openUpload();
     await userEvent.upload(within(panel).getByLabelText('File to upload'), dataset());
-    expect(within(panel).getByRole('textbox', { name: /Where it goes/ })).toHaveValue(
-      'data/train.csv',
-    );
+    expect(
+      within(panel).getByRole('textbox', { name: /Where to save it/ }),
+    ).toHaveValue('data/train.csv');
     await userEvent.click(
       within(panel).getByRole('button', { name: 'Upload and save' }),
     );
 
-    expect(await within(panel).findByText('Published as publication 3.')).toBeVisible();
+    expect(
+      await within(panel).findByText('Saved and published as publication 3.'),
+    ).toBeVisible();
     expect(panel).not.toHaveTextContent(/SHA-256|hash/i);
     expect(within(panel).queryByText(/Leaving this page loses it/)).toBeNull();
     expect(routes.seen.slots).toEqual([
@@ -173,7 +175,9 @@ describe("uploading a file into a task's tree", () => {
       within(panel).getByRole('button', { name: 'Upload and save' }),
     );
 
-    expect(await within(panel).findByText('Published as publication 3.')).toBeVisible();
+    expect(
+      await within(panel).findByText('Saved and published as publication 3.'),
+    ).toBeVisible();
     expect(routes.seen.puts).toBe(0);
     expect(routes.seen.completes).toBe(1);
   });
@@ -191,7 +195,9 @@ describe("uploading a file into a task's tree", () => {
       within(panel).getByRole('button', { name: 'Upload and save' }),
     );
 
-    expect(await within(panel).findByText('Published as publication 3.')).toBeVisible();
+    expect(
+      await within(panel).findByText('Saved and published as publication 3.'),
+    ).toBeVisible();
     expect(routes.seen.puts).toBe(2);
     expect(routes.seen.slots).toHaveLength(1);
   });
@@ -222,14 +228,14 @@ describe("uploading a file into a task's tree", () => {
 
     const panel = await openUpload();
     await userEvent.upload(within(panel).getByLabelText('File to upload'), dataset());
-    const path = within(panel).getByRole('textbox', { name: /Where it goes/ });
+    const path = within(panel).getByRole('textbox', { name: /Where to save it/ });
     await userEvent.clear(path);
     await userEvent.type(path, 'data/testcases/1.in');
     await userEvent.click(
       within(panel).getByRole('button', { name: 'Upload and save' }),
     );
 
-    await within(panel).findByText('Published as publication 3.');
+    await within(panel).findByText('Saved and published as publication 3.');
     expect(routes.seen.saves).toMatchObject([
       {
         changes: [{ path: 'data/testcases/1.in', upload: UPLOAD, token: 'token-1-in' }],
@@ -317,7 +323,9 @@ describe("uploading a file into a task's tree", () => {
       within(warning).getByRole('button', { name: 'Save mine over theirs' }),
     );
 
-    expect(await within(panel).findByText('Published as publication 4.')).toBeVisible();
+    expect(
+      await within(panel).findByText('Saved and published as publication 4.'),
+    ).toBeVisible();
     expect(saves[1]?.changes).toMatchObject([
       { path: 'train.csv', upload: UPLOAD, token: 'token-theirs' },
     ]);
@@ -384,7 +392,9 @@ describe("uploading a file into a task's tree", () => {
       await within(panel).findByRole('button', { name: 'Publish the change' }),
     );
 
-    expect(await within(panel).findByText('Published as publication 5.')).toBeVisible();
+    expect(
+      await within(panel).findByText('Saved and published as publication 5.'),
+    ).toBeVisible();
     expect(within(panel).queryByText(/Leaving this page loses it/)).toBeNull();
     expect(routes.seen.saves).toHaveLength(2);
     expect(routes.seen.saves[1]).toEqual({
@@ -409,7 +419,7 @@ describe("uploading a file into a task's tree", () => {
 
     const panel = await openUpload();
     await userEvent.upload(within(panel).getByLabelText('File to upload'), dataset());
-    const field = within(panel).getByRole('textbox', { name: /Where it goes/ });
+    const field = within(panel).getByRole('textbox', { name: /Where to save it/ });
     await userEvent.clear(field);
     await userEvent.type(field, 'tests/main/1/input');
 
@@ -488,7 +498,7 @@ describe("uploading a file into a task's tree", () => {
 
     await userEvent.click(within(shown).getByRole('button', { name: 'Upload again' }));
     const panel = within(shown).getByRole('region', { name: 'Upload train.csv again' });
-    const path = within(panel).getByRole('textbox', { name: /Where it goes/ });
+    const path = within(panel).getByRole('textbox', { name: /Where to save it/ });
     expect(path).toHaveValue('train.csv');
     expect(path).toBeDisabled();
     await userEvent.upload(within(panel).getByLabelText('New train.csv'), dataset());
@@ -496,7 +506,7 @@ describe("uploading a file into a task's tree", () => {
       within(panel).getByRole('button', { name: 'Upload and save' }),
     );
 
-    await within(panel).findByText('Published as publication 3.');
+    await within(panel).findByText('Saved and published as publication 3.');
     expect(routes.seen.saves).toMatchObject([
       { changes: [{ path: 'train.csv', upload: UPLOAD, token: 'token-train' }] },
     ]);

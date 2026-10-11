@@ -33,7 +33,7 @@ export function DefinitionErrors({
           <li key={`${error.path}:${error.message}`}>
             {place === undefined ? (
               <span className={classes.errorPath}>
-                {error.path === '' ? 'the whole file' : error.path}
+                {error.path === '' ? 'Overall' : error.path}
               </span>
             ) : (
               <PageLink to={place.to}>{place.label}</PageLink>

@@ -93,7 +93,7 @@ export function OrgContests({ org }: { org: string }) {
           rowOf(
             name,
             contest === null ? (
-              <BodyText tone="secondary">Its settings do not read</BodyText>
+              <BodyText tone="secondary">Its settings cannot be read</BodyText>
             ) : (
               <Standing contest={contest} />
             ),
@@ -124,7 +124,7 @@ export function OrgContests({ org }: { org: string }) {
           <>
             <ErrorBlock error={view.error} onRetry={view.retry} />
             {rows.length > 0 && (
-              <BodyText>Contests of this org you hold a role at:</BodyText>
+              <BodyText>Contests of this org where you have a role:</BodyText>
             )}
           </>
         )
@@ -142,7 +142,8 @@ export function OrgContests({ org }: { org: string }) {
             openLabel="New contest"
             second={{
               label: 'Title',
-              description: 'Shown on its pages. Its name is used when there is none.',
+              description:
+                'Shown on the contest’s pages. Left empty, its name is shown.',
             }}
             submitLabel="Create contest"
             pending={create.isPending}

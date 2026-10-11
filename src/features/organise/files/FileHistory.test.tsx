@@ -194,12 +194,12 @@ describe("a task file's history", () => {
     );
     const dialog = await screen.findByRole('dialog', { name: 'Roll this file back?' });
     expect(dialog).toHaveTextContent(
-      'task.yaml is written as it was at version 1a2b3c4',
+      'task.yaml goes back to how it was at version 1a2b3c4',
     );
     expect(sent).toEqual([]);
     await userEvent.click(within(dialog).getByRole('button', { name: 'Roll back' }));
 
-    const answer = await screen.findByText('Published as publication 3.');
+    const answer = await screen.findByText('Saved and published as publication 3.');
     expect(answer.closest('[role="status"]')).toHaveFocus();
     expect(sent).toEqual([
       {
@@ -245,7 +245,9 @@ describe("a task file's history", () => {
       within(alert).getByRole('button', { name: 'Publish the change' }),
     );
 
-    expect(await screen.findByText('Published as publication 3.')).toBeVisible();
+    expect(
+      await screen.findByText('Saved and published as publication 3.'),
+    ).toBeVisible();
     expect(sent.map(({ confirm, version }) => ({ confirm, version }))).toEqual([
       { confirm: false, version: SECOND },
       { confirm: true, version: SECOND },

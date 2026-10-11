@@ -73,8 +73,8 @@ function EntryForm({
   const noPoints = standing.timeline.worth === null && standing.state.latest !== null;
   const total =
     entry.worth === '' && standing.timeline.worth !== null
-      ? `${formatExact(standing.timeline.worth)}, the task's total`
-      : 'Its groups’ total';
+      ? `${formatExact(standing.timeline.worth)}, its test groups’ total`
+      : 'Its test groups’ total';
   const marks = markedBoardCovers(read.values, entry.id);
   const after: ContestValues = {
     ...read.values,
@@ -88,7 +88,7 @@ function EntryForm({
       ? undefined
       : (numberProblem(late) ??
         (Number(late) <= 0 || Number(late) > 100
-          ? 'Above 0, at most 100.'
+          ? 'Give a percentage above 0 and at most 100.'
           : undefined));
   const problems = [
     numberProblem(entry.worth),
@@ -114,7 +114,7 @@ function EntryForm({
           hint={
             noPoints
               ? 'This task gives no points, so it has no worth.'
-              : 'The most points it gives here. Left empty, its groups’ points add up to it.'
+              : 'The most points this task gives in the contest. Left empty, it is the total of its test groups’ points.'
           }
           disabled={noPoints}
         />
@@ -209,7 +209,7 @@ function EntryForm({
             value={entry.marks}
             onChange={(value) => set({ marks: value })}
             placeholder="1"
-            hint="For the boards that count marked submissions."
+            hint="For the leaderboards that count only the submissions each entrant marks."
             whole
           />
         </FieldBox>

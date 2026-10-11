@@ -66,11 +66,11 @@ export function BoardFields({
     <>
       {boards.length === 0 ? (
         <BodyText>
-          This contest has no boards yet, so nobody sees a ranking.
+          This contest has no leaderboards yet, so nobody sees a ranking.
           {disabled ? '' : ' Add one to rank its entrants.'}
         </BodyText>
       ) : (
-        <ol className={classes.entries} aria-label="Boards">
+        <ol className={classes.entries} aria-label="Leaderboards">
           {boards.map((board, index) => (
             <BoardEntry
               key={
@@ -94,7 +94,7 @@ export function BoardFields({
             variant="secondary"
             onClick={() => onChange([...boards, newBoard()])}
           >
-            Add a board
+            Add a leaderboard
           </Button>
         </div>
       )}
@@ -164,7 +164,7 @@ function BoardEntry({
               label="Name"
               value={board.name}
               onChange={(name) => onChange({ name })}
-              description="Different from the contest’s other boards."
+              description="Each leaderboard needs a name of its own."
               error={said('name')}
               disabled={disabled}
             />
@@ -214,7 +214,7 @@ function BoardEntry({
             label="Rows an entrant sees"
             description={
               guests
-                ? 'Someone not entered has no row of their own, so a board everyone sees shows rows to all.'
+                ? 'Visitors who have not entered have no row of their own, so a leaderboard everyone can see shows them every row.'
                 : undefined
             }
             value={rows}
@@ -235,7 +235,7 @@ function BoardEntry({
               label="How many top rows"
               value={board.rows}
               onChange={(value) => onChange({ rows: value })}
-              hint="Rows tied with the last are shown too, and the entrant’s own below."
+              hint="Rows tied with the last one are shown too, and the entrant’s own row below them."
               error={said('rows')}
               whole
               disabled={disabled}
@@ -280,7 +280,9 @@ function BoardEntry({
         <FieldBox name="order">
           <div role="group" aria-label="Ranked by">
             {board.order.length === 0 ? (
-              <BodyText tone="secondary">Points alone, unless a key is added.</BodyText>
+              <BodyText tone="secondary">
+                Ranked by points alone, unless you add another way to rank.
+              </BodyText>
             ) : (
               <ol className={classes.entries}>
                 {board.order.map((key, at) => (
@@ -326,7 +328,7 @@ function BoardEntry({
                   label={`Remove ${title}`}
                   onClick={() => setRemoving(true)}
                 >
-                  Remove the board
+                  Remove this leaderboard
                 </Button>
               </div>
             )}
@@ -406,7 +408,7 @@ function OrderKey({
           value={value.name}
           onChange={(name) => onChange({ kind: 'value', name })}
           placeholder="Such as time_ms"
-          description="Better or worse as the workflow that reports it says."
+          description="Whether higher or lower is better is set by the workflow that reports it."
           disabled={disabled}
         />
       )}
@@ -416,7 +418,7 @@ function OrderKey({
           value={value.perAttempt}
           onChange={(perAttempt) => onChange({ kind: 'penalty', perAttempt })}
           placeholder="0"
-          info="Added for each earlier attempt at the task that does not count, to the minutes from the start to the one that does."
+          info="Added for each earlier attempt at the task that does not count, on top of the minutes from the start to the submission that does."
           error={minutesError}
           whole
           disabled={disabled}

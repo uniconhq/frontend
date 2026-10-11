@@ -19,7 +19,7 @@ export function publishedLine(
   latest: Publication | null,
   author: string | null = null,
 ): string {
-  if (latest === null) return 'Not live yet: nothing is published.';
+  if (latest === null) return 'Not published yet, so entrants cannot be graded on it.';
   const by = author === null ? '' : ` by ${author}`;
   return `Entrants are graded on publication ${String(latest.number)}, saved ${formatDateTime(new Date(latest.at))}${by}.`;
 }

@@ -34,7 +34,7 @@ describe('the contest’s settings in words for the merge', () => {
     );
     expect(
       contestFieldName(['leaderboards', { key: 'name', value: 'Standings' }, 'who']),
-    ).toBe('Board Standings: Shown to');
+    ).toBe('Leaderboard Standings: Shown to');
     expect(contestFieldName(['tasks'])).toBe('Tasks');
   });
 
@@ -93,7 +93,7 @@ describe("a task's timeline as one line", () => {
         '1',
       ),
     ).toBe(
-      `points known once published · opens ${formatDateTime(new Date('2026-10-01T09:00:00Z'))} · closes ${formatDateTime(new Date('2026-10-03T09:00:00Z'))} · up to 1 marked submission`,
+      `points known once the task is published · opens ${formatDateTime(new Date('2026-10-01T09:00:00Z'))} · closes ${formatDateTime(new Date('2026-10-03T09:00:00Z'))} · up to 1 marked submission`,
     );
   });
 });

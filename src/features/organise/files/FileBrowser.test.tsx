@@ -59,7 +59,7 @@ describe('the file tree', () => {
     server.use(signedIn, taskState, publicationList, ...repoFiles);
     const { router } = renderApp(TASK);
 
-    expect(await screen.findByText('Pick a file to open it.')).toBeVisible();
+    expect(await screen.findByText('Choose a file to open it.')).toBeVisible();
     await userEvent.click(
       await within(tree()).findByRole('link', { name: 'statement.md' }),
     );
@@ -173,7 +173,7 @@ describe('the file tree', () => {
     server.use(signedIn, taskState, publicationList, ...repoFiles);
     renderApp(`${TASK}?file=data/testcases/logo.png`);
 
-    expect(await screen.findByText(/Binary, 11 bytes/)).toBeVisible();
+    expect(await screen.findByText(/This file is not text \(11 bytes\)/)).toBeVisible();
     expect(
       screen.queryByRole('textbox', { name: /data\/testcases\/logo\.png/ }),
     ).not.toBeInTheDocument();
@@ -406,7 +406,9 @@ describe('a text file someone else saved first', () => {
       'Rooms open at 8.\nMine.\n',
     );
 
-    await user.click(within(alert).getByRole('button', { name: 'Go on from theirs' }));
+    await user.click(
+      within(alert).getByRole('button', { name: 'Continue from theirs' }),
+    );
 
     expect(
       await screen.findByDisplayValue('Rooms open at 9.', {
@@ -486,7 +488,7 @@ describe('mending settings that do not read', () => {
 
     expect(
       await screen.findByText(
-        'These settings do not read, so the pages cannot change them.',
+        'These settings cannot be read, so the pages cannot change them.',
       ),
     ).toBeVisible();
     await userEvent.type(
@@ -522,7 +524,7 @@ describe('mending settings that do not read', () => {
     renderApp(`${TASK}?file=task.yaml`);
 
     expect(
-      await screen.findByText('An admin of the task can mend them as text.'),
+      await screen.findByText('An admin of the task can fix them as text.'),
     ).toBeVisible();
     expect(
       screen.getByRole('textbox', { name: 'The task’s settings' }),
@@ -550,7 +552,7 @@ describe('mending settings that do not read', () => {
 
     expect(
       await screen.findByText(
-        'These settings do not read, so the pages cannot change them.',
+        'These settings cannot be read, so the pages cannot change them.',
       ),
     ).toBeVisible();
     expect(screen.getByRole('list', { name: 'Errors' })).toHaveTextContent(

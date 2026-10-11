@@ -29,7 +29,7 @@ describe('deactivate and delete', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Deactivate account' }));
     expect(
-      await screen.findByText(/A platform admin can undo this/),
+      await screen.findByText(/until a platform admin turns it back on/),
     ).toBeInTheDocument();
   });
 
@@ -88,7 +88,9 @@ describe('deactivate and delete', () => {
 
     const dialog = await confirm('Delete account');
 
-    expect(await screen.findByText('You are the only admin somewhere')).toBeVisible();
+    expect(
+      await screen.findByText('You are the only admin of an org, contest or task'),
+    ).toBeVisible();
     expect(within(dialog).getByText('acme (org)')).toBeInTheDocument();
     expect(within(dialog).getByText('acme/spring (contest)')).toBeInTheDocument();
   });
@@ -120,7 +122,9 @@ describe('deactivate and delete', () => {
 
     const dialog = await confirm('Delete account');
 
-    expect(await screen.findByText('You are the only admin somewhere')).toBeVisible();
+    expect(
+      await screen.findByText('You are the only admin of an org, contest or task'),
+    ).toBeVisible();
     expect(within(dialog).queryByRole('list')).not.toBeInTheDocument();
   });
 });
