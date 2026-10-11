@@ -4,7 +4,8 @@ import type { DefinitionError, FileContent, WriteFile } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
-import { FileEditor } from '../files/FileEditor';
+import { PageLink } from '@/ui/PageLink';
+import { contestSectionPath, taskSectionPath } from '@/lib/sections';
 import { SaveOutcome, type Outcome } from '../files/SaveOutcome';
 import { UploadedFile } from '../files/UploadedFile';
 import type { Place } from '../files/place';
@@ -29,6 +30,13 @@ export type FormProps = {
 
 type Merge = { base: string; mine: string };
 
+/** Where a place's settings are kept as stored, which an admin mends as text when they do not read. */
+function mendAt(place: Place): string {
+  return place.kind === 'task'
+    ? taskSectionPath(place.org, place.contest, place.task, 'settings')
+    : `${contestSectionPath(place.org, place.contest, 'files')}?file=contest.yaml`;
+}
+
 /**
  * A definition file as a form. The form gets the file parsed as a YAML
  * document. Saving writes the changed document with the version it was read
@@ -37,8 +45,8 @@ type Merge = { base: string; mine: string };
  * shows as one, by its size and digest, not as a form.
  * `words` names the fields and values of the merge as the form does, and
  * `placeOf` each problem a refused save lists, with a link that opens it;
- * `bare` says a save in words alone. A file the form cannot read shows as
- * text in the editor, or, with `readOnly`, as text to read, with the reason.
+ * `bare` says a save in words alone. A file the form cannot read is no form:
+ * it says why, and where an admin mends it as text.
  */
 export function DefinitionForm({
   place,
@@ -48,7 +56,6 @@ export function DefinitionForm({
   words,
   placeOf,
   bare = false,
-  readOnly = false,
 }: {
   place: Place;
   path: string;
@@ -57,7 +64,6 @@ export function DefinitionForm({
   words?: MergeWords;
   placeOf?: PlaceOf;
   bare?: boolean;
-  readOnly?: boolean;
 }) {
   const query = useOwnFile(place, path);
   const { write, pending } = useFileWrite(place, path);
@@ -127,22 +133,16 @@ export function DefinitionForm({
           words={words}
         />
       ) : 'error' in read ? (
-        readOnly ? (
-          <div role="alert">
-            <BodyText>
-              These settings cannot be read, so they cannot be changed here.
-            </BodyText>
-            <BodyText tone="secondary">{read.error}</BodyText>
-          </div>
-        ) : (
-          <div role="alert">
-            <BodyText>
-              The form cannot read {path}, so it is open as text below.
-            </BodyText>
-            <BodyText tone="secondary">{read.error}</BodyText>
-            <FileEditor place={place} path={path} />
-          </div>
-        )
+        <div role="alert">
+          <BodyText>
+            These settings cannot be read, so they cannot be changed here.
+          </BodyText>
+          <BodyText tone="secondary">{read.error}</BodyText>
+          <BodyText tone="secondary">
+            An admin mends them as text where they are stored:{' '}
+            <PageLink to={mendAt(place)}>the settings as stored</PageLink>.
+          </BodyText>
+        </div>
       ) : (
         <div key={file.token}>
           {children({

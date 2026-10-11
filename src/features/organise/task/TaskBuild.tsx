@@ -52,6 +52,10 @@ import {
 } from './staged';
 import { TestsCard } from './TestsCard';
 import { WorkflowCard } from './WorkflowCard';
+import { BodyText } from '@/ui/BodyText';
+import { PageLink } from '@/ui/PageLink';
+import { taskSectionPath } from '@/lib/sections';
+import shared from '../organise.module.css';
 import classes from './task.module.css';
 
 const PATH = 'task.yaml';
@@ -318,6 +322,14 @@ function BuildForm({
 
   return (
     <div className={classes.build}>
+      {read.unreadable.length > 0 && (
+        <Unread
+          place={place}
+          admin={admin}
+          reason={`${read.unreadable.join(', ')} ${read.unreadable.length === 1 ? 'is' : 'are'} in a shape the cards cannot read.`}
+          line="The cards leave that part as it is."
+        />
+      )}
       <WorkflowCard
         saved={saved}
         newer={form?.newer ?? null}
@@ -499,6 +511,41 @@ function SaveAnswer({
 }
 
 /**
+ * That the task's settings do not read, or hold a part the cards cannot, and
+ * where an admin mends them as text: the settings as stored, in Settings.
+ */
+function Unread({
+  place,
+  reason,
+  admin,
+  line,
+}: {
+  place: TaskPlace;
+  reason: string;
+  admin: boolean;
+  line: string;
+}) {
+  return (
+    <div className={shared.panel} role="alert">
+      <BodyText>
+        The task’s settings do not read: {reason} {line}
+      </BodyText>
+      <BodyText tone="secondary">
+        {admin
+          ? 'Mend them as text in '
+          : 'An admin of the task mends them as text in '}
+        <PageLink
+          to={taskSectionPath(place.org, place.contest, place.task, 'settings')}
+        >
+          Settings
+        </PageLink>
+        ; the cards come back once they read.
+      </BodyText>
+    </div>
+  );
+}
+
+/**
  * The task's build cards, once its settings, its workflow's form and its
  * tests' folders are read: the Workflow, Inputs and Tests and scoring cards
  * and their one save bar. Settings that are an upload show as one; settings
@@ -542,9 +589,11 @@ export function TaskBuild({
   const read = readSettings(file.data);
   if ('error' in read) {
     return (
-      <ErrorBlock
-        error={toApiError(new Error(`The task’s settings do not read: ${read.error}`))}
-        onRetry={() => void file.refetch()}
+      <Unread
+        place={place}
+        reason={read.error}
+        admin={admin}
+        line="So the cards that build the task cannot show them."
       />
     );
   }

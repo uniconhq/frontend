@@ -191,7 +191,7 @@ describe('saving a task file', () => {
       }),
     );
 
-    await readThenEditAndSave('task.yaml');
+    await readThenEditAndSave('statement.md');
 
     const outcome = (await screen.findByText(/Saved as a draft/))
       .parentElement as HTMLElement;
@@ -226,7 +226,7 @@ describe('saving a task file', () => {
         ),
     );
 
-    await editAndSave('task.yaml');
+    await editAndSave('statement.md');
 
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent(
@@ -270,7 +270,7 @@ describe('saving a task file', () => {
         ),
     );
 
-    await editAndSave('task.yaml');
+    await editAndSave('statement.md');
     await userEvent.click(
       within(await screen.findByRole('alert')).getByRole('button', {
         name: 'Keep as draft',

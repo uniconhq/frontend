@@ -9,17 +9,32 @@ import { CodeEditor, type CodeLanguage } from '@/ui/CodeEditor';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
 import { FileHistory } from './FileHistory';
-import { fileQuery, staleAfterWrite, type Place } from './place';
+import { fileQuery, settingsPath, staleAfterWrite, type Place } from './place';
 import { SaveOutcome, type Outcome } from './SaveOutcome';
 import { TextConflict } from './TextConflict';
 import { UploadedFile } from './UploadedFile';
-import { SettingsFile } from '../contest/SettingsFile';
+import { SettingsText } from './SettingsText';
+import { useMe } from '@/session';
+import { holdsAt } from '../roles';
 import { placeOfIn } from '../task/places';
-
-/** The contest's settings, changed only on the contest's pages and shown here to read. */
-const CONTEST_FILE = 'contest.yaml';
 import shared from '../organise.module.css';
 import classes from './Files.module.css';
+
+/**
+ * Why a file of a task is shown to read and not to edit: a test is changed
+ * on the task's Tests and scoring card, and what is under `plans/` is the
+ * platform's own, written at each save. Null for a file edited here.
+ */
+function readOnlyBecause(place: Place, path: string): string | null {
+  if (place.kind !== 'task') return null;
+  if (path.startsWith('tests/')) {
+    return 'A test’s files are changed on the task’s page, in its Tests and scoring card.';
+  }
+  if (path.startsWith('plans/')) {
+    return 'The platform writes this at each save of the task, from its settings and its workflow.';
+  }
+  return null;
+}
 
 /** Bytes a base64 string decodes to, without decoding it. */
 function decodedSize(base64: string): number {
@@ -53,8 +68,9 @@ type Sent = WriteFile | RollbackFile;
  * busy: the read replaces the text with the file as saved, and a second save
  * would carry the old token.
  *
- * The contest's settings are read here and not edited: they are changed on
- * the contest's pages. At a contest a save answers with the new version. At a task it is a save of
+ * The settings files, `contest.yaml` and `task.yaml`, are read here and edited only by an
+ * admin while they do not read (SettingsText); a test's files and `plans/` are only read.
+ * At a contest a save answers with the new version. At a task it is a save of
  * the task, which publishes or keeps a draft; the answer and the refusals are
  * SaveOutcome's, and the answer takes the focus. A task's file also has its
  * history below, from which a manager rolls it back to an older version; the
@@ -63,6 +79,7 @@ type Sent = WriteFile | RollbackFile;
  */
 export function FileEditor({ place, path }: { place: Place; path: string }) {
   const queryClient = useQueryClient();
+  const admin = holdsAt(useMe().roles, place, 'admin');
   const query = useQuery({
     ...fileQuery(place, path),
     staleTime: Infinity,
@@ -143,6 +160,23 @@ export function FileEditor({ place, path }: { place: Place; path: string }) {
     return <ErrorBlock error={view.error} onRetry={view.retry} />;
 
   const file = view.data;
+  const textEditor = (
+    <TextEditor
+      key={file.token}
+      file={file}
+      busy={busy}
+      autoFocus={focusText}
+      onSave={(content) =>
+        void save({
+          content,
+          encoding: 'utf-8',
+          token: file.token,
+          confirm: false,
+          keep_as_draft: false,
+        })
+      }
+    />
+  );
 
   return (
     <div className={classes.editor}>
@@ -153,8 +187,21 @@ export function FileEditor({ place, path }: { place: Place; path: string }) {
           upload={file.upload}
           token={file.token}
         />
-      ) : place.kind === 'contest' && path === CONTEST_FILE ? (
-        <SettingsFile org={place.org} contest={place.contest} file={file} />
+      ) : path === settingsPath(place) ? (
+        <SettingsText place={place} file={file} admin={admin} editor={textEditor} />
+      ) : readOnlyBecause(place, path) !== null ? (
+        <>
+          <BodyText tone="secondary">{readOnlyBecause(place, path)}</BodyText>
+          {file.encoding === 'utf-8' && (
+            <CodeEditor
+              label={path}
+              value={file.content}
+              language={languageOf(path)}
+              rows={12}
+              readOnly
+            />
+          )}
+        </>
       ) : file.encoding === 'base64' ? (
         <>
           <BodyText mono>{file.path}</BodyText>
@@ -163,21 +210,7 @@ export function FileEditor({ place, path }: { place: Place; path: string }) {
           </BodyText>
         </>
       ) : (
-        <TextEditor
-          key={file.token}
-          file={file}
-          busy={busy}
-          autoFocus={focusText}
-          onSave={(content) =>
-            void save({
-              content,
-              encoding: 'utf-8',
-              token: file.token,
-              confirm: false,
-              keep_as_draft: false,
-            })
-          }
-        />
+        textEditor
       )}
       {kept !== null && (
         <div className={shared.stack}>

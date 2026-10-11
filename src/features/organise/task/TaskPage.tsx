@@ -4,6 +4,7 @@ import { $api } from '@/api/query';
 import { CardGrid, HubCard } from '@/ui/HubCard';
 import { Page, PageHeader } from '@/ui/Page';
 import { useMe } from '@/session';
+import { PageLink } from '@/ui/PageLink';
 import { useTaskParams } from '@/lib/route-params';
 import { TASK_SECTIONS, taskSectionPath, type TaskSectionKey } from '@/lib/sections';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -103,7 +104,14 @@ export function TaskPage() {
 
   return (
     <Page>
-      <PageHeader title={<TaskTitle place={place} />}>
+      <PageHeader
+        title={<TaskTitle place={place} />}
+        links={
+          <PageLink to={`${taskSectionPath(org, contest, task, 'settings')}#file`}>
+            View file
+          </PageLink>
+        }
+      >
         <TaskStanding place={place} saving={saving} manager={manager} />
       </PageHeader>
       <TaskBuild place={place} saving={saving} admin={admin} manager={manager} />

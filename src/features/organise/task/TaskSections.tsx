@@ -7,6 +7,7 @@ import { useTaskParams } from '@/lib/route-params';
 import { TASK_SECTIONS, sectionOf } from '@/lib/sections';
 import { formatDateTime } from '@/lib/time';
 import { FileBrowser } from '../files/FileBrowser';
+import { FileEditor } from '../files/FileEditor';
 import { PageLink } from '@/ui/PageLink';
 import { taskPath } from '@/lib/organiser-paths';
 import { savedBy } from './published';
@@ -44,6 +45,11 @@ export function TaskSettingsPage() {
       <Card>
         <TitleForm place={place} admin={admin} />
       </Card>
+      <section aria-label="The settings as stored" id="file">
+        <Card>
+          <FileEditor place={place} path="task.yaml" />
+        </Card>
+      </section>
     </SectionPage>
   );
 }

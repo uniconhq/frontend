@@ -336,7 +336,12 @@ describe("the contest's tasks", () => {
     const tasks = await screen.findByRole('region', { name: 'Tasks' });
     const alert = await within(tasks).findByRole('alert');
     expect(alert).toHaveTextContent("The contest's settings do not read");
-    expect(alert).toHaveTextContent('Mend each problem where it says.');
+    expect(alert).toHaveTextContent(
+      'Mend each problem where it says, or, as an admin, mend them as text in the settings as stored.',
+    );
+    expect(
+      within(alert).getByRole('link', { name: 'the settings as stored' }),
+    ).toHaveAttribute('href', '/orgs/acme/contests/spring/files?file=contest.yaml');
     const errors = within(alert).getByRole('list', { name: 'Errors' });
     expect(
       within(errors)

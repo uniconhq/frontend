@@ -34,7 +34,6 @@ export function ContestFile({
       words={WORDS}
       placeOf={contestPlaceOf(org, contest)}
       bare
-      readOnly
     >
       {(props) => children({ ...props, admin })}
     </DefinitionForm>

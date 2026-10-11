@@ -3,7 +3,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@/test/user-event';
 import { http, HttpResponse } from 'msw';
 import { renderApp } from '@/test/render';
-import { problem, server, signedIn } from '@/test/server';
+import { problem, server, signedIn, someone } from '@/test/server';
 import {
   CONTEST_API,
   TASK_API,
@@ -59,7 +59,7 @@ describe('the file tree', () => {
     expect(asked).toEqual(['', 'data', 'data/testcases']);
   });
 
-  it('opens a clicked file as text and puts it in the address', async () => {
+  it('opens a clicked file and puts it in the address, the task’s settings to read only', async () => {
     server.use(signedIn, taskState, publicationList, ...repoFiles);
     const { router } = renderApp(TASK);
 
@@ -68,13 +68,51 @@ describe('the file tree', () => {
       await within(tree()).findByRole('link', { name: 'task.yaml' }),
     );
 
-    const editor = await screen.findByRole('textbox', { name: 'task.yaml' });
-    expect(editor).toHaveValue(files['task.yaml']?.content);
+    const settings = await screen.findByRole('textbox', {
+      name: 'The task’s settings',
+    });
+    expect(settings).toHaveValue(files['task.yaml']?.content);
+    expect(settings).toHaveAttribute('readonly');
+    expect(screen.queryByRole('button', { name: 'Save' })).toBeNull();
+    expect(
+      within(screen.getByRole('main')).getByRole('link', { name: 'Inputs' }),
+    ).toHaveAttribute('href', '/orgs/acme/contests/spring/tasks/sum?card=inputs');
     expect(router.state.location.search).toBe('?file=task.yaml');
     expect(within(tree()).getByRole('link', { name: 'task.yaml' })).toHaveAttribute(
       'aria-current',
       'page',
     );
+  });
+
+  it('opens a test’s file to read, saying where tests are changed', async () => {
+    server.use(
+      signedIn,
+      taskState,
+      publicationList,
+      http.get(`${TASK_API}/files/:path`, ({ params }) =>
+        decodeURIComponent(String(params['path'])) === 'tests/main/1/input'
+          ? HttpResponse.json({
+              path: 'tests/main/1/input',
+              encoding: 'utf-8',
+              content: '1 2\n',
+              token: 'token-input',
+              upload: null,
+            })
+          : undefined,
+      ),
+      ...repoFiles,
+    );
+    renderApp(`${TASK}?file=tests/main/1/input`);
+
+    expect(
+      await screen.findByText(
+        'A test’s files are changed on the task’s page, in its Tests and scoring card.',
+      ),
+    ).toBeVisible();
+    expect(screen.getByRole('textbox', { name: 'tests/main/1/input' })).toHaveAttribute(
+      'readonly',
+    );
+    expect(screen.queryByRole('button', { name: 'Save' })).toBeNull();
   });
 
   it('opens a linked file with the folders above it open', async () => {
@@ -368,33 +406,57 @@ describe('a text file someone else saved first', () => {
   });
 });
 
-describe("saving a task's settings as text", () => {
+describe('mending settings that do not read', () => {
   const TASK_FILE = `${TASK_API}/files/:path`;
+  const BROKEN = 'name: sum\nworkflow: [unicon/classic@v2\n';
 
-  it('names each problem of a save that does not validate', async () => {
+  /** The sum task, its settings no longer YAML, and every save of them refused as `answer` says. */
+  function brokenBackend(answer: () => Response) {
     server.use(
       signedIn,
       taskState,
       publicationList,
-      ...repoFiles,
-      http.put(TASK_FILE, () =>
-        problem(422, 'invalid_definition', {
-          detail: 'task.yaml does not validate.',
-          errors: [{ path: 'workflow', message: 'There is no such workflow.' }],
-        }),
+      http.get(TASK_FILE, ({ params }) =>
+        params['path'] === 'task.yaml'
+          ? HttpResponse.json({
+              path: 'task.yaml',
+              encoding: 'utf-8',
+              content: BROKEN,
+              token: 'token-broken',
+              upload: null,
+            })
+          : undefined,
       ),
+      http.put(TASK_FILE, answer),
+      ...repoFiles,
+    );
+  }
+
+  it('offers an admin the text, and names each problem of a save that does not validate', async () => {
+    brokenBackend(() =>
+      problem(422, 'invalid_definition', {
+        detail: 'task.yaml does not validate.',
+        errors: [{ path: 'workflow', message: 'There is no such workflow.' }],
+      }),
     );
     renderApp(`${TASK}?file=task.yaml`);
 
+    expect(
+      await screen.findByText(
+        'These settings do not read, so the pages cannot change them.',
+      ),
+    ).toBeVisible();
     await userEvent.type(
       await screen.findByRole('textbox', { name: 'task.yaml' }),
-      'x: 1\n',
+      'x',
     );
     await userEvent.click(screen.getByRole('button', { name: 'Save' }));
 
-    const alert = await screen.findByRole('alert');
-    expect(alert).toHaveTextContent('Nothing was saved');
-    const errors = within(alert).getByRole('list', { name: 'Errors' });
+    const alert = await screen.findByText('Nothing was saved', { exact: false });
+    const errors = within(alert.closest('[role="alert"]') as HTMLElement).getByRole(
+      'list',
+      { name: 'Errors' },
+    );
     expect(errors).toHaveTextContent('Workflow: There is no such workflow.');
     expect(within(errors).getByRole('link', { name: 'Workflow' })).toHaveAttribute(
       'href',
@@ -402,7 +464,62 @@ describe("saving a task's settings as text", () => {
     );
   });
 
-  it("names each admin-only key a manager's save changed", async () => {
+  it('shows anyone else the text to read, and who may mend it', async () => {
+    brokenBackend(() => HttpResponse.json({}));
+    server.use(
+      http.get('/api/v1/me', () =>
+        HttpResponse.json({
+          ...someone,
+          roles: [
+            { names: { org: 'acme', contest: 'spring', task: 'sum' }, role: 'manager' },
+          ],
+        }),
+      ),
+    );
+    renderApp(`${TASK}?file=task.yaml`);
+
+    expect(
+      await screen.findByText('An admin of the task can mend them as text.'),
+    ).toBeVisible();
+    expect(
+      screen.getByRole('textbox', { name: 'The task’s settings' }),
+    ).toHaveAttribute('readonly');
+    expect(screen.queryByRole('button', { name: 'Save' })).toBeNull();
+  });
+
+  it('offers an admin the contest’s settings as text while the forge refuses them as they are', async () => {
+    server.use(
+      signedIn,
+      taskList,
+      http.get(`${CONTEST_API}/organise/tasks`, () =>
+        problem(422, 'invalid_definition', {
+          errors: [
+            {
+              path: 'registration.invite_only',
+              message: 'invite_only is retired: say who enters with registration.ways.',
+            },
+          ],
+        }),
+      ),
+      ...repoFiles,
+    );
+    renderApp('/orgs/acme/contests/spring/files?file=contest.yaml');
+
+    expect(
+      await screen.findByText(
+        'These settings do not read, so the pages cannot change them.',
+      ),
+    ).toBeVisible();
+    expect(screen.getByRole('list', { name: 'Errors' })).toHaveTextContent(
+      'invite_only is retired',
+    );
+    expect(screen.getByRole('textbox', { name: 'contest.yaml' })).not.toHaveAttribute(
+      'readonly',
+    );
+    expect(screen.getByRole('button', { name: 'Save' })).toBeVisible();
+  });
+
+  it("names each admin-only key a manager's save of a file changed", async () => {
     server.use(
       signedIn,
       taskState,
@@ -410,25 +527,25 @@ describe("saving a task's settings as text", () => {
       ...repoFiles,
       http.put(TASK_FILE, () =>
         problem(403, 'admin_only', {
-          detail: 'Only an admin may change name.',
-          keys: ['name'],
+          detail: 'Only an admin may change statement.md.',
+          keys: ['statement.md'],
         }),
       ),
     );
-    renderApp(`${TASK}?file=task.yaml`);
+    renderApp(`${TASK}?file=statement.md`);
 
     await userEvent.type(
-      await screen.findByRole('textbox', { name: 'task.yaml' }),
-      'x: 1\n',
+      await screen.findByRole('textbox', { name: 'statement.md' }),
+      'x',
     );
     await userEvent.click(screen.getByRole('button', { name: 'Save' }));
 
     const alert = await screen.findByRole('alert');
-    expect(alert).toHaveTextContent('Only an admin may change name.');
+    expect(alert).toHaveTextContent('Only an admin may change statement.md.');
     expect(
       within(
         within(alert).getByRole('list', { name: 'What stands in the way' }),
-      ).getByText('name'),
+      ).getByText('statement.md'),
     ).toBeVisible();
   });
 });

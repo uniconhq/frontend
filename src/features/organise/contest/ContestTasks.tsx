@@ -21,7 +21,7 @@ import { holdsAtContest, tasksReached } from '../roles';
 import type { ContestValues } from '../forms/contest-values';
 import type { Doc } from '../forms/yaml-doc';
 import { contestPlaceOf } from './opened';
-import { FIELD_PARAM, ITEM_PARAM } from './places';
+import { FIELD_PARAM, ITEM_PARAM, viewFilePath } from './places';
 import { useContestChange } from './save';
 import { useContestSettings } from './settings';
 import { TaskTimelineForm } from './TaskTimelineForm';
@@ -295,7 +295,9 @@ export function ContestTasks({ org, contest }: { org: string; contest: string })
         <BodyText>The contest&apos;s settings do not read</BodyText>
         <BodyText tone="secondary">
           Where each task stands comes from the contest&apos;s settings, which do not
-          pass validation. Mend each problem where it says.
+          pass validation. Mend each problem where it says, or, as an admin, mend them
+          as text in{' '}
+          <PageLink to={viewFilePath(org, contest)}>the settings as stored</PageLink>.
         </BodyText>
         {definitionErrorsOf(view.error).length > 0 ? (
           <DefinitionErrors
