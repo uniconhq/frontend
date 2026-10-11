@@ -1,11 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import userEvent from '@/test/user-event';
 import { http, HttpResponse } from 'msw';
 import type { Announcement, Clarification } from '@/api/types';
 import { renderApp } from '@/test/render';
 import { server, signedIn } from '@/test/server';
 import { CONTEST_API, TASK_API, home, registration, taskPage } from '@/test/contestant';
+import { passTime, withFakeTimers } from '@/test/timers';
 
 const HOME = '/contests/acme/spring';
 
@@ -236,21 +237,27 @@ describe('live updates', () => {
     await waitFor(() => expect(asked.count).toBe(2));
   });
 
-  it('opens a refused stream again later and refetches everything once it opens', async () => {
-    const asked = counted();
-    renderApp(HOME);
-    await screen.findByRole('heading', { name: 'Tasks' });
-    await waitFor(() => expect(asked.count).toBe(1));
-    const first = FakeSource.last;
-    first?.onopen?.();
+  describe('once refused', () => {
+    withFakeTimers();
 
-    if (first) first.readyState = FakeSource.CLOSED;
-    first?.onerror?.();
+    it('opens a refused stream again later and refetches everything once it opens', async () => {
+      const asked = counted();
+      renderApp(HOME);
+      await screen.findByRole('heading', { name: 'Tasks' });
+      await waitFor(() => expect(asked.count).toBe(1));
+      const first = FakeSource.last;
+      first?.onopen?.();
 
-    await waitFor(() => expect(FakeSource.made).toBe(2), { timeout: 8000 });
-    FakeSource.last?.onopen?.();
-    await waitFor(() => expect(asked.count).toBe(2));
-  }, 15_000);
+      if (first) first.readyState = FakeSource.CLOSED;
+      first?.onerror?.();
+
+      // The first reopen is 5 s after the refusal (LiveProvider.tsx).
+      await passTime(5_000);
+      await waitFor(() => expect(FakeSource.made).toBe(2));
+      FakeSource.last?.onopen?.();
+      await waitFor(() => expect(asked.count).toBe(2));
+    });
+  });
 
   it('closes the stream while the tab is hidden and opens it again in front', async () => {
     counted();

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { screen, within } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import userEvent from '@/test/user-event';
 import { http, HttpResponse, type HttpResponseResolver } from 'msw';
 import { renderApp } from '@/test/render';
 import { problem, server, signedIn } from '@/test/server';

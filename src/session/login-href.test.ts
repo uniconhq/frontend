@@ -17,6 +17,7 @@ describe('safeNext', () => {
     ['account', 'a bare word, which resolves against the current page'],
     ['/account\nSet-Cookie: x=1', 'a header injection attempt'],
     ['/account\r\n/', 'the same with a carriage return'],
+    ['/\t/evil.example', 'a tab the browser drops, leaving //evil.example'],
     ['', 'nothing'],
     [null, 'a missing parameter'],
   ])('refuses %s (%s) and lands on the home page', (candidate: string | null) => {
