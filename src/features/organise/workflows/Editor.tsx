@@ -1,19 +1,22 @@
 import { useEffect, useMemo, useReducer, useState, type KeyboardEvent } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useBlocker } from 'react-router';
 import { $api } from '@/api/query';
 import { toApiError, type ApiError } from '@/api/problem';
-import type { DefinitionProblem, WorkflowPage } from '@/api/types';
+import type { WorkflowPage } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
-import { Card } from '@/ui/Card';
 import { CodeEditor } from '@/ui/CodeEditor';
-import { SectionTitle } from '@/ui/SectionTitle';
-import { TextInput } from '@/ui/TextInput';
+import { Modal } from '@/ui/Modal';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { ActionMenu, type MenuEntry } from '@/ui/ActionMenu';
 import { useMarkColours } from '@/ui/brand/mark-colours';
 import { MergeView } from '../forms/MergeView';
 import { parseYaml } from '../forms/yaml-doc';
+import { AddStep } from './AddStep';
+import { WorkflowBar } from './Bar';
+import { checkQuery } from './check';
+import { Drawer, DRAWER_WIDTH } from './Drawer';
 import {
   addStep,
   clearPort,
@@ -24,43 +27,65 @@ import {
   wire,
   workflowOf,
 } from './edit';
-import { checkQuery } from './check';
 import { sourceAt, targetAt, type Notice, type Target } from './ends';
+import { FileView } from './FileView';
 import { Graph } from './Graph';
 import { layoutWorkflow, type Box } from './layout';
 import { linesOf, type Selected } from './lines';
-import { refLabel, type Ref, type Workflow } from './model';
-import { FieldsPanel, InputsPanel, Palette, ReportPanel, StepPanel } from './Panels';
-import { pinned as pinProblems } from './pins';
+import { type Ref, type Workflow } from './model';
+import { FieldsPanel, InputsPanel, ReportPanel, StepPanel } from './Panels';
+import { pinned as pinProblems, placed } from './pins';
+import { Problems } from './Problems';
 import { byRef, declared, type PrimitiveInfo } from './primitives';
+import { PublishVersion } from './Publish';
 import { reportable, reportRefusal, wireRefusal } from './rules';
-import { SharePanel } from './SharePanel';
+import { ShareButton } from './SharePanel';
+import { DRAFT_FILE, refWords } from './words';
 import classes from './workflows.module.css';
-import { nextVersion } from './versions';
 
 /**
- * The page a workflow is built on, and the only place one is edited (#377).
- * The graph is drawn from the draft every time; each change is an edit of
- * the YAML document in place, kept in the page's history for undo and
- * redo; beside the graph is the file a save writes, read-only. A moment
- * after each change the definition is checked as a version would be, and
- * each problem is pinned by its path to the box, port or row it names. A
- * draft with problems saves; a version of one is refused. A save over
- * someone else's opens the merge view, steps matched by id.
+ * The page a workflow's draft is built on, and the only place one is edited
+ * (#377). The graph is drawn from the draft every time, at its actual size;
+ * each change is an edit of the YAML document in place, comments and all,
+ * kept in the page's history for undo and redo. The bar above says it is the
+ * draft and holds Save, "Publish version", Share and "View file" (M32); the
+ * toolbar under it holds Undo, Redo, "Add step" and the inputs, a test's
+ * files and the report (M37). The box selected opens in a drawer on the
+ * right. A moment after each change the draft is checked as a version would
+ * be, and each problem is said in the banner, linked to its box, and beside
+ * its mark on the box (M31). A draft with problems saves; a version of one is
+ * refused. A draft whose file does not read cannot be drawn, so it is mended
+ * as text, with Save and Undo, until it reads (M30). A save over someone
+ * else's opens the merge view, steps matched by id.
  */
 
-type History = { past: string[]; present: string; future: string[] };
+type History = { past: string[]; present: string; future: string[]; typing: boolean };
 type Action =
   | { kind: 'change'; text: string }
+  | { kind: 'type'; text: string }
   | { kind: 'undo' }
-  | { kind: 'redo' }
-  | { kind: 'reset'; text: string };
+  | { kind: 'redo' };
 
 function history(state: History, action: Action): History {
   switch (action.kind) {
     case 'change':
       if (action.text === state.present) return state;
-      return { past: [...state.past, state.present], present: action.text, future: [] };
+      return {
+        past: [...state.past, state.present],
+        present: action.text,
+        future: [],
+        typing: false,
+      };
+    case 'type':
+      // A run of typing is one step back, not a step per key.
+      if (action.text === state.present) return state;
+      if (state.typing) return { ...state, present: action.text, future: [] };
+      return {
+        past: [...state.past, state.present],
+        present: action.text,
+        future: [],
+        typing: true,
+      };
     case 'undo': {
       const previous = state.past.at(-1);
       if (previous === undefined) return state;
@@ -68,15 +93,19 @@ function history(state: History, action: Action): History {
         past: state.past.slice(0, -1),
         present: previous,
         future: [state.present, ...state.future],
+        typing: false,
       };
     }
     case 'redo': {
       const [next, ...rest] = state.future;
       if (next === undefined) return state;
-      return { past: [...state.past, state.present], present: next, future: rest };
+      return {
+        past: [...state.past, state.present],
+        present: next,
+        future: rest,
+        typing: false,
+      };
     }
-    case 'reset':
-      return { past: [], present: action.text, future: [] };
   }
 }
 
@@ -96,17 +125,12 @@ function useCheck(text: string) {
 }
 
 /** The box a selection stands on now, found again after the layout moved. */
-function boxOf(
-  boxes: Box[],
-  workflow: Workflow,
-  selected: Selected | null,
-): string | null {
+function boxOf(boxes: Box[], selected: Selected | null): string | null {
   if (selected === null) return null;
   if (selected.kind === 'report') return 'report';
   if (selected.kind === 'step') return `step:${String(selected.index)}`;
   const kind = selected.kind;
   const names = kind === 'inputs' ? selected.ids : selected.names;
-  void workflow;
   return (
     boxes.find(
       (box) => box.kind === kind && box.right.some((name) => names.includes(name)),
@@ -139,6 +163,54 @@ function selectionOf(box: Box | undefined): Selected | null {
   return null;
 }
 
+function drawerTitle(selected: Selected | null, workflow: Workflow): string | null {
+  if (selected === null) return null;
+  if (selected.kind === 'step')
+    return `Step ${workflow.steps[selected.index]?.id || '(no name)'}`;
+  if (selected.kind === 'inputs') return 'Inputs';
+  if (selected.kind === 'test') return 'Each test’s files';
+  return 'Report';
+}
+
+/**
+ * Leaving the page with changes not saved asks first: by a link, the
+ * switcher or the browser's back, and by closing the tab.
+ */
+function LeaveGuard({ dirty }: { dirty: boolean }) {
+  const blocker = useBlocker(
+    ({ currentLocation, nextLocation }) =>
+      dirty &&
+      (currentLocation.pathname !== nextLocation.pathname ||
+        currentLocation.search !== nextLocation.search),
+  );
+  useEffect(() => {
+    if (!dirty) return;
+    const warn = (event: BeforeUnloadEvent) => event.preventDefault();
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [dirty]);
+  const asking = blocker.state === 'blocked';
+  return (
+    <Modal
+      opened={asking}
+      onClose={() => blocker.reset?.()}
+      title="Leave without saving?"
+    >
+      <div className={classes.stack}>
+        <BodyText size="md">
+          Your changes to the draft are not saved. Leaving drops them.
+        </BodyText>
+        <div className={classes.actions}>
+          <Button onClick={() => blocker.reset?.()}>Stay</Button>
+          <Button variant="danger" onClick={() => blocker.proceed?.()}>
+            Leave without saving
+          </Button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
 export function Editor({
   page,
   primitives,
@@ -153,6 +225,7 @@ export function Editor({
     past: [],
     present: page.draft.content,
     future: [],
+    typing: false,
   });
   const text = state.present;
   const [saved, setSaved] = useState({
@@ -160,6 +233,7 @@ export function Editor({
     token: page.draft.token,
   });
   const [chosen, setChosen] = useState<Chosen | null>(null);
+  const [nonce, setNonce] = useState(0);
   const [dragging, setDragging] = useState<Ref | null>(null);
   const [notice, setNotice] = useState<Notice | null>(null);
   const [conflict, setConflict] = useState<{
@@ -169,15 +243,13 @@ export function Editor({
     token: string | null;
   } | null>(null);
   const [saveError, setSaveError] = useState<ApiError | null>(null);
-  const [version, setVersion] = useState(nextVersion(page.versions));
-  const [versioned, setVersioned] = useState<
-    | { kind: 'made'; version: string }
-    | { kind: 'refused'; error: ApiError; problems: DefinitionProblem[] }
-    | null
-  >(null);
+  const [published, setPublished] = useState<string | null>(null);
 
   const primitiveMap = useMemo(() => byRef(primitives), [primitives]);
   const parsed = useMemo(() => parseYaml(text), [text]);
+  const unreadable = 'error' in parsed ? parsed.error : null;
+  const [mending, setMending] = useState(unreadable !== null);
+  if (unreadable !== null && !mending) setMending(true);
   const workflow = useMemo(() => workflowOf(text), [text]);
   const layout = useMemo(
     () => layoutWorkflow(workflow, primitiveMap),
@@ -196,13 +268,16 @@ export function Editor({
       ),
     [problems, workflow],
   );
+  const listed = useMemo(() => placed(problems, workflow), [problems, workflow]);
   const selected = useMemo(() => chosenStep(chosen, workflow), [chosen, workflow]);
-  const setSelected = (next: Selected | null, steps = workflow.steps) =>
+  const select = (next: Selected | null, steps = workflow.steps) => {
+    setNonce((count) => count + 1);
     setChosen(
       next?.kind === 'step'
         ? { kind: 'step', id: steps[next.index]?.id ?? '', index: next.index }
         : next,
     );
+  };
   if (chosen?.kind === 'step' && selected?.kind === 'step') {
     // A step found again elsewhere, or renamed in its place, is held by where
     // and what it is now.
@@ -210,24 +285,22 @@ export function Editor({
     if (id !== undefined && (id !== chosen.id || selected.index !== chosen.index))
       setChosen({ kind: 'step', id, index: selected.index });
   }
-  const selectedKey = boxOf(layout.boxes, workflow, selected);
+  const selectedKey = boxOf(layout.boxes, selected);
+  const reveal = useMemo(
+    () => (selectedKey === null ? null : { key: selectedKey, nonce }),
+    [selectedKey, nonce],
+  );
   const marked = useMemo(() => linesOf(text, selected), [text, selected]);
   const dirty = text !== saved.text;
+  const drawing = !mending;
 
   const change = (next: string) => {
     setNotice(null);
-    setVersioned(null);
+    setPublished(null);
     dispatch({ kind: 'change', text: next });
   };
 
-  const pageKey = $api.queryOptions('get', '/api/v1/workflows/{owner}/{name}', {
-    params: { path: { owner, name } },
-  }).queryKey;
   const save = $api.useMutation('put', '/api/v1/workflows/{owner}/{name}/draft');
-  const makeVersion = $api.useMutation(
-    'post',
-    '/api/v1/workflows/{owner}/{name}/versions',
-  );
 
   /** Write `content` over `over`, the file as last read: on a conflict the
    * merge view compares with what was written over. */
@@ -266,25 +339,6 @@ export function Editor({
       }
       setSaveError(error);
       return false;
-    }
-  };
-
-  const createVersion = async () => {
-    setVersioned(null);
-    try {
-      const made = await makeVersion.mutateAsync({
-        params: { path: { owner, name } },
-        body: { version: version.trim(), token: saved.token },
-      });
-      setVersioned({ kind: 'made', version: made.version });
-      setVersion(nextVersion([...page.versions, made.version]));
-      await queryClient.invalidateQueries({ queryKey: pageKey });
-    } catch (caught) {
-      const error = toApiError(caught);
-      const errors = Array.isArray(error.extensions.errors)
-        ? (error.extensions.errors as DefinitionProblem[])
-        : [];
-      setVersioned({ kind: 'refused', error, problems: errors });
     }
   };
 
@@ -359,7 +413,7 @@ export function Editor({
         for (const source of sources())
           entries.push({
             kind: 'item',
-            text: refLabel(source),
+            text: refWords(source),
             reason: refusal(source, target),
             onSelect: () => connect(source, target, box.key, port),
           });
@@ -372,12 +426,12 @@ export function Editor({
         if (decl !== undefined) {
           entries.push({
             kind: 'item',
-            text: 'Give it a value in the step’s panel',
-            onSelect: () => setSelected({ kind: 'step', index: target.step }),
+            text: 'Give it a value in the step’s drawer',
+            onSelect: () => select({ kind: 'step', index: target.step }),
           });
           entries.push({
             kind: 'item',
-            text: `A new input of type ${decl.type}, wired here`,
+            text: `A new input, of type ${decl.type}, wired here`,
             onSelect: () => {
               const id = freeName(
                 port.replaceAll('_', '-'),
@@ -395,7 +449,7 @@ export function Editor({
           if (step?.perTest)
             entries.push({
               kind: 'item',
-              text: `A new test field of type ${decl.type}, wired here`,
+              text: `A new part of each test, of type ${decl.type}, wired here`,
               onSelect: () => {
                 const field = freeName(
                   port.replaceAll('_', '-'),
@@ -423,21 +477,26 @@ export function Editor({
         for (const source of reportable(workflow, primitiveMap))
           entries.push({
             kind: 'item',
-            text: refLabel(source),
+            text: refWords(source),
             reason: refusal(source, target),
             onSelect: () => connect(source, target, box.key, port),
           });
         entries.push({ kind: 'divider' });
         entries.push({
           kind: 'item',
-          text: 'Edit it in the report’s panel',
-          onSelect: () => setSelected({ kind: 'report' }),
+          text: 'Change it in the report’s drawer',
+          onSelect: () => select({ kind: 'report' }),
         });
       }
     } else {
       const source = sourceAt(box, port, workflow);
       if (source === null) return <span>{port}</span>;
-      label = `The output ${refLabel(source)}`;
+      label =
+        source.kind === 'steps'
+          ? `The output ${source.output} of ${source.name}`
+          : source.kind === 'inputs'
+            ? `The input ${source.name}`
+            : `Each test’s ${source.name}`;
       if (source.kind === 'steps') {
         const reported = reportRefusal(workflow, primitiveMap, source);
         entries.push({
@@ -457,7 +516,7 @@ export function Editor({
           const to: Target = { kind: 'port', step: index, port: target };
           entries.push({
             kind: 'item',
-            text: `${step.id}.${target}`,
+            text: `${target} of ${step.id}`,
             reason: refusal(source, to),
             onSelect: () => connect(source, to, `step:${String(index)}`, target),
           });
@@ -490,35 +549,8 @@ export function Editor({
     });
   };
 
-  if ('error' in parsed)
-    return (
-      <Card>
-        <BodyText>
-          workflow.yaml is not YAML this page can read, so it cannot be drawn:{' '}
-          {parsed.error}
-        </BodyText>
-        <CodeEditor label="workflow.yaml" value={text} readOnly language="yaml" />
-      </Card>
-    );
-
   const panel =
-    selected === null ? (
-      <Palette
-        primitives={primitives}
-        onAdd={(primitive, perTest) => {
-          const next = addStep(text, primitive, perTest);
-          const steps = workflowOf(next).steps;
-          const added = steps.findIndex(
-            (step, at) => workflow.steps[at]?.id !== step.id,
-          );
-          change(next);
-          setSelected(
-            { kind: 'step', index: added < 0 ? workflow.steps.length : added },
-            steps,
-          );
-        }}
-      />
-    ) : selected.kind === 'step' ? (
+    selected === null ? null : selected.kind === 'step' ? (
       <StepPanel
         text={text}
         workflow={workflow}
@@ -526,7 +558,7 @@ export function Editor({
         pinned={pins}
         index={selected.index}
         change={change}
-        onRemoved={() => setSelected(null)}
+        onRemoved={() => select(null)}
       />
     ) : selected.kind === 'inputs' ? (
       <InputsPanel
@@ -556,19 +588,47 @@ export function Editor({
       />
     );
 
+  const checkFailure = check.isError
+    ? (toApiError(check.error).detail ?? toApiError(check.error).message)
+    : null;
+
   return (
     <div className={classes.editor} onKeyDown={onKeyDown}>
-      <div className={classes.toolbar} role="toolbar" aria-label="The workflow">
+      <WorkflowBar
+        page={page}
+        version={null}
+        status={
+          <BodyText size="sm" tone="secondary">
+            {dirty ? 'Changes not saved yet.' : 'All changes saved.'}
+          </BodyText>
+        }
+      >
         <Button
-          size="xs"
           disabled={!dirty}
           loading={save.isPending}
           onClick={() => void write(text, saved)}
         >
           Save
         </Button>
+        <PublishVersion
+          owner={owner}
+          name={name}
+          versions={page.versions}
+          token={saved.token}
+          dirty={dirty}
+          problems={check.isSuccess ? problems.length : 0}
+          onPublished={setPublished}
+        />
+        <ShareButton page={page} />
+        <FileView title={DRAFT_FILE} label={DRAFT_FILE} text={text} marked={marked} />
+      </WorkflowBar>
+      {published !== null && (
+        <p role="status" className={classes.note}>
+          {published} is published. Tasks can choose it now.
+        </p>
+      )}
+      <div className={classes.tools} role="toolbar" aria-label="Editing">
         <Button
-          size="xs"
           variant="secondary"
           disabled={state.past.length === 0}
           onClick={() => dispatch({ kind: 'undo' })}
@@ -576,40 +636,50 @@ export function Editor({
           Undo
         </Button>
         <Button
-          size="xs"
           variant="secondary"
           disabled={state.future.length === 0}
           onClick={() => dispatch({ kind: 'redo' })}
         >
           Redo
         </Button>
-        <Button size="xs" variant="secondary" onClick={() => setSelected(null)}>
-          Primitives
-        </Button>
+        <span className={classes.toolGap} aria-hidden />
+        <AddStep
+          primitives={primitives}
+          disabled={!drawing}
+          onAdd={(primitive) => {
+            const next = addStep(text, primitive, primitive.batch);
+            const steps = workflowOf(next).steps;
+            const added = steps.findIndex(
+              (step, at) => workflow.steps[at]?.id !== step.id,
+            );
+            change(next);
+            select(
+              { kind: 'step', index: added < 0 ? workflow.steps.length : added },
+              steps,
+            );
+          }}
+        />
         <Button
-          size="xs"
           variant="secondary"
-          onClick={() => setSelected({ kind: 'inputs', ids: [] })}
+          disabled={!drawing}
+          onClick={() => select({ kind: 'inputs', ids: [] })}
         >
           Inputs
         </Button>
         <Button
-          size="xs"
           variant="secondary"
-          onClick={() => setSelected({ kind: 'test', names: [] })}
+          disabled={!drawing}
+          onClick={() => select({ kind: 'test', names: [] })}
         >
-          Test fields
+          Each test’s files
         </Button>
         <Button
-          size="xs"
           variant="secondary"
-          onClick={() => setSelected({ kind: 'report' })}
+          disabled={!drawing}
+          onClick={() => select({ kind: 'report' })}
         >
           Report
         </Button>
-        <BodyText size="sm" tone="meta">
-          {dirty ? 'Changes not saved yet.' : 'Saved.'}
-        </BodyText>
       </div>
       {saveError !== null && <ErrorBlock error={saveError} compact />}
       {conflict !== null && (
@@ -635,43 +705,13 @@ export function Editor({
           }}
         />
       )}
-      <section aria-label="What a version would be refused for">
-        {check.isError ? (
-          <BodyText size="sm">
-            The check did not run, so this page cannot say what a version would be
-            refused for:{' '}
-            {toApiError(check.error).detail ?? toApiError(check.error).message}
-          </BodyText>
-        ) : check.isPending ? null : problems.length === 0 ? (
-          <BodyText size="sm" tone="secondary">
-            This definition passes every check a version must.
-          </BodyText>
-        ) : (
-          <>
-            <BodyText size="sm">
-              {problems.length === 1
-                ? 'One problem'
-                : `${String(problems.length)} problems`}{' '}
-              a version would be refused for. A draft saves with them; each is marked
-              where it is.
-            </BodyText>
-            {pins.page.length > 0 && (
-              <ul
-                className={classes.problems}
-                aria-label="Problems with the workflow as a whole"
-              >
-                {pins.page.map((problem) => (
-                  <li key={`${problem.path} ${problem.message}`}>
-                    {problem.path !== '' && <code>{problem.path}</code>}{' '}
-                    {problem.message}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </>
-        )}
-      </section>
-      <div className={classes.work}>
+      <Problems
+        status={check.isError ? 'failed' : check.isPending ? 'pending' : 'done'}
+        failure={checkFailure}
+        placed={drawing ? listed : listed.map((each) => ({ ...each, opens: null }))}
+        onOpen={(opens) => select(opens)}
+      />
+      {drawing ? (
         <Graph
           layout={layout}
           workflow={workflow}
@@ -685,87 +725,44 @@ export function Editor({
           refusal={refusal}
           menu={menu}
           onSelect={(key) =>
-            setSelected(selectionOf(layout.boxes.find((box) => box.key === key)))
+            select(selectionOf(layout.boxes.find((box) => box.key === key)))
           }
           onDragStart={setDragging}
           onDrop={connect}
+          reveal={reveal}
+          cover={selected === null ? 0 : DRAWER_WIDTH}
         />
-        <div className={classes.side}>
-          <Card>{panel}</Card>
-        </div>
-      </div>
-      <div className={classes.work}>
-        <CodeEditor
-          label="workflow.yaml as a save writes it"
-          value={text}
-          readOnly
-          language="yaml"
-          rows={24}
-          marked={marked}
-        />
-        <div className={classes.side}>
-          <Card>
-            <form
-              className={classes.stack}
-              aria-label="Make a version"
-              onSubmit={(event) => {
-                event.preventDefault();
-                void createVersion();
-              }}
-            >
-              <SectionTitle order={3}>Versions</SectionTitle>
-              <BodyText size="sm" tone="secondary">
-                {page.versions.length === 0 ? 'None yet.' : page.versions.join(', ')}
-              </BodyText>
-              <TextInput
-                label="New version"
-                value={version}
-                onChange={setVersion}
-                description={
-                  dirty
-                    ? 'Save first: a version is made of what is saved.'
-                    : 'A version never changes; a task names one.'
-                }
-              />
-              <div>
-                <Button
-                  size="xs"
-                  type="submit"
-                  disabled={dirty || version.trim() === ''}
-                  loading={makeVersion.isPending}
-                >
-                  Make the version
-                </Button>
-              </div>
-              {versioned?.kind === 'made' && (
-                <p role="status" className={classes.note}>
-                  {owner}/{name}@{versioned.version} is made.
-                </p>
-              )}
-              {versioned?.kind === 'refused' && (
-                <div role="alert">
-                  <BodyText size="sm">
-                    No version was made:{' '}
-                    {versioned.error.detail ?? versioned.error.message}
-                  </BodyText>
-                  {versioned.problems.length > 0 && (
-                    <ul className={classes.problems}>
-                      {versioned.problems.map((problem) => (
-                        <li key={`${problem.path} ${problem.message}`}>
-                          <code>{problem.path}</code>: {problem.message}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              )}
-            </form>
-          </Card>
-          <Card>
-            <SharePanel page={page} />
-          </Card>
-        </div>
-      </div>
+      ) : (
+        <section className={classes.mend} aria-label="Mend the draft">
+          <BodyText size="md">
+            {unreadable !== null
+              ? `This draft cannot be drawn, because its file does not read: ${unreadable} Mend it here and save it; Undo goes back over each change.`
+              : 'The file reads again, so the draft can be drawn.'}
+          </BodyText>
+          <CodeEditor
+            label={DRAFT_FILE}
+            value={text}
+            onChange={(next) => {
+              setPublished(null);
+              dispatch({ kind: 'type', text: next });
+            }}
+            language="yaml"
+            rows={24}
+          />
+          <div>
+            <Button disabled={unreadable !== null} onClick={() => setMending(false)}>
+              Back to the graph
+            </Button>
+          </div>
+        </section>
+      )}
+      <Drawer
+        title={drawing ? drawerTitle(selected, workflow) : null}
+        onClose={() => select(null)}
+      >
+        {panel}
+      </Drawer>
+      <LeaveGuard dirty={dirty} />
     </div>
   );
 }

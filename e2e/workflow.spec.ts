@@ -2,10 +2,12 @@ import { expect, test, type Locator, type Page, type Route } from '@playwright/t
 
 /**
  * The workflow editor in a real browser against the dev server with the API
- * stubbed: React Flow draws the graph at the places the page works out, a
- * wire drawn by dragging from one handle to another edits the file, and a
- * drag a version would refuse says why at the port. jsdom has no layout, so
- * this is where the drags themselves are tried.
+ * stubbed: React Flow draws the graph at its actual size, at the places the
+ * page works out; a wire drawn by dragging from one handle to another edits
+ * the file, and a drag a version would refuse says why at the port; a step
+ * added from the toolbar opens in the drawer, clear of the box it shows.
+ * jsdom has no layout, so this is where the drags and the scrolling are
+ * tried.
  */
 
 const CLASSIC = `# kenny/tuned, a workflow.
@@ -47,6 +49,7 @@ const port = (type: string, more: Record<string, unknown> = {}) => ({
   optional: false,
   runs: null,
   secret: false,
+  description: null,
   ...more,
 });
 
@@ -63,6 +66,8 @@ const PRIMITIVES = [
   {
     ref: 'unicon/compile@v2',
     name: 'compile',
+    title: 'Compile',
+    description: "Compiles the contestant's source files into one program.",
     version: 'v2',
     batch: false,
     network: false,
@@ -83,6 +88,9 @@ const PRIMITIVES = [
   {
     ref: 'unicon/diff-check@v2',
     name: 'diff-check',
+    title: 'Compare with the answer',
+    description:
+      "Compares a program's output with the answer, ignoring trailing whitespace.",
     version: 'v2',
     batch: true,
     network: false,
@@ -98,6 +106,9 @@ const PRIMITIVES = [
   {
     ref: 'unicon/sandbox-run@v2',
     name: 'sandbox-run',
+    title: 'Run program',
+    description:
+      "Runs a program on each test's input and records its output, time and memory.",
     version: 'v2',
     batch: true,
     network: false,
@@ -165,8 +176,10 @@ function handle(page: Page, node: string, id: string): Locator {
 
 /** A wire dragged with the mouse from one handle to another. */
 async function drag(page: Page, from: Locator, to: Locator) {
+  await from.scrollIntoViewIfNeeded();
   await from.hover();
   await page.mouse.down();
+  await to.scrollIntoViewIfNeeded();
   const box = await to.boundingBox();
   if (box === null) throw new Error('the target handle is not drawn');
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2, { steps: 12 });
@@ -174,20 +187,26 @@ async function drag(page: Page, from: Locator, to: Locator) {
 }
 
 /**
- * The file the preview shows, read from CodeMirror's document, which holds
- * every line where the page draws only those in view. A string the browser
- * runs, since these tests are typed without the DOM's types.
+ * The file as a save would write it, read from CodeMirror's document in the
+ * View file dialog, which holds every line where the page draws only those in
+ * view. A string the browser runs, since these tests are typed without the
+ * DOM's types.
  */
-const PREVIEW = `(() => {
+const FILE = `(() => {
   const label = [...document.querySelectorAll('label')].find(
-    (found) => found.textContent.trim() === 'workflow.yaml as a save writes it');
+    (found) => found.textContent.trim() === 'The draft’s file');
   const content = document.querySelector('[aria-labelledby="' + label.id + '"]');
   const view = content.cmView && content.cmView.view;
   return view ? view.state.doc.toString() : content.innerText;
 })()`;
 
-async function preview(page: Page): Promise<string> {
-  return page.evaluate<string>(PREVIEW);
+async function file(page: Page): Promise<string> {
+  await page.getByRole('button', { name: 'View file' }).click();
+  await expect(page.getByRole('dialog', { name: 'The draft’s file' })).toBeVisible();
+  const text = await page.evaluate<string>(FILE);
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog', { name: 'The draft’s file' })).toBeHidden();
+  return text;
 }
 
 test('a wire dragged onto a port edits the file, and a refused one says why', async ({
@@ -201,7 +220,7 @@ test('a wire dragged onto a port edits the file, and a refused one says why', as
   const limit = page.locator('.react-flow__handle[data-handleid="out:time_limit"]');
   const inputs = await limit.getAttribute('data-nodeid');
   await drag(page, limit, handle(page, 'step:1', 'in:args'));
-  await expect.poll(() => preview(page)).toContain('args: ${{ inputs.time_limit }}');
+  await expect.poll(() => file(page)).toContain('args: ${{ inputs.time_limit }}');
 
   const submission = page.locator(
     '.react-flow__handle[data-handleid="out:submission"]',
@@ -212,11 +231,13 @@ test('a wire dragged onto a port edits the file, and a refused one says why', as
       hasText: 'This value raises a limit, so the task must give it, not the entrant.',
     }),
   ).toBeVisible();
-  expect(await preview(page)).toContain('memory_limit: ${{ inputs.memory_limit }}');
+  expect(await file(page)).toContain('memory_limit: ${{ inputs.memory_limit }}');
   expect(inputs).not.toBeNull();
 });
 
-test('a step added from the palette is wired by dragging', async ({ page }) => {
+test('a step added from the toolbar opens in the drawer clear of its box, and is wired by dragging', async ({
+  page,
+}) => {
   await stubWorkflowApi(page);
   await page.setViewportSize({ width: 1600, height: 1000 });
   await page.goto('/workflows/kenny/tuned');
@@ -224,20 +245,53 @@ test('a step added from the palette is wired by dragging', async ({ page }) => {
     .getByRole('group', { name: 'Step check' })
     .getByRole('button', { name: /^check/ })
     .click();
-  await page.getByRole('button', { name: 'Remove the step check' }).click();
-  await page.getByRole('button', { name: 'Primitives', exact: true }).click();
-  await page
-    .getByRole('button', { name: 'Add unicon/diff-check@v2, run per test' })
-    .click();
-  await expect(page.getByRole('group', { name: 'Step diff-check' })).toBeVisible();
+  const drawer = page.getByRole('complementary', { name: 'Step check' });
+  await expect(drawer).toBeVisible();
+  await drawer.getByRole('button', { name: 'Remove the step check' }).click();
+  await expect(drawer).toBeHidden();
 
+  await page.getByRole('button', { name: 'Add step' }).click();
+  await page.getByRole('menuitem', { name: /^Compare with the answer/ }).click();
+  const added = page.getByRole('group', { name: 'Step diff-check' });
+  await expect(added).toBeVisible();
+  const opened = page.getByRole('complementary', { name: 'Step diff-check' });
+  await expect(opened.getByRole('radio', { name: 'Once for each test' })).toBeChecked();
+  // The box stands clear of the drawer over the right of the window.
+  const box = await added.boundingBox();
+  const over = await opened.boundingBox();
+  expect(box !== null && over !== null && box.x + box.width <= over.x).toBe(true);
+
+  await page.keyboard.press('Escape');
+  await expect(opened).toBeHidden();
   await drag(
     page,
     handle(page, 'step:1', 'out:output'),
     handle(page, 'step:2', 'in:actual'),
   );
+  await expect.poll(() => file(page)).toContain('actual: ${{ steps.run.output }}');
+});
 
-  await expect.poll(() => preview(page)).toContain('actual: ${{ steps.run.output }}');
+test('the graph stands at its actual size and slides sideways in its frame', async ({
+  page,
+}) => {
+  await stubWorkflowApi(page);
+  await page.setViewportSize({ width: 1000, height: 800 });
+  await page.goto('/workflows/kenny/tuned');
+  await expect(page.getByRole('group', { name: 'Step run' })).toBeVisible();
+
+  expect(await page.locator('.react-flow__viewport').getAttribute('style')).toContain(
+    'scale(1)',
+  );
+  const widths = await page.evaluate<[number, number]>(`(() => {
+    const frame = document.querySelector('.react-flow').parentElement.parentElement;
+    return [frame.scrollWidth, frame.clientWidth];
+  })()`);
+  expect(widths[0]).toBeGreaterThan(widths[1]);
+  const pageWidths = await page.evaluate<[number, number]>(
+    '[document.documentElement.scrollWidth, document.documentElement.clientWidth]',
+  );
+  expect(pageWidths[0]).toBe(pageWidths[1]);
+  await expect(page.locator('.react-flow__attribution')).toHaveCount(0);
 });
 
 test('every port of a step opens its menu with the mouse', async ({ page }) => {
@@ -259,6 +313,6 @@ test('every port of a step opens its menu with the mouse', async ({ page }) => {
     ).toBeVisible();
     await page.keyboard.press('Escape');
   }
-  await page.getByRole('button', { name: 'The output run.time_ms' }).click();
+  await page.getByRole('button', { name: 'The output time_ms of run' }).click();
   await expect(page.getByRole('menuitem', { name: 'Report it' })).toBeVisible();
 });

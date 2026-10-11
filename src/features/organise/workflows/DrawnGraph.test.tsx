@@ -77,7 +77,7 @@ describe('a workflow drawn', () => {
     expect(inputs).toHaveTextContent('Used by compile');
     const report = screen.getByRole('group', { name: 'Report' });
     expect(report).toHaveTextContent('largest over the tests · lower is better');
-    expect(screen.getAllByRole('group', { name: "Each test's files" }).length).toBe(2);
+    expect(screen.getAllByRole('group', { name: 'Each test’s files' }).length).toBe(2);
   });
 
   it('labels a long wire by where its value comes from, in words', async () => {

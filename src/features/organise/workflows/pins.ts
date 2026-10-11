@@ -1,4 +1,6 @@
 import type { DefinitionProblem } from '@/api/types';
+import type { Selected } from './lines';
+import type { Workflow } from './model';
 
 /**
  * Where a problem is pinned on the graph, from its YAML path: a step, or one
@@ -37,6 +39,59 @@ export type Pinned = {
 
 function add<K>(map: Map<K, DefinitionProblem[]>, key: K, problem: DefinitionProblem) {
   map.set(key, [...(map.get(key) ?? []), problem]);
+}
+
+/**
+ * A problem with where it is in words and what to open to fix it: the box
+ * it is pinned to, or nothing for one about the workflow as a whole.
+ */
+export type Placed = {
+  problem: DefinitionProblem;
+  where: string;
+  opens: Selected | null;
+};
+
+const WHOLE: Record<string, string> = {
+  '': 'The workflow',
+  inputs: 'Inputs',
+  test: 'Each test’s files',
+  steps: 'Steps',
+  report: 'Report',
+};
+
+/** Every problem, in the file's order, said where it is and what fixes it opens. */
+export function placed(problems: DefinitionProblem[], workflow: Workflow): Placed[] {
+  return problems.map((problem) => {
+    const pin = pinOf(problem.path);
+    if (pin.kind === 'step') {
+      const step = workflow.steps[pin.index];
+      if (step !== undefined)
+        return {
+          problem,
+          where: `Step ${step.id || '(no name)'}${pin.port === null ? '' : `, ${pin.port}`}`,
+          opens: { kind: 'step', index: pin.index },
+        };
+    }
+    if (pin.kind === 'input' && workflow.inputs.some((input) => input.id === pin.id))
+      return {
+        problem,
+        where: `Input ${pin.id}`,
+        opens: { kind: 'inputs', ids: [pin.id] },
+      };
+    if (pin.kind === 'field' && workflow.test.some((field) => field.name === pin.name))
+      return {
+        problem,
+        where: `Each test’s ${pin.name}`,
+        opens: { kind: 'test', names: [pin.name] },
+      };
+    if (
+      pin.kind === 'entry' &&
+      workflow.report.some((entry) => entry.name === pin.name)
+    )
+      return { problem, where: `Report, ${pin.name}`, opens: { kind: 'report' } };
+    const head = /^[^.[]*/.exec(problem.path)?.[0] ?? '';
+    return { problem, where: WHOLE[head] ?? problem.path, opens: null };
+  });
 }
 
 /** Every problem at the place its path names; a port's key is `<step>.<port>`. */

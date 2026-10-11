@@ -5,31 +5,43 @@ import { toApiError, type ApiError } from '@/api/problem';
 import type { Visibility, WorkflowPage } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
+import { Modal } from '@/ui/Modal';
 import { RadioGroup } from '@/ui/RadioGroup';
-import { SectionTitle } from '@/ui/SectionTitle';
 import { TextInput } from '@/ui/TextInput';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import classes from './workflows.module.css';
 
+const OPTIONS = [
+  {
+    value: 'private',
+    label: 'Private',
+    description: 'Only its owner reads it and chooses it for a task.',
+  },
+  {
+    value: 'shared',
+    label: 'Shared',
+    description: 'Its owner and the people listed here read it and choose it.',
+  },
+  {
+    value: 'public',
+    label: 'Public',
+    description: 'Everyone with an account reads it and chooses it.',
+  },
+];
+
 /**
- * Who reads a workflow: private, its owner alone; shared, the owner and the
- * people on its list; public, everyone. Shared is private with a list, so
- * choosing it before anyone is on the list leaves it read by its owner
- * alone until someone is added. Making it private or public empties the
- * list, which this panel says before it does.
+ * Who reads a workflow, applied as it is chosen (M32): private, its owner
+ * alone; shared, the owner and the people on its list; public, everyone.
+ * Choosing private or public when people are on the list takes it from them,
+ * so that choice asks first; every other choice applies at once.
  */
-export function SharePanel({ page }: { page: WorkflowPage }) {
+function SharePanel({ page }: { page: WorkflowPage }) {
   const { owner, name } = page;
   const queryClient = useQueryClient();
   const pageKey = $api.queryOptions('get', '/api/v1/workflows/{owner}/{name}', {
     params: { path: { owner, name } },
   }).queryKey;
-  const [chosen, setChosen] = useState<Visibility>(page.visibility);
-  const [shownVisibility, setShownVisibility] = useState(page.visibility);
-  if (shownVisibility !== page.visibility) {
-    setShownVisibility(page.visibility);
-    setChosen(page.visibility);
-  }
+  const [asking, setAsking] = useState<Visibility | null>(null);
   const [reader, setReader] = useState('');
   const [error, setError] = useState<ApiError | null>(null);
   const visibility = $api.useMutation(
@@ -56,45 +68,48 @@ export function SharePanel({ page }: { page: WorkflowPage }) {
       return false;
     }
   };
+  const apply = (chosen: Visibility) => {
+    setAsking(null);
+    void run(() =>
+      visibility.mutateAsync({
+        params: { path: { owner, name } },
+        body: { visibility: chosen },
+      }),
+    );
+  };
 
   const listed = page.readers.length > 0;
   return (
     <section className={classes.stack} aria-label="Who reads it">
-      <SectionTitle order={3}>Who reads it</SectionTitle>
       <RadioGroup
-        label="Visibility"
-        value={chosen}
-        options={[
-          { value: 'private', label: 'Private: only its owner' },
-          { value: 'shared', label: 'Shared with the people listed' },
-          { value: 'public', label: 'Public: everyone' },
-        ]}
-        description={
-          listed && chosen !== 'shared'
-            ? `Making it ${chosen} takes it from the ${String(page.readers.length)} people it is shared with.`
-            : undefined
-        }
-        onChange={(value) => setChosen(value as Visibility)}
+        label="Who reads it"
+        value={asking ?? page.visibility}
+        options={OPTIONS}
+        disabled={visibility.isPending}
+        onChange={(value) => {
+          const chosen = value as Visibility;
+          if (chosen === page.visibility) setAsking(null);
+          else if (listed && chosen !== 'shared') setAsking(chosen);
+          else apply(chosen);
+        }}
       />
-      {chosen !== page.visibility && (
-        <div>
-          <Button
-            size="xs"
-            loading={visibility.isPending}
-            onClick={() =>
-              void run(() =>
-                visibility.mutateAsync({
-                  params: { path: { owner, name } },
-                  body: { visibility: chosen },
-                }),
-              )
-            }
-          >
-            Make it {chosen}
-          </Button>
+      {asking !== null && (
+        <div className={classes.stack} role="alert">
+          <BodyText size="sm">
+            Making it {asking} takes it from the {String(page.readers.length)}{' '}
+            {page.readers.length === 1 ? 'person' : 'people'} it is shared with.
+          </BodyText>
+          <div className={classes.actions}>
+            <Button size="xs" onClick={() => apply(asking)}>
+              Make it {asking}
+            </Button>
+            <Button size="xs" variant="secondary" onClick={() => setAsking(null)}>
+              Keep it shared
+            </Button>
+          </div>
         </div>
       )}
-      {chosen === 'shared' && (
+      {page.visibility === 'shared' && asking === null && (
         <>
           {listed ? (
             <ul className={classes.list} aria-label="Shared with">
@@ -147,5 +162,20 @@ export function SharePanel({ page }: { page: WorkflowPage }) {
       )}
       {error !== null && <ErrorBlock error={error} compact />}
     </section>
+  );
+}
+
+/** "Share" on a workflow's bar, which opens who reads it in a dialog. */
+export function ShareButton({ page }: { page: WorkflowPage }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <Button variant="secondary" onClick={() => setOpen(true)}>
+        Share
+      </Button>
+      <Modal opened={open} onClose={() => setOpen(false)} title="Who reads it">
+        {open && <SharePanel page={page} />}
+      </Modal>
+    </>
   );
 }

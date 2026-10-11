@@ -3,7 +3,7 @@ import { ActionMenu } from '@/ui/ActionMenu';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
 import { Checkbox } from '@/ui/Checkbox';
-import { SectionTitle } from '@/ui/SectionTitle';
+import { RadioGroup } from '@/ui/RadioGroup';
 import { Select } from '@/ui/Select';
 import { TextInput } from '@/ui/TextInput';
 import { compareDecimal } from '@/lib/exact';
@@ -43,7 +43,7 @@ import {
   type Workflow,
 } from './model';
 import type { Pinned } from './pins';
-import { declared, raisingPorts, type PrimitiveInfo } from './primitives';
+import { declared, type PrimitiveInfo } from './primitives';
 import {
   BOUNDS,
   mayBeOptional,
@@ -54,15 +54,17 @@ import {
   valueRefusal,
   wireRefusal,
 } from './rules';
+import { portMarks, primitiveTitle, refWords } from './words';
 import classes from './workflows.module.css';
 
 /**
- * The panel beside the graph for what is selected: a step, with its id, its
- * primitive's version, whether it runs once or per test and a value for each
- * port without a wire; the inputs or test fields of a box, each declaration
- * offering exactly the keys the format allows it; the report's entries with
- * what each number means; and, with nothing selected, the palette. Every
- * change is an edit of the file in place, handed up as its new text.
+ * What the drawer holds for the box selected (M37): a step, with how often
+ * it runs, its name, its primitive's version, a value for each port without
+ * a wire and what each port is for (#436), what the author never acts on
+ * under Details; the inputs, each offering exactly what the format allows it
+ * and what the task's form names it (#434); a test's files; and the report's
+ * entries with what each number means. Every change is an edit of the file
+ * in place, handed up as its new text.
  */
 
 type Change = (next: string) => void;
@@ -87,12 +89,14 @@ function CommitField({
   value,
   apply,
   description,
+  placeholder,
 }: {
   label: string;
   value: string;
   /** Applies the text, or says why it cannot. */
   apply: (text: string) => string | null;
   description?: string;
+  placeholder?: string;
 }) {
   const [text, setText] = useState(value);
   const [shown, setShown] = useState(value);
@@ -107,6 +111,7 @@ function CommitField({
       label={label}
       value={text}
       description={description}
+      placeholder={placeholder}
       error={problem ?? undefined}
       onChange={setText}
       onCommit={() => {
@@ -121,6 +126,21 @@ function CommitField({
 function typed(text: string, type: string): string | NumberText {
   const number = type === 'number' ? numberText(text) : undefined;
   return number instanceof NumberText ? number : text;
+}
+
+/** A small heading inside the drawer, over a part of what it holds. */
+function Part({ children }: { children: string }) {
+  return <h3 className={classes.part}>{children}</h3>;
+}
+
+/** What a port is for: the primitive's sentence (#436), then what it does, in words. */
+function portLine(primitive: PrimitiveInfo, port: string): string | undefined {
+  const description = primitive.inputs[port]?.description ?? null;
+  const marks = portMarks(primitive, port).map(
+    (mark) => `${mark.charAt(0).toUpperCase()}${mark.slice(1)}.`,
+  );
+  const line = [description, ...marks].filter((part) => part !== null).join(' ');
+  return line === '' ? undefined : line;
 }
 
 function PortValue({
@@ -142,21 +162,29 @@ function PortValue({
   const primitive = step !== undefined ? declared(primitives, step.use) : null;
   const decl = primitive?.inputs[port];
   const value = step?.with[port];
-  if (step === undefined || decl === undefined) return null;
-  const label = `${port} (${decl.type}${decl.optional ? ', optional' : ''})`;
+  if (step === undefined || primitive === null || decl === undefined) return null;
+  const label = `${port}${decl.optional ? ' (optional)' : ''}`;
+  const line = portLine(primitive, port);
   if (value?.kind === 'wire')
     return (
-      <div className={classes.item}>
+      <div className={classes.portValue}>
         <BodyText size="sm">
-          {port} is wired from <code>{refLabel(value.ref)}</code>.
+          <strong>{label}</strong> takes {refWords(value.ref)}.
         </BodyText>
-        <Button
-          size="xs"
-          variant="secondary"
-          onClick={() => change(clearPort(text, index, port))}
-        >
-          Remove the wire to {port}
-        </Button>
+        {line !== undefined && (
+          <BodyText size="sm" tone="secondary">
+            {line}
+          </BodyText>
+        )}
+        <div>
+          <Button
+            size="xs"
+            variant="secondary"
+            onClick={() => change(clearPort(text, index, port))}
+          >
+            Remove the wire to {port}
+          </Button>
+        </div>
       </div>
     );
   const current =
@@ -195,6 +223,7 @@ function PortValue({
         label={label}
         value={current}
         placeholder="No value"
+        description={line}
         options={[
           { value: 'true', label: 'true' },
           { value: 'false', label: 'false' },
@@ -208,6 +237,7 @@ function PortValue({
         label={label}
         value={current}
         placeholder="No value"
+        description={line}
         options={(decl.options ?? []).map((option) => ({
           value: option,
           label: option,
@@ -217,10 +247,17 @@ function PortValue({
     );
   if (decl.type === 'file' || decl.type === 'folder')
     return (
-      <BodyText size="sm" tone="secondary">
-        {port} takes a {decl.type}: wire it from an input, a test field or a step’s
-        output.
-      </BodyText>
+      <div className={classes.portValue}>
+        <BodyText size="sm">
+          <strong>{label}</strong> takes a {decl.type}. Wire it from an input, a test’s
+          file or another step’s output, with its port on the graph.
+        </BodyText>
+        {line !== undefined && (
+          <BodyText size="sm" tone="secondary">
+            {line}
+          </BodyText>
+        )}
+      </div>
     );
   const insertable = [
     ...workflow.inputs
@@ -238,21 +275,22 @@ function PortValue({
         label={label}
         value={current}
         description={
-          decl.type === 'text'
-            ? 'Text; inputs and test fields can be written in as ${{ inputs.<id> }}.'
-            : raisingPorts(primitive!).has(port)
-              ? 'Raises a container limit, so it is known at the save.'
-              : undefined
+          decl.type === 'text' && insertable.length > 0
+            ? [line, 'Write in an input’s value with “Write in a value”.']
+                .filter((part) => part !== undefined)
+                .join(' ')
+            : line
         }
         apply={(typedText) => apply(typed(typedText, decl.type))}
       />
       {decl.type === 'text' && insertable.length > 0 && (
         <ActionMenu
+          button
           text="Write in a value"
           label={`Write a value into ${port}`}
           entries={insertable.map((ref) => ({
             kind: 'item' as const,
-            text: refLabel(ref),
+            text: refWords(ref),
             onSelect: () => {
               apply(
                 `${current}${current === '' || /\s$/.test(current) ? '' : ' '}${refText(ref)}`,
@@ -264,6 +302,59 @@ function PortValue({
     </div>
   );
 }
+
+const LIMIT_UNITS: Record<string, string> = {
+  time_ms: 'ms of time',
+  cpu_ms: 'ms of processor time',
+  memory_mb: 'MB of memory',
+  pids: 'processes',
+  output_mb: 'MB of output',
+  gpus: 'GPUs',
+};
+
+/** What the author never acts on, said once in plain words for whoever wants it. */
+function Details({ primitive }: { primitive: PrimitiveInfo }) {
+  const secret = Object.entries(primitive.inputs).filter(([, port]) => port.secret);
+  const outcome = primitive.outputs.outcome?.description ?? null;
+  const limits = Object.entries(primitive.limits)
+    .map(([limit, amount]) => `${String(amount)} ${LIMIT_UNITS[limit] ?? limit}`)
+    .join(', ');
+  return (
+    <details className={classes.details}>
+      <summary>Details</summary>
+      <ul className={classes.detailList}>
+        <li>
+          Primitive <code>{primitive.ref}</code>
+        </li>
+        {primitive.batch && (
+          <li>For each test, it runs every test in one container, not one each.</li>
+        )}
+        {primitive.network && <li>It may reach the network.</li>}
+        {outcome !== null && <li>How it went: {outcome}</li>}
+        {secret.map(([name]) => (
+          <li key={name}>
+            {name} is kept from the entrant’s program, so a task may give it a secret.
+          </li>
+        ))}
+        {limits !== '' && <li>Limits on each run: {limits}.</li>}
+      </ul>
+    </details>
+  );
+}
+
+const RUNS = [
+  {
+    value: 'once',
+    label: 'Once per submission',
+    description: 'It runs one time, before the tests, such as compiling the program.',
+  },
+  {
+    value: 'each',
+    label: 'Once for each test',
+    description:
+      'It runs for every test, given that test’s files, such as running the program on the test’s input.',
+  },
+];
 
 export function StepPanel({
   text,
@@ -300,22 +391,48 @@ export function StepPanel({
       .filter((port) => !(port in step.with))
       .flatMap((port) => pinned.ports.get(`${String(index)}.${port}`) ?? []),
   ];
+  const outputs = Object.entries(primitive?.outputs ?? {}).filter(
+    ([, port]) => port.type !== 'outcome',
+  );
   return (
-    <section className={classes.side} aria-label={`The step ${step.id}`}>
-      <SectionTitle order={3}>Step {step.id}</SectionTitle>
+    <section className={classes.panel} aria-label={`The step ${step.id}`}>
+      {primitive !== null ? (
+        <div className={classes.stack}>
+          <BodyText size="sm">
+            <strong>{primitiveTitle(primitive)}</strong>{' '}
+            <span className={classes.ref}>{primitive.ref}</span>
+          </BodyText>
+          {primitive.description !== null && (
+            <BodyText size="sm" tone="secondary">
+              {primitive.description}
+            </BodyText>
+          )}
+        </div>
+      ) : (
+        <BodyText size="sm">
+          {step.use} is not a primitive Unicon has now. Choose another version, or
+          remove the step.
+        </BodyText>
+      )}
       {problems.length > 0 && (
         <ul className={classes.problems} aria-label="Problems with this step">
           {problems.map((problem) => (
-            <li key={`${problem.path} ${problem.message}`}>
-              <code>{problem.path}</code>: {problem.message}
-            </li>
+            <li key={`${problem.path} ${problem.message}`}>{problem.message}</li>
           ))}
         </ul>
       )}
+      <RadioGroup
+        label="Run it"
+        value={step.perTest ? 'each' : 'once'}
+        options={RUNS}
+        disabled={switching !== null}
+        description={switching ?? undefined}
+        onChange={(chosen) => change(setPerTest(text, index, chosen === 'each'))}
+      />
       <CommitField
-        label="Id"
+        label="Name"
         value={step.id}
-        description="Renaming carries every reference to it."
+        description="Other steps read its outputs by this name. Renaming it changes them too."
         apply={(id) => {
           const problem = handleProblem(
             id,
@@ -325,11 +442,14 @@ export function StepPanel({
           return problem;
         }}
       />
-      {versions.length > 0 ? (
+      {versions.length > 1 && primitive !== null && (
         <Select
-          label="Primitive"
+          label="Version"
           value={step.use}
-          options={versions.map((found) => ({ value: found.ref, label: found.ref }))}
+          options={versions.map((found) => ({
+            value: found.ref,
+            label: found.version,
+          }))}
           error={versionRefused ?? undefined}
           onChange={(use) => {
             const written = setUse(text, index, use);
@@ -338,29 +458,42 @@ export function StepPanel({
             if (broken === null) change(written);
           }}
         />
-      ) : (
-        <BodyText size="sm" tone="secondary">
-          {step.use} is not a primitive the platform has now.
-        </BodyText>
       )}
-      <Checkbox
-        label="Runs once per test"
-        checked={step.perTest}
-        disabled={switching !== null}
-        description={switching ?? undefined}
-        onChange={(checked) => change(setPerTest(text, index, checked))}
-      />
-      {Object.keys(primitive?.inputs ?? {}).map((port) => (
-        <PortValue
-          key={port}
-          text={text}
-          workflow={workflow}
-          primitives={primitives}
-          index={index}
-          port={port}
-          change={change}
-        />
-      ))}
+      {primitive !== null && (
+        <>
+          <Part>What it takes</Part>
+          {Object.keys(primitive.inputs).map((port) => (
+            <PortValue
+              key={port}
+              text={text}
+              workflow={workflow}
+              primitives={primitives}
+              index={index}
+              port={port}
+              change={change}
+            />
+          ))}
+          {outputs.length > 0 && (
+            <>
+              <Part>What it gives</Part>
+              <ul className={classes.outputs} aria-label="What it gives">
+                {outputs.map(([name, port]) => (
+                  <li key={name}>
+                    <strong>{name}</strong>{' '}
+                    <span className={classes.ref}>{port.type}</span>
+                    {port.description !== null && (
+                      <BodyText size="sm" tone="secondary">
+                        {port.description}
+                      </BodyText>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+          <Details primitive={primitive} />
+        </>
+      )}
       <div>
         <Button
           size="xs"
@@ -377,7 +510,19 @@ export function StepPanel({
   );
 }
 
-const TYPE_OPTIONS = VALUE_TYPES.map((type) => ({ value: type, label: type }));
+const TYPE_WORDS: Record<string, string> = {
+  text: 'Text',
+  number: 'Number',
+  boolean: 'True or false',
+  enum: 'One of a list',
+  file: 'File',
+  folder: 'Folder',
+};
+
+const TYPE_OPTIONS = VALUE_TYPES.map((type) => ({
+  value: type,
+  label: TYPE_WORDS[type] ?? type,
+}));
 
 function optionsText(options: string[] | null): string {
   return (options ?? []).join(', ');
@@ -388,6 +533,12 @@ function optionsOf(text: string): string[] {
     .split(',')
     .map((option) => option.trim())
     .filter((option) => option !== '');
+}
+
+/** A line of text for the task's form: empty leaves it out of the file. */
+function formText(text: string): string | null {
+  const trimmed = text.trim();
+  return trimmed === '' ? null : trimmed;
 }
 
 function InputRow({
@@ -412,6 +563,9 @@ function InputRow({
     options: input.options,
     per_test: input.perTest,
     optional: input.optional,
+    title: input.title,
+    help: input.help,
+    unit: input.unit,
   };
   const update = (next: Partial<InputFields>) => {
     const merged = { ...fields, ...next };
@@ -427,10 +581,11 @@ function InputRow({
   };
   const problems = pinned.inputs.get(input.id) ?? [];
   return (
-    <li className={classes.primitive} aria-label={`The input ${input.id}`}>
+    <li className={classes.declaration} aria-label={`The input ${input.id}`}>
       <CommitField
-        label="Input id"
+        label="Name"
         value={input.id}
+        description="Steps read it by this name. Renaming it changes them too."
         apply={(id) => {
           const problem = handleProblem(
             id,
@@ -449,7 +604,12 @@ function InputRow({
         onChange={(type) => update({ type })}
       />
       <Checkbox
-        label="The contestant gives it"
+        label="The entrant gives it"
+        description={
+          input.contestant
+            ? 'Each submission gives it, such as the program and its language.'
+            : 'The task gives it, such as a time limit.'
+        }
         checked={input.contestant}
         onChange={(contestant) => update({ contestant })}
       />
@@ -470,7 +630,7 @@ function InputRow({
       )}
       {input.contestant && input.type === 'file' && (
         <Checkbox
-          label="One file per test"
+          label="One file for each test"
           checked={input.perTest}
           onChange={(perTest) => update({ per_test: perTest })}
         />
@@ -483,6 +643,35 @@ function InputRow({
             onChange={(optional) => update({ optional })}
           />
         )}
+      <div className={classes.formText}>
+        <CommitField
+          label="Title on the task’s form"
+          value={input.title ?? ''}
+          placeholder={input.id}
+          apply={(written) => {
+            update({ title: formText(written) });
+            return null;
+          }}
+        />
+        <CommitField
+          label="Unit"
+          value={input.unit ?? ''}
+          placeholder="seconds"
+          apply={(written) => {
+            update({ unit: formText(written) });
+            return null;
+          }}
+        />
+      </div>
+      <CommitField
+        label="Help on the task’s form"
+        value={input.help ?? ''}
+        description="One sentence saying what it is for, shown beside its title."
+        apply={(written) => {
+          update({ help: formText(written) });
+          return null;
+        }}
+      />
       {problems.map((problem) => (
         <p key={problem.message} className={classes.problemText}>
           {problem.message}
@@ -540,10 +729,11 @@ function FieldRow({
   };
   const problems = pinned.fields.get(field.name) ?? [];
   return (
-    <li className={classes.primitive} aria-label={`The test field ${field.name}`}>
+    <li className={classes.declaration} aria-label={`The test’s ${field.name}`}>
       <CommitField
-        label="Field name"
+        label="Name"
         value={field.name}
+        description="Steps read it by this name. Renaming it changes them too."
         apply={(name) => {
           if (name === 'test') return NOT_TEST;
           const problem = handleProblem(
@@ -577,7 +767,8 @@ function FieldRow({
       )}
       {(field.type === 'file' || field.type === 'folder') && (
         <Checkbox
-          label="Served to contestants"
+          label="Shown to entrants"
+          description="Entrants can download it from the task, for a task they work on offline."
           checked={field.public}
           onChange={(shown) => update({ public: shown })}
         />
@@ -598,21 +789,25 @@ function FieldRow({
           variant="secondary"
           onClick={() => change(removeField(text, field.name))}
         >
-          Remove the field {field.name}
+          Remove {field.name} from each test
         </Button>
       </div>
     </li>
   );
 }
 
-/** A new input's or field's id and type, added in place. */
+/** A new input's or test's name and type, added in place. */
 function AddDeclaration({
-  what,
+  label,
+  button,
   taken,
+  test = false,
   onAdd,
 }: {
-  what: string;
+  label: string;
+  button: string;
   taken: string[];
+  test?: boolean;
   onAdd: (id: string, type: string) => void;
 }) {
   const [id, setId] = useState('');
@@ -620,13 +815,12 @@ function AddDeclaration({
   const [problem, setProblem] = useState<string | null>(null);
   return (
     <form
-      className={classes.item}
-      aria-label={`Add ${what}`}
+      className={classes.add}
+      aria-label={button}
       onSubmit={(event) => {
         event.preventDefault();
         const found =
-          handleProblem(id, taken) ??
-          (what === 'a test field' && id === 'test' ? NOT_TEST : null);
+          handleProblem(id, taken) ?? (test && id === 'test' ? NOT_TEST : null);
         setProblem(found);
         if (found !== null) return;
         onAdd(id, type);
@@ -634,15 +828,17 @@ function AddDeclaration({
       }}
     >
       <TextInput
-        label={`New ${what.replace(/^an? /, '')}`}
+        label={label}
         value={id}
         onChange={setId}
         error={problem ?? undefined}
       />
       <Select label="Of type" value={type} options={TYPE_OPTIONS} onChange={setType} />
-      <Button size="xs" type="submit">
-        Add {what}
-      </Button>
+      <div>
+        <Button size="xs" type="submit">
+          {button}
+        </Button>
+      </div>
     </form>
   );
 }
@@ -667,8 +863,12 @@ export function InputsPanel({
     (input) => ids === null || ids.includes(input.id),
   );
   return (
-    <section className={classes.side} aria-label="Inputs">
-      <SectionTitle order={3}>Inputs</SectionTitle>
+    <section className={classes.panel} aria-label="The inputs">
+      <BodyText size="sm" tone="secondary">
+        What the workflow asks for: settings each task gives, such as a time limit, and
+        what each entrant gives, such as their program. The task’s form names each by
+        its title.
+      </BodyText>
       <ul className={classes.list}>
         {shown.map((input) => (
           <InputRow
@@ -683,7 +883,8 @@ export function InputsPanel({
         ))}
       </ul>
       <AddDeclaration
-        what="an input"
+        label="New input"
+        button="Add an input"
         taken={workflow.inputs.map((input) => input.id)}
         onAdd={(id, type) =>
           change(
@@ -714,10 +915,10 @@ export function FieldsPanel({
     (field) => names === null || names.includes(field.name),
   );
   return (
-    <section className={classes.side} aria-label="Test fields">
-      <SectionTitle order={3}>Test fields</SectionTitle>
+    <section className={classes.panel} aria-label="Each test’s files">
       <BodyText size="sm" tone="secondary">
-        What every test folder holds.
+        What every test holds, such as its input and its answer. Each task’s tests give
+        these, and only a step that runs for each test reads them.
       </BodyText>
       <ul className={classes.list}>
         {shown.map((field) => (
@@ -733,7 +934,9 @@ export function FieldsPanel({
         ))}
       </ul>
       <AddDeclaration
-        what="a test field"
+        label="New file or value"
+        button="Add to each test"
+        test
         taken={workflow.test.map((field) => field.name)}
         onAdd={(name, type) =>
           change(
@@ -747,6 +950,12 @@ export function FieldsPanel({
     </section>
   );
 }
+
+const FOLDS = [
+  { value: 'sum', label: 'Their total' },
+  { value: 'mean', label: 'Their average' },
+  { value: 'max', label: 'The largest' },
+];
 
 function EntryRow({
   text,
@@ -812,6 +1021,7 @@ function EntryRow({
     <CommitField
       label={label}
       value={current === null ? '' : current.text}
+      placeholder="None"
       apply={(written) => {
         if (written.trim() === '') {
           write({ [key]: null });
@@ -833,10 +1043,11 @@ function EntryRow({
     />
   );
   return (
-    <li className={classes.primitive} aria-label={`The report entry ${entry.name}`}>
+    <li className={classes.declaration} aria-label={`The report entry ${entry.name}`}>
       <CommitField
         label="Name"
         value={entry.name}
+        description="Leaderboards and results name it by this."
         apply={(name) => {
           if (!REPORT_NAME.test(name))
             return "A reported value's name may use only lower case letters, digits and underscores (_), starting with a letter.";
@@ -857,7 +1068,7 @@ function EntryRow({
         value={from !== null ? refLabel(from) : ''}
         placeholder="Nothing yet"
         error={refused ?? undefined}
-        options={sources.map((ref) => ({ value: refLabel(ref), label: refLabel(ref) }))}
+        options={sources.map((ref) => ({ value: refLabel(ref), label: refWords(ref) }))}
         onChange={(chosen) => {
           const ref = sources.find((found) => refLabel(found) === chosen);
           if (ref === undefined) return;
@@ -868,10 +1079,10 @@ function EntryRow({
       />
       {isNumber && perTest && (
         <Select
-          label="Folds over tests by"
+          label="Over the tests, report"
           value={entry.fold ?? ''}
-          placeholder="Not folded: shown per test"
-          options={['sum', 'mean', 'max'].map((fold) => ({ value: fold, label: fold }))}
+          placeholder="Each test’s value"
+          options={FOLDS}
           onChange={(fold) => write({ fold: fold === '' ? null : fold })}
         />
       )}
@@ -881,18 +1092,22 @@ function EntryRow({
           value={entry.better ?? ''}
           placeholder="Not ranked"
           options={[
-            { value: 'higher', label: 'higher' },
-            { value: 'lower', label: 'lower' },
+            { value: 'higher', label: 'Higher' },
+            { value: 'lower', label: 'Lower' },
             ...betterInputs.map((input) => ({
               value: refText({ kind: 'inputs', name: input.id }),
-              label: `as the task's ${input.id} says`,
+              label: `As the task’s ${input.id} says`,
             })),
           ]}
           onChange={(better) => write({ better: better === '' ? null : better })}
         />
       )}
-      {isNumber && bound('at_least', 'At least', entry.atLeast)}
-      {isNumber && bound('at_most', 'At most', entry.atMost)}
+      {isNumber && (
+        <div className={classes.formText}>
+          {bound('at_least', 'Lowest it can be', entry.atLeast)}
+          {bound('at_most', 'Highest it can be', entry.atMost)}
+        </div>
+      )}
       {(pinned.entries.get(entry.name) ?? []).map((problem) => (
         <p key={problem.message} className={classes.problemText}>
           {problem.message}
@@ -904,7 +1119,7 @@ function EntryRow({
           variant="secondary"
           onClick={() => change(removeEntry(text, entry.name))}
         >
-          Remove the entry {entry.name}
+          Remove {entry.name} from the report
         </Button>
       </div>
     </li>
@@ -927,8 +1142,11 @@ export function ReportPanel({
   const sources = reportable(workflow, primitives);
   const [chosen, setChosen] = useState('');
   return (
-    <section className={classes.side} aria-label="Report">
-      <SectionTitle order={3}>Report</SectionTitle>
+    <section className={classes.panel} aria-label="The report">
+      <BodyText size="sm" tone="secondary">
+        What each grading reports, such as the time a program took. Organisers see it
+        with every grading, and a leaderboard can rank by a number here.
+      </BodyText>
       <ul className={classes.list}>
         {workflow.report.map((entry) => (
           <EntryRow
@@ -943,105 +1161,38 @@ export function ReportPanel({
         ))}
       </ul>
       {sources.length > 0 && (
-        <div className={classes.item}>
+        <div className={classes.add}>
           <Select
             label="Report an output"
             value={chosen}
             placeholder="Choose an output"
             options={sources.map((ref) => ({
               value: refLabel(ref),
-              label: refLabel(ref),
+              label: refWords(ref),
             }))}
             onChange={setChosen}
           />
-          <Button
-            size="xs"
-            disabled={chosen === ''}
-            onClick={() => {
-              const ref = sources.find((found) => refLabel(found) === chosen);
-              if (ref === undefined) return;
-              const name = freeName(
-                ref.output,
-                workflow.report.map((entry) => entry.name),
-                '_',
-              );
-              change(setEntry(text, name, { from: ref }));
-              setChosen('');
-            }}
-          >
-            Add the entry
-          </Button>
+          <div>
+            <Button
+              size="xs"
+              disabled={chosen === ''}
+              onClick={() => {
+                const ref = sources.find((found) => refLabel(found) === chosen);
+                if (ref === undefined) return;
+                const name = freeName(
+                  ref.output,
+                  workflow.report.map((entry) => entry.name),
+                  '_',
+                );
+                change(setEntry(text, name, { from: ref }));
+                setChosen('');
+              }}
+            >
+              Add to the report
+            </Button>
+          </div>
         </div>
       )}
-    </section>
-  );
-}
-
-export function Palette({
-  primitives,
-  onAdd,
-}: {
-  primitives: PrimitiveInfo[];
-  onAdd: (primitive: PrimitiveInfo, perTest: boolean) => void;
-}) {
-  const usable = primitives.filter((primitive) => primitive.problem === null);
-  return (
-    <section className={classes.palette} aria-label="Palette">
-      <SectionTitle order={3}>Primitives</SectionTitle>
-      {usable.length === 0 && (
-        <BodyText size="sm">The platform has no primitive this page can use.</BodyText>
-      )}
-      {usable.map((primitive) => {
-        const raising = raisingPorts(primitive);
-        return (
-          <div
-            key={primitive.ref}
-            className={classes.primitive}
-            aria-label={primitive.ref}
-          >
-            <BodyText size="sm">
-              <strong>{primitive.ref}</strong>
-              {primitive.batch ? ' · takes a batch' : ''}
-              {primitive.network ? ' · network' : ''}
-            </BodyText>
-            <ul className={classes.ports} aria-label={`The ports of ${primitive.ref}`}>
-              {Object.entries(primitive.inputs).map(([name, port]) => (
-                <li key={`in ${name}`}>
-                  in {name}: {port.type}
-                  {port.optional ? ', optional' : ''}
-                  {port.runs ? ', runs' : ''}
-                  {port.secret ? ', secret' : ''}
-                  {raising.has(name) ? ', raises a limit' : ''}
-                  {port.options ? ` (${port.options.join(', ')})` : ''}
-                </li>
-              ))}
-              {Object.entries(primitive.outputs).map(([name, port]) => (
-                <li key={`out ${name}`}>
-                  out {name}: {port.type}
-                  {port.optional ? ', optional' : ''}
-                </li>
-              ))}
-            </ul>
-            <div className={classes.item}>
-              <Button
-                size="xs"
-                onClick={() => onAdd(primitive, false)}
-                label={`Add ${primitive.ref}, run once`}
-              >
-                Add, run once
-              </Button>
-              <Button
-                size="xs"
-                variant="secondary"
-                onClick={() => onAdd(primitive, true)}
-                label={`Add ${primitive.ref}, run per test`}
-              >
-                Add, run per test
-              </Button>
-            </div>
-          </div>
-        );
-      })}
     </section>
   );
 }

@@ -1,3 +1,4 @@
+import type { WorkflowItem } from '@/api/types';
 import type { Box } from './layout';
 import type { FieldDecl, InputDecl, Ref, ReportEntry, Workflow } from './model';
 import type { PrimitiveInfo } from './primitives';
@@ -10,6 +11,9 @@ import type { PrimitiveInfo } from './primitives';
  * batch, its outcome, a port that keeps a secret) has no word here; the
  * step's drawer says it under Details.
  */
+
+/** What the editor, a test and a screen reader call the draft's file. */
+export const DRAFT_FILE = 'The draft’s file';
 
 /** A primitive as a person names it: its title, or its name without one (#436). */
 export function primitiveTitle(primitive: PrimitiveInfo): string {
@@ -31,7 +35,7 @@ const LIMIT_WORDS: Record<string, string> = {
 };
 
 /** "sets the time limit" for a port a primitive raises its time limits from. */
-export function limitWords(primitive: PrimitiveInfo, port: string): string | null {
+function limitWords(primitive: PrimitiveInfo, port: string): string | null {
   const limits = [
     ...new Set(
       Object.entries(primitive.limits_from)
@@ -93,12 +97,25 @@ export function refWords(ref: Ref): string {
   return `${ref.name} from each test`;
 }
 
+/** Who reads a workflow, in a few words, as its page's header says it. */
+export function visibilityWords(
+  page: Pick<WorkflowItem, 'visibility'> & { readers?: string[] },
+): string {
+  if (page.visibility === 'public') return 'Public';
+  if (page.visibility === 'private') return 'Private';
+  const count = page.readers?.length;
+  if (count === undefined) return 'Shared';
+  return count === 0
+    ? 'Shared with nobody yet'
+    : `Shared with ${String(count)} ${count === 1 ? 'person' : 'people'}`;
+}
+
 /** The name a box is read out by, and the title of the drawer it opens. */
 export function boxName(box: Box, workflow: Workflow): string {
   if (box.kind === 'step' && box.step !== null)
     return `Step ${workflow.steps[box.step]?.id || '(no name)'}`;
   if (box.kind === 'inputs') return 'Inputs';
-  if (box.kind === 'test') return "Each test's files";
+  if (box.kind === 'test') return 'Each test’s files';
   return 'Report';
 }
 

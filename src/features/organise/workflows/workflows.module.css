@@ -1,5 +1,6 @@
-/* The editor fills the width the shell leaves it: the graph, then the
- * selected box's panel and the file a save writes. */
+/* The editor fills the width the shell leaves it: the bar, the toolbar, the
+ * problems, then the graph across the whole width, the selected box's
+ * drawer over it on the right. */
 .editor {
   display: flex;
   flex-direction: column;
@@ -7,31 +8,256 @@
   min-width: 0;
 }
 
-.toolbar {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  align-items: flex-end;
-}
-
-.work {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 360px;
-  gap: 12px;
-  align-items: start;
-}
-
-@media (max-width: 1100px) {
-  .work {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
-
-.side {
+/* The bar stays at the top of the window as the page scrolls down a tall
+ * graph, so Save is always in reach. */
+.barFrame {
+  position: sticky;
+  top: 0;
+  z-index: 10;
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  min-width: 0;
+  gap: 4px;
+  padding: 8px 0;
+  background: var(--unicon-canvas);
+}
+
+.bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px 16px;
+}
+
+.switch {
+  min-width: 220px;
+}
+
+.status {
+  padding-bottom: 8px;
+}
+
+.barActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.where {
+  margin: 0;
+  color: var(--unicon-text-secondary);
+  font-size: 13px;
+}
+
+.tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.toolGap {
+  width: 12px;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* What stops the draft from becoming a version, each linked to its box. */
+.banner {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 14px;
+  border: 1px solid var(--unicon-border);
+  border-radius: var(--mantine-radius-sm);
+  background: var(--unicon-body);
+}
+
+.banner[data-tone='problem'] {
+  border-left: 3px solid var(--unicon-text-danger);
+}
+
+.banner[data-tone='warn'] {
+  border-left: 3px solid var(--unicon-border-strong);
+}
+
+.problemList {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13px;
+  color: var(--unicon-text-body);
+}
+
+.problemLink {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--unicon-text-accent);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.problemLink:hover {
+  text-decoration: underline;
+}
+
+.problemLink:focus-visible {
+  outline: 2px solid var(--mantine-primary-color-filled);
+}
+
+/* A draft that does not read, mended as text. */
+.mend {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* The selected box's drawer, from the right, over the page. */
+.drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  max-width: 100vw;
+  border-left: 1px solid var(--unicon-border-strong);
+  background: var(--unicon-body);
+  box-shadow: -8px 0 24px rgb(0 0 0 / 0.18);
+}
+
+.drawerHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--unicon-border);
+}
+
+.drawerTitle {
+  flex: 1;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--unicon-text-primary);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.drawerTitle:focus {
+  outline: none;
+}
+
+.drawerClose {
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--unicon-border);
+  border-radius: var(--mantine-radius-sm);
+  background: transparent;
+  color: var(--unicon-text-body);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.drawerClose:hover {
+  background: var(--unicon-hover);
+}
+
+.drawerBody {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.part {
+  margin: 6px 0 0;
+  color: var(--unicon-text-primary);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.portValue {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.outputs {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+}
+
+.details summary {
+  cursor: pointer;
+  color: var(--unicon-text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.detailList {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  color: var(--unicon-text-secondary);
+  font-size: 13px;
+}
+
+/* One input, test file or report entry in its drawer. */
+.declaration {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--unicon-border);
+  border-radius: var(--mantine-radius-sm);
+}
+
+.formText {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  gap: 8px;
+}
+
+.add {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--unicon-border);
+}
+
+/* A primitive in the "Add step" menu: its title, what it does, its reference. */
+.addTitle,
+.addDescription {
+  display: block;
+}
+
+.addTitle {
+  font-weight: 700;
+}
+
+.addDescription {
+  color: var(--unicon-text-secondary);
+  font-size: 12px;
+  white-space: normal;
 }
 
 /* The graph's frame: the page's whole width, the graph at its actual size
@@ -296,31 +522,8 @@
   position: absolute;
   top: -2px;
   left: 6px;
-  font-family: var(--mantine-font-family-monospace);
-  font-size: 10px;
-}
-
-.palette {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.primitive {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 8px;
-  border: 1px solid var(--unicon-border);
-  border-radius: var(--mantine-radius-sm);
-}
-
-.ports {
-  margin: 0;
-  padding-left: 16px;
-  font-family: var(--mantine-font-family-monospace);
   font-size: 11px;
-  color: var(--unicon-text-body);
+  font-weight: 600;
 }
 
 .problems {
