@@ -14,15 +14,15 @@ import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
 import { useMe } from '@/session';
 import { workflowPath } from '@/lib/organiser-paths';
 import { workflowOwners } from '../roles';
-import { Combine, OwnerAndName } from './Combine';
+import { OwnerAndName } from './Combine';
 import shared from '../organise.module.css';
 import classes from './workflows.module.css';
 
 /**
  * Every workflow the person may read, those they may edit first, each
- * linking to its page; making a new one, which starts as the classic
- * workflow; and combining several versions into one new workflow of their
- * own, which then opens in the editor.
+ * linking to its page; and making a new one, which starts as the classic
+ * workflow. Combining workflows is off this page for now (M36): `Combine`
+ * and the backend's route stay, for when it has a place here again.
  */
 export function WorkflowsPage() {
   const view = queryView($api.useQuery('get', '/api/v1/workflows'));
@@ -39,11 +39,6 @@ export function WorkflowsPage() {
       <Card>
         <NewWorkflow />
       </Card>
-      {view.state === 'ready' && (
-        <Card>
-          <Combine items={view.data} />
-        </Card>
-      )}
     </div>
   );
 }

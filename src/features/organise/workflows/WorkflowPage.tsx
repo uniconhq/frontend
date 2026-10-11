@@ -22,7 +22,6 @@ import { parseYaml } from '../forms/yaml-doc';
 import { DefinitionErrors } from '../DefinitionErrors';
 import { workflowOwners } from '../roles';
 import { checkQuery } from './check';
-import { Combine } from './Combine';
 import { Editor } from './Editor';
 import type { Box } from './layout';
 import { DrawnGraph } from './DrawnGraph';
@@ -109,14 +108,11 @@ function Shown({
         )}
       </BodyText>
       {page.editable && asked === null && page.draft !== null ? (
-        <>
-          <Editor
-            key={`${page.owner}/${page.name}`}
-            page={{ ...page, draft: page.draft }}
-            primitives={primitives}
-          />
-          <CombineHere page={page} />
-        </>
+        <Editor
+          key={`${page.owner}/${page.name}`}
+          page={{ ...page, draft: page.draft }}
+          primitives={primitives}
+        />
       ) : (
         <VersionView
           page={page}
@@ -311,20 +307,5 @@ function CopyForm({ source }: { source: string }) {
       </div>
       {error !== null && <ErrorBlock error={error} compact />}
     </form>
-  );
-}
-
-/** Combine, from a workflow's own page, its latest version chosen to start with. */
-function CombineHere({ page }: { page: Page }) {
-  const listed = queryView($api.useQuery('get', '/api/v1/workflows'));
-  const latest = latestVersion(page.versions);
-  if (listed.state !== 'ready') return null;
-  return (
-    <Card>
-      <Combine
-        items={listed.data}
-        chosen={latest === undefined ? [] : [`${page.owner}/${page.name}@${latest}`]}
-      />
-    </Card>
   );
 }
