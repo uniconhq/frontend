@@ -271,7 +271,7 @@ describe('a number typed into a field', () => {
     }
     expect(numberProblem('0x10', true)).toBeUndefined();
     expect(numberProblem('0o17', true)).toBeUndefined();
-    expect(numberProblem('+.5', true)).toBe('A whole number.');
+    expect(numberProblem('+.5', true)).toBe('Enter a whole number.');
   });
 
   it('refuses what YAML 1.2 reads as text or as no finite number', () => {
@@ -285,7 +285,7 @@ describe('a number typed into a field', () => {
       '1:30',
       '.',
     ]) {
-      expect(numberProblem(typed), typed).toBe('Not a number.');
+      expect(numberProblem(typed), typed).toBe('Enter a number.');
       const read = parseYaml(`a: ${typed}`);
       if ('error' in read) throw new Error(read.error);
       const value: unknown = (read.doc.toJS() as { a: unknown }).a;

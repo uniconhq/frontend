@@ -120,9 +120,7 @@ describe('the entrants page', () => {
     expect(row('Red')).toHaveTextContent('30 min on sum');
     expect(row('Blue')).toHaveTextContent('Invited');
     expect(row('Blue')).toHaveTextContent('Waiting for approval');
-    expect(row('Blue')).toHaveTextContent(
-      'Short of people, so it cannot be approved yet.',
-    );
+    expect(row('Blue')).toHaveTextContent('Too few members to be approved yet.');
     expect(
       within(row('Blue')).getByRole('button', { name: 'Approve Blue' }),
     ).toBeDisabled();
@@ -226,7 +224,7 @@ describe('the entrants page', () => {
       within(dialog).getByRole('combobox', { name: 'Move dee to' }),
       'e-blue',
     );
-    expect(dialog).toHaveTextContent('and reach those of Blue instead.');
+    expect(dialog).toHaveTextContent('and gain access to those of Blue instead.');
     await user.click(within(dialog).getByRole('button', { name: 'Move' }));
 
     await waitFor(() => expect(sent).toHaveLength(2));

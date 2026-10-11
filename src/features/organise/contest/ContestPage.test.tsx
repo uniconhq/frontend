@@ -35,7 +35,7 @@ describe("the contest page's header", () => {
     const header = title.closest('header');
     if (header === null) throw new Error('the title is in a header');
     expect(await within(header).findByText('Draft')).toBeVisible();
-    expect(screen.getByRole('link', { name: 'View as contestant' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'View as an entrant' })).toHaveAttribute(
       'href',
       '/contests/acme/spring',
     );
@@ -241,11 +241,11 @@ describe("the contest's tasks", () => {
     const max = await screen.findByRole('listitem', { name: 'C · max' });
     expect(max).toHaveTextContent('Never published');
     expect(max).toHaveTextContent('1 problem in its last save');
-    expect(max).toHaveTextContent('points known once published');
+    expect(max).toHaveTextContent('points known once the task is published');
 
     const min = screen.getByRole('listitem', { name: 'D · min' });
     expect(min).toHaveTextContent('Never published');
-    expect(min).toHaveTextContent('Draft kept back');
+    expect(min).toHaveTextContent('Draft, not published');
   });
 
   it("reads the tasks afresh on coming back from saving the contest's settings", async () => {
@@ -336,12 +336,12 @@ describe("the contest's tasks", () => {
 
     const tasks = await screen.findByRole('region', { name: 'Tasks' });
     const alert = await within(tasks).findByRole('alert');
-    expect(alert).toHaveTextContent("The contest's settings do not read");
+    expect(alert).toHaveTextContent("The contest's settings cannot be read");
     expect(alert).toHaveTextContent(
-      'Mend each problem where it says, or, as an admin, mend them as text in the settings as stored.',
+      'Fix each problem where it is listed, or, as an admin, fix them as text in the stored settings.',
     );
     expect(
-      within(alert).getByRole('link', { name: 'the settings as stored' }),
+      within(alert).getByRole('link', { name: 'the stored settings' }),
     ).toHaveAttribute('href', '/orgs/acme/contests/spring/files?file=contest.yaml');
     const errors = within(alert).getByRole('list', { name: 'Errors' });
     expect(
@@ -391,7 +391,7 @@ describe("the contest's tasks", () => {
     renderApp(CONTEST);
 
     expect(
-      await screen.findByText('Tasks of this contest you hold a role at:'),
+      await screen.findByText('Tasks of this contest where you have a role:'),
     ).toBeVisible();
     const own = screen.getByRole('list', { name: 'Tasks' });
     expect(
@@ -453,7 +453,7 @@ describe('how the contest is scored', () => {
       await within(sort).findByText('small earns its 15 when every test passes.'),
     ).toBeVisible();
     expect(sort).toHaveTextContent(
-      `Worth 50 points, as the contest sets it; its groups total ${formatExact('100')}.`,
+      `Worth 50 points, as the contest sets it. Its test groups total ${formatExact('100')}.`,
     );
     expect(sort).toHaveTextContent(
       'Standings: Ranks entrants by points, from each entrant’s best submission on task sort',
@@ -465,9 +465,9 @@ describe('how the contest is scored', () => {
       ),
     ).toBeVisible();
     expect(sum).toHaveTextContent(
-      `Worth ${formatExact('100')} points, its groups’ total.`,
+      `Worth ${formatExact('100')} points, its test groups’ total.`,
     );
-    expect(sum).toHaveTextContent('No board counts it.');
+    expect(sum).toHaveTextContent('No leaderboard counts it.');
   });
 });
 
@@ -501,7 +501,7 @@ describe("a task's timeline, edited on its row", () => {
     );
     const dialog = await screen.findByRole('dialog', { name: 'Timeline of A · sort' });
     const worth = await within(dialog).findByRole('textbox', { name: 'Worth' });
-    expect(worth).toHaveAttribute('placeholder', "100, the task's total");
+    expect(worth).toHaveAttribute('placeholder', '100, its test groups’ total');
     await user.type(worth, '120');
     const due = within(dialog).getByRole('radiogroup', { name: 'Due' });
     await user.click(within(due).getByRole('radio', { name: 'At a time' }));
@@ -668,7 +668,7 @@ describe("the contest's sections", () => {
     await says('Gradings', '3 waiting to be graded, 1 being graded.');
     await says('Announcements', '2 posted; the latest is “Task B fixed”.');
     await says('Questions', 'Nobody has asked anything yet.');
-    await says('Boards', 'No leaderboard yet.');
+    await says('Leaderboards', 'No leaderboard yet.');
     await says('Files', 'No files yet.');
     await says('Contest organisers', '0 organisers');
     // No button and no form on the page but the tasks' one button.

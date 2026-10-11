@@ -78,7 +78,7 @@ describe("the contest's status", () => {
       '✓A · sort: published',
       '✗B · sum: its last save has problems',
       '✓Anyone with an account can register from when the contest opens until the contest ends. An organiser approves each one.',
-      '!No leaderboard yet, so nobody sees a ranking. Not needed to open it.',
+      '!No leaderboard yet, so nobody sees a ranking. The contest can open without one.',
     ]);
     expect(within(list).getByRole('link', { name: /B · sum/ })).toHaveAttribute(
       'href',
@@ -228,7 +228,7 @@ describe("the contest's status", () => {
 
     const card = await status();
     expect(
-      await within(card).findByText('Only an admin of the contest opens it.'),
+      await within(card).findByText('Only an admin of the contest can open it.'),
     ).toBeVisible();
     expect(within(card).queryByRole('button', { name: 'Open the contest' })).toBeNull();
     expect(

@@ -20,7 +20,7 @@ const TOP: Record<string, string> = {
   entrants: 'Teams',
   on_system_error: 'When grading fails',
   tasks: 'Tasks',
-  leaderboards: 'Boards',
+  leaderboards: 'Leaderboards',
 };
 
 const UNDER: Record<string, Record<string, string>> = {
@@ -69,7 +69,7 @@ function plain(key: string): string {
   return words.charAt(0).toUpperCase() + words.slice(1);
 }
 
-/** A setting of the contest named in words: "Task sum: Due", "Board Standings: Shown to". */
+/** A setting of the contest named in words: "Task sum: Due", "Leaderboard Standings: Shown to". */
 export function contestFieldName(path: MergePath): string {
   const [top, second, third] = path;
   if (typeof top !== 'string') return 'The settings';
@@ -80,7 +80,7 @@ export function contestFieldName(path: MergePath): string {
       : task;
   }
   if (top === 'leaderboards' && second !== undefined && typeof second !== 'string') {
-    const board = `Board ${second.value}`;
+    const board = `Leaderboard ${second.value}`;
     return typeof third === 'string'
       ? `${board}: ${BOARD_FIELDS[third] ?? plain(third)}`
       : board;

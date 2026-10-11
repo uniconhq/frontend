@@ -127,7 +127,7 @@ describe('how people enter', { timeout: 20_000 }, () => {
     expect(guests.getByRole('checkbox', { name: 'Needs a code' })).toBeChecked();
     expect(guests.getByLabelText('Code')).toHaveValue('guest-2026');
     expect(
-      guests.getByRole('radio', { name: 'An organiser approves each' }),
+      guests.getByRole('radio', { name: 'An organiser approves each one' }),
     ).toBeChecked();
   });
 
@@ -143,7 +143,7 @@ describe('how people enter', { timeout: 20_000 }, () => {
 
     expect(
       within(form).getByRole('list', { name: 'To fix before saving' }),
-    ).toHaveTextContent('Give way 1 its code, or untick it.');
+    ).toHaveTextContent('Way in 1: enter its code, or untick “Needs a code”.');
     expect(
       within(form).getByRole('button', { name: 'Save how people enter' }),
     ).toBeDisabled();
@@ -232,7 +232,7 @@ describe('how people enter', { timeout: 20_000 }, () => {
     settings(`${BASE}registration:\n  ways:\n    - signup: {code: x}\n`);
     const form = await openForm();
 
-    expect(form).toHaveTextContent('Only an admin of the contest changes these.');
+    expect(form).toHaveTextContent('Only an admin of the contest can change these.');
     expect(way(form, 'Sign-up').getByLabelText('Code')).toBeDisabled();
     expect(within(form).queryByRole('button', { name: 'Remove Sign-up' })).toBeNull();
     await waitFor(() =>

@@ -63,20 +63,19 @@ function useUnread(
     { params: { path } },
     { enabled: place.kind === 'contest', retry: false },
   );
-  if (file.encoding !== 'utf-8') return { reason: 'They are not text.', problems: [] };
+  if (file.encoding !== 'utf-8')
+    return { reason: 'The file is not text.', problems: [] };
   const parsed = parseYaml(file.content);
   if ('error' in parsed) return { reason: parsed.error, problems: [] };
   if (topMap(parsed.doc) === 'not-a-mapping') {
-    return { reason: 'They are not a list of settings.', problems: [] };
+    return { reason: 'The file does not hold a list of settings.', problems: [] };
   }
   const unreadable =
     place.kind === 'task'
       ? readTask(parsed.doc, []).unreadable
       : readContest(parsed.doc).unreadable;
   const reason =
-    unreadable.length === 0
-      ? null
-      : `${unreadable.join(', ')} ${unreadable.length === 1 ? 'is' : 'are'} not in a shape the pages can read.`;
+    unreadable.length === 0 ? null : `The pages cannot read ${unreadable.join(', ')}.`;
   if (place.kind === 'task') {
     const problems = (task.data?.errors ?? []).filter((error) => {
       const top = /^[^.[/]*/.exec(error.path)?.[0] ?? '';
@@ -210,8 +209,8 @@ function WhereChanged({ place }: { place: Place }) {
     const { org, contest, task } = place;
     return (
       <BodyText>
-        The task’s settings as they are stored, to read. They are changed on the task’s
-        page: its{' '}
+        The task’s settings as they are stored, for reading only. They are changed on
+        the task’s page: its{' '}
         <PageLink to={taskCardPath(org, contest, task, 'workflow')}>Workflow</PageLink>,{' '}
         <PageLink to={taskCardPath(org, contest, task, 'inputs')}>Inputs</PageLink> and{' '}
         <PageLink to={taskCardPath(org, contest, task, 'tests')}>
@@ -228,14 +227,15 @@ function WhereChanged({ place }: { place: Place }) {
   const { org, contest } = place;
   return (
     <BodyText>
-      The contest’s settings as they are stored, to read. They are changed on the
-      contest’s pages: its{' '}
+      The contest’s settings as they are stored, for reading only. They are changed on
+      the contest’s pages: its{' '}
       <PageLink to={contestPath(org, contest)}>status and tasks</PageLink>,{' '}
       <PageLink to={contestSectionPath(org, contest, 'settings')}>Settings</PageLink>,{' '}
       <PageLink to={contestSectionPath(org, contest, 'entry')}>
         How people enter
       </PageLink>{' '}
-      and <PageLink to={contestSectionPath(org, contest, 'boards')}>Boards</PageLink>.
+      and{' '}
+      <PageLink to={contestSectionPath(org, contest, 'boards')}>Leaderboards</PageLink>.
     </BodyText>
   );
 }
@@ -272,7 +272,7 @@ export function SettingsText({
       ) : (
         <div className={shared.panel} role="alert">
           <BodyText>
-            These settings do not read, so the pages cannot change them.
+            These settings cannot be read, so the pages cannot change them.
           </BodyText>
           {unread.reason !== null && (
             <BodyText tone="secondary">{unread.reason}</BodyText>
@@ -280,8 +280,8 @@ export function SettingsText({
           <DefinitionErrors errors={unread.problems} placeOf={placeOf} />
           <BodyText tone="secondary">
             {admin
-              ? 'As an admin you may mend them here as text. The pages come back once they read.'
-              : `An admin of the ${whose} can mend them as text.`}
+              ? 'As an admin, you can fix them here as text. The pages work again once the settings can be read.'
+              : `An admin of the ${whose} can fix them as text.`}
           </BodyText>
         </div>
       )}

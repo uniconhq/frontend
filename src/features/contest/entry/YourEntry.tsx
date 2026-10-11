@@ -591,7 +591,7 @@ function Leave({
   const outcome = team
     ? last && !entrant.submitted
       ? 'Nobody is left in it, so the team is deleted.'
-      : 'You stop reaching the team’s submissions and questions.'
+      : 'You lose access to the team’s submissions and questions.'
     : 'Your registration is taken away. You can register again while registration is open.';
 
   return (

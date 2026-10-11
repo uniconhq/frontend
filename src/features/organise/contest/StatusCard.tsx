@@ -136,7 +136,7 @@ function checksOf(
       text:
         values.boards.length > 0
           ? 'A leaderboard'
-          : 'No leaderboard yet, so nobody sees a ranking. Not needed to open it.',
+          : 'No leaderboard yet, so nobody sees a ranking. The contest can open without one.',
       to: contestSectionPath(org, contest, 'boards'),
     },
   ];
@@ -311,7 +311,7 @@ export function StatusCard({ org, contest }: { org: string; contest: string }) {
               )}
               {!admin && standing === 'draft' && (
                 <BodyText tone="secondary">
-                  Only an admin of the contest opens it.
+                  Only an admin of the contest can open it.
                 </BodyText>
               )}
               {actions.length > 0 && <div className={shared.actions}>{actions}</div>}
@@ -413,8 +413,8 @@ export function StatusCard({ org, contest }: { org: string; contest: string }) {
                     onChange={setVisibility}
                   />
                   <BodyText tone="secondary">
-                    Who may enter is How people enter, a separate question: a contest
-                    can be watched by anyone and entered by invitation.
+                    Who may enter is set separately, under How people enter: a contest
+                    can be seen by anyone and still entered only by invite.
                   </BodyText>
                   <div className={shared.actions}>
                     <Button

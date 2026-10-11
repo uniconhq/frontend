@@ -73,7 +73,7 @@ export function CreateForm({
         ref={nameField}
         autoFocus
         label="Name"
-        description="Part of every address, so it cannot change later."
+        description="Used in the web address, so it cannot be changed later."
         value={name}
         onChange={setName}
         required

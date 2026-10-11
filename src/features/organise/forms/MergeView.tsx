@@ -151,24 +151,24 @@ export function MergeView({
 
   return (
     <div ref={panel} className={shared.panel} role="alert" tabIndex={-1}>
-      <BodyText>Someone else saved this file since you opened it.</BodyText>
+      <BodyText>Someone else saved a change since you opened this.</BodyText>
       {diffs === null ? (
         <BodyText tone="secondary">
-          Nothing was saved. The file as it is now is not YAML the form can read, so the
-          two cannot be compared field by field. Drop your changes to see it, or edit it
-          as text.
+          Nothing was saved. The version saved now cannot be read by this form, so the
+          two versions cannot be compared field by field. Discard your changes to see
+          them.
         </BodyText>
       ) : diffs.length === 0 ? (
         <BodyText tone="secondary">
-          Nothing was saved, and nothing needs to be: the file as it is now already has
+          Nothing was saved, and nothing needs to be: the version saved now already has
           every change you made.
         </BodyText>
       ) : (
         <>
           <BodyText tone="secondary">
             {choosable
-              ? 'Nothing was saved yet. For each field the two versions disagree on, pick the one to keep, then save. Every other field stays as it is now.'
-              : 'Nothing was saved. Every field the two versions disagree on is one only an admin changes, so the file stays as it is now.'}
+              ? 'Nothing has been saved yet. For each field where the two versions differ, choose the one to keep, then save. Every other field stays as it is now.'
+              : 'Nothing was saved. Only an admin can change the fields where the two versions differ, so everything stays as it is now.'}
             {diffs.some(holdsTime) && ` Times are in your time, ${zoneName()}.`}
           </BodyText>
           <ul className={classes.merge} aria-label="Fields that differ">
@@ -180,7 +180,7 @@ export function MergeView({
                     label={labelOf(diff, words)}
                     description={
                       held
-                        ? 'Only an admin changes this, so it stays as it is now.'
+                        ? 'Only an admin can change this, so it stays as it is now.'
                         : undefined
                     }
                     disabled={held}
@@ -224,7 +224,7 @@ export function MergeView({
           </Button>
         )}
         <Button variant="secondary" disabled={busy} onClick={onDrop}>
-          {diffs !== null && !choosable ? 'Back to the form' : 'Drop my changes'}
+          {diffs !== null && !choosable ? 'Back to the form' : 'Discard my changes'}
         </Button>
       </div>
       <Modal

@@ -45,7 +45,7 @@ describe('the org page', () => {
     expect(rows[0]).toHaveTextContent(
       `${formatDateTime(new Date('2026-10-01T09:00:00Z'))} to ${formatDateTime(new Date('2026-10-01T14:00:00Z'))}`,
     );
-    expect(rows[2]).toHaveTextContent('Its settings do not read');
+    expect(rows[2]).toHaveTextContent('Its settings cannot be read');
   });
 
   it('shows a skeleton while the contests load', async () => {
@@ -102,7 +102,9 @@ describe('the org page', () => {
 
     expect(await screen.findByText('You cannot do that')).toBeVisible();
     expect(screen.getByText('You need the observer role at acme.')).toBeVisible();
-    expect(screen.getByText('Contests of this org you hold a role at:')).toBeVisible();
+    expect(
+      screen.getByText('Contests of this org where you have a role:'),
+    ).toBeVisible();
     const own = screen.getByRole('list', { name: 'Contests' });
     expect(within(own).getByRole('link', { name: 'spring' })).toHaveAttribute(
       'href',
@@ -220,7 +222,9 @@ describe("the org's display name and description", () => {
     await user.clear(screen.getByRole('textbox', { name: /^Display name/ }));
     await user.click(screen.getByRole('button', { name: 'Save' }));
 
-    expect(await screen.findByText('None; the name shows.')).toBeVisible();
+    expect(
+      await screen.findByText('Not set, so the org’s name is shown.'),
+    ).toBeVisible();
     expect(sent).toEqual([
       { display_name: '', description: 'Contests for Acme engineers.' },
     ]);
@@ -264,7 +268,9 @@ describe("the org's display name and description", () => {
         'Acme Contests',
       );
       expect(screen.queryByRole('button', { name: 'Edit' })).toBeNull();
-      expect(screen.getByText('Only an admin of the org changes these.')).toBeVisible();
+      expect(
+        screen.getByText('Only an admin of the org can change these.'),
+      ).toBeVisible();
     },
   );
 
@@ -289,7 +295,9 @@ describe("the org's display name and description", () => {
     expect(fields).toHaveTextContent('Display nameAcme Contests');
     expect(fields).toHaveTextContent('DescriptionContests for Acme engineers.');
     expect(screen.queryByRole('button', { name: 'Edit' })).toBeNull();
-    expect(screen.getByText('Only an admin of the org changes these.')).toBeVisible();
+    expect(
+      screen.getByText('Only an admin of the org can change these.'),
+    ).toBeVisible();
   });
 
   it("heads the org's page with them, and gives its admin a small Edit", async () => {

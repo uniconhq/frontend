@@ -52,8 +52,9 @@ export function TextConflict({
     <div ref={panel} className={shared.panel} role="alert" tabIndex={-1}>
       <BodyText>Someone else changed this file since you opened it.</BodyText>
       <BodyText tone="secondary">
-        Nothing was saved. Their version is on the left and yours on the right. Go on
-        from theirs and copy across what you want of yours, or save yours over theirs.
+        Nothing was saved. Their version is on the left and yours on the right. Continue
+        from theirs and copy in what you want to keep of yours, or save yours over
+        theirs.
       </BodyText>
       <Loaded view={theirs} rows={6}>
         {(file) => (
@@ -75,7 +76,7 @@ export function TextConflict({
               />
             </div>
             <div className={shared.actions}>
-              <Button onClick={onTakeTheirs}>Go on from theirs</Button>
+              <Button onClick={onTakeTheirs}>Continue from theirs</Button>
               <Button variant="danger" disabled={busy} onClick={() => setWarning(true)}>
                 Save yours over theirs
               </Button>

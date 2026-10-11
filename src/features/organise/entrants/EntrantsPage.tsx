@@ -103,7 +103,7 @@ function Members({ entrant }: { entrant: OrganisedEntrant }) {
         <li key={invited.invite} className={classes.person}>
           <span>{invited.username ?? invited.email ?? 'Someone'}</span>
           <BodyText tone="secondary">
-            Invited, not joined yet; it lapses on{' '}
+            Invited, not joined yet. The invite expires on{' '}
             {formatDateTime(new Date(invited.expires_at))}.
           </BodyText>
         </li>
@@ -244,7 +244,7 @@ function Manage({
       >
         <TextInput
           label="Extra minutes"
-          description="Moves the due time and the close of the tasks below. 0 takes it away."
+          description="Moves the due and closing times of the tasks below. Enter 0 to take the extra time away."
           value={minutes}
           onChange={setMinutes}
           inputMode="decimal"
@@ -346,8 +346,8 @@ function Manage({
       {asking?.kind === 'remove' && (
         <div className={classes.panel} role="alert">
           <BodyText>
-            Take {memberName(asking.member)} out of {entrant.display_name}? They stop
-            reaching its submissions and questions.
+            Take {memberName(asking.member)} out of {entrant.display_name}? They lose
+            access to its submissions and questions.
             {entrant.members.length === 1 && !entrant.submitted
               ? ' Nobody is left in it, so it is deleted.'
               : ''}
@@ -388,10 +388,10 @@ function Manage({
             onChange={(to) => setAsking({ ...asking, to })}
           />
           <BodyText>
-            They stop reaching the submissions and questions of {entrant.display_name}
+            They lose access to the submissions and questions of {entrant.display_name}
             {asking.to === ''
               ? '.'
-              : ` and reach those of ${others.find((found) => found.id === asking.to)?.display_name ?? 'the other'} instead.`}
+              : ` and gain access to those of ${others.find((found) => found.id === asking.to)?.display_name ?? 'the other'} instead.`}
           </BodyText>
           <div className={classes.actions}>
             <Button
@@ -422,8 +422,8 @@ function Manage({
           asking?.kind === 'delete' ? (
             <div className={classes.panel} role="alert">
               <BodyText>
-                Delete {entrant.display_name}? Its registration and its invites go, and
-                its members are in no entrant of this contest.
+                Delete {entrant.display_name}? Its registration and invites are removed,
+                and its members are no longer entered in this contest.
               </BodyText>
               <div className={classes.actions}>
                 <Button
@@ -549,9 +549,7 @@ function Row({
             <BodyText tone="secondary">{entrant.reason}</BodyText>
           )}
           {!entrant.complete && entrant.status === 'pending' && (
-            <BodyText tone="secondary">
-              Short of people, so it cannot be approved yet.
-            </BodyText>
+            <BodyText tone="secondary">Too few members to be approved yet.</BodyText>
           )}
           {teams && entrant.locked && <BodyText tone="secondary">Team fixed</BodyText>}
           <BodyText tone="meta">
@@ -665,7 +663,7 @@ function Row({
             <div className={classes.inline}>
               <BodyText>
                 {teams ? 'Its members' : name} can no longer submit or ask. What was
-                submitted stays, and so does its place on the boards.
+                submitted stays, and so does its place on the leaderboards.
               </BodyText>
               {error !== null && (
                 <div role="alert">
@@ -771,7 +769,7 @@ export function EntrantsPage() {
                 )}
                 {entrants.length > 0 &&
                   (shown.length === 0 ? (
-                    <BodyText tone="secondary">No entrant is in this state.</BodyText>
+                    <BodyText tone="secondary">No entrants have this status.</BodyText>
                   ) : (
                     <div className={classes.scroll}>
                       <table className={classes.table} aria-label="Entrants">

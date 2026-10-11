@@ -99,16 +99,16 @@ describe('the organisers’ invites', () => {
     const eve = await row('eve');
     expect(eve).toHaveTextContent('Manager');
     expect(eve).toHaveTextContent('Pending');
-    expect(eve).toHaveTextContent('Lapses');
+    expect(eve).toHaveTextContent('Expires');
     expect(eve).toHaveTextContent('Sent');
     expect(eve).toHaveTextContent('By kenny');
     const zed = await row('zed@example.org');
     expect(zed).toHaveTextContent('Observer');
-    expect(zed).toHaveTextContent('Lapsed');
+    expect(zed).toHaveTextContent('Expired');
     expect(zed).toHaveTextContent('Failed to send');
     const fay = await row('fay');
     expect(fay).toHaveTextContent('Accepted');
-    expect(fay).toHaveTextContent('No mail server');
+    expect(fay).toHaveTextContent('Not sent: no mail server');
   });
 
   it('offers Send again and Withdraw only on an invite still pending', async () => {
@@ -350,7 +350,7 @@ describe('the contestants’ invites', () => {
 
     const cal = await row('cal');
     expect(cal).toHaveTextContent('Pending');
-    expect(cal).toHaveTextContent('Their own');
+    expect(cal).toHaveTextContent('An entry of their own');
     expect(await row('dee')).toHaveTextContent('Red, from a member');
     const table = screen.getByRole('table', { name: 'Invites' });
     expect(within(table).queryByText('org')).toBeNull();

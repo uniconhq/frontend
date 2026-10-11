@@ -139,8 +139,8 @@ export function DefinitionForm({
           </BodyText>
           <BodyText tone="secondary">{read.error}</BodyText>
           <BodyText tone="secondary">
-            An admin mends them as text where they are stored:{' '}
-            <PageLink to={mendAt(place)}>the settings as stored</PageLink>.
+            An admin can fix them as text in{' '}
+            <PageLink to={mendAt(place)}>the stored settings</PageLink>.
           </BodyText>
         </div>
       ) : (
@@ -180,10 +180,10 @@ export function DefinitionForm({
 
 /** The file as a document the form can show, or why it is not one. */
 function readForm(file: FileContent): { doc: Doc } | { error: string } {
-  if (file.encoding !== 'utf-8') return { error: 'It is not text.' };
+  if (file.encoding !== 'utf-8') return { error: 'The file is not text.' };
   const parsed = parseYaml(file.content);
   if ('error' in parsed) return parsed;
   return topMap(parsed.doc) === 'not-a-mapping'
-    ? { error: 'Its top level is not a mapping of keys.' }
+    ? { error: 'The file does not hold a list of settings.' }
     : parsed;
 }

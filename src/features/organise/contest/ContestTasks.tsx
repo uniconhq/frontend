@@ -57,7 +57,7 @@ function TaskState({ standing }: { standing: TaskStanding }) {
           its last save
         </Chip>
       )}
-      {draft && errors.length === 0 && <Chip>Draft kept back</Chip>}
+      {draft && errors.length === 0 && <Chip>Draft, not published</Chip>}
       <span>{published}</span>
     </>
   );
@@ -282,8 +282,9 @@ export function ContestTasks({ org, contest }: { org: string; contest: string })
     startFailed !== null ? (
       <div className={classes.panel} role="alert">
         <BodyText>
-          {startFailed.task} was made, but not on {startFailed.workflow}: it grades with{' '}
-          {STARTER} until another workflow is chosen on{' '}
+          {startFailed.task} was created, but its workflow could not be set to{' '}
+          {startFailed.workflow}, so it is graded by {STARTER} for now. Choose its
+          workflow on{' '}
           <PageLink to={taskCardPath(org, contest, startFailed.task, 'workflow')}>
             its page
           </PageLink>
@@ -292,12 +293,12 @@ export function ContestTasks({ org, contest }: { org: string; contest: string })
       </div>
     ) : view.state !== 'error' ? undefined : unreadable ? (
       <div className={classes.panel} role="alert">
-        <BodyText>The contest&apos;s settings do not read</BodyText>
+        <BodyText>The contest&apos;s settings cannot be read</BodyText>
         <BodyText tone="secondary">
-          Where each task stands comes from the contest&apos;s settings, which do not
-          pass validation. Mend each problem where it says, or, as an admin, mend them
-          as text in{' '}
-          <PageLink to={viewFilePath(org, contest)}>the settings as stored</PageLink>.
+          Each task&apos;s timeline comes from the contest&apos;s settings, which have
+          problems. Fix each problem where it is listed, or, as an admin, fix them as
+          text in{' '}
+          <PageLink to={viewFilePath(org, contest)}>the stored settings</PageLink>.
         </BodyText>
         {definitionErrorsOf(view.error).length > 0 ? (
           <DefinitionErrors
@@ -314,7 +315,7 @@ export function ContestTasks({ org, contest }: { org: string; contest: string })
       <>
         <ErrorBlock error={view.error} onRetry={view.retry} />
         {rows.length > 0 && (
-          <BodyText>Tasks of this contest you hold a role at:</BodyText>
+          <BodyText>Tasks of this contest where you have a role:</BodyText>
         )}
       </>
     );
@@ -356,7 +357,8 @@ export function ContestTasks({ org, contest }: { org: string; contest: string })
               openLabel="New task"
               second={{
                 label: 'Title',
-                description: 'Shown on its pages. Its name is used when there is none.',
+                description:
+                  'Shown on the task’s pages. Left empty, its name is shown.',
               }}
               submitLabel="Create task"
               pending={create.isPending || starting}

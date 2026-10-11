@@ -40,7 +40,7 @@ describe('the org list', () => {
     renderApp('/orgs');
 
     expect(
-      await screen.findByText('You do not hold a role at any org yet.'),
+      await screen.findByText('You do not have a role at any org yet.'),
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'New org' })).toBeVisible();
   });

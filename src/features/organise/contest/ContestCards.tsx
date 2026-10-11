@@ -34,7 +34,8 @@ export function EntryCard({ path }: { path: Path }) {
   return (
     <Loaded view={settings} compact>
       {(values) => {
-        if (values === null) return <BodyText>Its settings cannot be read.</BodyText>;
+        if (values === null)
+          return <BodyText>The contest’s settings cannot be read.</BodyText>;
         const ways = values.ways ?? DEFAULT_WAYS;
         const named = ways.map((way) =>
           way.kind === 'invite'
@@ -45,7 +46,7 @@ export function EntryCard({ path }: { path: Path }) {
         );
         const line =
           ways.length === 0
-            ? 'Nobody can register: there is no way in.'
+            ? 'Nobody can register, since there is no way in.'
             : `${count(ways.length, 'way', 'ways')} in: ${named.join(', ')}.`;
         return (
           <BodyText>

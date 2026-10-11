@@ -65,7 +65,7 @@ export function StatementEditor({ place, admin }: { place: Place; admin: boolean
     <div className={classes.form}>
       {!admin && (
         <BodyText tone="secondary">
-          Only an admin of the task changes the statement.
+          Only an admin of the task can change the statement.
         </BodyText>
       )}
       <Source
@@ -138,7 +138,7 @@ function Source({
           rows={18}
           readOnly={!admin || busy}
         />
-        <section className={classes.preview} aria-label="What contestants see">
+        <section className={classes.preview} aria-label="What entrants see">
           <Markdown task={task ?? undefined}>{text}</Markdown>
         </section>
       </div>

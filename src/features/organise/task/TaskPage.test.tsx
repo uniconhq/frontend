@@ -288,7 +288,9 @@ describe('what the task has, under its name', { timeout: 20_000 }, () => {
     );
     await userEvent.click(within(status).getByRole('button', { name: 'Publish it' }));
 
-    expect(await screen.findByText('Published as publication 3.')).toBeVisible();
+    expect(
+      await screen.findByText('Saved and published as publication 3.'),
+    ).toBeVisible();
     expect(saves).toEqual([{ changes: [], confirm: false, keep_as_draft: false }]);
   });
 });

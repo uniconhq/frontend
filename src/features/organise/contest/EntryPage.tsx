@@ -70,7 +70,7 @@ const STARTERS: { label: string; says: string; ways: WayValues[] }[] = [
 
 const APPROVAL = [
   { value: 'auto', label: 'Approved straight away' },
-  { value: 'manual', label: 'An organiser approves each' },
+  { value: 'manual', label: 'An organiser approves each one' },
 ];
 
 /** What is wrong with the ways as typed, a ticked condition left empty among it. */
@@ -80,10 +80,12 @@ function problemsOf(ways: WayValues[], ticks: Ticks[]): string[] {
     const tick = ticks[at] ?? ticksOf(way);
     return [
       ...(tick.code && way.code.trim() === ''
-        ? [`Give way ${String(at + 1)} its code, or untick it.`]
+        ? [`Way in ${String(at + 1)}: enter its code, or untick “Needs a code”.`]
         : []),
       ...(tick.domains && way.domains.trim() === '' && way.emailPattern.trim() === ''
-        ? [`Give way ${String(at + 1)} its domains, or untick them.`]
+        ? [
+            `Way in ${String(at + 1)}: enter at least one domain, or untick “Only email addresses at these domains”.`,
+          ]
         : []),
     ];
   });
@@ -137,7 +139,7 @@ function WayCard({
       <Fieldset legend={title}>
         <FieldBox name="way">
           <RadioGroup
-            label="Who comes in this way is"
+            label="Approval"
             value={approvesAtOnce(way) ? 'auto' : 'manual'}
             options={APPROVAL}
             onChange={(approval) => onChange({ ...way, approval })}
@@ -207,7 +209,7 @@ function WayCard({
                 <>
                   <TextInput
                     label="Email domains"
-                    description="Separated by commas. Only a confirmed address counts, and u.nus.edu does not let in comp.u.nus.edu."
+                    description="Separate them with commas. Only confirmed addresses count, and each domain matches exactly: u.nus.edu does not let in comp.u.nus.edu."
                     placeholder="u.nus.edu"
                     value={way.domains}
                     onChange={(domains) => signup({ domains })}
@@ -319,7 +321,7 @@ function EntryForm({
   if (unreadable) {
     return (
       <BodyText>
-        How people enter cannot be read here. Ask a platform admin to mend the contest’s
+        How people enter cannot be read here. Ask a platform admin to fix the contest’s
         settings.
       </BodyText>
     );
@@ -341,13 +343,13 @@ function EntryForm({
       )}
       {locked && (
         <BodyText tone="secondary">
-          Only an admin of the contest changes these.
+          Only an admin of the contest can change these.
         </BodyText>
       )}
 
       <Fieldset
         legend="Ways in"
-        note="Anyone who qualifies by one way can register; everything a way asks must hold."
+        note="People can register through any one of these ways, as long as they meet everything that way asks."
       >
         {ways === null ? (
           <div className={shared.stack}>
@@ -512,7 +514,7 @@ function EntryForm({
               value={values.closes}
               raw={raw('registration.closes')}
               onChange={(closes) => set('closes', closes)}
-              hint="Set to the start at first; close it then to keep late entries out."
+              hint="Starts at the contest’s start. Closing registration then keeps late entrants out."
               disabled={locked}
             />
           )}
@@ -526,7 +528,7 @@ function EntryForm({
             value={values.capacity}
             onChange={(capacity) => set('capacity', capacity)}
             placeholder="No limit"
-            hint="Counting those waiting for approval."
+            hint="Entrants waiting for approval count towards it."
             whole
             disabled={locked}
           />

@@ -174,10 +174,10 @@ export function contestPlace(path: string): ContestPlace {
   }
   if (top === 'leaderboards') {
     if (typeof second !== 'number') {
-      return { part: 'boards', label: 'Boards', field: null, item: null };
+      return { part: 'boards', label: 'Leaderboards', field: null, item: null };
     }
     const label = typeof third === 'string' ? BOARD_FIELDS[third] : undefined;
-    const board = `Boards, board ${String(second + 1)}`;
+    const board = `Leaderboards, leaderboard ${String(second + 1)}`;
     return {
       part: 'boards',
       label: label === undefined ? board : `${board}: ${label}`,

@@ -65,7 +65,7 @@ describe('the statement beside its preview', { timeout: 20_000 }, () => {
     renderApp('/orgs/acme/contests/spring/tasks/sum/statement');
 
     const source = await screen.findByRole('textbox', { name: 'Statement source' });
-    const preview = screen.getByRole('region', { name: 'What contestants see' });
+    const preview = screen.getByRole('region', { name: 'What entrants see' });
     expect(within(preview).getByRole('heading', { name: 'Sum' })).toBeVisible();
 
     fireEvent.change(source, { target: { value: '# Sum of two\n\nAdd **both**.\n' } });
@@ -73,7 +73,9 @@ describe('the statement beside its preview', { timeout: 20_000 }, () => {
     expect(within(preview).getByText('both').tagName).toBe('STRONG');
     await userEvent.click(screen.getByRole('button', { name: 'Save statement' }));
 
-    expect(await screen.findByText('Published as publication 3.')).toBeVisible();
+    expect(
+      await screen.findByText('Saved and published as publication 3.'),
+    ).toBeVisible();
     expect(sent).toEqual([
       {
         content: '# Sum of two\n\nAdd **both**.\n',
@@ -90,7 +92,7 @@ describe('the statement beside its preview', { timeout: 20_000 }, () => {
     renderApp('/orgs/acme/contests/spring/tasks/sum/statement');
 
     const source = await screen.findByRole('textbox', { name: 'Statement source' });
-    const preview = screen.getByRole('region', { name: 'What contestants see' });
+    const preview = screen.getByRole('region', { name: 'What entrants see' });
     fireEvent.change(source, {
       target: { value: '![the tree](public/tree.png) ![afar](https://a.test/x.png)\n' },
     });
@@ -125,7 +127,7 @@ describe('the statement beside its preview', { timeout: 20_000 }, () => {
       await screen.findByRole('textbox', { name: 'Statement source' }),
     ).toHaveAttribute('readonly');
     expect(
-      screen.getByText('Only an admin of the task changes the statement.'),
+      screen.getByText('Only an admin of the task can change the statement.'),
     ).toBeVisible();
     expect(
       screen.queryByRole('button', { name: 'Save statement' }),

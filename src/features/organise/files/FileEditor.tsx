@@ -32,7 +32,7 @@ function readOnlyBecause(place: Place, path: string): string | null {
     return 'A test’s files are changed on the task’s page, in its Tests and scoring card.';
   }
   if (path.startsWith('plans/')) {
-    return 'The platform writes this at each save of the task, from its settings and its workflow.';
+    return 'Unicon writes this file each time the task is saved, from its settings and its workflow.';
   }
   return null;
 }
@@ -207,7 +207,8 @@ export function FileEditor({ place, path }: { place: Place; path: string }) {
         <>
           <BodyText mono>{file.path}</BodyText>
           <BodyText tone="secondary">
-            Binary, {decodedSize(file.content)} bytes. It cannot be edited as text.
+            This file is not text ({decodedSize(file.content)} bytes), so it cannot be
+            edited here.
           </BodyText>
         </>
       ) : (

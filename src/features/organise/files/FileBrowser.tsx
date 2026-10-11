@@ -37,8 +37,8 @@ function Elsewhere({ place }: { place: Place }) {
       <PageLink to={taskPath(place.org, place.contest, place.task)}>
         task’s page
       </PageLink>
-      , so neither is listed here. Files holds the rest, such as the pictures a
-      statement shows, under <code>public/</code>.
+      , so neither is listed here. Everything else the task holds is here, such as
+      pictures for its statement, which go in the <code>public</code> folder.
     </BodyText>
   );
 }
@@ -79,7 +79,7 @@ export function FileBrowser({ place }: { place: Place }) {
         <FileTree place={place} open={open} folder={folder} onFolder={setFolder} />
         <div className={classes.pane}>
           {open === null ? (
-            <BodyText tone="secondary">Pick a file to open it.</BodyText>
+            <BodyText tone="secondary">Choose a file to open it.</BodyText>
           ) : (
             <FileEditor key={open} place={place} path={open} />
           )}

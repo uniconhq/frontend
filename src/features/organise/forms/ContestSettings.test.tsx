@@ -217,7 +217,7 @@ describe('the contest settings form', { timeout: 20_000 }, () => {
     expect(inBox(form, 'Basics').getByLabelText('Description')).toHaveAttribute(
       'readonly',
     );
-    expect(form).toHaveTextContent('Only an admin of the contest changes these.');
+    expect(form).toHaveTextContent('Only an admin of the contest can change these.');
 
     fill(inBox(form, 'Schedule').getByLabelText(/^End/), '2026-06-01T15:00');
     await userEvent.click(within(form).getByRole('button', { name: 'Save settings' }));

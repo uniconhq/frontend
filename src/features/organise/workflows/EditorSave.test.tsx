@@ -223,7 +223,7 @@ describe('saving and publishing a workflow', () => {
     await user.click(barButton('Save'));
 
     expect(
-      await screen.findByText('Someone else saved this file since you opened it.'),
+      await screen.findByText('Someone else saved a change since you opened this.'),
     ).toBeInTheDocument();
     const fields = screen.getByRole('list', { name: 'Fields that differ' });
     expect(within(fields).getByText(/steps\[run\]\.with\.args/)).toBeInTheDocument();
@@ -293,7 +293,7 @@ describe('saving and publishing a workflow', () => {
     );
     backend.state.token = 'someone-else';
     await user.click(barButton('Save'));
-    await user.click(await screen.findByRole('button', { name: 'Drop my changes' }));
+    await user.click(await screen.findByRole('button', { name: 'Discard my changes' }));
 
     expect(await fileText(user)).toContain('fold: sum');
     await user.click(toolButton('Undo'));

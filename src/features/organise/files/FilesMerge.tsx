@@ -95,8 +95,8 @@ export function FilesMerge({
     const latest = history[index]?.data?.[0];
     const when =
       latest === undefined ? '' : ` on ${formatDateTime(new Date(latest.at))}`;
-    if (read === undefined || read.isPending) return 'Being read…';
-    if (read.data === undefined) return `Taken out by ${whoOf(latest)}${when}`;
+    if (read === undefined || read.isPending) return 'Loading…';
+    if (read.data === undefined) return `Removed by ${whoOf(latest)}${when}`;
     return `${formatSize(sizeOf(read.data))}, saved by ${whoOf(latest)}${when}`;
   };
   const chosen = (path: string) => choices[path] ?? 'theirs';
@@ -104,13 +104,13 @@ export function FilesMerge({
   return (
     <div ref={panel} className={shared.panel} role="alert" tabIndex={-1}>
       <BodyText>
-        Someone else changed{' '}
+        Since you started, someone else changed{' '}
         {files.length === 1 ? 'a file' : `${String(files.length)} files`} this save also
-        changes, since you started.
+        changes.
       </BodyText>
       <BodyText tone="secondary">
-        Nothing was saved yet. For each, keep their version or save yours over it, then
-        save. Everything else in the save goes in as it is.
+        Nothing has been saved yet. For each file, keep their version or choose yours,
+        then save. Everything else in your save goes in as it is.
       </BodyText>
       <ul className={formClasses.merge} aria-label="Files that differ">
         {files.map((file, index) => (
@@ -151,7 +151,7 @@ export function FilesMerge({
           Save mine over theirs
         </Button>
         <Button variant="secondary" disabled={busy} onClick={onDrop}>
-          Drop my changes
+          Discard my changes
         </Button>
       </div>
       <Modal

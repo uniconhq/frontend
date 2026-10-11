@@ -72,7 +72,7 @@ function EditForm({
         ref={first}
         label="Display name"
         placeholder={org}
-        description="Left empty: the org's own name shows."
+        description="Left empty, the org’s name is shown."
         info="What people see in place of the org's name."
         value={displayName}
         onChange={setDisplayName}
@@ -143,13 +143,13 @@ export function OrgProfile({ org }: { org: string }) {
                 <dd>
                   {view.data.display_name !== null && view.data.display_name !== ''
                     ? view.data.display_name
-                    : 'None; the name shows.'}
+                    : 'Not set, so the org’s name is shown.'}
                 </dd>
               </div>
               <div>
                 <dt>Description</dt>
                 <dd>
-                  {view.data.description !== '' ? view.data.description : 'None.'}
+                  {view.data.description !== '' ? view.data.description : 'Not set.'}
                 </dd>
               </div>
             </dl>
@@ -163,7 +163,7 @@ export function OrgProfile({ org }: { org: string }) {
           </>
         ))}
       {view.state === 'ready' && !editing && !administers && (
-        <BodyText tone="secondary">Only an admin of the org changes these.</BodyText>
+        <BodyText tone="secondary">Only an admin of the org can change these.</BodyText>
       )}
     </div>
   );

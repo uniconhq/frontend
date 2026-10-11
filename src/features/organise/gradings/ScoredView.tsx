@@ -41,8 +41,8 @@ export function ScoredView({
       aria-label={`Submission ${String(number)}, scored`}
     >
       <BodyText tone="secondary">
-        Scored in full, as its entrant will see it once everything is shown. Each group
-        says when its entrant sees it.
+        The full result, as its entrant will see it once everything is shown. Each test
+        group says when its entrant sees it.
       </BodyText>
       {view.state === 'loading' && <PageSkeleton rows={3} />}
       {view.state === 'error' && <ErrorBlock error={view.error} onRetry={view.retry} />}

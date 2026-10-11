@@ -67,9 +67,9 @@ describe('the ways into a contest', () => {
         newSignup({ name: 'a', domains: 'nus' }),
       ]),
     ).toEqual([
-      'Invites are one way in; there is already one.',
+      'There is already a way in by invite, and a contest has at most one.',
       'Two sign-ups have the same name.',
-      '“nus” is not a domain, such as u.nus.edu.',
+      '“nus” is not a domain. Write one such as u.nus.edu.',
     ]);
   });
 
@@ -120,7 +120,7 @@ describe('a board in a sentence', () => {
         rows: '10',
       }),
     ).toBe(
-      'Ranks entrants by points and the minute its counted submission was made, from the best submission on each group on tasks sum and sort, counting only the results shown during the contest. Everyone who can see the contest sees it, the top 10 rows.',
+      'Ranks entrants by points and the minute its counted submission was made, from the best submission on each test group on tasks sum and sort, counting only the results shown during the contest. Everyone who can see the contest sees it, the top 10 rows.',
     );
   });
 });

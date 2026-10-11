@@ -87,7 +87,7 @@ describe("the boards' settings", { timeout: 20_000 }, () => {
     );
     renderApp(PAGE);
 
-    const form = await screen.findByRole('form', { name: 'Boards' });
+    const form = await screen.findByRole('form', { name: 'Leaderboards' });
     expect(
       within(form).getByRole('status', { name: 'What Standings ranks' }),
     ).toHaveTextContent(
@@ -109,8 +109,8 @@ describe("the boards' settings", { timeout: 20_000 }, () => {
     const user = userEvent.setup();
     renderApp(PAGE);
 
-    const form = await screen.findByRole('form', { name: 'Boards' });
-    await user.click(within(form).getByRole('button', { name: 'Add a board' }));
+    const form = await screen.findByRole('form', { name: 'Leaderboards' });
+    await user.click(within(form).getByRole('button', { name: 'Add a leaderboard' }));
     const added = () => board(form, /^Board 2/);
     fireEvent.change(added().getByLabelText('Name'), { target: { value: 'ICPC' } });
     const icpcBoard = () => board(form, 'ICPC');
@@ -126,7 +126,7 @@ describe("the boards' settings", { timeout: 20_000 }, () => {
     fireEvent.change(key.getByLabelText('Minutes per earlier attempt'), {
       target: { value: '20' },
     });
-    await user.click(within(form).getByRole('button', { name: 'Save boards' }));
+    await user.click(within(form).getByRole('button', { name: 'Save leaderboards' }));
 
     expect(await screen.findByText('Saved.')).toBeVisible();
     const byHand = parse(`
@@ -158,9 +158,11 @@ describe("the boards' settings", { timeout: 20_000 }, () => {
     const user = userEvent.setup();
     renderApp(PAGE);
 
-    const form = await screen.findByRole('form', { name: 'Boards' });
+    const form = await screen.findByRole('form', { name: 'Leaderboards' });
     expect(
-      within(form).getByText('Points alone, unless a key is added.'),
+      within(form).getByText(
+        'Ranked by points alone, unless you add another way to rank.',
+      ),
     ).toBeVisible();
     await user.click(
       within(form).getByRole('button', { name: 'Add a way to rank Standings' }),
@@ -169,10 +171,12 @@ describe("the boards' settings", { timeout: 20_000 }, () => {
       board(form, 'Standings').getByRole('combobox', { name: 'Ranked first by' }),
       'penalty',
     );
-    await user.click(within(form).getByRole('button', { name: 'Save boards' }));
+    await user.click(within(form).getByRole('button', { name: 'Save leaderboards' }));
 
     expect(
-      await screen.findByRole('link', { name: 'Boards, board 1: Ranked by' }),
+      await screen.findByRole('link', {
+        name: 'Leaderboards, leaderboard 1: Ranked by',
+      }),
     ).toHaveAttribute('href', `${PAGE}?field=order&item=0`);
     const key = board(form, 'Standings').getByRole('combobox', {
       name: 'Ranked first by',
@@ -187,16 +191,16 @@ describe("the boards' settings", { timeout: 20_000 }, () => {
     const user = userEvent.setup();
     renderApp(PAGE);
 
-    const form = await screen.findByRole('form', { name: 'Boards' });
+    const form = await screen.findByRole('form', { name: 'Leaderboards' });
     await user.click(within(form).getByRole('button', { name: 'Remove Standings' }));
     const dialog = await screen.findByRole('dialog', { name: 'Remove Standings?' });
     await user.click(within(dialog).getByRole('button', { name: 'Remove' }));
     expect(
       within(form).getByText(
-        'This contest has no boards yet, so nobody sees a ranking. Add one to rank its entrants.',
+        'This contest has no leaderboards yet, so nobody sees a ranking. Add one to rank its entrants.',
       ),
     ).toBeVisible();
-    await user.click(within(form).getByRole('button', { name: 'Save boards' }));
+    await user.click(within(form).getByRole('button', { name: 'Save leaderboards' }));
 
     await screen.findByText('Saved.');
     expect(parse(sent[0] ?? '')).not.toHaveProperty('leaderboards');
@@ -216,10 +220,14 @@ describe("the boards' settings", { timeout: 20_000 }, () => {
     settings();
     renderApp(PAGE);
 
-    const form = await screen.findByRole('form', { name: 'Boards' });
+    const form = await screen.findByRole('form', { name: 'Leaderboards' });
     expect(board(form, 'Standings').getByLabelText('Name')).toBeDisabled();
-    expect(within(form).queryByRole('button', { name: 'Save boards' })).toBeNull();
-    expect(within(form).queryByRole('button', { name: 'Add a board' })).toBeNull();
+    expect(
+      within(form).queryByRole('button', { name: 'Save leaderboards' }),
+    ).toBeNull();
+    expect(
+      within(form).queryByRole('button', { name: 'Add a leaderboard' }),
+    ).toBeNull();
   });
 });
 
@@ -237,7 +245,9 @@ describe("the boards' previews", () => {
     renderApp(PAGE);
 
     const now = await screen.findByRole('table', { name: 'Standings, now' });
-    const later = screen.getByRole('table', { name: 'Standings, once all is shown' });
+    const later = screen.getByRole('table', {
+      name: 'Standings, once every result is shown',
+    });
     expect(within(now).getAllByRole('rowheader')).toHaveLength(3);
     expect(within(now).queryByText('The entrant previewed')).toBeNull();
     expect(within(later).getAllByRole('rowheader')[0]).toHaveTextContent('kenny');

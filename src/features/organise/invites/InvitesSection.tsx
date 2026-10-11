@@ -34,7 +34,7 @@ const MAIL: Record<Invite['mail_status'], string> = {
   waiting: 'Waiting to send',
   sent: 'Sent',
   failed: 'Failed to send',
-  off: 'No mail server',
+  off: 'Not sent: no mail server',
 };
 
 /** Refusals that mean the list is behind: the invite was decided or lapsed. */
@@ -55,7 +55,7 @@ function intoText(invite: Invite): string {
       ? `${invite.entrant.name}, from a member`
       : invite.entrant.name;
   }
-  return 'Their own';
+  return 'An entry of their own';
 }
 
 /** Where an invite stands, a lapsed one apart from one still open. */
@@ -65,20 +65,20 @@ function standing(invite: Invite): string {
       invite.status
     ];
   }
-  return invite.expired ? 'Lapsed' : 'Pending';
+  return invite.expired ? 'Expired' : 'Pending';
 }
 
 /** The date beside the standing: when it lapses or lapsed, or when it was decided. */
 function standingDate(invite: Invite): string {
   if (invite.status === 'pending') {
     const at = formatDateTime(new Date(invite.expires_at));
-    return invite.expired ? `Lapsed ${at}` : `Lapses ${at}`;
+    return invite.expired ? `Expired ${at}` : `Expires ${at}`;
   }
   return invite.decided_at === null ? '' : formatDateTime(new Date(invite.decided_at));
 }
 
 function who(invite: Invite): string {
-  return invite.username ?? invite.email ?? 'Nobody named';
+  return invite.username ?? invite.email ?? 'Unknown';
 }
 
 /** A username, or an email address when what was typed has an `@`. */
@@ -282,7 +282,7 @@ function InviteForm({ place, grants }: { place: RolePlace; grants: Grant[] }) {
         )}
       </div>
       <BodyText tone="secondary">
-        {means} The invite stands for {STANDS_DAYS} days.
+        {means} The invite expires after {STANDS_DAYS} days.
       </BodyText>
       <div className={classes.actions}>
         <Button type="submit" loading={change.pending !== null}>
@@ -362,7 +362,7 @@ function InviteTable({
         <tr>
           <th scope="col">Invited</th>
           {audience === 'organisers' ? (
-            <th scope="col">Grants</th>
+            <th scope="col">Role</th>
           ) : (
             <th scope="col">Place</th>
           )}

@@ -36,7 +36,7 @@ export const CONTEST_SECTIONS = [
   { key: 'entry', label: 'How people enter', segment: 'entry', card: 'grid' },
   { key: 'entrants', label: 'Entrants', segment: 'entrants', card: 'grid' },
   { key: 'gradings', label: 'Gradings', segment: 'gradings', card: 'grid' },
-  { key: 'boards', label: 'Boards', segment: 'boards', card: 'grid' },
+  { key: 'boards', label: 'Leaderboards', segment: 'boards', card: 'grid' },
   {
     key: 'announcements',
     label: 'Announcements',

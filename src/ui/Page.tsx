@@ -18,7 +18,7 @@ export function Page({ children, label }: { children: ReactNode; label?: string 
 /**
  * A page's header: its title, a line of what stands out about it (a state, a
  * countdown), a short description, and the page's links on the right, such
- * as "View as contestant" or a small "Edit". Links only: a page's header goes
+ * as "View as an entrant" or a small "Edit". Links only: a page's header goes
  * places, its actions sit with what they act on.
  */
 export function PageHeader({

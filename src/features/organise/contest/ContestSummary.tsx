@@ -38,7 +38,7 @@ export function ContestSummary({ org, contest }: { org: string; contest: string 
       <Loaded view={view} compact>
         {(values) =>
           values === null ? (
-            <BodyText>The settings cannot be read. Open them to mend them.</BodyText>
+            <BodyText>The settings cannot be read. Open them to fix them.</BodyText>
           ) : (
             <dl className={classes.summary} aria-label="The settings">
               <div>

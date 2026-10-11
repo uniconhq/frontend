@@ -68,7 +68,7 @@ function Notes({ notes }: { notes: string[] }) {
   if (notes.length === 0) return null;
   return (
     <>
-      <BodyText>Of note:</BodyText>
+      <BodyText>Notes:</BodyText>
       <ul className={classes.named} aria-label="Notes">
         {notes.map((note) => (
           <li key={note}>{note}</li>
@@ -119,7 +119,7 @@ export function SaveOutcome<Body = WriteFile>({
     if ('number' in result) {
       return (
         <Panel role="status">
-          <BodyText>Published as publication {result.number}.</BodyText>
+          <BodyText>Saved and published as publication {result.number}.</BodyText>
           {result.grading_changed ? (
             <>
               <BodyText>It changes how the task grades:</BodyText>
@@ -146,11 +146,12 @@ export function SaveOutcome<Body = WriteFile>({
     return (
       <Panel role="status">
         <BodyText>
-          Saved as a draft. Nothing was published; the last publication keeps grading.
+          Saved as a draft. Nothing was published, so entrants are still graded on the
+          last publication.
         </BodyText>
         {result.errors.length > 0 && (
           <>
-            <BodyText>What keeps it from publishing:</BodyText>
+            <BodyText>What stops it from publishing:</BodyText>
             <DefinitionErrors errors={result.errors} placeOf={placeOf} />
           </>
         )}
@@ -199,8 +200,8 @@ export function SaveOutcome<Body = WriteFile>({
         </ul>
         <BodyText tone="secondary">
           Publishing changes the grading of a running contest:{' '}
-          {regradedSentence(countOf(error, 'regrades'))} Keeping it as a draft writes
-          the files and publishes nothing.
+          {regradedSentence(countOf(error, 'regrades'))} Keeping it as a draft saves the
+          changes without publishing them.
         </BodyText>
         <div className={classes.actions}>
           <Button onClick={() => onConfirm(body)}>Publish the change</Button>

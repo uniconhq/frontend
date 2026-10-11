@@ -95,7 +95,7 @@ describe('saving a task file', () => {
 
     await readThenEditAndSave('statement.md');
 
-    const status = await screen.findByText('Published as publication 3.');
+    const status = await screen.findByText('Saved and published as publication 3.');
     const outcome = status.parentElement as HTMLElement;
     expect(outcome).toHaveTextContent('It changes how the task grades:');
     expect(
@@ -129,7 +129,7 @@ describe('saving a task file', () => {
 
     await editAndSave();
 
-    const outcome = (await screen.findByText('Published as publication 3.'))
+    const outcome = (await screen.findByText('Saved and published as publication 3.'))
       .parentElement as HTMLElement;
     expect(outcome).toHaveTextContent('It does not change how the task grades.');
   });
@@ -150,7 +150,7 @@ describe('saving a task file', () => {
 
     await editAndSave();
 
-    const outcome = (await screen.findByText('Published as publication 3.'))
+    const outcome = (await screen.findByText('Saved and published as publication 3.'))
       .parentElement as HTMLElement;
     expect(outcome).toHaveTextContent('12 submissions are graded again.');
     expect(
@@ -176,7 +176,7 @@ describe('saving a task file', () => {
 
     await editAndSave();
 
-    const outcome = (await screen.findByText('Published as publication 3.'))
+    const outcome = (await screen.findByText('Saved and published as publication 3.'))
       .parentElement as HTMLElement;
     expect(within(outcome).queryByRole('list', { name: 'Notes' })).toBeNull();
     expect(outcome).not.toHaveTextContent('graded again');
@@ -195,7 +195,9 @@ describe('saving a task file', () => {
 
     const outcome = (await screen.findByText(/Saved as a draft/))
       .parentElement as HTMLElement;
-    expect(outcome).toHaveTextContent('the last publication keeps grading');
+    expect(outcome).toHaveTextContent(
+      'entrants are still graded on the last publication',
+    );
     expect(within(outcome).getByRole('list', { name: 'Errors' })).toHaveTextContent(
       'Inputs: setter: There is no file under data/hidden/ in the task.',
     );
@@ -246,7 +248,9 @@ describe('saving a task file', () => {
       within(alert).getByRole('button', { name: 'Publish the change' }),
     );
 
-    expect(await screen.findByText('Published as publication 3.')).toBeVisible();
+    expect(
+      await screen.findByText('Saved and published as publication 3.'),
+    ).toBeVisible();
     expect(sent).toHaveLength(2);
     expect(sent[1]).toEqual({ ...(sent[0] as object), confirm: true });
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();

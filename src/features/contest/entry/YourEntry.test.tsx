@@ -188,7 +188,7 @@ describe('your entry in a contest entered in teams', () => {
     await user.click(within(part).getByRole('button', { name: 'Leave the team' }));
     const dialog = await screen.findByRole('dialog', { name: 'Leave Red?' });
     expect(dialog).toHaveTextContent(
-      'You stop reaching the team’s submissions and questions.',
+      'You lose access to the team’s submissions and questions.',
     );
     await user.click(within(dialog).getByRole('button', { name: 'Leave' }));
 

@@ -252,7 +252,7 @@ describe('a workflow one may only read', () => {
 
     const state = await screen.findByRole('alert');
     expect(state).toHaveTextContent('This version cannot be opened.');
-    expect(state).toHaveTextContent(`the whole file: ${reason}`);
+    expect(state).toHaveTextContent(`Overall: ${reason}`);
   });
 
   it('copies the version into a private workflow of one’s own', async () => {

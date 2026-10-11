@@ -93,7 +93,7 @@ export function ContestPage() {
           )
         }
         links={
-          <PageLink to={contestHomePath(org, contest)}>View as contestant</PageLink>
+          <PageLink to={contestHomePath(org, contest)}>View as an entrant</PageLink>
         }
       />
       <StatusCard org={org} contest={contest} />
