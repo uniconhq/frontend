@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate, useSearchParams } from 'react-router';
 import { $api, queryView } from '@/api/query';
@@ -14,23 +14,19 @@ import { SectionTitle } from '@/ui/SectionTitle';
 import { Select } from '@/ui/Select';
 import { TextInput } from '@/ui/TextInput';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
-import { useMarkColours } from '@/ui/brand/mark-colours';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
 import { useMe } from '@/session';
 import { WORKFLOWS_PATH, workflowPath } from '@/lib/organiser-paths';
 import { useWorkflowParams } from '@/lib/route-params';
-import { exactJS, parseYaml } from '../forms/yaml-doc';
+import { parseYaml } from '../forms/yaml-doc';
 import { DefinitionErrors } from '../DefinitionErrors';
 import { workflowOwners } from '../roles';
 import { checkQuery } from './check';
 import { Combine } from './Combine';
 import { Editor } from './Editor';
-import { Graph } from './Graph';
-import { layoutWorkflow } from './layout';
+import type { Box } from './layout';
+import { DrawnGraph } from './DrawnGraph';
 import { linesOf, type Selected } from './lines';
-import { readWorkflow } from './model';
-import { pinned } from './pins';
-import { byRef } from './primitives';
 import { SharePanel } from './SharePanel';
 import { latestVersion } from './versions';
 import shared from '../organise.module.css';
@@ -240,16 +236,8 @@ function Unopenable({
 
 /** A version drawn as the editor draws a draft, with nothing to change. */
 function Drawn({ text, primitives }: { text: string; primitives: Primitive[] }) {
-  const colours = useMarkColours();
-  const map = useMemo(() => byRef(primitives), [primitives]);
-  const parsed = useMemo(() => parseYaml(text), [text]);
-  const workflow = useMemo(
-    () => readWorkflow('error' in parsed ? null : exactJS(parsed.doc)),
-    [parsed],
-  );
-  const layout = useMemo(() => layoutWorkflow(workflow, map), [workflow, map]);
   const [selected, setSelected] = useState<string | null>(null);
-  const box = layout.boxes.find((found) => found.key === selected);
+  const [box, setBox] = useState<Box | undefined>(undefined);
   const lines: Selected | null =
     box === undefined
       ? null
@@ -262,21 +250,14 @@ function Drawn({ text, primitives }: { text: string; primitives: Primitive[] }) 
             : { kind: 'report' };
   return (
     <div className={classes.work}>
-      <Graph
-        layout={layout}
-        workflow={workflow}
-        primitives={map}
-        pinned={pinned([], 0, [], [], [])}
-        colours={colours}
+      <DrawnGraph
+        text={text}
+        primitives={primitives}
         selected={selected}
-        readOnly
-        dragging={null}
-        notice={null}
-        refusal={() => null}
-        menu={(_, port) => <span className={classes.port}>{port}</span>}
-        onSelect={setSelected}
-        onDragStart={() => undefined}
-        onDrop={() => undefined}
+        onSelect={(key, found) => {
+          setSelected(key);
+          setBox(found);
+        }}
       />
       <CodeEditor
         label="workflow.yaml"
