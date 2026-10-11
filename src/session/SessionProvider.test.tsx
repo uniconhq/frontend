@@ -4,6 +4,7 @@ import userEvent from '@/test/user-event';
 import { http, HttpResponse } from 'msw';
 import { renderApp } from '@/test/render';
 import { server, sessionList, someone } from '@/test/server';
+import { passTimeUntil, withFakeTimers } from '@/test/timers';
 
 /**
  * A backend that is broken until the test says otherwise, so "Try again" has
@@ -31,6 +32,9 @@ const badGateway = () =>
   });
 
 describe('when /me will not answer', () => {
+  // The retries wait on the fake clock, which passes them at once.
+  withFakeTimers();
+
   it.each([
     ['a 503 from the proxy', badGateway, 'Unexpected response from the server (503)'],
     ['no network at all', () => HttpResponse.error(), 'Cannot reach Unicon'],
@@ -39,7 +43,9 @@ describe('when /me will not answer', () => {
     const { router } = renderApp('/account');
 
     expect(
-      await screen.findByText(title, {}, { timeout: RETRIES_DONE }),
+      await passTimeUntil(() => screen.getByText(title), {
+        within: RETRIES_DONE,
+      }),
     ).toBeInTheDocument();
     expect(router.state.location.pathname).toBe('/account');
 
@@ -55,7 +61,9 @@ describe('when /me will not answer', () => {
     meIsBrokenUntilFixed(badGateway);
     renderApp('/account');
 
-    await screen.findByText('Account unavailable', {}, { timeout: RETRIES_DONE });
+    await passTimeUntil(() => screen.getByText('Account unavailable'), {
+      within: RETRIES_DONE,
+    });
     expect(screen.queryByRole('link', { name: 'Sign in' })).not.toBeInTheDocument();
   });
 

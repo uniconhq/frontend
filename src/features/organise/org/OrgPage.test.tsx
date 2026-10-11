@@ -5,6 +5,7 @@ import { delay, http, HttpResponse } from 'msw';
 import { renderApp } from '@/test/render';
 import { problem, server, signedIn, someone } from '@/test/server';
 import { ORG_API, contestList, contests, listAndCreate } from '@/test/organiser';
+import { passTimeUntil, withFakeTimers } from '@/test/timers';
 
 describe('the org page', () => {
   it('lists the contests, each linking to its page', async () => {
@@ -84,10 +85,10 @@ describe('the org page', () => {
     expect(screen.queryByRole('form', { name: 'New contest' })).not.toBeInTheDocument();
   });
 
-  it(
-    'offers to try again when the list failed for another reason',
-    { timeout: 15_000 },
-    async () => {
+  describe('when the list fails', () => {
+    withFakeTimers();
+
+    it('offers to try again when the list failed for another reason', async () => {
       let broken = true;
       server.use(
         signedIn,
@@ -98,14 +99,16 @@ describe('the org page', () => {
       renderApp('/orgs/acme');
 
       // The client asks twice more before it shows the error, 0.3 s and then
-      // 0.9 s later, which a busy machine stretches.
-      await screen.findByText('Forgejo did not answer', {}, { timeout: 10_000 });
+      // 0.9 s later, on the fake clock.
+      await passTimeUntil(() => screen.getByText('Forgejo did not answer'), {
+        within: 10_000,
+      });
       broken = false;
       await userEvent.click(screen.getByRole('button', { name: 'Try again' }));
 
       expect(await screen.findByRole('list', { name: 'Contests' })).toBeVisible();
-    },
-  );
+    });
+  });
 });
 
 describe("the org's display name and description", () => {
