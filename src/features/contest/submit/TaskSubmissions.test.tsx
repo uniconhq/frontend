@@ -333,7 +333,8 @@ describe('the submit panel', () => {
           errors: [
             {
               input: 'answers',
-              message: '1.txt is not named for a test, as <group>/<test>.',
+              message:
+                'Name each file of this input after a test, as <group>/<test>, such as main/1.txt.',
             },
           ],
         });
@@ -350,7 +351,7 @@ describe('the submit panel', () => {
 
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent(
-      'Your answers: 1.txt is not named for a test, as <group>/<test>.',
+      'Your answers: Name each file of this input after a test, as <group>/<test>, such as main/1.txt.',
     );
     expect(slots).toEqual([expect.objectContaining({ filename: '1.txt' })]);
   });
@@ -474,9 +475,9 @@ describe('the submit panel', () => {
     ['archived', {}, 'The contest is archived', 'they take no submissions'],
     [
       'not_approved',
-      { detail: 'Only an approved entrant of the contest submits to it.' },
+      { detail: 'Only approved entrants of this contest can submit to its tasks.' },
       'Your registration is not approved yet',
-      'Only an approved entrant',
+      'Only approved entrants of this contest can submit to its tasks.',
     ],
     [
       'submission_limit',
@@ -523,10 +524,10 @@ describe('the submit panel', () => {
     [
       'invalid_inputs',
       {
-        errors: [{ input: 'language', message: 'Must be one of python.' }],
+        errors: [{ input: 'language', message: 'Choose one of python.' }],
       },
       'The submission does not fit the task',
-      'language: Must be one of python.',
+      'language: Choose one of python.',
     ],
   ];
 
