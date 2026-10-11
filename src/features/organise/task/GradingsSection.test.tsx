@@ -127,9 +127,9 @@ describe("the task's gradings", () => {
 
     const table = await screen.findByRole('table', { name: 'Gradings' });
     const [, stopped, passed, failed] = within(table).getAllByRole('row');
-    expect(stopped).toHaveTextContent('compile_error');
-    expect(passed).toHaveTextContent('accepted');
-    expect(failed).toHaveTextContent('time_limit');
+    expect(stopped).toHaveTextContent('COMPILE ERROR');
+    expect(passed).toHaveTextContent('ACCEPTED');
+    expect(failed).toHaveTextContent('TIME LIMIT');
     expect(within(table).queryByRole('columnheader', { name: 'Stage' })).toBeNull();
   });
 
@@ -387,7 +387,7 @@ describe("the task's gradings", () => {
       name: 'B submission 3 by ada',
     });
     expect(within(third).getAllByRole('row')).toHaveLength(1);
-    expect(third).toHaveTextContent('compile_error');
+    expect(third).toHaveTextContent('COMPILE ERROR');
     expect(third).toHaveTextContent('publication 3');
 
     const toggle = within(third).getByRole('button', {
