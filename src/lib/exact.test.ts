@@ -18,6 +18,13 @@ describe('compareDecimal', () => {
     expect(compareDecimal('1e3', '999.9')).toBe(1);
   });
 
+  it('takes a whole number written in hex or octal, as YAML 1.2 reads one', () => {
+    expect(compareDecimal('0x10', '16')).toBe(0);
+    expect(compareDecimal('0o17', '15.0')).toBe(0);
+    expect(compareDecimal('0x10', '5')).toBe(1);
+    expect(compareDecimal('0x10', '0x10')).toBe(0);
+  });
+
   it('says NaN for text that is no decimal', () => {
     expect(compareDecimal('one', '1')).toBeNaN();
   });

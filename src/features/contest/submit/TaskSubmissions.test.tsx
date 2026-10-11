@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import userEvent from '@/test/user-event';
 import { http, HttpResponse } from 'msw';
 import type { GradingResult, Submission, TaskPage } from '@/api/types';
 import { formatExact } from '@/lib/exact';
@@ -434,7 +434,7 @@ describe('the submit panel', () => {
     expect(made.bodies).toHaveLength(0);
   });
 
-  it('reports a failed upload as possibly too large, with nothing half sent', async () => {
+  it('reports a refused upload as one that did not go through, with nothing half sent', async () => {
     const store = uploadStore();
     const made = submissions();
     let puts = 0;
@@ -839,7 +839,8 @@ describe('a submission opened from the list', () => {
     const main = within(detail).getByRole('region', { name: 'Group main' });
     expect(within(main).getByText('ACCEPTED')).toBeVisible();
     expect(within(main).getByText('100 / 100 points')).toBeVisible();
-    expect(within(main).getByText(/^Shown at /)).toBeVisible();
+    expect(within(main).getByText(/^Tests shown at /)).toBeVisible();
+    expect(within(main).queryByText(/^Shown at /)).toBeNull();
     expect(within(main).queryByRole('table')).toBeNull();
 
     const large = within(detail).getByRole('region', { name: 'Group large' });
@@ -852,6 +853,54 @@ describe('a submission opened from the list', () => {
     const extra = within(detail).getByRole('region', { name: 'Group extra' });
     expect(within(extra).getByText('Not run on this grading')).toBeVisible();
     expect(within(extra).queryByRole('table')).toBeNull();
+  });
+
+  it('shows beside each test its credit and, scored against the best, that best', async () => {
+    const relative = grading({
+      ...accepted,
+      groups: [
+        {
+          group: 'main',
+          show: 'always',
+          outcome: 'accepted',
+          tests: [
+            {
+              test: 'main/1',
+              outcome: 'accepted',
+              values: reported({ score: '80' }),
+              credit: '0.8',
+              best: '100',
+            },
+          ],
+          shown_at: null,
+          ran: true,
+          points: '80',
+          max: '100',
+        },
+      ],
+    });
+    server.use(
+      signedIn,
+      withPage({}),
+      listing([submission(1, relative)]),
+      http.get(`${TASK_API}/submissions/:number`, () =>
+        HttpResponse.json(submission(1, relative)),
+      ),
+    );
+    renderApp(`${PAGE}?submission=1`);
+
+    const detail = await screen.findByRole('region', { name: 'Submission 1' });
+    const tests = await within(detail).findByRole('table', { name: 'Tests main' });
+    expect(
+      within(tests)
+        .getAllByRole('columnheader')
+        .map((header) => header.textContent),
+    ).toEqual(['Test', 'Outcome', 'score', 'Credit', 'Best']);
+    expect(
+      within(tests)
+        .getAllByRole('cell')
+        .map((cell) => cell.textContent),
+    ).toEqual(['ACCEPTED', '80', formatExact('0.8'), '100']);
   });
 
   it('shows a cancelled one as cancelled, in the organisers’ words', async () => {
@@ -928,6 +977,80 @@ describe('a submission opened from the list', () => {
       '/-/downloads/acme/spring/sum/1/files/submission/my%20main.py',
     );
     expect(within(files).getAllByRole('link')).toHaveLength(1);
+  });
+
+  it('names each file with its input, and lists each value given', async () => {
+    server.use(
+      signedIn,
+      withPage({}),
+      listing([submission(1, accepted)]),
+      http.get(`${TASK_API}/submissions/:number`, () =>
+        HttpResponse.json(submission(1, accepted)),
+      ),
+      http.get(`${TASK_API}/submissions/:number/files`, () =>
+        HttpResponse.json({
+          number: 1,
+          inputs: {
+            program: { files: ['files/program/main.c'], value: null },
+            checker: { files: ['files/checker/main.c'], value: null },
+            language: { files: [], value: 'cpp' },
+            n: { files: [], value: '5' },
+            strict: { files: [], value: true },
+          },
+        }),
+      ),
+    );
+    renderApp(`${PAGE}?submission=1`);
+
+    const detail = await screen.findByRole('region', { name: 'Submission 1' });
+    const files = await within(detail).findByRole('list', { name: 'Files' });
+    expect(
+      within(files)
+        .getAllByRole('listitem')
+        .map((item) => item.textContent),
+    ).toEqual(['program: main.c', 'checker: main.c']);
+    const given = within(detail).getByRole('list', { name: 'Values given' });
+    expect(
+      within(given)
+        .getAllByRole('listitem')
+        .map((item) => item.textContent),
+    ).toEqual(['language: cpp', 'n: 5', 'strict: true']);
+  });
+
+  it('names each file by its path under its input, so files of one name differ', async () => {
+    server.use(
+      signedIn,
+      withPage({}),
+      listing([submission(1, accepted)]),
+      http.get(`${TASK_API}/submissions/:number`, () =>
+        HttpResponse.json(submission(1, accepted)),
+      ),
+      http.get(`${TASK_API}/submissions/:number/files`, () =>
+        HttpResponse.json({
+          number: 1,
+          inputs: {
+            out: {
+              files: ['files/out/main/1.txt', 'files/out/samples/1.txt'],
+              value: null,
+            },
+            program: { files: ['files/program/src/io.c'], value: null },
+          },
+        }),
+      ),
+    );
+    renderApp(`${PAGE}?submission=1`);
+
+    const detail = await screen.findByRole('region', { name: 'Submission 1' });
+    const files = await within(detail).findByRole('list', { name: 'Files' });
+    expect(
+      within(files)
+        .getAllByRole('link')
+        .map((link) => [link.textContent, link.getAttribute('href')]),
+    ).toEqual([
+      ['main/1.txt', '/-/downloads/acme/spring/sum/1/files/out/main/1.txt'],
+      ['samples/1.txt', '/-/downloads/acme/spring/sum/1/files/out/samples/1.txt'],
+      ['src/io.c', '/-/downloads/acme/spring/sum/1/files/program/src/io.c'],
+    ]);
   });
 
   it('shows what stopped the run as its verdict, and its log as text, never as markup', async () => {

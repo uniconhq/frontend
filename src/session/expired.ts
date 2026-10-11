@@ -1,3 +1,5 @@
+import { useSyncExternalStore } from 'react';
+
 /**
  * A session can end while a page is open: it expires, someone revokes it, or
  * refreshing the Forgejo token fails. The page and its drafts stay mounted and
@@ -19,6 +21,11 @@ export function subscribe(listener: () => void): () => void {
 
 export function isSessionExpired(): boolean {
   return open;
+}
+
+/** Whether the session ended while the page was open, kept up to date. */
+export function useSessionExpired(): boolean {
+  return useSyncExternalStore(subscribe, isSessionExpired, () => false);
 }
 
 /** Called by the session provider: true once a person is known to be signed in. */

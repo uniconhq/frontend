@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { screen, within } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import userEvent from '@/test/user-event';
 import { http, HttpResponse } from 'msw';
 import { renderApp } from '@/test/render';
 import { problem, server, signedIn, someone } from '@/test/server';
@@ -41,6 +41,19 @@ describe('the contestants page', () => {
             status: 'rejected',
             reason: 'No.',
           }),
+          contestant({
+            user_id: 23,
+            user: {
+              id: 23,
+              username: 'eve',
+              name: null,
+              email: null,
+              avatar_url: null,
+            },
+            status: 'approved',
+            time_extension: 600,
+            extension_tasks: ['sum', 'max'],
+          }),
         ]),
       ),
     );
@@ -54,6 +67,8 @@ describe('the contestants page', () => {
     expect(row('carol')).toHaveTextContent('carol@example.org');
     expect(row('dee')).toHaveTextContent('Approved');
     expect(row('dee')).toHaveTextContent('30 min');
+    expect(row('dee')).not.toHaveTextContent('30 min on');
+    expect(row('eve')).toHaveTextContent('10 min on sum, max');
     expect(row('Deleted user')).toHaveTextContent('No.');
   });
 

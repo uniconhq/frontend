@@ -16,7 +16,8 @@ function rowName(row: BoardRow): string {
 
 /**
  * Only the reader's own row carries how many of its submissions are still
- * grading, so the row that has it is theirs. Organisers get it on every row.
+ * grading, so the row that has it is theirs. Organisers get it on every row,
+ * so when more than one row has it, none is the reader's.
  */
 function isOwn(row: BoardRow): boolean {
   return Object.values(row.cells).some((cell) => cell.grading !== null);
@@ -63,7 +64,9 @@ function NotInView({ board }: { board: Board }) {
  * two rows next to each other would show alike. The reader's own row also
  * says how many of its submissions are still grading and which it counts,
  * each a link where `submissionTo` gives one, and is marked `ownLabel`.
- * `everyRow` is for organisers, whose rows all carry that, so none is marked.
+ * `everyRow` is for organisers, whose rows all carry that, so none is marked;
+ * a board given with that on more than one row is read so too, wherever it
+ * is shown.
  * A board whose scope shows nothing yet reads "Shown from" its time, or, with
  * none of its tasks released and so no time to name, says that. `title`
  * names the board's heading and table, its name unless given.
@@ -81,8 +84,8 @@ export function BoardTable({
   ownLabel?: string;
   submissionTo?: (task: string, number: number) => string;
 }) {
-  const link = (task: string, number: number): ReactNode =>
-    submissionTo === undefined ? (
+  const link = (task: string, number: number, own: boolean): ReactNode =>
+    submissionTo === undefined || !own ? (
       `#${number}`
     ) : (
       <PageLink to={submissionTo(task, number)} mono>
@@ -103,6 +106,7 @@ export function BoardTable({
     );
   }
 
+  const everyGiven = everyRow || board.rows.filter(isOwn).length > 1;
   const places = keyPlaces(board);
   const taskPlaces = Object.fromEntries(
     board.tasks.map((task) => [task.id, cellPlaces(board, task.id)]),
@@ -135,7 +139,7 @@ export function BoardTable({
             </thead>
             <tbody>
               {board.rows.map((row) => {
-                const own = !everyRow && isOwn(row);
+                const own = !everyGiven && isOwn(row);
                 return (
                   <tr
                     key={`${String(row.row.user_id)}-${String(row.row.team)}`}
@@ -182,7 +186,7 @@ export function BoardTable({
                                   {cell.submissions.map((number, at) => (
                                     <span key={number}>
                                       {at > 0 && ', '}
-                                      {link(task.id, number)}
+                                      {link(task.id, number, own)}
                                     </span>
                                   ))}
                                 </span>

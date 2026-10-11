@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import userEvent from '@/test/user-event';
 import { EditorView } from '@codemirror/view';
 import { renderWithProviders } from '@/test/render';
 import { CodeEditor } from './CodeEditor';
