@@ -46,9 +46,11 @@ function TaskState({ standing }: { standing: TaskStanding }) {
   const published =
     latest === null
       ? 'Never published'
-      : `Publication ${String(latest.number)}, ${when(latest.at)}, ${
-          latest.grading_changed ? 'changed how it grades' : 'grading unchanged'
-        }`;
+      : latest.number === 1
+        ? `Publication 1, ${when(latest.at)}`
+        : `Publication ${String(latest.number)}, ${when(latest.at)}, ${
+            latest.grading_changed ? 'changed how it grades' : 'grading unchanged'
+          }`;
   return (
     <>
       {draft && errors.length > 0 && (
