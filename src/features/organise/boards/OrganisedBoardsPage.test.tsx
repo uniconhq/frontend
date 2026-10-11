@@ -103,6 +103,26 @@ describe("the boards' settings", { timeout: 20_000 }, () => {
     expect(standings.getByRole('radio', { name: 'Only their own row' })).toBeChecked();
   });
 
+  it('offers each choice once, an unset one shown as the default it means', async () => {
+    server.use(signedIn);
+    settings();
+    renderApp(PAGE);
+
+    const form = await screen.findByRole('form', { name: 'Leaderboards' });
+    const standings = board(form, 'Standings');
+    for (const [name, shown] of [
+      ['Counts', 'Every result'],
+      ['Which submission counts', 'Best submission'],
+    ] as const) {
+      const field = standings.getByRole('combobox', { name });
+      const labels = within(field)
+        .getAllByRole('option')
+        .map((option) => option.textContent);
+      expect(new Set(labels).size).toBe(labels.length);
+      expect(field).toHaveDisplayValue(shown);
+    }
+  });
+
   it('builds a board from its fields that reads as the same board written by hand', async () => {
     server.use(signedIn);
     const sent = settings();

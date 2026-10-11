@@ -188,10 +188,9 @@ function BoardEntry({
           <FieldBox name="over">
             <Select
               label="Counts"
-              value={board.over}
+              value={board.over === '' ? 'all' : board.over}
               options={choices(board.over, OVER)}
-              placeholder="Every result"
-              onChange={(over) => onChange({ over })}
+              onChange={(over) => onChange({ over: over === 'all' ? '' : over })}
               error={said('over')}
               disabled={disabled}
             />
@@ -199,10 +198,11 @@ function BoardEntry({
           <FieldBox name="select">
             <Select
               label="Which submission counts"
-              value={board.select}
+              value={board.select === '' ? 'best' : board.select}
               options={choices(board.select, SELECT)}
-              placeholder="Best submission"
-              onChange={(select) => onChange({ select })}
+              onChange={(select) =>
+                onChange({ select: select === 'best' ? '' : select })
+              }
               error={said('select')}
               disabled={disabled}
             />
