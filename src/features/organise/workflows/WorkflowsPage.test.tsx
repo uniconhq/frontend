@@ -214,7 +214,7 @@ describe('a workflow one may only read', () => {
     expect(
       within(state).getByRole('heading', { name: 'unicon/classic@v1' }),
     ).toBeVisible();
-    expect(state).toHaveTextContent('This version cannot be opened.');
+    expect(state).toHaveTextContent('This version cannot be opened, because:');
     expect(state).toHaveTextContent(`outputs: ${reason}`);
     expect(screen.queryByRole('group', { name: /^Step/ })).not.toBeInTheDocument();
     expect(
@@ -235,7 +235,7 @@ describe('a workflow one may only read', () => {
     renderApp('/workflows/unicon/classic?version=v1');
 
     const state = await screen.findByRole('alert');
-    expect(state).toHaveTextContent('This version cannot be opened.');
+    expect(state).toHaveTextContent('This version cannot be opened, because:');
     expect(state).toHaveTextContent('unicon/classic has no version v1.');
   });
 
@@ -251,7 +251,7 @@ describe('a workflow one may only read', () => {
     renderApp('/workflows/unicon/classic?version=v1');
 
     const state = await screen.findByRole('alert');
-    expect(state).toHaveTextContent('This version cannot be opened.');
+    expect(state).toHaveTextContent('This version cannot be opened, because:');
     expect(state).toHaveTextContent(`Overall: ${reason}`);
   });
 
@@ -314,12 +314,12 @@ describe('who reads a workflow', () => {
     renderApp('/workflows/kenny/tuned');
 
     await user.click(await screen.findByRole('button', { name: 'Share' }));
-    const panel = await screen.findByRole('region', { name: 'Who reads it' });
+    const panel = await screen.findByRole('region', { name: 'Who can see it' });
     await user.click(within(panel).getByRole('radio', { name: /^Shared/ }));
     await waitFor(() => expect(backend.state.visibility).toBe('shared'));
     expect(
       await within(panel).findByText(
-        'Shared with nobody yet, so only its owner reads it.',
+        'Shared with nobody yet, so only its owner can see it.',
       ),
     ).toBeInTheDocument();
     await user.type(within(panel).getByRole('textbox', { name: 'Username' }), 'ada');
@@ -331,7 +331,7 @@ describe('who reads a workflow', () => {
     // Making it public would take it from ada, so it asks first.
     await user.click(within(panel).getByRole('radio', { name: /^Public/ }));
     expect(within(panel).getByRole('alert')).toHaveTextContent(
-      'Making it public takes it from the 1 person it is shared with.',
+      'Making it public stops sharing it with the 1 person it is shared with.',
     );
     expect(backend.state.visibility).toBe('shared');
     await user.click(within(panel).getByRole('button', { name: 'Keep it shared' }));

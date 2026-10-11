@@ -81,8 +81,8 @@ export function Combine({
       <SectionTitle order={3}>Combine workflows</SectionTitle>
       <BodyText size="sm" tone="secondary">
         One new private workflow holding every step of the versions chosen, in their
-        order. An input or a test field they declare alike is shared; anything else with
-        the same name is numbered.
+        order. An input or a test field that is the same in each is shared; anything
+        else with the same name is numbered.
       </BodyText>
       <fieldset className={classes.stack}>
         <legend>Versions to combine</legend>

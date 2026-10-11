@@ -38,7 +38,7 @@ function a(type: string): string {
       text: 'text',
       number: 'a number',
       boolean: 'true or false',
-      enum: 'an enum',
+      enum: 'one of a list',
       file: 'a file',
       folder: 'a folder',
       outcome: 'an outcome',

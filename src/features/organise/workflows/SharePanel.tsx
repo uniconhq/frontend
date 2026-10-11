@@ -15,17 +15,17 @@ const OPTIONS = [
   {
     value: 'private',
     label: 'Private',
-    description: 'Only its owner reads it and chooses it for a task.',
+    description: 'Only its owner can see it and choose it for a task.',
   },
   {
     value: 'shared',
     label: 'Shared',
-    description: 'Its owner and the people listed here read it and choose it.',
+    description: 'Its owner and the people listed here can see it and choose it.',
   },
   {
     value: 'public',
     label: 'Public',
-    description: 'Everyone with an account reads it and chooses it.',
+    description: 'Everyone with an account can see it and choose it.',
   },
 ];
 
@@ -80,9 +80,9 @@ function SharePanel({ page }: { page: WorkflowPage }) {
 
   const listed = page.readers.length > 0;
   return (
-    <section className={classes.stack} aria-label="Who reads it">
+    <section className={classes.stack} aria-label="Who can see it">
       <RadioGroup
-        label="Who reads it"
+        label="Who can see it"
         value={asking ?? page.visibility}
         options={OPTIONS}
         disabled={visibility.isPending}
@@ -96,7 +96,7 @@ function SharePanel({ page }: { page: WorkflowPage }) {
       {asking !== null && (
         <div className={classes.stack} role="alert">
           <BodyText size="sm">
-            Making it {asking} takes it from the {String(page.readers.length)}{' '}
+            Making it {asking} stops sharing it with the {String(page.readers.length)}{' '}
             {page.readers.length === 1 ? 'person' : 'people'} it is shared with.
           </BodyText>
           <div className={classes.actions}>
@@ -136,7 +136,7 @@ function SharePanel({ page }: { page: WorkflowPage }) {
             </ul>
           ) : (
             <BodyText size="sm" tone="secondary">
-              Shared with nobody yet, so only its owner reads it.
+              Shared with nobody yet, so only its owner can see it.
             </BodyText>
           )}
           <form

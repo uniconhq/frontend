@@ -172,7 +172,7 @@ describe('the workflow editor', () => {
     ).toBeVisible();
     const banner = screen.getByLabelText('Problems', { selector: 'section' });
     expect(banner).toHaveTextContent(
-      '2 problems to fix before publishing a version. The draft saves with them.',
+      '2 problems to fix before publishing a version. You can still save the draft with them.',
     );
     expect(banner).toHaveTextContent(
       'Each test’s files: A workflow has at least one test field.',
@@ -471,11 +471,11 @@ describe('the workflow editor', () => {
     const user = userEvent.setup();
     renderApp(EDITOR_PAGE);
 
-    const mend = await screen.findByLabelText('Mend the draft', {
+    const mend = await screen.findByLabelText('Fix the draft', {
       selector: 'section',
     });
     expect(mend).toHaveTextContent(
-      'This draft cannot be drawn, because its file does not read',
+      'This draft cannot be drawn, because its file cannot be read',
     );
     // Not "nothing to fix", whatever the check says of a file that does not read.
     await waitFor(() => expect(backend.state.checks).toBeGreaterThan(0), CHECKED);
@@ -487,7 +487,7 @@ describe('the workflow editor', () => {
     await user.clear(field);
     await user.paste('test: {input: file}\nsteps: []\n');
     expect(back).toBeEnabled();
-    expect(mend).toHaveTextContent('The file reads again');
+    expect(mend).toHaveTextContent('The file can be read again');
 
     await user.click(barButton('Save'));
     await waitFor(() =>
@@ -500,7 +500,7 @@ describe('the workflow editor', () => {
     await user.click(toolButton('Redo'));
     await user.click(back);
     expect(
-      screen.queryByLabelText('Mend the draft', { selector: 'section' }),
+      screen.queryByLabelText('Fix the draft', { selector: 'section' }),
     ).toBeNull();
     expect(toolButton('Add step')).toBeEnabled();
   });

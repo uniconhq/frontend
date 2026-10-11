@@ -198,7 +198,7 @@ function LeaveGuard({ dirty }: { dirty: boolean }) {
     >
       <div className={classes.stack}>
         <BodyText size="md">
-          Your changes to the draft are not saved. Leaving drops them.
+          Your changes to the draft are not saved. Leaving loses them.
         </BodyText>
         <div className={classes.actions}>
           <Button onClick={() => blocker.reset?.()}>Stay</Button>
@@ -736,18 +736,18 @@ export function Editor({
           cover={selected === null ? 0 : DRAWER_WIDTH}
         />
       ) : (
-        <section className={classes.mend} aria-label="Mend the draft">
+        <section className={classes.mend} aria-label="Fix the draft">
           {unreadable !== null ? (
             <>
               <BodyText size="md">
-                This draft cannot be drawn, because its file does not read. Mend it here
-                and save it; Undo goes back over each change. What is wrong:
+                This draft cannot be drawn, because its file cannot be read. Fix it here
+                and save it; Undo steps back through each change. What is wrong:
               </BodyText>
               <pre className={classes.unreadable}>{unreadable}</pre>
             </>
           ) : (
             <BodyText size="md">
-              The file reads again, so the draft can be drawn.
+              The file can be read again, so the draft can be drawn.
             </BodyText>
           )}
           <CodeEditor

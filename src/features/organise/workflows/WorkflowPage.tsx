@@ -204,7 +204,7 @@ function Unopenable({
     <Card>
       <div className={classes.stack} role="alert">
         <SectionTitle>{label}</SectionTitle>
-        <BodyText>This version cannot be opened. Unicon says why:</BodyText>
+        <BodyText>This version cannot be opened, because:</BodyText>
         {children}
         {onRetry !== undefined && (
           <div>
