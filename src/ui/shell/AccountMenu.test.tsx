@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import userEvent from '@/test/user-event';
 import { renderApp } from '@/test/render';
 import { FORGE, server, sessionList, signedIn } from '@/test/server';
 

@@ -31,6 +31,7 @@ import { readWorkflow } from './model';
 import { pinned } from './pins';
 import { byRef } from './primitives';
 import { SharePanel } from './SharePanel';
+import { latestVersion } from './versions';
 import shared from '../organise.module.css';
 import classes from './workflows.module.css';
 
@@ -119,7 +120,7 @@ function Shown({
         <VersionView
           page={page}
           primitives={primitives}
-          version={asked ?? versions.at(-1) ?? null}
+          version={asked ?? latestVersion(versions) ?? null}
         />
       )}
     </>
@@ -335,7 +336,7 @@ function CopyForm({ source }: { source: string }) {
 /** Combine, from a workflow's own page, its latest version chosen to start with. */
 function CombineHere({ page }: { page: Page }) {
   const listed = queryView($api.useQuery('get', '/api/v1/workflows'));
-  const latest = page.versions.at(-1);
+  const latest = latestVersion(page.versions);
   if (listed.state !== 'ready') return null;
   return (
     <Card>

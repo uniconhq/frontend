@@ -58,7 +58,11 @@ export function ScoredView({
               )}
               <BodyText tone="secondary">{STATUS[view.data.grading.status]}</BodyText>
             </div>
-            <ScoredResult grading={view.data.grading} shownAt="Its row sees this at" />
+            <ScoredResult
+              grading={view.data.grading}
+              shownAt="Its row sees this at"
+              testsShownAt="Its row sees its tests at"
+            />
           </>
         ))}
     </section>

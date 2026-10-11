@@ -5,10 +5,14 @@
  */
 
 const DECIMAL = /^([-+]?)(\d*)(?:\.(\d*))?(?:[eE]([-+]?\d+))?$/;
+/** A whole number in hex or octal, as YAML 1.2's core schema writes one. */
+const BASED = /^0x[0-9a-fA-F]+$|^0o[0-7]+$/;
 
 /** A decimal as a whole number of units and the power of ten of a unit. */
 function scaled(text: string): { units: bigint; power: number } | null {
-  const found = DECIMAL.exec(text.trim());
+  const trimmed = text.trim();
+  if (BASED.test(trimmed)) return { units: BigInt(trimmed), power: 0 };
+  const found = DECIMAL.exec(trimmed);
   if (found === null) return null;
   const [, sign = '', whole = '', fraction = '', exponent = '0'] = found;
   if (whole === '' && fraction === '') return null;
@@ -22,7 +26,8 @@ function scaled(text: string): { units: bigint; power: number } | null {
 /**
  * How two decimals written as text compare, digit for digit, however many
  * digits they have and whatever way each is spelled (`2.5`, `2.50`,
- * `25e-1`): below zero when `a` is less, zero when they are the same
+ * `25e-1`, and a whole number as `0x19` or `0o31`, which a definition file
+ * may hold): below zero when `a` is less, zero when they are the same
  * number, above zero when `a` is more. Text that is no decimal compares as
  * NaN.
  */

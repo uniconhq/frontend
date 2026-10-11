@@ -6,8 +6,9 @@ import { serverNow } from '@/lib/time';
  * is still to finish, since one usually takes seconds, less often the longer
  * it has waited, since one waiting for a machine at a contest's start can
  * wait minutes and every read costs the forge several calls, and now and then
- * otherwise, so an organiser's rejudge reaches the page. Live updates replace
- * this in a later feature.
+ * otherwise, so an organiser's rejudge reaches the page. While the live
+ * stream is open it tells the page of each change, and this is once a
+ * minute.
  */
 const WAITING: [olderThanMs: number, everyMs: number][] = [
   [120_000, 15_000],

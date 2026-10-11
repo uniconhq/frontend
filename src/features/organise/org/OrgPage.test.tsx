@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import userEvent from '@/test/user-event';
 import { delay, http, HttpResponse } from 'msw';
 import { renderApp } from '@/test/render';
 import { problem, server, signedIn, someone } from '@/test/server';
 import { ORG_API, contestList, contests, listAndCreate } from '@/test/organiser';
+import { passTimeUntil, withFakeTimers } from '@/test/timers';
 
 describe('the org page', () => {
   it('lists the contests, each linking to its page', async () => {
@@ -84,21 +85,29 @@ describe('the org page', () => {
     expect(screen.queryByRole('form', { name: 'New contest' })).not.toBeInTheDocument();
   });
 
-  it('offers to try again when the list failed for another reason', async () => {
-    let broken = true;
-    server.use(
-      signedIn,
-      http.get(`${ORG_API}/contests`, () =>
-        broken ? problem(503, 'forge_unavailable') : HttpResponse.json(contests),
-      ),
-    );
-    renderApp('/orgs/acme');
+  describe('when the list fails', () => {
+    withFakeTimers();
 
-    await screen.findByText('Forgejo did not answer', {}, { timeout: 3_000 });
-    broken = false;
-    await userEvent.click(screen.getByRole('button', { name: 'Try again' }));
+    it('offers to try again when the list failed for another reason', async () => {
+      let broken = true;
+      server.use(
+        signedIn,
+        http.get(`${ORG_API}/contests`, () =>
+          broken ? problem(503, 'forge_unavailable') : HttpResponse.json(contests),
+        ),
+      );
+      renderApp('/orgs/acme');
 
-    expect(await screen.findByRole('list', { name: 'Contests' })).toBeVisible();
+      // The client asks twice more before it shows the error, 0.3 s and then
+      // 0.9 s later, on the fake clock.
+      await passTimeUntil(() => screen.getByText('Forgejo did not answer'), {
+        within: 10_000,
+      });
+      broken = false;
+      await userEvent.click(screen.getByRole('button', { name: 'Try again' }));
+
+      expect(await screen.findByRole('list', { name: 'Contests' })).toBeVisible();
+    });
   });
 });
 

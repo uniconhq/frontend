@@ -1,6 +1,7 @@
 import type { Publication, TaskStanding } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { PageLink } from '@/ui/PageLink';
+import { formatExact } from '@/lib/exact';
 import { formatDateTime } from '@/lib/time';
 import { taskPath } from '@/lib/organiser-paths';
 import { DefinitionErrors } from '../DefinitionErrors';
@@ -10,9 +11,16 @@ function when(at: string): string {
   return formatDateTime(new Date(at));
 }
 
-/** A fraction as a percentage, to a tenth at most: 0.1 is `10%`. */
-function percent(fraction: number): string {
-  return `${String(Math.round(fraction * 1000) / 10)}%`;
+/**
+ * A fraction, served as exact digits, as the percentage it is, to the last
+ * digit: 0.1 is `10%` and 0.0001 is `0.01%`.
+ */
+function percent(fraction: string): string {
+  const [whole = '0', decimals = ''] = fraction.split('.');
+  const padded = decimals.padEnd(2, '0');
+  const rest = padded.slice(2);
+  const digits = `${whole}${padded.slice(0, 2)}`.replace(/^0+(?=\d)/, '');
+  return `${formatExact(rest === '' ? digits : `${digits}.${rest}`, rest.length)}%`;
 }
 
 function LatestPublication({ latest }: { latest: Publication | null }) {
@@ -63,7 +71,7 @@ function Timeline({ standing }: { standing: TaskStanding }) {
       : `${when(timeline.due)}${
           timeline.late_per_day === null
             ? ''
-            : `, then ${percent(Number(timeline.late_per_day))} off per late day started`
+            : `, then ${percent(timeline.late_per_day)} off per late day started`
         }`;
   const worth =
     timeline.worth !== null

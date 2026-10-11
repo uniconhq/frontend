@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { screen, within } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import userEvent from '@/test/user-event';
 import { http, HttpResponse } from 'msw';
 import { leaveFor } from '@/lib/leave';
 import { renderApp } from '@/test/render';

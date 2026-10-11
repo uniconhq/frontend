@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { screen, within } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import userEvent from '@/test/user-event';
 import { http, HttpResponse } from 'msw';
 import type { FeedEntry, Grading, OrganisedSubmission, Submitter } from '@/api/types';
 import { renderApp } from '@/test/render';
@@ -618,6 +618,7 @@ describe("the organisers' scored view of a submission", () => {
     const main = within(view).getByRole('region', { name: 'Group main' });
     expect(main).toHaveTextContent('100 / 100 points');
     expect(main).toHaveTextContent(/Its row sees this at/);
+    expect(main).not.toHaveTextContent(/Its row sees its tests at/);
     expect(within(main).getByRole('table', { name: 'Tests main' })).toHaveTextContent(
       'main/1',
     );

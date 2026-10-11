@@ -17,13 +17,6 @@ import { useMarks, type MarkState } from './use-marks';
 import classes from './submit.module.css';
 
 /**
- * The caller's own submissions of the task, newest first, each with where its
- * grading stands or what came back: read every two seconds while any is still
- * being graded, so a queued one moves on to its outcome without a reload.
- * The server answers with the caller's own alone. On a task a `marked` board
- * covers, each also has the row's mark on it, a toggle until the row's close.
- */
-/**
  * What a screen reader is told as the list is read again: each submission
  * whose grading has just finished, with its verdict. The table changes in
  * place, which a screen reader does not say on its own. The last read is
@@ -54,6 +47,15 @@ function useJustFinished(submissions: Submission[] | undefined): string {
   return said;
 }
 
+/**
+ * The caller's own submissions of the task, newest first, each with where its
+ * grading stands or what came back: read again while any is still being
+ * graded, soon at first and less often the longer it waits (`pollEvery`),
+ * and once a minute while the live stream tells the page, so a queued one
+ * moves on to its outcome without a reload. The server answers with the
+ * caller's own alone. On a task a `marked` board covers, each also has the
+ * row's mark on it, a toggle until the row's close.
+ */
 export function SubmissionList({
   org,
   contest,

@@ -593,22 +593,22 @@ Submit runs in this order, in `src/features/contest/submit/use-submit.ts`:
    for digit, and the files of each input together against its `max_size`.
    A number is sent as the digits it was typed as, never a JSON number.
    A file too large is caught here, before any upload starts.
-2. For each file, a slot (`POST .../uploads`) naming the input and the
-   file's path under it, the bytes straight to the store,
-   and `POST .../uploads/{id}/complete`. A form slot is one POST of exactly the
-   slot's `fields`, in their order, then the file last; any other field, such
-   as a Content-Type, and Garage's policy refuses it. A slot in parts, for a
-   file larger than the server takes in one request, is one PUT per part of exactly its length, since each URL
-   is signed for that length, and completing names every part's ETag. Sends go
-   by `XMLHttpRequest`, for the progress each file shows. A send the store
-   drops, answers with anything but a 2xx, or that sends nothing for 30
-   seconds, is reported as a file that may be too large, since that is how
-   the store answers one.
+2. For each file, its SHA-256 read in the browser, a slot
+   (`POST .../uploads`) naming the input, the file's path under it, its
+   digest and its size, one PUT of the file to the slot's address on the
+   upload door, and `POST .../uploads/{id}/complete`. The forge stores the
+   body and keeps it only when it has the digest and length the slot names. A
+   slot with no address is a file the forge holds already, and nothing is
+   sent to it. Sends go by `XMLHttpRequest`, for the progress each file shows.
+   A send whose connection breaks, or that sends nothing for 30 seconds, asks
+   where the upload stands before sending the file again from the start; a
+   refusal is an upload that did not go through, which says the file may
+   have changed since it was chosen.
 3. `POST .../submissions` with every upload and one idempotency key.
 
-A slot's URL is sent to as a path on this origin, so a file never goes
-anywhere else, and from `pnpm dev` it goes through the dev server's proxy
-with the Host the URL was signed for.
+A slot's address is sent to as a path on this origin (`/-/uploads/...`), so
+a file never goes anywhere else, and from `pnpm dev` it goes through the dev
+server's proxy, as `/api` does.
 
 The idempotency key is made once per attempt, and an attempt is one set of
 panel contents: a second click while one runs does nothing, and sending the
@@ -639,7 +639,8 @@ shows now, and `GRADED` when it shows none yet. A contestant is served a
 submission's state in the format's words, `queued`, `grading`, `graded` or
 `cancelled`; a run that failed on the platform's side is served as `grading`
 until staff end it; then it reads
-`CANCELLED` with the sentence they gave, and is no longer read again.
+`CANCELLED` with the sentence they gave, and is read again only as often
+as a list with nothing grading is.
 `src/ui/VerdictBadge.tsx` has a label for every outcome and status and puts
 each in one of the handoff's six colour pairs; an outcome it does not know
 shows under its own name in the neutral one.

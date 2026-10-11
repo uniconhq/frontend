@@ -116,6 +116,17 @@ describe('merging a number past what a float holds', () => {
 
   it('takes a number spelled another way for the same number', () => {
     const spelled = TASK.replace('0.123456789012345678901', '0.1234567890123456789010');
+    const hex = 'name: Sum\ntest_groups:\n  main: {each: 0x10}\n';
+
+    expect(differences(exact(hex), exact(hex), exact(hex), 'task.yaml')).toEqual([]);
+    expect(
+      differences(
+        exact(hex),
+        exact(hex.replace('0x10', '0o20')),
+        exact(hex),
+        'task.yaml',
+      ),
+    ).toEqual([]);
 
     expect(differences(exact(TASK), exact(spelled), exact(TASK), 'task.yaml')).toEqual(
       [],

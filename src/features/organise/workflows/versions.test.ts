@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { nextVersion, versionNumber } from './versions';
+import { latestVersion, nextVersion, versionNumber } from './versions';
 
 describe('workflow version names', () => {
   it('reads the number of v and a whole number, and none of any other name', () => {
@@ -14,5 +14,12 @@ describe('workflow version names', () => {
     expect(nextVersion(['beta'])).toBe('v1');
     expect(nextVersion(['v1', 'v9', 'beta'])).toBe('v10');
     expect(nextVersion(['v10', 'v2'])).toBe('v11');
+  });
+
+  it('takes the highest number as the latest, whatever else is tagged', () => {
+    expect(latestVersion(['beta', 'v1', 'v9', 'v10', 'zeta'])).toBe('v10');
+    expect(latestVersion(['v2', 'v10', 'w'])).toBe('v10');
+    expect(latestVersion(['beta', 'zeta'])).toBe('zeta');
+    expect(latestVersion([])).toBeUndefined();
   });
 });
