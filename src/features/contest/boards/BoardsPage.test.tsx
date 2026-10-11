@@ -165,7 +165,7 @@ describe("a contest's boards for a signed-in person", () => {
     renderApp(PAGE);
 
     expect(
-      await screen.findByText('This contest has no board you can see.'),
+      await screen.findByText('This contest has no leaderboard you can see.'),
     ).toBeVisible();
   });
 });

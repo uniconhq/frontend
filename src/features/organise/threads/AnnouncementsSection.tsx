@@ -6,6 +6,7 @@ import type { Announcement } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
 import { Card } from '@/ui/Card';
+import { Modal } from '@/ui/Modal';
 import { SectionTitle } from '@/ui/SectionTitle';
 import { TextInput } from '@/ui/TextInput';
 import { Textarea } from '@/ui/Textarea';
@@ -83,21 +84,33 @@ function Composer({
   );
 }
 
-/** One announcement with, for a manager, Edit and Close; there is no delete. */
+/**
+ * One announcement with, for a manager, Edit and Close while it is open, and
+ * Reopen once it is closed; there is no delete. Close asks first, saying what
+ * entrants will then see, on the contest's page or the task's (`where`).
+ */
 function Managed({
   announcement,
   manages,
+  where,
   changes,
   onChanged,
 }: {
   announcement: Announcement;
   manages: boolean;
+  where: string;
   changes: ReturnType<typeof useAnnouncementChanges>;
   onChanged: () => Promise<void>;
 }) {
   const [editing, setEditing] = useState(false);
+  const [closing, setClosing] = useState(false);
   const change = useChange({ reread: onChanged });
   const name = announcement.title;
+
+  const close = async () => {
+    const outcome = await change.run('close', () => changes.close(announcement.number));
+    if (outcome.ok) setClosing(false);
+  };
 
   if (editing) {
     return (
@@ -132,25 +145,64 @@ function Managed({
             size="xs"
             variant="secondary"
             label={`Close ${name}`}
-            loading={change.pending === 'close'}
-            onClick={() =>
-              void change.run('close', () => changes.close(announcement.number))
-            }
+            onClick={() => {
+              change.dismiss();
+              setClosing(true);
+            }}
           >
             Close
           </Button>
         </div>
       )}
-      {change.error !== null && <ErrorBlock error={change.error} compact />}
+      {manages && announcement.closed && (
+        <div className={classes.actions}>
+          <Button
+            size="xs"
+            variant="secondary"
+            label={`Reopen ${name}`}
+            loading={change.pending === 'reopen'}
+            onClick={() =>
+              void change.run('reopen', () => changes.reopen(announcement.number))
+            }
+          >
+            Reopen
+          </Button>
+        </div>
+      )}
+      {change.error !== null && !closing && <ErrorBlock error={change.error} compact />}
+      <Modal
+        opened={closing}
+        onClose={() => setClosing(false)}
+        title="Close this announcement?"
+      >
+        <div className={classes.stack}>
+          <BodyText>
+            Entrants will no longer see &ldquo;{name}&rdquo; on {where}. Those who have
+            read it are not told it was closed.
+          </BodyText>
+          <BodyText tone="secondary">
+            It stays here for the organisers, marked closed, and you can reopen it.
+          </BodyText>
+          {change.error !== null && <ErrorBlock error={change.error} compact />}
+          <div className={classes.actions}>
+            <Button loading={change.pending === 'close'} onClick={() => void close()}>
+              Close it
+            </Button>
+            <Button variant="secondary" onClick={() => setClosing(false)}>
+              Not now
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </li>
   );
 }
 
 /**
  * The announcements of a contest or a task for its organisers: every one,
- * newest first, closed ones kept and marked so, with a composer, Edit and
- * Close for a manager. There is no delete anywhere, since a message people
- * have already read should not vanish.
+ * newest first, closed ones kept and marked so, with a composer, Edit, Close
+ * and Reopen for a manager. There is no delete anywhere, since a message
+ * people have already read should not vanish.
  */
 export function AnnouncementsSection({ place }: { place: AnnouncementPlace }) {
   const queryClient = useQueryClient();
@@ -189,6 +241,11 @@ export function AnnouncementsSection({ place }: { place: AnnouncementPlace }) {
                     key={announcement.number}
                     announcement={announcement}
                     manages={manages}
+                    where={
+                      place.kind === 'contest'
+                        ? 'the contest’s page'
+                        : 'the task’s page or the contest’s'
+                    }
                     changes={changes}
                     onChanged={readAgain}
                   />

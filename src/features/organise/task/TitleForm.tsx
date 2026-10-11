@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { BodyText } from '@/ui/BodyText';
+import { UnsavedNote } from '@/ui/UnsavedNote';
 import { Button } from '@/ui/Button';
 import { TextInput } from '@/ui/TextInput';
 import { FieldBox } from '../contest/ContestFile';
@@ -57,7 +57,7 @@ function Form({ doc, busy, onSave, admin }: FormProps & { admin: boolean }) {
           >
             Save title
           </Button>
-          {changed && <BodyText tone="secondary">Unsaved changes</BodyText>}
+          {changed && <UnsavedNote />}
         </div>
       )}
     </form>

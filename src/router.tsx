@@ -13,7 +13,12 @@ import { NotFound } from '@/ui/feedback/NotFound';
 import { HomePage, InviteLink, InvitesPage } from '@/features/home';
 import { LoginPage } from '@/features/auth';
 import { AccountPage } from '@/features/account';
-import { BoardsPage, ContestHomePage, TaskStatementPage } from '@/features/contest';
+import {
+  BoardsPage,
+  ContestHomePage,
+  QuestionsPage,
+  TaskStatementPage,
+} from '@/features/contest';
 import {
   CONTEST_SECTION_PAGES,
   ContestPage,
@@ -143,6 +148,7 @@ export const routes: RouteObject[] = [
            */
           { path: 'contests/:org/:contest', element: <ContestHomePage /> },
           { path: 'contests/:org/:contest/boards', element: <BoardsPage /> },
+          { path: 'contests/:org/:contest/questions', element: <QuestionsPage /> },
           {
             path: 'contests/:org/:contest/tasks/:task',
             element: <TaskStatementPage />,

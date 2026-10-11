@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { BodyText } from '@/ui/BodyText';
+import { UnsavedNote } from '@/ui/UnsavedNote';
 import { Button } from '@/ui/Button';
 import { RadioGroup } from '@/ui/RadioGroup';
 import { Textarea } from '@/ui/Textarea';
@@ -204,7 +205,7 @@ function SettingsForm({ doc, busy, onSave, admin }: FormProps & { admin: boolean
         <Button type="submit" loading={busy} disabled={!changed || problems.length > 0}>
           Save settings
         </Button>
-        {changed && <BodyText tone="secondary">Unsaved changes</BodyText>}
+        {changed && <UnsavedNote />}
       </div>
     </form>
   );

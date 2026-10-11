@@ -55,6 +55,19 @@ export function formatDateTime(date: Date): string {
 }
 
 /**
+ * A moment as a short line names it: its time of day alone when it falls on
+ * the same day as `now` in the viewer's timezone, such as `14:00`, and its
+ * date and time otherwise.
+ */
+export function formatWhen(date: Date, now: Date = serverNow()): string {
+  const sameDay = date.toDateString() === now.toDateString();
+  return new Intl.DateTimeFormat(
+    undefined,
+    sameDay ? { timeStyle: 'short' } : { dateStyle: 'medium', timeStyle: 'short' },
+  ).format(date);
+}
+
+/**
  * A stretch of time as a countdown shows it: days when there are any, then
  * hours, minutes and seconds, two digits each after the first, such as
  * `1d 02h 05m 09s` or `4m 30s`. Nothing left reads as `0s`.

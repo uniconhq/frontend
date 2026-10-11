@@ -11,7 +11,7 @@ import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
 import { BodyText } from '@/ui/BodyText';
 import { formatSize } from '@/lib/size';
 import { fileHref, folderOf } from './file-param';
-import { treeQuery, type Place } from './place';
+import { settingsPath, treeQuery, type Place } from './place';
 import classes from './Files.module.css';
 
 function nameOf(path: string): string {
@@ -25,6 +25,18 @@ function ordered(entries: TreeEntry[]): TreeEntry[] {
   );
 }
 
+/**
+ * What the tree lists of a folder: everything but what has a page of its
+ * own, the settings file at the top and, at a task, its `tests/` folder.
+ */
+function listed(place: Place, entries: TreeEntry[]): TreeEntry[] {
+  const settings = settingsPath(place);
+  return entries.filter(
+    (entry) =>
+      entry.path !== settings && !(place.kind === 'task' && entry.path === 'tests'),
+  );
+}
+
 /** Every folder above `path`: `a/b/c.txt` is inside `a` and `a/b`. */
 function foldersAbove(path: string | null): string[] {
   if (path === null) return [];
@@ -33,7 +45,9 @@ function foldersAbove(path: string | null): string[] {
 }
 
 /**
- * The repo as a tree. A file that is an upload says so beside its name, with
+ * The repo as a tree, but for what has a page of its own: the settings file
+ * and a task's tests, which still open from a link to them. A file that is an
+ * upload says so beside its name, with
  * the size of what it holds. Each folder is listed when it is opened, with
  * `GET <place>/tree?path=`, so a large repo costs one request per folder
  * looked at. Opening a file is a link that sets `?file=`, so it can be copied,
@@ -106,13 +120,18 @@ function Folder({
   if (view.state === 'loading') return <PageSkeleton rows={2} />;
   if (view.state === 'error')
     return <ErrorBlock error={view.error} onRetry={view.retry} />;
-  if (view.data.length === 0) {
-    return <BodyText tone="secondary">Empty folder</BodyText>;
+  const entries = listed(place, view.data);
+  if (entries.length === 0) {
+    return (
+      <BodyText tone="secondary">
+        {folder === '' ? 'No other files yet.' : 'Empty folder'}
+      </BodyText>
+    );
   }
 
   return (
     <ul className={classes.entries}>
-      {ordered(view.data).map((entry) =>
+      {ordered(entries).map((entry) =>
         entry.kind === 'directory' ? (
           <li key={entry.path}>
             <button

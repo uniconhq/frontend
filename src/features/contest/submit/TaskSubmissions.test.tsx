@@ -4,6 +4,7 @@ import userEvent from '@/test/user-event';
 import { http, HttpResponse } from 'msw';
 import type { GradingResult, Submission, TaskPage } from '@/api/types';
 import { formatExact } from '@/lib/exact';
+import { formatWhen } from '@/lib/time';
 import { renderApp } from '@/test/render';
 import { problem, server, signedIn } from '@/test/server';
 import { fakeTimerUser, passTime, withFakeTimers } from '@/test/timers';
@@ -333,7 +334,8 @@ describe('the submit panel', () => {
           errors: [
             {
               input: 'answers',
-              message: '1.txt is not named for a test, as <group>/<test>.',
+              message:
+                'Name each file of this input after a test, as <group>/<test>, such as main/1.txt.',
             },
           ],
         });
@@ -350,7 +352,7 @@ describe('the submit panel', () => {
 
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent(
-      'Your answers: 1.txt is not named for a test, as <group>/<test>.',
+      'Your answers: Name each file of this input after a test, as <group>/<test>, such as main/1.txt.',
     );
     expect(slots).toEqual([expect.objectContaining({ filename: '1.txt' })]);
   });
@@ -474,9 +476,9 @@ describe('the submit panel', () => {
     ['archived', {}, 'The contest is archived', 'they take no submissions'],
     [
       'not_approved',
-      { detail: 'Only an approved entrant of the contest submits to it.' },
+      { detail: 'Only approved entrants of this contest can submit to its tasks.' },
       'Your registration is not approved yet',
-      'Only an approved entrant',
+      'Only approved entrants of this contest can submit to its tasks.',
     ],
     [
       'submission_limit',
@@ -523,10 +525,10 @@ describe('the submit panel', () => {
     [
       'invalid_inputs',
       {
-        errors: [{ input: 'language', message: 'Must be one of python.' }],
+        errors: [{ input: 'language', message: 'Choose one of python.' }],
       },
       'The submission does not fit the task',
-      'language: Must be one of python.',
+      'language: Choose one of python.',
     ],
   ];
 
@@ -766,11 +768,58 @@ describe('the submissions list', () => {
     const list = await screen.findByRole('table', { name: 'Your submissions' });
     const rows = within(list).getAllByRole('row').slice(1);
     expect(rows.map((row) => row.textContent)).toEqual([
-      expect.stringMatching(/^#4.*GRADING$/),
-      expect.stringMatching(/^#3.*2 days lateWRONG ANSWER$/),
-      expect.stringMatching(/^#2.*COMPILE ERR$/),
-      expect.stringMatching(/^#1.*ACCEPTED$/),
+      expect.stringMatching(/^#4.*GRADING—$/),
+      expect.stringMatching(/^#3.*2 days lateWRONG ANSWER—$/),
+      expect.stringMatching(/^#2.*COMPILE ERR—$/),
+      expect.stringMatching(/^#1.*ACCEPTED100$/),
     ]);
+  });
+
+  it('says each submission’s points in its row, or when held-back points are shown', async () => {
+    const held = (shown: string) =>
+      grading({
+        ...accepted,
+        points: { shown, pending: '70', pending_until: '2026-09-12T14:00:00Z' },
+      });
+    server.use(
+      signedIn,
+      withPage({}),
+      listing([
+        submission(
+          1,
+          grading({
+            ...accepted,
+            points: { shown: '82.5', pending: '0', pending_until: null },
+          }),
+        ),
+        submission(2, held('0')),
+        submission(3, held('30')),
+        submission(4, grading({ status: 'queued' })),
+      ]),
+    );
+    renderApp(PAGE);
+
+    const list = await screen.findByRole('table', { name: 'Your submissions' });
+    const at = formatWhen(new Date('2026-09-12T14:00:00Z'));
+    const cells = within(list)
+      .getAllByRole('row')
+      .slice(1)
+      .map((row) => row.lastElementChild?.textContent);
+    expect(cells).toEqual([
+      '—',
+      `30 so far, more shown at ${at}`,
+      `shown at ${at}`,
+      formatExact('82.5', 2),
+    ]);
+    expect(within(list).getByRole('columnheader', { name: 'Points' })).toBeVisible();
+  });
+
+  it('leaves points out of the list on a task that gives none', async () => {
+    server.use(signedIn, withPage({ worth: null }), listing([submission(1, accepted)]));
+    renderApp(PAGE);
+
+    const list = await screen.findByRole('table', { name: 'Your submissions' });
+    expect(within(list).queryByRole('columnheader', { name: 'Points' })).toBeNull();
   });
 });
 

@@ -55,7 +55,7 @@ describe('the sidebar', () => {
     );
   });
 
-  it("lists a contest's tasks and leaderboards to its contestants, the tasks marked on a task's page", async () => {
+  it("lists a contest's tasks, leaderboards and questions to its contestants, the tasks marked on a task's page", async () => {
     server.use(
       signedIn,
       http.get('/api/v1/orgs/:org/contests/:contest/home', () =>
@@ -67,6 +67,7 @@ describe('the sidebar', () => {
     expect(await entries('Contest')).toEqual([
       ['Tasks', '/contests/acme/spring'],
       ['Leaderboards', '/contests/acme/spring/boards'],
+      ['Questions', '/contests/acme/spring/questions'],
     ]);
     const nav = screen.getByRole('navigation', { name: 'Sections' });
     expect(within(nav).getByRole('link', { name: 'Tasks' }).className).toMatch(

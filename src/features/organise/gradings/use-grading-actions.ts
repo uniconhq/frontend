@@ -8,14 +8,21 @@ type ContestPath = { org: string; contest: string };
  * What a manager is being asked to confirm, each about one task: a retry or a
  * cancel of a submission's latest attempt, the cancel with the sentence its
  * contestant will read; falling back to a broken attempt's last good result
- * or clearing that; or a rejudge of the whole task.
+ * or clearing that; or a rejudge of the whole task. A rejudge asked from the
+ * contest's gradings carries the tasks to `choose` from, its `task` empty
+ * until one is chosen.
  */
 export type Asking =
   | { kind: 'retry'; task: string; entry: FeedEntry }
   | { kind: 'cancel'; task: string; entry: FeedEntry; reason: string }
   | { kind: 'fallBack'; task: string; entry: FeedEntry }
   | { kind: 'clearFallback'; task: string; entry: FeedEntry }
-  | { kind: 'rejudge'; task: string; title: string };
+  | {
+      kind: 'rejudge';
+      task: string;
+      title: string;
+      choose?: { value: string; label: string }[];
+    };
 
 /** Every read a grading's change can move: a task's gradings, the feed and the queue. */
 const READS = [

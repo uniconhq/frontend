@@ -244,7 +244,7 @@ describe("the task's gradings", () => {
     ).toBeNull();
   });
 
-  it('cancels only once asked, with the sentence the contestant reads', async () => {
+  it('cancels only once asked, with the sentence the entrant reads', async () => {
     const cancelled: { grading: string; body: unknown }[] = [];
     server.use(
       signedIn,
@@ -283,7 +283,7 @@ describe("the task's gradings", () => {
     });
     expect(confirm).toBeDisabled();
     const field = within(dialog).getByRole('textbox', {
-      name: /What the contestant reads/,
+      name: /What the entrant reads/,
     });
     expect(field).toBeRequired();
     expect(field).toHaveAttribute('maxlength', '500');
@@ -313,7 +313,7 @@ describe("the task's gradings", () => {
 
     const table = await screen.findByRole('table', { name: 'Gradings' });
     expect(table).toHaveTextContent('Cancelled');
-    expect(table).toHaveTextContent('Told the contestant: “The checker crashed.”');
+    expect(table).toHaveTextContent('Told the entrant: “The checker crashed.”');
   });
 
   it.each([
@@ -342,7 +342,7 @@ describe("the task's gradings", () => {
       );
       const dialog = await screen.findByRole('dialog');
       await userEvent.type(
-        within(dialog).getByRole('textbox', { name: /What the contestant reads/ }),
+        within(dialog).getByRole('textbox', { name: /What the entrant reads/ }),
         'The checker crashed.',
       );
       await userEvent.click(

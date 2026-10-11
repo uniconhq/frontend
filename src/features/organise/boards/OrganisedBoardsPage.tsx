@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router';
 import { $api, queryView } from '@/api/query';
 import type { OrganisedBoard } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
+import { UnsavedNote } from '@/ui/UnsavedNote';
 import { Button } from '@/ui/Button';
 import { Card } from '@/ui/Card';
 import { PageLink } from '@/ui/PageLink';
@@ -96,7 +97,7 @@ function BoardsForm({
           >
             Save boards
           </Button>
-          {changed && <BodyText tone="secondary">Unsaved changes</BodyText>}
+          {changed && <UnsavedNote />}
         </div>
       )}
     </form>

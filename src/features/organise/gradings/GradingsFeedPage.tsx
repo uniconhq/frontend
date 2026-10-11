@@ -190,8 +190,9 @@ function FilterBar({
  * Every grading of the contest, newest first, for anyone with a role at the
  * contest or one of its tasks: the queue above, the filters by task,
  * entrant, the member who submitted and status kept in the page's address, and the gradings as
- * `GradingsList` shows them, with Rejudge for the task the feed is filtered
- * to. The live stream makes the feed and the queue stale as gradings move;
+ * `GradingsList` shows them, with Rejudge always there, asking which task in
+ * its confirmation, the one the feed is filtered to chosen to begin with. The
+ * live stream makes the feed and the queue stale as gradings move;
  * while it is down both are read again every ten seconds while something is
  * still to finish.
  */
@@ -225,7 +226,7 @@ export function GradingsFeedPage() {
             path={path}
             view={view}
             showTask
-            rejudge={filters.task === null ? null : { task: filters.task }}
+            rejudge={{ tasks: tasks.map((task) => task.value), task: filters.task }}
             empty={
               filtered
                 ? 'No grading matches these filters.'

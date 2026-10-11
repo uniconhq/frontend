@@ -85,6 +85,28 @@ describe('the statement beside its preview', { timeout: 20_000 }, () => {
     ]);
   });
 
+  it('draws the task’s own pictures in the preview and says how to show one', async () => {
+    statementBackend(() => HttpResponse.json({}));
+    renderApp('/orgs/acme/contests/spring/tasks/sum/statement');
+
+    const source = await screen.findByRole('textbox', { name: 'Statement source' });
+    const preview = screen.getByRole('region', { name: 'What contestants see' });
+    fireEvent.change(source, {
+      target: { value: '![the tree](public/tree.png) ![afar](https://a.test/x.png)\n' },
+    });
+    expect(within(preview).getByRole('img', { name: 'the tree' })).toHaveAttribute(
+      'src',
+      '/api/v1/orgs/acme/contests/spring/tasks/sum/public/tree.png',
+    );
+    expect(within(preview).getByRole('link', { name: 'afar' })).toBeVisible();
+    const hint = screen.getByText(/To show a picture, upload it in the task/);
+    expect(hint).toBeVisible();
+    expect(within(hint).getByRole('link', { name: 'Files' })).toHaveAttribute(
+      'href',
+      '/orgs/acme/contests/spring/tasks/sum/files',
+    );
+  });
+
   it('shows a manager the statement read-only, with no way to save it', async () => {
     statementBackend(() => problem(403, 'admin_only', { keys: ['statement.md'] }));
     server.use(
