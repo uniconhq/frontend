@@ -485,7 +485,7 @@ const REFUSALS: [string, number, Record<string, unknown>, string][] = [
     'may be at most 1 MB in all',
   ],
   ['upload_not_yours', 404, { uploads: [] }, 'A file is not one you uploaded'],
-  ['upload_not_ready', 409, { uploads: [] }, 'A file did not arrive whole'],
+  ['upload_not_ready', 409, { uploads: [] }, 'A file did not arrive in full'],
   [
     'invalid_inputs',
     422,
