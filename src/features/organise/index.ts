@@ -11,7 +11,6 @@ import { GradingsFeedPage } from './gradings/GradingsFeedPage';
 import { OrganisedBoardsPage } from './boards/OrganisedBoardsPage';
 import { OrgOrganisersPage, OrgSettingsPage } from './org/OrgSections';
 import {
-  StatementPage,
   TaskAnnouncementsPage,
   TaskFilesPage,
   TaskGradingsPage,
@@ -54,7 +53,6 @@ export const CONTEST_SECTION_PAGES: Record<ContestSectionKey, ComponentType> = {
 };
 
 export const TASK_SECTION_PAGES: Record<TaskSectionKey, ComponentType> = {
-  statement: StatementPage,
   gradings: TaskGradingsPage,
   publications: TaskPublicationsPage,
   announcements: TaskAnnouncementsPage,

@@ -1,9 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
-import { $api, queryView, type QueryView } from '@/api/query';
-import type { WorkflowForm } from '@/api/types';
+import { $api, queryView } from '@/api/query';
 import { BodyText } from '@/ui/BodyText';
 import { useLiveConnected } from '@/live';
-import { formatSize } from '@/lib/size';
 import { treeQuery } from '../files/place';
 import { readAgainIn } from '../gradings/feed';
 import { count } from '../hub/count';
@@ -14,91 +12,6 @@ import { publishedLine } from './published';
 type TaskPath = { org: string; contest: string; task: string };
 
 const TASK = '/api/v1/orgs/{org}/contests/{contest}/tasks/{task}';
-
-/** The inputs and test fields the task's workflow declares, read for its cards. */
-function useWorkflowForm(path: TaskPath): QueryView<WorkflowForm> {
-  return queryView(
-    $api.useQuery(
-      'get',
-      `${TASK}/workflow-form`,
-      { params: { path } },
-      { retry: false },
-    ),
-  );
-}
-
-/** Which workflow grades the task, and whether a newer version is out. */
-export function WorkflowCard({ path }: { path: TaskPath }) {
-  return (
-    <Line
-      view={useWorkflowForm(path)}
-      say={(form) =>
-        form.workflow === null
-          ? 'No workflow is named yet.'
-          : form.problem !== null
-            ? `${form.workflow} cannot be read: ${form.problem}`
-            : form.newer !== null
-              ? `Graded by ${form.workflow}. Version ${form.newer} is out.`
-              : `Graded by ${form.workflow}.`
-      }
-    />
-  );
-}
-
-/** How many of the workflow's inputs the contestant gives, and how many the task sets. */
-export function InputsCard({ path }: { path: TaskPath }) {
-  return (
-    <Line
-      view={useWorkflowForm(path)}
-      say={(form) => {
-        if (form.problem !== null || form.workflow === null) {
-          return 'Known once the workflow can be read.';
-        }
-        const contestant = form.inputs.filter((input) => input.contestant).length;
-        const task = form.inputs.length - contestant;
-        return `${count(contestant, 'input', 'inputs')} the contestant gives, ${String(task)} the task sets.`;
-      }}
-    />
-  );
-}
-
-/** The test groups, one per folder of tests. */
-export function TestsCard({ path }: { path: TaskPath }) {
-  const view = queryView(
-    useQuery({ ...treeQuery({ kind: 'task', ...path }, 'tests'), retry: false }),
-  );
-  return (
-    <Line
-      view={view}
-      say={(entries) => {
-        const groups = entries.filter((entry) => entry.kind === 'directory');
-        return groups.length === 0
-          ? 'No tests yet. Upload them in Files.'
-          : `${count(groups.length, 'test group', 'test groups')}: ${groups
-              .map((group) => group.path.slice('tests/'.length))
-              .join(', ')}.`;
-      }}
-    />
-  );
-}
-
-/** Whether the statement is written. */
-export function StatementCard({ path }: { path: TaskPath }) {
-  const view = queryView(useQuery(treeQuery({ kind: 'task', ...path }, '')));
-  return (
-    <Line
-      view={view}
-      say={(entries) => {
-        const statement = entries.find((entry) => entry.path === 'statement.md');
-        return statement === undefined
-          ? 'Not written yet.'
-          : statement.size === null
-            ? 'Written.'
-            : `Written, ${formatSize(statement.size)}.`;
-      }}
-    />
-  );
-}
 
 /** How many gradings there are, and how many still run. */
 export function GradingsCard({ path }: { path: TaskPath }) {
@@ -147,5 +60,5 @@ export function FilesCard({ path }: { path: TaskPath }) {
 }
 
 export function SettingsCard() {
-  return <BodyText>Name, workflow, inputs, scoring and submission limits.</BodyText>;
+  return <BodyText>Its title, and its settings as they are stored.</BodyText>;
 }

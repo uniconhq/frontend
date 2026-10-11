@@ -2,7 +2,6 @@ import { useState, type ReactNode } from 'react';
 import { toApiError } from '@/api/problem';
 import type { DefinitionError, FileContent, WriteFile } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
-import { Tabs } from '@/ui/Tabs';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
 import { FileEditor } from '../files/FileEditor';
@@ -28,60 +27,14 @@ export type FormProps = {
   refused: DefinitionError[];
 };
 
-/**
- * A definition file as a form, with the file as text in a tab beside it,
- * since some keys have no field. The form gets the file parsed as a YAML
- * document; one that is not YAML, or not a mapping, falls back to the text
- * with the reason. Saving writes the changed document with the version it
- * was read at. A save refused as a conflict opens the merge view over the file
- * as it is now; any other answer is SaveOutcome's, as in the file editor.
- * A file that is an upload shows as one, by its size and digest, not as a form.
- */
-export function DefinitionFile({
-  place,
-  path,
-  label,
-  admin,
-  placeOf,
-  children,
-}: {
-  place: Place;
-  path: string;
-  /** What the tabs are views of, such as "The contest's settings". */
-  label: string;
-  /** Whether the organiser is an admin at the scope, which the merge view needs. */
-  admin: boolean;
-  /** Where each problem a refused save lists is fixed. */
-  placeOf?: PlaceOf;
-  children: (props: FormProps) => ReactNode;
-}) {
-  return (
-    <Tabs
-      label={label}
-      tabs={[
-        {
-          value: 'form',
-          label: 'Form',
-          panel: (
-            <DefinitionForm place={place} path={path} admin={admin} placeOf={placeOf}>
-              {children}
-            </DefinitionForm>
-          ),
-        },
-        {
-          value: 'text',
-          label: path,
-          panel: <FileEditor place={place} path={path} />,
-        },
-      ]}
-    />
-  );
-}
-
 type Merge = { base: string; mine: string };
 
 /**
- * A definition file as a form alone, saved as DefinitionFile's form is.
+ * A definition file as a form. The form gets the file parsed as a YAML
+ * document. Saving writes the changed document with the version it was read
+ * at; a save refused as a conflict opens the merge view over the file as it
+ * is now, and any other answer is SaveOutcome's. A file that is an upload
+ * shows as one, by its size and digest, not as a form.
  * `words` names the fields and values of the merge as the form does, and
  * `placeOf` each problem a refused save lists, with a link that opens it;
  * `bare` says a save in words alone. A file the form cannot read shows as

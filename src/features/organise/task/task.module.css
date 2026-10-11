@@ -1,4 +1,4 @@
-/* What contestants are graded on, under the task's name. */
+/* What entrants are graded on, under the task's name. */
 .status {
   display: flex;
   flex-direction: column;
@@ -10,4 +10,222 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 6px 10px;
+}
+
+/* The readiness row: each part of the task ticked, or what it is missing. */
+.ready {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  font-size: 13px;
+}
+
+.ready li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tick {
+  color: var(--unicon-text-primary);
+  font-weight: 700;
+}
+
+.missing {
+  color: var(--unicon-text-danger);
+  font-weight: 700;
+}
+
+/* The cards that build a task, one under the other, the form's sections. */
+.build {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.card {
+  border: 1px solid var(--unicon-border);
+  border-radius: var(--mantine-radius-md);
+  background: var(--unicon-body);
+  scroll-margin-top: calc(var(--unicon-header-height) + 12px);
+}
+
+.band {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px 16px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--unicon-border);
+  border-radius: var(--mantine-radius-md) var(--mantine-radius-md) 0 0;
+  background: var(--unicon-hover);
+}
+
+.bandText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.cardTitle {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--unicon-text-primary);
+}
+
+.cardLine {
+  margin: 0;
+  font-size: 13px;
+  color: var(--unicon-text-secondary);
+}
+
+.aside {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.cardBody {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding: 16px;
+}
+
+.part {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.partTitle {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--unicon-text-primary);
+}
+
+.partLine {
+  margin: 0;
+  font-size: 12px;
+  color: var(--unicon-text-secondary);
+}
+
+/* An input, a test group: a box of its own inside a part. */
+.item {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--unicon-border);
+  border-radius: var(--mantine-radius-sm);
+  scroll-margin-top: calc(var(--unicon-header-height) + 12px);
+}
+
+.itemHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 12px;
+}
+
+.itemTitle {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--unicon-text-primary);
+}
+
+.id {
+  font-family: var(--mantine-font-family-monospace);
+  font-size: 11px;
+  color: var(--unicon-text-secondary);
+}
+
+.sentence {
+  margin: 0;
+  padding: 8px 10px;
+  border-left: 3px solid var(--unicon-text-accent);
+  font-size: 13px;
+  color: var(--unicon-text-body);
+  background: var(--unicon-hover);
+}
+
+/* The one save bar, in view at the foot of the window while there is something to save. */
+.saveBar {
+  position: sticky;
+  bottom: 0;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 16px;
+  border: 1px solid var(--unicon-border-strong);
+  border-radius: var(--mantine-radius-md);
+  background: var(--unicon-body);
+  box-shadow: 0 -4px 16px rgb(0 0 0 / 12%);
+}
+
+.changes {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13px;
+  color: var(--unicon-text-body);
+}
+
+/* A group's tests, a row each. */
+.tests {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--unicon-border);
+}
+
+.test {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 16px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--unicon-border);
+  font-size: 13px;
+}
+
+.testName {
+  min-width: 64px;
+  font-weight: 600;
+}
+
+.testFiles {
+  flex: 1;
+  min-width: 0;
+  color: var(--unicon-text-secondary);
+  overflow-wrap: anywhere;
+}
+
+.weight {
+  width: 110px;
+}
+
+/* What files were matched to tests, before they are added. */
+.matched {
+  max-height: 320px;
+  overflow: auto;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 10px;
 }

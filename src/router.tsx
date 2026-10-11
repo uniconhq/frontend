@@ -32,8 +32,9 @@ import {
   contestSectionPath,
   ORG_SECTIONS,
   TASK_SECTIONS,
+  taskCardPath,
 } from '@/lib/sections';
-import { useContestParams } from '@/lib/route-params';
+import { useContestParams, useTaskParams } from '@/lib/route-params';
 
 const ORG = ':org';
 const CONTEST = `${ORG}/contests/:contest`;
@@ -70,10 +71,19 @@ function ToEntrants() {
   );
 }
 
-const movedRoutes: RouteObject[] = ['contestants', 'teams'].map((segment) => ({
-  path: `${CONTEST}/${segment}`,
-  element: <ToEntrants />,
-}));
+/** A task's Statement page, now the Statement card on the task's own page. */
+function ToStatement() {
+  const { org, contest, task } = useTaskParams();
+  return <Navigate to={taskCardPath(org, contest, task, 'statement')} replace />;
+}
+
+const movedRoutes: RouteObject[] = [
+  ...['contestants', 'teams'].map((segment) => ({
+    path: `${CONTEST}/${segment}`,
+    element: <ToEntrants />,
+  })),
+  { path: `${TASK}/statement`, element: <ToStatement /> },
+];
 
 /**
  * Data-router mode, because the route tree is about to get deep and loaders are

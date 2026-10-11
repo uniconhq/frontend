@@ -1,5 +1,17 @@
 import { expect, test, type Page, type Route } from '@playwright/test';
 
+/** unicon/classic@v2 as deploy seeds it, its inputs titled for the task's form (#434). */
+const CLASSIC = `inputs:
+  submission: {type: file, contestant: true, title: Solution}
+  language: {type: enum, options: [c, cpp, java, python], contestant: true, title: Language}
+  time_limit: {type: number, title: Time limit, unit: seconds, help: The CPU time the program may use on each test.}
+  memory_limit: {type: number, title: Memory limit, unit: MB}
+test:
+  input: file
+  answer: file
+steps: []
+`;
+
 /**
  * The organiser path against the dev server with the API stubbed, so it needs
  * no backend: make an org and land on its page, walk down to a task, open a
@@ -15,6 +27,9 @@ async function stubOrganiserApi(page: Page) {
     contestYaml:
       'name: Spring 2026\nstart: 2030-10-01T09:00:00Z\nend: 2030-10-01T14:00:00Z\nstate: draft\nvisibility: signed-in\ntasks:\n  - id: sum\n',
     contestSaves: 0,
+    taskYaml:
+      'name: Sum\nworkflow: unicon/classic@v2\ninputs:\n  submission: {label: Your solution}\n  language: {options: [python]}\n  time_limit: 2\n  memory_limit: 256\ntest_groups:\n  main: {each: 100}\n',
+    taskSaves: [] as unknown[],
   };
 
   const taskState = () => ({
@@ -41,6 +56,21 @@ async function stubOrganiserApi(page: Page) {
   await page.route('**/api/v1/time', (route) =>
     json(route, { now: '2026-09-29T10:00:00Z' }),
   );
+  await page.route('**/api/v1/workflows', (route) =>
+    json(route, [
+      {
+        owner: 'unicon',
+        name: 'classic',
+        versions: ['v2'],
+        editable: false,
+        visibility: 'public',
+      },
+    ]),
+  );
+  await page.route('**/api/v1/workflows/unicon/classic/versions/v2', (route) =>
+    json(route, { content: CLASSIC }),
+  );
+  await page.route('**/api/v1/primitives', (route) => json(route, []));
   await page.route('**/api/v1/me', (route) =>
     json(route, {
       user: {
@@ -131,12 +161,40 @@ async function stubOrganiserApi(page: Page) {
       return json(route, { queued: 0, dispatched: 0 });
     }
     if (path === `${task}/workflow-form`) {
+      const input = (id: string, type: string, more: object) => ({
+        id,
+        type,
+        contestant: false,
+        options: null,
+        per_test: false,
+        optional: false,
+        title: null,
+        help: null,
+        unit: null,
+        ...more,
+      });
       return json(route, {
         workflow: 'unicon/classic@v2',
         newer: null,
         problem: null,
-        inputs: [],
-        test: [],
+        inputs: [
+          input('submission', 'file', { contestant: true, title: 'Solution' }),
+          input('language', 'enum', {
+            contestant: true,
+            title: 'Language',
+            options: ['c', 'cpp', 'java', 'python'],
+          }),
+          input('time_limit', 'number', {
+            title: 'Time limit',
+            unit: 'seconds',
+            help: 'The CPU time the program may use on each test.',
+          }),
+          input('memory_limit', 'number', { title: 'Memory limit', unit: 'MB' }),
+        ],
+        test: [
+          { name: 'input', type: 'file', options: null },
+          { name: 'answer', type: 'file', options: null },
+        ],
         graded: false,
       });
     }
@@ -176,10 +234,46 @@ async function stubOrganiserApi(page: Page) {
     }
     if (path === task) return json(route, taskState());
     if (path === `${task}/publications`) return json(route, []);
+    if (path === `${task}/history`) return json(route, []);
+    if (path === `${task}/save` && request.method() === 'POST') {
+      state.taskSaves.push(request.postDataJSON());
+      state.published += 1;
+      return json(route, {
+        publication: `pub-${String(state.published)}`,
+        number: state.published,
+        grading_changed: true,
+        changes: [],
+        notes: [],
+        regraded: 0,
+      });
+    }
     if (path === `${task}/tree`) {
-      return json(route, [
-        { path: 'statement.md', kind: 'file', size: 30, upload: null },
-      ]);
+      const folder = new URL(request.url()).searchParams.get('path') ?? '';
+      const tree: Record<string, unknown[]> = {
+        '': [
+          { path: 'statement.md', kind: 'file', size: 30, upload: null },
+          { path: 'task.yaml', kind: 'file', size: 120, upload: null },
+          { path: 'tests', kind: 'directory', size: null, upload: null },
+        ],
+        tests: [{ path: 'tests/main', kind: 'directory', size: null, upload: null }],
+        'tests/main': [
+          { path: 'tests/main/1', kind: 'directory', size: null, upload: null },
+        ],
+        'tests/main/1': [
+          { path: 'tests/main/1/input', kind: 'file', size: 4, upload: null },
+          { path: 'tests/main/1/answer', kind: 'file', size: 2, upload: null },
+        ],
+      };
+      return json(route, tree[folder] ?? []);
+    }
+    if (path === `${task}/files/task.yaml`) {
+      return json(route, {
+        path: 'task.yaml',
+        encoding: 'utf-8',
+        content: state.taskYaml,
+        token: `token-task-${String(state.published)}`,
+        upload: null,
+      });
     }
     if (path === `${task}/files/statement.md`) {
       if (request.method() === 'PUT') {
@@ -282,4 +376,34 @@ test('an organiser opens a contest from its checklist', async ({ page }) => {
 
   await expect(status).toContainText('Live');
   expect(state.contestYaml).toContain('state: published');
+});
+
+test('an organiser sets a task up on its cards and saves them in one save', async ({
+  page,
+}) => {
+  const state = await stubOrganiserApi(page);
+  state.orgMade = true;
+  await page.goto('/orgs/acme/contests/spring/tasks/sum');
+
+  const inputs = page.getByRole('region', { name: 'Inputs' });
+  const limit = inputs
+    .getByRole('group', { name: 'Time limit (seconds)' })
+    .getByRole('textbox', { name: /^Time limit/ });
+  await expect(limit).toHaveValue('2');
+  await limit.fill('3');
+  const scoring = page.getByRole('region', { name: 'Tests and scoring' });
+  await expect(scoring.getByRole('group', { name: 'main' })).toContainText(
+    'main earns 100 times the share of its tests you passed.',
+  );
+
+  const bar = page.getByRole('region', { name: 'Save the task' });
+  await expect(bar.getByRole('list', { name: 'What changed' })).toContainText(
+    'Inputs: Time limit (seconds)',
+  );
+  await bar.getByRole('button', { name: 'Save' }).click();
+
+  await expect(page.getByText('Published as publication 2.')).toBeVisible();
+  const [saved] = state.taskSaves as { changes: { path: string; content: string }[] }[];
+  expect(saved?.changes.map((change) => change.path)).toEqual(['task.yaml']);
+  expect(saved?.changes[0]?.content).toContain('time_limit: 3');
 });

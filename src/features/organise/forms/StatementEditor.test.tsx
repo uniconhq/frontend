@@ -42,7 +42,12 @@ describe('the statement beside its preview', { timeout: 20_000 }, () => {
     statementBackend(() => HttpResponse.json({}), { size: 40, digest: 'c'.repeat(64) });
     renderApp('/orgs/acme/contests/spring/tasks/sum/statement');
 
-    const shown = await screen.findByRole('region', { name: 'Uploaded statement.md' });
+    // The statement is a card of the task's whole page, which takes its reads first.
+    const shown = await screen.findByRole(
+      'region',
+      { name: 'Uploaded statement.md' },
+      { timeout: 5000 },
+    );
     expect(within(shown).getByText('c'.repeat(64))).toBeVisible();
     expect(screen.queryByRole('textbox', { name: 'Statement source' })).toBeNull();
   });

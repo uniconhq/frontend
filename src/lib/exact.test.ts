@@ -1,5 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import { compareDecimal, formatExact, placesToTell, rounded } from './exact';
+import {
+  addRatio,
+  compareDecimal,
+  compareRatio,
+  divRatio,
+  formatExact,
+  formatRatio,
+  mulRatio,
+  placesToTell,
+  ratioDigits,
+  ratioOf,
+  rounded,
+  ZERO,
+} from './exact';
 
 describe('compareDecimal', () => {
   it('compares to the last digit, past what a float holds', () => {
@@ -78,5 +91,42 @@ describe('placesToTell', () => {
 
   it('passes over rows with no number and ties', () => {
     expect(placesToTell(['50.001', null, '50.001', '50.002'])).toBe(3);
+  });
+});
+
+describe('exact fractions', () => {
+  const r = (text: string) => ratioOf(text) ?? ZERO;
+
+  it('reads a decimal as the fraction it is, past what a float holds', () => {
+    expect(ratioOf('0.1')).toEqual({ num: 1n, den: 10n });
+    expect(ratioOf('2.50')).toEqual({ num: 5n, den: 2n });
+    expect(ratioOf('1e3')).toEqual({ num: 1000n, den: 1n });
+    expect(ratioOf('0.1000000000000000000001')).toEqual({
+      num: 1000000000000000000001n,
+      den: 10000000000000000000000n,
+    });
+    expect(ratioOf('thirty')).toBeNull();
+  });
+
+  it('adds, multiplies and divides exactly', () => {
+    expect(addRatio(r('0.1'), r('0.2'))).toEqual(r('0.3'));
+    expect(mulRatio(r('100'), divRatio(r('30'), r('120')))).toEqual(r('25'));
+    expect(compareRatio(divRatio(r('1'), r('3')), r('0.333'))).toBe(1);
+  });
+
+  it('writes a fraction as digits, saying when they are not exact', () => {
+    expect(ratioDigits(divRatio(r('100'), r('3')))).toEqual({
+      digits: '33.33',
+      exact: false,
+    });
+    expect(ratioDigits(r('82.5'))).toEqual({ digits: '82.5', exact: true });
+    expect(ratioDigits(divRatio(r('2'), r('3')), 0)).toEqual({
+      digits: '1',
+      exact: false,
+    });
+    expect(formatRatio(r('72'))).toBe('72');
+    expect(formatRatio(divRatio(r('200'), r('3')))).toBe(
+      `about ${formatExact('66.67')}`,
+    );
   });
 });

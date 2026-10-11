@@ -19,7 +19,7 @@ import type { Place } from '../files/place';
  * page, which holds its title. `tests` is the Tests and scoring card, which
  * also holds the submission rules.
  */
-export type TaskCard = 'workflow' | 'inputs' | 'tests' | 'statement' | 'settings';
+type TaskCard = 'workflow' | 'inputs' | 'tests' | 'statement' | 'settings';
 
 export type TaskPlace = {
   card: TaskCard;
@@ -32,7 +32,7 @@ export type TaskPlace = {
 };
 
 /** The card's own name, as the page heads it. */
-export const CARD_LABELS: Record<TaskCard, string> = {
+const CARD_LABELS: Record<TaskCard, string> = {
   workflow: 'Workflow',
   inputs: 'Inputs',
   tests: 'Tests and scoring',
@@ -183,7 +183,7 @@ export function taskPlace(
 }
 
 /** The address a card's place is opened by: the card on the task's page, or Settings. */
-export function taskPlaceHref(
+function taskPlaceHref(
   org: string,
   contest: string,
   task: string,

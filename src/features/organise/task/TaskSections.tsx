@@ -7,8 +7,9 @@ import { useTaskParams } from '@/lib/route-params';
 import { TASK_SECTIONS, sectionOf } from '@/lib/sections';
 import { formatDateTime } from '@/lib/time';
 import { FileBrowser } from '../files/FileBrowser';
-import { StatementEditor } from '../forms/StatementEditor';
-import { TaskSettings } from '../forms/TaskSettings';
+import { PageLink } from '@/ui/PageLink';
+import { taskPath } from '@/lib/organiser-paths';
+import { TitleForm } from './TitleForm';
 import { PeopleSection } from '../people/PeopleSection';
 import { holdsAt } from '../roles';
 import { SectionPage } from '../SectionPage';
@@ -22,30 +23,25 @@ function useTaskPlace() {
   return { place, admin: holdsAt(useMe().roles, place, 'admin') };
 }
 
-/** The statement, written beside how contestants see it; it saves on its own. */
-export function StatementPage() {
-  const { place, admin } = useTaskPlace();
-  return (
-    <SectionPage section={sectionOf(TASK_SECTIONS, 'statement')}>
-      <Card>
-        <StatementEditor place={place} admin={admin} />
-      </Card>
-    </SectionPage>
-  );
-}
-
 /**
- * The task's settings as a form: its name, its workflow, the inputs the
- * workflow declares, its scoring and its submission limits. Saving publishes
- * the task, read as the page opens, so the version it saves against is the
- * one the organiser started from.
+ * The task's title, the one setting not on its page. Its workflow, inputs,
+ * tests and scoring are set on the task's own page.
  */
 export function TaskSettingsPage() {
   const { place, admin } = useTaskPlace();
+  const { org, contest, task } = place;
   return (
-    <SectionPage section={sectionOf(TASK_SECTIONS, 'settings')}>
+    <SectionPage
+      section={sectionOf(TASK_SECTIONS, 'settings')}
+      intro={
+        <BodyText tone="secondary">
+          The workflow, inputs, tests and scoring are set on{' '}
+          <PageLink to={taskPath(org, contest, task)}>the task’s page</PageLink>.
+        </BodyText>
+      }
+    >
       <Card>
-        <TaskSettings place={place} admin={admin} />
+        <TitleForm place={place} admin={admin} />
       </Card>
     </SectionPage>
   );

@@ -11,13 +11,13 @@ import { contestPath, orgPath, taskPath } from './organiser-paths';
  *
  * `segment` is the section's part of the address under its level. `card`
  * says where its hub shows it: in the grid of cards, as the summary at the
- * top (a contest's settings), or among the cards that build a task.
+ * top (a contest’s settings).
  */
 export type Section<Key extends string = string> = {
   key: Key;
   label: string;
   segment: string;
-  card: 'grid' | 'summary' | 'build';
+  card: 'grid' | 'summary';
 };
 
 export const ORG_SECTIONS = [
@@ -54,12 +54,12 @@ export const CONTEST_SECTIONS = [
 ] as const satisfies readonly Section[];
 
 /**
- * A task's statement is built on its own page; its workflow, inputs and
- * scoring are one form today, its settings, which is last in the grid for
- * running the task, as the rest of the grid is.
+ * A task's sections for running it, each a page of its own. What builds the
+ * task (its workflow, inputs, tests and scoring, and statement) is on the
+ * task's own page, as the cards `TASK_BUILD_CARDS` lists; its Settings page
+ * holds its title and its settings as they are stored.
  */
 export const TASK_SECTIONS = [
-  { key: 'statement', label: 'Statement', segment: 'statement', card: 'build' },
   { key: 'gradings', label: 'Gradings', segment: 'gradings', card: 'grid' },
   {
     key: 'publications',
@@ -79,17 +79,27 @@ export const TASK_SECTIONS = [
 ] as const satisfies readonly Section[];
 
 /**
- * The cards that build a task, in the order one decides the next, each with
- * the section it opens: the workflow, its inputs, and the tests and their
- * scoring are each a part of the task's settings, the statement a section
- * of its own.
+ * The cards that build a task, on its own page, in the order one decides the
+ * next: the workflow, its inputs, the tests and their scoring, which share
+ * one save, and the statement, which saves on its own. Each key is the card's
+ * anchor, which the sidebar and a link to one of its fields open it by.
  */
 export const TASK_BUILD_CARDS = [
-  { key: 'workflow', label: 'Workflow', section: 'settings' },
-  { key: 'inputs', label: 'Inputs', section: 'settings' },
-  { key: 'tests', label: 'Tests and scoring', section: 'settings' },
-  { key: 'statement', label: 'Statement', section: 'statement' },
-] as const satisfies readonly { key: string; label: string; section: TaskSectionKey }[];
+  { key: 'workflow', label: 'Workflow' },
+  { key: 'inputs', label: 'Inputs' },
+  { key: 'tests', label: 'Tests and scoring' },
+  { key: 'statement', label: 'Statement' },
+] as const;
+
+/** A card on the task's page, opened by its address: `?card=tests`. */
+export function taskCardPath(
+  org: string,
+  contest: string,
+  task: string,
+  card: (typeof TASK_BUILD_CARDS)[number]['key'],
+): string {
+  return `${taskPath(org, contest, task)}?card=${card}`;
+}
 
 /** The contest as its contestants see it: its tasks, on its own page, and its boards. */
 export const CONTEST_VIEW_SECTIONS = [

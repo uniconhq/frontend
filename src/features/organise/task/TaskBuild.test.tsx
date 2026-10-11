@@ -3,16 +3,26 @@ import { fireEvent, screen, within } from '@testing-library/react';
 import userEvent from '@/test/user-event';
 import { http, HttpResponse } from 'msw';
 import { parse } from 'yaml';
-import type { DeclaredInput, FileContent, TreeEntry, WorkflowForm } from '@/api/types';
+import type {
+  DeclaredInput,
+  FileContent,
+  SaveRequest,
+  TreeEntry,
+  WorkflowForm,
+  WorkflowItem,
+} from '@/api/types';
+import { formatExact } from '@/lib/exact';
 import { renderApp } from '@/test/render';
 import { problem, server, signedIn, someone } from '@/test/server';
 import {
   TASK_API,
+  CONTEST_API,
   draftTask,
   publicationList,
   repoFiles,
   taskState,
 } from '@/test/organiser';
+import { makeZip } from '@/test/zip';
 
 const TASK = `name: Shortest Path   # the title
 workflow: unicon/checked@v1
@@ -32,14 +42,39 @@ submissions:
   rate: {count: 1, per: 30}
 `;
 
-const TESTS: TreeEntry[] = ['samples', 'small', 'large'].map((group) => ({
-  path: `tests/${group}`,
-  kind: 'directory',
-  size: null,
-  upload: null,
-}));
+/** The folders under `tests/`: a group each, a test each under it. */
+const FOLDERS: Record<string, string[]> = {
+  samples: ['1', '2'],
+  small: ['1', '2', '3'],
+  large: ['1'],
+};
 
-/** A workflow form whose workflow cannot be read, so the form edits the entries there are. */
+function folder(path: string): TreeEntry {
+  return { path, kind: 'directory', size: null, upload: null };
+}
+
+function file(path: string, size = 4): TreeEntry {
+  return { path, kind: 'file', size, upload: null };
+}
+
+/** The tree of the task's tests as `GET <task>/tree?path=` answers it, folder by folder. */
+function testsTree(groups: Record<string, string[]>): Record<string, TreeEntry[]> {
+  const tree: Record<string, TreeEntry[]> = {
+    tests: Object.keys(groups).map((group) => folder(`tests/${group}`)),
+  };
+  for (const [group, tests] of Object.entries(groups)) {
+    tree[`tests/${group}`] = tests.map((test) => folder(`tests/${group}/${test}`));
+    for (const test of tests) {
+      tree[`tests/${group}/${test}`] = [
+        file(`tests/${group}/${test}/input`),
+        file(`tests/${group}/${test}/answer`, 2),
+      ];
+    }
+  }
+  return tree;
+}
+
+/** A workflow form whose workflow cannot be read, so the cards edit the entries there are. */
 const UNREAD: WorkflowForm = {
   workflow: 'unicon/checked@v1',
   inputs: [],
@@ -68,7 +103,7 @@ function declared(
   };
 }
 
-/** What unicon/checked@v1 declares, as the form reads it. */
+/** What unicon/checked@v1 declares, as the backend reads it. */
 const CHECKED: WorkflowForm = {
   workflow: 'unicon/checked@v1',
   problem: null,
@@ -81,7 +116,11 @@ const CHECKED: WorkflowForm = {
       options: ['cpp', 'python', 'java'],
     }),
     declared('checker', 'file'),
-    declared('time_limit', 'number'),
+    declared('time_limit', 'number', {
+      title: 'Time limit',
+      unit: 'seconds',
+      help: 'The CPU time the program may use on each test.',
+    }),
     declared('memory_limit', 'number', { optional: true }),
     declared('strict', 'boolean'),
     declared('greeting', 'text', { optional: true }),
@@ -93,50 +132,146 @@ const CHECKED: WorkflowForm = {
   ],
 };
 
+/** unicon/checked's file, which reports a fraction a test may earn. */
+const CHECKED_YAML = `inputs:
+  submission: {type: file, contestant: true}
+  language: {type: enum, options: [cpp, python, java], contestant: true}
+  checker: file
+  time_limit: {type: number, title: Time limit, unit: seconds}
+  memory_limit: {type: number, optional: true}
+  strict: boolean
+  greeting: {type: text, optional: true}
+  token: text
+test:
+  input: file
+  answer: file
+steps: []
+report:
+  fraction: {from: "\${{ steps.check.fraction }}", fold: mean, better: higher, at_least: 0, at_most: 1}
+  time_ms: {from: "\${{ steps.run.time_ms }}", fold: max, better: lower, at_least: 0}
+`;
+
+/** A workflow that takes the time limit from the entrant. */
+const TUNABLE_YAML = CHECKED_YAML.replace(
+  'time_limit: {type: number, title: Time limit, unit: seconds}',
+  'time_limit: {type: number, contestant: true, title: Time limit, unit: seconds}',
+);
+
+const WORKFLOWS: WorkflowItem[] = [
+  {
+    owner: 'unicon',
+    name: 'checked',
+    versions: ['v1', 'v3'],
+    editable: false,
+    visibility: 'public',
+  },
+  {
+    owner: 'my-org',
+    name: 'tunable',
+    versions: ['v1'],
+    editable: true,
+    visibility: 'private',
+  },
+];
+
+const PUBLISHED = {
+  number: 4,
+  grading_changed: true,
+  changes: [],
+  notes: [],
+  regraded: 0,
+};
+
 /**
- * The sum task with `task.yaml` as above and three folders under `tests/`,
- * its workflow declaring what `form` says. With `conflictWith`, the first
- * write is refused as a conflict and the file becomes that text, as if
- * someone else had saved it.
+ * The sum task with its settings as above, its tests as `groups` says, and
+ * its workflow declaring what `form` says. Each save is kept in `sent`; with
+ * `conflictWith`, the first is refused as a conflict and the settings become
+ * that text, as if someone else had saved them.
  */
 function taskBackend(
-  answer: () => Response,
-  conflictWith?: string,
-  form: WorkflowForm = UNREAD,
+  options: {
+    answer?: () => Response;
+    conflictWith?: string;
+    form?: WorkflowForm;
+    groups?: Record<string, string[]>;
+    contest?: string;
+  } = {},
 ) {
-  let file: FileContent = {
+  const { answer = () => HttpResponse.json(PUBLISHED), form = UNREAD } = options;
+  const tree = testsTree(options.groups ?? FOLDERS);
+  let settings: FileContent = {
     path: 'task.yaml',
     encoding: 'utf-8',
     content: TASK,
     token: 'token-task',
     upload: null,
   };
-  const sent: { content: string; token: string }[] = [];
+  const sent: SaveRequest[] = [];
   server.use(
     signedIn,
     taskState,
     publicationList,
-    http.get(`${TASK_API}/tree`, ({ request }) =>
-      new URL(request.url).searchParams.get('path') === 'tests'
-        ? HttpResponse.json(TESTS)
-        : undefined,
-    ),
-    http.get(`${TASK_API}/files/:path`, ({ params }) =>
-      params['path'] === 'task.yaml' ? HttpResponse.json(file) : undefined,
-    ),
+    http.get(`${TASK_API}/tree`, ({ request }) => {
+      const at = new URL(request.url).searchParams.get('path') ?? '';
+      return at.startsWith('tests') ? HttpResponse.json(tree[at] ?? []) : undefined;
+    }),
+    http.get(`${TASK_API}/files/:path`, ({ params }) => {
+      const path = decodeURIComponent(String(params['path']));
+      if (path === 'task.yaml') return HttpResponse.json(settings);
+      if (path.startsWith('tests/')) {
+        return HttpResponse.json({
+          path,
+          encoding: 'utf-8',
+          content: '1 2\n',
+          token: `token-${path}`,
+          upload: null,
+        });
+      }
+      return undefined;
+    }),
     http.get(`${TASK_API}/workflow-form`, () => HttpResponse.json(form)),
-    http.put(`${TASK_API}/files/:path`, async ({ request }) => {
-      const body = (await request.json()) as { content: string; token: string };
+    http.get('/api/v1/workflows', () => HttpResponse.json(WORKFLOWS)),
+    http.get('/api/v1/workflows/:owner/:name/versions/:version', ({ params }) =>
+      HttpResponse.json({
+        content: params['name'] === 'tunable' ? TUNABLE_YAML : CHECKED_YAML,
+      }),
+    ),
+    http.post(`${TASK_API}/save`, async ({ request }) => {
+      const body = (await request.json()) as SaveRequest;
       sent.push(body);
-      if (conflictWith !== undefined && sent.length === 1) {
-        file = { ...file, content: conflictWith, token: 'token-theirs' };
+      if (options.conflictWith !== undefined && sent.length === 1) {
+        settings = {
+          ...settings,
+          content: options.conflictWith,
+          token: 'token-theirs',
+        };
         return problem(409, 'conflict');
       }
-      file = { ...file, content: body.content, token: `token-${String(sent.length)}` };
+      const yaml = body.changes.find((change) => change.path === 'task.yaml');
+      if (yaml?.content != null) {
+        settings = {
+          ...settings,
+          content: yaml.content,
+          token: `token-${String(sent.length)}`,
+        };
+      }
       return answer();
     }),
     ...repoFiles,
   );
+  if (options.contest !== undefined) {
+    server.use(
+      http.get(`${CONTEST_API}/files/:path`, () =>
+        HttpResponse.json({
+          path: 'contest.yaml',
+          encoding: 'utf-8',
+          content: options.contest,
+          token: 'token-contest',
+          upload: null,
+        }),
+      ),
+    );
+  }
   return { sent };
 }
 
@@ -157,542 +292,574 @@ function fill(field: HTMLElement, value: string) {
   fireEvent.change(field, { target: { value } });
 }
 
-/**
- * A field inside one box of the form, an input or a test group, found by the
- * box's title: a field is named for what it is, and its box says whose it is.
- */
-function fieldIn(form: HTMLElement, box: string | RegExp, name: string): HTMLElement {
-  return within(within(form).getByRole('group', { name: box })).getByLabelText(name);
+/** A field inside one box of a card, found by the box's name. */
+function fieldIn(
+  scope: HTMLElement,
+  box: string | RegExp,
+  name: string | RegExp,
+): HTMLElement {
+  return within(within(scope).getByRole('group', { name: box })).getByLabelText(name);
 }
 
-async function openForm() {
-  renderApp('/orgs/acme/contests/spring/tasks/sum/settings');
-  return screen.findByRole('form', { name: 'Task settings' });
+/** The settings a save wrote, as values. */
+function written(body: SaveRequest | undefined): Record<string, unknown> {
+  const yaml = body?.changes.find((change) => change.path === 'task.yaml');
+  return parse(yaml?.content ?? '') as Record<string, unknown>;
+}
+
+async function openTask() {
+  renderApp('/orgs/acme/contests/spring/tasks/sum');
+  const inputs = await screen.findByRole('region', { name: 'Inputs' });
+  const tests = screen.getByRole('region', { name: 'Tests and scoring' });
+  const workflow = screen.getByRole('region', { name: 'Workflow' });
+  return { inputs, tests, workflow };
+}
+
+async function save() {
+  const bar = await screen.findByRole('region', { name: 'Save the task' });
+  await userEvent.click(within(bar).getByRole('button', { name: 'Save' }));
+  return bar;
 }
 
 /**
- * Each test drives a whole task page with a form of many fields, and a query
- * after each change reads all of it again, which takes jsdom far longer than
- * a browser, more so with the rest of the suite running beside it.
+ * Each test drives the whole task page, its cards built from many reads,
+ * which takes jsdom far longer than a browser, more so with the rest of the
+ * suite running beside it.
  */
-describe('the task settings form', { timeout: 20_000 }, () => {
-  it("lets a manager edit every manager key and shows the admin's read-only", async () => {
-    const { sent } = taskBackend(() =>
-      HttpResponse.json({
-        number: 4,
-        grading_changed: true,
-        changes: ['the plan'],
-        notes: [],
-        regraded: 0,
-      }),
-    );
+describe('the cards that build a task', { timeout: 30_000 }, () => {
+  it('builds the inputs from the workflow, each by its title, and saves what changed in one save', async () => {
+    const { sent } = taskBackend({ form: CHECKED });
     asManager();
-    const form = await openForm();
-    const field = (name: string) => within(form).getByLabelText(name);
+    const { inputs, tests } = await openTask();
 
-    for (const name of ['Name', 'At most', 'Rate: count', 'Rate: per seconds']) {
-      expect(field(name)).toBeDisabled();
-    }
-    expect(
-      within(form).getByText(/A folder under tests\/ with no entry in task.yaml yet/),
-    ).toBeVisible();
-
-    // Every field there is from the start is found before the first change,
-    // since a query after each change re-reads the whole page.
-    const [
-      workflow,
-      label,
-      options,
-      checker,
-      limit,
-      newId,
-      credit,
-      passAt,
-      each,
-      show,
-    ] = [
-      field('Workflow'),
-      fieldIn(form, /^submission:/, 'Label'),
-      fieldIn(form, /^language:/, 'Options'),
-      fieldIn(form, /^checker:/, 'Value'),
-      fieldIn(form, /^time_limit:/, 'Value'),
-      field("New input's id"),
-      field('An accepted test earns'),
-      fieldIn(form, 'small', 'Pass at'),
-      fieldIn(form, 'large', 'Each'),
-      fieldIn(form, 'large', 'Show'),
-    ];
-    const [removeToken, removeOld, addValue, addDetails, addWeight, save] = [
-      'Remove token',
-      'Remove old',
-      'Add with a value',
-      "Add the contestant's",
-      'Add a test weight to small',
-      'Save settings',
-    ].map((name) => within(form).getByRole('button', { name, hidden: true }));
-    fill(workflow, 'unicon/checked@v2');
-    fill(label, 'Your program');
-    fill(options, 'cpp, python, java');
-    fill(checker, 'checker/new.cpp');
-    fill(limit, '3');
-    fill(passAt, '0.8');
-    fill(each, '70');
-    fill(show, 'after_close');
-    fill(credit, 'relative');
-    fireEvent.click(removeToken!);
-    fireEvent.click(removeOld!);
-    fill(newId, 'memory_limit');
-    fireEvent.click(addValue!);
-    fill(newId, 'notes');
-    fireEvent.click(addDetails!);
-    fireEvent.click(addWeight!);
-    const weightRow = within(
-      within(within(form).getByRole('group', { name: 'small' })).getByRole('group', {
-        name: 'Test weight 1',
-      }),
-    );
-    const [memory, notes, valueName, test, weight] = [
-      fieldIn(form, /^memory_limit:/, 'Value'),
-      fieldIn(form, /^notes:/, 'Label'),
-      field('Value name'),
-      weightRow.getByLabelText('Test'),
-      weightRow.getByLabelText('Weight'),
-    ];
-    fill(memory, '256');
-    fill(notes, 'Notes');
-    fill(valueName, 'score');
-    fill(test, '7');
-    fill(weight, '3');
-    fireEvent.click(save!);
-
-    expect(await screen.findByText('Published as publication 4.')).toBeVisible();
-    expect(sent[0]?.token).toBe('token-task');
-    expect(parse(sent[0]?.content ?? '')).toEqual({
-      name: 'Shortest Path',
-      workflow: 'unicon/checked@v2',
-      inputs: {
-        submission: { label: 'Your program', max_size: '1MB' },
-        language: { options: ['cpp', 'python', 'java'], default: 'cpp' },
-        checker: 'checker/new.cpp',
-        time_limit: 3,
-        memory_limit: 256,
-        notes: { label: 'Notes' },
-      },
-      credit: { relative: 'score' },
-      test_groups: {
-        samples: {},
-        small: { pass: 30, show: 'verdict', pass_at: 0.8, test_weights: { '7': 3 } },
-        large: { each: 70, show: 'after_close' },
-      },
-      submissions: { max: 50, rate: { count: 1, per: 30 } },
+    expect(within(tests).getByLabelText('Most submissions')).toBeDisabled();
+    const entrants = within(inputs).getByRole('region', {
+      name: 'What entrants submit',
     });
-    // A line the save did not change stays as the file wrote it.
-    expect(sent[0]?.content).toContain('name: Shortest Path   # the title');
-    expect(sent[0]?.content).toContain('samples: {}');
-  });
-
-  it('says a newer version of the workflow exists and names it only when asked', async () => {
-    const { sent } = taskBackend(
-      () =>
-        HttpResponse.json({
-          number: 4,
-          grading_changed: true,
-          changes: [],
-          notes: [],
-          regraded: 0,
-        }),
-      undefined,
-      { ...CHECKED, newer: 'v3' },
-    );
-    asManager();
-    const form = await openForm();
-
-    const notice = await within(form).findByRole('status');
-    expect(notice).toHaveTextContent(
-      'unicon/checked has a newer version, v3. This task grades with unicon/checked@v1 until unicon/checked@v3 is named here and the task is saved.',
-    );
-    expect(sent).toEqual([]);
-    await userEvent.click(
-      within(notice).getByRole('button', { name: 'Name unicon/checked@v3' }),
-    );
-
-    expect(within(form).getByLabelText('Workflow')).toHaveValue('unicon/checked@v3');
-    expect(sent).toEqual([]);
-  });
-
-  it("lets an admin change the admin's keys, and shows a draft's errors", async () => {
-    const { sent } = taskBackend(() =>
-      HttpResponse.json({ version: '5e6f', errors: draftTask.errors, held_back: [] }),
-    );
-    const form = await openForm();
-    const field = (name: string) => within(form).getByLabelText(name);
-
-    fill(field('Name'), 'Shortest Paths');
-    fill(field('At most'), '20');
-    fill(field('Rate: count'), '2');
-    fill(field('Rate: per seconds'), '60');
-    await userEvent.click(within(form).getByRole('button', { name: 'Save settings' }));
-
-    const outcome = (await screen.findByText(/Saved as a draft/))
-      .parentElement as HTMLElement;
-    expect(within(outcome).getByRole('list', { name: 'Errors' })).toHaveTextContent(
-      'Inputs: setter: There is no file under data/hidden/ in the task.',
-    );
-    const saved = parse(sent[0]?.content ?? '') as Record<string, unknown>;
-    expect(saved['name']).toBe('Shortest Paths');
-    expect(saved['submissions']).toEqual({ max: 20, rate: { count: 2, per: 60 } });
-  });
-
-  it("builds the inputs from the workflow's declarations and writes each as its type", async () => {
-    const { sent } = taskBackend(
-      () =>
-        HttpResponse.json({
-          number: 4,
-          grading_changed: false,
-          changes: [],
-          notes: [],
-          regraded: 0,
-        }),
-      undefined,
-      CHECKED,
-    );
-    asManager();
-    const form = await openForm();
-    const inputs = within(form).getByRole('list', { name: 'Inputs' });
-
-    expect(within(form).queryByLabelText("New input's id")).toBeNull();
+    const limits = within(inputs).getByRole('region', { name: 'Limits and settings' });
+    expect(fieldIn(limits, 'Time limit (seconds)', /^Time limit/)).toHaveValue('2');
     expect(
-      within(form).queryByRole('button', { name: /Make .* the contestant's/ }),
-    ).toBeNull();
-    expect(
-      within(form).getByText('Each test holds: input (file), answer (file).'),
+      within(limits).getByRole('button', { name: 'About Time limit (seconds)' }),
     ).toBeVisible();
-    expect(fieldIn(inputs, /^submission:/, 'Largest size')).toBeVisible();
-    expect(
-      within(
-        within(inputs).getByRole('group', { name: /^submission:/ }),
-      ).queryByLabelText('Default'),
-    ).toBeNull();
-    expect(
-      within(
-        within(inputs).getByRole('group', { name: /^time_limit:/ }),
-      ).queryByLabelText('Minimum'),
-    ).toBeNull();
-    expect(
-      within(inputs).getByText(/the save refuses the task until it has a value/),
-    ).toBeVisible();
+    expect(within(entrants).queryByLabelText(/Time limit/)).toBeNull();
 
-    const options = within(
-      within(inputs).getByRole('group', { name: /^language:/ }),
-    ).getByRole('group', { name: 'Options' });
-    expect(within(options).getByRole('checkbox', { name: 'cpp' })).toBeChecked();
-    expect(within(options).getByRole('checkbox', { name: 'java' })).not.toBeChecked();
-    fireEvent.click(within(options).getByRole('checkbox', { name: 'java' }));
-    fill(fieldIn(inputs, /^time_limit:/, 'Value'), '3');
+    fill(fieldIn(entrants, 'submission', 'Label shown to entrants'), 'Your program');
     fireEvent.click(
-      within(inputs).getByRole('button', { name: 'Give memory_limit a value' }),
-    );
-    fireEvent.click(
-      within(inputs).getByRole('button', { name: 'Give strict a value' }),
-    );
-    fireEvent.click(
-      within(inputs).getByRole('button', { name: 'Give greeting a value' }),
-    );
-    fill(fieldIn(inputs, /^memory_limit:/, 'Value'), '256');
-    fill(fieldIn(inputs, /^strict:/, 'Value'), 'true');
-    fill(fieldIn(inputs, /^greeting:/, 'Value'), '42');
-    expect(
-      within(within(inputs).getByRole('group', { name: /^token:/ })).getByRole(
+      within(within(entrants).getByRole('group', { name: 'language' })).getByRole(
         'checkbox',
         {
-          name: 'A secret of the org',
+          name: 'java',
+        },
+      ),
+    );
+    fill(fieldIn(limits, 'checker', 'checker'), 'checker/new.cpp');
+    fill(fieldIn(limits, 'Time limit (seconds)', /^Time limit/), '3');
+    fill(fieldIn(limits, 'memory_limit', 'memory_limit'), '256');
+    fill(fieldIn(limits, 'strict', 'strict'), 'true');
+    fill(fieldIn(limits, 'greeting', 'greeting'), '42');
+    expect(
+      within(within(limits).getByRole('group', { name: 'token' })).getByRole(
+        'checkbox',
+        {
+          name: 'Use one of the org’s secrets',
         },
       ),
     ).toBeChecked();
-    fireEvent.click(within(form).getByRole('button', { name: 'Save settings' }));
+
+    const bar = await screen.findByRole('region', { name: 'Save the task' });
+    expect(within(bar).getByRole('list', { name: 'What changed' })).toHaveTextContent(
+      'Inputs: Time limit (seconds)',
+    );
+    await save();
 
     expect(await screen.findByText('Published as publication 4.')).toBeVisible();
-    const saved = parse(sent[0]?.content ?? '') as { inputs: Record<string, unknown> };
-    expect(saved.inputs).toEqual({
-      submission: { label: 'Your solution', max_size: '1MB' },
+    expect(sent).toHaveLength(1);
+    expect(sent[0]?.changes.find((change) => change.path === 'task.yaml')?.token).toBe(
+      'token-task',
+    );
+    expect(written(sent[0])['inputs']).toEqual({
+      submission: { label: 'Your program', max_size: '1MB' },
       language: { options: ['cpp', 'python', 'java'], default: 'cpp' },
-      checker: 'checker/checker.cpp',
+      checker: 'checker/new.cpp',
       time_limit: 3,
       token: { secret: 'judge-token' },
       memory_limit: 256,
       strict: true,
       greeting: '42',
     });
+    const content = sent[0]?.changes.find(
+      (change) => change.path === 'task.yaml',
+    )?.content;
+    expect(content).toContain('name: Shortest Path   # the title');
   });
 
-  it('leaves out a contestant input, and offers to remove one the workflow does not declare', async () => {
-    const { sent } = taskBackend(
-      () =>
-        HttpResponse.json({
-          number: 4,
-          grading_changed: false,
-          changes: [],
-          notes: [],
-          regraded: 0,
-        }),
-      undefined,
-      { ...CHECKED, inputs: CHECKED.inputs.filter((input) => input.id !== 'token') },
-    );
+  it('says a newer version of the workflow is out and takes it only when asked', async () => {
+    const { sent } = taskBackend({ form: { ...CHECKED, newer: 'v3' } });
     asManager();
-    const form = await openForm();
-    const inputs = within(form).getByRole('list', { name: 'Inputs' });
+    const { workflow } = await openTask();
 
-    expect(within(inputs).getByText(/declares no input with this id/)).toBeVisible();
-    expect(
-      within(inputs).queryByRole('button', { name: 'Leave checker out' }),
-    ).toBeNull();
-    fireEvent.click(within(inputs).getByRole('button', { name: 'Remove token' }));
-    fireEvent.click(
-      within(inputs).getByRole('button', { name: 'Leave submission out' }),
+    const notice = within(workflow).getByRole('status', { name: 'A newer version' });
+    expect(notice).toHaveTextContent('v3 available');
+    expect(notice).toHaveTextContent(
+      'The task grades with unicon/checked@v1 until unicon/checked@v3 is chosen and saved.',
     );
     expect(
-      within(inputs).getByRole('button', { name: 'Give submission form details' }),
+      within(workflow).getByRole('link', { name: 'Open unicon/checked@v1' }),
     ).toBeVisible();
-    fireEvent.click(within(form).getByRole('button', { name: 'Save settings' }));
+    await userEvent.click(within(notice).getByRole('button', { name: 'Use v3' }));
 
-    expect(await screen.findByText('Published as publication 4.')).toBeVisible();
-    const saved = parse(sent[0]?.content ?? '') as { inputs: Record<string, unknown> };
-    expect(Object.keys(saved.inputs)).toEqual(['language', 'checker', 'time_limit']);
+    expect(within(workflow).getByLabelText('Version')).toHaveValue('v3');
+    expect(sent).toEqual([]);
+    await save();
+    expect(written(await waitForSave(sent))['workflow']).toBe('unicon/checked@v3');
   });
 
-  it('writes an input the file holds the other way as the workflow declares it', async () => {
-    const { sent } = taskBackend(
-      () =>
-        HttpResponse.json({
-          number: 4,
-          grading_changed: false,
-          changes: [],
-          notes: [],
-          regraded: 0,
-        }),
-      undefined,
-      {
-        ...CHECKED,
-        inputs: CHECKED.inputs.map((input) =>
-          input.id === 'time_limit' ? { ...input, contestant: true } : input,
-        ),
-      },
-    );
+  it('shows the inputs of another workflow as soon as it is chosen, and drops those it does not have', async () => {
+    const { sent } = taskBackend({ form: CHECKED });
     asManager();
-    const form = await openForm();
+    const { inputs, workflow } = await openTask();
 
+    fill(await within(workflow).findByLabelText(/^Workflow/), 'my-org/tunable');
+    const entrants = await within(inputs).findByRole('region', {
+      name: 'What entrants submit',
+    });
     expect(
-      within(form).getByText(
-        /task.yaml gives it a value, but the contestant gives this one/,
-      ),
-    ).toBeVisible();
-    const save = within(form).getByRole('button', { name: 'Save settings' });
-    expect(save).toBeEnabled();
-    fill(fieldIn(form, /^time_limit:/, 'Maximum'), '10');
-    fireEvent.click(save);
-
-    expect(await screen.findByText('Published as publication 4.')).toBeVisible();
-    const saved = parse(sent[0]?.content ?? '') as { inputs: Record<string, unknown> };
-    expect(saved.inputs['time_limit']).toEqual({ max: 10 });
-  });
-
-  it('builds the form after a save from the workflow the save named', async () => {
-    const published = () =>
-      HttpResponse.json({
-        number: 4,
-        grading_changed: true,
-        changes: [],
-        notes: [],
-        regraded: 0,
-      });
-    const { sent } = taskBackend(published, undefined, CHECKED);
-    // The new workflow takes the time limit from the contestant.
-    const tunable: WorkflowForm = {
-      ...CHECKED,
-      workflow: 'my-org/tunable@v1',
-      inputs: CHECKED.inputs.map((input) =>
-        input.id === 'time_limit' ? { ...input, contestant: true } : input,
-      ),
-    };
-    server.use(
-      http.get(`${TASK_API}/workflow-form`, () =>
-        HttpResponse.json(sent.length === 0 ? CHECKED : tunable),
-      ),
-    );
-    asManager();
-    const form = await openForm();
-    expect(fieldIn(form, /^time_limit:/, 'Value')).toBeVisible();
-
-    fill(within(form).getByLabelText('Workflow'), 'my-org/tunable@v1');
-    fireEvent.click(within(form).getByRole('button', { name: 'Save settings' }));
-    expect(await screen.findByText('Published as publication 4.')).toBeVisible();
-
-    const after = await screen.findByRole('form', { name: 'Task settings' });
-    expect(
-      await within(after).findByText(
-        /task.yaml gives it a value, but the contestant gives this one/,
-      ),
+      await within(entrants).findByRole('group', { name: 'Time limit (seconds)' }),
     ).toBeVisible();
     expect(
       within(
-        within(after).getByRole('group', { name: /^time_limit:/ }),
-      ).queryByLabelText('Value'),
-    ).toBeNull();
-    expect(fieldIn(after, /^time_limit:/, 'Maximum')).toBeVisible();
+        within(entrants).getByRole('group', { name: 'Time limit (seconds)' }),
+      ).getByText(/The settings give this a value, but entrants give it/),
+    ).toBeVisible();
+    fill(fieldIn(entrants, 'Time limit (seconds)', 'Largest allowed'), '10');
+    await save();
+
+    const saved = written(await waitForSave(sent));
+    expect(saved['workflow']).toBe('my-org/tunable@v1');
+    expect((saved['inputs'] as Record<string, unknown>)['time_limit']).toEqual({
+      max: 10,
+    });
   });
 
-  it("removes a declared input's key when its value is cleared", async () => {
-    const { sent } = taskBackend(
-      () =>
-        HttpResponse.json({
-          number: 4,
-          grading_changed: true,
-          changes: [],
-          notes: [],
-          regraded: 0,
-        }),
-      undefined,
-      CHECKED,
-    );
+  it('removes an input’s key when its value is cleared, and one the workflow does not have', async () => {
+    const { sent } = taskBackend({
+      form: {
+        ...CHECKED,
+        inputs: CHECKED.inputs.filter((input) => input.id !== 'token'),
+      },
+    });
     asManager();
-    const form = await openForm();
+    const { inputs } = await openTask();
 
-    fill(fieldIn(form, /^time_limit:/, 'Value'), '');
-    fireEvent.click(within(form).getByRole('button', { name: 'Save settings' }));
+    fill(fieldIn(inputs, 'Time limit (seconds)', /^Time limit/), '');
+    const unused = within(inputs).getByRole('region', {
+      name: 'Not used by this workflow',
+    });
+    await userEvent.click(within(unused).getByRole('button', { name: 'Remove token' }));
+    fill(fieldIn(inputs, 'submission', 'Label shown to entrants'), '');
+    fill(fieldIn(inputs, 'submission', 'Maximum size'), '');
+    await save();
 
-    expect(await screen.findByText('Published as publication 4.')).toBeVisible();
-    const saved = parse(sent[0]?.content ?? '') as { inputs: Record<string, unknown> };
-    expect(saved.inputs).not.toHaveProperty('time_limit');
+    const saved = written(await waitForSave(sent)) as {
+      inputs: Record<string, unknown>;
+    };
+    expect(Object.keys(saved.inputs)).toEqual(['language', 'checker']);
   });
 
-  it("says why the workflow's inputs could not be read, and edits the entries there are", async () => {
-    taskBackend(() => HttpResponse.json({}));
-    const form = await openForm();
+  it('edits the inputs the settings hold when the workflow cannot be read', async () => {
+    taskBackend();
+    const { inputs } = await openTask();
 
     expect(
-      within(form).getByText(/The workflow unicon\/checked@v1 cannot be read\./),
+      within(inputs).getByText(/The workflow unicon\/checked@v1 cannot be read\./),
     ).toBeVisible();
-    expect(within(form).getByLabelText("New input's id")).toBeVisible();
+    expect(
+      within(inputs).getByLabelText('Another input, by its name in the workflow'),
+    ).toBeVisible();
   });
 
-  it('shows a task.yaml that is an upload by its size and digest, not as a form', async () => {
-    taskBackend(() => HttpResponse.json({}));
+  it('shows settings that are an upload by their size and digest, not as cards', async () => {
+    taskBackend();
     server.use(
       http.get(`${TASK_API}/files/:path`, ({ params }) =>
         params['path'] === 'task.yaml'
           ? HttpResponse.json({
               path: 'task.yaml',
               encoding: 'utf-8',
-              content: `version https://git-lfs.github.com/spec/v1
-oid sha256:${'d'.repeat(64)}
-size 120
-`,
+              content: `version https://git-lfs.github.com/spec/v1\noid sha256:${'d'.repeat(64)}\nsize 120\n`,
               token: 'token-task',
               upload: { size: 120, digest: 'd'.repeat(64) },
             })
           : undefined,
       ),
     );
-    renderApp('/orgs/acme/contests/spring/tasks/sum/settings');
+    renderApp('/orgs/acme/contests/spring/tasks/sum');
 
     const [shown] = await screen.findAllByRole('region', {
       name: 'Uploaded task.yaml',
     });
     expect(within(shown!).getByText('d'.repeat(64))).toBeVisible();
-    expect(screen.queryByRole('form', { name: 'Task settings' })).toBeNull();
+    expect(screen.queryByRole('region', { name: 'Inputs' })).toBeNull();
   });
 
-  it('requires the show of a group the save adds once the task is graded, and of no other', async () => {
-    const { sent } = taskBackend(
-      () =>
-        HttpResponse.json({
-          number: 4,
-          grading_changed: true,
-          changes: [],
-          notes: [],
-          regraded: 0,
-        }),
-      undefined,
-      { ...UNREAD, graded: true },
-    );
-    const form = await openForm();
-    const show = (group: string) =>
-      within(within(form).getByRole('group', { name: group })).getByRole('combobox', {
-        name: /^Show/,
-      });
-    const [added, kept, empty] = [show('large'), show('small'), show('samples')];
-    expect(added).toBeRequired();
-    expect(added).toHaveAccessibleDescription(
-      'Required: the task has graded submissions, so a group the save adds must say what it shows.',
-    );
-    expect(kept).not.toBeRequired();
-    expect(empty).not.toBeRequired();
-    expect(
-      within(empty).getByRole('option', { name: 'Not set (always)' }),
-    ).toBeVisible();
+  it('lets an admin change the submission rules, and names a draft’s problems where they are fixed', async () => {
+    const { sent } = taskBackend({
+      answer: () =>
+        HttpResponse.json({ version: '5e6f', errors: draftTask.errors, held_back: [] }),
+    });
+    const { tests } = await openTask();
 
-    fill(fieldIn(form, 'small', 'Pass at'), '0.5');
-    const save = within(form).getByRole('button', { name: 'Save settings' });
-    expect(save).toBeDisabled();
-    fill(added, 'verdict');
-    expect(save).toBeEnabled();
-    fireEvent.click(save);
+    fill(within(tests).getByLabelText('Most submissions'), '20');
+    fill(within(tests).getByLabelText('Submissions in a window'), '2');
+    fill(within(tests).getByLabelText('Length of the window (seconds)'), '60');
+    await save();
 
-    expect(await screen.findByText('Published as publication 4.')).toBeVisible();
-    const written = parse(sent[0]?.content ?? '') as { test_groups: object };
-    expect(written.test_groups).toEqual({
+    const outcome = (await screen.findByText(/Saved as a draft/))
+      .parentElement as HTMLElement;
+    expect(within(outcome).getByRole('list', { name: 'Errors' })).toHaveTextContent(
+      'Inputs: setter: There is no file under data/hidden/ in the task.',
+    );
+    expect(written(sent[0])['submissions']).toEqual({
+      max: 20,
+      rate: { count: 2, per: 60 },
+    });
+  });
+
+  it('asks when entrants see a group added once the task is graded, and of no other', async () => {
+    const { sent } = taskBackend({ form: { ...UNREAD, graded: true } });
+    const { tests } = await openTask();
+    const show = (group: string) => fieldIn(tests, group, /^When entrants see results/);
+
+    expect(show('large')).toBeRequired();
+    expect(show('small')).not.toBeRequired();
+    const bar = await screen.findByRole('region', { name: 'Save the task' });
+    expect(within(bar).getByRole('button', { name: 'Save' })).toBeDisabled();
+    expect(bar).toHaveTextContent('Choose when entrants see large’s results.');
+    fill(show('large'), 'verdict');
+    expect(within(bar).getByRole('button', { name: 'Save' })).toBeEnabled();
+    await save();
+
+    expect(written(await waitForSave(sent))['test_groups']).toEqual({
       samples: {},
-      small: { pass: 30, show: 'verdict', pass_at: 0.5 },
+      small: { pass: 30, show: 'verdict' },
       old: { each: 5 },
       large: { show: 'verdict' },
     });
   });
 
-  it('will not save a number field that holds no number', async () => {
-    taskBackend(() => HttpResponse.json({}));
-    const form = await openForm();
+  it('will not save a points box that holds no number', async () => {
+    taskBackend();
+    const { tests } = await openTask();
 
-    fill(fieldIn(form, 'small', 'Pass'), 'thirty');
+    fill(fieldIn(tests, 'small', 'Points'), 'thirty');
 
-    expect(within(form).getByText('Not a number.')).toBeVisible();
-    expect(within(form).getByRole('button', { name: 'Save settings' })).toBeDisabled();
+    expect(within(tests).getByText('Not a number.')).toBeVisible();
+    expect(
+      within(screen.getByRole('region', { name: 'Save the task' })).getByRole(
+        'button',
+        {
+          name: 'Save',
+        },
+      ),
+    ).toBeDisabled();
   });
 
-  it('merges field by field when someone else saved the task first', async () => {
+  it('merges field by field, in words, when someone else saved the settings first', async () => {
     const theirs = TASK.replace('time_limit: 2', 'time_limit: 5');
-    const { sent } = taskBackend(
-      () =>
-        HttpResponse.json({
-          number: 5,
-          grading_changed: false,
-          changes: [],
-          notes: [],
-          regraded: 0,
-        }),
-      theirs,
-    );
-    const form = await openForm();
+    const { sent } = taskBackend({ conflictWith: theirs });
+    const { inputs, tests } = await openTask();
 
-    fill(fieldIn(form, /^time_limit:/, 'Value'), '3');
-    fill(fieldIn(form, 'large', 'Each'), '70');
-    await userEvent.click(within(form).getByRole('button', { name: 'Save settings' }));
+    fill(fieldIn(inputs, 'time_limit', 'Value'), '3');
+    fill(fieldIn(tests, 'small', 'Points'), '40');
+    await save();
 
     const merge = await screen.findByRole('list', { name: 'Fields that differ' });
     const limit = within(merge).getByRole('radiogroup', {
-      name: 'inputs.time_limit (both changed it)',
+      name: 'Inputs: time_limit (both changed it)',
     });
     await userEvent.click(within(limit).getByRole('radio', { name: 'Now: 5' }));
+    expect(
+      within(merge).getByRole('radiogroup', {
+        name: 'Tests and scoring, small: Points when enough tests pass',
+      }),
+    ).toBeVisible();
     await userEvent.click(
       screen.getByRole('button', { name: 'Save the merged version' }),
     );
 
-    expect(await screen.findByText('Published as publication 5.')).toBeVisible();
-    expect(sent[1]?.token).toBe('token-theirs');
-    const saved = parse(sent[1]?.content ?? '') as {
+    expect(await screen.findByText('Published as publication 4.')).toBeVisible();
+    const yaml = sent[1]?.changes.find((change) => change.path === 'task.yaml');
+    expect(yaml?.token).toBe('token-theirs');
+    const saved = written(sent[1]) as {
       inputs: Record<string, unknown>;
       test_groups: Record<string, unknown>;
     };
     expect(saved.inputs['time_limit']).toBe(5);
-    expect(saved.test_groups['large']).toEqual({ each: 70 });
+    expect(saved.test_groups['small']).toEqual({ pass: 40, show: 'verdict' });
+  });
+});
+
+/** The first save sent, once it has been. */
+async function waitForSave(sent: SaveRequest[]): Promise<SaveRequest> {
+  await expect.poll(() => sent.length).toBeGreaterThan(0);
+  return sent[0] as SaveRequest;
+}
+
+describe('scoring a task', { timeout: 30_000 }, () => {
+  it('says what each group does as an entrant is told, and the task’s total', async () => {
+    taskBackend({ form: { ...CHECKED, inputs: [] } });
+    const { tests } = await openTask();
+
+    expect(
+      within(fieldGroup(tests, 'small')).getByText(
+        'small earns its 30 when every test passes.',
+      ),
+    ).toBeVisible();
+    expect(within(tests).getByLabelText('The task’s points')).toHaveTextContent(
+      `Total: ${formatExact('35')} points.`,
+    );
+    const rule = fieldIn(tests, 'old', 'How does this group earn points?');
+    expect(
+      within(rule).getByRole('option', { name: 'The lowest test score counts' }),
+    ).toBeEnabled();
+  });
+
+  it('greys out a rule the save would refuse, with the reason', async () => {
+    taskBackend({ form: { ...CHECKED, inputs: [] } });
+    const { tests } = await openTask();
+
+    fill(within(tests).getByLabelText(/^A test earns/), 'none');
+    const rule = fieldIn(tests, 'small', 'How does this group earn points?');
+    expect(
+      within(rule).getByRole('option', { name: 'The lowest test score counts' }),
+    ).toBeDisabled();
+    expect(rule).toHaveAccessibleDescription(
+      'The lowest test score counts: Only when a test can earn part of its points: set how a test earns first.',
+    );
+    fill(fieldIn(tests, 'old', 'How does this group earn points?'), 'all');
+    expect(
+      within(fieldIn(tests, 'old', /^When entrants see results/)).getByRole('option', {
+        name: 'Pass or fail right away, the tests once the task closes',
+      }),
+    ).toBeEnabled();
+  });
+
+  it('says before a save that a task with no worth of its own is worth its new total (#435)', async () => {
+    taskBackend({ form: { ...CHECKED, inputs: [] } });
+    const { tests } = await openTask();
+
+    fill(fieldIn(tests, 'small', 'Points'), '40');
+
+    const bar = await screen.findByRole('region', { name: 'Save the task' });
+    expect(bar).toHaveTextContent(
+      `This changes the task’s points: its contest gives it no worth of its own, so the task will be worth ${formatExact('45')} points, not ${formatExact('35')}.`,
+    );
+  });
+
+  it('scales each group’s points to what the contest makes the task worth, exactly', async () => {
+    taskBackend({
+      form: { ...CHECKED, inputs: [] },
+      contest: 'name: Spring\ntasks:\n  - id: sort\n  - id: sum\n    worth: 70\n',
+    });
+    const { tests } = await openTask();
+
+    expect(
+      await within(tests).findByText(`small earns its 60 when every test passes.`),
+    ).toBeVisible();
+    expect(within(tests).getByLabelText('The task’s points')).toHaveTextContent(
+      `Its contest makes the task worth ${formatExact('70')}`,
+    );
+  });
+});
+
+function fieldGroup(scope: HTMLElement, name: string): HTMLElement {
+  return within(scope).getByRole('group', { name });
+}
+
+describe('the tests of a task', { timeout: 30_000 }, () => {
+  it('adds tests from files named by test, shows what was matched first, and saves them with the settings', async () => {
+    const { sent } = taskBackend({ form: { ...CHECKED, inputs: [] } });
+    const { tests } = await openTask();
+
+    await userEvent.click(
+      within(fieldGroup(tests, 'small')).getByRole('button', {
+        name: 'Add tests to small',
+      }),
+    );
+    const dialog = await screen.findByRole('dialog', { name: 'Add tests' });
+    await userEvent.click(
+      within(dialog).getByRole('radio', { name: 'Several, from files named by test' }),
+    );
+    await userEvent.upload(within(dialog).getByLabelText('Test files'), [
+      new File(['1 1\n'], '4.in'),
+      new File(['2\n'], '4.out'),
+      new File(['x'], 'notes.txt'),
+    ]);
+    const matched = within(dialog).getByRole('region', { name: 'What was matched' });
+    expect(matched).toHaveTextContent(
+      'small, test 4: input (4 bytes), answer (2 bytes)',
+    );
+    expect(
+      within(matched).getByRole('list', { name: 'Not matched' }),
+    ).toHaveTextContent(
+      'notes.txt: Its ending “.txt” names no part of a test: a test has input, answer.',
+    );
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Add the test' }));
+
+    const rows = within(fieldGroup(tests, 'small')).getByRole('list', {
+      name: 'Tests of small',
+    });
+    expect(within(rows).getByText('New')).toBeVisible();
+    await save();
+
+    const body = await waitForSave(sent);
+    expect(body.changes.filter((change) => change.path.startsWith('tests/'))).toEqual([
+      {
+        path: 'tests/small/4/input',
+        token: null,
+        content: btoa('1 1\n'),
+        encoding: 'base64',
+        remove: false,
+      },
+      {
+        path: 'tests/small/4/answer',
+        token: null,
+        content: btoa('2\n'),
+        encoding: 'base64',
+        remove: false,
+      },
+    ]);
+  });
+
+  it('adds a new group’s tests from a zip, and the group shows in scoring', async () => {
+    const { sent } = taskBackend({ form: { ...CHECKED, inputs: [] } });
+    const { tests } = await openTask();
+
+    await userEvent.click(within(tests).getByRole('button', { name: 'Add tests' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Add tests' });
+    await userEvent.click(within(dialog).getByRole('radio', { name: 'From a zip' }));
+    await userEvent.upload(
+      within(dialog).getByLabelText('Zip of tests'),
+      await makeZip([
+        { name: 'tests/huge/1/input', text: '9 9\n' },
+        { name: 'tests/huge/1/answer', text: '18\n' },
+      ]),
+    );
+    expect(
+      await within(dialog).findByText(
+        /huge, test 1: input \(4 bytes\), answer \(3 bytes\), in a new group/,
+      ),
+    ).toBeVisible();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Add the test' }));
+
+    const group = fieldGroup(tests, 'huge');
+    fill(within(group).getByLabelText('How does this group earn points?'), 'all');
+    fill(within(group).getByLabelText('Points'), '50');
+    await save();
+
+    const body = await waitForSave(sent);
+    expect(body.changes.map((change) => change.path)).toEqual([
+      'task.yaml',
+      'tests/huge/1/input',
+      'tests/huge/1/answer',
+    ]);
+    expect((written(body)['test_groups'] as Record<string, unknown>)['huge']).toEqual({
+      pass: 50,
+    });
+  });
+
+  it('takes a test out with the token each of its files was read with', async () => {
+    const { sent } = taskBackend({ form: { ...CHECKED, inputs: [] } });
+    const { tests } = await openTask();
+
+    const rows = within(fieldGroup(tests, 'small')).getByRole('list', {
+      name: 'Tests of small',
+    });
+    await userEvent.click(within(rows).getByRole('button', { name: 'Remove test 2' }));
+    expect(await within(rows).findByText('To be removed')).toBeVisible();
+    await save();
+
+    const body = await waitForSave(sent);
+    expect(body.changes.filter((change) => change.path !== 'task.yaml')).toEqual([
+      {
+        path: 'tests/small/2/input',
+        token: 'token-tests/small/2/input',
+        remove: true,
+        encoding: 'utf-8',
+      },
+      {
+        path: 'tests/small/2/answer',
+        token: 'token-tests/small/2/answer',
+        remove: true,
+        encoding: 'utf-8',
+      },
+    ]);
+  });
+
+  it('shows whose a test file is when someone else changed it first, and saves over it only when chosen', async () => {
+    const { sent } = taskBackend({ form: { ...CHECKED, inputs: [] } });
+    let moved = false;
+    server.use(
+      http.post(`${TASK_API}/save`, async ({ request }) => {
+        sent.push((await request.json()) as SaveRequest);
+        if (sent.length === 1) {
+          moved = true;
+          return problem(409, 'conflict');
+        }
+        return HttpResponse.json(PUBLISHED);
+      }),
+      http.get(`${TASK_API}/files/:path`, ({ params }) => {
+        const path = decodeURIComponent(String(params['path']));
+        if (!path.startsWith('tests/')) return undefined;
+        return HttpResponse.json({
+          path,
+          encoding: 'utf-8',
+          content: moved && path === 'tests/small/2/answer' ? 'theirs\n' : '1 2\n',
+          token:
+            moved && path === 'tests/small/2/answer' ? 'token-theirs' : `token-${path}`,
+          upload: null,
+        });
+      }),
+      http.get(`${TASK_API}/history`, () =>
+        HttpResponse.json([
+          {
+            version: 'abc',
+            at: '2026-10-11T14:02:00Z',
+            author: 'alice',
+            author_id: 3,
+            message: 'Save',
+          },
+        ]),
+      ),
+    );
+    const { tests } = await openTask();
+
+    const rows = within(fieldGroup(tests, 'small')).getByRole('list', {
+      name: 'Tests of small',
+    });
+    await userEvent.click(within(rows).getByRole('button', { name: 'Remove test 2' }));
+    await within(rows).findByText('To be removed');
+    await save();
+
+    const files = await screen.findByRole('list', { name: 'Files that differ' });
+    const answer = within(files).getByRole('radiogroup', {
+      name: 'Tests, small, test 2: answer',
+    });
+    expect(answer).toHaveTextContent('Yours: Taken out');
+    expect(
+      await within(answer).findByText(/Now: 7 bytes, saved by alice/),
+    ).toBeVisible();
+    await userEvent.click(within(answer).getByRole('radio', { name: /^Yours/ }));
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Save the merged version' }),
+    );
+
+    expect(await screen.findByText('Published as publication 4.')).toBeVisible();
+    expect(sent[1]?.changes).toContainEqual({
+      path: 'tests/small/2/answer',
+      token: 'token-theirs',
+      remove: true,
+      encoding: 'utf-8',
+    });
   });
 });

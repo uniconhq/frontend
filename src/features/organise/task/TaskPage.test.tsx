@@ -112,23 +112,35 @@ describe('the task page', () => {
     server.use(signedIn, taskState, publicationList, ...repoFiles);
     renderApp(TASK);
 
-    const building = await screen.findByRole('group', { name: 'Building the task' });
-    const links = within(building)
-      .getAllByRole('heading', { level: 2 })
-      .map((heading) => within(heading).getByRole('link'));
-    expect(links.map((link) => [link.textContent, link.getAttribute('href')])).toEqual(
-      TASK_BUILD_CARDS.map((card) => [card.label, `${TASK}/${card.section}`]),
+    await screen.findByRole('region', { name: 'Workflow' });
+    const cards = TASK_BUILD_CARDS.map((card) =>
+      screen.getByRole('region', { name: card.label }),
     );
+    for (const [at, card] of cards.entries()) {
+      const next = cards[at + 1];
+      if (next !== undefined) {
+        expect(card.compareDocumentPosition(next)).toBe(
+          Node.DOCUMENT_POSITION_FOLLOWING,
+        );
+      }
+    }
     expect(
-      await within(screen.getByRole('region', { name: 'Statement' })).findByText(
-        /^Written, 40/,
+      await within(screen.getByRole('region', { name: 'Statement' })).findByRole(
+        'textbox',
+        { name: 'Statement source' },
       ),
-    ).toBeVisible();
+    ).toHaveValue('Write the sum of two numbers.\n');
     expect(
-      await within(screen.getByRole('region', { name: 'Workflow' })).findByText(
-        'No workflow is named yet.',
-      ),
+      within(screen.getByRole('region', { name: 'Workflow' })).getByRole('combobox', {
+        name: 'Version',
+      }),
     ).toBeVisible();
+    const sidebar = screen.getByRole('group', { name: 'Task' });
+    expect(
+      TASK_BUILD_CARDS.map((card) =>
+        within(sidebar).getByRole('link', { name: card.label }).getAttribute('href'),
+      ),
+    ).toEqual(TASK_BUILD_CARDS.map((card) => `${TASK}?card=${card.key}`));
   });
 
   it('gives each section a card in the order the sidebar lists them', async () => {
@@ -136,17 +148,16 @@ describe('the task page', () => {
     renderApp(TASK);
 
     const running = await screen.findByRole('group', { name: 'Running the task' });
-    const grid = TASK_SECTIONS.filter((section) => section.card === 'grid');
     expect(
       within(running)
         .getAllByRole('heading', { level: 2 })
         .map((heading) => within(heading).getByRole('link').getAttribute('href')),
-    ).toEqual(grid.map((section) => `${TASK}/${section.segment}`));
+    ).toEqual(TASK_SECTIONS.map((section) => `${TASK}/${section.segment}`));
     const sidebar = screen.getByRole('group', { name: 'Task' });
     expect(
       within(sidebar)
         .getAllByRole('link')
-        .slice(1)
+        .slice(1 + TASK_BUILD_CARDS.length)
         .map((link) => link.textContent),
     ).toEqual(TASK_SECTIONS.map((section) => section.label));
     expect(
@@ -154,7 +165,6 @@ describe('the task page', () => {
         /^Contestants are graded on publication 2/,
       ),
     ).toBeVisible();
-    expect(screen.queryByRole('form')).toBeNull();
   });
 });
 

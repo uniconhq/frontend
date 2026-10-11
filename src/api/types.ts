@@ -17,6 +17,8 @@ export type DefinitionError = Schemas['DefinitionError'];
 export type TreeEntry = Schemas['TreeEntry'];
 export type FileContent = Schemas['FileContent'];
 export type WriteFile = Schemas['WriteFile'];
+/** One file a task's save writes or removes. */
+export type SaveChange = Schemas['FileChange'];
 /** What a file that is an upload holds: its size and SHA-256. */
 export type UploadInfo = Schemas['UploadInfo'];
 export type RollbackFile = Schemas['RollbackFile'];

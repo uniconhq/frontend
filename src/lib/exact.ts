@@ -41,6 +41,90 @@ export function compareDecimal(a: string, b: string): number {
   return x < y ? -1 : x > y ? 1 : 0;
 }
 
+/**
+ * An exact fraction of two whole numbers, its denominator above zero, for
+ * working out points from decimals as the scoring model does (TASK-FORMAT
+ * section 3): a group's share of a task's worth is a fraction no float holds,
+ * such as 100 times 1/3.
+ */
+export type Ratio = { num: bigint; den: bigint };
+
+export const ZERO: Ratio = { num: 0n, den: 1n };
+
+function gcd(a: bigint, b: bigint): bigint {
+  let [x, y] = [a < 0n ? -a : a, b < 0n ? -b : b];
+  while (y !== 0n) [x, y] = [y, x % y];
+  return x === 0n ? 1n : x;
+}
+
+function reduced(num: bigint, den: bigint): Ratio {
+  const sign = den < 0n ? -1n : 1n;
+  const divisor = gcd(num, den);
+  return { num: (sign * num) / divisor, den: (sign * den) / divisor };
+}
+
+/** A decimal written as text as the fraction it is, or null when it is no decimal. */
+export function ratioOf(text: string): Ratio | null {
+  const found = scaled(text);
+  if (found === null) return null;
+  return found.power >= 0
+    ? reduced(found.units * 10n ** BigInt(found.power), 1n)
+    : reduced(found.units, 10n ** BigInt(-found.power));
+}
+
+export function addRatio(a: Ratio, b: Ratio): Ratio {
+  return reduced(a.num * b.den + b.num * a.den, a.den * b.den);
+}
+
+export function mulRatio(a: Ratio, b: Ratio): Ratio {
+  return reduced(a.num * b.num, a.den * b.den);
+}
+
+/** `a` over `b`; `b` must not be zero. */
+export function divRatio(a: Ratio, b: Ratio): Ratio {
+  return reduced(a.num * b.den, a.den * b.num);
+}
+
+export function compareRatio(a: Ratio, b: Ratio): number {
+  const left = a.num * b.den;
+  const right = b.num * a.den;
+  return left < right ? -1 : left > right ? 1 : 0;
+}
+
+/**
+ * A fraction as plain decimal digits, rounded half away from zero to at
+ * most `places` decimals, and whether that is the fraction exactly: `1/4` is
+ * `0.25` exactly, `100/3` is `33.33` and not exact.
+ */
+export function ratioDigits(
+  value: Ratio,
+  places = 2,
+): { digits: string; exact: boolean } {
+  const negative = value.num < 0n;
+  const num = negative ? -value.num : value.num;
+  const scale = 10n ** BigInt(places);
+  const whole = (num * scale) / value.den;
+  const left = (num * scale) % value.den;
+  const units = 2n * left >= value.den ? whole + 1n : whole;
+  const text = units.toString().padStart(places + 1, '0');
+  const digits =
+    places === 0 ? text : `${text.slice(0, -places)}.${text.slice(-places)}`;
+  const kept = rounded(digits, places);
+  return {
+    digits: negative && units !== 0n ? `-${kept}` : kept,
+    exact: left === 0n,
+  };
+}
+
+/**
+ * A fraction for reading, as `formatExact` writes a number, with "about"
+ * before it when the digits shown are not the fraction exactly.
+ */
+export function formatRatio(value: Ratio, places = 2): string {
+  const { digits, exact } = ratioDigits(value, places);
+  return exact ? formatExact(digits, places) : `about ${formatExact(digits, places)}`;
+}
+
 /** The digits of an exact number split at its point, its sign apart. */
 type Parts = { negative: boolean; whole: string; fraction: string };
 
