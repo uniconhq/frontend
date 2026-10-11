@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useReducer, useState, type KeyboardEvent } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useBlocker } from 'react-router';
 import { $api } from '@/api/query';
 import { toApiError, type ApiError } from '@/api/problem';
@@ -120,9 +120,16 @@ function useSettled<T>(value: T, delay: number): T {
   return settled;
 }
 
-/** What a version would be refused for, checked a moment after each change. */
+/**
+ * What a version would be refused for, checked a moment after each change.
+ * The last answer stays while the next is awaited, so the problems and their
+ * marks do not leave and come back on every edit; `checking` says the answer
+ * is not yet for the text as it is.
+ */
 function useCheck(text: string) {
-  return useQuery(checkQuery(useSettled(text, 400)));
+  const settled = useSettled(text, 400);
+  const check = useQuery({ ...checkQuery(settled), placeholderData: keepPreviousData });
+  return { check, checking: settled !== text || check.isPlaceholderData };
 }
 
 /** The box a selection stands on now, found again after the layout moved. */
@@ -256,7 +263,7 @@ export function Editor({
     () => layoutWorkflow(workflow, primitiveMap),
     [workflow, primitiveMap],
   );
-  const check = useCheck(text);
+  const { check, checking } = useCheck(text);
   const problems = useMemo(() => check.data ?? [], [check.data]);
   const pins = useMemo(
     () =>
@@ -642,6 +649,7 @@ export function Editor({
           token={saved.token}
           dirty={dirty}
           problems={check.isSuccess ? problems.length : 0}
+          checking={checking || check.isPending}
           onPublished={setPublished}
         />
         <ShareButton page={page} />
@@ -734,6 +742,7 @@ export function Editor({
         // A file that does not read is not "nothing to fix", whatever the check says.
         <Problems
           status={check.isError ? 'failed' : check.isPending ? 'pending' : 'done'}
+          checking={checking}
           failure={checkFailure}
           placed={drawing ? listed : listed.map((each) => ({ ...each, opens: null }))}
           onOpen={(opens) => select(opens)}

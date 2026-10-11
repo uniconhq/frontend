@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@/test/user-event';
 import { renderApp } from '@/test/render';
-import { http } from 'msw';
+import { delay, http } from 'msw';
 import { problem, server, signedIn } from '@/test/server';
 import { CLASSIC_V2, workflowBackend } from '@/test/workflows';
 import {
@@ -11,7 +11,9 @@ import {
   drawer,
   fileText,
   noDrawer,
+  findPart,
   openMenu,
+  part,
   openStep,
   stepPanel,
   outputButton,
@@ -132,6 +134,51 @@ describe('the workflow editor', () => {
     expect(await fileText(user)).toBe(CLASSIC_V2);
     await user.click(toolButton('Redo'));
     expect(await fileText(user)).not.toContain('id: check');
+  });
+
+  it('keeps the problems and their marks in place while the next change is checked', async () => {
+    const broken = CLASSIC_V2.replace(
+      'binary: ${{ steps.compile.binary }}',
+      'binary: ${{ steps.compiler.binary }}',
+    );
+    server.use(
+      signedIn,
+      ...workflowBackend(broken, {
+        problems: () => [
+          {
+            path: 'steps[1].with.binary',
+            message: 'There is no step called compiler before this one.',
+          },
+        ],
+      }).handlers,
+    );
+    const user = userEvent.setup();
+    renderApp(EDITOR_PAGE);
+
+    const banner = await findPart('section', 'Problems', CHECKED);
+    await within(banner).findByText(/One problem to fix/, {}, CHECKED);
+    // The next check does not answer while the test looks.
+    server.use(http.post('/api/v1/workflows/check', () => delay('infinite')));
+    await user.click(await outputButton('run', 'time_ms'));
+    await user.click(
+      within(await openMenu('The output time_ms of run')).getByRole('menuitem', {
+        name: 'Report it',
+      }),
+    );
+
+    expect(
+      await within(part('section', 'Problems')).findByText(
+        'Checking the latest change…',
+        {},
+        CHECKED,
+      ),
+    ).toBeInTheDocument();
+    expect(part('section', 'Problems')).toHaveTextContent(/One problem to fix/);
+    expect(
+      within(await stepBox('run')).getByRole('note', {
+        name: 'There is no step called compiler before this one.',
+      }),
+    ).toBeInTheDocument();
   });
 
   it('says each problem beside its mark and in the banner, which opens its box', async () => {

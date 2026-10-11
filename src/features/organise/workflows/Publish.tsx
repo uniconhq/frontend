@@ -23,6 +23,7 @@ export function PublishVersion({
   token,
   dirty,
   problems,
+  checking = false,
   onPublished,
 }: {
   owner: string;
@@ -33,6 +34,8 @@ export function PublishVersion({
   dirty: boolean;
   /** How many problems the check found, which a version would be refused for. */
   problems: number;
+  /** The draft's check has not answered yet for the text as it is. */
+  checking?: boolean;
   onPublished: (version: string) => void;
 }) {
   const queryClient = useQueryClient();
@@ -93,7 +96,12 @@ export function PublishVersion({
               .
             </BodyText>
           )}
-          {!dirty && problems > 0 && (
+          {!dirty && checking && (
+            <BodyText size="md">
+              The draft is still being checked. Wait a moment for its answer.
+            </BodyText>
+          )}
+          {!dirty && !checking && problems > 0 && (
             <BodyText size="md">
               {problems === 1
                 ? 'One problem stops'
@@ -121,7 +129,7 @@ export function PublishVersion({
           <div className={classes.actions}>
             <Button
               loading={make.isPending}
-              disabled={dirty || problems > 0}
+              disabled={dirty || checking || problems > 0}
               onClick={() => void publish()}
             >
               Publish {next}

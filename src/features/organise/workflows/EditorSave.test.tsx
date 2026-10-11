@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
-import { http, HttpResponse } from 'msw';
+import { delay, http, HttpResponse } from 'msw';
 import userEvent from '@/test/user-event';
 import { renderApp } from '@/test/render';
 import { server, signedIn } from '@/test/server';
@@ -11,6 +11,7 @@ import {
   barButton,
   fileText,
   openMenu,
+  outputButton,
   openStep,
   stepPanel,
   portButton,
@@ -70,6 +71,31 @@ describe('saving and publishing a workflow', () => {
     expect(dialog).toHaveTextContent('One problem stops it');
     expect(within(dialog).getByRole('button', { name: 'Publish v1' })).toBeDisabled();
     expect(backend.state.versions).toEqual([]);
+  });
+
+  it('will not publish a saved draft until its check has answered', async () => {
+    const backend = workflowBackend(CLASSIC_V2);
+    server.use(signedIn, ...backend.handlers);
+    const user = userEvent.setup();
+    renderApp(EDITOR_PAGE);
+
+    await screen.findByText(/Nothing to fix/, {}, CHECKED);
+    server.use(http.post('/api/v1/workflows/check', () => delay('infinite')));
+    await user.click(await outputButton('run', 'time_ms'));
+    await user.click(
+      within(await openMenu('The output time_ms of run')).getByRole('menuitem', {
+        name: 'Report it',
+      }),
+    );
+    await user.click(barButton('Save'));
+    await waitFor(() => expect(backend.state.draft).toContain('time_ms_2'));
+
+    await user.click(barButton('Publish version'));
+    const dialog = await screen.findByLabelText('Publish v1', {
+      selector: '[role="dialog"]',
+    });
+    expect(dialog).toHaveTextContent('The draft is still being checked.');
+    expect(within(dialog).getByRole('button', { name: 'Publish v1' })).toBeDisabled();
   });
 
   it('says in the forge’s words why it made no version', async () => {
