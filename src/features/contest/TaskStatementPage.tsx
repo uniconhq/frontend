@@ -12,10 +12,13 @@ import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
 import { contestHomePath } from '@/lib/contest-paths';
 import { formatExact } from '@/lib/exact';
 import { useTaskParams } from '@/lib/route-params';
+import { contestViewSectionPath } from '@/lib/sections';
 import { formatDateTime } from '@/lib/time';
 import { TaskAnnouncements } from './threads/AnnouncementList';
+import { ASK_ABOUT } from './threads/questions';
 import { BySession } from './BySession';
 import { SignInPrompt } from './SignInPrompt';
+import { TaskCountdown } from './TaskCountdown';
 import { TaskSubmissions } from './submit/TaskSubmissions';
 import { headingOf } from './task-names';
 import classes from './contest.module.css';
@@ -73,10 +76,12 @@ function Back({ org, contest }: { org: string; contest: string }) {
 }
 
 /**
- * A released task as a signed-in person reads it: the statement, its times
- * and limits, the panel they submit from while the task is open, or why it
- * is not, with the countdowns to its due and close, and their submissions.
- * Crossing the due or the close reads the page again at once.
+ * A released task as a signed-in person reads it: first the time left on it
+ * for them, counted to its due and its close, and the way to ask the
+ * organisers about it; then its announcements, the statement, its times and
+ * limits, the panel they submit from while the task is open, or why it is
+ * not, and their submissions. Crossing the due or the close reads the page
+ * again at once.
  */
 function SignedInTask({
   org,
@@ -109,10 +114,21 @@ function SignedInTask({
     return <ErrorBlock error={view.error} onRetry={view.retry} />;
 
   const page = view.data;
+  const asks = page.release.closed !== 'not_approved';
   return (
     <div className={classes.page}>
       <Back org={org} contest={contest} />
       <PageTitle>{headingOf(page)}</PageTitle>
+      <TaskCountdown due={page.due} closes={page.closes} onBoundary={readAgain} />
+      {asks && (
+        <div className={classes.links}>
+          <PageLink
+            to={`${contestViewSectionPath(org, contest, 'questions')}?${ASK_ABOUT}=${encodeURIComponent(task)}`}
+          >
+            Ask a question about this task
+          </PageLink>
+        </div>
+      )}
       <TaskAnnouncements org={org} contest={contest} task={task} />
       <Card>
         <Markdown task={{ org, contest, task }}>{page.statement}</Markdown>
@@ -123,13 +139,7 @@ function SignedInTask({
           <LimitList page={page} />
         </div>
       </Card>
-      <TaskSubmissions
-        org={org}
-        contest={contest}
-        task={task}
-        page={page}
-        onBoundary={readAgain}
-      />
+      <TaskSubmissions org={org} contest={contest} task={task} page={page} />
     </div>
   );
 }

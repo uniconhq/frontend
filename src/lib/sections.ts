@@ -101,10 +101,15 @@ export function taskCardPath(
   return `${taskPath(org, contest, task)}?card=${card}`;
 }
 
-/** The contest as its contestants see it: its tasks, on its own page, and its boards. */
+/**
+ * The contest as its entrants see it: its tasks, on its own page, its
+ * leaderboards, and their questions to the organisers, which every task's
+ * page also links to.
+ */
 export const CONTEST_VIEW_SECTIONS = [
   { key: 'tasks', label: 'Tasks', segment: '', card: 'grid' },
   { key: 'boards', label: 'Leaderboards', segment: 'boards', card: 'grid' },
+  { key: 'questions', label: 'Questions', segment: 'questions', card: 'grid' },
 ] as const satisfies readonly Section[];
 
 export type OrgSectionKey = (typeof ORG_SECTIONS)[number]['key'];

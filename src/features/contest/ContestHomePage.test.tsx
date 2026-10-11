@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { screen, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@/test/user-event';
 import { http, HttpResponse } from 'msw';
-import { formatDateTime } from '@/lib/time';
+import type { TaskRelease } from '@/api/types';
+import { formatWhen } from '@/lib/time';
 import { icpc } from '@/test/boards';
 import { renderApp } from '@/test/render';
 import { problem, server, signedIn } from '@/test/server';
@@ -31,9 +32,10 @@ describe('the contest page for a signed-in person', () => {
     expect(
       await screen.findByRole('heading', { name: 'Spring 2026', level: 1 }),
     ).toBeVisible();
-    expect(
-      await screen.findByRole('timer', { name: 'Contest countdown' }),
-    ).toHaveTextContent(/Contest ends in (29m 5\ds|30m 00s)/);
+    const timer = await screen.findByRole('timer', { name: 'Contest countdown' });
+    await waitFor(() =>
+      expect(timer).toHaveTextContent(/Contest ends in (29m 5\ds|30m 00s)/),
+    );
     const tasks = screen.getByRole('list', { name: 'Tasks' });
     expect(within(tasks).getByRole('link', { name: 'Sum of Two' })).toHaveAttribute(
       'href',
@@ -44,6 +46,101 @@ describe('the contest page for a signed-in person', () => {
       'href',
       PAGE,
     );
+  });
+
+  it('runs in race order once the person is in: time, tasks, leaderboard, announcements, questions, then the entry', async () => {
+    server.use(
+      signedIn,
+      http.get(`${CONTEST_API}/home`, () =>
+        HttpResponse.json(home({ registration: registration({ status: 'approved' }) })),
+      ),
+      http.get(`${CONTEST_API}/boards`, () => HttpResponse.json([icpc()])),
+    );
+    renderApp(PAGE);
+
+    const timer = await screen.findByRole('timer', { name: 'Contest countdown' });
+    const tasks = screen.getByRole('heading', { name: 'Tasks' });
+    const board = await screen.findByRole('region', { name: 'Leaderboard' });
+    const announcements = screen.getByRole('heading', { name: 'Announcements' });
+    const questions = screen.getByRole('region', {
+      name: 'Questions to the organisers',
+    });
+    const entry = screen.getByRole('status', { name: 'Registration' });
+    const order = [timer, tasks, board, announcements, questions, entry];
+    for (const [index, element] of order.slice(1).entries()) {
+      expect(
+        order[index]?.compareDocumentPosition(element),
+        `${String(index)} before ${String(index + 1)}`,
+      ).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    }
+    expect(
+      within(questions).getByRole('link', { name: 'Ask a question' }),
+    ).toHaveAttribute('href', '/contests/acme/spring/questions');
+  });
+
+  it('puts an entry still to settle before the tasks', async () => {
+    server.use(
+      signedIn,
+      http.get(`${CONTEST_API}/home`, () => HttpResponse.json(home())),
+    );
+    renderApp(PAGE);
+
+    const register = await screen.findByRole('button', { name: 'Register' });
+    const tasks = screen.getByRole('heading', { name: 'Tasks' });
+    expect(register.compareDocumentPosition(tasks)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+    expect(
+      screen.queryByRole('region', { name: 'Questions to the organisers' }),
+    ).toBeNull();
+  });
+
+  it('says where the person’s entrant stands on each leaderboard, with the way to them', async () => {
+    const standings = icpc();
+    const [first] = standings.rows;
+    if (first === undefined) throw new Error('the board needs a row');
+    server.use(
+      signedIn,
+      http.get(`${CONTEST_API}/home`, () =>
+        HttpResponse.json(
+          home({
+            registration: registration({ status: 'approved', id: first.row.entrant }),
+          }),
+        ),
+      ),
+      http.get(`${CONTEST_API}/boards`, () =>
+        HttpResponse.json([
+          standings,
+          { ...standings, board: 'Later', nothing_shown: true, shown_at: null },
+        ]),
+      ),
+    );
+    renderApp(PAGE);
+
+    const board = await screen.findByRole('region', { name: 'Leaderboard' });
+    const places = await within(board).findByRole('list', { name: 'Where you stand' });
+    const [shown, later] = within(places).getAllByRole('listitem');
+    expect(shown).toHaveTextContent(
+      `Standings: You are ${String(first.rank)}${first.rank === 1 ? 'st' : 'th'} of ${String(standings.rows.length)}.`,
+    );
+    expect(later).toHaveTextContent('Later: Shown once its tasks are released.');
+    expect(
+      within(board).getByRole('link', { name: 'See the leaderboards' }),
+    ).toHaveAttribute('href', '/contests/acme/spring/boards');
+  });
+
+  it('shows no leaderboard card when the contest shows the person none', async () => {
+    server.use(
+      signedIn,
+      http.get(`${CONTEST_API}/home`, () =>
+        HttpResponse.json(home({ registration: registration({ status: 'approved' }) })),
+      ),
+    );
+    renderApp(PAGE);
+
+    await screen.findByRole('heading', { name: 'Tasks' });
+    await screen.findByRole('region', { name: 'Questions to the organisers' });
+    expect(screen.queryByRole('region', { name: 'Leaderboard' })).toBeNull();
   });
 
   it('leads an organiser of the contest back to organising it, and nobody else', async () => {
@@ -122,14 +219,96 @@ describe('the contest page for a signed-in person', () => {
 
     const tasks = await screen.findByRole('list', { name: 'Tasks' });
     const [sum, max] = within(tasks).getAllByRole('listitem');
-    expect(sum).toHaveTextContent(
-      `Due ${formatDateTime(new Date('2026-09-12T10:45:00Z'))}`,
-    );
-    expect(sum).toHaveTextContent(
-      `Closes ${formatDateTime(new Date('2026-09-12T11:00:00Z'))}`,
-    );
+    await waitFor(() => expect(sum).toHaveTextContent(/Due in (44m 5\ds|45m 00s)/));
+    expect(sum).toHaveTextContent(/Closes in (59m 5\ds|1h 00m 00s)/);
+    expect(sum).toHaveTextContent('100 points');
     expect(max).not.toHaveTextContent('Due');
-    expect(max).toHaveTextContent('Closes');
+    expect(max).not.toHaveTextContent('points');
+    expect(max).toHaveTextContent(/Closes in /);
+  });
+
+  it('says when each task falls due and closes before the server’s time is in', async () => {
+    let answer = () => undefined as void;
+    const asked = new Promise<void>((resolve) => {
+      answer = resolve;
+    });
+    server.use(
+      signedIn,
+      http.get('/api/v1/time', async () => {
+        await asked;
+        return HttpResponse.json({ now: '2026-09-12T10:00:00Z' });
+      }),
+      http.get(`${CONTEST_API}/home`, () =>
+        HttpResponse.json(
+          home({
+            registration: registration({ status: 'approved' }),
+            tasks: [
+              {
+                name: 'sum',
+                label: 'A',
+                title: 'Sum of Two',
+                worth: '100',
+                release: { released: true, visible: true, open: true, closed: null },
+                due: '2026-09-12T10:45:00Z',
+                closes: '2026-09-12T11:00:00Z',
+              },
+            ],
+          }),
+        ),
+      ),
+    );
+    renderApp(PAGE);
+
+    const timer = await screen.findByRole('timer', { name: 'Contest countdown' });
+    expect(timer).toHaveTextContent(
+      `Contest ends at ${formatWhen(new Date('2026-09-12T10:30:00Z'))}`,
+    );
+    const [sum] = within(screen.getByRole('list', { name: 'Tasks' })).getAllByRole(
+      'listitem',
+    );
+    expect(sum).toHaveTextContent(
+      `Due at ${formatWhen(new Date('2026-09-12T10:45:00Z'))}`,
+    );
+    expect(sum).toHaveTextContent(
+      `Closes at ${formatWhen(new Date('2026-09-12T11:00:00Z'))}`,
+    );
+    answer();
+    await waitFor(() => expect(timer).toHaveTextContent(/Contest ends in /));
+    expect(sum).toHaveTextContent(/Due in /);
+  });
+
+  it('says why a task takes nothing from the person now', async () => {
+    const task = (name: string, closed: TaskRelease['closed']) => ({
+      name,
+      label: name.toUpperCase(),
+      title: name,
+      worth: '100',
+      release: { released: true, visible: true, open: false, closed },
+      due: null,
+      closes: '2026-09-12T11:00:00Z',
+    });
+    server.use(
+      signedIn,
+      http.get(`${CONTEST_API}/home`, () =>
+        HttpResponse.json(
+          home({
+            tasks: [
+              task('a', 'not_approved'),
+              { ...task('b', 'closed'), closes: '2026-09-12T09:30:00Z' },
+              task('c', 'archived'),
+            ],
+          }),
+        ),
+      ),
+    );
+    renderApp(PAGE);
+
+    const tasks = await screen.findByRole('list', { name: 'Tasks' });
+    const [a, b, c] = within(tasks).getAllByRole('listitem');
+    expect(a).toHaveTextContent('Open once your registration is approved');
+    await waitFor(() => expect(a).toHaveTextContent(/Closes in /));
+    await waitFor(() => expect(b).toHaveTextContent('Closed for you'));
+    expect(c).toHaveTextContent('Takes no submissions');
   });
 
   it('registers and then shows the registration waiting', async () => {
@@ -357,9 +536,8 @@ describe('the contest page at its start', () => {
     renderApp(PAGE);
 
     expect(await screen.findByText('No task is released yet.')).toBeVisible();
-    expect(
-      await screen.findByRole('timer', { name: 'Contest countdown' }),
-    ).toHaveTextContent(/^Contest starts in /);
+    const timer = await screen.findByRole('timer', { name: 'Contest countdown' });
+    await waitFor(() => expect(timer).toHaveTextContent(/^Contest starts in /));
     expect(
       await screen.findByRole('link', { name: 'Sum of Two' }, { timeout: 5_000 }),
     ).toBeVisible();

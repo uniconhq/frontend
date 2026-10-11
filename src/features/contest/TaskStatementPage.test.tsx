@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { screen, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
-import { formatDateTime } from '@/lib/time';
+import { formatDateTime, formatWhen } from '@/lib/time';
 import { renderApp } from '@/test/render';
 import { problem, server, signedIn } from '@/test/server';
 import { noSubmissions, PUBLIC_API, TASK_API, taskPage } from '@/test/contestant';
@@ -108,9 +108,85 @@ describe('a task page for a signed-in person', () => {
     renderApp(PAGE);
 
     const timer = await screen.findByRole('timer', { name: 'Task countdown' });
-    expect(timer).toHaveTextContent(/Due in (14m 5\ds|15m 00s)/);
+    await waitFor(() => expect(timer).toHaveTextContent(/Due in (14m 5\ds|15m 00s)/));
     expect(timer).toHaveTextContent(/Closes in (44m 5\ds|45m 00s)/);
     expect(timer).not.toHaveTextContent("this device's clock");
+  });
+
+  it('puts the time left at the top, saying when each falls before the server’s time is in', async () => {
+    let answer = () => undefined as void;
+    const asked = new Promise<void>((resolve) => {
+      answer = resolve;
+    });
+    server.use(
+      signedIn,
+      noSubmissions,
+      http.get('/api/v1/time', async () => {
+        await asked;
+        return HttpResponse.json({ now: '2026-09-12T10:00:00Z' });
+      }),
+      http.get(`${TASK_API}/page`, () =>
+        HttpResponse.json({
+          ...taskPage,
+          due: '2026-09-12T10:15:00Z',
+          closes: '2026-09-12T10:45:00Z',
+        }),
+      ),
+    );
+    renderApp(PAGE);
+
+    const timer = await screen.findByRole('timer', { name: 'Task countdown' });
+    const title = screen.getByRole('heading', { name: 'A. Sum of Two', level: 1 });
+    const statement = screen.getByRole('heading', { name: 'Sum', level: 2 });
+    expect(title.compareDocumentPosition(timer)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(timer.compareDocumentPosition(statement)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+    expect(timer).toHaveTextContent(
+      `Due at ${formatWhen(new Date('2026-09-12T10:15:00Z'))}`,
+    );
+    expect(timer).toHaveTextContent(
+      `Closes at ${formatWhen(new Date('2026-09-12T10:45:00Z'))}`,
+    );
+    answer();
+    await waitFor(() => expect(timer).toHaveTextContent(/Due in (14m 5\ds|15m 00s)/));
+  });
+
+  it('links to asking the organisers about the task', async () => {
+    server.use(
+      signedIn,
+      noSubmissions,
+      http.get(`${TASK_API}/page`, () => HttpResponse.json(taskPage)),
+    );
+    renderApp(PAGE);
+
+    expect(
+      await screen.findByRole('link', { name: 'Ask a question about this task' }),
+    ).toHaveAttribute('href', '/contests/acme/spring/questions?task=sum');
+  });
+
+  it('offers no question to someone not approved yet', async () => {
+    server.use(
+      signedIn,
+      noSubmissions,
+      http.get(`${TASK_API}/page`, () =>
+        HttpResponse.json({
+          ...taskPage,
+          release: {
+            released: true,
+            visible: true,
+            open: false,
+            closed: 'not_approved',
+          },
+        }),
+      ),
+    );
+    renderApp(PAGE);
+
+    await screen.findByRole('heading', { name: 'A. Sum of Two', level: 1 });
+    expect(
+      screen.queryByRole('link', { name: 'Ask a question about this task' }),
+    ).toBeNull();
   });
 
   it("says it counts by the device's clock when the server's time did not come in", async () => {
@@ -123,8 +199,10 @@ describe('a task page for a signed-in person', () => {
     renderApp(PAGE);
 
     const timer = await screen.findByRole('timer', { name: 'Task countdown' });
-    expect(timer).toHaveTextContent(
-      "Counted by this device's clock: the server's time did not come in.",
+    await waitFor(() =>
+      expect(timer).toHaveTextContent(
+        "Counted by this device's clock: the server's time did not come in.",
+      ),
     );
   });
 
@@ -139,7 +217,9 @@ describe('a task page for a signed-in person', () => {
     renderApp(PAGE);
 
     const timer = await screen.findByRole('timer', { name: 'Task countdown' });
-    expect(timer).toHaveTextContent('Past due: a submission now is late.');
+    await waitFor(() =>
+      expect(timer).toHaveTextContent('Past due: a submission now is late.'),
+    );
     expect(timer).toHaveTextContent(/Closes in (29m 5\ds|30m 00s)/);
     expect(screen.getByRole('form', { name: 'Submit' })).toBeVisible();
   });

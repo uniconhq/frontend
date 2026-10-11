@@ -87,7 +87,7 @@ export function ContestPage() {
                 {chipText(standing, home)}
               </Chip>
               {standing !== 'archived' && (
-                <Countdown start={home.start} end={home.end} />
+                <Countdown start={home.start} end={home.end} now={home.now} />
               )}
             </>
           )
