@@ -13,15 +13,23 @@ export function Problems({
   status,
   failure,
   placed,
+  checking = false,
   onOpen,
 }: {
   status: 'pending' | 'failed' | 'done';
+  /** The answer shown is the last one, while the latest change is checked. */
+  checking?: boolean;
   /** Why the check did not run, when it did not. */
   failure: string | null;
   placed: Placed[];
   onOpen: (selected: Selected) => void;
 }) {
   if (status === 'pending') return null;
+  const waiting = checking && (
+    <BodyText size="sm" tone="secondary">
+      Checking the latest change…
+    </BodyText>
+  );
   if (status === 'failed')
     return (
       <section className={classes.banner} aria-label="Problems" data-tone="warn">
@@ -29,6 +37,7 @@ export function Problems({
           The check did not run, so this page cannot say whether the draft can be
           published as a version: {failure}
         </BodyText>
+        {waiting}
       </section>
     );
   if (placed.length === 0)
@@ -37,6 +46,7 @@ export function Problems({
         <BodyText size="sm" tone="secondary">
           Nothing to fix: this draft can be published as a version.
         </BodyText>
+        {waiting}
       </section>
     );
   const one = placed.length === 1;
@@ -64,6 +74,7 @@ export function Problems({
           </li>
         ))}
       </ul>
+      {waiting}
     </section>
   );
 }

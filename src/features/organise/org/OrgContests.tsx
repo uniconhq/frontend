@@ -120,14 +120,23 @@ export function OrgContests({ org }: { org: string }) {
       rows={rows}
       empty="No contests yet."
       notice={
-        view.state === 'error' && (
+        view.state === 'error' &&
+        // Organising some of its contests and not the org is a normal
+        // place to be, not a failure to try again.
+        (view.error.code === 'forbidden' ? (
+          <BodyText>
+            {rows.length > 0
+              ? `You organise these contests of ${org}:`
+              : `You have no role at ${org} or at any of its contests.`}
+          </BodyText>
+        ) : (
           <>
             <ErrorBlock error={view.error} onRetry={view.retry} />
             {rows.length > 0 && (
               <BodyText>Contests of this org where you have a role:</BodyText>
             )}
           </>
-        )
+        ))
       }
       body={
         view.state === 'loading' ? (

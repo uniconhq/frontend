@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@/test/user-event';
 import { renderApp } from '@/test/render';
-import { http } from 'msw';
+import { delay, http } from 'msw';
 import { problem, server, signedIn } from '@/test/server';
 import { CLASSIC_V2, workflowBackend } from '@/test/workflows';
 import {
@@ -11,8 +11,11 @@ import {
   drawer,
   fileText,
   noDrawer,
+  findPart,
   openMenu,
+  part,
   openStep,
+  stepPanel,
   outputButton,
   portButton,
   stepBox,
@@ -39,6 +42,21 @@ describe('the workflow editor', () => {
     // The file is out of the editing area, behind View file.
     expect(screen.queryByLabelText('The draft’s file')).toBeNull();
     expect(await fileText(user)).toBe(CLASSIC_V2);
+  });
+
+  it('opens the drawer below the bar, so Save and the bar stay in reach', async () => {
+    server.use(signedIn, ...workflowBackend(CLASSIC_V2).handlers);
+    const user = userEvent.setup();
+    renderApp(EDITOR_PAGE);
+
+    await stepBox('run');
+    // jsdom lays nothing out: the bar's frame says where it ends.
+    const frame = part('[role="toolbar"]', 'The workflow').parentElement;
+    if (frame === null) throw new Error('the bar has a frame');
+    frame.getBoundingClientRect = () => new DOMRect(0, 0, 1000, 120);
+    await user.click(toolButton('Inputs'));
+
+    expect(drawer('Inputs').style.top).toBe('120px');
   });
 
   it('opens a box in a drawer, which Escape and its × close', async () => {
@@ -131,6 +149,51 @@ describe('the workflow editor', () => {
     expect(await fileText(user)).toBe(CLASSIC_V2);
     await user.click(toolButton('Redo'));
     expect(await fileText(user)).not.toContain('id: check');
+  });
+
+  it('keeps the problems and their marks in place while the next change is checked', async () => {
+    const broken = CLASSIC_V2.replace(
+      'binary: ${{ steps.compile.binary }}',
+      'binary: ${{ steps.compiler.binary }}',
+    );
+    server.use(
+      signedIn,
+      ...workflowBackend(broken, {
+        problems: () => [
+          {
+            path: 'steps[1].with.binary',
+            message: 'There is no step called compiler before this one.',
+          },
+        ],
+      }).handlers,
+    );
+    const user = userEvent.setup();
+    renderApp(EDITOR_PAGE);
+
+    const banner = await findPart('section', 'Problems', CHECKED);
+    await within(banner).findByText(/One problem to fix/, {}, CHECKED);
+    // The next check does not answer while the test looks.
+    server.use(http.post('/api/v1/workflows/check', () => delay('infinite')));
+    await user.click(await outputButton('run', 'time_ms'));
+    await user.click(
+      within(await openMenu('The output time_ms of run')).getByRole('menuitem', {
+        name: 'Report it',
+      }),
+    );
+
+    expect(
+      await within(part('section', 'Problems')).findByText(
+        'Checking the latest change…',
+        {},
+        CHECKED,
+      ),
+    ).toBeInTheDocument();
+    expect(part('section', 'Problems')).toHaveTextContent(/One problem to fix/);
+    expect(
+      within(await stepBox('run')).getByRole('note', {
+        name: 'There is no step called compiler before this one.',
+      }),
+    ).toBeInTheDocument();
   });
 
   it('says each problem beside its mark and in the banner, which opens its box', async () => {
@@ -234,16 +297,14 @@ describe('the workflow editor', () => {
     );
   });
 
-  it('declares an input, a value of each test and a report entry in place', async () => {
+  it('declares an input in place', async () => {
     server.use(signedIn, ...workflowBackend(CLASSIC_V2).handlers);
     const user = userEvent.setup();
     renderApp(EDITOR_PAGE);
 
     await stepBox('run');
     await user.click(toolButton('Inputs'));
-    const inputs = within(drawer('Inputs')).getByLabelText('Add an input', {
-      selector: 'form',
-    });
+    const inputs = within(drawer('Inputs')).getByRole('form', { name: 'Add an input' });
     await user.type(
       within(inputs).getByRole('textbox', { name: 'New input' }),
       'episodes',
@@ -254,13 +315,19 @@ describe('the workflow editor', () => {
     );
     await user.click(within(inputs).getByRole('button', { name: 'Add an input' }));
 
+    expect(await fileText(user)).toContain('episodes: number');
+  });
+
+  it('declares a value of each test in place', async () => {
+    server.use(signedIn, ...workflowBackend(CLASSIC_V2).handlers);
+    const user = userEvent.setup();
+    renderApp(EDITOR_PAGE);
+
+    await stepBox('run');
     await user.click(toolButton('Each test’s files'));
-    const fields = within(drawer('Each test’s files')).getByLabelText(
-      'Add to each test',
-      {
-        selector: 'form',
-      },
-    );
+    const fields = within(drawer('Each test’s files')).getByRole('form', {
+      name: 'Add to each test',
+    });
     await user.type(
       within(fields).getByRole('textbox', { name: 'New file or value' }),
       'seed',
@@ -271,6 +338,14 @@ describe('the workflow editor', () => {
     );
     await user.click(within(fields).getByRole('button', { name: 'Add to each test' }));
 
+    expect(await fileText(user)).toContain('seed: text');
+  });
+
+  it('declares a report entry in place', async () => {
+    server.use(signedIn, ...workflowBackend(CLASSIC_V2).handlers);
+    const user = userEvent.setup();
+    renderApp(EDITOR_PAGE);
+
     await user.click(await outputButton('run', 'time_ms'));
     await user.click(
       within(await openMenu('The output time_ms of run')).getByRole('menuitem', {
@@ -278,10 +353,7 @@ describe('the workflow editor', () => {
       }),
     );
 
-    const text = await fileText(user);
-    expect(text).toContain('episodes: number');
-    expect(text).toContain('seed: text');
-    expect(text).toContain('time_ms_2: ${{ steps.run.time_ms }}');
+    expect(await fileText(user)).toContain('time_ms_2: ${{ steps.run.time_ms }}');
   });
 
   it('names an input for the task’s form: its title, unit and help', async () => {
@@ -408,9 +480,7 @@ describe('the workflow editor', () => {
     const panel = await openStep(user, 'first');
     await user.click(within(panel).getByRole('radio', { name: 'Once for each test' }));
 
-    const kept = within(drawer('Step first')).getByLabelText('The step first', {
-      selector: 'section',
-    });
+    const kept = stepPanel('first');
     expect(
       within(kept).getByRole('radio', { name: 'Once for each test' }),
     ).toBeChecked();

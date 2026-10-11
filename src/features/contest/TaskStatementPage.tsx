@@ -6,6 +6,7 @@ import { Card } from '@/ui/Card';
 import { Markdown } from '@/ui/Markdown';
 import { PageLink } from '@/ui/PageLink';
 import { PageTitle } from '@/ui/PageTitle';
+import { BackToOrganising } from './BackToOrganising';
 import { SectionTitle } from '@/ui/SectionTitle';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
@@ -117,7 +118,10 @@ function SignedInTask({
   const asks = page.release.closed !== 'not_approved';
   return (
     <div className={classes.page}>
-      <Back org={org} contest={contest} />
+      <div className={classes.links}>
+        <Back org={org} contest={contest} />
+        <BackToOrganising org={org} contest={contest} />
+      </div>
       <PageTitle>{headingOf(page)}</PageTitle>
       <TaskCountdown due={page.due} closes={page.closes} onBoundary={readAgain} />
       {asks && (

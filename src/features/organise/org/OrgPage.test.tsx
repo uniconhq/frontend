@@ -91,7 +91,7 @@ describe('the org page', () => {
     expect(screen.getByRole('button', { name: 'New contest' })).toHaveFocus();
   });
 
-  it('shows the refusal to someone who is not an observer, with the contests they can reach', async () => {
+  it('shows someone who organises only some of its contests those contests, plainly', async () => {
     server.use(
       signedIn,
       http.get(`${ORG_API}/contests`, () =>
@@ -100,11 +100,12 @@ describe('the org page', () => {
     );
     renderApp('/orgs/acme');
 
-    expect(await screen.findByText('You cannot do that')).toBeVisible();
-    expect(screen.getByText('You need the observer role at acme.')).toBeVisible();
     expect(
-      screen.getByText('Contests of this org where you have a role:'),
+      await screen.findByText('You organise these contests of acme:'),
     ).toBeVisible();
+    expect(screen.queryByText('You cannot do that')).not.toBeInTheDocument();
+    expect(screen.queryByText(/forbidden/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Try again' })).not.toBeInTheDocument();
     const own = screen.getByRole('list', { name: 'Contests' });
     expect(within(own).getByRole('link', { name: 'spring' })).toHaveAttribute(
       'href',

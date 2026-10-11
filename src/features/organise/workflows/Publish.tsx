@@ -23,6 +23,7 @@ export function PublishVersion({
   token,
   dirty,
   problems,
+  checking = false,
   onPublished,
 }: {
   owner: string;
@@ -33,6 +34,8 @@ export function PublishVersion({
   dirty: boolean;
   /** How many problems the check found, which a version would be refused for. */
   problems: number;
+  /** The draft's check has not answered yet for the text as it is. */
+  checking?: boolean;
   onPublished: (version: string) => void;
 }) {
   const queryClient = useQueryClient();
@@ -40,31 +43,39 @@ export function PublishVersion({
   const [refused, setRefused] = useState<{
     error: ApiError;
     problems: DefinitionProblem[];
+    /** The version asked for, when someone else made it first. */
+    taken: string | null;
   } | null>(null);
   const make = $api.useMutation('post', '/api/v1/workflows/{owner}/{name}/versions');
   const next = nextVersion(versions);
 
+  const page = $api.queryOptions('get', '/api/v1/workflows/{owner}/{name}', {
+    params: { path: { owner, name } },
+  }).queryKey;
+
   const publish = async () => {
     setRefused(null);
+    const asked = next;
     try {
       const made = await make.mutateAsync({
         params: { path: { owner, name } },
-        body: { version: next, token },
+        body: { version: asked, token },
       });
-      await queryClient.invalidateQueries({
-        queryKey: $api.queryOptions('get', '/api/v1/workflows/{owner}/{name}', {
-          params: { path: { owner, name } },
-        }).queryKey,
-      });
+      await queryClient.invalidateQueries({ queryKey: page });
       setOpen(false);
       onPublished(made.version);
     } catch (caught) {
       const error = toApiError(caught);
+      // What was refused may be out of date (a version made, the draft saved
+      // by someone else): read the workflow again, so the dialog offers what
+      // holds now.
+      await queryClient.invalidateQueries({ queryKey: page });
       setRefused({
         error,
         problems: Array.isArray(error.extensions.errors)
           ? (error.extensions.errors as DefinitionProblem[])
           : [],
+        taken: error.code === 'conflict' ? asked : null,
       });
     }
   };
@@ -93,7 +104,12 @@ export function PublishVersion({
               .
             </BodyText>
           )}
-          {!dirty && problems > 0 && (
+          {!dirty && checking && (
+            <BodyText size="md">
+              The draft is still being checked. Wait a moment for its answer.
+            </BodyText>
+          )}
+          {!dirty && !checking && problems > 0 && (
             <BodyText size="md">
               {problems === 1
                 ? 'One problem stops'
@@ -105,7 +121,9 @@ export function PublishVersion({
           {refused !== null && (
             <div role="alert" className={classes.stack}>
               <BodyText size="md">
-                No version was made: {refused.error.detail ?? refused.error.message}
+                {refused.taken !== null && versions.includes(refused.taken)
+                  ? `Someone else published ${refused.taken} meanwhile, so this will be ${next}.`
+                  : `No version was made: ${refused.error.detail ?? refused.error.message}`}
               </BodyText>
               {refused.problems.length > 0 && (
                 <ul className={classes.problems}>
@@ -121,7 +139,7 @@ export function PublishVersion({
           <div className={classes.actions}>
             <Button
               loading={make.isPending}
-              disabled={dirty || problems > 0}
+              disabled={dirty || checking || problems > 0}
               onClick={() => void publish()}
             >
               Publish {next}

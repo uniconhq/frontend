@@ -327,6 +327,10 @@ export function workflowBackend(
       const found = options.problems?.(state.draft) ?? [];
       if (found.length > 0)
         return problem(422, 'invalid_definition', { errors: found });
+      if (state.versions.includes(version))
+        return problem(409, 'conflict', {
+          detail: `kenny/tuned already has a version ${version}. Choose another version.`,
+        });
       state.versions.push(version);
       return HttpResponse.json({ version }, { status: 201 });
     }),

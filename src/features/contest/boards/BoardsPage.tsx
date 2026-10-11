@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { $api, queryView } from '@/api/query';
 import { PageLink } from '@/ui/PageLink';
 import { PageTitle } from '@/ui/PageTitle';
+import { BackToOrganising } from '../BackToOrganising';
 import { contestHomePath, taskPagePath } from '@/lib/contest-paths';
 import { useContestParams } from '@/lib/route-params';
 import { CONTEST_VIEW_SECTIONS, sectionOf } from '@/lib/sections';
@@ -17,10 +18,16 @@ function Back({ org, contest }: ContestPath) {
   return <PageLink to={contestHomePath(org, contest)}>Back to the contest</PageLink>;
 }
 
-function Page({ org, contest, children }: ContestPath & { children: ReactNode }) {
+function Page({
+  org,
+  contest,
+  signedIn = false,
+  children,
+}: ContestPath & { signedIn?: boolean; children: ReactNode }) {
   return (
     <div className={classes.page}>
       <Back org={org} contest={contest} />
+      {signedIn && <BackToOrganising org={org} contest={contest} />}
       <PageTitle>{sectionOf(CONTEST_VIEW_SECTIONS, 'boards').label}</PageTitle>
       {children}
     </div>
@@ -41,7 +48,7 @@ function SignedInBoards({ org, contest }: ContestPath) {
     ),
   );
   return (
-    <Page org={org} contest={contest}>
+    <Page org={org} contest={contest} signedIn>
       <BoardList
         view={view}
         empty="This contest has no leaderboard you can see."

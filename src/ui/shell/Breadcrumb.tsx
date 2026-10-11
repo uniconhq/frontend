@@ -116,8 +116,9 @@ function trailOf(pathname: string, params: Params): Segment[] {
     return segments;
   }
   const place = PLACES[pathname];
+  // An address that is no page's is said as such, not as some other page.
   return [
-    { label: place ?? 'Browse contests', to: place === undefined ? '/' : pathname },
+    place === undefined ? { label: 'Page not found' } : { label: place, to: pathname },
   ];
 }
 

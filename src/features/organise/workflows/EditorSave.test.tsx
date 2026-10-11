@@ -1,17 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
-import { http, HttpResponse } from 'msw';
+import { delay, http, HttpResponse } from 'msw';
 import userEvent from '@/test/user-event';
 import { renderApp } from '@/test/render';
 import { server, signedIn } from '@/test/server';
 import { CLASSIC_V2, workflowBackend } from '@/test/workflows';
 import {
   EDITOR_PAGE,
+  part,
   barButton,
-  drawer,
   fileText,
   openMenu,
+  outputButton,
   openStep,
+  stepPanel,
   portButton,
   toolButton,
 } from '@/test/workflow-editor';
@@ -42,9 +44,7 @@ describe('saving and publishing a workflow', () => {
         name: 'Give it a value in the step’s drawer',
       }),
     );
-    const panel = within(drawer('Step run')).getByLabelText('The step run', {
-      selector: 'section',
-    });
+    const panel = stepPanel('run');
     await user.click(
       within(panel).getByRole('button', { name: 'Remove the wire to memory_limit' }),
     );
@@ -52,10 +52,16 @@ describe('saving and publishing a workflow', () => {
       within(panel).getByRole('textbox', { name: /^memory_limit/ }),
       '9{Enter}',
     );
-    expect(screen.getByText('Changes not saved yet.')).toBeInTheDocument();
+    expect(
+      within(part('[role="toolbar"]', 'The workflow')).getByText(
+        'Not saved yet: leaving this page loses these changes.',
+      ),
+    ).toBeInTheDocument();
     await user.click(barButton('Save'));
     await waitFor(() => expect(backend.state.draft).toContain('memory_limit: 9'));
-    expect(screen.getByText('All changes saved.')).toBeInTheDocument();
+    expect(
+      within(part('[role="toolbar"]', 'The workflow')).getByText('All changes saved.'),
+    ).toBeInTheDocument();
     await screen.findByText(/One problem to fix/, {}, CHECKED);
 
     await user.click(barButton('Publish version'));
@@ -65,6 +71,31 @@ describe('saving and publishing a workflow', () => {
     expect(dialog).toHaveTextContent('One problem stops it');
     expect(within(dialog).getByRole('button', { name: 'Publish v1' })).toBeDisabled();
     expect(backend.state.versions).toEqual([]);
+  });
+
+  it('will not publish a saved draft until its check has answered', async () => {
+    const backend = workflowBackend(CLASSIC_V2);
+    server.use(signedIn, ...backend.handlers);
+    const user = userEvent.setup();
+    renderApp(EDITOR_PAGE);
+
+    await screen.findByText(/Nothing to fix/, {}, CHECKED);
+    server.use(http.post('/api/v1/workflows/check', () => delay('infinite')));
+    await user.click(await outputButton('run', 'time_ms'));
+    await user.click(
+      within(await openMenu('The output time_ms of run')).getByRole('menuitem', {
+        name: 'Report it',
+      }),
+    );
+    await user.click(barButton('Save'));
+    await waitFor(() => expect(backend.state.draft).toContain('time_ms_2'));
+
+    await user.click(barButton('Publish version'));
+    const dialog = await screen.findByLabelText('Publish v1', {
+      selector: '[role="dialog"]',
+    });
+    expect(dialog).toHaveTextContent('The draft is still being checked.');
+    expect(within(dialog).getByRole('button', { name: 'Publish v1' })).toBeDisabled();
   });
 
   it('says in the forge’s words why it made no version', async () => {
@@ -146,6 +177,30 @@ describe('saving and publishing a workflow', () => {
     expect(
       await screen.findByLabelText('Publish v11', { selector: '[role="dialog"]' }),
     ).toBeInTheDocument();
+  });
+
+  it('offers the next version once someone else has published the one it offered', async () => {
+    const backend = workflowBackend(CLASSIC_V2, { versions: ['v1'] });
+    server.use(signedIn, ...backend.handlers);
+    const user = userEvent.setup();
+    renderApp(EDITOR_PAGE);
+
+    await screen.findByText(/Nothing to fix/, {}, CHECKED);
+    // Someone else publishes v2 after the page was read.
+    backend.state.versions.push('v2');
+    await user.click(barButton('Publish version'));
+    const dialog = await screen.findByLabelText('Publish v2', {
+      selector: '[role="dialog"]',
+    });
+    await user.click(within(dialog).getByRole('button', { name: 'Publish v2' }));
+
+    expect(
+      await within(dialog).findByText(
+        'Someone else published v2 meanwhile, so this will be v3.',
+      ),
+    ).toBeInTheDocument();
+    await user.click(await within(dialog).findByRole('button', { name: 'Publish v3' }));
+    await waitFor(() => expect(backend.state.versions).toEqual(['v1', 'v2', 'v3']));
   });
 
   it('asks for a save before publishing changes', async () => {

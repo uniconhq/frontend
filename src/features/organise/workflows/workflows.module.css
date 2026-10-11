@@ -128,7 +128,8 @@
   white-space: pre-wrap;
 }
 
-/* The selected box's drawer, from the right, over the page. */
+/* The selected box's drawer, from the right, over the graph: its top is set
+ * below the workflow's bar as the page scrolls (Drawer.tsx). */
 .drawer {
   position: fixed;
   top: 0;
