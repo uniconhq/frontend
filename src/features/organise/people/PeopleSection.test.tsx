@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { screen, within } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@/test/user-event';
 import { http, HttpResponse } from 'msw';
 import type { Holder, Me } from '@/api/types';
 import { renderApp } from '@/test/render';
@@ -153,7 +153,8 @@ describe('the organisers section', () => {
     await user.selectOptions(within(form).getByLabelText('Role'), 'observer');
     await user.click(within(form).getByRole('button', { name: 'Save' }));
 
-    expect(await within(row('dee')).findByText('Observer')).toBeVisible();
+    // The save replaces dee's row with a new one, so the row is found afresh each try.
+    await waitFor(() => expect(within(row('dee')).getByText('Observer')).toBeVisible());
     expect(sent[0]).toEqual({
       method: 'POST',
       body: { username: 'dee', role: 'observer' },
