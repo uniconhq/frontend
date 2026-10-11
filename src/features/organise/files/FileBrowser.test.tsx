@@ -394,8 +394,11 @@ describe("saving a task's settings as text", () => {
 
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent('Nothing was saved');
-    expect(within(alert).getByRole('list', { name: 'Errors' })).toHaveTextContent(
-      'workflow: There is no such workflow.',
+    const errors = within(alert).getByRole('list', { name: 'Errors' });
+    expect(errors).toHaveTextContent('Workflow: There is no such workflow.');
+    expect(within(errors).getByRole('link', { name: 'Workflow' })).toHaveAttribute(
+      'href',
+      '/orgs/acme/contests/spring/tasks/sum?card=workflow&field=workflow',
     );
   });
 

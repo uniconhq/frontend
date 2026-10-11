@@ -8,6 +8,9 @@ import classes from './organise.module.css';
  */
 export type ProblemPlace = { label: string; to: string };
 
+/** Where a problem, by its place in the file and its sentence, is fixed. */
+export type PlaceOf = (path: string, message: string) => ProblemPlace;
+
 /**
  * What is wrong with a definition file. With `placeOf`, each problem names
  * the part of the page and the field it is about, in words, as a link that
@@ -19,13 +22,13 @@ export function DefinitionErrors({
   placeOf,
 }: {
   errors: DefinitionError[];
-  placeOf?: (path: string) => ProblemPlace;
+  placeOf?: PlaceOf;
 }) {
   if (errors.length === 0) return null;
   return (
     <ul className={classes.named} aria-label="Errors">
       {errors.map((error) => {
-        const place = placeOf?.(error.path);
+        const place = placeOf?.(error.path, error.message);
         return (
           <li key={`${error.path}:${error.message}`}>
             {place === undefined ? (

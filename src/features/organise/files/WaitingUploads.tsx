@@ -6,6 +6,7 @@ import type { Place } from './place';
 import { useSaveUploads, type ArrivedUpload } from './upload-save';
 import { UploadSaveAnswer } from './UploadSaveAnswer';
 import { WaitingContext, useWaitingUploads, type Waiting } from './waiting-uploads';
+import { placeOfIn } from '../task/places';
 import shared from '../organise.module.css';
 import classes from './Files.module.css';
 
@@ -101,7 +102,7 @@ export function WaitingUploads({ place }: { place: TaskPlace }) {
           )}
         </>
       )}
-      <UploadSaveAnswer saving={saving} />
+      <UploadSaveAnswer saving={saving} placeOf={placeOfIn(place)} />
     </section>
   );
 }

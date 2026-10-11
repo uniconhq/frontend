@@ -4,7 +4,7 @@ import type { SaveResult, WriteFile } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
-import { DefinitionErrors, type ProblemPlace } from '../DefinitionErrors';
+import { DefinitionErrors, type PlaceOf } from '../DefinitionErrors';
 import classes from '../organise.module.css';
 import { countOf, definitionErrorsOf, stringsOf } from './refusals';
 
@@ -96,7 +96,7 @@ export function SaveOutcome<Body = WriteFile>({
   onConfirm: (body: Body) => void;
   onKeepAsDraft: (body: Body) => void;
   onReload: () => void;
-  placeOf?: (path: string) => ProblemPlace;
+  placeOf?: PlaceOf;
   bare?: boolean;
 }) {
   if (outcome.kind === 'written') {
@@ -151,7 +151,7 @@ export function SaveOutcome<Body = WriteFile>({
         {result.errors.length > 0 && (
           <>
             <BodyText>What keeps it from publishing:</BodyText>
-            <DefinitionErrors errors={result.errors} />
+            <DefinitionErrors errors={result.errors} placeOf={placeOf} />
           </>
         )}
         {result.held_back.length > 0 && (

@@ -10,6 +10,7 @@ import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
 import { SaveOutcome, type Outcome } from '../files/SaveOutcome';
 import { UploadedFile } from '../files/UploadedFile';
 import type { Place } from '../files/place';
+import { placeOfIn } from '../task/places';
 import shared from '../organise.module.css';
 import { useFileWrite, useOwnFile } from './file-hooks';
 import classes from './forms.module.css';
@@ -87,6 +88,7 @@ export function StatementEditor({ place, admin }: { place: Place; admin: boolean
             setOutcome(null);
             void query.refetch();
           }}
+          placeOf={placeOfIn(place)}
         />
       )}
     </div>

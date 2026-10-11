@@ -11,7 +11,7 @@ import { UploadedFile } from '../files/UploadedFile';
 import type { Place } from '../files/place';
 import { useFileWrite, useOwnFile } from './file-hooks';
 import { definitionErrorsOf } from '../files/refusals';
-import type { ProblemPlace } from '../DefinitionErrors';
+import type { PlaceOf } from '../DefinitionErrors';
 import { MergeView, type MergeWords } from './MergeView';
 import { parseYaml, topMap, writeOver, type Doc } from './yaml-doc';
 
@@ -42,6 +42,7 @@ export function DefinitionFile({
   path,
   label,
   admin,
+  placeOf,
   children,
 }: {
   place: Place;
@@ -50,6 +51,8 @@ export function DefinitionFile({
   label: string;
   /** Whether the organiser is an admin at the scope, which the merge view needs. */
   admin: boolean;
+  /** Where each problem a refused save lists is fixed. */
+  placeOf?: PlaceOf;
   children: (props: FormProps) => ReactNode;
 }) {
   return (
@@ -60,7 +63,7 @@ export function DefinitionFile({
           value: 'form',
           label: 'Form',
           panel: (
-            <DefinitionForm place={place} path={path} admin={admin}>
+            <DefinitionForm place={place} path={path} admin={admin} placeOf={placeOf}>
               {children}
             </DefinitionForm>
           ),
@@ -99,7 +102,7 @@ export function DefinitionForm({
   admin: boolean;
   children: (props: FormProps) => ReactNode;
   words?: MergeWords;
-  placeOf?: (path: string) => ProblemPlace;
+  placeOf?: PlaceOf;
   bare?: boolean;
   readOnly?: boolean;
 }) {

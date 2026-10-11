@@ -336,7 +336,7 @@ describe('the task settings form', { timeout: 20_000 }, () => {
     const outcome = (await screen.findByText(/Saved as a draft/))
       .parentElement as HTMLElement;
     expect(within(outcome).getByRole('list', { name: 'Errors' })).toHaveTextContent(
-      'inputs.setter[0].value',
+      'Inputs: setter: There is no file under data/hidden/ in the task.',
     );
     const saved = parse(sent[0]?.content ?? '') as Record<string, unknown>;
     expect(saved['name']).toBe('Shortest Paths');

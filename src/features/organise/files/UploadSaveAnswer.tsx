@@ -2,6 +2,7 @@ import type { ApiError } from '@/api/problem';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
+import type { PlaceOf } from '../DefinitionErrors';
 import { SaveOutcome } from './SaveOutcome';
 import type { useSaveUploads } from './upload-save';
 import shared from '../organise.module.css';
@@ -50,8 +51,11 @@ export function Refused({ error }: { error: ApiError }) {
  */
 export function UploadSaveAnswer({
   saving,
+  placeOf,
 }: {
   saving: ReturnType<typeof useSaveUploads>;
+  /** Where each problem of a save kept as a draft is fixed. */
+  placeOf?: PlaceOf;
 }) {
   const { outcome, send, saveOver, pending } = saving;
   if (outcome === null) return null;
@@ -98,6 +102,7 @@ export function UploadSaveAnswer({
       onConfirm={(body) => void send({ ...body, confirm: true })}
       onKeepAsDraft={(body) => void send({ ...body, keep_as_draft: true })}
       onReload={() => undefined}
+      placeOf={placeOf}
     />
   );
 }

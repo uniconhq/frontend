@@ -14,6 +14,7 @@ import { SaveOutcome, type Outcome } from './SaveOutcome';
 import { TextConflict } from './TextConflict';
 import { UploadedFile } from './UploadedFile';
 import { SettingsFile } from '../contest/SettingsFile';
+import { placeOfIn } from '../task/places';
 
 /** The contest's settings, changed only on the contest's pages and shown here to read. */
 const CONTEST_FILE = 'contest.yaml';
@@ -218,6 +219,7 @@ export function FileEditor({ place, path }: { place: Place; path: string }) {
           onConfirm={(body) => void save({ ...body, confirm: true })}
           onKeepAsDraft={(body) => void save({ ...body, keep_as_draft: true })}
           onReload={() => void reload()}
+          placeOf={placeOfIn(place)}
         />
       )}
       {place.kind === 'task' && (

@@ -197,7 +197,7 @@ describe('saving a task file', () => {
       .parentElement as HTMLElement;
     expect(outcome).toHaveTextContent('the last publication keeps grading');
     expect(within(outcome).getByRole('list', { name: 'Errors' })).toHaveTextContent(
-      'inputs.setter[0].value: There is no file under data/hidden/ in the task.',
+      'Inputs: setter: There is no file under data/hidden/ in the task.',
     );
     const before = reads.state;
     await comeBack();

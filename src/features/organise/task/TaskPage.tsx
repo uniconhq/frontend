@@ -15,6 +15,7 @@ import {
 } from '@/lib/sections';
 import { DefinitionErrors } from '../DefinitionErrors';
 import { OrganisersLine } from '../hub/lines';
+import { taskPlaceOf } from './places';
 import { publishedLine } from './published';
 import {
   AnnouncementsCard,
@@ -82,7 +83,10 @@ function TaskStatus({ path }: { path: TaskPath }) {
             (state.errors.length > 0 ? (
               <>
                 <BodyText>The last save did not publish, for these problems:</BodyText>
-                <DefinitionErrors errors={state.errors} />
+                <DefinitionErrors
+                  errors={state.errors}
+                  placeOf={taskPlaceOf(path.org, path.contest, path.task)}
+                />
               </>
             ) : (
               <BodyText tone="secondary">

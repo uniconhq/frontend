@@ -10,6 +10,7 @@ import { useSaveUploads, type ArrivedUpload } from './upload-save';
 import { Refused, UploadSaveAnswer } from './UploadSaveAnswer';
 import { useTaskUpload, type UploadState } from './use-task-upload';
 import { useWaitingUploads } from './waiting-uploads';
+import { placeOfIn } from '../task/places';
 import shared from '../organise.module.css';
 import classes from './Files.module.css';
 
@@ -233,7 +234,7 @@ export function TaskUpload({
         </div>
       )}
 
-      <UploadSaveAnswer saving={saving} />
+      <UploadSaveAnswer saving={saving} placeOf={placeOfIn(place)} />
     </section>
   );
 }

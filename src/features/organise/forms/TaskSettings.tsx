@@ -9,6 +9,7 @@ import { Select } from '@/ui/Select';
 import { TextInput } from '@/ui/TextInput';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
 import { treeQuery, type Place } from '../files/place';
+import { placeOfIn } from '../task/places';
 import shared from '../organise.module.css';
 import { DefinitionFile, type FormProps } from './DefinitionFile';
 import { Fieldset, NumberField } from './fields';
@@ -47,6 +48,7 @@ export function TaskSettings({ place, admin }: { place: Place; admin: boolean })
       path="task.yaml"
       admin={admin}
       label="The task's settings"
+      placeOf={placeOfIn(place)}
     >
       {(props) => <WithFolders {...props} place={place} admin={admin} />}
     </DefinitionFile>

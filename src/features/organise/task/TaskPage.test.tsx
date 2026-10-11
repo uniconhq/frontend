@@ -49,7 +49,7 @@ describe('the task page', () => {
     );
     const errors = within(status).getByRole('list', { name: 'Errors' });
     expect(within(errors).getByRole('listitem')).toHaveTextContent(
-      'inputs.setter[0].value: There is no file under data/hidden/ in the task.',
+      'Inputs: setter: There is no file under data/hidden/ in the task.',
     );
   });
 
