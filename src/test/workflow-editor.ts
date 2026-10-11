@@ -115,3 +115,38 @@ export async function openStep(user: UserEvent, id: string): Promise<HTMLElement
   await user.click(within(box).getByRole('button', { name: new RegExp(`^${id}`) }));
   return stepPanel(id);
 }
+
+/** The dialog open with the title `title`, once it is. */
+export function findDialog(title: string): Promise<HTMLElement> {
+  return waitFor(() => {
+    const found = [...document.querySelectorAll<HTMLElement>('[role="dialog"]')].find(
+      (dialog) =>
+        dialog.getAttribute('aria-label') === title ||
+        document.getElementById(dialog.getAttribute('aria-labelledby') ?? '')
+          ?.textContent === title,
+    );
+    if (found === undefined) throw new Error(`No dialog is open titled ${title}.`);
+    return found;
+  });
+}
+
+/** The problems banner once it says `words`: the check answers a moment after a change. */
+export function findProblems(words: RegExp): Promise<HTMLElement> {
+  return waitFor(
+    () => {
+      const banner = part('section', 'Problems');
+      if (!words.test(banner.textContent))
+        throw new Error(`The banner does not say ${String(words)}.`);
+      return banner;
+    },
+    { timeout: 3_000 },
+  );
+}
+
+/** The merge view of a save over someone else's, once it is open. */
+export async function findMerge(): Promise<HTMLElement> {
+  const fields = await findPart('ul', 'Fields that differ');
+  const panel = fields.closest<HTMLElement>('[role="alert"]');
+  if (panel === null) throw new Error('The merge view has no panel.');
+  return panel;
+}

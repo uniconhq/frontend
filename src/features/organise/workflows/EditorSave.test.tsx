@@ -16,24 +16,25 @@ import {
   stepPanel,
   portButton,
   toolButton,
+  findDialog,
+  findMerge,
+  findProblems,
 } from '@/test/workflow-editor';
 
-/** The forge's check runs 400 ms after the text settles, then answers. */
-const CHECKED = { timeout: 3_000 };
+/** The forge's check of a draft whose run step is given its memory as text. */
+const memoryAsText = (content: string) =>
+  content.includes('memory_limit: 9')
+    ? [
+        {
+          path: 'steps[1].with.memory_limit',
+          message: 'This takes a number, not text.',
+        },
+      ]
+    : [];
 
 describe('saving and publishing a workflow', () => {
-  it('saves a draft with a problem, and will not publish a version of it', async () => {
-    const backend = workflowBackend(CLASSIC_V2, {
-      problems: (content) =>
-        content.includes('memory_limit: 9')
-          ? [
-              {
-                path: 'steps[1].with.memory_limit',
-                message: 'This takes a number, not text.',
-              },
-            ]
-          : [],
-    });
+  it('saves a draft with a problem', async () => {
+    const backend = workflowBackend(CLASSIC_V2, { problems: memoryAsText });
     server.use(signedIn, ...backend.handlers);
     const user = userEvent.setup();
     renderApp(EDITOR_PAGE);
@@ -62,12 +63,21 @@ describe('saving and publishing a workflow', () => {
     expect(
       within(part('[role="toolbar"]', 'The workflow')).getByText('All changes saved.'),
     ).toBeInTheDocument();
-    await screen.findByText(/One problem to fix/, {}, CHECKED);
+    await findProblems(/One problem to fix/);
+  });
 
+  it('will not publish a version of a saved draft with a problem', async () => {
+    const backend = workflowBackend(
+      CLASSIC_V2.replace('memory_limit: ${{ inputs.memory_limit }}', 'memory_limit: 9'),
+      { problems: memoryAsText },
+    );
+    server.use(signedIn, ...backend.handlers);
+    const user = userEvent.setup();
+    renderApp(EDITOR_PAGE);
+
+    await findProblems(/One problem to fix/);
     await user.click(barButton('Publish version'));
-    const dialog = await screen.findByLabelText('Publish v1', {
-      selector: '[role="dialog"]',
-    });
+    const dialog = await findDialog('Publish v1');
     expect(dialog).toHaveTextContent('One problem stops it');
     expect(within(dialog).getByRole('button', { name: 'Publish v1' })).toBeDisabled();
     expect(backend.state.versions).toEqual([]);
@@ -79,7 +89,7 @@ describe('saving and publishing a workflow', () => {
     const user = userEvent.setup();
     renderApp(EDITOR_PAGE);
 
-    await screen.findByText(/Nothing to fix/, {}, CHECKED);
+    await findProblems(/Nothing to fix/);
     server.use(http.post('/api/v1/workflows/check', () => delay('infinite')));
     await user.click(await outputButton('run', 'time_ms'));
     await user.click(
@@ -91,9 +101,7 @@ describe('saving and publishing a workflow', () => {
     await waitFor(() => expect(backend.state.draft).toContain('time_ms_2'));
 
     await user.click(barButton('Publish version'));
-    const dialog = await screen.findByLabelText('Publish v1', {
-      selector: '[role="dialog"]',
-    });
+    const dialog = await findDialog('Publish v1');
     expect(dialog).toHaveTextContent('The draft is still being checked.');
     expect(within(dialog).getByRole('button', { name: 'Publish v1' })).toBeDisabled();
   });
@@ -116,11 +124,9 @@ describe('saving and publishing a workflow', () => {
     const user = userEvent.setup();
     renderApp(EDITOR_PAGE);
 
-    await screen.findByText(/Nothing to fix/, {}, CHECKED);
+    await findProblems(/Nothing to fix/);
     await user.click(barButton('Publish version'));
-    const dialog = await screen.findByLabelText('Publish v1', {
-      selector: '[role="dialog"]',
-    });
+    const dialog = await findDialog('Publish v1');
     await user.click(within(dialog).getByRole('button', { name: 'Publish v1' }));
 
     const refused = await within(dialog).findByRole('alert');
@@ -137,11 +143,9 @@ describe('saving and publishing a workflow', () => {
     const user = userEvent.setup();
     renderApp(EDITOR_PAGE);
 
-    await screen.findByText(/Nothing to fix/, {}, CHECKED);
+    await findProblems(/Nothing to fix/);
     await user.click(barButton('Publish version'));
-    const dialog = await screen.findByLabelText('Publish v1', {
-      selector: '[role="dialog"]',
-    });
+    const dialog = await findDialog('Publish v1');
     expect(dialog).toHaveTextContent('v1 will hold the draft as it was last saved');
     await user.click(within(dialog).getByRole('button', { name: 'Publish v1' }));
 
@@ -157,11 +161,9 @@ describe('saving and publishing a workflow', () => {
     const user = userEvent.setup();
     renderApp(EDITOR_PAGE);
 
-    await screen.findByText(/Nothing to fix/, {}, CHECKED);
+    await findProblems(/Nothing to fix/);
     await user.click(barButton('Publish version'));
-    const dialog = await screen.findByLabelText('Publish v10', {
-      selector: '[role="dialog"]',
-    });
+    const dialog = await findDialog('Publish v10');
     await user.click(within(dialog).getByRole('button', { name: 'Publish v10' }));
 
     expect(await screen.findByRole('status', { name: '' })).toHaveTextContent(
@@ -174,9 +176,7 @@ describe('saving and publishing a workflow', () => {
       ).toBeInTheDocument(),
     );
     await user.click(barButton('Publish version'));
-    expect(
-      await screen.findByLabelText('Publish v11', { selector: '[role="dialog"]' }),
-    ).toBeInTheDocument();
+    expect(await findDialog('Publish v11')).toBeInTheDocument();
   });
 
   it('offers the next version once someone else has published the one it offered', async () => {
@@ -185,13 +185,11 @@ describe('saving and publishing a workflow', () => {
     const user = userEvent.setup();
     renderApp(EDITOR_PAGE);
 
-    await screen.findByText(/Nothing to fix/, {}, CHECKED);
+    await findProblems(/Nothing to fix/);
     // Someone else publishes v2 after the page was read.
     backend.state.versions.push('v2');
     await user.click(barButton('Publish version'));
-    const dialog = await screen.findByLabelText('Publish v2', {
-      selector: '[role="dialog"]',
-    });
+    const dialog = await findDialog('Publish v2');
     await user.click(within(dialog).getByRole('button', { name: 'Publish v2' }));
 
     expect(
@@ -214,9 +212,7 @@ describe('saving and publishing a workflow', () => {
       within(panel).getByRole('button', { name: 'Remove the step check' }),
     );
     await user.click(barButton('Publish version'));
-    const dialog = await screen.findByLabelText('Publish v1', {
-      selector: '[role="dialog"]',
-    });
+    const dialog = await findDialog('Publish v1');
 
     expect(dialog).toHaveTextContent('You have changes that are not saved.');
     expect(within(dialog).getByRole('button', { name: 'Publish v1' })).toBeDisabled();
@@ -280,9 +276,13 @@ describe('saving and publishing a workflow', () => {
     expect(
       await screen.findByText('Someone else saved a change since you opened this.'),
     ).toBeInTheDocument();
-    const fields = screen.getByRole('list', { name: 'Fields that differ' });
+    const fields = part('ul', 'Fields that differ');
     expect(within(fields).getByText(/steps\[run\]\.with\.args/)).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Save the merged version' }));
+    await user.click(
+      within(await findMerge()).getByRole('button', {
+        name: 'Save the merged version',
+      }),
+    );
     await waitFor(() =>
       expect(backend.state.draft).toContain('args: ${{ inputs.time_limit }}'),
     );
@@ -307,24 +307,30 @@ describe('saving and publishing a workflow', () => {
     );
     backend.state.token = 'someone-else';
     await user.click(barButton('Save'));
-    await screen.findByRole('list', { name: 'Fields that differ' });
+    await findMerge();
     backend.state.draft = backend.state.draft.replace(
       'fold: sum, better: lower',
       'fold: min, better: lower',
     );
     backend.state.token = 'a-third';
-    await user.click(screen.getByRole('button', { name: 'Save the merged version' }));
+    await user.click(
+      within(await findMerge()).getByRole('button', {
+        name: 'Save the merged version',
+      }),
+    );
 
     await waitFor(() =>
       expect(
-        within(screen.getByRole('list', { name: 'Fields that differ' })).getByText(
-          /time_ms\.fold/,
-        ),
+        within(part('ul', 'Fields that differ')).getByText(/time_ms\.fold/),
       ).toBeInTheDocument(),
     );
-    const fields = screen.getByRole('list', { name: 'Fields that differ' });
+    const fields = part('ul', 'Fields that differ');
     expect(within(fields).queryByText(/both changed it/)).not.toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Save the merged version' }));
+    await user.click(
+      within(await findMerge()).getByRole('button', {
+        name: 'Save the merged version',
+      }),
+    );
     await waitFor(() => expect(backend.state.token).not.toBe('a-third'));
     expect(backend.state.draft).toContain('args: ${{ inputs.time_limit }}');
     expect(backend.state.draft).toContain('fold: min');
@@ -348,7 +354,9 @@ describe('saving and publishing a workflow', () => {
     );
     backend.state.token = 'someone-else';
     await user.click(barButton('Save'));
-    await user.click(await screen.findByRole('button', { name: 'Discard my changes' }));
+    await user.click(
+      within(await findMerge()).getByRole('button', { name: 'Discard my changes' }),
+    );
 
     expect(await fileText(user)).toContain('fold: sum');
     await user.click(toolButton('Undo'));
