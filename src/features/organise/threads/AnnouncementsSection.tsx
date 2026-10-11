@@ -69,11 +69,11 @@ function Composer({
       <Textarea label="Text" value={body} onChange={setBody} rows={4} required />
       {change.error !== null && <ErrorBlock error={change.error} compact />}
       <div className={classes.actions}>
-        <Button type="submit" size="xs" loading={change.pending !== null}>
+        <Button type="submit" loading={change.pending !== null}>
           {label}
         </Button>
         {onCancel !== undefined && (
-          <Button size="xs" variant="secondary" onClick={onCancel}>
+          <Button variant="secondary" onClick={onCancel}>
             Cancel
           </Button>
         )}

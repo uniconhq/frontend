@@ -267,7 +267,7 @@ function InviteForm({ place, grants }: { place: RolePlace; grants: Grant[] }) {
         {means} The invite stands for {STANDS_DAYS} days.
       </BodyText>
       <div className={classes.actions}>
-        <Button size="xs" type="submit" loading={change.pending !== null}>
+        <Button type="submit" loading={change.pending !== null}>
           Invite
         </Button>
       </div>

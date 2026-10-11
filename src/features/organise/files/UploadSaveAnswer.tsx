@@ -82,7 +82,6 @@ export function UploadSaveAnswer({
         </BodyText>
         <div className={shared.actions}>
           <Button
-            size="xs"
             variant="secondary"
             loading={pending}
             onClick={() => void saveOver(outcome.body)}

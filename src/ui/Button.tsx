@@ -15,6 +15,13 @@ import type { CSSProperties, ReactNode } from 'react';
  * fill taken away. `href` turns the
  * button into a real anchor, for the trips out of the app the browser has to
  * perform.
+ *
+ * The rules every page keeps: a button does something, and a link (PageLink,
+ * OutLink) goes somewhere; a card or a form has at most one primary button;
+ * a destructive one never sits on a hub. Every action of a page, a card, a
+ * form or a dialog is `sm`, the default, so equal actions side by side are
+ * one size; `xs` is only for an action on one item of a list or one row of a
+ * table, which keeps the row low.
  */
 export function Button({
   children,

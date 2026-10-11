@@ -104,7 +104,6 @@ export function Combine({
       <OwnerAndName owner={owner} name={name} setOwner={setOwner} setName={setName} />
       <div>
         <Button
-          size="xs"
           type="submit"
           loading={combine.isPending}
           disabled={chosen.length < 2 || name.trim() === ''}
@@ -112,7 +111,7 @@ export function Combine({
           Combine
         </Button>
       </div>
-      {error !== null && <ErrorBlock error={error} />}
+      {error !== null && <ErrorBlock error={error} compact />}
     </form>
   );
 }

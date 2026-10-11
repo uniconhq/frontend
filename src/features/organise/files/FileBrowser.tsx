@@ -38,7 +38,7 @@ export function FileBrowser({ place }: { place: Place }) {
         <div className={classes.heading}>
           <SectionTitle>Files</SectionTitle>
           {uploads && !uploading && (
-            <Button size="xs" variant="secondary" onClick={() => setUploading(true)}>
+            <Button variant="secondary" onClick={() => setUploading(true)}>
               Upload a file
             </Button>
           )}
