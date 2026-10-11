@@ -1,21 +1,34 @@
+import { useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { $api, queryView } from '@/api/query';
-import type { BoardRow, OrganisedBoard } from '@/api/types';
+import type { OrganisedBoard } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
+import { Button } from '@/ui/Button';
 import { Card } from '@/ui/Card';
+import { PageLink } from '@/ui/PageLink';
+import { SectionTitle } from '@/ui/SectionTitle';
 import { Select } from '@/ui/Select';
 import { BoardTable } from '@/ui/boards/BoardTable';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
+import { useMe } from '@/session';
 import { CONTEST_SECTIONS, sectionOf } from '@/lib/sections';
-import { SectionPage } from '../SectionPage';
 import { useContestParams } from '@/lib/route-params';
+import { ContestFile } from '../contest/ContestFile';
+import { useOpenedField } from '../contest/opened';
+import { viewFilePath } from '../contest/places';
+import { boardProblems } from '../forms/board-values';
+import { BoardFields } from '../forms/BoardFields';
+import { readContest, writeContest, type ContestValues } from '../forms/contest-values';
+import type { FormProps } from '../forms/DefinitionFile';
+import { holdsAtContest } from '../roles';
+import { SectionPage } from '../SectionPage';
 import classes from '../organise.module.css';
 
 /** Read again now and then, since a board is computed from what is graded and shown. */
 const MEANWHILE_MS = 30_000;
 
-/** The row picked to read `now` as, kept in the page's address as `entrant`, its id. */
+/** The entrant previewed, kept in the page's address as `entrant`, its id. */
 const ROW_PARAM = 'entrant';
 
 function pickedOf(search: URLSearchParams): { entrant: string } | null {
@@ -23,16 +36,12 @@ function pickedOf(search: URLSearchParams): { entrant: string } | null {
   return value === '' ? null : { entrant: value };
 }
 
-function rowValue(row: BoardRow): string {
-  return row.row.entrant;
-}
-
-/** Every row any board lists in its final state, once each, by name. */
+/** Every entrant any board lists once every result is shown, once each, by name. */
 function rowChoices(boards: OrganisedBoard[]): { value: string; label: string }[] {
   const named = new Map<string, string>();
   for (const board of boards) {
     for (const row of board.final.rows) {
-      named.set(rowValue(row), row.row.name === '' ? rowValue(row) : row.row.name);
+      named.set(row.row.entrant, row.row.name === '' ? 'An entrant' : row.row.name);
     }
   }
   return [...named]
@@ -41,13 +50,67 @@ function rowChoices(boards: OrganisedBoard[]): { value: string; label: string }[
 }
 
 /**
- * One board as organisers read it: `now`, exactly what its audience is
- * given, every row unless a row is picked, then as that row sees it; and
- * `final`, as it will read once every task has revealed. What `now` does not
- * count yet is listed with when contestants get it. What the board asks of
- * its tasks that does not hold is said above both.
+ * The boards' settings as a form, each board in plain words with the
+ * sentence that says what it ranks; a manager adds, changes and removes
+ * boards, and everyone else reads them.
  */
-function Organised({ board, picked }: { board: OrganisedBoard; picked: boolean }) {
+function BoardsForm({
+  doc,
+  busy,
+  onSave,
+  refused,
+  admin,
+  manages,
+}: FormProps & { admin: boolean; manages: boolean }) {
+  const [read] = useState(() => readContest(doc));
+  const [values, setValues] = useState<ContestValues>(read.values);
+  useOpenedField(true);
+  const changed = JSON.stringify(values) !== JSON.stringify(read.values);
+  const problems = values.boards.flatMap(boardProblems);
+
+  if (read.unreadable.includes('leaderboards')) {
+    return <BodyText>The boards’ settings cannot be read here.</BodyText>;
+  }
+  return (
+    <form
+      className={classes.stack}
+      aria-label="Boards"
+      onSubmit={(event) => {
+        event.preventDefault();
+        onSave((fresh) => writeContest(fresh, read.values, values, { admin }));
+      }}
+    >
+      <BoardFields
+        boards={values.boards}
+        taskIds={values.tasks.map((entry) => entry.id)}
+        refused={refused}
+        disabled={!manages}
+        onChange={(boards) => setValues((before) => ({ ...before, boards }))}
+      />
+      {manages && (
+        <div className={classes.actions}>
+          <Button
+            type="submit"
+            loading={busy}
+            disabled={!changed || problems.length > 0}
+          >
+            Save boards
+          </Button>
+          {changed && <BodyText tone="secondary">Unsaved changes</BodyText>}
+        </div>
+      )}
+    </form>
+  );
+}
+
+/**
+ * One board as organisers read it: now, exactly what its audience is given,
+ * every row unless an entrant is previewed, then as that entrant sees it;
+ * and as it will read once every result is shown. What it does not count
+ * yet is listed with when entrants get it. What the board asks of its tasks
+ * that does not hold is said above both.
+ */
+function Previewed({ board, picked }: { board: OrganisedBoard; picked: boolean }) {
   const name = board.final.board;
   return (
     <Card>
@@ -63,24 +126,26 @@ function Organised({ board, picked }: { board: OrganisedBoard; picked: boolean }
         )}
         <BoardTable
           board={board.now}
-          title={`${name} now`}
+          title={`${name}, now`}
           everyRow={!picked}
-          ownLabel="The row picked"
+          ownLabel="The entrant previewed"
         />
-        <BoardTable board={board.final} title={`${name} final`} everyRow />
+        <BoardTable board={board.final} title={`${name}, once all is shown`} everyRow />
       </div>
     </Card>
   );
 }
 
 /**
- * Every board of the contest whatever its `who` and `rows`, for anyone with
- * the observer role at it, each `now` and `final`, with a row to read `now`
- * as, kept in the address. Nothing is computed again for the pick: `now`
- * cut to that row is exactly the board its contestant is given.
+ * A contest's boards: their settings as a form, then each board as it reads
+ * now and as it will once every result is shown, for anyone with the
+ * observer role at the contest, whatever each board shows to whom. An
+ * entrant can be previewed, kept in the address: each board now as that
+ * entrant is given it, computed exactly as theirs is.
  */
 export function OrganisedBoardsPage() {
   const { org, contest } = useContestParams();
+  const manages = holdsAtContest(useMe().roles, org, contest, 'manager');
   const [search, setSearch] = useSearchParams();
   const picked = pickedOf(search);
   const view = queryView(
@@ -100,33 +165,35 @@ export function OrganisedBoardsPage() {
   };
 
   return (
-    <SectionPage section={sectionOf(CONTEST_SECTIONS, 'boards')}>
+    <SectionPage
+      section={sectionOf(CONTEST_SECTIONS, 'boards')}
+      links={<PageLink to={viewFilePath(org, contest)}>View file</PageLink>}
+    >
+      <Card>
+        <ContestFile org={org} contest={contest}>
+          {(props) => <BoardsForm {...props} manages={manages} />}
+        </ContestFile>
+      </Card>
       {view.state === 'loading' && <PageSkeleton rows={4} />}
       {view.state === 'error' && <ErrorBlock error={view.error} onRetry={view.retry} />}
-      {view.state === 'ready' &&
-        (view.data.length === 0 ? (
-          <BodyText tone="secondary">This contest has no boards.</BodyText>
-        ) : (
-          <>
-            <div className={classes.form}>
-              <Select
-                label="Read now as"
-                value={search.get(ROW_PARAM) ?? ''}
-                options={rowChoices(view.data)}
-                placeholder="Every row"
-                description="Shows each board's now as this row is given it."
-                onChange={pick}
-              />
-            </div>
-            {view.data.map((board) => (
-              <Organised
-                key={board.final.board}
-                board={board}
-                picked={picked !== null}
-              />
-            ))}
-          </>
-        ))}
+      {view.state === 'ready' && view.data.length > 0 && (
+        <>
+          <SectionTitle>As they read</SectionTitle>
+          <div className={classes.form}>
+            <Select
+              label="Preview as an entrant"
+              value={search.get(ROW_PARAM) ?? ''}
+              options={rowChoices(view.data)}
+              placeholder="Every row, as organisers see it"
+              description="Shows each board now as this entrant is given it."
+              onChange={pick}
+            />
+          </div>
+          {view.data.map((board) => (
+            <Previewed key={board.final.board} board={board} picked={picked !== null} />
+          ))}
+        </>
+      )}
     </SectionPage>
   );
 }

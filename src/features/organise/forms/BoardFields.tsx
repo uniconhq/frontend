@@ -1,9 +1,13 @@
+import { useState } from 'react';
 import type { DefinitionError } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
 import { Checkbox } from '@/ui/Checkbox';
+import { Modal } from '@/ui/Modal';
+import { RadioGroup } from '@/ui/RadioGroup';
 import { Select } from '@/ui/Select';
 import { TextInput } from '@/ui/TextInput';
+import { FieldBox } from '../contest/ContestFile';
 import shared from '../organise.module.css';
 import {
   boardRefusals,
@@ -11,29 +15,9 @@ import {
   type BoardValues,
   type OrderKeyValues,
 } from './board-values';
+import { boardSentence, KINDS, OVER, SELECT, WHO } from './board-words';
 import { Fieldset, NumberField } from './fields';
 import classes from './forms.module.css';
-
-const OVER = [
-  { value: 'all', label: 'all: every group' },
-  { value: 'live', label: 'live: the groups shown always or verdict' },
-  { value: 'after_close', label: 'after_close: the groups shown after the close' },
-];
-const SELECT = [
-  { value: 'best', label: 'best: the one ranking the row highest' },
-  { value: 'best_per_group', label: 'best_per_group: the most points on each group' },
-  { value: 'marked', label: 'marked: the best of those the row marked' },
-];
-const WHO = [
-  { value: 'organisers', label: 'organisers: observers and above' },
-  { value: 'contestants', label: 'contestants: approved contestants and organisers' },
-  { value: 'everyone', label: 'everyone: anyone who may see the contest' },
-];
-const KINDS = [
-  { value: 'points', label: 'points, higher is better' },
-  { value: 'penalty', label: 'penalty, lower is better' },
-  { value: 'value', label: 'a value the tasks report' },
-];
 
 /** The keys of a board that have a field of their own. */
 const FIELDS = ['name', 'tasks', 'over', 'select', 'order', 'who', 'rows'];
@@ -50,28 +34,41 @@ function keyOfKind(kind: string): OrderKeyValues {
   return { kind: 'points' };
 }
 
+/** How many rows a viewer below the organisers sees, as the radio's choice. */
+function rowsChoice(rows: string): 'all' | 'own' | 'top' {
+  if (rows === '' || rows === 'all') return 'all';
+  return rows === 'own' ? 'own' : 'top';
+}
+
 /**
- * The contest's leaderboards, a field per key of each, added and removed
- * here and written by the same save as the rest of the file. What the last
- * save was refused for about a board reads on the field that caused it.
+ * The contest's leaderboards, each a box of fields in plain words with a
+ * sentence that says what it ranks, added and removed here, removing asked
+ * first, and written by one save. What the last save was refused for about
+ * a board reads on the field that caused it. `disabled` shows them to
+ * someone who may not change them.
  */
 export function BoardFields({
   boards,
   taskIds,
   refused,
   onChange,
+  disabled = false,
 }: {
   boards: BoardValues[];
   taskIds: string[];
   refused: DefinitionError[];
   onChange: (boards: BoardValues[]) => void;
+  disabled?: boolean;
 }) {
   const change = (index: number, to: Partial<BoardValues>) =>
     onChange(boards.map((board, at) => (at === index ? { ...board, ...to } : board)));
   return (
     <>
       {boards.length === 0 ? (
-        <BodyText tone="secondary">No leaderboards yet.</BodyText>
+        <BodyText>
+          This contest has no boards yet, so nobody sees a ranking.
+          {disabled ? '' : ' Add one to rank its entrants.'}
+        </BodyText>
       ) : (
         <ol className={classes.entries} aria-label="Boards">
           {boards.map((board, index) => (
@@ -83,21 +80,24 @@ export function BoardFields({
               index={index}
               taskIds={taskIds}
               refusals={boardRefusals(refused, index)}
+              disabled={disabled}
               onChange={(to) => change(index, to)}
               onRemove={() => onChange(boards.filter((_, at) => at !== index))}
             />
           ))}
         </ol>
       )}
-      <div className={shared.actions}>
-        <Button
-          size="xs"
-          variant="secondary"
-          onClick={() => onChange([...boards, newBoard()])}
-        >
-          Add a board
-        </Button>
-      </div>
+      {!disabled && (
+        <div className={shared.actions}>
+          <Button
+            size="xs"
+            variant="secondary"
+            onClick={() => onChange([...boards, newBoard()])}
+          >
+            Add a board
+          </Button>
+        </div>
+      )}
     </>
   );
 }
@@ -107,6 +107,7 @@ function BoardEntry({
   index,
   taskIds,
   refusals,
+  disabled,
   onChange,
   onRemove,
 }: {
@@ -114,10 +115,12 @@ function BoardEntry({
   index: number;
   taskIds: string[];
   refusals: Map<string, string[]>;
+  disabled: boolean;
   onChange: (to: Partial<BoardValues>) => void;
   onRemove: () => void;
 }) {
-  const prefix = `Board ${String(index + 1)}`;
+  const [removing, setRemoving] = useState(false);
+  const title = board.name === '' ? `Board ${String(index + 1)}` : board.name;
   const said = (...keys: string[]) => {
     const messages = keys.flatMap((key) => refusals.get(key) ?? []);
     return messages.length === 0 ? undefined : messages.join(' ');
@@ -141,135 +144,220 @@ function BoardEntry({
     if (key !== undefined) order.splice(at + by, 0, key);
     onChange({ order });
   };
+  const rows = rowsChoice(board.rows);
+  const guests = board.who === 'everyone';
 
   return (
-    <li>
-      <Fieldset legend={board.name === '' ? prefix : `${prefix}: ${board.name}`}>
+    <li data-item={index}>
+      <Fieldset legend={title}>
+        <div className={shared.panel} role="status" aria-label={`What ${title} ranks`}>
+          <BodyText>{boardSentence(board)}</BodyText>
+        </div>
         {elsewhere.map(([key, messages]) => (
           <p key={key} className={classes.refused} role="alert">
-            {key === '' ? messages.join(' ') : `${key}: ${messages.join(' ')}`}
+            {messages.join(' ')}
           </p>
         ))}
         <div className={classes.grid}>
-          <TextInput
-            label="Name"
-            value={board.name}
-            onChange={(name) => onChange({ name })}
-            description="Unique among the contest's boards."
-            error={said('name')}
-          />
-          <Select
-            label="Shown to"
-            value={board.who}
-            options={choices(board.who, WHO)}
-            placeholder="Not set (organisers)"
-            onChange={(who) => onChange({ who })}
-            error={said('who')}
-          />
-          <TextInput
-            label="Rows"
-            value={board.rows}
-            onChange={(rows) => onChange({ rows })}
-            placeholder="all"
-            description="all, own, or a number of top rows."
-            error={said('rows')}
-          />
-          <Select
-            label="Counts groups"
-            value={board.over}
-            options={choices(board.over, OVER)}
-            placeholder="Not set (all)"
-            onChange={(over) => onChange({ over })}
-            error={said('over')}
-          />
-          <Select
-            label="Counts which submission"
-            value={board.select}
-            options={choices(board.select, SELECT)}
-            placeholder="Not set (best)"
-            onChange={(select) => onChange({ select })}
-            error={said('select')}
-          />
+          <FieldBox name="name">
+            <TextInput
+              label="Name"
+              value={board.name}
+              onChange={(name) => onChange({ name })}
+              description="Different from the contest’s other boards."
+              error={said('name')}
+              disabled={disabled}
+            />
+          </FieldBox>
+          <FieldBox name="who">
+            <Select
+              label="Shown to"
+              value={board.who}
+              options={choices(board.who, WHO)}
+              placeholder="Organisers only, until chosen"
+              onChange={(who) =>
+                onChange({
+                  who,
+                  ...(who === 'everyone' && board.rows === 'own' && { rows: '' }),
+                })
+              }
+              error={said('who')}
+              disabled={disabled}
+            />
+          </FieldBox>
+          <FieldBox name="over">
+            <Select
+              label="Counts"
+              value={board.over}
+              options={choices(board.over, OVER)}
+              placeholder="Every result"
+              onChange={(over) => onChange({ over })}
+              error={said('over')}
+              disabled={disabled}
+            />
+          </FieldBox>
+          <FieldBox name="select">
+            <Select
+              label="Which submission counts"
+              value={board.select}
+              options={choices(board.select, SELECT)}
+              placeholder="Best submission"
+              onChange={(select) => onChange({ select })}
+              error={said('select')}
+              disabled={disabled}
+            />
+          </FieldBox>
         </div>
 
-        <div role="group" aria-label="Tasks">
-          <Checkbox
-            label="Covers every task"
-            checked={board.tasks === null}
-            onChange={(every) => onChange({ tasks: every ? null : [...taskIds] })}
+        <FieldBox name="rows">
+          <RadioGroup
+            label="Rows an entrant sees"
+            description={
+              guests
+                ? 'Someone not entered has no row of their own, so a board everyone sees shows rows to all.'
+                : undefined
+            }
+            value={rows}
+            options={[
+              { value: 'all', label: 'All rows' },
+              ...(guests ? [] : [{ value: 'own', label: 'Only their own row' }]),
+              { value: 'top', label: 'The top rows' },
+            ]}
+            onChange={(choice) =>
+              onChange({
+                rows: choice === 'all' ? '' : choice === 'own' ? 'own' : '10',
+              })
+            }
+            disabled={disabled}
           />
-          {board.tasks !== null &&
-            shownTasks.map((task) => (
-              <Checkbox
-                key={task}
-                label={task}
-                checked={board.tasks?.includes(task) ?? false}
-                onChange={(covered) =>
-                  onChange({
-                    tasks: covered
-                      ? shownTasks.filter(
-                          (id) => id === task || (board.tasks ?? []).includes(id),
-                        )
-                      : (board.tasks ?? []).filter((id) => id !== task),
-                  })
-                }
-              />
-            ))}
-          {tasksSaid !== undefined && (
-            <p className={classes.refused} role="alert">
-              {tasksSaid}
-            </p>
+          {rows === 'top' && (
+            <NumberField
+              label="How many top rows"
+              value={board.rows}
+              onChange={(value) => onChange({ rows: value })}
+              hint="Rows tied with the last are shown too, and the entrant’s own below."
+              error={said('rows')}
+              whole
+              disabled={disabled}
+            />
           )}
-        </div>
+        </FieldBox>
 
-        <div role="group" aria-label="Ranks on">
-          {board.order.length === 0 ? (
-            <BodyText tone="secondary">Points alone, the default.</BodyText>
-          ) : (
-            <ol className={classes.entries}>
-              {board.order.map((key, at) => (
-                <OrderKey
-                  key={at}
-                  label={`Key ${String(at + 1)}`}
-                  of={prefix}
-                  value={key}
-                  first={at === 0}
-                  last={at === board.order.length - 1}
-                  error={said(`order.${String(at)}`)}
-                  minutesError={said(`order.${String(at)}.per_attempt`)}
-                  onChange={(to) => setKey(at, to)}
-                  onMove={(by) => moveKey(at, by)}
-                  onRemove={() =>
-                    onChange({ order: board.order.filter((_, k) => k !== at) })
+        <FieldBox name="tasks">
+          <div role="group" aria-label="Tasks">
+            <Checkbox
+              label="Covers every task"
+              checked={board.tasks === null}
+              onChange={(every) => onChange({ tasks: every ? null : [...taskIds] })}
+              disabled={disabled}
+            />
+            {board.tasks !== null &&
+              shownTasks.map((task) => (
+                <Checkbox
+                  key={task}
+                  label={task}
+                  checked={board.tasks?.includes(task) ?? false}
+                  onChange={(covered) =>
+                    onChange({
+                      tasks: covered
+                        ? shownTasks.filter(
+                            (id) => id === task || (board.tasks ?? []).includes(id),
+                          )
+                        : (board.tasks ?? []).filter((id) => id !== task),
+                    })
                   }
+                  disabled={disabled}
                 />
               ))}
-            </ol>
-          )}
-          {orderSaid !== undefined && (
-            <p className={classes.refused} role="alert">
-              {orderSaid}
-            </p>
-          )}
-          <div className={shared.actions}>
-            <Button
-              size="xs"
-              variant="secondary"
-              label={`Add a key to ${prefix}`}
-              onClick={() => onChange({ order: [...board.order, { kind: 'points' }] })}
-            >
-              Add a key
-            </Button>
-            <Button
-              size="xs"
-              variant="danger"
-              label={`Remove ${prefix}`}
-              onClick={onRemove}
-            >
-              Remove the board
-            </Button>
+            {tasksSaid !== undefined && (
+              <p className={classes.refused} role="alert">
+                {tasksSaid}
+              </p>
+            )}
           </div>
-        </div>
+        </FieldBox>
+
+        <FieldBox name="order">
+          <div role="group" aria-label="Ranked by">
+            {board.order.length === 0 ? (
+              <BodyText tone="secondary">Points alone, unless a key is added.</BodyText>
+            ) : (
+              <ol className={classes.entries}>
+                {board.order.map((key, at) => (
+                  <OrderKey
+                    key={at}
+                    label={at === 0 ? 'Ranked first by' : `Then by (${String(at + 1)})`}
+                    of={title}
+                    value={key}
+                    first={at === 0}
+                    last={at === board.order.length - 1}
+                    error={said(`order.${String(at)}`)}
+                    minutesError={said(`order.${String(at)}.per_attempt`)}
+                    disabled={disabled}
+                    onChange={(to) => setKey(at, to)}
+                    onMove={(by) => moveKey(at, by)}
+                    onRemove={() =>
+                      onChange({ order: board.order.filter((_, k) => k !== at) })
+                    }
+                  />
+                ))}
+              </ol>
+            )}
+            {orderSaid !== undefined && (
+              <p className={classes.refused} role="alert">
+                {orderSaid}
+              </p>
+            )}
+            {!disabled && (
+              <div className={shared.actions}>
+                <Button
+                  size="xs"
+                  variant="secondary"
+                  label={`Add a way to rank ${title}`}
+                  onClick={() =>
+                    onChange({ order: [...board.order, { kind: 'points' }] })
+                  }
+                >
+                  Add a way to rank
+                </Button>
+                <Button
+                  size="xs"
+                  variant="danger"
+                  label={`Remove ${title}`}
+                  onClick={() => setRemoving(true)}
+                >
+                  Remove the board
+                </Button>
+              </div>
+            )}
+          </div>
+        </FieldBox>
+        <Modal
+          opened={removing}
+          onClose={() => setRemoving(false)}
+          title={`Remove ${title}?`}
+        >
+          <div className={shared.stack}>
+            <BodyText>
+              Once saved, nobody sees this ranking any more. Submissions and their
+              points stay as they are.
+            </BodyText>
+            <div className={shared.actions}>
+              <Button
+                variant="danger"
+                onClick={() => {
+                  setRemoving(false);
+                  onRemove();
+                }}
+              >
+                Remove
+              </Button>
+              <Button variant="secondary" onClick={() => setRemoving(false)}>
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </Modal>
       </Fieldset>
     </li>
   );
@@ -283,11 +371,12 @@ function OrderKey({
   last,
   error,
   minutesError,
+  disabled,
   onChange,
   onMove,
   onRemove,
 }: {
-  /** The key's name in its board, such as "Key 1". */
+  /** The key's name in its board, such as "Ranked first by". */
   label: string;
   /** The board it belongs to, for its buttons' names. */
   of: string;
@@ -296,6 +385,7 @@ function OrderKey({
   last: boolean;
   error: string | undefined;
   minutesError: string | undefined;
+  disabled: boolean;
   onChange: (key: OrderKeyValues) => void;
   onMove: (by: -1 | 1) => void;
   onRemove: () => void;
@@ -308,17 +398,16 @@ function OrderKey({
         options={KINDS}
         onChange={(kind) => onChange(keyOfKind(kind))}
         error={error}
+        disabled={disabled}
       />
       {value.kind === 'value' && (
         <TextInput
-          label="Value name"
+          label="Value"
           value={value.name}
           onChange={(name) => onChange({ kind: 'value', name })}
-          description={
-            value.name.trim() === ''
-              ? 'Name the value, such as time_ms.'
-              : 'Its direction is the value’s own.'
-          }
+          placeholder="Such as time_ms"
+          description="Better or worse as the workflow that reports it says."
+          disabled={disabled}
         />
       )}
       {value.kind === 'penalty' && (
@@ -327,37 +416,42 @@ function OrderKey({
           value={value.perAttempt}
           onChange={(perAttempt) => onChange({ kind: 'penalty', perAttempt })}
           placeholder="0"
-          info="Added for each earlier attempt that does not count."
+          info="Added for each earlier attempt at the task that does not count, to the minutes from the start to the one that does."
           error={minutesError}
           whole
+          disabled={disabled}
         />
       )}
-      <Button
-        size="xs"
-        variant="secondary"
-        disabled={first}
-        label={`Move ${label} of ${of} up`}
-        onClick={() => onMove(-1)}
-      >
-        Up
-      </Button>
-      <Button
-        size="xs"
-        variant="secondary"
-        disabled={last}
-        label={`Move ${label} of ${of} down`}
-        onClick={() => onMove(1)}
-      >
-        Down
-      </Button>
-      <Button
-        size="xs"
-        variant="secondary"
-        label={`Remove ${label} of ${of}`}
-        onClick={onRemove}
-      >
-        Remove
-      </Button>
+      {!disabled && (
+        <>
+          <Button
+            size="xs"
+            variant="secondary"
+            disabled={first}
+            label={`Move ${label} of ${of} up`}
+            onClick={() => onMove(-1)}
+          >
+            Up
+          </Button>
+          <Button
+            size="xs"
+            variant="secondary"
+            disabled={last}
+            label={`Move ${label} of ${of} down`}
+            onClick={() => onMove(1)}
+          >
+            Down
+          </Button>
+          <Button
+            size="xs"
+            variant="secondary"
+            label={`Remove ${label} of ${of}`}
+            onClick={onRemove}
+          >
+            Remove
+          </Button>
+        </>
+      )}
     </li>
   );
 }
