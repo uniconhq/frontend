@@ -1,3 +1,4 @@
+import type { ApiError } from '@/api/problem';
 import { useState, type ReactNode } from 'react';
 import { $api, queryView } from '@/api/query';
 import type { TaskStanding } from '@/api/types';
@@ -170,6 +171,26 @@ function openingSentences(values: ContestValues, now: Date): string[] {
 type Ask = 'open' | 'draft' | 'archive' | 'visibility' | null;
 
 /**
+ * A refusal about this card's own settings, where it stands and who sees it
+ * (#438: a contest that has started never goes back to draft), as its
+ * sentences alone, here where the button was; null for any other refusal,
+ * which says where each problem is.
+ */
+function ownRefusals(error: ApiError) {
+  const errors = definitionErrorsOf(error);
+  if (errors.length === 0) return null;
+  if (!errors.every((each) => each.path === 'state' || each.path === 'visibility'))
+    return null;
+  return (
+    <>
+      {errors.map((each) => (
+        <BodyText key={each.message}>{each.message}</BodyText>
+      ))}
+    </>
+  );
+}
+
+/**
  * Where the contest stands, at the top of its page: one word and a sentence,
  * who sees it, and while it is a draft what opening it needs, each item a
  * link to where it is fixed. An admin opens it with one button, once every
@@ -317,11 +338,15 @@ export function StatusCard({ org, contest }: { org: string; contest: string }) {
               {actions.length > 0 && <div className={shared.actions}>{actions}</div>}
               {refused?.kind === 'refused' && (
                 <div className={shared.panel} role="alert">
-                  <ErrorBlock error={refused.error} compact />
-                  <DefinitionErrors
-                    errors={definitionErrorsOf(refused.error)}
-                    placeOf={contestPlaceOf(org, contest)}
-                  />
+                  {ownRefusals(refused.error) ?? (
+                    <>
+                      <ErrorBlock error={refused.error} compact />
+                      <DefinitionErrors
+                        errors={definitionErrorsOf(refused.error)}
+                        placeOf={contestPlaceOf(org, contest)}
+                      />
+                    </>
+                  )}
                 </div>
               )}
               <Modal
