@@ -5,7 +5,8 @@ import { expect, test, type Page, type Route } from '@playwright/test';
  * needs no backend: a visitor finds a public contest on the landing page and
  * reads a released statement; signed in, they register, wait for an
  * organiser and land in the contest once approved,
- * with a countdown by the server's clock, and the task's times, its limits
+ * with the time left, its tasks, where they stand on its leaderboard and the
+ * way to ask a question, and the task's time left at its top, its limits
  * and the panel to submit from.
  * The stub keeps just enough state for each answer to follow from the last.
  */
@@ -17,6 +18,50 @@ const CONTEST = {
   end: '2026-09-29T12:00:00Z',
 };
 const OPEN = { released: true, visible: true, open: true, closed: null };
+const ENTRANT = '0e000000-0000-4000-8000-000000000007';
+
+/** The contest's one leaderboard, the caller's entrant first of two, its numbers exact strings. */
+const STANDINGS = {
+  board: 'Standings',
+  over: 'all',
+  select: 'best',
+  who: 'contestants',
+  keys: [{ by: 'points', better: 'higher', per_attempt: null }],
+  tasks: [{ id: 'sum', label: 'A', worth: '100' }],
+  not_in_view: [],
+  rows: [
+    {
+      rank: 1,
+      row: { entrant: ENTRANT, name: 'kenny' },
+      keys: ['100'],
+      cells: {
+        sum: {
+          attempts: 1,
+          counting: true,
+          grading: 0,
+          numbers: { points: '100' },
+          submissions: [],
+        },
+      },
+    },
+    {
+      rank: 2,
+      row: { entrant: '0e000000-0000-4000-8000-000000000008', name: 'ada' },
+      keys: ['42.5'],
+      cells: {
+        sum: {
+          attempts: 2,
+          counting: true,
+          grading: null,
+          numbers: { points: '42.5' },
+          submissions: null,
+        },
+      },
+    },
+  ],
+  nothing_shown: false,
+  shown_at: null,
+};
 
 async function stubContestantApi(page: Page, signedIn: boolean) {
   const state = { registered: false, homeReads: 0 };
@@ -96,7 +141,7 @@ async function stubContestantApi(page: Page, signedIn: boolean) {
     if (!state.registered) return entry;
     state.homeReads += 1;
     const entrant = {
-      id: '0e000000-0000-4000-8000-000000000007',
+      id: ENTRANT,
       name: null,
       display_name: 'kenny',
       status: state.homeReads < 2 ? 'pending' : 'approved',
@@ -186,6 +231,11 @@ async function stubContestantApi(page: Page, signedIn: boolean) {
       });
     }
     if (path.endsWith('/tasks/sum/submissions')) return json(route, []);
+    if (path.endsWith('/boards')) return json(route, [STANDINGS]);
+    if (path.endsWith('/questions') && request.method() === 'GET') {
+      return json(route, []);
+    }
+    if (path.endsWith('/announcements')) return json(route, []);
     return route.fulfill({ status: 404, body: 'not stubbed' });
   });
   return state;
@@ -231,7 +281,23 @@ test('a contestant registers, waits, is let in and reads the task', async ({
   expect(state.registered).toBe(true);
   await expect(page.getByText('You are in')).toBeVisible({ timeout: 15_000 });
 
+  // In race order: the time left, then the tasks, the leaderboard and the way to ask.
+  const tasks = page.getByRole('list', { name: 'Tasks' });
+  await expect(tasks).toContainText('100 points');
+  await expect(tasks).toContainText('Closes in');
+  await expect(
+    page.getByRole('region', { name: 'Leaderboard' }).getByText('You are 1st of 2.'),
+  ).toBeVisible();
+  await expect(
+    page
+      .getByRole('region', { name: 'Questions to the organisers' })
+      .getByRole('link', { name: 'Ask a question' }),
+  ).toBeVisible();
+
   await page.getByRole('link', { name: 'Sum of Two' }).click();
+  await expect(page.getByRole('timer', { name: 'Task countdown' })).toContainText(
+    'Closes in',
+  );
   await expect(page.getByLabel('Limits')).toContainText('1 in any 30 seconds');
   await expect(page.getByLabel('Limits')).toContainText('Closes');
   const form = page.getByRole('form', { name: 'Submit' });
@@ -240,4 +306,12 @@ test('a contestant registers, waits, is let in and reads the task', async ({
   await expect(
     page.getByText('You have not submitted to this task yet.'),
   ).toBeVisible();
+
+  await page.getByRole('link', { name: 'Ask a question about this task' }).click();
+  await expect(page).toHaveURL(/\/contests\/acme\/spring\/questions\?task=sum$/);
+  await expect(
+    page
+      .getByRole('form', { name: 'Ask' })
+      .getByRole('combobox', { name: 'About the task' }),
+  ).toHaveValue('sum');
 });
