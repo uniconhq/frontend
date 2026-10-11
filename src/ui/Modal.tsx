@@ -5,7 +5,8 @@ import type { ReactNode } from 'react';
  * Mantine's Modal, kept for its focus trap, escape handling and scroll lock,
  * which are expensive to get right and invisible when they work. `dismissable:
  * false` is for the session-expired modal, where there is nothing useful behind
- * it.
+ * it. `wide` is for a dialog that shows a file or a table, which a form's
+ * width would wrap.
  */
 export function Modal({
   opened,
@@ -13,12 +14,14 @@ export function Modal({
   title,
   children,
   dismissable = true,
+  wide = false,
 }: {
   opened: boolean;
   onClose: () => void;
   title: string;
   children: ReactNode;
   dismissable?: boolean;
+  wide?: boolean;
 }) {
   return (
     <MantineModal
@@ -26,6 +29,7 @@ export function Modal({
       onClose={onClose}
       title={title}
       centered
+      size={wide ? 'xl' : 'md'}
       radius="md"
       withCloseButton={dismissable}
       closeOnClickOutside={dismissable}
