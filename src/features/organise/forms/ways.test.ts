@@ -82,6 +82,9 @@ describe('the ways into a contest', () => {
     expect(whoWords(newSignup({ emailPattern: '.*' }))).toBe(
       'anyone with an email address matching the pattern',
     );
+    expect(whoWords(newSignup({ domains: 'u.nus.edu', emailPattern: '^e' }))).toBe(
+      'anyone with an @u.nus.edu email matching the pattern',
+    );
   });
 
   it('adds it all up in one sentence, and says when nobody can register', () => {
