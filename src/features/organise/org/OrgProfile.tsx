@@ -71,7 +71,9 @@ function EditForm({
       <TextInput
         ref={first}
         label="Display name"
-        description="What people see in place of the org's name. Empty shows the name."
+        placeholder={org}
+        description="Left empty: the org's own name shows."
+        info="What people see in place of the org's name."
         value={displayName}
         onChange={setDisplayName}
         maxLength={DISPLAY_NAME_MAX}
