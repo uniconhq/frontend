@@ -5,24 +5,15 @@ import { renderApp } from '@/test/render';
 import { http } from 'msw';
 import { problem, server, signedIn } from '@/test/server';
 import { CLASSIC_V2, workflowBackend } from '@/test/workflows';
+import { EDITOR_PAGE, preview, previewNow } from '@/test/workflow-editor';
 
-const PAGE = '/workflows/kenny/tuned';
-const PREVIEW = 'workflow.yaml as a save writes it';
 /** The forge's check runs 400 ms after the text settles, then answers. */
 const CHECKED = { timeout: 3_000 };
-
-async function preview(): Promise<string> {
-  return (await screen.findByLabelText<HTMLTextAreaElement>(PREVIEW)).value;
-}
-
-function previewNow(): string {
-  return screen.getByLabelText<HTMLTextAreaElement>(PREVIEW).value;
-}
 
 describe('the workflow editor', () => {
   it('draws each step, the inputs, the test fields and the report as boxes', async () => {
     server.use(signedIn, ...workflowBackend(CLASSIC_V2).handlers);
-    renderApp(PAGE);
+    renderApp(EDITOR_PAGE);
 
     expect(
       await screen.findByRole('group', { name: 'Step compile' }),
@@ -40,7 +31,7 @@ describe('the workflow editor', () => {
   it('refuses a wire a version would refuse, saying why, in the port’s menu', async () => {
     server.use(signedIn, ...workflowBackend(CLASSIC_V2).handlers);
     const user = userEvent.setup();
-    renderApp(PAGE);
+    renderApp(EDITOR_PAGE);
 
     await user.click(
       await screen.findByRole('button', { name: 'The port entry of compile' }),
@@ -59,7 +50,7 @@ describe('the workflow editor', () => {
   it('wires a port from its menu and the preview shows it at once', async () => {
     server.use(signedIn, ...workflowBackend(CLASSIC_V2).handlers);
     const user = userEvent.setup();
-    renderApp(PAGE);
+    renderApp(EDITOR_PAGE);
 
     await user.click(
       await screen.findByRole('button', { name: 'The port args of run' }),
@@ -78,7 +69,7 @@ describe('the workflow editor', () => {
   it('removes a step and undo brings it back with its wires', async () => {
     server.use(signedIn, ...workflowBackend(CLASSIC_V2).handlers);
     const user = userEvent.setup();
-    renderApp(PAGE);
+    renderApp(EDITOR_PAGE);
 
     const step = await screen.findByRole('group', { name: 'Step check' });
     await user.click(within(step).getByRole('button', { name: /^check/ }));
@@ -112,7 +103,7 @@ describe('the workflow editor', () => {
             : [],
       }).handlers,
     );
-    renderApp(PAGE);
+    renderApp(EDITOR_PAGE);
 
     const step = await screen.findByRole('group', { name: 'Step run' });
     expect(
@@ -127,173 +118,10 @@ describe('the workflow editor', () => {
     ).toBeInTheDocument();
   });
 
-  it('saves a draft with a problem and refuses a version of it', async () => {
-    const backend = workflowBackend(CLASSIC_V2, {
-      problems: (content) =>
-        content.includes('memory_limit: 9')
-          ? [{ path: 'steps[1].with.memory_limit', message: 'Takes number, not text.' }]
-          : [],
-    });
-    server.use(signedIn, ...backend.handlers);
-    const user = userEvent.setup();
-    renderApp(PAGE);
-
-    await user.click(
-      await screen.findByRole('button', { name: 'The port memory_limit of run' }),
-    );
-    await user.click(
-      await screen.findByRole('menuitem', {
-        name: 'Give it a value in the step’s panel',
-      }),
-    );
-    const panel = await screen.findByRole('region', { name: 'The step run' });
-    await user.click(
-      within(panel).getByRole('button', { name: 'Remove the wire to memory_limit' }),
-    );
-    const field = within(panel).getByRole('textbox', { name: /^memory_limit/ });
-    await user.type(field, '9{Enter}');
-    await waitFor(() => expect(previewNow()).toContain('memory_limit: 9'));
-    await user.click(screen.getByRole('button', { name: 'Save' }));
-    await waitFor(() => expect(backend.state.draft).toContain('memory_limit: 9'));
-    await user.click(screen.getByRole('button', { name: 'Make the version' }));
-
-    const refused = await screen.findByRole('alert');
-    expect(refused).toHaveTextContent('No version was made');
-    expect(refused).toHaveTextContent(
-      'steps[1].with.memory_limit: Takes number, not text.',
-    );
-    expect(backend.state.versions).toEqual([]);
-  });
-
-  it('makes a version of a saved draft that checks', async () => {
-    const backend = workflowBackend(CLASSIC_V2);
-    server.use(signedIn, ...backend.handlers);
-    const user = userEvent.setup();
-    renderApp(PAGE);
-
-    await user.click(await screen.findByRole('button', { name: 'Make the version' }));
-
-    expect(await screen.findByRole('status', { name: '' })).toHaveTextContent(
-      'kenny/tuned@v1 is made.',
-    );
-    expect(backend.state.versions).toEqual(['v1']);
-  });
-
-  it('offers the number after the highest version, whatever else is tagged', async () => {
-    const backend = workflowBackend(CLASSIC_V2, { versions: ['v1', 'beta', 'v9'] });
-    server.use(signedIn, ...backend.handlers);
-    const user = userEvent.setup();
-    renderApp(PAGE);
-
-    const field = await screen.findByRole('textbox', { name: /New version/ });
-    expect(field).toHaveValue('v10');
-    await user.click(screen.getByRole('button', { name: 'Make the version' }));
-
-    expect(await screen.findByRole('status', { name: '' })).toHaveTextContent(
-      'kenny/tuned@v10 is made.',
-    );
-    expect(backend.state.versions).toEqual(['v1', 'beta', 'v9', 'v10']);
-    expect(screen.getByRole('textbox', { name: /New version/ })).toHaveValue('v11');
-  });
-
-  it('says in the forge’s words why a name cannot be a version', async () => {
-    const backend = workflowBackend(CLASSIC_V2);
-    server.use(signedIn, ...backend.handlers);
-    const user = userEvent.setup();
-    renderApp(PAGE);
-
-    const field = await screen.findByRole('textbox', { name: /New version/ });
-    expect(field).toHaveValue('v1');
-    await user.clear(field);
-    await user.type(field, 'beta');
-    await user.click(screen.getByRole('button', { name: 'Make the version' }));
-
-    expect(await screen.findByRole('alert')).toHaveTextContent(
-      "No version was made: 'beta' cannot name a version: a version is v and a whole number from 1",
-    );
-    expect(backend.state.versions).toEqual([]);
-  });
-
-  it('opens the merge view on a save over someone else’s, matching steps by id', async () => {
-    const backend = workflowBackend(CLASSIC_V2);
-    server.use(signedIn, ...backend.handlers);
-    const user = userEvent.setup();
-    renderApp(PAGE);
-
-    await user.click(
-      await screen.findByRole('button', { name: 'The port args of run' }),
-    );
-    await user.click(
-      await screen.findByRole('menuitem', { name: /^inputs\.time_limit/ }),
-    );
-    backend.state.draft = CLASSIC_V2.replace(
-      'fold: max, better: lower',
-      'fold: sum, better: lower',
-    );
-    backend.state.token = 'someone-else';
-    await user.click(screen.getByRole('button', { name: 'Save' }));
-
-    expect(
-      await screen.findByText('Someone else saved this file since you opened it.'),
-    ).toBeInTheDocument();
-    const fields = screen.getByRole('list', { name: 'Fields that differ' });
-    expect(within(fields).getByText(/steps\[run\]\.with\.args/)).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Save the merged version' }));
-    await waitFor(() =>
-      expect(backend.state.draft).toContain('args: ${{ inputs.time_limit }}'),
-    );
-    expect(backend.state.draft).toContain('fold: sum');
-  });
-
-  it(
-    'merges again over a second save by someone else, from the file merged over',
-    { timeout: 20_000 },
-    async () => {
-      const backend = workflowBackend(CLASSIC_V2);
-      server.use(signedIn, ...backend.handlers);
-      const user = userEvent.setup();
-      renderApp(PAGE);
-
-      await user.click(
-        await screen.findByRole('button', { name: 'The port args of run' }),
-      );
-      await user.click(
-        await screen.findByRole('menuitem', { name: /^inputs\.time_limit/ }),
-      );
-      backend.state.draft = CLASSIC_V2.replace(
-        'fold: max, better: lower',
-        'fold: sum, better: lower',
-      );
-      backend.state.token = 'someone-else';
-      await user.click(screen.getByRole('button', { name: 'Save' }));
-      await screen.findByRole('list', { name: 'Fields that differ' });
-      backend.state.draft = backend.state.draft.replace(
-        'fold: sum, better: lower',
-        'fold: min, better: lower',
-      );
-      backend.state.token = 'a-third';
-      await user.click(screen.getByRole('button', { name: 'Save the merged version' }));
-
-      await waitFor(() =>
-        expect(
-          within(screen.getByRole('list', { name: 'Fields that differ' })).getByText(
-            /time_ms\.fold/,
-          ),
-        ).toBeInTheDocument(),
-      );
-      const fields = screen.getByRole('list', { name: 'Fields that differ' });
-      expect(within(fields).queryByText(/both changed it/)).not.toBeInTheDocument();
-      await user.click(screen.getByRole('button', { name: 'Save the merged version' }));
-      await waitFor(() => expect(backend.state.token).not.toBe('a-third'));
-      expect(backend.state.draft).toContain('args: ${{ inputs.time_limit }}');
-      expect(backend.state.draft).toContain('fold: min');
-    },
-  );
-
   it('adds a step from the palette, named for its primitive', async () => {
     server.use(signedIn, ...workflowBackend(CLASSIC_V2).handlers);
     const user = userEvent.setup();
-    renderApp(PAGE);
+    renderApp(EDITOR_PAGE);
 
     await user.click(
       await screen.findByRole('button', {
@@ -312,7 +140,7 @@ describe('the workflow editor', () => {
   it('declares an input, a test field and a report entry in place', async () => {
     server.use(signedIn, ...workflowBackend(CLASSIC_V2).handlers);
     const user = userEvent.setup();
-    renderApp(PAGE);
+    renderApp(EDITOR_PAGE);
 
     await user.click(await screen.findByRole('button', { name: 'Inputs' }));
     const inputs = await screen.findByRole('form', { name: 'Add an input' });
@@ -355,7 +183,7 @@ describe('the workflow editor', () => {
       ).handlers,
     );
     const user = userEvent.setup();
-    renderApp(PAGE);
+    renderApp(EDITOR_PAGE);
 
     const step = await screen.findByRole('group', { name: 'Step run' });
     await user.click(within(step).getByRole('button', { name: /^run/ }));
@@ -377,7 +205,7 @@ describe('the workflow editor', () => {
   it('wires a port given a whole reference in its field', async () => {
     server.use(signedIn, ...workflowBackend(CLASSIC_V2).handlers);
     const user = userEvent.setup();
-    renderApp(PAGE);
+    renderApp(EDITOR_PAGE);
 
     const step = await screen.findByRole('group', { name: 'Step compile' });
     await user.click(within(step).getByRole('button', { name: /^compile/ }));
@@ -406,112 +234,6 @@ describe('the workflow editor', () => {
     );
   });
 
-  it('takes the current file in the merge view as one step undo goes back over', async () => {
-    const backend = workflowBackend(CLASSIC_V2);
-    server.use(signedIn, ...backend.handlers);
-    const user = userEvent.setup();
-    renderApp(PAGE);
-
-    await user.click(
-      await screen.findByRole('button', { name: 'The port args of run' }),
-    );
-    await user.click(
-      await screen.findByRole('menuitem', { name: /^inputs\.time_limit/ }),
-    );
-    backend.state.draft = CLASSIC_V2.replace(
-      'fold: max, better: lower',
-      'fold: sum, better: lower',
-    );
-    backend.state.token = 'someone-else';
-    await user.click(screen.getByRole('button', { name: 'Save' }));
-    await user.click(await screen.findByRole('button', { name: 'Drop my changes' }));
-
-    await waitFor(() => expect(previewNow()).toContain('fold: sum'));
-    await user.click(screen.getByRole('button', { name: 'Undo' }));
-    expect(previewNow()).toContain('args: ${{ inputs.time_limit }}');
-  });
-
-  // Tabbing to each control walks the whole page, so this takes a while.
-  it(
-    'builds three wired steps from the palette by keyboard alone',
-    { timeout: 60_000 },
-    async () => {
-      const empty = [
-        'inputs:',
-        '  submission: {type: folder, contestant: true}',
-        '  time_limit: number',
-        '  memory_limit: number',
-        'test:',
-        '  input: file',
-        '  answer: file',
-        'steps: []',
-        '',
-      ].join('\n');
-      server.use(signedIn, ...workflowBackend(empty).handlers);
-      const user = userEvent.setup();
-      renderApp(PAGE);
-
-      // Every control is reached by Tab and every menu item by the arrow keys.
-      const tabTo = async (target: HTMLElement) => {
-        for (let step = 0; step < 400 && document.activeElement !== target; step += 1)
-          await user.tab();
-        expect(target).toHaveFocus();
-      };
-      const press = async (target: HTMLElement) => {
-        await tabTo(target);
-        await user.keyboard('{Enter}');
-      };
-      const wireFrom = async (port: string, step: string, source: RegExp) => {
-        await press(
-          await screen.findByRole('button', { name: `The port ${port} of ${step}` }),
-        );
-        const menu = await screen.findByRole('menu', {
-          name: `The port ${port} of ${step}`,
-        });
-        const item = within(menu).getByRole('menuitem', { name: source });
-        for (let move = 0; move < 40 && document.activeElement !== item; move += 1)
-          await user.keyboard('{ArrowDown}');
-        expect(item).toHaveFocus();
-        await user.keyboard('{Enter}');
-      };
-      await press(
-        await screen.findByRole('button', { name: 'Add unicon/compile@v2, run once' }),
-      );
-      await press(screen.getByRole('button', { name: 'Primitives' }));
-      await press(
-        await screen.findByRole('button', {
-          name: 'Add unicon/sandbox-run@v2, run per test',
-        }),
-      );
-      await press(screen.getByRole('button', { name: 'Primitives' }));
-      await press(
-        await screen.findByRole('button', {
-          name: 'Add unicon/diff-check@v2, run per test',
-        }),
-      );
-      await wireFrom('source', 'compile', /^inputs\.submission/);
-      await wireFrom('binary', 'sandbox-run', /^compile\.binary/);
-      await wireFrom('input', 'sandbox-run', /^test\.input/);
-      await wireFrom('time_limit', 'sandbox-run', /^inputs\.time_limit/);
-      await wireFrom('memory_limit', 'sandbox-run', /^inputs\.memory_limit/);
-      await wireFrom('actual', 'diff-check', /^sandbox-run\.output/);
-      await wireFrom('expected', 'diff-check', /^test\.answer/);
-
-      const text = previewNow();
-      for (const wire of [
-        'source: ${{ inputs.submission }}',
-        'binary: ${{ steps.compile.binary }}',
-        'input: ${{ test.input }}',
-        'time_limit: ${{ inputs.time_limit }}',
-        'memory_limit: ${{ inputs.memory_limit }}',
-        'actual: ${{ steps.sandbox-run.output }}',
-        'expected: ${{ test.answer }}',
-      ])
-        expect(text).toContain(wire);
-      expect(text.match(/per_test: true/g)).toHaveLength(2);
-    },
-  );
-
   it('offers for which way is better only an enum input the task gives whole', async () => {
     server.use(
       signedIn,
@@ -523,7 +245,7 @@ describe('the workflow editor', () => {
       ).handlers,
     );
     const user = userEvent.setup();
-    renderApp(PAGE);
+    renderApp(EDITOR_PAGE);
 
     await user.click(await screen.findByRole('button', { name: 'Report' }));
     const entry = await screen.findByRole('listitem', {
@@ -548,7 +270,7 @@ describe('the workflow editor', () => {
     ].join('\n');
     server.use(signedIn, ...workflowBackend(two).handlers);
     const user = userEvent.setup();
-    renderApp(PAGE);
+    renderApp(EDITOR_PAGE);
 
     const step = await screen.findByRole('group', { name: 'Step first' });
     await user.click(within(step).getByRole('button', { name: /^first/ }));
@@ -575,7 +297,7 @@ describe('the workflow editor', () => {
       signedIn,
       ...workflowBackend(CLASSIC_V2).handlers,
     );
-    renderApp(PAGE);
+    renderApp(EDITOR_PAGE);
 
     expect(
       await screen.findByText(/The check did not run/, {}, CHECKED),
@@ -586,7 +308,7 @@ describe('the workflow editor', () => {
   it('refuses on a panel a declaration a wire would refuse, saying why', async () => {
     server.use(signedIn, ...workflowBackend(CLASSIC_V2).handlers);
     const user = userEvent.setup();
-    renderApp(PAGE);
+    renderApp(EDITOR_PAGE);
 
     await user.click(await screen.findByRole('button', { name: 'Inputs' }));
     const row = await screen.findByRole('listitem', { name: 'The input time_limit' });
@@ -606,7 +328,7 @@ describe('the workflow editor', () => {
       ['language: ${{ inputs.language }}', '      entry: ${{ test.input }}'].join('\n'),
     );
     server.use(signedIn, ...workflowBackend(backwards).handlers);
-    renderApp(PAGE);
+    renderApp(EDITOR_PAGE);
 
     const step = await screen.findByRole('group', { name: 'Step compile' });
     expect(within(step).getByText('= from test.input, not drawn')).toBeInTheDocument();
