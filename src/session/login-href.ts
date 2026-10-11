@@ -12,7 +12,9 @@ export function safeNext(candidate: string | null | undefined): string {
   if (!candidate || !candidate.startsWith('/') || candidate.length > MAX_LENGTH)
     return DEFAULT_NEXT;
   if (candidate.startsWith('//') || candidate.startsWith('/\\')) return DEFAULT_NEXT;
-  if (candidate.includes('\n') || candidate.includes('\r')) return DEFAULT_NEXT;
+  // A browser drops a tab or a line break from a URL, so `/<tab>/x` would
+  // land on `//x`.
+  if (/[\t\n\r]/.test(candidate)) return DEFAULT_NEXT;
   return candidate;
 }
 
