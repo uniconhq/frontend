@@ -234,7 +234,7 @@ describe('the inbox', () => {
     );
 
     expect(
-      await screen.findByText('No question is waiting for an answer.'),
+      await screen.findByText('No questions are waiting for an answer.'),
     ).toBeVisible();
     expect(did).toEqual(['mark 1']);
   });

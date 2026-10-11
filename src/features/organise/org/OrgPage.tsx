@@ -44,7 +44,7 @@ function QuestionsCard({ org }: { org: string }) {
       {(open) => (
         <BodyText>
           {open.length === 0
-            ? 'No question is waiting for an answer.'
+            ? 'No questions are waiting for an answer.'
             : `${String(open.length)} ${open.length === 1 ? 'question waits' : 'questions wait'} for an answer.`}
         </BodyText>
       )}
