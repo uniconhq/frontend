@@ -87,8 +87,10 @@ function rowOf(org: string, contest: string, standing: TaskStanding): ListRow {
     text: label,
     detail: (
       <>
-        <TaskState standing={standing} />
-        <span>{timeline(standing)}</span>
+        <span className={classes.line}>
+          <TaskState standing={standing} />
+        </span>
+        <span className={classes.line}>{timeline(standing)}</span>
       </>
     ),
   };

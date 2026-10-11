@@ -2,7 +2,7 @@
 .summary {
   margin: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr));
   gap: 8px 24px;
 }
 
@@ -15,6 +15,15 @@
   margin: 0;
   font-size: 13px;
   color: var(--unicon-text-body);
+}
+
+/* One line of a task's row: where it stands, then its timeline. */
+.line {
+  display: flex;
+  flex-basis: 100%;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
 }
 
 /* A contest's settings that do not read, said where its tasks would be. */
