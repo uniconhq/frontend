@@ -126,7 +126,7 @@ function ClarificationCard({
           {org}/{contest}
         </BodyText>
       )}
-      <QuestionThread clarification={clarification} asker={asker} />
+      <QuestionThread clarification={clarification} asker={asker} named />
       {manages && (
         <>
           <form

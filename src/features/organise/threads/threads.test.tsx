@@ -5,6 +5,7 @@ import { http, HttpResponse } from 'msw';
 import type { Announcement, Clarification } from '@/api/types';
 import { renderApp } from '@/test/render';
 import { server, signedIn } from '@/test/server';
+import { organisedEntrant } from '@/test/contestant';
 
 const CONTEST_API = '/api/v1/orgs/:org/contests/:contest';
 
@@ -275,6 +276,24 @@ describe('the inbox', () => {
 });
 
 describe("a contest's questions, for its organisers", () => {
+  it('names the entrant who asked each one', async () => {
+    questionRoutes(
+      [question({ asker: 'entrant.0e000000000040008000000000000020' })],
+      `${CONTEST_API}/clarifications`,
+    );
+    server.use(
+      http.get(`${CONTEST_API}/organise/entrants`, () =>
+        HttpResponse.json([organisedEntrant({ display_name: 'Red' })]),
+      ),
+    );
+    renderApp('/orgs/acme/contests/spring/questions');
+
+    const open = await screen.findByRole('list', { name: 'Open questions' });
+    await waitFor(() =>
+      expect(within(open).getByRole('listitem')).toHaveTextContent('Asked by Red'),
+    );
+  });
+
   it('puts the open ones first, folds the answered away, and reopens one', async () => {
     const did = questionRoutes(
       [
