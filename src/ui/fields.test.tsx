@@ -103,6 +103,19 @@ describe('a field with background behind an ⓘ', () => {
     expect(await screen.findByText('The most points the task gives.')).toBeVisible();
   });
 
+  it('closes on a second tap on a touch screen', async () => {
+    renderWithProviders(field);
+    const button = screen.getByRole('button', { name: 'About Worth' });
+
+    // A tap fires the browser's stand-in mouseenter, then a click; a second
+    // tap only the click, the stand-in mouse being over it still.
+    fireEvent.mouseEnter(button);
+    fireEvent.click(button);
+    expect(await screen.findByText('The most points the task gives.')).toBeVisible();
+    fireEvent.click(button);
+    expect(screen.queryByText('The most points the task gives.')).toBeNull();
+  });
+
   it('opens while the pointer is over it', async () => {
     renderWithProviders(field);
 

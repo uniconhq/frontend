@@ -34,7 +34,12 @@ export function InfoTip({ about, children }: { about: string; children: ReactNod
           aria-label={`About ${about}`}
           onMouseEnter={() => setHovered(true)}
           onMouseLeave={() => setHovered(false)}
-          onClick={() => setPinned((open) => !open)}
+          onClick={() => {
+            // A tap also counts as the pointer over it, which no tap elsewhere
+            // ends; the click alone says whether it stays open.
+            setHovered(false);
+            setPinned((open) => !open);
+          }}
           onKeyDown={(event) => {
             if (event.key === 'Escape') {
               setPinned(false);
