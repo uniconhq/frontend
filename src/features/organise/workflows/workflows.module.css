@@ -117,6 +117,17 @@
   gap: 10px;
 }
 
+.unreadable {
+  margin: 0;
+  padding: 8px 12px;
+  border-left: 3px solid var(--unicon-text-danger);
+  background: var(--unicon-body);
+  color: var(--unicon-text-body);
+  font-family: var(--mantine-font-family-monospace);
+  font-size: 12px;
+  white-space: pre-wrap;
+}
+
 /* The selected box's drawer, from the right, over the page. */
 .drawer {
   position: fixed;

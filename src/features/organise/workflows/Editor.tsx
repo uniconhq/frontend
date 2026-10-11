@@ -705,12 +705,15 @@ export function Editor({
           }}
         />
       )}
-      <Problems
-        status={check.isError ? 'failed' : check.isPending ? 'pending' : 'done'}
-        failure={checkFailure}
-        placed={drawing ? listed : listed.map((each) => ({ ...each, opens: null }))}
-        onOpen={(opens) => select(opens)}
-      />
+      {(drawing || listed.length > 0) && (
+        // A file that does not read is not "nothing to fix", whatever the check says.
+        <Problems
+          status={check.isError ? 'failed' : check.isPending ? 'pending' : 'done'}
+          failure={checkFailure}
+          placed={drawing ? listed : listed.map((each) => ({ ...each, opens: null }))}
+          onOpen={(opens) => select(opens)}
+        />
+      )}
       {drawing ? (
         <Graph
           layout={layout}
@@ -734,11 +737,19 @@ export function Editor({
         />
       ) : (
         <section className={classes.mend} aria-label="Mend the draft">
-          <BodyText size="md">
-            {unreadable !== null
-              ? `This draft cannot be drawn, because its file does not read: ${unreadable} Mend it here and save it; Undo goes back over each change.`
-              : 'The file reads again, so the draft can be drawn.'}
-          </BodyText>
+          {unreadable !== null ? (
+            <>
+              <BodyText size="md">
+                This draft cannot be drawn, because its file does not read. Mend it here
+                and save it; Undo goes back over each change. What is wrong:
+              </BodyText>
+              <pre className={classes.unreadable}>{unreadable}</pre>
+            </>
+          ) : (
+            <BodyText size="md">
+              The file reads again, so the draft can be drawn.
+            </BodyText>
+          )}
           <CodeEditor
             label={DRAFT_FILE}
             value={text}

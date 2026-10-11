@@ -442,6 +442,9 @@ describe('the workflow editor', () => {
     expect(mend).toHaveTextContent(
       'This draft cannot be drawn, because its file does not read',
     );
+    // Not "nothing to fix", whatever the check says of a file that does not read.
+    await waitFor(() => expect(backend.state.checks).toBeGreaterThan(0), CHECKED);
+    expect(screen.queryByText(/Nothing to fix/)).toBeNull();
     expect(screen.getByRole('button', { name: 'Add step' })).toBeDisabled();
     const back = within(mend).getByRole('button', { name: 'Back to the graph' });
     expect(back).toBeDisabled();

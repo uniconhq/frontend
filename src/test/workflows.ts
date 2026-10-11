@@ -264,6 +264,8 @@ export function workflowBackend(
     versions: [...(options.versions ?? [])],
     visibility: 'private' as 'private' | 'shared' | 'public',
     readers: [] as string[],
+    /** How many times the version check has answered. */
+    checks: 0,
   };
   const page = () => ({
     owner: 'kenny',
@@ -297,6 +299,7 @@ export function workflowBackend(
     http.get('/api/v1/primitives', () => HttpResponse.json(PRIMITIVES)),
     http.post('/api/v1/workflows/check', async ({ request }) => {
       const { content } = (await request.json()) as { content: string };
+      state.checks += 1;
       return HttpResponse.json({ problems: options.problems?.(content) ?? [] });
     }),
     http.put(`${WORKFLOW_API}/draft`, async ({ request }) => {

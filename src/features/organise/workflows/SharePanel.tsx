@@ -173,7 +173,11 @@ export function ShareButton({ page }: { page: WorkflowPage }) {
       <Button variant="secondary" onClick={() => setOpen(true)}>
         Share
       </Button>
-      <Modal opened={open} onClose={() => setOpen(false)} title="Who reads it">
+      <Modal
+        opened={open}
+        onClose={() => setOpen(false)}
+        title={`Share ${page.owner}/${page.name}`}
+      >
         {open && <SharePanel page={page} />}
       </Modal>
     </>
