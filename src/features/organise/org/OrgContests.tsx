@@ -1,6 +1,6 @@
+import type { ReactNode } from 'react';
 import { useQueries, useQueryClient } from '@tanstack/react-query';
 import { $api, queryView } from '@/api/query';
-import type { ContestHome } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { Chip } from '@/ui/Chip';
 import { ListCard, type ListRow } from '@/ui/ListCard';
@@ -22,27 +22,41 @@ import { contestsReached, holdsAt } from '../roles';
 const CONTESTS = '/api/v1/orgs/{org}/contests';
 const HOME = '/api/v1/orgs/{org}/contests/{contest}/home';
 
-/** A contest's state and the date that matters, once its home has been read. */
-function Standing({ home }: { home: ContestHome }) {
+type Dated = Parameters<typeof standingOf>[0];
+
+/** A contest's state and the date that matters. */
+function Standing({ contest }: { contest: Dated }) {
   const now = serverNow();
-  const standing = standingOf(home, now);
+  const standing = standingOf(contest, now);
   return (
     <>
       <Chip tone={standing === 'live' ? 'live' : 'quiet'}>
         {STANDING_WORD[standing]}
       </Chip>
-      <span>{datesLine(home, now)}</span>
+      <span>{datesLine(contest, now)}</span>
     </>
   );
 }
 
+/** The state and dates the list gives, or null for a contest whose settings do not read. */
+function datedOf(listed: {
+  state: Dated['state'] | null;
+  start: string | null;
+  end: string | null;
+}): Dated | null {
+  const { state, start, end } = listed;
+  return state === null || start === null || end === null
+    ? null
+    : { state, start, end };
+}
+
 /**
  * An org's contests as a list card, those running now first, each row its
- * state and the date that matters, read from each contest's home; "New
- * contest" at the bottom for a manager of the org. Listing needs the
- * observer role at the org: someone who holds a role only at one of its
- * contests or tasks is refused the list, so the refusal comes with the
- * contests their own roles reach, and the way down still works.
+ * state and the date that matters, as the list gives them; "New contest" at
+ * the bottom for a manager of the org. Listing needs the observer role at
+ * the org: someone who holds a role only at one of its contests or tasks is
+ * refused the list, so the refusal comes with the contests their own roles
+ * reach, each read from its home, and the way down still works.
  */
 export function OrgContests({ org }: { org: string }) {
   const roles = useMe().roles;
@@ -56,36 +70,49 @@ export function OrgContests({ org }: { org: string }) {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: listKey }),
   });
 
-  const names =
-    view.state === 'ready'
-      ? view.data.map((contest) => contest.name)
-      : view.state === 'error'
-        ? contestsReached(roles, org)
-        : [];
+  const reached = view.state === 'error' ? contestsReached(roles, org) : [];
   const homes = useQueries({
-    queries: names.map((contest) =>
+    queries: reached.map((contest) =>
       $api.queryOptions('get', HOME, { params: { path: { org, contest } } }),
     ),
   });
   const now = serverNow();
-  const rows: ListRow[] = byWhatMattersNow(
-    names.map((name, at) => ({ name, contest: homes[at]?.data ?? null, at })),
-    now,
-  ).map(({ name, at }) => {
-    const home = homes[at];
-    return {
-      key: name,
-      to: contestPath(org, name),
-      name,
-      text: name,
-      detail:
-        home === undefined ? undefined : (
-          <Loaded view={queryView(home)} compact>
-            {(found) => <Standing home={found} />}
-          </Loaded>
-        ),
-    };
+  const rowOf = (name: string, detail: ReactNode): ListRow => ({
+    key: name,
+    to: contestPath(org, name),
+    name,
+    text: name,
+    detail,
   });
+  const rows: ListRow[] =
+    view.state === 'ready'
+      ? byWhatMattersNow(
+          view.data.map((listed) => ({ name: listed.name, contest: datedOf(listed) })),
+          now,
+        ).map(({ name, contest }) =>
+          rowOf(
+            name,
+            contest === null ? (
+              <BodyText tone="secondary">Its settings do not read</BodyText>
+            ) : (
+              <Standing contest={contest} />
+            ),
+          ),
+        )
+      : byWhatMattersNow(
+          reached.map((name, at) => ({ name, contest: homes[at]?.data ?? null, at })),
+          now,
+        ).map(({ name, at }) => {
+          const home = homes[at];
+          return rowOf(
+            name,
+            home === undefined ? undefined : (
+              <Loaded view={queryView(home)} compact>
+                {(found) => <Standing contest={found} />}
+              </Loaded>
+            ),
+          );
+        });
 
   return (
     <ListCard
@@ -96,7 +123,7 @@ export function OrgContests({ org }: { org: string }) {
         view.state === 'error' && (
           <>
             <ErrorBlock error={view.error} onRetry={view.retry} />
-            {names.length > 0 && (
+            {rows.length > 0 && (
               <BodyText>Contests of this org you hold a role at:</BodyText>
             )}
           </>
@@ -105,7 +132,7 @@ export function OrgContests({ org }: { org: string }) {
       body={
         view.state === 'loading' ? (
           <PageSkeleton rows={3} />
-        ) : view.state === 'error' && names.length === 0 ? (
+        ) : view.state === 'error' && rows.length === 0 ? (
           <></>
         ) : undefined
       }

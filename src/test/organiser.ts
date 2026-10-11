@@ -1,6 +1,7 @@
 import { http, HttpResponse } from 'msw';
 import type {
   FileContent,
+  ListedContest,
   Named,
   Publication,
   TaskStanding,
@@ -21,7 +22,21 @@ export const TASK_API = `${CONTEST_API}/tasks/:task`;
 
 // Lists
 
-export const contests: Named[] = [{ name: 'autumn' }, { name: 'spring' }];
+/** The org's contests as the list gives them, both drafts in October 2026. */
+export const contests: ListedContest[] = [
+  {
+    name: 'autumn',
+    state: 'draft',
+    start: '2026-10-20T09:00:00Z',
+    end: '2026-10-20T14:00:00Z',
+  },
+  {
+    name: 'spring',
+    state: 'draft',
+    start: '2026-10-01T09:00:00Z',
+    end: '2026-10-01T14:00:00Z',
+  },
+];
 const tasks: Named[] = [{ name: 'sort' }, { name: 'sum' }];
 
 export const contestList = http.get(`${ORG_API}/contests`, () =>
@@ -46,7 +61,7 @@ export function listAndCreate(path: string, existing: { name: string }[]) {
     http.post(path, async ({ request }) => {
       const body = (await request.json()) as { name: string };
       sent.push(body);
-      listed.push({ name: body.name });
+      listed.push({ ...existing[0], name: body.name });
       return HttpResponse.json({ name: body.name }, { status: 201 });
     }),
   ];

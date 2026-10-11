@@ -129,7 +129,16 @@ async function stubOrganiserApi(page: Page) {
         graded: false,
       });
     }
-    if (path === '/api/v1/orgs/acme/contests') return json(route, [{ name: 'spring' }]);
+    if (path === '/api/v1/orgs/acme/contests') {
+      return json(route, [
+        {
+          name: 'spring',
+          state: 'draft',
+          start: '2026-10-01T09:00:00Z',
+          end: '2026-10-01T14:00:00Z',
+        },
+      ]);
+    }
     if (path === '/api/v1/orgs/acme/contests/spring/tasks') {
       return json(route, [{ name: 'sum' }]);
     }

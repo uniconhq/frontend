@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@/test/user-event';
 import { delay, http, HttpResponse } from 'msw';
+import { formatDateTime } from '@/lib/time';
 import { renderApp } from '@/test/render';
 import { problem, server, signedIn, someone } from '@/test/server';
 import { ORG_API, contestList, contests, listAndCreate } from '@/test/organiser';
@@ -15,10 +16,36 @@ describe('the org page', () => {
     const list = await screen.findByRole('list', { name: 'Contests' });
     const links = within(list).getAllByRole('link');
     expect(links.map((link) => link.getAttribute('href'))).toEqual([
-      '/orgs/acme/contests/autumn',
       '/orgs/acme/contests/spring',
+      '/orgs/acme/contests/autumn',
     ]);
     expect(screen.getByRole('heading', { name: 'acme', level: 1 })).toBeVisible();
+  });
+
+  it('says each contest’s state and dates as the list gives them, the soonest draft first', async () => {
+    server.use(
+      signedIn,
+      http.get(`${ORG_API}/contests`, () =>
+        HttpResponse.json([
+          ...contests,
+          { name: 'broken', state: null, start: null, end: null },
+        ]),
+      ),
+    );
+    renderApp('/orgs/acme');
+
+    const list = await screen.findByRole('list', { name: 'Contests' });
+    const rows = within(list).getAllByRole('listitem');
+    expect(rows.map((row) => within(row).getByRole('link').textContent)).toEqual([
+      'spring',
+      'autumn',
+      'broken',
+    ]);
+    expect(rows[0]).toHaveTextContent('Draft');
+    expect(rows[0]).toHaveTextContent(
+      `${formatDateTime(new Date('2026-10-01T09:00:00Z'))} to ${formatDateTime(new Date('2026-10-01T14:00:00Z'))}`,
+    );
+    expect(rows[2]).toHaveTextContent('Its settings do not read');
   });
 
   it('shows a skeleton while the contests load', async () => {
