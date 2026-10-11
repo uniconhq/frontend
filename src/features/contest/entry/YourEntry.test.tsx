@@ -206,7 +206,7 @@ describe('your entry in a contest entered in teams', () => {
 
     const part = await yourEntry();
     expect(part).toHaveTextContent(
-      'Your team is fixed now: only the organisers change who is in it.',
+      'Your team is fixed now: only the organisers can change who is in it.',
     );
     expect(
       within(part).queryByRole('form', { name: 'Invite someone to your team' }),

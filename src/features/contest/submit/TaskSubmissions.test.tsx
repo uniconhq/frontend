@@ -507,7 +507,7 @@ describe('the submit panel', () => {
     [
       'upload_not_ready',
       { uploads: ['x'] },
-      'A file did not arrive whole',
+      'A file did not arrive in full',
       'Nothing was submitted.',
     ],
     [
@@ -519,7 +519,7 @@ describe('the submit panel', () => {
     [
       'invalid_idempotency_key',
       {},
-      'That submit could not be sent',
+      'That submission could not be sent',
       'Reload the page and submit again.',
     ],
     [
@@ -581,8 +581,8 @@ describe('the submit panel', () => {
       http.post(`${TASK_API}/uploads/:upload/complete`, () =>
         problem(409, 'upload_not_ready', { uploads: ['x'] }),
       ),
-      'A file did not arrive whole',
-      'Submit again and the files are sent again.',
+      'A file did not arrive in full',
+      'Submit again to send the files again.',
     ],
     [
       'an upload the forge does not hold',
@@ -598,7 +598,7 @@ describe('the submit panel', () => {
         }),
       ),
       'A file did not arrive as it was sent',
-      'The forge has not got the file.',
+      'Unicon did not receive the file as it was sent.',
     ],
   ];
 
@@ -770,7 +770,7 @@ describe('the submissions list', () => {
     expect(rows.map((row) => row.textContent)).toEqual([
       expect.stringMatching(/^#4.*GRADING—$/),
       expect.stringMatching(/^#3.*2 days lateWRONG ANSWER—$/),
-      expect.stringMatching(/^#2.*COMPILE ERR—$/),
+      expect.stringMatching(/^#2.*COMPILE ERROR—$/),
       expect.stringMatching(/^#1.*ACCEPTED100$/),
     ]);
   });
@@ -1119,7 +1119,7 @@ describe('a submission opened from the list', () => {
     renderApp(`${PAGE}?submission=1`);
 
     const detail = await screen.findByRole('region', { name: 'Submission 1' });
-    expect(await within(detail).findByText('COMPILE ERR')).toBeVisible();
+    expect(await within(detail).findByText('COMPILE ERROR')).toBeVisible();
     expect(within(detail).getByText(/, 1 day late$/)).toBeVisible();
     expect(within(detail).getByLabelText('log')).toHaveTextContent(
       '<img src=x onerror="alert(1)">',

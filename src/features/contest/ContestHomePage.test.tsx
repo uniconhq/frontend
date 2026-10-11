@@ -357,7 +357,7 @@ describe('the contest page for a signed-in person', () => {
   it.each([
     ['registration_closed', 403, 'Registration is closed'],
     ['is_staff', 403, 'You organise this contest'],
-    ['invite_required', 403, 'This contest is by invitation'],
+    ['invite_required', 403, 'This contest is by invite only'],
     ['domain_not_allowed', 403, 'Your email address is not accepted'],
     ['already_registered', 409, 'You have registered already'],
     ['contest_full', 409, 'The contest is full'],

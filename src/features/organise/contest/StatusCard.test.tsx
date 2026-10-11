@@ -176,7 +176,7 @@ describe("the contest's status", () => {
     renderApp(CONTEST);
 
     const card = await status();
-    await waitFor(() => expect(card).toHaveTextContent('Finished'));
+    await waitFor(() => expect(card).toHaveTextContent('Ended'));
     await user.click(await within(card).findByRole('button', { name: 'Archive' }));
     const dialog = await screen.findByRole('dialog', { name: 'Archive the contest?' });
     await user.click(within(dialog).getByRole('button', { name: 'Archive' }));

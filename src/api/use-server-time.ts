@@ -43,4 +43,4 @@ export function useServerClock(): { at: number; measured: boolean; byDevice: boo
 
 /** What a countdown says while it goes by the browser's clock. */
 export const BY_DEVICE =
-  "Counted by this device's clock: the server's time did not come in.";
+  "Counted by this device's clock, since Unicon's time could not be read.";

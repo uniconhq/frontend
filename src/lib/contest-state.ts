@@ -10,7 +10,7 @@ export type ContestStanding = 'draft' | 'live' | 'finished' | 'archived';
 export const STANDING_WORD: Record<ContestStanding, string> = {
   draft: 'Draft',
   live: 'Live',
-  finished: 'Finished',
+  finished: 'Ended',
   archived: 'Archived',
 };
 

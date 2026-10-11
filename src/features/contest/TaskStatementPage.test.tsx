@@ -201,7 +201,7 @@ describe('a task page for a signed-in person', () => {
     const timer = await screen.findByRole('timer', { name: 'Task countdown' });
     await waitFor(() =>
       expect(timer).toHaveTextContent(
-        "Counted by this device's clock: the server's time did not come in.",
+        "Counted by this device's clock, since Unicon's time could not be read.",
       ),
     );
   });
