@@ -60,7 +60,7 @@ export function UploadedFile({
       </BodyText>
       {manages && !again && (
         <div className={shared.actions}>
-          <Button size="xs" variant="secondary" onClick={() => setAgain(true)}>
+          <Button variant="secondary" onClick={() => setAgain(true)}>
             Upload again
           </Button>
         </div>

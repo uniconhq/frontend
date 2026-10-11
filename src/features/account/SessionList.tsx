@@ -72,7 +72,6 @@ export function SessionList() {
             </div>
             <span className={classes.action}>
               <Button
-                size="xs"
                 variant="secondary"
                 disabled={revoke.isPending}
                 onClick={() => void revokeOne(session.id, session.current)}
@@ -84,8 +83,8 @@ export function SessionList() {
         ))}
       </ul>
 
-      {revoke.error !== null && <ErrorBlock error={revoke.error} />}
-      {revokeAll.error !== null && <ErrorBlock error={revokeAll.error} />}
+      {revoke.error !== null && <ErrorBlock error={revoke.error} compact />}
+      {revokeAll.error !== null && <ErrorBlock error={revokeAll.error} compact />}
 
       <div>
         <Button

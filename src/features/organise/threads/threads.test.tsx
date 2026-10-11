@@ -61,7 +61,7 @@ describe("a contest's announcements, for its organisers", () => {
         );
       }),
     );
-    renderApp('/orgs/acme/contests/spring');
+    renderApp('/orgs/acme/contests/spring/announcements');
 
     const form = await screen.findByRole('form', { name: 'Post announcement' });
     await userEvent.type(within(form).getByLabelText(/Title/), 'Lunch');
@@ -99,7 +99,7 @@ describe('posting an announcement', () => {
         return HttpResponse.json(announcement({ number: 2 }), { status: 201 });
       }),
     );
-    renderApp('/orgs/acme/contests/spring');
+    renderApp('/orgs/acme/contests/spring/announcements');
 
     const form = await screen.findByRole('form', { name: 'Post announcement' });
     await userEvent.type(within(form).getByLabelText(/Title/), 'Lunch');

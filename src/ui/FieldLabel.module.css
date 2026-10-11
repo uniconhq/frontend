@@ -1,0 +1,7 @@
+/* The label and its ⓘ on one line, as tall as a label alone. */
+.row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 20px;
+}

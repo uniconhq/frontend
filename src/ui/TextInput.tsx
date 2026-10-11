@@ -1,10 +1,15 @@
 import { TextInput as MantineTextInput } from '@mantine/core';
-import type { Ref } from 'react';
+import type { ReactNode, Ref } from 'react';
+import { useFieldLabel } from './FieldLabel';
 
 /**
  * A one-line field with its label always shown, since a placeholder is gone
- * the moment someone types. `description` is the helper line under the label,
- * and `maxLength`, when given, is the most characters the field takes.
+ * the moment someone types. `placeholder` is for a format or a default
+ * ("10 MB"), which helps only until something is typed; what is needed while
+ * typing goes in `description`, a short line under the box. Hints sit under
+ * the box, as the theme puts them for every field, so fields side by side
+ * start their boxes on one line. `info` is background behind an ⓘ beside the
+ * label. `maxLength`, when given, is the most characters the field takes.
  * `inputMode="decimal"` asks a phone for its number keys, for a field that
  * takes a number. `ref` is the input itself, for moving the focus to it.
  * `error`, when given, is what the server refused about the field: it reads
@@ -17,6 +22,8 @@ export function TextInput({
   value,
   onChange,
   description,
+  placeholder,
+  info,
   error,
   required = false,
   maxLength,
@@ -29,6 +36,8 @@ export function TextInput({
   value: string;
   onChange: (value: string) => void;
   description?: string;
+  placeholder?: string;
+  info?: ReactNode;
   error?: string;
   required?: boolean;
   maxLength?: number;
@@ -37,11 +46,14 @@ export function TextInput({
   ref?: Ref<HTMLInputElement>;
   onCommit?: () => void;
 }) {
-  return (
+  const { inputLabel, id, wrap } = useFieldLabel({ label, info, required });
+  return wrap(
     <MantineTextInput
       ref={ref}
-      label={label}
+      id={id}
+      label={inputLabel}
       description={description}
+      placeholder={placeholder}
       error={error}
       value={value}
       onChange={(event) => onChange(event.currentTarget.value)}
@@ -57,6 +69,6 @@ export function TextInput({
           onCommit();
         }
       }}
-    />
+    />,
   );
 }

@@ -13,9 +13,7 @@ export function LinkList({
     <ul className={classes.list} aria-label={label}>
       {links.map((link) => (
         <li key={link.to}>
-          <PageLink to={link.to} mono>
-            {link.name}
-          </PageLink>
+          <PageLink to={link.to}>{link.name}</PageLink>
         </li>
       ))}
     </ul>

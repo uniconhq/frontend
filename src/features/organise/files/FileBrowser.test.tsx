@@ -14,8 +14,8 @@ import {
   taskState,
 } from '@/test/organiser';
 
-const CONTEST = '/orgs/acme/contests/spring';
-const TASK = `${CONTEST}/tasks/sum`;
+const CONTEST = '/orgs/acme/contests/spring/files';
+const TASK = '/orgs/acme/contests/spring/tasks/sum/files';
 const CONTEST_FILE = `${CONTEST_API}/files/:path`;
 
 function tree() {
@@ -98,11 +98,8 @@ describe('the file tree', () => {
     expect(
       screen.queryByRole('textbox', { name: /data\/testcases\/logo\.png/ }),
     ).not.toBeInTheDocument();
-    expect(
-      new Set(
-        screen.queryAllByRole('textbox').map((box) => box.closest('form')?.ariaLabel),
-      ),
-    ).toEqual(new Set(['Add someone', 'Invite someone', 'Post announcement']));
+    // The page is the files alone, so no box on it takes text.
+    expect(screen.queryAllByRole('textbox')).toEqual([]);
     expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument();
   });
 

@@ -145,7 +145,7 @@ export function SharePanel({ page }: { page: WorkflowPage }) {
           </form>
         </>
       )}
-      {error !== null && <ErrorBlock error={error} />}
+      {error !== null && <ErrorBlock error={error} compact />}
     </section>
   );
 }

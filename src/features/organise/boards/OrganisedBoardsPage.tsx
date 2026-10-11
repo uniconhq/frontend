@@ -3,13 +3,12 @@ import { $api, queryView } from '@/api/query';
 import type { BoardRow, OrganisedBoard } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { Card } from '@/ui/Card';
-import { PageLink } from '@/ui/PageLink';
-import { PageTitle } from '@/ui/PageTitle';
 import { Select } from '@/ui/Select';
 import { BoardTable } from '@/ui/boards/BoardTable';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
-import { contestPath } from '@/lib/organiser-paths';
+import { CONTEST_SECTIONS, sectionOf } from '@/lib/sections';
+import { SectionPage } from '../SectionPage';
 import { useContestParams } from '@/lib/route-params';
 import classes from '../organise.module.css';
 
@@ -112,9 +111,7 @@ export function OrganisedBoardsPage() {
   };
 
   return (
-    <div className={classes.page}>
-      <PageLink to={contestPath(org, contest)}>Back to the contest</PageLink>
-      <PageTitle>Boards</PageTitle>
+    <SectionPage section={sectionOf(CONTEST_SECTIONS, 'boards')}>
       {view.state === 'loading' && <PageSkeleton rows={4} />}
       {view.state === 'error' && <ErrorBlock error={view.error} onRetry={view.retry} />}
       {view.state === 'ready' &&
@@ -141,6 +138,6 @@ export function OrganisedBoardsPage() {
             ))}
           </>
         ))}
-    </div>
+    </SectionPage>
   );
 }

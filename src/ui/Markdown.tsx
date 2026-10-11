@@ -1,6 +1,7 @@
-import { Anchor, Typography } from '@mantine/core';
+import { Typography } from '@mantine/core';
 import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { OutLink } from './OutLink';
 
 /** Whether a link leaves this site, and so opens apart from it. */
 function external(href: string | undefined): boolean {
@@ -23,12 +24,12 @@ const COMPONENTS: Components = {
   h4: 'h5',
   h5: 'h6',
   a: ({ href, children }) =>
-    external(href) ? (
-      <Anchor href={href} target="_blank" rel="noopener noreferrer">
-        {children}
-      </Anchor>
+    href === undefined ? (
+      <span>{children}</span>
     ) : (
-      <Anchor href={href}>{children}</Anchor>
+      <OutLink href={href} newTab={external(href)}>
+        {children}
+      </OutLink>
     ),
   img: ({ src, alt }) => {
     const target = typeof src === 'string' ? src : undefined;
@@ -36,9 +37,9 @@ const COMPONENTS: Components = {
     return target === undefined ? (
       <span>{text}</span>
     ) : (
-      <Anchor href={target} target="_blank" rel="noopener noreferrer">
+      <OutLink href={target} newTab>
         {text}
-      </Anchor>
+      </OutLink>
     );
   },
 };

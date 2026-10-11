@@ -165,7 +165,7 @@ export function SaveOutcome<Body = WriteFile>({
           and replaces your text, so copy anything you want to keep first.
         </BodyText>
         <div className={classes.actions}>
-          <Button size="xs" variant="secondary" onClick={onReload}>
+          <Button variant="secondary" onClick={onReload}>
             Reload the file
           </Button>
         </div>
@@ -189,10 +189,8 @@ export function SaveOutcome<Body = WriteFile>({
           the files and publishes nothing.
         </BodyText>
         <div className={classes.actions}>
-          <Button size="xs" onClick={() => onConfirm(body)}>
-            Publish the change
-          </Button>
-          <Button size="xs" variant="secondary" onClick={() => onKeepAsDraft(body)}>
+          <Button onClick={() => onConfirm(body)}>Publish the change</Button>
+          <Button variant="secondary" onClick={() => onKeepAsDraft(body)}>
             Keep as draft
           </Button>
         </div>

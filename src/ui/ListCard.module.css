@@ -1,0 +1,111 @@
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid var(--unicon-border);
+  border-radius: var(--mantine-radius-md);
+  background: var(--unicon-body);
+}
+
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  min-height: 30px;
+}
+
+.title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--unicon-text-primary);
+}
+
+.filter {
+  width: 220px;
+}
+
+/* About six two-line rows, scrolling inside past that, whatever the count. */
+.rows {
+  height: 336px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* On a narrow screen the list grows with the page instead. */
+@media (max-width: 760px) {
+  .rows {
+    height: auto;
+    min-height: 56px;
+    overflow: visible;
+  }
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.row {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--unicon-border);
+}
+
+.row:hover {
+  background: var(--unicon-hover);
+}
+
+/* The row's name is its link, and the whole row answers to it. */
+.name {
+  color: var(--unicon-text-accent);
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+.name::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+}
+
+.row:hover .name {
+  text-decoration: underline;
+}
+
+.name:focus-visible {
+  outline: 2px solid var(--unicon-text-accent);
+  outline-offset: 2px;
+}
+
+.detail {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  font-size: 13px;
+  color: var(--unicon-text-secondary);
+}
+
+/* Anything to press in a row's line, such as a retry, stays above the row's link. */
+.detail :is(button, a) {
+  position: relative;
+  z-index: 1;
+}
+
+/* The card's one button, at its bottom. */
+.action {
+  display: flex;
+  padding-top: 10px;
+  border-top: 1px solid var(--unicon-border);
+}

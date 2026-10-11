@@ -16,7 +16,7 @@ import {
 
 type Change = components['schemas']['Change'];
 
-const TASK = '/orgs/acme/contests/spring/tasks/sum';
+const TASK = '/orgs/acme/contests/spring/tasks/sum/files';
 const LATEST = '3c4d5e6f7a8b9c0d1e2f';
 /** Publication 2's version, and publication 1's. */
 const SECOND = publications[1]?.version ?? '';

@@ -8,19 +8,18 @@ import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
 import { Card } from '@/ui/Card';
 import { Modal } from '@/ui/Modal';
-import { PageLink } from '@/ui/PageLink';
-import { PageTitle } from '@/ui/PageTitle';
 import { SectionTitle } from '@/ui/SectionTitle';
 import { Select } from '@/ui/Select';
 import { TextInput } from '@/ui/TextInput';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
 import { useMe } from '@/session';
-import { contestPath } from '@/lib/organiser-paths';
+import { CONTEST_SECTIONS, sectionOf } from '@/lib/sections';
 import { useContestParams } from '@/lib/route-params';
 import { teamNameProblem, USERNAME_MAX } from '@/lib/team-fields';
 import { formatDateTime } from '@/lib/time';
 import { holdsAtContest } from '../roles';
+import { SectionPage } from '../SectionPage';
 import classes from './teams.module.css';
 
 const EVERY = '/api/v1/orgs/{org}/contests/{contest}/organise/teams';
@@ -627,9 +626,7 @@ export function TeamsPage() {
   );
 
   return (
-    <div className={classes.page}>
-      <PageLink to={contestPath(org, contest)}>Back to the contest</PageLink>
-      <PageTitle>Teams</PageTitle>
+    <SectionPage section={sectionOf(CONTEST_SECTIONS, 'teams')}>
       <Card>
         <div className={classes.stack}>
           <BodyText tone="secondary">
@@ -667,6 +664,6 @@ export function TeamsPage() {
             ))
           ))}
       </section>
-    </div>
+    </SectionPage>
   );
 }

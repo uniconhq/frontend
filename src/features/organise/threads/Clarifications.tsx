@@ -6,18 +6,16 @@ import type { Clarification } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
 import { Card } from '@/ui/Card';
-import { PageLink } from '@/ui/PageLink';
-import { PageTitle } from '@/ui/PageTitle';
-import { SectionTitle } from '@/ui/SectionTitle';
 import { TextInput } from '@/ui/TextInput';
 import { Textarea } from '@/ui/Textarea';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
 import { useMe } from '@/session';
 import { useFallbackPoll } from '@/live';
-import { clarificationsPath, orgPath } from '@/lib/organiser-paths';
 import { useOrgParam } from '@/lib/route-params';
+import { ORG_SECTIONS, sectionOf } from '@/lib/sections';
 import { holdsAtContest } from '../roles';
+import { SectionPage } from '../SectionPage';
 import { QuestionThread } from '@/ui/threads/ThreadParts';
 import { isTeams } from '@/ui/threads/asker';
 import classes from '@/ui/threads/threads.module.css';
@@ -217,13 +215,15 @@ export function InboxPage() {
   );
 
   return (
-    <div className={classes.stack}>
-      <PageLink to={orgPath(org)}>Back to the org</PageLink>
-      <PageTitle>Questions</PageTitle>
-      <BodyText tone="secondary">
-        Every question still open across the org. A reply keeps a question here; only
-        Mark as answered takes it off.
-      </BodyText>
+    <SectionPage
+      section={sectionOf(ORG_SECTIONS, 'questions')}
+      intro={
+        <BodyText tone="secondary">
+          Every question still open across the org. A reply keeps a question here; only
+          Mark as answered takes it off.
+        </BodyText>
+      }
+    >
       <Card>
         {view.state === 'loading' && <PageSkeleton rows={3} />}
         {view.state === 'error' && (
@@ -249,7 +249,7 @@ export function InboxPage() {
             </ol>
           ))}
       </Card>
-    </div>
+    </SectionPage>
   );
 }
 
@@ -276,8 +276,6 @@ export function ContestClarifications({
 
   return (
     <div className={classes.stack}>
-      <SectionTitle>Questions</SectionTitle>
-      <PageLink to={clarificationsPath(org)}>Open questions across the org</PageLink>
       {view.state === 'loading' && <PageSkeleton rows={2} />}
       {view.state === 'error' && <ErrorBlock error={view.error} onRetry={view.retry} />}
       {view.state === 'ready' &&

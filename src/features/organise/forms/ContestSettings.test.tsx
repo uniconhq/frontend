@@ -78,10 +78,7 @@ function fill(field: HTMLElement, value: string) {
 }
 
 async function openForm() {
-  renderApp('/orgs/acme/contests/spring');
-  await userEvent.click(
-    await screen.findByRole('button', { name: 'Edit the settings' }),
-  );
+  renderApp('/orgs/acme/contests/spring/settings');
   return screen.findByRole('form', { name: 'Contest settings' });
 }
 
@@ -449,10 +446,7 @@ describe('the contest settings form', { timeout: 20_000 }, () => {
 
   it('falls back to the text with the reason when the file is not YAML', async () => {
     contestBackend({ current: 'name: [Spring\n' });
-    renderApp('/orgs/acme/contests/spring');
-    await userEvent.click(
-      await screen.findByRole('button', { name: 'Edit the settings' }),
-    );
+    renderApp('/orgs/acme/contests/spring/settings');
 
     expect(
       await screen.findByText(

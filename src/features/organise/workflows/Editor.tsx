@@ -611,7 +611,7 @@ export function Editor({
           {dirty ? 'Changes not saved yet.' : 'Saved.'}
         </BodyText>
       </div>
-      {saveError !== null && <ErrorBlock error={saveError} />}
+      {saveError !== null && <ErrorBlock error={saveError} compact />}
       {conflict !== null && (
         <MergeView
           key={conflict.token}

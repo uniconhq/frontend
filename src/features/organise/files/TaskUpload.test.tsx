@@ -7,7 +7,7 @@ import { renderApp } from '@/test/render';
 import { problem, server, signedIn, someone } from '@/test/server';
 import { TASK_API, publicationList, repoFiles, taskState } from '@/test/organiser';
 
-const TASK = '/orgs/acme/contests/spring/tasks/sum';
+const TASK = '/orgs/acme/contests/spring/tasks/sum/files';
 const UPLOAD = '0199a2c1-6b7e-7c3a-9f10-5d2e4b8a6c99';
 const DOOR = `/-/uploads/${UPLOAD}`;
 /** The SHA-256 of `1 2\n`, the file the tests upload. */

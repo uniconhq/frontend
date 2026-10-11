@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router';
+import { useNavigate } from 'react-router';
 import { $api, queryView } from '@/api/query';
 import { toApiError, type ApiError } from '@/api/problem';
 import type { WorkflowItem } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
 import { Card } from '@/ui/Card';
+import { PageLink } from '@/ui/PageLink';
 import { PageTitle } from '@/ui/PageTitle';
 import { SectionTitle } from '@/ui/SectionTitle';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
@@ -54,9 +55,9 @@ function Listed({ items }: { items: WorkflowItem[] }) {
     <ul className={classes.list} aria-label={label}>
       {shown.map((item) => (
         <li key={`${item.owner}/${item.name}`} className={classes.item}>
-          <Link to={workflowPath(item.owner, item.name)}>
+          <PageLink to={workflowPath(item.owner, item.name)}>
             {item.owner}/{item.name}
-          </Link>
+          </PageLink>
           <BodyText size="sm" tone="meta">
             {item.visibility}
             {item.versions.length > 0
@@ -102,16 +103,11 @@ function NewWorkflow() {
       </BodyText>
       <OwnerAndName owner={owner} name={name} setOwner={setOwner} setName={setName} />
       <div>
-        <Button
-          size="xs"
-          type="submit"
-          loading={create.isPending}
-          disabled={name.trim() === ''}
-        >
+        <Button type="submit" loading={create.isPending} disabled={name.trim() === ''}>
           Make it
         </Button>
       </div>
-      {error !== null && <ErrorBlock error={error} />}
+      {error !== null && <ErrorBlock error={error} compact />}
     </form>
   );
 }

@@ -2,7 +2,7 @@ import { useState, type ReactNode } from 'react';
 import type { Fallback, FeedEntry } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { PageLink } from '@/ui/PageLink';
-import { TextLink } from '@/ui/TextLink';
+import { OutLink } from '@/ui/OutLink';
 import { formatDateTime } from '@/lib/time';
 import { taskPath } from '@/lib/organiser-paths';
 import { STATUS, bySubmission, logHref, nameOf, resultOf, submitterOf } from './feed';
@@ -27,9 +27,7 @@ function TaskCell({ path, entry }: { path: ContestPath; entry: FeedEntry }) {
   return (
     <span className={classes.task}>
       {label !== null && <span className={classes.letter}>{label}</span>}
-      <PageLink to={taskPath(path.org, path.contest, task)} mono>
-        {task}
-      </PageLink>
+      <PageLink to={taskPath(path.org, path.contest, task)}>{task}</PageLink>
     </span>
   );
 }
@@ -75,13 +73,13 @@ function StatusCell({
         <BodyText tone="secondary">{resultOf(grading.result)}</BodyText>
       )}
       {grading.log && entry.task !== null && (
-        <TextLink
+        <OutLink
           href={logHref({ ...path, task: entry.task }, grading.id)}
           label={`Log of ${name}`}
           newTab
         >
           Log
-        </TextLink>
+        </OutLink>
       )}
     </>
   );

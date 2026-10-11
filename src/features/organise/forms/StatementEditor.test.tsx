@@ -40,10 +40,7 @@ function statementBackend(
 describe('the statement beside its preview', { timeout: 20_000 }, () => {
   it('shows a statement that is an upload by its size and digest, never as text', async () => {
     statementBackend(() => HttpResponse.json({}), { size: 40, digest: 'c'.repeat(64) });
-    renderApp('/orgs/acme/contests/spring/tasks/sum');
-    await userEvent.click(
-      await screen.findByRole('button', { name: 'Edit the statement' }),
-    );
+    renderApp('/orgs/acme/contests/spring/tasks/sum/statement');
 
     const shown = await screen.findByRole('region', { name: 'Uploaded statement.md' });
     expect(within(shown).getByText('c'.repeat(64))).toBeVisible();
@@ -60,10 +57,7 @@ describe('the statement beside its preview', { timeout: 20_000 }, () => {
         regraded: 0,
       }),
     );
-    renderApp('/orgs/acme/contests/spring/tasks/sum');
-    await userEvent.click(
-      await screen.findByRole('button', { name: 'Edit the statement' }),
-    );
+    renderApp('/orgs/acme/contests/spring/tasks/sum/statement');
 
     const source = await screen.findByRole('textbox', { name: 'Statement source' });
     const preview = screen.getByRole('region', { name: 'What contestants see' });
@@ -98,10 +92,7 @@ describe('the statement beside its preview', { timeout: 20_000 }, () => {
         }),
       ),
     );
-    renderApp('/orgs/acme/contests/spring/tasks/sum');
-    await userEvent.click(
-      await screen.findByRole('button', { name: 'Read the statement' }),
-    );
+    renderApp('/orgs/acme/contests/spring/tasks/sum/statement');
 
     expect(
       await screen.findByRole('textbox', { name: 'Statement source' }),

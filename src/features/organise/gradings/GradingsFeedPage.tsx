@@ -6,7 +6,6 @@ import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
 import { Card } from '@/ui/Card';
 import { PageLink } from '@/ui/PageLink';
-import { PageTitle } from '@/ui/PageTitle';
 import { SectionTitle } from '@/ui/SectionTitle';
 import { Select } from '@/ui/Select';
 import { TextInput } from '@/ui/TextInput';
@@ -14,6 +13,8 @@ import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
 import { useLiveConnected } from '@/live';
 import { useContestParams } from '@/lib/route-params';
+import { CONTEST_SECTIONS, sectionOf } from '@/lib/sections';
+import { SectionPage } from '../SectionPage';
 import { GradingsList } from './GradingsList';
 import {
   STATUS,
@@ -25,7 +26,6 @@ import {
   type FilterKey,
   type Filters,
 } from './feed';
-import shared from '../organise.module.css';
 import classes from './feed.module.css';
 
 /** How often the queue is read again while one waits and the stream is down, and otherwise. */
@@ -212,8 +212,7 @@ export function GradingsFeedPage() {
   const filtered = Object.values(filters).some((value) => value !== null);
 
   return (
-    <div className={shared.page}>
-      <PageTitle>Gradings</PageTitle>
+    <SectionPage section={sectionOf(CONTEST_SECTIONS, 'gradings')}>
       <Card>
         <QueueDepthPanel path={path} />
       </Card>
@@ -241,6 +240,6 @@ export function GradingsFeedPage() {
           />
         </div>
       </Card>
-    </div>
+    </SectionPage>
   );
 }

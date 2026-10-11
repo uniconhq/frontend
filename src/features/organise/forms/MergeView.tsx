@@ -180,14 +180,13 @@ export function MergeView({
       <div className={shared.actions}>
         {choosable && (
           <Button
-            size="xs"
             loading={busy}
             onClick={() => onSave(mergeText(currentText, diffs, choices))}
           >
             Save the merged version
           </Button>
         )}
-        <Button size="xs" variant="secondary" disabled={busy} onClick={onDrop}>
+        <Button variant="secondary" disabled={busy} onClick={onDrop}>
           {diffs !== null && !choosable ? 'Back to the form' : 'Drop my changes'}
         </Button>
       </div>

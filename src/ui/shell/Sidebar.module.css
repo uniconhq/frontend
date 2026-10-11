@@ -35,13 +35,12 @@
 .active {
   background: var(--unicon-hover);
   color: var(--unicon-text-primary);
+  font-weight: 600;
 }
 
-.upcoming {
-  color: var(--unicon-text-faint);
-  cursor: default;
-}
-
-.upcoming:hover {
-  background: transparent;
+/* A long name, such as an org's or a task's, stays on its line. */
+.item {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }

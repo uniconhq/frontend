@@ -163,7 +163,7 @@ function Listed({ view, marks }: { view: QueryView<Submission[]>; marks: MarkSta
         {newestFirst(view.data).map((submission) => (
           <tr key={submission.number}>
             <th scope="row">
-              <PageLink to={submissionHref(submission.number)} mono>
+              <PageLink to={submissionHref(submission.number)}>
                 #{submission.number}
               </PageLink>
             </th>

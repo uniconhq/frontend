@@ -7,14 +7,13 @@ import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
 import { Card } from '@/ui/Card';
 import { Modal } from '@/ui/Modal';
-import { PageLink } from '@/ui/PageLink';
-import { PageTitle } from '@/ui/PageTitle';
 import { SectionTitle } from '@/ui/SectionTitle';
 import { TextInput } from '@/ui/TextInput';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
 import { useMe } from '@/session';
-import { contestPath } from '@/lib/organiser-paths';
+import { CONTEST_SECTIONS, sectionOf } from '@/lib/sections';
+import { SectionPage } from '../SectionPage';
 import { useContestParams } from '@/lib/route-params';
 import { formatDateTime } from '@/lib/time';
 import { holdsAtContest } from '../roles';
@@ -367,9 +366,7 @@ export function ContestantsPage() {
   );
 
   return (
-    <div className={classes.page}>
-      <PageLink to={contestPath(org, contest)}>Back to the contest</PageLink>
-      <PageTitle>Contestants</PageTitle>
+    <SectionPage section={sectionOf(CONTEST_SECTIONS, 'contestants')}>
       <Card>
         {view.state === 'loading' && <PageSkeleton rows={4} />}
         {view.state === 'error' && (
@@ -418,6 +415,6 @@ export function ContestantsPage() {
           />
         </div>
       </Card>
-    </div>
+    </SectionPage>
   );
 }
