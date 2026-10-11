@@ -1,4 +1,12 @@
-import { createContext, useContext, useEffect, useMemo, type ReactNode } from 'react';
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  type ReactNode,
+  type RefObject,
+} from 'react';
 import {
   BaseEdge,
   Handle,
@@ -10,12 +18,14 @@ import {
   type FinalConnectionState,
   type Node,
   type NodeProps,
-  useReactFlow,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
+import type { DefinitionProblem } from '@/api/types';
 import {
   GEOMETRY,
   columnX,
+  headerOf,
+  rowOf,
   wirePath,
   type Box,
   type Layout,
@@ -23,9 +33,20 @@ import {
 } from './layout';
 import { sourceAt, targetAt, type Notice, type Target } from './ends';
 import { NumberText } from '../forms/yaml-doc';
-import { refLabel, type Ref, type Workflow } from './model';
+import { type Ref, type Workflow } from './model';
 import type { Pinned } from './pins';
-import { declared, raisingPorts, type PrimitiveInfo } from './primitives';
+import { declared, type PrimitiveInfo } from './primitives';
+import {
+  boxName,
+  entryMarks,
+  fieldMarks,
+  inputMarks,
+  portMarks,
+  primitiveTitle,
+  readersWords,
+  refWords,
+  runsWords,
+} from './words';
 import classes from './workflows.module.css';
 
 /**
@@ -35,7 +56,10 @@ import classes from './workflows.module.css';
  * dragging from a source's handle to a port's; while one is dragged, each
  * port says whether it would take it, and one that would not says why, at
  * the port, when the wire is dropped there. Every port is also a button
- * whose menu does what a drag does, for the keyboard.
+ * whose menu does what a drag does, for the keyboard. Each box and row says
+ * what it is in words (M31): a step its primitive's title and what it does,
+ * a port what it does that the author acts on, and a problem its message
+ * beside its mark.
  */
 
 type GraphContext = {
@@ -62,8 +86,6 @@ function useGraph(): GraphContext {
   return found;
 }
 
-const rowTop = (row: number) => GEOMETRY.header + row * GEOMETRY.row + GEOMETRY.row / 2;
-
 type BoxNode = Node<{ box: Box }, 'box'>;
 type SlotNode = Node<{ label: string | null; colour: number; source: string }, 'slot'>;
 type BandNode = Node<Record<string, never>, 'band'>;
@@ -89,13 +111,32 @@ function shownValue(
   if (value.kind === 'wire')
     return drawn.has(`port:${String(box.step)}.${port}`)
       ? null
-      : `from ${refLabel(value.ref)}, not drawn`;
+      : `${refWords(value.ref)}, not drawn`;
   if (value.kind === 'literal')
     return value.value instanceof NumberText
-      ? value.value.text
-      : JSON.stringify(value.value);
-  if (value.kind === 'text') return JSON.stringify(value.text);
-  return 'not a value a port takes';
+      ? `= ${value.value.text}`
+      : `= ${JSON.stringify(value.value)}`;
+  if (value.kind === 'text') return `= ${JSON.stringify(value.text)}`;
+  return 'a value no port takes';
+}
+
+/** A problem's mark, read out as its message, with the message beside it. */
+function ProblemMark({ problem }: { problem: DefinitionProblem }) {
+  return (
+    <>
+      <span
+        className={classes.problem}
+        role="note"
+        aria-label={problem.message}
+        title={problem.message}
+      >
+        !
+      </span>
+      <span className={classes.problemBeside} aria-hidden>
+        {problem.message}
+      </span>
+    </>
+  );
 }
 
 function PortRow({
@@ -153,31 +194,28 @@ function PortRow({
       ? graph.workflow.report.find((found) => found.name === port)
       : undefined;
   const type = decl?.type ?? input?.type ?? field?.type ?? null;
+  const optional = decl?.optional === true || input?.optional === true;
   const marks = [
-    decl?.optional ? 'optional' : null,
-    decl?.runs ? 'runs' : null,
-    decl?.secret ? 'secret' : null,
-    side === 'left' && primitive !== null && raisingPorts(primitive).has(port)
-      ? 'raises a limit'
-      : null,
-    input?.contestant ? 'contestant' : null,
-    input?.perTest ? 'per test' : null,
-    input?.optional ? 'optional' : null,
-    field?.public ? 'public' : null,
-    entry?.fold ? `fold ${entry.fold}` : null,
-    entry?.better
-      ? `better ${entry.better.startsWith('${{') ? 'by input' : entry.better}`
-      : null,
-  ].filter((mark): mark is string => mark !== null);
+    ...(side === 'left' && primitive !== null ? portMarks(primitive, port) : []),
+    ...(input !== undefined ? inputMarks(input) : []),
+    ...(field !== undefined ? fieldMarks(field) : []),
+    ...(entry !== undefined ? entryMarks(entry) : []),
+  ];
+  const said = [type, ...marks, value].filter((part) => part !== null).join(' · ');
   const isNew = box.kind === 'report' && port === '+';
+  const first = problems[0];
   return (
     <div
       className={classes.row}
       data-side={side}
+      data-output={(box.kind === 'step' && side === 'right') || undefined}
+      data-first-output={
+        (box.kind === 'step' && side === 'right' && box.right[0] === port) || undefined
+      }
       data-offered={offered || undefined}
       data-refused={refused !== null || undefined}
-      style={{ top: rowTop(row) - GEOMETRY.row / 2, height: GEOMETRY.row }}
-      title={refused ?? undefined}
+      style={{ top: headerOf(box.kind) + row * GEOMETRY.row, height: GEOMETRY.row }}
+      title={refused ?? first?.message ?? (isNew ? undefined : `${port} · ${said}`)}
     >
       <Handle
         type={side === 'left' ? 'target' : 'source'}
@@ -190,29 +228,21 @@ function PortRow({
       />
       {isNew ? (
         <span className={classes.drop}>
-          {graph.readOnly ? '' : 'Drop an output to report it'}
+          {graph.readOnly ? '' : 'Drop an output here to report it'}
         </span>
       ) : (
         <>
           {graph.menu(box, port, side)}
-          {type !== null && <span className={classes.type}>{type}</span>}
-          {marks.length > 0 && (
-            <span className={classes.marks}>{marks.join(' · ')}</span>
+          {optional && <span className={classes.optional}>(optional)</span>}
+          {first !== undefined ? (
+            problems.map((problem) => (
+              <ProblemMark key={problem.message} problem={problem} />
+            ))
+          ) : (
+            <span className={classes.said}>{said}</span>
           )}
-          {value !== null && <span className={classes.value}>= {value}</span>}
         </>
       )}
-      {problems.map((problem) => (
-        <span
-          key={problem.message}
-          className={classes.problem}
-          role="note"
-          aria-label={problem.message}
-          title={problem.message}
-        >
-          !
-        </span>
-      ))}
       {refused !== null && (
         <span className={classes.refusedMark} aria-hidden>
           ✕
@@ -227,28 +257,68 @@ function PortRow({
   );
 }
 
-function boxTitle(box: Box, workflow: Workflow): { title: string; detail: string } {
-  if (box.kind === 'step' && box.step !== null) {
-    const step = workflow.steps[box.step];
-    return {
-      title: step?.id || '(no id)',
-      detail: `${step?.use ?? ''}${step?.perTest ? ' · per test' : ' · once'}`,
-    };
-  }
-  const by =
-    box.readers.length > 0
-      ? `read by ${box.readers.join(', ')}`
-      : 'nothing reads these yet';
-  if (box.kind === 'inputs') return { title: 'Inputs', detail: by };
-  if (box.kind === 'test') return { title: 'Test fields', detail: by };
-  return { title: 'Report', detail: 'what a run reports' };
+/** The head of a step's box: its name and how often it runs, its primitive, what that does. */
+function StepHead({ box }: { box: Box }) {
+  const graph = useGraph();
+  const step = box.step !== null ? graph.workflow.steps[box.step] : undefined;
+  const primitive = step !== undefined ? declared(graph.primitives, step.use) : null;
+  const problems = box.step !== null ? (graph.pinned.steps.get(box.step) ?? []) : [];
+  return (
+    <>
+      <button
+        type="button"
+        className={`${classes.headButton} nodrag nopan`}
+        onClick={() => graph.select(box.key)}
+      >
+        <span className={classes.titleLine}>
+          <span className={classes.title}>{step?.id || '(no name)'}</span>
+          <span className={classes.runs}>{runsWords(step?.perTest === true)}</span>
+        </span>
+        <span className={classes.primitiveLine}>
+          {primitive !== null && (
+            <span className={classes.primitiveTitle}>{primitiveTitle(primitive)}</span>
+          )}
+          <span className={classes.ref}>{step?.use ?? ''}</span>
+        </span>
+      </button>
+      {problems.length > 0 ? (
+        <p className={classes.headProblem}>
+          {problems.map((problem) => (
+            <ProblemMark key={problem.message} problem={problem} />
+          ))}
+        </p>
+      ) : (
+        primitive?.description && (
+          <p className={classes.description} title={primitive.description}>
+            {primitive.description}
+          </p>
+        )
+      )}
+    </>
+  );
+}
+
+function GroupHead({ box }: { box: Box }) {
+  const graph = useGraph();
+  return (
+    <button
+      type="button"
+      className={`${classes.headButton} nodrag nopan`}
+      onClick={() => graph.select(box.key)}
+    >
+      <span className={classes.title}>{boxName(box, graph.workflow)}</span>
+      <span className={classes.detail}>
+        {box.kind === 'report'
+          ? 'What each grading reports'
+          : readersWords(box.readers)}
+      </span>
+    </button>
+  );
 }
 
 function BoxView({ data }: NodeProps<BoxNode>) {
   const graph = useGraph();
   const { box } = data;
-  const { title, detail } = boxTitle(box, graph.workflow);
-  const problems = box.step !== null ? (graph.pinned.steps.get(box.step) ?? []) : [];
   const left = box.kind === 'report' ? [...box.left, '+'] : box.left;
   return (
     <div
@@ -258,32 +328,22 @@ function BoxView({ data }: NodeProps<BoxNode>) {
       data-dimmed={(graph.selected !== null && graph.selected !== box.key) || undefined}
       style={{ borderColor: graph.colours[box.colour] }}
       role="group"
-      aria-label={box.kind === 'step' ? `Step ${title}` : title}
+      aria-label={boxName(box, graph.workflow)}
     >
-      <button
-        type="button"
-        className={`${classes.header} nodrag nopan`}
-        onClick={() => graph.select(box.key)}
-      >
-        <span className={classes.title}>{title}</span>
-        <span className={classes.detail}>{detail}</span>
-      </button>
-      {problems.map((problem) => (
-        <span
-          key={problem.message}
-          className={classes.boxProblem}
-          role="note"
-          aria-label={problem.message}
-          title={problem.message}
-        >
-          !
-        </span>
-      ))}
+      <div className={classes.header} style={{ height: headerOf(box.kind) }}>
+        {box.kind === 'step' ? <StepHead box={box} /> : <GroupHead box={box} />}
+      </div>
       {left.map((port, row) => (
         <PortRow key={`in ${port}`} box={box} port={port} row={row} side="left" />
       ))}
-      {box.right.map((port, row) => (
-        <PortRow key={`out ${port}`} box={box} port={port} row={row} side="right" />
+      {box.right.map((port) => (
+        <PortRow
+          key={`out ${port}`}
+          box={box}
+          port={port}
+          row={rowOf(box, 'right', port)}
+          side="right"
+        />
       ))}
     </div>
   );
@@ -317,24 +377,57 @@ function WireView({ data }: EdgeProps<WireEdge>) {
   );
 }
 
-/**
- * The whole graph in view whenever its layout changes, so a box a change
- * adds is never drawn outside the canvas.
- */
-function FitOnChange({ layout }: { layout: Layout }) {
-  const flow = useReactFlow();
-  useEffect(() => {
-    const frame = requestAnimationFrame(() => {
-      void flow.fitView();
-    });
-    return () => cancelAnimationFrame(frame);
-  }, [flow, layout]);
-  return null;
-}
-
 const NODE_TYPES = { box: BoxView, slot: SlotView, band: BandView };
 const EDGE_TYPES = { wire: WireView };
 
+/** Space around the graph inside its frame, room for the band and the handles. */
+const PAD = 32;
+
+/** A box asked to be scrolled into view; `nonce` asks again for the same box. */
+export type Reveal = { key: string; nonce: number };
+
+/**
+ * Scroll the box `reveal` names into view: sideways inside the graph's own
+ * frame, clear of `cover` pixels of it hidden under a drawer on the right,
+ * and up or down in the page.
+ */
+function useReveal(
+  frame: RefObject<HTMLDivElement | null>,
+  layout: Layout,
+  reveal: Reveal | null,
+  cover: number,
+) {
+  useEffect(() => {
+    const scroller = frame.current;
+    if (reveal === null || scroller === null) return;
+    const box = layout.boxes.find((found) => found.key === reveal.key);
+    if (box === undefined) return;
+    const rect = scroller.getBoundingClientRect();
+    const hidden = Math.max(0, rect.right - (window.innerWidth - cover));
+    const seen = scroller.clientWidth - hidden;
+    const left = PAD + box.x - 16;
+    const right = PAD + box.x + box.width + 16;
+    let to = scroller.scrollLeft;
+    if (right > to + seen) to = right - seen;
+    if (left < to) to = left;
+    if (to !== scroller.scrollLeft) scroller.scrollTo?.({ left: Math.max(0, to) });
+    const node = scroller.querySelector<HTMLElement>(
+      `.react-flow__node[data-id="${CSS.escape(box.key)}"]`,
+    );
+    node?.scrollIntoView?.({ block: 'nearest' });
+  }, [frame, layout, reveal, cover]);
+}
+
+/**
+ * The graph at its actual size, never scaled: as tall as its tallest column,
+ * so the page scrolls down it, and as wide as its columns, sliding sideways
+ * inside its frame with a scrollbar, Shift and the wheel, or a trackpad's
+ * sideways swipe. The wheel alone scrolls the page, as anywhere else, since
+ * a graph that took it would trap the page under it. React Flow only draws
+ * and drags here: its viewport is fixed, with no zoom and no pan of its own.
+ * `reveal` scrolls a box into view, clear of `cover` pixels a drawer hides
+ * on the right, where the graph keeps that much room past its last column.
+ */
 export function Graph({
   layout,
   workflow,
@@ -350,6 +443,8 @@ export function Graph({
   onSelect,
   onDragStart,
   onDrop,
+  reveal = null,
+  cover = 0,
 }: {
   layout: Layout;
   workflow: Workflow;
@@ -365,7 +460,11 @@ export function Graph({
   onSelect: (key: string | null) => void;
   onDragStart: (source: Ref | null) => void;
   onDrop: (source: Ref, target: Target, box: string, port: string) => void;
+  reveal?: Reveal | null;
+  cover?: number;
 }) {
+  const frame = useRef<HTMLDivElement>(null);
+  useReveal(frame, layout, reveal, cover);
   const boxes = useMemo(
     () => new Map(layout.boxes.map((box) => [box.key, box])),
     [layout],
@@ -464,59 +563,95 @@ export function Graph({
       : null;
   };
 
-  const context: GraphContext = {
-    readOnly,
-    workflow,
-    primitives,
-    pinned,
-    colours,
-    selected,
-    dragging,
-    refusal,
-    notice,
-    menu,
-    select: (key) => onSelect(key === selected ? null : key),
-    drawn: new Set(layout.wires.map((wire) => wire.target)),
-  };
+  const drawn = useMemo(
+    () => new Set(layout.wires.map((wire) => wire.target)),
+    [layout],
+  );
+  const context = useMemo<GraphContext>(
+    () => ({
+      readOnly,
+      workflow,
+      primitives,
+      pinned,
+      colours,
+      selected,
+      dragging,
+      refusal,
+      notice,
+      menu,
+      select: (key) => onSelect(key === selected ? null : key),
+      drawn,
+    }),
+    [
+      readOnly,
+      workflow,
+      primitives,
+      pinned,
+      colours,
+      selected,
+      dragging,
+      refusal,
+      notice,
+      menu,
+      onSelect,
+      drawn,
+    ],
+  );
   return (
     <Context value={context}>
       <ReactFlowProvider>
-        <div className={classes.canvas}>
-          <ReactFlow
-            nodes={nodes}
-            edges={edges}
-            nodeTypes={NODE_TYPES}
-            edgeTypes={EDGE_TYPES}
-            nodesDraggable={false}
-            nodesConnectable={!readOnly}
-            elementsSelectable={false}
-            fitView
-            minZoom={0.2}
-            isValidConnection={() => true}
-            onPaneClick={() => onSelect(null)}
-            onNodeClick={(event, node) => {
-              const inside = (event.target as HTMLElement).closest(
-                'button, [role="menu"]',
-              );
-              if (inside === null && boxes.has(node.id)) context.select(node.id);
-            }}
-            onConnectStart={(_, params) => {
-              const from = ends(params.nodeId, params.handleId);
-              onDragStart(
-                from !== null && params.handleType === 'source'
-                  ? sourceAt(from.box, from.port, workflow)
-                  : null,
-              );
-            }}
-            onConnectEnd={(_, state) => {
-              onDragStart(null);
-              const found = fromConnection(state);
-              if (found !== null)
-                onDrop(found.source, found.target, found.box, found.port);
+        <div className={classes.frame} ref={frame}>
+          <div
+            className={classes.canvas}
+            style={{
+              width: layout.width + 2 * PAD + cover,
+              height: layout.height + 2 * PAD,
             }}
           >
-            <FitOnChange layout={layout} />
-          </ReactFlow>
+            <ReactFlow
+              nodes={nodes}
+              edges={edges}
+              nodeTypes={NODE_TYPES}
+              edgeTypes={EDGE_TYPES}
+              nodesDraggable={false}
+              nodesConnectable={!readOnly}
+              elementsSelectable={false}
+              defaultViewport={{ x: PAD, y: PAD, zoom: 1 }}
+              minZoom={1}
+              maxZoom={1}
+              panOnDrag={false}
+              panOnScroll={false}
+              zoomOnScroll={false}
+              zoomOnPinch={false}
+              zoomOnDoubleClick={false}
+              preventScrolling={false}
+              autoPanOnConnect={false}
+              autoPanOnNodeFocus={false}
+              proOptions={{ hideAttribution: true }}
+              isValidConnection={() => true}
+              onPaneClick={() => onSelect(null)}
+              onNodeClick={(event, node) => {
+                const inside = (event.target as HTMLElement).closest(
+                  'button, [role="menu"]',
+                );
+                if (inside === null && boxes.has(node.id)) context.select(node.id);
+              }}
+              onConnectStart={(_, params) => {
+                const from = ends(params.nodeId, params.handleId);
+                onDragStart(
+                  from !== null && params.handleType === 'source'
+                    ? sourceAt(from.box, from.port, workflow)
+                    : null,
+                );
+              }}
+              onConnectEnd={(_, state) => {
+                onDragStart(null);
+                const found = fromConnection(state);
+                if (found !== null)
+                  onDrop(found.source, found.target, found.box, found.port);
+              }}
+            />
+          </div>
         </div>
       </ReactFlowProvider>
     </Context>

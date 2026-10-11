@@ -1,108 +1,60 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router';
 import { $api, queryView } from '@/api/query';
-import { toApiError, type ApiError } from '@/api/problem';
 import type { WorkflowItem } from '@/api/types';
+import { ListCard, type ListRow } from '@/ui/ListCard';
+import { Page, PageHeader } from '@/ui/Page';
 import { BodyText } from '@/ui/BodyText';
-import { Button } from '@/ui/Button';
-import { Card } from '@/ui/Card';
-import { PageLink } from '@/ui/PageLink';
-import { PageTitle } from '@/ui/PageTitle';
-import { SectionTitle } from '@/ui/SectionTitle';
-import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
-import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
-import { useMe } from '@/session';
+import { Loaded } from '@/ui/feedback/Loaded';
 import { workflowPath } from '@/lib/organiser-paths';
-import { workflowOwners } from '../roles';
-import { OwnerAndName } from './Combine';
-import shared from '../organise.module.css';
-import classes from './workflows.module.css';
+import { NewWorkflowButton } from './NewWorkflow';
+import { latestVersion } from './versions';
+import { visibilityWords } from './words';
+
+function rows(items: WorkflowItem[]): ListRow[] {
+  return items.map((item) => {
+    const latest = latestVersion(item.versions);
+    return {
+      key: `${item.owner}/${item.name}`,
+      to: workflowPath(item.owner, item.name),
+      name: `${item.owner}/${item.name}`,
+      detail: `${visibilityWords(item)} · ${latest === undefined ? 'No version yet' : `Latest version ${latest}`}`,
+      text: `${item.owner}/${item.name}`,
+    };
+  });
+}
 
 /**
- * Every workflow the person may read, those they may edit first, each
- * linking to its page; and making a new one, which starts as the classic
- * workflow. Combining workflows is off this page for now (M36): `Combine`
- * and the backend's route stay, for when it has a place here again.
+ * Every workflow the person may read: those they may change, with the one
+ * way to make a new one (M32), and those shared with them or public, each
+ * going to its page. Combining workflows is off this page for now (M36):
+ * `Combine` and the backend's route stay, for when it has a place among the
+ * ways to make a workflow.
  */
 export function WorkflowsPage() {
   const view = queryView($api.useQuery('get', '/api/v1/workflows'));
+  const loading =
+    view.state === 'ready' ? undefined : <Loaded view={view}>{() => null}</Loaded>;
+  const items = view.state === 'ready' ? view.data : [];
   return (
-    <div className={shared.page}>
-      <PageTitle>Workflows</PageTitle>
-      <Card>
-        {view.state === 'loading' && <PageSkeleton rows={4} />}
-        {view.state === 'error' && (
-          <ErrorBlock error={view.error} onRetry={view.retry} />
-        )}
-        {view.state === 'ready' && <Listed items={view.data} />}
-      </Card>
-      <Card>
-        <NewWorkflow />
-      </Card>
-    </div>
-  );
-}
-
-function Listed({ items }: { items: WorkflowItem[] }) {
-  const mine = items.filter((item) => item.editable);
-  const others = items.filter((item) => !item.editable);
-  const list = (label: string, shown: WorkflowItem[]) => (
-    <ul className={classes.list} aria-label={label}>
-      {shown.map((item) => (
-        <li key={`${item.owner}/${item.name}`} className={classes.item}>
-          <PageLink to={workflowPath(item.owner, item.name)}>
-            {item.owner}/{item.name}
-          </PageLink>
-          <BodyText size="sm" tone="meta">
-            {item.visibility}
-            {item.versions.length > 0
-              ? ` · ${item.versions.join(', ')}`
-              : ' · no version yet'}
-          </BodyText>
-        </li>
-      ))}
-    </ul>
-  );
-  return (
-    <div className={shared.stack}>
-      <SectionTitle>Yours to edit</SectionTitle>
-      {mine.length === 0 ? <BodyText>None yet.</BodyText> : list('Yours to edit', mine)}
-      <SectionTitle>You may read</SectionTitle>
-      {others.length === 0 ? <BodyText>None.</BodyText> : list('You may read', others)}
-    </div>
-  );
-}
-
-function NewWorkflow() {
-  const [owner, setOwner] = useState(workflowOwners(useMe())[0] ?? '');
-  const [name, setName] = useState('');
-  const [error, setError] = useState<ApiError | null>(null);
-  const navigate = useNavigate();
-  const create = $api.useMutation('post', '/api/v1/workflows');
-  return (
-    <form
-      className={shared.form}
-      aria-label="New workflow"
-      onSubmit={(event) => {
-        event.preventDefault();
-        setError(null);
-        create
-          .mutateAsync({ body: { owner, name: name.trim() } })
-          .then((made) => navigate(workflowPath(made.owner, made.name)))
-          .catch((caught: unknown) => setError(toApiError(caught)));
-      }}
-    >
-      <SectionTitle order={3}>New workflow</SectionTitle>
-      <BodyText size="sm" tone="secondary">
-        It starts as unicon/classic@v2, private, for you to change.
-      </BodyText>
-      <OwnerAndName owner={owner} name={name} setOwner={setOwner} setName={setName} />
-      <div>
-        <Button type="submit" loading={create.isPending} disabled={name.trim() === ''}>
-          Make it
-        </Button>
-      </div>
-      {error !== null && <ErrorBlock error={error} compact />}
-    </form>
+    <Page>
+      <PageHeader title="Workflows">
+        <BodyText size="md" tone="secondary">
+          A workflow is the steps that grade a submission. Each task chooses a version
+          of one.
+        </BodyText>
+      </PageHeader>
+      <ListCard
+        title="Workflows you can change"
+        rows={rows(items.filter((item) => item.editable))}
+        empty="You have no workflow of your own yet."
+        action={<NewWorkflowButton />}
+        body={loading}
+      />
+      <ListCard
+        title="Workflows you can use"
+        rows={rows(items.filter((item) => !item.editable))}
+        empty="Nobody has shared a workflow with you, and none is public."
+        body={loading}
+      />
+    </Page>
   );
 }

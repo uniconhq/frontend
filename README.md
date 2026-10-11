@@ -416,9 +416,17 @@ own, which the proxy sends here beside `/orgs`.
 
 | Address                              | Page                                                                                     |
 | ------------------------------------ | ---------------------------------------------------------------------------------------- |
-| `/workflows`                         | every workflow you may read, yours to edit first; New workflow; Combine workflows        |
+| `/workflows`                         | every workflow you may read, those you may change first; New workflow                    |
 | `/workflows/:owner/:name`            | for one you may edit, the editor over its draft; otherwise its latest version, read-only |
-| `/workflows/:owner/:name?version=v1` | that version, read-only, with Copy it into a workflow of your own                        |
+| `/workflows/:owner/:name?version=v1` | that version, read-only, with Copy into a new workflow                                   |
+
+There is one way to make a workflow, New workflow: from the starter (compile,
+run on each test, compare with the answer) or as a copy of any version one can
+read, under oneself or an org one manages; a version's "Copy into a new
+workflow" opens the same dialog with that version chosen. Combining workflows
+is off both pages for now (M36): `Combine.tsx` and the backend's
+`POST /workflow-combinations` stay, tested on their own, for when it has a
+place among the ways to make one.
 
 **The editor is the only place a workflow is edited** (PROPOSAL.md section
 12, #377). `features/organise/workflows/` holds it. `model.ts` reads
@@ -435,9 +443,25 @@ first; a slot of its own in each column a wire skips, shared by the wires
 from one port and labelled at its first; each column sorted by where its
 wires come from and go, a few sweeps each way, keeping the fewest crossings;
 and five colours cut from the mark's gradient, the columns taking them 1 to 5
-and back. Every wire joins neighbouring columns, so none passes behind a box.
+and back. Every port has a row of its own, a step's outputs under its
+inputs. Every wire joins neighbouring columns, so none passes behind a box.
 React Flow draws the boxes and wires at those places and handles the drags;
-it places nothing, and no box can be dragged.
+it places nothing, and no box can be dragged. The graph is always at its
+actual size (`Graph.tsx`): no zoom, no pan of React Flow's own and no fit on
+change; it is as tall as its tallest column, so the page scrolls down it,
+and slides sideways in its frame with a scrollbar, Shift and the wheel, or a
+trackpad. React Flow's attribution is hidden (`proOptions.hideAttribution`,
+which its MIT licence allows; its authors ask those who hide it to consider
+sponsoring them). A version's page and a task's Workflow card draw the same
+graph (`DrawnGraph.tsx`).
+
+Each box says what it is in words (`words.ts`, M31): a step its name, "Once"
+or "For each test", its primitive's title and what it does (#436), its
+reference small; a port its type and what it does that the author acts on
+("runs this as a program", "sets the time limit", "(optional)"); a wire skipping
+columns its source ("time_ms from run"). What the author never acts on, a
+primitive taking a batch, its outcome and a port that keeps a secret, is
+under Details in the step's drawer.
 
 `rules.ts` refuses at the drag whatever a version would refuse that the
 primitives' declarations decide, in the forge's own words: the type under
@@ -466,26 +490,42 @@ them (`NumberText`), the workflow editor reads its bounds and values that way
 (`exactJS`), the merge view compares numbers digit for digit, and an edit to
 the last of thirty digits is an edit.
 
+The page (M32, M37): a bar that stays at the top of the window, with the
+switcher between the draft and each version, a line saying which one is
+shown and what that means, and Save, "Publish version", Share and "View
+file"; under it the toolbar, Undo, Redo, "Add step" (the primitives as a
+menu, the newest version of each, with its title, what it does and its
+reference) and the inputs, each test's files and the report; then the
+problems; then the graph across the page's whole width. The box selected
+opens in a drawer from the right (`Drawer.tsx`), over the graph, which
+scrolls the box clear of it; × or Escape closes it. A step's drawer asks
+"Run it: once per submission, or once for each test?", a new step starting
+for each test when its primitive takes a batch; then its name, its version,
+a value for each port without a wire with the port's description, what it
+gives, and Details. The inputs' drawer offers each declaration only the keys
+the format allows it and the title, unit and help the task's form names it
+by (#434).
+
 A moment after each change the definition goes to `POST /workflows/check`
 (a check that did not run says so, never that it passed), and each problem
-is pinned by its YAML path to the step, port, input, field
-or report entry it names; one that names nothing drawn heads the page. A
-draft with problems saves; making a version of it is refused with every
-problem listed. A save over someone else's opens the merge view with steps
-matched by `id`. Beside the graph is the file a save writes, read-only, with
-the selected box's lines marked. The panel beside it shows what is
-selected: a step's id, version, once or per test, and a value for each port
-without a wire, text taking inputs and test fields written in; the inputs,
-test fields and report entries, each declaration offering only the keys the
-format allows it; or, with nothing selected, the palette of primitives with
-their ports. Who reads the workflow is set beside the versions: private,
-shared with the people listed, or public; combine sits below, the
-workflow's latest version chosen to start with. A version is named `v` and
-a whole number, and the field offers the number after the highest
-(`versions.ts`); any other name is refused in the forge's words. A version
-is made of the save the page made, with its token, or not at all. A wire the layout cannot
-draw, such as a once step reading a per-test one in a draft, is shown on
-its port as text, and a step with no id keeps its place.
+is pinned by its YAML path to the step, port, input, field or report entry
+it names, its message beside its mark, and listed in the banner above the
+graph, each a link that opens its box (`Problems.tsx`). A draft with
+problems saves; "Publish version" names the next version, `v` and the
+number after the highest (`versions.ts`), says what publishing means, asks
+for a save first, and is held while the check finds problems; a version the
+forge still refuses says why, with every problem. A version is made of the
+save the page made, with its token, or not at all. A save over someone
+else's opens the merge view with steps matched by `id`. "View file" shows
+the file a save writes, read-only, with the selected box's lines marked. A
+draft whose file does not read cannot be drawn, so it opens as text to mend,
+with Save and Undo, a run of typing one step back, and the graph returns
+once it reads (M30). Leaving with changes not saved asks first. Who reads
+the workflow is applied as it is chosen, private, shared with the people
+listed or public, asking first only when that takes it from people on the
+list. A wire the layout cannot draw, such as a once step reading a per-test
+one in a draft, is shown on its port as text, and a step with no id keeps
+its place.
 
 A task whose workflow has a version with a larger number than the one it
 names says so on
