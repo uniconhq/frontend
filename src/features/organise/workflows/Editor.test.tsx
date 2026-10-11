@@ -5,7 +5,19 @@ import { renderApp } from '@/test/render';
 import { http } from 'msw';
 import { problem, server, signedIn } from '@/test/server';
 import { CLASSIC_V2, workflowBackend } from '@/test/workflows';
-import { EDITOR_PAGE, fileText, openStep, stepBox } from '@/test/workflow-editor';
+import {
+  EDITOR_PAGE,
+  barButton,
+  drawer,
+  fileText,
+  noDrawer,
+  openMenu,
+  openStep,
+  outputButton,
+  portButton,
+  stepBox,
+  toolButton,
+} from '@/test/workflow-editor';
 
 /** The forge's check runs 400 ms after the text settles, then answers. */
 const CHECKED = { timeout: 3_000 };
@@ -35,24 +47,20 @@ describe('the workflow editor', () => {
     renderApp(EDITOR_PAGE);
 
     await openStep(user, 'run');
-    const drawer = screen.getByRole('complementary', { name: 'Step run' });
-    expect(within(drawer).getByRole('heading', { name: 'Step run' })).toHaveFocus();
-    expect(within(drawer).getByText('Run program')).toBeInTheDocument();
+    const open = screen.getByRole('complementary', { name: 'Step run' });
+    expect(within(open).getByRole('heading', { name: 'Step run' })).toHaveFocus();
+    expect(within(open).getByText('Run program')).toBeInTheDocument();
     expect(
-      within(drawer).getByText(
-        'Seconds of CPU time the program may use on each test.',
-        {
-          exact: false,
-        },
-      ),
+      within(open).getByText('Seconds of CPU time the program may use on each test.', {
+        exact: false,
+      }),
     ).toBeInTheDocument();
     await user.keyboard('{Escape}');
-    expect(screen.queryByRole('complementary')).toBeNull();
+    expect(noDrawer()).toBe(true);
 
-    await user.click(screen.getByRole('button', { name: 'Report' }));
-    const report = screen.getByRole('complementary', { name: 'Report' });
-    await user.click(within(report).getByRole('button', { name: 'Close' }));
-    expect(screen.queryByRole('complementary')).toBeNull();
+    await user.click(toolButton('Report'));
+    await user.click(within(drawer('Report')).getByRole('button', { name: 'Close' }));
+    expect(noDrawer()).toBe(true);
   });
 
   it('keeps under Details what the author never acts on', async () => {
@@ -77,10 +85,8 @@ describe('the workflow editor', () => {
     const user = userEvent.setup();
     renderApp(EDITOR_PAGE);
 
-    await user.click(
-      await screen.findByRole('button', { name: 'The port entry of compile' }),
-    );
-    const menu = await screen.findByRole('menu', { name: 'The port entry of compile' });
+    await user.click(await portButton('compile', 'entry'));
+    const menu = await openMenu('The port entry of compile');
     const field = within(menu).getByRole('menuitem', { name: /^input from each test/ });
     expect(field).toBeDisabled();
     expect(field).toHaveTextContent(
@@ -96,10 +102,8 @@ describe('the workflow editor', () => {
     const user = userEvent.setup();
     renderApp(EDITOR_PAGE);
 
-    await user.click(
-      await screen.findByRole('button', { name: 'The port args of run' }),
-    );
-    const menu = await screen.findByRole('menu', { name: 'The port args of run' });
+    await user.click(await portButton('run', 'args'));
+    const menu = await openMenu('The port args of run');
     await user.click(
       within(menu).getByRole('menuitem', { name: /^time_limit from the inputs/ }),
     );
@@ -118,12 +122,14 @@ describe('the workflow editor', () => {
     await user.click(
       within(panel).getByRole('button', { name: 'Remove the step check' }),
     );
-    expect(screen.queryByRole('group', { name: 'Step check' })).toBeNull();
-    expect(screen.queryByRole('complementary')).toBeNull();
-    await user.click(screen.getByRole('button', { name: 'Undo' }));
+    expect(
+      screen.queryByLabelText('Step check', { selector: '[role="group"]' }),
+    ).toBeNull();
+    expect(noDrawer()).toBe(true);
+    await user.click(toolButton('Undo'));
 
     expect(await fileText(user)).toBe(CLASSIC_V2);
-    await user.click(screen.getByRole('button', { name: 'Redo' }));
+    await user.click(toolButton('Redo'));
     expect(await fileText(user)).not.toContain('id: check');
   });
 
@@ -164,7 +170,7 @@ describe('the workflow editor', () => {
         selector: 'span[aria-hidden]',
       }),
     ).toBeVisible();
-    const banner = screen.getByRole('region', { name: 'Problems' });
+    const banner = screen.getByLabelText('Problems', { selector: 'section' });
     expect(banner).toHaveTextContent(
       '2 problems to fix before publishing a version. The draft saves with them.',
     );
@@ -172,7 +178,7 @@ describe('the workflow editor', () => {
       'Each test’s files: A workflow has at least one test field.',
     );
     await user.click(within(banner).getByRole('button', { name: 'Step run, binary' }));
-    expect(screen.getByRole('complementary', { name: 'Step run' })).toHaveTextContent(
+    expect(drawer('Step run')).toHaveTextContent(
       'There is no step called compiler before this one.',
     );
   });
@@ -182,26 +188,27 @@ describe('the workflow editor', () => {
     const user = userEvent.setup();
     renderApp(EDITOR_PAGE);
 
-    await user.click(await screen.findByRole('button', { name: 'Add step' }));
-    const menu = await screen.findByRole('menu', { name: 'Add step' });
+    await stepBox('run');
+    await user.click(toolButton('Add step'));
+    const menu = await openMenu('Add step');
     // Each primitive once, by its title, what it does and its reference.
     expect(within(menu).getAllByRole('menuitem')).toHaveLength(3);
     await user.click(within(menu).getByRole('menuitem', { name: /^Compile/ }));
 
     expect(await stepBox('compile-2')).toBeInTheDocument();
-    const drawer = screen.getByRole('complementary', { name: 'Step compile-2' });
-    const once = within(drawer).getByRole('radio', { name: 'Once per submission' });
-    expect(once).toBeChecked();
+    const added = drawer('Step compile-2');
     expect(
-      within(drawer).getByText(/before the tests, such as compiling/),
+      within(added).getByRole('radio', { name: 'Once per submission' }),
+    ).toBeChecked();
+    expect(
+      within(added).getByText(/before the tests, such as compiling/),
     ).toBeVisible();
-    await user.click(within(drawer).getByRole('radio', { name: 'Once for each test' }));
+    await user.click(within(added).getByRole('radio', { name: 'Once for each test' }));
 
     expect(
-      within(screen.getByRole('complementary', { name: 'Step compile-2' })).getByRole(
-        'radio',
-        { name: 'Once for each test' },
-      ),
+      within(drawer('Step compile-2')).getByRole('radio', {
+        name: 'Once for each test',
+      }),
     ).toBeChecked();
     expect(await fileText(user)).toContain(
       '- id: compile-2\n    use: unicon/compile@v2\n    per_test: true',
@@ -213,9 +220,12 @@ describe('the workflow editor', () => {
     const user = userEvent.setup();
     renderApp(EDITOR_PAGE);
 
-    await user.click(await screen.findByRole('button', { name: 'Add step' }));
+    await stepBox('run');
+    await user.click(toolButton('Add step'));
     await user.click(
-      await screen.findByRole('menuitem', { name: /^Compare with the answer/ }),
+      within(await openMenu('Add step')).getByRole('menuitem', {
+        name: /^Compare with the answer/,
+      }),
     );
 
     expect(await stepBox('diff-check')).toBeInTheDocument();
@@ -229,8 +239,11 @@ describe('the workflow editor', () => {
     const user = userEvent.setup();
     renderApp(EDITOR_PAGE);
 
-    await user.click(await screen.findByRole('button', { name: 'Inputs' }));
-    const inputs = screen.getByRole('form', { name: 'Add an input' });
+    await stepBox('run');
+    await user.click(toolButton('Inputs'));
+    const inputs = within(drawer('Inputs')).getByLabelText('Add an input', {
+      selector: 'form',
+    });
     await user.type(
       within(inputs).getByRole('textbox', { name: 'New input' }),
       'episodes',
@@ -241,8 +254,13 @@ describe('the workflow editor', () => {
     );
     await user.click(within(inputs).getByRole('button', { name: 'Add an input' }));
 
-    await user.click(screen.getByRole('button', { name: 'Each test’s files' }));
-    const fields = screen.getByRole('form', { name: 'Add to each test' });
+    await user.click(toolButton('Each test’s files'));
+    const fields = within(drawer('Each test’s files')).getByLabelText(
+      'Add to each test',
+      {
+        selector: 'form',
+      },
+    );
     await user.type(
       within(fields).getByRole('textbox', { name: 'New file or value' }),
       'seed',
@@ -253,8 +271,12 @@ describe('the workflow editor', () => {
     );
     await user.click(within(fields).getByRole('button', { name: 'Add to each test' }));
 
-    await user.click(screen.getByRole('button', { name: 'The output time_ms of run' }));
-    await user.click(await screen.findByRole('menuitem', { name: 'Report it' }));
+    await user.click(await outputButton('run', 'time_ms'));
+    await user.click(
+      within(await openMenu('The output time_ms of run')).getByRole('menuitem', {
+        name: 'Report it',
+      }),
+    );
 
     const text = await fileText(user);
     expect(text).toContain('episodes: number');
@@ -267,8 +289,11 @@ describe('the workflow editor', () => {
     const user = userEvent.setup();
     renderApp(EDITOR_PAGE);
 
-    await user.click(await screen.findByRole('button', { name: 'Inputs' }));
-    const row = screen.getByRole('listitem', { name: 'The input memory_limit' });
+    await stepBox('run');
+    await user.click(toolButton('Inputs'));
+    const row = within(drawer('Inputs')).getByLabelText('The input memory_limit', {
+      selector: 'li',
+    });
     await user.type(
       within(row).getByRole('textbox', { name: 'Title on the task’s form' }),
       'Memory limit{Enter}',
@@ -303,7 +328,9 @@ describe('the workflow editor', () => {
       within(panel).getByRole('button', { name: 'Write a value into args' }),
     );
     await user.click(
-      await screen.findByRole('menuitem', { name: 'episodes from each test' }),
+      within(await openMenu('Write a value into args')).getByRole('menuitem', {
+        name: 'episodes from each test',
+      }),
     );
 
     expect(await fileText(user)).toMatch(
@@ -352,9 +379,10 @@ describe('the workflow editor', () => {
     const user = userEvent.setup();
     renderApp(EDITOR_PAGE);
 
-    await user.click(await screen.findByRole('button', { name: 'Report' }));
-    const entry = screen.getByRole('listitem', {
-      name: 'The report entry time_ms',
+    await stepBox('run');
+    await user.click(toolButton('Report'));
+    const entry = within(drawer('Report')).getByLabelText('The report entry time_ms', {
+      selector: 'li',
     });
     const better = within(entry).getByRole('combobox', { name: 'Better is' });
 
@@ -380,7 +408,9 @@ describe('the workflow editor', () => {
     const panel = await openStep(user, 'first');
     await user.click(within(panel).getByRole('radio', { name: 'Once for each test' }));
 
-    const kept = screen.getByRole('region', { name: 'The step first' });
+    const kept = within(drawer('Step first')).getByLabelText('The step first', {
+      selector: 'section',
+    });
     expect(
       within(kept).getByRole('radio', { name: 'Once for each test' }),
     ).toBeChecked();
@@ -406,8 +436,11 @@ describe('the workflow editor', () => {
     const user = userEvent.setup();
     renderApp(EDITOR_PAGE);
 
-    await user.click(await screen.findByRole('button', { name: 'Inputs' }));
-    const row = screen.getByRole('listitem', { name: 'The input time_limit' });
+    await stepBox('run');
+    await user.click(toolButton('Inputs'));
+    const row = within(drawer('Inputs')).getByLabelText('The input time_limit', {
+      selector: 'li',
+    });
     await user.click(
       within(row).getByRole('checkbox', { name: 'The entrant gives it' }),
     );
@@ -438,36 +471,38 @@ describe('the workflow editor', () => {
     const user = userEvent.setup();
     renderApp(EDITOR_PAGE);
 
-    const mend = await screen.findByRole('region', { name: 'Mend the draft' });
+    const mend = await screen.findByLabelText('Mend the draft', {
+      selector: 'section',
+    });
     expect(mend).toHaveTextContent(
       'This draft cannot be drawn, because its file does not read',
     );
     // Not "nothing to fix", whatever the check says of a file that does not read.
     await waitFor(() => expect(backend.state.checks).toBeGreaterThan(0), CHECKED);
     expect(screen.queryByText(/Nothing to fix/)).toBeNull();
-    expect(screen.getByRole('button', { name: 'Add step' })).toBeDisabled();
+    expect(toolButton('Add step')).toBeDisabled();
     const back = within(mend).getByRole('button', { name: 'Back to the graph' });
     expect(back).toBeDisabled();
     const field = within(mend).getByRole('textbox', { name: 'The draft’s file' });
     await user.clear(field);
     await user.paste('test: {input: file}\nsteps: []\n');
     expect(back).toBeEnabled();
-    expect(screen.getByRole('region', { name: 'Mend the draft' })).toHaveTextContent(
-      'The file reads again',
-    );
+    expect(mend).toHaveTextContent('The file reads again');
 
-    await user.click(screen.getByRole('button', { name: 'Save' }));
+    await user.click(barButton('Save'));
     await waitFor(() =>
       expect(backend.state.draft).toBe('test: {input: file}\nsteps: []\n'),
     );
     // A run of typing is one step back.
-    await user.click(screen.getByRole('button', { name: 'Undo' }));
+    await user.click(toolButton('Undo'));
     expect(field).toHaveValue('steps: [\n');
     expect(back).toBeDisabled();
-    await user.click(screen.getByRole('button', { name: 'Redo' }));
+    await user.click(toolButton('Redo'));
     await user.click(back);
-    expect(screen.queryByRole('region', { name: 'Mend the draft' })).toBeNull();
-    expect(screen.getByRole('button', { name: 'Add step' })).toBeEnabled();
+    expect(
+      screen.queryByLabelText('Mend the draft', { selector: 'section' }),
+    ).toBeNull();
+    expect(toolButton('Add step')).toBeEnabled();
   });
 
   it('asks before leaving a draft with changes not saved', async () => {

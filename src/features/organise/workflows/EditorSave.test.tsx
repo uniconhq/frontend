@@ -5,7 +5,16 @@ import userEvent from '@/test/user-event';
 import { renderApp } from '@/test/render';
 import { server, signedIn } from '@/test/server';
 import { CLASSIC_V2, workflowBackend } from '@/test/workflows';
-import { EDITOR_PAGE, fileText, openStep } from '@/test/workflow-editor';
+import {
+  EDITOR_PAGE,
+  barButton,
+  drawer,
+  fileText,
+  openMenu,
+  openStep,
+  portButton,
+  toolButton,
+} from '@/test/workflow-editor';
 
 /** The forge's check runs 400 ms after the text settles, then answers. */
 const CHECKED = { timeout: 3_000 };
@@ -27,15 +36,15 @@ describe('saving and publishing a workflow', () => {
     const user = userEvent.setup();
     renderApp(EDITOR_PAGE);
 
+    await user.click(await portButton('run', 'memory_limit'));
     await user.click(
-      await screen.findByRole('button', { name: 'The port memory_limit of run' }),
-    );
-    await user.click(
-      await screen.findByRole('menuitem', {
+      within(await openMenu('The port memory_limit of run')).getByRole('menuitem', {
         name: 'Give it a value in the step’s drawer',
       }),
     );
-    const panel = screen.getByRole('region', { name: 'The step run' });
+    const panel = within(drawer('Step run')).getByLabelText('The step run', {
+      selector: 'section',
+    });
     await user.click(
       within(panel).getByRole('button', { name: 'Remove the wire to memory_limit' }),
     );
@@ -44,13 +53,15 @@ describe('saving and publishing a workflow', () => {
       '9{Enter}',
     );
     expect(screen.getByText('Changes not saved yet.')).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Save' }));
+    await user.click(barButton('Save'));
     await waitFor(() => expect(backend.state.draft).toContain('memory_limit: 9'));
     expect(screen.getByText('All changes saved.')).toBeInTheDocument();
     await screen.findByText(/One problem to fix/, {}, CHECKED);
 
-    await user.click(screen.getByRole('button', { name: 'Publish version' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Publish v1' });
+    await user.click(barButton('Publish version'));
+    const dialog = await screen.findByLabelText('Publish v1', {
+      selector: '[role="dialog"]',
+    });
     expect(dialog).toHaveTextContent('One problem stops it');
     expect(within(dialog).getByRole('button', { name: 'Publish v1' })).toBeDisabled();
     expect(backend.state.versions).toEqual([]);
@@ -75,8 +86,10 @@ describe('saving and publishing a workflow', () => {
     renderApp(EDITOR_PAGE);
 
     await screen.findByText(/Nothing to fix/, {}, CHECKED);
-    await user.click(screen.getByRole('button', { name: 'Publish version' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Publish v1' });
+    await user.click(barButton('Publish version'));
+    const dialog = await screen.findByLabelText('Publish v1', {
+      selector: '[role="dialog"]',
+    });
     await user.click(within(dialog).getByRole('button', { name: 'Publish v1' }));
 
     const refused = await within(dialog).findByRole('alert');
@@ -94,8 +107,10 @@ describe('saving and publishing a workflow', () => {
     renderApp(EDITOR_PAGE);
 
     await screen.findByText(/Nothing to fix/, {}, CHECKED);
-    await user.click(screen.getByRole('button', { name: 'Publish version' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Publish v1' });
+    await user.click(barButton('Publish version'));
+    const dialog = await screen.findByLabelText('Publish v1', {
+      selector: '[role="dialog"]',
+    });
     expect(dialog).toHaveTextContent('v1 will hold the draft as it was last saved');
     await user.click(within(dialog).getByRole('button', { name: 'Publish v1' }));
 
@@ -112,8 +127,10 @@ describe('saving and publishing a workflow', () => {
     renderApp(EDITOR_PAGE);
 
     await screen.findByText(/Nothing to fix/, {}, CHECKED);
-    await user.click(screen.getByRole('button', { name: 'Publish version' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Publish v10' });
+    await user.click(barButton('Publish version'));
+    const dialog = await screen.findByLabelText('Publish v10', {
+      selector: '[role="dialog"]',
+    });
     await user.click(within(dialog).getByRole('button', { name: 'Publish v10' }));
 
     expect(await screen.findByRole('status', { name: '' })).toHaveTextContent(
@@ -125,9 +142,9 @@ describe('saving and publishing a workflow', () => {
         screen.getByRole('option', { name: 'v10, the latest version' }),
       ).toBeInTheDocument(),
     );
-    await user.click(screen.getByRole('button', { name: 'Publish version' }));
+    await user.click(barButton('Publish version'));
     expect(
-      await screen.findByRole('dialog', { name: 'Publish v11' }),
+      await screen.findByLabelText('Publish v11', { selector: '[role="dialog"]' }),
     ).toBeInTheDocument();
   });
 
@@ -141,8 +158,10 @@ describe('saving and publishing a workflow', () => {
     await user.click(
       within(panel).getByRole('button', { name: 'Remove the step check' }),
     );
-    await user.click(screen.getByRole('button', { name: 'Publish version' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Publish v1' });
+    await user.click(barButton('Publish version'));
+    const dialog = await screen.findByLabelText('Publish v1', {
+      selector: '[role="dialog"]',
+    });
 
     expect(dialog).toHaveTextContent('You have changes that are not saved.');
     expect(within(dialog).getByRole('button', { name: 'Publish v1' })).toBeDisabled();
@@ -174,7 +193,11 @@ describe('saving and publishing a workflow', () => {
     expect(
       await screen.findByText(/You are looking at v1, a version/),
     ).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Save' })).toBeNull();
+    expect(
+      within(
+        screen.getByLabelText('The workflow', { selector: '[role="toolbar"]' }),
+      ).queryByRole('button', { name: 'Save' }),
+    ).toBeNull();
     expect(
       screen.getByRole('button', { name: 'Copy into a new workflow' }),
     ).toBeInTheDocument();
@@ -186,18 +209,18 @@ describe('saving and publishing a workflow', () => {
     const user = userEvent.setup();
     renderApp(EDITOR_PAGE);
 
+    await user.click(await portButton('run', 'args'));
     await user.click(
-      await screen.findByRole('button', { name: 'The port args of run' }),
-    );
-    await user.click(
-      await screen.findByRole('menuitem', { name: /^time_limit from the inputs/ }),
+      within(await openMenu('The port args of run')).getByRole('menuitem', {
+        name: /^time_limit from the inputs/,
+      }),
     );
     backend.state.draft = CLASSIC_V2.replace(
       'fold: max, better: lower',
       'fold: sum, better: lower',
     );
     backend.state.token = 'someone-else';
-    await user.click(screen.getByRole('button', { name: 'Save' }));
+    await user.click(barButton('Save'));
 
     expect(
       await screen.findByText('Someone else saved this file since you opened it.'),
@@ -217,18 +240,18 @@ describe('saving and publishing a workflow', () => {
     const user = userEvent.setup();
     renderApp(EDITOR_PAGE);
 
+    await user.click(await portButton('run', 'args'));
     await user.click(
-      await screen.findByRole('button', { name: 'The port args of run' }),
-    );
-    await user.click(
-      await screen.findByRole('menuitem', { name: /^time_limit from the inputs/ }),
+      within(await openMenu('The port args of run')).getByRole('menuitem', {
+        name: /^time_limit from the inputs/,
+      }),
     );
     backend.state.draft = CLASSIC_V2.replace(
       'fold: max, better: lower',
       'fold: sum, better: lower',
     );
     backend.state.token = 'someone-else';
-    await user.click(screen.getByRole('button', { name: 'Save' }));
+    await user.click(barButton('Save'));
     await screen.findByRole('list', { name: 'Fields that differ' });
     backend.state.draft = backend.state.draft.replace(
       'fold: sum, better: lower',
@@ -258,22 +281,22 @@ describe('saving and publishing a workflow', () => {
     const user = userEvent.setup();
     renderApp(EDITOR_PAGE);
 
+    await user.click(await portButton('run', 'args'));
     await user.click(
-      await screen.findByRole('button', { name: 'The port args of run' }),
-    );
-    await user.click(
-      await screen.findByRole('menuitem', { name: /^time_limit from the inputs/ }),
+      within(await openMenu('The port args of run')).getByRole('menuitem', {
+        name: /^time_limit from the inputs/,
+      }),
     );
     backend.state.draft = CLASSIC_V2.replace(
       'fold: max, better: lower',
       'fold: sum, better: lower',
     );
     backend.state.token = 'someone-else';
-    await user.click(screen.getByRole('button', { name: 'Save' }));
+    await user.click(barButton('Save'));
     await user.click(await screen.findByRole('button', { name: 'Drop my changes' }));
 
     expect(await fileText(user)).toContain('fold: sum');
-    await user.click(screen.getByRole('button', { name: 'Undo' }));
+    await user.click(toolButton('Undo'));
     expect(await fileText(user)).toContain('args: ${{ inputs.time_limit }}');
   });
 });
