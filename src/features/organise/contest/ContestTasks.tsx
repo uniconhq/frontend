@@ -190,6 +190,10 @@ function EditTimeline({
               A task’s letter is its place in the list.
             </BodyText>
           </div>
+          <BodyText tone="secondary">
+            Every task in this list is part of the contest: a task cannot be taken out
+            of it yet, so the contest opens only once each is published.
+          </BodyText>
           {refused !== null && (
             <div role="alert">
               <ErrorBlock error={refused} compact />

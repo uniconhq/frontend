@@ -568,6 +568,23 @@ describe("a task's timeline, edited on its row", () => {
     ]);
   });
 
+  it('says in a task’s timeline that it cannot be taken out of the contest yet', async () => {
+    server.use(signedIn, standingList, ...repoFiles);
+    settingsSaved();
+    const user = userEvent.setup();
+    renderApp(CONTEST);
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Edit the timeline of A · sort' }),
+    );
+    const dialog = await screen.findByRole('dialog', { name: 'Timeline of A · sort' });
+    expect(
+      within(dialog).getByText(
+        'Every task in this list is part of the contest: a task cannot be taken out of it yet, so the contest opens only once each is published.',
+      ),
+    ).toBeVisible();
+  });
+
   it('moves the task it was opened for, wherever the list read fresh has it', async () => {
     server.use(signedIn, standingList, ...repoFiles);
     // Someone else put a task ahead of sort since the page read its list.
