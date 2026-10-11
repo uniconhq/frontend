@@ -44,6 +44,31 @@ describe('the contest page for a signed-in person', () => {
     );
   });
 
+  it('leads an organiser of the contest back to organising it, and nobody else', async () => {
+    server.use(
+      signedIn,
+      http.get(`${CONTEST_API}/home`, () =>
+        HttpResponse.json({ ...home(), organises: true }),
+      ),
+    );
+    renderApp(PAGE);
+
+    expect(
+      await screen.findByRole('link', { name: 'Back to organising' }),
+    ).toHaveAttribute('href', '/orgs/acme/contests/spring');
+  });
+
+  it('offers a contestant no way to the organisers’ pages', async () => {
+    server.use(
+      signedIn,
+      http.get(`${CONTEST_API}/home`, () => HttpResponse.json(home())),
+    );
+    renderApp(PAGE);
+
+    await screen.findByRole('heading', { name: 'Spring 2026', level: 1 });
+    expect(screen.queryByRole('link', { name: 'Back to organising' })).toBeNull();
+  });
+
   it('says an archived contest is still read and takes no submissions', async () => {
     server.use(
       signedIn,
