@@ -978,6 +978,37 @@ describe('the tests of a task', { timeout: 30_000 }, () => {
     });
   });
 
+  it('says before the save that a new group gives no points until its rule is chosen', async () => {
+    taskBackend({ form: { ...CHECKED, inputs: [] } });
+    const { tests } = await openTask();
+
+    await userEvent.click(within(tests).getByRole('button', { name: 'Add tests' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Add tests' });
+    await userEvent.click(within(dialog).getByRole('radio', { name: 'From a zip' }));
+    await userEvent.upload(
+      within(dialog).getByLabelText('Zip of tests'),
+      await makeZip([
+        { name: 'tests/huge/1/input', text: '9 9\n' },
+        { name: 'tests/huge/1/answer', text: '18\n' },
+      ]),
+    );
+    await userEvent.click(
+      await within(dialog).findByRole('button', { name: 'Add the test' }),
+    );
+
+    const bar = await screen.findByRole('region', { name: 'Save the task' });
+    expect(bar).toHaveTextContent(
+      'huge gives no points: it is for practice until you choose how it earns.',
+    );
+    fill(
+      within(fieldGroup(tests, 'huge')).getByLabelText(
+        'How does this group earn points?',
+      ),
+      'all',
+    );
+    expect(bar).not.toHaveTextContent('huge gives no points');
+  });
+
   it('takes a test out with the token each of its files was read with', async () => {
     const { sent } = taskBackend({ form: { ...CHECKED, inputs: [] } });
     const { tests } = await openTask();

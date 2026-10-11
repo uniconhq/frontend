@@ -322,12 +322,23 @@ function BuildForm({
         : undefined,
     ]),
   ].filter((problem): problem is string => problem !== undefined);
-  const notices = pointsNotice(
-    taskWeight(read.values.groups),
-    taskWeight(values.groups),
-    worth,
-    known,
-  );
+  const notices = [
+    ...pointsNotice(
+      taskWeight(read.values.groups),
+      taskWeight(values.groups),
+      worth,
+      known,
+    ),
+    // A new group starts with no rule; in a task that gives points, say so.
+    ...(taskWeight(values.groups).num === 0n
+      ? []
+      : values.groups
+          .filter((group) => !group.read && ruleOf(group) === 'none')
+          .map(
+            (group) =>
+              `${group.name} gives no points: it is for practice until you choose how it earns.`,
+          )),
+  ];
 
   const save = () => {
     const fresh = parseYaml(file.content);
