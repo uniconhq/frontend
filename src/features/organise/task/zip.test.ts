@@ -76,6 +76,14 @@ describe('reading a zip of tests in the browser', () => {
     );
   });
 
+  it('reads a name written with backslashes, as some Windows tools write one, as a path', async () => {
+    const zip = await makeZip([{ name: 'small\\1\\input', text: '1 2\n' }]);
+
+    const entries = await readZip(zip);
+
+    expect(entries.map((entry) => entry.path)).toEqual(['small/1/input']);
+  });
+
   it('says a file is not a zip', async () => {
     await expect(
       readZip(new File(['not a zip at all'], 'x.zip')),

@@ -171,9 +171,10 @@ export async function readZip(file: Blob): Promise<ZipEntry[]> {
     const extraLength = view.getUint16(at + 30, true);
     const commentLength = view.getUint16(at + 32, true);
     let local = view.getUint32(at + 42, true);
+    // Some Windows tools write a path's folders with backslashes.
     const name = UTF8.decode(
       new Uint8Array(view.buffer, view.byteOffset + at + 46, nameLength),
-    );
+    ).replaceAll('\\', '/');
     const big = zip64Of(view, at + 46 + nameLength, extraLength, {
       size: unpacked === MAX32,
       compressed: compressed === MAX32,
