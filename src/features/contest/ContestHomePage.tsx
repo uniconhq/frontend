@@ -5,11 +5,12 @@ import type { ContestHome, MyRegistration, PublicTask, TaskEntry } from '@/api/t
 import { BodyText } from '@/ui/BodyText';
 import { Card } from '@/ui/Card';
 import { PageLink } from '@/ui/PageLink';
-import { PageTitle } from '@/ui/PageTitle';
+import { Page, PageHeader } from '@/ui/Page';
 import { SectionTitle } from '@/ui/SectionTitle';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
 import { taskPagePath } from '@/lib/contest-paths';
+import { contestPath } from '@/lib/organiser-paths';
 import { useContestParams } from '@/lib/route-params';
 import { formatDateTime } from '@/lib/time';
 import { ContestAnnouncements } from './threads/AnnouncementList';
@@ -121,20 +122,28 @@ function Home({
   onBoundary: () => void;
 }) {
   return (
-    <div className={classes.page}>
-      <PageTitle>{home.name}</PageTitle>
-      {home.state === 'draft' && (
-        <BodyText tone="secondary">
-          This contest is a draft, so only its organisers see it.
-        </BodyText>
-      )}
-      {home.state === 'archived' && (
-        <BodyText tone="secondary">
-          This contest is archived: its tasks can still be read, and they take no
-          submissions.
-        </BodyText>
-      )}
-      {home.description !== '' && <BodyText size="md">{home.description}</BodyText>}
+    <Page>
+      <PageHeader
+        title={home.name}
+        links={
+          home.organises ? (
+            <PageLink to={contestPath(org, contest)}>Back to organising</PageLink>
+          ) : undefined
+        }
+      >
+        {home.state === 'draft' && (
+          <BodyText tone="secondary">
+            This contest is a draft, so only its organisers see it.
+          </BodyText>
+        )}
+        {home.state === 'archived' && (
+          <BodyText tone="secondary">
+            This contest is archived: its tasks can still be read, and they take no
+            submissions.
+          </BodyText>
+        )}
+        {home.description !== '' && <BodyText size="md">{home.description}</BodyText>}
+      </PageHeader>
       <Card>
         <div className={classes.stack}>
           <Dates start={home.start} end={home.end} />
@@ -163,7 +172,7 @@ function Home({
           />
         </Card>
       )}
-    </div>
+    </Page>
   );
 }
 
@@ -189,9 +198,10 @@ function PublicHome({ org, contest }: { org: string; contest: string }) {
 
   const found = view.data;
   return (
-    <div className={classes.page}>
-      <PageTitle>{found.name}</PageTitle>
-      {found.description !== '' && <BodyText size="md">{found.description}</BodyText>}
+    <Page>
+      <PageHeader title={found.name}>
+        {found.description !== '' && <BodyText size="md">{found.description}</BodyText>}
+      </PageHeader>
       <Card>
         <div className={classes.stack}>
           <Dates start={found.start} end={found.end} />
@@ -206,7 +216,7 @@ function PublicHome({ org, contest }: { org: string; contest: string }) {
         </div>
       </Card>
       <LandingBoards org={org} contest={contest} />
-    </div>
+    </Page>
   );
 }
 
