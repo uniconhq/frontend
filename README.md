@@ -639,7 +639,8 @@ shows now, and `GRADED` when it shows none yet. A contestant is served a
 submission's state in the format's words, `queued`, `grading`, `graded` or
 `cancelled`; a run that failed on the platform's side is served as `grading`
 until staff end it; then it reads
-`CANCELLED` with the sentence they gave, and is no longer read again.
+`CANCELLED` with the sentence they gave, and is read again only as often
+as a list with nothing grading is.
 `src/ui/VerdictBadge.tsx` has a label for every outcome and status and puts
 each in one of the handoff's six colour pairs; an outcome it does not know
 shows under its own name in the neutral one.
