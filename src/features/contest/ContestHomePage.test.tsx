@@ -121,12 +121,36 @@ describe('the contest page for a signed-in person', () => {
     const places = await within(board).findByRole('list', { name: 'Where you stand' });
     const [shown, later] = within(places).getAllByRole('listitem');
     expect(shown).toHaveTextContent(
-      `Standings: You are ${String(first.rank)}${first.rank === 1 ? 'st' : 'th'} of ${String(standings.rows.length)}.`,
+      `Standings: You are ${String(first.rank)}${first.rank === 1 ? 'st' : 'th'}.`,
     );
     expect(later).toHaveTextContent('Later: Shown once its tasks are released.');
     expect(
       within(board).getByRole('link', { name: 'See the leaderboards' }),
     ).toHaveAttribute('href', '/contests/acme/spring/boards');
+  });
+
+  it('says only the place on a board that shows the reader their own row alone', async () => {
+    const standings = icpc();
+    const [first] = standings.rows;
+    if (first === undefined) throw new Error('the board needs a row');
+    server.use(
+      signedIn,
+      http.get(`${CONTEST_API}/home`, () =>
+        HttpResponse.json(
+          home({
+            registration: registration({ status: 'approved', id: first.row.entrant }),
+          }),
+        ),
+      ),
+      http.get(`${CONTEST_API}/boards`, () =>
+        HttpResponse.json([{ ...standings, rows: [{ ...first, rank: 4 }] }]),
+      ),
+    );
+    renderApp(PAGE);
+
+    const board = await screen.findByRole('region', { name: 'Leaderboard' });
+    const places = await within(board).findByRole('list', { name: 'Where you stand' });
+    expect(within(places).getByRole('listitem')).toHaveTextContent(/^You are 4th\.$/);
   });
 
   it('shows no leaderboard card when the contest shows the person none', async () => {

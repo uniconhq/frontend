@@ -286,7 +286,7 @@ test('a contestant registers, waits, is let in and reads the task', async ({
   await expect(tasks).toContainText('100 points');
   await expect(tasks).toContainText('Closes in');
   await expect(
-    page.getByRole('region', { name: 'Leaderboard' }).getByText('You are 1st of 2.'),
+    page.getByRole('region', { name: 'Leaderboard' }).getByText('You are 1st.'),
   ).toBeVisible();
   await expect(
     page
