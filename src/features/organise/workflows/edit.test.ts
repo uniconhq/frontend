@@ -283,6 +283,51 @@ describe('editing the file in place', () => {
     expect(declared).toContain('# what they send');
   });
 
+  it('names an input for the task’s form, keeping how its declaration is written', () => {
+    const block = [
+      'inputs:',
+      '  memory_limit:',
+      '    type: number',
+      '    title: Memory limit # the form shows it',
+      '    unit: MB',
+      'test: {input: file}',
+      'steps: []',
+      '',
+    ].join('\n');
+
+    const helped = setInput(block, 'memory_limit', {
+      type: 'number',
+      title: 'Memory limit',
+      unit: 'MB',
+      help: 'The memory the program may use on each test.',
+    });
+    expect(helped).toContain(
+      [
+        '  memory_limit:',
+        '    type: number',
+        '    title: Memory limit # the form shows it',
+        '    unit: MB',
+        '    help: The memory the program may use on each test.',
+      ].join('\n'),
+    );
+    const plain = setInput(helped, 'memory_limit', {
+      type: 'number',
+      title: '',
+      unit: null,
+      help: 'The memory the program may use on each test.',
+    });
+    expect(workflowOf(plain).inputs[0]).toMatchObject({
+      title: null,
+      unit: null,
+      help: 'The memory the program may use on each test.',
+    });
+    const short = setInput(COMMENTED, 'time_limit', {
+      type: 'number',
+      title: 'Time limit',
+    });
+    expect(short).toContain('time_limit: {type: number, title: Time limit}');
+  });
+
   it('removes an input with every port reading it', () => {
     const removed = removeInput(COMMENTED, 'time_limit');
 
