@@ -12,11 +12,37 @@ export function contestPlaceOf(org: string, contest: string) {
 }
 
 /**
+ * Call `then` with what `find` finds, now or as soon as the page draws it,
+ * since a card may show its fields only once its data has come; the
+ * returned function stops looking.
+ */
+export function whenDrawn<T>(
+  find: () => T | null,
+  then: (found: T) => void,
+): () => void {
+  const now = find();
+  if (now !== null) {
+    then(now);
+    return () => {};
+  }
+  const watch = new MutationObserver(() => {
+    const found = find();
+    if (found === null) return;
+    watch.disconnect();
+    then(found);
+  });
+  watch.observe(document.body, { childList: true, subtree: true });
+  return () => watch.disconnect();
+}
+
+/**
  * The field a link opened (`?field=`, and `?item=` for a task, a board or
- * a way), focused and scrolled to once the page's form is there: a box
- * marked `data-field`, inside the one marked `data-item` when there is an
- * item, and the first thing in it that takes the focus. `byItem: false` is
- * for a form that holds the one item alone, such as a task's timeline.
+ * a way), focused and scrolled to once the page's form is there, however
+ * long its cards take to load: a box marked `data-field`, inside the one
+ * marked `data-item` when there is an item, and the first thing in it that
+ * takes the focus (a radio group's chosen one), any closed part around it
+ * opened. `byItem: false` is for a form that holds the one item alone, such
+ * as a task's timeline.
  */
 export function useOpenedField(ready: boolean, { byItem = true } = {}) {
   const [search] = useSearchParams();
@@ -24,25 +50,39 @@ export function useOpenedField(ready: boolean, { byItem = true } = {}) {
   const item = search.get(ITEM_PARAM);
   useEffect(() => {
     if (!ready || field === null) return;
-    const scope =
-      item === null || !byItem
-        ? document
-        : document.querySelector(`[data-item="${item}"]`);
-    const box = scope?.querySelector(`[data-field="${field}"]`);
-    if (box === null || box === undefined) return;
-    const target = (
-      box.matches('input, select, textarea, button')
-        ? box
-        : box.querySelector('input:not([disabled]), select, textarea, button')
-    ) as HTMLElement | null;
-    target?.focus();
-    box.scrollIntoView?.({ block: 'center' });
-    // A dialog takes the focus to its own first field as it opens; take it
-    // back once it has.
-    const again = window.setTimeout(() => {
-      if (document.activeElement !== target) target?.focus();
-    }, 150);
-    return () => window.clearTimeout(again);
+    let again = 0;
+    const stop = whenDrawn(
+      () => {
+        const scope =
+          item === null || !byItem
+            ? document
+            : document.querySelector(`[data-item="${item}"]`);
+        return scope?.querySelector(`[data-field="${field}"]`) ?? null;
+      },
+      (box) => {
+        for (let part = box.closest('details'); part !== null;) {
+          part.open = true;
+          part = part.parentElement?.closest('details') ?? null;
+        }
+        const target = (
+          box.matches('input, select, textarea, button')
+            ? box
+            : (box.querySelector('input[type="radio"]:checked:not([disabled])') ??
+              box.querySelector('input:not([disabled]), select, textarea, button'))
+        ) as HTMLElement | null;
+        target?.focus();
+        box.scrollIntoView?.({ block: 'center' });
+        // A dialog takes the focus to its own first field as it opens; take it
+        // back once it has.
+        again = window.setTimeout(() => {
+          if (document.activeElement !== target) target?.focus();
+        }, 150);
+      },
+    );
+    return () => {
+      stop();
+      window.clearTimeout(again);
+    };
   }, [ready, field, item, byItem]);
   return { field, item: item === null ? null : Number(item) };
 }

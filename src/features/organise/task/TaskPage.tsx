@@ -11,7 +11,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { readTask } from '../forms/task-values';
 import { readSettings } from './build-data';
 import { TaskStanding } from './TaskHeader';
-import { useOpenedField } from '../contest/opened';
+import { useOpenedField, whenDrawn } from '../contest/opened';
 import { fileQuery } from '../files/place';
 import { StatementEditor } from '../forms/StatementEditor';
 import { OrganisersLine } from '../hub/lines';
@@ -65,10 +65,10 @@ function useOpenedCard() {
   const card = search.get(CARD_PARAM);
   useEffect(() => {
     if (card === null) return;
-    const frame = requestAnimationFrame(() =>
-      document.getElementById(card)?.scrollIntoView?.({ block: 'start' }),
+    return whenDrawn(
+      () => document.getElementById(card),
+      (found) => found.scrollIntoView?.({ block: 'start' }),
     );
-    return () => cancelAnimationFrame(frame);
   }, [card]);
   useOpenedField(card !== null);
 }

@@ -6,7 +6,6 @@ import { Button } from '@/ui/Button';
 import { Chip } from '@/ui/Chip';
 import { Loaded } from '@/ui/feedback/Loaded';
 import { formatSize } from '@/lib/size';
-import { FieldBox } from '../contest/ContestFile';
 import { treeQuery } from '../files/place';
 import { NumberField } from '../forms/fields';
 import type { GroupValues } from '../forms/task-values';
@@ -111,10 +110,8 @@ export function TestRows({
         const out = removed.includes(name);
         const weight = group.weights.find((row) => row.test === name)?.weight ?? '';
         return (
-          <li key={name} className={classes.test}>
-            <FieldBox name={testField(name)}>
-              <span className={classes.testName}>{name}</span>
-            </FieldBox>
+          <li key={name} className={classes.test} data-field={testField(name)}>
+            <span className={classes.testName}>{name}</span>
             <span className={classes.testFiles}>
               {change !== undefined ? (
                 stagedText(change)

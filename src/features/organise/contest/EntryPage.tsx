@@ -136,140 +136,142 @@ function WayCard({
 
   return (
     <li data-item={index}>
-      <Fieldset legend={title}>
-        <FieldBox name="way">
-          <RadioGroup
-            label="Approval"
-            value={approvesAtOnce(way) ? 'auto' : 'manual'}
-            options={APPROVAL}
-            onChange={(approval) => onChange({ ...way, approval })}
-            disabled={disabled}
-          />
-        </FieldBox>
-        {way.kind === 'invite' ? (
-          saved ? (
-            <InvitesSection
-              place={{ kind: 'contest', org, contest }}
-              audience="contestants"
-              manages={manages}
-              administers={false}
+      <FieldBox name="way">
+        <Fieldset legend={title}>
+          <FieldBox name="approval">
+            <RadioGroup
+              label="Approval"
+              value={approvesAtOnce(way) ? 'auto' : 'manual'}
+              options={APPROVAL}
+              onChange={(approval) => onChange({ ...way, approval })}
+              disabled={disabled}
             />
+          </FieldBox>
+          {way.kind === 'invite' ? (
+            saved ? (
+              <InvitesSection
+                place={{ kind: 'contest', org, contest }}
+                audience="contestants"
+                manages={manages}
+                administers={false}
+              />
+            ) : (
+              <BodyText tone="secondary">
+                Save first, then invite people by username or email address here.
+              </BodyText>
+            )
           ) : (
-            <BodyText tone="secondary">
-              Save first, then invite people by username or email address here.
-            </BodyText>
-          )
-        ) : (
-          <>
-            <BodyText tone="secondary">
-              People register themselves. With nothing ticked below, anyone with an
-              account can.
-            </BodyText>
-            <FieldBox name="name">
-              <TextInput
-                label="Name"
-                description="Shown beside everyone who came in this way, on the Entrants page."
-                placeholder="Such as NUS students"
-                value={way.name}
-                onChange={(name) => signup({ name })}
-                disabled={disabled}
-              />
-            </FieldBox>
-            <FieldBox name="code">
-              <Checkbox
-                label="Needs a code"
-                checked={ticks.code}
-                onChange={(code) => {
-                  onTicks({ ...ticks, code });
-                  if (!code) signup({ code: '' });
-                }}
-                disabled={disabled}
-              />
-              {ticks.code && (
+            <>
+              <BodyText tone="secondary">
+                People register themselves. With nothing ticked below, anyone with an
+                account can.
+              </BodyText>
+              <FieldBox name="name">
                 <TextInput
-                  label="Code"
-                  description="People type it to register. Give it to those it is for."
-                  value={way.kind === 'signup' ? way.code : ''}
-                  onChange={(code) => signup({ code })}
+                  label="Name"
+                  description="Shown beside everyone who came in this way, on the Entrants page."
+                  placeholder="Such as NUS students"
+                  value={way.name}
+                  onChange={(name) => signup({ name })}
                   disabled={disabled}
                 />
-              )}
-            </FieldBox>
-            <FieldBox name="domains">
-              <Checkbox
-                label="Only email addresses at these domains"
-                checked={ticks.domains}
-                onChange={(domains) => {
-                  onTicks({ ...ticks, domains });
-                  if (!domains) signup({ domains: '', emailPattern: '' });
-                }}
-                disabled={disabled}
-              />
-              {ticks.domains && way.kind === 'signup' && (
-                <>
+              </FieldBox>
+              <FieldBox name="code">
+                <Checkbox
+                  label="Needs a code"
+                  checked={ticks.code}
+                  onChange={(code) => {
+                    onTicks({ ...ticks, code });
+                    if (!code) signup({ code: '' });
+                  }}
+                  disabled={disabled}
+                />
+                {ticks.code && (
                   <TextInput
-                    label="Email domains"
-                    description="Separate them with commas. Only confirmed addresses count, and each domain matches exactly: u.nus.edu does not let in comp.u.nus.edu."
-                    placeholder="u.nus.edu"
-                    value={way.domains}
-                    onChange={(domains) => signup({ domains })}
+                    label="Code"
+                    description="People type it to register. Give it to those it is for."
+                    value={way.kind === 'signup' ? way.code : ''}
+                    onChange={(code) => signup({ code })}
                     disabled={disabled}
                   />
-                  <details className={classes.advanced}>
-                    <summary>Advanced</summary>
-                    <FieldBox name="email_pattern">
-                      <TextInput
-                        label="Email pattern"
-                        description="A regular expression a confirmed address must match, ignoring case, as well as the domains."
-                        value={way.emailPattern}
-                        onChange={(emailPattern) => signup({ emailPattern })}
-                        disabled={disabled}
-                      />
-                    </FieldBox>
-                  </details>
-                </>
-              )}
-            </FieldBox>
-          </>
-        )}
-        {!disabled && (
-          <div className={shared.actions}>
-            <Button
-              size="xs"
-              variant="danger"
-              label={`Remove ${title}`}
-              onClick={() => setAsking(true)}
-            >
-              Remove this way
-            </Button>
-          </div>
-        )}
-        <Modal
-          opened={asking}
-          onClose={() => setAsking(false)}
-          title={`Remove ${title}?`}
-        >
-          <div className={shared.stack}>
-            <BodyText>
-              Nobody new comes in this way once it is saved. Those already in stay.
-            </BodyText>
+                )}
+              </FieldBox>
+              <FieldBox name="domains">
+                <Checkbox
+                  label="Only email addresses at these domains"
+                  checked={ticks.domains}
+                  onChange={(domains) => {
+                    onTicks({ ...ticks, domains });
+                    if (!domains) signup({ domains: '', emailPattern: '' });
+                  }}
+                  disabled={disabled}
+                />
+                {ticks.domains && way.kind === 'signup' && (
+                  <>
+                    <TextInput
+                      label="Email domains"
+                      description="Separate them with commas. Only confirmed addresses count, and each domain matches exactly: u.nus.edu does not let in comp.u.nus.edu."
+                      placeholder="u.nus.edu"
+                      value={way.domains}
+                      onChange={(domains) => signup({ domains })}
+                      disabled={disabled}
+                    />
+                    <details className={classes.advanced}>
+                      <summary>Advanced</summary>
+                      <FieldBox name="email_pattern">
+                        <TextInput
+                          label="Email pattern"
+                          description="A regular expression a confirmed address must match, ignoring case, as well as the domains."
+                          value={way.emailPattern}
+                          onChange={(emailPattern) => signup({ emailPattern })}
+                          disabled={disabled}
+                        />
+                      </FieldBox>
+                    </details>
+                  </>
+                )}
+              </FieldBox>
+            </>
+          )}
+          {!disabled && (
             <div className={shared.actions}>
               <Button
+                size="xs"
                 variant="danger"
-                onClick={() => {
-                  setAsking(false);
-                  onRemove();
-                }}
+                label={`Remove ${title}`}
+                onClick={() => setAsking(true)}
               >
-                Remove
-              </Button>
-              <Button variant="secondary" onClick={() => setAsking(false)}>
-                Cancel
+                Remove this way
               </Button>
             </div>
-          </div>
-        </Modal>
-      </Fieldset>
+          )}
+          <Modal
+            opened={asking}
+            onClose={() => setAsking(false)}
+            title={`Remove ${title}?`}
+          >
+            <div className={shared.stack}>
+              <BodyText>
+                Nobody new comes in this way once it is saved. Those already in stay.
+              </BodyText>
+              <div className={shared.actions}>
+                <Button
+                  variant="danger"
+                  onClick={() => {
+                    setAsking(false);
+                    onRemove();
+                  }}
+                >
+                  Remove
+                </Button>
+                <Button variant="secondary" onClick={() => setAsking(false)}>
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          </Modal>
+        </Fieldset>
+      </FieldBox>
     </li>
   );
 }

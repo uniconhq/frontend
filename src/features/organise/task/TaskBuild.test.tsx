@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fireEvent, screen, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@/test/user-event';
 import { http, HttpResponse } from 'msw';
 import { parse } from 'yaml';
@@ -987,6 +987,22 @@ describe('the tests of a task', { timeout: 30_000 }, () => {
     const body = await waitForSave(sent);
     const groups = written(body)['test_groups'] as Record<string, unknown>;
     expect(groups['small']).toEqual({ each: 30, test_weights: { '3': 2 } });
+  });
+
+  it('opens a test’s weight from a link followed to the page, once the cards are there', async () => {
+    taskBackend({
+      form: { ...CHECKED, inputs: [] },
+      content: TASK.replace(
+        'small: {pass: 30, show: verdict}',
+        "small: {each: 30, test_weights: {'2': 3}}",
+      ),
+    });
+    renderApp(
+      '/orgs/acme/contests/spring/tasks/sum?card=tests&item=small&field=test:2',
+    );
+
+    const weight = await screen.findByLabelText('Test weight of 2');
+    await waitFor(() => expect(weight).toHaveFocus());
   });
 
   it('shows whose a test file is when someone else changed it first, and saves over it only when chosen', async () => {
