@@ -179,6 +179,30 @@ describe('saving and publishing a workflow', () => {
     ).toBeInTheDocument();
   });
 
+  it('offers the next version once someone else has published the one it offered', async () => {
+    const backend = workflowBackend(CLASSIC_V2, { versions: ['v1'] });
+    server.use(signedIn, ...backend.handlers);
+    const user = userEvent.setup();
+    renderApp(EDITOR_PAGE);
+
+    await screen.findByText(/Nothing to fix/, {}, CHECKED);
+    // Someone else publishes v2 after the page was read.
+    backend.state.versions.push('v2');
+    await user.click(barButton('Publish version'));
+    const dialog = await screen.findByLabelText('Publish v2', {
+      selector: '[role="dialog"]',
+    });
+    await user.click(within(dialog).getByRole('button', { name: 'Publish v2' }));
+
+    expect(
+      await within(dialog).findByText(
+        'Someone else published v2 meanwhile, so this will be v3.',
+      ),
+    ).toBeInTheDocument();
+    await user.click(await within(dialog).findByRole('button', { name: 'Publish v3' }));
+    await waitFor(() => expect(backend.state.versions).toEqual(['v1', 'v2', 'v3']));
+  });
+
   it('asks for a save before publishing changes', async () => {
     const backend = workflowBackend(CLASSIC_V2);
     server.use(signedIn, ...backend.handlers);
