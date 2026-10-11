@@ -23,20 +23,25 @@ import {
   sectionOf,
   taskSectionPath,
 } from '@/lib/sections';
-import { holdsAt, isPlace, ROLE_LABEL, ROLE_MEANS, type RolePlace } from '../roles';
+import {
+  holdsAt,
+  isPlace,
+  offered,
+  ROLE_LABEL,
+  ROLE_MEANS,
+  type RolePlace,
+} from '../roles';
 import { InvitesSection } from '../invites/InvitesSection';
 import { holdersQuery, useHolders, useRoleChanges } from './holders';
 import classes from './people.module.css';
 
 /**
- * Every role, to a manager as well as an admin: only an admin may give the
- * admin role, and a manager who tries is told so by the forge's refusal
- * rather than finding the choice missing.
+ * The roles the caller may give, as Invite offers them: only an admin gives
+ * the admin role.
  */
-const ROLE_OPTIONS = (['admin', 'manager', 'observer'] as const).map((role) => ({
-  value: role,
-  label: ROLE_LABEL[role],
-}));
+function roleOptions(administers: boolean) {
+  return offered(administers).map((role) => ({ value: role, label: ROLE_LABEL[role] }));
+}
 
 /** The broader scope a role was given at, which reaches the place it is listed at. */
 function givenAt(names: ScopeNames): string {
@@ -209,7 +214,7 @@ function HolderRow({
               <Select
                 label="Role"
                 value={role}
-                options={ROLE_OPTIONS}
+                options={roleOptions(administers)}
                 onChange={(value) => setRole(value as RoleName)}
               />
               <BodyText tone="secondary">{ROLE_MEANS[role]}</BodyText>
