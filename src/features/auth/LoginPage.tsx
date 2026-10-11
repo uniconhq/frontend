@@ -60,7 +60,7 @@ export function LoginPage() {
         ) : (
           <OutLink href={forge}>{new URL(forge).host}</OutLink>
         )}
-        , where your account, your repositories and your submissions live.
+        , where your account and the work you submit are kept.
       </BodyText>
 
       <BodyText tone="secondary">Unicon never sees your password.</BodyText>

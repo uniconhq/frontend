@@ -65,8 +65,8 @@ export function SessionList() {
                   <span className={classes.current}>This device</span>
                 )}
               </div>
-              <BodyText tone="secondary" mono>
-                signed in {formatDateTime(new Date(session.created_at))} · last seen{' '}
+              <BodyText tone="secondary">
+                Signed in {formatDateTime(new Date(session.created_at))} · last seen{' '}
                 {formatDateTime(new Date(session.last_seen_at))}
               </BodyText>
             </div>
@@ -76,7 +76,7 @@ export function SessionList() {
                 disabled={revoke.isPending}
                 onClick={() => void revokeOne(session.id, session.current)}
               >
-                {session.current ? 'Sign out' : 'Revoke'}
+                {session.current ? 'Sign out' : 'Sign out there'}
               </Button>
             </span>
           </li>

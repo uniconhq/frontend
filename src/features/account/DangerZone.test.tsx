@@ -29,7 +29,7 @@ describe('deactivate and delete', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Deactivate account' }));
     expect(
-      await screen.findByText(/A platform admin can undo this/),
+      await screen.findByText(/until a platform admin turns it back on/),
     ).toBeInTheDocument();
   });
 

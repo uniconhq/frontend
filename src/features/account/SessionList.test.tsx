@@ -35,7 +35,7 @@ describe('the session list', () => {
     const { router } = renderApp('/account');
 
     await screen.findByText('Firefox on Linux');
-    await userEvent.click(screen.getByRole('button', { name: 'Revoke' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Sign out there' }));
 
     await waitForGone('Firefox on Linux');
     expect(screen.getByText('Chrome on Windows')).toBeInTheDocument();

@@ -83,9 +83,9 @@ describe('AccountPage', () => {
     expect(current).toHaveTextContent('This device');
     expect(current).toHaveTextContent('last seen');
     expect(other).not.toHaveTextContent('This device');
-    expect(screen.getAllByRole('button', { name: 'Revoke' })).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: 'Sign out there' })).toHaveLength(1);
     expect(
-      within(other as HTMLElement).getByRole('button', { name: 'Revoke' }),
+      within(other as HTMLElement).getByRole('button', { name: 'Sign out there' }),
     ).toBeVisible();
     expect(
       within(current as HTMLElement).getByRole('button', { name: 'Sign out' }),
