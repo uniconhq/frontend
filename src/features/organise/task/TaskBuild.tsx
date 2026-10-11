@@ -295,6 +295,9 @@ function BuildForm({
   const lines = changeLines(read.values, values, staged, titles);
   const changed = lines.length > 0 || values.inputs.some(heldTheOtherWay);
   const problems = [
+    values.credit.kind !== 'none' && values.credit.name.trim() === ''
+      ? 'Choose which value a test earns, under How a test earns.'
+      : undefined,
     ...[values.max, values.rateCount, values.ratePer].map((text) =>
       numberProblem(text, true),
     ),

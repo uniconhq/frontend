@@ -746,6 +746,22 @@ describe('scoring a task', { timeout: 30_000 }, () => {
     });
   });
 
+  it('will not save a score the workflow gives until its value is chosen', async () => {
+    taskBackend({
+      form: { ...CHECKED, inputs: [] },
+      content: TASK.replace('credit: fraction\n', ''),
+    });
+    const { tests } = await openTask();
+
+    fill(within(tests).getByLabelText('A test earns'), 'value');
+
+    const bar = await screen.findByRole('region', { name: 'Save the task' });
+    expect(bar).toHaveTextContent(
+      'Choose which value a test earns, under How a test earns.',
+    );
+    expect(within(bar).getByRole('button', { name: 'Save' })).toBeDisabled();
+  });
+
   it('will not save a share above 100%', async () => {
     taskBackend({ form: { ...CHECKED, inputs: [] } });
     const { tests } = await openTask();
