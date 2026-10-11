@@ -116,9 +116,9 @@ describe("the contest's tasks", () => {
     renderApp(CONTEST);
 
     const sort = await screen.findByRole('listitem', { name: 'A · sort' });
-    expect(sort).toHaveTextContent(
-      `Publication 1, ${at('2026-09-20T10:00:00Z')}, changed how it grades`,
-    );
+    // The first publication has none before it to have changed from.
+    expect(sort).toHaveTextContent(`Publication 1, ${at('2026-09-20T10:00:00Z')}`);
+    expect(sort).not.toHaveTextContent(/grades|grading/);
     expect(sort).toHaveTextContent(
       `100 points · opens with the contest · due ${at('2026-10-08T09:00:00Z')} · loses 10% per started day late · closes with the contest`,
     );

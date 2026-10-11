@@ -5,6 +5,28 @@ import { NumberText } from '../forms/yaml-doc';
 import { contestFieldName, contestValueWords } from './merge-words';
 import { fractionOf, percentOf } from './percent';
 import { timelineSentence } from './timeline';
+import { teamsSentence } from './words';
+
+describe('how big a team is, as the settings card says it', () => {
+  it.each([
+    [{ most: '', fewest: '', locks: 'start' }, 'Everyone enters alone'],
+    [{ most: '1', fewest: '', locks: 'start' }, 'Everyone enters alone'],
+    [
+      { most: '3', fewest: '', locks: 'start' },
+      'Teams of up to 3 people, fixed when the contest starts',
+    ],
+    [
+      { most: '3', fewest: '2', locks: 'start' },
+      'Teams of 2 to 3 people, fixed when the contest starts',
+    ],
+    [
+      { most: '2', fewest: '2', locks: 'first_submission' },
+      'Teams of exactly 2 people, fixed at a team’s first submission',
+    ],
+  ])('says %o as %s', (values, sentence) => {
+    expect(teamsSentence(values)).toBe(sentence);
+  });
+});
 
 describe('a late rate as a percentage and back, exactly', () => {
   it.each([

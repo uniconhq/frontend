@@ -461,9 +461,13 @@ export function AddTests({
           <Button disabled={!ready} loading={reading} onClick={() => void add()}>
             {replacing
               ? 'Replace it'
-              : whole.length === placed.length
-                ? `Add ${whole.length === 1 ? 'the test' : `${String(whole.length)} tests`}`
-                : `Add the ${String(whole.length)} whole ${whole.length === 1 ? 'test' : 'tests'}`}
+              : whole.length === 0
+                ? mode === 'one'
+                  ? 'Add the test'
+                  : 'Add tests'
+                : whole.length === placed.length
+                  ? `Add ${whole.length === 1 ? 'the test' : `${String(whole.length)} tests`}`
+                  : `Add the ${String(whole.length)} whole ${whole.length === 1 ? 'test' : 'tests'}`}
           </Button>
           <Button variant="secondary" onClick={onClose}>
             Cancel

@@ -162,7 +162,7 @@ function EntrantFields({
           label="Label shown to entrants"
           value={input.label}
           onChange={(label) => onChange({ label })}
-          placeholder={declared.title ?? declared.id}
+          placeholder={declared.id}
           disabled={disabled}
         />
         {type === 'text' && (

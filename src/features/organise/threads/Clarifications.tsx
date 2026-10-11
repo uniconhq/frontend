@@ -126,7 +126,7 @@ function ClarificationCard({
           {org}/{contest}
         </BodyText>
       )}
-      <QuestionThread clarification={clarification} asker={asker} />
+      <QuestionThread clarification={clarification} asker={asker} named />
       {manages && (
         <>
           <form
@@ -286,7 +286,7 @@ export function InboxPage() {
         )}
         {view.state === 'ready' &&
           (view.data.length === 0 ? (
-            <BodyText>No question is waiting for an answer.</BodyText>
+            <BodyText>No questions are waiting for an answer.</BodyText>
           ) : (
             <ol className={classes.list} aria-label="Open questions">
               {view.data.map((clarification) => (

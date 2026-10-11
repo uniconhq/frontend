@@ -3,27 +3,14 @@ import { HubCard } from '@/ui/HubCard';
 import { Loaded } from '@/ui/feedback/Loaded';
 import { contestSectionPath } from '@/lib/sections';
 import { formatDateTime } from '@/lib/time';
-import type { ContestValues } from '../forms/contest-values';
 import { registrationSentence } from '../forms/ways';
-import { VISIBILITY_CHOICES } from './words';
+import { VISIBILITY_CHOICES, teamsSentence } from './words';
 import { useContestSettings } from './settings';
 import classes from './contest.module.css';
 
 /** A time the form holds in the organiser's own zone, as a date and time. */
 function when(local: string): string {
   return local === '' ? 'Not set' : formatDateTime(new Date(local));
-}
-
-function teams(values: ContestValues): string {
-  if (values.most === '' || values.most === '1') return 'Everyone enters alone';
-  const fewest = values.fewest === '' ? '1' : values.fewest;
-  const size =
-    fewest === '1' ? `up to ${values.most}` : `${fewest} to ${values.most} people`;
-  const fixed =
-    values.locks === 'first_submission'
-      ? 'fixed at a team’s first submission'
-      : 'fixed when the contest starts';
-  return `Teams of ${size}, ${fixed}`;
 }
 
 /**
@@ -60,7 +47,7 @@ export function ContestSummary({ org, contest }: { org: string; contest: string 
               </div>
               <div>
                 <dt>Teams</dt>
-                <dd>{teams(values)}</dd>
+                <dd>{teamsSentence(values)}</dd>
               </div>
             </dl>
           )
