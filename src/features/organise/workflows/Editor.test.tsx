@@ -40,7 +40,7 @@ describe('the workflow editor', () => {
     const field = within(menu).getByRole('menuitem', { name: /^test\.input/ });
     expect(field).toBeDisabled();
     expect(field).toHaveTextContent(
-      'test.<field> is there only in a step that runs per test.',
+      "Only a step that runs for each test can read a test's fields.",
     );
     expect(
       within(menu).getByRole('menuitem', { name: /^inputs\.submission/ }),
@@ -216,14 +216,14 @@ describe('the workflow editor', () => {
     await user.keyboard('{Enter}');
 
     expect(
-      await within(panel).findByText(/Takes text, not file\./),
+      await within(panel).findByText(/This takes text, not a file\./),
     ).toBeInTheDocument();
     await user.clear(entry);
     await user.paste('main ${{ inputs }}');
     await user.keyboard('{Enter}');
     expect(
       await within(panel).findByText(
-        '${{ inputs }} is not a reference a workflow makes: inputs.<id>, test.<field> or steps.<id>.<output>.',
+        'Unicon cannot read ${{ inputs }}. Write ${{ inputs.<id> }}, ${{ test.<field> }} or ${{ steps.<id>.<output> }}.',
       ),
     ).toBeInTheDocument();
     await user.clear(entry);
@@ -317,7 +317,7 @@ describe('the workflow editor', () => {
     );
 
     expect(within(row).getByRole('alert')).toHaveTextContent(
-      'run.time_limit: This port raises a limit, so the task must give it, not the contestant.',
+      'run.time_limit: This value raises a limit, so the task must give it, not the entrant.',
     );
     expect(previewNow()).toBe(CLASSIC_V2);
   });

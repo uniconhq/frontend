@@ -45,6 +45,7 @@ import {
 import type { Pinned } from './pins';
 import { declared, raisingPorts, type PrimitiveInfo } from './primitives';
 import {
+  BOUNDS,
   mayBeOptional,
   newProblem,
   reportable,
@@ -70,12 +71,13 @@ const HANDLE = /^[a-z0-9][a-z0-9_-]{0,39}$/;
 const REPORT_NAME = /^[a-z][a-z0-9_]*$/;
 const RESERVED = ['outcome', 'points', 'penalty'];
 const SCALARS = ['text', 'number', 'boolean', 'enum'];
+const NOT_TEST = 'A test field cannot be called test. Choose another name.';
 
 /** Why `name` cannot be an id among `taken`, or null when it can. */
 function handleProblem(name: string, taken: string[]): string | null {
   if (!HANDLE.test(name))
-    return 'Lower case letters, digits, hyphens and underscores, starting with a letter or a digit, at most 40.';
-  if (taken.includes(name)) return 'That is taken.';
+    return 'Use at most 40 lower case letters, digits, hyphens (-) and underscores (_), starting with a letter or a digit.';
+  if (taken.includes(name)) return 'Another one already has that name. Choose another.';
   return null;
 }
 
@@ -458,8 +460,9 @@ function InputRow({
           value={optionsText(input.options)}
           apply={(written) => {
             const options = optionsOf(written);
-            if (options.length === 0) return 'An enum lists at least one option.';
-            if (new Set(options).size !== options.length) return 'Each option once.';
+            if (options.length === 0) return 'List the options to choose from.';
+            if (new Set(options).size !== options.length)
+              return 'List each option once.';
             update({ options });
             return null;
           }}
@@ -542,8 +545,7 @@ function FieldRow({
         label="Field name"
         value={field.name}
         apply={(name) => {
-          if (name === 'test')
-            return 'No field is named test, since test.yaml would match it.';
+          if (name === 'test') return NOT_TEST;
           const problem = handleProblem(
             name,
             workflow.test
@@ -567,7 +569,7 @@ function FieldRow({
           value={optionsText(field.options)}
           apply={(written) => {
             const options = optionsOf(written);
-            if (options.length === 0) return 'An enum lists at least one option.';
+            if (options.length === 0) return 'List the options to choose from.';
             update({ options });
             return null;
           }}
@@ -624,7 +626,7 @@ function AddDeclaration({
         event.preventDefault();
         const found =
           handleProblem(id, taken) ??
-          (what === 'a test field' && id === 'test' ? 'No field is named test.' : null);
+          (what === 'a test field' && id === 'test' ? NOT_TEST : null);
         setProblem(found);
         if (found !== null) return;
         onAdd(id, type);
@@ -816,7 +818,7 @@ function EntryRow({
           return null;
         }
         const value = numberText(written);
-        if (!(value instanceof NumberText)) return 'A number.';
+        if (!(value instanceof NumberText)) return 'Give a number.';
         const least = key === 'at_least' ? value : entry.atLeast;
         const most = key === 'at_most' ? value : entry.atMost;
         if (
@@ -824,7 +826,7 @@ function EntryRow({
           most !== null &&
           compareDecimal(least.text, most.text) > 0
         )
-          return 'Must be at least at_least.';
+          return BOUNDS;
         write({ [key]: value });
         return null;
       }}
@@ -837,15 +839,15 @@ function EntryRow({
         value={entry.name}
         apply={(name) => {
           if (!REPORT_NAME.test(name))
-            return 'Lower case letters, digits and _, starting with a letter.';
+            return "A reported value's name may use only lower case letters, digits and underscores (_), starting with a letter.";
           if (RESERVED.includes(name))
-            return `${name} is the platform’s own name for what a board ranks.`;
+            return `${name} is a name Unicon uses itself, for what a leaderboard ranks. Report this value under another name.`;
           if (
             workflow.report.some(
               (other) => other.name === name && other.name !== entry.name,
             )
           )
-            return 'That is taken.';
+            return 'Another one already has that name. Choose another.';
           change(renameEntry(text, entry.name, name));
           return null;
         }}

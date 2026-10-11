@@ -209,8 +209,7 @@ test('a wire dragged onto a port edits the file, and a refused one says why', as
   await drag(page, submission, handle(page, 'step:1', 'in:memory_limit'));
   await expect(
     page.getByRole('alert').filter({
-      hasText:
-        'This port raises a limit, so the task must give it, not the contestant.',
+      hasText: 'This value raises a limit, so the task must give it, not the entrant.',
     }),
   ).toBeVisible();
   expect(await preview(page)).toContain('memory_limit: ${{ inputs.memory_limit }}');
