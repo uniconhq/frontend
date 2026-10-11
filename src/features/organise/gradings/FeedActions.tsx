@@ -3,6 +3,7 @@ import type { FeedEntry, GradingStatus, Rejudged } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
 import { Modal } from '@/ui/Modal';
+import { Select } from '@/ui/Select';
 import { TextInput } from '@/ui/TextInput';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { STATUS, UNFINISHED, submitterOf } from './feed';
@@ -99,6 +100,14 @@ const CONFIRM: Record<Asking['kind'], string> = {
 /** What confirming does, in words. */
 function Consequence({ asking }: { asking: Asking }) {
   if (asking.kind === 'rejudge') {
+    if (asking.task === '') {
+      return (
+        <BodyText>
+          Choose the task to rejudge. Every submission of it has its latest attempt
+          graded again against the task&apos;s current publication, as a new attempt.
+        </BodyText>
+      );
+    }
     return (
       <>
         <BodyText>
@@ -313,10 +322,32 @@ export function ConfirmDialog({
     <Modal
       opened={asking !== null}
       onClose={onClose}
-      title={asking === null ? '' : TITLE[asking.kind]}
+      title={
+        asking === null
+          ? ''
+          : asking.kind === 'rejudge' && asking.choose !== undefined
+            ? 'Rejudge every submission of a task?'
+            : TITLE[asking.kind]
+      }
     >
       {asking !== null && (
         <div className={shared.stack}>
+          {asking.kind === 'rejudge' && asking.choose !== undefined && (
+            <Select
+              label="Task"
+              value={asking.task}
+              placeholder="Choose a task"
+              options={asking.choose}
+              onChange={(task) =>
+                onChange({
+                  ...asking,
+                  task,
+                  title:
+                    asking.choose?.find((found) => found.value === task)?.label ?? task,
+                })
+              }
+            />
+          )}
           <Consequence asking={asking} />
           {asking.kind === 'cancel' && (
             <TextInput
@@ -333,7 +364,10 @@ export function ConfirmDialog({
             <Button
               variant={asking.kind === 'cancel' ? 'danger' : 'primary'}
               loading={pending}
-              disabled={asking.kind === 'cancel' && asking.reason.trim() === ''}
+              disabled={
+                (asking.kind === 'cancel' && asking.reason.trim() === '') ||
+                (asking.kind === 'rejudge' && asking.task === '')
+              }
               onClick={onConfirm}
             >
               {CONFIRM[asking.kind]}

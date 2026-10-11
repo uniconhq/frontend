@@ -443,7 +443,7 @@ describe('acting on the feed', () => {
     expect(alert).toHaveTextContent('It is queued now.');
   });
 
-  it('rejudges the task the feed is filtered to, after saying what it does', async () => {
+  it('offers Rejudge without a filter, asking which task first and saying what it does', async () => {
     const rejudgedAt: string[] = [];
     server.use(
       signedIn,
@@ -463,16 +463,21 @@ describe('acting on the feed', () => {
     renderApp(FEED);
 
     await screen.findByRole('table', { name: 'Gradings' });
-    expect(screen.queryByRole('button', { name: /^Rejudge/ })).toBeNull();
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Task' }), 'sum');
-    await user.click(await screen.findByRole('button', { name: 'Rejudge B · sum' }));
+    await user.click(screen.getByRole('button', { name: 'Rejudge a task' }));
     const dialog = await screen.findByRole('dialog', {
-      name: 'Rejudge every submission of this task?',
+      name: 'Rejudge every submission of a task?',
     });
+    const confirm = within(dialog).getByRole('button', { name: 'Rejudge' });
+    expect(confirm).toBeDisabled();
+    expect(dialog).toHaveTextContent('Choose the task to rejudge.');
+    await user.selectOptions(
+      within(dialog).getByRole('combobox', { name: 'Task' }),
+      'sum',
+    );
     expect(dialog).toHaveTextContent(
       "Every submission of B · sum has its latest attempt graded again against the task's current publication, as a new attempt.",
     );
-    await user.click(within(dialog).getByRole('button', { name: 'Rejudge' }));
+    await user.click(confirm);
 
     const outcome = await screen.findByText(/rejudged against publication 2/);
     expect(outcome).toHaveTextContent(
@@ -494,8 +499,9 @@ describe('acting on the feed', () => {
     const user = userEvent.setup();
     renderApp(`${FEED}?task=sort`);
 
-    await user.click(await screen.findByRole('button', { name: 'Rejudge sort' }));
+    await user.click(await screen.findByRole('button', { name: 'Rejudge a task' }));
     const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByRole('combobox', { name: 'Task' })).toHaveValue('sort');
     await user.click(within(dialog).getByRole('button', { name: 'Rejudge' }));
 
     expect(await within(dialog).findByRole('alert')).toHaveTextContent(
