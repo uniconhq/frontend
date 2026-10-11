@@ -115,7 +115,7 @@ async function stubContestantApi(page: Page, signedIn: boolean) {
             name: 'sum',
             label: 'A',
             title: 'Sum of Two',
-            worth: 100,
+            worth: '100',
             release: OPEN,
             due: null,
             closes: CONTEST.end,
@@ -128,7 +128,7 @@ async function stubContestantApi(page: Page, signedIn: boolean) {
         name: 'sum',
         label: 'A',
         title: 'Sum of Two',
-        worth: 100,
+        worth: '100',
         statement: '# Sum\n\nPrint the sum of two numbers.\n',
         submissions: { max: 50, rate: { count: 1, per: 30 } },
         inputs: [
