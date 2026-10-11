@@ -25,9 +25,11 @@ export function Problems({
   onOpen: (selected: Selected) => void;
 }) {
   if (status === 'pending') return null;
-  const waiting = checking && (
-    <BodyText size="sm" tone="secondary">
-      Checking the latest change…
+  // Always one line, so the banner keeps its height and the graph under it
+  // never moves while someone drags a wire as a check comes and goes.
+  const waiting = (
+    <BodyText size="sm" tone="secondary" aria-live="polite">
+      {checking ? 'Checking the latest change…' : 'Checked as it stands now.'}
     </BodyText>
   );
   if (status === 'failed')
