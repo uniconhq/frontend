@@ -618,6 +618,7 @@ describe("the organisers' scored view of a submission", () => {
     const main = within(view).getByRole('region', { name: 'Group main' });
     expect(main).toHaveTextContent('100 / 100 points');
     expect(main).toHaveTextContent(/Its row sees this at/);
+    expect(main).not.toHaveTextContent(/Its row sees its tests at/);
     expect(within(main).getByRole('table', { name: 'Tests main' })).toHaveTextContent(
       'main/1',
     );

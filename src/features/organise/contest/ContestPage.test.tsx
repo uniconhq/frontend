@@ -3,6 +3,7 @@ import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { delay, http, HttpResponse } from 'msw';
 import type { TaskStanding } from '@/api/types';
+import { formatExact } from '@/lib/exact';
 import { formatDateTime } from '@/lib/time';
 import { renderApp } from '@/test/render';
 import { problem, server, signedIn, someone } from '@/test/server';
@@ -69,6 +70,31 @@ describe('the contest page', () => {
     const sum = screen.getByRole('listitem', { name: 'B · sum' });
     expect(sum).toHaveTextContent('No due time');
     expect(sum).toHaveTextContent('No points');
+  });
+
+  it('shows the late rate as the exact percentage it is, however small', async () => {
+    const [sort] = standings;
+    if (sort === undefined) throw new Error('standings has sort');
+    const rated = (late: string): TaskStanding => ({
+      ...sort,
+      timeline: { ...sort.timeline, late_per_day: late },
+    });
+    server.use(
+      signedIn,
+      http.get(`${CONTEST_API}/organise/tasks`, () =>
+        HttpResponse.json([rated('0.0001'), { ...rated('0.0005'), label: 'B' }]),
+      ),
+      ...repoFiles,
+    );
+    renderApp(CONTEST);
+
+    const items = await screen.findAllByRole('listitem', { name: /sort$/ });
+    expect(items[0]).toHaveTextContent(
+      `then ${formatExact('0.01', 2)}% off per late day started`,
+    );
+    expect(items[1]).toHaveTextContent(
+      `then ${formatExact('0.05', 2)}% off per late day started`,
+    );
   });
 
   it('shows a draft with errors beside the publication it sits on, each at its YAML path', async () => {

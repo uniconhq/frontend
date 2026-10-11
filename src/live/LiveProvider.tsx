@@ -13,15 +13,14 @@ const REOPEN_MS = [5_000, 10_000, 20_000, 40_000, 60_000];
 /**
  * Which reads each kind of nudge makes stale, by the route the read was
  * made at: a grading moves a contestant's submissions, an organiser's
- * gradings and a contest's queue, but not a submission's files or a log, which a grading never
- * changes once there is one; an announcement the announcement lists; and a
+ * gradings and a contest's queue, but not a submission's files, which a
+ * grading never changes, nor a grading's log, kept once it is written
+ * (`.../gradings/{grading}/log`); an announcement the announcement lists; and a
  * clarification the asker's questions and the organisers' inbox.
  */
 const STALE: Record<string, (path: string) => boolean> = {
   grading: (path) =>
-    (path.includes('/submissions') &&
-      !path.endsWith('/files') &&
-      !path.endsWith('/log')) ||
+    (path.includes('/submissions') && !path.endsWith('/files')) ||
     path.endsWith('/gradings') ||
     path.endsWith('/gradings/queue'),
   announcement: (path) => path.includes('/announcements'),

@@ -62,7 +62,10 @@ function FoldedValues({ folded }: { folded: Record<string, string> }) {
 
 /**
  * One row per test of a group, with its own outcome and each value its steps
- * reported for it, such as its time and memory, a column per value.
+ * reported for it, such as its time and memory, a column per value; then the
+ * credit it earned and, where it is scored against the best, that best `B`,
+ * so the one can be checked against the other (section 3.2). A column none of
+ * the rows has is left out.
  */
 function Tests({ group }: { group: GroupShown }) {
   const rows = group.tests ?? [];
@@ -75,6 +78,8 @@ function Tests({ group }: { group: GroupShown }) {
       ]),
     ),
   ];
+  const credited = rows.some((row) => row.credit !== null);
+  const bested = rows.some((row) => row.best !== null);
   return (
     <table className={classes.table} aria-label={`Tests ${group.group}`}>
       <thead>
@@ -86,6 +91,8 @@ function Tests({ group }: { group: GroupShown }) {
               {name}
             </th>
           ))}
+          {credited && <th scope="col">Credit</th>}
+          {bested && <th scope="col">Best</th>}
         </tr>
       </thead>
       <tbody>
@@ -100,6 +107,8 @@ function Tests({ group }: { group: GroupShown }) {
             {names.map((name) => (
               <td key={name}>{valueText(row.values, name) ?? '—'}</td>
             ))}
+            {credited && <td>{row.credit === null ? '—' : formatExact(row.credit)}</td>}
+            {bested && <td>{row.best === null ? '—' : formatExact(row.best)}</td>}
           </tr>
         ))}
       </tbody>
@@ -109,12 +118,21 @@ function Tests({ group }: { group: GroupShown }) {
 
 /**
  * One test group as the result shows it: its outcome once its verdict is
- * shown, its tests once they are, and, under `shownAt`'s words, when what is
- * held back is shown. What the result leaves out is simply not shown, with
+ * shown, its tests once they are, and when what is held back is shown: under
+ * `testsShownAt`'s words for a group whose verdict is shown and only its
+ * tests wait, under `shownAt`'s for one held back whole. What the result leaves out is simply not shown, with
  * nothing in its place. A group that did not run on this grading says so
  * where its outcome would be.
  */
-function Group({ group, shownAt }: { group: GroupShown; shownAt: string }) {
+function Group({
+  group,
+  shownAt,
+  testsShownAt,
+}: {
+  group: GroupShown;
+  shownAt: string;
+  testsShownAt: string;
+}) {
   const points = pointsText(group);
   return (
     <section className={classes.stack} aria-label={`Group ${group.group}`}>
@@ -133,7 +151,8 @@ function Group({ group, shownAt }: { group: GroupShown; shownAt: string }) {
       </div>
       {group.shown_at !== null && (
         <BodyText tone="secondary">
-          {shownAt} {formatDateTime(new Date(group.shown_at))}
+          {group.show === 'verdict' ? testsShownAt : shownAt}{' '}
+          {formatDateTime(new Date(group.shown_at))}
         </BodyText>
       )}
       <Tests group={group} />
@@ -146,14 +165,17 @@ function Group({ group, shownAt }: { group: GroupShown; shownAt: string }) {
  * late factor they include, what the run reported once, the folds over its
  * tests, and each test group. A contestant reads it as the task shows it now;
  * organisers read the same payload with everything filled in, where each
- * group's time says when its contestant sees it (`shownAt`).
+ * group's time says when its contestant sees it (`shownAt`, and
+ * `testsShownAt` for a group whose tests alone wait).
  */
 export function ScoredResult({
   grading,
   shownAt = 'Shown at',
+  testsShownAt = 'Tests shown at',
 }: {
   grading: ScoredGrading;
   shownAt?: string;
+  testsShownAt?: string;
 }) {
   return (
     <>
@@ -170,7 +192,12 @@ export function ScoredResult({
       <OnceValues values={grading.values} />
       <FoldedValues folded={grading.folded} />
       {grading.groups.map((group) => (
-        <Group key={group.group} group={group} shownAt={shownAt} />
+        <Group
+          key={group.group}
+          group={group}
+          shownAt={shownAt}
+          testsShownAt={testsShownAt}
+        />
       ))}
     </>
   );

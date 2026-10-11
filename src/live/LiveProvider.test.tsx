@@ -174,19 +174,37 @@ describe('where the live stream stands', () => {
     vi.useFakeTimers();
     try {
       const client = new QueryClient();
-      const task = '/api/v1/orgs/acme/contests/spring/tasks/sum';
-      const reads = [
+      // Every read a nudge could reach, as the client names it: the route's
+      // own template from openapi.json.
+      const org = '/api/v1/orgs/{org}';
+      const contest = `${org}/contests/{contest}`;
+      const task = `${contest}/tasks/{task}`;
+      const graded = [
         `${task}/submissions`,
         `${task}/submissions/{number}`,
+        `${task}/organise/submissions/{number}`,
+        `${task}/gradings`,
+        `${contest}/gradings`,
+        `${contest}/gradings/queue`,
+      ];
+      const announced = [
+        `${contest}/announcements`,
+        `${contest}/home/announcements`,
+        `${task}/announcements`,
+        `${task}/page/announcements`,
+      ];
+      const asked = [
+        `${contest}/questions`,
+        `${contest}/clarifications`,
+        `${org}/clarifications`,
+      ];
+      const untouched = [
         `${task}/submissions/{number}/files`,
-        `${task}/submissions/{number}/log`,
-        `${task}/organise/gradings`,
-        '/api/v1/orgs/acme/contests/spring/gradings/queue',
-        '/api/v1/orgs/acme/contests/spring/announcements',
-        '/api/v1/orgs/acme/contests/spring/questions',
-        '/api/v1/orgs/acme/contests/spring/organise/clarifications',
+        `${task}/gradings/{grading}/log`,
+        `${task}/page`,
         '/api/v1/me',
       ];
+      const reads = [...graded, ...announced, ...asked, ...untouched];
       for (const path of reads) client.setQueryData(['get', path], {});
       const stale = () =>
         reads.filter((path) => client.getQueryState(['get', path])?.isInvalidated);
@@ -199,27 +217,19 @@ describe('where the live stream stands', () => {
       act(() => {
         vi.advanceTimersByTime(300);
       });
-      expect(stale()).toEqual([
-        `${task}/submissions`,
-        `${task}/submissions/{number}`,
-        `${task}/organise/gradings`,
-        '/api/v1/orgs/acme/contests/spring/gradings/queue',
-      ]);
+      expect(stale()).toEqual(graded);
 
       act(() => {
         source?.listeners.get('announcement')?.();
+        vi.advanceTimersByTime(300);
+      });
+      expect(stale()).toEqual([...graded, ...announced]);
+
+      act(() => {
         source?.listeners.get('clarification')?.();
         vi.advanceTimersByTime(300);
       });
-      expect(stale()).toEqual([
-        `${task}/submissions`,
-        `${task}/submissions/{number}`,
-        `${task}/organise/gradings`,
-        '/api/v1/orgs/acme/contests/spring/gradings/queue',
-        '/api/v1/orgs/acme/contests/spring/announcements',
-        '/api/v1/orgs/acme/contests/spring/questions',
-        '/api/v1/orgs/acme/contests/spring/organise/clarifications',
-      ]);
+      expect(stale()).toEqual([...graded, ...announced, ...asked]);
 
       act(() => source?.listeners.get('resync')?.());
       expect(stale()).toEqual(reads);
