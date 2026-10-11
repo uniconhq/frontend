@@ -1,0 +1,92 @@
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-auto-rows: 1fr;
+  gap: 16px;
+}
+
+.four {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+@media (max-width: 1180px) {
+  .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .grid {
+    grid-template-columns: minmax(0, 1fr);
+    grid-auto-rows: auto;
+  }
+}
+
+/* The whole card is the title's link, with the button kept above it. */
+.card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 112px;
+  padding: 16px;
+  border: 1px solid var(--unicon-border);
+  border-radius: var(--mantine-radius-md);
+  background: var(--unicon-body);
+}
+
+.card:hover {
+  border-color: var(--unicon-border-strong);
+}
+
+.card:focus-within {
+  border-color: var(--unicon-text-accent);
+}
+
+.title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.link {
+  color: var(--unicon-text-primary);
+  text-decoration: none;
+}
+
+.link::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+}
+
+.link:focus-visible {
+  outline: none;
+}
+
+.card:hover .link {
+  text-decoration: underline;
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--unicon-text-body);
+}
+
+/* Anything to press inside the line, such as a retry, stays above the card's link. */
+.body :is(button, a) {
+  position: relative;
+  z-index: 1;
+}
+
+.action {
+  position: relative;
+  z-index: 1;
+  margin-top: auto;
+  padding-top: 4px;
+}
