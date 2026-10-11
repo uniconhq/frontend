@@ -39,14 +39,10 @@ describe('the file tree', () => {
 
     await within(await screen.findByRole('navigation', { name: 'Files' })).findByRole(
       'link',
-      { name: 'task.yaml' },
+      { name: 'statement.md' },
     );
     const top = within(tree()).getAllByRole('listitem');
-    expect(top.map((item) => item.textContent)).toEqual([
-      '▸data/',
-      'statement.md',
-      'task.yaml',
-    ]);
+    expect(top.map((item) => item.textContent)).toEqual(['▸data/', 'statement.md']);
 
     await userEvent.click(within(tree()).getByRole('button', { name: /data\// }));
     await userEvent.click(
@@ -59,14 +55,63 @@ describe('the file tree', () => {
     expect(asked).toEqual(['', 'data', 'data/testcases']);
   });
 
-  it('opens a clicked file and puts it in the address, the task’s settings to read only', async () => {
+  it('opens a clicked file and puts it in the address', async () => {
     server.use(signedIn, taskState, publicationList, ...repoFiles);
     const { router } = renderApp(TASK);
 
     expect(await screen.findByText('Pick a file to open it.')).toBeVisible();
     await userEvent.click(
-      await within(tree()).findByRole('link', { name: 'task.yaml' }),
+      await within(tree()).findByRole('link', { name: 'statement.md' }),
     );
+
+    expect(await screen.findByRole('textbox', { name: 'statement.md' })).toHaveValue(
+      files['statement.md']?.content,
+    );
+    expect(router.state.location.search).toBe('?file=statement.md');
+    expect(within(tree()).getByRole('link', { name: 'statement.md' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+  });
+
+  it('leaves the tests and the settings out of the tree, saying where each is changed', async () => {
+    server.use(
+      signedIn,
+      taskState,
+      publicationList,
+      http.get(`${TASK_API}/tree`, ({ request }) =>
+        new URL(request.url).searchParams.get('path') === ''
+          ? HttpResponse.json([
+              { path: 'task.yaml', kind: 'file', size: 120, upload: null },
+              { path: 'tests', kind: 'directory', size: null, upload: null },
+              { path: 'public', kind: 'directory', size: null, upload: null },
+            ])
+          : undefined,
+      ),
+      ...repoFiles,
+    );
+    renderApp(TASK);
+
+    await within(await screen.findByRole('navigation', { name: 'Files' })).findByRole(
+      'button',
+      { name: /public\// },
+    );
+    const top = within(tree()).getAllByRole('listitem');
+    expect(top.map((item) => item.textContent)).toEqual(['▸public/']);
+    const main = within(screen.getByRole('main'));
+    expect(main.getByRole('link', { name: 'Tests and scoring' })).toHaveAttribute(
+      'href',
+      '/orgs/acme/contests/spring/tasks/sum?card=tests',
+    );
+    expect(main.getByRole('link', { name: 'task’s page' })).toHaveAttribute(
+      'href',
+      '/orgs/acme/contests/spring/tasks/sum',
+    );
+  });
+
+  it('opens the task’s settings from a link, to read only, though the tree leaves them out', async () => {
+    server.use(signedIn, taskState, publicationList, ...repoFiles);
+    renderApp(`${TASK}?file=task.yaml`);
 
     const settings = await screen.findByRole('textbox', {
       name: 'The task’s settings',
@@ -77,11 +122,7 @@ describe('the file tree', () => {
     expect(
       within(screen.getByRole('main')).getByRole('link', { name: 'Inputs' }),
     ).toHaveAttribute('href', '/orgs/acme/contests/spring/tasks/sum?card=inputs');
-    expect(router.state.location.search).toBe('?file=task.yaml');
-    expect(within(tree()).getByRole('link', { name: 'task.yaml' })).toHaveAttribute(
-      'aria-current',
-      'page',
-    );
+    expect(within(tree()).queryByRole('link', { name: 'task.yaml' })).toBeNull();
   });
 
   it('opens a test’s file to read, saying where tests are changed', async () => {

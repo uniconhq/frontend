@@ -104,23 +104,31 @@ export async function sendToTask(
 /**
  * An upload into a task at a path, through the upload door (`sendToTask`),
  * with where it stands to show, and the token of the file at the path, which
- * the caller's save presents.
+ * the caller's save presents. `start` answers the upload once it has
+ * arrived, for the caller to save at once, or null when it did not.
  */
 export function useTaskUpload(place: TaskPlace) {
   const [state, setState] = useState<UploadState>({ stage: 'idle' });
   const busy = useRef(false);
 
-  const start = async (file: File, path: string, token?: string | null) => {
-    if (busy.current) return;
+  const start = async (
+    file: File,
+    path: string,
+    token?: string | null,
+  ): Promise<{ upload: string; path: string; token: string | null } | null> => {
+    if (busy.current) return null;
     busy.current = true;
     try {
       // The token is the one the caller read the file with, or the file's as
       // the upload starts, so a change made meanwhile is a conflict at the save.
       const current = token === undefined ? await tokenNow(place, path) : token;
       const upload = await sendToTask(place, file, path, setState);
-      setState({ stage: 'arrived', upload, path, token: current });
+      const arrived = { upload, path, token: current };
+      setState({ stage: 'arrived', ...arrived });
+      return arrived;
     } catch (error) {
       setState({ stage: 'refused', error: toApiError(error) });
+      return null;
     } finally {
       busy.current = false;
     }

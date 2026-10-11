@@ -311,7 +311,7 @@ describe("the contest's tasks", () => {
     ).toBeVisible();
     const cards = screen.getByRole('group', { name: "The contest's sections" });
     expect(within(cards).getByRole('link', { name: 'Files' })).toBeVisible();
-    expect(await within(cards).findByText('contest.yaml')).toBeVisible();
+    expect(await within(cards).findByText('No files yet.')).toBeVisible();
   });
 
   it("shows the settings' errors at their paths and lists the tasks by name when the settings do not read", async () => {
@@ -669,7 +669,7 @@ describe("the contest's sections", () => {
     await says('Announcements', '2 posted; the latest is “Task B fixed”.');
     await says('Questions', 'Nobody has asked anything yet.');
     await says('Boards', 'No leaderboard yet.');
-    await says('Files', 'contest.yaml');
+    await says('Files', 'No files yet.');
     await says('Contest organisers', '0 organisers');
     // No button and no form on the page but the tasks' one button.
     const sections = screen.getByRole('group', { name: "The contest's sections" });

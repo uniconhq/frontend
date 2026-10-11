@@ -1,15 +1,16 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useState, type FormEvent } from 'react';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
 import { FileDrop } from '@/ui/FileDrop';
+import { PageLink } from '@/ui/PageLink';
 import { Progress } from '@/ui/Progress';
 import { TextInput } from '@/ui/TextInput';
 import { formatSize } from '@/lib/size';
+import { taskCardPath } from '@/lib/sections';
 import type { Place } from './place';
 import { useSaveUploads, type ArrivedUpload } from './upload-save';
 import { Refused, UploadSaveAnswer } from './UploadSaveAnswer';
 import { useTaskUpload, type UploadState } from './use-task-upload';
-import { useWaitingUploads } from './waiting-uploads';
 import { placeOfIn } from '../task/places';
 import shared from '../organise.module.css';
 import classes from './Files.module.css';
@@ -26,49 +27,57 @@ function cleanPath(path: string): string {
   return path.trim().replace(/^\/+|\/+$/g, '');
 }
 
-/** How far the file has got, while it is being read or sent. */
-function UnderWay({ state }: { state: UploadState }) {
-  if (state.stage === 'hashing') {
-    const percent = Math.round(state.share * 100);
-    return (
-      <div className={shared.stack}>
-        <BodyText tone="secondary">
-          Working out the file&apos;s SHA-256: {percent}%
-        </BodyText>
-        <Progress value={percent} label="Read" />
-      </div>
-    );
+/**
+ * Why a path is not one Files takes, and where that file is changed instead:
+ * a test is added on the Tests and scoring card, and the task's settings are
+ * its page's. Null for a path Files takes.
+ */
+function elsewhere(path: string): { why: string; card: 'tests' | 'workflow' } | null {
+  if (path === 'tests' || path.startsWith('tests/')) {
+    return {
+      why: 'Tests are added on the task’s page, in its Tests and scoring card.',
+      card: 'tests',
+    };
   }
-  if (state.stage === 'sending') {
-    const percent = Math.round(state.share * 100);
-    return (
-      <div className={shared.stack}>
-        <BodyText tone="secondary">Sending: {percent}%</BodyText>
-        {state.attempt > 1 && (
-          <BodyText tone="secondary">
-            The connection was cut, so it is being sent again from the start (try{' '}
-            {state.attempt}).
-          </BodyText>
-        )}
-        <Progress value={percent} label="Sent" />
-      </div>
-    );
+  if (path === 'task.yaml') {
+    return { why: 'The task’s settings are changed on its page.', card: 'workflow' };
   }
   return null;
 }
 
+/** How far the file has got, while it is being read or sent. */
+function UnderWay({ state }: { state: UploadState }) {
+  if (state.stage !== 'hashing' && state.stage !== 'sending') return null;
+  const percent = Math.round(state.share * 100);
+  return (
+    <div className={shared.stack}>
+      <BodyText tone="secondary">
+        {state.stage === 'hashing'
+          ? `Getting the file ready: ${String(percent)}%`
+          : `Uploading: ${String(percent)}%`}
+      </BodyText>
+      {state.stage === 'sending' && state.attempt > 1 && (
+        <BodyText tone="secondary">
+          The connection was cut, so it is being sent again from the start (try{' '}
+          {state.attempt}).
+        </BodyText>
+      )}
+      <Progress value={percent} label={state.stage === 'hashing' ? 'Read' : 'Sent'} />
+      <BodyText tone="secondary">Leaving this page now stops the upload.</BodyText>
+    </div>
+  );
+}
+
 /**
- * Uploading a file into a task: choose it and the path it goes to, by
- * default the folder picked in the tree and the file's name, then Upload,
- * which reads it for its SHA-256 and sends it through the upload door, each
- * with its progress. An upload that has arrived is not in the task yet, and
- * says so: Save puts it there, a save of the task like any other, which
- * publishes or keeps a draft and answers as a file's save does. Discarding
- * it, or leaving, changes nothing.
- *
- * Where the page keeps waiting uploads (the file panel), an arrived upload
- * may instead be kept waiting, to be saved later together with others, and
- * its own Save takes every waiting one with it: several files, one save.
+ * Uploading a file into a task: choose it and where it goes, by default the
+ * folder picked in the tree and the file's name, then Upload and save, which
+ * sends it through the upload door with its progress and saves it into the
+ * task at once, a save like any other, which publishes or keeps a draft and
+ * answers as a file's save does. A save that needs an answer first (a
+ * confirmation in a running contest, someone else's file at the path) holds
+ * the upload until it is answered, and says plainly that leaving loses it.
+ * Tests and the task's settings are not uploaded here: the form says where
+ * they are changed.
  *
  * `again` is a file that is an upload already, replaced by uploading it
  * again: its path is fixed, and the save presents the token it was read
@@ -87,77 +96,69 @@ export function TaskUpload({
   onClose: () => void;
 }) {
   const upload = useTaskUpload(place);
-  const waiting = useWaitingUploads();
   const [file, setFile] = useState<File | null>(null);
   const [path, setPath] = useState(again?.path ?? '');
   const [typed, setTyped] = useState(false);
+  const [held, setHeld] = useState<ArrivedUpload | null>(null);
 
   const { state } = upload;
   const working = state.stage === 'hashing' || state.stage === 'sending';
   const target = cleanPath(path);
-  const arrived = state.stage === 'arrived' ? state : null;
-  const others = (waiting?.uploads ?? []).filter((kept) => kept.path !== arrived?.path);
+  const other = elsewhere(target);
 
-  const forget = () => {
+  const saving = useSaveUploads(place, () => {
     upload.reset();
+    setHeld(null);
     setFile(null);
-  };
-  const saving = useSaveUploads(place, (paths) => {
-    waiting?.saved(paths);
-    forget();
+    if (again === undefined) setPath('');
+    setTyped(false);
   });
-
-  // While it holds an arrived upload, its Save is the one that takes the
-  // waiting uploads with it, so the waiting list's own Save steps aside.
-  const holding = arrived !== null && saving.outcome === null;
-  const hold = waiting?.hold;
-  useEffect(() => {
-    if (!holding || hold === undefined) return;
-    hold(true);
-    return () => hold(false);
-  }, [holding, hold]);
+  const busy = working || saving.pending;
+  const unsaved = held !== null && !saving.pending;
 
   const choose = (chosen: File[]) => {
     const next = chosen[0] ?? null;
     setFile(next);
     saving.forget();
     upload.reset();
+    setHeld(null);
     if (again === undefined && !typed)
       setPath(next === null ? '' : pathIn(folder, next.name));
   };
 
-  const start = (event: FormEvent) => {
+  const start = async (event: FormEvent) => {
     event.preventDefault();
-    if (file === null || target === '') return;
+    if (file === null || target === '' || other !== null) return;
     saving.forget();
-    void upload.start(file, target, again?.token);
+    setHeld(null);
+    const arrived = await upload.start(file, target, again?.token);
+    if (arrived === null) return;
+    const mine = { ...arrived, size: file.size };
+    setHeld(mine);
+    await saving.save([mine]);
   };
 
-  const own = (): ArrivedUpload | null =>
-    arrived === null
-      ? null
-      : {
-          upload: arrived.upload,
-          path: arrived.path,
-          token: arrived.token,
-          size: file?.size ?? null,
-        };
+  const discard = () => {
+    saving.forget();
+    upload.reset();
+    setHeld(null);
+  };
 
   return (
     <section
       className={classes.upload}
       aria-label={again === undefined ? 'Upload a file' : `Upload ${again.path} again`}
     >
-      <form className={shared.stack} onSubmit={start}>
+      <form className={shared.stack} onSubmit={(event) => void start(event)}>
         <FileDrop
           label={again === undefined ? 'File to upload' : `New ${again.path}`}
-          description="Any size; it goes to the forge's own store, not through the editor."
+          description="A file of any size."
           files={file === null ? [] : [file]}
           onChange={choose}
-          disabled={working || saving.pending}
+          disabled={busy}
         />
         <TextInput
-          label="Path in the task"
+          label="Where it goes"
           value={path}
           onChange={(value) => {
             setTyped(true);
@@ -165,21 +166,33 @@ export function TaskUpload({
           }}
           description={
             again === undefined
-              ? 'Where the file goes, such as data/train.csv. A file there now is replaced.'
-              : 'Uploading again replaces the file at this path.'
+              ? 'A path in the task’s files, such as public/diagram.png. A file there now is replaced.'
+              : 'Uploading again replaces the file here.'
           }
-          disabled={again !== undefined || working || saving.pending}
+          error={other?.why}
+          disabled={again !== undefined || busy}
           required
         />
+        {other !== null && (
+          <BodyText tone="secondary">
+            <PageLink
+              to={taskCardPath(place.org, place.contest, place.task, other.card)}
+            >
+              {other.card === 'tests'
+                ? 'Go to Tests and scoring'
+                : 'Go to the task’s page'}
+            </PageLink>
+          </BodyText>
+        )}
         <div className={shared.actions}>
           <Button
             type="submit"
-            loading={working}
-            disabled={file === null || target === '' || arrived !== null}
+            loading={busy}
+            disabled={file === null || target === '' || other !== null || held !== null}
           >
-            Upload
+            Upload and save
           </Button>
-          <Button variant="secondary" onClick={onClose} disabled={working}>
+          <Button variant="secondary" onClick={onClose} disabled={busy}>
             Close
           </Button>
         </div>
@@ -187,54 +200,30 @@ export function TaskUpload({
 
       <div role="status" aria-label="Uploading">
         <UnderWay state={state} />
+        {saving.pending && (
+          <BodyText tone="secondary">
+            Saving {held?.path ?? 'the file'} into the task…
+          </BodyText>
+        )}
       </div>
       {state.stage === 'refused' && <Refused error={state.error} />}
 
-      {arrived !== null && saving.outcome === null && (
-        <div className={shared.panel} role="status">
+      <UploadSaveAnswer place={place} saving={saving} placeOf={placeOfIn(place)} />
+
+      {unsaved && (
+        <div className={shared.panel} role="alert">
           <BodyText>
-            <span className={shared.mono}>{arrived.path}</span> has arrived
-            {file === null ? '' : `, ${formatSize(file.size)}`}.
-          </BodyText>
-          <BodyText>
-            It is not in the task yet. Saving puts it there, as a save of the task that
-            publishes or keeps a draft
-            {arrived.token === null ? '' : ', and replaces the file there now'}.
-            {others.length > 0 &&
-              ` The ${others.length === 1 ? 'upload' : `${String(others.length)} uploads`} waiting to be saved go in the same save.`}
+            <span className={shared.mono}>{held.path}</span>
+            {held.size === null ? '' : `, ${formatSize(held.size)},`} has been uploaded
+            but is not saved into the task. Leaving this page loses it.
           </BodyText>
           <div className={shared.actions}>
-            <Button
-              loading={saving.pending}
-              onClick={() => {
-                const mine = own();
-                if (mine !== null) void saving.save([...others, mine]);
-              }}
-            >
-              Save into the task
-            </Button>
-            {waiting !== null && (
-              <Button
-                variant="secondary"
-                disabled={saving.pending}
-                onClick={() => {
-                  const mine = own();
-                  if (mine !== null) waiting.keep(mine);
-                  forget();
-                  if (again !== undefined) onClose();
-                }}
-              >
-                Keep it waiting
-              </Button>
-            )}
-            <Button variant="secondary" disabled={saving.pending} onClick={forget}>
-              Discard
+            <Button variant="secondary" onClick={discard}>
+              Discard it
             </Button>
           </div>
         </div>
       )}
-
-      <UploadSaveAnswer place={place} saving={saving} placeOf={placeOfIn(place)} />
     </section>
   );
 }
