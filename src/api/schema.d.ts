@@ -4887,7 +4887,7 @@ export interface components {
         /**
          * Timeline
          * @description A task's timeline in its contest, from its entry in `contest.yaml`,
-         *     each time at its default where the entry gives none: `worth`, the most
+         *     points it gives, its groups' total unless the entry says, and none on a task whose
          *     points it gives, 100 unless the entry says, and none on a task whose
          *     latest publication gives no points or that has none; `release_at`, the
          *     contest's start unless the entry says; `due`, after which a submission
