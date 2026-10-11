@@ -101,20 +101,61 @@ function zip64Of(
   return found;
 }
 
-/** The bytes of a deflated entry, inflated as the browser does. */
-async function inflate(compressed: Blob): Promise<Blob> {
+/** The most files an archive may hold, its folders counted. */
+export const MOST_ENTRIES = 10_000;
+/** The most bytes one file may unpack to. */
+export const MOST_FILE = 256 * 2 ** 20;
+/** The most bytes an archive's files may unpack to together. */
+export const MOST_TOTAL = 2 ** 30;
+
+/** That the archive is not what it says of `name`'s size. */
+function wrongSize(name: string): ZipError {
+  return new ZipError(
+    `${name} is not the size the zip says it is, so the zip is damaged or made to mislead.`,
+  );
+}
+
+/**
+ * The bytes of a deflated entry, inflated as the browser does a chunk at a
+ * time, stopped as soon as they pass the size the archive declares, and
+ * refused when they end short of it, so a small archive cannot unpack to
+ * far more than it says.
+ */
+async function inflate(compressed: Blob, name: string, size: number): Promise<Blob> {
   const body = new Response(await compressed.arrayBuffer()).body;
   if (body === null) return new Blob([]);
-  const stream = body.pipeThrough(new DecompressionStream('deflate-raw'));
-  return new Blob([await new Response(stream).arrayBuffer()]);
+  const reader = body.pipeThrough(new DecompressionStream('deflate-raw')).getReader();
+  const chunks: Uint8Array<ArrayBuffer>[] = [];
+  let length = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    length += value.byteLength;
+    if (length > size) {
+      await reader.cancel();
+      throw wrongSize(name);
+    }
+    chunks.push(value);
+  }
+  if (length !== size) throw wrongSize(name);
+  return new Blob(chunks);
 }
 
 /**
  * Every file of a zip archive, in the order its directory lists them, its
- * folders and the folders a Mac adds (`__MACOSX/`) left out.
+ * folders and the folders a Mac adds (`__MACOSX/`) left out. An archive of
+ * more than 10,000 entries, with a file over 256 MB unpacked, or with files
+ * over 1 GB unpacked together, is refused, and so is a file whose bytes
+ * are not the size the archive declares when they are read.
  */
 export async function readZip(file: Blob): Promise<ZipEntry[]> {
   const { offset, size, count } = await directoryOf(file);
+  if (count > MOST_ENTRIES) {
+    throw new ZipError(
+      `The zip holds more than ${MOST_ENTRIES.toLocaleString('en')} files, more than this page unpacks at once. Split it into smaller zips.`,
+    );
+  }
+  let total = 0;
   const view = await bytesOf(file, offset, offset + size);
   const entries: ZipEntry[] = [];
   let at = 0;
@@ -144,6 +185,17 @@ export async function readZip(file: Blob): Promise<ZipEntry[]> {
     at += 46 + nameLength + extraLength + commentLength;
 
     if (name.endsWith('/') || name.startsWith('__MACOSX/')) continue;
+    if (unpacked > MOST_FILE) {
+      throw new ZipError(
+        `${name} unpacks to more than 256 MB, more than this page unpacks of one file.`,
+      );
+    }
+    total += unpacked;
+    if (total > MOST_TOTAL) {
+      throw new ZipError(
+        'The zip’s files unpack to more than 1 GB together, more than this page unpacks at once. Split it into smaller zips.',
+      );
+    }
     const problem =
       (flags & 1) !== 0
         ? 'It is encrypted.'
@@ -164,7 +216,9 @@ export async function readZip(file: Blob): Promise<ZipEntry[]> {
         const data =
           start + 30 + header.getUint16(26, true) + header.getUint16(28, true);
         const raw = file.slice(data, data + length);
-        return method === 0 ? raw : inflate(raw);
+        if (method !== 0) return inflate(raw, name, unpacked);
+        if (raw.size !== unpacked) throw wrongSize(name);
+        return raw;
       },
     });
   }
