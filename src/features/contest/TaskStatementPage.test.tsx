@@ -4,7 +4,14 @@ import { http, HttpResponse } from 'msw';
 import { formatDateTime, formatWhen } from '@/lib/time';
 import { renderApp } from '@/test/render';
 import { problem, server, signedIn } from '@/test/server';
-import { noSubmissions, PUBLIC_API, TASK_API, taskPage } from '@/test/contestant';
+import {
+  CONTEST_API,
+  home,
+  noSubmissions,
+  PUBLIC_API,
+  TASK_API,
+  taskPage,
+} from '@/test/contestant';
 import { passTime, withFakeTimers } from '@/test/timers';
 
 const PAGE = '/contests/acme/spring/tasks/sum';
@@ -42,6 +49,22 @@ describe('a task page for a signed-in person', () => {
       'href',
       '/contests/acme/spring',
     );
+  });
+
+  it('leads an organiser of the contest back to organising it', async () => {
+    server.use(
+      signedIn,
+      noSubmissions,
+      http.get(`${TASK_API}/page`, () => HttpResponse.json(taskPage)),
+      http.get(`${CONTEST_API}/home`, () =>
+        HttpResponse.json({ ...home(), organises: true }),
+      ),
+    );
+    renderApp(PAGE);
+
+    expect(
+      await screen.findByRole('link', { name: 'Back to organising' }),
+    ).toHaveAttribute('href', '/orgs/acme/contests/spring');
   });
 
   it('says no worth on a task that gives no points', async () => {

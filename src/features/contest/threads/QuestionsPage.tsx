@@ -7,6 +7,7 @@ import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
 import { Card } from '@/ui/Card';
 import { Page, PageHeader } from '@/ui/Page';
+import { BackToOrganising } from '../BackToOrganising';
 import { PageLink } from '@/ui/PageLink';
 import { SectionTitle } from '@/ui/SectionTitle';
 import { Select } from '@/ui/Select';
@@ -256,7 +257,15 @@ function SignedInQuestions({ org, contest }: { org: string; contest: string }) {
   );
   return (
     <Page>
-      <PageHeader title={TITLE} links={<Back org={org} contest={contest} />} />
+      <PageHeader
+        title={TITLE}
+        links={
+          <>
+            <Back org={org} contest={contest} />
+            <BackToOrganising org={org} contest={contest} />
+          </>
+        }
+      />
       {view.state === 'loading' && <PageSkeleton rows={4} />}
       {view.state === 'error' && <ErrorBlock error={view.error} onRetry={view.retry} />}
       {view.state === 'ready' &&
