@@ -504,6 +504,19 @@ describe("a task's timeline, edited on its row", () => {
     );
   });
 
+  it("opens a task's timeline from such a link followed while the page is open", async () => {
+    server.use(signedIn, standingList, ...repoFiles);
+    settingsSaved();
+    const { router } = renderApp(CONTEST);
+    await screen.findByRole('listitem', { name: 'B · sum' });
+
+    await router.navigate(`${CONTEST}?part=tasks&field=closes&item=1`);
+
+    expect(
+      await screen.findByRole('dialog', { name: 'Timeline of B · sum' }),
+    ).toBeVisible();
+  });
+
   it('offers an observer no way to edit a timeline', async () => {
     server.use(
       http.get('/api/v1/me', () =>

@@ -209,6 +209,12 @@ export function ContestTasks({ org, contest }: { org: string; contest: string })
   const [editing, setEditing] = useState<number | null>(
     opened === null ? null : Number(opened),
   );
+  // A link to a task's timeline followed while the page is open opens it too.
+  const [shownOpened, setShownOpened] = useState(opened);
+  if (shownOpened !== opened) {
+    setShownOpened(opened);
+    if (opened !== null) setEditing(Number(opened));
+  }
   const card = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (search.get('part') === 'tasks')
