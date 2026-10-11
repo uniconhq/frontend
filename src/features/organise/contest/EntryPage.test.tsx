@@ -235,6 +235,18 @@ describe('how people enter', { timeout: 20_000 }, () => {
     );
   });
 
+  it('keeps the page up for a link whose item or field is no name at all', async () => {
+    server.use(signedIn);
+    settings(`${BASE}registration:\n  ways:\n    - invite: {}\n`);
+    renderApp(`${PAGE}?field=a"]&item="`);
+
+    const form = await screen.findByRole('group', { name: 'How people enter' });
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(
+      within(form).getByRole('radio', { name: 'Approved straight away' }),
+    ).toBeVisible();
+  });
+
   it('opens the advanced part to focus an email pattern a link names', async () => {
     server.use(signedIn);
     settings(

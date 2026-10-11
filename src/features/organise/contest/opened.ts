@@ -56,8 +56,8 @@ export function useOpenedField(ready: boolean, { byItem = true } = {}) {
         const scope =
           item === null || !byItem
             ? document
-            : document.querySelector(`[data-item="${item}"]`);
-        return scope?.querySelector(`[data-field="${field}"]`) ?? null;
+            : document.querySelector(`[data-item="${CSS.escape(item)}"]`);
+        return scope?.querySelector(`[data-field="${CSS.escape(field)}"]`) ?? null;
       },
       (box) => {
         for (let part = box.closest('details'); part !== null;) {
