@@ -34,9 +34,19 @@ function isPlace(grants: Invite['grants']): grants is 'contestant' | 'member' {
   return grants === 'contestant' || grants === 'member';
 }
 
+/**
+ * Where an invite is, as people know it: its contest by its title, a task in
+ * it by its name and the contest's title, an org by its name.
+ */
+function whereOf(invite: Invite): string {
+  const { where, contest_title: title } = invite;
+  if (title === null || where.contest === null) return scopeName(where);
+  return where.task === null ? title : `${where.task}, a task of ${title}`;
+}
+
 /** What an invite offers and where, in a few words. */
 function offer(invite: Invite): string {
-  const where = scopeName(invite.where);
+  const where = whereOf(invite);
   if (!isPlace(invite.grants)) return `${ROLE[invite.grants]} at ${where}`;
   return invite.entrant === null
     ? `A place in the contest ${where}`
@@ -57,7 +67,7 @@ function enteredSentence(entered: Entered, where: string): string {
       return `You joined ${name} in ${where}.${then}`;
     case 'already':
       return `You were in ${name} in ${where} already.`;
-    default:
+    case 'made':
       return `You are registered for ${where} as ${name}.${then}`;
   }
 }
@@ -75,7 +85,7 @@ function placePath({ where }: Invite): string {
  * accepted it, and leads to the contest.
  */
 function Outcome({ invite, entered }: { invite: Invite; entered: Entered | null }) {
-  const where = scopeName(invite.where);
+  const where = whereOf(invite);
   const { grants } = invite;
   if (invite.status === 'accepted' && isPlace(grants)) {
     return (

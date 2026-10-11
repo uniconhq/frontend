@@ -92,7 +92,7 @@ describe('invites on the home page', () => {
     expect(role).toHaveTextContent('The manager role at acme');
     expect(role).toHaveTextContent('Sent by kenny.');
     expect(role).toHaveTextContent('It expires on');
-    expect(place).toHaveTextContent('A place in the contest acme/spring');
+    expect(place).toHaveTextContent('A place in the contest Spring 2026');
   });
 
   it('accepts a role and reads the session again, so the role shows', async () => {
@@ -126,13 +126,13 @@ describe('invites on the home page', () => {
     renderApp('/');
 
     const card = await screen.findByRole('listitem', {
-      name: 'A place in the contest acme/spring',
+      name: 'A place in the contest Spring 2026',
     });
     await user.click(within(card).getByRole('button', { name: /^Accept/ }));
 
     expect(
       await within(card).findByText(
-        'You are registered for acme/spring as kenny. An organiser approves each registration, and the contest’s page will say when yours is.',
+        'You are registered for Spring 2026 as kenny. An organiser approves each registration, and the contest’s page will say when yours is.',
       ),
     ).toBeVisible();
     expect(
@@ -156,12 +156,12 @@ describe('invites on the home page', () => {
     renderApp('/');
 
     const card = await screen.findByRole('listitem', {
-      name: 'A place in the team Red, in the contest acme/spring',
+      name: 'A place in the team Red, in the contest Spring 2026',
     });
     await user.click(within(card).getByRole('button', { name: /^Accept/ }));
 
     expect(
-      await within(card).findByText('You joined Red in acme/spring. You are in.'),
+      await within(card).findByText('You joined Red in Spring 2026. You are in.'),
     ).toBeVisible();
   });
 
@@ -202,7 +202,7 @@ describe('invites on the home page', () => {
     renderApp('/');
 
     const card = await screen.findByRole('listitem', {
-      name: 'A place in the team Red, in the contest acme/spring',
+      name: 'A place in the team Red, in the contest Spring 2026',
     });
     await user.click(within(card).getByRole('button', { name: /^Accept/ }));
     const code = await within(card).findByRole('textbox', { name: /Contest code/ });
@@ -297,7 +297,7 @@ describe('the invites page', () => {
     });
     expect(
       within(opened).getByRole('listitem', {
-        name: 'A place in the contest acme/spring',
+        name: 'A place in the contest Spring 2026',
       }),
     ).toBeVisible();
     const others = await screen.findByRole('list', { name: 'Your other invites' });
