@@ -15,7 +15,9 @@ import { useFieldLabel } from './FieldLabel';
  * `error`, when given, is what the server refused about the field: it reads
  * under it and marks the field invalid. `onCommit`, when given, is called
  * when the field is left or Enter is pressed in it, for a field whose change
- * applies once the person is done typing.
+ * applies once the person is done typing. `autoFocus` takes the focus as
+ * the field appears, inside a dialog too, which otherwise gives it to its
+ * first button.
  */
 export function TextInput({
   label,
@@ -31,6 +33,7 @@ export function TextInput({
   disabled = false,
   ref,
   onCommit,
+  autoFocus = false,
 }: {
   label: string;
   value: string;
@@ -45,6 +48,7 @@ export function TextInput({
   disabled?: boolean;
   ref?: Ref<HTMLInputElement>;
   onCommit?: () => void;
+  autoFocus?: boolean;
 }) {
   const { inputLabel, id, wrap } = useFieldLabel({ label, info, required });
   return wrap(
@@ -63,6 +67,8 @@ export function TextInput({
       disabled={disabled}
       radius="sm"
       onBlur={onCommit}
+      autoFocus={autoFocus}
+      data-autofocus={autoFocus ? true : undefined}
       onKeyDown={(event) => {
         if (event.key === 'Enter' && onCommit !== undefined) {
           event.preventDefault();

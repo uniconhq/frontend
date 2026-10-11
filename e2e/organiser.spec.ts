@@ -64,9 +64,64 @@ async function stubOrganiserApi(page: Page) {
       state.orgMade = true;
       return json(route, { name: 'acme' }, 201);
     }
-    if (path.endsWith('/roles')) return json(route, []);
+    if (path.endsWith('/roles') || path.endsWith('/invites')) return json(route, []);
     if (path === '/api/v1/orgs/acme') {
       return json(route, { display_name: '', description: '' });
+    }
+    if (path === '/api/v1/orgs/acme/clarifications') return json(route, []);
+    if (path === '/api/v1/orgs/acme/contests/spring/home') {
+      return json(route, {
+        where: { org: 'acme', contest: 'spring' },
+        name: 'Spring 2026',
+        description: '',
+        start: '2026-10-01T09:00:00Z',
+        end: '2026-10-01T14:00:00Z',
+        state: 'draft',
+        now: '2026-09-29T10:00:00Z',
+        registration: null,
+        organises: true,
+        registration_open: false,
+        invite_only: false,
+        asks_code: false,
+        tasks: [],
+      });
+    }
+    if (path === '/api/v1/orgs/acme/contests/spring/files/contest.yaml') {
+      return json(route, {
+        path: 'contest.yaml',
+        encoding: 'utf-8',
+        content:
+          'name: Spring 2026\nstart: 2026-10-01T09:00:00Z\nend: 2026-10-01T14:00:00Z\nstate: draft\nvisibility: signed-in\n',
+        token: 'token-contest',
+        upload: null,
+      });
+    }
+    const contest = '/api/v1/orgs/acme/contests/spring';
+    if (
+      [
+        `${contest}/contestants`,
+        `${contest}/organise/teams`,
+        `${contest}/organise/boards`,
+        `${contest}/announcements`,
+        `${contest}/clarifications`,
+        `${task}/announcements`,
+        `${task}/gradings`,
+      ].includes(path)
+    ) {
+      return json(route, []);
+    }
+    if (path === `${contest}/gradings/queue`) {
+      return json(route, { queued: 0, dispatched: 0 });
+    }
+    if (path === `${task}/workflow-form`) {
+      return json(route, {
+        workflow: 'unicon/classic@v2',
+        newer: null,
+        problem: null,
+        inputs: [],
+        test: [],
+        graded: false,
+      });
     }
     if (path === '/api/v1/orgs/acme/contests') return json(route, [{ name: 'spring' }]);
     if (path === '/api/v1/orgs/acme/contests/spring/tasks') {
@@ -134,19 +189,32 @@ test('an organiser makes an org, walks to a task and publishes a file', async ({
   await page.goto('/orgs');
 
   await expect(page.getByText('You do not hold a role at any org yet.')).toBeVisible();
-  await page.getByRole('link', { name: 'New org' }).click();
+  await page.getByRole('button', { name: 'New org' }).click();
 
-  await page.getByRole('textbox', { name: /^Name/ }).fill('acme');
-  await page.getByRole('button', { name: 'Create org' }).click();
+  const form = page.getByRole('form', { name: 'New org' });
+  await form.getByRole('textbox', { name: /^Name/ }).fill('acme');
+  await form.getByRole('button', { name: 'Create org' }).click();
 
   await expect(page).toHaveURL(/\/orgs\/acme$/, { timeout: 10_000 });
   await expect(page.getByRole('heading', { name: 'acme', level: 1 })).toBeVisible();
-  await page.getByRole('link', { name: 'spring' }).click();
-  await page.getByRole('link', { name: 'sum' }).click();
+  await page
+    .getByRole('list', { name: 'Contests' })
+    .getByRole('link', { name: 'spring' })
+    .click();
+  await expect(
+    page.getByRole('heading', { name: 'Spring 2026', level: 1 }),
+  ).toBeVisible();
+  await page
+    .getByRole('list', { name: 'Tasks' })
+    .getByRole('link', { name: 'A · sum' })
+    .click();
 
-  await expect(page.getByText('Latest publication: 1.')).toBeVisible();
+  const standing = page.getByLabel('Where the task stands');
+  await expect(standing).toContainText('Contestants are graded on publication 1');
+  const sidebar = page.getByRole('navigation', { name: 'Sections' });
+  await sidebar.getByRole('link', { name: 'Files' }).click();
   await page.getByRole('link', { name: 'statement.md' }).click();
-  await expect(page).toHaveURL(/\?file=statement\.md$/);
+  await expect(page).toHaveURL(/\/files\?file=statement\.md$/);
 
   await page
     .getByRole('textbox', { name: 'statement.md' })
@@ -158,12 +226,14 @@ test('an organiser makes an org, walks to a task and publishes a file', async ({
   });
   await expect(outcome).toBeVisible();
   await expect(outcome).toBeFocused();
-  await expect(page.getByText('Latest publication: 2.')).toBeVisible();
   expect(state.saved).toMatchObject({
     content: 'Write the sum of two.\n',
     token: 'token-1',
   });
+  await sidebar.getByRole('link', { name: 'sum' }).click();
+  await expect(standing).toContainText('Contestants are graded on publication 2');
 
-  await page.getByRole('link', { name: 'orgs', exact: true }).click();
+  const trail = page.getByRole('navigation', { name: 'Breadcrumb' });
+  await trail.getByRole('link', { name: 'Orgs', exact: true }).click();
   await expect(page.getByRole('list', { name: 'Your orgs' })).toContainText('acme');
 });

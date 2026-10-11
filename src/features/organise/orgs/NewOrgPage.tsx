@@ -1,61 +1,28 @@
-import { useQueryClient } from '@tanstack/react-query';
-import { useNavigate } from 'react-router';
-import { $api } from '@/api/query';
-import { orgPath } from '@/lib/organiser-paths';
 import { Card } from '@/ui/Card';
-import { BodyText } from '@/ui/BodyText';
-import { PageTitle } from '@/ui/PageTitle';
-import { Create } from '../Create';
-import classes from '../organise.module.css';
-
-/** The most an org's description holds: the forge takes no more. */
-const DESCRIPTION_MAX = 255;
+import { Page, PageHeader } from '@/ui/Page';
+import { CreateForm } from '../CreateForm';
+import { NEW_ORG, useCreateOrg } from './new-org';
 
 /**
- * Makes an org and goes to its page. The org, its teams, its event push and
- * its service account are made before the create answers, which takes a few
- * seconds, so the button stays busy until then. The person who asked becomes
- * its first admin, so their roles are read again before the org's page needs
- * them.
+ * The new org's form at an address of its own, for a link straight to it;
+ * the orgs page opens the same form from its New org button.
  */
 export function NewOrgPage() {
-  const queryClient = useQueryClient();
-  const create = $api.useMutation('post', '/api/v1/orgs', {
-    onSuccess: () =>
-      queryClient.invalidateQueries({
-        queryKey: $api.queryOptions('get', '/api/v1/me').queryKey,
-      }),
-  });
-  const navigate = useNavigate();
-
+  const { create, submit } = useCreateOrg();
   return (
-    <div className={classes.page}>
-      <PageTitle>New org</PageTitle>
+    <Page>
+      <PageHeader title="New org" />
       <Card>
-        <div className={classes.stack}>
-          <BodyText size="md">
-            An org holds contests and the people who run them. You become its first
-            admin.
-          </BodyText>
-          <Create
-            openLabel="New org"
-            title="The org"
-            second={{
-              label: 'Description',
-              description: `Optional, at most ${String(DESCRIPTION_MAX)} characters.`,
-              maxLength: DESCRIPTION_MAX,
-            }}
-            submitLabel="Create org"
-            startOpen
-            pending={create.isPending}
-            error={create.error}
-            onSubmit={async (name, description) => {
-              const made = await create.mutateAsync({ body: { name, description } });
-              await navigate(orgPath(made.name));
-            }}
-          />
-        </div>
+        <CreateForm
+          title="New org"
+          intro={NEW_ORG.intro}
+          second={NEW_ORG.second}
+          submitLabel="Create org"
+          pending={create.isPending}
+          error={create.error}
+          onSubmit={submit}
+        />
       </Card>
-    </div>
+    </Page>
   );
 }

@@ -127,7 +127,7 @@ export function OrgProfile({ org }: { org: string }) {
 
   return (
     <div className={classes.stack}>
-      <SectionTitle>About</SectionTitle>
+      <SectionTitle>Name and description</SectionTitle>
       {view.state === 'loading' && <PageSkeleton rows={2} />}
       {view.state === 'error' && <ErrorBlock error={view.error} onRetry={view.retry} />}
       {view.state === 'ready' &&

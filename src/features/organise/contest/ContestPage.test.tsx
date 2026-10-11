@@ -4,11 +4,13 @@ import userEvent from '@/test/user-event';
 import { delay, http, HttpResponse } from 'msw';
 import type { TaskStanding } from '@/api/types';
 import { formatExact } from '@/lib/exact';
+import { CONTEST_SECTIONS } from '@/lib/sections';
 import { formatDateTime } from '@/lib/time';
 import { renderApp } from '@/test/render';
 import { problem, server, signedIn, someone } from '@/test/server';
 import {
   CONTEST_API,
+  files,
   repoFiles,
   standingList,
   standings,
@@ -21,8 +23,69 @@ function at(iso: string): string {
   return formatDateTime(new Date(iso));
 }
 
-describe('the contest page', () => {
-  it('lists the tasks in order, each linking to its page, and the contest files', async () => {
+describe("the contest page's header", () => {
+  it('names the contest, says where it stands, and leads to the page its contestants see', async () => {
+    server.use(signedIn, standingList, ...repoFiles);
+    renderApp(CONTEST);
+
+    expect(
+      await screen.findByRole('heading', { name: 'spring', level: 1 }),
+    ).toBeVisible();
+    expect(await screen.findByText('Draft')).toBeVisible();
+    expect(screen.getByRole('link', { name: 'View as contestant' })).toHaveAttribute(
+      'href',
+      '/contests/acme/spring',
+    );
+    expect(
+      await screen.findByRole('timer', { name: 'Contest countdown' }),
+    ).toBeVisible();
+  });
+});
+
+describe("the contest's settings at a glance", () => {
+  it('says when it runs, who sees it, how people enter and in teams or not', async () => {
+    server.use(
+      signedIn,
+      standingList,
+      http.get(`${CONTEST_API}/files/:path`, () =>
+        HttpResponse.json({
+          ...files['contest.yaml'],
+          content: [
+            'name: Spring',
+            'start: 2026-10-01T09:00:00Z',
+            'end: 2026-10-01T14:00:00Z',
+            'state: draft',
+            'visibility: everyone',
+            'registration: {invite_only: true, approval: auto}',
+            'team_size: 3',
+            '',
+          ].join('\n'),
+        }),
+      ),
+      ...repoFiles,
+    );
+    renderApp(CONTEST);
+
+    const summary = await screen.findByLabelText('The settings');
+    const values = within(summary)
+      .getAllByRole('definition')
+      .map((value) => value.textContent);
+    expect(values).toEqual([
+      `${at('2026-10-01T09:00:00Z')} to ${at('2026-10-01T14:00:00Z')}`,
+      'Anyone, signed in or not',
+      'By invitation only, approved straight away',
+      'Teams of up to 3',
+    ]);
+    const card = screen.getByRole('region', { name: 'Settings' });
+    expect(within(card).getByRole('link', { name: 'Settings' })).toHaveAttribute(
+      'href',
+      '/orgs/acme/contests/spring/settings',
+    );
+  });
+});
+
+describe("the contest's tasks", () => {
+  it('lists the tasks in order, each by its letter and name, linking to its page', async () => {
     server.use(signedIn, standingList, ...repoFiles);
     renderApp(CONTEST);
 
@@ -34,18 +97,14 @@ describe('the contest page', () => {
     expect(
       within(list)
         .getAllByRole('link')
-        .map((link) => link.getAttribute('href')),
+        .map((link) => [link.textContent, link.getAttribute('href')]),
     ).toEqual([
-      '/orgs/acme/contests/spring/tasks/sort',
-      '/orgs/acme/contests/spring/tasks/sum',
+      ['A · sort', '/orgs/acme/contests/spring/tasks/sort'],
+      ['B · sum', '/orgs/acme/contests/spring/tasks/sum'],
     ]);
-    const tree = screen.getByRole('navigation', { name: 'Files' });
-    expect(
-      await within(tree).findByRole('link', { name: 'contest.yaml' }),
-    ).toBeVisible();
   });
 
-  it("shows each task's latest publication and its timeline, defaults resolved", async () => {
+  it("says each task's latest publication and its timeline, defaults resolved", async () => {
     server.use(signedIn, standingList, ...repoFiles);
     renderApp(CONTEST);
 
@@ -53,26 +112,16 @@ describe('the contest page', () => {
     expect(sort).toHaveTextContent(
       `Publication 1, ${at('2026-09-20T10:00:00Z')}, changed how it grades`,
     );
-    expect(within(sort).queryByRole('list', { name: 'Errors' })).toBeNull();
-    const times = within(sort).getAllByRole('definition');
-    expect(times.map((time) => time.textContent)).toEqual([
-      at('2026-10-01T09:00:00Z'),
-      `${at('2026-10-08T09:00:00Z')}, then 10% off per late day started`,
-      at('2026-10-15T09:00:00Z'),
-      '100 points',
-    ]);
-    expect(
-      within(sort)
-        .getAllByRole('term')
-        .map((term) => term.textContent),
-    ).toEqual(['Released', 'Due', 'Closes', 'Worth']);
+    expect(sort).toHaveTextContent(
+      `100 points · released ${at('2026-10-01T09:00:00Z')} · due ${at('2026-10-08T09:00:00Z')}, then 10% off per late day started · closes ${at('2026-10-15T09:00:00Z')}`,
+    );
 
     const sum = screen.getByRole('listitem', { name: 'B · sum' });
-    expect(sum).toHaveTextContent('No due time');
+    expect(sum).toHaveTextContent('no due time');
     expect(sum).toHaveTextContent('No points');
   });
 
-  it('shows the late rate as the exact percentage it is, however small', async () => {
+  it('says the late rate as the exact percentage it is, however small', async () => {
     const [sort] = standings;
     if (sort === undefined) throw new Error('standings has sort');
     const rated = (late: string): TaskStanding => ({
@@ -97,7 +146,7 @@ describe('the contest page', () => {
     );
   });
 
-  it('shows a draft with errors beside the publication it sits on, each at its YAML path', async () => {
+  it("says how many problems hold back a task's last save, which its own page lists", async () => {
     server.use(signedIn, standingList, ...repoFiles);
     renderApp(CONTEST);
 
@@ -105,13 +154,8 @@ describe('the contest page', () => {
     expect(sum).toHaveTextContent(
       `Publication 2, ${at('2026-09-21T10:00:00Z')}, grading unchanged`,
     );
-    expect(sum).toHaveTextContent(
-      'A draft sits on top of it, since its last save did not pass validation:',
-    );
-    const errors = within(sum).getByRole('list', { name: 'Errors' });
-    expect(errors).toHaveTextContent(
-      'inputs.setter[0].value: There is no file under data/hidden/ in the task.',
-    );
+    expect(sum).toHaveTextContent('1 problem in its last save');
+    expect(within(sum).queryByRole('list', { name: 'Errors' })).toBeNull();
   });
 
   it('says a task that has never published so, and what it is worth once it has', async () => {
@@ -151,21 +195,15 @@ describe('the contest page', () => {
 
     const max = await screen.findByRole('listitem', { name: 'C · max' });
     expect(max).toHaveTextContent('Never published');
-    expect(max).toHaveTextContent('Its last save did not pass validation:');
-    expect(within(max).getByRole('list', { name: 'Errors' })).toHaveTextContent(
-      'the whole file: task.yaml is missing.',
-    );
-    expect(max).toHaveTextContent('Not known until published');
+    expect(max).toHaveTextContent('1 problem in its last save');
+    expect(max).toHaveTextContent('Worth not known until published');
 
     const min = screen.getByRole('listitem', { name: 'D · min' });
     expect(min).toHaveTextContent('Never published');
-    expect(min).toHaveTextContent(
-      'Its files are saved as a draft, kept back from contestants.',
-    );
-    expect(min).not.toHaveTextContent('sits on top of it');
+    expect(min).toHaveTextContent('Draft kept back');
   });
 
-  it("reads the tasks again once the contest's file is saved, since it holds their times", async () => {
+  it("reads the tasks afresh on coming back from saving the contest's file", async () => {
     let reads = 0;
     server.use(
       signedIn,
@@ -178,15 +216,18 @@ describe('the contest page', () => {
         HttpResponse.json({ version: '9f8e7d6c5b4a39281706', notes: [] }),
       ),
     );
-    renderApp(`${CONTEST}?file=contest.yaml`);
+    renderApp(`${CONTEST}/files?file=contest.yaml`);
 
     const editor = await screen.findByRole('textbox', { name: 'contest.yaml' });
-    expect(reads).toBe(1);
+    expect(reads).toBe(0);
     await userEvent.type(editor, 'description: Our spring round\n');
     await userEvent.click(screen.getByRole('button', { name: 'Save' }));
-
     await screen.findByText(/Saved as version/);
-    await expect.poll(() => reads).toBe(2);
+
+    const trail = screen.getByRole('navigation', { name: 'Breadcrumb' });
+    await userEvent.click(within(trail).getByRole('link', { name: 'spring' }));
+    await screen.findByRole('list', { name: 'Tasks' });
+    expect(reads).toBe(1);
   });
 
   it('shows a skeleton while the tasks load', async () => {
@@ -200,14 +241,12 @@ describe('the contest page', () => {
     );
     renderApp(CONTEST);
 
-    await screen.findByRole('heading', { name: 'spring', level: 1 });
-    expect(screen.getAllByRole('status', { name: 'Loading' }).length).toBeGreaterThan(
-      0,
-    );
+    const tasks = await screen.findByRole('region', { name: 'Tasks' });
+    expect(within(tasks).getByRole('status', { name: 'Loading' })).toBeInTheDocument();
     expect(screen.queryByRole('list', { name: 'Tasks' })).not.toBeInTheDocument();
   });
 
-  it('shows the refusal when the tasks may not be listed, and keeps the files', async () => {
+  it('shows the refusal when the tasks may not be listed, and keeps the rest of the page', async () => {
     server.use(
       signedIn,
       ...repoFiles,
@@ -222,7 +261,9 @@ describe('the contest page', () => {
     expect(
       await screen.findByText('You need the observer role at acme/spring.'),
     ).toBeVisible();
-    expect(await screen.findByRole('link', { name: 'contest.yaml' })).toBeVisible();
+    const cards = screen.getByRole('group', { name: "The contest's sections" });
+    expect(within(cards).getByRole('link', { name: 'Files' })).toBeVisible();
+    expect(await within(cards).findByText('contest.yaml')).toBeVisible();
   });
 
   it("shows the settings' errors at their paths and lists the tasks by name when the settings do not read", async () => {
@@ -247,7 +288,7 @@ describe('the contest page', () => {
 
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent("The contest's settings do not read");
-    expect(alert).toHaveTextContent('Mend it under Settings or Files below.');
+    expect(alert).toHaveTextContent('Mend them in Settings or Files.');
     const errors = within(alert).getByRole('list', { name: 'Errors' });
     expect(
       within(errors)
@@ -257,7 +298,7 @@ describe('the contest page', () => {
       'tasks[0].due: It is not a time with an offset.',
       'the whole file: end comes before start.',
     ]);
-    const list = await screen.findByRole('list', { name: 'Tasks by name' });
+    const list = await screen.findByRole('list', { name: 'Tasks' });
     expect(within(list).getByRole('link', { name: 'sum' })).toHaveAttribute(
       'href',
       '/orgs/acme/contests/spring/tasks/sum',
@@ -291,12 +332,82 @@ describe('the contest page', () => {
     );
     renderApp(CONTEST);
 
-    const own = await screen.findByRole('list', { name: 'Your tasks' });
+    expect(
+      await screen.findByText('Tasks of this contest you hold a role at:'),
+    ).toBeVisible();
+    const own = screen.getByRole('list', { name: 'Tasks' });
     expect(
       within(own)
         .getAllByRole('link')
         .map((link) => [link.textContent, link.getAttribute('href')]),
     ).toEqual([['sum', '/orgs/acme/contests/spring/tasks/sum']]);
+    expect(screen.queryByRole('button', { name: 'New task' })).toBeNull();
+  });
+});
+
+describe("the contest's sections", () => {
+  it('gives each section a card going to its page, in the order the sidebar lists them', async () => {
+    server.use(signedIn, standingList, ...repoFiles);
+    renderApp(CONTEST);
+
+    const cards = await screen.findByRole('group', { name: "The contest's sections" });
+    const titles = within(cards)
+      .getAllByRole('heading', { level: 2 })
+      .map((heading) => within(heading).getByRole('link'));
+    const grid = CONTEST_SECTIONS.filter((section) => section.card === 'grid');
+    expect(titles.map((link) => link.textContent)).toEqual(
+      grid.map((section) => section.label),
+    );
+    expect(titles.map((link) => link.getAttribute('href'))).toEqual(
+      grid.map((section) => `${CONTEST}/${section.segment}`),
+    );
+
+    const sidebar = screen.getByRole('group', { name: 'Contest' });
+    expect(
+      within(sidebar)
+        .getAllByRole('link')
+        .slice(1)
+        .map((link) => [link.textContent, link.getAttribute('href')]),
+    ).toEqual(
+      CONTEST_SECTIONS.map((section) => [
+        section.label,
+        `${CONTEST}/${section.segment}`,
+      ]),
+    );
+  });
+
+  it('says on each card whether it needs going into', async () => {
+    server.use(
+      signedIn,
+      standingList,
+      ...repoFiles,
+      http.get(`${CONTEST_API}/gradings/queue`, () =>
+        HttpResponse.json({ queued: 3, dispatched: 1 }),
+      ),
+      http.get(`${CONTEST_API}/announcements`, () =>
+        HttpResponse.json([
+          { number: 1, title: 'Welcome', body: '', closed: false },
+          { number: 2, title: 'Task B fixed', body: '', closed: false },
+        ]),
+      ),
+    );
+    renderApp(CONTEST);
+
+    const says = async (name: string, line: string) =>
+      expect(
+        await within(await screen.findByRole('region', { name })).findByText(line),
+      ).toBeVisible();
+    await says('Contestants', 'Nobody has registered yet.');
+    await says('Gradings', '3 waiting to be graded, 1 being graded.');
+    await says('Announcements', '2 posted; the latest is “Task B fixed”.');
+    await says('Questions', 'Nobody has asked anything yet.');
+    await says('Boards', 'No leaderboard yet.');
+    await says('Files', 'contest.yaml');
+    await says('Contest organisers', '0 organisers');
+    // No button and no form on the page but the tasks' one button.
+    const sections = screen.getByRole('group', { name: "The contest's sections" });
+    expect(within(sections).queryByRole('button')).toBeNull();
+    expect(screen.queryByRole('form')).toBeNull();
   });
 });
 
@@ -354,7 +465,7 @@ describe('creating a task', () => {
     const form = await submitTask('max', 'Maximum');
 
     const list = screen.getByRole('list', { name: 'Tasks' });
-    expect(await within(list).findByRole('link', { name: 'max' })).toHaveAttribute(
+    expect(await within(list).findByRole('link', { name: 'C · max' })).toHaveAttribute(
       'href',
       '/orgs/acme/contests/spring/tasks/max',
     );

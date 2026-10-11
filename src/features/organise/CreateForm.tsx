@@ -1,12 +1,17 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useRef, useState, type FormEvent, type ReactNode } from 'react';
+import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
-import { SectionTitle } from '@/ui/SectionTitle';
 import { TextInput } from '@/ui/TextInput';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import classes from './organise.module.css';
 
 /** The second line, with the most characters it takes when there is a limit. */
-export type SecondField = { label: string; description?: string; maxLength?: number };
+export type SecondField = {
+  label: string;
+  description?: string;
+  placeholder?: string;
+  maxLength?: number;
+};
 
 /**
  * The one form behind New org, New contest and New task: a name, which forge
@@ -22,6 +27,7 @@ export type SecondField = { label: string; description?: string; maxLength?: num
  */
 export function CreateForm({
   title,
+  intro,
   second,
   submitLabel,
   pending,
@@ -29,7 +35,9 @@ export function CreateForm({
   onSubmit,
   onCancel,
 }: {
+  /** What the form is called, for a screen reader. */
   title: string;
+  intro?: ReactNode;
   second: SecondField;
   submitLabel: string;
   pending: boolean;
@@ -40,10 +48,6 @@ export function CreateForm({
   const [name, setName] = useState('');
   const [other, setOther] = useState('');
   const nameField = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    nameField.current?.focus();
-  }, []);
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -61,9 +65,10 @@ export function CreateForm({
       onSubmit={(event) => void submit(event)}
       aria-label={title}
     >
-      <SectionTitle order={3}>{title}</SectionTitle>
+      {intro !== undefined && <BodyText size="md">{intro}</BodyText>}
       <TextInput
         ref={nameField}
+        autoFocus
         label="Name"
         description="Part of every address, so it cannot change later."
         value={name}
@@ -73,6 +78,7 @@ export function CreateForm({
       <TextInput
         label={second.label}
         description={second.description}
+        placeholder={second.placeholder}
         maxLength={second.maxLength}
         value={other}
         onChange={setOther}

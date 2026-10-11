@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { screen, within } from '@testing-library/react';
 import userEvent from '@/test/user-event';
 import { delay, http, HttpResponse } from 'msw';
+import { TASK_BUILD_CARDS, TASK_SECTIONS } from '@/lib/sections';
+import { formatDateTime } from '@/lib/time';
 import { renderApp } from '@/test/render';
 import { problem, server, signedIn } from '@/test/server';
 import {
@@ -15,18 +17,23 @@ import {
 
 const TASK = '/orgs/acme/contests/spring/tasks/sum';
 
+function at(iso: string): string {
+  return formatDateTime(new Date(iso));
+}
+
 describe('the task page', () => {
-  it('shows the latest publication and that the head is it', async () => {
+  it('says what contestants are graded on, under the task’s name', async () => {
     server.use(signedIn, taskState, publicationList, ...repoFiles);
     renderApp(TASK);
 
-    expect(await screen.findByText('Latest publication: 2.')).toBeVisible();
-    expect(
-      screen.getByText('The files as they stand are the latest publication.'),
-    ).toBeVisible();
+    const status = await screen.findByLabelText('Where the task stands');
+    expect(status).toHaveTextContent('Published');
+    expect(status).toHaveTextContent(
+      `Contestants are graded on publication 2, of ${at('2026-09-21T10:00:00Z')}.`,
+    );
   });
 
-  it("shows a draft's errors, each with its YAML path", async () => {
+  it('lists what kept the last save from publishing, each where it is', async () => {
     server.use(
       signedIn,
       publicationList,
@@ -35,16 +42,18 @@ describe('the task page', () => {
     );
     renderApp(TASK);
 
-    expect(
-      await screen.findByText(/The files as they stand are a draft/),
-    ).toBeVisible();
-    const errors = screen.getByRole('list', { name: 'Errors' });
+    const status = await screen.findByLabelText('Where the task stands');
+    expect(status).toHaveTextContent('Last save has problems');
+    expect(status).toHaveTextContent(
+      'The last save did not publish, for these problems:',
+    );
+    const errors = within(status).getByRole('list', { name: 'Errors' });
     expect(within(errors).getByRole('listitem')).toHaveTextContent(
       'inputs.setter[0].value: There is no file under data/hidden/ in the task.',
     );
   });
 
-  it('says so when nothing is published yet', async () => {
+  it('says so when nothing is published yet, and when a save was kept back', async () => {
     server.use(
       signedIn,
       ...repoFiles,
@@ -55,38 +64,21 @@ describe('the task page', () => {
     );
     renderApp(TASK);
 
-    expect(await screen.findByText('Not published yet.')).toBeVisible();
-    expect(
-      await screen.findByText('None yet. The first valid save publishes.'),
-    ).toBeVisible();
-    expect(
-      screen.getByText(/it was held back, or it has not been saved/),
-    ).toBeVisible();
+    const status = await screen.findByLabelText('Where the task stands');
+    expect(status).toHaveTextContent(
+      'Nothing is published yet, so contestants cannot see the task.',
+    );
+    expect(status).toHaveTextContent('The last save is kept back as a draft');
   });
 
-  it('lists the publications newest first, with whether and how each changed grading', async () => {
-    server.use(signedIn, taskState, publicationList, ...repoFiles);
-    renderApp(TASK);
-
-    const list = await screen.findByRole('list', { name: 'Publications' });
-    const [newest, oldest] = Array.from(list.children);
-    expect(newest).toHaveTextContent('Publication 2');
-    expect(newest).toHaveTextContent('grading unchanged');
-    expect(oldest).toHaveTextContent('Publication 1');
-    expect(oldest).toHaveTextContent('changed how the task grades');
-    expect(within(list).getByText('plans/default.json added')).toBeVisible();
-  });
-
-  it('shows skeletons while the state and the publications load', async () => {
-    const forever = async () => {
-      await delay('infinite');
-      return HttpResponse.json({});
-    };
+  it('shows a skeleton while where it stands loads', async () => {
     server.use(
       signedIn,
       ...repoFiles,
-      http.get(TASK_API, forever),
-      http.get(`${TASK_API}/publications`, forever),
+      http.get(TASK_API, async () => {
+        await delay('infinite');
+        return HttpResponse.json({});
+      }),
     );
     renderApp(TASK);
 
@@ -108,9 +100,88 @@ describe('the task page', () => {
     );
     renderApp(TASK);
 
-    expect(await screen.findByText('Not found')).toBeVisible();
+    expect((await screen.findAllByText('Not found'))[0]).toBeVisible();
     refused = false;
     await userEvent.click(screen.getAllByRole('button', { name: 'Try again' })[0]!);
-    expect(await screen.findByText('Latest publication: 2.')).toBeVisible();
+    expect(await screen.findByLabelText('Where the task stands')).toHaveTextContent(
+      'Contestants are graded on publication 2',
+    );
+  });
+
+  it('builds the task in order with cards, each leading to where its part is done', async () => {
+    server.use(signedIn, taskState, publicationList, ...repoFiles);
+    renderApp(TASK);
+
+    const building = await screen.findByRole('group', { name: 'Building the task' });
+    const links = within(building)
+      .getAllByRole('heading', { level: 2 })
+      .map((heading) => within(heading).getByRole('link'));
+    expect(links.map((link) => [link.textContent, link.getAttribute('href')])).toEqual(
+      TASK_BUILD_CARDS.map((card) => [card.label, `${TASK}/${card.section}`]),
+    );
+    expect(
+      await within(screen.getByRole('region', { name: 'Statement' })).findByText(
+        /^Written, 40/,
+      ),
+    ).toBeVisible();
+    expect(
+      await within(screen.getByRole('region', { name: 'Workflow' })).findByText(
+        'No workflow is named yet.',
+      ),
+    ).toBeVisible();
+  });
+
+  it('gives each section a card in the order the sidebar lists them', async () => {
+    server.use(signedIn, taskState, publicationList, ...repoFiles);
+    renderApp(TASK);
+
+    const running = await screen.findByRole('group', { name: 'Running the task' });
+    const grid = TASK_SECTIONS.filter((section) => section.card === 'grid');
+    expect(
+      within(running)
+        .getAllByRole('heading', { level: 2 })
+        .map((heading) => within(heading).getByRole('link').getAttribute('href')),
+    ).toEqual(grid.map((section) => `${TASK}/${section.segment}`));
+    const sidebar = screen.getByRole('group', { name: 'Task' });
+    expect(
+      within(sidebar)
+        .getAllByRole('link')
+        .slice(1)
+        .map((link) => link.textContent),
+    ).toEqual(TASK_SECTIONS.map((section) => section.label));
+    expect(
+      await within(screen.getByRole('region', { name: 'Publications' })).findByText(
+        /^Contestants are graded on publication 2/,
+      ),
+    ).toBeVisible();
+    expect(screen.queryByRole('form')).toBeNull();
+  });
+});
+
+describe("the task's publications", () => {
+  it('lists them newest first, with whether and how each changed grading', async () => {
+    server.use(signedIn, taskState, publicationList, ...repoFiles);
+    renderApp(`${TASK}/publications`);
+
+    const list = await screen.findByRole('list', { name: 'Publications' });
+    const [newest, oldest] = Array.from(list.children);
+    expect(newest).toHaveTextContent('Publication 2');
+    expect(newest).toHaveTextContent('grading unchanged');
+    expect(oldest).toHaveTextContent('Publication 1');
+    expect(oldest).toHaveTextContent('changed how the task grades');
+    expect(within(list).getByText('plans/default.json added')).toBeVisible();
+  });
+
+  it('says so when there are none yet', async () => {
+    server.use(
+      signedIn,
+      taskState,
+      http.get(`${TASK_API}/publications`, () => HttpResponse.json([])),
+    );
+    renderApp(`${TASK}/publications`);
+
+    expect(
+      await screen.findByText('None yet. The first save without problems publishes.'),
+    ).toBeVisible();
   });
 });
