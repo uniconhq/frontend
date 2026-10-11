@@ -10,7 +10,7 @@ import { Button } from '@/ui/Button';
 import { CodeEditor } from '@/ui/CodeEditor';
 import { Modal } from '@/ui/Modal';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
-import { ActionMenu, type MenuEntry } from '@/ui/ActionMenu';
+import { type MenuEntry } from '@/ui/ActionMenu';
 import { useMarkColours } from '@/ui/brand/mark-colours';
 import { MergeView } from '../forms/MergeView';
 import { parseYaml } from '../forms/yaml-doc';
@@ -548,19 +548,6 @@ export function Editor({
     return entries;
   };
 
-  const menu = (box: Box, port: string, side: 'left' | 'right') => {
-    const label = menuLabel(box, port, side);
-    if (label === null) return <span>{port}</span>;
-    return (
-      <ActionMenu
-        text={port}
-        label={label}
-        entries={() => menuEntries(box, port, side)}
-        className={classes.port}
-      />
-    );
-  };
-
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     const field = (event.target as HTMLElement).closest(
       'input, textarea, select, [contenteditable]',
@@ -760,7 +747,8 @@ export function Editor({
           dragging={dragging}
           notice={notice}
           refusal={refusal}
-          menu={menu}
+          label={menuLabel}
+          entries={menuEntries}
           onSelect={(key) =>
             select(selectionOf(layout.boxes.find((box) => box.key === key)))
           }
