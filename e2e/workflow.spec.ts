@@ -189,15 +189,17 @@ async function drag(page: Page, from: Locator, to: Locator) {
 /**
  * The file as a save would write it, read from CodeMirror's document in the
  * View file dialog, which holds every line where the page draws only those in
- * view. A string the browser runs, since these tests are typed without the
- * DOM's types.
+ * view; CodeMirror keeps its view on the content element's tile. A string the
+ * browser runs, since these tests are typed without the DOM's types.
  */
 const FILE = `(() => {
   const label = [...document.querySelectorAll('label')].find(
     (found) => found.textContent.trim() === 'The draft’s file');
   const content = document.querySelector('[aria-labelledby="' + label.id + '"]');
-  const view = content.cmView && content.cmView.view;
-  return view ? view.state.doc.toString() : content.innerText;
+  const tile = content.cmTile || content.cmView;
+  const view = tile && tile.view;
+  if (!view) throw new Error('the file view holds no CodeMirror document');
+  return view.state.doc.toString();
 })()`;
 
 async function file(page: Page): Promise<string> {
