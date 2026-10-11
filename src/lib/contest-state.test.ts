@@ -57,7 +57,7 @@ describe('where a contest stands', () => {
         contest('published', '2026-10-10T00:00:00Z', '2026-10-12T00:00:00Z'),
         NOW,
       ),
-    ).toBe(`Running until ${at('2026-10-12T00:00:00Z')}`);
+    ).toBe(`Live until ${at('2026-10-12T00:00:00Z')}`);
     expect(
       datesLine(
         contest('published', '2026-10-01T00:00:00Z', '2026-10-02T00:00:00Z'),

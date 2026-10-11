@@ -9,7 +9,10 @@ Nothing on screen names a file, a format key or how something is stored
 the person is doing and what happens. Two places are the exception. "View
 file" shows a contest's or a task's stored settings, read-only, for checking.
 The workflow editor shows what a workflow's author must type: a port's name, a
-reference such as `${{ inputs.language }}`, and `fold` and `better`.
+reference such as `${{ inputs.language }}`, and `fold` and `better`. And where
+files are added to a task, the folders and files people make for it are named
+as they make them: `public/` for a statement's pictures, and a test's own
+`test.yaml` in a zip of tests.
 
 ## Places and people
 

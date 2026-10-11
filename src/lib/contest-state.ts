@@ -32,7 +32,7 @@ export function datesLine(contest: Dated, now: Date): string {
   if (standing === 'live') {
     return now.getTime() < Date.parse(contest.start)
       ? `Starts ${when(contest.start)}`
-      : `Running until ${when(contest.end)}`;
+      : `Live until ${when(contest.end)}`;
   }
   if (standing === 'finished' || standing === 'archived') {
     return `Ended ${when(contest.end)}`;

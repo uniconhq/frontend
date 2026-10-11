@@ -63,7 +63,7 @@ function standingSentence(
     case 'live':
       return now.getTime() < Date.parse(values.start)
         ? `${visibilitySentence(values.visibility)} It starts ${when(values.start)}.`
-        : `${visibilitySentence(values.visibility)} It is running, and ends ${when(values.end)}.`;
+        : `${visibilitySentence(values.visibility)} It is live, and ends ${when(values.end)}.`;
     case 'finished':
       return `It ended ${when(values.end)}. Archive it once nothing more needs doing.`;
     case 'archived':
