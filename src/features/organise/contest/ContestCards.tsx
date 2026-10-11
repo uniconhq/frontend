@@ -7,6 +7,10 @@ import { AnnouncementsLine, FilesLine, Line } from '../hub/lines';
 import { announcementsQuery } from '../threads/announcements';
 import { entrantsLine, useEntrants } from '../entrants/names';
 import { useInvites } from '../invites/invites';
+import { DEFAULT_WAYS } from '../forms/ways';
+import { BodyText } from '@/ui/BodyText';
+import { Loaded } from '@/ui/feedback/Loaded';
+import { useContestSettings } from './settings';
 
 type Path = { org: string; contest: string };
 
@@ -17,24 +21,41 @@ export function EntrantsCard({ path }: { path: Path }) {
   );
 }
 
-/** How many invites to a place in the contest wait to be accepted. */
+/** The ways in, by name, and how many invites wait to be accepted. */
 export function EntryCard({ path }: { path: Path }) {
-  const view = queryView(useInvites({ kind: 'contest', ...path }));
+  const settings = useContestSettings(path.org, path.contest);
+  const invites = useInvites({ kind: 'contest', ...path }).data ?? [];
+  const waiting = invites.filter(
+    (invite) =>
+      (invite.grants === 'contestant' || invite.grants === 'member') &&
+      invite.status === 'pending' &&
+      !invite.expired,
+  ).length;
   return (
-    <Line
-      view={view}
-      say={(invites) => {
-        const waiting = invites.filter(
-          (invite) =>
-            (invite.grants === 'contestant' || invite.grants === 'member') &&
-            invite.status === 'pending' &&
-            !invite.expired,
-        ).length;
-        return waiting === 0
-          ? 'No invite waits to be accepted.'
-          : `${count(waiting, 'invite waits', 'invites wait')} to be accepted.`;
+    <Loaded view={settings} compact>
+      {(values) => {
+        if (values === null) return <BodyText>Its settings cannot be read.</BodyText>;
+        const ways = values.ways ?? DEFAULT_WAYS;
+        const named = ways.map((way) =>
+          way.kind === 'invite'
+            ? 'invites'
+            : way.name.trim() === ''
+              ? 'a sign-up'
+              : `sign-up “${way.name.trim()}”`,
+        );
+        const line =
+          ways.length === 0
+            ? 'Nobody can register: there is no way in.'
+            : `${count(ways.length, 'way', 'ways')} in: ${named.join(', ')}.`;
+        return (
+          <BodyText>
+            {line}
+            {waiting > 0 &&
+              ` ${count(waiting, 'invite waits', 'invites wait')} to be accepted.`}
+          </BodyText>
+        );
       }}
-    />
+    </Loaded>
   );
 }
 

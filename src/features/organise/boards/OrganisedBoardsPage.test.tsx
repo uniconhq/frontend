@@ -1,13 +1,29 @@
 import { describe, expect, it } from 'vitest';
-import { screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@/test/user-event';
 import { http, HttpResponse } from 'msw';
+import { parse } from 'yaml';
+import type { FileContent } from '@/api/types';
 import { icpc, organised, row, cell, entrantOf } from '@/test/boards';
-import { CONTEST_API } from '@/test/organiser';
+import { CONTEST_API, repoFiles, taskList } from '@/test/organiser';
 import { renderApp } from '@/test/render';
-import { server, signedIn } from '@/test/server';
+import { problem, server, signedIn, someone } from '@/test/server';
 
 const PAGE = '/orgs/acme/contests/spring/boards';
+const FILE = `${CONTEST_API}/files/:path`;
+
+const CONTEST = `name: Spring
+start: 2026-06-01T09:00:00Z
+end: 2026-06-01T14:00:00Z
+state: draft
+visibility: signed-in
+leaderboards:
+  - name: Standings
+    who: contestants
+tasks:
+  - {id: sum}
+  - {id: sort}
+`;
 
 /** Before B's final group is shown: kenny is level with ada now, ahead of her once it is. */
 const final = icpc({
@@ -29,8 +45,186 @@ const final = icpc({
   ],
 });
 
-describe("the organisers' boards", () => {
-  it('shows each board now and final, every row and none marked as theirs', async () => {
+/** The contest's settings holding `current`, each save taken and the file becoming it. */
+function settings(current = CONTEST) {
+  let file: FileContent = {
+    path: 'contest.yaml',
+    encoding: 'utf-8',
+    content: current,
+    token: 'token-1',
+    upload: null,
+  };
+  const sent: string[] = [];
+  server.use(
+    taskList,
+    http.get(FILE, ({ params }) =>
+      params['path'] === 'contest.yaml' ? HttpResponse.json(file) : undefined,
+    ),
+    http.put(FILE, async ({ request }) => {
+      const body = (await request.json()) as { content: string };
+      sent.push(body.content);
+      file = { ...file, content: body.content, token: 'token-2' };
+      return HttpResponse.json({ version: 'v2', notes: [] });
+    }),
+    ...repoFiles,
+  );
+  return sent;
+}
+
+/** The fields of one board, found by its title. */
+function board(form: HTMLElement, name: string | RegExp) {
+  return within(within(form).getByRole('group', { name }));
+}
+
+describe("the boards' settings", { timeout: 20_000 }, () => {
+  it('says what each board ranks in a sentence, in plain words', async () => {
+    server.use(signedIn);
+    settings(
+      CONTEST.replace(
+        '    who: contestants\n',
+        '    who: contestants\n    rows: own\n    over: after_close\n    order: [points, {by: penalty, per_attempt: 20}]\n',
+      ),
+    );
+    renderApp(PAGE);
+
+    const form = await screen.findByRole('form', { name: 'Boards' });
+    expect(
+      within(form).getByRole('status', { name: 'What Standings ranks' }),
+    ).toHaveTextContent(
+      'Ranks entrants by points and penalty minutes, 20 for each earlier attempt, from each entrant’s best submission on every task, counting only the results shown after the contest ends. Entrants and organisers see it, each entrant only their own row.',
+    );
+    const standings = board(form, 'Standings');
+    expect(standings.getByRole('combobox', { name: 'Shown to' })).toHaveDisplayValue(
+      'Entrants',
+    );
+    expect(standings.getByRole('combobox', { name: 'Counts' })).toHaveDisplayValue(
+      'Results shown after the contest ends',
+    );
+    expect(standings.getByRole('radio', { name: 'Only their own row' })).toBeChecked();
+  });
+
+  it('builds a board from its fields that reads as the same board written by hand', async () => {
+    server.use(signedIn);
+    const sent = settings();
+    const user = userEvent.setup();
+    renderApp(PAGE);
+
+    const form = await screen.findByRole('form', { name: 'Boards' });
+    await user.click(within(form).getByRole('button', { name: 'Add a board' }));
+    const added = () => board(form, /^Board 2/);
+    fireEvent.change(added().getByLabelText('Name'), { target: { value: 'ICPC' } });
+    const icpcBoard = () => board(form, 'ICPC');
+    await user.selectOptions(icpcBoard().getByLabelText('Shown to'), 'everyone');
+    const tasks = within(icpcBoard().getByRole('group', { name: 'Tasks' }));
+    await user.click(tasks.getByRole('checkbox', { name: 'Covers every task' }));
+    await user.click(tasks.getByRole('checkbox', { name: 'sort' }));
+    await user.click(
+      within(form).getByRole('button', { name: 'Add a way to rank ICPC' }),
+    );
+    const key = within(icpcBoard().getByRole('group', { name: 'Then by (2)' }));
+    await user.selectOptions(key.getByLabelText('Then by (2)'), 'penalty');
+    fireEvent.change(key.getByLabelText('Minutes per earlier attempt'), {
+      target: { value: '20' },
+    });
+    await user.click(within(form).getByRole('button', { name: 'Save boards' }));
+
+    expect(await screen.findByText('Saved.')).toBeVisible();
+    const byHand = parse(`
+- name: Standings
+  who: contestants
+- {name: ICPC, tasks: [sum], order: [points, {by: penalty, per_attempt: 20}], who: everyone}
+`) as unknown;
+    const written = sent[0] ?? '';
+    expect((parse(written) as { leaderboards: unknown }).leaderboards).toEqual(byHand);
+    expect(written).toContain('    order: [points, {by: penalty, per_attempt: 20}]\n');
+  });
+
+  it('names a refused way to rank on the field itself and in words above', async () => {
+    server.use(signedIn);
+    settings();
+    server.use(
+      http.put(FILE, () =>
+        problem(422, 'invalid_definition', {
+          errors: [
+            {
+              path: 'leaderboards[0].order[0]',
+              message:
+                'penalty is never the first key: it breaks ties among rows equal on the keys before it.',
+            },
+          ],
+        }),
+      ),
+    );
+    const user = userEvent.setup();
+    renderApp(PAGE);
+
+    const form = await screen.findByRole('form', { name: 'Boards' });
+    expect(
+      within(form).getByText('Points alone, unless a key is added.'),
+    ).toBeVisible();
+    await user.click(
+      within(form).getByRole('button', { name: 'Add a way to rank Standings' }),
+    );
+    await user.selectOptions(
+      board(form, 'Standings').getByRole('combobox', { name: 'Ranked first by' }),
+      'penalty',
+    );
+    await user.click(within(form).getByRole('button', { name: 'Save boards' }));
+
+    expect(
+      await screen.findByRole('link', { name: 'Boards, board 1: Ranked by' }),
+    ).toHaveAttribute('href', `${PAGE}?field=order&item=0`);
+    const key = board(form, 'Standings').getByRole('combobox', {
+      name: 'Ranked first by',
+    });
+    expect(key).toBeInvalid();
+    expect(key).toHaveAccessibleDescription(/penalty is never the first key/);
+  });
+
+  it('removes a board only once asked, and the key with the last of them', async () => {
+    server.use(signedIn);
+    const sent = settings();
+    const user = userEvent.setup();
+    renderApp(PAGE);
+
+    const form = await screen.findByRole('form', { name: 'Boards' });
+    await user.click(within(form).getByRole('button', { name: 'Remove Standings' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Remove Standings?' });
+    await user.click(within(dialog).getByRole('button', { name: 'Remove' }));
+    expect(
+      within(form).getByText(
+        'This contest has no boards yet, so nobody sees a ranking. Add one to rank its entrants.',
+      ),
+    ).toBeVisible();
+    await user.click(within(form).getByRole('button', { name: 'Save boards' }));
+
+    await screen.findByText('Saved.');
+    expect(parse(sent[0] ?? '')).not.toHaveProperty('leaderboards');
+  });
+
+  it('shows an observer the boards to read, with nothing to change', async () => {
+    server.use(
+      http.get('/api/v1/me', () =>
+        HttpResponse.json({
+          ...someone,
+          roles: [
+            { names: { org: 'acme', contest: 'spring', task: null }, role: 'observer' },
+          ],
+        }),
+      ),
+    );
+    settings();
+    renderApp(PAGE);
+
+    const form = await screen.findByRole('form', { name: 'Boards' });
+    expect(board(form, 'Standings').getByLabelText('Name')).toBeDisabled();
+    expect(within(form).queryByRole('button', { name: 'Save boards' })).toBeNull();
+    expect(within(form).queryByRole('button', { name: 'Add a board' })).toBeNull();
+  });
+});
+
+describe("the boards' previews", () => {
+  it('shows each board now and once all is shown, every row and none marked as theirs', async () => {
     server.use(
       signedIn,
       http.get(`${CONTEST_API}/organise/boards`, () =>
@@ -39,12 +233,13 @@ describe("the organisers' boards", () => {
         ]),
       ),
     );
+    settings();
     renderApp(PAGE);
 
-    const now = await screen.findByRole('table', { name: 'Standings now' });
-    const later = screen.getByRole('table', { name: 'Standings final' });
+    const now = await screen.findByRole('table', { name: 'Standings, now' });
+    const later = screen.getByRole('table', { name: 'Standings, once all is shown' });
     expect(within(now).getAllByRole('rowheader')).toHaveLength(3);
-    expect(within(now).queryByText('The row picked')).toBeNull();
+    expect(within(now).queryByText('The entrant previewed')).toBeNull();
     expect(within(later).getAllByRole('rowheader')[0]).toHaveTextContent('kenny');
     expect(screen.getByRole('list', { name: 'Not counted yet' })).toHaveTextContent(
       'final of B',
@@ -54,7 +249,7 @@ describe("the organisers' boards", () => {
     );
   });
 
-  it('reads now as the row picked, kept in the address', async () => {
+  it('previews now as an entrant sees it, kept in the address', async () => {
     const asked: string[] = [];
     server.use(
       signedIn,
@@ -82,29 +277,23 @@ describe("the organisers' boards", () => {
         return HttpResponse.json([organised(now, final)]);
       }),
     );
+    settings();
     const user = userEvent.setup();
     const { router } = renderApp(PAGE);
-    await screen.findByRole('table', { name: 'Standings now' });
+    await screen.findByRole('table', { name: 'Standings, now' });
 
     await user.selectOptions(
-      screen.getByRole('combobox', { name: 'Read now as' }),
+      screen.getByRole('combobox', { name: 'Preview as an entrant' }),
       'carol',
     );
 
     await waitFor(() => expect(asked.at(-1)).toBe(`entrant=${entrantOf(30)}`));
     expect(router.state.location.search).toBe(`?entrant=${entrantOf(30)}`);
-    const now = screen.getByRole('table', { name: 'Standings now' });
+    const now = screen.getByRole('table', { name: 'Standings, now' });
     await waitFor(() =>
-      expect(within(now).getByText('The row picked').closest('tr')).toHaveTextContent(
-        'carol',
-      ),
+      expect(
+        within(now).getByText('The entrant previewed').closest('tr'),
+      ).toHaveTextContent('carol'),
     );
-  });
-
-  it('says when the contest has no boards', async () => {
-    server.use(signedIn);
-    renderApp(PAGE);
-
-    expect(await screen.findByText('This contest has no boards.')).toBeVisible();
   });
 });

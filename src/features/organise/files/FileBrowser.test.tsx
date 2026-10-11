@@ -111,6 +111,80 @@ describe('the file tree', () => {
   });
 });
 
+/** A contest's own note, a file beside its settings, edited as text. */
+const NOTES = {
+  path: 'notes.md',
+  encoding: 'utf-8' as const,
+  content: 'Rooms open at 8.\n',
+  token: 'token-notes',
+  upload: null,
+};
+
+/** The contest's tree with its note in it, and the note read as it stands. */
+const contestNotes = [
+  http.get(`${CONTEST_API}/tree`, () =>
+    HttpResponse.json([
+      { path: 'contest.yaml', kind: 'file', size: 80, upload: null },
+      { path: 'notes.md', kind: 'file', size: 17, upload: null },
+    ]),
+  ),
+  http.get(CONTEST_FILE, ({ params }) =>
+    params['path'] === 'notes.md' ? HttpResponse.json(NOTES) : undefined,
+  ),
+];
+
+describe("the contest's settings in its files", () => {
+  it('shows them to read, with where they are changed and every change to them', async () => {
+    server.use(
+      signedIn,
+      taskList,
+      ...repoFiles,
+      http.get(`${CONTEST_API}/history`, () =>
+        HttpResponse.json([
+          {
+            version: 'b2',
+            message: 'Open the contest',
+            author: 'kenny',
+            author_id: 7,
+            at: '2026-09-12T09:00:00Z',
+          },
+          {
+            version: 'a1',
+            message: 'Make the contest',
+            author: 'kenny',
+            author_id: 7,
+            at: '2026-09-11T09:00:00Z',
+          },
+        ]),
+      ),
+    );
+    const user = userEvent.setup();
+    renderApp(`${CONTEST}?file=contest.yaml`);
+
+    const settings = await screen.findByRole('textbox', {
+      name: 'The contest’s settings',
+    });
+    expect(settings).toHaveAttribute('readonly');
+    expect(screen.queryByRole('button', { name: 'Save' })).toBeNull();
+    expect(
+      within(screen.getByRole('main')).getByRole('link', { name: 'How people enter' }),
+    ).toHaveAttribute('href', '/orgs/acme/contests/spring/entry');
+    await user.click(screen.getByRole('button', { name: 'Every change' }));
+    const changes = await screen.findByRole('list', {
+      name: 'Changes to the settings',
+    });
+    expect(within(changes).getAllByRole('listitem')[0]).toHaveTextContent(
+      'Open the contest',
+    );
+    expect(within(changes).getAllByRole('listitem')[0]).toHaveTextContent(
+      'as they are now',
+    );
+    expect(
+      within(changes).getAllByRole('button', { name: /^Read the settings/ }),
+    ).toHaveLength(1);
+  });
+});
+
 describe('saving a contest file', () => {
   it('sends the text with the token it was read with, and shows the new version', async () => {
     let sent: unknown = null;
@@ -118,21 +192,22 @@ describe('saving a contest file', () => {
     server.use(
       signedIn,
       taskList,
-      http.get(CONTEST_FILE, () => {
-        reads += 1;
+      http.get(CONTEST_FILE, ({ params }) => {
+        if (params['path'] === 'notes.md') reads += 1;
         return undefined;
       }),
+      ...contestNotes,
       ...repoFiles,
       http.put(CONTEST_FILE, async ({ request }) => {
         sent = await request.json();
         return HttpResponse.json({ version: '9f8e7d6c5b4a39281706', notes: [] });
       }),
     );
-    renderApp(`${CONTEST}?file=contest.yaml`);
+    renderApp(`${CONTEST}?file=notes.md`);
 
-    const editor = await screen.findByRole('textbox', { name: 'contest.yaml' });
+    const editor = await screen.findByRole('textbox', { name: 'notes.md' });
     expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
-    await userEvent.type(editor, 'description: Our spring round\n');
+    await userEvent.type(editor, 'Lunch at noon.\n');
     expect(screen.getByText('Unsaved changes')).toBeVisible();
     await userEvent.click(screen.getByRole('button', { name: 'Save' }));
 
@@ -140,9 +215,9 @@ describe('saving a contest file', () => {
     expect(saved).toHaveTextContent('Saved as version 9f8e7d6.');
     expect(saved.closest('[role="status"]')).toHaveFocus();
     expect(sent).toEqual({
-      content: 'name: Spring\nvisibility: signed-in\ndescription: Our spring round\n',
+      content: 'Rooms open at 8.\nLunch at noon.\n',
       encoding: 'utf-8',
-      token: 'token-contest-yaml',
+      token: 'token-notes',
       confirm: false,
       keep_as_draft: false,
     });
@@ -158,130 +233,189 @@ describe('saving a contest file', () => {
     server.use(
       signedIn,
       taskList,
-      http.get(CONTEST_FILE, async () => {
+      http.get(CONTEST_FILE, async ({ params }) => {
+        if (params['path'] !== 'notes.md') return undefined;
         reads += 1;
         if (reads > 1) await held;
         return undefined;
       }),
+      ...contestNotes,
       ...repoFiles,
       http.put(CONTEST_FILE, () =>
         HttpResponse.json({ version: '9f8e7d6c5b4a39281706', notes: [] }),
       ),
     );
-    renderApp(`${CONTEST}?file=contest.yaml`);
+    renderApp(`${CONTEST}?file=notes.md`);
 
     await userEvent.type(
-      await screen.findByRole('textbox', { name: 'contest.yaml' }),
-      'x: 1\n',
+      await screen.findByRole('textbox', { name: 'notes.md' }),
+      'x\n',
     );
     await userEvent.click(screen.getByRole('button', { name: 'Save' }));
     await screen.findByText(/Saved as version/);
 
-    expect(screen.getByRole('textbox', { name: 'contest.yaml' })).toHaveAttribute(
+    expect(screen.getByRole('textbox', { name: 'notes.md' })).toHaveAttribute(
       'readonly',
     );
     expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
 
     readAgain();
     await waitFor(() =>
-      expect(screen.getByRole('textbox', { name: 'contest.yaml' })).not.toHaveAttribute(
+      expect(screen.getByRole('textbox', { name: 'notes.md' })).not.toHaveAttribute(
         'readonly',
       ),
     );
   });
+});
 
-  it('keeps the text on a conflict, and replaces it with their version on reload', async () => {
+describe('a text file someone else saved first', () => {
+  /** The note, theirs once the first save is refused as a conflict; `sent` holds each save. */
+  function conflicting() {
     let theirs = false;
+    const sent: { content: string; token: string }[] = [];
     server.use(
       signedIn,
       taskList,
-      http.get(CONTEST_FILE, () =>
-        theirs
+      http.get(CONTEST_FILE, ({ params }) =>
+        params['path'] === 'notes.md' && theirs
           ? HttpResponse.json({
-              path: 'contest.yaml',
-              encoding: 'utf-8',
-              content: 'name: Spring 2026\n',
+              ...NOTES,
+              content: 'Rooms open at 9.\n',
               token: 'token-theirs',
             })
           : undefined,
       ),
+      ...contestNotes,
       ...repoFiles,
-      http.put(CONTEST_FILE, () => {
-        theirs = true;
-        return problem(409, 'conflict', {
-          detail: 'The file changed since it was read.',
-        });
+      http.put(CONTEST_FILE, async ({ request }) => {
+        const body = (await request.json()) as { content: string; token: string };
+        sent.push(body);
+        if (!theirs) {
+          theirs = true;
+          return problem(409, 'conflict', {
+            detail: 'The file changed since it was read.',
+          });
+        }
+        return HttpResponse.json({ version: '1a2b3c4d5e6f', notes: [] });
       }),
     );
-    renderApp(`${CONTEST}?file=contest.yaml`);
+    return sent;
+  }
 
-    const editor = await screen.findByRole('textbox', { name: 'contest.yaml' });
-    await userEvent.type(editor, 'mine: true\n');
-    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+  it('shows both versions, and goes on from theirs keeping one’s own text to copy', async () => {
+    conflicting();
+    const user = userEvent.setup();
+    renderApp(`${CONTEST}?file=notes.md`);
+
+    const editor = await screen.findByRole('textbox', { name: 'notes.md' });
+    await user.type(editor, 'Mine.\n');
+    await user.click(screen.getByRole('button', { name: 'Save' }));
 
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent(
       'Someone else changed this file since you opened it.',
     );
     expect(alert).toHaveFocus();
-    expect(editor).toHaveValue('name: Spring\nvisibility: signed-in\nmine: true\n');
-
-    await userEvent.click(
-      within(alert).getByRole('button', { name: 'Reload the file' }),
+    expect(
+      await within(alert).findByRole('textbox', {
+        name: 'Their version, as it is now',
+      }),
+    ).toHaveValue('Rooms open at 9.\n');
+    expect(within(alert).getByRole('textbox', { name: 'Your version' })).toHaveValue(
+      'Rooms open at 8.\nMine.\n',
     );
 
-    const reloaded = await screen.findByDisplayValue('name: Spring 2026', {
-      normalizer: (v) => v.trim(),
-    });
-    expect(reloaded).toBeVisible();
-    expect(reloaded).toHaveFocus();
+    await user.click(within(alert).getByRole('button', { name: 'Go on from theirs' }));
+
+    expect(
+      await screen.findByDisplayValue('Rooms open at 9.', {
+        normalizer: (v) => v.trim(),
+      }),
+    ).toBeVisible();
+    expect(
+      screen.getByRole('textbox', { name: 'Your text from before, to copy from' }),
+    ).toHaveValue('Rooms open at 8.\nMine.\n');
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
-  it('names each error of a contest.yaml that does not validate', async () => {
+  it('saves one’s own over theirs only after a warning', async () => {
+    const sent = conflicting();
+    const user = userEvent.setup();
+    renderApp(`${CONTEST}?file=notes.md`);
+
+    await user.type(
+      await screen.findByRole('textbox', { name: 'notes.md' }),
+      'Mine.\n',
+    );
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    const alert = await screen.findByRole('alert');
+    await user.click(
+      await within(alert).findByRole('button', { name: 'Save yours over theirs' }),
+    );
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Save yours over theirs?',
+    });
+    expect(dialog).toHaveTextContent('Their change to notes.md is thrown away');
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Save yours over theirs' }),
+    );
+
+    expect(await screen.findByText(/Saved as version/)).toBeVisible();
+    expect(sent[1]).toMatchObject({
+      content: 'Rooms open at 8.\nMine.\n',
+      token: 'token-theirs',
+    });
+  });
+});
+
+describe("saving a task's settings as text", () => {
+  const TASK_FILE = `${TASK_API}/files/:path`;
+
+  it('names each problem of a save that does not validate', async () => {
     server.use(
       signedIn,
-      taskList,
+      taskState,
+      publicationList,
       ...repoFiles,
-      http.put(CONTEST_FILE, () =>
+      http.put(TASK_FILE, () =>
         problem(422, 'invalid_definition', {
-          detail: 'contest.yaml does not validate.',
-          errors: [{ path: 'visibility', message: 'Must be public or signed-in.' }],
+          detail: 'task.yaml does not validate.',
+          errors: [{ path: 'workflow', message: 'There is no such workflow.' }],
         }),
       ),
     );
-    renderApp(`${CONTEST}?file=contest.yaml`);
+    renderApp(`${TASK}?file=task.yaml`);
 
     await userEvent.type(
-      await screen.findByRole('textbox', { name: 'contest.yaml' }),
+      await screen.findByRole('textbox', { name: 'task.yaml' }),
       'x: 1\n',
     );
     await userEvent.click(screen.getByRole('button', { name: 'Save' }));
 
     const alert = await screen.findByRole('alert');
-    expect(alert).toHaveTextContent('The settings file has errors');
-    expect(alert).toHaveTextContent('contest.yaml does not validate.');
+    expect(alert).toHaveTextContent('Nothing was saved');
     expect(within(alert).getByRole('list', { name: 'Errors' })).toHaveTextContent(
-      'visibility: Must be public or signed-in.',
+      'workflow: There is no such workflow.',
     );
   });
 
   it("names each admin-only key a manager's save changed", async () => {
     server.use(
       signedIn,
-      taskList,
+      taskState,
+      publicationList,
       ...repoFiles,
-      http.put(CONTEST_FILE, () =>
+      http.put(TASK_FILE, () =>
         problem(403, 'admin_only', {
           detail: 'Only an admin may change name.',
           keys: ['name'],
         }),
       ),
     );
-    renderApp(`${CONTEST}?file=contest.yaml`);
+    renderApp(`${TASK}?file=task.yaml`);
 
     await userEvent.type(
-      await screen.findByRole('textbox', { name: 'contest.yaml' }),
+      await screen.findByRole('textbox', { name: 'task.yaml' }),
       'x: 1\n',
     );
     await userEvent.click(screen.getByRole('button', { name: 'Save' }));

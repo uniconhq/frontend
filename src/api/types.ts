@@ -52,6 +52,8 @@ export type Grant = Invite['grants'];
 export type AcceptedInvite = Schemas['AcceptedInvite'];
 export type Entered = Schemas['Entered'];
 export type ContestSummary = Schemas['ContestSummary'];
+/** A contest in its org's list, with its state and dates as its settings say. */
+export type ListedContest = Schemas['ListedContest'];
 
 export type ContestHome = Schemas['ContestHome'];
 export type PublicTask = Schemas['PublicTask'];

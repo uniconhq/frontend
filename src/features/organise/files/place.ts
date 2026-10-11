@@ -59,8 +59,19 @@ export function fileQuery(place: Place, path: string) {
  */
 export function staleAfterWrite(place: Place): QueryKey[] {
   if (place.kind === 'contest') {
+    // The contest's settings, read for its page, its home and its tasks'
+    // timelines move with a write of its settings.
     const path = { org: place.org, contest: place.contest };
-    return [$api.queryOptions('get', CONTEST_TREE, { params: { path } }).queryKey];
+    return [
+      $api.queryOptions('get', CONTEST_TREE, { params: { path } }).queryKey,
+      fileQuery(place, 'contest.yaml').queryKey,
+      $api.queryOptions('get', '/api/v1/orgs/{org}/contests/{contest}/home', {
+        params: { path },
+      }).queryKey,
+      $api.queryOptions('get', '/api/v1/orgs/{org}/contests/{contest}/organise/tasks', {
+        params: { path },
+      }).queryKey,
+    ];
   }
   const path = { org: place.org, contest: place.contest, task: place.task };
   return [

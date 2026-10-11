@@ -2,7 +2,6 @@ import type { ComponentType } from 'react';
 import type { ContestSectionKey, OrgSectionKey, TaskSectionKey } from '@/lib/sections';
 import {
   ContestAnnouncementsPage,
-  ContestEntryPage,
   ContestFilesPage,
   ContestOrganisersPage,
   ContestQuestionsPage,
@@ -20,6 +19,7 @@ import {
   TaskPublicationsPage,
   TaskSettingsPage,
 } from './task/TaskSections';
+import { ContestEntryPage } from './contest/EntryPage';
 import { EntrantsPage } from './entrants/EntrantsPage';
 import { InboxPage } from './threads/Clarifications';
 

@@ -144,8 +144,8 @@ export function describeError(error: ApiError): ErrorDescription {
       };
     case 'invalid_definition':
       return {
-        title: 'The settings file has errors',
-        message: error.detail ?? 'Nothing was saved. Fix the errors and save again.',
+        title: 'Nothing was saved',
+        message: 'Some settings will not do. Fix each one listed and save again.',
       };
     case 'invalid_path':
       return {
