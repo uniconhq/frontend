@@ -4,6 +4,7 @@ import { $api, queryView } from '@/api/query';
 import { toApiError } from '@/api/problem';
 import type { FileContent, RollbackFile, WriteFile } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
+import { UnsavedNote } from '@/ui/UnsavedNote';
 import { Button } from '@/ui/Button';
 import { CodeEditor, type CodeLanguage } from '@/ui/CodeEditor';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
@@ -304,7 +305,7 @@ function TextEditor({
         <Button loading={busy} disabled={!changed} onClick={() => onSave(text)}>
           Save
         </Button>
-        {changed && <BodyText tone="secondary">Unsaved changes</BodyText>}
+        {changed && <UnsavedNote />}
       </div>
     </>
   );

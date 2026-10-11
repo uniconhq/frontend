@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { toApiError } from '@/api/problem';
 import type { FileContent, WriteFile } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
+import { UnsavedNote } from '@/ui/UnsavedNote';
 import { Button } from '@/ui/Button';
 import { Markdown } from '@/ui/Markdown';
 import { CodeEditor } from '@/ui/CodeEditor';
@@ -151,7 +152,7 @@ function Source({
           >
             Save statement
           </Button>
-          {changed && <BodyText tone="secondary">Unsaved changes</BodyText>}
+          {changed && <UnsavedNote />}
         </div>
       )}
     </>

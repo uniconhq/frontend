@@ -287,7 +287,9 @@ describe('saving a contest file', () => {
     const editor = await screen.findByRole('textbox', { name: 'notes.md' });
     expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
     await userEvent.type(editor, 'Lunch at noon.\n');
-    expect(screen.getByText('Unsaved changes')).toBeVisible();
+    expect(
+      screen.getByText('Not saved yet: leaving this page loses these changes.'),
+    ).toBeVisible();
     await userEvent.click(screen.getByRole('button', { name: 'Save' }));
 
     const saved = await screen.findByText(/Saved as version/);

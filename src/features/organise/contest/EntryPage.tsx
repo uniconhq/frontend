@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { BodyText } from '@/ui/BodyText';
+import { UnsavedNote } from '@/ui/UnsavedNote';
 import { Button } from '@/ui/Button';
 import { Card } from '@/ui/Card';
 import { Checkbox } from '@/ui/Checkbox';
@@ -549,7 +550,7 @@ function EntryForm({
         >
           Save how people enter
         </Button>
-        {changed && <BodyText tone="secondary">Unsaved changes</BodyText>}
+        {changed && <UnsavedNote />}
       </div>
     </div>
   );
