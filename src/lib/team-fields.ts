@@ -1,7 +1,9 @@
 /**
  * The limits of the fields the team forms share. A team's name is checked
  * once trimmed, as the forge checks it, so spaces around it do not count
- * against its length. A Forgejo username is at most 40 characters.
+ * against its length, and its characters are counted as the forge counts
+ * them, a character outside the BMP as one. A Forgejo username is at most 40
+ * characters.
  */
 const TEAM_NAME_MAX = 60;
 export const USERNAME_MAX = 40;
@@ -10,7 +12,7 @@ export const USERNAME_MAX = 40;
 export function teamNameProblem(typed: string): string | null {
   const trimmed = typed.trim();
   if (trimmed === '') return 'A team needs a name.';
-  if (trimmed.length > TEAM_NAME_MAX) {
+  if ([...trimmed].length > TEAM_NAME_MAX) {
     return `A team’s name is at most ${TEAM_NAME_MAX} characters.`;
   }
   return null;
