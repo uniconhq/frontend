@@ -70,6 +70,37 @@ describe("a contest's boards for a signed-in person", () => {
     );
   });
 
+  it('marks no row as the reader’s own when every row comes with its gradings', async () => {
+    const board = icpc();
+    const [ada, kenny, carol] = board.rows;
+    if (ada === undefined || kenny === undefined || carol === undefined)
+      throw new Error('icpc has three rows');
+    const given = {
+      ...ada,
+      cells: {
+        sum: { ...ada.cells.sum!, grading: 0, submissions: [5] },
+        max: { ...ada.cells.max!, grading: 0, submissions: [] },
+      },
+    };
+    server.use(
+      signedIn,
+      http.get(`${CONTEST_API}/boards`, () =>
+        HttpResponse.json([{ ...board, rows: [given, kenny, carol] }]),
+      ),
+    );
+    renderApp(PAGE);
+
+    const table = await screen.findByRole('table', { name: 'Standings' });
+    expect(
+      within(table)
+        .getAllByRole('rowheader')
+        .map((header) => header.textContent),
+    ).toEqual(['ada', 'kenny', 'carol']);
+    expect(within(table).queryByRole('row', { current: true })).toBeNull();
+    expect(within(table).queryAllByRole('link')).toEqual([]);
+    expect(rowOf(table, 'ada')).toHaveTextContent('Counts #5');
+  });
+
   it('names what is not counted yet with when it joins', async () => {
     server.use(
       signedIn,

@@ -434,7 +434,7 @@ describe('the submit panel', () => {
     expect(made.bodies).toHaveLength(0);
   });
 
-  it('reports a failed upload as possibly too large, with nothing half sent', async () => {
+  it('reports a refused upload as one that did not go through, with nothing half sent', async () => {
     const store = uploadStore();
     const made = submissions();
     let puts = 0;

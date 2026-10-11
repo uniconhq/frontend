@@ -88,8 +88,8 @@ function Files({ where }: { where: Where }) {
 
 /**
  * One of the caller's submissions, opened from the list: when it was made and
- * how late, the files it was made with, and its grading, read again every two
- * seconds while it is still to finish.
+ * how late, the files it was made with, and its grading, read again while it
+ * is still to finish as the list is (`pollEvery`).
  */
 export function SubmissionDetail({
   org,

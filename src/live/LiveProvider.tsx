@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useQueryClient, type Query, type QueryClient } from '@tanstack/react-query';
-import { useSession } from '@/session';
+import { useSession, useSessionExpired } from '@/session';
 import { LiveContext, type LiveState } from './live-context';
 
 const LIVE_PATH = '/api/v1/live';
@@ -64,7 +64,8 @@ function refetchAll(client: QueryClient) {
  * missed meanwhile. The browser reopens a stream that
  * dropped on its own; one that was refused, a deploy's moment of errors or a
  * session that ended, it gives up on, so it is opened again after a wait that
- * grows, and the session is read again so a signed-out tab stops. While no
+ * grows, and the session is read again so a signed-out tab stops: once a
+ * read finds it ended, no stream is opened again. While no
  * stream is open, `useLiveConnected` is false and pages poll, and while one
  * waits after a refusal `useLiveRefused` is true and they poll less often.
  */
@@ -74,7 +75,10 @@ export function LiveProvider({ children }: { children: ReactNode }) {
   const visible = useVisible();
   const [state, setState] = useState<LiveState>('down');
   const everOpened = useRef(false);
-  const signedIn = session.status === 'signed-in';
+  // A session that ended while the page was open still reads as signed in,
+  // the page kept under the modal that says so; it opens no stream.
+  const ended = useSessionExpired();
+  const signedIn = session.status === 'signed-in' && !ended;
 
   useEffect(() => {
     if (!signedIn || !visible || typeof EventSource === 'undefined') return undefined;

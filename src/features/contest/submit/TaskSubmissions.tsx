@@ -37,9 +37,9 @@ function closedReason(closed: TaskRelease['closed']): string {
  * The contestant's half of a task page below its statement: the countdowns
  * to the row's due and close, the panel they submit from while the task is
  * open or why it is not in its place, the submission the address opens, and
- * the list of their own submissions. The panel's contents live here, so
- * restoring an earlier submission can fill it; a submission that goes
- * through empties it and joins the top of the list at once.
+ * the list of their own submissions. The panel's contents live here, so a
+ * submission that goes through empties it and joins the top of the list at
+ * once.
  */
 export function TaskSubmissions({
   org,

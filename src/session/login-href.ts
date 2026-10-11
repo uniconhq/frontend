@@ -1,13 +1,16 @@
 const DEFAULT_NEXT = '/';
+/** The longest path kept, as the forge's `next_path.py` keeps. */
+const MAX_LENGTH = 2048;
 
 /**
  * Where a login is allowed to land. `?next=` comes from the browser, so
  * anything that could leave this site falls back to the front page:
- * `//evil.com` is a URL, not a path. Mirrors the backend's next_path.py, and if
+ * `//evil.com` is a URL, not a path. Mirrors the forge's next_path.py, and if
  * the two disagree one of them is a hole.
  */
 export function safeNext(candidate: string | null | undefined): string {
-  if (!candidate || !candidate.startsWith('/')) return DEFAULT_NEXT;
+  if (!candidate || !candidate.startsWith('/') || candidate.length > MAX_LENGTH)
+    return DEFAULT_NEXT;
   if (candidate.startsWith('//') || candidate.startsWith('/\\')) return DEFAULT_NEXT;
   if (candidate.includes('\n') || candidate.includes('\r')) return DEFAULT_NEXT;
   return candidate;
