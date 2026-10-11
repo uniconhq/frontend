@@ -18,17 +18,41 @@ import {
 import classes from './Sidebar.module.css';
 
 /**
- * An entry is marked as where you are on its own address and, unless it is
- * `exact`, on every page below it, such as a file open in Files. `also` is a
- * further address it stands for, such as a contest's tasks for a task's page.
+ * An entry stands for its own address and, unless it is `exact`, every page
+ * below it, such as a file open in Files; an address with a query, such as a
+ * task's card, only with that query. `also` is a further address it stands
+ * for, such as a contest's tasks for a task's page.
  */
 type Item = { label: string; to: string; exact?: boolean; also?: string };
 type Group = { label: string; items: Item[] };
 
-function marks(item: Item, pathname: string): boolean {
+/** How closely an entry stands for where you are, or null when it does not. */
+function closeness(item: Item, pathname: string, search: string): number | null {
   const under = (path: string) => pathname === path || pathname.startsWith(`${path}/`);
-  if (item.also !== undefined && under(item.also)) return true;
-  return item.exact === true ? pathname === item.to : under(item.to);
+  const [path = '', query = ''] = item.to.split('?');
+  if (query !== '') {
+    const have = new URLSearchParams(search);
+    const wanted = [...new URLSearchParams(query)];
+    return pathname === path && wanted.every(([key, value]) => have.get(key) === value)
+      ? item.to.length
+      : null;
+  }
+  if (item.also !== undefined && under(item.also)) return item.also.length;
+  return (item.exact === true ? pathname === path : under(path)) ? path.length : null;
+}
+
+/** The one entry that is where you are: the one that stands for it most closely. */
+function currentOf(groups: Group[], pathname: string, search: string): Item | null {
+  let best: Item | null = null;
+  let most = -1;
+  for (const item of groups.flatMap((group) => group.items)) {
+    const close = closeness(item, pathname, search);
+    if (close !== null && close > most) {
+      best = item;
+      most = close;
+    }
+  }
+  return best;
 }
 
 /**
@@ -109,7 +133,7 @@ function here(
 export function Sidebar() {
   const session = useSession();
   const signedIn = session.status === 'signed-in';
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
   const place = here(pathname, useParams());
   const top: Group = {
     label: 'Unicon',
@@ -120,9 +144,12 @@ export function Sidebar() {
     })),
   };
 
+  const groups = [...(place === null ? [] : [place]), top];
+  const current = currentOf(groups, pathname, search);
+
   return (
     <nav className={classes.sidebar} aria-label="Sections">
-      {[...(place === null ? [] : [place]), top].map((group) => (
+      {groups.map((group) => (
         <div
           key={group.label}
           className={classes.group}
@@ -133,13 +160,13 @@ export function Sidebar() {
             {group.label}
           </div>
           {group.items.map((item) => {
-            const current = marks(item, pathname);
+            const here = item === current;
             return (
               <Link
                 key={item.to}
                 to={item.to}
-                className={current ? `${classes.item} ${classes.active}` : classes.item}
-                aria-current={pathname === item.to ? 'page' : undefined}
+                className={here ? `${classes.item} ${classes.active}` : classes.item}
+                aria-current={here ? 'page' : undefined}
               >
                 {item.label}
               </Link>

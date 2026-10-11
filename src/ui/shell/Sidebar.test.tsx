@@ -55,6 +55,35 @@ describe('the sidebar', () => {
     );
   });
 
+  it('marks one entry as where you are: the org, not Orgs above it', async () => {
+    server.use(signedIn);
+    renderApp('/orgs/acme');
+
+    await entries('Org');
+    const nav = screen.getByRole('navigation', { name: 'Sections' });
+    const marked = within(nav)
+      .getAllByRole('link')
+      .filter((link) => /active/.test(link.className))
+      .map((link) => link.textContent);
+    expect(marked).toEqual(['acme']);
+    expect(within(nav).getByRole('link', { name: 'Orgs' })).not.toHaveAttribute(
+      'aria-current',
+    );
+  });
+
+  it("marks a task's card when its address opens it", async () => {
+    server.use(signedIn);
+    renderApp('/orgs/acme/contests/spring/tasks/sum?card=tests');
+
+    await entries('Task');
+    const nav = screen.getByRole('navigation', { name: 'Sections' });
+    const marked = within(nav)
+      .getAllByRole('link')
+      .filter((link) => /active/.test(link.className))
+      .map((link) => link.textContent);
+    expect(marked).toEqual(['Tests and scoring']);
+  });
+
   it("lists a contest's tasks, leaderboards and questions to its contestants, the tasks marked on a task's page", async () => {
     server.use(
       signedIn,
