@@ -473,8 +473,9 @@ describe('how the contest is scored', () => {
 
 describe("a task's timeline, edited on its row", () => {
   /** The contest's settings, each save taken and the file becoming it. */
-  function settingsSaved() {
+  function settingsSaved(content?: string) {
     let file = files['contest.yaml']!;
+    if (content !== undefined) file = { ...file, content };
     const sent: string[] = [];
     server.use(
       http.get(`${CONTEST_API}/files/:path`, ({ params }) =>
@@ -562,6 +563,29 @@ describe("a task's timeline, edited on its row", () => {
 
     await waitFor(() => expect(sent).toHaveLength(1));
     expect((parse(sent[0] ?? '') as { tasks: { id: string }[] }).tasks).toEqual([
+      { id: 'sum' },
+      { id: 'sort' },
+    ]);
+  });
+
+  it('moves the task it was opened for, wherever the list read fresh has it', async () => {
+    server.use(signedIn, standingList, ...repoFiles);
+    // Someone else put a task ahead of sort since the page read its list.
+    const sent = settingsSaved(
+      'name: Spring\ntasks:\n  - id: extra\n  - id: sort\n  - id: sum\n',
+    );
+    const user = userEvent.setup();
+    renderApp(CONTEST);
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Edit the timeline of A · sort' }),
+    );
+    const dialog = await screen.findByRole('dialog', { name: 'Timeline of A · sort' });
+    await user.click(within(dialog).getByRole('button', { name: 'Move down' }));
+
+    await waitFor(() => expect(sent).toHaveLength(1));
+    expect((parse(sent[0] ?? '') as { tasks: { id: string }[] }).tasks).toEqual([
+      { id: 'extra' },
       { id: 'sum' },
       { id: 'sort' },
     ]);

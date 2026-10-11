@@ -42,6 +42,11 @@ function SharePanel({ page }: { page: WorkflowPage }) {
     params: { path: { owner, name } },
   }).queryKey;
   const [asking, setAsking] = useState<Visibility | null>(null);
+  // The forge reads a private workflow back as shared only once someone is on
+  // its list, so a choice of Shared holds here until the first person is added.
+  const [sharing, setSharing] = useState(false);
+  const shown: Visibility =
+    sharing && page.visibility === 'private' ? 'shared' : page.visibility;
   const [reader, setReader] = useState('');
   const [error, setError] = useState<ApiError | null>(null);
   const visibility = $api.useMutation(
@@ -70,6 +75,7 @@ function SharePanel({ page }: { page: WorkflowPage }) {
   };
   const apply = (chosen: Visibility) => {
     setAsking(null);
+    setSharing(chosen === 'shared');
     void run(() =>
       visibility.mutateAsync({
         params: { path: { owner, name } },
@@ -83,12 +89,12 @@ function SharePanel({ page }: { page: WorkflowPage }) {
     <section className={classes.stack} aria-label="Who can see it">
       <RadioGroup
         label="Who can see it"
-        value={asking ?? page.visibility}
+        value={asking ?? shown}
         options={OPTIONS}
         disabled={visibility.isPending}
         onChange={(value) => {
           const chosen = value as Visibility;
-          if (chosen === page.visibility) setAsking(null);
+          if (chosen === shown) setAsking(null);
           else if (listed && chosen !== 'shared') setAsking(chosen);
           else apply(chosen);
         }}
@@ -109,7 +115,7 @@ function SharePanel({ page }: { page: WorkflowPage }) {
           </div>
         </div>
       )}
-      {page.visibility === 'shared' && asking === null && (
+      {shown === 'shared' && asking === null && (
         <>
           {listed ? (
             <ul className={classes.list} aria-label="Shared with">

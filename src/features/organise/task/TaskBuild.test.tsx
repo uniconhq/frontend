@@ -724,6 +724,73 @@ describe('scoring a task', { timeout: 30_000 }, () => {
     );
   });
 
+  it('keeps a share as it is typed, its point included, and saves the fraction it is', async () => {
+    const { sent } = taskBackend({ form: { ...CHECKED, inputs: [] } });
+    const { tests } = await openTask();
+
+    fill(fieldIn(tests, 'small', 'How does this group earn points?'), 'share');
+    const share = fieldIn(tests, 'small', 'Share of tests that must pass (%)');
+    await userEvent.clear(share);
+    await userEvent.type(share, '82.5');
+
+    expect(share).toHaveValue('82.5');
+    expect(
+      within(fieldGroup(tests, 'small')).getByText(/at least 82\.5% of its tests pass/),
+    ).toBeVisible();
+    await save();
+    expect(
+      await screen.findByText('Saved and published as publication 4.'),
+    ).toBeVisible();
+    expect(written(sent[0])['test_groups']).toMatchObject({
+      small: { pass: 30, pass_at: 0.825 },
+    });
+  });
+
+  it('will not save a share above 100%', async () => {
+    taskBackend({ form: { ...CHECKED, inputs: [] } });
+    const { tests } = await openTask();
+
+    fill(fieldIn(tests, 'small', 'How does this group earn points?'), 'share');
+    fill(fieldIn(tests, 'small', 'Share of tests that must pass (%)'), '120');
+
+    const bar = await screen.findByRole('region', { name: 'Save the task' });
+    expect(bar).toHaveTextContent('Give a share above 0% and at most 100%.');
+    expect(within(bar).getByRole('button', { name: 'Save' })).toBeDisabled();
+  });
+
+  it('keeps the share rule chosen while its share is emptied or set to 100', async () => {
+    taskBackend({ form: { ...CHECKED, inputs: [] } });
+    const { tests } = await openTask();
+
+    const rule = fieldIn(tests, 'small', 'How does this group earn points?');
+    fill(rule, 'share');
+    fill(fieldIn(tests, 'small', 'Share of tests that must pass (%)'), '');
+    expect(rule).toHaveValue('share');
+    const share = fieldIn(tests, 'small', 'Share of tests that must pass (%)');
+    fill(share, '100');
+    expect(rule).toHaveValue('share');
+    fill(fieldIn(tests, 'small', 'Share of tests that must pass (%)'), '90');
+    expect(
+      within(fieldGroup(tests, 'small')).getByText(/at least 90% of its tests pass/),
+    ).toBeVisible();
+  });
+
+  it('keeps a saved share group’s rule while its share is typed again', async () => {
+    taskBackend({
+      form: { ...CHECKED, inputs: [] },
+      content: TASK.replace(
+        'small: {pass: 30, show: verdict}',
+        'small: {pass: 30, pass_at: 0.8}',
+      ),
+    });
+    const { tests } = await openTask();
+
+    const rule = fieldIn(tests, 'small', 'How does this group earn points?');
+    expect(rule).toHaveValue('share');
+    fill(fieldIn(tests, 'small', 'Share of tests that must pass (%)'), '');
+    expect(rule).toHaveValue('share');
+  });
+
   it('says before a save that a task with no worth of its own is worth its new total (#435)', async () => {
     taskBackend({ form: { ...CHECKED, inputs: [] } });
     const { tests } = await openTask();
@@ -891,6 +958,35 @@ describe('the tests of a task', { timeout: 30_000 }, () => {
         encoding: 'utf-8',
       },
     ]);
+  });
+
+  it('drops a removed test’s weight with it, and undo brings the weight back', async () => {
+    const { sent } = taskBackend({
+      form: { ...CHECKED, inputs: [] },
+      content: TASK.replace(
+        'small: {pass: 30, show: verdict}',
+        "small: {each: 30, test_weights: {'2': 3, '3': 2}}",
+      ),
+    });
+    const { tests } = await openTask();
+
+    const rows = within(fieldGroup(tests, 'small')).getByRole('list', {
+      name: 'Tests of small',
+    });
+    await userEvent.click(within(rows).getByRole('button', { name: 'Remove test 2' }));
+    expect(await within(rows).findByText('To be removed')).toBeVisible();
+    await userEvent.click(
+      within(rows).getByRole('button', { name: 'Undo the change to test 2' }),
+    );
+    expect(await within(rows).findByLabelText('Test weight of 2')).toHaveValue('3');
+
+    await userEvent.click(within(rows).getByRole('button', { name: 'Remove test 2' }));
+    expect(await within(rows).findByText('To be removed')).toBeVisible();
+    await save();
+
+    const body = await waitForSave(sent);
+    const groups = written(body)['test_groups'] as Record<string, unknown>;
+    expect(groups['small']).toEqual({ each: 30, test_weights: { '3': 2 } });
   });
 
   it('shows whose a test file is when someone else changed it first, and saves over it only when chosen', async () => {

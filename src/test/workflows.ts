@@ -267,10 +267,18 @@ export function workflowBackend(
     /** How many times the version check has answered. */
     checks: 0,
   };
+  // As the forge reads it back: a private workflow is shared once someone is
+  // on its list, and private while nobody is, whatever was last chosen.
+  const shown = () =>
+    state.visibility === 'public'
+      ? ('public' as const)
+      : state.readers.length > 0
+        ? ('shared' as const)
+        : ('private' as const);
   const page = () => ({
     owner: 'kenny',
     name: 'tuned',
-    visibility: state.visibility,
+    visibility: shown(),
     versions: state.versions,
     editable: true,
     draft: { content: state.draft, token: state.token },
@@ -283,7 +291,7 @@ export function workflowBackend(
         {
           owner: 'kenny',
           name: 'tuned',
-          visibility: state.visibility,
+          visibility: shown(),
           versions: state.versions,
           editable: true,
         },

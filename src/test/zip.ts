@@ -12,16 +12,17 @@ async function deflated(
  * A zip archive made in the test, as a person's zip tool writes one: each
  * file's local header and bytes, deflated or stored, then the central
  * directory and its end. Checksums are left at zero, which the reader under
- * test does not check.
+ * test does not check. `declared` is the size the archive says a file
+ * unpacks to, when it is to say another than the file's own.
  */
 export async function makeZip(
-  files: { name: string; text: string; stored?: boolean }[],
+  files: { name: string; text: string; stored?: boolean; declared?: number }[],
 ): Promise<File> {
   const encoder = new TextEncoder();
   const chunks: Uint8Array<ArrayBuffer>[] = [];
   const central: Uint8Array<ArrayBuffer>[] = [];
   let offset = 0;
-  for (const { name, text, stored = false } of files) {
+  for (const { name, text, stored = false, declared } of files) {
     const nameBytes = encoder.encode(name);
     const raw = encoder.encode(text);
     const data = stored ? raw : await deflated(raw);
@@ -30,7 +31,7 @@ export async function makeZip(
     local.setUint16(4, 20, true);
     local.setUint16(8, stored ? 0 : 8, true);
     local.setUint32(18, data.length, true);
-    local.setUint32(22, raw.length, true);
+    local.setUint32(22, declared ?? raw.length, true);
     local.setUint16(26, nameBytes.length, true);
     chunks.push(new Uint8Array(local.buffer), nameBytes, data);
 
@@ -40,7 +41,7 @@ export async function makeZip(
     entry.setUint16(6, 20, true);
     entry.setUint16(10, stored ? 0 : 8, true);
     entry.setUint32(20, data.length, true);
-    entry.setUint32(24, raw.length, true);
+    entry.setUint32(24, declared ?? raw.length, true);
     entry.setUint16(28, nameBytes.length, true);
     entry.setUint32(42, offset, true);
     central.push(new Uint8Array(entry.buffer), nameBytes);

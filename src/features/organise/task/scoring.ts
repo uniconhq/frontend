@@ -39,6 +39,19 @@ function everyTest(passAt: string): boolean {
   );
 }
 
+/**
+ * Why a share of tests cannot be saved, or undefined when it can: the format
+ * takes a share above none and at most every test.
+ */
+export function shareProblem(passAt: string): string | undefined {
+  if (!set(passAt)) return undefined;
+  const share = ratioOf(passAt);
+  if (share === null) return undefined;
+  return compareRatio(share, ZERO) <= 0 || compareRatio(share, { num: 1n, den: 1n }) > 0
+    ? 'Give a share above 0% and at most 100%.'
+    : undefined;
+}
+
 /** The rule a group's weights say, as the form offers rules. */
 export function ruleOf(group: GroupValues): Rule {
   const each = set(group.each);

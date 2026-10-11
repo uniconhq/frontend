@@ -162,7 +162,9 @@ function ordinal(place: number): string {
 
 /**
  * Where the reader's entrant stands on one leaderboard, in a line, `team`
- * saying so of a team; how many are on it for a reader with no entrant.
+ * saying so of a team; how many it shows for a reader with no entrant. The
+ * place is said alone: a board may show only the top rows or the reader's
+ * own, so the rows served are not everyone on it.
  */
 function placeOn(board: Board, entrant: string | null, team: boolean): string {
   if (board.nothing_shown) {
@@ -178,10 +180,10 @@ function placeOn(board: Board, entrant: string | null, team: boolean): string {
   const who = team ? 'Your team is' : 'You are';
   if (row === undefined) {
     return entrant === null
-      ? `${String(count)} ${count === 1 ? 'entrant' : 'entrants'} on it.`
+      ? `It shows ${String(count)} ${count === 1 ? 'entrant' : 'entrants'}.`
       : `${who} not on it yet.`;
   }
-  return `${who} ${ordinal(row.rank)} of ${String(count)}.`;
+  return `${who} ${ordinal(row.rank)}.`;
 }
 
 /**

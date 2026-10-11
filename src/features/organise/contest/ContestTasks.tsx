@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { useQueryClient } from '@tanstack/react-query';
-import { isSeq } from 'yaml';
+import { isMap, isSeq } from 'yaml';
 import { $api, queryView } from '@/api/query';
 import type { TaskStanding } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
@@ -110,13 +110,21 @@ function rowOf(
   };
 }
 
-/** Move the task entry at `from` by one place in the contest's list. */
-function moved(from: number, by: -1 | 1) {
+/**
+ * Move the entry of task `id` by one place in the contest's list, found by
+ * its id in the settings as read, so a list someone else changed since the
+ * page read it, or a retry on a newer version, still moves this task. At
+ * either end of the list it stays.
+ */
+function moved(id: string, by: -1 | 1) {
   return (doc: Doc) => {
     const list = doc.get('tasks', true);
     if (!isSeq(list)) return;
+    const from = list.items.findIndex((item) => isMap(item) && item.get('id') === id);
+    const to = from + by;
+    if (from < 0 || to < 0 || to >= list.items.length) return;
     const [item] = list.items.splice(from, 1);
-    if (item !== undefined) list.items.splice(from + by, 0, item);
+    if (item !== undefined) list.items.splice(to, 0, item);
   };
 }
 
@@ -144,9 +152,9 @@ function EditTimeline({
   const label =
     standing === undefined ? '' : `${standing.label} · ${standing.task.name}`;
   const move = async (by: -1 | 1) => {
-    if (editing === null) return;
+    if (standing === undefined) return;
     setRefused(null);
-    const outcome = await apply(moved(editing, by));
+    const outcome = await apply(moved(standing.task.name, by));
     if (outcome.kind === 'refused') setRefused(outcome.error);
     else onClose();
   };

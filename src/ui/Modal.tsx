@@ -32,6 +32,7 @@ export function Modal({
       size={wide ? 'xl' : 'md'}
       radius="md"
       withCloseButton={dismissable}
+      closeButtonProps={{ 'aria-label': 'Close' }}
       closeOnClickOutside={dismissable}
       closeOnEscape={dismissable}
       styles={{
