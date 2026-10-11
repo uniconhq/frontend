@@ -88,7 +88,7 @@ function history() {
 
 async function openHistory() {
   renderApp(`${TASK}?file=task.yaml`);
-  await screen.findByRole('textbox', { name: 'task.yaml' });
+  await screen.findByRole('textbox', { name: 'The task’s settings' });
   await userEvent.click(
     screen.getByRole('button', { name: 'Show the history of task.yaml' }),
   );

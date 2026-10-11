@@ -21,6 +21,7 @@ export function CreateButton({
   error,
   onOpen,
   onSubmit,
+  children,
 }: {
   /** The button, and the dialog's title, such as "New contest". */
   openLabel: string;
@@ -32,6 +33,8 @@ export function CreateButton({
   error: unknown;
   /** Called as the dialog opens, to forget the last refusal. */
   onOpen: () => void;
+  /** More of the form, under its two lines, such as the kind of task. */
+  children?: ReactNode;
   /** Resolves once the thing is made. */
   onSubmit: (name: string, second: string) => Promise<void>;
 }) {
@@ -70,6 +73,7 @@ export function CreateButton({
             pending={pending}
             error={error}
             onCancel={close}
+            extra={children}
             onSubmit={async (name, other) => {
               await onSubmit(name, other);
               close();

@@ -34,6 +34,7 @@ export function CreateForm({
   error,
   onSubmit,
   onCancel,
+  extra,
 }: {
   /** What the form is called, for a screen reader. */
   title: string;
@@ -44,6 +45,8 @@ export function CreateForm({
   error: unknown;
   onSubmit: (name: string, second: string) => Promise<unknown>;
   onCancel?: () => void;
+  /** More of the form, under its two lines. */
+  extra?: ReactNode;
 }) {
   const [name, setName] = useState('');
   const [other, setOther] = useState('');
@@ -83,6 +86,7 @@ export function CreateForm({
         value={other}
         onChange={setOther}
       />
+      {extra}
       {error !== null && error !== undefined && (
         <div className={classes.panel} role="alert">
           <ErrorBlock error={error} compact />

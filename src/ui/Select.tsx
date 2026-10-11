@@ -24,7 +24,8 @@ export function Select({
 }: {
   label: string;
   value: string;
-  options: { value: string; label: string }[];
+  /** Each choice; a `disabled` one is shown greyed out, its reason said beside the field. */
+  options: { value: string; label: string; disabled?: boolean }[];
   onChange: (value: string) => void;
   placeholder?: string;
   description?: string;

@@ -45,6 +45,10 @@ export type InputDecl = {
   options: string[] | null;
   perTest: boolean;
   optional: boolean;
+  /** What the task's form names it, a line of help and its unit (#434); null when not given. */
+  title: string | null;
+  help: string | null;
+  unit: string | null;
 };
 
 export type FieldDecl = {
@@ -204,6 +208,9 @@ function inputOf(id: string, raw: unknown): InputDecl {
     options: strings(found.options),
     perTest: found.per_test === true,
     optional: found.optional === true,
+    title: text(found.title),
+    help: text(found.help),
+    unit: text(found.unit),
   };
 }
 

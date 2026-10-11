@@ -6,7 +6,9 @@ import {
   CONTEST_SECTIONS,
   CONTEST_VIEW_SECTIONS,
   ORG_SECTIONS,
+  TASK_BUILD_CARDS,
   TASK_SECTIONS,
+  taskCardPath,
   TOP_PLACES,
   contestSectionPath,
   contestViewSectionPath,
@@ -48,6 +50,11 @@ function here(
         label: 'Task',
         items: [
           { label: task, to: taskPath(org, contest, task), exact: true },
+          ...TASK_BUILD_CARDS.map((card) => ({
+            label: card.label,
+            to: taskCardPath(org, contest, task, card.key),
+            exact: true,
+          })),
           ...TASK_SECTIONS.map((section) => ({
             label: section.label,
             to: taskSectionPath(org, contest, task, section.key),

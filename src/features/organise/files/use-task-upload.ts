@@ -1,6 +1,5 @@
 import { useRef, useState } from 'react';
 import { apiClient } from '@/api/client';
-import { $api } from '@/api/query';
 import { type ApiError, toApiError } from '@/api/problem';
 import { arrival, hashOf, mustBeVerified, sendAndComplete } from '@/api/upload/door';
 import type { Place } from './place';
@@ -47,26 +46,69 @@ export async function tokenNow(place: TaskPlace, path: string): Promise<string |
 }
 
 /**
- * Puts a file through the upload door for a task, at a path: the token of
- * the file there now, the SHA-256 with its progress, a slot for the path,
- * the bytes with their progress and the completion. A send the connection
- * cut is sent again from the start, to the same slot, after asking whether
- * the bytes arrived after all; a slot for a file the forge holds already
- * needs nothing sent. Nothing is in the task until a save names the upload;
- * the caller makes that save, with the token this read.
+ * Puts a file through the upload door for a task, at a path, and answers the
+ * upload's id: the SHA-256 with its progress, a slot for the path, the bytes
+ * with their progress and the completion. A send the connection cut is sent
+ * again from the start, to the same slot, after asking whether the bytes
+ * arrived after all; a slot for a file the forge holds already needs nothing
+ * sent. Nothing is in the task until a save names the upload.
+ */
+export async function sendToTask(
+  place: TaskPlace,
+  file: File,
+  path: string,
+  onState: (state: UploadState) => void = () => undefined,
+): Promise<string> {
+  const task = { org: place.org, contest: place.contest, task: place.task };
+  onState({ stage: 'hashing', share: 0 });
+  const sha256 = await hashOf(file, (share) => onState({ stage: 'hashing', share }));
+  onState({ stage: 'sending', share: 0, attempt: 1 });
+  const { data: slot } = await apiClient.POST(
+    '/api/v1/orgs/{org}/contests/{contest}/tasks/{task}/organise/uploads',
+    {
+      params: { path: task },
+      body: {
+        path,
+        size: file.size,
+        sha256,
+        content_type: file.type === '' ? null : file.type,
+      },
+    },
+  );
+  if (slot === undefined) throw new Error('The upload door gave no slot.');
+  const completeSlot = async () => {
+    const { data } = await apiClient.POST(
+      '/api/v1/orgs/{org}/contests/{contest}/tasks/{task}/uploads/{upload}/complete',
+      { params: { path: { ...task, upload: slot.id } } },
+    );
+    if (data === undefined) throw new Error('The upload door said nothing.');
+    return data;
+  };
+
+  for (let attempt = 1; ; attempt += 1) {
+    const share = (sent: number) => onState({ stage: 'sending', share: sent, attempt });
+    try {
+      const arrived = attempt === 1 ? null : await arrival(completeSlot);
+      share(0);
+      mustBeVerified(
+        arrived ?? (await sendAndComplete(slot, file, share, completeSlot)),
+      );
+      return slot.id;
+    } catch (error) {
+      const cut = toApiError(error).code === 'upload_failed';
+      if (!cut || attempt >= SEND_TRIES) throw error;
+    }
+  }
+}
+
+/**
+ * An upload into a task at a path, through the upload door (`sendToTask`),
+ * with where it stands to show, and the token of the file at the path, which
+ * the caller's save presents.
  */
 export function useTaskUpload(place: TaskPlace) {
-  const requestSlot = $api.useMutation(
-    'post',
-    '/api/v1/orgs/{org}/contests/{contest}/tasks/{task}/organise/uploads',
-  );
-  const complete = $api.useMutation(
-    'post',
-    '/api/v1/orgs/{org}/contests/{contest}/tasks/{task}/uploads/{upload}/complete',
-  );
   const [state, setState] = useState<UploadState>({ stage: 'idle' });
   const busy = useRef(false);
-  const task = { org: place.org, contest: place.contest, task: place.task };
 
   const start = async (file: File, path: string, token?: string | null) => {
     if (busy.current) return;
@@ -75,39 +117,8 @@ export function useTaskUpload(place: TaskPlace) {
       // The token is the one the caller read the file with, or the file's as
       // the upload starts, so a change made meanwhile is a conflict at the save.
       const current = token === undefined ? await tokenNow(place, path) : token;
-      setState({ stage: 'hashing', share: 0 });
-      const sha256 = await hashOf(file, (share) =>
-        setState({ stage: 'hashing', share }),
-      );
-      setState({ stage: 'sending', share: 0, attempt: 1 });
-      const slot = await requestSlot.mutateAsync({
-        params: { path: task },
-        body: {
-          path,
-          size: file.size,
-          sha256,
-          content_type: file.type === '' ? null : file.type,
-        },
-      });
-      const completeSlot = () =>
-        complete.mutateAsync({ params: { path: { ...task, upload: slot.id } } });
-
-      for (let attempt = 1; ; attempt += 1) {
-        const share = (sent: number) =>
-          setState({ stage: 'sending', share: sent, attempt });
-        try {
-          const arrived = attempt === 1 ? null : await arrival(completeSlot);
-          share(0);
-          mustBeVerified(
-            arrived ?? (await sendAndComplete(slot, file, share, completeSlot)),
-          );
-          break;
-        } catch (error) {
-          const cut = toApiError(error).code === 'upload_failed';
-          if (!cut || attempt >= SEND_TRIES) throw error;
-        }
-      }
-      setState({ stage: 'arrived', upload: slot.id, path, token: current });
+      const upload = await sendToTask(place, file, path, setState);
+      setState({ stage: 'arrived', upload, path, token: current });
     } catch (error) {
       setState({ stage: 'refused', error: toApiError(error) });
     } finally {

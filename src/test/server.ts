@@ -154,6 +154,25 @@ const emptyOrganising = [
       tasks: [],
     } satisfies ContestHome),
   ),
+  /** No workflow to choose from and no primitive, until a test lists some. */
+  http.get('/api/v1/workflows', () => HttpResponse.json([])),
+  http.get('/api/v1/primitives', () => HttpResponse.json([])),
+  http.get('/api/v1/workflows/:owner/:name/versions/:version', () =>
+    problem(404, 'not_found'),
+  ),
+  /** No file in any contest or task, and no change to one, until a test gives some. */
+  http.get('/api/v1/orgs/:org/contests/:contest/files/:path', () =>
+    problem(404, 'not_found'),
+  ),
+  http.get('/api/v1/orgs/:org/contests/:contest/tasks/:task/files/:path', () =>
+    problem(404, 'not_found'),
+  ),
+  http.get('/api/v1/orgs/:org/contests/:contest/tasks/:task/tree', () =>
+    HttpResponse.json([]),
+  ),
+  http.get('/api/v1/orgs/:org/contests/:contest/tasks/:task/history', () =>
+    HttpResponse.json([]),
+  ),
   /** A task naming no workflow yet, until a test names one. */
   http.get('/api/v1/orgs/:org/contests/:contest/tasks/:task/workflow-form', () =>
     HttpResponse.json({

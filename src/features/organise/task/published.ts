@@ -1,9 +1,25 @@
-import type { Publication } from '@/api/types';
+import type { FileChange, Publication } from '@/api/types';
 import { formatDateTime } from '@/lib/time';
 
-/** What contestants are graded on: the latest publication, or that there is none. */
-export function publishedLine(latest: Publication | null): string {
-  return latest === null
-    ? 'Nothing is published yet, so contestants cannot see the task.'
-    : `Contestants are graded on publication ${String(latest.number)}, of ${formatDateTime(new Date(latest.at))}.`;
+/** Who saved the change a publication is, by the task's history, when it says. */
+export function savedBy(
+  publication: Publication,
+  history: readonly FileChange[] | undefined,
+): string | null {
+  return (
+    history?.find((change) => change.version === publication.version)?.author ?? null
+  );
+}
+
+/**
+ * What entrants are graded on, in one line: the latest publication, when it
+ * was saved and by whom, or that nothing is live yet (M21).
+ */
+export function publishedLine(
+  latest: Publication | null,
+  author: string | null = null,
+): string {
+  if (latest === null) return 'Not live yet: nothing is published.';
+  const by = author === null ? '' : ` by ${author}`;
+  return `Entrants are graded on publication ${String(latest.number)}, saved ${formatDateTime(new Date(latest.at))}${by}.`;
 }

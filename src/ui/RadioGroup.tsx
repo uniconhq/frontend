@@ -15,7 +15,7 @@ export function RadioGroup({
 }: {
   label: string;
   value: string;
-  options: { value: string; label: string }[];
+  options: { value: string; label: string; disabled?: boolean }[];
   onChange: (value: string) => void;
   /** A line under the label, such as why the choice is held. */
   description?: string;
@@ -34,7 +34,7 @@ export function RadioGroup({
             key={option.value}
             value={option.value}
             label={option.label}
-            disabled={disabled}
+            disabled={disabled || option.disabled === true}
           />
         ))}
       </Group>

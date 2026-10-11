@@ -6,6 +6,7 @@ import type { TaskStanding } from '@/api/types';
 import { parse } from 'yaml';
 import { isoOf, localOf } from '../forms/times';
 import { CONTEST_SECTIONS } from '@/lib/sections';
+import { formatExact } from '@/lib/exact';
 import { formatDateTime } from '@/lib/time';
 import { renderApp } from '@/test/render';
 import { problem, server, signedIn, someone } from '@/test/server';
@@ -336,7 +337,12 @@ describe("the contest's tasks", () => {
     const tasks = await screen.findByRole('region', { name: 'Tasks' });
     const alert = await within(tasks).findByRole('alert');
     expect(alert).toHaveTextContent("The contest's settings do not read");
-    expect(alert).toHaveTextContent('Mend each problem where it says.');
+    expect(alert).toHaveTextContent(
+      'Mend each problem where it says, or, as an admin, mend them as text in the settings as stored.',
+    );
+    expect(
+      within(alert).getByRole('link', { name: 'the settings as stored' }),
+    ).toHaveAttribute('href', '/orgs/acme/contests/spring/files?file=contest.yaml');
     const errors = within(alert).getByRole('list', { name: 'Errors' });
     expect(
       within(errors)
@@ -394,6 +400,74 @@ describe("the contest's tasks", () => {
         .map((link) => [link.textContent, link.getAttribute('href')]),
     ).toEqual([['sum', '/orgs/acme/contests/spring/tasks/sum']]);
     expect(screen.queryByRole('button', { name: 'New task' })).toBeNull();
+  });
+});
+
+describe('how the contest is scored', () => {
+  it('says for each task its worth, how each group earns, its timeline and the boards that count it', async () => {
+    server.use(
+      signedIn,
+      standingList,
+      http.get(`${CONTEST_API}/files/:path`, () =>
+        HttpResponse.json({
+          path: 'contest.yaml',
+          encoding: 'utf-8',
+          content: [
+            'name: Spring',
+            'start: 2026-10-01T09:00:00Z',
+            'end: 2026-10-15T09:00:00Z',
+            'tasks:',
+            '  - id: sort',
+            '    worth: 50',
+            '  - id: sum',
+            'leaderboards:',
+            '  - name: Standings',
+            '    tasks: [sort]',
+            '',
+          ].join('\n'),
+          token: 'token-contest',
+          upload: null,
+        }),
+      ),
+      http.get(`${CONTEST_API}/tasks/:task/files/:path`, ({ params }) =>
+        HttpResponse.json({
+          path: 'task.yaml',
+          encoding: 'utf-8',
+          content:
+            params['task'] === 'sort'
+              ? 'name: Sort\nworkflow: unicon/classic@v2\ntest_groups:\n  small: {pass: 30}\n  large: {pass: 70}\n'
+              : 'name: Sum\nworkflow: unicon/classic@v2\ntest_groups:\n  main: {each: 80, pass: 20}\n',
+          token: 'token-task',
+          upload: null,
+        }),
+      ),
+      ...repoFiles,
+    );
+    renderApp(CONTEST);
+
+    const card = await screen.findByRole('region', {
+      name: 'How this contest is scored',
+    });
+    const sort = await within(card).findByRole('region', { name: 'A · sort' });
+    expect(
+      await within(sort).findByText('small earns its 15 when every test passes.'),
+    ).toBeVisible();
+    expect(sort).toHaveTextContent(
+      `Worth 50 points, as the contest sets it; its groups total ${formatExact('100')}.`,
+    );
+    expect(sort).toHaveTextContent(
+      'Standings: Ranks entrants by points, from each entrant’s best submission on task sort',
+    );
+    const sum = within(card).getByRole('region', { name: 'B · sum' });
+    expect(
+      await within(sum).findByText(
+        'main earns 80 times the share of its tests you passed, and 20 more when you pass them all.',
+      ),
+    ).toBeVisible();
+    expect(sum).toHaveTextContent(
+      `Worth ${formatExact('100')} points, its groups’ total.`,
+    );
+    expect(sum).toHaveTextContent('No board counts it.');
   });
 });
 
@@ -668,6 +742,86 @@ describe('creating a task', () => {
     expect(sent).toEqual([{ name: 'max', title: 'Maximum' }]);
     expect(form).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'New task' })).toHaveFocus();
+  });
+
+  it('starts a task of another kind on its workflow, in the task’s first save', async () => {
+    server.use(signedIn, ...repoFiles);
+    standingsAndCreate();
+    const saves: { changes: { path: string; content: string; token: string }[] }[] = [];
+    server.use(
+      http.get('/api/v1/workflows', () =>
+        HttpResponse.json([
+          {
+            owner: 'unicon',
+            name: 'classic',
+            versions: ['v2'],
+            editable: false,
+            visibility: 'public',
+          },
+          {
+            owner: 'unicon',
+            name: 'classic-folder',
+            versions: ['v1'],
+            editable: false,
+            visibility: 'public',
+          },
+        ]),
+      ),
+      http.get('/api/v1/workflows/unicon/classic-folder/versions/v1', () =>
+        HttpResponse.json({
+          content:
+            'inputs:\n  program: {type: folder, contestant: true, title: Program}\n  language: {type: enum, options: [c, python], contestant: true}\n  entry: {type: text, contestant: true}\n  time_limit: number\n  memory_limit: number\ntest:\n  input: file\n  answer: file\nsteps: []\n',
+        }),
+      ),
+      http.get('/api/v1/orgs/acme/contests/spring/tasks/max/files/task.yaml', () =>
+        HttpResponse.json({
+          path: 'task.yaml',
+          encoding: 'utf-8',
+          content:
+            'name: max\nworkflow: unicon/classic@v2\ninputs:\n  submission: {label: Your solution}\n  language: {options: [python]}\n  time_limit: 2\n  memory_limit: 256\ntest_groups:\n  main: {each: 100}\n',
+          token: 'token-starter',
+          upload: null,
+        }),
+      ),
+      http.post(
+        '/api/v1/orgs/acme/contests/spring/tasks/max/save',
+        async ({ request }) => {
+          saves.push((await request.json()) as (typeof saves)[number]);
+          return HttpResponse.json({
+            number: 1,
+            grading_changed: true,
+            changes: [],
+            notes: [],
+            regraded: 0,
+          });
+        },
+      ),
+    );
+    renderApp(CONTEST);
+
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'New task' }));
+    const form = screen.getByRole('form', { name: 'New task' });
+    await user.type(within(form).getByRole('textbox', { name: /^Name/ }), 'max');
+    await user.click(
+      await within(form).findByRole('radio', { name: 'A program of several files' }),
+    );
+    await user.click(within(form).getByRole('button', { name: 'Create task' }));
+
+    await expect.poll(() => saves.length).toBe(1);
+    const [change] = saves[0]?.changes ?? [];
+    expect(change?.token).toBe('token-starter');
+    expect(parse(change?.content ?? '')).toEqual({
+      name: 'max',
+      workflow: 'unicon/classic-folder@v1',
+      inputs: {
+        language: { options: ['python'] },
+        time_limit: 2,
+        memory_limit: 256,
+        program: { label: 'Your program' },
+      },
+      test_groups: { main: { each: 100 } },
+    });
   });
 
   it('sends no title when none was given', async () => {

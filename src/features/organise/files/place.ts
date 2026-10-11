@@ -13,6 +13,11 @@ export type Place =
 const CONTEST_TREE = '/api/v1/orgs/{org}/contests/{contest}/tree';
 const TASK_TREE = '/api/v1/orgs/{org}/contests/{contest}/tasks/{task}/tree';
 
+/** The settings file of a place, changed on its pages and read in its files. */
+export function settingsPath(place: Place): string {
+  return place.kind === 'task' ? 'task.yaml' : 'contest.yaml';
+}
+
 export function treeQuery(place: Place, folder: string) {
   const query = { path: folder };
   return place.kind === 'task'

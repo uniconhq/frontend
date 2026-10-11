@@ -79,35 +79,12 @@ describe('the workflows page', () => {
     expect(made).toEqual({ owner: 'acme', name: 'fresh' });
   });
 
-  it('combines two versions or more into a new workflow', async () => {
-    let asked: unknown = null;
-    server.use(
-      signedIn,
-      listed,
-      http.post('/api/v1/workflow-combinations', async ({ request }) => {
-        asked = await request.json();
-        return HttpResponse.json({ owner: 'kenny', name: 'both' }, { status: 201 });
-      }),
-    );
-    const user = userEvent.setup();
-    const { router } = renderApp('/workflows');
+  it('offers no way to combine workflows for now', async () => {
+    server.use(signedIn, listed);
+    renderApp('/workflows');
 
-    const form = await screen.findByRole('form', { name: 'Combine workflows' });
-    const combine = within(form).getByRole('button', { name: 'Combine' });
-    await user.click(within(form).getByRole('checkbox', { name: 'acme/graders@v1' }));
-    await user.type(within(form).getByRole('textbox', { name: /^Name/ }), 'both');
-    expect(combine).toBeDisabled();
-    await user.click(within(form).getByRole('checkbox', { name: 'unicon/classic@v2' }));
-    await user.click(combine);
-
-    await waitFor(() =>
-      expect(router.state.location.pathname).toBe('/workflows/kenny/both'),
-    );
-    expect(asked).toEqual({
-      sources: ['acme/graders@v1', 'unicon/classic@v2'],
-      owner: 'kenny',
-      name: 'both',
-    });
+    await screen.findByRole('list', { name: 'Yours to edit' });
+    expect(screen.queryByRole('form', { name: 'Combine workflows' })).toBeNull();
   });
 });
 
@@ -244,6 +221,16 @@ describe('a workflow one may only read', () => {
       owner: 'kenny',
       name: 'tuned',
     });
+  });
+});
+
+describe('a workflow one may edit', () => {
+  it('offers no way to combine it with others for now', async () => {
+    server.use(signedIn, ...workflowBackend(CLASSIC_V2).handlers);
+    renderApp('/workflows/kenny/tuned');
+
+    await screen.findByRole('group', { name: 'Step run' });
+    expect(screen.queryByRole('form', { name: 'Combine workflows' })).toBeNull();
   });
 });
 
