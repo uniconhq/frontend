@@ -234,7 +234,7 @@ export function TaskUpload({
         </div>
       )}
 
-      <UploadSaveAnswer saving={saving} placeOf={placeOfIn(place)} />
+      <UploadSaveAnswer place={place} saving={saving} placeOf={placeOfIn(place)} />
     </section>
   );
 }

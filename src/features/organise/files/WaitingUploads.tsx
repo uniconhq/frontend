@@ -102,7 +102,7 @@ export function WaitingUploads({ place }: { place: TaskPlace }) {
           )}
         </>
       )}
-      <UploadSaveAnswer saving={saving} placeOf={placeOfIn(place)} />
+      <UploadSaveAnswer place={place} saving={saving} placeOf={placeOfIn(place)} />
     </section>
   );
 }

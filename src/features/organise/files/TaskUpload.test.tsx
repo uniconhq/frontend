@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { screen, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@/test/user-event';
 import { http, HttpResponse } from 'msw';
 import type { SaveRequest, Upload } from '@/api/types';
@@ -240,14 +240,18 @@ describe("uploading a file into a task's tree", () => {
     ]);
   });
 
-  it('says when someone changed the file meanwhile, and saves over it once asked', async () => {
+  /**
+   * The upload door and a save refused the first time as a conflict, someone
+   * else, alice, having saved a train.csv of their own meanwhile.
+   */
+  function theirsSavedFirst() {
     const routes = uploadRoutes();
-    let writes = 0;
+    const saves: SaveRequest[] = [];
     server.use(signedIn, taskState, publicationList, ...repoFiles, ...routes.handlers);
     server.use(
-      http.post(`${TASK_API}/save`, () => {
-        writes += 1;
-        if (writes === 1) return problem(409, 'conflict');
+      http.post(`${TASK_API}/save`, async ({ request }) => {
+        saves.push((await request.json()) as SaveRequest);
+        if (saves.length === 1) return problem(409, 'conflict');
         return HttpResponse.json({
           number: 4,
           version: 'def5678abc',
@@ -257,26 +261,87 @@ describe("uploading a file into a task's tree", () => {
           regraded: 0,
         });
       }),
+      http.get(`${TASK_API}/files/:path`, ({ params }) =>
+        params['path'] === 'train.csv' && saves.length > 0
+          ? HttpResponse.json({
+              path: 'train.csv',
+              encoding: 'utf-8',
+              content: 'pointer',
+              token: 'token-theirs',
+              upload: { size: 2048, digest: 'b'.repeat(64) },
+            })
+          : undefined,
+      ),
+      http.get(`${TASK_API}/history`, () =>
+        HttpResponse.json([
+          {
+            version: 'theirs1',
+            at: '2026-10-11T14:02:00Z',
+            author: 'alice',
+            author_id: 3,
+            message: 'Upload train.csv',
+          },
+        ]),
+      ),
     );
-    renderApp(TASK);
+    return saves;
+  }
 
+  async function uploadAndSave() {
+    renderApp(TASK);
     const panel = await openUpload();
     await userEvent.upload(within(panel).getByLabelText('File to upload'), dataset());
     await userEvent.click(within(panel).getByRole('button', { name: 'Upload' }));
     await userEvent.click(
       await within(panel).findByRole('button', { name: 'Save into the task' }),
     );
+    return panel;
+  }
 
-    const alert = await within(panel).findByRole('alert');
-    expect(alert).toHaveTextContent(
-      'Someone else changed train.csv since the upload began.',
+  it('shows whose the file is when someone saved it meanwhile, and saves over it after a warning', async () => {
+    const saves = theirsSavedFirst();
+    const panel = await uploadAndSave();
+
+    const files = await within(panel).findByRole('list', { name: 'Files that differ' });
+    const row = within(files).getByRole('radiogroup', { name: 'train.csv' });
+    expect(row).toHaveTextContent('Yours: Your upload, 4 bytes');
+    expect(
+      await within(row).findByText(/^Now: 2 KB, saved by alice on /),
+    ).toBeVisible();
+    await userEvent.click(
+      within(panel).getByRole('button', { name: 'Save mine over theirs' }),
+    );
+    const warning = await screen.findByRole('dialog', {
+      name: 'Save yours over theirs?',
+    });
+    expect(warning).toHaveTextContent(
+      'This throws away what the other person saved in train.csv.',
     );
     await userEvent.click(
-      within(alert).getByRole('button', { name: 'Save over their version' }),
+      within(warning).getByRole('button', { name: 'Save mine over theirs' }),
     );
 
     expect(await within(panel).findByText('Published as publication 4.')).toBeVisible();
-    expect(writes).toBe(2);
+    expect(saves[1]?.changes).toMatchObject([
+      { path: 'train.csv', upload: UPLOAD, token: 'token-theirs' },
+    ]);
+  });
+
+  it('keeps their file when theirs is chosen, saving nothing', async () => {
+    const saves = theirsSavedFirst();
+    const panel = await uploadAndSave();
+
+    await within(panel).findByRole('list', { name: 'Files that differ' });
+    await userEvent.click(
+      within(panel).getByRole('button', { name: 'Save the merged version' }),
+    );
+
+    await waitFor(() =>
+      expect(
+        within(panel).queryByRole('list', { name: 'Files that differ' }),
+      ).toBeNull(),
+    );
+    expect(saves).toHaveLength(1);
   });
 
   it('keeps uploads waiting and saves them with the next one, in one save and one confirmation', async () => {

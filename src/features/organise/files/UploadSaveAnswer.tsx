@@ -1,8 +1,10 @@
 import type { ApiError } from '@/api/problem';
 import { BodyText } from '@/ui/BodyText';
-import { Button } from '@/ui/Button';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import type { PlaceOf } from '../DefinitionErrors';
+import { formatSize } from '@/lib/size';
+import { FilesMerge } from './FilesMerge';
+import type { Place } from './place';
 import { SaveOutcome } from './SaveOutcome';
 import type { useSaveUploads } from './upload-save';
 import shared from '../organise.module.css';
@@ -46,54 +48,43 @@ export function Refused({ error }: { error: ApiError }) {
 
 /**
  * What a save of uploads came back with: a refusal of the upload in words,
- * a conflict on a path with the offer to save over it, or any other answer
+ * a conflict shown file by file, whose each is now, to keep or save over
+ * (M27), or any other answer
  * as a file's save shows it.
  */
 export function UploadSaveAnswer({
+  place,
   saving,
   placeOf,
 }: {
+  place: Extract<Place, { kind: 'task' }>;
   saving: ReturnType<typeof useSaveUploads>;
   /** Where each problem of a save kept as a draft is fixed. */
   placeOf?: PlaceOf;
 }) {
-  const { outcome, send, saveOver, pending } = saving;
+  const { outcome, send, saveOver, pending, forget } = saving;
+  const sizeOf = (path: string) => {
+    const size = saving.sizeOf(path);
+    return size === null ? '' : `, ${formatSize(size)}`;
+  };
   if (outcome === null) return null;
   if (outcome.kind === 'refused' && UPLOAD_REFUSED[outcome.error.code] !== undefined) {
     return <Refused error={outcome.error} />;
   }
   if (outcome.kind === 'refused' && outcome.error.code === 'conflict') {
-    const paths = outcome.body.changes.map((change) => change.path);
+    const { body } = outcome;
     return (
-      <div className={shared.panel} role="alert">
-        <BodyText>
-          {paths.length === 1 ? (
-            <>
-              Someone else changed <span className={shared.mono}>{paths[0]}</span> since
-              the upload began.
-            </>
-          ) : (
-            <>
-              Someone else changed one of{' '}
-              <span className={shared.mono}>{paths.join(', ')}</span> since its upload
-              began.
-            </>
-          )}
-        </BodyText>
-        <BodyText tone="secondary">
-          Nothing was saved. Saving again replaces their version with{' '}
-          {paths.length === 1 ? 'this upload' : 'these uploads'}.
-        </BodyText>
-        <div className={shared.actions}>
-          <Button
-            variant="secondary"
-            loading={pending}
-            onClick={() => void saveOver(outcome.body)}
-          >
-            Save over their version
-          </Button>
-        </div>
-      </div>
+      <FilesMerge
+        place={place}
+        files={body.changes.map((change) => ({
+          path: change.path,
+          label: change.path,
+          mine: `Your upload${sizeOf(change.path)}`,
+        }))}
+        busy={pending}
+        onSave={(overwrite) => void saveOver(body, overwrite)}
+        onDrop={forget}
+      />
     );
   }
   return (
