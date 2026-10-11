@@ -3,8 +3,8 @@ import { Avatar } from '@/ui/Avatar';
 import { SectionTitle } from '@/ui/SectionTitle';
 import { PageTitle } from '@/ui/PageTitle';
 import { BodyText } from '@/ui/BodyText';
-import { TextLink } from '@/ui/TextLink';
-import { forgePage, useForgeUrl, useMe } from '@/session';
+import { OutLink } from '@/ui/OutLink';
+import { useForgeUrl, useMe } from '@/session';
 import { SessionList } from './SessionList';
 import { DangerZone } from './DangerZone';
 import { scopeName } from '@/lib/scope-name';
@@ -42,7 +42,7 @@ export function AccountPage() {
         )}
         {forge !== null && (
           <div className={classes.change}>
-            <TextLink href={`${forge}/user/settings`}>Change in Forgejo</TextLink>
+            <OutLink href={`${forge}/user/settings`}>Change in Forgejo</OutLink>
           </div>
         )}
       </Card>
@@ -70,12 +70,14 @@ export function AccountPage() {
             Forgejo owns your account. Your password, email addresses, avatar, and
             two-factor settings all live there.
           </BodyText>
-          <div className={classes.forgeLinks}>
-            <a href={forgePage(forge, '/user/settings/account')}>Password</a>
-            <a href={forgePage(forge, '/user/settings/account')}>Email addresses</a>
-            <a href={forgePage(forge, '/user/settings')}>Avatar</a>
-            <a href={forgePage(forge, '/user/settings/security')}>Two-factor</a>
-          </div>
+          {forge !== null && (
+            <div className={classes.forgeLinks}>
+              <OutLink href={`${forge}/user/settings/account`}>Password</OutLink>
+              <OutLink href={`${forge}/user/settings/account`}>Email addresses</OutLink>
+              <OutLink href={`${forge}/user/settings`}>Avatar</OutLink>
+              <OutLink href={`${forge}/user/settings/security`}>Two-factor</OutLink>
+            </div>
+          )}
           <SessionList />
         </div>
       </Card>

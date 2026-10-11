@@ -16,6 +16,21 @@ const markdownOnlyInUi = ['react-markdown', 'remark-gfm'].map((name) => ({
   message: 'Render Markdown with src/ui/Markdown instead.',
 }));
 
+/**
+ * Every link has one of two looks: in the app (PageLink) and out of it
+ * (OutLink); a thing that does something is a Button. So a page never draws a
+ * link of its own.
+ */
+const linksOnlyInUi = {
+  name: 'react-router',
+  importNames: ['Link', 'NavLink'],
+  message: 'Link with src/ui/PageLink, or a Button for an action.',
+};
+const noBareAnchor = {
+  selector: 'JSXOpeningElement[name.name="a"]',
+  message: 'Link with src/ui/PageLink or src/ui/OutLink, or a Button with href.',
+};
+
 const crossFeature = (escapePrefix) => ({
   patterns: [
     {
@@ -29,7 +44,7 @@ const crossFeature = (escapePrefix) => ({
         'A feature may not import from another feature. Move the shared piece into ui/, lib/, api/ or theme/.',
     },
   ],
-  paths: [mantineOnlyInUi, ...markdownOnlyInUi],
+  paths: [mantineOnlyInUi, ...markdownOnlyInUi, linksOnlyInUi],
 });
 
 export default tseslint.config(
@@ -73,8 +88,9 @@ export default tseslint.config(
     rules: {
       'no-restricted-imports': [
         'error',
-        { paths: [mantineOnlyInUi, ...markdownOnlyInUi] },
+        { paths: [mantineOnlyInUi, ...markdownOnlyInUi, linksOnlyInUi] },
       ],
+      'no-restricted-syntax': ['error', noBareAnchor],
     },
   },
 

@@ -123,7 +123,7 @@ export function TaskStandings({
         >
           <div className={classes.name}>
             <span className={classes.letter}>{standing.label}</span>
-            <PageLink to={taskPath(org, contest, standing.task.name)} mono>
+            <PageLink to={taskPath(org, contest, standing.task.name)}>
               {standing.task.name}
             </PageLink>
           </div>

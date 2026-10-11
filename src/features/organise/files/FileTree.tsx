@@ -1,4 +1,7 @@
 import { useState } from 'react';
+// A file is a row of the tree, drawn as the tree draws its rows, as the
+// sidebar draws its own; every other link is a PageLink.
+// eslint-disable-next-line no-restricted-imports
 import { Link } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { queryView } from '@/api/query';

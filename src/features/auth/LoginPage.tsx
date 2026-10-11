@@ -2,6 +2,7 @@ import { Navigate, useSearchParams } from 'react-router';
 import { UniconLockup } from '@/ui/brand/UniconLockup';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
+import { OutLink } from '@/ui/OutLink';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { ApiError } from '@/api/problem';
 import {
@@ -54,8 +55,12 @@ export function LoginPage() {
 
       <BodyText tone="secondary">
         You will sign in through{' '}
-        {forge === null ? 'Forgejo' : <a href={forge}>{new URL(forge).host}</a>}, where
-        your account, your repositories and your submissions live.
+        {forge === null ? (
+          'Forgejo'
+        ) : (
+          <OutLink href={forge}>{new URL(forge).host}</OutLink>
+        )}
+        , where your account, your repositories and your submissions live.
       </BodyText>
 
       <BodyText tone="secondary">Unicon never sees your password.</BodyText>

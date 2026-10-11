@@ -88,9 +88,7 @@ export function BoardTable({
     submissionTo === undefined || !own ? (
       `#${number}`
     ) : (
-      <PageLink to={submissionTo(task, number)} mono>
-        #{number}
-      </PageLink>
+      <PageLink to={submissionTo(task, number)}>#{number}</PageLink>
     );
 
   if (board.nothing_shown) {

@@ -1,12 +1,13 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Link, useNavigate, useSearchParams } from 'react-router';
+import { useNavigate, useSearchParams } from 'react-router';
 import { $api, queryView } from '@/api/query';
 import { toApiError, type ApiError } from '@/api/problem';
 import type { Primitive, WorkflowPage as Page } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
 import { Card } from '@/ui/Card';
+import { PageLink } from '@/ui/PageLink';
 import { CodeEditor } from '@/ui/CodeEditor';
 import { PageTitle } from '@/ui/PageTitle';
 import { SectionTitle } from '@/ui/SectionTitle';
@@ -59,7 +60,7 @@ export function WorkflowPage() {
         {owner}/{name}
       </PageTitle>
       <div className={shared.actions}>
-        <Link to={WORKFLOWS_PATH}>Every workflow you may read</Link>
+        <PageLink to={WORKFLOWS_PATH}>Every workflow you may read</PageLink>
       </div>
       {(page.state === 'loading' || primitives.state === 'loading') && (
         <PageSkeleton rows={6} />
@@ -97,13 +98,17 @@ function Shown({
         {versions.map((version, at) => (
           <span key={version}>
             {at > 0 && ', '}
-            <Link to={workflowPath(page.owner, page.name, version)}>{version}</Link>
+            <PageLink to={workflowPath(page.owner, page.name, version)}>
+              {version}
+            </PageLink>
           </span>
         ))}
         {asked !== null && page.editable && (
           <>
             {' · '}
-            <Link to={workflowPath(page.owner, page.name)}>Back to the draft</Link>
+            <PageLink to={workflowPath(page.owner, page.name)}>
+              Back to the draft
+            </PageLink>
           </>
         )}
       </BodyText>
@@ -223,7 +228,7 @@ function Unopenable({
         {children}
         {onRetry !== undefined && (
           <div>
-            <Button size="xs" variant="secondary" onClick={onRetry}>
+            <Button variant="secondary" onClick={onRetry}>
               Try again
             </Button>
           </div>
@@ -319,16 +324,11 @@ function CopyForm({ source }: { source: string }) {
       />
       <TextInput label="Name" value={name} onChange={setName} required />
       <div>
-        <Button
-          size="xs"
-          type="submit"
-          loading={copy.isPending}
-          disabled={name.trim() === ''}
-        >
+        <Button type="submit" loading={copy.isPending} disabled={name.trim() === ''}>
           Copy
         </Button>
       </div>
-      {error !== null && <ErrorBlock error={error} />}
+      {error !== null && <ErrorBlock error={error} compact />}
     </form>
   );
 }
