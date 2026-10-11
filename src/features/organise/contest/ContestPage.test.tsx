@@ -6,6 +6,7 @@ import type { TaskStanding } from '@/api/types';
 import { parse } from 'yaml';
 import { isoOf, localOf } from '../forms/times';
 import { CONTEST_SECTIONS } from '@/lib/sections';
+import { formatExact } from '@/lib/exact';
 import { formatDateTime } from '@/lib/time';
 import { renderApp } from '@/test/render';
 import { problem, server, signedIn, someone } from '@/test/server';
@@ -399,6 +400,74 @@ describe("the contest's tasks", () => {
         .map((link) => [link.textContent, link.getAttribute('href')]),
     ).toEqual([['sum', '/orgs/acme/contests/spring/tasks/sum']]);
     expect(screen.queryByRole('button', { name: 'New task' })).toBeNull();
+  });
+});
+
+describe('how the contest is scored', () => {
+  it('says for each task its worth, how each group earns, its timeline and the boards that count it', async () => {
+    server.use(
+      signedIn,
+      standingList,
+      http.get(`${CONTEST_API}/files/:path`, () =>
+        HttpResponse.json({
+          path: 'contest.yaml',
+          encoding: 'utf-8',
+          content: [
+            'name: Spring',
+            'start: 2026-10-01T09:00:00Z',
+            'end: 2026-10-15T09:00:00Z',
+            'tasks:',
+            '  - id: sort',
+            '    worth: 50',
+            '  - id: sum',
+            'leaderboards:',
+            '  - name: Standings',
+            '    tasks: [sort]',
+            '',
+          ].join('\n'),
+          token: 'token-contest',
+          upload: null,
+        }),
+      ),
+      http.get(`${CONTEST_API}/tasks/:task/files/:path`, ({ params }) =>
+        HttpResponse.json({
+          path: 'task.yaml',
+          encoding: 'utf-8',
+          content:
+            params['task'] === 'sort'
+              ? 'name: Sort\nworkflow: unicon/classic@v2\ntest_groups:\n  small: {pass: 30}\n  large: {pass: 70}\n'
+              : 'name: Sum\nworkflow: unicon/classic@v2\ntest_groups:\n  main: {each: 80, pass: 20}\n',
+          token: 'token-task',
+          upload: null,
+        }),
+      ),
+      ...repoFiles,
+    );
+    renderApp(CONTEST);
+
+    const card = await screen.findByRole('region', {
+      name: 'How this contest is scored',
+    });
+    const sort = await within(card).findByRole('region', { name: 'A · sort' });
+    expect(
+      await within(sort).findByText('small earns its 15 when every test passes.'),
+    ).toBeVisible();
+    expect(sort).toHaveTextContent(
+      `Worth 50 points, as the contest sets it; its groups total ${formatExact('100')}.`,
+    );
+    expect(sort).toHaveTextContent(
+      'Standings: Ranks entrants by points, from each entrant’s best submission on task sort',
+    );
+    const sum = within(card).getByRole('region', { name: 'B · sum' });
+    expect(
+      await within(sum).findByText(
+        'main earns 80 times the share of its tests you passed, and 20 more when you pass them all.',
+      ),
+    ).toBeVisible();
+    expect(sum).toHaveTextContent(
+      `Worth ${formatExact('100')} points, its groups’ total.`,
+    );
+    expect(sum).toHaveTextContent('No board counts it.');
   });
 });
 

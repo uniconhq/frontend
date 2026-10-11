@@ -24,6 +24,7 @@ import {
   GradingsCard,
   QuestionsCard,
 } from './ContestCards';
+import { ContestScoring } from './ContestScoring';
 import { ContestSummary } from './ContestSummary';
 import { ContestTasks } from './ContestTasks';
 import { StatusCard } from './StatusCard';
@@ -98,6 +99,7 @@ export function ContestPage() {
       <StatusCard org={org} contest={contest} />
       <ContestSummary org={org} contest={contest} />
       <ContestTasks org={org} contest={contest} />
+      <ContestScoring org={org} contest={contest} />
       <CardGrid label="The contest's sections">
         {CONTEST_SECTIONS.filter(
           (section): section is Extract<typeof section, { card: 'grid' }> =>
