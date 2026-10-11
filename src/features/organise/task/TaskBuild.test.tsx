@@ -397,6 +397,28 @@ describe('the cards that build a task', { timeout: 30_000 }, () => {
     expect(content).toContain('name: Shortest Path   # the title');
   });
 
+  it('shows, as an empty label’s placeholder, what entrants then see', async () => {
+    taskBackend({
+      form: {
+        ...CHECKED,
+        inputs: [
+          declared('submission', 'file', { contestant: true, title: 'Solution' }),
+          ...CHECKED.inputs.slice(1),
+        ],
+      },
+    });
+    const { inputs } = await openTask();
+
+    const entrants = within(inputs).getByRole('region', {
+      name: 'What entrants submit',
+    });
+    // An empty label shows entrants the input's name, not the workflow's title.
+    expect(fieldIn(entrants, 'Solution', 'Label shown to entrants')).toHaveAttribute(
+      'placeholder',
+      'submission',
+    );
+  });
+
   it('says a newer version of the workflow is out and takes it only when asked', async () => {
     const { sent } = taskBackend({ form: { ...CHECKED, newer: 'v3' } });
     asManager();
