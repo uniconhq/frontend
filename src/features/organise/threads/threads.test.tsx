@@ -115,31 +115,158 @@ describe('posting an announcement', () => {
   });
 });
 
-describe('the inbox', () => {
-  it('lists the open questions, and only marking takes one off', async () => {
-    let open = [question()];
-    const marked: string[] = [];
-    server.use(
-      signedIn,
-      http.get('/api/v1/orgs/:org/clarifications', () => HttpResponse.json(open)),
-      http.put(
-        '/api/v1/orgs/:org/contests/:contest/clarifications/:asker/:number/answered',
-        ({ params }) => {
-          marked.push(`${String(params.asker)}/${String(params.number)}`);
-          open = [];
-          return HttpResponse.json(question({ answered: true, closed: true }));
-        },
-      ),
+const QUESTION_API = `${CONTEST_API}/clarifications/:asker/:number`;
+const INBOX_API = '/api/v1/orgs/:org/clarifications';
+
+/**
+ * A list of questions at `list`, the inbox listing the open ones alone, and
+ * the routes that change one, keeping what each change did, in order.
+ */
+function questionRoutes(start: Clarification[], list: string) {
+  let listed = start;
+  const did: string[] = [];
+  const update = (number: unknown, change: Partial<Clarification>) => {
+    listed = listed.map((found) =>
+      String(found.number) === number ? { ...found, ...change } : found,
     );
+    return HttpResponse.json(listed.find((found) => String(found.number) === number));
+  };
+  server.use(
+    signedIn,
+    http.get(list, () =>
+      HttpResponse.json(
+        list === INBOX_API ? listed.filter((found) => !found.answered) : listed,
+      ),
+    ),
+    http.post(`${QUESTION_API}/replies`, async ({ params, request }) => {
+      const { body } = (await request.json()) as { body: string };
+      did.push(`reply ${String(params.number)}`);
+      const found = listed.find((each) => String(each.number) === params.number);
+      return update(params.number, {
+        messages: [
+          ...(found?.messages ?? []),
+          { from_asker: false, body, at: '2026-09-12T09:30:00Z' },
+        ],
+      });
+    }),
+    http.put(`${QUESTION_API}/answered`, ({ params }) => {
+      did.push(`mark ${String(params.number)}`);
+      return update(params.number, { answered: true, closed: true });
+    }),
+    http.delete(`${QUESTION_API}/answered`, ({ params }) => {
+      did.push(`reopen ${String(params.number)}`);
+      return update(params.number, { answered: false, closed: false });
+    }),
+  );
+  return did;
+}
+
+describe('the inbox', () => {
+  it('lists the open questions, and asks before marking one answered with no reply', async () => {
+    const did = questionRoutes([question()], INBOX_API);
     renderApp('/orgs/acme/clarifications');
 
     expect(await screen.findByText('Input size?')).toBeVisible();
-    expect(screen.getByText(/only Mark as answered takes it off/)).toBeVisible();
+    expect(screen.getByText(/Replying marks a question answered/)).toBeVisible();
     await userEvent.click(
       screen.getByRole('button', { name: 'Mark as answered Input size?' }),
     );
+    const asked = await screen.findByRole('dialog', {
+      name: 'Mark it answered without a reply?',
+    });
+    expect(asked).toHaveTextContent(
+      'The entrant sees it answered with no answer from you',
+    );
+    expect(did).toEqual([]);
+    await userEvent.click(
+      within(asked).getByRole('button', { name: 'Mark as answered' }),
+    );
 
-    expect(await screen.findByText('No question is waiting.')).toBeVisible();
-    expect(marked).toEqual(['20/1']);
+    expect(
+      await screen.findByText('No question is waiting for an answer.'),
+    ).toBeVisible();
+    expect(did).toEqual(['mark 1']);
+  });
+
+  it('marks a question answered as the reply goes, unless told not to', async () => {
+    const did = questionRoutes(
+      [question(), question({ number: 2, title: 'Output format?' })],
+      INBOX_API,
+    );
+    renderApp('/orgs/acme/clarifications');
+
+    const first = await screen.findByRole('form', { name: 'Reply to Input size?' });
+    expect(
+      within(first).getByRole('checkbox', { name: /Mark it answered/ }),
+    ).toBeChecked();
+    await userEvent.type(within(first).getByLabelText(/Reply/), 'Up to 10^5.');
+    await userEvent.click(within(first).getByRole('button', { name: 'Reply' }));
+    await waitFor(() => expect(did).toEqual(['reply 1', 'mark 1']));
+
+    const second = screen.getByRole('form', { name: 'Reply to Output format?' });
+    await userEvent.click(
+      within(second).getByRole('checkbox', { name: /Mark it answered/ }),
+    );
+    await userEvent.type(within(second).getByLabelText(/Reply/), 'Looking into it.');
+    await userEvent.click(within(second).getByRole('button', { name: 'Reply' }));
+    await waitFor(() => expect(did).toEqual(['reply 1', 'mark 1', 'reply 2']));
+    expect(await screen.findByText('Looking into it.')).toBeVisible();
+
+    // Replied to already, so marking it asks nothing.
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Mark as answered Output format?' }),
+    );
+    await waitFor(() =>
+      expect(did).toEqual(['reply 1', 'mark 1', 'reply 2', 'mark 2']),
+    );
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+});
+
+describe("a contest's questions, for its organisers", () => {
+  it('puts the open ones first, folds the answered away, and reopens one', async () => {
+    const did = questionRoutes(
+      [
+        question({ number: 1, title: 'Old answered', answered: true, closed: true }),
+        question({
+          number: 2,
+          title: 'Waiting less',
+          asked_at: '2026-09-12T09:20:00Z',
+        }),
+        question({
+          number: 3,
+          title: 'Waiting long',
+          asked_at: '2026-09-12T09:05:00Z',
+        }),
+      ],
+      `${CONTEST_API}/clarifications`,
+    );
+    renderApp('/orgs/acme/contests/spring/questions');
+
+    const open = await screen.findByRole('list', { name: 'Open questions' });
+    const titles = within(open)
+      .getAllByRole('listitem')
+      .map((item) => item.querySelector('strong')?.textContent);
+    expect(titles).toEqual(['Waiting long', 'Waiting less']);
+    expect(screen.queryByText('Old answered')).toBeNull();
+
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Show 1 answered question' }),
+    );
+    const answered = screen.getByRole('list', { name: 'Answered questions' });
+    expect(within(answered).getByText('Old answered')).toBeVisible();
+    expect(screen.queryByRole('button', { name: /^Unmark/ })).toBeNull();
+    await userEvent.click(
+      within(answered).getByRole('button', { name: 'Reopen Old answered' }),
+    );
+
+    await waitFor(() => expect(did).toEqual(['reopen 1']));
+    await waitFor(() =>
+      expect(
+        within(screen.getByRole('list', { name: 'Open questions' })).getByText(
+          'Old answered',
+        ),
+      ).toBeVisible(),
+    );
   });
 });
