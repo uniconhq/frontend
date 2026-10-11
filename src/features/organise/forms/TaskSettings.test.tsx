@@ -154,6 +154,14 @@ function fill(field: HTMLElement, value: string) {
   fireEvent.change(field, { target: { value } });
 }
 
+/**
+ * A field inside one box of the form, an input or a test group, found by the
+ * box's title: a field is named for what it is, and its box says whose it is.
+ */
+function fieldIn(form: HTMLElement, box: string | RegExp, name: string): HTMLElement {
+  return within(within(form).getByRole('group', { name: box })).getByLabelText(name);
+}
+
 async function openForm() {
   renderApp('/orgs/acme/contests/spring/tasks/sum/settings');
   return screen.findByRole('form', { name: 'Task settings' });
@@ -200,17 +208,17 @@ describe('the task settings form', { timeout: 20_000 }, () => {
       each,
       show,
     ] = [
-      'Workflow',
-      'submission label',
-      'language options',
-      'checker value',
-      'time_limit value',
-      "New input's id",
-      'An accepted test earns',
-      'small pass at',
-      'large each',
-      'large show',
-    ].map(field);
+      field('Workflow'),
+      fieldIn(form, /^submission:/, 'Label'),
+      fieldIn(form, /^language:/, 'Options'),
+      fieldIn(form, /^checker:/, 'Value'),
+      fieldIn(form, /^time_limit:/, 'Value'),
+      field("New input's id"),
+      field('An accepted test earns'),
+      fieldIn(form, 'small', 'Pass at'),
+      fieldIn(form, 'large', 'Each'),
+      fieldIn(form, 'large', 'Show'),
+    ];
     const [removeToken, removeOld, addValue, addDetails, addWeight, save] = [
       'Remove token',
       'Remove old',
@@ -219,34 +227,39 @@ describe('the task settings form', { timeout: 20_000 }, () => {
       'Add a test weight to small',
       'Save settings',
     ].map((name) => within(form).getByRole('button', { name, hidden: true }));
-    fill(workflow!, 'unicon/checked@v2');
-    fill(label!, 'Your program');
-    fill(options!, 'cpp, python, java');
-    fill(checker!, 'checker/new.cpp');
-    fill(limit!, '3');
-    fill(passAt!, '0.8');
-    fill(each!, '70');
-    fill(show!, 'after_close');
-    fill(credit!, 'relative');
+    fill(workflow, 'unicon/checked@v2');
+    fill(label, 'Your program');
+    fill(options, 'cpp, python, java');
+    fill(checker, 'checker/new.cpp');
+    fill(limit, '3');
+    fill(passAt, '0.8');
+    fill(each, '70');
+    fill(show, 'after_close');
+    fill(credit, 'relative');
     fireEvent.click(removeToken!);
     fireEvent.click(removeOld!);
-    fill(newId!, 'memory_limit');
+    fill(newId, 'memory_limit');
     fireEvent.click(addValue!);
-    fill(newId!, 'notes');
+    fill(newId, 'notes');
     fireEvent.click(addDetails!);
     fireEvent.click(addWeight!);
+    const weightRow = within(
+      within(within(form).getByRole('group', { name: 'small' })).getByRole('group', {
+        name: 'Test weight 1',
+      }),
+    );
     const [memory, notes, valueName, test, weight] = [
-      'memory_limit value',
-      'notes label',
-      'Value name',
-      'small test',
-      'small test weight',
-    ].map(field);
-    fill(memory!, '256');
-    fill(notes!, 'Notes');
-    fill(valueName!, 'score');
-    fill(test!, '7');
-    fill(weight!, '3');
+      fieldIn(form, /^memory_limit:/, 'Value'),
+      fieldIn(form, /^notes:/, 'Label'),
+      field('Value name'),
+      weightRow.getByLabelText('Test'),
+      weightRow.getByLabelText('Weight'),
+    ];
+    fill(memory, '256');
+    fill(notes, 'Notes');
+    fill(valueName, 'score');
+    fill(test, '7');
+    fill(weight, '3');
     fireEvent.click(save!);
 
     expect(await screen.findByText('Published as publication 4.')).toBeVisible();
@@ -351,18 +364,28 @@ describe('the task settings form', { timeout: 20_000 }, () => {
     expect(
       within(form).getByText('Each test holds: input (file), answer (file).'),
     ).toBeVisible();
-    expect(within(inputs).getByLabelText('submission max size')).toBeVisible();
-    expect(within(inputs).queryByLabelText('submission default')).toBeNull();
-    expect(within(inputs).queryByLabelText('time_limit min')).toBeNull();
+    expect(fieldIn(inputs, /^submission:/, 'Largest size')).toBeVisible();
+    expect(
+      within(
+        within(inputs).getByRole('group', { name: /^submission:/ }),
+      ).queryByLabelText('Default'),
+    ).toBeNull();
+    expect(
+      within(
+        within(inputs).getByRole('group', { name: /^time_limit:/ }),
+      ).queryByLabelText('Minimum'),
+    ).toBeNull();
     expect(
       within(inputs).getByText(/the save refuses the task until it has a value/),
     ).toBeVisible();
 
-    const options = within(inputs).getByRole('group', { name: 'language options' });
+    const options = within(
+      within(inputs).getByRole('group', { name: /^language:/ }),
+    ).getByRole('group', { name: 'Options' });
     expect(within(options).getByRole('checkbox', { name: 'cpp' })).toBeChecked();
     expect(within(options).getByRole('checkbox', { name: 'java' })).not.toBeChecked();
     fireEvent.click(within(options).getByRole('checkbox', { name: 'java' }));
-    fill(within(inputs).getByLabelText('time_limit value'), '3');
+    fill(fieldIn(inputs, /^time_limit:/, 'Value'), '3');
     fireEvent.click(
       within(inputs).getByRole('button', { name: 'Give memory_limit a value' }),
     );
@@ -372,11 +395,16 @@ describe('the task settings form', { timeout: 20_000 }, () => {
     fireEvent.click(
       within(inputs).getByRole('button', { name: 'Give greeting a value' }),
     );
-    fill(within(inputs).getByLabelText('memory_limit value'), '256');
-    fill(within(inputs).getByLabelText('strict value'), 'true');
-    fill(within(inputs).getByLabelText('greeting value'), '42');
+    fill(fieldIn(inputs, /^memory_limit:/, 'Value'), '256');
+    fill(fieldIn(inputs, /^strict:/, 'Value'), 'true');
+    fill(fieldIn(inputs, /^greeting:/, 'Value'), '42');
     expect(
-      within(inputs).getByRole('checkbox', { name: 'token: a secret of the org' }),
+      within(within(inputs).getByRole('group', { name: /^token:/ })).getByRole(
+        'checkbox',
+        {
+          name: 'A secret of the org',
+        },
+      ),
     ).toBeChecked();
     fireEvent.click(within(form).getByRole('button', { name: 'Save settings' }));
 
@@ -457,7 +485,7 @@ describe('the task settings form', { timeout: 20_000 }, () => {
     ).toBeVisible();
     const save = within(form).getByRole('button', { name: 'Save settings' });
     expect(save).toBeEnabled();
-    fill(within(form).getByLabelText('time_limit max'), '10');
+    fill(fieldIn(form, /^time_limit:/, 'Maximum'), '10');
     fireEvent.click(save);
 
     expect(await screen.findByText('Published as publication 4.')).toBeVisible();
@@ -490,7 +518,7 @@ describe('the task settings form', { timeout: 20_000 }, () => {
     );
     asManager();
     const form = await openForm();
-    expect(within(form).getByLabelText('time_limit value')).toBeVisible();
+    expect(fieldIn(form, /^time_limit:/, 'Value')).toBeVisible();
 
     fill(within(form).getByLabelText('Workflow'), 'my-org/tunable@v1');
     fireEvent.click(within(form).getByRole('button', { name: 'Save settings' }));
@@ -502,8 +530,12 @@ describe('the task settings form', { timeout: 20_000 }, () => {
         /task.yaml gives it a value, but the contestant gives this one/,
       ),
     ).toBeVisible();
-    expect(within(after).queryByLabelText('time_limit value')).toBeNull();
-    expect(within(after).getByLabelText('time_limit max')).toBeVisible();
+    expect(
+      within(
+        within(after).getByRole('group', { name: /^time_limit:/ }),
+      ).queryByLabelText('Value'),
+    ).toBeNull();
+    expect(fieldIn(after, /^time_limit:/, 'Maximum')).toBeVisible();
   });
 
   it("removes a declared input's key when its value is cleared", async () => {
@@ -522,7 +554,7 @@ describe('the task settings form', { timeout: 20_000 }, () => {
     asManager();
     const form = await openForm();
 
-    fill(within(form).getByLabelText('time_limit value'), '');
+    fill(fieldIn(form, /^time_limit:/, 'Value'), '');
     fireEvent.click(within(form).getByRole('button', { name: 'Save settings' }));
 
     expect(await screen.findByText('Published as publication 4.')).toBeVisible();
@@ -582,7 +614,9 @@ size 120
     );
     const form = await openForm();
     const show = (group: string) =>
-      within(form).getByRole('combobox', { name: new RegExp(`^${group} show`) });
+      within(within(form).getByRole('group', { name: group })).getByRole('combobox', {
+        name: /^Show/,
+      });
     const [added, kept, empty] = [show('large'), show('small'), show('samples')];
     expect(added).toBeRequired();
     expect(added).toHaveAccessibleDescription(
@@ -594,7 +628,7 @@ size 120
       within(empty).getByRole('option', { name: 'Not set (always)' }),
     ).toBeVisible();
 
-    fill(within(form).getByLabelText('small pass at'), '0.5');
+    fill(fieldIn(form, 'small', 'Pass at'), '0.5');
     const save = within(form).getByRole('button', { name: 'Save settings' });
     expect(save).toBeDisabled();
     fill(added, 'verdict');
@@ -615,7 +649,7 @@ size 120
     taskBackend(() => HttpResponse.json({}));
     const form = await openForm();
 
-    fill(within(form).getByLabelText('small pass'), 'thirty');
+    fill(fieldIn(form, 'small', 'Pass'), 'thirty');
 
     expect(within(form).getByText('Not a number.')).toBeVisible();
     expect(within(form).getByRole('button', { name: 'Save settings' })).toBeDisabled();
@@ -636,8 +670,8 @@ size 120
     );
     const form = await openForm();
 
-    fill(within(form).getByLabelText('time_limit value'), '3');
-    fill(within(form).getByLabelText('large each'), '70');
+    fill(fieldIn(form, /^time_limit:/, 'Value'), '3');
+    fill(fieldIn(form, 'large', 'Each'), '70');
     await userEvent.click(within(form).getByRole('button', { name: 'Save settings' }));
 
     const merge = await screen.findByRole('list', { name: 'Fields that differ' });
