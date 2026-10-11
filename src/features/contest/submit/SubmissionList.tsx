@@ -119,7 +119,7 @@ function MarksSummary({ state }: { state: Extract<MarkState, { kind: 'held' }> }
       <BodyText tone="secondary">
         {marks.frozen
           ? `Your marks are final: ${marks.numbers.length} of ${marks.most} marked.`
-          : `Marked ${marks.numbers.length} of ${marks.most}. The boards that count marks count the best of those you mark, and you may change them until ${until}.`}
+          : `Marked ${marks.numbers.length} of ${marks.most}. The leaderboards that count marks count the best of those you mark, and you may change them until ${until}.`}
       </BodyText>
       {refusal !== null && (
         <div role="alert">
