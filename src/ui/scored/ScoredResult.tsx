@@ -62,7 +62,10 @@ function FoldedValues({ folded }: { folded: Record<string, string> }) {
 
 /**
  * One row per test of a group, with its own outcome and each value its steps
- * reported for it, such as its time and memory, a column per value.
+ * reported for it, such as its time and memory, a column per value; then the
+ * credit it earned and, where it is scored against the best, that best `B`,
+ * so the one can be checked against the other (section 3.2). A column none of
+ * the rows has is left out.
  */
 function Tests({ group }: { group: GroupShown }) {
   const rows = group.tests ?? [];
@@ -75,6 +78,8 @@ function Tests({ group }: { group: GroupShown }) {
       ]),
     ),
   ];
+  const credited = rows.some((row) => row.credit !== null);
+  const bested = rows.some((row) => row.best !== null);
   return (
     <table className={classes.table} aria-label={`Tests ${group.group}`}>
       <thead>
@@ -86,6 +91,8 @@ function Tests({ group }: { group: GroupShown }) {
               {name}
             </th>
           ))}
+          {credited && <th scope="col">Credit</th>}
+          {bested && <th scope="col">Best</th>}
         </tr>
       </thead>
       <tbody>
@@ -100,6 +107,8 @@ function Tests({ group }: { group: GroupShown }) {
             {names.map((name) => (
               <td key={name}>{valueText(row.values, name) ?? '—'}</td>
             ))}
+            {credited && <td>{row.credit === null ? '—' : formatExact(row.credit)}</td>}
+            {bested && <td>{row.best === null ? '—' : formatExact(row.best)}</td>}
           </tr>
         ))}
       </tbody>

@@ -854,6 +854,54 @@ describe('a submission opened from the list', () => {
     expect(within(extra).queryByRole('table')).toBeNull();
   });
 
+  it('shows beside each test its credit and, scored against the best, that best', async () => {
+    const relative = grading({
+      ...accepted,
+      groups: [
+        {
+          group: 'main',
+          show: 'always',
+          outcome: 'accepted',
+          tests: [
+            {
+              test: 'main/1',
+              outcome: 'accepted',
+              values: reported({ score: '80' }),
+              credit: '0.8',
+              best: '100',
+            },
+          ],
+          shown_at: null,
+          ran: true,
+          points: '80',
+          max: '100',
+        },
+      ],
+    });
+    server.use(
+      signedIn,
+      withPage({}),
+      listing([submission(1, relative)]),
+      http.get(`${TASK_API}/submissions/:number`, () =>
+        HttpResponse.json(submission(1, relative)),
+      ),
+    );
+    renderApp(`${PAGE}?submission=1`);
+
+    const detail = await screen.findByRole('region', { name: 'Submission 1' });
+    const tests = await within(detail).findByRole('table', { name: 'Tests main' });
+    expect(
+      within(tests)
+        .getAllByRole('columnheader')
+        .map((header) => header.textContent),
+    ).toEqual(['Test', 'Outcome', 'score', 'Credit', 'Best']);
+    expect(
+      within(tests)
+        .getAllByRole('cell')
+        .map((cell) => cell.textContent),
+    ).toEqual(['ACCEPTED', '80', formatExact('0.8'), '100']);
+  });
+
   it('shows a cancelled one as cancelled, in the organisers’ words', async () => {
     const cancelled = grading({
       status: 'cancelled',
