@@ -102,11 +102,18 @@ function standing(entrant: Entrant, entry: MyEntry): Standing {
  * Where something stands, as a status the page reads out. After the person's
  * own change the focus is on the section around it, whose button has gone.
  */
-function Status({ title, message }: Standing) {
+function Status({ title, message, onRetry }: Standing & { onRetry?: () => void }) {
   return (
     <div className={classes.panel} role="status" aria-label="Registration">
       <BodyText>{title}</BodyText>
       <BodyText tone="secondary">{message}</BodyText>
+      {onRetry !== undefined && (
+        <div>
+          <Button size="xs" variant="secondary" onClick={onRetry}>
+            Try again
+          </Button>
+        </div>
+      )}
     </div>
   );
 }
@@ -123,6 +130,14 @@ function refusedStanding(entry: MyEntry): Standing {
     return {
       title: 'You cannot register',
       message: 'This contest is not taking your registration.',
+    };
+  }
+  if (entry.refused.code === 'forge_unavailable') {
+    // Nothing is wrong with the person: their addresses could not be read.
+    return {
+      title: 'Forgejo did not answer',
+      message:
+        'Your email addresses could not be checked just now, so whether you can register is not known yet.',
     };
   }
   const { title, message } = describeError(
@@ -711,7 +726,17 @@ export function YourEntry({
         ) : entry.can_register ? (
           <RegisterForm path={path} entry={entry} change={change} />
         ) : (
-          <Status {...refusedStanding(entry)} />
+          <Status
+            {...refusedStanding(entry)}
+            onRetry={
+              entry.refused?.code === 'forge_unavailable'
+                ? () =>
+                    void queryClient.invalidateQueries({
+                      predicate: (query) => ofContest(query, path),
+                    })
+                : undefined
+            }
+          />
         )
       ) : (
         <>
