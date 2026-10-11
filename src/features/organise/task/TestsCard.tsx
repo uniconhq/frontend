@@ -276,18 +276,20 @@ function GroupItem({
   const [open, setOpen] = useState(
     count <= 12 || (linked && (search.get(FIELD_PARAM) ?? '').startsWith('test:')),
   );
-  // The rule chosen holds while its points box is emptied to be typed again.
+  // The rule chosen holds while its points box is emptied to be typed again,
+  // and a bonus while its bonus box is still empty, which reads as points for
+  // each test alone.
   const [picked, setPicked] = useState<Rule | null>(null);
   const read = ruleOf(group);
+  const held =
+    picked !== null &&
+    (read === 'none' ||
+      (picked === 'bonus' && read === 'each' && group.pass.trim() === ''));
   // Weights for tests the group does not have, which the save refuses (T2).
   const strays = group.weights.filter(
     (row) => !saved.includes(row.test) && !added.some((test) => test.test === row.test),
   );
-  const rule: Rule = advanced
-    ? 'advanced'
-    : read === 'none' && picked !== null
-      ? picked
-      : read;
+  const rule: Rule = advanced ? 'advanced' : held ? picked : read;
   const refusal = ruleRefusal('worst', credit.kind);
   const showProblem = showRefusal(group.show, group, credit.kind);
   const verdictRefusal = showRefusal('verdict', group, credit.kind);

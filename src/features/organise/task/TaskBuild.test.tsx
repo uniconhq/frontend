@@ -684,6 +684,24 @@ describe('scoring a task', { timeout: 30_000 }, () => {
     ).toBeEnabled();
   });
 
+  it('keeps the bonus rule chosen while its bonus is still empty', async () => {
+    taskBackend({ form: { ...CHECKED, inputs: [] } });
+    const { tests } = await openTask();
+
+    const rule = fieldIn(tests, 'small', 'How does this group earn points?');
+    fill(rule, 'bonus');
+
+    expect(rule).toHaveValue('bonus');
+    const bonus = fieldIn(tests, 'small', 'Bonus for passing every test');
+    fill(bonus, '10');
+    expect(
+      within(fieldGroup(tests, 'small')).getByText(/more when you pass them all\./),
+    ).toBeVisible();
+    expect(fieldIn(tests, 'small', 'How does this group earn points?')).toHaveValue(
+      'bonus',
+    );
+  });
+
   it('says before a save that a task with no worth of its own is worth its new total (#435)', async () => {
     taskBackend({ form: { ...CHECKED, inputs: [] } });
     const { tests } = await openTask();
@@ -717,6 +735,23 @@ function fieldGroup(scope: HTMLElement, name: string): HTMLElement {
 }
 
 describe('the tests of a task', { timeout: 30_000 }, () => {
+  it('offers to add a test, not a count of none, before any file is chosen', async () => {
+    taskBackend({ form: { ...CHECKED, inputs: [] } });
+    const { tests } = await openTask();
+
+    await userEvent.click(
+      within(fieldGroup(tests, 'small')).getByRole('button', {
+        name: 'Add tests to small',
+      }),
+    );
+    const dialog = await screen.findByRole('dialog', { name: 'Add tests' });
+    expect(within(dialog).getByRole('button', { name: 'Add the test' })).toBeDisabled();
+    await userEvent.click(
+      within(dialog).getByRole('radio', { name: 'Several, from files named by test' }),
+    );
+    expect(within(dialog).getByRole('button', { name: 'Add tests' })).toBeDisabled();
+  });
+
   it('adds tests from files named by test, shows what was matched first, and saves them with the settings', async () => {
     const { sent } = taskBackend({ form: { ...CHECKED, inputs: [] } });
     const { tests } = await openTask();
