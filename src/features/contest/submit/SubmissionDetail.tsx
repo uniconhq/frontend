@@ -60,8 +60,9 @@ function Grading({ grading }: { grading: GradingResult }) {
 }
 
 /**
- * The files the submission was made with, each a download of the file as it
- * was submitted, whatever its size.
+ * What the submission was made with, input by input: each file a download of
+ * the file as it was submitted, whatever its size, named with its input, and
+ * each value given, as it was given.
  */
 function Files({ where }: { where: Where }) {
   const view = queryView(
@@ -73,16 +74,34 @@ function Files({ where }: { where: Where }) {
   );
   if (view.state === 'loading') return <PageSkeleton rows={1} />;
   if (view.state === 'error') return <ErrorBlock error={view.error} compact />;
-  const paths = Object.values(view.data.inputs).flatMap((input) => input.files);
-  if (paths.length === 0) return null;
+  const inputs = Object.entries(view.data.inputs);
+  const files = inputs.flatMap(([id, input]) =>
+    input.files.map((path) => ({ id, path })),
+  );
+  const values = inputs.flatMap(([id, input]) =>
+    input.value === null ? [] : [{ id, value: String(input.value) }],
+  );
   return (
-    <ul className={classes.files} aria-label="Files">
-      {paths.map((path) => (
-        <li key={path}>
-          <TextLink href={downloadHref(where, path)}>{nameOf(path)}</TextLink>
-        </li>
-      ))}
-    </ul>
+    <>
+      {files.length > 0 && (
+        <ul className={classes.files} aria-label="Files">
+          {files.map(({ id, path }) => (
+            <li key={path}>
+              {id}: <TextLink href={downloadHref(where, path)}>{nameOf(path)}</TextLink>
+            </li>
+          ))}
+        </ul>
+      )}
+      {values.length > 0 && (
+        <ul className={classes.files} aria-label="Values given">
+          {values.map(({ id, value }) => (
+            <li key={id}>
+              {id}: {value}
+            </li>
+          ))}
+        </ul>
+      )}
+    </>
   );
 }
 

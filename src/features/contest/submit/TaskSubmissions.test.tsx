@@ -979,6 +979,44 @@ describe('a submission opened from the list', () => {
     expect(within(files).getAllByRole('link')).toHaveLength(1);
   });
 
+  it('names each file with its input, and lists each value given', async () => {
+    server.use(
+      signedIn,
+      withPage({}),
+      listing([submission(1, accepted)]),
+      http.get(`${TASK_API}/submissions/:number`, () =>
+        HttpResponse.json(submission(1, accepted)),
+      ),
+      http.get(`${TASK_API}/submissions/:number/files`, () =>
+        HttpResponse.json({
+          number: 1,
+          inputs: {
+            program: { files: ['files/program/main.c'], value: null },
+            checker: { files: ['files/checker/main.c'], value: null },
+            language: { files: [], value: 'cpp' },
+            n: { files: [], value: '5' },
+            strict: { files: [], value: true },
+          },
+        }),
+      ),
+    );
+    renderApp(`${PAGE}?submission=1`);
+
+    const detail = await screen.findByRole('region', { name: 'Submission 1' });
+    const files = await within(detail).findByRole('list', { name: 'Files' });
+    expect(
+      within(files)
+        .getAllByRole('listitem')
+        .map((item) => item.textContent),
+    ).toEqual(['program: main.c', 'checker: main.c']);
+    const given = within(detail).getByRole('list', { name: 'Values given' });
+    expect(
+      within(given)
+        .getAllByRole('listitem')
+        .map((item) => item.textContent),
+    ).toEqual(['language: cpp', 'n: 5', 'strict: true']);
+  });
+
   it('names each file by its path under its input, so files of one name differ', async () => {
     server.use(
       signedIn,
