@@ -17,7 +17,7 @@ import { QuestionsSection } from './threads/QuestionsSection';
 import { TeamSection } from './teams/TeamSection';
 import { BOARDS_EVERY_MS, BoardList } from './boards/BoardList';
 import { BySession } from './BySession';
-import { Countdown } from './Countdown';
+import { Countdown } from '@/ui/Countdown';
 import { RegistrationPanel } from './RegistrationPanel';
 import { SignInButtons, SignInPrompt } from './SignInPrompt';
 import { labelOf } from './task-names';
