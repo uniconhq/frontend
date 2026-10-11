@@ -7,6 +7,9 @@ import { Markdown } from '@/ui/Markdown';
 import { CodeEditor } from '@/ui/CodeEditor';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
+import { PageLink } from '@/ui/PageLink';
+import { taskSectionPath } from '@/lib/sections';
+import type { TaskWhere } from '@/lib/task-pictures';
 import { SaveOutcome, type Outcome } from '../files/SaveOutcome';
 import { UploadedFile } from '../files/UploadedFile';
 import type { Place } from '../files/place';
@@ -19,7 +22,7 @@ const PATH = 'statement.md';
 
 /**
  * `statement.md`, the text contestants read, beside the same rendering their
- * task page gives it. The statement is the task admin's, so a manager reads
+ * task page gives it, the task's own pictures drawn as they will see them. The statement is the task admin's, so a manager reads
  * it here and changes nothing. A save is the save of the task, answered as
  * any other. A statement that is an upload shows as one, never as text.
  */
@@ -67,6 +70,11 @@ export function StatementEditor({ place, admin }: { place: Place; admin: boolean
       <Source
         key={query.data.token}
         file={query.data}
+        task={
+          place.kind === 'task'
+            ? { org: place.org, contest: place.contest, task: place.task }
+            : null
+        }
         admin={admin}
         busy={busy}
         onSave={(content, token) =>
@@ -98,11 +106,13 @@ export function StatementEditor({ place, admin }: { place: Place; admin: boolean
 /** The source as it is being edited, kept through a refused save. */
 function Source({
   file,
+  task,
   admin,
   busy,
   onSave,
 }: {
   file: FileContent;
+  task: TaskWhere | null;
   admin: boolean;
   busy: boolean;
   onSave: (content: string, token: string) => void;
@@ -128,9 +138,10 @@ function Source({
           readOnly={!admin || busy}
         />
         <section className={classes.preview} aria-label="What contestants see">
-          <Markdown>{text}</Markdown>
+          <Markdown task={task ?? undefined}>{text}</Markdown>
         </section>
       </div>
+      {admin && task !== null && <PictureHint task={task} />}
       {admin && (
         <div className={shared.actions}>
           <Button
@@ -144,5 +155,23 @@ function Source({
         </div>
       )}
     </>
+  );
+}
+
+/**
+ * How a statement shows a picture: a file uploaded under the task's
+ * `public/` folder, named by its path there. Anything else stays a link.
+ */
+function PictureHint({ task }: { task: TaskWhere }) {
+  return (
+    <BodyText tone="secondary">
+      To show a picture, upload it in the task&apos;s{' '}
+      <PageLink to={taskSectionPath(task.org, task.contest, task.task, 'files')}>
+        Files
+      </PageLink>{' '}
+      under <code>public/</code> and write{' '}
+      <code>![What it shows](public/diagram.png)</code>. A picture from anywhere else
+      shows as a link.
+    </BodyText>
   );
 }

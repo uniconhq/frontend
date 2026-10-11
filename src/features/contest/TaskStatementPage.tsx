@@ -115,7 +115,7 @@ function SignedInTask({
       <PageTitle>{headingOf(page)}</PageTitle>
       <TaskAnnouncements org={org} contest={contest} task={task} />
       <Card>
-        <Markdown>{page.statement}</Markdown>
+        <Markdown task={{ org, contest, task }}>{page.statement}</Markdown>
       </Card>
       <Card>
         <div className={classes.stack}>
@@ -172,7 +172,7 @@ function PublicTask({
       <Back org={org} contest={contest} />
       <PageTitle>{headingOf(found)}</PageTitle>
       <Card>
-        <Markdown>{statement}</Markdown>
+        <Markdown task={{ org, contest, task }}>{statement}</Markdown>
       </Card>
     </div>
   );

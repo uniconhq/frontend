@@ -183,6 +183,41 @@ describe('a task page for a signed-in person', () => {
     expect(guide).toHaveAttribute('rel', 'noopener noreferrer');
   });
 
+  it('draws the task’s own pictures from its route, and keeps any other image a link', async () => {
+    server.use(
+      signedIn,
+      noSubmissions,
+      http.get(`${TASK_API}/page`, () =>
+        HttpResponse.json({
+          ...taskPage,
+          statement: [
+            '![the tree](public/tree.png)',
+            '![the graph](./public/figures/graph%201.svg)',
+            '![outside](public/../task.yaml)',
+            '![from afar](https://elsewhere.test/public/d.png)',
+          ].join('\n\n'),
+        }),
+      ),
+    );
+    const { container } = renderApp(PAGE);
+
+    const tree = await screen.findByRole('img', { name: 'the tree' });
+    expect(tree).toHaveAttribute(
+      'src',
+      '/api/v1/orgs/acme/contests/spring/tasks/sum/public/tree.png',
+    );
+    expect(screen.getByRole('img', { name: 'the graph' })).toHaveAttribute(
+      'src',
+      '/api/v1/orgs/acme/contests/spring/tasks/sum/public/figures/graph%201.svg',
+    );
+    expect(screen.getByRole('link', { name: 'outside' })).toBeVisible();
+    expect(screen.getByRole('link', { name: 'from afar' })).toHaveAttribute(
+      'href',
+      'https://elsewhere.test/public/d.png',
+    );
+    expect(container.querySelectorAll('main img')).toHaveLength(2);
+  });
+
   it('answers not found for a task that is not released', async () => {
     server.use(
       signedIn,
@@ -250,6 +285,23 @@ describe('a task page for a visitor', () => {
     ).toBeVisible();
     expect(screen.getByText('Add two numbers.')).toBeVisible();
     expect(screen.queryByLabelText('Limits')).not.toBeInTheDocument();
+  });
+
+  it('draws the task’s own pictures for a visitor too', async () => {
+    server.use(
+      http.get(`${PUBLIC_API}/:org/:contest/tasks/:task`, () =>
+        HttpResponse.json({
+          task: { name: 'sum', label: 'A', title: 'Sum of Two' },
+          statement: '![the tree](public/tree.png)\n',
+        }),
+      ),
+    );
+    renderApp(PAGE);
+
+    expect(await screen.findByRole('img', { name: 'the tree' })).toHaveAttribute(
+      'src',
+      '/api/v1/orgs/acme/contests/spring/tasks/sum/public/tree.png',
+    );
   });
 
   it('asks a visitor to sign in for any other task', async () => {

@@ -82,6 +82,31 @@ describe('announcements', () => {
 
     expect(await screen.findByText('Read n first')).toBeVisible();
   });
+
+  it('draws a task’s own pictures in its announcements, and none in the contest’s', async () => {
+    server.use(
+      signedIn,
+      approvedHome,
+      http.get(`${CONTEST_API}/home/announcements`, () =>
+        HttpResponse.json([
+          announcement({ body: '![the map](public/map.png)' }),
+          announcement({
+            number: 2,
+            title: 'On sum',
+            body: '![the tree](public/tree.png)',
+            where: { org: 'acme', contest: 'spring', task: 'sum' },
+          }),
+        ]),
+      ),
+    );
+    renderApp(HOME);
+
+    expect(await screen.findByRole('img', { name: 'the tree' })).toHaveAttribute(
+      'src',
+      '/api/v1/orgs/acme/contests/spring/tasks/sum/public/tree.png',
+    );
+    expect(screen.getByRole('link', { name: 'the map' })).toBeVisible();
+  });
 });
 
 describe('questions', () => {
