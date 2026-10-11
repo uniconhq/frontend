@@ -237,6 +237,8 @@ describe('a workflow one may only read', () => {
     const state = await screen.findByRole('alert');
     expect(state).toHaveTextContent('This version cannot be opened, because:');
     expect(state).toHaveTextContent('unicon/classic has no version v1.');
+    // Asking again cannot find it; the switcher offers the versions there are.
+    expect(within(state).queryByRole('button', { name: 'Try again' })).toBeNull();
   });
 
   it('opens a version whose file does not parse in the same state', async () => {

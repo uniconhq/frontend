@@ -146,7 +146,11 @@ function VersionView({
     return (
       <>
         {bar(null)}
-        <Unopenable label={ref} onRetry={read.retry}>
+        <Unopenable
+          label={ref}
+          // A version that is not there will not be there on asking again.
+          onRetry={read.error.code === 'not_found' ? undefined : read.retry}
+        >
           <BodyText>{read.error.detail ?? read.error.message}</BodyText>
         </Unopenable>
       </>
