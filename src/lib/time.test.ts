@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   formatDuration,
+  formatWhen,
   recordServerTime,
   serverClockOffsetMs,
   serverNow,
@@ -21,6 +22,18 @@ describe('server clock', () => {
 
     expect(serverClockOffsetMs()).toBe(60_000);
     expect(serverNow().getTime() - Date.now()).toBeCloseTo(60_000, -2);
+  });
+});
+
+describe('a moment in a short line', () => {
+  it('gives the time alone on the same day, and the date with it on another', () => {
+    const now = new Date(2026, 8, 12, 10, 0);
+    const later = new Date(2026, 8, 12, 14, 0);
+    const tomorrow = new Date(2026, 8, 13, 14, 0);
+    const time = new Intl.DateTimeFormat(undefined, { timeStyle: 'short' });
+    expect(formatWhen(later, now)).toBe(time.format(later));
+    expect(formatWhen(tomorrow, now)).not.toBe(time.format(tomorrow));
+    expect(formatWhen(tomorrow, now)).toContain(time.format(tomorrow));
   });
 });
 

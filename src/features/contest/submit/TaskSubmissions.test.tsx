@@ -4,6 +4,7 @@ import userEvent from '@/test/user-event';
 import { http, HttpResponse } from 'msw';
 import type { GradingResult, Submission, TaskPage } from '@/api/types';
 import { formatExact } from '@/lib/exact';
+import { formatWhen } from '@/lib/time';
 import { renderApp } from '@/test/render';
 import { problem, server, signedIn } from '@/test/server';
 import { fakeTimerUser, passTime, withFakeTimers } from '@/test/timers';
@@ -767,11 +768,58 @@ describe('the submissions list', () => {
     const list = await screen.findByRole('table', { name: 'Your submissions' });
     const rows = within(list).getAllByRole('row').slice(1);
     expect(rows.map((row) => row.textContent)).toEqual([
-      expect.stringMatching(/^#4.*GRADING$/),
-      expect.stringMatching(/^#3.*2 days lateWRONG ANSWER$/),
-      expect.stringMatching(/^#2.*COMPILE ERR$/),
-      expect.stringMatching(/^#1.*ACCEPTED$/),
+      expect.stringMatching(/^#4.*GRADING—$/),
+      expect.stringMatching(/^#3.*2 days lateWRONG ANSWER—$/),
+      expect.stringMatching(/^#2.*COMPILE ERR—$/),
+      expect.stringMatching(/^#1.*ACCEPTED100$/),
     ]);
+  });
+
+  it('says each submission’s points in its row, or when held-back points are shown', async () => {
+    const held = (shown: string) =>
+      grading({
+        ...accepted,
+        points: { shown, pending: '70', pending_until: '2026-09-12T14:00:00Z' },
+      });
+    server.use(
+      signedIn,
+      withPage({}),
+      listing([
+        submission(
+          1,
+          grading({
+            ...accepted,
+            points: { shown: '82.5', pending: '0', pending_until: null },
+          }),
+        ),
+        submission(2, held('0')),
+        submission(3, held('30')),
+        submission(4, grading({ status: 'queued' })),
+      ]),
+    );
+    renderApp(PAGE);
+
+    const list = await screen.findByRole('table', { name: 'Your submissions' });
+    const at = formatWhen(new Date('2026-09-12T14:00:00Z'));
+    const cells = within(list)
+      .getAllByRole('row')
+      .slice(1)
+      .map((row) => row.lastElementChild?.textContent);
+    expect(cells).toEqual([
+      '—',
+      `30 so far, more shown at ${at}`,
+      `shown at ${at}`,
+      formatExact('82.5', 2),
+    ]);
+    expect(within(list).getByRole('columnheader', { name: 'Points' })).toBeVisible();
+  });
+
+  it('leaves points out of the list on a task that gives none', async () => {
+    server.use(signedIn, withPage({ worth: null }), listing([submission(1, accepted)]));
+    renderApp(PAGE);
+
+    const list = await screen.findByRole('table', { name: 'Your submissions' });
+    expect(within(list).queryByRole('columnheader', { name: 'Points' })).toBeNull();
   });
 });
 
