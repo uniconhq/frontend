@@ -475,6 +475,7 @@ export function numberProblem(text: string, whole = false): string | undefined {
   const value = numberOf(text);
   if (value === undefined) return undefined;
   if (Number.isNaN(value)) return 'Enter a number.';
+  if (!Number.isFinite(value)) return 'Enter a smaller number.';
   if (whole && !Number.isInteger(value)) return 'Enter a whole number.';
   return undefined;
 }

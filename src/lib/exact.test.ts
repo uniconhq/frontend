@@ -14,6 +14,15 @@ import {
   ZERO,
 } from './exact';
 
+describe('a number with a huge exponent', () => {
+  it('is no decimal to work with, at once rather than after building its digits', () => {
+    expect(ratioOf('1e9999999')).toBeNull();
+    expect(ratioOf('1e-9999999')).toBeNull();
+    expect(compareDecimal('1e9999999', '1')).toBeNaN();
+    expect(ratioOf('1e300')).not.toBeNull();
+  });
+});
+
 describe('compareDecimal', () => {
   it('compares to the last digit, past what a float holds', () => {
     expect(compareDecimal('1.00000000000000000001', '1.00000000000000000002')).toBe(-1);
