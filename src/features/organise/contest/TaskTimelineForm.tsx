@@ -31,14 +31,17 @@ export function TaskTimelineForm({
   org,
   contest,
   standing,
+  label,
 }: {
   org: string;
   contest: string;
   standing: TaskStanding;
+  /** What the task is called: its letter and its title. */
+  label: string;
 }) {
   return (
     <ContestFile org={org} contest={contest}>
-      {(props) => <EntryForm {...props} standing={standing} />}
+      {(props) => <EntryForm {...props} standing={standing} label={label} />}
     </ContestFile>
   );
 }
@@ -49,7 +52,8 @@ function EntryForm({
   onSave,
   admin,
   standing,
-}: FormProps & { admin: boolean; standing: TaskStanding }) {
+  label,
+}: FormProps & { admin: boolean; standing: TaskStanding; label: string }) {
   const [read] = useState(() => readContest(doc));
   const index = read.values.tasks.findIndex((entry) => entry.id === standing.task.name);
   const [entry, setEntry] = useState<TaskEntryValues | undefined>(
@@ -99,7 +103,7 @@ function EntryForm({
   return (
     <form
       className={forms.form}
-      aria-label={`Timeline of ${standing.label} · ${standing.task.name}`}
+      aria-label={`Timeline of ${label}`}
       onSubmit={(event) => {
         event.preventDefault();
         onSave((fresh) => writeContest(fresh, read.values, after, { admin }));

@@ -225,8 +225,17 @@ function treeAnswer(tree: Record<string, TreeEntry[]>) {
 
 /** The client sends a file's path as one segment, its slashes encoded. */
 function fileAnswer({ params }: { params: Record<string, unknown> }) {
-  const file = files[decodeURIComponent(String(params['path']))];
-  return file === undefined ? problem(404, 'not_found') : HttpResponse.json(file);
+  const path = decodeURIComponent(String(params['path']));
+  const file = files[path];
+  if (file === undefined) return problem(404, 'not_found');
+  // Each task's settings give it its own name as its title.
+  const task = params['task'];
+  return path === 'task.yaml' && typeof task === 'string'
+    ? HttpResponse.json({
+        ...file,
+        content: file.content.replace(/^name: .*$/m, `name: ${task}`),
+      })
+    : HttpResponse.json(file);
 }
 
 /** Both repos' trees and files, read-only; a test adds the writes it needs. */
