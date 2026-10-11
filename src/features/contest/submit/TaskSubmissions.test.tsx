@@ -839,7 +839,8 @@ describe('a submission opened from the list', () => {
     const main = within(detail).getByRole('region', { name: 'Group main' });
     expect(within(main).getByText('ACCEPTED')).toBeVisible();
     expect(within(main).getByText('100 / 100 points')).toBeVisible();
-    expect(within(main).getByText(/^Shown at /)).toBeVisible();
+    expect(within(main).getByText(/^Tests shown at /)).toBeVisible();
+    expect(within(main).queryByText(/^Shown at /)).toBeNull();
     expect(within(main).queryByRole('table')).toBeNull();
 
     const large = within(detail).getByRole('region', { name: 'Group large' });
