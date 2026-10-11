@@ -104,9 +104,9 @@ function zip64Of(
 /** The most files an archive may hold, its folders counted. */
 export const MOST_ENTRIES = 10_000;
 /** The most bytes one file may unpack to. */
-export const MOST_FILE = 256 * 2 ** 20;
+const MOST_FILE = 256 * 2 ** 20;
 /** The most bytes an archive's files may unpack to together. */
-export const MOST_TOTAL = 2 ** 30;
+const MOST_TOTAL = 2 ** 30;
 
 /** That the archive is not what it says of `name`'s size. */
 function wrongSize(name: string): ZipError {

@@ -13,7 +13,7 @@ import { DRAFT_FILE } from '@/features/organise/workflows/words';
  */
 
 /** The part of the page that is a `selector` named `name`, or null. */
-export function partOrNull(selector: string, name: string): HTMLElement | null {
+function partOrNull(selector: string, name: string): HTMLElement | null {
   return document.querySelector<HTMLElement>(
     `${selector}[aria-label="${CSS.escape(name)}"]`,
   );

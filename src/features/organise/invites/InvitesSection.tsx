@@ -224,13 +224,7 @@ function InviteRow({
  * place in the contest. One field takes either: a Forgejo username has no
  * `@`, so what has one is an address.
  */
-function InviteForm({
-  place,
-  grants,
-}: {
-  place: RolePlace;
-  grants: OfferedGrant[];
-}) {
+function InviteForm({ place, grants }: { place: RolePlace; grants: OfferedGrant[] }) {
   const queryClient = useQueryClient();
   const { create } = useInviteChanges(place);
   const [typed, setTyped] = useState('');
