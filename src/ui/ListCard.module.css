@@ -103,6 +103,18 @@
   z-index: 1;
 }
 
+/* A row's own small button, at its top right, above the row's link. */
+.rowAction {
+  position: absolute;
+  top: 6px;
+  right: 10px;
+  z-index: 1;
+}
+
+.row:has(.rowAction) {
+  padding-right: 80px;
+}
+
 /* The card's one button, at its bottom. */
 .action {
   display: flex;

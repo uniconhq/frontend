@@ -18,6 +18,8 @@ export type ListRow = {
   label?: string;
   /** What the filter matches it on. */
   text: string;
+  /** A small button for the row itself, such as editing it, kept above its link. */
+  action?: ReactNode;
 };
 
 /**
@@ -28,6 +30,7 @@ export type ListRow = {
  * With none, the space is left with one plain line; past six, a filter box
  * finds one by name. Its one button sits at the bottom, always in the same
  * place. `notice` is a line above the rows, for what the list cannot show.
+ * A row may carry a small button of its own, such as editing it in place.
  * `body`, when given, stands in for the rows, for a list still loading or
  * failed.
  */
@@ -88,6 +91,9 @@ export function ListCard({
                   </Link>
                   {row.detail !== undefined && (
                     <div className={classes.detail}>{row.detail}</div>
+                  )}
+                  {row.action !== undefined && (
+                    <div className={classes.rowAction}>{row.action}</div>
                   )}
                 </li>
               ))}

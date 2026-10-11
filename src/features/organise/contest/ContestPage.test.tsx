@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { screen, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@/test/user-event';
 import { delay, http, HttpResponse } from 'msw';
 import type { TaskStanding } from '@/api/types';
-import { formatExact } from '@/lib/exact';
+import { parse } from 'yaml';
+import { isoOf, localOf } from '../forms/times';
 import { CONTEST_SECTIONS } from '@/lib/sections';
 import { formatDateTime } from '@/lib/time';
 import { renderApp } from '@/test/render';
@@ -28,10 +29,11 @@ describe("the contest page's header", () => {
     server.use(signedIn, standingList, ...repoFiles);
     renderApp(CONTEST);
 
-    expect(
-      await screen.findByRole('heading', { name: 'spring', level: 1 }),
-    ).toBeVisible();
-    expect(await screen.findByText('Draft')).toBeVisible();
+    const title = await screen.findByRole('heading', { name: 'spring', level: 1 });
+    expect(title).toBeVisible();
+    const header = title.closest('header');
+    if (header === null) throw new Error('the title is in a header');
+    expect(await within(header).findByText('Draft')).toBeVisible();
     expect(screen.getByRole('link', { name: 'View as contestant' })).toHaveAttribute(
       'href',
       '/contests/acme/spring',
@@ -56,8 +58,12 @@ describe("the contest's settings at a glance", () => {
             'end: 2026-10-01T14:00:00Z',
             'state: draft',
             'visibility: everyone',
-            'registration: {capacity: 500}',
-            'entrants: {most: 3}',
+            'registration:',
+            '  capacity: 500',
+            '  ways:',
+            '    - invite: {}',
+            '    - signup: {domains: [u.nus.edu], approval: auto}',
+            'entrants: {most: 3, fewest: 2}',
             '',
           ].join('\n'),
         }),
@@ -73,8 +79,8 @@ describe("the contest's settings at a glance", () => {
     expect(values).toEqual([
       `${at('2026-10-01T09:00:00Z')} to ${at('2026-10-01T14:00:00Z')}`,
       'Anyone, signed in or not',
-      'At most 500 entrants',
-      'Teams of up to 3',
+      'Anyone you invite, or anyone with an @u.nus.edu email can register from when the contest opens until the contest ends. Each is approved straight away. At most 500 entrants can register.',
+      'Teams of 2 to 3 people, fixed when the contest starts',
     ]);
     const card = screen.getByRole('region', { name: 'Settings' });
     expect(within(card).getByRole('link', { name: 'Settings' })).toHaveAttribute(
@@ -104,7 +110,7 @@ describe("the contest's tasks", () => {
     ]);
   });
 
-  it("says each task's latest publication and its timeline, defaults resolved", async () => {
+  it("says each task's latest publication and its timeline as one line, defaults resolved", async () => {
     server.use(signedIn, standingList, ...repoFiles);
     renderApp(CONTEST);
 
@@ -113,12 +119,54 @@ describe("the contest's tasks", () => {
       `Publication 1, ${at('2026-09-20T10:00:00Z')}, changed how it grades`,
     );
     expect(sort).toHaveTextContent(
-      `100 points · released ${at('2026-10-01T09:00:00Z')} · due ${at('2026-10-08T09:00:00Z')}, then 10% off per late day started · closes ${at('2026-10-15T09:00:00Z')}`,
+      `100 points · opens with the contest · due ${at('2026-10-08T09:00:00Z')} · loses 10% per started day late · closes with the contest`,
     );
 
     const sum = screen.getByRole('listitem', { name: 'B · sum' });
-    expect(sum).toHaveTextContent('no due time');
-    expect(sum).toHaveTextContent('No points');
+    expect(sum).toHaveTextContent(
+      'gives no points · opens with the contest · closes with the contest',
+    );
+  });
+
+  it('names a time of its own, and the marks a marked board lets each entrant make', async () => {
+    const [sort] = standings;
+    if (sort === undefined) throw new Error('standings has sort');
+    server.use(
+      signedIn,
+      http.get(`${CONTEST_API}/organise/tasks`, () =>
+        HttpResponse.json([
+          {
+            ...sort,
+            timeline: {
+              ...sort.timeline,
+              release_at: '2026-10-02T09:00:00Z',
+              late_per_day: '1',
+            },
+          },
+        ]),
+      ),
+      http.get(`${CONTEST_API}/files/:path`, () =>
+        HttpResponse.json({
+          ...files['contest.yaml'],
+          content: [
+            'name: Spring',
+            'start: 2026-10-01T09:00:00Z',
+            'end: 2026-10-15T09:00:00Z',
+            'state: draft',
+            'visibility: signed-in',
+            'leaderboards: [{name: Final, select: marked}]',
+            'tasks: [{id: sort, marks: 2}]',
+            '',
+          ].join('\n'),
+        }),
+      ),
+      ...repoFiles,
+    );
+    renderApp(CONTEST);
+
+    expect(await screen.findByRole('listitem', { name: 'A · sort' })).toHaveTextContent(
+      `100 points · opens ${at('2026-10-02T09:00:00Z')} · due ${at('2026-10-08T09:00:00Z')} · earns nothing once late · closes with the contest · up to 2 marked submissions`,
+    );
   });
 
   it('says the late rate as the exact percentage it is, however small', async () => {
@@ -138,12 +186,8 @@ describe("the contest's tasks", () => {
     renderApp(CONTEST);
 
     const items = await screen.findAllByRole('listitem', { name: /sort$/ });
-    expect(items[0]).toHaveTextContent(
-      `then ${formatExact('0.01', 2)}% off per late day started`,
-    );
-    expect(items[1]).toHaveTextContent(
-      `then ${formatExact('0.05', 2)}% off per late day started`,
-    );
+    expect(items[0]).toHaveTextContent('loses 0.01% per started day late');
+    expect(items[1]).toHaveTextContent('loses 0.05% per started day late');
   });
 
   it("says how many problems hold back a task's last save, which its own page lists", async () => {
@@ -196,14 +240,14 @@ describe("the contest's tasks", () => {
     const max = await screen.findByRole('listitem', { name: 'C · max' });
     expect(max).toHaveTextContent('Never published');
     expect(max).toHaveTextContent('1 problem in its last save');
-    expect(max).toHaveTextContent('Worth not known until published');
+    expect(max).toHaveTextContent('points known once published');
 
     const min = screen.getByRole('listitem', { name: 'D · min' });
     expect(min).toHaveTextContent('Never published');
     expect(min).toHaveTextContent('Draft kept back');
   });
 
-  it("reads the tasks afresh on coming back from saving the contest's file", async () => {
+  it("reads the tasks afresh on coming back from saving the contest's settings", async () => {
     let reads = 0;
     server.use(
       signedIn,
@@ -216,13 +260,16 @@ describe("the contest's tasks", () => {
         HttpResponse.json({ version: '9f8e7d6c5b4a39281706', notes: [] }),
       ),
     );
-    renderApp(`${CONTEST}/files?file=contest.yaml`);
+    renderApp(`${CONTEST}/settings`);
 
-    const editor = await screen.findByRole('textbox', { name: 'contest.yaml' });
+    const form = await screen.findByRole('form', { name: 'Contest settings' });
     expect(reads).toBe(0);
-    await userEvent.type(editor, 'description: Our spring round\n');
-    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
-    await screen.findByText(/Saved as version/);
+    await userEvent.type(
+      within(form).getByRole('textbox', { name: 'Description' }),
+      'Ours',
+    );
+    await userEvent.click(within(form).getByRole('button', { name: 'Save settings' }));
+    await screen.findByText('Saved.');
 
     const trail = screen.getByRole('navigation', { name: 'Breadcrumb' });
     await userEvent.click(within(trail).getByRole('link', { name: 'spring' }));
@@ -286,18 +333,23 @@ describe("the contest's tasks", () => {
     );
     renderApp(CONTEST);
 
-    const alert = await screen.findByRole('alert');
+    const tasks = await screen.findByRole('region', { name: 'Tasks' });
+    const alert = await within(tasks).findByRole('alert');
     expect(alert).toHaveTextContent("The contest's settings do not read");
-    expect(alert).toHaveTextContent('Mend them in Settings or Files.');
+    expect(alert).toHaveTextContent('Mend each problem where it says.');
     const errors = within(alert).getByRole('list', { name: 'Errors' });
     expect(
       within(errors)
         .getAllByRole('listitem')
         .map((item) => item.textContent),
     ).toEqual([
-      'tasks[0].due: It is not a time with an offset.',
-      'the whole file: end comes before start.',
+      'Tasks, A: Due: It is not a time with an offset.',
+      'Settings: end comes before start.',
     ]);
+    expect(within(errors).getByRole('link', { name: 'Tasks, A: Due' })).toHaveAttribute(
+      'href',
+      '/orgs/acme/contests/spring?part=tasks&field=due&item=0',
+    );
     const list = await screen.findByRole('list', { name: 'Tasks' });
     expect(within(list).getByRole('link', { name: 'sum' })).toHaveAttribute(
       'href',
@@ -342,6 +394,133 @@ describe("the contest's tasks", () => {
         .map((link) => [link.textContent, link.getAttribute('href')]),
     ).toEqual([['sum', '/orgs/acme/contests/spring/tasks/sum']]);
     expect(screen.queryByRole('button', { name: 'New task' })).toBeNull();
+  });
+});
+
+describe("a task's timeline, edited on its row", () => {
+  /** The contest's settings, each save taken and the file becoming it. */
+  function settingsSaved() {
+    let file = files['contest.yaml']!;
+    const sent: string[] = [];
+    server.use(
+      http.get(`${CONTEST_API}/files/:path`, ({ params }) =>
+        params['path'] === 'contest.yaml' ? HttpResponse.json(file) : undefined,
+      ),
+      http.put(`${CONTEST_API}/files/:path`, async ({ request }) => {
+        const body = (await request.json()) as { content: string };
+        sent.push(body.content);
+        file = { ...file, content: body.content, token: 'token-2' };
+        return HttpResponse.json({ version: 'v2', notes: [] });
+      }),
+    );
+    return sent;
+  }
+
+  it('saves the worth, the due time and the late rate typed as a percentage, exactly', async () => {
+    server.use(signedIn, standingList, ...repoFiles);
+    const sent = settingsSaved();
+    const user = userEvent.setup();
+    renderApp(CONTEST);
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Edit the timeline of A · sort' }),
+    );
+    const dialog = await screen.findByRole('dialog', { name: 'Timeline of A · sort' });
+    const worth = await within(dialog).findByRole('textbox', { name: 'Worth' });
+    expect(worth).toHaveAttribute('placeholder', "100, the task's total");
+    await user.type(worth, '120');
+    const due = within(dialog).getByRole('radiogroup', { name: 'Due' });
+    await user.click(within(due).getByRole('radio', { name: 'At a time' }));
+    await user.type(
+      within(dialog).getByRole('textbox', { name: /Taken off per started late day/ }),
+      '12.5',
+    );
+    await user.click(within(dialog).getByRole('button', { name: 'Save the timeline' }));
+
+    expect(await within(dialog).findByText('Saved.')).toBeVisible();
+    const [saved] = sent;
+    expect(saved).toContain('late_per_day: 0.125');
+    expect(parse(saved ?? '')).toMatchObject({
+      tasks: [
+        { id: 'sort', worth: 120, due: isoOf(localOf('2026-10-15T09:00:00Z')) },
+        { id: 'sum' },
+      ],
+    });
+  });
+
+  it('offers a task that gives no points neither a worth nor a due time, saying why', async () => {
+    server.use(signedIn, standingList, ...repoFiles);
+    settingsSaved();
+    const user = userEvent.setup();
+    renderApp(CONTEST);
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Edit the timeline of B · sum' }),
+    );
+    const dialog = await screen.findByRole('dialog', { name: 'Timeline of B · sum' });
+    const worth = await within(dialog).findByRole('textbox', { name: 'Worth' });
+    expect(worth).toBeDisabled();
+    expect(worth).toHaveAccessibleDescription(
+      'This task gives no points, so it has no worth.',
+    );
+    expect(
+      within(within(dialog).getByRole('radiogroup', { name: 'Due' })).getByRole(
+        'radio',
+        {
+          name: 'At a time',
+        },
+      ),
+    ).toBeDisabled();
+  });
+
+  it('moves a task down the list, which saves at once', async () => {
+    server.use(signedIn, standingList, ...repoFiles);
+    const sent = settingsSaved();
+    const user = userEvent.setup();
+    renderApp(CONTEST);
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Edit the timeline of A · sort' }),
+    );
+    const dialog = await screen.findByRole('dialog', { name: 'Timeline of A · sort' });
+    expect(within(dialog).getByRole('button', { name: 'Move up' })).toBeDisabled();
+    await user.click(within(dialog).getByRole('button', { name: 'Move down' }));
+
+    await waitFor(() => expect(sent).toHaveLength(1));
+    expect((parse(sent[0] ?? '') as { tasks: { id: string }[] }).tasks).toEqual([
+      { id: 'sum' },
+      { id: 'sort' },
+    ]);
+  });
+
+  it("opens a task's timeline from a link that names one of its fields", async () => {
+    server.use(signedIn, standingList, ...repoFiles);
+    settingsSaved();
+    renderApp(`${CONTEST}?part=tasks&field=worth&item=0`);
+
+    const dialog = await screen.findByRole('dialog', { name: 'Timeline of A · sort' });
+    await waitFor(() =>
+      expect(within(dialog).getByRole('textbox', { name: 'Worth' })).toHaveFocus(),
+    );
+  });
+
+  it('offers an observer no way to edit a timeline', async () => {
+    server.use(
+      http.get('/api/v1/me', () =>
+        HttpResponse.json({
+          ...someone,
+          roles: [
+            { names: { org: 'acme', contest: 'spring', task: null }, role: 'observer' },
+          ],
+        }),
+      ),
+      standingList,
+      ...repoFiles,
+    );
+    renderApp(CONTEST);
+
+    await screen.findByRole('listitem', { name: 'A · sort' });
+    expect(screen.queryByRole('button', { name: /^Edit the timeline/ })).toBeNull();
   });
 });
 
@@ -397,7 +576,7 @@ describe("the contest's sections", () => {
       expect(
         await within(await screen.findByRole('region', { name })).findByText(line),
       ).toBeVisible();
-    await says('How people enter', 'No invite waits to be accepted.');
+    await says('How people enter', '1 way in: a sign-up.');
     await says('Entrants', 'Nobody has registered yet.');
     await says('Gradings', '3 waiting to be graded, 1 being graded.');
     await says('Announcements', '2 posted; the latest is “Task B fixed”.');

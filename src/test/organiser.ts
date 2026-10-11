@@ -202,7 +202,17 @@ export const files: Record<string, FileContent> = {
   'contest.yaml': {
     path: 'contest.yaml',
     encoding: 'utf-8',
-    content: 'name: Spring\nvisibility: signed-in\n',
+    content: [
+      'name: Spring',
+      'start: 2026-10-01T09:00:00Z',
+      'end: 2026-10-15T09:00:00Z',
+      'state: draft',
+      'visibility: signed-in',
+      'tasks:',
+      '  - id: sort',
+      '  - id: sum',
+      '',
+    ].join('\n'),
     token: 'token-contest-yaml',
     upload: null,
   },

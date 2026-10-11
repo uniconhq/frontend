@@ -8,7 +8,14 @@ import { expect, test, type Page, type Route } from '@playwright/test';
  * The stub keeps just enough state for each answer to follow from the last.
  */
 async function stubOrganiserApi(page: Page) {
-  const state = { orgMade: false, published: 1, saved: null as unknown };
+  const state = {
+    orgMade: false,
+    published: 1,
+    saved: null as unknown,
+    contestYaml:
+      'name: Spring 2026\nstart: 2030-10-01T09:00:00Z\nend: 2030-10-01T14:00:00Z\nstate: draft\nvisibility: signed-in\ntasks:\n  - id: sum\n',
+    contestSaves: 0,
+  };
 
   const taskState = () => ({
     head: `head-${String(state.published)}`,
@@ -94,12 +101,16 @@ async function stubOrganiserApi(page: Page) {
       });
     }
     if (path === '/api/v1/orgs/acme/contests/spring/files/contest.yaml') {
+      if (request.method() === 'PUT') {
+        state.contestYaml = (request.postDataJSON() as { content: string }).content;
+        state.contestSaves += 1;
+        return json(route, { version: `v${String(state.contestSaves)}`, notes: [] });
+      }
       return json(route, {
         path: 'contest.yaml',
         encoding: 'utf-8',
-        content:
-          'name: Spring 2026\nstart: 2026-10-01T09:00:00Z\nend: 2026-10-01T14:00:00Z\nstate: draft\nvisibility: signed-in\n',
-        token: 'token-contest',
+        content: state.contestYaml,
+        token: `token-contest-${String(state.contestSaves)}`,
         upload: null,
       });
     }
@@ -251,4 +262,24 @@ test('an organiser makes an org, walks to a task and publishes a file', async ({
   const trail = page.getByRole('navigation', { name: 'Breadcrumb' });
   await trail.getByRole('link', { name: 'Orgs', exact: true }).click();
   await expect(page.getByRole('list', { name: 'Your orgs' })).toContainText('acme');
+});
+
+test('an organiser opens a contest from its checklist', async ({ page }) => {
+  const state = await stubOrganiserApi(page);
+  state.orgMade = true;
+  await page.goto('/orgs/acme/contests/spring');
+
+  const status = page.getByRole('region', { name: 'Status' });
+  await expect(status).toContainText('Only its organisers can see it.');
+  const checklist = status.getByRole('list', { name: 'Before it opens' });
+  await expect(checklist).toContainText('A · sum: published');
+  await status.getByRole('button', { name: 'Open the contest' }).click();
+
+  const dialog = page.getByRole('dialog', { name: 'Open the contest?' });
+  await expect(dialog).toContainText('Anyone signed in can see it.');
+  await expect(dialog).toContainText('Registration opens now.');
+  await dialog.getByRole('button', { name: 'Open the contest' }).click();
+
+  await expect(status).toContainText('Live');
+  expect(state.contestYaml).toContain('state: published');
 });
