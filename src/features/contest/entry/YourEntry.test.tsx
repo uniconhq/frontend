@@ -230,6 +230,25 @@ describe('your entry in a contest entered in teams', () => {
     );
   });
 
+  it('sends a team short of people to the organisers once it is fixed', async () => {
+    server.use(
+      signedIn,
+      homeWith(() =>
+        entry({
+          ...teams,
+          entrant: entrant({ name: 'Red', complete: false, locked: true }),
+        }),
+      ),
+    );
+    renderApp(PAGE);
+
+    expect(
+      within(await yourEntry()).getByRole('status', { name: 'Registration' }),
+    ).toHaveTextContent(
+      'Your team is not complete yetA team needs at least 2 people before it can be approved. Your team is fixed now, so ask the organisers to add the others.',
+    );
+  });
+
   it('joins a team that invited the person, saying it moves them', async () => {
     const accepted: string[] = [];
     const own = entrant({ name: 'Solo', display_name: 'Solo' });

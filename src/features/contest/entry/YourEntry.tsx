@@ -55,7 +55,11 @@ function standing(entrant: Entrant, entry: MyEntry): Standing {
       if (!entrant.complete) {
         return {
           title: 'Your team is not complete yet',
-          message: `A team needs at least ${String(entry.fewest)} people before it can be approved. Invite the others below.`,
+          message: `A team needs at least ${String(entry.fewest)} people before it can be approved. ${
+            entrant.locked
+              ? 'Your team is fixed now, so ask the organisers to add the others.'
+              : 'Invite the others below.'
+          }`,
         };
       }
       return {
