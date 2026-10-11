@@ -195,6 +195,8 @@ function taskBackend(
     form?: WorkflowForm;
     groups?: Record<string, string[]>;
     contest?: string;
+    /** The settings as stored, in place of the ones above. */
+    content?: string;
   } = {},
 ) {
   const { answer = () => HttpResponse.json(PUBLISHED), form = UNREAD } = options;
@@ -202,7 +204,7 @@ function taskBackend(
   let settings: FileContent = {
     path: 'task.yaml',
     encoding: 'utf-8',
-    content: TASK,
+    content: options.content ?? TASK,
     token: 'token-task',
     upload: null,
   };
@@ -606,6 +608,38 @@ async function waitForSave(sent: SaveRequest[]): Promise<SaveRequest> {
 }
 
 describe('scoring a task', { timeout: 30_000 }, () => {
+  it('removes test weights set for tests a group does not have, which the save refuses', async () => {
+    const { sent } = taskBackend({
+      form: { ...CHECKED, inputs: [] },
+      content: TASK.replace(
+        'small: {pass: 30, show: verdict}',
+        'small: {pass: 30, pass_at: 0.5, test_weights: {"2": 3, "9": 4}}',
+      ),
+    });
+    const { tests } = await openTask();
+
+    const small = fieldGroup(tests, 'small');
+    expect(small).toHaveTextContent(
+      'Test weights are set for tests the group does not have: 9 (4).',
+    );
+    await userEvent.click(
+      within(small).getByRole('button', {
+        name: 'Remove the weights of tests small does not have',
+      }),
+    );
+    await save();
+
+    const groups = written(await waitForSave(sent))['test_groups'] as Record<
+      string,
+      unknown
+    >;
+    expect(groups['small']).toEqual({
+      pass: 30,
+      pass_at: 0.5,
+      test_weights: { '2': 3 },
+    });
+  });
+
   it('says what each group does as an entrant is told, and the task’s total', async () => {
     taskBackend({ form: { ...CHECKED, inputs: [] } });
     const { tests } = await openTask();

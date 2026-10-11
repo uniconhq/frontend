@@ -276,6 +276,10 @@ function GroupItem({
   // The rule chosen holds while its points box is emptied to be typed again.
   const [picked, setPicked] = useState<Rule | null>(null);
   const read = ruleOf(group);
+  // Weights for tests the group does not have, which the save refuses (T2).
+  const strays = group.weights.filter(
+    (row) => !saved.includes(row.test) && !added.some((test) => test.test === row.test),
+  );
   const rule: Rule = advanced
     ? 'advanced'
     : read === 'none' && picked !== null
@@ -446,22 +450,28 @@ function GroupItem({
           </Button>
         )}
       </div>
-      {group.weights.some(
-        (row) =>
-          !saved.includes(row.test) && !added.some((test) => test.test === row.test),
-      ) && (
-        <BodyText tone="secondary">
-          Test weights are set for tests the group does not have:{' '}
-          {group.weights
-            .filter(
-              (row) =>
-                !saved.includes(row.test) &&
-                !added.some((test) => test.test === row.test),
-            )
-            .map((row) => `${row.test} (${row.weight})`)
-            .join(', ')}
-          . A save is refused until they are removed or the tests added.
-        </BodyText>
+      {strays.length > 0 && (
+        <div className={shared.actions}>
+          <BodyText tone="secondary">
+            Test weights are set for tests the group does not have:{' '}
+            {strays.map((row) => `${row.test} (${row.weight})`).join(', ')}. A save is
+            refused until they are removed or the tests added.
+          </BodyText>
+          {!disabled && (
+            <Button
+              size="xs"
+              variant="secondary"
+              label={`Remove the weights of tests ${group.name} does not have`}
+              onClick={() =>
+                onChange({
+                  weights: group.weights.filter((row) => !strays.includes(row)),
+                })
+              }
+            >
+              Remove them
+            </Button>
+          )}
+        </div>
       )}
     </div>
   );
