@@ -65,7 +65,9 @@ describe('the task page', () => {
     renderApp(TASK);
 
     const status = await screen.findByLabelText('Where the task stands');
-    expect(status).toHaveTextContent('Not published yet, so entrants cannot be graded on it.');
+    expect(status).toHaveTextContent(
+      'Not published yet, so entrants cannot be graded on it.',
+    );
     expect(status).toHaveTextContent(
       'The task is saved and has no problems, but it is not published yet.',
     );
@@ -318,7 +320,9 @@ describe("the task's publications", () => {
     renderApp(`${TASK}/publications`);
 
     expect(
-      await screen.findByText('None yet. The first save without problems publishes the task.'),
+      await screen.findByText(
+        'None yet. The first save without problems publishes the task.',
+      ),
     ).toBeVisible();
   });
 });

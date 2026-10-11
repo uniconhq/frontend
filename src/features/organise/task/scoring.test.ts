@@ -67,7 +67,9 @@ describe('a test group’s rule', () => {
   });
 
   it('greys out what the save would refuse, with the reason', () => {
-    expect(ruleRefusal('worst', 'none')).toMatch(/Only available when a test can earn part/);
+    expect(ruleRefusal('worst', 'none')).toMatch(
+      /Only available when a test can earn part/,
+    );
     expect(ruleRefusal('worst', 'value')).toBeNull();
     expect(showRefusal('verdict', group('g', { each: '100' }), 'none')).toMatch(
       /all or nothing/,

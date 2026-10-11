@@ -88,7 +88,9 @@ describe('deactivate and delete', () => {
 
     const dialog = await confirm('Delete account');
 
-    expect(await screen.findByText('You are the only admin of an org, contest or task')).toBeVisible();
+    expect(
+      await screen.findByText('You are the only admin of an org, contest or task'),
+    ).toBeVisible();
     expect(within(dialog).getByText('acme (org)')).toBeInTheDocument();
     expect(within(dialog).getByText('acme/spring (contest)')).toBeInTheDocument();
   });
@@ -120,7 +122,9 @@ describe('deactivate and delete', () => {
 
     const dialog = await confirm('Delete account');
 
-    expect(await screen.findByText('You are the only admin of an org, contest or task')).toBeVisible();
+    expect(
+      await screen.findByText('You are the only admin of an org, contest or task'),
+    ).toBeVisible();
     expect(within(dialog).queryByRole('list')).not.toBeInTheDocument();
   });
 });

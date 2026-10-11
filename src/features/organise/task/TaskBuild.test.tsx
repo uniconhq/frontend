@@ -433,7 +433,9 @@ describe('the cards that build a task', { timeout: 30_000 }, () => {
     expect(
       within(
         within(entrants).getByRole('group', { name: 'Time limit (seconds)' }),
-      ).getByText(/The task sets a value for this, but under this workflow entrants give it/),
+      ).getByText(
+        /The task sets a value for this, but under this workflow entrants give it/,
+      ),
     ).toBeVisible();
     fill(fieldIn(entrants, 'Time limit (seconds)', 'Largest allowed'), '10');
     await save();
