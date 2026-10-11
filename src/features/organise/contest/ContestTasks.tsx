@@ -25,6 +25,10 @@ import { FIELD_PARAM, ITEM_PARAM } from './places';
 import { useContestChange } from './save';
 import { useContestSettings } from './settings';
 import { TaskTimelineForm } from './TaskTimelineForm';
+import { FIRST_KIND, STARTER, startOn, type Kind } from '../task/new-task';
+import { TaskKind } from '../task/TaskKind';
+import { PageLink } from '@/ui/PageLink';
+import { taskCardPath } from '@/lib/sections';
 import { markedBoardCovers, timelineSentence } from './timeline';
 import shared from '../organise.module.css';
 import classes from './contest.module.css';
@@ -216,6 +220,12 @@ export function ContestTasks({ org, contest }: { org: string; contest: string })
     if (opened !== null) setEditing(Number(opened));
   }
   const card = useRef<HTMLDivElement>(null);
+  const [kind, setKind] = useState<Kind>(FIRST_KIND);
+  const [starting, setStarting] = useState(false);
+  const [startFailed, setStartFailed] = useState<{
+    task: string;
+    workflow: string;
+  } | null>(null);
   useEffect(() => {
     if (search.get('part') === 'tasks')
       card.current?.scrollIntoView?.({ block: 'start' });
@@ -269,7 +279,18 @@ export function ContestTasks({ org, contest }: { org: string; contest: string })
           : [];
 
   const notice =
-    view.state !== 'error' ? undefined : unreadable ? (
+    startFailed !== null ? (
+      <div className={classes.panel} role="alert">
+        <BodyText>
+          {startFailed.task} was made, but not on {startFailed.workflow}: it grades with{' '}
+          {STARTER} until another workflow is chosen on{' '}
+          <PageLink to={taskCardPath(org, contest, startFailed.task, 'workflow')}>
+            its page
+          </PageLink>
+          .
+        </BodyText>
+      </div>
+    ) : view.state !== 'error' ? undefined : unreadable ? (
       <div className={classes.panel} role="alert">
         <BodyText>The contest&apos;s settings do not read</BodyText>
         <BodyText tone="secondary">
@@ -336,16 +357,33 @@ export function ContestTasks({ org, contest }: { org: string; contest: string })
                 description: 'Shown on its pages. Its name is used when there is none.',
               }}
               submitLabel="Create task"
-              pending={create.isPending}
+              pending={create.isPending || starting}
               error={create.error}
-              onOpen={create.reset}
+              onOpen={() => {
+                create.reset();
+                setKind(FIRST_KIND);
+                setStartFailed(null);
+              }}
               onSubmit={async (name, title) => {
                 await create.mutateAsync({
                   params: { path },
                   body: { name, title: title === '' ? null : title },
                 });
+                if (kind.workflow === STARTER || kind.workflow === '') return;
+                // The task is made; a workflow it could not be set to is said
+                // beside the list, to choose on the task's page.
+                setStarting(true);
+                try {
+                  await startOn({ org, contest, task: name }, kind.workflow);
+                } catch {
+                  setStartFailed({ task: name, workflow: kind.workflow });
+                } finally {
+                  setStarting(false);
+                }
               }}
-            />
+            >
+              <TaskKind value={kind} onChange={setKind} />
+            </CreateButton>
           ) : undefined
         }
       />

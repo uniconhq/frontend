@@ -670,6 +670,86 @@ describe('creating a task', () => {
     expect(screen.getByRole('button', { name: 'New task' })).toHaveFocus();
   });
 
+  it('starts a task of another kind on its workflow, in the task’s first save', async () => {
+    server.use(signedIn, ...repoFiles);
+    standingsAndCreate();
+    const saves: { changes: { path: string; content: string; token: string }[] }[] = [];
+    server.use(
+      http.get('/api/v1/workflows', () =>
+        HttpResponse.json([
+          {
+            owner: 'unicon',
+            name: 'classic',
+            versions: ['v2'],
+            editable: false,
+            visibility: 'public',
+          },
+          {
+            owner: 'unicon',
+            name: 'classic-folder',
+            versions: ['v1'],
+            editable: false,
+            visibility: 'public',
+          },
+        ]),
+      ),
+      http.get('/api/v1/workflows/unicon/classic-folder/versions/v1', () =>
+        HttpResponse.json({
+          content:
+            'inputs:\n  program: {type: folder, contestant: true, title: Program}\n  language: {type: enum, options: [c, python], contestant: true}\n  entry: {type: text, contestant: true}\n  time_limit: number\n  memory_limit: number\ntest:\n  input: file\n  answer: file\nsteps: []\n',
+        }),
+      ),
+      http.get('/api/v1/orgs/acme/contests/spring/tasks/max/files/task.yaml', () =>
+        HttpResponse.json({
+          path: 'task.yaml',
+          encoding: 'utf-8',
+          content:
+            'name: max\nworkflow: unicon/classic@v2\ninputs:\n  submission: {label: Your solution}\n  language: {options: [python]}\n  time_limit: 2\n  memory_limit: 256\ntest_groups:\n  main: {each: 100}\n',
+          token: 'token-starter',
+          upload: null,
+        }),
+      ),
+      http.post(
+        '/api/v1/orgs/acme/contests/spring/tasks/max/save',
+        async ({ request }) => {
+          saves.push((await request.json()) as (typeof saves)[number]);
+          return HttpResponse.json({
+            number: 1,
+            grading_changed: true,
+            changes: [],
+            notes: [],
+            regraded: 0,
+          });
+        },
+      ),
+    );
+    renderApp(CONTEST);
+
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'New task' }));
+    const form = screen.getByRole('form', { name: 'New task' });
+    await user.type(within(form).getByRole('textbox', { name: /^Name/ }), 'max');
+    await user.click(
+      await within(form).findByRole('radio', { name: 'A program of several files' }),
+    );
+    await user.click(within(form).getByRole('button', { name: 'Create task' }));
+
+    await expect.poll(() => saves.length).toBe(1);
+    const [change] = saves[0]?.changes ?? [];
+    expect(change?.token).toBe('token-starter');
+    expect(parse(change?.content ?? '')).toEqual({
+      name: 'max',
+      workflow: 'unicon/classic-folder@v1',
+      inputs: {
+        language: { options: ['python'] },
+        time_limit: 2,
+        memory_limit: 256,
+        program: { label: 'Your program' },
+      },
+      test_groups: { main: { each: 100 } },
+    });
+  });
+
   it('sends no title when none was given', async () => {
     server.use(signedIn, ...repoFiles);
     const sent = standingsAndCreate();
