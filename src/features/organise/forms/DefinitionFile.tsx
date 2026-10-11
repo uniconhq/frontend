@@ -11,7 +11,8 @@ import { UploadedFile } from '../files/UploadedFile';
 import type { Place } from '../files/place';
 import { useFileWrite, useOwnFile } from './file-hooks';
 import { definitionErrorsOf } from '../files/refusals';
-import { MergeView } from './MergeView';
+import type { ProblemPlace } from '../DefinitionErrors';
+import { MergeView, type MergeWords } from './MergeView';
 import { parseYaml, topMap, writeOver, type Doc } from './yaml-doc';
 
 /**
@@ -59,9 +60,9 @@ export function DefinitionFile({
           value: 'form',
           label: 'Form',
           panel: (
-            <FormView place={place} path={path} admin={admin}>
+            <DefinitionForm place={place} path={path} admin={admin}>
               {children}
-            </FormView>
+            </DefinitionForm>
           ),
         },
         {
@@ -76,16 +77,31 @@ export function DefinitionFile({
 
 type Merge = { base: string; mine: string };
 
-function FormView({
+/**
+ * A definition file as a form alone, saved as DefinitionFile's form is.
+ * `words` names the fields and values of the merge as the form does, and
+ * `placeOf` each problem a refused save lists, with a link that opens it;
+ * `bare` says a save in words alone. A file the form cannot read shows as
+ * text in the editor, or, with `readOnly`, as text to read, with the reason.
+ */
+export function DefinitionForm({
   place,
   path,
   admin,
   children,
+  words,
+  placeOf,
+  bare = false,
+  readOnly = false,
 }: {
   place: Place;
   path: string;
   admin: boolean;
   children: (props: FormProps) => ReactNode;
+  words?: MergeWords;
+  placeOf?: (path: string) => ProblemPlace;
+  bare?: boolean;
+  readOnly?: boolean;
 }) {
   const query = useOwnFile(place, path);
   const { write, pending } = useFileWrite(place, path);
@@ -152,13 +168,25 @@ function FormView({
           busy={busy}
           onSave={(content) => save(file, content)}
           onDrop={() => setMerge(null)}
+          words={words}
         />
       ) : 'error' in read ? (
-        <div role="alert">
-          <BodyText>The form cannot read {path}, so it is open as text below.</BodyText>
-          <BodyText tone="secondary">{read.error}</BodyText>
-          <FileEditor place={place} path={path} />
-        </div>
+        readOnly ? (
+          <div role="alert">
+            <BodyText>
+              These settings cannot be read, so they cannot be changed here.
+            </BodyText>
+            <BodyText tone="secondary">{read.error}</BodyText>
+          </div>
+        ) : (
+          <div role="alert">
+            <BodyText>
+              The form cannot read {path}, so it is open as text below.
+            </BodyText>
+            <BodyText tone="secondary">{read.error}</BodyText>
+            <FileEditor place={place} path={path} />
+          </div>
+        )
       ) : (
         <div key={file.token}>
           {children({
@@ -180,6 +208,8 @@ function FormView({
       {outcome !== null && (
         <SaveOutcome
           outcome={outcome}
+          placeOf={placeOf}
+          bare={bare}
           onConfirm={(body) => void send(file, { ...body, confirm: true })}
           onKeepAsDraft={(body) => void send(file, { ...body, keep_as_draft: true })}
           onReload={() => {

@@ -4,7 +4,7 @@ import type { SaveResult, WriteFile } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
-import { DefinitionErrors } from '../DefinitionErrors';
+import { DefinitionErrors, type ProblemPlace } from '../DefinitionErrors';
 import classes from '../organise.module.css';
 import { countOf, definitionErrorsOf, stringsOf } from './refusals';
 
@@ -78,23 +78,37 @@ function Notes({ notes }: { notes: string[] }) {
   );
 }
 
+/**
+ * What a save came back with, in words. `placeOf`, when given, names each
+ * problem a refused save lists by the part of the page and the field it is
+ * about, with a link that opens it; `bare` says a written save in words
+ * alone, for a form whose versions the organiser never sees.
+ */
 export function SaveOutcome<Body = WriteFile>({
   outcome,
   onConfirm,
   onKeepAsDraft,
   onReload,
+  placeOf,
+  bare = false,
 }: {
   outcome: Outcome<Body>;
   onConfirm: (body: Body) => void;
   onKeepAsDraft: (body: Body) => void;
   onReload: () => void;
+  placeOf?: (path: string) => ProblemPlace;
+  bare?: boolean;
 }) {
   if (outcome.kind === 'written') {
     return (
       <Panel role="status">
-        <BodyText>
-          Saved as version <code>{short(outcome.version)}</code>.
-        </BodyText>
+        {bare ? (
+          <BodyText>Saved.</BodyText>
+        ) : (
+          <BodyText>
+            Saved as version <code>{short(outcome.version)}</code>.
+          </BodyText>
+        )}
         <Notes notes={outcome.notes} />
       </Panel>
     );
@@ -214,7 +228,7 @@ export function SaveOutcome<Body = WriteFile>({
         </ul>
       )}
       {error.code === 'invalid_definition' && (
-        <DefinitionErrors errors={definitionErrorsOf(error)} />
+        <DefinitionErrors errors={definitionErrorsOf(error)} placeOf={placeOf} />
       )}
     </Panel>
   );

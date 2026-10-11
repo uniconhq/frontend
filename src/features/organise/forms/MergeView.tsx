@@ -1,15 +1,18 @@
 import { useEffect, useRef, useState } from 'react';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
+import { Modal } from '@/ui/Modal';
 import { RadioGroup } from '@/ui/RadioGroup';
 import {
   adminOnly,
   bothChanged,
+  changedByThem,
   defaultSide,
   differences,
   mergeText,
   pathText,
   type FieldDiff,
+  type MergePath,
   type Side,
 } from './merge';
 import { localOf, zoneName } from './times';
@@ -23,9 +26,22 @@ function timeText(value: string): string | null {
   return local === '' ? null : local.replace('T', ' ');
 }
 
+/**
+ * How a file's fields are said to the organiser: each field named as its
+ * form names it, and each value as the form says it, or null where the
+ * value reads well as it is. Without it, fields go by their place in the
+ * file.
+ */
+export type MergeWords = {
+  field: (path: MergePath) => string;
+  value: (path: MergePath, value: unknown) => string | null;
+};
+
 /** A side of a field as the merge view shows it. */
-function shown(diff: FieldDiff, value: unknown): string {
+function shown(diff: FieldDiff, value: unknown, words?: MergeWords): string {
   if (value === undefined) return diff.kind === 'item' ? 'not in the list' : 'not set';
+  const said = diff.kind === 'order' ? null : words?.value(diff.path, value);
+  if (said !== undefined && said !== null) return said;
   if (diff.kind === 'order') return (value as string[]).join(', ');
   if (typeof value === 'string')
     return value === '' ? '""' : (timeText(value) ?? value);
@@ -50,12 +66,14 @@ function holdsTime(diff: FieldDiff): boolean {
   );
 }
 
-/** The row's label: the field's path, each item by its key, and what it is. */
-function labelOf(diff: FieldDiff): string {
-  const path = pathText(diff.path);
+/** The row's label: the field by name or by its path, and what it is. */
+function labelOf(diff: FieldDiff, words?: MergeWords): string {
+  const path = words === undefined ? pathText(diff.path) : words.field(diff.path);
   const what =
     diff.kind === 'order'
-      ? `${path}: the order`
+      ? words === undefined
+        ? `${path}: the order`
+        : `The order of ${path.toLowerCase()}`
       : diff.kind === 'item'
         ? `${path} (${diff.mine === undefined ? 'only in the current version' : 'only in yours'})`
         : path;
@@ -74,7 +92,11 @@ function labelOf(diff: FieldDiff): string {
  * name) are matched by their key and named by it, an item only one side has
  * is a row of its own, and so is the list's order. Times compare as the
  * moments they name. A manager's admin-only keys stay as they are now: the
- * forge would refuse a manager's change to one.
+ * forge would refuse a manager's change to one. `words`, when given, names
+ * each field and value as the form does.
+ *
+ * Saving the organiser's whole version over the current one is there too,
+ * after a warning that says what of the other person's it throws away.
  */
 export function MergeView({
   file,
@@ -85,9 +107,11 @@ export function MergeView({
   busy,
   onSave,
   onDrop,
+  words,
 }: {
   /** The file's path in the repo, which names its keyed lists and admin keys. */
   file: string;
+  words?: MergeWords;
   /** Whether the organiser is an admin at the scope, who may change every key. */
   admin: boolean;
   /** The file as the organiser read it. */
@@ -122,6 +146,8 @@ export function MergeView({
     (diffs ?? []).map((diff) => (locked(diff) ? 'theirs' : defaultSide(diff))),
   );
   const choosable = diffs !== null && diffs.some((diff) => !locked(diff));
+  const [overwriting, setOverwriting] = useState(false);
+  const theirs = diffs?.filter((diff) => !locked(diff) && changedByThem(diff)) ?? [];
 
   return (
     <div ref={panel} className={shared.panel} role="alert" tabIndex={-1}>
@@ -151,7 +177,7 @@ export function MergeView({
               return (
                 <li key={`${diff.kind} ${pathText(diff.path)}`}>
                   <RadioGroup
-                    label={labelOf(diff)}
+                    label={labelOf(diff, words)}
                     description={
                       held
                         ? 'Only an admin changes this, so it stays as it is now.'
@@ -160,8 +186,14 @@ export function MergeView({
                     disabled={held}
                     value={choices[index] ?? 'theirs'}
                     options={[
-                      { value: 'mine', label: `Yours: ${shown(diff, diff.mine)}` },
-                      { value: 'theirs', label: `Now: ${shown(diff, diff.theirs)}` },
+                      {
+                        value: 'mine',
+                        label: `Yours: ${shown(diff, diff.mine, words)}`,
+                      },
+                      {
+                        value: 'theirs',
+                        label: `Now: ${shown(diff, diff.theirs, words)}`,
+                      },
                     ]}
                     onChange={(value) =>
                       setChoices((before) =>
@@ -186,10 +218,53 @@ export function MergeView({
             Save the merged version
           </Button>
         )}
+        {choosable && theirs.length > 0 && (
+          <Button variant="danger" disabled={busy} onClick={() => setOverwriting(true)}>
+            Save mine over theirs
+          </Button>
+        )}
         <Button variant="secondary" disabled={busy} onClick={onDrop}>
           {diffs !== null && !choosable ? 'Back to the form' : 'Drop my changes'}
         </Button>
       </div>
+      <Modal
+        opened={overwriting}
+        onClose={() => setOverwriting(false)}
+        title="Save yours over theirs?"
+      >
+        <div className={shared.stack}>
+          <BodyText>
+            This throws away what the other person changed in{' '}
+            {theirs
+              .map((diff) => labelOf(diff, words).replace(/ \(.*\)$/, ''))
+              .join(', ')}
+            . Picking a side for each field above keeps the rest of their work.
+          </BodyText>
+          <div className={shared.actions}>
+            <Button
+              variant="danger"
+              loading={busy}
+              onClick={() => {
+                setOverwriting(false);
+                if (diffs !== null) {
+                  onSave(
+                    mergeText(
+                      currentText,
+                      diffs,
+                      diffs.map((diff) => (locked(diff) ? 'theirs' : 'mine')),
+                    ),
+                  );
+                }
+              }}
+            >
+              Save mine over theirs
+            </Button>
+            <Button variant="secondary" onClick={() => setOverwriting(false)}>
+              Cancel
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }
