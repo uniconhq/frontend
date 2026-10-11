@@ -34,11 +34,19 @@
   min-width: 0;
 }
 
-.canvas {
-  height: 620px;
+/* The graph's frame: the page's whole width, the graph at its actual size
+ * inside it, sliding sideways when it is wider. */
+.frame {
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
   border: 1px solid var(--unicon-border);
   border-radius: var(--mantine-radius-sm);
   background: var(--unicon-body);
+}
+
+.canvas {
+  min-width: 100%;
 }
 
 .band {
