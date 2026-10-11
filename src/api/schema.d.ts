@@ -1874,8 +1874,12 @@ export interface paths {
         /**
          * A file under a task's public/, such as a statement's image
          * @description `path` is the file's path under `public/`. Read with exactly the rights
-         *     the statement is read with, and, for a signed-in caller holding a role
-         *     reaching the task, whether or not it is released. A path with an empty,
+         *     the statement is read with, as the task's latest publication holds it,
+         *     and, for a signed-in caller holding a role reaching the task, whether or
+         *     not it is released, as the task's head holds it, the draft the
+         *     statement's preview draws. Each answer carries an `ETag` of its bytes
+         *     and is asked again each time; `If-None-Match` with that tag is answered
+         *     304 while the bytes are the same. A path with an empty,
          *     `.` or `..` segment, or a file that is not there, is `not_found`, the
          *     same as a task the caller may not read; one larger than a page is served
          *     is `public_file_too_large`, with the `limit` in bytes.
@@ -2906,7 +2910,8 @@ export interface components {
          * @description One entry of a place's history: the version it made, who made it, what
          *     they said about it and when. `author` is the username of `author_id`,
          *     which the history names whether or not they still hold a role there, and
-         *     none when the forge knows no such account or the change has no author.
+         *     none when the forge knows no such account, the change has no author, or
+         *     the platform made it, which is no person (a new task's first files).
          */
         Change: {
             /**
@@ -3239,8 +3244,11 @@ export interface components {
          */
         Entered: {
             entrant: components["schemas"]["EntrantRef"];
-            /** How */
-            how: string;
+            /**
+             * How
+             * @enum {string}
+             */
+            how: "made" | "joined" | "already";
             status: components["schemas"]["Status"];
         };
         /**
@@ -3640,7 +3648,8 @@ export interface components {
         };
         /**
          * Invite
-         * @description An invite: where it is to, by its names, what it grants, a place in a
+         * @description An invite: where it is to, by its names, and the title of the contest
+         *     it is at or under, null at an org; what it grants, a place in a
          *     contest (`contestant`), a member's place in an entrant (`member`) or an
          *     organiser role, the entrant it asks someone into, if any, the username
          *     or the address it names, who sent it, where it stands, whether it has
@@ -3648,6 +3657,8 @@ export interface components {
          *     `failed`, or `off` where the deployment sends no mail.
          */
         Invite: {
+            /** Contest Title */
+            contest_title: string | null;
             /**
              * Created At
              * Format: date-time
@@ -3711,7 +3722,8 @@ export interface components {
          * @description Who to invite, by exactly one of `username` and `email`, to what, for
          *     how many days the invite stands, 14 unless given, and, for a place in a
          *     contest, the `entrant` it puts them straight into, by its id, or none to
-         *     register them on their own.
+         *     register them on their own. A member's place in an entrant is offered by
+         *     the entrant's members, never here.
          */
         InviteRequest: {
             /** Days */
@@ -3720,7 +3732,11 @@ export interface components {
             email?: string | null;
             /** Entrant */
             entrant?: string | null;
-            grants: components["schemas"]["Grant"];
+            /**
+             * Grants
+             * @enum {string}
+             */
+            grants: "admin" | "manager" | "observer" | "contestant";
             /** Username */
             username?: string | null;
         };
@@ -4057,9 +4073,9 @@ export interface components {
         };
         /**
          * OrganisedSubmission
-         * @description One submission of a contestant or a team, as organisers read it:
-         *     its number among the row's, when it was taken, how many started days
-         *     late, and its grading with everything filled in.
+         * @description One submission of an entrant, as organisers read it: its number
+         *     among the entrant's, when it was taken, how many started days late, and
+         *     its grading with everything filled in.
          */
         OrganisedSubmission: {
             grading: components["schemas"]["OrganisedResult"] | null;
@@ -4357,11 +4373,15 @@ export interface components {
         /**
          * Refusal
          * @description Why the caller cannot register now: the code registering would be
-         *     refused with, and its sentence.
+         *     refused with, or `forge_unavailable` when their addresses could not be
+         *     checked just now, and its sentence.
          */
         Refusal: {
-            /** Code */
-            code: string;
+            /**
+             * Code
+             * @enum {string}
+             */
+            code: "registration_closed" | "is_staff" | "already_registered" | "invite_required" | "wrong_invite_code" | "domain_not_allowed" | "contest_full" | "forge_unavailable";
             /** Detail */
             detail: string;
         };
@@ -4887,9 +4907,10 @@ export interface components {
         /**
          * Timeline
          * @description A task's timeline in its contest, from its entry in `contest.yaml`,
-         *     points it gives, its groups' total unless the entry says, and none on a task whose
-         *     points it gives, 100 unless the entry says, and none on a task whose
-         *     latest publication gives no points or that has none; `release_at`, the
+         *     each at its default where the entry gives none: `worth`, the most
+         *     points it gives, its groups' total unless the entry says, and none on a
+         *     task whose latest publication gives no points or that has none;
+         *     `release_at`, the
          *     contest's start unless the entry says; `due`, after which a submission
          *     is late, and `late_per_day`, the fraction a started late day takes off,
          *     1 unless the entry says, both none on a task with no due; and `closes`,

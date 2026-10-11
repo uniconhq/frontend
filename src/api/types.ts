@@ -50,6 +50,8 @@ export type Invite = Schemas['Invite'];
  * in an entrant, or a role.
  */
 export type Grant = Invite['grants'];
+/** What an organiser's invite may give: a role, or a place in a contest. */
+export type OfferedGrant = Schemas['InviteRequest']['grants'];
 /** What accepting an invite did: the invite, and the entrant it put the person in. */
 export type AcceptedInvite = Schemas['AcceptedInvite'];
 export type Entered = Schemas['Entered'];
