@@ -326,6 +326,24 @@ describe('the contestants’ invites', () => {
         body = await request.json();
         return HttpResponse.json(invite({ grants: 'contestant' }), { status: 201 });
       }),
+      // Invites are made in the contest's invite way, under How people enter.
+      http.get('/api/v1/orgs/:org/contests/:contest/files/:path', () =>
+        HttpResponse.json({
+          path: 'contest.yaml',
+          encoding: 'utf-8',
+          content: [
+            'name: Spring',
+            'start: 2026-10-01T09:00:00Z',
+            'end: 2026-10-01T14:00:00Z',
+            'state: draft',
+            'visibility: signed-in',
+            'registration: {ways: [{invite: {}}]}',
+            '',
+          ].join('\n'),
+          token: 'token-contest',
+          upload: null,
+        }),
+      ),
     );
     const user = userEvent.setup();
     renderApp('/orgs/acme/contests/spring/entry');

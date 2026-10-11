@@ -35,3 +35,69 @@
   border-radius: var(--mantine-radius-sm);
   background: var(--unicon-hover);
 }
+
+/* The four ways a new contest can start from, side by side where there is room. */
+.starters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr));
+  gap: 12px;
+}
+
+.starter {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+/* What few need, folded away under its summary. */
+.advanced summary {
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--unicon-text-secondary);
+}
+
+.advanced[open] summary {
+  margin-bottom: 8px;
+}
+
+/* Where the contest stands, at the top of its page. */
+.status {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid var(--unicon-border);
+  border-radius: var(--mantine-radius-md);
+  background: var(--unicon-body);
+}
+
+.statusHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+/* What opening the contest needs, each with its mark. */
+.checklist {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+}
+
+.checklist li {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+}
+
+.checklist li > span {
+  width: 1.2em;
+  text-align: center;
+  color: var(--unicon-text-secondary);
+}

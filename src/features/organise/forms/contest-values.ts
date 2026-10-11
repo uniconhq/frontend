@@ -1,6 +1,7 @@
 import { isSeq } from 'yaml';
 import { readBoards, writeBoards, type BoardValues } from './board-values';
 import { isoOf, localOf, unreadableTime } from './times';
+import { readWays, writeWays, type WayValues } from './ways';
 import {
   exactAt,
   isRecord,
@@ -28,6 +29,8 @@ export type ContestValues = {
   opens: string;
   closes: string;
   capacity: string;
+  /** The ways in; null for none written, the default of one manual sign-up. */
+  ways: WayValues[] | null;
   /** The most and the fewest people in one entrant, and when its roster locks. */
   most: string;
   fewest: string;
@@ -81,6 +84,8 @@ export function readContest(doc: Doc): ContestRead {
     unreadable.push('registration');
   const entrants = valueAt(doc, ['entrants']);
   if (entrants !== undefined && !isRecord(entrants)) unreadable.push('entrants');
+  const ways = isRecord(registration) ? readWays(doc) : null;
+  if (ways === 'unreadable') unreadable.push('ways');
   const list = valueAt(doc, ['tasks']);
   const listOk =
     list === undefined ||
@@ -115,6 +120,7 @@ export function readContest(doc: Doc): ContestRead {
       opens: isRecord(registration) ? time('registration', 'opens') : '',
       closes: isRecord(registration) ? time('registration', 'closes') : '',
       capacity: isRecord(registration) ? at('registration', 'capacity') : '',
+      ways: ways === 'unreadable' ? null : ways,
       most: isRecord(entrants) ? at('entrants', 'most') : '',
       fewest: isRecord(entrants) ? at('entrants', 'fewest') : '',
       locks: isRecord(entrants) ? at('entrants', 'locks') : '',
@@ -172,6 +178,7 @@ export function writeContest(
     put(reg('opens'), before.opens, after.opens, time, true);
     put(reg('closes'), before.closes, after.closes, time, true);
     put(reg('capacity'), before.capacity, after.capacity, number, true);
+    writeWays(doc, before.ways, after.ways);
   }
   put(['start'], before.start, after.start, time);
   put(['end'], before.end, after.end, time);

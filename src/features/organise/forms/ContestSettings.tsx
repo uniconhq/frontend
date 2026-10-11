@@ -1,100 +1,58 @@
 import { useState } from 'react';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
-import { Select } from '@/ui/Select';
+import { RadioGroup } from '@/ui/RadioGroup';
 import { Textarea } from '@/ui/Textarea';
 import { TextInput } from '@/ui/TextInput';
-import type { Place } from '../files/place';
+import { ContestFile, FieldBox } from '../contest/ContestFile';
+import { useOpenedField } from '../contest/opened';
 import shared from '../organise.module.css';
-import { boardProblems } from './board-values';
-import { BoardFields } from './BoardFields';
-import {
-  letterOf,
-  readContest,
-  writeContest,
-  type ContestValues,
-  type TaskEntryValues,
-} from './contest-values';
-import { DefinitionFile, type FormProps } from './DefinitionFile';
+import { readContest, writeContest, type ContestValues } from './contest-values';
+import type { FormProps } from './DefinitionFile';
 import { Fieldset, NumberField, TimeField } from './fields';
 import { numberProblem } from './yaml-doc';
 import classes from './forms.module.css';
 
-const STATES = ['draft', 'published', 'archived'];
-const VISIBILITIES = [
-  { value: 'everyone', label: 'everyone: anyone, guests included' },
-  { value: 'signed-in', label: 'signed-in: anyone signed in' },
-  { value: 'hidden', label: 'hidden: its contestants and organisers' },
-];
 const ADMIN_ONLY = 'Only an admin of the contest changes these.';
 
-/** The choices of a select, with the file's own value kept when it is none of them. */
-function choices(
-  value: string,
-  options: { value: string; label: string }[],
-): { value: string; label: string }[] {
-  return value === '' || options.some((option) => option.value === value)
-    ? options
-    : [{ value, label: value }, ...options];
+/** Whether the contest is entered in teams, from its most people in one entrant. */
+function teamsOn(values: ContestValues): boolean {
+  return values.most !== '' && values.most !== '1';
 }
 
 /**
- * `contest.yaml` as fields, with the file as text in the next tab for
- * anything the form does not show. A manager sees the admin's keys and
- * cannot change them; the leaderboards are a manager's, like the tasks.
+ * The contest's settings that are neither how people enter, its state, its
+ * tasks nor its boards, in sections: its name and description, when it
+ * runs, whether people enter in teams, and what a submission whose grading
+ * failed counts as. Each section has a heading and a line saying what it is
+ * for. A manager sees the admin's settings and cannot change them.
  */
-export function ContestSettings({ place, admin }: { place: Place; admin: boolean }) {
+export function ContestSettings({ org, contest }: { org: string; contest: string }) {
   return (
-    <DefinitionFile
-      place={place}
-      path="contest.yaml"
-      admin={admin}
-      label="The contest's settings"
-    >
-      {(props) => <ContestForm {...props} admin={admin} />}
-    </DefinitionFile>
+    <ContestFile org={org} contest={contest}>
+      {(props) => <SettingsForm {...props} />}
+    </ContestFile>
   );
 }
 
-function ContestForm({
-  doc,
-  busy,
-  onSave,
-  refused,
-  admin,
-}: FormProps & { admin: boolean }) {
+function SettingsForm({ doc, busy, onSave, admin }: FormProps & { admin: boolean }) {
   const [read] = useState(() => readContest(doc));
   const [values, setValues] = useState<ContestValues>(read.values);
+  useOpenedField(true);
   const set = <K extends keyof ContestValues>(key: K, value: ContestValues[K]) =>
     setValues((before) => ({ ...before, [key]: value }));
-  const setEntry = (index: number, change: Partial<TaskEntryValues>) =>
-    setValues((before) => ({
-      ...before,
-      tasks: before.tasks.map((entry, at) =>
-        at === index ? { ...entry, ...change } : entry,
-      ),
-    }));
-  const move = (index: number, by: -1 | 1) =>
-    setValues((before) => {
-      const tasks = [...before.tasks];
-      const [entry] = tasks.splice(index, 1);
-      if (entry !== undefined) tasks.splice(index + by, 0, entry);
-      return { ...before, tasks };
-    });
-
   const raw = (path: string) => read.rawTimes[path];
-  const regLocked = !admin || read.unreadable.includes('registration');
+  const teams = teamsOn(values);
   const changed = JSON.stringify(values) !== JSON.stringify(read.values);
+  const fewestTooMany =
+    teams &&
+    values.fewest !== '' &&
+    numberProblem(values.fewest, true) === undefined &&
+    Number(values.fewest) > Number(values.most);
   const problems = [
-    numberProblem(values.capacity, true),
     numberProblem(values.most, true),
     numberProblem(values.fewest, true),
-    ...values.tasks.flatMap((entry) => [
-      numberProblem(entry.worth),
-      numberProblem(entry.latePerDay),
-      numberProblem(entry.marks, true),
-    ]),
-    ...values.boards.flatMap(boardProblems),
+    ...(fewestTooMany ? ['The fewest is more than the most.'] : []),
   ].filter((problem) => problem !== undefined);
 
   return (
@@ -106,181 +64,140 @@ function ContestForm({
         onSave((fresh) => writeContest(fresh, read.values, values, { admin }));
       }}
     >
-      <Fieldset legend="The contest" note={admin ? undefined : ADMIN_ONLY}>
-        <TextInput
-          label="Name"
-          value={values.name}
-          onChange={(value) => set('name', value)}
-          disabled={!admin}
-        />
-        <Textarea
-          label="Description"
-          value={values.description}
-          onChange={(value) => set('description', value)}
-          readOnly={!admin}
-          rows={3}
-        />
-        <div className={classes.grid}>
-          <Select
-            label="State"
-            value={values.state}
-            options={choices(
-              values.state,
-              STATES.map((state) => ({ value: state, label: state })),
-            )}
-            placeholder={values.state === '' ? 'Not set' : undefined}
-            onChange={(value) => set('state', value)}
+      <Fieldset
+        legend="Basics"
+        note={admin ? 'What the contest is called, and what it is about.' : ADMIN_ONLY}
+      >
+        <FieldBox name="name">
+          <TextInput
+            label="Name"
+            value={values.name}
+            onChange={(value) => set('name', value)}
             disabled={!admin}
           />
-          <Select
-            label="Who sees it"
-            value={values.visibility}
-            options={choices(values.visibility, VISIBILITIES)}
-            placeholder={values.visibility === '' ? 'Not set' : undefined}
-            onChange={(value) => set('visibility', value)}
-            disabled={!admin}
+        </FieldBox>
+        <FieldBox name="description">
+          <Textarea
+            label="Description"
+            value={values.description}
+            onChange={(value) => set('description', value)}
+            readOnly={!admin}
+            rows={3}
           />
-        </div>
+        </FieldBox>
       </Fieldset>
 
-      <Fieldset legend="When it runs">
+      <Fieldset
+        legend="Schedule"
+        note="When the contest runs. Each task opens at the start and closes at the end unless its row in the tasks list says otherwise."
+      >
         <div className={classes.grid}>
-          <TimeField
-            label="Start"
-            value={values.start}
-            raw={raw('start')}
-            onChange={(value) => set('start', value)}
-          />
-          <TimeField
-            label="End"
-            value={values.end}
-            raw={raw('end')}
-            onChange={(value) => set('end', value)}
-          />
+          <FieldBox name="start">
+            <TimeField
+              label="Start"
+              value={values.start}
+              raw={raw('start')}
+              onChange={(value) => set('start', value)}
+            />
+          </FieldBox>
+          <FieldBox name="end">
+            <TimeField
+              label="End"
+              value={values.end}
+              raw={raw('end')}
+              onChange={(value) => set('end', value)}
+            />
+          </FieldBox>
         </div>
       </Fieldset>
 
       <Fieldset
-        legend="Who may enter"
+        legend="Teams"
         note={
-          read.unreadable.includes('registration')
-            ? 'registration is not a mapping the form can read; edit it as text.'
-            : admin
-              ? 'Left empty, a field is not set: no window, no pattern, no code, no cap.'
-              : ADMIN_ONLY
+          read.unreadable.includes('entrants')
+            ? 'These settings cannot be read here.'
+            : 'Whether people enter alone or in teams. A team registers once and shares its submissions, its extra time and its questions.'
         }
       >
-        <div className={classes.grid}>
-          <TimeField
-            label="Registration opens"
-            value={values.opens}
-            raw={raw('registration.opens')}
-            onChange={(value) => set('opens', value)}
-            disabled={regLocked}
+        <FieldBox name="most">
+          <RadioGroup
+            label="People enter"
+            value={teams ? 'teams' : 'alone'}
+            options={[
+              { value: 'alone', label: 'Alone' },
+              { value: 'teams', label: 'In teams' },
+            ]}
+            onChange={(how) =>
+              setValues((before) =>
+                how === 'teams'
+                  ? {
+                      ...before,
+                      most:
+                        before.most === '' || before.most === '1' ? '3' : before.most,
+                    }
+                  : { ...before, most: '', fewest: '' },
+              )
+            }
           />
-          <TimeField
-            label="Registration closes"
-            value={values.closes}
-            raw={raw('registration.closes')}
-            onChange={(value) => set('closes', value)}
-            disabled={regLocked}
-          />
-          <NumberField
-            label="Capacity"
-            value={values.capacity}
-            onChange={(value) => set('capacity', value)}
-            info="The most contestants, approved and waiting together."
-            hint="Left empty: no limit."
-            whole
-            disabled={regLocked}
-          />
-        </div>
-      </Fieldset>
-
-      <Fieldset legend="Teams">
-        <div className={classes.grid}>
-          <NumberField
-            label="Most people in a team"
-            value={values.most}
-            onChange={(value) => set('most', value)}
-            placeholder="1, everyone alone"
-            whole
-          />
-          <NumberField
-            label="Fewest people in a team"
-            value={values.fewest}
-            onChange={(value) => set('fewest', value)}
-            placeholder="1"
-            whole
-          />
-        </div>
-      </Fieldset>
-
-      <Fieldset
-        legend="Broken gradings"
-        note="A grading that fails on the platform's side, or that staff then cancel. Staff may still fall back on one grading at a time from its gradings list."
-      >
-        <Select
-          label="A submission whose grading broke counts as"
-          value={values.onSystemError}
-          options={choices(values.onSystemError, [
-            {
-              value: 'grading',
-              label: 'grading: still being graded until staff act, void once cancelled',
-            },
-            {
-              value: 'last_result',
-              label: 'last_result: its last attempt that finished with a result',
-            },
-          ])}
-          placeholder="Not set (grading)"
-          onChange={(value) => set('onSystemError', value)}
-        />
-      </Fieldset>
-
-      <Fieldset
-        legend="Tasks"
-        note={
-          read.unreadable.includes('tasks')
-            ? 'tasks is not a list of entries with an id the form can read; edit it as text.'
-            : 'Each task is shown under the letter of its place in the list. Empty times are the defaults: released at the start, closing at the end.'
-        }
-      >
-        {values.tasks.length === 0 ? (
-          <BodyText tone="secondary">No tasks yet.</BodyText>
-        ) : (
-          <ol className={classes.entries} aria-label="Task entries">
-            {values.tasks.map((entry, index) => (
-              <TaskEntry
-                key={entry.id}
-                entry={entry}
-                index={index}
-                last={index === values.tasks.length - 1}
-                raw={(key) => raw(`tasks.${entry.at}.${key}`)}
-                onChange={(change) => setEntry(index, change)}
-                onMove={(by) => move(index, by)}
+        </FieldBox>
+        {teams && (
+          <>
+            <div className={classes.grid}>
+              <FieldBox name="most">
+                <NumberField
+                  label="Most people in a team"
+                  value={values.most}
+                  onChange={(value) => set('most', value)}
+                  whole
+                />
+              </FieldBox>
+              <FieldBox name="fewest">
+                <NumberField
+                  label="Fewest people in a team"
+                  value={values.fewest}
+                  onChange={(value) => set('fewest', value)}
+                  placeholder="1, so one person may enter alone"
+                  error={fewestTooMany ? 'More than the most.' : undefined}
+                  whole
+                />
+              </FieldBox>
+            </div>
+            <FieldBox name="locks">
+              <RadioGroup
+                label="Teams are fixed"
+                description="Until then members invite others, rename their team and leave it; after, only organisers change who is in it."
+                value={values.locks === '' ? 'start' : values.locks}
+                options={[
+                  { value: 'start', label: 'When the contest starts' },
+                  { value: 'first_submission', label: 'At a team’s first submission' },
+                ]}
+                onChange={(locks) => set('locks', locks)}
               />
-            ))}
-          </ol>
+            </FieldBox>
+          </>
         )}
       </Fieldset>
 
       <Fieldset
-        legend="Leaderboards"
-        note={
-          read.unreadable.includes('leaderboards')
-            ? 'leaderboards is not a list of boards the form can read; edit it as text.'
-            : 'Each board ranks rows on its keys in turn, counting only what is shown. Empty fields are the defaults.'
-        }
+        legend="When grading fails"
+        note="A grading can fail on the platform's side, and organisers may cancel one. This is what such a submission counts as meanwhile; organisers can still choose for one submission at a time from its gradings."
       >
-        {!read.unreadable.includes('leaderboards') && (
-          <BoardFields
-            boards={values.boards}
-            taskIds={values.tasks.map((entry) => entry.id)}
-            refused={refused}
-            onChange={(boards) => set('boards', boards)}
+        <FieldBox name="on_system_error">
+          <RadioGroup
+            label="A submission whose grading failed"
+            value={values.onSystemError === '' ? 'grading' : values.onSystemError}
+            options={[
+              { value: 'grading', label: 'Waits for the organisers' },
+              { value: 'last_result', label: 'Uses its last good result' },
+            ]}
+            onChange={(value) => set('onSystemError', value)}
           />
-        )}
+        </FieldBox>
+        <BodyText tone="secondary">
+          {values.onSystemError === 'last_result'
+            ? 'It counts as the latest earlier grading of it that finished with a result, while it has one.'
+            : 'It counts as still being graded until an organiser grades it again, and as nothing once cancelled.'}
+        </BodyText>
       </Fieldset>
 
       <div className={shared.actions}>
@@ -290,92 +207,5 @@ function ContestForm({
         {changed && <BodyText tone="secondary">Unsaved changes</BodyText>}
       </div>
     </form>
-  );
-}
-
-function TaskEntry({
-  entry,
-  index,
-  last,
-  raw,
-  onChange,
-  onMove,
-}: {
-  entry: TaskEntryValues;
-  index: number;
-  last: boolean;
-  raw: (key: string) => string | undefined;
-  onChange: (change: Partial<TaskEntryValues>) => void;
-  onMove: (by: -1 | 1) => void;
-}) {
-  const letter = letterOf(index);
-  return (
-    <li>
-      <Fieldset legend={`${letter}: ${entry.id}`}>
-        <div className={classes.grid}>
-          <NumberField
-            label="Worth"
-            value={entry.worth}
-            onChange={(worth) => onChange({ worth })}
-            hint="Left empty: its test groups' points added up."
-            info="The most points the task gives in this contest."
-          />
-          <TimeField
-            label="Released at"
-            value={entry.releaseAt}
-            raw={raw('release_at')}
-            onChange={(releaseAt) => onChange({ releaseAt })}
-          />
-          <TimeField
-            label="Due"
-            value={entry.due}
-            raw={raw('due')}
-            onChange={(due) => onChange({ due })}
-          />
-          <NumberField
-            label="Taken off per late day"
-            value={entry.latePerDay}
-            onChange={(latePerDay) => onChange({ latePerDay })}
-            placeholder="1"
-            hint="Above 0, at most 1."
-            info="The share of the task's points taken off for each day started after it is due."
-          />
-          <TimeField
-            label="Closes"
-            value={entry.closes}
-            raw={raw('closes')}
-            onChange={(closes) => onChange({ closes })}
-          />
-          <NumberField
-            label="Marks"
-            value={entry.marks}
-            onChange={(marks) => onChange({ marks })}
-            hint="Only with a marked board."
-            info="How many of their submissions a contestant may mark to be counted."
-            whole
-          />
-        </div>
-        <div className={shared.actions}>
-          <Button
-            size="xs"
-            variant="secondary"
-            disabled={index === 0}
-            onClick={() => onMove(-1)}
-            label={`Move ${entry.id} up`}
-          >
-            Up
-          </Button>
-          <Button
-            size="xs"
-            variant="secondary"
-            disabled={last}
-            onClick={() => onMove(1)}
-            label={`Move ${entry.id} down`}
-          >
-            Down
-          </Button>
-        </div>
-      </Fieldset>
-    </li>
   );
 }
