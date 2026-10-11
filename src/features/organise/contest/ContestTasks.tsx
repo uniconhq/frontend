@@ -327,8 +327,7 @@ export function ContestTasks({ org, contest }: { org: string; contest: string })
               openLabel="New task"
               second={{
                 label: 'Title',
-                description:
-                  'Shown to contestants. The name is used when there is none.',
+                description: 'Shown on its pages. Its name is used when there is none.',
               }}
               submitLabel="Create task"
               pending={create.isPending}

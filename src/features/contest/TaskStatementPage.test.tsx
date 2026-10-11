@@ -65,7 +65,7 @@ describe('a task page for a signed-in person', () => {
       'closed',
       'This task has closed for you, so it takes no more submissions from you.',
     ],
-    ['not_approved', 'Only approved contestants submit to this task.'],
+    ['not_approved', 'You can submit once your registration is approved.'],
   ] as const)(
     'says in the panel’s place why it takes nothing, %s',
     async (closed, said) => {

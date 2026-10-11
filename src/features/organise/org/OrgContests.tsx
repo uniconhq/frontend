@@ -142,7 +142,7 @@ export function OrgContests({ org }: { org: string }) {
             openLabel="New contest"
             second={{
               label: 'Title',
-              description: 'Shown to contestants. The name is used when there is none.',
+              description: 'Shown on its pages. Its name is used when there is none.',
             }}
             submitLabel="Create contest"
             pending={create.isPending}

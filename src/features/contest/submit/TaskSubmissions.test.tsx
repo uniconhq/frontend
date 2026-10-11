@@ -659,7 +659,7 @@ describe('the submit panel', () => {
     renderApp(PAGE);
 
     expect(
-      await screen.findByText('Only approved contestants submit to this task.'),
+      await screen.findByText('You can submit once your registration is approved.'),
     ).toBeVisible();
     expect(screen.queryByRole('form', { name: 'Submit' })).not.toBeInTheDocument();
   });
