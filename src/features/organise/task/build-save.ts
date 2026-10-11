@@ -98,7 +98,7 @@ export function useTaskSave(place: TaskPlace, onSaved: () => Promise<void> | voi
         '/api/v1/orgs/{org}/contests/{contest}/tasks/{task}/save',
         { params: { path: taskPath(place) }, body },
       );
-      if (data === undefined) throw new Error('The save answered nothing.');
+      if (data === undefined) throw new Error('The save got no answer. Try again.');
       result = data;
     } catch (caught) {
       const error = toApiError(caught);

@@ -57,7 +57,7 @@ export function SaveBar({
         <BodyText key={notice}>{notice}</BodyText>
       ))}
       {problems.length > 0 && (
-        <BodyText tone="secondary">Before it saves: {problems.join(' ')}</BodyText>
+        <BodyText tone="secondary">Fix before saving: {problems.join(' ')}</BodyText>
       )}
       {state.stage === 'sending' && state.of > 0 && (
         <>

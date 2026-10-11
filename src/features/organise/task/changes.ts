@@ -47,7 +47,7 @@ function groupLines(
 ): string[] {
   if (was === undefined && now !== undefined) return [`New test group ${now.name}`];
   if (now === undefined && was !== undefined) {
-    return was.read ? [`Test group ${was.name} taken out`] : [];
+    return was.read ? [`Test group ${was.name} removed`] : [];
   }
   if (was === undefined || now === undefined) return [];
   const lines: string[] = [];
@@ -58,8 +58,7 @@ function groupLines(
   if (JSON.stringify(was.weights) !== JSON.stringify(now.weights)) {
     lines.push(`${now.name}: test weights`);
   }
-  if (!was.read && lines.length === 0)
-    lines.push(`${now.name}: written into the settings`);
+  if (!was.read && lines.length === 0) lines.push(`${now.name}: added to scoring`);
   return lines;
 }
 
@@ -85,7 +84,7 @@ export function changeLines(
     const was = before.inputs.find((input) => input.id === id);
     const now = after.inputs.find((input) => input.id === id);
     const name = titles.get(id) ?? id;
-    if (now === undefined) lines.push(`Inputs: ${name} taken out`);
+    if (now === undefined) lines.push(`Inputs: ${name} removed`);
     else if (was === undefined || held(was) !== held(now) || now.shape !== now.kind) {
       lines.push(`Inputs: ${name}`);
     }
@@ -115,7 +114,7 @@ export function changeLines(
     const parts = [
       added > 0 ? `${count(added, 'test', 'tests')} added` : null,
       replaced > 0 ? `${count(replaced, 'test', 'tests')} replaced` : null,
-      removed > 0 ? `${count(removed, 'test', 'tests')} taken out` : null,
+      removed > 0 ? `${count(removed, 'test', 'tests')} removed` : null,
     ].filter((part): part is string => part !== null);
     lines.push(`Tests of ${group}: ${parts.join(', ')}`);
   }

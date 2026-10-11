@@ -61,7 +61,7 @@ async function directoryOf(
       const where = uint64(view, locator + 8);
       const end64 = await bytesOf(file, where, where + 56);
       if (end64.getUint32(0, true) !== END64)
-        throw new ZipError('Its Zip64 end is damaged.');
+        throw new ZipError('The zip file is damaged.');
       count = uint64(end64, 32);
       size = uint64(end64, 40);
       offset = uint64(end64, 48);
@@ -120,7 +120,7 @@ export async function readZip(file: Blob): Promise<ZipEntry[]> {
   let at = 0;
   for (let index = 0; index < count; index += 1) {
     if (at + 46 > view.byteLength || view.getUint32(at, true) !== CENTRAL) {
-      throw new ZipError('Its list of files is damaged.');
+      throw new ZipError('The zip file’s list of contents is damaged.');
     }
     const flags = view.getUint16(at + 8, true);
     const method = view.getUint16(at + 10, true);
@@ -148,7 +148,7 @@ export async function readZip(file: Blob): Promise<ZipEntry[]> {
       (flags & 1) !== 0
         ? 'It is encrypted.'
         : method !== 0 && method !== 8
-          ? 'It is packed in a way this page does not read.'
+          ? 'It is compressed in a way this page cannot unpack.'
           : null;
     const start = local;
     const length = compressed;

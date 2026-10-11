@@ -55,11 +55,14 @@ const at = (text: string | null | undefined) =>
 function creditRefusal(entry: ReportEntry, kind: 'value' | 'relative'): string | null {
   if (entry.fold === null) return 'It is not a number reported for each test.';
   const least = entry.atLeast === null ? null : at(entry.atLeast.text);
-  if (least === null || least.num < 0n) return 'It is not known to be at least 0.';
+  if (least === null || least.num < 0n)
+    return 'The workflow does not promise it is at least 0.';
   if (kind === 'value') {
     const most = entry.atMost === null ? null : at(entry.atMost.text);
-    if (most === null || most.num > most.den) return 'It is not known to be at most 1.';
-    if (entry.better === 'lower') return 'Lower is better for it.';
+    if (most === null || most.num > most.den)
+      return 'The workflow does not promise it is at most 1.';
+    if (entry.better === 'lower')
+      return 'Lower is better for it, so it cannot be a score.';
     return null;
   }
   return entry.better === null
@@ -127,7 +130,7 @@ function CreditPart({
                 label="Which value"
                 value={credit.name}
                 onChange={(name) => onChange({ ...credit, name })}
-                description="What the workflow reports it as."
+                description="The name the workflow reports it under."
                 disabled={disabled}
               />
             ) : (
@@ -387,7 +390,7 @@ function GroupItem({
             placeholder={required ? 'Choose when' : undefined}
             description={
               required && group.show === ''
-                ? 'Needed: the task has graded submissions, so a group added now must say when its results are shown.'
+                ? 'Required: the task has graded submissions, so a test group added now must say when its results are shown.'
                 : (showProblem ??
                   (verdictRefusal === null
                     ? undefined
@@ -454,8 +457,8 @@ function GroupItem({
         <div className={shared.actions}>
           <BodyText tone="secondary">
             Test weights are set for tests the group does not have:{' '}
-            {strays.map((row) => `${row.test} (${row.weight})`).join(', ')}. A save is
-            refused until they are removed or the tests added.
+            {strays.map((row) => `${row.test} (${row.weight})`).join(', ')}. The task
+            cannot be saved until they are removed or the tests are added.
           </BodyText>
           {!disabled && (
             <Button
@@ -531,8 +534,8 @@ export function TestsCard({
   const max = values.max;
   const rate =
     values.rateCount === '' && values.ratePer === ''
-      ? 'one every 30 seconds'
-      : `${values.rateCount === '' ? '1' : values.rateCount} in any ${values.ratePer === '' ? '30' : values.ratePer} seconds`;
+      ? 'at most 1 in any 30 seconds'
+      : `at most ${values.rateCount === '' ? '1' : values.rateCount} in any ${values.ratePer === '' ? '30' : values.ratePer} seconds`;
   return (
     <BuildCard
       id="tests"
@@ -565,7 +568,7 @@ export function TestsCard({
       />
       <CardPart
         title="Test groups"
-        line="Each group earns its points by one rule. A group with no points is for entrants to try."
+        line="Each test group earns its points by one rule. A test group with no points is for entrants to practise on."
       >
         {values.groups.length === 0 ? (
           <BodyText>No tests yet. Add tests to grade submissions.</BodyText>
@@ -599,7 +602,7 @@ export function TestsCard({
       </CardPart>
       <CardPart
         title="Submission rules"
-        line={`Per entrant: at most ${max === '' ? '50' : max} submissions, ${rate}.${admin ? '' : ' Only an admin of the task changes these.'}`}
+        line={`Per entrant: at most ${max === '' ? '50' : max} submissions, and ${rate}.${admin ? '' : ' Only an admin of the task can change these.'}`}
       >
         <div className={classes.grid}>
           <FieldBox name="max">

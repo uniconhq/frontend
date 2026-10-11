@@ -433,7 +433,7 @@ describe('the cards that build a task', { timeout: 30_000 }, () => {
     expect(
       within(
         within(entrants).getByRole('group', { name: 'Time limit (seconds)' }),
-      ).getByText(/The settings give this a value, but entrants give it/),
+      ).getByText(/The task sets a value for this, but under this workflow entrants give it/),
     ).toBeVisible();
     fill(fieldIn(entrants, 'Time limit (seconds)', 'Largest allowed'), '10');
     await save();
@@ -672,7 +672,7 @@ describe('scoring a task', { timeout: 30_000 }, () => {
       within(rule).getByRole('option', { name: 'The lowest test score counts' }),
     ).toBeDisabled();
     expect(rule).toHaveAccessibleDescription(
-      'The lowest test score counts: Only when a test can earn part of its points: set how a test earns first.',
+      'The lowest test score counts: Only available when a test can earn part of its points. Set how a test earns first.',
     );
     fill(fieldIn(tests, 'old', 'How does this group earn points?'), 'all');
     expect(

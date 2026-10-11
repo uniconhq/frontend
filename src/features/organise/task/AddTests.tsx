@@ -167,7 +167,7 @@ export function AddTests({
         const unread = entries.filter((entry) => entry.problem !== null);
         if (unread.length > 0) {
           setZipProblem(
-            `Not read: ${unread.map((entry) => `${entry.path}: ${entry.problem ?? ''}`).join(' ')}`,
+            `Could not be read: ${unread.map((entry) => `${entry.path}: ${entry.problem ?? ''}`).join(' ')}`,
           );
         }
       })
@@ -183,11 +183,11 @@ export function AddTests({
     group !== NEW_GROUP
       ? null
       : target === ''
-        ? 'Name the new group.'
+        ? 'Give the new test group a name.'
         : !NAME.test(target)
-          ? 'A group’s name may hold only letters, digits, _ and -.'
+          ? 'A test group’s name may hold only letters, digits, _ and -.'
           : groups.some((each) => each.name === target)
-            ? 'There is a group with this name.'
+            ? 'There is already a test group with this name.'
             : null;
 
   // What the files make, each test in its group: the chosen one, unless a
@@ -326,7 +326,7 @@ export function AddTests({
                 onChange={setNewGroup}
                 description={
                   groupProblem ??
-                  'It then shows in Scoring, to set how it earns points.'
+                  'It then shows under Test groups, where you set how it earns points.'
                 }
               />
             )}
@@ -376,7 +376,7 @@ export function AddTests({
         {mode === 'paired' && (
           <FileDrop
             label="Test files"
-            description={`Named by test, each ending saying which part it is, such as 1.in and 1.out.`}
+            description={`Each named after its test, with an ending that says which part it is, such as 1.in and 1.out.`}
             multiple
             files={files}
             onChange={setFiles}
@@ -424,7 +424,7 @@ export function AddTests({
           <section aria-label="What was matched" className={classes.matched}>
             <BodyText>
               {placed.length === 0
-                ? 'No test yet.'
+                ? 'No tests yet.'
                 : `${String(placed.length)} ${placed.length === 1 ? 'test' : 'tests'}:`}
             </BodyText>
             <ul className={shared.named}>
@@ -470,7 +470,7 @@ export function AddTests({
           </Button>
         </div>
         <BodyText tone="secondary">
-          Nothing is saved yet: the tests join the changes to save below.
+          Nothing is saved yet: the tests are added to the changes you save below.
         </BodyText>
       </div>
     </Modal>

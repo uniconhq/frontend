@@ -49,7 +49,7 @@ export function TaskKind({
             <BodyText tone="secondary">
               {KINDS.find((kind) => kind.value === value.kind)?.line}
               {missing.length > 0 &&
-                ` ${missing.map((kind) => kind.label).join(' and ')}: not on this platform, so greyed out.`}
+                ` ${missing.map((kind) => kind.label).join(' and ')}: not available here, so greyed out.`}
             </BodyText>
             {value.kind === 'other' && (
               <WorkflowPicker

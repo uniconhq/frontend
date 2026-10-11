@@ -65,7 +65,7 @@ describe('the task page', () => {
     renderApp(TASK);
 
     const status = await screen.findByLabelText('Where the task stands');
-    expect(status).toHaveTextContent('Not live yet: nothing is published.');
+    expect(status).toHaveTextContent('Not published yet, so entrants cannot be graded on it.');
     expect(status).toHaveTextContent(
       'The task is saved and has no problems, but it is not published yet.',
     );
@@ -284,7 +284,7 @@ describe('what the task has, under its name', { timeout: 20_000 }, () => {
 
     const status = await screen.findByLabelText('Where the task stands');
     expect(status).toHaveTextContent(
-      'The last save is kept back as a draft, so entrants are graded as before.',
+      'The last save was kept as a draft, so entrants are graded as before.',
     );
     await userEvent.click(within(status).getByRole('button', { name: 'Publish it' }));
 
@@ -303,7 +303,7 @@ describe("the task's publications", () => {
     const list = await screen.findByRole('list', { name: 'Publications' });
     const [newest, oldest] = Array.from(list.children);
     expect(newest).toHaveTextContent('Publication 2');
-    expect(newest).toHaveTextContent('grades as the one before');
+    expect(newest).toHaveTextContent('grades the same as the one before');
     expect(oldest).toHaveTextContent('Publication 1');
     expect(oldest).toHaveTextContent('changed how submissions are graded');
     expect(within(list).getByText('plans/default.json added')).toBeVisible();
@@ -318,7 +318,7 @@ describe("the task's publications", () => {
     renderApp(`${TASK}/publications`);
 
     expect(
-      await screen.findByText('None yet. The first save without problems publishes.'),
+      await screen.findByText('None yet. The first save without problems publishes the task.'),
     ).toBeVisible();
   });
 });

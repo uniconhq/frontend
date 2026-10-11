@@ -71,7 +71,7 @@ export const RULES: { value: Exclude<Rule, 'advanced'>; label: string }[] = [
  */
 export function ruleRefusal(rule: Rule, credit: CreditKind): string | null {
   if (rule === 'worst' && credit === 'none') {
-    return 'Only when a test can earn part of its points: set how a test earns first.';
+    return 'Only available when a test can earn part of its points. Set how a test earns first.';
   }
   return null;
 }
@@ -279,10 +279,10 @@ export function showRefusal(
 ): string | null {
   if (show !== 'verdict') return null;
   if (credit === 'relative') {
-    return 'Not while a test earns against the best anyone reached: its points move as others improve.';
+    return 'Not available while a test earns against the best anyone reached, since its points move as others improve.';
   }
   if (set(group.each) || set(group.worst)) {
-    return 'Only for a group that earns all or nothing: its points would tell how its hidden tests went.';
+    return 'Only available for a test group that earns all or nothing, since its points would reveal how its hidden tests went.';
   }
   return null;
 }
@@ -290,11 +290,11 @@ export function showRefusal(
 /** The task's points in one line: "Total: 100 points". */
 export function totalSentence(total: Ratio, worth: Ratio | null): string {
   if (total.num === 0n) {
-    return 'The task gives no points: no group earns any. It is ranked on what its workflow reports, if a board says so.';
+    return 'The task gives no points: no group earns any. It is ranked on what its workflow reports, if a leaderboard says so.';
   }
   const own = `Total: ${pointsText(total)} ${total.num === total.den ? 'point' : 'points'}`;
   if (worth === null) return `${own}.`;
   return compareRatio(worth, total) === 0
     ? `${own}, as its contest gives it.`
-    : `${own} here. Its contest makes the task worth ${pointsText(worth)}, so each group's points are scaled to that.`;
+    : `${own} here. Its contest makes the task worth ${pointsText(worth)}, so each test group's points are scaled to that.`;
 }

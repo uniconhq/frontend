@@ -56,7 +56,7 @@ function ValueField({
   const hint = declared.optional
     ? 'Leave it empty to use none.'
     : empty
-      ? 'Needed: until it is set, a save is kept as a draft.'
+      ? 'Required: until it is set, the task is saved as a draft and not published.'
       : undefined;
   const { type } = declared;
   if (type === 'number') {
@@ -97,7 +97,7 @@ function ValueField({
         description={
           hint ??
           (type === 'file'
-            ? 'A file of the task, by where it is in the task’s files.'
+            ? 'A file in the task, given by where it is among the task’s files.'
             : 'A folder of the task; every file under it goes in.')
         }
         info={info}
@@ -211,7 +211,7 @@ function EntrantFields({
             value={input.maxSize}
             onChange={(maxSize) => onChange({ maxSize })}
             placeholder="10MB"
-            description="Such as 500KB or 2MB; 10MB if left empty."
+            description="Such as 500KB or 2MB. 10MB if left empty."
             disabled={disabled}
           />
         )}
@@ -223,8 +223,8 @@ function EntrantFields({
           </legend>
           {strays.length > 0 && (
             <BodyText tone="secondary">
-              The settings also offer {strays.join(', ')}, which the workflow does not
-              have; ticking here leaves {strays.length === 1 ? 'it' : 'them'} out.
+              The task also offers {strays.join(', ')}, which the workflow does not
+              have. Ticking any here leaves {strays.length === 1 ? 'it' : 'them'} out.
             </BodyText>
           )}
           <div className={classes.grid}>
@@ -272,8 +272,8 @@ function DeclaredItem({
         {other && (
           <BodyText tone="secondary">
             {declared.contestant
-              ? 'The settings give this a value, but entrants give it under this workflow: saving replaces the value with what is set here.'
-              : 'The settings let entrants give this, but under this workflow the task sets it: saving replaces that with the value here.'}
+              ? 'The task sets a value for this, but under this workflow entrants give it. Saving replaces the task’s value with what is set here.'
+              : 'Entrants give this now, but under this workflow the task sets it. Saving replaces that with the value set here.'}
           </BodyText>
         )}
         {declared.contestant ? (
@@ -497,11 +497,11 @@ export function InputsCard({
     return (
       <BuildCard id="inputs" title="Inputs" line={line}>
         <BodyText>
-          {workflowProblem ?? 'The workflow cannot be read'} The inputs below are what
-          the settings hold; the save checks them against the workflow.
+          {workflowProblem ?? 'The workflow cannot be read'} The inputs below are those
+          the task has saved. Saving checks them against the workflow.
         </BodyText>
         {inputs.length === 0 ? (
-          <BodyText tone="secondary">The settings give no inputs.</BodyText>
+          <BodyText tone="secondary">The task has no inputs saved.</BodyText>
         ) : (
           inputs.map((input) => (
             <UnknownItem
@@ -563,7 +563,7 @@ export function InputsCard({
       {undeclared.length > 0 && (
         <CardPart
           title="Not used by this workflow"
-          line="The settings give these, but the workflow has no such input, so a save is refused until they are removed."
+          line="The task has these, but the workflow has no such input, so the task cannot be saved until they are removed."
         >
           {undeclared.map((input) => (
             <div key={input.id} className={classes.item}>

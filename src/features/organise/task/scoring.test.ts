@@ -67,7 +67,7 @@ describe('a test group’s rule', () => {
   });
 
   it('greys out what the save would refuse, with the reason', () => {
-    expect(ruleRefusal('worst', 'none')).toMatch(/Only when a test can earn part/);
+    expect(ruleRefusal('worst', 'none')).toMatch(/Only available when a test can earn part/);
     expect(ruleRefusal('worst', 'value')).toBeNull();
     expect(showRefusal('verdict', group('g', { each: '100' }), 'none')).toMatch(
       /all or nothing/,
@@ -102,7 +102,7 @@ describe('a task’s points', () => {
     const groups = [group('a', { pass: '30' }), group('b', { pass: '90' })];
     expect(scaled(r('30'), taskWeight(groups), r('100'))).toEqual(r('25'));
     expect(totalSentence(taskWeight(groups), r('100'))).toMatch(
-      /Its contest makes the task worth 100, so each group's points are scaled/,
+      /Its contest makes the task worth 100, so each test group's points are scaled/,
     );
     const thirds = [
       group('a', { pass: '1' }),
