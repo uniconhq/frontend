@@ -268,6 +268,40 @@ describe('the contest settings form', { timeout: 20_000 }, () => {
     });
   });
 
+  it('keeps the merge open with the choices made when the merged version is refused', async () => {
+    const theirs = CONTEST.replace('name: Spring', 'name: Their spring');
+    contestBackend({ conflictWith: theirs });
+    const form = await openForm();
+    const field = (name: string) => within(form).getByLabelText(name);
+    await userEvent.clear(field('Name'));
+    await userEvent.type(field('Name'), 'My spring');
+    await userEvent.click(within(form).getByRole('button', { name: 'Save settings' }));
+    const merge = await screen.findByRole('list', { name: 'Fields that differ' });
+    const name = within(merge).getByRole('radiogroup', {
+      name: 'name (both changed it)',
+    });
+    await userEvent.click(
+      within(name).getByRole('radio', { name: 'Now: Their spring' }),
+    );
+    server.use(
+      http.put(FILE, () =>
+        problem(422, 'invalid_definition', {
+          errors: [{ path: 'name', message: 'The name is refused.' }],
+        }),
+      ),
+    );
+
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Save the merged version' }),
+    );
+
+    expect(await screen.findByText(/The name is refused./)).toBeVisible();
+    const kept = screen.getByRole('list', { name: 'Fields that differ' });
+    expect(
+      within(kept).getByRole('radio', { name: 'Now: Their spring' }),
+    ).toBeChecked();
+  });
+
   it("holds a manager's admin-only fields to the current version in the merge", async () => {
     const theirs = CONTEST.replace('name: Spring', 'name: Their spring').replace(
       'start: 2026-06-01T09:00:00Z',

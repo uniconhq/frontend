@@ -101,6 +101,12 @@ function FormView({
       await query.refetch();
       return;
     }
+    if (answer.kind === 'refused' && merge !== null) {
+      // A merged version refused for what it holds keeps the merge and its
+      // choices open beside the reason, as the form keeps what was typed.
+      setOutcome(answer);
+      return;
+    }
     setMerge(null);
     setOutcome(answer);
     if (answer.kind !== 'refused') await query.refetch();
