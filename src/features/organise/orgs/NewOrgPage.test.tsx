@@ -1,14 +1,21 @@
 import { describe, expect, it } from 'vitest';
-import { screen, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@/test/user-event';
 import { http, HttpResponse } from 'msw';
 import { renderApp } from '@/test/render';
 import { problem, server, signedIn, someone } from '@/test/server';
 import { contestList } from '@/test/organiser';
 
-async function createOrg(name: string, description = '') {
+/** Opens the new org's form from the orgs page's one button. */
+async function openForm() {
   const user = userEvent.setup();
-  renderApp('/orgs/new');
+  renderApp('/orgs');
+  await user.click(await screen.findByRole('button', { name: 'New org' }));
+  return { user, form: await screen.findByRole('form', { name: 'New org' }) };
+}
+
+async function createOrg(name: string, description = '') {
+  const { user } = await openForm();
   await user.type(await screen.findByRole('textbox', { name: /^Name/ }), name);
   if (description !== '') {
     await user.type(screen.getByRole('textbox', { name: /^Description/ }), description);
@@ -35,7 +42,7 @@ describe('creating an org', () => {
       await screen.findByRole('heading', { name: 'acme', level: 1 }),
     ).toBeVisible();
     expect(sent).toEqual({ name: 'acme', description: 'Acme contests' });
-    expect(screen.queryByRole('form', { name: 'The org' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('form', { name: 'New org' })).not.toBeInTheDocument();
     expect(await screen.findByRole('list', { name: 'Contests' })).toBeVisible();
   });
 
@@ -67,7 +74,8 @@ describe('creating an org', () => {
 
     const user = await createOrg('beta');
     await screen.findByRole('heading', { name: 'beta', level: 1 });
-    await user.click(screen.getByRole('link', { name: 'orgs' }));
+    const trail = screen.getByRole('navigation', { name: 'Breadcrumb' });
+    await user.click(within(trail).getByRole('link', { name: 'Orgs' }));
 
     const list = await screen.findByRole('list', { name: 'Your orgs' });
     expect(within(list).getByRole('link', { name: 'beta' })).toBeInTheDocument();
@@ -83,8 +91,7 @@ describe('creating an org', () => {
         return HttpResponse.json({ name: 'acme' }, { status: 201 });
       }),
     );
-    const user = userEvent.setup();
-    renderApp('/orgs/new');
+    const { user } = await openForm();
     await user.type(await screen.findByRole('textbox', { name: /^Name/ }), 'acme');
     const description = screen.getByRole('textbox', { name: /^Description/ });
     expect(description).toHaveAttribute('maxlength', '255');
@@ -111,13 +118,56 @@ describe('creating an org', () => {
 
       await createOrg('acme');
 
-      const form = screen.getByRole('form', { name: 'The org' });
+      const form = screen.getByRole('form', { name: 'New org' });
       const alert = await within(form).findByRole('alert');
       expect(alert).toHaveTextContent(detail);
       const name = within(form).getByRole('textbox', { name: /^Name/ });
       expect(name).toHaveValue('acme');
       expect(name).toHaveFocus();
-      expect(screen.getByRole('heading', { name: 'New org', level: 1 })).toBeVisible();
+      expect(screen.getByRole('dialog', { name: 'New org' })).toBeVisible();
     },
   );
+
+  it('closes the form on Cancel, back on its button, with nothing sent', async () => {
+    let sent = false;
+    server.use(
+      signedIn,
+      http.post('/api/v1/orgs', () => {
+        sent = true;
+        return HttpResponse.json({ name: 'acme' }, { status: 201 });
+      }),
+    );
+    const { user, form } = await openForm();
+    expect(within(form).getByRole('textbox', { name: /^Name/ })).toHaveFocus();
+
+    await user.click(within(form).getByRole('button', { name: 'Cancel' }));
+    expect(form).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'New org' })).toHaveFocus(),
+    );
+    expect(sent).toBe(false);
+  });
+
+  it('opens the same form at an address of its own', async () => {
+    let sent: unknown = null;
+    server.use(
+      signedIn,
+      contestList,
+      http.post('/api/v1/orgs', async ({ request }) => {
+        sent = await request.json();
+        return HttpResponse.json({ name: 'acme' }, { status: 201 });
+      }),
+    );
+    const user = userEvent.setup();
+    renderApp('/orgs/new');
+
+    const form = await screen.findByRole('form', { name: 'New org' });
+    await user.type(within(form).getByRole('textbox', { name: /^Name/ }), 'acme');
+    await user.click(within(form).getByRole('button', { name: 'Create org' }));
+
+    expect(
+      await screen.findByRole('heading', { name: 'acme', level: 1 }),
+    ).toBeVisible();
+    expect(sent).toEqual({ name: 'acme', description: '' });
+  });
 });

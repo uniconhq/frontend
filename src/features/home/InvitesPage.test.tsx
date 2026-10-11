@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { screen, within } from '@testing-library/react';
 import userEvent from '@/test/user-event';
 import { http, HttpResponse } from 'msw';
-import type { Invite } from '@/api/types';
+import type { AcceptedInvite, Entered, Invite } from '@/api/types';
 import { renderApp } from '@/test/render';
 import { problem, server, sessionList, signedIn, someone } from '@/test/server';
 import { invite } from '@/test/invites';
@@ -17,8 +17,12 @@ afterEach(() => {
   forgetInviteToken();
 });
 
-/** The person's invites as accepting and declining change them, and what was sent. */
-function myInvites(start: Invite[]) {
+/**
+ * The person's invites as accepting and declining change them, and what was
+ * sent. Accepting a place registers kenny alone, pending, unless `entered`
+ * says otherwise.
+ */
+function myInvites(start: Invite[], entered: Entered | null = null) {
   let invites = start;
   const sent: string[] = [];
   const decide = (request: Request, id: string, status: Invite['status']) => {
@@ -29,16 +33,27 @@ function myInvites(start: Invite[]) {
       decided_at: '2026-09-12T10:00:00Z',
     };
     invites = invites.filter((found) => found.id !== id);
-    return HttpResponse.json(decided);
+    return decided;
   };
   server.use(
     sessionList,
     http.get(MINE, () => HttpResponse.json(invites)),
-    http.post(`${MINE}/:id/accept`, ({ request, params }) =>
-      decide(request, String(params.id), 'accepted'),
-    ),
+    http.post(`${MINE}/:id/accept`, ({ request, params }) => {
+      const invite = decide(request, String(params.id), 'accepted');
+      const place = invite.grants === 'contestant' || invite.grants === 'member';
+      return HttpResponse.json({
+        invite,
+        entered: place
+          ? (entered ?? {
+              entrant: { id: 'e-kenny', name: 'kenny' },
+              status: 'pending',
+              how: 'made',
+            })
+          : null,
+      } satisfies AcceptedInvite);
+    }),
     http.post(`${MINE}/:id/decline`, ({ request, params }) =>
-      decide(request, String(params.id), 'declined'),
+      HttpResponse.json(decide(request, String(params.id), 'declined')),
     ),
   );
   return sent;
@@ -104,7 +119,7 @@ describe('invites on the home page', () => {
     expect(sent).toEqual([`${MINE}/${invite().id}/accept`]);
   });
 
-  it('accepts a place and links to the contest to register', async () => {
+  it('accepts a place, which registers, and says so with a link to the contest', async () => {
     server.use(signedIn);
     myInvites([invite({ grants: 'contestant', where: spring })]);
     const user = userEvent.setup();
@@ -116,11 +131,86 @@ describe('invites on the home page', () => {
     await user.click(within(card).getByRole('button', { name: /^Accept/ }));
 
     expect(
-      await within(card).findByText(/You have a place in acme\/spring/),
+      await within(card).findByText(
+        'You are registered for acme/spring as kenny. An organiser approves each registration; the contest’s page says when.',
+      ),
     ).toBeVisible();
     expect(
       within(card).getByRole('link', { name: 'Go to the contest' }),
     ).toHaveAttribute('href', '/contests/acme/spring');
+  });
+
+  it('accepts a place in a team and says the person joined it', async () => {
+    server.use(signedIn);
+    myInvites(
+      [
+        invite({
+          grants: 'member',
+          where: spring,
+          entrant: { id: 'e-red', name: 'Red' },
+        }),
+      ],
+      { entrant: { id: 'e-red', name: 'Red' }, status: 'approved', how: 'joined' },
+    );
+    const user = userEvent.setup();
+    renderApp('/');
+
+    const card = await screen.findByRole('listitem', {
+      name: 'A place in the team Red, in the contest acme/spring',
+    });
+    await user.click(within(card).getByRole('button', { name: /^Accept/ }));
+
+    expect(
+      await within(card).findByText('You joined Red in acme/spring. You are in.'),
+    ).toBeVisible();
+  });
+
+  it('asks for the contest’s code when accepting needs it, and accepts again with it', async () => {
+    const bodies: unknown[] = [];
+    server.use(
+      signedIn,
+      sessionList,
+      http.get(MINE, () =>
+        HttpResponse.json([
+          invite({
+            grants: 'member',
+            where: spring,
+            entrant: { id: 'e-red', name: 'Red' },
+          }),
+        ]),
+      ),
+      http.post(`${MINE}/:id/accept`, async ({ request }) => {
+        const body = (await request.json()) as { code: string | null };
+        bodies.push(body);
+        if (body.code !== 'sesame') return problem(403, 'wrong_invite_code');
+        return HttpResponse.json({
+          invite: invite({
+            grants: 'member',
+            where: spring,
+            entrant: { id: 'e-red', name: 'Red' },
+            status: 'accepted',
+          }),
+          entered: {
+            entrant: { id: 'e-red', name: 'Red' },
+            status: 'approved',
+            how: 'joined',
+          },
+        } satisfies AcceptedInvite);
+      }),
+    );
+    const user = userEvent.setup();
+    renderApp('/');
+
+    const card = await screen.findByRole('listitem', {
+      name: 'A place in the team Red, in the contest acme/spring',
+    });
+    await user.click(within(card).getByRole('button', { name: /^Accept/ }));
+    const code = await within(card).findByRole('textbox', { name: /Contest code/ });
+    await user.type(code, 'sesame');
+    await user.click(within(card).getByRole('button', { name: /^Accept/ }));
+
+    expect(await within(card).findByText(/You joined Red/)).toBeVisible();
+    expect(bodies).toEqual([{ code: null }, { code: 'sesame' }]);
   });
 
   it('declines an invite', async () => {

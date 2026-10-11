@@ -50,11 +50,6 @@
   font-size: 13px;
 }
 
-.scope {
-  font-family: var(--mantine-font-family-monospace);
-  color: var(--unicon-text-primary);
-}
-
 .roleName {
   color: var(--unicon-text-secondary);
 }

@@ -197,7 +197,9 @@ function TaskForm({
           label="Workflow"
           value={values.workflow}
           onChange={(value) => set('workflow', value)}
-          description="owner/name@version, such as unicon/classic@v2. The save pins it."
+          placeholder="unicon/classic@v2"
+          description="As owner/name@version."
+          info="The task is graded by the version named here until another is named and saved."
         />
         {workflowForm?.newer && workflowForm.workflow !== null && (
           <NewerVersion
@@ -368,6 +370,7 @@ function TaskForm({
             label="At most"
             value={values.max}
             onChange={(value) => set('max', value)}
+            placeholder="50"
             whole
             disabled={!admin || unreadable('submissions')}
           />
@@ -375,7 +378,8 @@ function TaskForm({
             label="Rate: count"
             value={values.rateCount}
             onChange={(value) => set('rateCount', value)}
-            hint="Submissions in any window"
+            placeholder="1"
+            hint="Submissions in any window."
             whole
             disabled={!admin || unreadable('submissions')}
           />
@@ -383,7 +387,8 @@ function TaskForm({
             label="Rate: per seconds"
             value={values.ratePer}
             onChange={(value) => set('ratePer', value)}
-            hint="The window, in seconds"
+            placeholder="30"
+            hint="The window, in seconds."
             whole
             disabled={!admin || unreadable('submissions')}
           />
@@ -577,7 +582,7 @@ function ValueField({
   input: InputValues;
   onChange: (change: Partial<InputValues>) => void;
 }) {
-  const label = `${input.id} value`;
+  const label = 'Value';
   const { type } = declared;
   if (type === 'number') {
     return (
@@ -616,7 +621,7 @@ function ValueField({
       />
       {secrets && (
         <Checkbox
-          label={`${input.id}: a secret of the org`}
+          label="A secret of the org"
           checked={input.secret}
           onChange={(secret) => onChange({ secret })}
         />
@@ -666,21 +671,22 @@ function DetailsFields({
     <>
       <div className={classes.grid}>
         <TextInput
-          label={`${id} label`}
+          label="Label"
           value={input.label}
           onChange={(label) => onChange({ label })}
-          description="Empty: the id."
+          placeholder={id}
+          description="Left empty: the input's name."
         />
         {(type === 'text' || type === 'boolean' || type === 'enum') &&
           (type === 'text' ? (
             <TextInput
-              label={`${id} default`}
+              label="Default"
               value={input.default}
               onChange={(value) => onChange({ default: value })}
             />
           ) : (
             <Select
-              label={`${id} default`}
+              label="Default"
               value={input.default}
               options={choices(
                 type === 'boolean' ? ['true', 'false'] : offered,
@@ -693,17 +699,17 @@ function DetailsFields({
         {type === 'number' && (
           <>
             <NumberField
-              label={`${id} default`}
+              label="Default"
               value={input.default}
               onChange={(value) => onChange({ default: value })}
             />
             <NumberField
-              label={`${id} min`}
+              label="Minimum"
               value={input.min}
               onChange={(min) => onChange({ min })}
             />
             <NumberField
-              label={`${id} max`}
+              label="Maximum"
               value={input.max}
               onChange={(max) => onChange({ max })}
             />
@@ -711,16 +717,17 @@ function DetailsFields({
         )}
         {(type === 'file' || type === 'folder') && (
           <TextInput
-            label={`${id} max size`}
+            label="Largest size"
             value={input.maxSize}
             onChange={(maxSize) => onChange({ maxSize })}
-            description="Such as 1MB. Empty: 10MB."
+            placeholder="10MB"
+            description="Such as 1MB or 500KB."
           />
         )}
       </div>
       {type === 'enum' && (
         <Fieldset
-          legend={`${id} options`}
+          legend="Options"
           note={
             strays.length > 0
               ? `task.yaml also offers ${strays.join(', ')}, which the workflow does not declare; choosing here leaves those out.`
@@ -761,45 +768,47 @@ function InputEntry({
         {input.kind === 'details' ? (
           <div className={classes.grid}>
             <TextInput
-              label={`${id} label`}
+              label="Label"
               value={input.label}
               onChange={(label) => onChange({ label })}
-              description="Empty: the id."
+              placeholder={id}
+              description="Left empty: the input's name."
             />
             <TextInput
-              label={`${id} options`}
+              label="Options"
               value={input.options}
               onChange={(options) => onChange({ options })}
               description="For a choice: the ones offered, separated by commas."
             />
             <TextInput
-              label={`${id} default`}
+              label="Default"
               value={input.default}
               onChange={(value) => onChange({ default: value })}
             />
             <NumberField
-              label={`${id} min`}
+              label="Minimum"
               value={input.min}
               onChange={(min) => onChange({ min })}
               hint="For a number."
             />
             <NumberField
-              label={`${id} max`}
+              label="Maximum"
               value={input.max}
               onChange={(max) => onChange({ max })}
               hint="For a number."
             />
             <TextInput
-              label={`${id} max size`}
+              label="Largest size"
               value={input.maxSize}
               onChange={(maxSize) => onChange({ maxSize })}
-              description="For files, such as 1MB. Empty: 10MB."
+              placeholder="10MB"
+              description="For files, such as 1MB."
             />
           </div>
         ) : (
           <div className={classes.grid}>
             <TextInput
-              label={`${id} value`}
+              label="Value"
               value={input.value}
               onChange={(value) => onChange({ value })}
               description={
@@ -877,31 +886,33 @@ function GroupEntry({
       <Fieldset legend={name} note={note}>
         <div className={classes.grid}>
           <NumberField
-            label={`${name} each`}
+            label="Each"
             value={group.each}
             onChange={(each) => onChange({ each })}
-            hint="Earns the mean credit of its tests."
+            info="The group earns this many points times the mean credit of its tests."
           />
           <NumberField
-            label={`${name} worst`}
+            label="Worst"
             value={group.worst}
             onChange={(worst) => onChange({ worst })}
-            hint="Earns its worst test's credit."
+            info="The group earns this many points times its worst test's credit."
           />
           <NumberField
-            label={`${name} pass`}
+            label="Pass"
             value={group.pass}
             onChange={(pass) => onChange({ pass })}
-            hint="Earns all of it when enough pass."
+            info="The group earns all of these points when enough of its tests pass."
           />
           <NumberField
-            label={`${name} pass at`}
+            label="Pass at"
             value={group.passAt}
             onChange={(passAt) => onChange({ passAt })}
-            hint="The part that must pass. Empty: all."
+            placeholder="1"
+            hint="Left empty: every test."
+            info="The share of the group's tests that must pass for Pass to be earned, such as 0.5."
           />
           <Select
-            label={`${name} show`}
+            label="Show"
             value={group.show}
             options={
               group.show === '' || SHOWS.some((show) => show.value === group.show)
@@ -922,14 +933,19 @@ function GroupEntry({
           Test weights: each test weighs 1 unless set here.
         </BodyText>
         {group.weights.map((row, index) => (
-          <div key={index} className={classes.grid}>
+          <div
+            key={index}
+            className={classes.grid}
+            role="group"
+            aria-label={`Test weight ${String(index + 1)}`}
+          >
             <TextInput
-              label={`${name} test`}
+              label="Test"
               value={row.test}
               onChange={(test) => setRow(index, { test })}
             />
             <NumberField
-              label={`${name} test weight`}
+              label="Weight"
               value={row.weight}
               onChange={(weight) => setRow(index, { weight })}
             />

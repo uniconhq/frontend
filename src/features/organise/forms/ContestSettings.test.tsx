@@ -16,7 +16,7 @@ end: 2026-06-01T14:00:00Z
 state: draft
 visibility: signed-in
 registration:
-  approval: manual
+  capacity: 100
 leaderboards:
   - name: Standings
     who: contestants
@@ -77,6 +77,15 @@ function fill(field: HTMLElement, value: string) {
   fireEvent.change(field, { target: { value } });
 }
 
+/**
+ * The fields of one box of the form, a task's entry, a board or the contest
+ * itself, found by its title: a field is named for what it is, and its box
+ * says whose it is.
+ */
+function inBox(form: HTMLElement, name: string | RegExp) {
+  return within(within(form).getByRole('group', { name }));
+}
+
 async function openForm() {
   renderApp('/orgs/acme/contests/spring/settings');
   return screen.findByRole('form', { name: 'Contest settings' });
@@ -88,32 +97,26 @@ describe('the contest settings form', { timeout: 20_000 }, () => {
     const form = await openForm();
     const field = (name: string) => within(form).getByLabelText(name);
 
-    fill(field('Name'), 'Spring 2026');
+    fill(inBox(form, 'The contest').getByLabelText('Name'), 'Spring 2026');
     fill(field('Description'), 'Two lines\nof description');
     await userEvent.selectOptions(field('State'), 'published');
     await userEvent.selectOptions(field('Who sees it'), 'everyone');
-    await userEvent.click(
-      within(form).getByRole('checkbox', { name: 'By invitation only' }),
-    );
     fill(field('Registration opens'), '2026-05-01T08:00');
-    await userEvent.selectOptions(field('Approval'), 'auto');
     fill(field('Capacity'), '500');
-    fill(field('Code'), 'olympiad');
-    fill(field('Email pattern'), '.*@u\\.nus\\.edu');
     fill(field('Registration closes'), '2026-06-01T09:00');
     fill(field('Start'), '2026-06-01T10:00');
-    fill(field('A released at'), '2026-06-01T11:00');
-    fill(field('A closes'), '2026-06-01T22:00');
-    fill(field('A marks'), '2');
+    fill(inBox(form, 'A: sum').getByLabelText('Released at'), '2026-06-01T11:00');
+    fill(inBox(form, 'A: sum').getByLabelText('Closes'), '2026-06-01T22:00');
+    fill(inBox(form, 'A: sum').getByLabelText('Marks'), '2');
     fill(field('End'), '2026-06-01T23:30');
-    fill(field('Team size'), '3');
+    fill(field('Most people in a team'), '3');
     await userEvent.selectOptions(
       field('A submission whose grading broke counts as'),
       'last_result',
     );
-    fill(field('B worth'), '70');
-    fill(field('B due'), '2026-06-01T20:00');
-    fill(field('B taken off per late day'), '0.1');
+    fill(inBox(form, 'B: sort').getByLabelText('Worth'), '70');
+    fill(inBox(form, 'B: sort').getByLabelText('Due'), '2026-06-01T20:00');
+    fill(inBox(form, 'B: sort').getByLabelText('Taken off per late day'), '0.1');
     await userEvent.click(within(form).getByRole('button', { name: 'Move sort up' }));
     await userEvent.click(within(form).getByRole('button', { name: 'Save settings' }));
 
@@ -129,13 +132,9 @@ describe('the contest settings form', { timeout: 20_000 }, () => {
       state: 'published',
       visibility: 'everyone',
       registration: {
-        approval: 'auto',
-        invite_only: true,
+        capacity: 500,
         opens: isoOf('2026-05-01T08:00'),
         closes: isoOf('2026-06-01T09:00'),
-        code: 'olympiad',
-        email_pattern: '.*@u\\.nus\\.edu',
-        capacity: 500,
       },
       leaderboards: [{ name: 'Standings', who: 'contestants' }],
       tasks: [
@@ -148,7 +147,7 @@ describe('the contest settings form', { timeout: 20_000 }, () => {
           marks: 2,
         },
       ],
-      team_size: 3,
+      entrants: { most: 3 },
       on_system_error: 'last_result',
     });
     expect(write?.content).toContain("# the page's title");
@@ -159,7 +158,7 @@ describe('the contest settings form', { timeout: 20_000 }, () => {
     contestBackend({ notes: ['Standings counts nothing from sort.'] });
     const form = await openForm();
 
-    fill(within(form).getByLabelText('Name'), 'Spring 2026');
+    fill(inBox(form, 'The contest').getByLabelText('Name'), 'Spring 2026');
     await userEvent.click(within(form).getByRole('button', { name: 'Save settings' }));
 
     expect(await screen.findByText(/Saved as version/)).toBeVisible();
@@ -173,7 +172,7 @@ describe('the contest settings form', { timeout: 20_000 }, () => {
     contestBackend();
     const form = await openForm();
 
-    fill(within(form).getByLabelText('Name'), 'Spring 2026');
+    fill(inBox(form, 'The contest').getByLabelText('Name'), 'Spring 2026');
     await userEvent.click(within(form).getByRole('button', { name: 'Save settings' }));
 
     expect(await screen.findByText(/Saved as version/)).toBeVisible();
@@ -195,23 +194,14 @@ describe('the contest settings form', { timeout: 20_000 }, () => {
     const form = await openForm();
     const field = (name: string) => within(form).getByLabelText(name);
 
-    for (const name of [
-      'Name',
-      'State',
-      'Who sees it',
-      'Approval',
-      'Code',
-      'Capacity',
-    ]) {
+    expect(inBox(form, 'The contest').getByLabelText('Name')).toBeDisabled();
+    for (const name of ['State', 'Who sees it', 'Capacity']) {
       expect(field(name)).toBeDisabled();
     }
-    expect(
-      within(form).getByRole('checkbox', { name: 'By invitation only' }),
-    ).toBeDisabled();
     expect(field('Description')).toHaveAttribute('readonly');
 
-    await userEvent.clear(field('A worth'));
-    await userEvent.type(field('A worth'), '120');
+    await userEvent.clear(inBox(form, 'A: sum').getByLabelText('Worth'));
+    await userEvent.type(inBox(form, 'A: sum').getByLabelText('Worth'), '120');
     await userEvent.click(within(form).getByRole('button', { name: 'Save settings' }));
 
     await screen.findByText(/Saved as version/);
@@ -233,9 +223,12 @@ describe('the contest settings form', { timeout: 20_000 }, () => {
     const form = await openForm();
     const field = (name: string) => within(form).getByLabelText(name);
 
-    await userEvent.clear(field('Name'));
-    await userEvent.type(field('Name'), 'My spring');
-    await userEvent.type(field('Team size'), '2');
+    await userEvent.clear(inBox(form, 'The contest').getByLabelText('Name'));
+    await userEvent.type(
+      inBox(form, 'The contest').getByLabelText('Name'),
+      'My spring',
+    );
+    await userEvent.type(field('Most people in a team'), '2');
     await userEvent.click(within(form).getByRole('button', { name: 'Save settings' }));
 
     const merge = await screen.findByRole('list', { name: 'Fields that differ' });
@@ -245,8 +238,10 @@ describe('the contest settings form', { timeout: 20_000 }, () => {
     expect(within(name).getByRole('radio', { name: 'Yours: My spring' })).toBeChecked();
     const state = within(merge).getByRole('radiogroup', { name: 'state' });
     expect(within(state).getByRole('radio', { name: 'Now: published' })).toBeChecked();
-    const teams = within(merge).getByRole('radiogroup', { name: 'team_size' });
-    expect(within(teams).getByRole('radio', { name: 'Yours: 2' })).toBeChecked();
+    const teams = within(merge).getByRole('radiogroup', { name: 'entrants' });
+    expect(
+      within(teams).getByRole('radio', { name: 'Yours: {"most":2}' }),
+    ).toBeChecked();
     expect(sent).toHaveLength(1);
 
     await userEvent.click(
@@ -261,7 +256,7 @@ describe('the contest settings form', { timeout: 20_000 }, () => {
     expect(sent[1]?.token).toBe('token-2');
     expect(parse(sent[1]?.content ?? '')).toEqual({
       ...(parse(theirs) as object),
-      team_size: 2,
+      entrants: { most: 2 },
     });
   });
 
@@ -269,9 +264,11 @@ describe('the contest settings form', { timeout: 20_000 }, () => {
     const theirs = CONTEST.replace('name: Spring', 'name: Their spring');
     contestBackend({ conflictWith: theirs });
     const form = await openForm();
-    const field = (name: string) => within(form).getByLabelText(name);
-    await userEvent.clear(field('Name'));
-    await userEvent.type(field('Name'), 'My spring');
+    await userEvent.clear(inBox(form, 'The contest').getByLabelText('Name'));
+    await userEvent.type(
+      inBox(form, 'The contest').getByLabelText('Name'),
+      'My spring',
+    );
     await userEvent.click(within(form).getByRole('button', { name: 'Save settings' }));
     const merge = await screen.findByRole('list', { name: 'Fields that differ' });
     const name = within(merge).getByRole('radiogroup', {
@@ -316,7 +313,7 @@ describe('the contest settings form', { timeout: 20_000 }, () => {
       ),
     );
     const form = await openForm();
-    fill(within(form).getByLabelText('B worth'), '70');
+    fill(inBox(form, 'B: sort').getByLabelText('Worth'), '70');
     await userEvent.click(within(form).getByRole('button', { name: 'Save settings' }));
 
     const merge = await screen.findByRole('list', { name: 'Fields that differ' });
@@ -346,22 +343,19 @@ describe('the contest settings form', { timeout: 20_000 }, () => {
   it('builds a board from its fields that reads as the same board written by hand', async () => {
     const { sent } = contestBackend();
     const form = await openForm();
-    const field = (name: string) => within(form).getByLabelText(name);
-
     await userEvent.click(within(form).getByRole('button', { name: 'Add a board' }));
-    fill(field('Board 2 name'), 'ICPC');
-    await userEvent.selectOptions(field('Board 2 shown to'), 'everyone');
-    await userEvent.click(
-      within(form).getByRole('checkbox', { name: 'Board 2 covers every task' }),
-    );
-    await userEvent.click(
-      within(form).getByRole('checkbox', { name: 'Board 2 covers sort' }),
-    );
+    const board = () => inBox(form, /^Board 2/);
+    fill(board().getByLabelText('Name'), 'ICPC');
+    await userEvent.selectOptions(board().getByLabelText('Shown to'), 'everyone');
+    const tasks = within(board().getByRole('group', { name: 'Tasks' }));
+    await userEvent.click(tasks.getByRole('checkbox', { name: 'Covers every task' }));
+    await userEvent.click(tasks.getByRole('checkbox', { name: 'sort' }));
     await userEvent.click(
       within(form).getByRole('button', { name: 'Add a key to Board 2' }),
     );
-    await userEvent.selectOptions(field('Board 2 key 2'), 'penalty');
-    fill(field('Board 2 key 2 minutes per earlier attempt'), '20');
+    const key = within(board().getByRole('group', { name: 'Key 2' }));
+    await userEvent.selectOptions(key.getByLabelText('Key 2'), 'penalty');
+    fill(key.getByLabelText('Minutes per earlier attempt'), '20');
     await userEvent.click(within(form).getByRole('button', { name: 'Save settings' }));
 
     expect(await screen.findByText(/Saved as version/)).toBeVisible();
@@ -394,20 +388,23 @@ describe('the contest settings form', { timeout: 20_000 }, () => {
       ),
     );
     const form = await openForm();
-    const field = (name: string) => within(form).getByLabelText(name);
+    const board = () => inBox(form, /^Board 1/);
 
     expect(within(form).getByText('Points alone, the default.')).toBeVisible();
     await userEvent.click(
       within(form).getByRole('button', { name: 'Add a key to Board 1' }),
     );
-    await userEvent.selectOptions(field('Board 1 key 1'), 'penalty');
+    await userEvent.selectOptions(
+      board().getByRole('combobox', { name: 'Key 1' }),
+      'penalty',
+    );
     await userEvent.click(within(form).getByRole('button', { name: 'Save settings' }));
 
     expect(await screen.findByText('leaderboards[0].order[0]')).toBeVisible();
-    const key = field('Board 1 key 1');
+    const key = board().getByRole('combobox', { name: 'Key 1' });
     expect(key).toBeInvalid();
     expect(key).toHaveAccessibleDescription(/penalty is never the first key/);
-    expect(field('Board 1 name')).toBeValid();
+    expect(board().getByLabelText('Name')).toBeValid();
   });
 
   it('removes a board, and the key with the last of them', async () => {

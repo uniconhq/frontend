@@ -1,0 +1,13 @@
+/* What contestants are graded on, under the task's name. */
+.status {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.statusLine {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+}

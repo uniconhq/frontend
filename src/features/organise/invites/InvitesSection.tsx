@@ -17,14 +17,17 @@ import classes from './invites.module.css';
 
 /**
  * Whose invites a section is about: the organisers', with a role to choose,
- * on the people section, or the contestants', each a place in the contest,
- * on the contestants page. A contest's one list holds both.
+ * on the people section, or the entrants', each a place in the contest, on
+ * the contest's How people enter. A contest's one list holds both. The
+ * entrants' list also holds the invites members of a team made into it,
+ * which organisers see, send again and withdraw.
  */
 type Audience = 'organisers' | 'contestants';
 
 const GRANT_LABEL: Record<Grant, string> = {
   ...ROLE_LABEL,
-  contestant: 'A contestant’s place',
+  contestant: 'A place in the contest',
+  member: 'A place in a team',
 };
 
 const MAIL: Record<Invite['mail_status'], string> = {
@@ -41,7 +44,18 @@ const BEHIND = new Set(['wrong_status', 'invite_expired']);
 const STANDS_DAYS = 14;
 
 function shownTo(audience: Audience, invite: Invite): boolean {
-  return (invite.grants === 'contestant') === (audience === 'contestants');
+  const place = invite.grants === 'contestant' || invite.grants === 'member';
+  return place === (audience === 'contestants');
+}
+
+/** Where a place leads: into a team by name, or a place of their own. */
+function intoText(invite: Invite): string {
+  if (invite.entrant !== null) {
+    return invite.grants === 'member'
+      ? `${invite.entrant.name}, from a member`
+      : invite.entrant.name;
+  }
+  return 'Their own';
 }
 
 /** Where an invite stands, a lapsed one apart from one still open. */
@@ -151,7 +165,11 @@ function InviteRow({
           </BodyText>
         </div>
       </th>
-      {audience === 'organisers' && <td>{GRANT_LABEL[invite.grants]}</td>}
+      {audience === 'organisers' ? (
+        <td>{GRANT_LABEL[invite.grants]}</td>
+      ) : (
+        <td>{intoText(invite)}</td>
+      )}
       <td>
         <div className={classes.cell}>
           <span>{standing(invite)}</span>
@@ -233,8 +251,8 @@ function InviteForm({ place, grants }: { place: RolePlace; grants: Grant[] }) {
   };
 
   const means =
-    grant === 'contestant'
-      ? 'They get a place in this contest and register from its page.'
+    grant === 'contestant' || grant === 'member'
+      ? 'Accepting registers them for this contest.'
       : ROLE_MEANS[grant];
 
   return (
@@ -343,7 +361,11 @@ function InviteTable({
       <thead>
         <tr>
           <th scope="col">Invited</th>
-          {audience === 'organisers' && <th scope="col">Grants</th>}
+          {audience === 'organisers' ? (
+            <th scope="col">Grants</th>
+          ) : (
+            <th scope="col">Place</th>
+          )}
           <th scope="col">Status</th>
           <th scope="col">Mail</th>
           {manages && <th scope="col">Actions</th>}

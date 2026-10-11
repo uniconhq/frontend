@@ -116,7 +116,12 @@ export function Sidebar() {
   return (
     <nav className={classes.sidebar} aria-label="Sections">
       {[...(place === null ? [] : [place]), top].map((group) => (
-        <div key={group.label} role="group" aria-label={group.label}>
+        <div
+          key={group.label}
+          className={classes.group}
+          role="group"
+          aria-label={group.label}
+        >
           <div className={classes.groupLabel} aria-hidden="true">
             {group.label}
           </div>

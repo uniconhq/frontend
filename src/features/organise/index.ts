@@ -1,8 +1,8 @@
 import type { ComponentType } from 'react';
 import type { ContestSectionKey, OrgSectionKey, TaskSectionKey } from '@/lib/sections';
-import { ContestantsPage } from './contestants/ContestantsPage';
 import {
   ContestAnnouncementsPage,
+  ContestEntryPage,
   ContestFilesPage,
   ContestOrganisersPage,
   ContestQuestionsPage,
@@ -20,7 +20,7 @@ import {
   TaskPublicationsPage,
   TaskSettingsPage,
 } from './task/TaskSections';
-import { TeamsPage } from './teams/TeamsPage';
+import { EntrantsPage } from './entrants/EntrantsPage';
 import { InboxPage } from './threads/Clarifications';
 
 export { OrgsPage } from './orgs/OrgsPage';
@@ -43,8 +43,8 @@ export const ORG_SECTION_PAGES: Record<OrgSectionKey, ComponentType> = {
 
 export const CONTEST_SECTION_PAGES: Record<ContestSectionKey, ComponentType> = {
   settings: ContestSettingsPage,
-  contestants: ContestantsPage,
-  teams: TeamsPage,
+  entry: ContestEntryPage,
+  entrants: EntrantsPage,
   gradings: GradingsFeedPage,
   boards: OrganisedBoardsPage,
   announcements: ContestAnnouncementsPage,

@@ -71,7 +71,9 @@ function EditForm({
       <TextInput
         ref={first}
         label="Display name"
-        description="What people see in place of the org's name. Empty shows the name."
+        placeholder={org}
+        description="Left empty: the org's own name shows."
+        info="What people see in place of the org's name."
         value={displayName}
         onChange={setDisplayName}
         maxLength={DISPLAY_NAME_MAX}
@@ -127,7 +129,7 @@ export function OrgProfile({ org }: { org: string }) {
 
   return (
     <div className={classes.stack}>
-      <SectionTitle>About</SectionTitle>
+      <SectionTitle>Name and description</SectionTitle>
       {view.state === 'loading' && <PageSkeleton rows={2} />}
       {view.state === 'error' && <ErrorBlock error={view.error} onRetry={view.retry} />}
       {view.state === 'ready' &&

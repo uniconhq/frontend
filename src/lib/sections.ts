@@ -33,8 +33,8 @@ export const ORG_SECTIONS = [
 
 export const CONTEST_SECTIONS = [
   { key: 'settings', label: 'Settings', segment: 'settings', card: 'summary' },
-  { key: 'contestants', label: 'Contestants', segment: 'contestants', card: 'grid' },
-  { key: 'teams', label: 'Teams', segment: 'teams', card: 'grid' },
+  { key: 'entry', label: 'How people enter', segment: 'entry', card: 'grid' },
+  { key: 'entrants', label: 'Entrants', segment: 'entrants', card: 'grid' },
   { key: 'gradings', label: 'Gradings', segment: 'gradings', card: 'grid' },
   { key: 'boards', label: 'Boards', segment: 'boards', card: 'grid' },
   {

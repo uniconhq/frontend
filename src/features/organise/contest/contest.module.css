@@ -1,0 +1,37 @@
+/* The settings at a glance: each label over its value, side by side. */
+.summary {
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr));
+  gap: 8px 24px;
+}
+
+.summary dt {
+  font-size: 12px;
+  color: var(--unicon-text-secondary);
+}
+
+.summary dd {
+  margin: 0;
+  font-size: 13px;
+  color: var(--unicon-text-body);
+}
+
+/* One line of a task's row: where it stands, then its timeline. */
+.line {
+  display: flex;
+  flex-basis: 100%;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+}
+
+/* A contest's settings that do not read, said where its tasks would be. */
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+  border-radius: var(--mantine-radius-sm);
+  background: var(--unicon-hover);
+}

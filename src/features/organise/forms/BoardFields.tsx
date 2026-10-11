@@ -152,14 +152,14 @@ function BoardEntry({
         ))}
         <div className={classes.grid}>
           <TextInput
-            label={`${prefix} name`}
+            label="Name"
             value={board.name}
             onChange={(name) => onChange({ name })}
             description="Unique among the contest's boards."
             error={said('name')}
           />
           <Select
-            label={`${prefix} shown to`}
+            label="Shown to"
             value={board.who}
             options={choices(board.who, WHO)}
             placeholder="Not set (organisers)"
@@ -167,14 +167,15 @@ function BoardEntry({
             error={said('who')}
           />
           <TextInput
-            label={`${prefix} rows`}
+            label="Rows"
             value={board.rows}
             onChange={(rows) => onChange({ rows })}
-            description="all, own, or how many top rows. Empty: all."
+            placeholder="all"
+            description="all, own, or a number of top rows."
             error={said('rows')}
           />
           <Select
-            label={`${prefix} counts groups`}
+            label="Counts groups"
             value={board.over}
             options={choices(board.over, OVER)}
             placeholder="Not set (all)"
@@ -182,7 +183,7 @@ function BoardEntry({
             error={said('over')}
           />
           <Select
-            label={`${prefix} counts which submission`}
+            label="Counts which submission"
             value={board.select}
             options={choices(board.select, SELECT)}
             placeholder="Not set (best)"
@@ -191,9 +192,9 @@ function BoardEntry({
           />
         </div>
 
-        <div role="group" aria-label={`${prefix} tasks`}>
+        <div role="group" aria-label="Tasks">
           <Checkbox
-            label={`${prefix} covers every task`}
+            label="Covers every task"
             checked={board.tasks === null}
             onChange={(every) => onChange({ tasks: every ? null : [...taskIds] })}
           />
@@ -201,7 +202,7 @@ function BoardEntry({
             shownTasks.map((task) => (
               <Checkbox
                 key={task}
-                label={`${prefix} covers ${task}`}
+                label={task}
                 checked={board.tasks?.includes(task) ?? false}
                 onChange={(covered) =>
                   onChange({
@@ -221,7 +222,7 @@ function BoardEntry({
           )}
         </div>
 
-        <div role="group" aria-label={`${prefix} ranks on`}>
+        <div role="group" aria-label="Ranks on">
           {board.order.length === 0 ? (
             <BodyText tone="secondary">Points alone, the default.</BodyText>
           ) : (
@@ -229,7 +230,8 @@ function BoardEntry({
               {board.order.map((key, at) => (
                 <OrderKey
                   key={at}
-                  label={`${prefix} key ${String(at + 1)}`}
+                  label={`Key ${String(at + 1)}`}
+                  of={prefix}
                   value={key}
                   first={at === 0}
                   last={at === board.order.length - 1}
@@ -275,6 +277,7 @@ function BoardEntry({
 
 function OrderKey({
   label,
+  of,
   value,
   first,
   last,
@@ -284,7 +287,10 @@ function OrderKey({
   onMove,
   onRemove,
 }: {
+  /** The key's name in its board, such as "Key 1". */
   label: string;
+  /** The board it belongs to, for its buttons' names. */
+  of: string;
   value: OrderKeyValues;
   first: boolean;
   last: boolean;
@@ -295,7 +301,7 @@ function OrderKey({
   onRemove: () => void;
 }) {
   return (
-    <li className={classes.orderKey}>
+    <li className={classes.orderKey} role="group" aria-label={label}>
       <Select
         label={label}
         value={value.kind}
@@ -305,7 +311,7 @@ function OrderKey({
       />
       {value.kind === 'value' && (
         <TextInput
-          label={`${label} value`}
+          label="Value name"
           value={value.name}
           onChange={(name) => onChange({ kind: 'value', name })}
           description={
@@ -317,10 +323,11 @@ function OrderKey({
       )}
       {value.kind === 'penalty' && (
         <NumberField
-          label={`${label} minutes per earlier attempt`}
+          label="Minutes per earlier attempt"
           value={value.perAttempt}
           onChange={(perAttempt) => onChange({ kind: 'penalty', perAttempt })}
-          hint="Each earlier attempt that does not count. Empty: 0."
+          placeholder="0"
+          info="Added for each earlier attempt that does not count."
           error={minutesError}
           whole
         />
@@ -329,7 +336,7 @@ function OrderKey({
         size="xs"
         variant="secondary"
         disabled={first}
-        label={`Move ${label} up`}
+        label={`Move ${label} of ${of} up`}
         onClick={() => onMove(-1)}
       >
         Up
@@ -338,7 +345,7 @@ function OrderKey({
         size="xs"
         variant="secondary"
         disabled={last}
-        label={`Move ${label} down`}
+        label={`Move ${label} of ${of} down`}
         onClick={() => onMove(1)}
       >
         Down
@@ -346,7 +353,7 @@ function OrderKey({
       <Button
         size="xs"
         variant="secondary"
-        label={`Remove ${label}`}
+        label={`Remove ${label} of ${of}`}
         onClick={onRemove}
       >
         Remove

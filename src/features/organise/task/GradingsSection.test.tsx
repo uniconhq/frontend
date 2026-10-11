@@ -10,7 +10,12 @@ import { TASK_API, publicationList, repoFiles, taskState } from '@/test/organise
 
 const TASK = '/orgs/acme/contests/spring/tasks/sum/gradings';
 
-const ada: Submitter = { user_id: 11, name: 'ada', team: null };
+const ada: Submitter = {
+  entrant: 'e-ada',
+  entrant_name: 'ada',
+  user_id: 11,
+  username: 'ada',
+};
 
 /** A grading of sum, the contest's task B, as the route answers it. */
 function entry(grading: Grading, by: Submitter = ada): FeedEntry {
@@ -43,6 +48,7 @@ const stuck: Grading = {
   falls_back: false,
   last_good: null,
   fallback: null,
+  submitted_by: null,
 };
 
 const waiting: Grading = {
@@ -426,7 +432,12 @@ describe("the task's gradings", () => {
       status: 'queued',
       error: null,
     };
-    const grace: Submitter = { user_id: 12, name: 'grace', team: null };
+    const grace: Submitter = {
+      entrant: 'e-grace',
+      entrant_name: 'grace',
+      user_id: 12,
+      username: 'grace',
+    };
     server.use(
       signedIn,
       taskState,
@@ -613,12 +624,11 @@ describe("the organisers' scored view of a submission", () => {
     );
 
     const view = await screen.findByRole('region', { name: 'Submission 3, scored' });
-    expect(asked[0]?.get('user_id')).toBe('11');
-    expect(asked[0]?.has('team')).toBe(false);
+    expect(asked[0]?.get('entrant')).toBe('e-ada');
     const main = within(view).getByRole('region', { name: 'Group main' });
     expect(main).toHaveTextContent('100 / 100 points');
-    expect(main).toHaveTextContent(/Its row sees this at/);
-    expect(main).not.toHaveTextContent(/Its row sees its tests at/);
+    expect(main).toHaveTextContent(/Its entrant sees this at/);
+    expect(main).not.toHaveTextContent(/Its entrant sees its tests at/);
     expect(within(main).getByRole('table', { name: 'Tests main' })).toHaveTextContent(
       'main/1',
     );
@@ -626,7 +636,7 @@ describe("the organisers' scored view of a submission", () => {
     expect(view).toHaveTextContent('Done');
   });
 
-  it("asks for a team's submission by its team", async () => {
+  it("asks for a team's submission by its entrant", async () => {
     const asked: URLSearchParams[] = [];
     const team = '0192f4a4-7b7e-7000-8000-000000000001';
     server.use(
@@ -635,7 +645,14 @@ describe("the organisers' scored view of a submission", () => {
       publicationList,
       ...repoFiles,
       http.get(`${TASK_API}/gradings`, () =>
-        HttpResponse.json([entry(done, { user_id: null, team, name: 'Byte Me' })]),
+        HttpResponse.json([
+          entry(done, {
+            entrant: team,
+            entrant_name: 'Byte Me',
+            user_id: 12,
+            username: 'grace',
+          }),
+        ]),
       ),
       http.get(`${TASK_API}/organise/submissions/:number`, ({ request }) => {
         asked.push(new URL(request.url).searchParams);
@@ -650,7 +667,6 @@ describe("the organisers' scored view of a submission", () => {
     );
 
     await screen.findByRole('region', { name: 'Submission 3, scored' });
-    expect(asked[0]?.get('team')).toBe(team);
-    expect(asked[0]?.has('user_id')).toBe(false);
+    expect(asked[0]?.get('entrant')).toBe(team);
   });
 });

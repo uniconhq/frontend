@@ -152,7 +152,13 @@ describe("uploading a file into a task's tree", () => {
     expect(routes.seen.saves).toEqual([
       {
         changes: [
-          { path: 'data/train.csv', upload: UPLOAD, token: null, encoding: 'utf-8' },
+          {
+            path: 'data/train.csv',
+            upload: UPLOAD,
+            token: null,
+            encoding: 'utf-8',
+            remove: false,
+          },
         ],
         confirm: false,
         keep_as_draft: false,
@@ -333,8 +339,20 @@ describe("uploading a file into a task's tree", () => {
     expect(routes.seen.saves).toHaveLength(2);
     expect(routes.seen.saves[1]).toEqual({
       changes: [
-        { path: 'tests/main/1/input', upload: UPLOAD, token: null, encoding: 'utf-8' },
-        { path: 'tests/main/1/answer', upload: UPLOAD, token: null, encoding: 'utf-8' },
+        {
+          path: 'tests/main/1/input',
+          upload: UPLOAD,
+          token: null,
+          encoding: 'utf-8',
+          remove: false,
+        },
+        {
+          path: 'tests/main/1/answer',
+          upload: UPLOAD,
+          token: null,
+          encoding: 'utf-8',
+          remove: false,
+        },
       ],
       confirm: true,
       keep_as_draft: false,

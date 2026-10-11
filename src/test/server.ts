@@ -1,6 +1,6 @@
 import { setupServer } from 'msw/node';
 import { http, HttpResponse } from 'msw';
-import type { Me, SessionInfo } from '@/api/types';
+import type { ContestHome, Me, SessionInfo, WorkflowForm } from '@/api/types';
 
 /**
  * A fake backend for the tests, so they exercise the real client, the real
@@ -122,6 +122,49 @@ const emptyOrganising = [
   http.get('/api/v1/orgs/:org', () =>
     HttpResponse.json({ display_name: null, description: '' }),
   ),
+  /** Nobody registered for any contest, until a test registers someone. */
+  http.get('/api/v1/orgs/:org/contests/:contest/organise/entrants', () =>
+    HttpResponse.json([]),
+  ),
+  /**
+   * Every contest a draft its caller organises, from 1 to 15 October 2026,
+   * with nothing released, until a test says otherwise.
+   */
+  http.get('/api/v1/orgs/:org/contests/:contest/home', ({ params }) =>
+    HttpResponse.json({
+      where: { org: String(params.org), contest: String(params.contest) },
+      name: String(params.contest),
+      description: '',
+      start: '2026-10-01T09:00:00Z',
+      end: '2026-10-15T09:00:00Z',
+      state: 'draft',
+      now: '2026-09-12T10:00:00Z',
+      registration: {
+        entrant: null,
+        invitations: [],
+        registration_open: false,
+        can_register: false,
+        asks_code: false,
+        refused: null,
+        most: 1,
+        fewest: 1,
+        locks: 'start',
+      },
+      organises: true,
+      tasks: [],
+    } satisfies ContestHome),
+  ),
+  /** A task naming no workflow yet, until a test names one. */
+  http.get('/api/v1/orgs/:org/contests/:contest/tasks/:task/workflow-form', () =>
+    HttpResponse.json({
+      workflow: null,
+      newer: null,
+      problem: null,
+      inputs: [],
+      test: [],
+      graded: false,
+    } satisfies WorkflowForm),
+  ),
 ];
 
 /** No announcement or question anywhere, until a test says there is one. */
@@ -145,16 +188,6 @@ const noThreads = [
     HttpResponse.json([]),
   ),
   http.get('/api/v1/orgs/:org/clarifications', () => HttpResponse.json([])),
-];
-
-/** A contest whose settings leave teams off, until a test turns them on. */
-const noTeams = [
-  http.get('/api/v1/orgs/:org/contests/:contest/my-team', () =>
-    problem(409, 'teams_off'),
-  ),
-  http.get('/api/v1/orgs/:org/contests/:contest/organise/teams', () =>
-    HttpResponse.json([]),
-  ),
 ];
 
 /** A contest with no boards, so no task takes marks, until a test gives some. */
@@ -184,6 +217,5 @@ export const server = setupServer(
   noGradings,
   ...emptyOrganising,
   ...noThreads,
-  ...noTeams,
   ...noBoards,
 );

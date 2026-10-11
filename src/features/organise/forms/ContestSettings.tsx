@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
-import { Checkbox } from '@/ui/Checkbox';
 import { Select } from '@/ui/Select';
 import { Textarea } from '@/ui/Textarea';
 import { TextInput } from '@/ui/TextInput';
@@ -88,7 +87,8 @@ function ContestForm({
   const changed = JSON.stringify(values) !== JSON.stringify(read.values);
   const problems = [
     numberProblem(values.capacity, true),
-    numberProblem(values.teamSize, true),
+    numberProblem(values.most, true),
+    numberProblem(values.fewest, true),
     ...values.tasks.flatMap((entry) => [
       numberProblem(entry.worth),
       numberProblem(entry.latePerDay),
@@ -170,12 +170,6 @@ function ContestForm({
               : ADMIN_ONLY
         }
       >
-        <Checkbox
-          label="By invitation only"
-          checked={values.inviteOnly}
-          onChange={(checked) => set('inviteOnly', checked)}
-          disabled={regLocked}
-        />
         <div className={classes.grid}>
           <TimeField
             label="Registration opens"
@@ -191,50 +185,35 @@ function ContestForm({
             onChange={(value) => set('closes', value)}
             disabled={regLocked}
           />
-          <Select
-            label="Approval"
-            value={values.approval}
-            options={choices(values.approval, [
-              { value: 'auto', label: 'auto: approved when the rules pass' },
-              { value: 'manual', label: 'manual: an organiser decides' },
-            ])}
-            placeholder="Not set (manual)"
-            onChange={(value) => set('approval', value)}
-            disabled={regLocked}
-          />
           <NumberField
             label="Capacity"
             value={values.capacity}
             onChange={(value) => set('capacity', value)}
-            hint="The most contestants, approved and pending."
+            info="The most contestants, approved and waiting together."
+            hint="Left empty: no limit."
             whole
-            disabled={regLocked}
-          />
-          <TextInput
-            label="Email pattern"
-            value={values.emailPattern}
-            onChange={(value) => set('emailPattern', value)}
-            description="A regular expression the email must match."
-            disabled={regLocked}
-          />
-          <TextInput
-            label="Code"
-            value={values.code}
-            onChange={(value) => set('code', value)}
-            description="What a contestant types to register."
             disabled={regLocked}
           />
         </div>
       </Fieldset>
 
       <Fieldset legend="Teams">
-        <NumberField
-          label="Team size"
-          value={values.teamSize}
-          onChange={(value) => set('teamSize', value)}
-          hint="The most members a team may have. Empty: no teams."
-          whole
-        />
+        <div className={classes.grid}>
+          <NumberField
+            label="Most people in a team"
+            value={values.most}
+            onChange={(value) => set('most', value)}
+            placeholder="1, everyone alone"
+            whole
+          />
+          <NumberField
+            label="Fewest people in a team"
+            value={values.fewest}
+            onChange={(value) => set('fewest', value)}
+            placeholder="1"
+            whole
+          />
+        </div>
       </Fieldset>
 
       <Fieldset
@@ -335,40 +314,44 @@ function TaskEntry({
       <Fieldset legend={`${letter}: ${entry.id}`}>
         <div className={classes.grid}>
           <NumberField
-            label={`${letter} worth`}
+            label="Worth"
             value={entry.worth}
             onChange={(worth) => onChange({ worth })}
-            hint="The most points. Empty: 100."
+            hint="Left empty: its test groups' points added up."
+            info="The most points the task gives in this contest."
           />
           <TimeField
-            label={`${letter} released at`}
+            label="Released at"
             value={entry.releaseAt}
             raw={raw('release_at')}
             onChange={(releaseAt) => onChange({ releaseAt })}
           />
           <TimeField
-            label={`${letter} due`}
+            label="Due"
             value={entry.due}
             raw={raw('due')}
             onChange={(due) => onChange({ due })}
           />
           <NumberField
-            label={`${letter} taken off per late day`}
+            label="Taken off per late day"
             value={entry.latePerDay}
             onChange={(latePerDay) => onChange({ latePerDay })}
-            hint="Above 0, at most 1. Empty: 1."
+            placeholder="1"
+            hint="Above 0, at most 1."
+            info="The share of the task's points taken off for each day started after it is due."
           />
           <TimeField
-            label={`${letter} closes`}
+            label="Closes"
             value={entry.closes}
             raw={raw('closes')}
             onChange={(closes) => onChange({ closes })}
           />
           <NumberField
-            label={`${letter} marks`}
+            label="Marks"
             value={entry.marks}
             onChange={(marks) => onChange({ marks })}
             hint="Only with a marked board."
+            info="How many of their submissions a contestant may mark to be counted."
             whole
           />
         </div>

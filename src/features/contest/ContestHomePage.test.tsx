@@ -9,6 +9,8 @@ import { problem, server, signedIn } from '@/test/server';
 import {
   CONTEST_API,
   PUBLIC_API,
+  entrant,
+  entry,
   home,
   homesInTurn,
   publicContest,
@@ -42,6 +44,31 @@ describe('the contest page for a signed-in person', () => {
       'href',
       PAGE,
     );
+  });
+
+  it('leads an organiser of the contest back to organising it, and nobody else', async () => {
+    server.use(
+      signedIn,
+      http.get(`${CONTEST_API}/home`, () =>
+        HttpResponse.json({ ...home(), organises: true }),
+      ),
+    );
+    renderApp(PAGE);
+
+    expect(
+      await screen.findByRole('link', { name: 'Back to organising' }),
+    ).toHaveAttribute('href', '/orgs/acme/contests/spring');
+  });
+
+  it('offers a contestant no way to the organisers’ pages', async () => {
+    server.use(
+      signedIn,
+      http.get(`${CONTEST_API}/home`, () => HttpResponse.json(home())),
+    );
+    renderApp(PAGE);
+
+    await screen.findByRole('heading', { name: 'Spring 2026', level: 1 });
+    expect(screen.queryByRole('link', { name: 'Back to organising' })).toBeNull();
   });
 
   it('says an archived contest is still read and takes no submissions', async () => {
@@ -110,9 +137,9 @@ describe('the contest page for a signed-in person', () => {
     server.use(
       signedIn,
       homesInTurn([home(), home({ registration: registration() })]),
-      http.post(`${CONTEST_API}/registration`, async ({ request }) => {
+      http.post(`${CONTEST_API}/entrants`, async ({ request }) => {
         body = await request.json();
-        return HttpResponse.json(registration(), { status: 201 });
+        return HttpResponse.json(entrant(), { status: 201 });
       }),
     );
     renderApp(PAGE);
@@ -120,7 +147,7 @@ describe('the contest page for a signed-in person', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Register' }));
 
     expect(await screen.findByText('Your registration is waiting')).toBeVisible();
-    expect(body).toEqual({ invite_code: null });
+    expect(body).toEqual({ name: null, code: null });
   });
 
   it('asks for the contest’s code when it takes one, and sends it', async () => {
@@ -128,9 +155,9 @@ describe('the contest page for a signed-in person', () => {
     server.use(
       signedIn,
       http.get(`${CONTEST_API}/home`, () =>
-        HttpResponse.json(home({ asks_code: true })),
+        HttpResponse.json(home({ registration: entry({ asks_code: true }) })),
       ),
-      http.post(`${CONTEST_API}/registration`, async ({ request }) => {
+      http.post(`${CONTEST_API}/entrants`, async ({ request }) => {
         body = await request.json();
         return problem(403, 'wrong_invite_code');
       }),
@@ -143,7 +170,7 @@ describe('the contest page for a signed-in person', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'That code is not right',
     );
-    expect(body).toEqual({ invite_code: 'sesame' });
+    expect(body).toEqual({ name: null, code: 'sesame' });
   });
 
   it.each([
@@ -157,7 +184,7 @@ describe('the contest page for a signed-in person', () => {
     server.use(
       signedIn,
       http.get(`${CONTEST_API}/home`, () => HttpResponse.json(home())),
-      http.post(`${CONTEST_API}/registration`, () => problem(status, code)),
+      http.post(`${CONTEST_API}/entrants`, () => problem(status, code)),
     );
     renderApp(PAGE);
 
@@ -192,7 +219,11 @@ describe('the contest page for a signed-in person', () => {
     server.use(
       signedIn,
       http.get(`${CONTEST_API}/home`, () =>
-        HttpResponse.json(home({ registration_open: false })),
+        HttpResponse.json(
+          home({
+            registration: entry({ registration_open: false, can_register: false }),
+          }),
+        ),
       ),
     );
     renderApp(PAGE);

@@ -62,3 +62,12 @@
   border-radius: var(--mantine-radius-sm);
   background: var(--unicon-hover);
 }
+
+/* A field with its button beside it, such as the team's name. */
+.inline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px;
+  max-width: 420px;
+}

@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { useSearchParams } from 'react-router';
 import { $api, queryView } from '@/api/query';
-import type { QueueDepth, Team } from '@/api/types';
+import type { OrganisedEntrant, QueueDepth } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
 import { Card } from '@/ui/Card';
@@ -14,6 +14,7 @@ import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
 import { useLiveConnected } from '@/live';
 import { useContestParams } from '@/lib/route-params';
 import { CONTEST_SECTIONS, sectionOf } from '@/lib/sections';
+import { useEntrants } from '../entrants/names';
 import { SectionPage } from '../SectionPage';
 import { GradingsList } from './GradingsList';
 import {
@@ -49,15 +50,9 @@ function useTasks(path: ContestPath) {
   return (query.data ?? []).map((task) => ({ value: task.name, label: task.name }));
 }
 
-/** The contest's teams, for the filter; none in a contest without teams. */
-function useTeams(path: ContestPath): Team[] {
-  const query = $api.useQuery(
-    'get',
-    '/api/v1/orgs/{org}/contests/{contest}/organise/teams',
-    { params: { path } },
-    { retry: false },
-  );
-  return query.data ?? [];
+/** The contest's entrants, for the filter, by the name each goes by. */
+function useEntrantList(path: ContestPath): OrganisedEntrant[] {
+  return useEntrants(path.org, path.contest).data ?? [];
 }
 
 /** How many of the contest's gradings wait, by status. */
@@ -107,11 +102,11 @@ function QueueDepthPanel({ path }: { path: ContestPath }) {
 function FilterBar({
   filters,
   tasks,
-  teams,
+  entrants,
 }: {
   filters: Filters;
   tasks: { value: string; label: string }[];
-  teams: Team[];
+  entrants: OrganisedEntrant[];
 }) {
   const [search, setSearch] = useSearchParams();
   const [user, setUser] = useState(filters.user ?? '');
@@ -136,7 +131,10 @@ function FilterBar({
       ? options
       : [...options, { value, label: value }];
 
-  const teamOptions = teams.map((team) => ({ value: team.id, label: team.name }));
+  const entrantOptions = entrants
+    .map((entrant) => ({ value: entrant.id, label: entrant.display_name }))
+    .sort((a, b) => a.label.localeCompare(b.label));
+  const teams = entrants.some((entrant) => entrant.members.length > 1);
   const anySet = Object.values(filters).some((value) => value !== null);
 
   return (
@@ -155,22 +153,25 @@ function FilterBar({
         placeholder="Every status"
         onChange={(value) => set('status', value)}
       />
-      {(teamOptions.length > 0 || filters.team !== null) && (
+      {(entrantOptions.length > 0 || filters.entrant !== null) && (
         <Select
-          label="Team"
-          value={filters.team ?? ''}
-          options={keep(teamOptions, filters.team)}
-          placeholder="Every team"
-          onChange={(value) => set('team', value)}
+          label="Entrant"
+          value={filters.entrant ?? ''}
+          options={keep(entrantOptions, filters.entrant)}
+          placeholder="Every entrant"
+          onChange={(value) => set('entrant', value)}
         />
       )}
-      <form className={classes.user} onSubmit={submitUser} aria-label="By contestant">
+      <form
+        className={classes.user}
+        onSubmit={submitUser}
+        aria-label="By who submitted"
+      >
         <TextInput
-          label="Contestant's username"
+          label="Submitted by"
+          placeholder="A username"
           description={
-            teams.length > 0
-              ? "Finds their own submissions and their team's, by the team they were in when each was made."
-              : undefined
+            teams ? 'Finds the submissions one member of a team made.' : undefined
           }
           value={user}
           onChange={setUser}
@@ -188,7 +189,7 @@ function FilterBar({
 /**
  * Every grading of the contest, newest first, for anyone with a role at the
  * contest or one of its tasks: the queue above, the filters by task,
- * contestant, team and status kept in the page's address, and the gradings as
+ * entrant, the member who submitted and status kept in the page's address, and the gradings as
  * `GradingsList` shows them, with Rejudge for the task the feed is filtered
  * to. The live stream makes the feed and the queue stale as gradings move;
  * while it is down both are read again every ten seconds while something is
@@ -200,7 +201,7 @@ export function GradingsFeedPage() {
   const filters = readFilters(search);
   const live = useLiveConnected();
   const tasks = useTasks(path);
-  const teams = useTeams(path);
+  const entrants = useEntrantList(path);
   const view = queryView(
     $api.useQuery(
       'get',
@@ -219,7 +220,7 @@ export function GradingsFeedPage() {
       <Card>
         <div className={classes.stack}>
           <SectionTitle>Every grading</SectionTitle>
-          <FilterBar filters={filters} tasks={tasks} teams={teams} />
+          <FilterBar filters={filters} tasks={tasks} entrants={entrants} />
           <GradingsList
             path={path}
             view={view}

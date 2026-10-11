@@ -15,7 +15,7 @@ type ContestPath = { org: string; contest: string };
  * section 1.7), opened beside its grading: the same payload its contestant
  * reads, scored by the same code, with every group's outcome, tests and
  * points shown and each group saying when its row sees it. The row is the
- * contestant or the team who made it, as the feed names them.
+ * entrant that made it, as the feed names it.
  */
 export function ScoredView({
   path,
@@ -27,8 +27,7 @@ export function ScoredView({
   entry: FeedEntry;
 }) {
   const number = entry.grading.submission_number;
-  const query =
-    entry.by.team !== null ? { team: entry.by.team } : { user_id: entry.by.user_id };
+  const query = { entrant: entry.by.entrant };
   const view = queryView(
     $api.useQuery(
       'get',
@@ -42,8 +41,8 @@ export function ScoredView({
       aria-label={`Submission ${String(number)}, scored`}
     >
       <BodyText tone="secondary">
-        As its row reads it, with everything filled in; each group says when its row
-        sees it.
+        Scored in full, as its entrant will see it once everything is shown. Each group
+        says when its entrant sees it.
       </BodyText>
       {view.state === 'loading' && <PageSkeleton rows={3} />}
       {view.state === 'error' && <ErrorBlock error={view.error} onRetry={view.retry} />}
@@ -60,8 +59,8 @@ export function ScoredView({
             </div>
             <ScoredResult
               grading={view.data.grading}
-              shownAt="Its row sees this at"
-              testsShownAt="Its row sees its tests at"
+              shownAt="Its entrant sees this at"
+              testsShownAt="Its entrant sees its tests at"
             />
           </>
         ))}

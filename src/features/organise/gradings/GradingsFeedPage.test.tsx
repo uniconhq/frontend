@@ -5,6 +5,7 @@ import { http, HttpResponse } from 'msw';
 import type { FeedEntry, Grading } from '@/api/types';
 import { renderApp } from '@/test/render';
 import { problem, server, signedIn, someone } from '@/test/server';
+import { organisedEntrant } from '@/test/contestant';
 import { CONTEST_API, standingList, taskList } from '@/test/organiser';
 import { passTime, withFakeTimers } from '@/test/timers';
 
@@ -44,10 +45,16 @@ const grading: Grading = {
   falls_back: false,
   last_good: null,
   fallback: null,
+  submitted_by: null,
 };
 
-const ada = { user_id: 11, name: 'ada', team: null };
-const lovelaces = { user_id: null, name: 'Lovelaces', team: 'team-1' };
+const ada = { entrant: 'e-ada', entrant_name: 'ada', user_id: 11, username: 'ada' };
+const lovelaces = {
+  entrant: 'team-1',
+  entrant_name: 'Lovelaces',
+  user_id: 12,
+  username: 'grace',
+};
 
 /** A first attempt that hit a system error, then its retry, still queued. */
 const stuckFirst: FeedEntry = {
@@ -155,11 +162,11 @@ describe("the contest's gradings feed", () => {
     expect(sum).toHaveTextContent('Queued');
     expect(within(sum).getAllByRole('row')).toHaveLength(1);
 
-    expect(team).toHaveTextContent('Lovelaces (team)');
+    expect(team).toHaveTextContent('Lovelaces (grace)');
     expect(team).toHaveTextContent('wrong_answer');
     expect(
       within(team).getByRole('link', {
-        name: 'Log of A submission 1 by Lovelaces (team), attempt 1',
+        name: 'Log of A submission 1 by Lovelaces (grace), attempt 1',
       }),
     ).toHaveAttribute(
       'href',
@@ -195,22 +202,21 @@ describe("the contest's gradings feed", () => {
     );
   });
 
-  it('narrows the feed by task, status, team and username, keeping each in the address', async () => {
+  it('narrows the feed by task, status, entrant and who submitted, keeping each in the address', async () => {
     server.use(
       signedIn,
       taskList,
-      http.get(`${CONTEST_API}/organise/teams`, () =>
+      http.get(`${CONTEST_API}/organise/entrants`, () =>
         HttpResponse.json([
-          {
+          organisedEntrant({
             id: 'team-1',
             name: 'Lovelaces',
-            leader: null,
-            members: [],
-            pending: [],
-            submitted: true,
-            time_extension: 0,
-            extension_tasks: null,
-          },
+            display_name: 'Lovelaces',
+            members: [
+              { ...organisedEntrant().members[0]!, user_id: 12 },
+              organisedEntrant().members[0]!,
+            ],
+          }),
         ]),
       ),
     );
@@ -245,20 +251,23 @@ describe("the contest's gradings feed", () => {
     ).toBeVisible();
     expect(screen.getAllByRole('rowgroup')).toHaveLength(2);
 
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Team' }), 'team-1');
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: 'Entrant' }),
+      'team-1',
+    );
     await waitFor(() =>
-      expect(asked.at(-1)).toBe('task=sort&team=team-1&status=cancelled'),
+      expect(asked.at(-1)).toBe('task=sort&entrant=team-1&status=cancelled'),
     );
 
-    const username = screen.getByRole('textbox', { name: "Contestant's username" });
+    const username = screen.getByRole('textbox', { name: 'Submitted by' });
     expect(username).toHaveAccessibleDescription(
-      "Finds their own submissions and their team's, by the team they were in when each was made.",
+      'Finds the submissions one member of a team made.',
     );
     await user.type(username, 'ada');
-    expect(asked.at(-1)).toBe('task=sort&team=team-1&status=cancelled');
+    expect(asked.at(-1)).toBe('task=sort&entrant=team-1&status=cancelled');
     await user.click(screen.getByRole('button', { name: 'Filter' }));
     await waitFor(() =>
-      expect(asked.at(-1)).toBe('task=sort&user=ada&team=team-1&status=cancelled'),
+      expect(asked.at(-1)).toBe('task=sort&entrant=team-1&user=ada&status=cancelled'),
     );
 
     await user.click(screen.getByRole('link', { name: 'Clear filters' }));
@@ -266,9 +275,7 @@ describe("the contest's gradings feed", () => {
     expect(
       await screen.findByRole('rowgroup', { name: 'B submission 3 by ada' }),
     ).toBeVisible();
-    expect(screen.getByRole('textbox', { name: "Contestant's username" })).toHaveValue(
-      '',
-    );
+    expect(screen.getByRole('textbox', { name: 'Submitted by' })).toHaveValue('');
   });
 
   it('reads the filters from the address it was opened at', async () => {
@@ -278,12 +285,10 @@ describe("the contest's gradings feed", () => {
 
     expect(await screen.findByText('No grading matches these filters.')).toBeVisible();
     expect(
-      screen.getByRole('textbox', { name: "Contestant's username" }),
+      screen.getByRole('textbox', { name: 'Submitted by' }),
     ).not.toHaveAccessibleDescription();
     expect(asked).toEqual(['user=ada&status=system_error']);
-    expect(screen.getByRole('textbox', { name: "Contestant's username" })).toHaveValue(
-      'ada',
-    );
+    expect(screen.getByRole('textbox', { name: 'Submitted by' })).toHaveValue('ada');
     expect(screen.getByRole('combobox', { name: 'Status' })).toHaveValue(
       'system_error',
     );
@@ -335,19 +340,19 @@ describe('acting on the feed', () => {
     feedAnswering(() => now);
     renderApp(FEED);
 
-    const name = 'A submission 1 by Lovelaces (team), attempt 1';
+    const name = 'A submission 1 by Lovelaces (grace), attempt 1';
     expect(await screen.findByRole('button', { name: `Retry ${name}` })).toBeVisible();
     expect(screen.queryByRole('button', { name: `Cancel ${name}` })).toBeNull();
     await userEvent.click(screen.getByRole('button', { name: `Retry ${name}` }));
     const dialog = await screen.findByRole('dialog', { name: 'Retry this grading?' });
     expect(dialog).toHaveTextContent(
-      "Lovelaces (team)'s submission 1 to sort is graded again as a new attempt, against publication 2, as attempt 1 was.",
+      "Lovelaces (grace)'s submission 1 to sort is graded again as a new attempt, against publication 2, as attempt 1 was.",
     );
     expect(retriedAt).toEqual([]);
     await userEvent.click(within(dialog).getByRole('button', { name: 'Retry' }));
 
     const group = await screen.findByRole('rowgroup', {
-      name: 'A submission 1 by Lovelaces (team)',
+      name: 'A submission 1 by Lovelaces (grace)',
     });
     await waitFor(() => expect(group).toHaveTextContent('Queued'));
     expect(retriedAt).toEqual(['sort/g-sort-1']);
@@ -518,7 +523,7 @@ describe('acting on the feed', () => {
 
     expect(
       await screen.findByRole('button', {
-        name: 'Retry A submission 1 by Lovelaces (team), attempt 1',
+        name: 'Retry A submission 1 by Lovelaces (grace), attempt 1',
       }),
     ).toBeVisible();
     expect(
@@ -707,7 +712,7 @@ describe('acting on the feed', () => {
 
     await user.click(
       await screen.findByRole('button', {
-        name: 'Retry A submission 1 by Lovelaces (team), attempt 1',
+        name: 'Retry A submission 1 by Lovelaces (grace), attempt 1',
       }),
     );
     const dialog = await screen.findByRole('dialog', { name: 'Retry this grading?' });
@@ -753,7 +758,7 @@ describe('acting on the feed', () => {
     ).toBeVisible();
     expect(
       screen.queryByRole('button', {
-        name: 'Retry A submission 1 by Lovelaces (team), attempt 1',
+        name: 'Retry A submission 1 by Lovelaces (grace), attempt 1',
       }),
     ).toBeNull();
   });

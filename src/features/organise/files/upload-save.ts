@@ -68,6 +68,7 @@ export function useSaveUploads(place: TaskPlace, onSaved: (paths: string[]) => v
         token,
         upload,
         encoding: 'utf-8',
+        remove: false,
       })),
       confirm: false,
       keep_as_draft: false,
