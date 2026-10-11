@@ -5,9 +5,8 @@ import { AccountMenu } from './AccountMenu';
 import classes from './Header.module.css';
 
 /**
- * Lockup on the left, clicking it goes to browse; then the breadcrumb, which is
- * also the sideways switcher once there is a contest in context. On the right
- * the account slot: a sign-in link or the avatar menu.
+ * Lockup on the left, clicking it goes to browse; then the breadcrumb, where
+ * you are. On the right the account slot: a sign-in link or the avatar menu.
  */
 export function Header() {
   return (

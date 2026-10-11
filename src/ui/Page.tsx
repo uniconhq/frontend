@@ -3,9 +3,12 @@ import { PageTitle } from './PageTitle';
 import classes from './Page.module.css';
 
 /**
- * Every page's frame: its parts one under the other, as wide as the room
- * beside the sidebar, so every page's right edge is in the same place. A page
- * that wants a narrow column, such as a form, narrows its form, not itself.
+ * A page's frame, with its header: its parts one under the other, as wide as
+ * the room beside the sidebar, so every page's right edge is in the same
+ * place. A page that wants a narrow column, such as a form, narrows its form,
+ * not itself. A few pages (Account, Sign in, Home, Invites, an entrant's task
+ * and leaderboards) draw the same frame themselves, from `.page` and
+ * `PageTitle`, with links of their own above the title.
  */
 export function Page({ children, label }: { children: ReactNode; label?: string }) {
   return (
