@@ -150,3 +150,16 @@
   font-family: var(--mantine-font-family-monospace);
   overflow-wrap: anywhere;
 }
+
+/* Two versions of a file side by side, one under the other on a narrow screen. */
+.sides {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+@media (max-width: 760px) {
+  .sides {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

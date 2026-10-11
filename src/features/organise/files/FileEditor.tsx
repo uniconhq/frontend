@@ -11,7 +11,12 @@ import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
 import { FileHistory } from './FileHistory';
 import { fileQuery, staleAfterWrite, type Place } from './place';
 import { SaveOutcome, type Outcome } from './SaveOutcome';
+import { TextConflict } from './TextConflict';
 import { UploadedFile } from './UploadedFile';
+import { SettingsFile } from '../contest/SettingsFile';
+
+/** The contest's settings, changed only on the contest's pages and shown here to read. */
+const CONTEST_FILE = 'contest.yaml';
 import shared from '../organise.module.css';
 import classes from './Files.module.css';
 
@@ -47,7 +52,8 @@ type Sent = WriteFile | RollbackFile;
  * busy: the read replaces the text with the file as saved, and a second save
  * would carry the old token.
  *
- * At a contest a save answers with the new version. At a task it is a save of
+ * The contest's settings are read here and not edited: they are changed on
+ * the contest's pages. At a contest a save answers with the new version. At a task it is a save of
  * the task, which publishes or keeps a draft; the answer and the refusals are
  * SaveOutcome's, and the answer takes the focus. A task's file also has its
  * history below, from which a manager rolls it back to an older version; the
@@ -83,11 +89,16 @@ export function FileEditor({ place, path }: { place: Place; path: string }) {
     rollBackTask.isPending ||
     query.isFetching;
   const [outcome, setOutcome] = useState<Outcome<Sent> | null>(null);
+  /** The text a save someone else's beat tried to write, while both are shown. */
+  const [conflict, setConflict] = useState<WriteFile | null>(null);
+  /** The organiser's own text, kept beside theirs to copy from once they go on from it. */
+  const [kept, setKept] = useState<string | null>(null);
   /** Set by Reload, so the text read again takes the focus. */
   const [focusText, setFocusText] = useState(false);
 
   const save = async (body: Sent) => {
     setOutcome(null);
+    setConflict(null);
     setFocusText(false);
     try {
       if (place.kind === 'task') {
@@ -107,7 +118,9 @@ export function FileEditor({ place, path }: { place: Place; path: string }) {
         setOutcome({ kind: 'written', version: written.version, notes: written.notes });
       }
     } catch (caught) {
-      setOutcome({ kind: 'refused', error: toApiError(caught), body });
+      const error = toApiError(caught);
+      if (error.code === 'conflict' && 'content' in body) setConflict(body);
+      else setOutcome({ kind: 'refused', error, body });
       return;
     }
     await Promise.all([
@@ -139,6 +152,8 @@ export function FileEditor({ place, path }: { place: Place; path: string }) {
           upload={file.upload}
           token={file.token}
         />
+      ) : place.kind === 'contest' && path === CONTEST_FILE ? (
+        <SettingsFile org={place.org} contest={place.contest} file={file} />
       ) : file.encoding === 'base64' ? (
         <>
           <BodyText mono>{file.path}</BodyText>
@@ -161,6 +176,40 @@ export function FileEditor({ place, path }: { place: Place; path: string }) {
               keep_as_draft: false,
             })
           }
+        />
+      )}
+      {kept !== null && (
+        <div className={shared.stack}>
+          <CodeEditor
+            label="Your text from before, to copy from"
+            value={kept}
+            language={languageOf(path)}
+            rows={10}
+            readOnly
+          />
+          <div className={shared.actions}>
+            <Button size="xs" variant="secondary" onClick={() => setKept(null)}>
+              Done with it
+            </Button>
+          </div>
+        </div>
+      )}
+      {conflict !== null && (
+        <TextConflict
+          place={place}
+          path={path}
+          mine={conflict.content ?? ''}
+          language={languageOf(path)}
+          busy={busy}
+          onTakeTheirs={() => {
+            setKept(conflict.content ?? '');
+            setConflict(null);
+            void reload();
+          }}
+          onOverwrite={(theirs) => {
+            setConflict(null);
+            void save({ ...conflict, token: theirs.token });
+          }}
         />
       )}
       {outcome !== null && (
