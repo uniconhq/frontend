@@ -42,6 +42,16 @@ describe("a contest's announcements, for its organisers", () => {
   it('posts, edits and closes, keeping a closed one readable and offering no delete', async () => {
     let listed: Announcement[] = [announcement()];
     const sent: unknown[] = [];
+    const closing =
+      (closed: boolean) =>
+      ({ params }: { params: Record<string, unknown> }) => {
+        listed = listed.map((found) =>
+          String(found.number) === params['number'] ? { ...found, closed } : found,
+        );
+        return HttpResponse.json(
+          listed.find((found) => String(found.number) === params['number']),
+        );
+      };
     server.use(
       signedIn,
       http.get(`${CONTEST_API}/announcements`, () => HttpResponse.json(listed)),
@@ -52,14 +62,8 @@ describe("a contest's announcements, for its organisers", () => {
         listed = [...listed, made];
         return HttpResponse.json(made, { status: 201 });
       }),
-      http.post(`${CONTEST_API}/announcements/:number/close`, ({ params }) => {
-        listed = listed.map((found) =>
-          String(found.number) === params.number ? { ...found, closed: true } : found,
-        );
-        return HttpResponse.json(
-          listed.find((found) => String(found.number) === params.number),
-        );
-      }),
+      http.post(`${CONTEST_API}/announcements/:number/close`, closing(true)),
+      http.post(`${CONTEST_API}/announcements/:number/reopen`, closing(false)),
     );
     renderApp('/orgs/acme/contests/spring/announcements');
 
@@ -73,11 +77,58 @@ describe("a contest's announcements, for its organisers", () => {
     expect(await screen.findByText('Lunch')).toBeVisible();
 
     await userEvent.click(screen.getByRole('button', { name: 'Close Welcome' }));
-
+    const asked = await screen.findByRole('dialog', {
+      name: 'Close this announcement?',
+    });
+    expect(asked).toHaveTextContent(
+      'Entrants will no longer see “Welcome” on the contest’s page.',
+    );
+    expect(asked).toHaveTextContent('you can reopen it');
     const list = screen.getAllByRole('list', { name: 'Announcements' })[0]!;
-    await waitFor(() => expect(within(list).getByText(/closed/)).toBeVisible());
+    expect(within(list).queryByText(/· closed/)).toBeNull();
+    await userEvent.click(within(asked).getByRole('button', { name: 'Close it' }));
+
+    await waitFor(() => expect(within(list).getByText(/· closed/)).toBeVisible());
     expect(within(list).getByText('Welcome')).toBeVisible();
     expect(screen.queryByRole('button', { name: /Delete/ })).toBeNull();
+
+    await userEvent.click(within(list).getByRole('button', { name: 'Reopen Welcome' }));
+    await waitFor(() => expect(within(list).queryByText(/· closed/)).toBeNull());
+    expect(within(list).getByRole('button', { name: 'Close Welcome' })).toBeVisible();
+  });
+
+  it('reopens a task’s closed announcement at the task, saying closing hides it there', async () => {
+    let listed: Announcement[] = [
+      announcement({
+        closed: true,
+        where: { org: 'acme', contest: 'spring', task: 'sum' },
+      }),
+    ];
+    const reopened: string[] = [];
+    server.use(
+      signedIn,
+      http.get(`${CONTEST_API}/tasks/:task/announcements`, () =>
+        HttpResponse.json(listed),
+      ),
+      http.post(
+        `${CONTEST_API}/tasks/:task/announcements/:number/reopen`,
+        ({ params }) => {
+          reopened.push(`${String(params['task'])}/${String(params['number'])}`);
+          listed = listed.map((found) => ({ ...found, closed: false }));
+          return HttpResponse.json(listed[0]);
+        },
+      ),
+    );
+    renderApp('/orgs/acme/contests/spring/tasks/sum/announcements');
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Reopen Welcome' }),
+    );
+    await waitFor(() => expect(reopened).toEqual(['sum/1']));
+    await userEvent.click(await screen.findByRole('button', { name: 'Close Welcome' }));
+    expect(
+      await screen.findByRole('dialog', { name: 'Close this announcement?' }),
+    ).toHaveTextContent('on the task’s page or the contest’s');
   });
 });
 
