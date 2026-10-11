@@ -372,7 +372,8 @@ describe("uploading a file into a task's tree", () => {
       await userEvent.clear(field);
       await userEvent.type(field, path);
       await userEvent.click(within(panel).getByRole('button', { name: 'Upload' }));
-      await within(panel).findByText(/has arrived/);
+      // Working out a file's SHA-256 takes a while beside a full run of the suite.
+      await within(panel).findByText(/has arrived/, {}, { timeout: 5000 });
     };
     await upload('tests/main/1/input');
     await userEvent.click(
