@@ -330,7 +330,7 @@ test('an organiser makes an org, walks to a task and publishes a file', async ({
     .click();
 
   const standing = page.getByLabel('Where the task stands');
-  await expect(standing).toContainText('Contestants are graded on publication 1');
+  await expect(standing).toContainText('Entrants are graded on publication 1');
   const sidebar = page.getByRole('navigation', { name: 'Sections' });
   await sidebar.getByRole('link', { name: 'Files' }).click();
   await page.getByRole('link', { name: 'statement.md' }).click();
@@ -351,7 +351,7 @@ test('an organiser makes an org, walks to a task and publishes a file', async ({
     token: 'token-1',
   });
   await sidebar.getByRole('link', { name: 'sum' }).click();
-  await expect(standing).toContainText('Contestants are graded on publication 2');
+  await expect(standing).toContainText('Entrants are graded on publication 2');
 
   const trail = page.getByRole('navigation', { name: 'Breadcrumb' });
   await trail.getByRole('link', { name: 'Orgs', exact: true }).click();

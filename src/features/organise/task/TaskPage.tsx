@@ -1,17 +1,15 @@
 import { useEffect, type ReactNode } from 'react';
 import { useSearchParams } from 'react-router';
-import { $api, queryView } from '@/api/query';
-import type { TaskState } from '@/api/types';
-import { BodyText } from '@/ui/BodyText';
-import { Chip } from '@/ui/Chip';
+import { $api } from '@/api/query';
 import { CardGrid, HubCard } from '@/ui/HubCard';
 import { Page, PageHeader } from '@/ui/Page';
-import { Loaded } from '@/ui/feedback/Loaded';
 import { useMe } from '@/session';
 import { useTaskParams } from '@/lib/route-params';
 import { TASK_SECTIONS, taskSectionPath, type TaskSectionKey } from '@/lib/sections';
-import { useQueryClient } from '@tanstack/react-query';
-import { DefinitionErrors } from '../DefinitionErrors';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { readTask } from '../forms/task-values';
+import { readSettings } from './build-data';
+import { TaskStanding } from './TaskHeader';
 import { useOpenedField } from '../contest/opened';
 import { fileQuery } from '../files/place';
 import { StatementEditor } from '../forms/StatementEditor';
@@ -19,8 +17,7 @@ import { OrganisersLine } from '../hub/lines';
 import { holdsAt } from '../roles';
 import { BuildCard } from './BuildCard';
 import { useTaskSave } from './build-save';
-import { CARD_PARAM, taskPlaceOf } from './places';
-import { publishedLine } from './published';
+import { CARD_PARAM } from './places';
 import { TaskBuild } from './TaskBuild';
 import {
   AnnouncementsCard,
@@ -29,7 +26,6 @@ import {
   PublicationsCard,
   SettingsCard,
 } from './TaskCards';
-import classes from './task.module.css';
 
 type TaskPath = { org: string; contest: string; task: string };
 type CardLine = (props: { path: TaskPath }) => ReactNode;
@@ -46,48 +42,17 @@ const GRID_CARDS: Record<TaskSectionKey, CardLine> = {
   settings: SettingsCard,
 };
 
-/** Where the task's files stand, in a word beside its name. */
-function StateChip({ state }: { state: TaskState }) {
-  if (state.draft && state.errors.length > 0) {
-    return <Chip tone="warn">Last save has problems</Chip>;
-  }
-  if (state.latest === null) return <Chip>Not published</Chip>;
-  if (state.draft) return <Chip>Draft kept back</Chip>;
-  return <Chip tone="live">Published</Chip>;
-}
-
-/**
- * What entrants are graded on, and what holds the last save back: its
- * problems, each where it is fixed, or that it was kept back as a draft.
- */
-function TaskStatus({ path }: { path: TaskPath }) {
-  const view = queryView($api.useQuery('get', TASK, { params: { path } }));
-  return (
-    <Loaded view={view} rows={1}>
-      {(state) => (
-        <div className={classes.status} aria-label="Where the task stands">
-          <div className={classes.statusLine}>
-            <StateChip state={state} />
-            <BodyText>{publishedLine(state.latest)}</BodyText>
-          </div>
-          {state.draft &&
-            (state.errors.length > 0 ? (
-              <>
-                <BodyText>The last save did not publish, for these problems:</BodyText>
-                <DefinitionErrors
-                  errors={state.errors}
-                  placeOf={taskPlaceOf(path.org, path.contest, path.task)}
-                />
-              </>
-            ) : (
-              <BodyText tone="secondary">
-                The last save is kept back as a draft, so entrants are graded as before.
-              </BodyText>
-            ))}
-        </div>
-      )}
-    </Loaded>
-  );
+/** The task's title, as its settings give it, or its name until they are read. */
+function TaskTitle({
+  place,
+}: {
+  place: { kind: 'task'; org: string; contest: string; task: string };
+}) {
+  const file = useQuery({ ...fileQuery(place, 'task.yaml'), retry: false });
+  const read = file.data === undefined ? null : readSettings(file.data);
+  const title =
+    read === null || 'error' in read ? '' : readTask(read.doc, []).values.name.trim();
+  return <>{title === '' ? place.task : title}</>;
 }
 
 /**
@@ -138,8 +103,8 @@ export function TaskPage() {
 
   return (
     <Page>
-      <PageHeader title={task}>
-        <TaskStatus path={path} />
+      <PageHeader title={<TaskTitle place={place} />}>
+        <TaskStanding place={place} saving={saving} manager={manager} />
       </PageHeader>
       <TaskBuild place={place} saving={saving} admin={admin} manager={manager} />
       <BuildCard

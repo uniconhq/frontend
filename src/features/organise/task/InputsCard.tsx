@@ -284,7 +284,7 @@ function DeclaredItem({
             disabled={disabled}
           />
         ) : (
-          <>
+          <div className={classes.single}>
             <ValueField
               declared={declared}
               input={input}
@@ -292,7 +292,7 @@ function DeclaredItem({
               disabled={disabled}
             />
             <span className={classes.id}>{declared.id}</span>
-          </>
+          </div>
         )}
       </div>
     </FieldBox>

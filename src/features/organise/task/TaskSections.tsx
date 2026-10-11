@@ -9,6 +9,7 @@ import { formatDateTime } from '@/lib/time';
 import { FileBrowser } from '../files/FileBrowser';
 import { PageLink } from '@/ui/PageLink';
 import { taskPath } from '@/lib/organiser-paths';
+import { savedBy } from './published';
 import { TitleForm } from './TitleForm';
 import { PeopleSection } from '../people/PeopleSection';
 import { holdsAt } from '../roles';
@@ -71,6 +72,11 @@ export function TaskPublicationsPage() {
       { params: { path: { org, contest, task } } },
     ),
   );
+  const history = $api.useQuery(
+    'get',
+    '/api/v1/orgs/{org}/contests/{contest}/tasks/{task}/history',
+    { params: { path: { org, contest, task } } },
+  );
   return (
     <SectionPage section={sectionOf(TASK_SECTIONS, 'publications')}>
       <Card>
@@ -84,10 +90,14 @@ export function TaskPublicationsPage() {
                   <li key={publication.number}>
                     <BodyText>
                       <strong>Publication {publication.number}</strong> ·{' '}
-                      {formatDateTime(new Date(publication.at))} ·{' '}
+                      {formatDateTime(new Date(publication.at))}
+                      {savedBy(publication, history.data) === null
+                        ? ''
+                        : ` by ${savedBy(publication, history.data) ?? ''}`}{' '}
+                      ·{' '}
                       {publication.grading_changed
-                        ? 'changed how the task grades'
-                        : 'grading unchanged'}
+                        ? 'changed how submissions are graded'
+                        : 'grades as the one before'}
                     </BodyText>
                     {publication.changes.length > 0 && (
                       <ul className={classes.named}>

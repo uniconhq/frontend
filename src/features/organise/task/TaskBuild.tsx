@@ -396,13 +396,17 @@ function BuildForm({
           saving.forget();
         }}
       >
-        <SaveAnswer
-          place={place}
-          saving={saving}
-          placeOf={placeOf}
-          titles={titles}
-          admin={admin}
-        />
+        {(saving.outcome !== null ||
+          saving.merge !== null ||
+          saving.conflicts !== null) && (
+          <SaveAnswer
+            place={place}
+            saving={saving}
+            placeOf={placeOf}
+            titles={titles}
+            admin={admin}
+          />
+        )}
       </SaveBar>
     </div>
   );

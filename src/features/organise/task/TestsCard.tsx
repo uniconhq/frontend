@@ -369,32 +369,34 @@ function GroupItem({
         {groupSentence(group, { total, worth, credit: credit.kind, tests: count })}
       </p>
       <FieldBox name="show">
-        <Select
-          label="When entrants see results"
-          value={group.show === '' && !required ? 'always' : group.show}
-          options={SHOWS.map((option) => ({
-            ...option,
-            disabled:
-              option.value === 'verdict' &&
-              verdictRefusal !== null &&
-              group.show !== 'verdict',
-          }))}
-          placeholder={required ? 'Choose when' : undefined}
-          description={
-            required && group.show === ''
-              ? 'Needed: the task has graded submissions, so a group added now must say when its results are shown.'
-              : (showProblem ??
-                (verdictRefusal === null
-                  ? undefined
-                  : `Pass or fail alone: ${verdictRefusal}`))
-          }
-          error={showProblem ?? undefined}
-          required={required}
-          onChange={(show) =>
-            onChange({ show: show === 'always' && group.show === '' ? '' : show })
-          }
-          disabled={disabled}
-        />
+        <div className={classes.single}>
+          <Select
+            label="When entrants see results"
+            value={group.show === '' && !required ? 'always' : group.show}
+            options={SHOWS.map((option) => ({
+              ...option,
+              disabled:
+                option.value === 'verdict' &&
+                verdictRefusal !== null &&
+                group.show !== 'verdict',
+            }))}
+            placeholder={required ? 'Choose when' : undefined}
+            description={
+              required && group.show === ''
+                ? 'Needed: the task has graded submissions, so a group added now must say when its results are shown.'
+                : (showProblem ??
+                  (verdictRefusal === null
+                    ? undefined
+                    : `Pass or fail alone: ${verdictRefusal}`))
+            }
+            error={showProblem ?? undefined}
+            required={required}
+            onChange={(show) =>
+              onChange({ show: show === 'always' && group.show === '' ? '' : show })
+            }
+            disabled={disabled}
+          />
+        </div>
       </FieldBox>
       <BodyText tone="secondary">{showSentence(group.show)}</BodyText>
       {open ? (

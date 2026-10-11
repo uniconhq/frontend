@@ -34,7 +34,9 @@ export function SaveBar({
   children?: ReactNode;
 }) {
   const busy = state.stage !== 'idle';
-  if (lines.length === 0 && !busy && children === undefined) return null;
+  if (lines.length === 0 && !busy && (children === undefined || children === false)) {
+    return null;
+  }
   return (
     <section className={classes.saveBar} aria-label="Save the task">
       {lines.length > 0 && (

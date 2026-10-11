@@ -224,6 +224,11 @@
   overflow: auto;
 }
 
+/* A field alone on its line is as wide as a field needs, not the card. */
+.single {
+  max-width: 640px;
+}
+
 .grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
