@@ -153,6 +153,16 @@ sentence for a stable `code`, never the code itself, and an unknown code falls
 back to the server's own title and detail so a frontend that lags the backend by
 a release still says something true.
 
+## Writing what the pages say
+
+Every word on screen is written for someone setting up their first contest, or
+entering one, who knows nothing of the files behind it: plain sentences or
+clear labels, no file or format words, and one word for each idea.
+[`GLOSSARY.md`](GLOSSARY.md) lists those words, the ones they replace and how
+to write a hint, a button or a refusal. Use it when writing a page, and check a
+change against it in review; a page that needs a word it lacks adds the word
+there first. A test that finds something by its words changes with them.
+
 ## The organiser pages
 
 An organiser makes an org, a contest and a task, then edits the contest's and
