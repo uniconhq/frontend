@@ -50,7 +50,7 @@ export function WorkflowBar({
     })),
   ];
   return (
-    <div className={classes.barFrame}>
+    <div className={classes.barFrame} data-workflow-bar>
       <div className={classes.bar} role="toolbar" aria-label="The workflow">
         {options.length > 0 && (
           <div className={classes.switch}>

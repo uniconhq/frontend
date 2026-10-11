@@ -44,6 +44,21 @@ describe('the workflow editor', () => {
     expect(await fileText(user)).toBe(CLASSIC_V2);
   });
 
+  it('opens the drawer below the bar, so Save and the bar stay in reach', async () => {
+    server.use(signedIn, ...workflowBackend(CLASSIC_V2).handlers);
+    const user = userEvent.setup();
+    renderApp(EDITOR_PAGE);
+
+    await stepBox('run');
+    // jsdom lays nothing out: the bar's frame says where it ends.
+    const frame = part('[role="toolbar"]', 'The workflow').parentElement;
+    if (frame === null) throw new Error('the bar has a frame');
+    frame.getBoundingClientRect = () => new DOMRect(0, 0, 1000, 120);
+    await user.click(toolButton('Inputs'));
+
+    expect(drawer('Inputs').style.top).toBe('120px');
+  });
+
   it('opens a box in a drawer, which Escape and its × close', async () => {
     server.use(signedIn, ...workflowBackend(CLASSIC_V2).handlers);
     const user = userEvent.setup();

@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import classes from './workflows.module.css';
 
 /** How wide the drawer is, which the graph keeps clear of the box it shows. */
@@ -11,7 +11,8 @@ export const DRAWER_WIDTH = 440;
  * one instead. It closes with its × or with Escape, unless Escape is for a
  * menu or a dialog open over it. Opening moves the focus to its title, and
  * closing gives it back to where it was, so the keyboard does not lose its
- * place.
+ * place. It starts below the workflow's bar, wherever the page has
+ * scrolled it, so Save and the rest of the bar are never under it.
  */
 export function Drawer({
   title,
@@ -26,6 +27,22 @@ export function Drawer({
   const heading = useRef<HTMLHeadingElement>(null);
   const before = useRef<Element | null>(null);
   const open = title !== null;
+  const [top, setTop] = useState(0);
+
+  useLayoutEffect(() => {
+    if (!open) return;
+    const place = () => {
+      const bar = document.querySelector('[data-workflow-bar]');
+      setTop(bar === null ? 0 : Math.max(0, bar.getBoundingClientRect().bottom));
+    };
+    place();
+    window.addEventListener('scroll', place, { capture: true, passive: true });
+    window.addEventListener('resize', place);
+    return () => {
+      window.removeEventListener('scroll', place, { capture: true });
+      window.removeEventListener('resize', place);
+    };
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -54,7 +71,7 @@ export function Drawer({
     <aside
       className={classes.drawer}
       aria-label={title}
-      style={{ width: DRAWER_WIDTH }}
+      style={{ width: DRAWER_WIDTH, top }}
     >
       <div className={classes.drawerHead}>
         <h2 className={classes.drawerTitle} ref={heading} tabIndex={-1}>
