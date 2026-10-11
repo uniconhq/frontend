@@ -45,11 +45,15 @@ export function taskTimeLines(
     lines.push({ key: 'due', text: `Due ${left(dueAt)}` });
   }
   if (phase === 'late') {
-    lines.push({ key: 'late', text: 'Past due: a submission now is late.' });
+    lines.push({ key: 'late', text: 'Past due: a submission now counts as late.' });
   }
   if (phase !== 'closed' && closesAt !== null) {
     lines.push({ key: 'closes', text: `Closes ${left(closesAt)}` });
   }
-  if (phase === 'closed') lines.push({ key: 'closed', text: 'Closed for you' });
+  if (phase === 'closed')
+    lines.push({
+      key: 'closed',
+      text: 'Closed: it takes no more submissions from you',
+    });
   return lines;
 }

@@ -272,7 +272,7 @@ describe('the submit panel', () => {
     expect(alert).toHaveTextContent(
       'The files for this input may be at most 4 bytes in all.',
     );
-    expect(alert).toHaveTextContent('The input: Your solution');
+    expect(alert).toHaveTextContent('Too large: Your solution');
     expect(store.seen.slots).toHaveLength(0);
   });
 

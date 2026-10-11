@@ -220,7 +220,7 @@ function RegisterForm({
  */
 function stuckBecause(entrant: Entrant): string | null {
   if (entrant.status === 'rejected' || entrant.status === 'removed') {
-    return 'You cannot move to another team, since yours was turned away.';
+    return 'You cannot move to another team, since yours was not accepted.';
   }
   if (entrant.locked)
     return 'You cannot move to another team, since yours is fixed now.';
@@ -249,7 +249,7 @@ function Invitations({ entry, change }: { entry: MyEntry; change: Change }) {
   if (entry.invitations.length === 0) return null;
   return (
     <>
-      <SectionTitle order={3}>Invitations for you</SectionTitle>
+      <SectionTitle order={3}>Invites for you</SectionTitle>
       {own !== null && (
         <BodyText tone="secondary">
           {stuck ??
@@ -259,12 +259,12 @@ function Invitations({ entry, change }: { entry: MyEntry; change: Change }) {
       {needsCode && stuck === null && (
         <TextInput
           label="Contest code"
-          description="Joining a team that invited you still asks for the contest’s code."
+          description="Joining a team that invited you still needs the contest’s code."
           value={code}
           onChange={setCode}
         />
       )}
-      <ul className={classes.list} aria-label="Invitations for you">
+      <ul className={classes.list} aria-label="Invites for you">
         {entry.invitations.map((invitation: Invitation) => {
           const into = invitation.entrant.name;
           return (
@@ -273,9 +273,9 @@ function Invitations({ entry, change }: { entry: MyEntry; change: Change }) {
                 <span className={classes.name}>{into}</span>
                 <BodyText tone="secondary">
                   {invitation.by_organiser
-                    ? 'The organisers put you forward for this team.'
+                    ? 'The organisers invited you into this team.'
                     : 'A member invited you to join them.'}{' '}
-                  It lapses on {formatDateTime(new Date(invitation.expires_at))}.
+                  It expires on {formatDateTime(new Date(invitation.expires_at))}.
                 </BodyText>
               </div>
               <div className={classes.actions}>
@@ -303,7 +303,7 @@ function Invitations({ entry, change }: { entry: MyEntry; change: Change }) {
                 <Button
                   size="xs"
                   variant="secondary"
-                  label={`Decline the invitation to ${into}`}
+                  label={`Decline the invite to ${into}`}
                   loading={change.pending === `decline:${invitation.invite}`}
                   disabled={busy}
                   onClick={() =>
@@ -519,7 +519,7 @@ function TeamPart({
                   <div className={classes.who}>
                     <span className={classes.name}>{who}</span>
                     <BodyText tone="secondary">
-                      Invited {by}; it lapses on{' '}
+                      Invited {by}. The invite expires on{' '}
                       {formatDateTime(new Date(invited.expires_at))}.
                     </BodyText>
                   </div>
@@ -527,7 +527,7 @@ function TeamPart({
                     <Button
                       size="xs"
                       variant="secondary"
-                      label={`Withdraw the invitation for ${who}`}
+                      label={`Withdraw the invite for ${who}`}
                       loading={change.pending === `withdraw:${invited.invite}`}
                       disabled={change.pending !== null}
                       onClick={() =>

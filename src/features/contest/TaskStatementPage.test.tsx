@@ -27,7 +27,7 @@ describe('a task page for a signed-in person', () => {
     expect(screen.getByText('sum', { selector: 'strong' })).toBeVisible();
     const list = screen.getByLabelText('Limits');
     expect(within(list).getByText('50 in all')).toBeVisible();
-    expect(within(list).getByText('1 in any 30 seconds')).toBeVisible();
+    expect(within(list).getByText('At most 1 in any 30 seconds')).toBeVisible();
     expect(
       within(list).getByText(formatDateTime(new Date('2026-09-12T10:15:00Z'))),
     ).toBeVisible();
@@ -218,7 +218,7 @@ describe('a task page for a signed-in person', () => {
 
     const timer = await screen.findByRole('timer', { name: 'Task countdown' });
     await waitFor(() =>
-      expect(timer).toHaveTextContent('Past due: a submission now is late.'),
+      expect(timer).toHaveTextContent('Past due: a submission now counts as late.'),
     );
     expect(timer).toHaveTextContent(/Closes in (29m 5\ds|30m 00s)/);
     expect(screen.getByRole('form', { name: 'Submit' })).toBeVisible();

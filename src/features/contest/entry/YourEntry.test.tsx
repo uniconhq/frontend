@@ -127,7 +127,7 @@ describe('your entry in a contest entered in teams', () => {
       ),
     ).toBeVisible();
     await user.click(
-      within(part).getByRole('button', { name: 'Withdraw the invitation for dee' }),
+      within(part).getByRole('button', { name: 'Withdraw the invite for dee' }),
     );
 
     expect(bodies).toEqual([{ email: 'eve@example.org' }]);

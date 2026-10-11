@@ -82,7 +82,7 @@ describe('invites on the home page', () => {
     expect(screen.queryByRole('heading', { name: 'Invites for you' })).toBeNull();
   });
 
-  it('shows each waiting invite with what it offers, who sent it and when it lapses', async () => {
+  it('shows each waiting invite with what it offers, who sent it and when it expires', async () => {
     server.use(signedIn);
     myInvites([invite(), invite({ id: 'b', grants: 'contestant', where: spring })]);
     renderApp('/');
@@ -91,7 +91,7 @@ describe('invites on the home page', () => {
     const [role, place] = within(list).getAllByRole('listitem');
     expect(role).toHaveTextContent('The manager role at acme');
     expect(role).toHaveTextContent('Sent by kenny.');
-    expect(role).toHaveTextContent('It lapses on');
+    expect(role).toHaveTextContent('It expires on');
     expect(place).toHaveTextContent('A place in the contest acme/spring');
   });
 
@@ -132,7 +132,7 @@ describe('invites on the home page', () => {
 
     expect(
       await within(card).findByText(
-        'You are registered for acme/spring as kenny. An organiser approves each registration; the contest’s page says when.',
+        'You are registered for acme/spring as kenny. An organiser approves each registration, and the contest’s page will say when yours is.',
       ),
     ).toBeVisible();
     expect(
@@ -228,7 +228,7 @@ describe('invites on the home page', () => {
     expect(sent).toEqual([`${MINE}/${invite().id}/decline`]);
   });
 
-  it('offers nothing on a lapsed invite but to ask for a new one', async () => {
+  it('offers nothing on an expired invite but to ask for a new one', async () => {
     server.use(signedIn);
     myInvites([invite({ expired: true })]);
     renderApp('/');
@@ -236,7 +236,7 @@ describe('invites on the home page', () => {
     const card = await screen.findByRole('listitem', {
       name: 'The manager role at acme',
     });
-    expect(card).toHaveTextContent('It lapsed on');
+    expect(card).toHaveTextContent('It expired on');
     expect(card).toHaveTextContent('Ask the organisers for a new one.');
     expect(within(card).queryByRole('button')).toBeNull();
   });

@@ -73,7 +73,7 @@ function Refusal({ error, inputs }: { error: ApiError; inputs: InputField[] }) {
         </ul>
       )}
       {error.code === 'too_large' && typeof input === 'string' && (
-        <BodyText tone="secondary">The input: {labelOf(input)}</BodyText>
+        <BodyText tone="secondary">Too large: {labelOf(input)}</BodyText>
       )}
     </Said>
   );
@@ -86,7 +86,7 @@ function Refusal({ error, inputs }: { error: ApiError; inputs: InputField[] }) {
 function fileHint(input: InputField): string {
   const limit = formatLimit(input.max_size);
   if (input.per_test) {
-    return `One file for each test, named for it as <group>/<test>, such as main/1.txt: choose a folder that holds a folder for each test group. At most ${limit} in all.`;
+    return `One file for each test, named after its test group and test, such as main/1.txt. Choose a folder that holds one folder for each test group. At most ${limit} in all.`;
   }
   return input.type === 'folder' ? `At most ${limit} in all.` : `At most ${limit}.`;
 }

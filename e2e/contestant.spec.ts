@@ -298,7 +298,7 @@ test('a contestant registers, waits, is let in and reads the task', async ({
   await expect(page.getByRole('timer', { name: 'Task countdown' })).toContainText(
     'Closes in',
   );
-  await expect(page.getByLabel('Limits')).toContainText('1 in any 30 seconds');
+  await expect(page.getByLabel('Limits')).toContainText('At most 1 in any 30 seconds');
   await expect(page.getByLabel('Limits')).toContainText('Closes');
   const form = page.getByRole('form', { name: 'Submit' });
   await expect(form).toBeVisible();

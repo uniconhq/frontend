@@ -27,7 +27,10 @@ export function SignInPrompt({ title, back }: { title: string; back?: ReactNode 
     <div className={classes.page}>
       {back}
       <PageTitle>{title}</PageTitle>
-      <BodyText>It is open to people with an account, or it is not there.</BodyText>
+      <BodyText>
+        Only people who are signed in can see this page, if it exists. Sign in to see
+        it.
+      </BodyText>
       <SignInButtons />
     </div>
   );
