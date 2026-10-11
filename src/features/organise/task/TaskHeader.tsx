@@ -39,6 +39,9 @@ function StateChip({ state }: { state: TaskState }) {
 }
 
 type Card = 'workflow' | 'inputs' | 'tests' | 'statement';
+
+/** The statement a new task starts with, which is not yet written (TASK-FORMAT 1.2). */
+const STARTER_STATEMENT = 'Write the statement entrants read here.';
 type Item = { card: Card; ok: boolean; text: string };
 
 const under = (state: TaskState, ...tops: string[]) =>
@@ -62,8 +65,13 @@ function readiness(
   settings: string | null,
   folders: GroupFolder[],
   top: TreeEntry[],
+  statementText: string | null,
 ): Item[] {
   const statement = top.find((entry) => entry.path === 'statement.md');
+  const written =
+    statement !== undefined &&
+    (statement.size ?? 1) > 0 &&
+    statementText?.trim() !== STARTER_STATEMENT;
   const read =
     settings === null
       ? null
@@ -95,11 +103,8 @@ function readiness(
   return [
     {
       card: 'statement',
-      ok: statement !== undefined && (statement.size ?? 1) > 0,
-      text:
-        statement !== undefined && (statement.size ?? 1) > 0
-          ? 'Statement'
-          : 'Statement: not written yet',
+      ok: written,
+      text: written ? 'Statement' : 'Statement: not written yet',
     },
     {
       card: 'workflow',
@@ -241,6 +246,12 @@ export function TaskStanding({
   const settings = useQuery({ ...fileQuery(place, 'task.yaml'), retry: false });
   const folders = useTestFolders(place);
   const top = useQuery(treeQuery(place, ''));
+  // Read to tell the statement a new task starts with from one written.
+  const statement = useQuery({
+    ...fileQuery(place, 'statement.md'),
+    retry: false,
+    enabled: top.data?.some((entry) => entry.path === 'statement.md') ?? false,
+  });
   const changes: FileChange[] | undefined = history.data;
   const last = changes?.[0];
 
@@ -266,6 +277,7 @@ export function TaskStanding({
                 settings.data?.encoding === 'utf-8' ? settings.data.content : null,
                 folders.data,
                 top.data,
+                statement.data?.encoding === 'utf-8' ? statement.data.content : null,
               )}
             />
           )}

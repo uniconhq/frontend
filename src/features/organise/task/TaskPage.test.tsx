@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { screen, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@/test/user-event';
 import { delay, http, HttpResponse } from 'msw';
 import { TASK_BUILD_CARDS, TASK_SECTIONS } from '@/lib/sections';
@@ -269,6 +269,34 @@ describe('what the task has, under its name', { timeout: 20_000 }, () => {
       'href',
       `${TASK}?card=inputs`,
     );
+  });
+
+  it('does not tick a statement that is still the one a new task starts with', async () => {
+    readyBackend();
+    server.use(
+      http.get(`${TASK_API}/files/:path`, ({ params }) =>
+        params['path'] === 'statement.md'
+          ? HttpResponse.json({
+              path: 'statement.md',
+              encoding: 'utf-8',
+              content: 'Write the statement entrants read here.\n',
+              token: 'token-statement',
+              upload: null,
+            })
+          : undefined,
+      ),
+    );
+    renderApp(TASK);
+
+    const row = await screen.findByRole('list', { name: 'What the task has' });
+    await waitFor(() =>
+      expect(within(row).getAllByRole('listitem')[0]).toHaveTextContent(
+        'Statement: not written yet',
+      ),
+    );
+    expect(
+      within(within(row).getAllByRole('listitem')[0]!).getByRole('img'),
+    ).toHaveAttribute('aria-label', 'Not done');
   });
 
   it('says who saved the publication entrants are graded on', async () => {
