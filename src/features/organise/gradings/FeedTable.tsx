@@ -3,6 +3,7 @@ import type { Fallback, FeedEntry } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { PageLink } from '@/ui/PageLink';
 import { OutLink } from '@/ui/OutLink';
+import { verdictLabel } from '@/ui/verdicts';
 import { formatDateTime } from '@/lib/time';
 import { taskPath } from '@/lib/organiser-paths';
 import { STATUS, bySubmission, logHref, nameOf, resultOf, submitterOf } from './feed';
@@ -70,7 +71,7 @@ function StatusCell({
         </BodyText>
       )}
       {grading.status === 'done' && grading.result !== null && (
-        <BodyText tone="secondary">{resultOf(grading.result)}</BodyText>
+        <BodyText tone="secondary">{verdictLabel(resultOf(grading.result))}</BodyText>
       )}
       {grading.log && entry.task !== null && (
         <OutLink

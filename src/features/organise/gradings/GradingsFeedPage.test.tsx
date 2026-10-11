@@ -163,7 +163,8 @@ describe("the contest's gradings feed", () => {
     expect(within(sum).getAllByRole('row')).toHaveLength(1);
 
     expect(team).toHaveTextContent('Lovelaces (grace)');
-    expect(team).toHaveTextContent('wrong_answer');
+    expect(team).toHaveTextContent('WRONG ANSWER');
+    expect(team).not.toHaveTextContent('wrong_answer');
     expect(
       within(team).getByRole('link', {
         name: 'Log of A submission 1 by Lovelaces (grace), attempt 1',
