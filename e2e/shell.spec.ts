@@ -64,7 +64,7 @@ test('the shell and the landing page render', async ({ page }) => {
 
   await expect(page.getByRole('heading', { name: 'Unicon', level: 1 })).toBeVisible();
   await expect(page.getByRole('navigation', { name: 'Sections' })).toContainText(
-    'Discover',
+    'Browse contests',
   );
   await expect(page.getByText('server time')).toBeVisible();
 });
