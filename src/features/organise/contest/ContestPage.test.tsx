@@ -471,6 +471,62 @@ describe('how the contest is scored', () => {
   });
 });
 
+describe('how the contest is scored, as published', () => {
+  it('reads each task as its latest publication holds it, not the draft saved since', async () => {
+    const neverPublished: TaskStanding = {
+      ...standings[0]!,
+      task: { name: 'new' },
+      label: 'C',
+      state: { head: 'f0', latest: null, draft: true, errors: [] },
+    };
+    server.use(
+      signedIn,
+      http.get(`${CONTEST_API}/organise/tasks`, () =>
+        HttpResponse.json([...standings, neverPublished]),
+      ),
+      http.get(`${CONTEST_API}/tasks/:task/files/:path`, ({ params, request }) => {
+        const at = new URL(request.url).searchParams.get('at');
+        const content =
+          params['task'] === 'sort'
+            ? 'name: Sort\nworkflow: unicon/icpc@v1\ntest_groups:\n  judge: {pass: 1}\n'
+            : at === standings[1]!.state.latest?.version
+              ? 'name: Sum\nworkflow: unicon/classic@v2\ntest_groups:\n  main: {each: 80, pass: 20}\n'
+              : 'name: Sum\nworkflow: unicon/classic@v2\ntest_groups:\n  main: {each: 120}\n';
+        return HttpResponse.json({
+          path: 'task.yaml',
+          encoding: 'utf-8',
+          content,
+          token: 'token-task',
+          upload: null,
+        });
+      }),
+      ...repoFiles,
+    );
+    renderApp(CONTEST);
+
+    const card = await screen.findByRole('region', {
+      name: 'How this contest is scored',
+    });
+    const sum = await within(card).findByRole('region', { name: 'B · sum' });
+    expect(
+      await within(sum).findByText(
+        'main earns 80 times the share of its tests you passed, and 20 more when you pass them all.',
+      ),
+    ).toBeVisible();
+    expect(sum).toHaveTextContent(
+      `Worth ${formatExact('100')} points, its test groups’ total.`,
+    );
+    const sort = within(card).getByRole('region', { name: 'A · sort' });
+    expect(
+      await within(sort).findByText('Worth 1 point, its test groups’ total.'),
+    ).toBeVisible();
+    const fresh = within(card).getByRole('region', { name: 'C · new' });
+    expect(
+      within(fresh).getByText('Not published yet, so entrants are told nothing of it.'),
+    ).toBeVisible();
+  });
+});
+
 describe("a task's timeline, edited on its row", () => {
   /** The contest's settings, each save taken and the file becoming it. */
   function settingsSaved(content?: string) {
