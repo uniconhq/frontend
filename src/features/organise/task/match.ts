@@ -57,9 +57,19 @@ function fieldOf(ending: string, fields: DeclaredField[]): DeclaredField | undef
   return undefined;
 }
 
-/** Files the zip or the disk adds that are no one's tests: hidden ones. */
-function hidden(path: string): boolean {
-  return path.split('/').some((part) => part.startsWith('.'));
+/**
+ * Why a file is left out before it is matched, or null: one whose path leads
+ * out of its folder, or a hidden one the zip or the disk adds, which is no
+ * one's test.
+ */
+function leftOut(path: string): string | null {
+  const parts = path.split('/');
+  if (parts.some((part) => part === '..')) {
+    return 'Its path leads out of its folder, so it is left out.';
+  }
+  return parts.some((part) => part.startsWith('.'))
+    ? 'It is a hidden file, so it is left out.'
+    : null;
 }
 
 type Placed = { group: string | null; test: string; field: string; entry: string };
@@ -140,7 +150,11 @@ export function matchFiles(sources: Source[], fields: DeclaredField[]): Matched 
   const tests = new Map<string, MatchedTest>();
   const unmatched: Matched['unmatched'] = [];
   for (const source of sources) {
-    if (hidden(source.path)) continue;
+    const out = leftOut(source.path);
+    if (out !== null) {
+      unmatched.push({ path: source.path, reason: out });
+      continue;
+    }
     const found = place(source.path, fileFields);
     if (typeof found === 'string') {
       unmatched.push({ path: source.path, reason: found });
@@ -164,6 +178,11 @@ export function matchFiles(sources: Source[], fields: DeclaredField[]): Matched 
     tests.set(key, test);
   }
   for (const test of tests.values()) {
+    const entries = test.files.map((file) => file.entry);
+    for (const entry of new Set(entries)) {
+      const times = entries.filter((each) => each === entry).length;
+      if (times > 1) test.problems.push(`It has ${String(times)} files at ${entry}.`);
+    }
     for (const field of fileFields) {
       const given = test.files.filter((file) => file.field === field.name);
       if (given.length === 0) test.problems.push(`It has no ${field.name}.`);

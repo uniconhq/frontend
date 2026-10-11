@@ -154,10 +154,14 @@ export function approvesAtOnce(way: WayValues): boolean {
 export function whoWords(way: WayValues): string {
   if (way.kind === 'invite') return 'anyone you invite';
   const domains = domainsOf(way.domains);
+  const pattern = way.emailPattern.trim() !== '';
+  // The same confirmed address must be at a domain and match the pattern.
   const conditions = [
     ...(domains.length > 0
-      ? [`an ${domains.map((domain) => `@${domain}`).join(' or ')} email`]
-      : way.emailPattern.trim() !== ''
+      ? [
+          `an ${domains.map((domain) => `@${domain}`).join(' or ')} email${pattern ? ' matching the pattern' : ''}`,
+        ]
+      : pattern
         ? ['an email address matching the pattern']
         : []),
     ...(way.code.trim() !== '' ? ['the code'] : []),

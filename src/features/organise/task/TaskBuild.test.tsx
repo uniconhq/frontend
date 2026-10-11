@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fireEvent, screen, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@/test/user-event';
 import { http, HttpResponse } from 'msw';
 import { parse } from 'yaml';
@@ -629,6 +629,36 @@ describe('the cards that build a task', { timeout: 30_000 }, () => {
   });
 });
 
+describe('discarding at a conflict', { timeout: 30_000 }, () => {
+  it('drops my changes and shows the settings as they are now', async () => {
+    const theirs = TASK.replace('time_limit: 2', 'time_limit: 5');
+    // A folder for each group the settings hold, so nothing else is to save.
+    taskBackend({
+      conflictWith: theirs,
+      groups: { samples: ['1', '2'], small: ['1', '2', '3'], old: ['1'] },
+    });
+    const { tests } = await openTask();
+
+    fill(fieldIn(tests, 'small', 'Points'), '40');
+    await save();
+    await screen.findByRole('list', { name: 'Fields that differ' });
+    await userEvent.click(screen.getByRole('button', { name: 'Discard my changes' }));
+
+    await waitFor(() =>
+      expect(screen.queryByRole('region', { name: 'Save the task' })).toBeNull(),
+    );
+    const inputs = await screen.findByRole('region', { name: 'Inputs' });
+    expect(await within(inputs).findByDisplayValue('5')).toBeVisible();
+    expect(
+      fieldIn(
+        screen.getByRole('region', { name: 'Tests and scoring' }),
+        'small',
+        'Points',
+      ),
+    ).toHaveValue('30');
+  });
+});
+
 /** The first save sent, once it has been. */
 async function waitForSave(sent: SaveRequest[]): Promise<SaveRequest> {
   await expect.poll(() => sent.length).toBeGreaterThan(0);
@@ -744,6 +774,22 @@ describe('scoring a task', { timeout: 30_000 }, () => {
     expect(written(sent[0])['test_groups']).toMatchObject({
       small: { pass: 30, pass_at: 0.825 },
     });
+  });
+
+  it('will not save a score the workflow gives until its value is chosen', async () => {
+    taskBackend({
+      form: { ...CHECKED, inputs: [] },
+      content: TASK.replace('credit: fraction\n', ''),
+    });
+    const { tests } = await openTask();
+
+    fill(within(tests).getByLabelText('A test earns'), 'value');
+
+    const bar = await screen.findByRole('region', { name: 'Save the task' });
+    expect(bar).toHaveTextContent(
+      'Choose which value a test earns, under How a test earns.',
+    );
+    expect(within(bar).getByRole('button', { name: 'Save' })).toBeDisabled();
   });
 
   it('will not save a share above 100%', async () => {
@@ -987,6 +1033,22 @@ describe('the tests of a task', { timeout: 30_000 }, () => {
     const body = await waitForSave(sent);
     const groups = written(body)['test_groups'] as Record<string, unknown>;
     expect(groups['small']).toEqual({ each: 30, test_weights: { '3': 2 } });
+  });
+
+  it('opens a test’s weight from a link followed to the page, once the cards are there', async () => {
+    taskBackend({
+      form: { ...CHECKED, inputs: [] },
+      content: TASK.replace(
+        'small: {pass: 30, show: verdict}',
+        "small: {each: 30, test_weights: {'2': 3}}",
+      ),
+    });
+    renderApp(
+      '/orgs/acme/contests/spring/tasks/sum?card=tests&item=small&field=test:2',
+    );
+
+    const weight = await screen.findByLabelText('Test weight of 2');
+    await waitFor(() => expect(weight).toHaveFocus());
   });
 
   it('shows whose a test file is when someone else changed it first, and saves over it only when chosen', async () => {

@@ -218,6 +218,47 @@ describe('how people enter', { timeout: 20_000 }, () => {
     );
   });
 
+  it('opens a way’s approval from a link that names it', async () => {
+    server.use(signedIn);
+    settings(
+      `${BASE}registration:\n  ways:\n    - invite: {}\n    - signup: {name: Students, approval: manual}\n`,
+    );
+    renderApp(`${PAGE}?field=approval&item=1`);
+
+    const form = await screen.findByRole('group', { name: 'How people enter' });
+    await waitFor(() =>
+      expect(
+        way(form, 'Sign-up: Students').getByRole('radio', {
+          name: 'An organiser approves each one',
+        }),
+      ).toHaveFocus(),
+    );
+  });
+
+  it('keeps the page up for a link whose item or field is no name at all', async () => {
+    server.use(signedIn);
+    settings(`${BASE}registration:\n  ways:\n    - invite: {}\n`);
+    renderApp(`${PAGE}?field=a"]&item="`);
+
+    const form = await screen.findByRole('group', { name: 'How people enter' });
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(
+      within(form).getByRole('radio', { name: 'Approved straight away' }),
+    ).toBeVisible();
+  });
+
+  it('opens the advanced part to focus an email pattern a link names', async () => {
+    server.use(signedIn);
+    settings(
+      `${BASE}registration:\n  ways:\n    - signup: {domains: [u.nus.edu], email_pattern: '^e'}\n`,
+    );
+    renderApp(`${PAGE}?field=email_pattern&item=0`);
+
+    const pattern = await screen.findByLabelText('Email pattern');
+    await waitFor(() => expect(pattern).toHaveFocus());
+    expect(pattern.closest('details')).toHaveAttribute('open');
+  });
+
   it('shows a manager how people enter, to read', async () => {
     server.use(
       http.get('/api/v1/me', () =>

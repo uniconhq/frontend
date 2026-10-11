@@ -71,8 +71,34 @@ describe('matching files to tests', () => {
         'large/7: input=input, answer=answer',
         'small/1: input=input, answer=answer.txt',
       ],
-      unmatched: [],
+      unmatched: ['.DS_Store'],
     });
+  });
+
+  it('lists the files it leaves out, hidden ones and those outside their folder, with why', () => {
+    const { unmatched } = matchFiles(
+      sources('.DS_Store', 'small/.git/config', '../1.in', 'small/../2.in'),
+      CLASSIC,
+    );
+    expect(unmatched.map((file) => [file.path, file.reason])).toEqual([
+      ['.DS_Store', 'It is a hidden file, so it is left out.'],
+      ['small/.git/config', 'It is a hidden file, so it is left out.'],
+      ['../1.in', 'Its path leads out of its folder, so it is left out.'],
+      ['small/../2.in', 'Its path leads out of its folder, so it is left out.'],
+    ]);
+  });
+
+  it('says when a test has two files at one place, such as two of its test.yaml', () => {
+    expect(
+      shown([
+        'small/1/input',
+        'small/1/answer',
+        'small/1/test.yaml',
+        'small/1/test.yaml',
+      ]).tests,
+    ).toEqual([
+      'small/1: input=input, answer=answer, test.yaml=test.yaml, test.yaml=test.yaml (It has 2 files at test.yaml.)',
+    ]);
   });
 
   it('says why a file fits no test', () => {

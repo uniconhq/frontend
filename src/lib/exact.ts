@@ -7,6 +7,12 @@
 const DECIMAL = /^([-+]?)(\d*)(?:\.(\d*))?(?:[eE]([-+]?\d+))?$/;
 /** A whole number in hex or octal, as YAML 1.2's core schema writes one. */
 const BASED = /^0x[0-9a-fA-F]+$|^0o[0-7]+$/;
+/**
+ * The largest power of ten a decimal is worked with at: past it, its digits
+ * would take ever longer to build, while no number the format holds comes
+ * near it.
+ */
+const MOST_POWER = 1000;
 
 /** A decimal as a whole number of units and the power of ten of a unit. */
 function scaled(text: string): { units: bigint; power: number } | null {
@@ -16,6 +22,7 @@ function scaled(text: string): { units: bigint; power: number } | null {
   if (found === null) return null;
   const [, sign = '', whole = '', fraction = '', exponent = '0'] = found;
   if (whole === '' && fraction === '') return null;
+  if (Math.abs(Number(exponent)) > MOST_POWER) return null;
   const units = BigInt(`${whole}${fraction}` || '0');
   return {
     units: sign === '-' ? -units : units,

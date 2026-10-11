@@ -292,4 +292,10 @@ describe('a number typed into a field', () => {
       expect(typeof value === 'number' && Number.isFinite(value), typed).toBe(false);
     }
   });
+
+  it('refuses a number past what a float holds', () => {
+    expect(numberProblem('1e9999999')).toBe('Enter a smaller number.');
+    expect(numberProblem('-1e400')).toBe('Enter a smaller number.');
+    expect(numberProblem('1e300')).toBeUndefined();
+  });
 });
