@@ -8,7 +8,7 @@ import { problem, server, signedIn, someone } from '@/test/server';
 import { graded, reported } from '@/test/contestant';
 import { TASK_API, publicationList, repoFiles, taskState } from '@/test/organiser';
 
-const TASK = '/orgs/acme/contests/spring/tasks/sum';
+const TASK = '/orgs/acme/contests/spring/tasks/sum/gradings';
 
 const ada: Submitter = { user_id: 11, name: 'ada', team: null };
 

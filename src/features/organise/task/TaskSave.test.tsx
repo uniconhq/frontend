@@ -46,9 +46,39 @@ function taskBackend(answer: HttpResponseResolver) {
 }
 
 async function editAndSave(path = 'statement.md') {
-  renderApp(`/orgs/acme/contests/spring/tasks/sum?file=${path}`);
+  renderApp(`/orgs/acme/contests/spring/tasks/sum/files?file=${path}`);
   await userEvent.type(await screen.findByRole('textbox', { name: path }), ' Now.');
   await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+}
+
+/** Goes to one of the task's pages from the sidebar, as an organiser does. */
+async function goTo(section: string) {
+  const sidebar = screen.getByRole('group', { name: 'Task' });
+  await userEvent.click(within(sidebar).getByRole('link', { name: section }));
+}
+
+/**
+ * The task's page and its publications read first, then a file saved from
+ * Files, as an organiser comes to it: so a read the save leaves stale is one
+ * the page has, which it reads again on coming back.
+ */
+async function readThenEditAndSave(path: string) {
+  renderApp('/orgs/acme/contests/spring/tasks/sum');
+  await screen.findByLabelText('Where the task stands');
+  await goTo('Publications');
+  await screen.findByRole('list', { name: 'Publications' });
+  await goTo('Files');
+  await userEvent.click(await screen.findByRole('link', { name: path }));
+  await userEvent.type(await screen.findByRole('textbox', { name: path }), ' Now.');
+  await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+}
+
+/** Back to the publications and the task's own page, each read again. */
+async function comeBack() {
+  await goTo('Publications');
+  await screen.findByRole('list', { name: 'Publications' });
+  await goTo('sum');
+  await screen.findByLabelText('Where the task stands');
 }
 
 describe('saving a task file', () => {
@@ -63,7 +93,7 @@ describe('saving a task file', () => {
       }),
     );
 
-    await editAndSave();
+    await readThenEditAndSave('statement.md');
 
     const status = await screen.findByText('Published as publication 3.');
     const outcome = status.parentElement as HTMLElement;
@@ -80,7 +110,10 @@ describe('saving a task file', () => {
         keep_as_draft: false,
       },
     ]);
-    await expect.poll(() => reads).toEqual({ state: 2, publications: 2, tree: 2 });
+    const before = { ...reads };
+    await comeBack();
+    await expect.poll(() => reads.state).toBe(before.state + 1);
+    expect(reads.publications).toBe(before.publications + 1);
   });
 
   it('says when a publication leaves grading as it was', async () => {
@@ -158,7 +191,7 @@ describe('saving a task file', () => {
       }),
     );
 
-    await editAndSave('task.yaml');
+    await readThenEditAndSave('task.yaml');
 
     const outcome = (await screen.findByText(/Saved as a draft/))
       .parentElement as HTMLElement;
@@ -166,7 +199,9 @@ describe('saving a task file', () => {
     expect(within(outcome).getByRole('list', { name: 'Errors' })).toHaveTextContent(
       'inputs.setter[0].value: There is no file under data/hidden/ in the task.',
     );
-    await expect.poll(() => reads.state).toBe(2);
+    const before = reads.state;
+    await comeBack();
+    await expect.poll(() => reads.state).toBe(before + 1);
   });
 
   it('asks before a grading change during the contest, and publishes once confirmed', async () => {

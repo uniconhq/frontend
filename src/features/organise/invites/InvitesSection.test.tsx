@@ -94,7 +94,7 @@ describe('the organisers’ invites', () => {
         mailed_at: null,
       }),
     ]);
-    renderApp('/orgs/acme');
+    renderApp('/orgs/acme/organisers');
 
     const eve = await row('eve');
     expect(eve).toHaveTextContent('Manager');
@@ -118,7 +118,7 @@ describe('the organisers’ invites', () => {
       invite({ id: 'c', username: 'fay', mail_status: 'off', mailed_at: null }),
       invite({ id: 'd', username: 'gus', status: 'declined' }),
     ]);
-    renderApp('/orgs/acme');
+    renderApp('/orgs/acme/organisers');
 
     const eve = await row('eve');
     expect(
@@ -138,7 +138,7 @@ describe('the organisers’ invites', () => {
   it('invites a username to the role chosen', async () => {
     const sent = orgInvites([]);
     const user = userEvent.setup();
-    renderApp('/orgs/acme');
+    renderApp('/orgs/acme/organisers');
 
     const form = await screen.findByRole('form', { name: 'Invite someone' });
     expect(await screen.findByText('No invites yet.')).toBeVisible();
@@ -167,7 +167,7 @@ describe('the organisers’ invites', () => {
   it('invites an email address when what is typed has an @', async () => {
     const sent = orgInvites([]);
     const user = userEvent.setup();
-    renderApp('/orgs/acme');
+    renderApp('/orgs/acme/organisers');
 
     const form = await screen.findByRole('form', { name: 'Invite someone' });
     await user.type(
@@ -184,7 +184,7 @@ describe('the organisers’ invites', () => {
     orgInvites([]);
     server.use(http.post(ORG_INVITES, () => problem(404, 'not_found')));
     const user = userEvent.setup();
-    renderApp('/orgs/acme');
+    renderApp('/orgs/acme/organisers');
 
     const form = await screen.findByRole('form', { name: 'Invite someone' });
     await user.type(
@@ -204,7 +204,7 @@ describe('the organisers’ invites', () => {
       http.post(ORG_INVITES, () => problem(409, 'already_invited', { invite: 'a' })),
     );
     const user = userEvent.setup();
-    renderApp('/orgs/acme');
+    renderApp('/orgs/acme/organisers');
 
     const form = await screen.findByRole('form', { name: 'Invite someone' });
     await user.type(
@@ -221,7 +221,7 @@ describe('the organisers’ invites', () => {
   it('sends an invite again and withdraws one, each row as it comes back', async () => {
     const sent = orgInvites([invite()]);
     const user = userEvent.setup();
-    renderApp('/orgs/acme');
+    renderApp('/orgs/acme/organisers');
 
     await user.click(
       within(await row('eve')).getByRole('button', { name: 'Send again to eve' }),
@@ -251,7 +251,7 @@ describe('the organisers’ invites', () => {
       ),
     );
     const user = userEvent.setup();
-    renderApp('/orgs/acme');
+    renderApp('/orgs/acme/organisers');
 
     await user.click(
       within(await row('eve')).getByRole('button', { name: /Withdraw/ }),
@@ -269,7 +269,7 @@ describe('the organisers’ invites', () => {
       contestList,
       http.get(ORG_INVITES, () => HttpResponse.json([invite()])),
     );
-    renderApp('/orgs/acme');
+    renderApp('/orgs/acme/organisers');
 
     const eve = await row('eve');
     expect(within(eve).queryByRole('button')).toBeNull();
@@ -291,7 +291,7 @@ describe('the organisers’ invites', () => {
         ]),
       ),
     );
-    renderApp('/orgs/acme/contests/spring');
+    renderApp('/orgs/acme/contests/spring/organisers');
 
     expect(within(await row('eve')).queryByRole('button')).toBeNull();
     const form = screen.getByRole('form', { name: 'Invite someone' });

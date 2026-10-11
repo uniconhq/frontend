@@ -5,11 +5,12 @@ import { queryView } from '@/api/query';
 import type { Announcement } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
+import { Card } from '@/ui/Card';
 import { SectionTitle } from '@/ui/SectionTitle';
 import { TextInput } from '@/ui/TextInput';
 import { Textarea } from '@/ui/Textarea';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
-import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
+import { Loaded } from '@/ui/feedback/Loaded';
 import { useMe } from '@/session';
 import { useFallbackPoll } from '@/live';
 import { holdsAt } from '../roles';
@@ -160,36 +161,43 @@ export function AnnouncementsSection({ place }: { place: AnnouncementPlace }) {
     queryClient.invalidateQueries({ queryKey: announcementsQuery(place).queryKey });
 
   return (
-    <div className={classes.stack}>
-      <SectionTitle>Announcements</SectionTitle>
+    <>
       {manages && (
-        <Composer
-          label="Post announcement"
-          initial={{ title: '', body: '' }}
-          onSend={async (text) => {
-            await changes.post(text);
-            await readAgain();
-          }}
-        />
+        <Card>
+          <div className={classes.stack}>
+            <SectionTitle>Post an announcement</SectionTitle>
+            <Composer
+              label="Post announcement"
+              initial={{ title: '', body: '' }}
+              onSend={async (text) => {
+                await changes.post(text);
+                await readAgain();
+              }}
+            />
+          </div>
+        </Card>
       )}
-      {view.state === 'loading' && <PageSkeleton rows={2} />}
-      {view.state === 'error' && <ErrorBlock error={view.error} onRetry={view.retry} />}
-      {view.state === 'ready' &&
-        (view.data.length === 0 ? (
-          <BodyText tone="secondary">No announcements yet.</BodyText>
-        ) : (
-          <ol className={classes.list} aria-label="Announcements">
-            {[...view.data].reverse().map((announcement) => (
-              <Managed
-                key={announcement.number}
-                announcement={announcement}
-                manages={manages}
-                changes={changes}
-                onChanged={readAgain}
-              />
-            ))}
-          </ol>
-        ))}
-    </div>
+      <Card>
+        <Loaded view={view} rows={2}>
+          {(posted) =>
+            posted.length === 0 ? (
+              <BodyText tone="secondary">No announcements yet.</BodyText>
+            ) : (
+              <ol className={classes.list} aria-label="Announcements">
+                {[...posted].reverse().map((announcement) => (
+                  <Managed
+                    key={announcement.number}
+                    announcement={announcement}
+                    manages={manages}
+                    changes={changes}
+                    onChanged={readAgain}
+                  />
+                ))}
+              </ol>
+            )
+          }
+        </Loaded>
+      </Card>
+    </>
   );
 }

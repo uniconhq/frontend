@@ -3,7 +3,6 @@ import { useSearchParams } from 'react-router';
 import { useMe } from '@/session';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
-import { SectionTitle } from '@/ui/SectionTitle';
 import { holdsAt } from '../roles';
 import { FILE_PARAM, folderOf } from './file-param';
 import { FileEditor } from './FileEditor';
@@ -35,14 +34,13 @@ export function FileBrowser({ place }: { place: Place }) {
   return (
     <WaitingUploadsProvider>
       <div className={classes.browser}>
-        <div className={classes.heading}>
-          <SectionTitle>Files</SectionTitle>
-          {uploads && !uploading && (
+        {uploads && !uploading && (
+          <div className={classes.heading}>
             <Button variant="secondary" onClick={() => setUploading(true)}>
               Upload a file
             </Button>
-          )}
-        </div>
+          </div>
+        )}
         {place.kind === 'task' && uploading && (
           <TaskUpload
             place={place}

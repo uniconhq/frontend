@@ -42,7 +42,7 @@ describe('the teams page', () => {
     );
     expect(await card('Blue')).toHaveTextContent('Nobody is in this team.');
     const trail = screen.getByRole('navigation', { name: 'Breadcrumb' });
-    expect(within(trail).getByRole('link', { name: 'teams' })).toHaveAttribute(
+    expect(within(trail).getByRole('link', { name: 'Teams' })).toHaveAttribute(
       'href',
       PAGE,
     );
@@ -75,10 +75,16 @@ describe('the teams page', () => {
     );
     renderApp('/orgs/acme/contests/spring');
 
-    expect(await screen.findByRole('link', { name: 'Teams' })).toHaveAttribute(
+    const cards = await screen.findByRole('group', { name: "The contest's sections" });
+    expect(within(cards).getByRole('link', { name: 'Teams' })).toHaveAttribute(
       'href',
       PAGE,
     );
+    expect(
+      within(screen.getByRole('navigation', { name: 'Sections' })).getByRole('link', {
+        name: 'Teams',
+      }),
+    ).toHaveAttribute('href', PAGE);
   });
 
   it('makes a team with a leader', async () => {

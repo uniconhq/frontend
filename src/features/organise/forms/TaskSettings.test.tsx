@@ -155,10 +155,7 @@ function fill(field: HTMLElement, value: string) {
 }
 
 async function openForm() {
-  renderApp('/orgs/acme/contests/spring/tasks/sum');
-  await userEvent.click(
-    await screen.findByRole('button', { name: 'Edit the settings' }),
-  );
+  renderApp('/orgs/acme/contests/spring/tasks/sum/settings');
   return screen.findByRole('form', { name: 'Task settings' });
 }
 
@@ -561,10 +558,7 @@ size 120
           : undefined,
       ),
     );
-    renderApp('/orgs/acme/contests/spring/tasks/sum');
-    await userEvent.click(
-      await screen.findByRole('button', { name: 'Edit the settings' }),
-    );
+    renderApp('/orgs/acme/contests/spring/tasks/sum/settings');
 
     const [shown] = await screen.findAllByRole('region', {
       name: 'Uploaded task.yaml',

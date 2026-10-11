@@ -1,5 +1,4 @@
 import { $api, queryView } from '@/api/query';
-import { SectionTitle } from '@/ui/SectionTitle';
 import { useLiveConnected } from '@/live';
 import { GradingsList } from '../gradings/GradingsList';
 import { readAgainIn } from '../gradings/feed';
@@ -26,7 +25,6 @@ export function GradingsSection({ path }: { path: TaskPath }) {
   );
   return (
     <div className={classes.stack}>
-      <SectionTitle>Gradings</SectionTitle>
       <GradingsList
         path={path}
         view={view}
