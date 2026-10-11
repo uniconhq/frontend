@@ -271,6 +271,25 @@ test('a step added from the toolbar opens in the drawer clear of its box, and is
   await expect.poll(() => file(page)).toContain('actual: ${{ steps.run.output }}');
 });
 
+test('a step added below the window is scrolled into it', async ({ page }) => {
+  await stubWorkflowApi(page);
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto('/workflows/kenny/tuned');
+  await expect(page.getByRole('group', { name: 'Step run' })).toBeVisible();
+
+  await page.getByRole('button', { name: 'Add step' }).click();
+  await page.getByRole('menuitem', { name: /^Run program/ }).click();
+  const added = page.getByRole('group', { name: 'Step sandbox-run' });
+  await expect(added).toBeVisible();
+  // Up or down the page as well as sideways in the frame, the whole box in the window.
+  await expect
+    .poll(async () => {
+      const box = await added.boundingBox();
+      return box !== null && box.y >= 0 && box.y + box.height <= 1000;
+    })
+    .toBe(true);
+});
+
 test('the graph stands at its actual size and slides sideways in its frame', async ({
   page,
 }) => {

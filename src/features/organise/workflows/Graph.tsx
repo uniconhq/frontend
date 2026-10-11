@@ -411,10 +411,25 @@ function useReveal(
     if (right > to + seen) to = right - seen;
     if (left < to) to = left;
     if (to !== scroller.scrollLeft) scroller.scrollTo?.({ left: Math.max(0, to) });
-    const node = scroller.querySelector<HTMLElement>(
-      `.react-flow__node[data-id="${CSS.escape(box.key)}"]`,
-    );
-    node?.scrollIntoView?.({ block: 'nearest' });
+    // React Flow draws a box it has just been given a frame or two later, and
+    // the frame grows to hold it then, so up or down the page waits for that.
+    const selector = `.react-flow__node[data-id="${CSS.escape(box.key)}"]`;
+    let tries = 0;
+    let waiting = 0;
+    const down = () => {
+      const node = scroller.querySelector<HTMLElement>(selector);
+      const drawn =
+        node !== null &&
+        scroller.getBoundingClientRect().bottom >= node.getBoundingClientRect().bottom;
+      if (node !== null && (drawn || tries >= 30)) {
+        node.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
+        return;
+      }
+      tries += 1;
+      if (tries <= 30) waiting = requestAnimationFrame(down);
+    };
+    down();
+    return () => cancelAnimationFrame(waiting);
   }, [frame, layout, reveal, cover]);
 }
 
