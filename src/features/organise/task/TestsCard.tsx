@@ -24,6 +24,7 @@ import {
   ruleRefusal,
   RULES,
   scaled,
+  shareProblem,
   showRefusal,
   showSentence,
   SHOWS,
@@ -174,13 +175,21 @@ function ShareField({
   onChange: (fraction: string) => void;
   disabled: boolean;
 }) {
+  // The percentage as typed, so a point or a trailing zero holds while the
+  // next digit is typed; the settings' fraction when they hold another.
+  const [typed, setTyped] = useState(() => percentOf(value));
+  const shown = fractionOf(typed) === value ? typed : percentOf(value);
   return (
     <NumberField
       label={label}
-      value={percentOf(value)}
-      onChange={(percent) => onChange(fractionOf(percent))}
+      value={shown}
+      onChange={(percent) => {
+        setTyped(percent);
+        onChange(fractionOf(percent));
+      }}
       placeholder="100"
       hint="A percentage, such as 80."
+      error={shareProblem(value)}
       disabled={disabled}
     />
   );
@@ -279,12 +288,15 @@ function GroupItem({
   // The rule chosen holds while its points box is emptied to be typed again,
   // and a bonus while its bonus box is still empty, which reads as points for
   // each test alone.
-  const [picked, setPicked] = useState<Rule | null>(null);
+  // A share while its share box is emptied or typed as 100, which reads as
+  // every test, counts too. The rule the group was read with counts as chosen.
+  const [picked, setPicked] = useState<Rule | null>(() => ruleOf(group));
   const read = ruleOf(group);
   const held =
     picked !== null &&
     (read === 'none' ||
-      (picked === 'bonus' && read === 'each' && group.pass.trim() === ''));
+      (picked === 'bonus' && read === 'each' && group.pass.trim() === '') ||
+      (picked === 'share' && read === 'all'));
   // Weights for tests the group does not have, which the save refuses (T2).
   const strays = group.weights.filter(
     (row) => !saved.includes(row.test) && !added.some((test) => test.test === row.test),

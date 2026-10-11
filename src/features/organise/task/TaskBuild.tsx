@@ -42,7 +42,7 @@ import { InputsCard } from './InputsCard';
 import { taskMergeWords } from './merge-words';
 import { taskPlace, taskPlaceOf } from './places';
 import { SaveBar } from './SaveBar';
-import { pointsText, ruleOf, taskWeight } from './scoring';
+import { pointsText, ruleOf, shareProblem, taskWeight } from './scoring';
 import {
   existingOf,
   NOTHING_STAGED,
@@ -279,7 +279,7 @@ function BuildForm({
       numberProblem(group.each),
       numberProblem(group.worst),
       numberProblem(group.pass),
-      numberProblem(group.passAt),
+      numberProblem(group.passAt) ?? shareProblem(group.passAt),
       ...group.weights.map((row) => numberProblem(row.weight)),
       form?.graded === true && !group.read && group.show === ''
         ? `Choose when entrants see ${group.name}’s results.`
