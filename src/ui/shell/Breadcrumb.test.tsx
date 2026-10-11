@@ -57,6 +57,15 @@ describe('the breadcrumb', () => {
     });
   });
 
+  it('says an address that is no page is not found, not that it is another page', async () => {
+    server.use(signedIn);
+    renderApp('/no/such/page');
+
+    expect(await trail()).toEqual([
+      { label: 'Page not found', to: null, current: false },
+    ]);
+  });
+
   it('puts a contest its contestants see under the contests, with its org', async () => {
     server.use(
       http.get('/api/v1/public/contests/:org/:contest/boards', () =>
