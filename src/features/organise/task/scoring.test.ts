@@ -144,6 +144,16 @@ describe('a task’s points', () => {
     ).toBe(
       'core earns 100 when at least 80% of its tests pass, counted by test weight.',
     );
+    const weights = [{ test: '7', weight: '3' }];
+    expect(say(group('main', { each: '42', weights }), 10)).toBe(
+      'main earns 42 times the share of its tests you passed, counted by test weight.',
+    );
+    expect(say(group('main', { each: '42', weights }), null, 'value')).toBe(
+      "main earns 42 times the mean of its tests' scores, each from 0 to 1, weighted by test weight.",
+    );
+    expect(say(group('main', { each: '80', pass: '20', weights }), 10)).toBe(
+      'main earns 80 times the share of its tests you passed, counted by test weight, and 20 more when you pass them all.',
+    );
     expect(say(group('main', { worst: '100' }), null, 'value')).toBe(
       "main earns 100 times your worst test's score.",
     );

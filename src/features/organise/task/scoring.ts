@@ -213,8 +213,8 @@ export function groupSentence(
   const weighted = group.weights.length > 0;
   const passed =
     credit === 'none'
-      ? 'the share of its tests you passed'
-      : "the mean of its tests' scores, each from 0 to 1";
+      ? `the share of its tests you passed${weighted ? ', counted by test weight' : ''}`
+      : `the mean of its tests' scores, each from 0 to 1${weighted ? ', weighted by test weight' : ''}`;
   const shareOf = (passAt: string) => `${percentOf(passAt)}%`;
   const example = (each: string, bonus: string | null) => {
     if (credit !== 'none' || weighted || tests === null || tests < 2) return '';
