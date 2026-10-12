@@ -274,6 +274,17 @@ async function stubOrganiserApi(page: Page) {
       };
       return json(route, tree[folder] ?? []);
     }
+    if (path.startsWith(`${task}/files/tests`)) {
+      // A test's file, its path one segment of the address, its slashes encoded.
+      const at = decodeURIComponent(path.slice(`${task}/files/`.length));
+      return json(route, {
+        path: at,
+        encoding: 'utf-8',
+        content: at.endsWith('/input') ? '1 2\n' : '3\n',
+        token: `token-${at}`,
+        upload: null,
+      });
+    }
     if (path === `${task}/files/task.yaml`) {
       return json(route, {
         path: 'task.yaml',
@@ -438,4 +449,33 @@ test('an organiser follows the failed gradings from the contest page', async ({
   await expect(page.getByLabel('Queue')).toContainText('Failed, waiting for you2');
   await expect(page.getByText('No grading matches these filters.')).toBeVisible();
   expect(state.feedAsked).toContain('status=system_error&latest=true');
+});
+
+test('an organiser reads a test in place, its parts side by side, and is told how to name test files', async ({
+  page,
+}) => {
+  const state = await stubOrganiserApi(page);
+  state.orgMade = true;
+  await page.goto('/orgs/acme/contests/spring/tasks/sum');
+
+  const scoring = page.getByRole('region', { name: 'Tests and scoring' });
+  const row = scoring.getByRole('listitem', { name: 'Test 1' });
+  await expect(row).toContainText('Test 1 · input 4 B, answer 2 B');
+  await row.getByRole('button', { name: /Test 1/ }).click();
+  const view = row.getByRole('region', { name: 'What test 1 holds' });
+  await expect(view.getByLabel('What input holds')).toHaveText('1 2');
+  await expect(view.getByLabel('What answer holds')).toHaveText('3');
+  const input = await view.getByRole('region', { name: 'input' }).boundingBox();
+  const answer = await view.getByRole('region', { name: 'answer' }).boundingBox();
+  expect(answer?.x ?? 0).toBeGreaterThan((input?.x ?? 0) + (input?.width ?? 0) - 1);
+  expect(Math.abs((answer?.y ?? 0) - (input?.y ?? 0))).toBeLessThan(2);
+
+  await scoring.getByRole('button', { name: 'Add tests', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'Add tests' });
+  await dialog.getByRole('radio', { name: 'Many files at once' }).check();
+  await expect(dialog.getByLabel('How to name the files')).toContainText(
+    "Name them like 1.in (test 1's input) and 1.out (test 1's answer).",
+  );
+  await expect(dialog.getByRole('button', { name: 'Add tests' })).toBeDisabled();
+  await expect(dialog).toContainText('Drop files above to see the tests they make.');
 });
