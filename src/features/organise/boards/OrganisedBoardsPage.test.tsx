@@ -96,7 +96,7 @@ describe("the boards' settings", { timeout: 20_000 }, () => {
       expect(
         within(form).getByRole('status', { name: 'What Standings ranks' }),
       ).toHaveTextContent(
-        'Highest total first, then fewest penalty minutes, counting 20 for each earlier attempt, using each entrant’s best submission, on every task. Organisers see the whole leaderboard, and each entrant only their own row. It counts nothing: it counts only test groups whose results entrants see once their task closes, and no task it covers has one.',
+        'Ranks entrants by their total points over every task, highest first; ties are broken by penalty minutes, fewest first, counting 20 for each earlier attempt. Each entrant’s best submission to each task counts. Organisers see all of it, and each entrant only their own row. It counts nothing: it counts only test groups whose results entrants see once their task closes, and no task it covers has one.',
       ),
     );
     const standings = board(form, 'Standings');
@@ -139,7 +139,7 @@ describe("the boards' settings", { timeout: 20_000 }, () => {
       expect(
         within(form).getByRole('status', { name: 'What Standings ranks' }),
       ).toHaveTextContent(
-        `Highest total first, using each entrant’s best submission, on every task. Entrants and organisers see the whole leaderboard. Results from test group “hidden” of task B join it when task B closes, ${formatDateTime(new Date('2026-10-15T09:00:00Z'))}.`,
+        `Ranks entrants by their total points over every task, highest first. Each entrant’s best submission to each task counts. Entrants and organisers see all of it. Results from test group “hidden” of task B join it when task B closes, ${formatDateTime(new Date('2026-10-15T09:00:00Z'))}.`,
       ),
     );
   });
@@ -304,7 +304,7 @@ describe("the boards' settings", { timeout: 20_000 }, () => {
     expect(
       within(form).getByRole('status', { name: 'What Standings ranks' }),
     ).toHaveTextContent(
-      'Organisers see the whole leaderboard; entrants see the top 10 rows and any row tied with the last of them, and an entrant their own row as well.',
+      'Organisers see all of it; entrants see the top 10 rows and any row tied with the last of them, and an entrant their own row as well.',
     );
   });
 

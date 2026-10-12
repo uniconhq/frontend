@@ -21,9 +21,10 @@ import shared from '../organise.module.css';
 import forms from '../forms/forms.module.css';
 
 /**
- * One task's timeline in the contest, edited from its row: what it is worth,
- * when it opens, falls due and closes, what a late day costs, and how many
- * submissions may be marked when a board counts marked ones. A setting the
+ * One task's place in the contest, changed from its row on the contest's
+ * page or from its own page: what it is worth, when it opens, falls due and
+ * closes, what a late day costs, and how many submissions may be marked
+ * when a board counts marked ones. A setting the
  * save would refuse is not offered, with the reason beside it: a task that
  * gives no points has no worth and no due time.
  */
@@ -103,7 +104,7 @@ function EntryForm({
   return (
     <form
       className={forms.form}
-      aria-label={`Timeline of ${label}`}
+      aria-label={`${label} in this contest`}
       onSubmit={(event) => {
         event.preventDefault();
         onSave((fresh) => writeContest(fresh, read.values, after, { admin }));
@@ -220,7 +221,7 @@ function EntryForm({
       )}
       <div className={shared.actions}>
         <Button type="submit" loading={busy} disabled={!changed || problems.length > 0}>
-          Save the timeline
+          Save
         </Button>
       </div>
     </form>

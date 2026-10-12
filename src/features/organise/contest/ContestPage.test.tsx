@@ -541,16 +541,28 @@ describe('how the contest is scored (M52)', () => {
       sortPart,
       "Its contest makes the task worth 50 points, so each test group's points are scaled to that.",
     );
-    // A worked example from the group's own number of tests.
+    // The groups first, in one line, at the points the contest makes them.
+    expect(
+      within(sortPart).getByText('Two test groups: small (15 points) and large (35).'),
+    ).toBeVisible();
+    // Each group's size and points before its rule, with a worked example from its own tests.
     await line(
       sortPart,
-      'Test group “small”: an entrant earns 15 points when every test passes, and nothing otherwise. An entrant who passes 3 of 4 gets nothing.',
+      'small (4 tests, 15 points): an entrant earns 15 points when every test passes, and nothing otherwise. An entrant who passes 3 of 4 gets nothing.',
     );
     await line(
       sortPart,
-      'Counted on Standings: highest total first, using each entrant’s best submission. Only organisers see it.',
+      'Leaderboard “Standings”: ranks entrants by their total points over task sort, highest first. Each entrant’s best submission to this task counts. Only organisers see it.',
     );
     expect(sortPart).not.toHaveTextContent(/\byou\b/i);
+    // The whole card opens Leaderboards; each task's heading keeps its own link.
+    expect(
+      within(card).getByRole('link', { name: 'How this contest is scored' }),
+    ).toHaveAttribute('href', '/orgs/acme/contests/spring/boards');
+    expect(within(sortPart).getByRole('link', { name: 'A · sort' })).toHaveAttribute(
+      'href',
+      expect.stringMatching(/^\/orgs\/acme\/contests\/spring\/tasks\/sort\b/),
+    );
 
     const sumPart = within(card).getByRole('region', { name: 'B · sum' });
     expect(within(sumPart).getByRole('heading', { level: 3 })).toHaveTextContent(
@@ -561,7 +573,7 @@ describe('how the contest is scored (M52)', () => {
     // A draft on top of its publication: its tests now are not the published ones.
     await line(
       sumPart,
-      'Test group “main”: each test passed is worth an equal share of 80 points. Passing every test earns 20 points more.',
+      'main (100 points): each test passed earns an equal share of 80 points. Passing every test earns 20 points more.',
     );
     await line(sumPart, 'No leaderboard counts it.');
   });
@@ -646,22 +658,25 @@ describe('how the contest is scored (M52)', () => {
       name: 'How this contest is scored',
     });
     const part = await within(card).findByRole('region', { name: 'A · sum' });
+    expect(
+      within(part).getByText('Two test groups: samples (0 points) and hidden (100).'),
+    ).toBeVisible();
     await line(
       part,
-      'Test group “samples”: no points: its tests are for entrants to practise on.',
+      'samples (2 tests, no points): its tests are for entrants to practise on.',
     );
     // The same words the task's Tests card gives the group.
     await line(
       part,
-      'Test group “hidden”: each test passed is worth an equal share of 100 points. An entrant who passes 3 of 4 gets 75.',
+      'hidden (4 tests, 100 points): each test passed earns an equal share, 25. An entrant who passes 3 of 4 gets 75.',
     );
     await line(
       part,
-      'Counted on Live: highest total first, using each entrant’s best submission. Entrants and organisers see the whole leaderboard. It leaves out test group “hidden”, whose results entrants see only once the task closes.',
+      'Leaderboard “Live”: ranks entrants by their total points over every task, highest first. Each entrant’s best submission to this task counts. Entrants and organisers see all of it. It leaves out test group “hidden”, whose results entrants see only once the task closes.',
     );
     await line(
       part,
-      'Counted on Final: highest total first, using each entrant’s best submission. Everyone who can see the contest sees the whole leaderboard. Results from test group “hidden” join it when the contest ends.',
+      'Leaderboard “Final”: ranks entrants by their total points over every task, highest first. Each entrant’s best submission to this task counts. Everyone who can see the contest sees all of it. Results from test group “hidden” join it when the contest ends.',
     );
     // A board that does not cover the task is not listed under it.
     expect(part).not.toHaveTextContent('Practice');
@@ -711,12 +726,12 @@ describe('how the contest is scored, as published', () => {
     const sum = await within(card).findByRole('region', { name: 'B · sum' });
     await line(
       sum,
-      'Test group “main”: each test passed is worth an equal share of 80 points. Passing every test earns 20 points more.',
+      'main (100 points): each test passed earns an equal share of 80 points. Passing every test earns 20 points more.',
     );
     const sort = within(card).getByRole('region', { name: 'A · sort' });
     await line(
       sort,
-      'Test group “judge”: an entrant earns 1 point when every test passes, and nothing otherwise.',
+      'judge (1 point): an entrant earns 1 point when every test passes, and nothing otherwise.',
     );
     const fresh = within(card).getByRole('region', { name: 'C · new' });
     expect(
@@ -728,7 +743,7 @@ describe('how the contest is scored, as published', () => {
   });
 });
 
-describe("a task's timeline, edited on its row", () => {
+describe("a task's place in the contest, changed from its row", () => {
   /** The contest's settings, each save taken and the file becoming it. */
   function settingsSaved(content?: string) {
     let file = files['contest.yaml']!;
@@ -755,9 +770,11 @@ describe("a task's timeline, edited on its row", () => {
     renderApp(CONTEST);
 
     await user.click(
-      await screen.findByRole('button', { name: 'Edit the timeline of A · sort' }),
+      await screen.findByRole('button', { name: 'Change A · sort in this contest' }),
     );
-    const dialog = await screen.findByRole('dialog', { name: 'Timeline of A · sort' });
+    const dialog = await screen.findByRole('dialog', {
+      name: 'A · sort in this contest',
+    });
     const worth = await within(dialog).findByRole('textbox', { name: 'Worth' });
     expect(worth).toHaveAttribute('placeholder', '100, its test groups’ total');
     await user.type(worth, '120');
@@ -767,7 +784,7 @@ describe("a task's timeline, edited on its row", () => {
       within(dialog).getByRole('textbox', { name: /Taken off per started late day/ }),
       '12.5',
     );
-    await user.click(within(dialog).getByRole('button', { name: 'Save the timeline' }));
+    await user.click(within(dialog).getByRole('button', { name: 'Save' }));
 
     expect(await within(dialog).findByText('Saved.')).toBeVisible();
     const [saved] = sent;
@@ -787,9 +804,11 @@ describe("a task's timeline, edited on its row", () => {
     renderApp(CONTEST);
 
     await user.click(
-      await screen.findByRole('button', { name: 'Edit the timeline of B · sum' }),
+      await screen.findByRole('button', { name: 'Change B · sum in this contest' }),
     );
-    const dialog = await screen.findByRole('dialog', { name: 'Timeline of B · sum' });
+    const dialog = await screen.findByRole('dialog', {
+      name: 'B · sum in this contest',
+    });
     const worth = await within(dialog).findByRole('textbox', { name: 'Worth' });
     expect(worth).toBeDisabled();
     expect(worth).toHaveAccessibleDescription(
@@ -805,44 +824,81 @@ describe("a task's timeline, edited on its row", () => {
     ).toBeDisabled();
   });
 
-  it('moves a task down the list, which saves at once', async () => {
+  it('moves a task down the list from its row, which saves at once', async () => {
     server.use(signedIn, standingList, ...repoFiles);
     const sent = settingsSaved();
     const user = userEvent.setup();
     renderApp(CONTEST);
 
-    await user.click(
-      await screen.findByRole('button', { name: 'Edit the timeline of A · sort' }),
-    );
-    const dialog = await screen.findByRole('dialog', { name: 'Timeline of A · sort' });
-    expect(within(dialog).getByRole('button', { name: 'Move up' })).toBeDisabled();
-    await user.click(within(dialog).getByRole('button', { name: 'Move down' }));
+    const row = await screen.findByRole('listitem', { name: 'A · sort' });
+    expect(
+      within(row).getByRole('button', { name: 'Move A · sort up' }),
+    ).toBeDisabled();
+    await user.click(within(row).getByRole('button', { name: 'Move A · sort down' }));
 
     await waitFor(() => expect(sent).toHaveLength(1));
     expect((parse(sent[0] ?? '') as { tasks: { id: string }[] }).tasks).toEqual([
       { id: 'sum' },
       { id: 'sort' },
     ]);
+    expect(
+      within(screen.getByRole('listitem', { name: 'B · sum' })).getByRole('button', {
+        name: 'Move B · sum down',
+      }),
+    ).toBeDisabled();
   });
 
-  it('says in a task’s timeline that it cannot be taken out of the contest yet', async () => {
+  it('opens the dialog from the row’s second line, which ends in Change, and has no Edit button', async () => {
+    server.use(signedIn, standingList, ...repoFiles);
+    settingsSaved();
+    renderApp(CONTEST);
+
+    const row = await screen.findByRole('listitem', { name: 'A · sort' });
+    const line = within(row).getByRole('button', {
+      name: 'Change A · sort in this contest',
+    });
+    expect(line).toHaveTextContent(/^100 points, .*·Change$/);
+    expect(within(row).queryByRole('button', { name: /^Edit/ })).toBeNull();
+  });
+
+  it('offers no arrows while the contest has one task', async () => {
+    server.use(
+      signedIn,
+      http.get(`${CONTEST_API}/organise/tasks`, () =>
+        HttpResponse.json(standings.slice(0, 1)),
+      ),
+      ...repoFiles,
+    );
+    settingsSaved();
+    renderApp(CONTEST);
+
+    const row = await screen.findByRole('listitem', { name: 'A · sort' });
+    expect(within(row).queryByRole('button', { name: /^Move/ })).toBeNull();
+    expect(
+      within(row).getByRole('button', { name: 'Change A · sort in this contest' }),
+    ).toBeVisible();
+  });
+
+  it('says in a task’s dialog that it cannot be taken out of the contest yet', async () => {
     server.use(signedIn, standingList, ...repoFiles);
     settingsSaved();
     const user = userEvent.setup();
     renderApp(CONTEST);
 
     await user.click(
-      await screen.findByRole('button', { name: 'Edit the timeline of A · sort' }),
+      await screen.findByRole('button', { name: 'Change A · sort in this contest' }),
     );
-    const dialog = await screen.findByRole('dialog', { name: 'Timeline of A · sort' });
+    const dialog = await screen.findByRole('dialog', {
+      name: 'A · sort in this contest',
+    });
     expect(
       within(dialog).getByText(
-        'Every task in this list is part of the contest: a task cannot be taken out of it yet, so the contest opens only once each is published.',
+        'A task cannot be taken out of its contest yet, so the contest opens only once every one of its tasks is published.',
       ),
     ).toBeVisible();
   });
 
-  it('moves the task it was opened for, wherever the list read fresh has it', async () => {
+  it('moves the task whose arrow was pressed, wherever the list read fresh has it', async () => {
     server.use(signedIn, standingList, ...repoFiles);
     // Someone else put a task ahead of sort since the page read its list.
     const sent = settingsSaved(
@@ -851,11 +907,8 @@ describe("a task's timeline, edited on its row", () => {
     const user = userEvent.setup();
     renderApp(CONTEST);
 
-    await user.click(
-      await screen.findByRole('button', { name: 'Edit the timeline of A · sort' }),
-    );
-    const dialog = await screen.findByRole('dialog', { name: 'Timeline of A · sort' });
-    await user.click(within(dialog).getByRole('button', { name: 'Move down' }));
+    const row = await screen.findByRole('listitem', { name: 'A · sort' });
+    await user.click(within(row).getByRole('button', { name: 'Move A · sort down' }));
 
     await waitFor(() => expect(sent).toHaveLength(1));
     expect((parse(sent[0] ?? '') as { tasks: { id: string }[] }).tasks).toEqual([
@@ -865,18 +918,20 @@ describe("a task's timeline, edited on its row", () => {
     ]);
   });
 
-  it("opens a task's timeline from a link that names one of its fields", async () => {
+  it("opens a task's dialog from a link that names one of its fields", async () => {
     server.use(signedIn, standingList, ...repoFiles);
     settingsSaved();
     renderApp(`${CONTEST}?part=tasks&field=worth&item=0`);
 
-    const dialog = await screen.findByRole('dialog', { name: 'Timeline of A · sort' });
+    const dialog = await screen.findByRole('dialog', {
+      name: 'A · sort in this contest',
+    });
     await waitFor(() =>
       expect(within(dialog).getByRole('textbox', { name: 'Worth' })).toHaveFocus(),
     );
   });
 
-  it("opens a task's timeline from such a link followed while the page is open", async () => {
+  it("opens a task's dialog from such a link followed while the page is open", async () => {
     server.use(signedIn, standingList, ...repoFiles);
     settingsSaved();
     const { router } = renderApp(CONTEST);
@@ -885,11 +940,11 @@ describe("a task's timeline, edited on its row", () => {
     await router.navigate(`${CONTEST}?part=tasks&field=closes&item=1`);
 
     expect(
-      await screen.findByRole('dialog', { name: 'Timeline of B · sum' }),
+      await screen.findByRole('dialog', { name: 'B · sum in this contest' }),
     ).toBeVisible();
   });
 
-  it('offers an observer no way to edit a timeline', async () => {
+  it('offers an observer the line as text, with no way to change or move a task', async () => {
     server.use(
       http.get('/api/v1/me', () =>
         HttpResponse.json({
@@ -904,8 +959,9 @@ describe("a task's timeline, edited on its row", () => {
     );
     renderApp(CONTEST);
 
-    await screen.findByRole('listitem', { name: 'A · sort' });
-    expect(screen.queryByRole('button', { name: /^Edit the timeline/ })).toBeNull();
+    const row = await screen.findByRole('listitem', { name: 'A · sort' });
+    expect(within(row).getByText(/^100 points, /)).toBeVisible();
+    expect(within(row).queryByRole('button')).toBeNull();
   });
 });
 

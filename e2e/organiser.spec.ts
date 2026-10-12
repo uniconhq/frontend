@@ -458,7 +458,7 @@ test('an organiser sets a task up on its cards and saves them in one save', asyn
   await limit.fill('3');
   const scoring = page.getByRole('region', { name: 'Tests and scoring' });
   await expect(scoring.getByRole('group', { name: 'main' })).toContainText(
-    'Each test passed is worth an equal share of 100 points.',
+    'Its one test earns 100 points when it passes.',
   );
 
   const bar = page.getByRole('region', { name: 'Save the task' });
@@ -503,7 +503,7 @@ test('an organiser reads a test in place, its parts side by side, and is told ho
 
   const scoring = page.getByRole('region', { name: 'Tests and scoring' });
   const row = scoring.getByRole('listitem', { name: 'Test 1' });
-  await expect(row).toContainText('Test 1 · input 4 B, answer 2 B');
+  await expect(row).toContainText('Test 1 · input, answer');
   await row.getByRole('button', { name: /Test 1/ }).click();
   const view = row.getByRole('region', { name: 'What test 1 holds' });
   await expect(view.getByLabel('What input holds')).toHaveText('1 2');

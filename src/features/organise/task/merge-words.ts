@@ -12,8 +12,8 @@ import { SHOWS } from './scoring';
  */
 
 const RULE_WEIGHTS: Record<string, string> = {
-  each: 'Points by the share of tests passed',
-  worst: 'Points by the worst test',
+  each: 'Points shared among the tests',
+  worst: 'Points times the lowest test score',
   pass: 'Points when enough tests pass',
   pass_at: 'Share of tests that must pass',
   test_weights: 'Weights',

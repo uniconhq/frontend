@@ -75,6 +75,12 @@ export type ReportEntry = {
   betterRef: Ref | null;
   atLeast: NumberText | null;
   atMost: NumberText | null;
+  /**
+   * What pages name the value, "Run time", and what it is counted in, "ms"
+   * (M58); null when not given, and the value is then named by its key.
+   */
+  title: string | null;
+  unit: string | null;
   /** Written as a bare reference rather than a mapping. */
   short: boolean;
 };
@@ -234,6 +240,8 @@ function entryOf(name: string, raw: unknown): ReportEntry {
       betterRef: null,
       atLeast: null,
       atMost: null,
+      title: null,
+      unit: null,
       short: true,
     };
   }
@@ -248,6 +256,8 @@ function entryOf(name: string, raw: unknown): ReportEntry {
     betterRef: better !== null ? wholeRef(better) : null,
     atLeast: number(found.at_least),
     atMost: number(found.at_most),
+    title: text(found.title),
+    unit: text(found.unit),
     short: false,
   };
 }

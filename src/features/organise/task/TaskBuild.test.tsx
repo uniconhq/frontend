@@ -1131,6 +1131,78 @@ describe('scoring a task', { timeout: 30_000 }, () => {
     });
   });
 
+  it('sets a hand-set mix one line per part, its bar inside its line, and says what the parts add up to (M59)', async () => {
+    const { sent } = taskBackend({ form: { ...CHECKED, inputs: [] } });
+    const { tests } = await openTask();
+
+    const rule = fieldIn(tests, 'small', 'How does this group earn points?');
+    fill(rule, 'advanced');
+    expect(rule).toHaveDisplayValue('A mix of these, each part with its own points');
+    const small = fieldGroup(tests, 'small');
+    const lines = within(
+      within(small).getByRole('list', { name: 'The parts of the mix' }),
+    ).getAllByRole('listitem');
+    expect(lines).toHaveLength(3);
+    expect(lines[0]).toHaveTextContent(
+      'points shared among the tests, each times its score from 0 to 1',
+    );
+    expect(lines[1]).toHaveTextContent('points times the lowest test score');
+    expect(lines[2]).toHaveTextContent('points when at least% of the tests pass');
+    fill(within(lines[0]!).getByLabelText('Points shared among the tests'), '100');
+    fill(within(lines[1]!).getByLabelText('Points times the lowest test score'), '10');
+    const share = within(lines[2]!).getByLabelText('Share of tests that must pass (%)');
+    await userEvent.type(share, '80');
+
+    expect(
+      within(small).getByText('The parts add up: up to 140 points.'),
+    ).toBeVisible();
+    expect(
+      within(small).getByText(
+        /An entrant whose tests all score 0\.5 gets 55 \(50 \+ 5 \+ 0\)\./,
+      ),
+    ).toBeVisible();
+    await save();
+    expect(
+      await screen.findByText('Saved and published as publication 4.'),
+    ).toBeVisible();
+    expect(written(sent[0])['test_groups']).toMatchObject({
+      small: { each: 100, worst: 10, pass: 30, pass_at: 0.8 },
+    });
+  });
+
+  it('leaves the lowest test score out of a mix while tests only pass or fail, and says why one set cannot stay (M59)', async () => {
+    taskBackend({
+      form: { ...CHECKED, inputs: [] },
+      content: TASK.replace('credit: fraction\n', '').replace(
+        'old: {each: 5}',
+        'old: {each: 5, worst: 5}',
+      ),
+    });
+    const { tests } = await openTask();
+
+    fill(fieldIn(tests, 'small', 'How does this group earn points?'), 'advanced');
+    const small = within(fieldGroup(tests, 'small')).getByRole('list', {
+      name: 'The parts of the mix',
+    });
+    expect(within(small).getAllByRole('listitem')).toHaveLength(2);
+    expect(
+      within(small).queryByLabelText('Points times the lowest test score'),
+    ).toBeNull();
+    expect(within(small).getAllByRole('listitem')[0]).toHaveTextContent(
+      'points shared among the tests passed',
+    );
+
+    const old = within(fieldGroup(tests, 'old')).getByRole('list', {
+      name: 'The parts of the mix',
+    });
+    expect(
+      within(old).getByLabelText('Points times the lowest test score'),
+    ).toHaveValue('5');
+    expect(old).toHaveTextContent(
+      'Only available when a test can earn part of its points. Set how a test earns first.',
+    );
+  });
+
   it('offers how a test earns as options with an example each, and says in a value’s own name why it cannot be one', async () => {
     taskBackend({ form: { ...CHECKED, inputs: [] } });
     const { tests } = await openTask();
@@ -1168,10 +1240,61 @@ describe('scoring a task', { timeout: 30_000 }, () => {
         name: 'Its result against the best anyone reached',
       }),
     );
+    // Against the best, each value says which way is better.
     expect(
       within(within(tests).getByRole('combobox', { name: 'Which value' })).getByRole(
         'option',
-        { name: 'time_ms' },
+        { name: 'time_ms (lower is better)' },
+      ),
+    ).toBeEnabled();
+  });
+
+  it('gives the lower-is-better case against the best, and says in its own line that a workflow gives no score rather than greying every value (M58)', async () => {
+    taskBackend({
+      form: { ...CHECKED, inputs: [] },
+      content: TASK.replace('credit: fraction\n', ''),
+    });
+    server.use(
+      http.get('/api/v1/workflows/:owner/:name/versions/:version', () =>
+        HttpResponse.json({
+          content: CHECKED_YAML.replace(/ {2}fraction: .*\n/, '').replace(
+            'fold: max,',
+            'fold: max, title: Run time, unit: ms,',
+          ),
+        }),
+      ),
+    );
+    const { tests } = await openTask();
+
+    const earns = within(tests).getByRole('radiogroup', { name: 'A test earns' });
+    expect(
+      within(earns).getByRole('radio', {
+        name: 'Its result against the best anyone reached',
+      }),
+    ).toHaveAccessibleDescription(
+      /where lower is better, as with run time, the fastest earns all of it and one twice as slow earns half\./,
+    );
+    const score = within(earns).getByRole('radio', {
+      name: 'A score the workflow gives it, from 0 to 1',
+    });
+    await waitFor(() => expect(score).toBeDisabled());
+    expect(score).toHaveAccessibleDescription(
+      /This workflow’s checker only says right or wrong, so it gives no score from 0 to 1\.$/,
+    );
+    expect(
+      within(tests).queryByRole('combobox', { name: 'Which value' }),
+    ).not.toBeInTheDocument();
+
+    // A value is named by its title where the workflow gives one.
+    await userEvent.click(
+      within(earns).getByRole('radio', {
+        name: 'Its result against the best anyone reached',
+      }),
+    );
+    expect(
+      within(within(tests).getByRole('combobox', { name: 'Which value' })).getByRole(
+        'option',
+        { name: 'Run time (lower is better)' },
       ),
     ).toBeEnabled();
   });
@@ -1274,6 +1397,84 @@ describe('scoring a task', { timeout: 30_000 }, () => {
 function fieldGroup(scope: HTMLElement, name: string): HTMLElement {
   return within(scope).getByRole('group', { name });
 }
+
+describe('the save’s answer (M66)', { timeout: 30_000 }, () => {
+  it('stands in the page at the bar’s place once nothing is left to save, with Close', async () => {
+    taskBackend({ form: { ...CHECKED, inputs: [] } });
+    const { tests } = await openTask();
+
+    fill(fieldIn(tests, 'small', 'Points'), '40');
+    const bar = await screen.findByRole('region', { name: 'Save the task' });
+    // While there is something to save, the bar stays in view at the window's foot.
+    expect(bar).not.toHaveClass(/saveSettled/);
+    await save();
+
+    expect(
+      await screen.findByText('Saved and published as publication 4.'),
+    ).toBeVisible();
+    const answer = screen.getByRole('region', { name: 'Save the task' });
+    await waitFor(() => expect(answer).toHaveClass(/saveSettled/));
+    await userEvent.click(
+      within(answer).getByRole('button', { name: 'Close the save’s answer' }),
+    );
+    expect(screen.queryByRole('region', { name: 'Save the task' })).toBeNull();
+  });
+
+  it('goes once something is changed again, rather than standing beside changes it does not cover', async () => {
+    taskBackend({ form: { ...CHECKED, inputs: [] } });
+    const { tests } = await openTask();
+
+    fill(fieldIn(tests, 'small', 'Points'), '40');
+    await save();
+    expect(
+      await screen.findByText('Saved and published as publication 4.'),
+    ).toBeVisible();
+    await waitFor(() =>
+      expect(screen.getByRole('region', { name: 'Save the task' })).toHaveClass(
+        /saveSettled/,
+      ),
+    );
+
+    fill(
+      fieldIn(
+        screen.getByRole('region', { name: 'Tests and scoring' }),
+        'small',
+        'Points',
+      ),
+      '50',
+    );
+    const bar = await screen.findByRole('region', { name: 'Save the task' });
+    await waitFor(() =>
+      expect(bar).not.toHaveTextContent('Saved and published as publication 4.'),
+    );
+    expect(bar).not.toHaveClass(/saveSettled/);
+    expect(within(bar).getByRole('button', { name: 'Save' })).toBeEnabled();
+  });
+
+  it('stays in view while it asks to publish or keep a draft, with no Close', async () => {
+    taskBackend({
+      form: { ...CHECKED, inputs: [] },
+      answer: () =>
+        problem(409, 'confirmation_required', {
+          detail: 'The contest is running and this changes how the task grades.',
+          changes: ['limits.time changed'],
+          regrades: 2,
+        }),
+    });
+    const { tests } = await openTask();
+
+    fill(fieldIn(tests, 'small', 'Points'), '40');
+    await save();
+    const bar = screen.getByRole('region', { name: 'Save the task' });
+    expect(
+      await within(bar).findByRole('button', { name: 'Publish the change' }),
+    ).toBeVisible();
+    expect(bar).not.toHaveClass(/saveSettled/);
+    expect(
+      within(bar).queryByRole('button', { name: 'Close the save’s answer' }),
+    ).toBeNull();
+  });
+});
 
 describe('the tests of a task', { timeout: 30_000 }, () => {
   it('offers to add a test, not a count of none, before any file is chosen', async () => {
@@ -1638,7 +1839,7 @@ describe('the tests of a task', { timeout: 30_000 }, () => {
     await waitFor(() => expect(weight).toHaveFocus());
   });
 
-  it('reads each test as its parts and sizes, and says what a weight does behind an ⓘ (M48)', async () => {
+  it('reads each test as its parts, hides the weights until asked for, and says what a weight does behind an ⓘ (M48, M67)', async () => {
     taskBackend({
       form: { ...CHECKED, inputs: [] },
       content: TASK.replace('small: {pass: 30, show: verdict}', 'small: {each: 30}'),
@@ -1646,20 +1847,67 @@ describe('the tests of a task', { timeout: 30_000 }, () => {
     const user = userEvent.setup();
     const { tests } = await openTask();
 
-    const rows = within(fieldGroup(tests, 'small')).getByRole('list', {
-      name: 'Tests of small',
-    });
+    const small = fieldGroup(tests, 'small');
+    const rows = within(small).getByRole('list', { name: 'Tests of small' });
     const row = within(rows).getByRole('listitem', { name: 'Test 1' });
-    await waitFor(() =>
-      expect(row).toHaveTextContent('Test 1 · input 4 B, answer 2 B'),
+    // Small files: a size would say nothing.
+    await waitFor(() => expect(row).toHaveTextContent('Test 1 · input, answer'));
+    expect(row).not.toHaveTextContent(/\d B/);
+    // Every test weighs 1, so no row has a weight box until asked.
+    expect(within(rows).queryByLabelText('Weight')).toBeNull();
+    await user.click(
+      within(small).getByRole('button', {
+        name: 'Weigh the tests of small differently',
+      }),
     );
     expect(within(row).getByLabelText('Weight')).toHaveAttribute('placeholder', '1');
+    expect(
+      within(small).queryByRole('button', {
+        name: 'Weigh the tests of small differently',
+      }),
+    ).toBeNull();
     await user.click(within(row).getByRole('button', { name: 'About Weight' }));
     expect(
       await screen.findByText(
         'How much this test counts against the others. 1 by default; a test of weight 2 counts twice.',
       ),
     ).toBeVisible();
+  });
+
+  it('gives a file’s size on its row only where it says something: a large file, and an empty one in the warning colour (M67)', async () => {
+    taskBackend({ form: { ...CHECKED, inputs: [] } });
+    server.use(
+      http.get(`${TASK_API}/tree`, ({ request }) => {
+        const at = new URL(request.url).searchParams.get('path');
+        if (at === 'tests/small/2') {
+          return HttpResponse.json([
+            file('tests/small/2/input', 12_400_000),
+            file('tests/small/2/answer', 5),
+          ]);
+        }
+        if (at === 'tests/small/3') {
+          return HttpResponse.json([
+            file('tests/small/3/input', 1024),
+            file('tests/small/3/answer', 0),
+          ]);
+        }
+        return undefined;
+      }),
+    );
+    const { tests } = await openTask();
+
+    const rows = within(fieldGroup(tests, 'small')).getByRole('list', {
+      name: 'Tests of small',
+    });
+    const large = within(rows).getByRole('listitem', { name: 'Test 2' });
+    await waitFor(() =>
+      expect(large).toHaveTextContent('Test 2 · input 11.8 MB, answer'),
+    );
+    const empty = within(rows).getByRole('listitem', { name: 'Test 3' });
+    await waitFor(() =>
+      expect(empty).toHaveTextContent('Test 3 · input, answer is empty'),
+    );
+    expect(within(empty).getByText('answer is empty')).toHaveClass(/emptyPart/);
   });
 
   it('shows whose a test file is when someone else changed it first, and saves over it only when chosen', async () => {
@@ -1923,7 +2171,7 @@ describe('a test opened in place (M50)', { timeout: 30_000 }, () => {
       name: 'Tests of small',
     });
     const row = within(rows).getByRole('listitem', { name: 'Test 9' });
-    expect(row).toHaveTextContent('Test 9 · input 4 B, answer 2 B');
+    expect(row).toHaveTextContent('Test 9 · input, answer');
     await user.click(within(row).getByRole('button', { name: /Test 9/ }));
     const answer = await within(row).findByRole('region', { name: 'answer' });
     expect(await within(answer).findByLabelText('What answer holds')).toHaveTextContent(

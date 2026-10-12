@@ -54,6 +54,7 @@ import {
   primitiveTitle,
   readersWords,
   refWords,
+  BAND_LABEL,
   runsWords,
 } from './words';
 import classes from './workflows.module.css';
@@ -527,8 +528,16 @@ const SlotView = memo(function SlotView({ data }: NodeProps<SlotNode>) {
   );
 });
 
+/**
+ * The shaded band behind the steps that run for each test and the test's
+ * files, labelled at its top so it says what it is (M55).
+ */
 function BandView() {
-  return <div className={classes.band} aria-hidden />;
+  return (
+    <div className={classes.band}>
+      <span className={classes.bandLabel}>{BAND_LABEL}</span>
+    </div>
+  );
 }
 
 const WireView = memo(function WireView({ data }: EdgeProps<WireEdge>) {

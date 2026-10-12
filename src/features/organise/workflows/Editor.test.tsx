@@ -91,11 +91,28 @@ describe('the workflow editor', () => {
     expect(details).not.toBeNull();
     expect(details).toHaveTextContent('it runs every test in one container');
     expect(details).toHaveTextContent(
-      'How it went: Accepted, or the limit the program went over, or a runtime error.',
+      'Result it reports: Accepted, or the limit the program went over, or a runtime error.',
     );
+    // What the step gets, in seconds and whole units, the limits the task raises
+    // said so, and the entrant's program inside it (M56).
+    expect(details).toHaveTextContent(
+      'What this step gets each time it runs: up to 2 seconds, 256 MB of memory, 128 processes, 64 MB of output; its time grows with the task’s time_limit and its memory with the task’s memory_limit. The entrant’s program runs inside it, within the task’s time_limit and the task’s memory_limit.',
+    );
+    expect(details).not.toHaveTextContent(/GPU|ms of/);
     expect(
       within(panel).getByRole('list', { name: 'What it gives' }),
     ).not.toHaveTextContent('outcome');
+  });
+
+  it('says a step’s limits are its own where it does not run the entrant’s program (M56)', async () => {
+    server.use(signedIn, ...workflowBackend(CLASSIC_V2).handlers);
+    const user = userEvent.setup();
+    renderApp(EDITOR_PAGE);
+
+    const compile = await openStep(user, 'compile');
+    expect(within(compile).getByText('Details').closest('details')).toHaveTextContent(
+      'What this step gets each time it runs: up to 60 seconds, 1 GB of memory, 128 processes, 64 MB of output. These are the step’s own limits, not the entrant’s program’s.',
+    );
   });
 
   it('refuses a wire a version would refuse, saying why, in the port’s menu', async () => {
@@ -266,6 +283,15 @@ describe('the workflow editor', () => {
     expect(
       within(added).getByText(/before the tests, such as compiling/),
     ).toBeVisible();
+    // The drawer says how the step runs, and that one for each test stands in the band (M55).
+    expect(
+      within(added).getByRole('radiogroup', { name: 'Run it' }),
+    ).toHaveAccessibleDescription('Runs once, for the whole submission.');
+    expect(
+      within(added).getByRole('radio', { name: 'Once for each test' }),
+    ).toHaveAccessibleDescription(
+      /It stands in the shaded band on the graph, “Runs once for each test”\.$/,
+    );
     await user.click(within(added).getByRole('radio', { name: 'Once for each test' }));
 
     expect(
@@ -273,6 +299,11 @@ describe('the workflow editor', () => {
         name: 'Once for each test',
       }),
     ).toBeChecked();
+    expect(
+      within(drawer('Step compile-2')).getByRole('radiogroup', { name: 'Run it' }),
+    ).toHaveAccessibleDescription(
+      'Runs once for each test, so it stands in the shaded band on the graph.',
+    );
     expect(await fileText(user)).toContain(
       '- id: compile-2\n    use: unicon/compile@v2\n    per_test: true',
     );
