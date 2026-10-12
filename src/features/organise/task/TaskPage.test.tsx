@@ -14,6 +14,7 @@ import {
   repoFiles,
   standingList,
   taskState,
+  unchanged,
 } from '@/test/organiser';
 
 const TASK = '/orgs/acme/contests/spring/tasks/sum';
@@ -321,6 +322,7 @@ describe('what the task has, under its name', { timeout: 20_000 }, () => {
           changes: [],
           notes: [],
           regraded: 0,
+          effect: unchanged,
         });
       }),
       ...repoFiles,

@@ -21,6 +21,7 @@ import {
   publicationList,
   repoFiles,
   taskState,
+  unchanged,
 } from '@/test/organiser';
 import { makeZip } from '@/test/zip';
 import { comeBackToTab, fakeLiveStream, openStream, realLiveStream } from '@/test/live';
@@ -200,6 +201,7 @@ const PUBLISHED = {
   changes: [],
   notes: [],
   regraded: 0,
+  effect: unchanged,
 };
 
 /**

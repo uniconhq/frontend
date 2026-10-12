@@ -1,12 +1,13 @@
 import { useEffect, useRef, type ReactNode } from 'react';
 import type { ApiError } from '@/api/problem';
-import type { SaveResult, WriteFile } from '@/api/types';
+import { describeError } from '@/api/describe-error';
+import type { SaveEffect, SaveResult, WriteFile } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { DefinitionErrors, type PlaceOf } from '../DefinitionErrors';
 import classes from '../organise.module.css';
-import { countOf, definitionErrorsOf, stringsOf } from './refusals';
+import { definitionErrorsOf, effectOf, stringsOf } from './refusals';
 
 /**
  * What a save came back with: a contest file's new version with what its
@@ -33,20 +34,6 @@ function short(version: string): string {
 }
 
 /**
- * What confirming a grading change costs, from the count the refusal
- * carries: how many submissions are graded again, or every one when a
- * backend sends no count.
- */
-function regradedSentence(count: number | null): string {
-  if (count === null)
-    return 'every submission to the task is graded again against the new publication.';
-  if (count === 0) return 'no submission to the task is graded again.';
-  if (count === 1)
-    return '1 submission to the task is graded again against the new publication.';
-  return `${String(count)} submissions to the task are graded again against the new publication.`;
-}
-
-/**
  * The panel an outcome is shown in. It takes the focus as it appears, since
  * the Save button that had it went busy, so the answer is what a keyboard or a
  * screen reader lands on: `status` for an answer, `alert` for a refusal.
@@ -63,17 +50,55 @@ function Panel({ role, children }: { role: 'status' | 'alert'; children: ReactNo
   );
 }
 
-/** What a save reports beside what it wrote, such as a board that counts nothing. */
-function Notes({ notes }: { notes: string[] }) {
+/**
+ * What a save reports beside what it did, under a label that says what they
+ * are: `label`, such as "About the leaderboards:".
+ */
+function Notes({ label, notes }: { label: string; notes: string[] }) {
   if (notes.length === 0) return null;
   return (
     <>
-      <BodyText>Notes:</BodyText>
-      <ul className={classes.named} aria-label="Notes">
+      <BodyText>{label}</BodyText>
+      <ul className={classes.named} aria-label={label.replace(/:$/, '')}>
         {notes.map((note) => (
           <li key={note}>{note}</li>
         ))}
       </ul>
+    </>
+  );
+}
+
+/** The parts of what a save does, each under its label, in this order (#449). */
+const PARTS = [
+  ['runs_again', 'Runs again'],
+  ['scores', 'Scores'],
+  ['reading', 'What entrants read'],
+] as const;
+
+/**
+ * What a save does, in the same words before it, as the question a running
+ * contest asks, and after it, as its answer (#449, M66): whether anyone's
+ * result changes, then what runs again, the scores and what entrants read,
+ * each part a line or more.
+ */
+function Effect({ effect }: { effect: SaveEffect }) {
+  return (
+    <>
+      <BodyText>
+        <strong>{effect.summary}</strong>
+      </BodyText>
+      {PARTS.map(([part, label]) =>
+        effect[part].length === 0 ? null : (
+          <div key={part} className={classes.effectPart}>
+            <BodyText>{label}</BodyText>
+            <ul className={classes.named} aria-label={label}>
+              {effect[part].map((line) => (
+                <li key={line}>{line}</li>
+              ))}
+            </ul>
+          </div>
+        ),
+      )}
     </>
   );
 }
@@ -109,7 +134,7 @@ export function SaveOutcome<Body = WriteFile>({
             Saved as version <code>{short(outcome.version)}</code>.
           </BodyText>
         )}
-        <Notes notes={outcome.notes} />
+        <Notes label="About the leaderboards:" notes={outcome.notes} />
       </Panel>
     );
   }
@@ -120,31 +145,8 @@ export function SaveOutcome<Body = WriteFile>({
       return (
         <Panel role="status">
           <BodyText>Saved and published as publication {result.number}.</BodyText>
-          {result.number === 1 ? (
-            // The first publication is what makes the task grade at all.
-            <BodyText>
-              Entrants’ submissions are graded against it from now on.
-            </BodyText>
-          ) : result.grading_changed ? (
-            <>
-              <BodyText>It changes how the task grades:</BodyText>
-              <ul className={classes.named} aria-label="What changed">
-                {result.changes.map((change) => (
-                  <li key={change}>{change}</li>
-                ))}
-              </ul>
-            </>
-          ) : (
-            <BodyText>It does not change how the task grades.</BodyText>
-          )}
-          {result.regraded > 0 && (
-            <BodyText>
-              {result.regraded === 1
-                ? '1 submission is graded again.'
-                : `${String(result.regraded)} submissions are graded again.`}
-            </BodyText>
-          )}
-          <Notes notes={result.notes} />
+          <Effect effect={result.effect} />
+          <Notes label="About the task as published:" notes={result.notes} />
         </Panel>
       );
     }
@@ -194,26 +196,37 @@ export function SaveOutcome<Body = WriteFile>({
   }
 
   if (error.code === 'confirmation_required') {
+    const effect = effectOf(error);
     return (
       <Panel role="alert">
-        <ErrorBlock error={error} compact />
-        <BodyText>What would change:</BodyText>
-        <ul className={classes.named} aria-label="What would change">
-          {stringsOf(error, 'changes').map((change) => (
-            <li key={change}>{change}</li>
-          ))}
-        </ul>
-        <BodyText tone="secondary">
-          Publishing changes the grading of a running contest:{' '}
-          {regradedSentence(countOf(error, 'regrades'))} Keeping it as a draft saves the
-          changes without publishing them.
-        </BodyText>
+        {effect === null ? (
+          // A backend that does not say what the save does yet names what changed.
+          <>
+            <ErrorBlock error={error} compact />
+            <ul className={classes.named} aria-label="What would change">
+              {stringsOf(error, 'changes').map((change) => (
+                <li key={change}>{change}</li>
+              ))}
+            </ul>
+          </>
+        ) : (
+          <>
+            <Effect effect={effect} />
+            <BodyText>
+              <strong>{describeError(error).title}</strong>
+            </BodyText>
+          </>
+        )}
         <div className={classes.actions}>
           <Button onClick={() => onConfirm(body)}>Publish the change</Button>
           <Button variant="secondary" onClick={() => onKeepAsDraft(body)}>
             Keep as draft
           </Button>
         </div>
+        <BodyText tone="secondary">
+          A draft keeps the change without publishing it: entrants see no difference
+          until it is published.
+        </BodyText>
       </Panel>
     );
   }

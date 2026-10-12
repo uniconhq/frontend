@@ -28,6 +28,12 @@ export type RollbackFile = Schemas['RollbackFile'];
 export type SaveRequest = Schemas['SaveRequest'];
 /** A task save's answer: published, or kept as a draft. */
 export type SaveResult = Schemas['Published'] | Schemas['Draft'];
+/**
+ * What a save does, in words: whether anyone's result changes, and what runs
+ * again, the scores and what entrants read. A running contest asks with it
+ * before a save publishes, and a published save answers with it.
+ */
+export type SaveEffect = Schemas['SaveEffect'];
 
 export type TaskRelease = Schemas['TaskRelease'];
 /**

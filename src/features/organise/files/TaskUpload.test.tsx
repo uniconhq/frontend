@@ -5,7 +5,13 @@ import { http, HttpResponse } from 'msw';
 import type { SaveRequest, Upload } from '@/api/types';
 import { renderApp } from '@/test/render';
 import { afterAnswers, problem, server, signedIn, someone } from '@/test/server';
-import { TASK_API, publicationList, repoFiles, taskState } from '@/test/organiser';
+import {
+  TASK_API,
+  publicationList,
+  repoFiles,
+  taskState,
+  unchanged,
+} from '@/test/organiser';
 
 /** The task's page, opened at its Statement card. */
 const STATEMENT = '/orgs/acme/contests/spring/tasks/sum?card=statement';
@@ -79,6 +85,7 @@ function uploadRoutes({
         changes: [],
         notes: [],
         regraded: 0,
+        effect: unchanged,
       });
     }),
   ];
@@ -257,6 +264,7 @@ describe('uploading a file of a task again', { timeout: 20_000 }, () => {
           changes: [],
           notes: [],
           regraded: 0,
+          effect: unchanged,
         });
       }),
       http.get(`${TASK_API}/files/:path`, ({ params }) =>
@@ -361,6 +369,7 @@ describe('uploading a file of a task again', { timeout: 20_000 }, () => {
           changes: ['the statement'],
           notes: [],
           regraded: 0,
+          effect: unchanged,
         });
       }),
     );

@@ -4,7 +4,13 @@ import userEvent from '@/test/user-event';
 import { http, HttpResponse } from 'msw';
 import { renderApp } from '@/test/render';
 import { problem, server, signedIn, someone } from '@/test/server';
-import { TASK_API, publicationList, repoFiles, taskState } from '@/test/organiser';
+import {
+  TASK_API,
+  publicationList,
+  repoFiles,
+  taskState,
+  unchanged,
+} from '@/test/organiser';
 import { comeBackToTab, fakeLiveStream, openStream, realLiveStream } from '@/test/live';
 
 const STATEMENT = '# Sum\n\nWrite the sum of two numbers.\n';
@@ -62,6 +68,7 @@ describe('the statement beside its preview', { timeout: 20_000 }, () => {
         changes: [],
         notes: [],
         regraded: 0,
+        effect: unchanged,
       }),
     );
     renderApp('/orgs/acme/contests/spring/tasks/sum/statement');
@@ -188,6 +195,7 @@ describe('the statement beside its preview', { timeout: 20_000 }, () => {
                 changes: [],
                 notes: [],
                 regraded: 0,
+                effect: unchanged,
               });
         }),
       );
@@ -261,8 +269,13 @@ describe('the statement beside its preview', { timeout: 20_000 }, () => {
       const { saves } = picturesBackend([
         () =>
           problem(409, 'confirmation_required', {
-            changes: ['tests/main changed'],
-            regrades: 3,
+            changes: [],
+            regrades: 0,
+            ...unchanged,
+            reading: [
+              'The statement changes.',
+              'The pictures and files beside the statement change.',
+            ],
           }),
       ]);
       const user = userEvent.setup();
@@ -274,7 +287,9 @@ describe('the statement beside its preview', { timeout: 20_000 }, () => {
       await user.click(screen.getByRole('button', { name: 'Save statement' }));
 
       const asked = await screen.findByRole('alert');
-      expect(asked).toHaveTextContent('3 submissions to the task are graded again');
+      expect(asked).toHaveTextContent(
+        'What entrants readThe statement changes.The pictures and files beside the statement change.',
+      );
       await user.click(within(asked).getByRole('button', { name: /Publish/ }));
 
       expect(
@@ -447,6 +462,7 @@ describe('the statement while it is being edited', { timeout: 20_000 }, () => {
               changes: [],
               notes: [],
               regraded: 0,
+              effect: unchanged,
             })
           : problem(409, 'conflict');
       }),

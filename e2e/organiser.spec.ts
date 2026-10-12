@@ -48,9 +48,12 @@ async function stubOrganiserApi(page: Page) {
       grading_changed: state.published === 1,
       changes: [],
       at: '2026-09-29T09:00:00Z',
+      meanings: [],
     },
     draft: false,
     errors: [],
+    statement_written: true,
+    head_statement_written: true,
   });
 
   const json = (route: Route, body: unknown, status = 200) =>
@@ -254,9 +257,19 @@ async function stubOrganiserApi(page: Page) {
         publication: `pub-${String(state.published)}`,
         number: state.published,
         grading_changed: true,
-        changes: [],
+        changes: ['The time limit changes.'],
         notes: [],
         regraded: 0,
+        effect: {
+          results_change: false,
+          summary: "Nobody's result changes.",
+          runs_again: [
+            'No submission runs again: there are none yet.',
+            'The time limit changes.',
+          ],
+          scores: ['No score changes.'],
+          reading: ['Nothing entrants read changes.'],
+        },
       });
     }
     if (path === `${task}/tree`) {
@@ -328,6 +341,15 @@ async function stubOrganiserApi(page: Page) {
           changes: [],
           notes: [],
           regraded: 0,
+          effect: {
+            results_change: false,
+            summary: "Nobody's result changes.",
+            runs_again: [
+              'No submission runs again: the tests and how they run are the same.',
+            ],
+            scores: ['No score changes.'],
+            reading: ['The statement changes.'],
+          },
         });
       }
       return json(route, {
@@ -467,7 +489,12 @@ test('an organiser sets a task up on its cards and saves them in one save', asyn
   );
   await bar.getByRole('button', { name: 'Save' }).click();
 
-  await expect(page.getByText('Saved and published as publication 2.')).toBeVisible();
+  const answer = bar.getByRole('status');
+  await expect(answer).toContainText('Saved and published as publication 2.');
+  await expect(answer.getByRole('list', { name: 'Runs again' })).toContainText(
+    'The time limit changes.',
+  );
+  await expect(answer).not.toContainText('It changes how the task grades');
   const [saved] = state.taskSaves as { changes: { path: string; content: string }[] }[];
   expect(saved?.changes.map((change) => change.path)).toEqual(['task.yaml']);
   expect(saved?.changes[0]?.content).toContain('time_limit: 3');

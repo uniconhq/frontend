@@ -4,6 +4,7 @@ import type {
   ListedContest,
   Named,
   Publication,
+  SaveEffect,
   TaskStanding,
   TaskState,
   TreeEntry,
@@ -69,6 +70,15 @@ export function listAndCreate(path: string, existing: { name: string }[]) {
 }
 
 // A task's state and publications
+
+/** What a published save does when it moves nobody's result, in the forge's words. */
+export const unchanged: SaveEffect = {
+  results_change: false,
+  summary: "Nobody's result changes.",
+  runs_again: ['No submission runs again: the tests and how they run are the same.'],
+  scores: ['No score changes.'],
+  reading: ['Nothing entrants read changes.'],
+};
 
 export const publications: Publication[] = [
   {

@@ -41,6 +41,13 @@
   background: var(--unicon-hover);
 }
 
+/* One part of what a save does: its label, then its lines. */
+.effectPart {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
 /* A field's box: what it holds one under the other, a form's gap apart. */
 .fieldBox > * + * {
   margin-top: 10px;

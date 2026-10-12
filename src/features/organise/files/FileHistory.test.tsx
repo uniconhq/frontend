@@ -13,6 +13,7 @@ import {
   publications,
   repoFiles,
   taskState,
+  unchanged,
 } from '@/test/organiser';
 
 type Change = components['schemas']['Change'];
@@ -188,6 +189,7 @@ describe("a task file's history", () => {
           changes: [],
           notes: [],
           regraded: 0,
+          effect: unchanged,
         });
       }),
     );
@@ -230,6 +232,7 @@ describe("a task file's history", () => {
               changes: ['limits changed'],
               notes: [],
               regraded: 0,
+              effect: unchanged,
             })
           : problem(409, 'confirmation_required', { changes: ['limits changed'] });
       }),
