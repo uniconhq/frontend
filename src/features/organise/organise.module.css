@@ -41,6 +41,11 @@
   background: var(--unicon-hover);
 }
 
+/* A field's box: what it holds one under the other, a form's gap apart. */
+.fieldBox > * + * {
+  margin-top: 10px;
+}
+
 .form {
   display: flex;
   flex-direction: column;
