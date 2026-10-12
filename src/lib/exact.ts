@@ -160,6 +160,17 @@ export function rounded(exact: string, places: number): string {
   return rounded(negative ? `-${cut}` : cut, places);
 }
 
+/**
+ * `exact` cut to at most `places` decimals, toward zero, with trailing zeros
+ * dropped: `"99.996"` to 2 is `"99.99"`. For a number that must never read
+ * as more than it is, such as points short of a task's worth.
+ */
+export function cut(exact: string, places: number): string {
+  const { fraction } = partsOf(exact);
+  if (fraction.length <= places) return rounded(exact, places);
+  return rounded(exact.slice(0, exact.indexOf('.') + 1 + places), places);
+}
+
 const locale = new Intl.NumberFormat();
 const decimalSign =
   locale.formatToParts(0.5).find((part) => part.type === 'decimal')?.value ?? '.';

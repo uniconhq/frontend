@@ -638,7 +638,10 @@ entrant, each task also shows their points out of its worth, "62 / 100", as
 a leaderboard over that task counts them, so nothing a leaderboard holds
 back (#440, `task-points.ts`): while some are held back it says when they
 are shown, "More shown at 14:00", or "— / 100" and "Shown at 14:00" while
-none are, and the page reads them again as that time passes. Every
+none are, and the page reads them again as that time passes. The points are
+cut to two decimals, never rounded up, so points short of the worth never
+read as it. Anyone else, such as someone waiting for approval, reads each
+task's worth alone, "100 points". Every
 refusal code has its own sentence in `src/api/describe-error.ts`. A statement
 is Markdown, rendered by `src/ui/Markdown.tsx` with raw HTML dropped, links
 out of the site opened apart, a picture saved with the task under `public/`

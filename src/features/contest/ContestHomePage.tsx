@@ -102,7 +102,7 @@ function useReveals(tasks: TaskEntry[], at: number, onReveal: () => void) {
  * A contest's released tasks as a signed-in person works from them, in the
  * contest's order: each a link to its page, with their points on it out of
  * its worth once they are in an approved entrant, read again as held-back
- * points are shown, and where it stands for them, the time left on it
+ * points are shown, its worth alone before then, and where it stands for them, the time left on it
  * counted down by the server's clock.
  */
 function TaskList({

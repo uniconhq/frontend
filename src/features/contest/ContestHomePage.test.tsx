@@ -249,7 +249,10 @@ describe('the contest page for a signed-in person', () => {
     const [sum, max] = within(tasks).getAllByRole('listitem');
     await waitFor(() => expect(sum).toHaveTextContent(/Due in (44m 5\ds|45m 00s)/));
     expect(sum).toHaveTextContent(/Closes in (59m 5\ds|1h 00m 00s)/);
-    expect(sum).not.toHaveTextContent('100');
+    // No points for them yet, so the task reads as its worth alone.
+    expect(sum).toHaveTextContent('100 points');
+    expect(sum).not.toHaveTextContent('/ 100');
+    expect(max).not.toHaveTextContent('points');
     expect(max).not.toHaveTextContent('Due');
     expect(max).toHaveTextContent(/Closes in /);
   });
