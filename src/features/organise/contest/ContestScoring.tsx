@@ -113,6 +113,7 @@ function TaskScoring({
                 {total.num !== 0n &&
                   groups.map((group) => (
                     <li key={group.name}>
+                      Test group “{group.name}”:{' '}
                       {groupSentence(group, {
                         total,
                         worth,

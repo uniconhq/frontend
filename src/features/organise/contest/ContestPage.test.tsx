@@ -479,7 +479,9 @@ describe('how the contest is scored', () => {
     });
     const sort = await within(card).findByRole('region', { name: 'A · sort' });
     expect(
-      await within(sort).findByText('small earns its 15 when every test passes.'),
+      await within(sort).findByText(
+        'Test group “small”: An entrant earns 15 points when every test passes, and nothing otherwise.',
+      ),
     ).toBeVisible();
     expect(sort).toHaveTextContent(
       `Worth 50 points, as the contest sets it. Its test groups total ${formatExact('100')}.`,
@@ -490,7 +492,7 @@ describe('how the contest is scored', () => {
     const sum = within(card).getByRole('region', { name: 'B · sum' });
     expect(
       await within(sum).findByText(
-        'main earns 80 times the share of its tests you passed, and 20 more when you pass them all.',
+        'Test group “main”: Each test passed is worth an equal share of 80 points. Passing every test earns 20 points more.',
       ),
     ).toBeVisible();
     expect(sum).toHaveTextContent(
@@ -539,7 +541,7 @@ describe('how the contest is scored, as published', () => {
     const sum = await within(card).findByRole('region', { name: 'B · sum' });
     expect(
       await within(sum).findByText(
-        'main earns 80 times the share of its tests you passed, and 20 more when you pass them all.',
+        'Test group “main”: Each test passed is worth an equal share of 80 points. Passing every test earns 20 points more.',
       ),
     ).toBeVisible();
     expect(sum).toHaveTextContent(

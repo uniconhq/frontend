@@ -818,7 +818,7 @@ describe('scoring a task', { timeout: 30_000 }, () => {
 
     expect(
       within(fieldGroup(tests, 'small')).getByText(
-        'small earns its 30 when every test passes.',
+        'An entrant earns 30 points when every test passes, and nothing otherwise. An entrant who passes 2 of 3 gets nothing.',
       ),
     ).toBeVisible();
     expect(within(tests).getByLabelText('The task’s points')).toHaveTextContent(
@@ -873,7 +873,9 @@ describe('scoring a task', { timeout: 30_000 }, () => {
     const bonus = fieldIn(tests, 'small', 'Bonus for passing every test');
     fill(bonus, '10');
     expect(
-      within(fieldGroup(tests, 'small')).getByText(/more when you pass them all\./),
+      within(fieldGroup(tests, 'small')).getByText(
+        /Passing every test earns 10 points more\./,
+      ),
     ).toBeVisible();
     expect(fieldIn(tests, 'small', 'How does this group earn points?')).toHaveValue(
       'bonus',
@@ -1032,7 +1034,9 @@ describe('scoring a task', { timeout: 30_000 }, () => {
     const { tests } = await openTask();
 
     expect(
-      await within(tests).findByText(`small earns its 60 when every test passes.`),
+      await within(tests).findByText(
+        /^An entrant earns 60 points when every test passes, and nothing otherwise\./,
+      ),
     ).toBeVisible();
     expect(within(tests).getByLabelText('The task’s points')).toHaveTextContent(
       `Its contest makes the task worth ${formatExact('70')}`,
