@@ -1540,9 +1540,9 @@ describe('taking a task out of the contest', () => {
     const back = await screen.findByRole('dialog', {
       name: 'A · sort is back in the contest',
     });
-    expect(within(back).getByRole('list', { name: 'Notes' })).toHaveTextContent(
-      'The leaderboard Standings counts sort again.',
-    );
+    expect(
+      within(back).getByRole('list', { name: 'About the leaderboards' }),
+    ).toHaveTextContent('The leaderboard Standings counts sort again.');
     expect(sent).toEqual(['sort']);
     await user.click(within(back).getByRole('button', { name: 'Done' }));
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
