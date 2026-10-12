@@ -1,22 +1,23 @@
 import { useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { queryView } from '@/api/query';
+import { useQuery } from '@tanstack/react-query';
+import { $api, queryView } from '@/api/query';
 import type { FileContent, TreeEntry, UploadInfo } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
+import { OutLink } from '@/ui/OutLink';
 import { Loaded } from '@/ui/feedback/Loaded';
 import { formatSize } from '@/lib/size';
 import { saveFile } from '@/lib/save-file';
-import { fileQuery, treeQuery, type Place } from './place';
+import { fileQuery, taskDownloadHref, treeQuery, type Place } from './place';
 import classes from './FilePreview.module.css';
 
 /**
- * A file of a task or a contest shown to be read, never edited (M50, M51):
- * its first lines as text, with Show all and Download; a file that is not
- * text, or too big to read here, by its size and Download; a file that is an
- * upload by its size alone, since its bytes are kept apart and no route
- * gives them to the page; and a folder as a small tree, a file in it shown
- * once chosen.
+ * A file of a task shown to be read, never edited (M50, M51): its first
+ * lines as text, with Show all and Download; a file that is not text by its
+ * size and Download; and a file that is an upload, or too big to read here,
+ * by its size and Download as a link to the download door (#444), which
+ * streams it whatever its size; and a folder as a small tree, a file in it
+ * shown once chosen.
  */
 
 /** How many lines a text shows before Show all. */
@@ -106,7 +107,62 @@ function Head({ name, size }: { name: string; size: number | null }) {
   );
 }
 
-/** One saved file, read once it is shown, when it is not too big to read. */
+/**
+ * The version a file too big to read was listed at, to download it at: the
+ * task's head, which its folder is listed at. Null until it is known, and
+ * at a contest, whose files the door does not serve.
+ */
+function useHead(place: Place, wanted: boolean): string | null {
+  const task = $api.useQuery(
+    'get',
+    '/api/v1/orgs/{org}/contests/{contest}/tasks/{task}',
+    {
+      params: {
+        path: {
+          org: place.org,
+          contest: place.contest,
+          task: place.kind === 'task' ? place.task : '',
+        },
+      },
+    },
+    { enabled: wanted && place.kind === 'task' },
+  );
+  return place.kind === 'task' ? (task.data?.head ?? null) : null;
+}
+
+/**
+ * Download for a file the page does not read whole, as a link to the
+ * download door at `version`; nothing at a contest or without a version,
+ * where the file's size alone is shown.
+ */
+function DownloadLink({
+  place,
+  path,
+  version,
+}: {
+  place: Place;
+  path: string;
+  version: string | null;
+}) {
+  if (place.kind !== 'task' || version === null) return null;
+  return (
+    <div className={classes.actions}>
+      <OutLink
+        href={taskDownloadHref(place, version, path)}
+        label={`Download ${nameOf(path)}`}
+      >
+        Download
+      </OutLink>
+    </div>
+  );
+}
+
+/**
+ * One saved file, read once it is shown: an upload for the version it holds
+ * its pointer at, to download it whole through the download door; a file
+ * too big to read here not at all, downloaded at the task's head; and any
+ * other file whole, its first lines shown.
+ */
 export function SavedFile({
   place,
   path,
@@ -121,38 +177,30 @@ export function SavedFile({
   size: number | null;
   upload: UploadInfo | null;
 }) {
-  const queryClient = useQueryClient();
   const big = upload === null && size !== null && size > READ_AT_MOST;
-  const read = useQuery({
-    ...fileQuery(place, path),
-    enabled: upload === null && !big,
-  });
+  // An upload reads as its pointer, which is small, and says its version.
+  const read = useQuery({ ...fileQuery(place, path), enabled: !big });
+  const head = useHead(place, big);
   const name = nameOf(path);
-  const download = async () => {
-    const file = read.data ?? (await queryClient.fetchQuery(fileQuery(place, path)));
-    if (file !== undefined) saveFile(name, blobOf(file));
-  };
 
   return (
     <section className={classes.part} aria-label={title}>
       <Head name={title} size={upload?.size ?? size} />
       {upload !== null ? (
-        <BodyText tone="secondary">
-          It was uploaded, so it is kept by its size and not shown here.
-        </BodyText>
+        <>
+          <BodyText tone="secondary">
+            It was uploaded, so it is not shown here.
+          </BodyText>
+          <DownloadLink
+            place={place}
+            path={path}
+            version={read.data?.version ?? null}
+          />
+        </>
       ) : big ? (
         <>
           <BodyText tone="secondary">It is too big to show here.</BodyText>
-          <div className={classes.actions}>
-            <Button
-              size="xs"
-              variant="secondary"
-              onClick={() => void download()}
-              label={`Download ${name}`}
-            >
-              Download
-            </Button>
-          </div>
+          <DownloadLink place={place} path={path} version={head} />
         </>
       ) : (
         <Loaded view={queryView(read)} compact>

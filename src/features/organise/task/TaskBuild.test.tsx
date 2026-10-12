@@ -18,6 +18,7 @@ import {
   TASK_API,
   CONTEST_API,
   draftTask,
+  publishedTask,
   publicationList,
   repoFiles,
   taskState,
@@ -1554,7 +1555,13 @@ describe('a test opened in place (M50)', { timeout: 30_000 }, () => {
     '\n',
   );
 
-  /** Test 1 of small with an input as long text, an uploaded answer, a binary note, a folder and values. */
+  /** The version the uploaded part was last changed at, as its read says. */
+  const UPLOADED_AT = 'a1b2c3d4e5f6a7b8c9d0a1b2c3d4e5f6a7b8c9d0';
+
+  /**
+   * Test 1 of small with an input as long text, a binary answer, an uploaded
+   * expected answer, a folder, a log too big to show, and values.
+   */
   function richTest() {
     server.use(
       http.get(`${TASK_API}/tree`, ({ request }) => {
@@ -1567,7 +1574,6 @@ describe('a test opened in place (M50)', { timeout: 30_000 }, () => {
               kind: 'file',
               size: LONG.length,
               upload: null,
-              version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
             },
             {
               path: 'tests/small/1/expected',
@@ -1577,6 +1583,7 @@ describe('a test opened in place (M50)', { timeout: 30_000 }, () => {
             },
             folder('tests/small/1/data'),
             file('tests/small/1/test.yaml', 20),
+            file('tests/small/1/run log.txt', 5_000_000),
           ]);
         }
         if (at === 'tests/small/1/data') {
@@ -1600,6 +1607,20 @@ describe('a test opened in place (M50)', { timeout: 30_000 }, () => {
           return read(btoa('\u0000\u0001'), 'base64');
         if (path === 'tests/small/1/data/a.csv') return read('x,y\n1,2\n');
         if (path === 'tests/small/1/test.yaml') return read('episodes: 12\nseed: 7\n');
+        if (path === 'tests/small/1/expected') {
+          // An upload reads as its pointer, at the version that last changed it.
+          return HttpResponse.json({
+            path,
+            encoding: 'utf-8',
+            content: 'version https://git-lfs.github.com/spec/v1\n',
+            token: `t-${path}`,
+            upload: { size: 50_000_000, digest: 'ab'.repeat(32) },
+            version: UPLOADED_AT,
+          });
+        }
+        if (path === 'tests/small/1/run log.txt') {
+          throw new Error('A file too big to show is never read whole.');
+        }
         return undefined;
       }),
     );
@@ -1642,6 +1663,7 @@ describe('a test opened in place (M50)', { timeout: 30_000 }, () => {
         'answer',
         'expected',
         'data',
+        'run log',
         'Its values',
       ]);
       const input = within(view).getByRole('region', { name: 'input' });
@@ -1663,8 +1685,23 @@ describe('a test opened in place (M50)', { timeout: 30_000 }, () => {
 
       const expected = within(view).getByRole('region', { name: 'expected' });
       expect(expected).toHaveTextContent('47.7 MB');
-      expect(expected).toHaveTextContent(
-        'It was uploaded, so it is kept by its size and not shown here.',
+      expect(expected).toHaveTextContent('It was uploaded, so it is not shown here.');
+      // Downloaded whole through the door, at the version its read says (#444).
+      expect(
+        await within(expected).findByRole('link', { name: 'Download expected' }),
+      ).toHaveAttribute(
+        'href',
+        `/-/downloads/acme/spring/sum/versions/${UPLOADED_AT}/tests/small/1/expected`,
+      );
+
+      // A file too big to show is downloaded at the task's head, never read.
+      const log = within(view).getByRole('region', { name: 'run log' });
+      expect(log).toHaveTextContent('It is too big to show here.');
+      expect(
+        await within(log).findByRole('link', { name: 'Download run log.txt' }),
+      ).toHaveAttribute(
+        'href',
+        `/-/downloads/acme/spring/sum/versions/${publishedTask.head}/tests/small/1/run%20log.txt`,
       );
 
       const data = within(view).getByRole('region', { name: 'data' });

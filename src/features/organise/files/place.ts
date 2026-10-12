@@ -18,6 +18,23 @@ export function settingsPath(place: Place): string {
   return place.kind === 'task' ? 'task.yaml' : 'contest.yaml';
 }
 
+/**
+ * Where one of a task's files downloads from at one version: the download
+ * door on this origin (#444). The proxy in `deploy` asks the backend whether
+ * the caller holds a role reaching the task, then streams the file from the
+ * forge's store whatever its size, so a big upload never passes through the
+ * platform. Each part of the address is encoded on its own, so a name stays
+ * one segment.
+ */
+export function taskDownloadHref(
+  place: Extract<Place, { kind: 'task' }>,
+  version: string,
+  path: string,
+): string {
+  const parts = [place.org, place.contest, place.task, 'versions', version];
+  return `/-/downloads/${[...parts, ...path.split('/')].map(encodeURIComponent).join('/')}`;
+}
+
 export function treeQuery(place: Place, folder: string) {
   const query = { path: folder };
   return place.kind === 'task'
