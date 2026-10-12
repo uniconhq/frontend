@@ -91,6 +91,7 @@ as they make them: `public/` for a statement's pictures, and a test's own
 - A refusal says what is wrong and what to do: "That code is not right. Check it with the organisers."
 - Settings that cannot be read "cannot be read", and are fixed; nothing "does not read" or is "mended".
 - Spell words out: "RUNTIME ERROR", not "RUNTIME ERR".
+- Write a size one way everywhere: "4 B", "12 KB", "3.5 MB" (`lib/size.ts`).
 - A choice of up to four options whose labels are sentences shows them all, as radio options, each with what it means or an example under it, and a greyed one with why under it. A dropdown is for a longer list of short words; one with long labels takes the whole row, and a greyed choice says why in its own label.
 - An input's help goes behind an ⓘ beside its title. No field shows a key name beside it.
 - Mark what waits for the save as a test's row does: "New", "Replaced", "To be removed".

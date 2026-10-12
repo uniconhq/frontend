@@ -507,7 +507,7 @@ describe('the cards that build a task', { timeout: 30_000 }, () => {
     const { inputs } = await openTask();
 
     const checker = within(inputs).getByRole('group', { name: 'checker' });
-    expect(await within(checker).findByText('checker.cpp, 21 bytes')).toBeVisible();
+    expect(await within(checker).findByText('checker.cpp, 21 B')).toBeVisible();
     expect(within(checker).queryByRole('textbox')).toBeNull();
     await user.click(within(checker).getByRole('button', { name: 'View checker' }));
     expect(
@@ -519,7 +519,7 @@ describe('the cards that build a task', { timeout: 30_000 }, () => {
       within(checker).getByLabelText('checker: a new file'),
       new File(['print(1)\n'], 'checker.py'),
     );
-    expect(await within(checker).findByText('checker.py, 9 bytes')).toBeVisible();
+    expect(await within(checker).findByText('checker.py, 9 B')).toBeVisible();
     // Waiting for the save, marked as a replaced test's row is.
     expect(within(checker).getByText('Replaced')).toBeVisible();
     const bar = await screen.findByRole('region', { name: 'Save the task' });
@@ -567,7 +567,7 @@ describe('the cards that build a task', { timeout: 30_000 }, () => {
     const { inputs } = await openTask();
 
     const checker = within(inputs).getByRole('group', { name: 'checker' });
-    await within(checker).findByText('checker.cpp, 21 bytes');
+    await within(checker).findByText('checker.cpp, 21 B');
     await user.click(within(checker).getByRole('button', { name: 'Replace checker' }));
     await user.upload(
       within(checker).getByLabelText('checker: a new file'),
@@ -578,7 +578,7 @@ describe('the cards that build a task', { timeout: 30_000 }, () => {
         name: 'Undo the new file of checker',
       }),
     );
-    expect(await within(checker).findByText('checker.cpp, 21 bytes')).toBeVisible();
+    expect(await within(checker).findByText('checker.cpp, 21 B')).toBeVisible();
     expect(
       await screen.findByRole('list', { name: 'What changed' }),
     ).not.toHaveTextContent('checker');
@@ -1229,7 +1229,7 @@ describe('the tests of a task', { timeout: 30_000 }, () => {
       within(five!)
         .getAllByRole('cell')
         .map((cell) => cell.textContent),
-    ).toEqual(['5.in, 4 bytes', 'Missing', 'A part is missing.']);
+    ).toEqual(['5.in, 4 B', 'Missing', 'A part is missing.']);
     const add = within(dialog).getByRole('button', { name: 'Add tests' });
     expect(add).toBeDisabled();
     expect(add).toHaveAccessibleDescription(
@@ -1280,7 +1280,7 @@ describe('the tests of a task', { timeout: 30_000 }, () => {
         .map((header) => header.textContent),
     ).toEqual(['Test', 'input', 'answer', 'Notes']);
     expect(within(table).getByRole('row', { name: /small, test 4/ })).toHaveTextContent(
-      'small, test 44.in, 4 bytes4.out, 2 bytesComplete',
+      'small, test 44.in, 4 B4.out, 2 BComplete',
     );
     expect(
       within(matched).getByRole('list', { name: 'Not matched' }),
@@ -1332,7 +1332,7 @@ describe('the tests of a task', { timeout: 30_000 }, () => {
     );
     expect(
       await within(dialog).findByRole('row', { name: /huge, test 1/ }),
-    ).toHaveTextContent('huge, test 1input, 4 bytesanswer, 3 bytesIn a new group.');
+    ).toHaveTextContent('huge, test 1input, 4 Banswer, 3 BIn a new group.');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Add tests' }));
 
     const group = fieldGroup(tests, 'huge');
@@ -1536,7 +1536,7 @@ describe('the tests of a task', { timeout: 30_000 }, () => {
     });
     expect(answer).toHaveTextContent('Yours: Taken out');
     expect(
-      await within(answer).findByText(/Now: 7 bytes, saved by alice/),
+      await within(answer).findByText(/Now: 7 B, saved by alice/),
     ).toBeVisible();
     await userEvent.click(within(answer).getByRole('radio', { name: /^Yours/ }));
     await userEvent.click(
