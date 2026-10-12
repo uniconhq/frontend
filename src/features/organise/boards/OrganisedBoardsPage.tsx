@@ -18,7 +18,7 @@ import { useContestParams } from '@/lib/route-params';
 import { ContestFile } from '../contest/ContestFile';
 import { useOpenedField } from '../contest/opened';
 import { viewFilePath } from '../contest/places';
-import { useHeldGroups } from '../contest/published';
+import { useHeldGroups, useReportedValues } from '../contest/published';
 import { boardProblems } from '../forms/board-values';
 import { BoardFields } from '../forms/BoardFields';
 import { readContest, writeContest, type ContestValues } from '../forms/contest-values';
@@ -69,6 +69,7 @@ function BoardsForm({
   const [read] = useState(() => readContest(doc));
   const [values, setValues] = useState<ContestValues>(read.values);
   const held = useHeldGroups(org, contest, values);
+  const reported = useReportedValues(org, contest);
   useOpenedField(true);
   const changed = JSON.stringify(values) !== JSON.stringify(read.values);
   const problems = values.boards.flatMap(boardProblems);
@@ -89,6 +90,7 @@ function BoardsForm({
         boards={values.boards}
         taskIds={values.tasks.map((entry) => entry.id)}
         held={held}
+        reported={reported}
         refused={refused}
         disabled={!manages}
         onChange={(boards) => setValues((before) => ({ ...before, boards }))}

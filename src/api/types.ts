@@ -90,6 +90,11 @@ export type OrganisedSubmission = Schemas['OrganisedSubmission'];
 export type GroupShown = Schemas['GroupShown'];
 /** A run's reported values by name, its numbers exact and its texts apart. */
 export type Reported = Schemas['Reported'];
+/**
+ * One value a task's workflow reports, as pages name it: its key, its title
+ * and unit, and how it folds over the tests and which way is better.
+ */
+export type ValueMeaning = Schemas['ValueMeaning'];
 /** One test's row of a result, with its credit once scored. */
 export type GradedTest = Schemas['GradedTest'];
 export type Grading = Schemas['Grading'];

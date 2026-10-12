@@ -1,10 +1,12 @@
 import type { Board, BoardCell, BoardKey } from '@/api/types';
 import { formatExact, placesToTell } from '@/lib/exact';
+import { valueTitle, withUnit } from '@/lib/values';
 
 /**
  * What a board's numbers read as. Every key a board ranks on is a column, so
  * a contestant can see why one row is above the next; each is named by what
- * it ranks by. A `penalty` with `per_attempt: 0` charges nothing for an
+ * it ranks by: a value by its title, "Run time", or its key until it has
+ * one (M58). A `penalty` with `per_attempt: 0` charges nothing for an
  * attempt, so all it ranks on is the minute submitted, and it says so.
  */
 export function keyLabel(key: BoardKey): string {
@@ -12,7 +14,13 @@ export function keyLabel(key: BoardKey): string {
   if (key.by === 'penalty') {
     return (key.per_attempt ?? 0) === 0 ? 'Submitted at minute' : 'Penalty';
   }
-  return key.by;
+  return valueTitle(key.by, key);
+}
+
+/** A row's number on a key, as its column shows it: a value's with its unit, "28 ms". */
+export function keyNumber(key: BoardKey, exact: string, places: number): string {
+  const shown = formatExact(exact, places);
+  return key.by === 'points' || key.by === 'penalty' ? shown : withUnit(shown, key);
 }
 
 function plural(count: number, one: string, many: string): string {
@@ -40,14 +48,20 @@ export function cellPlaces(board: Board, task: string): Record<string, number> {
   );
 }
 
-/** One of a cell's numbers, with what it is: "100 points", "minute 45", "12.5 time_ms". */
+/**
+ * One of a cell's numbers, with what it is: "100 points", "minute 45"; a
+ * value's with its unit, "28 ms", or its title where it has no unit,
+ * "12.5 Score", or its key where it has neither.
+ */
 function numberText(key: BoardKey, exact: string, places: number): string {
   const shown = formatExact(exact, places);
   if (key.by === 'points') return `${shown} ${exact === '1' ? 'point' : 'points'}`;
   if (key.by === 'penalty') {
     return (key.per_attempt ?? 0) === 0 ? `minute ${shown}` : `${shown} penalty`;
   }
-  return `${shown} ${key.by}`;
+  return key.unit !== null && key.unit !== ''
+    ? withUnit(shown, key)
+    : `${shown} ${valueTitle(key.by, key)}`;
 }
 
 /**

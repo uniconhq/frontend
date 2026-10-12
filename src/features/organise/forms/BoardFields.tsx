@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { DefinitionError } from '@/api/types';
+import type { DefinitionError, ValueMeaning } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
 import { Checkbox } from '@/ui/Checkbox';
@@ -9,6 +9,7 @@ import { RadioGroup } from '@/ui/RadioGroup';
 import { Select } from '@/ui/Select';
 import { TextInput } from '@/ui/TextInput';
 import { FieldBox } from '../contest/ContestFile';
+import type { TaskValuesReported } from '../contest/published';
 import shared from '../organise.module.css';
 import {
   boardRefusals,
@@ -33,8 +34,10 @@ import {
   nextKey,
   orderSummary,
   orderToWrite,
+  rankableValues,
   repeatedValue,
   shownOrder,
+  valueOption,
 } from './order-words';
 import { numberProblem } from './yaml-doc';
 import classes from './forms.module.css';
@@ -59,12 +62,15 @@ function rowsChoice(rows: string): 'all' | 'own' | 'top' {
  * sentence that says what it ranks, added and removed here, removing asked
  * first, and written by one save. What the last save was refused for about
  * a board reads on the field that caused it. `disabled` shows them to
- * someone who may not change them.
+ * someone who may not change them. `reported` is what each published task
+ * reports, which names the values a board may rank by (M58); null while it
+ * is not known, when a value is typed by its key.
  */
 export function BoardFields({
   boards,
   taskIds,
   held = null,
+  reported = null,
   refused,
   onChange,
   disabled = false,
@@ -73,6 +79,8 @@ export function BoardFields({
   taskIds: string[];
   /** The published tasks' groups whose results come out once their task closes, when known. */
   held?: HeldGroup[] | null;
+  /** The values each published task reports, when known. */
+  reported?: TaskValuesReported[] | null;
   refused: DefinitionError[];
   onChange: (boards: BoardValues[]) => void;
   disabled?: boolean;
@@ -97,6 +105,7 @@ export function BoardFields({
               index={index}
               taskIds={taskIds}
               held={held}
+              values={reported === null ? null : rankableValues(reported, board.tasks)}
               refusals={boardRefusals(refused, index)}
               disabled={disabled}
               onChange={(to) => change(index, to)}
@@ -120,11 +129,30 @@ export function BoardFields({
   );
 }
 
+/**
+ * Why row `at` names a value the board cannot rank by, or null: no task the
+ * board covers reports it as a number for each test, or none reports one at
+ * all. Nothing is said while what the tasks report is not known.
+ */
+function unreportedValue(
+  key: OrderKeyValues | undefined,
+  values: ValueMeaning[] | null,
+): string | null {
+  if (key?.kind !== 'value' || values === null) return null;
+  const name = key.name.trim();
+  if (values.length === 0) {
+    return 'No task this leaderboard covers reports a number for each test, so it cannot rank by one.';
+  }
+  if (name === '' || values.some((value) => value.name === name)) return null;
+  return `No task this leaderboard covers reports ${name} for each test.`;
+}
+
 function BoardEntry({
   board,
   index,
   taskIds,
   held,
+  values,
   refusals,
   disabled,
   onChange,
@@ -134,6 +162,8 @@ function BoardEntry({
   index: number;
   taskIds: string[];
   held: HeldGroup[] | null;
+  /** The values the board may rank by, or null while not known. */
+  values: ValueMeaning[] | null;
   refusals: Map<string, string[]>;
   disabled: boolean;
   onChange: (to: Partial<BoardValues>) => void;
@@ -173,7 +203,12 @@ function BoardEntry({
     const refusal = said(`order.${String(at)}`);
     if (refusal !== undefined) return refusal;
     const penaltyFirst = rows[at]?.kind === 'penalty' ? penaltyRefusal(at === 0) : null;
-    return penaltyFirst ?? repeatedValue(rows, at) ?? undefined;
+    return (
+      penaltyFirst ??
+      unreportedValue(rows[at], values) ??
+      repeatedValue(rows, at, values) ??
+      undefined
+    );
   };
   const shownRows = rowsChoice(board.rows);
   const guests = board.who === 'everyone';
@@ -183,7 +218,7 @@ function BoardEntry({
     <li data-item={index}>
       <Fieldset legend={title}>
         <div className={shared.panel} role="status" aria-label={`What ${title} ranks`}>
-          <BodyText>{boardSentence(board, { held })}</BodyText>
+          <BodyText>{boardSentence(board, { held, values })}</BodyText>
         </div>
         {elsewhere.map(([key, messages]) => (
           <p key={key} className={classes.refused} role="alert">
@@ -324,7 +359,7 @@ function BoardEntry({
             <span className={classes.checksLabel} aria-hidden>
               Ranked by
             </span>
-            <BodyText>{orderSummary(board.order)}</BodyText>
+            <BodyText>{orderSummary(board.order, values)}</BodyText>
             <ol className={classes.orderRows}>
               {rows.map((key, at) => (
                 <OrderKey
@@ -333,6 +368,7 @@ function BoardEntry({
                   of={title}
                   value={key}
                   options={kindOptions(rows, at)}
+                  values={values}
                   last={at === rows.length - 1}
                   alone={rows.length === 1}
                   error={keyProblem(at)}
@@ -406,11 +442,30 @@ function BoardEntry({
   );
 }
 
+/**
+ * The values a row's dropdown offers, by their titles, with the one the
+ * file names kept first when no task reports it, so it stays in view.
+ */
+function valueChoices(
+  values: ValueMeaning[],
+  named: string,
+): { value: string; label: string }[] {
+  const offered = values.map((meaning) => ({
+    value: meaning.name,
+    label: valueOption(meaning),
+  }));
+  const name = named.trim();
+  return name === '' || values.some((meaning) => meaning.name === name)
+    ? offered
+    : [{ value: named, label: name }, ...offered];
+}
+
 function OrderKey({
   at,
   of,
   value,
   options,
+  values,
   last,
   alone,
   error,
@@ -427,6 +482,8 @@ function OrderKey({
   value: OrderKeyValues;
   /** The ways this row may take. */
   options: { value: string; label: string }[];
+  /** The values it may rank by, or null while not known. */
+  values: ValueMeaning[] | null;
   last: boolean;
   /** Whether it is the board's only way to rank, which stays. */
   alone: boolean;
@@ -454,16 +511,27 @@ function OrderKey({
             onChange={(kind) => onChange(keyOfKind(kind))}
             disabled={disabled}
           />
-          {value.kind === 'value' && (
-            <TextInput
-              label="Which value"
-              labelHidden
-              value={value.name}
-              onChange={(text) => onChange({ kind: 'value', name: text })}
-              placeholder="Its name, such as time_ms"
-              disabled={disabled}
-            />
-          )}
+          {value.kind === 'value' &&
+            (values === null ? (
+              <TextInput
+                label="Which value"
+                labelHidden
+                value={value.name}
+                onChange={(text) => onChange({ kind: 'value', name: text })}
+                placeholder="Its name, such as time_ms"
+                disabled={disabled}
+              />
+            ) : (
+              <Select
+                label="Which value"
+                labelHidden
+                value={value.name}
+                options={valueChoices(values, value.name)}
+                onChange={(name) => onChange({ kind: 'value', name })}
+                placeholder="Choose a value"
+                disabled={disabled}
+              />
+            ))}
           {value.kind === 'penalty' && (
             <span className={classes.minutes}>
               <TextInput

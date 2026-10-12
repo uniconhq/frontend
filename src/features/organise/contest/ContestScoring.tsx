@@ -152,7 +152,12 @@ function TaskScoring({
                             ? 'Leaderboard'
                             : `Leaderboard “${board.name}”`}
                         </strong>
-                        : {boardSentence(board, { tasks: false, held })}
+                        :{' '}
+                        {boardSentence(board, {
+                          tasks: false,
+                          held,
+                          values: standing.state.latest?.meanings ?? null,
+                        })}
                       </li>
                     ))
                   )}
