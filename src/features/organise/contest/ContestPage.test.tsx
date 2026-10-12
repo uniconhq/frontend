@@ -460,6 +460,7 @@ describe('how the contest is scored', () => {
           ].join('\n'),
           token: 'token-contest',
           upload: null,
+          version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
         }),
       ),
       http.get(`${CONTEST_API}/tasks/:task/files/:path`, ({ params }) =>
@@ -472,6 +473,7 @@ describe('how the contest is scored', () => {
               : 'name: Sum\nworkflow: unicon/classic@v2\ntest_groups:\n  main: {each: 80, pass: 20}\n',
           token: 'token-task',
           upload: null,
+          version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
         }),
       ),
       ...repoFiles,
@@ -533,6 +535,7 @@ describe('how the contest is scored, as published', () => {
           content,
           token: 'token-task',
           upload: null,
+          version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
         });
       }),
       ...repoFiles,
@@ -945,6 +948,7 @@ describe('creating a task', () => {
             'name: max\nworkflow: unicon/classic@v2\ninputs:\n  submission: {label: Your solution}\n  language: {options: [python]}\n  time_limit: 2\n  memory_limit: 256\ntest_groups:\n  main: {each: 100}\n',
           token: 'token-starter',
           upload: null,
+          version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
         }),
       ),
       http.post(

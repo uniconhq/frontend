@@ -3345,7 +3345,11 @@ export interface components {
          * @description One file at one version, with the token a write presents back, and
          *     `upload` when it is a file an organiser uploaded: its `content` is then
          *     the pointer to the bytes, never opened as text, and `upload` the size
-         *     and SHA-256 of what it holds. A typed file has none.
+         *     and SHA-256 of what it holds. A typed file has none. `version` is a
+         *     version holding the file as read, the one it was read at or the latest
+         *     change to it, which a task's file is downloaded at
+         *     (`/-/downloads/<org>/<contest>/<task>/versions/<version>/<path>`); null
+         *     when the forge did not say.
          */
         FileContent: {
             /** Content */
@@ -3360,6 +3364,8 @@ export interface components {
             /** Token */
             token: string;
             upload: components["schemas"]["UploadInfo"] | null;
+            /** Version */
+            version: string | null;
         };
         /**
          * ForgeUrl

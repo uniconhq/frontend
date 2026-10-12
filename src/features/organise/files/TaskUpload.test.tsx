@@ -267,6 +267,7 @@ describe('uploading a file of a task again', { timeout: 20_000 }, () => {
               content: 'pointer',
               token: 'token-theirs',
               upload: { size: 2048, digest: 'c'.repeat(64) },
+              version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
             })
           : undefined,
       ),

@@ -146,6 +146,7 @@ async function stubOrganiserApi(page: Page) {
         content: state.contestYaml,
         token: `token-contest-${String(state.contestSaves)}`,
         upload: null,
+        version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
       });
     }
     const contest = '/api/v1/orgs/acme/contests/spring';
@@ -283,6 +284,7 @@ async function stubOrganiserApi(page: Page) {
         content: at.endsWith('/input') ? '1 2\n' : '3\n',
         token: `token-${at}`,
         upload: null,
+        version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
       });
     }
     if (path === `${task}/files/task.yaml`) {
@@ -292,6 +294,7 @@ async function stubOrganiserApi(page: Page) {
         content: state.taskYaml,
         token: `token-task-${String(state.published)}`,
         upload: null,
+        version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
       });
     }
     if (path === `${task}/files/statement.md`) {
@@ -313,6 +316,7 @@ async function stubOrganiserApi(page: Page) {
         content: 'Write the sum.\n',
         token: `token-${String(state.published)}`,
         upload: null,
+        version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
       });
     }
     return route.fulfill({ status: 404, body: 'not stubbed' });

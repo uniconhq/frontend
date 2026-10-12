@@ -217,6 +217,7 @@ function taskBackend(
     content: options.content ?? TASK,
     token: 'token-task',
     upload: null,
+    version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
   };
   const sent: SaveRequest[] = [];
   server.use(
@@ -237,6 +238,7 @@ function taskBackend(
           content: '1 2\n',
           token: `token-${path}`,
           upload: null,
+          version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
         });
       }
       return undefined;
@@ -284,6 +286,7 @@ function taskBackend(
           content: options.contest,
           token: 'token-contest',
           upload: null,
+          version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
         }),
       ),
     );
@@ -494,6 +497,7 @@ describe('the cards that build a task', { timeout: 30_000 }, () => {
               content: 'int main() { return 0; }\n',
               token: 'token-checker',
               upload: null,
+              version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
             })
           : undefined,
       ),
@@ -671,6 +675,7 @@ describe('the cards that build a task', { timeout: 30_000 }, () => {
               content: `version https://git-lfs.github.com/spec/v1\noid sha256:${'d'.repeat(64)}\nsize 120\n`,
               token: 'token-task',
               upload: { size: 120, digest: 'd'.repeat(64) },
+              version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
             })
           : undefined,
       ),
@@ -1495,6 +1500,7 @@ describe('the tests of a task', { timeout: 30_000 }, () => {
           token:
             moved && path === 'tests/small/2/answer' ? 'token-theirs' : `token-${path}`,
           upload: null,
+          version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
         });
       }),
       http.get(`${TASK_API}/history`, () =>
@@ -1561,6 +1567,7 @@ describe('a test opened in place (M50)', { timeout: 30_000 }, () => {
               kind: 'file',
               size: LONG.length,
               upload: null,
+              version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
             },
             {
               path: 'tests/small/1/expected',
@@ -1586,6 +1593,7 @@ describe('a test opened in place (M50)', { timeout: 30_000 }, () => {
             content,
             token: `t-${path}`,
             upload: null,
+            version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
           });
         if (path === 'tests/small/1/input') return read(LONG);
         if (path === 'tests/small/1/answer')

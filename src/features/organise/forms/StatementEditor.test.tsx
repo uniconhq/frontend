@@ -26,6 +26,7 @@ function statementBackend(
             content: STATEMENT,
             token: 'token-statement',
             upload,
+            version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
           })
         : undefined,
     ),
@@ -221,6 +222,7 @@ describe('the statement while it is being edited', { timeout: 20_000 }, () => {
           encoding: 'utf-8',
           ...stored,
           upload: null,
+          version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
         });
       }),
       http.put(`${TASK_API}/files/:path`, async ({ request }) => {
