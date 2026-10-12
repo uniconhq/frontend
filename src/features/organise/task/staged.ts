@@ -40,7 +40,10 @@ export const NOTHING_STAGED: Staged = { tests: [], removals: [] };
 const TREE = '/api/v1/orgs/{org}/contests/{contest}/tasks/{task}/tree';
 
 /** Every file under a folder of the task, each with its token, read now. */
-async function filesUnder(place: TaskPlace, folder: string): Promise<Existing[]> {
+export async function filesUnder(
+  place: TaskPlace,
+  folder: string,
+): Promise<Existing[]> {
   const path = { org: place.org, contest: place.contest, task: place.task };
   let entries;
   try {

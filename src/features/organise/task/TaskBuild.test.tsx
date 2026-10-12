@@ -378,7 +378,6 @@ describe('the cards that build a task', { timeout: 30_000 }, () => {
         },
       ),
     );
-    fill(fieldIn(limits, 'checker', 'checker'), 'checker/new.cpp');
     fill(fieldIn(limits, 'Time limit (seconds)', /^Time limit/), '3');
     fill(fieldIn(limits, 'memory_limit', 'memory_limit'), '256');
     fill(fieldIn(limits, 'strict', 'strict'), 'true');
@@ -408,7 +407,7 @@ describe('the cards that build a task', { timeout: 30_000 }, () => {
     expect(written(sent[0])['inputs']).toEqual({
       submission: { label: 'Your program', max_size: '1MB' },
       language: { options: ['cpp', 'python', 'java'], default: 'cpp' },
-      checker: 'checker/new.cpp',
+      checker: 'checker/checker.cpp',
       time_limit: 3,
       token: { secret: 'judge-token' },
       memory_limit: 256,
@@ -476,6 +475,102 @@ describe('the cards that build a task', { timeout: 30_000 }, () => {
     const limits = within(inputs).getByRole('region', { name: 'Limits and settings' });
     expect(within(limits).queryByText('time_limit')).toBeNull();
     expect(fieldIn(limits, 'Time limit (seconds)', /^Time limit/)).toBeVisible();
+  });
+
+  it('views and replaces a setting’s file in its box, saving the new one with the task and taking out the old (M51)', async () => {
+    const { sent } = taskBackend({ form: CHECKED });
+    asManager();
+    server.use(
+      http.get(`${TASK_API}/tree`, ({ request }) =>
+        new URL(request.url).searchParams.get('path') === 'checker'
+          ? HttpResponse.json([file('checker/checker.cpp', 21)])
+          : undefined,
+      ),
+      http.get(`${TASK_API}/files/:path`, ({ params }) =>
+        decodeURIComponent(String(params['path'])) === 'checker/checker.cpp'
+          ? HttpResponse.json({
+              path: 'checker/checker.cpp',
+              encoding: 'utf-8',
+              content: 'int main() { return 0; }\n',
+              token: 'token-checker',
+              upload: null,
+            })
+          : undefined,
+      ),
+    );
+    const user = userEvent.setup();
+    const { inputs } = await openTask();
+
+    const checker = within(inputs).getByRole('group', { name: 'checker' });
+    expect(await within(checker).findByText('checker.cpp, 21 bytes')).toBeVisible();
+    expect(within(checker).queryByRole('textbox')).toBeNull();
+    await user.click(within(checker).getByRole('button', { name: 'View checker' }));
+    expect(
+      await within(checker).findByLabelText('What checker.cpp holds'),
+    ).toHaveTextContent('int main() { return 0; }');
+
+    await user.click(within(checker).getByRole('button', { name: 'Replace checker' }));
+    await user.upload(
+      within(checker).getByLabelText('checker: a new file'),
+      new File(['print(1)\n'], 'checker.py'),
+    );
+    expect(await within(checker).findByText('checker.py, 9 bytes')).toBeVisible();
+    const bar = await screen.findByRole('region', { name: 'Save the task' });
+    expect(within(bar).getByRole('list', { name: 'What changed' })).toHaveTextContent(
+      'Inputs: checker, a new file',
+    );
+    await save();
+
+    const body = await waitForSave(sent);
+    expect(written(body)['inputs']).toMatchObject({ checker: 'checker/checker.py' });
+    expect(body.changes.filter((change) => change.path.startsWith('checker/'))).toEqual(
+      [
+        {
+          path: 'checker/checker.py',
+          token: null,
+          content: btoa('print(1)\n'),
+          encoding: 'base64',
+          remove: false,
+        },
+        {
+          path: 'checker/checker.cpp',
+          token: 'token-checker',
+          remove: true,
+          encoding: 'utf-8',
+        },
+      ],
+    );
+  });
+
+  it('puts a setting’s file back as it was on Undo', async () => {
+    taskBackend({ form: CHECKED });
+    asManager();
+    server.use(
+      http.get(`${TASK_API}/tree`, ({ request }) =>
+        new URL(request.url).searchParams.get('path') === 'checker'
+          ? HttpResponse.json([file('checker/checker.cpp', 21)])
+          : undefined,
+      ),
+    );
+    const user = userEvent.setup();
+    const { inputs } = await openTask();
+
+    const checker = within(inputs).getByRole('group', { name: 'checker' });
+    await within(checker).findByText('checker.cpp, 21 bytes');
+    await user.click(within(checker).getByRole('button', { name: 'Replace checker' }));
+    await user.upload(
+      within(checker).getByLabelText('checker: a new file'),
+      new File(['x'], 'other.cpp'),
+    );
+    await user.click(
+      await within(checker).findByRole('button', {
+        name: 'Undo the new file of checker',
+      }),
+    );
+    expect(await within(checker).findByText('checker.cpp, 21 bytes')).toBeVisible();
+    expect(
+      await screen.findByRole('list', { name: 'What changed' }),
+    ).not.toHaveTextContent('checker');
   });
 
   it('says a newer version of the workflow is out and takes it only when asked', async () => {

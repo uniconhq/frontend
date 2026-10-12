@@ -138,6 +138,19 @@
   gap: 4px 12px;
 }
 
+/* A setting that is a file or a folder: its name, what it holds and its buttons. */
+.fileSetting {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.settingTitle {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--unicon-text-primary);
+}
+
 /* A box's title with its ⓘ beside it. */
 .titleRow {
   display: flex;

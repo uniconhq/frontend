@@ -40,7 +40,8 @@ import {
 } from './build-data';
 import type { TaskSave } from './build-save';
 import { changeLines } from './changes';
-import { InputsCard } from './InputsCard';
+import { stageInputFiles, type StagedInput } from './input-files';
+import { InputsCard, type InputFiles } from './InputsCard';
 import { taskMergeWords } from './merge-words';
 import { taskPlace, taskPlaceOf } from './places';
 import { SaveBar } from './SaveBar';
@@ -130,6 +131,7 @@ function BuildForm({
   const [values, setValues] = useState<TaskValues>(read.values);
   const queryClient = useQueryClient();
   const [staged, setStaged] = useState<Staged>(NOTHING_STAGED);
+  const [inputFiles, setInputFiles] = useState<StagedInput[]>([]);
   const [advanced, setAdvanced] = useState<Set<string>>(
     () =>
       new Set(
@@ -295,7 +297,38 @@ function BuildForm({
       removeTests(name, folder.tests);
   };
 
-  const lines = changeLines(read.values, values, staged, titles);
+  /** Files chosen for a setting wait for the save, which writes them and points the setting at them. */
+  const files: InputFiles = {
+    place,
+    staged: inputFiles,
+    onChoose: (input, chosen, was) => {
+      setReading(null);
+      stageInputFiles(place, input, chosen, was)
+        .then((change) => {
+          setInputFiles((before) => [
+            ...before.filter((each) => each.id !== change.id),
+            {
+              ...change,
+              was: before.find((each) => each.id === change.id)?.was ?? was,
+            },
+          ]);
+          setInput(change.id, { value: change.value });
+        })
+        .catch((error: unknown) => setReading(error));
+    },
+    onUndo: (id) => {
+      const undone = inputFiles.find((each) => each.id === id);
+      setInputFiles((before) => before.filter((each) => each.id !== id));
+      if (undone !== undefined) setInput(id, { value: undone.was });
+    },
+  };
+
+  const lines = [
+    ...changeLines(read.values, values, staged, titles),
+    ...inputFiles.map(
+      (change) => `Inputs: ${titles.get(change.id) ?? change.id}, a new file`,
+    ),
+  ];
   const changed = lines.length > 0 || values.inputs.some(heldTheOtherWay);
   const problems = [
     values.credit.kind !== 'none' && values.credit.name.trim() === ''
@@ -350,7 +383,10 @@ function BuildForm({
         content === file.content
           ? null
           : { content, base: file.content, token: file.token },
-      planned: plannedChanges(staged, declared?.test ?? []),
+      planned: [
+        ...plannedChanges(staged, declared?.test ?? []),
+        ...inputFiles.flatMap((change) => change.planned),
+      ],
     });
   };
 
@@ -402,6 +438,7 @@ function BuildForm({
           set({ inputs: values.inputs.filter((input) => input.id !== id) })
         }
         onAdd={(id, kind) => set({ inputs: [...values.inputs, emptyInput(id, kind)] })}
+        files={files}
         disabled={disabled}
       />
       <TestsCard
@@ -452,6 +489,7 @@ function BuildForm({
         onDiscard={() => {
           setValues(read.values);
           setStaged(NOTHING_STAGED);
+          setInputFiles([]);
           saving.forget();
         }}
       >
@@ -468,6 +506,7 @@ function BuildForm({
               // My changes go, and the cards read the task as it is now.
               setValues(read.values);
               setStaged(NOTHING_STAGED);
+              setInputFiles([]);
               saving.drop();
               for (const queryKey of [
                 fileQuery(place, PATH).queryKey,
