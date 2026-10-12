@@ -71,7 +71,7 @@ function replied(clarification: Clarification): boolean {
  * under the title given, the question itself staying private and a message
  * on it naming the announcement. Either way sending marks the question
  * answered, unless the manager unticks that, so an answer takes it out of
- * the open questions in one step. Mark as answered closes it without a
+ * the open questions in one step. Mark it answered closes it without a
  * reply, and asks first while nobody has replied, since the entrant then
  * reads no answer. Reopen opens an answered one again.
  */
@@ -146,14 +146,14 @@ function ClarificationCard({
     <Button
       size="xs"
       variant="secondary"
-      label={`Mark as answered ${name}`}
+      label={`Mark ${name} answered`}
       loading={busy === 'mark'}
       onClick={() => {
         if (replied(clarification)) void markAnswered();
         else setAsking(true);
       }}
     >
-      Mark as answered
+      Mark it answered
     </Button>
   ) : (
     <Button
@@ -272,7 +272,7 @@ function ClarificationCard({
                 {change.error !== null && <ErrorBlock error={change.error} compact />}
                 <div className={classes.actions}>
                   <Button loading={busy === 'mark'} onClick={() => void markAnswered()}>
-                    Mark as answered
+                    Mark it answered
                   </Button>
                   <Button variant="secondary" onClick={() => setAsking(false)}>
                     Not now

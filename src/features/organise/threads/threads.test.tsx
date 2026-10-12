@@ -245,7 +245,7 @@ describe('the inbox', () => {
     expect(await screen.findByText('Input size?')).toBeVisible();
     expect(screen.getByText(/Replying marks a question answered/)).toBeVisible();
     await userEvent.click(
-      screen.getByRole('button', { name: 'Mark as answered Input size?' }),
+      screen.getByRole('button', { name: 'Mark Input size? answered' }),
     );
     const asked = await screen.findByRole('dialog', {
       name: 'Mark it answered without a reply?',
@@ -255,7 +255,7 @@ describe('the inbox', () => {
     );
     expect(did).toEqual([]);
     await userEvent.click(
-      within(asked).getByRole('button', { name: 'Mark as answered' }),
+      within(asked).getByRole('button', { name: 'Mark it answered' }),
     );
 
     expect(
@@ -305,7 +305,7 @@ describe('the inbox', () => {
 
     // Replied to already, so marking it asks nothing.
     await userEvent.click(
-      screen.getByRole('button', { name: 'Mark as answered Output format?' }),
+      screen.getByRole('button', { name: 'Mark Output format? answered' }),
     );
     await waitFor(() =>
       expect(did).toEqual(['reply 1', 'mark 1', 'reply 2', 'mark 2']),
