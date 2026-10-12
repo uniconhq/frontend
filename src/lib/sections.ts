@@ -56,8 +56,9 @@ export const CONTEST_SECTIONS = [
 /**
  * A task's sections for running it, each a page of its own. What builds the
  * task (its workflow, inputs, tests and scoring, and statement) is on the
- * task's own page, as the cards `TASK_BUILD_CARDS` lists; its Settings page
- * holds its title and its settings as they are stored.
+ * task's own page, as the cards `TASK_BUILD_CARDS` lists, each file it holds
+ * changed on the card it belongs to; its Settings page holds its title, its
+ * settings as they are stored and, for its admins, every file to read (M51).
  */
 export const TASK_SECTIONS = [
   { key: 'gradings', label: 'Gradings', segment: 'gradings', card: 'grid' },
@@ -73,7 +74,6 @@ export const TASK_SECTIONS = [
     segment: 'announcements',
     card: 'grid',
   },
-  { key: 'files', label: 'Files', segment: 'files', card: 'grid' },
   { key: 'organisers', label: 'Task organisers', segment: 'organisers', card: 'grid' },
   { key: 'settings', label: 'Settings', segment: 'settings', card: 'grid' },
 ] as const satisfies readonly Section[];

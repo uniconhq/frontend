@@ -12,7 +12,6 @@ import { OrganisedBoardsPage } from './boards/OrganisedBoardsPage';
 import { OrgOrganisersPage, OrgSettingsPage } from './org/OrgSections';
 import {
   TaskAnnouncementsPage,
-  TaskFilesPage,
   TaskGradingsPage,
   TaskOrganisersPage,
   TaskPublicationsPage,
@@ -56,7 +55,6 @@ export const TASK_SECTION_PAGES: Record<TaskSectionKey, ComponentType> = {
   gradings: TaskGradingsPage,
   publications: TaskPublicationsPage,
   announcements: TaskAnnouncementsPage,
-  files: TaskFilesPage,
   organisers: TaskOrganisersPage,
   settings: TaskSettingsPage,
 };

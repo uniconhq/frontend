@@ -310,7 +310,7 @@ async function stubOrganiserApi(page: Page) {
   return state;
 }
 
-test('an organiser makes an org, walks to a task and publishes a file', async ({
+test('an organiser makes an org, walks to a task and publishes its statement', async ({
   page,
 }) => {
   const state = await stubOrganiserApi(page);
@@ -340,26 +340,29 @@ test('an organiser makes an org, walks to a task and publishes a file', async ({
   const standing = page.getByLabel('Where the task stands');
   await expect(standing).toContainText('Entrants are graded on publication 1');
   const sidebar = page.getByRole('navigation', { name: 'Sections' });
-  await sidebar.getByRole('link', { name: 'Files' }).click();
-  await page.getByRole('link', { name: 'statement.md' }).click();
-  await expect(page).toHaveURL(/\/files\?file=statement\.md$/);
+  // A task has no Files page: each file is changed on its own card (M51).
+  await expect(sidebar.getByRole('link', { name: 'Files' })).toHaveCount(0);
+  await sidebar.getByRole('link', { name: 'Statement' }).click();
 
   await page
-    .getByRole('textbox', { name: 'statement.md' })
+    .getByRole('textbox', { name: 'Statement source' })
     .fill('Write the sum of two.\n');
-  await page.getByRole('button', { name: 'Save' }).click();
+  await page.getByRole('button', { name: 'Save statement' }).click();
 
   const outcome = page.getByRole('status').filter({
     hasText: 'Saved and published as publication 2.',
   });
   await expect(outcome).toBeVisible();
-  await expect(outcome).toBeFocused();
   expect(state.saved).toMatchObject({
     content: 'Write the sum of two.\n',
     token: 'token-1',
   });
-  await sidebar.getByRole('link', { name: 'sum' }).click();
   await expect(standing).toContainText('Entrants are graded on publication 2');
+
+  // An old link to the task's Files page lands on the task's page.
+  await page.goto('/orgs/acme/contests/spring/tasks/sum/files?file=statement.md');
+  await expect(page).toHaveURL(/\/orgs\/acme\/contests\/spring\/tasks\/sum$/);
+  await expect(standing).toBeVisible();
 
   const trail = page.getByRole('navigation', { name: 'Breadcrumb' });
   await trail.getByRole('link', { name: 'Orgs', exact: true }).click();

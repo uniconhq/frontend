@@ -9,7 +9,6 @@ import { useMe } from '@/session';
 import { useTaskParams } from '@/lib/route-params';
 import { TASK_SECTIONS, sectionOf } from '@/lib/sections';
 import { formatDateTime } from '@/lib/time';
-import { FileBrowser } from '../files/FileBrowser';
 import { FileEditor } from '../files/FileEditor';
 import { SavedFolder } from '../files/FilePreview';
 import type { Place } from '../files/place';
@@ -175,18 +174,6 @@ export function TaskAnnouncementsPage() {
   return (
     <SectionPage section={sectionOf(TASK_SECTIONS, 'announcements')}>
       <AnnouncementsSection place={place} />
-    </SectionPage>
-  );
-}
-
-/** The task's files, the tree beside the open file, and uploads for a manager. */
-export function TaskFilesPage() {
-  const { place } = useTaskPlace();
-  return (
-    <SectionPage section={sectionOf(TASK_SECTIONS, 'files')}>
-      <Card>
-        <FileBrowser place={place} />
-      </Card>
     </SectionPage>
   );
 }

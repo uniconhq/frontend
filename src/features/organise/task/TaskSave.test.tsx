@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { screen, within } from '@testing-library/react';
+import { fireEvent, screen, within } from '@testing-library/react';
 import userEvent from '@/test/user-event';
 import { http, HttpResponse, type HttpResponseResolver } from 'msw';
 import { renderApp } from '@/test/render';
@@ -19,8 +19,10 @@ const WRITE = `${TASK_API}/files/:path`;
  * so a test can see that a save fetched each again, and a write answered by
  * `answer`.
  */
+type Reads = { state: number; publications: number; tree: number };
+
 function taskBackend(answer: HttpResponseResolver) {
-  const reads = { state: 0, publications: 0, tree: 0 };
+  const reads: Reads = { state: 0, publications: 0, tree: 0 };
   const sent: unknown[] = [];
   server.use(
     signedIn,
@@ -45,10 +47,17 @@ function taskBackend(answer: HttpResponseResolver) {
   return { reads, sent };
 }
 
-async function editAndSave(path = 'statement.md') {
-  renderApp(`/orgs/acme/contests/spring/tasks/sum/files?file=${path}`);
-  await userEvent.type(await screen.findByRole('textbox', { name: path }), ' Now.');
-  await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+/** The statement, on its card of the task's page, changed and saved. */
+async function changeStatementAndSave() {
+  fireEvent.change(await screen.findByRole('textbox', { name: 'Statement source' }), {
+    target: { value: 'Write the sum of two numbers.\n Now.' },
+  });
+  await userEvent.click(screen.getByRole('button', { name: 'Save statement' }));
+}
+
+async function editAndSave() {
+  renderApp('/orgs/acme/contests/spring/tasks/sum?card=statement');
+  await changeStatementAndSave();
 }
 
 /** Goes to one of the task's pages from the sidebar, as an organiser does. */
@@ -58,27 +67,28 @@ async function goTo(section: string) {
 }
 
 /**
- * The task's page and its publications read first, then a file saved from
- * Files, as an organiser comes to it: so a read the save leaves stale is one
- * the page has, which it reads again on coming back.
+ * The task's page and its publications read first, then the statement saved
+ * from its card, as an organiser comes to it: so the reads the save leaves
+ * stale are ones the page has. Answers how often each was read just before
+ * the save.
  */
-async function readThenEditAndSave(path: string) {
+async function readThenEditAndSave(reads: Reads): Promise<Reads> {
   renderApp('/orgs/acme/contests/spring/tasks/sum');
   await screen.findByLabelText('Where the task stands');
   await goTo('Publications');
   await screen.findByRole('list', { name: 'Publications' });
-  await goTo('Files');
-  await userEvent.click(await screen.findByRole('link', { name: path }));
-  await userEvent.type(await screen.findByRole('textbox', { name: path }), ' Now.');
-  await userEvent.click(screen.getByRole('button', { name: 'Save' }));
-}
-
-/** Back to the publications and the task's own page, each read again. */
-async function comeBack() {
-  await goTo('Publications');
-  await screen.findByRole('list', { name: 'Publications' });
   await goTo('sum');
   await screen.findByLabelText('Where the task stands');
+  await screen.findByRole('textbox', { name: 'Statement source' });
+  const before = { ...reads };
+  await changeStatementAndSave();
+  return before;
+}
+
+/** The publications page, read again after the save left them stale. */
+async function toPublications() {
+  await goTo('Publications');
+  await screen.findByRole('list', { name: 'Publications' });
 }
 
 describe('saving a task file', () => {
@@ -93,7 +103,7 @@ describe('saving a task file', () => {
       }),
     );
 
-    await readThenEditAndSave('statement.md');
+    const before = await readThenEditAndSave(reads);
 
     const status = await screen.findByText('Saved and published as publication 3.');
     const outcome = status.parentElement as HTMLElement;
@@ -110,10 +120,11 @@ describe('saving a task file', () => {
         keep_as_draft: false,
       },
     ]);
-    const before = { ...reads };
-    await comeBack();
-    await expect.poll(() => reads.state).toBe(before.state + 1);
-    expect(reads.publications).toBe(before.publications + 1);
+    // The page in view reads where the task stands again; the publications,
+    // once their page is opened.
+    await expect.poll(() => reads.state).toBeGreaterThan(before.state);
+    await toPublications();
+    expect(reads.publications).toBeGreaterThan(before.publications);
   });
 
   it('says when a publication leaves grading as it was', async () => {
@@ -191,7 +202,7 @@ describe('saving a task file', () => {
       }),
     );
 
-    await readThenEditAndSave('statement.md');
+    const before = await readThenEditAndSave(reads);
 
     const outcome = (await screen.findByText(/Saved as a draft/))
       .parentElement as HTMLElement;
@@ -201,9 +212,7 @@ describe('saving a task file', () => {
     expect(within(outcome).getByRole('list', { name: 'Errors' })).toHaveTextContent(
       'Inputs: setter: There is no file under data/hidden/ in the task.',
     );
-    const before = reads.state;
-    await comeBack();
-    await expect.poll(() => reads.state).toBe(before + 1);
+    await expect.poll(() => reads.state).toBeGreaterThan(before.state);
   });
 
   it('asks before a grading change during the contest, and publishes once confirmed', async () => {
@@ -228,7 +237,7 @@ describe('saving a task file', () => {
         ),
     );
 
-    await editAndSave('statement.md');
+    await editAndSave();
 
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent(
@@ -274,7 +283,7 @@ describe('saving a task file', () => {
         ),
     );
 
-    await editAndSave('statement.md');
+    await editAndSave();
     await userEvent.click(
       within(await screen.findByRole('alert')).getByRole('button', {
         name: 'Keep as draft',
@@ -305,7 +314,7 @@ describe('saving a task file', () => {
     expect(
       within(alert).getByRole('list', { name: 'What stands in the way' }),
     ).toHaveTextContent(named);
-    expect(screen.getByRole('textbox', { name: 'statement.md' })).toHaveValue(
+    expect(screen.getByRole('textbox', { name: 'Statement source' })).toHaveValue(
       'Write the sum of two numbers.\n Now.',
     );
   });

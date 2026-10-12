@@ -22,7 +22,6 @@ import { CARD_PARAM } from './places';
 import { TaskBuild } from './TaskBuild';
 import {
   AnnouncementsCard,
-  FilesCard,
   GradingsCard,
   PublicationsCard,
   SettingsCard,
@@ -38,7 +37,6 @@ const GRID_CARDS: Record<TaskSectionKey, CardLine> = {
   gradings: GradingsCard,
   publications: PublicationsCard,
   announcements: AnnouncementsCard,
-  files: FilesCard,
   organisers: ({ path }) => <OrganisersLine place={{ kind: 'task', ...path }} />,
   settings: SettingsCard,
 };

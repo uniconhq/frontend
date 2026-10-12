@@ -39,6 +39,7 @@ import {
   TASK_SECTIONS,
   taskCardPath,
 } from '@/lib/sections';
+import { taskPath } from '@/lib/organiser-paths';
 import { useContestParams, useTaskParams } from '@/lib/route-params';
 
 const ORG = ':org';
@@ -82,12 +83,22 @@ function ToStatement() {
   return <Navigate to={taskCardPath(org, contest, task, 'statement')} replace />;
 }
 
+/**
+ * A task's Files page, gone now that each file has its form on the task's
+ * own page (M51): an old link lands there.
+ */
+function ToTaskPage() {
+  const { org, contest, task } = useTaskParams();
+  return <Navigate to={taskPath(org, contest, task)} replace />;
+}
+
 const movedRoutes: RouteObject[] = [
   ...['contestants', 'teams'].map((segment) => ({
     path: `${CONTEST}/${segment}`,
     element: <ToEntrants />,
   })),
   { path: `${TASK}/statement`, element: <ToStatement /> },
+  { path: `${TASK}/files`, element: <ToTaskPage /> },
 ];
 
 /**

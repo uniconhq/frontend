@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@/test/user-event';
 import { http, HttpResponse } from 'msw';
+import type { FileContent, TreeEntry } from '@/api/types';
 import { renderApp } from '@/test/render';
 import { problem, server, signedIn, someone } from '@/test/server';
 import {
@@ -16,104 +17,170 @@ import {
 import { comeBackToTab, fakeLiveStream, openStream, realLiveStream } from '@/test/live';
 
 const CONTEST = '/orgs/acme/contests/spring/files';
-const TASK = '/orgs/acme/contests/spring/tasks/sum/files';
+/** Where a task's Files page was, before each file had its form (M51). */
+const TASK_FILES = '/orgs/acme/contests/spring/tasks/sum/files';
+/** The task's Settings page, which holds its settings as stored. */
+const TASK_SETTINGS = '/orgs/acme/contests/spring/tasks/sum/settings';
 const CONTEST_FILE = `${CONTEST_API}/files/:path`;
 
 function tree() {
   return screen.getByRole('navigation', { name: 'Files' });
 }
 
+/** A contest's files beyond its settings: a folder of rooms, with a text and a picture. */
+const CONTEST_TREE: Record<string, TreeEntry[]> = {
+  '': [
+    { path: 'contest.yaml', kind: 'file', size: 80, upload: null },
+    { path: 'notes.md', kind: 'file', size: 17, upload: null },
+    { path: 'data', kind: 'directory', size: null, upload: null },
+  ],
+  data: [{ path: 'data/rooms', kind: 'directory', size: null, upload: null }],
+  'data/rooms': [
+    { path: 'data/rooms/1.in', kind: 'file', size: 4, upload: null },
+    { path: 'data/rooms/logo.png', kind: 'file', size: 11, upload: null },
+  ],
+};
+
+const CONTEST_FILES: Record<string, FileContent> = {
+  'data/rooms/1.in': {
+    path: 'data/rooms/1.in',
+    encoding: 'utf-8',
+    content: '1 2\n',
+    token: 'token-1-in',
+    upload: null,
+  },
+  'data/rooms/logo.png': {
+    path: 'data/rooms/logo.png',
+    encoding: 'base64',
+    content: 'iVBORw0KGgoA//4=',
+    token: 'token-logo',
+    upload: null,
+  },
+};
+
+/** The contest's tree as above, each folder read as it is asked for. */
+function contestFiles(asked: string[] = []) {
+  return [
+    http.get(`${CONTEST_API}/tree`, ({ request }) => {
+      const at = new URL(request.url).searchParams.get('path') ?? '';
+      asked.push(at);
+      return HttpResponse.json(CONTEST_TREE[at] ?? []);
+    }),
+    http.get(CONTEST_FILE, ({ params }) => {
+      const path = decodeURIComponent(String(params['path']));
+      if (path === 'notes.md') return HttpResponse.json(NOTES);
+      const file = CONTEST_FILES[path];
+      return file === undefined ? undefined : HttpResponse.json(file);
+    }),
+  ];
+}
+
 describe('the file tree', () => {
   it('lists the top folder, folders first, and opens a folder by listing it', async () => {
     const asked: string[] = [];
-    server.use(
-      signedIn,
-      taskState,
-      publicationList,
-      http.get(`${TASK_API}/tree`, ({ request }) => {
-        asked.push(new URL(request.url).searchParams.get('path') ?? '');
-        return undefined;
-      }),
-      ...repoFiles,
-    );
-    renderApp(TASK);
+    server.use(signedIn, taskList, ...contestFiles(asked), ...repoFiles);
+    renderApp(CONTEST);
 
     await within(await screen.findByRole('navigation', { name: 'Files' })).findByRole(
       'link',
-      { name: 'statement.md' },
+      { name: 'notes.md' },
     );
     const top = within(tree()).getAllByRole('listitem');
-    expect(top.map((item) => item.textContent)).toEqual(['▸data/', 'statement.md']);
+    expect(top.map((item) => item.textContent)).toEqual(['▸data/', 'notes.md']);
 
     await userEvent.click(within(tree()).getByRole('button', { name: /data\// }));
     await userEvent.click(
-      await within(tree()).findByRole('button', { name: /testcases\// }),
+      await within(tree()).findByRole('button', { name: /rooms\// }),
     );
     expect(await within(tree()).findByRole('link', { name: '1.in' })).toHaveAttribute(
       'href',
-      `${TASK}?file=data/testcases/1.in`,
+      `${CONTEST}?file=data/rooms/1.in`,
     );
-    expect(asked).toEqual(['', 'data', 'data/testcases']);
+    expect(asked).toEqual(['', 'data', 'data/rooms']);
   });
 
   it('opens a clicked file and puts it in the address', async () => {
-    server.use(signedIn, taskState, publicationList, ...repoFiles);
-    const { router } = renderApp(TASK);
+    server.use(signedIn, taskList, ...contestFiles(), ...repoFiles);
+    const { router } = renderApp(CONTEST);
 
     expect(await screen.findByText('Choose a file to open it.')).toBeVisible();
     await userEvent.click(
-      await within(tree()).findByRole('link', { name: 'statement.md' }),
+      await within(tree()).findByRole('link', { name: 'notes.md' }),
     );
 
-    expect(await screen.findByRole('textbox', { name: 'statement.md' })).toHaveValue(
-      files['statement.md']?.content,
+    expect(await screen.findByRole('textbox', { name: 'notes.md' })).toHaveValue(
+      NOTES.content,
     );
-    expect(router.state.location.search).toBe('?file=statement.md');
-    expect(within(tree()).getByRole('link', { name: 'statement.md' })).toHaveAttribute(
+    expect(router.state.location.search).toBe('?file=notes.md');
+    expect(within(tree()).getByRole('link', { name: 'notes.md' })).toHaveAttribute(
       'aria-current',
       'page',
     );
   });
 
-  it('leaves the tests, the settings and the plans Unicon writes out of the tree, saying where each is changed', async () => {
-    server.use(
-      signedIn,
-      taskState,
-      publicationList,
-      http.get(`${TASK_API}/tree`, ({ request }) =>
-        new URL(request.url).searchParams.get('path') === ''
-          ? HttpResponse.json([
-              { path: 'task.yaml', kind: 'file', size: 120, upload: null },
-              { path: 'tests', kind: 'directory', size: null, upload: null },
-              { path: 'plans', kind: 'directory', size: null, upload: null },
-              { path: 'public', kind: 'directory', size: null, upload: null },
-            ])
-          : undefined,
-      ),
-      ...repoFiles,
-    );
-    renderApp(TASK);
+  it('leaves the settings out of the tree, saying where they are changed', async () => {
+    server.use(signedIn, taskList, ...contestFiles(), ...repoFiles);
+    renderApp(CONTEST);
 
     await within(await screen.findByRole('navigation', { name: 'Files' })).findByRole(
-      'button',
-      { name: /public\// },
+      'link',
+      { name: 'notes.md' },
     );
-    const top = within(tree()).getAllByRole('listitem');
-    expect(top.map((item) => item.textContent)).toEqual(['▸public/']);
-    const main = within(screen.getByRole('main'));
-    expect(main.getByRole('link', { name: 'Tests and scoring' })).toHaveAttribute(
-      'href',
-      '/orgs/acme/contests/spring/tasks/sum?card=tests',
+    expect(within(tree()).queryByRole('link', { name: 'contest.yaml' })).toBeNull();
+    expect(
+      within(screen.getByRole('main')).getByRole('link', { name: 'Settings' }),
+    ).toHaveAttribute('href', '/orgs/acme/contests/spring/settings');
+  });
+
+  it('opens a linked file with the folders above it open', async () => {
+    server.use(signedIn, taskList, ...contestFiles(), ...repoFiles);
+    renderApp(`${CONTEST}?file=data/rooms/1.in`);
+
+    expect(await screen.findByRole('textbox', { name: 'data/rooms/1.in' })).toHaveValue(
+      '1 2\n',
     );
-    expect(main.getByRole('link', { name: 'task’s page' })).toHaveAttribute(
-      'href',
-      '/orgs/acme/contests/spring/tasks/sum',
+    expect(await within(tree()).findByRole('link', { name: '1.in' })).toHaveAttribute(
+      'aria-current',
+      'page',
     );
   });
 
-  it('opens the task’s settings from a link, to read only, though the tree leaves them out', async () => {
+  it('shows a binary file as its size, not as text to edit', async () => {
+    server.use(signedIn, taskList, ...contestFiles(), ...repoFiles);
+    renderApp(`${CONTEST}?file=data/rooms/logo.png`);
+
+    expect(await screen.findByText(/This file is not text \(11 bytes\)/)).toBeVisible();
+    expect(
+      screen.queryByRole('textbox', { name: /data\/rooms\/logo\.png/ }),
+    ).not.toBeInTheDocument();
+    // The page is the files alone, so no box on it takes text.
+    expect(screen.queryAllByRole('textbox')).toEqual([]);
+    expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument();
+  });
+
+  it('shows why a file would not open', async () => {
+    server.use(signedIn, taskList, ...contestFiles(), ...repoFiles);
+    renderApp(`${CONTEST}?file=nowhere.txt`);
+
+    expect(await screen.findByText('Not found')).toBeVisible();
+  });
+});
+
+describe("a task's files, each on its own form (M51)", () => {
+  it('has no Files page of its own: an old link to it, or to a file in it, lands on the task’s page', async () => {
     server.use(signedIn, taskState, publicationList, ...repoFiles);
-    renderApp(`${TASK}?file=task.yaml`);
+    const { router } = renderApp(`${TASK_FILES}?file=tests/main/1/input`);
+
+    expect(await screen.findByLabelText('Where the task stands')).toBeVisible();
+    expect(router.state.location.pathname).toBe('/orgs/acme/contests/spring/tasks/sum');
+    const sidebar = screen.getByRole('group', { name: 'Task' });
+    expect(within(sidebar).queryByRole('link', { name: 'Files' })).toBeNull();
+    expect(screen.queryByRole('region', { name: 'Files' })).toBeNull();
+  });
+
+  it('opens the task’s settings on its Settings page, to read only, saying where they are changed', async () => {
+    server.use(signedIn, taskState, publicationList, ...repoFiles);
+    renderApp(TASK_SETTINGS);
 
     const settings = await screen.findByRole('textbox', {
       name: 'The task’s settings',
@@ -124,71 +191,6 @@ describe('the file tree', () => {
     expect(
       within(screen.getByRole('main')).getByRole('link', { name: 'Inputs' }),
     ).toHaveAttribute('href', '/orgs/acme/contests/spring/tasks/sum?card=inputs');
-    expect(within(tree()).queryByRole('link', { name: 'task.yaml' })).toBeNull();
-  });
-
-  it('opens a test’s file to read, saying where tests are changed', async () => {
-    server.use(
-      signedIn,
-      taskState,
-      publicationList,
-      http.get(`${TASK_API}/files/:path`, ({ params }) =>
-        decodeURIComponent(String(params['path'])) === 'tests/main/1/input'
-          ? HttpResponse.json({
-              path: 'tests/main/1/input',
-              encoding: 'utf-8',
-              content: '1 2\n',
-              token: 'token-input',
-              upload: null,
-            })
-          : undefined,
-      ),
-      ...repoFiles,
-    );
-    renderApp(`${TASK}?file=tests/main/1/input`);
-
-    expect(
-      await screen.findByText(
-        'A test’s files are changed on the task’s page, in its Tests and scoring card.',
-      ),
-    ).toBeVisible();
-    expect(screen.getByRole('textbox', { name: 'tests/main/1/input' })).toHaveAttribute(
-      'readonly',
-    );
-    expect(screen.queryByRole('button', { name: 'Save' })).toBeNull();
-  });
-
-  it('opens a linked file with the folders above it open', async () => {
-    server.use(signedIn, taskState, publicationList, ...repoFiles);
-    renderApp(`${TASK}?file=data/testcases/1.in`);
-
-    expect(
-      await screen.findByRole('textbox', { name: 'data/testcases/1.in' }),
-    ).toHaveValue('1 2\n');
-    expect(await within(tree()).findByRole('link', { name: '1.in' })).toHaveAttribute(
-      'aria-current',
-      'page',
-    );
-  });
-
-  it('shows a binary file as its size, not as text to edit', async () => {
-    server.use(signedIn, taskState, publicationList, ...repoFiles);
-    renderApp(`${TASK}?file=data/testcases/logo.png`);
-
-    expect(await screen.findByText(/This file is not text \(11 bytes\)/)).toBeVisible();
-    expect(
-      screen.queryByRole('textbox', { name: /data\/testcases\/logo\.png/ }),
-    ).not.toBeInTheDocument();
-    // The page is the files alone, so no box on it takes text.
-    expect(screen.queryAllByRole('textbox')).toEqual([]);
-    expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument();
-  });
-
-  it('shows why a file would not open', async () => {
-    server.use(signedIn, taskState, publicationList, ...repoFiles);
-    renderApp(`${TASK}?file=nowhere.txt`);
-
-    expect(await screen.findByText('Not found')).toBeVisible();
   });
 });
 
@@ -528,7 +530,7 @@ describe('mending settings that do not read', () => {
         errors: [{ path: 'workflow', message: 'There is no such workflow.' }],
       }),
     );
-    renderApp(`${TASK}?file=task.yaml`);
+    renderApp(TASK_SETTINGS);
 
     expect(
       await screen.findByText(
@@ -565,7 +567,7 @@ describe('mending settings that do not read', () => {
         }),
       ),
     );
-    renderApp(`${TASK}?file=task.yaml`);
+    renderApp(TASK_SETTINGS);
 
     expect(
       await screen.findByText('An admin of the task can fix them as text.'),
@@ -608,7 +610,7 @@ describe('mending settings that do not read', () => {
     expect(screen.getByRole('button', { name: 'Save' })).toBeVisible();
   });
 
-  it("names each admin-only key a manager's save of a file changed", async () => {
+  it("names each admin-only key a save of a task's file changed, on the file's own card", async () => {
     server.use(
       signedIn,
       taskState,
@@ -621,13 +623,12 @@ describe('mending settings that do not read', () => {
         }),
       ),
     );
-    renderApp(`${TASK}?file=statement.md`);
+    renderApp('/orgs/acme/contests/spring/tasks/sum?card=statement');
 
-    await userEvent.type(
-      await screen.findByRole('textbox', { name: 'statement.md' }),
-      'x',
-    );
-    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+    fireEvent.change(await screen.findByRole('textbox', { name: 'Statement source' }), {
+      target: { value: 'x' },
+    });
+    await userEvent.click(screen.getByRole('button', { name: 'Save statement' }));
 
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent('Only an admin may change statement.md.');
