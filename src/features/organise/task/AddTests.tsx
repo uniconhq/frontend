@@ -260,7 +260,8 @@ export function AddTests({
   const chooseZip = (next: File | null) => {
     setZip(next);
     setZipProblem(null);
-    setZipped(next === null ? null : []);
+    // Null while it is read, so nothing is said of its files until they are known.
+    setZipped(null);
     if (next === null) return;
     readZip(next)
       .then((entries) => {
@@ -277,7 +278,6 @@ export function AddTests({
         }
       })
       .catch((error: unknown) => {
-        setZipped([]);
         setZipProblem(
           error instanceof ZipError ? error.message : 'It could not be read as a zip.',
         );
@@ -378,9 +378,13 @@ export function AddTests({
           )
           ? `${ways.one.replace(/\.$/, '')} first.`
           : (placed[0]?.problems.join(' ') ?? '')
-        : placed.length === 0
-          ? 'No files dropped yet.'
-          : 'No test is complete yet: the table says what each one is missing.';
+        : placed.length > 0
+          ? 'No test is complete yet: the table says what each one is missing.'
+          : unmatched.length > 0
+            ? 'None of the files dropped makes a test: the list says why for each.'
+            : mode === 'zip' && zip !== null && zipped === null && zipProblem === null
+              ? 'The zip is still being read.'
+              : 'No files dropped yet.';
 
   const add = async () => {
     setReading(true);
@@ -554,12 +558,16 @@ export function AddTests({
           <section aria-label="What the files make" className={classes.matched}>
             {placed.length === 0 && unmatched.length === 0 ? (
               <BodyText tone="secondary">
-                {mode === 'zip' && zip !== null && zipped?.length === 0
-                  ? 'The zip holds no files.'
-                  : 'Drop files above to see the tests they make.'}
+                {mode !== 'zip' || zip === null
+                  ? 'Drop files above to see the tests they make.'
+                  : zipped !== null
+                    ? 'The zip holds no files.'
+                    : zipProblem === null
+                      ? 'Reading the zip…'
+                      : null}
               </BodyText>
             ) : (
-              <Preview tests={placed} parts={parts} />
+              placed.length > 0 && <Preview tests={placed} parts={parts} />
             )}
             {unmatched.length > 0 && (
               <>

@@ -1316,6 +1316,71 @@ describe('the tests of a task', { timeout: 30_000 }, () => {
     ]);
   });
 
+  it('says a zip is being read while it is, never that it holds no files', async () => {
+    taskBackend({ form: { ...CHECKED, inputs: [] } });
+    const { tests } = await openTask();
+    let release = () => {};
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const zip = await makeZip([
+      { name: '1.in', text: '1 1\n' },
+      { name: '1.out', text: '2\n' },
+    ]);
+    // A zip whose bytes come only once the test lets them, as a big one's do.
+    const slow = new File([zip], 'tests.zip', { type: 'application/zip' });
+    const slice = slow.slice.bind(slow);
+    slow.slice = (...args: Parameters<Blob['slice']>) => {
+      const part = slice(...args);
+      const read = part.arrayBuffer.bind(part);
+      part.arrayBuffer = async () => {
+        await held;
+        return read();
+      };
+      return part;
+    };
+
+    await userEvent.click(within(tests).getByRole('button', { name: 'Add tests' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Add tests' });
+    await userEvent.click(within(dialog).getByRole('radio', { name: 'A zip' }));
+    await userEvent.upload(within(dialog).getByLabelText('Zip of tests'), slow);
+
+    const made = within(dialog).getByRole('region', { name: 'What the files make' });
+    expect(made).toHaveTextContent('Reading the zip…');
+    expect(made).not.toHaveTextContent('holds no files');
+    const add = within(dialog).getByRole('button', { name: 'Add tests' });
+    expect(add).toHaveAccessibleDescription('The zip is still being read.');
+
+    release();
+    expect(await within(dialog).findByRole('row', { name: /test 1/ })).toBeVisible();
+    expect(made).not.toHaveTextContent('Reading the zip');
+  });
+
+  it('shows no empty table for files that make no test, and says so beside the button', async () => {
+    taskBackend({ form: { ...CHECKED, inputs: [] } });
+    const { tests } = await openTask();
+
+    await userEvent.click(within(tests).getByRole('button', { name: 'Add tests' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Add tests' });
+    await userEvent.click(
+      within(dialog).getByRole('radio', { name: 'Many files at once' }),
+    );
+    await userEvent.upload(within(dialog).getByLabelText('Test files'), [
+      new File(['x'], 'readme.txt'),
+    ]);
+
+    const made = within(dialog).getByRole('region', { name: 'What the files make' });
+    expect(within(made).queryByRole('table')).toBeNull();
+    expect(within(made).getByRole('list', { name: 'Not matched' })).toHaveTextContent(
+      'readme.txt',
+    );
+    expect(
+      within(dialog).getByRole('button', { name: 'Add tests' }),
+    ).toHaveAccessibleDescription(
+      'None of the files dropped makes a test: the list says why for each.',
+    );
+  });
+
   it('adds a new group’s tests from a zip, and the group shows in scoring', async () => {
     const { sent } = taskBackend({ form: { ...CHECKED, inputs: [] } });
     const { tests } = await openTask();
@@ -1535,9 +1600,7 @@ describe('the tests of a task', { timeout: 30_000 }, () => {
       name: 'Tests, small, test 2: answer',
     });
     expect(answer).toHaveTextContent('Yours: Taken out');
-    expect(
-      await within(answer).findByText(/Now: 7 B, saved by alice/),
-    ).toBeVisible();
+    expect(await within(answer).findByText(/Now: 7 B, saved by alice/)).toBeVisible();
     await userEvent.click(within(answer).getByRole('radio', { name: /^Yours/ }));
     await userEvent.click(
       screen.getByRole('button', { name: 'Save the merged version' }),
