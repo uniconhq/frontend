@@ -12,7 +12,8 @@ import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
 import { FileHistory } from './FileHistory';
 import { fileQuery, settingsPath, staleAfterWrite, type Place } from './place';
 import { SaveOutcome, type Outcome } from './SaveOutcome';
-import { TextConflict } from './TextConflict';
+import { KeptText, TextConflict } from './TextConflict';
+import { EDITED } from '@/live';
 import { UploadedFile } from './UploadedFile';
 import { SettingsText } from './SettingsText';
 import { useMe } from '@/session';
@@ -60,14 +61,15 @@ type Sent = WriteFile | RollbackFile;
  * One file, open as text in the code editor, or, for a file that is an
  * upload, shown as what it holds. The text is saved with the token it was read
  * with, so a file someone else changed in the meantime comes back as a
- * conflict and nothing is overwritten. That is why the file is read once and
- * never refetched behind the organiser's back: a background refetch would
- * swap the token under text that was read at the old one. It is read again
- * after a save, and on Reload.
+ * conflict and nothing is overwritten. That is why the file is read once,
+ * under a key of its own, and never refetched behind the organiser's back,
+ * not even when the live stream opens again (`EDITED`): a background
+ * refetch would swap the token under text that was read at the old one. It
+ * is read again after a save, and on Reload.
  *
  * From Save until that fresh read lands the text is read-only and Save is
  * busy: the read replaces the text with the file as saved, and a second save
- * would carry the old token.
+ * would carry the old token. Nothing else makes it busy.
  *
  * The settings files, `contest.yaml` and `task.yaml`, are read here and edited only by an
  * admin while they do not read (SettingsText); a test's files and `plans/` are only read.
@@ -81,8 +83,11 @@ type Sent = WriteFile | RollbackFile;
 export function FileEditor({ place, path }: { place: Place; path: string }) {
   const queryClient = useQueryClient();
   const admin = holdsAt(useMe().roles, place, 'admin');
+  const { queryKey, queryFn } = fileQuery(place, path);
   const query = useQuery({
-    ...fileQuery(place, path),
+    queryKey: [...queryKey, 'editor'],
+    queryFn,
+    meta: EDITED,
     staleTime: Infinity,
     gcTime: 0,
     refetchOnWindowFocus: false,
@@ -102,11 +107,8 @@ export function FileEditor({ place, path }: { place: Place; path: string }) {
     'post',
     '/api/v1/orgs/{org}/contests/{contest}/tasks/{task}/files/{path}/rollback',
   );
-  const busy =
-    writeContest.isPending ||
-    writeTask.isPending ||
-    rollBackTask.isPending ||
-    query.isFetching;
+  /** From Save until the file as saved is read back. */
+  const [busy, setBusy] = useState(false);
   const [outcome, setOutcome] = useState<Outcome<Sent> | null>(null);
   /** The text a save someone else's beat tried to write, while both are shown. */
   const [conflict, setConflict] = useState<WriteFile | null>(null);
@@ -116,6 +118,15 @@ export function FileEditor({ place, path }: { place: Place; path: string }) {
   const [focusText, setFocusText] = useState(false);
 
   const save = async (body: Sent) => {
+    setBusy(true);
+    try {
+      await send(body);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const send = async (body: Sent) => {
     setOutcome(null);
     setConflict(null);
     setFocusText(false);
@@ -215,20 +226,11 @@ export function FileEditor({ place, path }: { place: Place; path: string }) {
         textEditor
       )}
       {kept !== null && (
-        <div className={shared.stack}>
-          <CodeEditor
-            label="Your text from before, to copy from"
-            value={kept}
-            language={languageOf(path)}
-            rows={10}
-            readOnly
-          />
-          <div className={shared.actions}>
-            <Button size="xs" variant="secondary" onClick={() => setKept(null)}>
-              Done with it
-            </Button>
-          </div>
-        </div>
+        <KeptText
+          text={kept}
+          language={languageOf(path)}
+          onDone={() => setKept(null)}
+        />
       )}
       {conflict !== null && (
         <TextConflict

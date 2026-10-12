@@ -18,7 +18,6 @@ const TOP: Record<string, string> = {
   visibility: 'Who sees it',
   registration: 'How people enter',
   entrants: 'Teams',
-  on_system_error: 'When grading fails',
   tasks: 'Tasks',
   leaderboards: 'Leaderboards',
 };
@@ -52,10 +51,6 @@ const VALUES: Record<string, Record<string, string>> = {
   locks: {
     start: 'When the contest starts',
     first_submission: 'At its first submission',
-  },
-  on_system_error: {
-    grading: 'Wait for the organisers',
-    last_result: 'Use the last good result',
   },
   who: wordsOf(WHO),
   over: wordsOf(OVER),

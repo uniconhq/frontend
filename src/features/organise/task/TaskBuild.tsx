@@ -625,8 +625,8 @@ export function TaskBuild({
   manager: boolean;
 }) {
   const file = useOwnFile(place, PATH);
-  const workflowForm = useWorkflowForm(place);
-  const folders = useTestFolders(place);
+  const workflowForm = useWorkflowForm(place, true);
+  const folders = useTestFolders(place, true);
   if (file.isPending || workflowForm.isPending || folders.state === 'loading') {
     return <PageSkeleton rows={8} />;
   }

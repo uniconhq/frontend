@@ -74,6 +74,10 @@ function NewWorkflowForm({
         options={STARTS.map((option) => ({
           ...option,
           disabled: option.value === 'copy' && choices.length === 0,
+          reason:
+            listed.state === 'ready'
+              ? 'No workflow you can read has a version yet.'
+              : 'The workflows you can read are still loading.',
         }))}
         onChange={setStart}
       />

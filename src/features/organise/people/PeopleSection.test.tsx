@@ -110,7 +110,7 @@ describe('the organisers section', () => {
     await screen.findByRole('table', { name: / organisers$/ });
     await user.click(screen.getByRole('button', { name: 'Change role of dee' }));
     const form = screen.getByRole('form', { name: 'Change role of dee' });
-    await user.selectOptions(within(form).getByLabelText('Role'), 'observer');
+    await user.click(within(form).getByRole('radio', { name: 'Observer' }));
     await user.click(within(form).getByRole('button', { name: 'Save' }));
 
     // The save replaces dee's row with a new one, so the row is found afresh each try.
@@ -180,7 +180,7 @@ describe('the organisers section', () => {
     await screen.findByRole('table', { name: / organisers$/ });
     await user.click(screen.getByRole('button', { name: 'Change role of kenny' }));
     const form = screen.getByRole('form', { name: 'Change role of kenny' });
-    await user.selectOptions(within(form).getByLabelText('Role'), 'manager');
+    await user.click(within(form).getByRole('radio', { name: 'Manager' }));
     await user.click(within(form).getByRole('button', { name: 'Save' }));
 
     const alert = await within(row('kenny')).findByRole('alert');
@@ -220,12 +220,15 @@ describe('the organisers section', () => {
     expect(within(row('kenny')).getByText('This contest')).toBeVisible();
     await user.click(screen.getByRole('button', { name: 'Change role of kenny' }));
     const form = screen.getByRole('form', { name: 'Change role of kenny' });
-    const roles = within(form).getByLabelText('Role');
+    const roles = within(form).getByRole('radiogroup', { name: 'Role' });
     expect(
       within(roles)
-        .getAllByRole('option')
-        .map((option) => option.textContent),
-    ).toEqual(['Manager', 'Observer']);
+        .getAllByRole('radio')
+        .map((option) => option.getAttribute('value')),
+    ).toEqual(['manager', 'observer']);
+    expect(
+      within(roles).getByRole('radio', { name: 'Observer' }),
+    ).toHaveAccessibleDescription('Sees everything here and changes nothing.');
   });
 
   it('keeps a refusal about the role that was sent while another is picked', async () => {
@@ -258,7 +261,7 @@ describe('the organisers section', () => {
     await screen.findByRole('table', { name: / organisers$/ });
     await user.click(screen.getByRole('button', { name: 'Change role of kim' }));
     const form = screen.getByRole('form', { name: 'Change role of kim' });
-    await user.selectOptions(within(form).getByLabelText('Role'), 'admin');
+    await user.click(within(form).getByRole('radio', { name: 'Admin' }));
     await user.click(within(form).getByRole('button', { name: 'Save' }));
 
     const alert = await within(row('kim')).findByRole('alert');
@@ -266,7 +269,7 @@ describe('the organisers section', () => {
     expect(alert).toHaveTextContent(
       'Only an admin of acme/spring may grant admin there.',
     );
-    await user.selectOptions(within(form).getByLabelText('Role'), 'observer');
+    await user.click(within(form).getByRole('radio', { name: 'Observer' }));
     expect(within(row('kim')).getByRole('alert')).toHaveTextContent(
       'Only an admin gives the admin role',
     );

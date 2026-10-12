@@ -6,6 +6,7 @@ import {
   reportUnauthenticated,
   resetSessionExpiry,
 } from '@/session/expired';
+import { EDITED } from './edited';
 import { LiveProvider } from './LiveProvider';
 import { useLiveConnected, useLiveRefused } from './live-context';
 
@@ -233,6 +234,39 @@ describe('where the live stream stands', () => {
 
       act(() => source?.listeners.get('resync')?.());
       expect(stale()).toEqual(reads);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('passes over, on resync and when it opens again, the reads a form or an editor edits from', () => {
+    const client = new QueryClient();
+    const edited = ['get', '/api/v1/orgs/{org}/contests/{contest}/files/{path}', 'own'];
+    const shown = ['get', '/api/v1/orgs/{org}/contests/{contest}/home'];
+    client.getQueryCache().build(client, { queryKey: edited, meta: EDITED });
+    client.setQueryData(edited, {});
+    client.setQueryData(shown, {});
+    const invalidated = (key: unknown[]) =>
+      client.getQueryState(key)?.isInvalidated ?? false;
+    renderProvider(client);
+    const first = FakeSource.last;
+    act(() => first?.onopen?.());
+
+    act(() => first?.listeners.get('resync')?.());
+    expect(invalidated(shown)).toBe(true);
+    expect(invalidated(edited)).toBe(false);
+
+    vi.useFakeTimers();
+    try {
+      client.setQueryData(shown, {});
+      act(() => {
+        if (first) first.readyState = FakeSource.CLOSED;
+        first?.onerror?.();
+        vi.advanceTimersByTime(5_000);
+      });
+      act(() => FakeSource.last?.onopen?.());
+      expect(invalidated(shown)).toBe(true);
+      expect(invalidated(edited)).toBe(false);
     } finally {
       vi.useRealTimers();
     }

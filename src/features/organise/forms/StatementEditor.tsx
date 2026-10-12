@@ -12,6 +12,7 @@ import { PageLink } from '@/ui/PageLink';
 import { taskSectionPath } from '@/lib/sections';
 import type { TaskWhere } from '@/lib/task-pictures';
 import { SaveOutcome, type Outcome } from '../files/SaveOutcome';
+import { KeptText, TextConflict } from '../files/TextConflict';
 import { UploadedFile } from '../files/UploadedFile';
 import type { Place } from '../files/place';
 import { placeOfIn } from '../task/places';
@@ -25,19 +26,38 @@ const PATH = 'statement.md';
  * `statement.md`, the text contestants read, beside the same rendering their
  * task page gives it, the task's own pictures drawn as they will see them. The statement is the task admin's, so a manager reads
  * it here and changes nothing. A save is the save of the task, answered as
- * any other. A statement that is an upload shows as one, never as text.
+ * any other; one someone else's save beat shows both versions, as the
+ * file editor does, and never swaps the text being edited for theirs. A
+ * statement that is an upload shows as one, never as text.
  */
 export function StatementEditor({ place, admin }: { place: Place; admin: boolean }) {
   const query = useOwnFile(place, PATH);
-  const { write, pending } = useFileWrite(place, PATH);
+  const { write } = useFileWrite(place, PATH);
   const [outcome, setOutcome] = useState<Outcome | null>(null);
-  const busy = pending || query.isFetching;
+  // From Save until the statement as saved is read back, the text is
+  // read-only and Save spins: the read replaces the text, and a second save
+  // would carry the old token. Nothing else makes it busy.
+  const [saving, setSaving] = useState(false);
+  /** The save someone else's beat, while both versions are shown. */
+  const [conflict, setConflict] = useState<WriteFile | null>(null);
+  /** The organiser's own text, kept beside theirs to copy from once they go on from it. */
+  const [kept, setKept] = useState<string | null>(null);
 
   const send = async (body: WriteFile) => {
     setOutcome(null);
-    const answer = await write(body);
-    setOutcome(answer);
-    if (answer.kind !== 'refused') await query.refetch();
+    setConflict(null);
+    setSaving(true);
+    try {
+      const answer = await write(body);
+      if (answer.kind === 'refused' && answer.error.code === 'conflict') {
+        setConflict(body);
+        return;
+      }
+      setOutcome(answer);
+      if (answer.kind !== 'refused') await query.refetch();
+    } finally {
+      setSaving(false);
+    }
   };
 
   if (query.isPending) return <PageSkeleton rows={6} />;
@@ -77,7 +97,7 @@ export function StatementEditor({ place, admin }: { place: Place; admin: boolean
             : null
         }
         admin={admin}
-        busy={busy}
+        busy={saving}
         onSave={(content, token) =>
           void send({
             content,
@@ -88,6 +108,24 @@ export function StatementEditor({ place, admin }: { place: Place; admin: boolean
           })
         }
       />
+      {kept !== null && (
+        <KeptText text={kept} language="markdown" onDone={() => setKept(null)} />
+      )}
+      {conflict !== null && (
+        <TextConflict
+          place={place}
+          path={PATH}
+          mine={conflict.content ?? ''}
+          language="markdown"
+          busy={saving}
+          onTakeTheirs={() => {
+            setKept(conflict.content ?? '');
+            setConflict(null);
+            void query.refetch();
+          }}
+          onOverwrite={(theirs) => void send({ ...conflict, token: theirs.token })}
+        />
+      )}
       {outcome !== null && (
         <SaveOutcome
           outcome={outcome}

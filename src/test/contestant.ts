@@ -103,6 +103,7 @@ export function home(overrides: Partial<ContestHome> = {}): ContestHome {
         label: 'A',
         title: 'Sum of Two',
         worth: '100',
+        points: null,
         release: OPEN,
         due: null,
         closes: '2026-09-12T10:30:00Z',

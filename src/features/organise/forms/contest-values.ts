@@ -35,7 +35,6 @@ export type ContestValues = {
   most: string;
   fewest: string;
   locks: string;
-  onSystemError: string;
   /** The task entries in the order the form shows them. */
   tasks: TaskEntryValues[];
   boards: BoardValues[];
@@ -124,7 +123,6 @@ export function readContest(doc: Doc): ContestRead {
       most: isRecord(entrants) ? at('entrants', 'most') : '',
       fewest: isRecord(entrants) ? at('entrants', 'fewest') : '',
       locks: isRecord(entrants) ? at('entrants', 'locks') : '',
-      onSystemError: at('on_system_error'),
       tasks: entries.map((entry, index) => ({
         id: String(entry['id']),
         at: index,
@@ -139,6 +137,13 @@ export function readContest(doc: Doc): ContestRead {
     },
   };
 }
+
+/**
+ * The setting that said what a submission whose grading failed counted as,
+ * retired once a failed grading is retried by itself and a result stays
+ * until a newer one replaces it.
+ */
+const RETIRED = 'on_system_error';
 
 /** A text field's value as the file holds it; an empty one is no key. */
 const text = (value: string) => (value === '' ? undefined : value);
@@ -186,7 +191,9 @@ export function writeContest(
   put(team('most'), before.most, after.most, number, true);
   put(team('fewest'), before.fewest, after.fewest, number, true);
   put(team('locks'), before.locks, after.locks, text, true);
-  put(['on_system_error'], before.onSystemError, after.onSystemError, text);
+  // Retired (#442): the forge refuses any save that still has it, and no
+  // form sets it any more, so every save takes it out.
+  if (doc.has(RETIRED)) doc.delete(RETIRED);
 
   // The list in its new order first, each entry moving with its comments;
   // then each entry's fields, at the entry's new place.

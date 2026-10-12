@@ -6,27 +6,82 @@ import type { BoardValues, OrderKeyValues } from './board-values';
  */
 
 export const OVER = [
-  { value: 'all', label: 'Every result' },
-  { value: 'live', label: 'Results shown during the contest' },
-  { value: 'after_close', label: 'Results shown once each task closes' },
+  {
+    value: 'all',
+    label: 'Every result',
+    description:
+      'Every test group’s points, each group’s joining once entrants can see its results.',
+  },
+  {
+    value: 'live',
+    label: 'Results shown during the contest',
+    description:
+      'Only the test groups whose results entrants see while the contest runs. A group hidden until its task closes is left out.',
+  },
+  {
+    value: 'after_close',
+    label: 'Results shown once each task closes',
+    description:
+      'Only the test groups hidden until their task closes, such as a final set of hidden tests.',
+  },
 ];
 
 export const SELECT = [
-  { value: 'best', label: 'Best submission' },
-  { value: 'best_per_group', label: 'Best submission on each test group' },
-  { value: 'marked', label: 'Best of the submissions an entrant marks' },
+  {
+    value: 'best',
+    label: 'Best submission',
+    description: 'On each task, the one submission that ranks the entrant highest.',
+  },
+  {
+    value: 'best_per_group',
+    label: 'Best submission on each test group',
+    description:
+      'On each task, the most points any submission earned on each test group, added up.',
+  },
+  {
+    value: 'marked',
+    label: 'Best of the submissions an entrant marks',
+    description:
+      'Entrants mark the submissions they want counted, and the best of those counts.',
+  },
 ];
 
 export const WHO = [
-  { value: 'organisers', label: 'Organisers only' },
-  { value: 'contestants', label: 'Entrants' },
-  { value: 'everyone', label: 'Everyone who can see the contest' },
+  {
+    value: 'organisers',
+    label: 'Organisers only',
+    description: 'Every organiser of the contest, observers included.',
+  },
+  {
+    value: 'contestants',
+    label: 'Entrants',
+    description: 'The members of every approved entrant, and the organisers.',
+  },
+  {
+    value: 'everyone',
+    label: 'Everyone who can see the contest',
+    description: 'Anyone the contest is open to, whether they entered or not.',
+  },
 ];
 
 export const KINDS = [
-  { value: 'points', label: 'Points, most first' },
-  { value: 'penalty', label: 'Penalty minutes, fewest first' },
-  { value: 'value', label: 'A value the tasks report' },
+  {
+    value: 'points',
+    label: 'Points, most first',
+    description: 'More points ranks higher.',
+  },
+  {
+    value: 'penalty',
+    label: 'Penalty minutes, fewest first',
+    description:
+      'The minutes from the start to each counted submission, and a set number more for each earlier attempt. Fewer ranks higher.',
+  },
+  {
+    value: 'value',
+    label: 'A value the tasks report',
+    description:
+      'A number the tasks’ workflow reports, such as running time. The workflow says whether higher or lower is better.',
+  },
 ];
 
 /** Why the save would refuse penalty minutes as the first key (C3), or null. */

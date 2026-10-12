@@ -1,5 +1,4 @@
 import { queryView } from '@/api/query';
-import { BodyText } from '@/ui/BodyText';
 import { RadioGroup } from '@/ui/RadioGroup';
 import { Loaded } from '@/ui/feedback/Loaded';
 import { useWorkflowList } from './build-data';
@@ -34,7 +33,9 @@ export function TaskKind({
               options={KINDS.map((kind) => ({
                 value: kind.value,
                 label: kind.label,
+                description: kind.line,
                 disabled: missing.some((each) => each.value === kind.value),
+                reason: 'Its workflow is not available here.',
               }))}
               onChange={(chosen) => {
                 const kind = KINDS.find((each) => each.value === chosen);
@@ -46,11 +47,6 @@ export function TaskKind({
                 });
               }}
             />
-            <BodyText tone="secondary">
-              {KINDS.find((kind) => kind.value === value.kind)?.line}
-              {missing.length > 0 &&
-                ` ${missing.map((kind) => kind.label).join(' and ')}: not available here, so greyed out.`}
-            </BodyText>
             {value.kind === 'other' && (
               <WorkflowPicker
                 value={value.workflow}

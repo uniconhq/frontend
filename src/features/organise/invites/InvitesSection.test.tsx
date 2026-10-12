@@ -146,7 +146,7 @@ describe('the organisers’ invites', () => {
       within(form).getByLabelText('Username or email address', { exact: false }),
       ' dee ',
     );
-    await user.selectOptions(within(form).getByLabelText('Role'), 'observer');
+    await user.click(within(form).getByRole('radio', { name: 'Observer' }));
     await user.click(within(form).getByRole('button', { name: 'Invite' }));
 
     const dee = await row('dee');
@@ -295,11 +295,16 @@ describe('the organisers’ invites', () => {
 
     expect(within(await row('eve')).queryByRole('button')).toBeNull();
     const form = screen.getByRole('form', { name: 'Invite someone' });
-    const options = within(within(form).getByLabelText('Role')).getAllByRole('option');
-    expect(options.map((option) => option.textContent)).toEqual([
-      'Manager',
-      'Observer',
+    const options = within(
+      within(form).getByRole('radiogroup', { name: 'Role' }),
+    ).getAllByRole('radio');
+    expect(options.map((option) => option.getAttribute('value'))).toEqual([
+      'manager',
+      'observer',
     ]);
+    expect(options[0]).toHaveAccessibleDescription(
+      'Changes and publishes, approves registrations, and gives the manager and observer roles.',
+    );
   });
 });
 
@@ -361,7 +366,7 @@ describe('the contestants’ invites', () => {
     ).toEqual(['Invited', 'Place', 'Status', 'Mail', 'Actions']);
 
     const form = screen.getByRole('form', { name: 'Invite someone' });
-    expect(within(form).queryByLabelText('Role')).toBeNull();
+    expect(within(form).queryByRole('radiogroup', { name: 'Role' })).toBeNull();
     await user.type(
       within(form).getByLabelText('Username or email address', { exact: false }),
       'dan@example.org',

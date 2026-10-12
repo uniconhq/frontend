@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { BodyText } from '@/ui/BodyText';
 import { UnsavedNote } from '@/ui/UnsavedNote';
 import { Button } from '@/ui/Button';
 import { RadioGroup } from '@/ui/RadioGroup';
@@ -24,9 +23,8 @@ function teamsOn(values: ContestValues): boolean {
 /**
  * The contest's settings that are neither how people enter, its state, its
  * tasks nor its boards, in sections: its name and description, when it
- * runs, whether people enter in teams, and what a submission whose grading
- * failed counts as. Each section has a heading and a line saying what it is
- * for. A manager sees the admin's settings and cannot change them.
+ * runs, and whether people enter in teams. Each section has a heading and
+ * a line saying what it is for. A manager sees the admin's settings and cannot change them.
  */
 export function ContestSettings({ org, contest }: { org: string; contest: string }) {
   return (
@@ -181,28 +179,6 @@ function SettingsForm({ doc, busy, onSave, admin }: FormProps & { admin: boolean
             </FieldBox>
           </>
         )}
-      </Fieldset>
-
-      <Fieldset
-        legend="When grading fails"
-        note="A grading can fail because of a problem on Unicon’s side, and organisers can cancel one. This says what such a submission counts as until it is graded again. Organisers can still choose differently for one submission on the Gradings page."
-      >
-        <FieldBox name="on_system_error">
-          <RadioGroup
-            label="A submission whose grading failed"
-            value={values.onSystemError === '' ? 'grading' : values.onSystemError}
-            options={[
-              { value: 'grading', label: 'Waits for the organisers' },
-              { value: 'last_result', label: 'Uses its last good result' },
-            ]}
-            onChange={(value) => set('onSystemError', value)}
-          />
-        </FieldBox>
-        <BodyText tone="secondary">
-          {values.onSystemError === 'last_result'
-            ? 'It counts as the latest earlier grading of it that finished with a result, while it has one.'
-            : 'It counts as still being graded until an organiser grades it again, and as nothing once cancelled.'}
-        </BodyText>
       </Fieldset>
 
       <div className={shared.actions}>

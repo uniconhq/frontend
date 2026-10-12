@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useQueryClient, type Query, type QueryClient } from '@tanstack/react-query';
 import { useSession, useSessionExpired } from '@/session';
+import { isEdited } from './edited';
 import { LiveContext, type LiveState } from './live-context';
 
 const LIVE_PATH = '/api/v1/live';
@@ -44,8 +45,12 @@ function useVisible(): boolean {
   return visible;
 }
 
+/** Every read, but those a form or an editor is editing from (`EDITED`). */
 function refetchAll(client: QueryClient) {
-  void client.invalidateQueries(undefined, { cancelRefetch: false });
+  void client.invalidateQueries(
+    { predicate: (query) => !isEdited(query) },
+    { cancelRefetch: false },
+  );
 }
 
 /**
@@ -60,7 +65,8 @@ function refetchAll(client: QueryClient) {
  *
  * Every opening after the tab's first, a tab brought back to the front
  * included, and `resync` refetch everything, since nudges may have been
- * missed meanwhile. The browser reopens a stream that
+ * missed meanwhile, except the reads a form or an editor is editing from
+ * (`EDITED`), whose changes are met at their save. The browser reopens a stream that
  * dropped on its own; one that was refused, a deploy's moment of errors or a
  * session that ended, it gives up on, so it is opened again after a wait that
  * grows, and the session is read again so a signed-out tab stops: once a
