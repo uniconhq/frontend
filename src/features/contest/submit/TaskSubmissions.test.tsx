@@ -914,9 +914,9 @@ describe('a submission opened from the list', () => {
     expect(
       within(detail).getByText(/^100 points, and up to 70 more shown at /),
     ).toBeVisible();
-    expect(within(detail).getByLabelText('Over the tests')).toHaveTextContent(
-      `time_ms${formatExact('12.5')}`,
-    );
+    expect(
+      within(detail).getByRole('group', { name: 'Over all tests' }),
+    ).toHaveTextContent(`time_ms${formatExact('12.5')}`);
 
     const main = within(detail).getByRole('region', { name: 'Group main' });
     expect(within(main).getByText('ACCEPTED')).toBeVisible();
