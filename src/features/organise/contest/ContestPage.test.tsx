@@ -950,6 +950,44 @@ describe('creating a task', () => {
     });
   });
 
+  it('says under each kind of task what it is, and under a greyed one why', async () => {
+    server.use(signedIn, ...repoFiles);
+    standingsAndCreate();
+    server.use(
+      http.get('/api/v1/workflows', () =>
+        HttpResponse.json([
+          {
+            owner: 'unicon',
+            name: 'classic',
+            versions: ['v2'],
+            editable: false,
+            visibility: 'public',
+          },
+        ]),
+      ),
+    );
+    renderApp(CONTEST);
+
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'New task' }));
+    const form = screen.getByRole('form', { name: 'New task' });
+    const classic = await within(form).findByRole('radio', {
+      name: 'Compare output with an answer',
+    });
+    expect(classic).toBeChecked();
+    expect(classic).toHaveAccessibleDescription(
+      'Entrants submit one source file. Each test runs it on an input and compares what it prints with the answer.',
+    );
+    const folder = within(form).getByRole('radio', {
+      name: 'A program of several files',
+    });
+    expect(folder).toBeDisabled();
+    expect(folder).toHaveAccessibleDescription(/Its workflow is not available here\.$/);
+    expect(
+      within(form).getByRole('radiogroup', { name: 'What kind of task' }),
+    ).not.toHaveAccessibleDescription(/not available/);
+  });
+
   it('sends no title when none was given', async () => {
     server.use(signedIn, ...repoFiles);
     const sent = standingsAndCreate();
