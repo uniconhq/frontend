@@ -906,7 +906,7 @@ describe('scoring a task', { timeout: 30_000 }, () => {
 
     const small = fieldGroup(tests, 'small');
     expect(small).toHaveTextContent(
-      'Test weights are set for tests the group does not have: 9 (4).',
+      'Weights are set for tests the group does not have: 9 (4).',
     );
     await userEvent.click(
       within(small).getByRole('button', {

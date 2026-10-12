@@ -16,7 +16,7 @@ const RULE_WEIGHTS: Record<string, string> = {
   worst: 'Points by the worst test',
   pass: 'Points when enough tests pass',
   pass_at: 'Share of tests that must pass',
-  test_weights: 'Test weights',
+  test_weights: 'Weights',
 };
 
 const INPUT_DETAILS: Record<string, string> = {
