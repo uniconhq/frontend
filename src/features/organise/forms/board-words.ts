@@ -205,12 +205,12 @@ function whoWords(board: BoardValues): string {
   const everyone = board.who === 'everyone';
   if (rows === '' || rows === 'all') {
     return everyone
-      ? 'Everyone who can see the contest sees the whole board.'
-      : 'Entrants and organisers see the whole board.';
+      ? 'Everyone who can see the contest sees the whole leaderboard.'
+      : 'Entrants and organisers see the whole leaderboard.';
   }
   if (rows === 'own')
-    return 'Organisers see the whole board, and each entrant only their own row.';
-  return `Organisers see the whole board; ${everyone ? 'everyone else who can see the contest sees' : 'entrants see'} the top ${rows} rows and any row tied with the last of them, and an entrant their own row as well.`;
+    return 'Organisers see the whole leaderboard, and each entrant only their own row.';
+  return `Organisers see the whole leaderboard; ${everyone ? 'everyone else who can see the contest sees' : 'entrants see'} the top ${rows} rows and any row tied with the last of them, and an entrant their own row as well.`;
 }
 
 /**
@@ -218,7 +218,7 @@ function whoWords(board: BoardValues): string {
  * sentences an organiser can check the board against, the same on the
  * Leaderboards page and in how the contest is scored: "highest total first,
  * using each entrant’s best submission. Entrants and organisers see the
- * whole board." `tasks` says which tasks it covers, for a page that shows
+ * whole leaderboard." `tasks` says which tasks it covers, for a page that shows
  * the board on its own; `held` is the test groups of those tasks whose
  * results come out once their task closes, said only where they change
  * what the board counts, or null when they are not known.

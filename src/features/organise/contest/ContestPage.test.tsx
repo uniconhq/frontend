@@ -616,11 +616,11 @@ describe('how the contest is scored (M52)', () => {
     );
     await line(
       part,
-      'Counted on Live: highest total first, using each entrant’s best submission. Entrants and organisers see the whole board. It leaves out test group “hidden”, whose results entrants see only once the task closes.',
+      'Counted on Live: highest total first, using each entrant’s best submission. Entrants and organisers see the whole leaderboard. It leaves out test group “hidden”, whose results entrants see only once the task closes.',
     );
     await line(
       part,
-      'Counted on Final: highest total first, using each entrant’s best submission. Everyone who can see the contest sees the whole board. Results from test group “hidden” join it when the contest ends.',
+      'Counted on Final: highest total first, using each entrant’s best submission. Everyone who can see the contest sees the whole leaderboard. Results from test group “hidden” join it when the contest ends.',
     );
     // A board that does not cover the task is not listed under it.
     expect(part).not.toHaveTextContent('Practice');

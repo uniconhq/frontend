@@ -130,7 +130,7 @@ describe('a board in a sentence (M52)', () => {
         rows: '10',
       }),
     ).toBe(
-      'Highest total first, then fewest penalty minutes, counting nothing for earlier attempts, using each entrant’s best result on each test group, on tasks sum and sort. Organisers see the whole board; everyone else who can see the contest sees the top 10 rows and any row tied with the last of them, and an entrant their own row as well. It leaves out every test group whose results entrants see only once its task closes.',
+      'Highest total first, then fewest penalty minutes, counting nothing for earlier attempts, using each entrant’s best result on each test group, on tasks sum and sort. Organisers see the whole leaderboard; everyone else who can see the contest sees the top 10 rows and any row tied with the last of them, and an entrant their own row as well. It leaves out every test group whose results entrants see only once its task closes.',
     );
   });
 
@@ -138,17 +138,17 @@ describe('a board in a sentence (M52)', () => {
     expect(
       boardSentence({ ...newBoard(), who: 'contestants' }, { tasks: false, held: [] }),
     ).toBe(
-      'highest total first, using each entrant’s best submission. Entrants and organisers see the whole board.',
+      'highest total first, using each entrant’s best submission. Entrants and organisers see the whole leaderboard.',
     );
   });
 
   it('names a held group that joins it once shown, and when, only where it changes something', () => {
     const board = { ...newBoard(), who: 'contestants' };
     expect(boardSentence(board, { tasks: false, held: held.slice(0, 1) })).toBe(
-      'highest total first, using each entrant’s best submission. Entrants and organisers see the whole board. Results from test group “hidden” join it when the contest ends.',
+      'highest total first, using each entrant’s best submission. Entrants and organisers see the whole leaderboard. Results from test group “hidden” join it when the contest ends.',
     );
     expect(boardSentence(board, { held })).toBe(
-      `Highest total first, using each entrant’s best submission, on every task. Entrants and organisers see the whole board. Results from test group “hidden” of task A join it when the contest ends. Results from test group “final” of task B join it when task B closes, ${formatDateTime(new Date('2026-10-03T09:00:00Z'))}.`,
+      `Highest total first, using each entrant’s best submission, on every task. Entrants and organisers see the whole leaderboard. Results from test group “hidden” of task A join it when the contest ends. Results from test group “final” of task B join it when task B closes, ${formatDateTime(new Date('2026-10-03T09:00:00Z'))}.`,
     );
   });
 
@@ -165,7 +165,7 @@ describe('a board in a sentence (M52)', () => {
         { held },
       ),
     ).toBe(
-      'Highest total first, using each entrant’s best submission, on task sum. Organisers see the whole board, and each entrant only their own row. It leaves out test group “hidden”, whose results entrants see only once the task closes.',
+      'Highest total first, using each entrant’s best submission, on task sum. Organisers see the whole leaderboard, and each entrant only their own row. It leaves out test group “hidden”, whose results entrants see only once the task closes.',
     );
   });
 
