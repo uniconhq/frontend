@@ -89,7 +89,10 @@ describe('the workflow editor', () => {
     const panel = await openStep(user, 'run');
     const details = within(panel).getByText('Details').closest('details');
     expect(details).not.toBeNull();
-    expect(details).toHaveTextContent('it runs every test in one container');
+    expect(details).toHaveTextContent(
+      'When it runs for each test, it runs once for all the tests together, rather than once for each.',
+    );
+    expect(details).not.toHaveTextContent(/container/);
     // Each result in the primitive's own words, one line each (M56).
     const results = within(details as HTMLElement).getByRole('list', {
       name: 'Results it reports',
