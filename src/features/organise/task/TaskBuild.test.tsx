@@ -18,6 +18,7 @@ import {
   TASK_API,
   CONTEST_API,
   draftTask,
+  publishedTask,
   publicationList,
   repoFiles,
   taskState,
@@ -217,6 +218,7 @@ function taskBackend(
     content: options.content ?? TASK,
     token: 'token-task',
     upload: null,
+    version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
   };
   const sent: SaveRequest[] = [];
   server.use(
@@ -237,6 +239,7 @@ function taskBackend(
           content: '1 2\n',
           token: `token-${path}`,
           upload: null,
+          version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
         });
       }
       return undefined;
@@ -284,6 +287,7 @@ function taskBackend(
           content: options.contest,
           token: 'token-contest',
           upload: null,
+          version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
         }),
       ),
     );
@@ -494,6 +498,7 @@ describe('the cards that build a task', { timeout: 30_000 }, () => {
               content: 'int main() { return 0; }\n',
               token: 'token-checker',
               upload: null,
+              version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
             })
           : undefined,
       ),
@@ -515,6 +520,8 @@ describe('the cards that build a task', { timeout: 30_000 }, () => {
       new File(['print(1)\n'], 'checker.py'),
     );
     expect(await within(checker).findByText('checker.py, 9 bytes')).toBeVisible();
+    // Waiting for the save, marked as a replaced test's row is.
+    expect(within(checker).getByText('Replaced')).toBeVisible();
     const bar = await screen.findByRole('region', { name: 'Save the task' });
     expect(within(bar).getByRole('list', { name: 'What changed' })).toHaveTextContent(
       'Inputs: checker, a new file',
@@ -671,6 +678,7 @@ describe('the cards that build a task', { timeout: 30_000 }, () => {
               content: `version https://git-lfs.github.com/spec/v1\noid sha256:${'d'.repeat(64)}\nsize 120\n`,
               token: 'token-task',
               upload: { size: 120, digest: 'd'.repeat(64) },
+              version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
             })
           : undefined,
       ),
@@ -1197,7 +1205,7 @@ describe('the tests of a task', { timeout: 30_000 }, () => {
     );
   });
 
-  it('shows a test a file is missing from as Missing in its column, and adds only the whole ones', async () => {
+  it('shows a test a file is missing from as Missing in its column, and adds only the complete ones', async () => {
     const { sent } = taskBackend({ form: { ...CHECKED, inputs: [] } });
     const { tests } = await openTask();
 
@@ -1222,7 +1230,7 @@ describe('the tests of a task', { timeout: 30_000 }, () => {
     const add = within(dialog).getByRole('button', { name: 'Add tests' });
     expect(add).toBeDisabled();
     expect(add).toHaveAccessibleDescription(
-      'No test is whole yet: the table says what each one lacks.',
+      'No test is complete yet: the table says what each one is missing.',
     );
 
     await userEvent.upload(drop, [
@@ -1231,7 +1239,7 @@ describe('the tests of a task', { timeout: 30_000 }, () => {
     ]);
     expect(add).toBeEnabled();
     expect(add).toHaveAccessibleDescription(
-      'Adds 1 test; 1 test that is not whole is left out.',
+      'Adds 1 test; 1 test that is not complete is left out.',
     );
     await userEvent.click(add);
     await save();
@@ -1269,7 +1277,7 @@ describe('the tests of a task', { timeout: 30_000 }, () => {
         .map((header) => header.textContent),
     ).toEqual(['Test', 'input', 'answer', 'Notes']);
     expect(within(table).getByRole('row', { name: /small, test 4/ })).toHaveTextContent(
-      'small, test 44.in, 4 bytes4.out, 2 bytesWhole',
+      'small, test 44.in, 4 bytes4.out, 2 bytesComplete',
     );
     expect(
       within(matched).getByRole('list', { name: 'Not matched' }),
@@ -1495,6 +1503,7 @@ describe('the tests of a task', { timeout: 30_000 }, () => {
           token:
             moved && path === 'tests/small/2/answer' ? 'token-theirs' : `token-${path}`,
           upload: null,
+          version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
         });
       }),
       http.get(`${TASK_API}/history`, () =>
@@ -1548,7 +1557,13 @@ describe('a test opened in place (M50)', { timeout: 30_000 }, () => {
     '\n',
   );
 
-  /** Test 1 of small with an input as long text, an uploaded answer, a binary note, a folder and values. */
+  /** The version the uploaded part was last changed at, as its read says. */
+  const UPLOADED_AT = 'a1b2c3d4e5f6a7b8c9d0a1b2c3d4e5f6a7b8c9d0';
+
+  /**
+   * Test 1 of small with an input as long text, a binary answer, an uploaded
+   * expected answer, a folder, a log too big to show, and values.
+   */
   function richTest() {
     server.use(
       http.get(`${TASK_API}/tree`, ({ request }) => {
@@ -1570,6 +1585,7 @@ describe('a test opened in place (M50)', { timeout: 30_000 }, () => {
             },
             folder('tests/small/1/data'),
             file('tests/small/1/test.yaml', 20),
+            file('tests/small/1/run log.txt', 5_000_000),
           ]);
         }
         if (at === 'tests/small/1/data') {
@@ -1586,12 +1602,27 @@ describe('a test opened in place (M50)', { timeout: 30_000 }, () => {
             content,
             token: `t-${path}`,
             upload: null,
+            version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
           });
         if (path === 'tests/small/1/input') return read(LONG);
         if (path === 'tests/small/1/answer')
           return read(btoa('\u0000\u0001'), 'base64');
         if (path === 'tests/small/1/data/a.csv') return read('x,y\n1,2\n');
         if (path === 'tests/small/1/test.yaml') return read('episodes: 12\nseed: 7\n');
+        if (path === 'tests/small/1/expected') {
+          // An upload reads as its pointer, at the version that last changed it.
+          return HttpResponse.json({
+            path,
+            encoding: 'utf-8',
+            content: 'version https://git-lfs.github.com/spec/v1\n',
+            token: `t-${path}`,
+            upload: { size: 50_000_000, digest: 'ab'.repeat(32) },
+            version: UPLOADED_AT,
+          });
+        }
+        if (path === 'tests/small/1/run log.txt') {
+          throw new Error('A file too big to show is never read whole.');
+        }
         return undefined;
       }),
     );
@@ -1634,6 +1665,7 @@ describe('a test opened in place (M50)', { timeout: 30_000 }, () => {
         'answer',
         'expected',
         'data',
+        'run log',
         'Its values',
       ]);
       const input = within(view).getByRole('region', { name: 'input' });
@@ -1656,7 +1688,24 @@ describe('a test opened in place (M50)', { timeout: 30_000 }, () => {
       const expected = within(view).getByRole('region', { name: 'expected' });
       expect(expected).toHaveTextContent('47.7 MB');
       expect(expected).toHaveTextContent(
-        'It was uploaded, so it is kept by its size and not shown here.',
+        'It was uploaded, so it is shown by its size rather than as text.',
+      );
+      // Downloaded whole through the door, at the version its read says (#444).
+      expect(
+        await within(expected).findByRole('link', { name: 'Download expected' }),
+      ).toHaveAttribute(
+        'href',
+        `/-/downloads/acme/spring/sum/versions/${UPLOADED_AT}/tests/small/1/expected`,
+      );
+
+      // A file too big to show is downloaded at the task's head, never read.
+      const log = within(view).getByRole('region', { name: 'run log' });
+      expect(log).toHaveTextContent('It is too big to show here.');
+      expect(
+        await within(log).findByRole('link', { name: 'Download run log.txt' }),
+      ).toHaveAttribute(
+        'href',
+        `/-/downloads/acme/spring/sum/versions/${publishedTask.head}/tests/small/1/run%20log.txt`,
       );
 
       const data = within(view).getByRole('region', { name: 'data' });

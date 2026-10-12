@@ -1,5 +1,8 @@
 import { expect, test, type Page, type Route } from '@playwright/test';
 
+/** The version the uploaded part of test 1 was last changed at. */
+const UPLOADED_AT = 'a1b2c3d4e5f6a7b8c9d0a1b2c3d4e5f6a7b8c9d0';
+
 /** unicon/classic@v2 as deploy seeds it, its inputs titled for the task's form (#434). */
 const CLASSIC = `inputs:
   submission: {type: file, contestant: true, title: Solution}
@@ -146,6 +149,7 @@ async function stubOrganiserApi(page: Page) {
         content: state.contestYaml,
         token: `token-contest-${String(state.contestSaves)}`,
         upload: null,
+        version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
       });
     }
     const contest = '/api/v1/orgs/acme/contests/spring';
@@ -270,9 +274,26 @@ async function stubOrganiserApi(page: Page) {
         'tests/main/1': [
           { path: 'tests/main/1/input', kind: 'file', size: 4, upload: null },
           { path: 'tests/main/1/answer', kind: 'file', size: 2, upload: null },
+          {
+            path: 'tests/main/1/expected',
+            kind: 'file',
+            size: 130,
+            upload: { size: 10_485_760, digest: 'ab'.repeat(32) },
+          },
         ],
       };
       return json(route, tree[folder] ?? []);
+    }
+    if (path === `${task}/files/${encodeURIComponent('tests/main/1/expected')}`) {
+      // An upload reads as its pointer, at the version that last changed it.
+      return json(route, {
+        path: 'tests/main/1/expected',
+        encoding: 'utf-8',
+        content: 'version https://git-lfs.github.com/spec/v1\n',
+        token: 'token-expected',
+        upload: { size: 10_485_760, digest: 'ab'.repeat(32) },
+        version: UPLOADED_AT,
+      });
     }
     if (path.startsWith(`${task}/files/tests`)) {
       // A test's file, its path one segment of the address, its slashes encoded.
@@ -283,6 +304,7 @@ async function stubOrganiserApi(page: Page) {
         content: at.endsWith('/input') ? '1 2\n' : '3\n',
         token: `token-${at}`,
         upload: null,
+        version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
       });
     }
     if (path === `${task}/files/task.yaml`) {
@@ -292,6 +314,7 @@ async function stubOrganiserApi(page: Page) {
         content: state.taskYaml,
         token: `token-task-${String(state.published)}`,
         upload: null,
+        version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
       });
     }
     if (path === `${task}/files/statement.md`) {
@@ -313,6 +336,7 @@ async function stubOrganiserApi(page: Page) {
         content: 'Write the sum.\n',
         token: `token-${String(state.published)}`,
         upload: null,
+        version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
       });
     }
     return route.fulfill({ status: 404, body: 'not stubbed' });
@@ -488,6 +512,26 @@ test('an organiser reads a test in place, its parts side by side, and is told ho
   const answer = await view.getByRole('region', { name: 'answer' }).boundingBox();
   expect(answer?.x ?? 0).toBeGreaterThan((input?.x ?? 0) + (input?.width ?? 0) - 1);
   expect(Math.abs((answer?.y ?? 0) - (input?.y ?? 0))).toBeLessThan(2);
+
+  // An uploaded part downloads whole through the download door (#444).
+  await page.route('**/-/downloads/**', (route) =>
+    route.fulfill({
+      status: 200,
+      headers: { 'Content-Disposition': 'attachment; filename="expected"' },
+      body: '3\n',
+    }),
+  );
+  const expected = view.getByRole('region', { name: 'expected' });
+  await expect(expected).toContainText(
+    'It was uploaded, so it is shown by its size rather than as text.',
+  );
+  const download = expected.getByRole('link', { name: 'Download expected' });
+  await expect(download).toHaveAttribute(
+    'href',
+    `/-/downloads/acme/spring/sum/versions/${UPLOADED_AT}/tests/main/1/expected`,
+  );
+  const [saved] = await Promise.all([page.waitForEvent('download'), download.click()]);
+  expect(saved.suggestedFilename()).toBe('expected');
 
   await scoring.getByRole('button', { name: 'Add tests', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: 'Add tests' });

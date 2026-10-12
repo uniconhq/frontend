@@ -168,7 +168,7 @@ function Preview({
                 ) : test.problems.length > 0 ? (
                   <strong>A part is missing.</strong>
                 ) : (
-                  'Whole'
+                  'Complete'
                 )}
               </td>
             </tr>
@@ -367,7 +367,7 @@ export function AddTests({
       ? null
       : left === 0
         ? `Adds ${count(whole.length, 'test', 'tests')}.`
-        : `Adds ${count(whole.length, 'test', 'tests')}; ${count(left, 'test that is not whole is', 'tests that are not whole are')} left out.`;
+        : `Adds ${count(whole.length, 'test', 'tests')}; ${count(left, 'test that is not complete is', 'tests that are not complete are')} left out.`;
   /** Why the button is greyed, said beside it. */
   const notReady =
     intoNew && groupProblem !== null
@@ -380,7 +380,7 @@ export function AddTests({
           : (placed[0]?.problems.join(' ') ?? '')
         : placed.length === 0
           ? 'No files dropped yet.'
-          : 'No test is whole yet: the table says what each one lacks.';
+          : 'No test is complete yet: the table says what each one is missing.';
 
   const add = async () => {
     setReading(true);

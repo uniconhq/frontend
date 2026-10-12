@@ -267,6 +267,7 @@ describe('uploading a file of a task again', { timeout: 20_000 }, () => {
               content: 'pointer',
               token: 'token-theirs',
               upload: { size: 2048, digest: 'c'.repeat(64) },
+              version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
             })
           : undefined,
       ),
@@ -416,6 +417,7 @@ describe('uploading a file of a task again', { timeout: 20_000 }, () => {
   });
 
   it('tells an uploaded file from a typed one among every file of the task', async () => {
+    let read = false;
     server.use(
       signedIn,
       taskState,
@@ -434,6 +436,20 @@ describe('uploading a file of a task again', { timeout: 20_000 }, () => {
             ])
           : undefined,
       ),
+      // The forge did not say which version holds it.
+      http.get(`${TASK_API}/files/:path`, ({ params }) => {
+        if (params['path'] === 'train.csv') read = true;
+        return params['path'] === 'train.csv'
+          ? HttpResponse.json({
+              path: 'train.csv',
+              encoding: 'utf-8',
+              content: 'version https://git-lfs.github.com/spec/v1\n',
+              token: 'token-train',
+              upload: { size: 314_572_800, digest: DIGEST },
+              version: null,
+            })
+          : undefined;
+      }),
       ...repoFiles,
     );
     const user = userEvent.setup();
@@ -447,11 +463,17 @@ describe('uploading a file of a task again', { timeout: 20_000 }, () => {
       'notes.md 12 bytes',
     );
     await user.click(train);
+    const shown = await within(all).findByRole('region', { name: 'train.csv' });
     expect(
-      await within(all).findByText(
-        'It was uploaded, so it is kept by its size and not shown here.',
+      within(shown).getByText(
+        'It was uploaded, so it is shown by its size rather than as text.',
       ),
     ).toBeVisible();
+    expect(shown).toHaveTextContent('300 MB');
+    // With no version to download it at, its size alone is shown.
+    await expect.poll(() => read).toBe(true);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(within(shown).queryByRole('link', { name: /Download/ })).toBeNull();
   });
 
   it('offers an observer no upload', async () => {

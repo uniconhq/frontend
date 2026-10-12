@@ -16,6 +16,7 @@ import {
 } from './board-values';
 import {
   boardSentence,
+  type HeldGroup,
   KINDS,
   OVER,
   penaltyRefusal,
@@ -57,12 +58,15 @@ function rowsChoice(rows: string): 'all' | 'own' | 'top' {
 export function BoardFields({
   boards,
   taskIds,
+  held = null,
   refused,
   onChange,
   disabled = false,
 }: {
   boards: BoardValues[];
   taskIds: string[];
+  /** The published tasks' groups whose results come out once their task closes, when known. */
+  held?: HeldGroup[] | null;
   refused: DefinitionError[];
   onChange: (boards: BoardValues[]) => void;
   disabled?: boolean;
@@ -86,6 +90,7 @@ export function BoardFields({
               board={board}
               index={index}
               taskIds={taskIds}
+              held={held}
               refusals={boardRefusals(refused, index)}
               disabled={disabled}
               onChange={(to) => change(index, to)}
@@ -113,6 +118,7 @@ function BoardEntry({
   board,
   index,
   taskIds,
+  held,
   refusals,
   disabled,
   onChange,
@@ -121,6 +127,7 @@ function BoardEntry({
   board: BoardValues;
   index: number;
   taskIds: string[];
+  held: HeldGroup[] | null;
   refusals: Map<string, string[]>;
   disabled: boolean;
   onChange: (to: Partial<BoardValues>) => void;
@@ -159,7 +166,7 @@ function BoardEntry({
     <li data-item={index}>
       <Fieldset legend={title}>
         <div className={shared.panel} role="status" aria-label={`What ${title} ranks`}>
-          <BodyText>{boardSentence(board)}</BodyText>
+          <BodyText>{boardSentence(board, { held })}</BodyText>
         </div>
         {elsewhere.map(([key, messages]) => (
           <p key={key} className={classes.refused} role="alert">

@@ -109,7 +109,7 @@ export function AddPicture({
         <>
           <FileDrop
             label="Picture"
-            description="It is saved with the task at once, and written at the end of the statement for you to move."
+            description="It is saved with the task at once, and a line that shows it is added at the end of the statement, for you to move."
             accept="image/*"
             files={[]}
             onChange={(chosen) => {
@@ -128,8 +128,9 @@ export function AddPicture({
       )}
       {added !== null && (
         <BodyText tone="secondary">
-          {added} is in the task, and the statement shows it from where it is written at
-          its end. Save the statement to keep that.
+          {added} is saved with the task, and the line that shows it is at the end of
+          the statement. Move the line to where the picture belongs, then save the
+          statement.
         </BodyText>
       )}
       {refused !== null && <ErrorBlock error={refused} compact />}

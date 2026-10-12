@@ -342,7 +342,7 @@ describe("the contest's gradings feed", () => {
     const depth = await screen.findByLabelText('Queue');
     await waitFor(() => expect(depth).toHaveTextContent('Failed, waiting for you2'));
     expect(
-      screen.getByText(/is tried again once by itself; after that it waits for you/),
+      screen.getByText(/again once by itself\. If that fails too, it waits for you/),
     ).toBeVisible();
     await user.click(screen.getByRole('link', { name: 'Show the failed gradings' }));
     await waitFor(() => expect(asked.at(-1)).toBe('status=system_error&latest=true'));
@@ -688,7 +688,7 @@ describe('acting on the feed', () => {
     const asked = await screen.findByRole('dialog', { name: 'Retry this grading?' });
 
     expect(asked).toHaveTextContent(
-      "Until the new attempt finishes with a result, the entrant and the leaderboards see attempt 1's.",
+      "Until the new attempt finishes with a result, the entrant and the leaderboards see attempt 1's result.",
     );
   });
 

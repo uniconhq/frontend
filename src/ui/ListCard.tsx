@@ -61,7 +61,8 @@ function useMoreBelow(count: number, body: ReactNode) {
  * The wheel moves the page once the list cannot scroll further. Each row
  * goes to its page and says something about it. With none, one plain line
  * says so; past six, a filter box finds one by name. Its one button sits
- * just under the rows. `notice` is a line above the rows, for what the list cannot show.
+ * just under the rows. `notice` is a line above the rows, for what the list
+ * cannot show.
  * A row may carry a small button of its own, such as editing it in place.
  * `body`, when given, stands in for the rows, for a list still loading or
  * failed.

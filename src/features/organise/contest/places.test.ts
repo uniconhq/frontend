@@ -59,6 +59,11 @@ describe('where a refused setting of the contest is changed', () => {
       '/orgs/acme/contests/spring/entry?field=domains&item=1',
     ],
     [
+      'registration.ways[1].signup.name',
+      'How people enter, way 2: Name of this sign-up',
+      '/orgs/acme/contests/spring/entry?field=name&item=1',
+    ],
+    [
       'registration.ways[0]',
       'How people enter, way 1',
       '/orgs/acme/contests/spring/entry?field=way&item=0',

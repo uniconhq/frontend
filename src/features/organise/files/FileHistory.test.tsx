@@ -128,6 +128,7 @@ describe("a task file's history", () => {
           encoding: 'utf-8',
           content: 'name: sum\n',
           token: 'token-old',
+          version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
         });
       }),
     );
@@ -158,6 +159,7 @@ describe("a task file's history", () => {
               content: POINTER,
               token: 'token-old',
               upload: { size: 2048, digest: 'a'.repeat(64) },
+              version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
             }),
       ),
     );

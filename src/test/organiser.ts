@@ -177,6 +177,7 @@ export const files: Record<string, FileContent> = {
     content: 'name: sum\nworkflow: unicon/classic@v2\n',
     token: 'token-task-yaml',
     upload: null,
+    version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
   },
   'statement.md': {
     path: 'statement.md',
@@ -184,6 +185,7 @@ export const files: Record<string, FileContent> = {
     content: 'Write the sum of two numbers.\n',
     token: 'token-statement',
     upload: null,
+    version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
   },
   'data/testcases/1.in': {
     path: 'data/testcases/1.in',
@@ -191,6 +193,7 @@ export const files: Record<string, FileContent> = {
     content: '1 2\n',
     token: 'token-1-in',
     upload: null,
+    version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
   },
   'data/testcases/logo.png': {
     path: 'data/testcases/logo.png',
@@ -198,6 +201,7 @@ export const files: Record<string, FileContent> = {
     content: 'iVBORw0KGgoA//4=',
     token: 'token-logo',
     upload: null,
+    version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
   },
   'contest.yaml': {
     path: 'contest.yaml',
@@ -215,6 +219,7 @@ export const files: Record<string, FileContent> = {
     ].join('\n'),
     token: 'token-contest-yaml',
     upload: null,
+    version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
   },
 };
 

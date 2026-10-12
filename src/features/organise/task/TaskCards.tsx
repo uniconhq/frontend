@@ -55,7 +55,8 @@ export function AnnouncementsCard({ path }: { path: TaskPath }) {
 export function SettingsCard() {
   return (
     <BodyText>
-      Its title, its settings as they are stored, and every file it holds, to read.
+      Its title and its settings as they are stored; its admins can also read every file
+      it holds.
     </BodyText>
   );
 }

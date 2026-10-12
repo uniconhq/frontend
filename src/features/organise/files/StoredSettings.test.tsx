@@ -194,6 +194,7 @@ const BROKEN = {
   content: 'name: Spring\nstart: [\n',
   token: 'token-broken',
   upload: null,
+  version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
 };
 
 /** The contest with its settings broken, each read counted as `reads` says. */
@@ -456,6 +457,7 @@ describe('mending settings that do not read', () => {
               content: BROKEN_TASK,
               token: 'token-broken',
               upload: null,
+              version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
             })
           : undefined,
       ),

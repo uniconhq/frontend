@@ -66,11 +66,11 @@ function refetchAll(client: QueryClient) {
  * Every opening after the tab's first, a tab brought back to the front
  * included, and `resync` refetch everything, since nudges may have been
  * missed meanwhile, except the reads a form or an editor is editing from
- * (`EDITED`), whose changes are met at their save. The browser reopens a stream that
- * dropped on its own; one that was refused, a deploy's moment of errors or a
- * session that ended, it gives up on, so it is opened again after a wait that
- * grows, and the session is read again so a signed-out tab stops: once a
- * read finds it ended, no stream is opened again. While no
+ * (`EDITED`), whose changes are met at their save. The browser reopens a
+ * stream that dropped on its own; one that was refused, a deploy's moment of
+ * errors or a session that ended, it gives up on, so it is opened again
+ * after a wait that grows, and the session is read again so a signed-out
+ * tab stops: once a read finds it ended, no stream is opened again. While no
  * stream is open, `useLiveConnected` is false and pages poll, and while one
  * waits after a refusal `useLiveRefused` is true and they poll less often.
  */
