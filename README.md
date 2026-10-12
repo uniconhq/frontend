@@ -175,11 +175,11 @@ it as a draft.
 | `/orgs`                                    | the orgs your roles reach, and New org                                                |
 | `/orgs/new`                                | the new org form, then the new org                                                    |
 | `/orgs/:org`                               | the org's display name and description, its contests, New contest, and its organisers |
-| `/orgs/:org/contests/:contest`             | where each task stands, New task, the contest repo's files, and its organisers        |
+| `/orgs/:org/contests/:contest`             | where each task stands, New task, how it is scored, and a card for each section       |
 | `/orgs/:org/contests/:contest/contestants` | every registration, with approve, reject, undo a rejection, remove and extend         |
 | `/orgs/:org/contests/:contest/teams`       | every team, with make, delete, add, move, remove and change the leader                |
 | `/orgs/:org/contests/:contest/gradings`    | every grading of the contest, its queue, and retry, cancel and rejudge                |
-| `/orgs/:org/contests/:contest/tasks/:task` | the task's state, its publications, the task repo's files, and its organisers         |
+| `/orgs/:org/contests/:contest/tasks/:task` | the task's state, the cards that build it, and a card for each section                |
 
 **Every organiser page lives under `/orgs`.** The proxy in `deploy` sends
 exactly `/orgs` and `/orgs/...` to this app, and `/contests/...` for the
@@ -190,8 +190,8 @@ place, `src/lib/organiser-paths.ts`, which the pages and the breadcrumb share.
 
 The pages live in `src/features/organise/`: a sub-folder for each page
 (`orgs/` holds `/orgs` and `/orgs/new`, then `org/`, `contest/`, `contestants/`,
-`teams/`, `gradings/` and `task/`), one for the file tree and editor the contest and task pages
-share (`files/`), one for the settings forms and the statement (`forms/`),
+`teams/`, `gradings/` and `task/`), one for reading, previewing and saving the files the
+contest and task pages share (`files/`), one for the settings forms and the statement (`forms/`),
 and one for the organisers section all three pages share (`people/`). The pieces more than one of those use sit at its top:
 the create form and `Create`, which keeps it behind a New button and
 closes it once the thing is made; the list of links, the definition errors, and what a person's roles

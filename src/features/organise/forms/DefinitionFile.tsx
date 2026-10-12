@@ -5,7 +5,8 @@ import { BodyText } from '@/ui/BodyText';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
 import { PageLink } from '@/ui/PageLink';
-import { contestSectionPath, taskSectionPath } from '@/lib/sections';
+import { taskSectionPath } from '@/lib/sections';
+import { STORED, viewFilePath } from '../contest/places';
 import { SaveOutcome, type Outcome } from '../files/SaveOutcome';
 import { UploadedFile } from '../files/UploadedFile';
 import type { Place } from '../files/place';
@@ -33,8 +34,8 @@ type Merge = { base: string; mine: string };
 /** Where a place's settings are kept as stored, which an admin mends as text when they do not read. */
 function mendAt(place: Place): string {
   return place.kind === 'task'
-    ? taskSectionPath(place.org, place.contest, place.task, 'settings')
-    : `${contestSectionPath(place.org, place.contest, 'files')}?file=contest.yaml`;
+    ? `${taskSectionPath(place.org, place.contest, place.task, 'settings')}#${STORED}`
+    : viewFilePath(place.org, place.contest);
 }
 
 /**

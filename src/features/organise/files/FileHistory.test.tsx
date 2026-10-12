@@ -16,7 +16,8 @@ import {
 
 type Change = components['schemas']['Change'];
 
-const TASK = '/orgs/acme/contests/spring/tasks/sum/files';
+/** The task's Settings page, which holds its settings as stored, with their history. */
+const SETTINGS = '/orgs/acme/contests/spring/tasks/sum/settings';
 const LATEST = '3c4d5e6f7a8b9c0d1e2f';
 /** Publication 2's version, and publication 1's. */
 const SECOND = publications[1]?.version ?? '';
@@ -87,7 +88,7 @@ function history() {
 }
 
 async function openHistory() {
-  renderApp(`${TASK}?file=task.yaml`);
+  renderApp(SETTINGS);
   await screen.findByRole('textbox', { name: 'The task’s settings' });
   await userEvent.click(
     screen.getByRole('button', { name: 'Show the history of task.yaml' }),

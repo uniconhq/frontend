@@ -46,13 +46,13 @@ describe('the breadcrumb', () => {
     ]);
   });
 
-  it('keeps a file open in Files under Files', async () => {
+  it('keeps a part of a section opened by its address under the section', async () => {
     server.use(signedIn);
-    renderApp('/orgs/acme/contests/spring/files?file=contest.yaml');
+    renderApp('/orgs/acme/contests/spring/settings#file');
 
     expect((await trail()).at(-1)).toEqual({
-      label: 'Files',
-      to: '/orgs/acme/contests/spring/files',
+      label: 'Settings',
+      to: '/orgs/acme/contests/spring/settings',
       current: true,
     });
   });

@@ -12,7 +12,7 @@ function article(name: string): string {
 }
 
 /** Words joined as a list is said: "a, b and c". */
-export function listed(words: string[]): string {
+function listed(words: string[]): string {
   if (words.length <= 1) return words.join('');
   return `${words.slice(0, -1).join(', ')} and ${words.at(-1) ?? ''}`;
 }

@@ -8,14 +8,13 @@ import { Markdown } from '@/ui/Markdown';
 import { CodeEditor } from '@/ui/CodeEditor';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
-import { PageLink } from '@/ui/PageLink';
-import { taskSectionPath } from '@/lib/sections';
 import type { TaskWhere } from '@/lib/task-pictures';
 import { SaveOutcome, type Outcome } from '../files/SaveOutcome';
 import { KeptText, TextConflict } from '../files/TextConflict';
 import { UploadedFile } from '../files/UploadedFile';
 import type { Place } from '../files/place';
 import { placeOfIn } from '../task/places';
+import { AddPicture } from './AddPicture';
 import shared from '../organise.module.css';
 import { useFileWrite, useOwnFile } from './file-hooks';
 import classes from './forms.module.css';
@@ -180,7 +179,23 @@ function Source({
           <Markdown task={task ?? undefined}>{text}</Markdown>
         </section>
       </div>
-      {admin && task !== null && <PictureHint task={task} />}
+      {admin && task !== null && (
+        <>
+          <BodyText tone="secondary">
+            A picture shows where the statement has a line such as{' '}
+            <code>![What it shows](public/diagram.png)</code>, for a picture in the
+            task. Add a picture to save one in the task and write that line for it. A
+            picture from anywhere else shows as a link.
+          </BodyText>
+          <AddPicture
+            task={{ kind: 'task', ...task }}
+            disabled={busy}
+            onAdded={(line) =>
+              setText((before) => `${before.replace(/\n*$/, '')}\n\n${line}\n`)
+            }
+          />
+        </>
+      )}
       {admin && (
         <div className={shared.actions}>
           <Button
@@ -194,23 +209,5 @@ function Source({
         </div>
       )}
     </>
-  );
-}
-
-/**
- * How a statement shows a picture: a file uploaded under the task's
- * `public/` folder, named by its path there. Anything else stays a link.
- */
-function PictureHint({ task }: { task: TaskWhere }) {
-  return (
-    <BodyText tone="secondary">
-      To show a picture, upload it in the task&apos;s{' '}
-      <PageLink to={taskSectionPath(task.org, task.contest, task.task, 'files')}>
-        Files
-      </PageLink>{' '}
-      under <code>public/</code> and write{' '}
-      <code>![What it shows](public/diagram.png)</code>. A picture from anywhere else
-      shows as a link.
-    </BodyText>
   );
 }

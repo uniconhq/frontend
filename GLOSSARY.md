@@ -35,36 +35,40 @@ as they make them: `public/` for a statement's pictures, and a test's own
 
 ## Building a task
 
-| Word            | Means                                                                        | Not                                                            |
-| --------------- | ---------------------------------------------------------------------------- | -------------------------------------------------------------- |
-| **workflow**    | the steps that grade a submission, which a task chooses                      | pipeline, grader, checker (for the whole)                      |
-| **step**        | one stage of a workflow, which runs a primitive                              | node, job                                                      |
-| **primitive**   | a ready-made program a step runs, such as Compile or Run program             | component, action                                              |
-| **input**       | a setting a workflow asks of the task, or of the entrant                     | parameter, option, field (for these)                           |
-| **test**        | one case a submission is graded on                                           | test case, sample (unless it is a sample group)                |
-| **test group**  | tests scored together under one rule                                         | subtask, group alone (except where "test group" was just said) |
-| **statement**   | the text entrants read about a task                                          | description, problem text                                      |
-| **publication** | a saved version of a task that grades; every save without problems publishes | release, version (for a task), deploy                          |
-| **draft**       | a save kept without publishing, because it has problems or was held back     | kept back                                                      |
-| **upload**      | a file put into a task from the organiser's computer, with Upload and save   |                                                                |
+| Word                   | Means                                                                                         | Not                                                            |
+| ---------------------- | --------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| **workflow**           | the steps that grade a submission, which a task chooses                                       | pipeline, grader, checker (for the whole)                      |
+| **step**               | one stage of a workflow, which runs a primitive                                               | node, job                                                      |
+| **primitive**          | a ready-made program a step runs, such as Compile or Run program                              | component, action                                              |
+| **input**              | a setting a workflow asks of the task, or of the entrant                                      | parameter, option, field (for these)                           |
+| **test**               | one case a submission is graded on                                                            | test case, sample (unless it is a sample group)                |
+| **part (of a test)**   | one of the files or values a test is made of, named by the workflow, such as input and answer | field (on screen)                                              |
+| **weight (of a test)** | how much a test counts against the others in its group, 1 by default                          | test weight (as a label)                                       |
+| **test group**         | tests scored together under one rule                                                          | subtask, group alone (except where "test group" was just said) |
+| **statement**          | the text entrants read about a task                                                           | description, problem text                                      |
+| **publication**        | a saved version of a task that grades; every save without problems publishes                  | release, version (for a task), deploy                          |
+| **draft**              | a save kept without publishing, because it has problems or was held back                      | kept back                                                      |
+| **upload**             | a file put into a task from the organiser's computer, with Upload and save                    |                                                                |
 
 ## Running a contest
 
-| Word                             | Means                                                                      | Not                                                       |
-| -------------------------------- | -------------------------------------------------------------------------- | --------------------------------------------------------- |
-| **submission**                   | what an entrant sends for a task                                           | attempt (unless counting tries), solution (as a record)   |
-| **grading**                      | one run of a workflow on a submission                                      | judging, evaluation, run (on screen)                      |
-| **rejudge**                      | grade every submission of a task again against its current publication     | regrade (as a button)                                     |
-| **result**                       | what a grading found                                                       | verdict (except the pass/fail word itself)                |
-| **points**                       | what a submission earned on a task                                         | score (except a value a workflow reports for a test)      |
-| **worth**                        | the most points a task gives in a contest                                  | max score, weight                                         |
-| **leaderboard**                  | a ranking of entrants a contest shows, on every page, organisers' included | board (alone), standings (except as a leaderboard's name) |
-| **announcement**                 | a message organisers post to everyone in a contest or task                 | notice, broadcast                                         |
-| **question**                     | something an entrant asks the organisers; organisers answer it             | clarification (on screen)                                 |
-| **extra time**                   | more time given to an entrant on some tasks                                | extension (on screen)                                     |
-| **open (a contest)**             | let entrants see and register for it; it is then **live**                  | publish (for a contest)                                   |
-| **Draft, Live, Ended, Archived** | where a contest stands, in one word                                        | Published, Running, Finished (as its state)               |
-| **Unicon's clock**               | the time every deadline and countdown follows                              | server time                                               |
+| Word                             | Means                                                                                                    | Not                                                       |
+| -------------------------------- | -------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| **submission**                   | what an entrant sends for a task                                                                         | attempt (unless counting tries), solution (as a record)   |
+| **grading**                      | one run of a workflow on a submission                                                                    | judging, evaluation, run (on screen)                      |
+| **rejudge**                      | grade every submission of a task again against its current publication                                   | regrade (as a button)                                     |
+| **result**                       | what a grading found                                                                                     | verdict (except the pass/fail word itself)                |
+| **failed (a grading)**           | a grading that ended on a problem on Unicon's side, with no result; Unicon tries it again once by itself | system error (except as its status on Gradings), broken   |
+| **delayed (a submission)**       | what its entrant reads while its grading has failed and it has no result                                 | still grading, stuck                                      |
+| **points**                       | what a submission earned on a task                                                                       | score (except a value a workflow reports for a test)      |
+| **worth**                        | the most points a task gives in a contest                                                                | max score, weight                                         |
+| **leaderboard**                  | a ranking of entrants a contest shows, on every page, organisers' included                               | board (alone), standings (except as a leaderboard's name) |
+| **announcement**                 | a message organisers post to everyone in a contest or task                                               | notice, broadcast                                         |
+| **question**                     | something an entrant asks the organisers; organisers answer it                                           | clarification (on screen)                                 |
+| **extra time**                   | more time given to an entrant on some tasks                                                              | extension (on screen)                                     |
+| **open (a contest)**             | let entrants see and register for it; it is then **live**                                                | publish (for a contest)                                   |
+| **Draft, Live, Ended, Archived** | where a contest stands, in one word                                                                      | Published, Running, Finished (as its state)               |
+| **Unicon's clock**               | the time every deadline and countdown follows                                                            | server time                                               |
 
 ## How to write
 

@@ -10,7 +10,9 @@ import { FieldBox } from '../contest/ContestFile';
 import { NumberField } from '../forms/fields';
 import { heldTheOtherWay, type InputValues } from '../forms/task-values';
 import { BuildCard, CardPart } from './BuildCard';
-import { inputTitle } from './build-data';
+import { inputTitle, type TaskPlace } from './build-data';
+import { FileSetting } from './FileSetting';
+import type { StagedInput } from './input-files';
 import shared from '../organise.module.css';
 import classes from './task.module.css';
 
@@ -36,6 +38,18 @@ function chosenOf(text: string): string[] {
 type Change = (change: Partial<InputValues>) => void;
 
 /**
+ * What a setting that is a file or a folder is chosen with (M51): the task,
+ * the files chosen for settings and waiting for the save, and what choosing
+ * and undoing do.
+ */
+export type InputFiles = {
+  place: TaskPlace;
+  staged: StagedInput[];
+  onChoose: (declared: DeclaredInput, files: File[], was: string) => void;
+  onUndo: (id: string) => void;
+};
+
+/**
  * What the task gives an input the workflow asks it for, as a field of the
  * input's type: a number, yes or no, one of its options, text or one of the
  * org's secrets, or a file or folder of the task by its path.
@@ -44,11 +58,13 @@ function ValueField({
   declared,
   input,
   onChange,
+  files,
   disabled,
 }: {
   declared: DeclaredInput;
   input: InputValues;
   onChange: Change;
+  files: InputFiles | undefined;
   disabled: boolean;
 }) {
   const label = inputTitle(declared);
@@ -84,6 +100,21 @@ function ValueField({
         description={hint}
         info={info}
         onChange={(value) => onChange({ value })}
+        disabled={disabled}
+      />
+    );
+  }
+  if ((type === 'file' || type === 'folder') && files !== undefined) {
+    return (
+      <FileSetting
+        place={files.place}
+        declared={declared}
+        value={input.value}
+        staged={files.staged.find((each) => each.id === declared.id)}
+        hint={hint}
+        onChoose={(chosen) => files.onChoose(declared, chosen, input.value)}
+        onUndo={() => files.onUndo(declared.id)}
+        onClear={declared.optional ? () => onChange({ value: '' }) : null}
         disabled={disabled}
       />
     );
@@ -255,11 +286,13 @@ function DeclaredItem({
   declared,
   input,
   onChange,
+  files,
   disabled,
 }: {
   declared: DeclaredInput;
   input: InputValues;
   onChange: Change;
+  files: InputFiles | undefined;
   disabled: boolean;
 }) {
   const other = heldTheOtherWay(input);
@@ -298,6 +331,7 @@ function DeclaredItem({
             <ValueField
               declared={declared}
               input={input}
+              files={files}
               onChange={onChange}
               disabled={disabled}
             />
@@ -488,10 +522,13 @@ export function InputsCard({
   onChange,
   onRemove,
   onAdd,
+  files,
   disabled,
 }: {
   /** The inputs the workflow declares, or null when it cannot be read. */
   declared: DeclaredInput[] | null;
+  /** How a setting that is a file or a folder is chosen, when the task can take one. */
+  files?: InputFiles;
   /** Why the workflow cannot be read, when it cannot. */
   workflowProblem: string | null;
   inputs: InputValues[];
@@ -542,6 +579,7 @@ export function InputsCard({
         declared={each}
         input={input}
         onChange={(change) => onChange(each.id, change)}
+        files={files}
         disabled={disabled}
       />
     );

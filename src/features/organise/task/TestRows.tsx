@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { queryView } from '@/api/query';
 import type { DeclaredField, TreeEntry } from '@/api/types';
@@ -10,21 +11,16 @@ import { treeQuery } from '../files/place';
 import { NumberField } from '../forms/fields';
 import type { GroupValues } from '../forms/task-values';
 import { lastPart, type TaskPlace } from './build-data';
+import { partOf } from './parts';
 import { testField } from './places';
 import type { StagedTest } from './staged';
+import { TestView } from './TestView';
 import shared from '../organise.module.css';
 import classes from './task.module.css';
 
 /** A size as short as a test's row says it: "4 B" below a kilobyte, then as everywhere. */
 function shortSize(bytes: number): string {
   return bytes < 1024 ? `${String(bytes)} B` : formatSize(bytes);
-}
-
-/** The part of a test a file in its folder is, by its name: `answer.txt` is `answer`. */
-function partOf(entry: string): string {
-  const [first = ''] = entry.split('/');
-  const dot = first.indexOf('.');
-  return dot < 0 ? first : first.slice(0, dot);
 }
 
 /** One part of a test as its row names it: its name and size, or that it is a folder. */
@@ -105,7 +101,8 @@ const WEIGHT_INFO =
  * answer 2 B", its parts in the workflow's order; its weight where the
  * group's rule reads weights, with what a weight does behind an ⓘ; and
  * Replace and Remove. A test added, replaced or taken out says so on its row
- * until the save, with Undo.
+ * until the save, with Undo. Its name opens it in place, below its row, to
+ * read what it holds (`TestView`).
  */
 export function TestRows({
   place,
@@ -143,6 +140,14 @@ export function TestRows({
     (a, b) => a.localeCompare(b, undefined, { numeric: true }),
   );
   const order = (fields ?? []).map((field) => field.name);
+  const [opened, setOpened] = useState<ReadonlySet<string>>(new Set());
+  const toggle = (name: string) =>
+    setOpened((before) => {
+      const next = new Set(before);
+      if (next.has(name)) next.delete(name);
+      else next.add(name);
+      return next;
+    });
   if (names.length === 0) {
     return (
       <BodyText tone="secondary">
@@ -164,7 +169,14 @@ export function TestRows({
             data-field={testField(name)}
             aria-label={`Test ${name}`}
           >
-            <span className={classes.testName}>Test {name}</span>{' '}
+            <button
+              type="button"
+              className={classes.testName}
+              aria-expanded={opened.has(name)}
+              onClick={() => toggle(name)}
+            >
+              <span aria-hidden="true">{opened.has(name) ? '▾' : '▸'}</span> Test {name}
+            </button>{' '}
             <span className={classes.testFiles}>
               ·{' '}
               {change !== undefined ? (
@@ -224,6 +236,15 @@ export function TestRows({
                   </>
                 )}
               </div>
+            )}
+            {opened.has(name) && (
+              <TestView
+                place={place}
+                group={group.name}
+                test={name}
+                fields={fields}
+                staged={change}
+              />
             )}
           </li>
         );
