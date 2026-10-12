@@ -1,4 +1,5 @@
 import type { WorkflowItem } from '@/api/types';
+import { formatExact, ratioDigits } from '@/lib/exact';
 import { listed } from '@/lib/listed';
 import type { Box } from './layout';
 import type { FieldDecl, InputDecl, Ref, ReportEntry, Workflow } from './model';
@@ -10,7 +11,8 @@ import type { PrimitiveInfo } from './primitives';
  * runs, a port by what it does that the author acts on, and a wire by where
  * its value comes from. What the author never acts on (a primitive taking a
  * batch, its outcome, a port that keeps a secret) has no word here; the
- * step's drawer says it under Details.
+ * step's drawer says it under Details, with what the step gets each time it
+ * runs (`limitsWords`).
  */
 
 /** What the editor, a test and a screen reader call the draft's file. */
@@ -135,4 +137,114 @@ export function readersWords(readers: string[]): string {
   if (readers.length === 0) return 'Nothing uses these yet';
   if (readers.length === 1) return `Used by ${readers[0] ?? ''}`;
   return `Used by ${listed(readers)}`;
+}
+
+/** A time limit in milliseconds as seconds: "60 seconds", "1.5 seconds", "1 second". */
+function seconds(ms: number): string {
+  const { digits } = ratioDigits({ num: BigInt(Math.round(ms)), den: 1000n }, 3);
+  return `${formatExact(digits, 3)} ${digits === '1' ? 'second' : 'seconds'}`;
+}
+
+/** A size in megabytes in its largest whole unit: "1 GB", "256 MB". */
+function megabytes(mb: number): string {
+  return mb >= 1024 && mb % 1024 === 0 ? `${String(mb / 1024)} GB` : `${String(mb)} MB`;
+}
+
+/** A count of a thing: "128 processes", "1 GPU". */
+function counted(count: number, one: string, many: string): string {
+  return `${String(count)} ${count === 1 ? one : many}`;
+}
+
+/** What each limit a primitive takes is, after "up to": its time once when both are equal. */
+function limitParts(limits: Record<string, number>): string[] {
+  const {
+    time_ms: time,
+    cpu_ms: cpu,
+    memory_mb,
+    pids,
+    output_mb,
+    gpus,
+    ...rest
+  } = limits;
+  const times =
+    time !== undefined && cpu !== undefined
+      ? time === cpu
+        ? [`up to ${seconds(time)}`]
+        : [
+            `up to ${seconds(time)} of running time and ${seconds(cpu)} of processor time`,
+          ]
+      : time !== undefined
+        ? [`up to ${seconds(time)}`]
+        : cpu !== undefined
+          ? [`up to ${seconds(cpu)} of processor time`]
+          : [];
+  return [
+    ...times,
+    memory_mb === undefined ? null : `${megabytes(memory_mb)} of memory`,
+    pids === undefined ? null : counted(pids, 'process', 'processes'),
+    output_mb === undefined ? null : `${megabytes(output_mb)} of output`,
+    gpus === undefined || gpus === 0 ? null : counted(gpus, 'GPU', 'GPUs'),
+    ...Object.entries(rest).map(([limit, amount]) => `${String(amount)} ${limit}`),
+  ].filter((part): part is string => part !== null);
+}
+
+/**
+ * Where a port a limit grows from takes its value: "the task’s Time limit"
+ * for a workflow input, named by its title, or the entrant’s when the entrant
+ * gives it; "what its time_limit is given" otherwise.
+ */
+function sourceWords(
+  step: Workflow['steps'][number] | undefined,
+  workflow: Workflow,
+  port: string,
+): string {
+  const value = step?.with[port];
+  if (value?.kind === 'wire' && value.ref.kind === 'inputs') {
+    const name = value.ref.name;
+    const input = workflow.inputs.find((found) => found.id === name);
+    return `the ${input?.contestant === true ? 'entrant’s' : 'task’s'} ${input?.title ?? name}`;
+  }
+  return `what its ${port} is given`;
+}
+
+/**
+ * What a step's container gets each time it runs, in plain words (M56): "What
+ * this step gets each time it runs: up to 60 seconds, 1 GB of memory, 128
+ * processes, 64 MB of output", with each limit a task raises said so ("its
+ * time grows with the task’s Time limit"); null when the primitive gives no
+ * limits. Then whose limits they are. A step runs the entrant's program when
+ * its primitive runs what arrives at a port (`runs`) and raises its limits
+ * from what it is given (`limits_from`), as Run program does to fit the
+ * task's Time limit: the program then runs inside it within those. Compile
+ * runs what arrives too, but takes nothing from the task, so its limits are
+ * its own.
+ */
+export function limitsWords(
+  primitive: PrimitiveInfo,
+  step: Workflow['steps'][number] | undefined,
+  workflow: Workflow,
+): { gets: string; whose: string } | null {
+  const parts = limitParts(primitive.limits);
+  if (parts.length === 0) return null;
+  const raised = new Map<string, string>();
+  for (const [limit, source] of Object.entries(primitive.limits_from)) {
+    const word = LIMIT_WORDS[limit] ?? limit;
+    if (!raised.has(word)) raised.set(word, sourceWords(step, workflow, source.input));
+  }
+  const grows = [...raised].map(([word, from], at) =>
+    at === 0 ? `its ${word} grows with ${from}` : `its ${word} with ${from}`,
+  );
+  const gets = `What this step gets each time it runs: ${parts.join(', ')}${
+    grows.length === 0 ? '' : `; ${listed(grows)}`
+  }.`;
+  const runsProgram =
+    raised.size > 0 &&
+    Object.values(primitive.inputs).some((port) => port.runs === true);
+  const sources = [...new Set(raised.values())];
+  return {
+    gets,
+    whose: runsProgram
+      ? `The entrant’s program runs inside it, within ${listed(sources)}.`
+      : 'These are the step’s own limits, not the entrant’s program’s.',
+  };
 }

@@ -54,7 +54,13 @@ import {
   valueRefusal,
   wireRefusal,
 } from './rules';
-import { portMarks, primitiveTitle, refWords, runsSentence } from './words';
+import {
+  limitsWords,
+  portMarks,
+  primitiveTitle,
+  refWords,
+  runsSentence,
+} from './words';
 import classes from './workflows.module.css';
 
 /**
@@ -303,22 +309,26 @@ function PortValue({
   );
 }
 
-const LIMIT_UNITS: Record<string, string> = {
-  time_ms: 'ms of time',
-  cpu_ms: 'ms of processor time',
-  memory_mb: 'MB of memory',
-  pids: 'processes',
-  output_mb: 'MB of output',
-  gpus: 'GPUs',
-};
-
-/** What the author never acts on, said once in plain words for whoever wants it. */
-function Details({ primitive }: { primitive: PrimitiveInfo }) {
+/**
+ * What the author never acts on, said once in plain words for whoever wants
+ * it: the primitive, how it runs the tests, what result it reports, what it
+ * keeps secret, and what it gets each time it runs and whose limits those
+ * are (M56).
+ */
+function Details({
+  primitive,
+  step,
+  workflow,
+}: {
+  primitive: PrimitiveInfo;
+  step: Workflow['steps'][number];
+  workflow: Workflow;
+}) {
   const secret = Object.entries(primitive.inputs).filter(([, port]) => port.secret);
+  // The outcome port's own sentence until the primitive says each outcome in
+  // words of its own (M56, the second wave).
   const outcome = primitive.outputs.outcome?.description ?? null;
-  const limits = Object.entries(primitive.limits)
-    .map(([limit, amount]) => `${String(amount)} ${LIMIT_UNITS[limit] ?? limit}`)
-    .join(', ');
+  const limits = limitsWords(primitive, step, workflow);
   return (
     <details className={classes.details}>
       <summary>Details</summary>
@@ -333,13 +343,17 @@ function Details({ primitive }: { primitive: PrimitiveInfo }) {
           </li>
         )}
         {primitive.network && <li>It can reach the network.</li>}
-        {outcome !== null && <li>How it went: {outcome}</li>}
+        {outcome !== null && <li>Result it reports: {outcome}</li>}
         {secret.map(([name]) => (
           <li key={name}>
             {name} is kept from the entrant’s program, so a task may give it a secret.
           </li>
         ))}
-        {limits !== '' && <li>Limits on each run: {limits}.</li>}
+        {limits !== null && (
+          <li>
+            {limits.gets} {limits.whose}
+          </li>
+        )}
       </ul>
     </details>
   );
@@ -496,7 +510,7 @@ export function StepPanel({
               </ul>
             </>
           )}
-          <Details primitive={primitive} />
+          <Details primitive={primitive} step={step} workflow={workflow} />
         </>
       )}
       <div>

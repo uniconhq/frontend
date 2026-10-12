@@ -91,11 +91,28 @@ describe('the workflow editor', () => {
     expect(details).not.toBeNull();
     expect(details).toHaveTextContent('it runs every test in one container');
     expect(details).toHaveTextContent(
-      'How it went: Accepted, or the limit the program went over, or a runtime error.',
+      'Result it reports: Accepted, or the limit the program went over, or a runtime error.',
     );
+    // What the step gets, in seconds and whole units, the limits the task raises
+    // said so, and the entrant's program inside it (M56).
+    expect(details).toHaveTextContent(
+      'What this step gets each time it runs: up to 2 seconds, 256 MB of memory, 128 processes, 64 MB of output; its time grows with the task’s time_limit and its memory with the task’s memory_limit. The entrant’s program runs inside it, within the task’s time_limit and the task’s memory_limit.',
+    );
+    expect(details).not.toHaveTextContent(/GPU|ms of/);
     expect(
       within(panel).getByRole('list', { name: 'What it gives' }),
     ).not.toHaveTextContent('outcome');
+  });
+
+  it('says a step’s limits are its own where it does not run the entrant’s program (M56)', async () => {
+    server.use(signedIn, ...workflowBackend(CLASSIC_V2).handlers);
+    const user = userEvent.setup();
+    renderApp(EDITOR_PAGE);
+
+    const compile = await openStep(user, 'compile');
+    expect(within(compile).getByText('Details').closest('details')).toHaveTextContent(
+      'What this step gets each time it runs: up to 60 seconds, 1 GB of memory, 128 processes, 64 MB of output. These are the step’s own limits, not the entrant’s program’s.',
+    );
   });
 
   it('refuses a wire a version would refuse, saying why, in the port’s menu', async () => {
