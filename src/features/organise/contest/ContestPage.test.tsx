@@ -479,7 +479,9 @@ describe('how the contest is scored', () => {
     });
     const sort = await within(card).findByRole('region', { name: 'A · sort' });
     expect(
-      await within(sort).findByText('small earns its 15 when every test passes.'),
+      await within(sort).findByText(
+        'Test group “small”: An entrant earns 15 points when every test passes, and nothing otherwise.',
+      ),
     ).toBeVisible();
     expect(sort).toHaveTextContent(
       `Worth 50 points, as the contest sets it. Its test groups total ${formatExact('100')}.`,
@@ -490,7 +492,7 @@ describe('how the contest is scored', () => {
     const sum = within(card).getByRole('region', { name: 'B · sum' });
     expect(
       await within(sum).findByText(
-        'main earns 80 times the share of its tests you passed, and 20 more when you pass them all.',
+        'Test group “main”: Each test passed is worth an equal share of 80 points. Passing every test earns 20 points more.',
       ),
     ).toBeVisible();
     expect(sum).toHaveTextContent(
@@ -539,7 +541,7 @@ describe('how the contest is scored, as published', () => {
     const sum = await within(card).findByRole('region', { name: 'B · sum' });
     expect(
       await within(sum).findByText(
-        'main earns 80 times the share of its tests you passed, and 20 more when you pass them all.',
+        'Test group “main”: Each test passed is worth an equal share of 80 points. Passing every test earns 20 points more.',
       ),
     ).toBeVisible();
     expect(sum).toHaveTextContent(
@@ -768,13 +770,44 @@ describe("the contest's sections", () => {
     );
   });
 
+  it('says how many gradings failed, linking to them on Gradings, and nothing while none has', async () => {
+    let failed = 2;
+    server.use(
+      signedIn,
+      standingList,
+      http.get(`${CONTEST_API}/gradings/queue`, () =>
+        HttpResponse.json({ queued: 0, dispatched: 0, failed }),
+      ),
+    );
+    const { unmount } = renderApp(CONTEST);
+
+    const notice = await screen.findByRole('region', { name: 'Failed gradings' });
+    expect(notice).toHaveTextContent("2 gradings failed on Unicon's side.");
+    expect(
+      within(notice).getByRole('link', { name: 'Show the failed gradings' }),
+    ).toHaveAttribute(
+      'href',
+      '/orgs/acme/contests/spring/gradings?status=system_error&latest=true',
+    );
+    unmount();
+
+    failed = 0;
+    renderApp(CONTEST);
+    expect(
+      await within(await screen.findByRole('region', { name: 'Gradings' })).findByText(
+        'Nothing is waiting to be graded.',
+      ),
+    ).toBeVisible();
+    expect(screen.queryByRole('region', { name: 'Failed gradings' })).toBeNull();
+  });
+
   it('says on each card whether it needs going into', async () => {
     server.use(
       signedIn,
       standingList,
       ...repoFiles,
       http.get(`${CONTEST_API}/gradings/queue`, () =>
-        HttpResponse.json({ queued: 3, dispatched: 1 }),
+        HttpResponse.json({ queued: 3, dispatched: 1, failed: 0 }),
       ),
       http.get(`${CONTEST_API}/announcements`, () =>
         HttpResponse.json([

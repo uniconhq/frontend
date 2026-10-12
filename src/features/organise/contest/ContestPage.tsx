@@ -20,6 +20,7 @@ import {
   BoardsCard,
   EntrantsCard,
   EntryCard,
+  FailedGradings,
   FilesCard,
   GradingsCard,
   QuestionsCard,
@@ -61,7 +62,7 @@ const CARDS: Record<
 /**
  * A contest's page for its organisers: a header with its name, where it
  * stands, the time to its start or end and the page its contestants see;
- * its status, with what opening it needs and the buttons that open, take
+ * how many gradings failed, while any wait; its status, with what opening it needs and the buttons that open, take
  * back and archive it; its settings at a glance; its tasks; and a card for
  * each of its sections, each going to its own page. The forms are on the
  * sections' pages, but for a task's timeline, edited on its row, and the
@@ -96,6 +97,7 @@ export function ContestPage() {
           <PageLink to={contestHomePath(org, contest)}>View as an entrant</PageLink>
         }
       />
+      <FailedGradings path={{ org, contest }} />
       <StatusCard org={org} contest={contest} />
       <ContestSummary org={org} contest={contest} />
       <ContestTasks org={org} contest={contest} />

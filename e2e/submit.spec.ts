@@ -446,6 +446,33 @@ test('a submission that did not compile shows that as its verdict', async ({
   await expect(detail.getByRole('table')).toHaveCount(0);
 });
 
+test('a submission whose grading failed on Unicon’s side reads as delayed', async ({
+  page,
+}) => {
+  await stubApi(page, {
+    submissions: [
+      {
+        number: 1,
+        submitted_at: '2026-09-29T09:30:00Z',
+        late_days: 0,
+        grading: { ...queued, status: 'delayed' },
+      },
+    ],
+  });
+  await page.goto(`${PAGE}?submission=1`);
+
+  const list = page.getByRole('table', { name: 'Your submissions' });
+  await expect(list.getByText('GRADING DELAYED')).toBeVisible();
+  const detail = page.getByRole('region', { name: 'Submission 1' });
+  await expect(detail.getByText('GRADING DELAYED')).toBeVisible();
+  await expect(
+    detail.getByText(
+      "A problem on Unicon's side. Nothing is lost, and it does not use up a submission.",
+    ),
+  ).toBeVisible();
+  await expect(detail.getByRole('table')).toHaveCount(0);
+});
+
 test('an earlier submission lists its files, each a download through the door', async ({
   page,
 }) => {

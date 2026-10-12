@@ -74,7 +74,10 @@ export function cellLines(
   return [...numbers, ...before];
 }
 
-/** How many of the row's own submissions to the task are still grading, in words. */
+/**
+ * How many of the row's own submissions to the task wait for a result, in
+ * words: being graded, or delayed after a grading failed on Unicon's side.
+ */
 export function gradingText(count: number): string | null {
-  return count > 0 ? `${count} still grading` : null;
+  return count > 0 ? `${count} waiting for a result` : null;
 }

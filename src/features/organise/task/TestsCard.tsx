@@ -256,6 +256,7 @@ function AdvancedFields({
 function GroupItem({
   place,
   group,
+  fields,
   folder,
   staged,
   credit,
@@ -274,6 +275,7 @@ function GroupItem({
 }: {
   place: TaskPlace;
   group: GroupValues;
+  fields: DeclaredField[] | null;
   folder: GroupFolder | undefined;
   staged: Staged;
   credit: TaskValues['credit'];
@@ -436,6 +438,7 @@ function GroupItem({
         <TestRows
           place={place}
           group={group}
+          fields={fields}
           saved={saved}
           staged={added}
           removed={removed}
@@ -604,6 +607,7 @@ export function TestsCard({
               key={group.name}
               place={place}
               group={group}
+              fields={fields}
               folder={folders.find((folder) => folder.name === group.name)}
               staged={staged}
               credit={values.credit}

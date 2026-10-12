@@ -63,6 +63,21 @@ describe('how often submissions are read again', () => {
     ).toEqual([1]);
   });
 
+  it('follows a delayed grading, which Unicon tries again by itself, and says when it is graded', () => {
+    const delayed: Submission = {
+      ...submitted(600, 'grading'),
+      grading: { ...done, status: 'delayed' },
+    };
+    expect(pollEvery([delayed], NOW)).toBe(15_000);
+    expect(
+      justFinished([submitted(600, 'grading')], [delayed]).map((found) => found.number),
+    ).toEqual([]);
+    expect(
+      justFinished([delayed], [submitted(600, 'graded')]).map((found) => found.number),
+    ).toEqual([1]);
+    expect(pointsLine(delayed.grading)).toBe('—');
+  });
+
   it('is once a minute when nothing is being graded', () => {
     expect(pollEvery([submitted(3, 'graded')], NOW)).toBe(60_000);
     expect(pollEvery(undefined, NOW)).toBe(60_000);

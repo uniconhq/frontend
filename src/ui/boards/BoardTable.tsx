@@ -61,7 +61,7 @@ function NotInView({ board }: { board: Board }) {
  * one rank, each with its number on every key it is ranked on and its cell
  * on every task. Numbers are rounded for reading, with more digits where
  * two rows next to each other would show alike. The reader's own row also
- * says how many of its submissions are still grading and which it counts,
+ * says how many of its submissions wait for a result and which it counts,
  * each a link where `submissionTo` gives one, and is marked `ownLabel`.
  * `everyRow` is for organisers, whose rows all carry that, so none is marked;
  * a board given with that on more than one row is read so too, wherever it

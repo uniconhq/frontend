@@ -9,6 +9,10 @@ import { entrantsLine, useEntrants } from '../entrants/names';
 import { useInvites } from '../invites/invites';
 import { DEFAULT_WAYS } from '../forms/ways';
 import { BodyText } from '@/ui/BodyText';
+import { PageLink } from '@/ui/PageLink';
+import { contestSectionPath } from '@/lib/sections';
+import { FAILED_SEARCH } from '../gradings/feed';
+import shared from '../organise.module.css';
 import { Loaded } from '@/ui/feedback/Loaded';
 import { useContestSettings } from './settings';
 
@@ -60,16 +64,45 @@ export function EntryCard({ path }: { path: Path }) {
   );
 }
 
+/** The contest's gradings queue, read again now and then while the live stream is down. */
+function useQueue(path: Path) {
+  return $api.useQuery(
+    'get',
+    '/api/v1/orgs/{org}/contests/{contest}/gradings/queue',
+    { params: { path } },
+    { refetchInterval: useFallbackPoll(30_000) },
+  );
+}
+
+/**
+ * How many gradings failed on Unicon's side and wait (#442), with a link to
+ * them on Gradings; nothing while none has, or while the count cannot be
+ * read, which the Gradings card says.
+ */
+export function FailedGradings({ path }: { path: Path }) {
+  const failed = useQueue(path).data?.failed ?? 0;
+  if (failed === 0) return null;
+  return (
+    <section className={shared.panel} aria-label="Failed gradings">
+      <BodyText>
+        {count(failed, 'grading', 'gradings')} failed on Unicon&apos;s side.
+      </BodyText>
+      <BodyText tone="secondary">
+        A grading that fails is tried again once by itself; after that it waits for you
+        to retry or cancel it. Until then its entrant reads that it is delayed.
+      </BodyText>
+      <PageLink
+        to={`${contestSectionPath(path.org, path.contest, 'gradings')}?${FAILED_SEARCH}`}
+      >
+        Show the failed gradings
+      </PageLink>
+    </section>
+  );
+}
+
 /** How many submissions wait to be graded, and how many are being graded. */
 export function GradingsCard({ path }: { path: Path }) {
-  const view = queryView(
-    $api.useQuery(
-      'get',
-      '/api/v1/orgs/{org}/contests/{contest}/gradings/queue',
-      { params: { path } },
-      { refetchInterval: useFallbackPoll(30_000) },
-    ),
-  );
+  const view = queryView(useQueue(path));
   return (
     <Line
       view={view}

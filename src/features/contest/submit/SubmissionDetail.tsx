@@ -12,7 +12,13 @@ import { formatDateTime } from '@/lib/time';
 import { downloadHref, nameOf } from './download';
 import { useLiveConnected, useLiveRefused } from '@/live';
 import { serverNow } from '@/lib/time';
-import { cancelReason, lateness, pollEvery, verdictOf } from './grading';
+import {
+  DELAYED_SENTENCE,
+  cancelReason,
+  lateness,
+  pollEvery,
+  verdictOf,
+} from './grading';
 import shared from '../contest.module.css';
 import classes from './submit.module.css';
 
@@ -24,9 +30,20 @@ type Where = { org: string; contest: string; task: string; number: number };
  * shows it. A grading the organisers cancelled holds their sentence instead,
  * and says the submission no longer counts against the task's limit: a cancel
  * with a sentence is the one the forge leaves out of the limit, so one
- * without (made before cancels carried one) says nothing about the limit.
+ * without (made before cancels carried one) says nothing about the limit. A
+ * delayed one says its grading failed on Unicon's side, and nothing else.
  */
 function Grading({ grading }: { grading: GradingResult }) {
+  if (grading.status === 'delayed') {
+    return (
+      <>
+        <div className={classes.verdict}>
+          <VerdictBadge verdict="delayed" />
+        </div>
+        <BodyText>{DELAYED_SENTENCE}</BodyText>
+      </>
+    );
+  }
   if (grading.status === 'cancelled') {
     const reason = cancelReason(grading);
     return (

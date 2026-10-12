@@ -980,6 +980,34 @@ describe('a submission opened from the list', () => {
     expect(within(detail).getByText(/does not count against the task/)).toBeVisible();
   });
 
+  it('says a delayed grading is delayed on Unicon’s side, in its row and opened, and nothing more', async () => {
+    const delayed = grading({ status: 'delayed' });
+    server.use(
+      signedIn,
+      withPage({}),
+      listing([submission(1, delayed)]),
+      http.get(`${TASK_API}/submissions/:number`, () =>
+        HttpResponse.json(submission(1, delayed)),
+      ),
+    );
+    renderApp(`${PAGE}?submission=1`);
+
+    const list = await screen.findByRole('table', { name: 'Your submissions' });
+    const [, row] = within(list).getAllByRole('row');
+    expect(row).toHaveTextContent(
+      "GRADING DELAYEDA problem on Unicon's side. Nothing is lost, and it does not use up a submission.",
+    );
+    expect(row).not.toHaveTextContent('GRADING DELAYEDGRADING');
+    const detail = await screen.findByRole('region', { name: 'Submission 1' });
+    expect(await within(detail).findByText('GRADING DELAYED')).toBeVisible();
+    expect(
+      within(detail).getByText(
+        "A problem on Unicon's side. Nothing is lost, and it does not use up a submission.",
+      ),
+    ).toBeVisible();
+    expect(within(detail).queryByRole('table')).toBeNull();
+  });
+
   it('says nothing of the limit for a cancel that carries no sentence', async () => {
     const cancelled = grading({ status: 'cancelled', reason: null });
     server.use(

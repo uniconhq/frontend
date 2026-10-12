@@ -68,7 +68,9 @@ export function useOpenedField(ready: boolean, { byItem = true } = {}) {
           box.matches('input, select, textarea, button')
             ? box
             : (box.querySelector('input[type="radio"]:checked:not([disabled])') ??
-              box.querySelector('input:not([disabled]), select, textarea, button'))
+              // A field before a button, so the ⓘ beside a label never takes it.
+              box.querySelector('input:not([disabled]), select, textarea') ??
+              box.querySelector('button'))
         ) as HTMLElement | null;
         target?.focus();
         box.scrollIntoView?.({ block: 'center' });
