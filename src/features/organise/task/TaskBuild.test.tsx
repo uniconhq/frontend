@@ -74,8 +74,26 @@ function folder(path: string): TreeEntry {
 /** The commit a listed file was last changed at, as the tree names it. */
 const LISTED_AT = '9f8e7d6c5b4a39281706f5e4d3c2b1a098765432';
 
+/**
+ * How a test file begins, as the listing gives it of a small text file
+ * (M67): an input "1 2", an answer "3", nothing past 1 KB.
+ */
+function startFor(path: string, size: number): string | null {
+  if (size === 0) return '';
+  if (size > 1024) return null;
+  return path.endsWith('/input') ? '1 2\n' : '3\n';
+}
+
 function file(path: string, size = 4, version: string | null = LISTED_AT): TreeEntry {
-  return { path, kind: 'file', size, upload: null, start: null, token: null, version };
+  return {
+    path,
+    kind: 'file',
+    size,
+    upload: null,
+    start: startFor(path, size),
+    token: `token-${path}`,
+    version,
+  };
 }
 
 /** The tree of the task's tests as `GET <task>/tree?path=` answers it, folder by folder. */
@@ -1852,8 +1870,9 @@ describe('the tests of a task', { timeout: 30_000 }, () => {
     const small = fieldGroup(tests, 'small');
     const rows = within(small).getByRole('list', { name: 'Tests of small' });
     const row = within(rows).getByRole('listitem', { name: 'Test 1' });
-    // Small files: a size would say nothing.
-    await waitFor(() => expect(row).toHaveTextContent('Test 1 · input, answer'));
+    // Small files: what they hold, from what goes in to what comes out; a
+    // size would say nothing.
+    await waitFor(() => expect(row).toHaveTextContent('Test 1 · 1 2 → 3'));
     expect(row).not.toHaveTextContent(/\d B/);
     // Every test weighs 1, so no row has a weight box until asked.
     expect(within(rows).queryByLabelText('Weight')).toBeNull();
@@ -1902,12 +1921,10 @@ describe('the tests of a task', { timeout: 30_000 }, () => {
       name: 'Tests of small',
     });
     const large = within(rows).getByRole('listitem', { name: 'Test 2' });
-    await waitFor(() =>
-      expect(large).toHaveTextContent('Test 2 · input 11.8 MB, answer'),
-    );
+    await waitFor(() => expect(large).toHaveTextContent('Test 2 · input 11.8 MB → 3'));
     const empty = within(rows).getByRole('listitem', { name: 'Test 3' });
     await waitFor(() =>
-      expect(empty).toHaveTextContent('Test 3 · input, answer is empty'),
+      expect(empty).toHaveTextContent('Test 3 · 1 2 → answer is empty'),
     );
     expect(within(empty).getByText('answer is empty')).toHaveClass(/emptyPart/);
   });
@@ -2173,7 +2190,8 @@ describe('a test opened in place (M50)', { timeout: 30_000 }, () => {
       name: 'Tests of small',
     });
     const row = within(rows).getByRole('listitem', { name: 'Test 9' });
-    expect(row).toHaveTextContent('Test 9 · input, answer');
+    // Read from the files chosen, as a saved test's row reads (M67).
+    await waitFor(() => expect(row).toHaveTextContent('Test 9 · 3 4 → 7'));
     await user.click(within(row).getByRole('button', { name: /Test 9/ }));
     const answer = await within(row).findByRole('region', { name: 'answer' });
     expect(await within(answer).findByLabelText('What answer holds')).toHaveTextContent(

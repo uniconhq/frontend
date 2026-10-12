@@ -285,13 +285,27 @@ async function stubOrganiserApi(page: Page) {
           { path: 'tests/main/1', kind: 'directory', size: null, upload: null },
         ],
         'tests/main/1': [
-          { path: 'tests/main/1/input', kind: 'file', size: 4, upload: null },
-          { path: 'tests/main/1/answer', kind: 'file', size: 2, upload: null },
+          // A small text file's start, as the listing gives it (M67); none for an upload.
+          {
+            path: 'tests/main/1/input',
+            kind: 'file',
+            size: 4,
+            upload: null,
+            start: '1 2',
+          },
+          {
+            path: 'tests/main/1/answer',
+            kind: 'file',
+            size: 2,
+            upload: null,
+            start: '3',
+          },
           {
             path: 'tests/main/1/expected',
             kind: 'file',
             size: 130,
             upload: { size: 10_485_760, digest: 'ab'.repeat(32) },
+            start: null,
           },
         ],
       };
@@ -530,7 +544,7 @@ test('an organiser reads a test in place, its parts side by side, and is told ho
 
   const scoring = page.getByRole('region', { name: 'Tests and scoring' });
   const row = scoring.getByRole('listitem', { name: 'Test 1' });
-  await expect(row).toContainText('Test 1 · input, answer');
+  await expect(row).toContainText('Test 1 · 1 2 → 3 → expected 10 MB');
   await row.getByRole('button', { name: /Test 1/ }).click();
   const view = row.getByRole('region', { name: 'What test 1 holds' });
   await expect(view.getByLabel('What input holds')).toHaveText('1 2');

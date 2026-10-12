@@ -1,4 +1,4 @@
-import { Fragment, useState, type ReactNode } from 'react';
+import { Fragment, useEffect, useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { queryView } from '@/api/query';
 import type { DeclaredField, TreeEntry } from '@/api/types';
@@ -20,9 +20,10 @@ import classes from './task.module.css';
 
 /**
  * One part of a test as its row names it: its name, its size, whether it is
- * a folder, and `start`, the first bytes of a small text file as the forge's
- * listing will give them (M67): text, null for a file that is not text or is
- * too large to give, undefined while the listing gives none.
+ * a folder, and `start`, how a small text file begins, as the forge's
+ * listing gives it for a saved file and the page reads it from a staged
+ * one's own bytes (M67): text, null for a file that is not text or is too
+ * large to give, undefined while it is not known yet.
  */
 type Part = {
   part: string;
@@ -36,6 +37,25 @@ const LARGE = 1024;
 
 /** The longest start a row shows of a file, cut short with "…" past it or its first line. */
 const START = 40;
+
+/** How many characters of a file's start the forge's listing gives, and a staged file's read keeps. */
+const START_CHARS = 80;
+
+/**
+ * How a file begins, as the forge's listing says it of a saved file: its
+ * first characters when it is text, valid UTF-8 with no NUL, an empty file
+ * giving an empty start; null when it is not text.
+ */
+function startOf(bytes: Uint8Array): string | null {
+  if (bytes.includes(0)) return null;
+  try {
+    return [...new TextDecoder('utf-8', { fatal: true }).decode(bytes)]
+      .slice(0, START_CHARS)
+      .join('');
+  } catch {
+    return null;
+  }
+}
 
 /** A file's first line, cut short past `START` characters, "…" marking the cut. */
 function startText(start: string): string {
@@ -107,8 +127,7 @@ function SavedParts({
               part: partOf(lastPart(entry.path)),
               size: entry.upload?.size ?? entry.size,
               folder: entry.kind === 'directory',
-              // The listing's first bytes of a small text file plug in here as
-              // `start` once the forge gives them (M67); until then, none.
+              start: entry.start,
             })),
             order,
           )}
@@ -118,18 +137,55 @@ function SavedParts({
   );
 }
 
-/** What a staged test writes, as a row shows it: its parts, a folder's files together. */
-function stagedText(test: StagedTest, order: string[]): ReactNode {
+/**
+ * How each small file a staged test writes begins, read from its own bytes,
+ * by the part it fills: so a row about to be saved reads as a saved one
+ * does. A file over 1 KB, or a folder's, is not read. Empty until read.
+ */
+function useStagedStarts(test: StagedTest): ReadonlyMap<string, string | null> {
+  const [starts, setStarts] = useState<ReadonlyMap<string, string | null>>(new Map());
+  useEffect(() => {
+    let live = true;
+    const small = test.files.filter(
+      (file) =>
+        !file.entry.includes('/') &&
+        file.source.size <= LARGE &&
+        test.files.filter((other) => other.field === file.field).length === 1,
+    );
+    void Promise.all(
+      small.map(async (file): Promise<[string, string | null]> => {
+        try {
+          const blob = await file.source.read();
+          return [file.field, startOf(new Uint8Array(await blob.arrayBuffer()))];
+        } catch {
+          return [file.field, null];
+        }
+      }),
+    ).then((read) => {
+      if (live) setStarts(new Map(read));
+    });
+    return () => {
+      live = false;
+    };
+  }, [test]);
+  return starts;
+}
+
+/** What a staged test writes, as a row shows it: its parts, a folder's files together, each small file's start. */
+function StagedParts({ test, order }: { test: StagedTest; order: string[] }) {
+  const starts = useStagedStarts(test);
   const parts = new Map<string, Part>();
   for (const file of test.files) {
     const before = parts.get(file.field);
+    const folder = file.entry.includes('/') || (before?.folder ?? false);
     parts.set(file.field, {
       part: file.field,
       size: (before?.size ?? 0) + file.source.size,
-      folder: file.entry.includes('/') || (before?.folder ?? false),
+      folder,
+      start: folder ? undefined : starts.get(file.field),
     });
   }
-  return partsText([...parts.values()], order);
+  return <>{partsText([...parts.values()], order)}</>;
 }
 
 const WEIGHT_INFO =
@@ -219,7 +275,7 @@ export function TestRows({
             <span className={classes.testFiles}>
               ·{' '}
               {change !== undefined ? (
-                stagedText(change, order)
+                <StagedParts test={change} order={order} />
               ) : (
                 <SavedParts
                   place={place}
