@@ -285,7 +285,8 @@ function FolderLevel({
                           })
                         }
                       >
-                        {opened ? '▾' : '▸'} {name}/
+                        <span aria-hidden="true">{opened ? '▾ ' : '▸ '}</span>
+                        {name}/
                       </button>
                       {opened && (
                         <FolderLevel
@@ -322,27 +323,32 @@ function FolderLevel({
   );
 }
 
-/** A folder as a small tree, the file chosen in it shown below. */
+/**
+ * A folder as a small tree, the file chosen in it shown below; `path` ""
+ * is the whole of the place, every file it holds.
+ */
 export function SavedFolder({
   place,
   path,
   title = nameOf(path),
+  heading = `${title}, a folder`,
 }: {
   place: Place;
   path: string;
   title?: string;
+  heading?: string;
 }) {
   const [chosen, setChosen] = useState<TreeEntry | null>(null);
   return (
     <section className={classes.part} aria-label={title}>
-      <Head name={`${title}, a folder`} size={null} />
+      <Head name={heading} size={null} />
       <FolderLevel place={place} path={path} chosen={chosen} onChoose={setChosen} />
       {chosen !== null && (
         <SavedFile
           key={chosen.path}
           place={place}
           path={chosen.path}
-          title={chosen.path.slice(path.length + 1)}
+          title={path === '' ? chosen.path : chosen.path.slice(path.length + 1)}
           size={chosen.size}
           upload={chosen.upload}
         />
