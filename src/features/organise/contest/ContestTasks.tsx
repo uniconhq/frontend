@@ -49,8 +49,8 @@ function TaskState({ standing }: { standing: TaskStanding }) {
       ? 'Never published'
       : latest.number === 1
         ? `Publication 1, ${when(latest.at)}`
-        : `Publication ${String(latest.number)}, ${when(latest.at)}, ${
-            latest.grading_changed ? 'changed how it grades' : 'grading unchanged'
+        : `Publication ${String(latest.number)}, ${when(latest.at)}${
+            latest.grading_changed ? ', changed how it grades' : ''
           }`;
   return (
     <>

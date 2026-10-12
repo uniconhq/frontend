@@ -111,10 +111,14 @@ describe("a task file's history", () => {
     expect(items[0]).not.toHaveTextContent('Publication');
     // grace holds no role at the task any more; the history still names her.
     expect(items[1]).toHaveTextContent('grace');
-    expect(items[1]).toHaveTextContent('Publication 2 · grading unchanged');
+    // A publication that changed nothing of how the task grades says nothing of it.
+    expect(items[1]).toHaveTextContent('Publication 2');
+    expect(items[1]).not.toHaveTextContent(/unchanged|how the task grades/);
     expect(items[2]).toHaveTextContent('account 12');
     expect(items[3]).toHaveTextContent('an unknown author');
-    expect(items[3]).toHaveTextContent('Publication 1 · changed how the task grades');
+    // The first publication is how the task first grades: nothing to say of a change.
+    expect(items[3]).toHaveTextContent('Publication 1');
+    expect(items[3]).not.toHaveTextContent(/how the task grades/);
     expect(asked).toEqual(['task.yaml']);
   });
 
