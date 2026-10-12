@@ -18,6 +18,7 @@ import { useContestParams } from '@/lib/route-params';
 import { ContestFile } from '../contest/ContestFile';
 import { useOpenedField } from '../contest/opened';
 import { viewFilePath } from '../contest/places';
+import { useHeldGroups } from '../contest/published';
 import { boardProblems } from '../forms/board-values';
 import { BoardFields } from '../forms/BoardFields';
 import { readContest, writeContest, type ContestValues } from '../forms/contest-values';
@@ -56,15 +57,18 @@ function rowChoices(boards: OrganisedBoard[]): { value: string; label: string }[
  * boards, and everyone else reads them.
  */
 function BoardsForm({
+  org,
+  contest,
   doc,
   busy,
   onSave,
   refused,
   admin,
   manages,
-}: FormProps & { admin: boolean; manages: boolean }) {
+}: FormProps & { org: string; contest: string; admin: boolean; manages: boolean }) {
   const [read] = useState(() => readContest(doc));
   const [values, setValues] = useState<ContestValues>(read.values);
+  const held = useHeldGroups(org, contest, values);
   useOpenedField(true);
   const changed = JSON.stringify(values) !== JSON.stringify(read.values);
   const problems = values.boards.flatMap(boardProblems);
@@ -84,6 +88,7 @@ function BoardsForm({
       <BoardFields
         boards={values.boards}
         taskIds={values.tasks.map((entry) => entry.id)}
+        held={held}
         refused={refused}
         disabled={!manages}
         onChange={(boards) => setValues((before) => ({ ...before, boards }))}
@@ -176,7 +181,9 @@ export function OrganisedBoardsPage() {
     >
       <Card>
         <ContestFile org={org} contest={contest}>
-          {(props) => <BoardsForm {...props} manages={manages} />}
+          {(props) => (
+            <BoardsForm {...props} org={org} contest={contest} manages={manages} />
+          )}
         </ContestFile>
       </Card>
       {view.state === 'loading' && <PageSkeleton rows={4} />}

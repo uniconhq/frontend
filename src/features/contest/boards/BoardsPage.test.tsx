@@ -63,7 +63,7 @@ describe("a contest's boards for a signed-in person", () => {
     expect(own).toHaveAttribute('aria-current', 'true');
     expect(rowOf(table, 'ada')).not.toHaveAttribute('aria-current');
     expect(own).toHaveTextContent('1 attempt before');
-    expect(own).toHaveTextContent('1 still grading');
+    expect(own).toHaveTextContent('1 waiting for a result');
     expect(within(own).getByRole('link', { name: '#2' })).toHaveAttribute(
       'href',
       '/contests/acme/spring/tasks/sum?submission=2',

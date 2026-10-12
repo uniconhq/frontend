@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { toApiError, type ApiError } from '@/api/problem';
 import type { DeclaredField } from '@/api/types';
@@ -15,7 +15,15 @@ import { fileQuery } from '../files/place';
 import { NumberField } from '../forms/fields';
 import { isRecord, parseYaml, textAt, valueAt } from '../forms/yaml-doc';
 import type { TaskPlace } from './build-data';
-import { matchFiles, NAME, type MatchedTest, type Source } from './match';
+import { namingSentences, pairedRefusal, waysOf, zipFolders } from './add-words';
+import {
+  matchFiles,
+  NAME,
+  namingOf,
+  type MatchedTest,
+  type PartNaming,
+  type Source,
+} from './match';
 import { existingOf, testFolder, type StagedTest } from './staged';
 import { readZip, ZipError } from './zip';
 import shared from '../organise.module.css';
@@ -76,6 +84,99 @@ function ValueBox({
     );
   }
   return <TextInput label={field.name} value={value} onChange={onChange} />;
+}
+
+/** A number of things, with the word for one or for many. */
+function count(n: number, one: string, many: string): string {
+  return `${String(n)} ${n === 1 ? one : many}`;
+}
+
+/** How files dropped by name are named for the task's parts, under the drop box. */
+function Naming({ parts }: { parts: PartNaming[] }) {
+  return (
+    <div className={classes.naming} aria-label="How to name the files">
+      {namingSentences(parts).map((line) => (
+        <BodyText key={line} tone="secondary">
+          {line}
+        </BodyText>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * What the files make, a row per test and a column per part, so a missing
+ * file stands out: each part's file and size, or Missing; then where the
+ * test goes and what else stops it.
+ */
+function Preview({
+  tests,
+  parts,
+}: {
+  tests: (MatchedTest & { group: string; replaces: boolean; newGroup: boolean })[];
+  parts: PartNaming[];
+}) {
+  const missing = (part: string) => `It has no ${part}.`;
+  return (
+    <table className={classes.preview} aria-label="Tests the files make">
+      <thead>
+        <tr>
+          <th scope="col">Test</th>
+          {parts.map((part) => (
+            <th key={part.name} scope="col">
+              {part.name}
+            </th>
+          ))}
+          <th scope="col">Notes</th>
+        </tr>
+      </thead>
+      <tbody>
+        {tests.map((test) => {
+          const notes = [
+            ...(test.newGroup && test.group !== '' ? ['In a new group.'] : []),
+            ...(test.replaces ? ['Replaces the test there.'] : []),
+            ...test.problems.filter(
+              (problem) => !parts.some((part) => problem === missing(part.name)),
+            ),
+          ];
+          return (
+            <tr key={`${test.group}/${test.test}`}>
+              <th scope="row">
+                {test.group}, test {test.test}
+              </th>
+              {parts.map((part) => {
+                const files = test.files.filter((file) => file.field === part.name);
+                if (files.length === 0) {
+                  return (
+                    <td key={part.name} className={classes.missing}>
+                      Missing
+                    </td>
+                  );
+                }
+                const size = files.reduce((sum, file) => sum + file.source.size, 0);
+                return (
+                  <td key={part.name}>
+                    {part.folder
+                      ? `${count(files.length, 'file', 'files')}, ${formatSize(size)}`
+                      : `${files[0]?.source.path.split('/').pop() ?? ''}, ${formatSize(size)}`}
+                  </td>
+                );
+              })}
+              <td>
+                {notes.length > 0 ? (
+                  <strong>{notes.join(' ')}</strong>
+                ) : test.problems.length > 0 ? (
+                  <strong>A part is missing.</strong>
+                ) : (
+                  'Complete'
+                )}
+              </td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+  );
 }
 
 /** The values a test has now, read from its `test.yaml`, to start a replacement from. */
@@ -143,6 +244,10 @@ export function AddTests({
   const [values, setValues] = useState<Record<string, string>>({});
   const [reading, setReading] = useState(false);
   const [refused, setRefused] = useState<ApiError | null>(null);
+  const whyNot = useId();
+  const parts = namingOf(fields);
+  const ways = waysOf(parts);
+  const pairedNo = pairedRefusal(parts);
 
   // A replaced test's values start as it has them, once they are read.
   const [seeded, setSeeded] = useState(false);
@@ -155,7 +260,8 @@ export function AddTests({
   const chooseZip = (next: File | null) => {
     setZip(next);
     setZipProblem(null);
-    setZipped(next === null ? null : []);
+    // Null while it is read, so nothing is said of its files until they are known.
+    setZipped(null);
     if (next === null) return;
     readZip(next)
       .then((entries) => {
@@ -172,7 +278,6 @@ export function AddTests({
         }
       })
       .catch((error: unknown) => {
-        setZipped([]);
         setZipProblem(
           error instanceof ZipError ? error.message : 'It could not be read as a zip.',
         );
@@ -255,6 +360,31 @@ export function AddTests({
   // A new group must be named well when a test goes into it.
   const intoNew = group === NEW_GROUP && whole.some((test) => test.group === target);
   const ready = whole.length > 0 && !(intoNew && groupProblem !== null);
+  const left = placed.length - whole.length;
+  /** What the button adds, said beside it once it can. */
+  const addsLine =
+    mode === 'one'
+      ? null
+      : left === 0
+        ? `Adds ${count(whole.length, 'test', 'tests')}.`
+        : `Adds ${count(whole.length, 'test', 'tests')}; ${count(left, 'test that is not complete is', 'tests that are not complete are')} left out.`;
+  /** Why the button is greyed, said beside it. */
+  const notReady =
+    intoNew && groupProblem !== null
+      ? groupProblem
+      : mode === 'one'
+        ? (placed[0]?.problems ?? []).some((problem) =>
+            problem.startsWith('It has no '),
+          )
+          ? `${ways.one.replace(/\.$/, '')} first.`
+          : (placed[0]?.problems.join(' ') ?? '')
+        : placed.length > 0
+          ? 'No test is complete yet: the table says what each one is missing.'
+          : unmatched.length > 0
+            ? 'None of the files dropped makes a test: the list says why for each.'
+            : mode === 'zip' && zip !== null && zipped === null && zipProblem === null
+              ? 'The zip is still being read.'
+              : 'No files dropped yet.';
 
   const add = async () => {
     setReading(true);
@@ -334,12 +464,18 @@ export function AddTests({
         )}
         {!replacing && (
           <RadioGroup
-            label="How"
+            label="How do you want to add tests?"
             value={mode}
             options={[
-              { value: 'one', label: 'One test' },
-              { value: 'paired', label: 'Several, from files named by test' },
-              { value: 'zip', label: 'From a zip' },
+              { value: 'one', label: 'One test', description: ways.one },
+              {
+                value: 'paired',
+                label: 'Many files at once',
+                description: ways.paired,
+                disabled: pairedNo !== null,
+                reason: pairedNo,
+              },
+              { value: 'zip', label: 'A zip', description: ways.zip },
             ]}
             onChange={(value) =>
               setMode(value === 'paired' || value === 'zip' ? value : 'one')
@@ -374,23 +510,21 @@ export function AddTests({
           </>
         )}
         {mode === 'paired' && (
-          <FileDrop
-            label="Test files"
-            description={`Each named after its test, with an ending that says which part it is, such as 1.in and 1.out.`}
-            multiple
-            files={files}
-            onChange={setFiles}
-          />
+          <>
+            <FileDrop label="Test files" multiple files={files} onChange={setFiles} />
+            <Naming parts={parts} />
+          </>
         )}
         {mode === 'zip' && (
           <>
             <FileDrop
               label="Zip of tests"
-              description="Folders for groups and tests, such as small/1/input, or files named by test."
+              description={zipFolders(parts)}
               accept=".zip,application/zip"
               files={zip === null ? [] : [zip]}
               onChange={(next) => chooseZip(next[0] ?? null)}
             />
+            <Naming parts={parts} />
             {zipProblem !== null && <BodyText tone="secondary">{zipProblem}</BodyText>}
           </>
         )}
@@ -420,28 +554,21 @@ export function AddTests({
           </fieldset>
         )}
 
-        {(mode !== 'one' || placed.some((test) => test.files.length > 0)) && (
-          <section aria-label="What was matched" className={classes.matched}>
-            <BodyText>
-              {placed.length === 0
-                ? 'No tests yet.'
-                : `${String(placed.length)} ${placed.length === 1 ? 'test' : 'tests'}:`}
-            </BodyText>
-            <ul className={shared.named}>
-              {placed.map((test) => (
-                <li key={`${test.group}/${test.test}`}>
-                  {test.group}, test {test.test}:{' '}
-                  {test.files
-                    .map((file) => `${file.entry} (${formatSize(file.source.size)})`)
-                    .join(', ') || 'no new files'}
-                  {test.newGroup && test.group !== '' ? ', in a new group' : ''}
-                  {test.replaces ? '; replaces the test there' : ''}
-                  {test.problems.length > 0 && (
-                    <strong> {test.problems.join(' ')}</strong>
-                  )}
-                </li>
-              ))}
-            </ul>
+        {mode !== 'one' && (
+          <section aria-label="What the files make" className={classes.matched}>
+            {placed.length === 0 && unmatched.length === 0 ? (
+              <BodyText tone="secondary">
+                {mode !== 'zip' || zip === null
+                  ? 'Drop files above to see the tests they make.'
+                  : zipped !== null
+                    ? 'The zip holds no files.'
+                    : zipProblem === null
+                      ? 'Reading the zip…'
+                      : null}
+              </BodyText>
+            ) : (
+              placed.length > 0 && <Preview tests={placed} parts={parts} />
+            )}
             {unmatched.length > 0 && (
               <>
                 <BodyText>Not matched to a test:</BodyText>
@@ -458,20 +585,20 @@ export function AddTests({
         )}
         {refused !== null && <ErrorBlock error={refused} compact />}
         <div className={shared.actions}>
-          <Button disabled={!ready} loading={reading} onClick={() => void add()}>
-            {replacing
-              ? 'Replace it'
-              : whole.length === 0
-                ? mode === 'one'
-                  ? 'Add the test'
-                  : 'Add tests'
-                : whole.length === placed.length
-                  ? `Add ${whole.length === 1 ? 'the test' : `${String(whole.length)} tests`}`
-                  : `Add the ${String(whole.length)} whole ${whole.length === 1 ? 'test' : 'tests'}`}
+          <Button
+            disabled={!ready}
+            loading={reading}
+            onClick={() => void add()}
+            aria-describedby={whyNot}
+          >
+            {replacing ? 'Replace it' : mode === 'one' ? 'Add the test' : 'Add tests'}
           </Button>
           <Button variant="secondary" onClick={onClose}>
             Cancel
           </Button>
+          <span id={whyNot} className={classes.why}>
+            {ready ? addsLine : notReady}
+          </span>
         </div>
         <BodyText tone="secondary">
           Nothing is saved yet: the tests are added to the changes you save below.

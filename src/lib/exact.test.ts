@@ -11,6 +11,7 @@ import {
   ratioDigits,
   ratioOf,
   rounded,
+  cut,
   ZERO,
 } from './exact';
 
@@ -65,6 +66,18 @@ describe('rounded', () => {
 
   it('keeps every digit of a number past what a float holds', () => {
     expect(rounded('100000000000000000001.25', 1)).toBe('100000000000000000001.3');
+  });
+});
+
+describe('cut', () => {
+  it('drops the digits past the places, never rounding up', () => {
+    expect(cut('99.996', 2)).toBe('99.99');
+    expect(cut('-2.679', 2)).toBe('-2.67');
+    expect(cut('2.5', 2)).toBe('2.5');
+    expect(cut('82.50', 4)).toBe('82.5');
+    expect(cut('0.0009', 3)).toBe('0');
+    expect(cut('-0.0009', 3)).toBe('0');
+    expect(cut('100000000000000000001.99', 1)).toBe('100000000000000000001.9');
   });
 });
 

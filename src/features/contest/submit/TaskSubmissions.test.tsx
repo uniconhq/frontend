@@ -270,7 +270,7 @@ describe('the submit panel', () => {
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent('Too large for this input');
     expect(alert).toHaveTextContent(
-      'The files for this input may be at most 4 bytes in all.',
+      'The files for this input may be at most 4 B in all.',
     );
     expect(alert).toHaveTextContent('Too large: Your solution');
     expect(store.seen.slots).toHaveLength(0);
@@ -776,7 +776,7 @@ describe('the submissions list', () => {
   });
 
   it('says each submission’s points in its row, or when held-back points are shown', async () => {
-    const held = (shown: string) =>
+    const held = (shown: string | null) =>
       grading({
         ...accepted,
         points: { shown, pending: '70', pending_until: '2026-09-12T14:00:00Z' },
@@ -792,7 +792,7 @@ describe('the submissions list', () => {
             points: { shown: '82.5', pending: '0', pending_until: null },
           }),
         ),
-        submission(2, held('0')),
+        submission(2, held(null)),
         submission(3, held('30')),
         submission(4, grading({ status: 'queued' })),
       ]),
@@ -820,6 +820,33 @@ describe('the submissions list', () => {
 
     const list = await screen.findByRole('table', { name: 'Your submissions' });
     expect(within(list).queryByRole('columnheader', { name: 'Points' })).toBeNull();
+  });
+});
+
+describe('a submission opened from the list, nothing of it shown yet', () => {
+  it('says no points are shown yet and when they are, never a shown 0', async () => {
+    const hidden = grading({
+      ...accepted,
+      points: { shown: null, pending: '70', pending_until: '2026-09-12T14:00:00Z' },
+    });
+    server.use(
+      signedIn,
+      withPage({}),
+      listing([submission(1, hidden)]),
+      http.get(`${TASK_API}/submissions/:number`, () =>
+        HttpResponse.json(submission(1, hidden)),
+      ),
+    );
+    const user = userEvent.setup();
+    renderApp(PAGE);
+
+    await user.click(await screen.findByRole('link', { name: '#1' }));
+
+    const detail = await screen.findByRole('region', { name: 'Submission 1' });
+    expect(
+      await within(detail).findByText(/^No points shown yet: up to 70, shown at /),
+    ).toBeVisible();
+    expect(within(detail).queryByText(/^0 points/)).toBeNull();
   });
 });
 
@@ -978,6 +1005,34 @@ describe('a submission opened from the list', () => {
     ).toBeVisible();
     expect(within(detail).getByText('CANCELLED')).toBeVisible();
     expect(within(detail).getByText(/does not count against the task/)).toBeVisible();
+  });
+
+  it('says a delayed grading is delayed on Unicon’s side, in its row and opened, and nothing more', async () => {
+    const delayed = grading({ status: 'delayed' });
+    server.use(
+      signedIn,
+      withPage({}),
+      listing([submission(1, delayed)]),
+      http.get(`${TASK_API}/submissions/:number`, () =>
+        HttpResponse.json(submission(1, delayed)),
+      ),
+    );
+    renderApp(`${PAGE}?submission=1`);
+
+    const list = await screen.findByRole('table', { name: 'Your submissions' });
+    const [, row] = within(list).getAllByRole('row');
+    expect(row).toHaveTextContent(
+      "GRADING DELAYEDA problem on Unicon's side. Nothing is lost, and it does not use up a submission.",
+    );
+    expect(row).not.toHaveTextContent('GRADING DELAYEDGRADING');
+    const detail = await screen.findByRole('region', { name: 'Submission 1' });
+    expect(await within(detail).findByText('GRADING DELAYED')).toBeVisible();
+    expect(
+      within(detail).getByText(
+        "A problem on Unicon's side. Nothing is lost, and it does not use up a submission.",
+      ),
+    ).toBeVisible();
+    expect(within(detail).queryByRole('table')).toBeNull();
   });
 
   it('says nothing of the limit for a cancel that carries no sentence', async () => {

@@ -181,10 +181,16 @@ describe('your entry in a contest entered in teams', () => {
     renderApp(PAGE);
 
     const part = await yourEntry();
+    await user.click(
+      within(part).getByRole('button', { name: 'Edit the team’s name' }),
+    );
     const name = within(part).getByRole('textbox', { name: 'Team name' });
     await user.clear(name);
     await user.type(name, 'Crimson');
-    await user.click(within(part).getByRole('button', { name: 'Rename' }));
+    await user.click(within(part).getByRole('button', { name: 'Save' }));
+    await waitFor(() =>
+      expect(within(part).queryByRole('textbox', { name: 'Team name' })).toBeNull(),
+    );
     await user.click(within(part).getByRole('button', { name: 'Leave the team' }));
     const dialog = await screen.findByRole('dialog', { name: 'Leave Red?' });
     expect(dialog).toHaveTextContent(
@@ -195,6 +201,76 @@ describe('your entry in a contest entered in teams', () => {
     await screen.findByRole('region', { name: 'Your entry' });
     expect(sent).toEqual([{ name: 'Crimson' }]);
     await expect.poll(() => left).toBe(true);
+  });
+
+  it('renames the team from Edit beside its name, Cancel and Escape sending nothing, and keeps Invite someone to the invite (M41)', async () => {
+    const sent: unknown[] = [];
+    server.use(
+      signedIn,
+      homeWith(() => entry({ ...teams, entrant: red })),
+      http.put(`${MINE}/name`, async ({ request }) => {
+        sent.push(await request.json());
+        return HttpResponse.json(red);
+      }),
+    );
+    const user = userEvent.setup();
+    renderApp(PAGE);
+
+    const part = await yourEntry();
+    // Under Invite someone, only the invite.
+    expect(within(part).queryByRole('form', { name: 'Rename your team' })).toBeNull();
+    expect(within(part).queryByRole('textbox', { name: 'Team name' })).toBeNull();
+    const edit = within(part).getByRole('button', { name: 'Edit the team’s name' });
+    expect(edit.closest('div')).toHaveTextContent('Red');
+
+    await user.click(edit);
+    const form = within(part).getByRole('form', { name: 'Rename your team' });
+    const name = within(form).getByRole('textbox', { name: 'Team name' });
+    expect(name).toHaveValue('Red');
+    expect(name).toHaveFocus();
+    await user.type(name, ' Two');
+    await user.click(within(form).getByRole('button', { name: 'Cancel' }));
+    expect(within(part).queryByRole('textbox', { name: 'Team name' })).toBeNull();
+    await waitFor(() =>
+      expect(
+        within(part).getByRole('button', { name: 'Edit the team’s name' }),
+      ).toHaveFocus(),
+    );
+
+    await user.click(
+      within(part).getByRole('button', { name: 'Edit the team’s name' }),
+    );
+    const again = within(part).getByRole('textbox', { name: 'Team name' });
+    expect(again).toHaveValue('Red');
+    await user.type(again, ' Two{Escape}');
+    expect(within(part).queryByRole('textbox', { name: 'Team name' })).toBeNull();
+
+    await user.click(
+      within(part).getByRole('button', { name: 'Edit the team’s name' }),
+    );
+    const last = within(part).getByRole('textbox', { name: 'Team name' });
+    await user.clear(last);
+    await user.type(last, 'Crimson{Enter}');
+    await waitFor(() => expect(sent).toEqual([{ name: 'Crimson' }]));
+  });
+
+  it('offers no Edit for a team that can no longer change, the name plain text', async () => {
+    for (const fixed of [
+      { ...red, locked: true },
+      { ...red, status: 'rejected' as const },
+    ]) {
+      server.use(
+        signedIn,
+        homeWith(() => entry({ ...teams, entrant: fixed })),
+      );
+      const { unmount } = renderApp(PAGE);
+      const part = await yourEntry();
+      expect(part).toHaveTextContent('Red');
+      expect(
+        within(part).queryByRole('button', { name: 'Edit the team’s name' }),
+      ).toBeNull();
+      unmount();
+    }
   });
 
   it('offers nothing to change once the team is fixed', async () => {

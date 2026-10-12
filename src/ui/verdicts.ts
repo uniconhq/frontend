@@ -25,6 +25,7 @@ const LOOK: Record<Verdict, { label: string; colors: VerdictName }> = {
   done: { label: 'GRADED', colors: 'queued' },
   grading: { label: 'GRADING', colors: 'running' },
   graded: { label: 'GRADED', colors: 'queued' },
+  delayed: { label: 'GRADING DELAYED', colors: 'queued' },
   cancelled: { label: 'CANCELLED', colors: 'queued' },
 };
 

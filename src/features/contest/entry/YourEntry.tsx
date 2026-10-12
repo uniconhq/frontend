@@ -423,45 +423,111 @@ function InviteForm({
   );
 }
 
-/** The team's new name, by any member while the team is not fixed. */
-function RenameForm({
+/**
+ * The team's name at the top of its panel (M41): plain text once the team
+ * can no longer change; until then, with Edit beside it, which turns it into
+ * a box with Save and Cancel in place. Any member may rename the team. Save
+ * or Cancel puts the name back as text, the focus back on Edit; Escape in
+ * the box cancels.
+ */
+function TeamName({
   path,
   entrant,
+  open,
   change,
 }: {
   path: Path;
   entrant: Entrant;
+  open: boolean;
   change: Change;
 }) {
   const rename = $api.useMutation(
     'put',
     '/api/v1/orgs/{org}/contests/{contest}/entrants/mine/name',
   );
+  const [editing, setEditing] = useState(false);
   const [name, setName] = useState(entrant.name ?? '');
   const [problem, setProblem] = useState<string | null>(null);
+  const edit = useRef<HTMLButtonElement>(null);
   const changed = name.trim() !== (entrant.name ?? '');
 
-  const submit = (event: FormEvent) => {
+  const close = () => {
+    setEditing(false);
+    setProblem(null);
+    // Back on Edit once it is drawn again.
+    requestAnimationFrame(() => edit.current?.focus());
+  };
+  const submit = async (event: FormEvent) => {
     event.preventDefault();
+    if (!changed) {
+      close();
+      return;
+    }
     const found = teamNameProblem(name);
     setProblem(found);
     if (found !== null) return;
-    void change.run('rename', () =>
+    const outcome = await change.run('rename', () =>
       rename.mutateAsync({ params: { path }, body: { name: name.trim() } }),
     );
+    if (outcome.ok) close();
   };
 
+  if (!open || !editing) {
+    return (
+      <div className={classes.actions}>
+        <span className={classes.name}>{entrant.display_name}</span>
+        {open && (
+          <Button
+            ref={edit}
+            size="xs"
+            variant="secondary"
+            label="Edit the team’s name"
+            disabled={change.pending !== null}
+            onClick={() => {
+              setName(entrant.name ?? '');
+              setEditing(true);
+            }}
+          >
+            Edit
+          </Button>
+        )}
+      </div>
+    );
+  }
   return (
-    <form className={classes.inline} aria-label="Rename your team" onSubmit={submit}>
-      <TextInput label="Team name" value={name} onChange={setName} maxLength={60} />
+    <form
+      className={classes.inline}
+      aria-label="Rename your team"
+      onSubmit={(event) => void submit(event)}
+      onKeyDown={(event) => {
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          close();
+        }
+      }}
+    >
+      <TextInput
+        label="Team name"
+        value={name}
+        onChange={setName}
+        maxLength={60}
+        autoFocus
+      />
+      <Button
+        size="xs"
+        type="submit"
+        loading={change.pending === 'rename'}
+        disabled={change.pending !== null && change.pending !== 'rename'}
+      >
+        Save
+      </Button>
       <Button
         size="xs"
         variant="secondary"
-        type="submit"
-        loading={change.pending === 'rename'}
-        disabled={!changed || (change.pending !== null && change.pending !== 'rename')}
+        disabled={change.pending === 'rename'}
+        onClick={close}
       >
-        Rename
+        Cancel
       </Button>
       {problem !== null && (
         <div role="alert">
@@ -474,8 +540,8 @@ function RenameForm({
 
 /**
  * The caller's team: who is in it and how each came in, the invites waiting
- * to be accepted, and, until it is fixed, the forms to invite someone and to
- * rename it. The size and lock rules are said plainly above them.
+ * to be accepted, and, until it is fixed, Edit beside its name and the form
+ * to invite someone. The size and lock rules are said plainly above them.
  */
 function TeamPart({
   path,
@@ -502,7 +568,7 @@ function TeamPart({
   return (
     <>
       <div className={classes.panel}>
-        <BodyText>{entrant.display_name}</BodyText>
+        <TeamName path={path} entrant={entrant} open={open} change={change} />
         <BodyText tone="secondary">
           {sizeSentence(entry)} {lockSentence(entry.locks, entrant.locked)}
         </BodyText>
@@ -570,12 +636,6 @@ function TeamPart({
         <>
           <SectionTitle order={3}>Invite someone</SectionTitle>
           <InviteForm path={path} full={full} most={entry.most} change={change} />
-          <RenameForm
-            key={entrant.name}
-            path={path}
-            entrant={entrant}
-            change={change}
-          />
         </>
       )}
     </>

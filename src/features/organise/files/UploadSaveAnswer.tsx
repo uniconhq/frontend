@@ -78,7 +78,8 @@ export function UploadSaveAnswer({
         place={place}
         files={body.changes.map((change) => ({
           path: change.path,
-          label: change.path,
+          // In the words of the page it is changed on, "Statement", not its path.
+          label: placeOf === undefined ? change.path : placeOf(change.path, '').label,
           mine: `Your upload${sizeOf(change.path)}`,
         }))}
         busy={pending}

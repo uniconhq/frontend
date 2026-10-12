@@ -56,17 +56,19 @@ function groupLines(
   if (rule(was) !== rule(now)) lines.push(`${now.name}: how it earns points`);
   if (was.show !== now.show) lines.push(`${now.name}: when entrants see results`);
   if (JSON.stringify(was.weights) !== JSON.stringify(now.weights)) {
-    lines.push(`${now.name}: test weights`);
+    lines.push(`${now.name}: weights`);
   }
   if (!was.read && lines.length === 0) lines.push(`${now.name}: added to scoring`);
   return lines;
 }
 
+/** The lines of a save; `newFiles` are the settings given a new file, each said once as such. */
 export function changeLines(
   before: TaskValues,
   after: TaskValues,
   staged: Staged,
   titles: ReadonlyMap<string, string>,
+  newFiles: readonly string[] = [],
 ): string[] {
   const lines: string[] = [];
   if (before.name !== after.name) lines.push('Title');
@@ -85,6 +87,7 @@ export function changeLines(
     const now = after.inputs.find((input) => input.id === id);
     const name = titles.get(id) ?? id;
     if (now === undefined) lines.push(`Inputs: ${name} removed`);
+    else if (newFiles.includes(id)) lines.push(`Inputs: ${name}, a new file`);
     else if (was === undefined || held(was) !== held(now) || now.shape !== now.kind) {
       lines.push(`Inputs: ${name}`);
     }

@@ -1,16 +1,21 @@
+import { useState } from 'react';
 import { $api, queryView } from '@/api/query';
 import { BodyText } from '@/ui/BodyText';
+import { Button } from '@/ui/Button';
 import { Card } from '@/ui/Card';
+import { SectionTitle } from '@/ui/SectionTitle';
 import { Loaded } from '@/ui/feedback/Loaded';
 import { useMe } from '@/session';
 import { useTaskParams } from '@/lib/route-params';
 import { TASK_SECTIONS, sectionOf } from '@/lib/sections';
 import { formatDateTime } from '@/lib/time';
-import { FileBrowser } from '../files/FileBrowser';
-import { FileEditor } from '../files/FileEditor';
+import { StoredSettings } from '../files/StoredSettings';
+import { SavedFolder } from '../files/FilePreview';
+import type { Place } from '../files/place';
 import { PageLink } from '@/ui/PageLink';
 import { taskPath } from '@/lib/organiser-paths';
 import { savedBy } from './published';
+import { STORED } from '../contest/places';
 import { TitleForm } from './TitleForm';
 import { PeopleSection } from '../people/PeopleSection';
 import { holdsAt } from '../roles';
@@ -45,12 +50,51 @@ export function TaskSettingsPage() {
       <Card>
         <TitleForm place={place} admin={admin} />
       </Card>
-      <section aria-label="The settings as stored" id="file">
+      <section aria-label="The settings as stored" id={STORED}>
         <Card>
-          <FileEditor place={place} path="task.yaml" />
+          <StoredSettings place={place} />
         </Card>
       </section>
+      {admin && <AllFiles place={place} />}
     </SectionPage>
+  );
+}
+
+/**
+ * Every file the task holds, for its admins to read (M51): the files its
+ * forms make, and anything else in it, as a tree, a file chosen shown below.
+ * Nothing here changes a file: the task's forms do that.
+ */
+function AllFiles({ place }: { place: Extract<Place, { kind: 'task' }> }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <Card>
+      <div className={classes.stack}>
+        <SectionTitle>All files</SectionTitle>
+        <BodyText tone="secondary">
+          Every file the task holds, to read but not change. They are changed on the
+          task&apos;s page: tests in Tests and scoring, pictures from the Statement
+          card, and a setting&apos;s file in its box on the Inputs card.
+        </BodyText>
+        <div className={classes.actions}>
+          <Button
+            variant="secondary"
+            aria-expanded={open}
+            onClick={() => setOpen(!open)}
+          >
+            {open ? 'Hide the files' : 'View all files'}
+          </Button>
+        </div>
+        {open && (
+          <SavedFolder
+            place={place}
+            path=""
+            title="The task's files"
+            heading="The task's files"
+          />
+        )}
+      </div>
+    </Card>
   );
 }
 
@@ -131,18 +175,6 @@ export function TaskAnnouncementsPage() {
   return (
     <SectionPage section={sectionOf(TASK_SECTIONS, 'announcements')}>
       <AnnouncementsSection place={place} />
-    </SectionPage>
-  );
-}
-
-/** The task's files, the tree beside the open file, and uploads for a manager. */
-export function TaskFilesPage() {
-  const { place } = useTaskPlace();
-  return (
-    <SectionPage section={sectionOf(TASK_SECTIONS, 'files')}>
-      <Card>
-        <FileBrowser place={place} />
-      </Card>
     </SectionPage>
   );
 }

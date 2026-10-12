@@ -12,6 +12,7 @@ import { readTask } from '../forms/task-values';
 import { readSettings } from './build-data';
 import { TaskStanding } from './TaskHeader';
 import { useOpenedField, whenDrawn } from '../contest/opened';
+import { STORED } from '../contest/places';
 import { fileQuery } from '../files/place';
 import { StatementEditor } from '../forms/StatementEditor';
 import { OrganisersLine } from '../hub/lines';
@@ -22,7 +23,6 @@ import { CARD_PARAM } from './places';
 import { TaskBuild } from './TaskBuild';
 import {
   AnnouncementsCard,
-  FilesCard,
   GradingsCard,
   PublicationsCard,
   SettingsCard,
@@ -38,7 +38,6 @@ const GRID_CARDS: Record<TaskSectionKey, CardLine> = {
   gradings: GradingsCard,
   publications: PublicationsCard,
   announcements: AnnouncementsCard,
-  files: FilesCard,
   organisers: ({ path }) => <OrganisersLine place={{ kind: 'task', ...path }} />,
   settings: SettingsCard,
 };
@@ -107,7 +106,7 @@ export function TaskPage() {
       <PageHeader
         title={<TaskTitle place={place} />}
         links={
-          <PageLink to={`${taskSectionPath(org, contest, task, 'settings')}#file`}>
+          <PageLink to={`${taskSectionPath(org, contest, task, 'settings')}#${STORED}`}>
             View file
           </PageLink>
         }

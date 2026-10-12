@@ -4,6 +4,7 @@ import type { DeclaredField } from '@/api/types';
 import { ratioOf, type Ratio } from '@/lib/exact';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
+import { RadioGroup } from '@/ui/RadioGroup';
 import { Select } from '@/ui/Select';
 import { TextInput } from '@/ui/TextInput';
 import { FieldBox } from '../contest/ContestFile';
@@ -18,7 +19,7 @@ import {
   groupSentence,
   groupWeight,
   pointsOf,
-  pointsText,
+  pointsWords,
   readsWeights,
   ruleOf,
   ruleRefusal,
@@ -26,7 +27,6 @@ import {
   scaled,
   shareProblem,
   showRefusal,
-  showSentence,
   SHOWS,
   taskWeight,
   totalSentence,
@@ -52,30 +52,50 @@ function fieldWords(field: DeclaredField): string {
 const at = (text: string | null | undefined) =>
   text === null || text === undefined ? null : ratioOf(text);
 
-/** Whether a reported value can be what a test earns, and why not. */
+/**
+ * Whether a reported value can be what a test earns, and why not, short
+ * enough to follow the value's name in the list of values.
+ */
 function creditRefusal(entry: ReportEntry, kind: 'value' | 'relative'): string | null {
-  if (entry.fold === null) return 'It is not a number reported for each test.';
+  if (entry.fold === null) return 'not reported for each test';
   const least = entry.atLeast === null ? null : at(entry.atLeast.text);
-  if (least === null || least.num < 0n)
-    return 'The workflow does not promise it is at least 0.';
+  if (least === null || least.num < 0n) return 'not promised to be 0 or more';
   if (kind === 'value') {
     const most = entry.atMost === null ? null : at(entry.atMost.text);
-    if (most === null || most.num > most.den)
-      return 'The workflow does not promise it is at most 1.';
-    if (entry.better === 'lower')
-      return 'Lower is better for it, so it cannot be a score.';
+    if (most === null || most.num > most.den) return 'not promised to be 1 or less';
+    if (entry.better === 'lower') return 'lower is better, so it cannot be a score';
     return null;
   }
-  return entry.better === null
-    ? 'It does not say whether higher or lower is better.'
-    : null;
+  return entry.better === null ? 'says neither higher nor lower is better' : null;
 }
+
+/** How a test can earn, each with an example of what choosing it means. */
+const CREDITS = [
+  {
+    value: 'none',
+    label: 'All when it passes, nothing when it fails',
+    description:
+      'Every test is worth the same; it passes when its answer is accepted, or it does not.',
+  },
+  {
+    value: 'value',
+    label: 'A score the workflow gives it, from 0 to 1',
+    description:
+      'For a checker that gives part marks: a test scored 0.5 earns half of what it is worth.',
+  },
+  {
+    value: 'relative',
+    label: 'Its result against the best anyone reached',
+    description:
+      'For optimisation: where higher is better, reaching 80 on a test where the best anyone reached is 100 earns 80% of it. Its points move as others do better.',
+  },
+];
 
 /**
  * How a test earns, in words: 1 when it passes; or a score the workflow
  * reports, from 0 to 1, such as a checker's; or its value against the best
  * any entrant reached on it. A reported value that cannot be one is listed
- * greyed out, with why.
+ * greyed out, with why in its own name.
  */
 function CreditPart({
   credit,
@@ -97,61 +117,58 @@ function CreditPart({
           label: entry.name,
           reason: creditRefusal(entry, kind),
         }));
-  const refused = options.filter((option) => option.reason !== null);
+  const chosenRefusal =
+    options.find((option) => option.value === credit.name)?.reason ?? null;
   return (
     <CardPart
       title="How a test earns"
       line="What a test gives towards its group’s points."
     >
       <FieldBox name="credit">
-        <div className={classes.grid}>
-          <Select
+        <div className={shared.stack}>
+          <RadioGroup
             label="A test earns"
             value={kind}
-            options={[
-              { value: 'none', label: 'All when it passes, nothing when it fails' },
-              { value: 'value', label: 'A score the workflow gives it, from 0 to 1' },
-              {
-                value: 'relative',
-                label: 'Its result against the best anyone reached',
-              },
-            ]}
+            options={CREDITS}
             onChange={(next) =>
               onChange({
                 ...credit,
                 kind: next === 'value' || next === 'relative' ? next : 'none',
               })
             }
-            info="A test fails unless it is accepted. Passing or failing suits a plain comparison of answers; a score suits a checker that gives part marks; the best anyone reached suits optimisation, where a test's points move as others do better."
             disabled={disabled}
           />
           {kind !== 'none' &&
             (report === null ? (
-              <TextInput
-                label="Which value"
-                value={credit.name}
-                onChange={(name) => onChange({ ...credit, name })}
-                description="The name the workflow reports it under."
-                disabled={disabled}
-              />
+              <div className={classes.single}>
+                <TextInput
+                  label="Which value"
+                  value={credit.name}
+                  onChange={(name) => onChange({ ...credit, name })}
+                  description="The name the workflow reports it under."
+                  disabled={disabled}
+                />
+              </div>
             ) : (
               <Select
                 label="Which value"
                 value={credit.name}
                 options={options.map((option) => ({
                   value: option.value,
-                  label: option.label,
-                  disabled: option.reason !== null,
+                  label:
+                    option.reason === null
+                      ? option.label
+                      : `${option.label} (${option.reason})`,
+                  disabled: option.reason !== null && option.value !== credit.name,
                 }))}
                 placeholder="Choose one"
                 description={
-                  options.length === 0
-                    ? 'The workflow reports no value.'
-                    : refused.length === 0
-                      ? undefined
-                      : refused
-                          .map((option) => `${option.label}: ${option.reason ?? ''}`)
-                          .join(' ')
+                  options.length === 0 ? 'The workflow reports no value.' : undefined
+                }
+                error={
+                  chosenRefusal === null
+                    ? undefined
+                    : `It cannot be what a test earns: ${chosenRefusal}.`
                 }
                 onChange={(name) => onChange({ ...credit, name })}
                 disabled={disabled}
@@ -239,6 +256,7 @@ function AdvancedFields({
 function GroupItem({
   place,
   group,
+  fields,
   folder,
   staged,
   credit,
@@ -257,6 +275,7 @@ function GroupItem({
 }: {
   place: TaskPlace;
   group: GroupValues;
+  fields: DeclaredField[] | null;
   folder: GroupFolder | undefined;
   staged: Staged;
   credit: TaskValues['credit'];
@@ -306,7 +325,7 @@ function GroupItem({
   const showProblem = showRefusal(group.show, group, credit.kind);
   const verdictRefusal = showRefusal('verdict', group, credit.kind);
   const required = graded && !group.read;
-  const points = pointsText(scaled(groupWeight(group), total, worth));
+  const points = pointsWords(scaled(groupWeight(group), total, worth));
   const pick = (next: string) => {
     if (next === 'advanced') {
       onAdvanced(true);
@@ -328,58 +347,58 @@ function GroupItem({
       <div className={classes.itemHead}>
         <h4 className={classes.itemTitle}>{group.name}</h4>
         <BodyText tone="secondary">
-          {count === 1 ? '1 test' : `${String(count)} tests`} · up to {points}{' '}
-          {points === '1' ? 'point' : 'points'}
+          {count === 1 ? '1 test' : `${String(count)} tests`} · up to {points}
           {!group.read && ' · new'}
         </BodyText>
       </div>
       <FieldBox name="rule">
-        <div className={classes.grid}>
+        <div className={shared.stack}>
           <Select
             label="How does this group earn points?"
             value={rule}
             options={[
-              ...RULES.map((option) => ({
-                value: option.value,
-                label: option.label,
-                disabled:
-                  option.value === 'worst' && refusal !== null && rule !== 'worst',
-              })),
+              ...RULES.map((option) => {
+                const greyed =
+                  option.value === 'worst' && refusal !== null && rule !== 'worst';
+                return {
+                  value: option.value,
+                  label: greyed
+                    ? `${option.label} (needs tests that earn part of their points)`
+                    : option.label,
+                  disabled: greyed,
+                };
+              }),
               { value: 'advanced', label: 'Another mix of these, set by hand' },
             ]}
-            description={
-              refusal !== null && rule !== 'worst'
-                ? `The lowest test score counts: ${refusal}`
-                : rule === 'worst' && refusal !== null
-                  ? refusal
-                  : undefined
-            }
+            error={rule === 'worst' && refusal !== null ? refusal : undefined}
             onChange={pick}
             disabled={disabled}
           />
           {rule !== 'none' && rule !== 'advanced' && (
-            <NumberField
-              label="Points"
-              value={pointsOf(group, rule)}
-              onChange={(value) => onChange(withPoints(group, value, rule))}
-              disabled={disabled}
-            />
-          )}
-          {rule === 'bonus' && (
-            <NumberField
-              label="Bonus for passing every test"
-              value={group.pass}
-              onChange={(pass) => onChange({ pass })}
-              disabled={disabled}
-            />
-          )}
-          {rule === 'share' && (
-            <ShareField
-              label="Share of tests that must pass (%)"
-              value={group.passAt}
-              onChange={(passAt) => onChange({ passAt })}
-              disabled={disabled}
-            />
+            <div className={classes.grid}>
+              <NumberField
+                label="Points"
+                value={pointsOf(group, rule)}
+                onChange={(value) => onChange(withPoints(group, value, rule))}
+                disabled={disabled}
+              />
+              {rule === 'bonus' && (
+                <NumberField
+                  label="Bonus for passing every test"
+                  value={group.pass}
+                  onChange={(pass) => onChange({ pass })}
+                  disabled={disabled}
+                />
+              )}
+              {rule === 'share' && (
+                <ShareField
+                  label="Share of tests that must pass (%)"
+                  value={group.passAt}
+                  onChange={(passAt) => onChange({ passAt })}
+                  disabled={disabled}
+                />
+              )}
+            </div>
           )}
         </div>
       </FieldBox>
@@ -390,40 +409,35 @@ function GroupItem({
         {groupSentence(group, { total, worth, credit: credit.kind, tests: count })}
       </p>
       <FieldBox name="show">
-        <div className={classes.single}>
-          <Select
-            label="When entrants see results"
-            value={group.show === '' && !required ? 'always' : group.show}
-            options={SHOWS.map((option) => ({
-              ...option,
-              disabled:
-                option.value === 'verdict' &&
-                verdictRefusal !== null &&
-                group.show !== 'verdict',
-            }))}
-            placeholder={required ? 'Choose when' : undefined}
-            description={
-              required && group.show === ''
-                ? 'Required: the task has graded submissions, so a test group added now must say when its results are shown.'
-                : (showProblem ??
-                  (verdictRefusal === null
-                    ? undefined
-                    : `Pass or fail alone: ${verdictRefusal}`))
-            }
-            error={showProblem ?? undefined}
-            required={required}
-            onChange={(show) =>
-              onChange({ show: show === 'always' && group.show === '' ? '' : show })
-            }
-            disabled={disabled}
-          />
-        </div>
+        <RadioGroup
+          label="When entrants see results"
+          value={group.show === '' && !required ? 'always' : group.show}
+          options={SHOWS.map((option) => ({
+            ...option,
+            disabled:
+              option.value === 'verdict' &&
+              verdictRefusal !== null &&
+              group.show !== 'verdict',
+            reason: option.value === 'verdict' ? verdictRefusal : null,
+          }))}
+          description={
+            required && group.show === ''
+              ? 'The task has graded submissions, so a test group added now must say when its results are shown.'
+              : undefined
+          }
+          error={showProblem ?? undefined}
+          required={required}
+          onChange={(show) =>
+            onChange({ show: show === 'always' && group.show === '' ? '' : show })
+          }
+          disabled={disabled}
+        />
       </FieldBox>
-      <BodyText tone="secondary">{showSentence(group.show)}</BodyText>
       {open ? (
         <TestRows
           place={place}
           group={group}
+          fields={fields}
           saved={saved}
           staged={added}
           removed={removed}
@@ -470,7 +484,7 @@ function GroupItem({
       {strays.length > 0 && (
         <div className={shared.actions}>
           <BodyText tone="secondary">
-            Test weights are set for tests the group does not have:{' '}
+            Weights are set for tests the group does not have:{' '}
             {strays.map((row) => `${row.test} (${row.weight})`).join(', ')}. The task
             cannot be saved until they are removed or the tests are added.
           </BodyText>
@@ -592,6 +606,7 @@ export function TestsCard({
               key={group.name}
               place={place}
               group={group}
+              fields={fields}
               folder={folders.find((folder) => folder.name === group.name)}
               staged={staged}
               credit={values.credit}

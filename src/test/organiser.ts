@@ -152,22 +152,47 @@ export const standingList = http.get(`${CONTEST_API}/organise/tasks`, () =>
 
 // Repo files
 
+/** The commit every listed file was last changed at. */
+const LISTED_AT = '9f8e7d6c5b4a39281706f5e4d3c2b1a098765432';
+
 /** Folder by folder, as `GET <place>/tree?path=` answers. */
 const taskTree: Record<string, TreeEntry[]> = {
   '': [
-    { path: 'task.yaml', kind: 'file', size: 120, upload: null },
-    { path: 'data', kind: 'directory', size: null, upload: null },
-    { path: 'statement.md', kind: 'file', size: 40, upload: null },
+    { path: 'task.yaml', kind: 'file', size: 120, upload: null, version: LISTED_AT },
+    { path: 'data', kind: 'directory', size: null, upload: null, version: null },
+    { path: 'statement.md', kind: 'file', size: 40, upload: null, version: LISTED_AT },
   ],
-  data: [{ path: 'data/testcases', kind: 'directory', size: null, upload: null }],
+  data: [
+    {
+      path: 'data/testcases',
+      kind: 'directory',
+      size: null,
+      upload: null,
+      version: null,
+    },
+  ],
   'data/testcases': [
-    { path: 'data/testcases/1.in', kind: 'file', size: 4, upload: null },
-    { path: 'data/testcases/logo.png', kind: 'file', size: 11, upload: null },
+    {
+      path: 'data/testcases/1.in',
+      kind: 'file',
+      size: 4,
+      upload: null,
+      version: LISTED_AT,
+    },
+    {
+      path: 'data/testcases/logo.png',
+      kind: 'file',
+      size: 11,
+      upload: null,
+      version: LISTED_AT,
+    },
   ],
 };
 
 const contestTree: Record<string, TreeEntry[]> = {
-  '': [{ path: 'contest.yaml', kind: 'file', size: 80, upload: null }],
+  '': [
+    { path: 'contest.yaml', kind: 'file', size: 80, upload: null, version: LISTED_AT },
+  ],
 };
 
 export const files: Record<string, FileContent> = {
@@ -177,6 +202,7 @@ export const files: Record<string, FileContent> = {
     content: 'name: sum\nworkflow: unicon/classic@v2\n',
     token: 'token-task-yaml',
     upload: null,
+    version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
   },
   'statement.md': {
     path: 'statement.md',
@@ -184,6 +210,7 @@ export const files: Record<string, FileContent> = {
     content: 'Write the sum of two numbers.\n',
     token: 'token-statement',
     upload: null,
+    version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
   },
   'data/testcases/1.in': {
     path: 'data/testcases/1.in',
@@ -191,6 +218,7 @@ export const files: Record<string, FileContent> = {
     content: '1 2\n',
     token: 'token-1-in',
     upload: null,
+    version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
   },
   'data/testcases/logo.png': {
     path: 'data/testcases/logo.png',
@@ -198,6 +226,7 @@ export const files: Record<string, FileContent> = {
     content: 'iVBORw0KGgoA//4=',
     token: 'token-logo',
     upload: null,
+    version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
   },
   'contest.yaml': {
     path: 'contest.yaml',
@@ -215,6 +244,7 @@ export const files: Record<string, FileContent> = {
     ].join('\n'),
     token: 'token-contest-yaml',
     upload: null,
+    version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
   },
 };
 

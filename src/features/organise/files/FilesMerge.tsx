@@ -19,7 +19,7 @@ export type MovedFile = {
   path: string;
   /** The file in words, as the page names it: "Tests, small, test 3: answer". */
   label: string;
-  /** What this save does to it, in words: "answer.txt, 12 bytes", or "Taken out". */
+  /** What this save does to it, in words: "answer.txt, 12 B", or "Taken out". */
   mine: string;
 };
 

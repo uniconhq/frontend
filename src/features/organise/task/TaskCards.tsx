@@ -2,10 +2,9 @@ import { useQuery } from '@tanstack/react-query';
 import { $api, queryView } from '@/api/query';
 import { BodyText } from '@/ui/BodyText';
 import { useLiveConnected } from '@/live';
-import { treeQuery } from '../files/place';
 import { readAgainIn } from '../gradings/feed';
 import { count } from '../hub/count';
-import { AnnouncementsLine, FilesLine, Line } from '../hub/lines';
+import { AnnouncementsLine, Line } from '../hub/lines';
 import { announcementsQuery } from '../threads/announcements';
 import { publishedLine } from './published';
 
@@ -53,12 +52,11 @@ export function AnnouncementsCard({ path }: { path: TaskPath }) {
   );
 }
 
-export function FilesCard({ path }: { path: TaskPath }) {
-  return (
-    <FilesLine view={queryView(useQuery(treeQuery({ kind: 'task', ...path }, '')))} />
-  );
-}
-
 export function SettingsCard() {
-  return <BodyText>Its title, and its settings as they are stored.</BodyText>;
+  return (
+    <BodyText>
+      Its title and its settings as they are stored; its admins can also read every file
+      it holds.
+    </BodyText>
+  );
 }

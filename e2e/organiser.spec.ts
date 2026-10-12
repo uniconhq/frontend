@@ -1,5 +1,8 @@
 import { expect, test, type Page, type Route } from '@playwright/test';
 
+/** The version the uploaded part of test 1 was last changed at. */
+const UPLOADED_AT = 'a1b2c3d4e5f6a7b8c9d0a1b2c3d4e5f6a7b8c9d0';
+
 /** unicon/classic@v2 as deploy seeds it, its inputs titled for the task's form (#434). */
 const CLASSIC = `inputs:
   submission: {type: file, contestant: true, title: Solution}
@@ -30,6 +33,10 @@ async function stubOrganiserApi(page: Page) {
     taskYaml:
       'name: Sum\nworkflow: unicon/classic@v2\ninputs:\n  submission: {label: Your solution}\n  language: {options: [python]}\n  time_limit: 2\n  memory_limit: 256\ntest_groups:\n  main: {each: 100}\n',
     taskSaves: [] as unknown[],
+    /** How many gradings failed and wait, as the queue counts them. */
+    failed: 0,
+    /** The feed's queries, each as the page asked it. */
+    feedAsked: [] as string[],
   };
 
   const taskState = () => ({
@@ -142,6 +149,7 @@ async function stubOrganiserApi(page: Page) {
         content: state.contestYaml,
         token: `token-contest-${String(state.contestSaves)}`,
         upload: null,
+        version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
       });
     }
     const contest = '/api/v1/orgs/acme/contests/spring';
@@ -158,7 +166,11 @@ async function stubOrganiserApi(page: Page) {
       return json(route, []);
     }
     if (path === `${contest}/gradings/queue`) {
-      return json(route, { queued: 0, dispatched: 0 });
+      return json(route, { queued: 0, dispatched: 0, failed: state.failed });
+    }
+    if (path === `${contest}/gradings`) {
+      state.feedAsked.push(new URL(request.url()).searchParams.toString());
+      return json(route, []);
     }
     if (path === `${task}/workflow-form`) {
       const input = (id: string, type: string, more: object) => ({
@@ -262,9 +274,38 @@ async function stubOrganiserApi(page: Page) {
         'tests/main/1': [
           { path: 'tests/main/1/input', kind: 'file', size: 4, upload: null },
           { path: 'tests/main/1/answer', kind: 'file', size: 2, upload: null },
+          {
+            path: 'tests/main/1/expected',
+            kind: 'file',
+            size: 130,
+            upload: { size: 10_485_760, digest: 'ab'.repeat(32) },
+          },
         ],
       };
       return json(route, tree[folder] ?? []);
+    }
+    if (path === `${task}/files/${encodeURIComponent('tests/main/1/expected')}`) {
+      // An upload reads as its pointer, at the version that last changed it.
+      return json(route, {
+        path: 'tests/main/1/expected',
+        encoding: 'utf-8',
+        content: 'version https://git-lfs.github.com/spec/v1\n',
+        token: 'token-expected',
+        upload: { size: 10_485_760, digest: 'ab'.repeat(32) },
+        version: UPLOADED_AT,
+      });
+    }
+    if (path.startsWith(`${task}/files/tests`)) {
+      // A test's file, its path one segment of the address, its slashes encoded.
+      const at = decodeURIComponent(path.slice(`${task}/files/`.length));
+      return json(route, {
+        path: at,
+        encoding: 'utf-8',
+        content: at.endsWith('/input') ? '1 2\n' : '3\n',
+        token: `token-${at}`,
+        upload: null,
+        version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
+      });
     }
     if (path === `${task}/files/task.yaml`) {
       return json(route, {
@@ -273,6 +314,7 @@ async function stubOrganiserApi(page: Page) {
         content: state.taskYaml,
         token: `token-task-${String(state.published)}`,
         upload: null,
+        version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
       });
     }
     if (path === `${task}/files/statement.md`) {
@@ -294,6 +336,7 @@ async function stubOrganiserApi(page: Page) {
         content: 'Write the sum.\n',
         token: `token-${String(state.published)}`,
         upload: null,
+        version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
       });
     }
     return route.fulfill({ status: 404, body: 'not stubbed' });
@@ -302,7 +345,7 @@ async function stubOrganiserApi(page: Page) {
   return state;
 }
 
-test('an organiser makes an org, walks to a task and publishes a file', async ({
+test('an organiser makes an org, walks to a task and publishes its statement', async ({
   page,
 }) => {
   const state = await stubOrganiserApi(page);
@@ -332,30 +375,52 @@ test('an organiser makes an org, walks to a task and publishes a file', async ({
   const standing = page.getByLabel('Where the task stands');
   await expect(standing).toContainText('Entrants are graded on publication 1');
   const sidebar = page.getByRole('navigation', { name: 'Sections' });
-  await sidebar.getByRole('link', { name: 'Files' }).click();
-  await page.getByRole('link', { name: 'statement.md' }).click();
-  await expect(page).toHaveURL(/\/files\?file=statement\.md$/);
+  // A task has no Files page: each file is changed on its own card (M51).
+  await expect(sidebar.getByRole('link', { name: 'Files' })).toHaveCount(0);
+  await sidebar.getByRole('link', { name: 'Statement' }).click();
 
   await page
-    .getByRole('textbox', { name: 'statement.md' })
+    .getByRole('textbox', { name: 'Statement source' })
     .fill('Write the sum of two.\n');
-  await page.getByRole('button', { name: 'Save' }).click();
+  await page.getByRole('button', { name: 'Save statement' }).click();
 
   const outcome = page.getByRole('status').filter({
     hasText: 'Saved and published as publication 2.',
   });
   await expect(outcome).toBeVisible();
-  await expect(outcome).toBeFocused();
   expect(state.saved).toMatchObject({
     content: 'Write the sum of two.\n',
     token: 'token-1',
   });
-  await sidebar.getByRole('link', { name: 'sum' }).click();
   await expect(standing).toContainText('Entrants are graded on publication 2');
+
+  // An old link to the task's Files page lands on the task's page.
+  await page.goto('/orgs/acme/contests/spring/tasks/sum/files?file=statement.md');
+  await expect(page).toHaveURL(/\/orgs\/acme\/contests\/spring\/tasks\/sum$/);
+  await expect(standing).toBeVisible();
 
   const trail = page.getByRole('navigation', { name: 'Breadcrumb' });
   await trail.getByRole('link', { name: 'Orgs', exact: true }).click();
   await expect(page.getByRole('list', { name: 'Your orgs' })).toContainText('acme');
+});
+
+test('a contest has no Files page: an old link to one lands on its stored settings', async ({
+  page,
+}) => {
+  const state = await stubOrganiserApi(page);
+  state.orgMade = true;
+  await page.goto('/orgs/acme/contests/spring');
+  const sidebar = page.getByRole('navigation', { name: 'Sections' });
+  await expect(sidebar.getByRole('link', { name: 'Settings' })).toBeVisible();
+  await expect(sidebar.getByRole('link', { name: 'Files' })).toHaveCount(0);
+
+  await page.goto('/orgs/acme/contests/spring/files?file=contest.yaml');
+  await expect(page).toHaveURL(/\/orgs\/acme\/contests\/spring\/settings#file$/);
+  const stored = page.getByRole('region', { name: 'The settings as stored' });
+  await expect(
+    stored.getByRole('textbox', { name: 'The contest’s settings' }),
+  ).toBeVisible();
+  await expect(stored).toBeInViewport();
 });
 
 test('an organiser opens a contest from its checklist', async ({ page }) => {
@@ -393,7 +458,7 @@ test('an organiser sets a task up on its cards and saves them in one save', asyn
   await limit.fill('3');
   const scoring = page.getByRole('region', { name: 'Tests and scoring' });
   await expect(scoring.getByRole('group', { name: 'main' })).toContainText(
-    'main earns 100 times the share of its tests you passed.',
+    'Each test passed is worth an equal share of 100 points.',
   );
 
   const bar = page.getByRole('region', { name: 'Save the task' });
@@ -406,4 +471,74 @@ test('an organiser sets a task up on its cards and saves them in one save', asyn
   const [saved] = state.taskSaves as { changes: { path: string; content: string }[] }[];
   expect(saved?.changes.map((change) => change.path)).toEqual(['task.yaml']);
   expect(saved?.changes[0]?.content).toContain('time_limit: 3');
+});
+
+test('an organiser follows the failed gradings from the contest page', async ({
+  page,
+}) => {
+  const state = await stubOrganiserApi(page);
+  state.orgMade = true;
+  state.failed = 2;
+  await page.goto('/orgs/acme/contests/spring');
+
+  const failed = page.getByRole('region', { name: 'Failed gradings' });
+  await expect(failed).toContainText("2 gradings failed on Unicon's side.");
+  await failed.getByRole('link', { name: 'Show the failed gradings' }).click();
+
+  await expect(page).toHaveURL(/\/gradings\?status=system_error&latest=true$/);
+  await expect(
+    page.getByRole('checkbox', { name: 'Latest attempts only' }),
+  ).toBeChecked();
+  await expect(page.getByLabel('Queue')).toContainText('Failed2');
+  await expect(page.getByText('No grading matches these filters.')).toBeVisible();
+  expect(state.feedAsked).toContain('status=system_error&latest=true');
+});
+
+test('an organiser reads a test in place, its parts side by side, and is told how to name test files', async ({
+  page,
+}) => {
+  const state = await stubOrganiserApi(page);
+  state.orgMade = true;
+  await page.goto('/orgs/acme/contests/spring/tasks/sum');
+
+  const scoring = page.getByRole('region', { name: 'Tests and scoring' });
+  const row = scoring.getByRole('listitem', { name: 'Test 1' });
+  await expect(row).toContainText('Test 1 · input 4 B, answer 2 B');
+  await row.getByRole('button', { name: /Test 1/ }).click();
+  const view = row.getByRole('region', { name: 'What test 1 holds' });
+  await expect(view.getByLabel('What input holds')).toHaveText('1 2');
+  await expect(view.getByLabel('What answer holds')).toHaveText('3');
+  const input = await view.getByRole('region', { name: 'input' }).boundingBox();
+  const answer = await view.getByRole('region', { name: 'answer' }).boundingBox();
+  expect(answer?.x ?? 0).toBeGreaterThan((input?.x ?? 0) + (input?.width ?? 0) - 1);
+  expect(Math.abs((answer?.y ?? 0) - (input?.y ?? 0))).toBeLessThan(2);
+
+  // An uploaded part downloads whole through the download door (#444).
+  await page.route('**/-/downloads/**', (route) =>
+    route.fulfill({
+      status: 200,
+      headers: { 'Content-Disposition': 'attachment; filename="expected"' },
+      body: '3\n',
+    }),
+  );
+  const expected = view.getByRole('region', { name: 'expected' });
+  await expect(expected).toContainText(
+    'It was uploaded, so it is shown by its size rather than as text.',
+  );
+  const download = expected.getByRole('link', { name: 'Download expected' });
+  await expect(download).toHaveAttribute(
+    'href',
+    `/-/downloads/acme/spring/sum/versions/${UPLOADED_AT}/tests/main/1/expected`,
+  );
+  const [saved] = await Promise.all([page.waitForEvent('download'), download.click()]);
+  expect(saved.suggestedFilename()).toBe('expected');
+
+  await scoring.getByRole('button', { name: 'Add tests', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'Add tests' });
+  await dialog.getByRole('radio', { name: 'Many files at once' }).check();
+  await expect(dialog.getByLabel('How to name the files')).toContainText(
+    "Name them like 1.in (test 1's input) and 1.out (test 1's answer).",
+  );
+  await expect(dialog.getByRole('button', { name: 'Add tests' })).toBeDisabled();
+  await expect(dialog).toContainText('Drop files above to see the tests they make.');
 });

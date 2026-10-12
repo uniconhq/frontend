@@ -511,17 +511,43 @@
   font-weight: 700;
 }
 
+/* Why a wire was refused, over its box's title (M53): as wide as the box,
+ * at least as tall as the title, growing upwards, and fading out at the end
+ * of the time it shows. */
 .notice {
   position: absolute;
-  top: 100%;
   left: 0;
+  right: 0;
   z-index: 5;
-  padding: 4px 8px;
+  display: flex;
+  align-items: center;
+  margin: 0;
+  padding: 6px 10px;
   border-radius: var(--mantine-radius-sm);
   background: var(--mantine-color-red-filled);
   color: white;
+  font-size: 12px;
   white-space: normal;
-  width: 220px;
+  pointer-events: none;
+  animation-name: notice-fades;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+}
+
+@keyframes notice-fades {
+  0%,
+  80% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .notice {
+    animation-name: none;
+  }
 }
 
 .slot {

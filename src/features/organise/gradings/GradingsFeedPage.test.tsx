@@ -42,9 +42,8 @@ const grading: Grading = {
   finished_at: '2026-10-05T10:01:00Z',
   deadline_at: null,
   cancel_reason: null,
-  falls_back: false,
+  automatic: false,
   last_good: null,
-  fallback: null,
   submitted_by: null,
 };
 
@@ -140,7 +139,7 @@ describe("the contest's gradings feed", () => {
         return HttpResponse.json([]);
       }),
       http.get(`${CONTEST_API}/gradings/queue`, () =>
-        HttpResponse.json({ queued: 4, dispatched: 2 }),
+        HttpResponse.json({ queued: 4, dispatched: 2, failed: 0 }),
       ),
     );
     feedAnswering(() => feed);
@@ -295,6 +294,65 @@ describe("the contest's gradings feed", () => {
     );
   });
 
+  it('keeps to the latest attempts once asked, and reads it from the address the contest page links to', async () => {
+    server.use(signedIn, taskList);
+    const asked = feedAnswering((query) =>
+      query.get('latest') === 'true'
+        ? feed.filter((entry) => entry.grading.latest)
+        : feed,
+    );
+    const user = userEvent.setup();
+    const { router } = renderApp(`${FEED}?status=system_error&latest=true`);
+
+    await waitFor(() => expect(asked).toEqual(['status=system_error&latest=true']));
+    const latest = screen.getByRole('checkbox', { name: 'Latest attempts only' });
+    expect(latest).toBeChecked();
+    expect(screen.getByRole('combobox', { name: 'Status' })).toHaveValue(
+      'system_error',
+    );
+
+    await user.click(latest);
+    await waitFor(() =>
+      expect(router.state.location.search).toBe('?status=system_error'),
+    );
+    expect(asked.at(-1)).toBe('status=system_error');
+    await user.click(screen.getByRole('checkbox', { name: 'Latest attempts only' }));
+    await waitFor(() =>
+      expect(router.state.location.search).toBe('?status=system_error&latest=true'),
+    );
+    await user.click(screen.getByRole('link', { name: 'Clear filters' }));
+    await waitFor(() => expect(router.state.location.search).toBe(''));
+    expect(
+      screen.getByRole('checkbox', { name: 'Latest attempts only' }),
+    ).not.toBeChecked();
+  });
+
+  it('counts the failed gradings beside the queue, and shows them on asking', async () => {
+    server.use(
+      signedIn,
+      taskList,
+      http.get(`${CONTEST_API}/gradings/queue`, () =>
+        HttpResponse.json({ queued: 0, dispatched: 0, failed: 2 }),
+      ),
+    );
+    const asked = feedAnswering(() => []);
+    const user = userEvent.setup();
+    renderApp(FEED);
+
+    const depth = await screen.findByLabelText('Queue');
+    await waitFor(() => expect(depth).toHaveTextContent('Failed2'));
+    expect(depth).not.toHaveTextContent('waiting for you');
+    expect(
+      screen.getByText(/again once by itself\. If that fails too, it waits for you/),
+    ).toBeVisible();
+    await user.click(screen.getByRole('link', { name: 'Show the failed gradings' }));
+    await waitFor(() => expect(asked.at(-1)).toBe('status=system_error&latest=true'));
+    expect(screen.queryByRole('link', { name: 'Show the failed gradings' })).toBeNull();
+    expect(
+      screen.getByText(/again once by itself\. If that fails too, it waits for you/),
+    ).toBeVisible();
+  });
+
   it('is linked from the contest page', async () => {
     server.use(signedIn, standingList);
     renderApp('/orgs/acme/contests/spring');
@@ -321,7 +379,7 @@ describe('acting on the feed', () => {
       taskList,
       http.get(`${CONTEST_API}/gradings/queue`, () => {
         queueReads += 1;
-        return HttpResponse.json({ queued: 0, dispatched: 0 });
+        return HttpResponse.json({ queued: 0, dispatched: 0, failed: 0 });
       }),
       http.post(`${CONTEST_API}/tasks/:task/gradings/:grading/retry`, ({ params }) => {
         retriedAt.push(`${String(params.task)}/${String(params.grading)}`);
@@ -538,139 +596,66 @@ describe('acting on the feed', () => {
     ).toBeNull();
   });
 
-  it('uses a broken attempt’s last good result after saying what it shows and how to undo it, and stops using it', async () => {
-    const broken: FeedEntry = {
-      ...retried,
-      grading: { ...stuckFirst.grading, id: 'g-sum-2', attempt: 2, last_good: 1 },
-    };
-    let now = broken;
-    const changed: string[] = [];
-    const answer = (grading: FeedEntry['grading']) => {
-      now = { ...broken, grading };
-      return HttpResponse.json(grading);
-    };
-    server.use(
-      signedIn,
-      taskList,
-      http.put(
-        `${CONTEST_API}/tasks/:task/gradings/:grading/fallback`,
-        ({ params }) => {
-          changed.push(`put ${String(params.task)}/${String(params.grading)}`);
-          return answer({ ...broken.grading, fallback: 'staff', falls_back: true });
-        },
-      ),
-      http.delete(
-        `${CONTEST_API}/tasks/:task/gradings/:grading/fallback`,
-        ({ params }) => {
-          changed.push(`delete ${String(params.task)}/${String(params.grading)}`);
-          return answer(broken.grading);
-        },
-      ),
-    );
-    feedAnswering(() => [now]);
-    const user = userEvent.setup();
-    renderApp(FEED);
-
-    const name = 'B submission 3 by ada, attempt 2';
-    const use = `Use the last good result, attempt 1, for ${name}`;
-    await user.click(await screen.findByRole('button', { name: use }));
-    const asked = await screen.findByRole('dialog', {
-      name: 'Use the last good result?',
-    });
-    expect(asked).toHaveTextContent(
-      "The entrant and the leaderboards see ada's submission 3 to sum with the result of attempt 1, its last attempt that finished, in place of attempt 2's system error.",
-    );
-    expect(asked).toHaveTextContent(
-      'To undo it, choose Stop using the last good result on this submission.',
-    );
-    expect(changed).toEqual([]);
-    await user.click(
-      within(asked).getByRole('button', { name: 'Use the last good result' }),
-    );
-
-    const group = await screen.findByRole('rowgroup', {
-      name: 'B submission 3 by ada',
-    });
-    await waitFor(() =>
-      expect(group).toHaveTextContent(
-        "Uses the last good result, attempt 1's, as an organiser chose.",
-      ),
-    );
-    expect(within(group).queryByRole('button', { name: use })).toBeNull();
-    await user.click(
-      within(group).getByRole('button', {
-        name: `Stop using the last good result for ${name}`,
-      }),
-    );
-    const clearing = await screen.findByRole('dialog', {
-      name: 'Stop using the last good result?',
-    });
-    expect(clearing).toHaveTextContent(
-      "The entrant and the leaderboards see ada's submission 3 to sum as the contest's settings say for attempt 2's system error: still being graded, counting nothing, unless they use the last good result.",
-    );
-    expect(clearing).toHaveTextContent(
-      'To undo it, choose Use the last good result again.',
-    );
-    await user.click(within(clearing).getByRole('button', { name: 'Stop using it' }));
-
-    await waitFor(() =>
-      expect(group).not.toHaveTextContent('Uses the last good result'),
-    );
-    expect(changed).toEqual(['put sum/g-sum-2', 'delete sum/g-sum-2']);
-    expect(within(group).getByRole('button', { name: use })).toBeVisible();
-  });
-
-  it("says when the contest's settings count a broken attempt's last good result", async () => {
+  it('says which result stands while a broken latest attempt has none, and offers nothing to change it', async () => {
     server.use(signedIn, taskList);
     feedAnswering(() => [
       {
+        ...retried,
+        grading: { ...stuckFirst.grading, id: 'g-sum-2', attempt: 2, last_good: 1 },
+      },
+      {
         ...cancelled,
-        grading: {
-          ...cancelled.grading,
-          attempt: 2,
-          last_good: 1,
-          fallback: 'contest',
-        },
+        grading: { ...cancelled.grading, attempt: 2, last_good: 1 },
       },
     ]);
     renderApp(FEED);
 
-    const group = await screen.findByRole('rowgroup', {
-      name: 'A submission 1 by ada',
+    const broken = await screen.findByRole('rowgroup', {
+      name: 'B submission 3 by ada',
     });
-    expect(group).toHaveTextContent(
-      "Uses the last good result, attempt 1's, as the contest's settings say.",
+    expect(broken).toHaveTextContent(
+      "The entrant and the leaderboards see attempt 1's result until a newer attempt finishes with one.",
     );
-    expect(within(group).queryByRole('button', { name: /^Stop using/ })).toBeNull();
-    // An organiser may still choose it, so it outlasts a change to the settings.
-    await userEvent.click(
-      within(group).getByRole('button', {
-        name: 'Use the last good result, attempt 1, for A submission 1 by ada, attempt 2',
-      }),
+    const ended = screen.getByRole('rowgroup', { name: 'A submission 1 by ada' });
+    expect(ended).toHaveTextContent(
+      "The entrant and the leaderboards keep attempt 1's result.",
     );
-    const asked = await screen.findByRole('dialog', {
-      name: 'Use the last good result?',
-    });
-    expect(asked).toHaveTextContent("in place of attempt 2's cancel.");
-    expect(asked).toHaveTextContent(
-      "The contest's settings use it already; choosing it here keeps it if they change.",
-    );
-    expect(asked).toHaveTextContent(
-      "It counts against the task's limit on submissions again.",
-    );
+    expect(screen.queryByRole('button', { name: /last good result/ })).toBeNull();
+    expect(screen.queryByText(/last good result/)).toBeNull();
   });
 
-  it('keeps a refused last good result in the dialog with its sentence', async () => {
-    server.use(
-      signedIn,
-      taskList,
-      http.put(`${CONTEST_API}/tasks/:task/gradings/:grading/fallback`, () =>
-        problem(409, 'conflict', {
-          detail:
-            'No earlier attempt of this submission finished with a result to fall back to.',
-        }),
-      ),
-    );
+  it('says nothing of an earlier result where no attempt has one', async () => {
+    server.use(signedIn, taskList);
+    feedAnswering(() => [stuckFirst]);
+    renderApp(FEED);
+
+    const broken = await screen.findByRole('rowgroup', {
+      name: 'B submission 3 by ada',
+    });
+    expect(broken).toHaveTextContent('System error');
+    expect(broken).not.toHaveTextContent('The entrant and the leaderboards');
+  });
+
+  it('marks an attempt Unicon made by itself after the one before failed', async () => {
+    server.use(signedIn, taskList);
+    feedAnswering(() => [
+      { ...retried, grading: { ...retried.grading, automatic: true } },
+      superseded,
+    ]);
+    const user = userEvent.setup();
+    renderApp(FEED);
+
+    const group = await screen.findByRole('rowgroup', {
+      name: 'B submission 3 by ada',
+    });
+    expect(group).toHaveTextContent('Retried by Unicon after attempt 1 failed');
+    await user.click(within(group).getByRole('button', { name: /earlier attempts/ }));
+    const [, first] = within(group).getAllByRole('row');
+    expect(first).not.toHaveTextContent('Retried by Unicon');
+  });
+
+  it('says a cancel keeps the earlier result, and that its sentence stays with the organisers', async () => {
+    server.use(signedIn, taskList);
     feedAnswering(() => [
       { ...retried, grading: { ...stuckFirst.grading, attempt: 2, last_good: 1 } },
     ]);
@@ -679,36 +664,29 @@ describe('acting on the feed', () => {
 
     await user.click(
       await screen.findByRole('button', {
-        name: 'Use the last good result, attempt 1, for B submission 3 by ada, attempt 2',
+        name: 'Cancel B submission 3 by ada, attempt 2',
       }),
     );
     const asked = await screen.findByRole('dialog', {
-      name: 'Use the last good result?',
+      name: 'Cancel this attempt?',
     });
-    await user.click(
-      within(asked).getByRole('button', { name: 'Use the last good result' }),
+    expect(asked).toHaveTextContent(
+      "Attempt 2 of ada's submission 3 to sum ends as cancelled. The submission keeps attempt 1's result, which its entrant and the leaderboards go on seeing.",
     );
-
-    const refused = await within(asked).findByRole('alert');
-    expect(refused).toHaveTextContent('No last good result to use');
-    expect(refused).toHaveTextContent(
-      'No earlier attempt of this submission finished with a result to fall back to.',
-    );
+    expect(
+      within(asked).getByRole('button', { name: 'Cancel the attempt' }),
+    ).toBeVisible();
+    expect(
+      within(asked).queryByRole('button', { name: 'Cancel the submission' }),
+    ).toBeNull();
+    expect(within(asked).getByLabelText(/^Why it was cancelled/)).toBeVisible();
+    expect(within(asked).queryByLabelText(/^What the entrant reads/)).toBeNull();
   });
 
-  it('says a retry stops using the last good result', async () => {
+  it('says a retry leaves the earlier result standing until it finishes with one', async () => {
     server.use(signedIn, taskList);
     feedAnswering(() => [
-      {
-        ...retried,
-        grading: {
-          ...stuckFirst.grading,
-          attempt: 2,
-          last_good: 1,
-          fallback: 'staff',
-          falls_back: true,
-        },
-      },
+      { ...retried, grading: { ...stuckFirst.grading, attempt: 2, last_good: 1 } },
     ]);
     const user = userEvent.setup();
     renderApp(FEED);
@@ -720,7 +698,9 @@ describe('acting on the feed', () => {
     );
     const asked = await screen.findByRole('dialog', { name: 'Retry this grading?' });
 
-    expect(asked).toHaveTextContent('The retry stops using the last good result');
+    expect(asked).toHaveTextContent(
+      "Until the new attempt finishes with a result, the entrant and the leaderboards see attempt 1's result.",
+    );
   });
 
   it('keeps a refused retry in the dialog with its sentence', async () => {
@@ -794,7 +774,7 @@ describe('the feed without the stream', () => {
 
   it('reads the feed and the queue again every ten seconds while one is to finish', async () => {
     let now: FeedEntry[] = [retried];
-    let depth = { queued: 1, dispatched: 0 };
+    let depth = { queued: 1, dispatched: 0, failed: 0 };
     server.use(
       signedIn,
       taskList,
@@ -805,7 +785,7 @@ describe('the feed without the stream', () => {
 
     const sum = await screen.findByRole('rowgroup', { name: 'B submission 3 by ada' });
     now = [{ ...retried, grading: { ...retried.grading, status: 'done' } }];
-    depth = { queued: 0, dispatched: 0 };
+    depth = { queued: 0, dispatched: 0, failed: 0 };
     await passTime(10_000);
 
     await waitFor(() => expect(sum).toHaveTextContent('Done'));
@@ -851,7 +831,7 @@ describe('the feed kept up to date', () => {
 
   it('shows a grading that changed, and the queue, once the stream says one did', async () => {
     let now: FeedEntry[] = [retried];
-    let depth = { queued: 1, dispatched: 0 };
+    let depth = { queued: 1, dispatched: 0, failed: 0 };
     server.use(
       signedIn,
       taskList,
@@ -866,7 +846,7 @@ describe('the feed kept up to date', () => {
     FakeSource.last?.onopen?.();
 
     now = [{ ...retried, grading: { ...retried.grading, status: 'running' } }];
-    depth = { queued: 0, dispatched: 0 };
+    depth = { queued: 0, dispatched: 0, failed: 0 };
     FakeSource.last?.emit('grading');
 
     await waitFor(() => expect(sum).toHaveTextContent('Running'));

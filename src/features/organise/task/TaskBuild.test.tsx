@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@/test/user-event';
 import { http, HttpResponse } from 'msw';
@@ -13,7 +13,7 @@ import type {
 } from '@/api/types';
 import { formatExact } from '@/lib/exact';
 import { renderApp } from '@/test/render';
-import { problem, server, signedIn, someone } from '@/test/server';
+import { afterAnswers, problem, server, signedIn, someone } from '@/test/server';
 import {
   TASK_API,
   CONTEST_API,
@@ -23,6 +23,15 @@ import {
   taskState,
 } from '@/test/organiser';
 import { makeZip } from '@/test/zip';
+import { comeBackToTab, fakeLiveStream, openStream, realLiveStream } from '@/test/live';
+
+/** The names of the files handed to the browser to save, in turn. */
+const saved = vi.hoisted((): string[] => []);
+vi.mock('@/lib/save-file', () => ({
+  saveFile: (name: string) => {
+    saved.push(name);
+  },
+}));
 
 const TASK = `name: Shortest Path   # the title
 workflow: unicon/checked@v1
@@ -50,11 +59,14 @@ const FOLDERS: Record<string, string[]> = {
 };
 
 function folder(path: string): TreeEntry {
-  return { path, kind: 'directory', size: null, upload: null };
+  return { path, kind: 'directory', size: null, upload: null, version: null };
 }
 
-function file(path: string, size = 4): TreeEntry {
-  return { path, kind: 'file', size, upload: null };
+/** The commit a listed file was last changed at, as the tree names it. */
+const LISTED_AT = '9f8e7d6c5b4a39281706f5e4d3c2b1a098765432';
+
+function file(path: string, size = 4, version: string | null = LISTED_AT): TreeEntry {
+  return { path, kind: 'file', size, upload: null, version };
 }
 
 /** The tree of the task's tests as `GET <task>/tree?path=` answers it, folder by folder. */
@@ -200,13 +212,15 @@ function taskBackend(
   } = {},
 ) {
   const { answer = () => HttpResponse.json(PUBLISHED), form = UNREAD } = options;
-  const tree = testsTree(options.groups ?? FOLDERS);
+  let tree = testsTree(options.groups ?? FOLDERS);
+  let declaredNow = form;
   let settings: FileContent = {
     path: 'task.yaml',
     encoding: 'utf-8',
     content: options.content ?? TASK,
     token: 'token-task',
     upload: null,
+    version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
   };
   const sent: SaveRequest[] = [];
   server.use(
@@ -227,11 +241,12 @@ function taskBackend(
           content: '1 2\n',
           token: `token-${path}`,
           upload: null,
+          version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
         });
       }
       return undefined;
     }),
-    http.get(`${TASK_API}/workflow-form`, () => HttpResponse.json(form)),
+    http.get(`${TASK_API}/workflow-form`, () => HttpResponse.json(declaredNow)),
     http.get('/api/v1/workflows', () => HttpResponse.json(WORKFLOWS)),
     http.get('/api/v1/workflows/:owner/:name/versions/:version', ({ params }) =>
       HttpResponse.json({
@@ -250,6 +265,10 @@ function taskBackend(
         return problem(409, 'conflict');
       }
       const yaml = body.changes.find((change) => change.path === 'task.yaml');
+      // A save made with the token of settings since saved over is refused.
+      if (yaml !== undefined && yaml.token !== settings.token) {
+        return problem(409, 'conflict');
+      }
       if (yaml?.content != null) {
         settings = {
           ...settings,
@@ -270,11 +289,22 @@ function taskBackend(
           content: options.contest,
           token: 'token-contest',
           upload: null,
+          version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
         }),
       ),
     );
   }
-  return { sent };
+  /** Someone else saving the task: its settings, its tests and what its workflow declares. */
+  const elsewhere = (now: {
+    content: string;
+    groups: Record<string, string[]>;
+    form: WorkflowForm;
+  }) => {
+    settings = { ...settings, content: now.content, token: 'token-theirs' };
+    tree = testsTree(now.groups);
+    declaredNow = now.form;
+  };
+  return { sent, elsewhere };
 }
 
 function asManager() {
@@ -354,7 +384,6 @@ describe('the cards that build a task', { timeout: 30_000 }, () => {
         },
       ),
     );
-    fill(fieldIn(limits, 'checker', 'checker'), 'checker/new.cpp');
     fill(fieldIn(limits, 'Time limit (seconds)', /^Time limit/), '3');
     fill(fieldIn(limits, 'memory_limit', 'memory_limit'), '256');
     fill(fieldIn(limits, 'strict', 'strict'), 'true');
@@ -384,7 +413,7 @@ describe('the cards that build a task', { timeout: 30_000 }, () => {
     expect(written(sent[0])['inputs']).toEqual({
       submission: { label: 'Your program', max_size: '1MB' },
       language: { options: ['cpp', 'python', 'java'], default: 'cpp' },
-      checker: 'checker/new.cpp',
+      checker: 'checker/checker.cpp',
       time_limit: 3,
       token: { secret: 'judge-token' },
       memory_limit: 256,
@@ -412,11 +441,260 @@ describe('the cards that build a task', { timeout: 30_000 }, () => {
     const entrants = within(inputs).getByRole('region', {
       name: 'What entrants submit',
     });
-    // An empty label shows entrants the input's name, not the workflow's title.
+    // An empty label shows entrants the workflow's title, and its key only
+    // where it gives none.
     expect(fieldIn(entrants, 'Solution', 'Label shown to entrants')).toHaveAttribute(
       'placeholder',
-      'submission',
+      'Solution',
     );
+    expect(fieldIn(entrants, 'language', 'Label shown to entrants')).toHaveAttribute(
+      'placeholder',
+      'language',
+    );
+  });
+
+  it('shows an entrant input’s help behind an ⓘ, and no input’s key beside its title (M45)', async () => {
+    taskBackend({
+      form: {
+        ...CHECKED,
+        inputs: [
+          declared('submission', 'file', {
+            contestant: true,
+            title: 'Solution',
+            help: 'The source file the contestant submits.',
+          }),
+          ...CHECKED.inputs.slice(1),
+        ],
+      },
+    });
+    const user = userEvent.setup();
+    const { inputs } = await openTask();
+
+    const entrants = within(inputs).getByRole('region', {
+      name: 'What entrants submit',
+    });
+    const solution = within(entrants).getByRole('group', { name: 'Solution' });
+    await user.click(within(solution).getByRole('button', { name: 'About Solution' }));
+    expect(
+      await screen.findByText('The source file the contestant submits.'),
+    ).toBeVisible();
+    expect(within(solution).queryByText('submission')).toBeNull();
+    // An input the workflow gives no title keeps its key as its title, and no ⓘ.
+    const language = within(entrants).getByRole('group', { name: 'language' });
+    expect(within(language).getByRole('heading', { name: 'language' })).toBeVisible();
+    expect(within(language).queryByRole('button', { name: /^About/ })).toBeNull();
+    const limits = within(inputs).getByRole('region', { name: 'Limits and settings' });
+    expect(within(limits).queryByText('time_limit')).toBeNull();
+    expect(fieldIn(limits, 'Time limit (seconds)', /^Time limit/)).toBeVisible();
+  });
+
+  it('views and replaces a setting’s file in its box, saving the new one with the task and taking out the old (M51)', async () => {
+    const { sent } = taskBackend({ form: CHECKED });
+    asManager();
+    server.use(
+      http.get(`${TASK_API}/tree`, ({ request }) =>
+        new URL(request.url).searchParams.get('path') === 'checker'
+          ? HttpResponse.json([file('checker/checker.cpp', 21)])
+          : undefined,
+      ),
+      http.get(`${TASK_API}/files/:path`, ({ params }) =>
+        decodeURIComponent(String(params['path'])) === 'checker/checker.cpp'
+          ? HttpResponse.json({
+              path: 'checker/checker.cpp',
+              encoding: 'utf-8',
+              content: 'int main() { return 0; }\n',
+              token: 'token-checker',
+              upload: null,
+              version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
+            })
+          : undefined,
+      ),
+    );
+    const user = userEvent.setup();
+    const { inputs } = await openTask();
+
+    const checker = within(inputs).getByRole('group', { name: 'checker' });
+    expect(await within(checker).findByText('checker.cpp, 21 B')).toBeVisible();
+    expect(within(checker).queryByRole('textbox')).toBeNull();
+    await user.click(within(checker).getByRole('button', { name: 'View checker' }));
+    expect(
+      await within(checker).findByLabelText('What checker.cpp holds'),
+    ).toHaveTextContent('int main() { return 0; }');
+
+    await user.click(within(checker).getByRole('button', { name: 'Replace checker' }));
+    await user.upload(
+      within(checker).getByLabelText('checker: a new file'),
+      new File(['print(1)\n'], 'checker.py'),
+    );
+    expect(await within(checker).findByText('checker.py, 9 B')).toBeVisible();
+    // Waiting for the save, marked as a replaced test's row is.
+    expect(within(checker).getByText('Replaced')).toBeVisible();
+    const bar = await screen.findByRole('region', { name: 'Save the task' });
+    // One change, said once.
+    expect(
+      within(within(bar).getByRole('list', { name: 'What changed' }))
+        .getAllByRole('listitem')
+        .map((item) => item.textContent)
+        .filter((line) => line?.startsWith('Inputs:')),
+    ).toEqual(['Inputs: checker, a new file']);
+    await save();
+
+    const body = await waitForSave(sent);
+    expect(written(body)['inputs']).toMatchObject({ checker: 'checker/checker.py' });
+    expect(body.changes.filter((change) => change.path.startsWith('checker/'))).toEqual(
+      [
+        {
+          path: 'checker/checker.py',
+          token: null,
+          content: btoa('print(1)\n'),
+          encoding: 'base64',
+          remove: false,
+        },
+        {
+          path: 'checker/checker.cpp',
+          token: 'token-checker',
+          remove: true,
+          encoding: 'utf-8',
+        },
+      ],
+    );
+  });
+
+  it('puts a setting’s file back as it was on Undo', async () => {
+    taskBackend({ form: CHECKED });
+    asManager();
+    server.use(
+      http.get(`${TASK_API}/tree`, ({ request }) =>
+        new URL(request.url).searchParams.get('path') === 'checker'
+          ? HttpResponse.json([file('checker/checker.cpp', 21)])
+          : undefined,
+      ),
+    );
+    const user = userEvent.setup();
+    const { inputs } = await openTask();
+
+    const checker = within(inputs).getByRole('group', { name: 'checker' });
+    await within(checker).findByText('checker.cpp, 21 B');
+    await user.click(within(checker).getByRole('button', { name: 'Replace checker' }));
+    await user.upload(
+      within(checker).getByLabelText('checker: a new file'),
+      new File(['x'], 'other.cpp'),
+    );
+    await user.click(
+      await within(checker).findByRole('button', {
+        name: 'Undo the new file of checker',
+      }),
+    );
+    expect(await within(checker).findByText('checker.cpp, 21 B')).toBeVisible();
+    expect(
+      await screen.findByRole('list', { name: 'What changed' }),
+    ).not.toHaveTextContent('checker');
+  });
+
+  describe('a file chosen for a setting, through a change of workflow', () => {
+    /** The checker replaced by checker.py, waiting for the save. */
+    async function replaceChecker(form: WorkflowForm) {
+      const backend = taskBackend({ form });
+      asManager();
+      server.use(
+        http.get(`${TASK_API}/tree`, ({ request }) =>
+          new URL(request.url).searchParams.get('path') === 'checker'
+            ? HttpResponse.json([file('checker/checker.cpp', 21)])
+            : undefined,
+        ),
+        http.get(`${TASK_API}/files/:path`, ({ params }) =>
+          decodeURIComponent(String(params['path'])) === 'checker/checker.cpp'
+            ? HttpResponse.json({
+                path: 'checker/checker.cpp',
+                encoding: 'utf-8',
+                content: 'int main() { return 0; }\n',
+                token: 'token-checker',
+                upload: null,
+                version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
+              })
+            : undefined,
+        ),
+      );
+      const user = userEvent.setup();
+      const opened = await openTask();
+      const checker = within(opened.inputs).getByRole('group', { name: 'checker' });
+      await within(checker).findByText('checker.cpp, 21 B');
+      await user.click(
+        within(checker).getByRole('button', { name: 'Replace checker' }),
+      );
+      await user.upload(
+        within(checker).getByLabelText('checker: a new file'),
+        new File(['print(1)\n'], 'checker.py'),
+      );
+      await within(checker).findByText('checker.py, 9 B');
+      return { ...backend, ...opened };
+    }
+
+    it('stays, the setting naming it, when the new version still takes that input as a file', async () => {
+      const { sent, workflow } = await replaceChecker({
+        ...CHECKED,
+        newer: 'v3',
+      });
+
+      await userEvent.click(
+        within(
+          within(workflow).getByRole('status', { name: 'A newer version' }),
+        ).getByRole('button', { name: 'Use v3' }),
+      );
+
+      // The card is drawn again from the new version once it is read.
+      const checker = () =>
+        within(
+          within(screen.getByRole('region', { name: 'Inputs' })).getByRole('group', {
+            name: 'checker',
+          }),
+        );
+      await waitFor(() =>
+        expect(screen.getByRole('combobox', { name: 'Version' })).toHaveValue('v3'),
+      );
+      await waitFor(() => expect(checker().getByText('checker.py, 9 B')).toBeVisible());
+      expect(checker().getByText('Replaced')).toBeVisible();
+      await save();
+      const body = await waitForSave(sent);
+      expect(written(body)['workflow']).toBe('unicon/checked@v3');
+      expect(written(body)['inputs']).toMatchObject({ checker: 'checker/checker.py' });
+      expect(
+        body.changes
+          .filter((change) => change.path.startsWith('checker/'))
+          .map((change) => change.path),
+      ).toEqual(['checker/checker.py', 'checker/checker.cpp']);
+    });
+
+    it('goes with the input when the new version does not have it', async () => {
+      const { sent, workflow } = await replaceChecker({ ...CHECKED, newer: 'v3' });
+      server.use(
+        http.get('/api/v1/workflows/:owner/:name/versions/:version', ({ params }) =>
+          params['version'] === 'v3'
+            ? HttpResponse.json({
+                content: CHECKED_YAML.replace('  checker: file\n', ''),
+              })
+            : undefined,
+        ),
+      );
+
+      await userEvent.click(
+        within(
+          within(workflow).getByRole('status', { name: 'A newer version' }),
+        ).getByRole('button', { name: 'Use v3' }),
+      );
+
+      const bar = await screen.findByRole('region', { name: 'Save the task' });
+      await waitFor(() =>
+        expect(
+          within(bar).getByRole('list', { name: 'What changed' }),
+        ).not.toHaveTextContent('a new file'),
+      );
+      await save();
+      const body = await waitForSave(sent);
+      expect(
+        body.changes.filter((change) => change.path.startsWith('checker/')),
+      ).toEqual([]);
+    });
   });
 
   it('says a newer version of the workflow is out and takes it only when asked', async () => {
@@ -517,6 +795,7 @@ describe('the cards that build a task', { timeout: 30_000 }, () => {
               content: `version https://git-lfs.github.com/spec/v1\noid sha256:${'d'.repeat(64)}\nsize 120\n`,
               token: 'token-task',
               upload: { size: 120, digest: 'd'.repeat(64) },
+              version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
             })
           : undefined,
       ),
@@ -554,16 +833,32 @@ describe('the cards that build a task', { timeout: 30_000 }, () => {
   });
 
   it('asks when entrants see a group added once the task is graded, and of no other', async () => {
-    const { sent } = taskBackend({ form: { ...UNREAD, graded: true } });
+    const { sent } = taskBackend({ form: { ...CHECKED, inputs: [], graded: true } });
     const { tests } = await openTask();
-    const show = (group: string) => fieldIn(tests, group, /^When entrants see results/);
+    const show = (group: string) =>
+      within(within(tests).getByRole('group', { name: group })).getByRole(
+        'radiogroup',
+        { name: /^When entrants see results/ },
+      );
 
-    expect(show('large')).toBeRequired();
-    expect(show('small')).not.toBeRequired();
+    expect(within(show('large')).queryByRole('radio', { checked: true })).toBeNull();
+    expect(show('large')).toHaveAccessibleDescription(
+      'The task has graded submissions, so a test group added now must say when its results are shown.',
+    );
+    expect(
+      within(show('small')).getByRole('radio', {
+        name: 'Pass or fail right away, the tests once the task closes',
+      }),
+    ).toBeChecked();
+    expect(show('small')).not.toHaveAccessibleDescription(/must say/);
     const bar = await screen.findByRole('region', { name: 'Save the task' });
     expect(within(bar).getByRole('button', { name: 'Save' })).toBeDisabled();
     expect(bar).toHaveTextContent('Choose when entrants see large’s results.');
-    fill(show('large'), 'verdict');
+    await userEvent.click(
+      within(show('large')).getByRole('radio', {
+        name: 'Pass or fail right away, the tests once the task closes',
+      }),
+    );
     expect(within(bar).getByRole('button', { name: 'Save' })).toBeEnabled();
     await save();
 
@@ -629,6 +924,52 @@ describe('the cards that build a task', { timeout: 30_000 }, () => {
   });
 });
 
+describe('the cards while the task is being changed', { timeout: 30_000 }, () => {
+  beforeEach(fakeLiveStream);
+  afterEach(realLiveStream);
+
+  it('keep what was changed, and do not spin, when the tab comes back, and meet someone else’s save at the save', async () => {
+    const { sent, elsewhere } = taskBackend();
+    const { inputs, tests } = await openTask();
+    openStream();
+    fill(fieldIn(inputs, 'time_limit', 'Value'), '3');
+    fill(fieldIn(tests, 'small', 'Points'), '40');
+
+    // Someone else saves the task meanwhile, with a new group and a graded submission.
+    elsewhere({
+      content: TASK.replace('time_limit: 2', 'time_limit: 5'),
+      groups: { ...FOLDERS, extra: ['1'] },
+      form: { ...UNREAD, graded: true },
+    });
+    await afterAnswers(comeBackToTab);
+
+    const cards = screen.getByRole('region', { name: 'Inputs' });
+    expect(fieldIn(cards, 'time_limit', 'Value')).toHaveValue('3');
+    expect(
+      fieldIn(
+        screen.getByRole('region', { name: 'Tests and scoring' }),
+        'small',
+        'Points',
+      ),
+    ).toHaveValue('40');
+    const bar = screen.getByRole('region', { name: 'Save the task' });
+    const button = within(bar).getByRole('button', { name: 'Save' });
+    expect(button).not.toHaveAttribute('data-loading');
+    expect(button).toBeEnabled();
+
+    await userEvent.click(button);
+
+    const merge = await screen.findByRole('list', { name: 'Fields that differ' });
+    expect(
+      within(merge).getByRole('radiogroup', {
+        name: 'Inputs: time_limit (both changed it)',
+      }),
+    ).toBeVisible();
+    const yaml = sent[0]?.changes.find((change) => change.path === 'task.yaml');
+    expect(yaml?.token).toBe('token-task');
+  });
+});
+
 describe('discarding at a conflict', { timeout: 30_000 }, () => {
   it('drops my changes and shows the settings as they are now', async () => {
     const theirs = TASK.replace('time_limit: 2', 'time_limit: 5');
@@ -678,7 +1019,7 @@ describe('scoring a task', { timeout: 30_000 }, () => {
 
     const small = fieldGroup(tests, 'small');
     expect(small).toHaveTextContent(
-      'Test weights are set for tests the group does not have: 9 (4).',
+      'Weights are set for tests the group does not have: 9 (4).',
     );
     await userEvent.click(
       within(small).getByRole('button', {
@@ -704,7 +1045,7 @@ describe('scoring a task', { timeout: 30_000 }, () => {
 
     expect(
       within(fieldGroup(tests, 'small')).getByText(
-        'small earns its 30 when every test passes.',
+        'An entrant earns 30 points when every test passes, and nothing otherwise. An entrant who passes 2 of 3 gets nothing.',
       ),
     ).toBeVisible();
     expect(within(tests).getByLabelText('The task’s points')).toHaveTextContent(
@@ -720,20 +1061,32 @@ describe('scoring a task', { timeout: 30_000 }, () => {
     taskBackend({ form: { ...CHECKED, inputs: [] } });
     const { tests } = await openTask();
 
-    fill(within(tests).getByLabelText(/^A test earns/), 'none');
+    await userEvent.click(
+      within(tests).getByRole('radio', {
+        name: 'All when it passes, nothing when it fails',
+      }),
+    );
     const rule = fieldIn(tests, 'small', 'How does this group earn points?');
     expect(
-      within(rule).getByRole('option', { name: 'The lowest test score counts' }),
+      within(rule).getByRole('option', {
+        name: 'The lowest test score counts (needs tests that earn part of their points)',
+      }),
     ).toBeDisabled();
-    expect(rule).toHaveAccessibleDescription(
-      'The lowest test score counts: Only available when a test can earn part of its points. Set how a test earns first.',
+    expect(rule).not.toHaveAccessibleDescription(/lowest/);
+
+    // A group that earns by each test cannot show its pass or fail alone: the
+    // choice is greyed with its reason under it.
+    const shown = () =>
+      within(within(tests).getByRole('group', { name: 'old' })).getByRole('radio', {
+        name: 'Pass or fail right away, the tests once the task closes',
+      });
+    expect(shown()).toBeDisabled();
+    expect(shown()).toHaveAccessibleDescription(
+      /Only available for a test group that earns all or nothing/,
     );
     fill(fieldIn(tests, 'old', 'How does this group earn points?'), 'all');
-    expect(
-      within(fieldIn(tests, 'old', /^When entrants see results/)).getByRole('option', {
-        name: 'Pass or fail right away, the tests once the task closes',
-      }),
-    ).toBeEnabled();
+    expect(shown()).toBeEnabled();
+    expect(shown()).not.toHaveAccessibleDescription(/Only available/);
   });
 
   it('keeps the bonus rule chosen while its bonus is still empty', async () => {
@@ -747,7 +1100,9 @@ describe('scoring a task', { timeout: 30_000 }, () => {
     const bonus = fieldIn(tests, 'small', 'Bonus for passing every test');
     fill(bonus, '10');
     expect(
-      within(fieldGroup(tests, 'small')).getByText(/more when you pass them all\./),
+      within(fieldGroup(tests, 'small')).getByText(
+        /Passing every test earns 10 points more\./,
+      ),
     ).toBeVisible();
     expect(fieldIn(tests, 'small', 'How does this group earn points?')).toHaveValue(
       'bonus',
@@ -776,6 +1131,51 @@ describe('scoring a task', { timeout: 30_000 }, () => {
     });
   });
 
+  it('offers how a test earns as options with an example each, and says in a value’s own name why it cannot be one', async () => {
+    taskBackend({ form: { ...CHECKED, inputs: [] } });
+    const { tests } = await openTask();
+
+    const earns = within(tests).getByRole('radiogroup', { name: 'A test earns' });
+    expect(
+      within(earns)
+        .getAllByRole('radio')
+        .map((radio) => radio.getAttribute('value')),
+    ).toEqual(['none', 'value', 'relative']);
+    expect(
+      within(earns).getByRole('radio', {
+        name: 'A score the workflow gives it, from 0 to 1',
+      }),
+    ).toBeChecked();
+    expect(
+      within(earns).getByRole('radio', {
+        name: 'All when it passes, nothing when it fails',
+      }),
+    ).toHaveAccessibleDescription(
+      'Every test is worth the same; it passes when its answer is accepted, or it does not.',
+    );
+
+    const value = await within(tests).findByRole('combobox', { name: 'Which value' });
+    expect(within(value).getByRole('option', { name: 'fraction' })).toBeEnabled();
+    expect(
+      within(value).getByRole('option', {
+        name: 'time_ms (not promised to be 1 or less)',
+      }),
+    ).toBeDisabled();
+    expect(value).not.toHaveAccessibleDescription(/time_ms/);
+
+    await userEvent.click(
+      within(earns).getByRole('radio', {
+        name: 'Its result against the best anyone reached',
+      }),
+    );
+    expect(
+      within(within(tests).getByRole('combobox', { name: 'Which value' })).getByRole(
+        'option',
+        { name: 'time_ms' },
+      ),
+    ).toBeEnabled();
+  });
+
   it('will not save a score the workflow gives until its value is chosen', async () => {
     taskBackend({
       form: { ...CHECKED, inputs: [] },
@@ -783,7 +1183,11 @@ describe('scoring a task', { timeout: 30_000 }, () => {
     });
     const { tests } = await openTask();
 
-    fill(within(tests).getByLabelText('A test earns'), 'value');
+    await userEvent.click(
+      within(tests).getByRole('radio', {
+        name: 'A score the workflow gives it, from 0 to 1',
+      }),
+    );
 
     const bar = await screen.findByRole('region', { name: 'Save the task' });
     expect(bar).toHaveTextContent(
@@ -857,7 +1261,9 @@ describe('scoring a task', { timeout: 30_000 }, () => {
     const { tests } = await openTask();
 
     expect(
-      await within(tests).findByText(`small earns its 60 when every test passes.`),
+      await within(tests).findByText(
+        /^An entrant earns 60 points when every test passes, and nothing otherwise\./,
+      ),
     ).toBeVisible();
     expect(within(tests).getByLabelText('The task’s points')).toHaveTextContent(
       `Its contest makes the task worth ${formatExact('70')}`,
@@ -880,11 +1286,85 @@ describe('the tests of a task', { timeout: 30_000 }, () => {
       }),
     );
     const dialog = await screen.findByRole('dialog', { name: 'Add tests' });
-    expect(within(dialog).getByRole('button', { name: 'Add the test' })).toBeDisabled();
-    await userEvent.click(
-      within(dialog).getByRole('radio', { name: 'Several, from files named by test' }),
+    const how = within(dialog).getByRole('radiogroup', {
+      name: 'How do you want to add tests?',
+    });
+    expect(
+      within(how).getByRole('radio', { name: 'One test' }),
+    ).toHaveAccessibleDescription('Pick its input and its answer.');
+    expect(
+      within(how).getByRole('radio', { name: 'Many files at once' }),
+    ).toHaveAccessibleDescription(
+      'Drop pairs like 1.in and 1.out. Each number becomes one test.',
     );
-    expect(within(dialog).getByRole('button', { name: 'Add tests' })).toBeDisabled();
+    expect(
+      within(how).getByRole('radio', { name: 'A zip' }),
+    ).toHaveAccessibleDescription(
+      'The same pairs in a zip, or a folder per test (1/input, 1/answer).',
+    );
+    const one = within(dialog).getByRole('button', { name: 'Add the test' });
+    expect(one).toBeDisabled();
+    expect(one).toHaveAccessibleDescription('Pick its input and its answer first.');
+
+    await userEvent.click(
+      within(how).getByRole('radio', { name: 'Many files at once' }),
+    );
+    const many = within(dialog).getByRole('button', { name: 'Add tests' });
+    expect(many).toBeDisabled();
+    expect(many).toHaveAccessibleDescription('No files dropped yet.');
+    expect(
+      within(dialog).getByRole('region', { name: 'What the files make' }),
+    ).toHaveTextContent('Drop files above to see the tests they make.');
+    expect(within(dialog).queryByText(/Add 0/)).toBeNull();
+    expect(within(dialog).getByLabelText('How to name the files')).toHaveTextContent(
+      "Each test needs an input and an answer.Name them like 1.in (test 1's input) and 1.out (test 1's answer).Also taken: .inp, .input; .ans, .a, .expected, .answer.",
+    );
+  });
+
+  it('shows a test a file is missing from as Missing in its column, and adds only the complete ones', async () => {
+    const { sent } = taskBackend({ form: { ...CHECKED, inputs: [] } });
+    const { tests } = await openTask();
+
+    await userEvent.click(
+      within(fieldGroup(tests, 'small')).getByRole('button', {
+        name: 'Add tests to small',
+      }),
+    );
+    const dialog = await screen.findByRole('dialog', { name: 'Add tests' });
+    await userEvent.click(
+      within(dialog).getByRole('radio', { name: 'Many files at once' }),
+    );
+    const drop = within(dialog).getByLabelText('Test files');
+    await userEvent.upload(drop, [new File(['1 1\n'], '5.in')]);
+    const table = within(dialog).getByRole('table', { name: 'Tests the files make' });
+    const [, five] = within(table).getAllByRole('row');
+    expect(
+      within(five!)
+        .getAllByRole('cell')
+        .map((cell) => cell.textContent),
+    ).toEqual(['5.in, 4 B', 'Missing', 'A part is missing.']);
+    const add = within(dialog).getByRole('button', { name: 'Add tests' });
+    expect(add).toBeDisabled();
+    expect(add).toHaveAccessibleDescription(
+      'No test is complete yet: the table says what each one is missing.',
+    );
+
+    await userEvent.upload(drop, [
+      new File(['2\n'], '6.in'),
+      new File(['3\n'], '6.ans'),
+    ]);
+    expect(add).toBeEnabled();
+    expect(add).toHaveAccessibleDescription(
+      'Adds 1 test; 1 test that is not complete is left out.',
+    );
+    await userEvent.click(add);
+    await save();
+    const body = await waitForSave(sent);
+    expect(
+      body.changes
+        .filter((change) => change.path.startsWith('tests/'))
+        .map((change) => change.path),
+    ).toEqual(['tests/small/6/input', 'tests/small/6/answer']);
   });
 
   it('adds tests from files named by test, shows what was matched first, and saves them with the settings', async () => {
@@ -898,23 +1378,31 @@ describe('the tests of a task', { timeout: 30_000 }, () => {
     );
     const dialog = await screen.findByRole('dialog', { name: 'Add tests' });
     await userEvent.click(
-      within(dialog).getByRole('radio', { name: 'Several, from files named by test' }),
+      within(dialog).getByRole('radio', { name: 'Many files at once' }),
     );
     await userEvent.upload(within(dialog).getByLabelText('Test files'), [
       new File(['1 1\n'], '4.in'),
       new File(['2\n'], '4.out'),
       new File(['x'], 'notes.txt'),
     ]);
-    const matched = within(dialog).getByRole('region', { name: 'What was matched' });
-    expect(matched).toHaveTextContent(
-      'small, test 4: input (4 bytes), answer (2 bytes)',
+    const matched = within(dialog).getByRole('region', { name: 'What the files make' });
+    const table = within(matched).getByRole('table', { name: 'Tests the files make' });
+    expect(
+      within(table)
+        .getAllByRole('columnheader')
+        .map((header) => header.textContent),
+    ).toEqual(['Test', 'input', 'answer', 'Notes']);
+    expect(within(table).getByRole('row', { name: /small, test 4/ })).toHaveTextContent(
+      'small, test 44.in, 4 B4.out, 2 BComplete',
     );
     expect(
       within(matched).getByRole('list', { name: 'Not matched' }),
     ).toHaveTextContent(
       'notes.txt: Its ending “.txt” names no part of a test: a test has input, answer.',
     );
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Add the test' }));
+    const add = within(dialog).getByRole('button', { name: 'Add tests' });
+    expect(add).toHaveAccessibleDescription('Adds 1 test.');
+    await userEvent.click(add);
 
     const rows = within(fieldGroup(tests, 'small')).getByRole('list', {
       name: 'Tests of small',
@@ -941,13 +1429,78 @@ describe('the tests of a task', { timeout: 30_000 }, () => {
     ]);
   });
 
+  it('says a zip is being read while it is, never that it holds no files', async () => {
+    taskBackend({ form: { ...CHECKED, inputs: [] } });
+    const { tests } = await openTask();
+    let release = () => {};
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const zip = await makeZip([
+      { name: '1.in', text: '1 1\n' },
+      { name: '1.out', text: '2\n' },
+    ]);
+    // A zip whose bytes come only once the test lets them, as a big one's do.
+    const slow = new File([zip], 'tests.zip', { type: 'application/zip' });
+    const slice = slow.slice.bind(slow);
+    slow.slice = (...args: Parameters<Blob['slice']>) => {
+      const part = slice(...args);
+      const read = part.arrayBuffer.bind(part);
+      part.arrayBuffer = async () => {
+        await held;
+        return read();
+      };
+      return part;
+    };
+
+    await userEvent.click(within(tests).getByRole('button', { name: 'Add tests' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Add tests' });
+    await userEvent.click(within(dialog).getByRole('radio', { name: 'A zip' }));
+    await userEvent.upload(within(dialog).getByLabelText('Zip of tests'), slow);
+
+    const made = within(dialog).getByRole('region', { name: 'What the files make' });
+    expect(made).toHaveTextContent('Reading the zip…');
+    expect(made).not.toHaveTextContent('holds no files');
+    const add = within(dialog).getByRole('button', { name: 'Add tests' });
+    expect(add).toHaveAccessibleDescription('The zip is still being read.');
+
+    release();
+    expect(await within(dialog).findByRole('row', { name: /test 1/ })).toBeVisible();
+    expect(made).not.toHaveTextContent('Reading the zip');
+  });
+
+  it('shows no empty table for files that make no test, and says so beside the button', async () => {
+    taskBackend({ form: { ...CHECKED, inputs: [] } });
+    const { tests } = await openTask();
+
+    await userEvent.click(within(tests).getByRole('button', { name: 'Add tests' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Add tests' });
+    await userEvent.click(
+      within(dialog).getByRole('radio', { name: 'Many files at once' }),
+    );
+    await userEvent.upload(within(dialog).getByLabelText('Test files'), [
+      new File(['x'], 'readme.txt'),
+    ]);
+
+    const made = within(dialog).getByRole('region', { name: 'What the files make' });
+    expect(within(made).queryByRole('table')).toBeNull();
+    expect(within(made).getByRole('list', { name: 'Not matched' })).toHaveTextContent(
+      'readme.txt',
+    );
+    expect(
+      within(dialog).getByRole('button', { name: 'Add tests' }),
+    ).toHaveAccessibleDescription(
+      'None of the files dropped makes a test: the list says why for each.',
+    );
+  });
+
   it('adds a new group’s tests from a zip, and the group shows in scoring', async () => {
     const { sent } = taskBackend({ form: { ...CHECKED, inputs: [] } });
     const { tests } = await openTask();
 
     await userEvent.click(within(tests).getByRole('button', { name: 'Add tests' }));
     const dialog = await screen.findByRole('dialog', { name: 'Add tests' });
-    await userEvent.click(within(dialog).getByRole('radio', { name: 'From a zip' }));
+    await userEvent.click(within(dialog).getByRole('radio', { name: 'A zip' }));
     await userEvent.upload(
       within(dialog).getByLabelText('Zip of tests'),
       await makeZip([
@@ -956,11 +1509,9 @@ describe('the tests of a task', { timeout: 30_000 }, () => {
       ]),
     );
     expect(
-      await within(dialog).findByText(
-        /huge, test 1: input \(4 bytes\), answer \(3 bytes\), in a new group/,
-      ),
-    ).toBeVisible();
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Add the test' }));
+      await within(dialog).findByRole('row', { name: /huge, test 1/ }),
+    ).toHaveTextContent('huge, test 1input, 4 Banswer, 3 BIn a new group.');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Add tests' }));
 
     const group = fieldGroup(tests, 'huge');
     fill(within(group).getByLabelText('How does this group earn points?'), 'all');
@@ -984,7 +1535,7 @@ describe('the tests of a task', { timeout: 30_000 }, () => {
 
     await userEvent.click(within(tests).getByRole('button', { name: 'Add tests' }));
     const dialog = await screen.findByRole('dialog', { name: 'Add tests' });
-    await userEvent.click(within(dialog).getByRole('radio', { name: 'From a zip' }));
+    await userEvent.click(within(dialog).getByRole('radio', { name: 'A zip' }));
     await userEvent.upload(
       within(dialog).getByLabelText('Zip of tests'),
       await makeZip([
@@ -992,9 +1543,8 @@ describe('the tests of a task', { timeout: 30_000 }, () => {
         { name: 'tests/huge/1/answer', text: '18\n' },
       ]),
     );
-    await userEvent.click(
-      await within(dialog).findByRole('button', { name: 'Add the test' }),
-    );
+    await within(dialog).findByRole('row', { name: /huge, test 1/ });
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Add tests' }));
 
     const bar = await screen.findByRole('region', { name: 'Save the task' });
     expect(bar).toHaveTextContent(
@@ -1055,7 +1605,11 @@ describe('the tests of a task', { timeout: 30_000 }, () => {
     await userEvent.click(
       within(rows).getByRole('button', { name: 'Undo the change to test 2' }),
     );
-    expect(await within(rows).findByLabelText('Test weight of 2')).toHaveValue('3');
+    expect(
+      await within(
+        within(rows).getByRole('listitem', { name: 'Test 2' }),
+      ).findByLabelText('Weight'),
+    ).toHaveValue('3');
 
     await userEvent.click(within(rows).getByRole('button', { name: 'Remove test 2' }));
     expect(await within(rows).findByText('To be removed')).toBeVisible();
@@ -1078,8 +1632,34 @@ describe('the tests of a task', { timeout: 30_000 }, () => {
       '/orgs/acme/contests/spring/tasks/sum?card=tests&item=small&field=test:2',
     );
 
-    const weight = await screen.findByLabelText('Test weight of 2');
+    const rows = await screen.findByRole('list', { name: 'Tests of small' });
+    const row = within(rows).getByRole('listitem', { name: 'Test 2' });
+    const weight = await within(row).findByLabelText('Weight');
     await waitFor(() => expect(weight).toHaveFocus());
+  });
+
+  it('reads each test as its parts and sizes, and says what a weight does behind an ⓘ (M48)', async () => {
+    taskBackend({
+      form: { ...CHECKED, inputs: [] },
+      content: TASK.replace('small: {pass: 30, show: verdict}', 'small: {each: 30}'),
+    });
+    const user = userEvent.setup();
+    const { tests } = await openTask();
+
+    const rows = within(fieldGroup(tests, 'small')).getByRole('list', {
+      name: 'Tests of small',
+    });
+    const row = within(rows).getByRole('listitem', { name: 'Test 1' });
+    await waitFor(() =>
+      expect(row).toHaveTextContent('Test 1 · input 4 B, answer 2 B'),
+    );
+    expect(within(row).getByLabelText('Weight')).toHaveAttribute('placeholder', '1');
+    await user.click(within(row).getByRole('button', { name: 'About Weight' }));
+    expect(
+      await screen.findByText(
+        'How much this test counts against the others. 1 by default; a test of weight 2 counts twice.',
+      ),
+    ).toBeVisible();
   });
 
   it('shows whose a test file is when someone else changed it first, and saves over it only when chosen', async () => {
@@ -1104,6 +1684,7 @@ describe('the tests of a task', { timeout: 30_000 }, () => {
           token:
             moved && path === 'tests/small/2/answer' ? 'token-theirs' : `token-${path}`,
           upload: null,
+          version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
         });
       }),
       http.get(`${TASK_API}/history`, () =>
@@ -1132,9 +1713,7 @@ describe('the tests of a task', { timeout: 30_000 }, () => {
       name: 'Tests, small, test 2: answer',
     });
     expect(answer).toHaveTextContent('Yours: Taken out');
-    expect(
-      await within(answer).findByText(/Now: 7 bytes, saved by alice/),
-    ).toBeVisible();
+    expect(await within(answer).findByText(/Now: 7 B, saved by alice/)).toBeVisible();
     await userEvent.click(within(answer).getByRole('radio', { name: /^Yours/ }));
     await userEvent.click(
       screen.getByRole('button', { name: 'Save the merged version' }),
@@ -1149,5 +1728,206 @@ describe('the tests of a task', { timeout: 30_000 }, () => {
       remove: true,
       encoding: 'utf-8',
     });
+  });
+});
+
+describe('a test opened in place (M50)', { timeout: 30_000 }, () => {
+  const LONG = Array.from({ length: 30 }, (_, at) => `line ${String(at + 1)}`).join(
+    '\n',
+  );
+
+  /** The version the uploaded part was last changed at, as its read says. */
+  const UPLOADED_AT = 'a1b2c3d4e5f6a7b8c9d0a1b2c3d4e5f6a7b8c9d0';
+
+  /**
+   * Test 1 of small with an input as long text, a binary answer, an uploaded
+   * expected answer, a folder, a log too big to show, and values.
+   */
+  function richTest() {
+    server.use(
+      http.get(`${TASK_API}/tree`, ({ request }) => {
+        const at = new URL(request.url).searchParams.get('path') ?? '';
+        if (at === 'tests/small/1') {
+          return HttpResponse.json([
+            file('tests/small/1/answer', 130),
+            {
+              path: 'tests/small/1/input',
+              kind: 'file',
+              size: LONG.length,
+              upload: null,
+              version: LISTED_AT,
+            },
+            {
+              path: 'tests/small/1/expected',
+              kind: 'file',
+              size: 130,
+              upload: { size: 50_000_000, digest: 'ab'.repeat(32) },
+              version: UPLOADED_AT,
+            },
+            folder('tests/small/1/data'),
+            file('tests/small/1/test.yaml', 20),
+            file('tests/small/1/run log.txt', 5_000_000),
+          ]);
+        }
+        if (at === 'tests/small/1/data') {
+          return HttpResponse.json([file('tests/small/1/data/a.csv', 6)]);
+        }
+        return undefined;
+      }),
+      http.get(`${TASK_API}/files/:path`, ({ params }) => {
+        const path = decodeURIComponent(String(params['path']));
+        const read = (content: string, encoding: 'utf-8' | 'base64' = 'utf-8') =>
+          HttpResponse.json({
+            path,
+            encoding,
+            content,
+            token: `t-${path}`,
+            upload: null,
+            version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
+          });
+        if (path === 'tests/small/1/input') return read(LONG);
+        if (path === 'tests/small/1/answer')
+          return read(btoa('\u0000\u0001'), 'base64');
+        if (path === 'tests/small/1/data/a.csv') return read('x,y\n1,2\n');
+        if (path === 'tests/small/1/test.yaml') return read('episodes: 12\nseed: 7\n');
+        if (path === 'tests/small/1/expected') {
+          // An upload reads as its pointer, at the version that last changed it.
+          return HttpResponse.json({
+            path,
+            encoding: 'utf-8',
+            content: 'version https://git-lfs.github.com/spec/v1\n',
+            token: `t-${path}`,
+            upload: { size: 50_000_000, digest: 'ab'.repeat(32) },
+            version: UPLOADED_AT,
+          });
+        }
+        if (path === 'tests/small/1/run log.txt') {
+          throw new Error('A file too big to show is never read whole.');
+        }
+        return undefined;
+      }),
+    );
+  }
+
+  it('shows each part side by side, the first lines of a text, a binary and an upload by size, a folder as a tree, and the test’s values', async () => {
+    taskBackend({
+      form: {
+        ...CHECKED,
+        inputs: [],
+        test: [
+          { name: 'input', type: 'file', options: null },
+          { name: 'answer', type: 'file', options: null },
+          { name: 'expected', type: 'file', options: null },
+          { name: 'data', type: 'folder', options: null },
+          { name: 'episodes', type: 'number', options: null },
+        ],
+      },
+    });
+    richTest();
+    saved.length = 0;
+    {
+      const user = userEvent.setup();
+      const { tests } = await openTask();
+      const rows = within(fieldGroup(tests, 'small')).getByRole('list', {
+        name: 'Tests of small',
+      });
+      const row = within(rows).getByRole('listitem', { name: 'Test 1' });
+      const name = within(row).getByRole('button', { name: /Test 1/ });
+      expect(name).toHaveAttribute('aria-expanded', 'false');
+      await user.click(name);
+      expect(name).toHaveAttribute('aria-expanded', 'true');
+
+      const view = await within(row).findByRole('region', {
+        name: 'What test 1 holds',
+      });
+      const parts = await within(view).findAllByRole('region');
+      expect(parts.map((part) => part.getAttribute('aria-label'))).toEqual([
+        'input',
+        'answer',
+        'expected',
+        'data',
+        'run log',
+        'Its values',
+      ]);
+      const input = within(view).getByRole('region', { name: 'input' });
+      const text = await within(input).findByLabelText('What input holds');
+      expect(text).toHaveTextContent('line 12');
+      expect(text).not.toHaveTextContent('line 13');
+      await user.click(within(input).getByRole('button', { name: 'Show all' }));
+      expect(text).toHaveTextContent('line 30');
+      await user.click(within(input).getByRole('button', { name: 'Download input' }));
+      expect(saved).toEqual(['input']);
+
+      const answer = within(view).getByRole('region', { name: 'answer' });
+      expect(
+        await within(answer).findByText('It is not text, so it is not shown here.'),
+      ).toBeVisible();
+      expect(
+        within(answer).getByRole('button', { name: 'Download answer' }),
+      ).toBeVisible();
+
+      const expected = within(view).getByRole('region', { name: 'expected' });
+      expect(expected).toHaveTextContent('47.7 MB');
+      expect(expected).toHaveTextContent(
+        'It was uploaded, so it is shown by its size rather than as text.',
+      );
+      // Downloaded whole through the door, at the version its read says (#444).
+      expect(
+        await within(expected).findByRole('link', { name: 'Download expected' }),
+      ).toHaveAttribute(
+        'href',
+        `/-/downloads/acme/spring/sum/versions/${UPLOADED_AT}/tests/small/1/expected`,
+      );
+
+      // A file too big to show is downloaded at the version it was listed at, never read.
+      const log = within(view).getByRole('region', { name: 'run log' });
+      expect(log).toHaveTextContent('It is too big to show here.');
+      expect(
+        await within(log).findByRole('link', { name: 'Download run log.txt' }),
+      ).toHaveAttribute(
+        'href',
+        `/-/downloads/acme/spring/sum/versions/${LISTED_AT}/tests/small/1/run%20log.txt`,
+      );
+
+      const data = within(view).getByRole('region', { name: 'data' });
+      await user.click(await within(data).findByRole('button', { name: /a\.csv/ }));
+      expect(await within(data).findByLabelText('What a.csv holds')).toHaveTextContent(
+        'x,y 1,2',
+      );
+
+      const values = within(view).getByRole('region', { name: 'Its values' });
+      await waitFor(() => expect(values).toHaveTextContent('episodes12'));
+      expect(values).not.toHaveTextContent('seed');
+    }
+  });
+
+  it('shows a test added and not saved yet from the files chosen for it', async () => {
+    taskBackend({ form: { ...CHECKED, inputs: [] } });
+    const user = userEvent.setup();
+    const { tests } = await openTask();
+
+    await user.click(
+      within(fieldGroup(tests, 'small')).getByRole('button', {
+        name: 'Add tests to small',
+      }),
+    );
+    const dialog = await screen.findByRole('dialog', { name: 'Add tests' });
+    await user.click(within(dialog).getByRole('radio', { name: 'Many files at once' }));
+    await user.upload(within(dialog).getByLabelText('Test files'), [
+      new File(['3 4\n'], '9.in'),
+      new File(['7\n'], '9.out'),
+    ]);
+    await user.click(within(dialog).getByRole('button', { name: 'Add tests' }));
+
+    const rows = within(fieldGroup(tests, 'small')).getByRole('list', {
+      name: 'Tests of small',
+    });
+    const row = within(rows).getByRole('listitem', { name: 'Test 9' });
+    expect(row).toHaveTextContent('Test 9 · input 4 B, answer 2 B');
+    await user.click(within(row).getByRole('button', { name: /Test 9/ }));
+    const answer = await within(row).findByRole('region', { name: 'answer' });
+    expect(await within(answer).findByLabelText('What answer holds')).toHaveTextContent(
+      '7',
+    );
   });
 });

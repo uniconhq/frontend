@@ -18,10 +18,7 @@ const REASON_MAX = 500;
  * What a latest attempt offers a manager of its task: Retry once it has
  * finished, drawn as the thing to do for a system error, and Cancel for a
  * system error alone. A submission the organisers cancelled is offered
- * neither, since a cancel is final. A broken attempt with an earlier result
- * offers "Use the last good result" until an organiser has chosen it, even
- * where the contest's settings use it already, so the choice outlasts a
- * change to them, and "Stop using the last good result" once they have.
+ * neither, since a cancel is final.
  */
 export function AttemptActions({
   task,
@@ -34,7 +31,7 @@ export function AttemptActions({
   name: string;
   onAsk: (asking: Asking) => void;
 }) {
-  const { status, last_good: lastGood, falls_back: fallsBack } = entry.grading;
+  const { status } = entry.grading;
   return (
     <div className={classes.actions}>
       {!UNFINISHED.has(status) && status !== 'cancelled' && (
@@ -57,50 +54,26 @@ export function AttemptActions({
           Cancel
         </Button>
       )}
-      {lastGood !== null && !fallsBack && (
-        <Button
-          size="xs"
-          variant="secondary"
-          label={`Use the last good result, attempt ${String(lastGood)}, for ${name}`}
-          onClick={() => onAsk({ kind: 'fallBack', task, entry })}
-        >
-          Use the last good result
-        </Button>
-      )}
-      {lastGood !== null && fallsBack && (
-        <Button
-          size="xs"
-          variant="secondary"
-          label={`Stop using the last good result for ${name}`}
-          onClick={() => onAsk({ kind: 'clearFallback', task, entry })}
-        >
-          Stop using the last good result
-        </Button>
-      )}
     </div>
   );
+}
+
+/** A cancel that leaves an earlier result standing ends only the attempt. */
+function endsAttempt(asking: Asking): boolean {
+  return asking.kind === 'cancel' && asking.entry.grading.last_good !== null;
 }
 
 const TITLE: Record<Asking['kind'], string> = {
   retry: 'Retry this grading?',
   cancel: 'Cancel this submission?',
-  fallBack: 'Use the last good result?',
-  clearFallback: 'Stop using the last good result?',
   rejudge: 'Rejudge every submission of this task?',
 };
 
 const CONFIRM: Record<Asking['kind'], string> = {
   retry: 'Retry',
   cancel: 'Cancel the submission',
-  fallBack: 'Use the last good result',
-  clearFallback: 'Stop using it',
   rejudge: 'Rejudge',
 };
-
-/** What went wrong with the attempt a last good result stands in for. */
-function brokenAs(status: string): string {
-  return status === 'cancelled' ? 'cancel' : 'system error';
-}
 
 /** What confirming does, in words. */
 function Consequence({ asking }: { asking: Asking }) {
@@ -129,47 +102,6 @@ function Consequence({ asking }: { asking: Asking }) {
   }
   const { grading } = asking.entry;
   const submission = `${submitterOf(asking.entry.by)}'s submission ${String(grading.submission_number)}`;
-  if (asking.kind === 'fallBack') {
-    return (
-      <>
-        <BodyText>
-          The entrant and the leaderboards see {submission} to {asking.task} with the
-          result of attempt {grading.last_good}, its last attempt that finished, in
-          place of attempt {grading.attempt}&apos;s {brokenAs(grading.status)}.
-        </BodyText>
-        <BodyText>
-          To undo it, choose Stop using the last good result on this submission.
-        </BodyText>
-        {grading.fallback === 'contest' && (
-          <BodyText tone="secondary">
-            The contest&apos;s settings use it already; choosing it here keeps it if
-            they change.
-          </BodyText>
-        )}
-        {grading.status === 'cancelled' && (
-          <BodyText tone="secondary">
-            It counts against the task&apos;s limit on submissions again.
-          </BodyText>
-        )}
-      </>
-    );
-  }
-  if (asking.kind === 'clearFallback') {
-    return (
-      <>
-        <BodyText>
-          The entrant and the leaderboards see {submission} to {asking.task} as the
-          contest&apos;s settings say for attempt {grading.attempt}&apos;s{' '}
-          {brokenAs(grading.status)}:{' '}
-          {grading.status === 'cancelled'
-            ? 'cancelled, counting nothing'
-            : 'still being graded, counting nothing'}
-          , unless they use the last good result.
-        </BodyText>
-        <BodyText>To undo it, choose Use the last good result again.</BodyText>
-      </>
-    );
-  }
   if (asking.kind === 'retry') {
     return (
       <>
@@ -180,10 +112,10 @@ function Consequence({ asking }: { asking: Asking }) {
         <BodyText tone="secondary">
           Attempt {grading.attempt} stays in the list for the record.
         </BodyText>
-        {grading.falls_back && (
+        {grading.last_good !== null && (
           <BodyText tone="secondary">
-            The retry stops using the last good result: the submission counts as the new
-            attempt, or as the contest&apos;s settings say if that one fails too.
+            Until the new attempt finishes with a result, the entrant and the
+            leaderboards see attempt {grading.last_good}&apos;s result.
           </BodyText>
         )}
       </>
@@ -191,7 +123,7 @@ function Consequence({ asking }: { asking: Asking }) {
   }
   return (
     <>
-      {grading.fallback === null ? (
+      {grading.last_good === null ? (
         <BodyText>
           {submission} to {asking.task} ends as cancelled. Its entrant reads the
           sentence below in place of a result, and the submission no longer counts
@@ -200,8 +132,8 @@ function Consequence({ asking }: { asking: Asking }) {
       ) : (
         <BodyText>
           Attempt {grading.attempt} of {submission} to {asking.task} ends as cancelled.
-          While the last good result is used, the submission keeps counting as attempt{' '}
-          {grading.last_good}, and its entrant sees that.
+          The submission keeps attempt {grading.last_good}&apos;s result, which its
+          entrant and the leaderboards go on seeing.
         </BodyText>
       )}
       <BodyText tone="secondary">
@@ -245,24 +177,9 @@ const RETRY_REFUSED: Words = {
   },
 };
 
-const FALL_BACK_REFUSED: Words = {
-  wrong_status: {
-    title: 'It did not fail',
-    fallback:
-      'The last good result is used only for a grading that failed with a system error, or one the organisers cancelled.',
-  },
-  conflict: {
-    title: 'No last good result to use',
-    fallback:
-      'It is used only for the latest attempt, and only when an earlier attempt finished with a result.',
-  },
-};
-
 const REFUSED: Record<Asking['kind'], Words> = {
   cancel: CANCEL_REFUSED,
   retry: RETRY_REFUSED,
-  fallBack: FALL_BACK_REFUSED,
-  clearFallback: {},
   rejudge: {},
 };
 
@@ -335,7 +252,9 @@ export function ConfirmDialog({
           ? ''
           : asking.kind === 'rejudge' && asking.choose !== undefined
             ? 'Rejudge every submission of a task?'
-            : TITLE[asking.kind]
+            : endsAttempt(asking)
+              ? 'Cancel this attempt?'
+              : TITLE[asking.kind]
       }
     >
       {asking !== null && (
@@ -359,8 +278,16 @@ export function ConfirmDialog({
           <Consequence asking={asking} />
           {asking.kind === 'cancel' && (
             <TextInput
-              label="What the entrant reads"
-              description={`One sentence, at most ${String(REASON_MAX)} characters, shown with the submission.`}
+              label={
+                asking.entry.grading.last_good === null
+                  ? 'What the entrant reads'
+                  : 'Why it was cancelled'
+              }
+              description={
+                asking.entry.grading.last_good === null
+                  ? `One sentence, at most ${String(REASON_MAX)} characters, shown with the submission.`
+                  : `One sentence, at most ${String(REASON_MAX)} characters, kept with the grading for the organisers.`
+              }
               value={asking.reason}
               onChange={(reason) => onChange({ ...asking, reason })}
               maxLength={REASON_MAX}
@@ -378,7 +305,7 @@ export function ConfirmDialog({
               }
               onClick={onConfirm}
             >
-              {CONFIRM[asking.kind]}
+              {endsAttempt(asking) ? 'Cancel the attempt' : CONFIRM[asking.kind]}
             </Button>
             <Button variant="secondary" onClick={onClose}>
               Not now

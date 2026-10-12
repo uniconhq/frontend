@@ -2,21 +2,25 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { $api } from '@/api/query';
 import { toApiError } from '@/api/problem';
 import type { WriteFile } from '@/api/types';
+import { EDITED } from '@/live';
 import type { Outcome } from '../files/SaveOutcome';
 import { fileQuery, staleAfterWrite, type Place } from '../files/place';
 
 /**
- * A file read for a form or the statement, under a key of its own: the file
- * editor's copy of the same file keeps its own token, so a save here never
- * swaps the text under an edit there, which then conflicts as it should.
- * Read once, never refetched behind the organiser's back, and read afresh
- * each time the view opens.
+ * A file read for a form or the statement, under a key of its own: the
+ * stored settings' copy of the same file keeps its own token, so a save here
+ * never swaps the text under an edit there, which then conflicts as it
+ * should.
+ * Read once, never refetched behind the organiser's back, not even when the
+ * live stream opens again (`EDITED`), and read afresh each time the view
+ * opens and after each save.
  */
 export function useOwnFile(place: Place, path: string) {
   const { queryKey, queryFn } = fileQuery(place, path);
   return useQuery({
     queryKey: [...queryKey, 'own'],
     queryFn,
+    meta: EDITED,
     staleTime: Infinity,
     gcTime: 0,
     refetchOnWindowFocus: false,
@@ -25,7 +29,7 @@ export function useOwnFile(place: Place, path: string) {
 }
 
 /**
- * The same write the file editor makes, at a contest or a task: at a task it
+ * The same write the stored settings make, at a contest or a task: at a task it
  * is the save of the task, which publishes or keeps a draft. A write that
  * went through leaves the place's tree, and a task's state and publications,
  * to be read again.

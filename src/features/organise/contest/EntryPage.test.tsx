@@ -28,6 +28,7 @@ function settings(current: string) {
     content: current,
     token: 'token-1',
     upload: null,
+    version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
   };
   const sent: string[] = [];
   server.use(
@@ -124,6 +125,13 @@ describe('how people enter', { timeout: 20_000 }, () => {
     );
     expect(invited.getByRole('form', { name: 'Invite someone' })).toBeVisible();
     const guests = way(form, 'Sign-up: Guests');
+    // What the name names, and everyone who reads it (M42).
+    const name = guests.getByRole('textbox', { name: 'Name of this sign-up' });
+    expect(name).toHaveValue('Guests');
+    expect(name).toHaveAttribute('placeholder', 'Such as NUS students');
+    expect(name).toHaveAccessibleDescription(
+      'Optional. Shown beside each person who came in this way: to you on the Entrants page, and to their teammates.',
+    );
     expect(guests.getByRole('checkbox', { name: 'Needs a code' })).toBeChecked();
     expect(guests.getByLabelText('Code')).toHaveValue('guest-2026');
     expect(
