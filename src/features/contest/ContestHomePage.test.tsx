@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@/test/user-event';
 import { http, HttpResponse } from 'msw';
-import type { TaskRelease } from '@/api/types';
+import type { TaskEntry, TaskRelease } from '@/api/types';
+
+type Points = NonNullable<TaskEntry['points']>;
 import { formatWhen } from '@/lib/time';
 import { icpc } from '@/test/boards';
 import { renderApp } from '@/test/render';
@@ -247,10 +249,91 @@ describe('the contest page for a signed-in person', () => {
     const [sum, max] = within(tasks).getAllByRole('listitem');
     await waitFor(() => expect(sum).toHaveTextContent(/Due in (44m 5\ds|45m 00s)/));
     expect(sum).toHaveTextContent(/Closes in (59m 5\ds|1h 00m 00s)/);
-    expect(sum).toHaveTextContent('100 points');
+    expect(sum).not.toHaveTextContent('100');
     expect(max).not.toHaveTextContent('Due');
-    expect(max).not.toHaveTextContent('points');
     expect(max).toHaveTextContent(/Closes in /);
+  });
+
+  it('shows each task as the entrant’s points out of its worth, and when held-back points are shown', async () => {
+    const task = (name: string, more: object) => ({
+      name,
+      label: name.toUpperCase(),
+      title: name,
+      worth: '100',
+      points: null,
+      release: { released: true, visible: true, open: true, closed: null },
+      due: null,
+      closes: '2026-09-12T11:00:00Z',
+      ...more,
+    });
+    const reveal = '2026-09-12T14:00:00Z';
+    server.use(
+      signedIn,
+      http.get(`${CONTEST_API}/home`, () =>
+        HttpResponse.json(
+          home({
+            registration: registration({ status: 'approved' }),
+            tasks: [
+              task('a', { points: { shown: '62', pending: '0', pending_until: null } }),
+              task('b', {
+                points: { shown: '30', pending: '70', pending_until: reveal },
+              }),
+              task('c', {
+                points: { shown: '0', pending: '100', pending_until: reveal },
+              }),
+              task('d', { worth: null }),
+            ],
+          }),
+        ),
+      ),
+    );
+    renderApp(PAGE);
+
+    const tasks = await screen.findByRole('list', { name: 'Tasks' });
+    const [a, b, c, d] = within(tasks).getAllByRole('listitem');
+    expect(a).toHaveTextContent('62 / 100');
+    expect(a).not.toHaveTextContent('shown at');
+    expect(b).toHaveTextContent('30 / 100');
+    expect(b).toHaveTextContent(/More shown at \S/);
+    expect(b).not.toHaveTextContent('70');
+    expect(c).toHaveTextContent('— / 100');
+    expect(c).toHaveTextContent(/Shown at \S/);
+    expect(d).not.toHaveTextContent('/');
+    expect(d).not.toHaveTextContent('points');
+  });
+
+  it('reads the tasks again once held-back points are shown', async () => {
+    const soon = new Date(Date.parse('2026-09-12T10:00:00Z') + 1_500).toISOString();
+    const sum = (points: Points) => ({
+      name: 'sum',
+      label: 'A',
+      title: 'Sum of Two',
+      worth: '100',
+      points,
+      release: { released: true, visible: true, open: true, closed: null },
+      due: null,
+      closes: '2026-09-12T11:00:00Z',
+    });
+    server.use(
+      signedIn,
+      homesInTurn([
+        home({
+          registration: registration({ status: 'approved' }),
+          tasks: [sum({ shown: '30', pending: '70', pending_until: soon })],
+        }),
+        home({
+          registration: registration({ status: 'approved' }),
+          tasks: [sum({ shown: '100', pending: '0', pending_until: null })],
+        }),
+      ]),
+    );
+    renderApp(PAGE);
+
+    const tasks = await screen.findByRole('list', { name: 'Tasks' });
+    expect(await within(tasks).findByText('30 / 100')).toBeVisible();
+    expect(
+      await within(tasks).findByText('100 / 100', {}, { timeout: 5_000 }),
+    ).toBeVisible();
   });
 
   it('says when each task falls due and closes before the server’s time is in', async () => {
