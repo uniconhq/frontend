@@ -22,6 +22,9 @@ pnpm dev            # http://localhost:5173
 which is where the compose stack in `deploy` publishes its proxy. Point
 somewhere else with `VITE_API_PROXY=http://localhost:8000 pnpm dev`. Without a backend the landing
 page renders its error block, which is the error path working, not a crash.
+`VITE_API_PROXY=none` runs it with no backend at all, every proxied path
+answering 404 at once; the browser tests (`pnpm e2e`) run their own dev server
+that way on port 5190, so they pass the same with or without a local stack.
 
 Two settings, both with dev defaults, both listed in `.env.example` and both
 read by `vite.config.ts`, not by the app: `VITE_API_PROXY` is where the dev
@@ -60,6 +63,7 @@ the one address that differs, Forgejo's, comes from the backend.
 | Where          | Port | What answers                                             |
 | -------------- | ---- | -------------------------------------------------------- |
 | `pnpm dev`     | 5173 | Vite, proxying `/api`, `/healthz`, `/readyz` and uploads |
+| `pnpm e2e`     | 5190 | Vite for the browser tests, with no backend behind it    |
 | `pnpm preview` | 4173 | the built bundle                                         |
 | the container  | 8080 | nginx, static files and the SPA fallback                 |
 
