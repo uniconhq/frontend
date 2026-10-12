@@ -541,16 +541,28 @@ describe('how the contest is scored (M52)', () => {
       sortPart,
       "Its contest makes the task worth 50 points, so each test group's points are scaled to that.",
     );
-    // A worked example from the group's own number of tests.
+    // The groups first, in one line, at the points the contest makes them.
+    expect(
+      within(sortPart).getByText('Two test groups: small (15 points) and large (35).'),
+    ).toBeVisible();
+    // Each group's size and points before its rule, with a worked example from its own tests.
     await line(
       sortPart,
-      'Test group “small”: an entrant earns 15 points when every test passes, and nothing otherwise. An entrant who passes 3 of 4 gets nothing.',
+      'small (4 tests, 15 points): an entrant earns 15 points when every test passes, and nothing otherwise. An entrant who passes 3 of 4 gets nothing.',
     );
     await line(
       sortPart,
-      'Counted on Standings: highest total first, using each entrant’s best submission. Only organisers see it.',
+      'Leaderboard “Standings”: ranks entrants by their total points over task sort, highest first. Each entrant’s best submission to this task counts. Only organisers see it.',
     );
     expect(sortPart).not.toHaveTextContent(/\byou\b/i);
+    // The whole card opens Leaderboards; each task's heading keeps its own link.
+    expect(
+      within(card).getByRole('link', { name: 'How this contest is scored' }),
+    ).toHaveAttribute('href', '/orgs/acme/contests/spring/boards');
+    expect(within(sortPart).getByRole('link', { name: 'A · sort' })).toHaveAttribute(
+      'href',
+      expect.stringMatching(/^\/orgs\/acme\/contests\/spring\/tasks\/sort\b/),
+    );
 
     const sumPart = within(card).getByRole('region', { name: 'B · sum' });
     expect(within(sumPart).getByRole('heading', { level: 3 })).toHaveTextContent(
@@ -561,7 +573,7 @@ describe('how the contest is scored (M52)', () => {
     // A draft on top of its publication: its tests now are not the published ones.
     await line(
       sumPart,
-      'Test group “main”: each test passed is worth an equal share of 80 points. Passing every test earns 20 points more.',
+      'main (100 points): each test passed earns an equal share of 80 points. Passing every test earns 20 points more.',
     );
     await line(sumPart, 'No leaderboard counts it.');
   });
@@ -646,22 +658,25 @@ describe('how the contest is scored (M52)', () => {
       name: 'How this contest is scored',
     });
     const part = await within(card).findByRole('region', { name: 'A · sum' });
+    expect(
+      within(part).getByText('Two test groups: samples (0 points) and hidden (100).'),
+    ).toBeVisible();
     await line(
       part,
-      'Test group “samples”: no points: its tests are for entrants to practise on.',
+      'samples (2 tests, no points): its tests are for entrants to practise on.',
     );
     // The same words the task's Tests card gives the group.
     await line(
       part,
-      'Test group “hidden”: each test passed is worth an equal share of 100 points. An entrant who passes 3 of 4 gets 75.',
+      'hidden (4 tests, 100 points): each test passed earns an equal share, 25. An entrant who passes 3 of 4 gets 75.',
     );
     await line(
       part,
-      'Counted on Live: highest total first, using each entrant’s best submission. Entrants and organisers see the whole leaderboard. It leaves out test group “hidden”, whose results entrants see only once the task closes.',
+      'Leaderboard “Live”: ranks entrants by their total points over every task, highest first. Each entrant’s best submission to this task counts. Entrants and organisers see all of it. It leaves out test group “hidden”, whose results entrants see only once the task closes.',
     );
     await line(
       part,
-      'Counted on Final: highest total first, using each entrant’s best submission. Everyone who can see the contest sees the whole leaderboard. Results from test group “hidden” join it when the contest ends.',
+      'Leaderboard “Final”: ranks entrants by their total points over every task, highest first. Each entrant’s best submission to this task counts. Everyone who can see the contest sees all of it. Results from test group “hidden” join it when the contest ends.',
     );
     // A board that does not cover the task is not listed under it.
     expect(part).not.toHaveTextContent('Practice');
@@ -711,12 +726,12 @@ describe('how the contest is scored, as published', () => {
     const sum = await within(card).findByRole('region', { name: 'B · sum' });
     await line(
       sum,
-      'Test group “main”: each test passed is worth an equal share of 80 points. Passing every test earns 20 points more.',
+      'main (100 points): each test passed earns an equal share of 80 points. Passing every test earns 20 points more.',
     );
     const sort = within(card).getByRole('region', { name: 'A · sort' });
     await line(
       sort,
-      'Test group “judge”: an entrant earns 1 point when every test passes, and nothing otherwise.',
+      'judge (1 point): an entrant earns 1 point when every test passes, and nothing otherwise.',
     );
     const fresh = within(card).getByRole('region', { name: 'C · new' });
     expect(

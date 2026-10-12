@@ -104,20 +104,37 @@ export function perGroupRefusal(order: OrderKeyValues[]): string | null {
     : 'The best submission on each test group needs points ranked first and no value to rank by.';
 }
 
-/** One key of a board's order in words, first or after another: "highest total first". */
-function keyWords(key: OrderKeyValues, first: boolean): string {
-  if (key.kind === 'points')
-    return first ? 'highest total first' : 'then highest total';
+/**
+ * One key of a board's order in words, saying a total of what: "their total
+ * points over every task, highest first". `over` is the tasks the total runs
+ * over, said with the first key only. A value is named by its key until a
+ * workflow's report gives it a title (M58).
+ */
+function keyWords(key: OrderKeyValues, over: string | null): string {
+  const across = over === null ? '' : ` over ${over}`;
+  if (key.kind === 'points') return `their total points${across}, highest first`;
   if (key.kind === 'value') {
     const name = key.name.trim() === '' ? 'value' : key.name.trim();
-    return first ? `best ${name} first` : `then best ${name}`;
+    return `their total ${name}${across}, best first`;
   }
   const minutes = key.perAttempt.trim();
   const attempts =
     minutes === '' || minutes === '0'
       ? 'counting nothing for earlier attempts'
       : `counting ${minutes} for each earlier attempt`;
-  return `${first ? 'fewest penalty minutes first' : 'then fewest penalty minutes'}, ${attempts}`;
+  return `penalty minutes${across}, fewest first, ${attempts}`;
+}
+
+/**
+ * How a board ranks, its first key and then what breaks ties: "ranks entrants
+ * by their total points over every task, highest first; ties are broken by
+ * penalty minutes, fewest first, counting 20 for each earlier attempt".
+ */
+function rankWords(order: OrderKeyValues[], covers: string): string {
+  const [first, ...ties] = order;
+  const ranks = `ranks entrants by ${first === undefined ? keyWords({ kind: 'points' }, covers) : keyWords(first, covers)}`;
+  if (ties.length === 0) return ranks;
+  return `${ranks}; ties are broken by ${ties.map((key) => keyWords(key, null)).join(', then by ')}`;
 }
 
 /**
@@ -207,37 +224,40 @@ function whoWords(board: BoardValues): string {
   const everyone = board.who === 'everyone';
   if (rows === '' || rows === 'all') {
     return everyone
-      ? 'Everyone who can see the contest sees the whole leaderboard.'
-      : 'Entrants and organisers see the whole leaderboard.';
+      ? 'Everyone who can see the contest sees all of it.'
+      : 'Entrants and organisers see all of it.';
   }
   if (rows === 'own')
-    return 'Organisers see the whole leaderboard, and each entrant only their own row.';
-  return `Organisers see the whole leaderboard; ${everyone ? 'everyone else who can see the contest sees' : 'entrants see'} the top ${rows} rows and any row tied with the last of them, and an entrant their own row as well.`;
+    return 'Organisers see all of it, and each entrant only their own row.';
+  return `Organisers see all of it; ${everyone ? 'everyone else who can see the contest sees' : 'entrants see'} the top ${rows} rows and any row tied with the last of them, and an entrant their own row as well.`;
+}
+
+/** Which submission counts, to this task or to each: "Each entrant’s best submission to this task counts." */
+function selectWords(select: string, task: string): string {
+  if (select === 'best_per_group')
+    return `Each entrant’s best result on each test group of ${task} counts.`;
+  if (select === 'marked')
+    return `The best of the submissions each entrant marks on ${task} counts.`;
+  return `Each entrant’s best submission to ${task} counts.`;
 }
 
 /**
- * What a board ranks, by what, and who sees how much of it, as a few plain
- * sentences an organiser can check the board against, the same on the
- * Leaderboards page and in how the contest is scored: "highest total first,
- * using each entrant’s best submission. Entrants and organisers see the
- * whole leaderboard." `tasks` says which tasks it covers, for a page that shows
- * the board on its own; left out, the sentence is said under one task, and
- * `held` is that task's alone; `held` is the test groups of those tasks whose
- * results come out once their task closes, said only where they change
+ * What a board ranks, a total of what over which tasks, which submission
+ * counts, and who sees how much of it, as a few plain sentences an organiser
+ * can check the board against, the same on the Leaderboards page and in how
+ * the contest is scored (M65): "ranks entrants by their total points over
+ * every task, highest first. Each entrant’s best submission to this task
+ * counts. Entrants and organisers see all of it." `tasks` is set for a page
+ * that shows the board on its own, which starts it as a sentence; left out,
+ * the sentence is said under one task, after the board's name and a colon,
+ * and `held` is that task's alone; `held` is the test groups of those tasks
+ * whose results come out once their task closes, said only where they change
  * what the board counts, or null when they are not known.
  */
 export function boardSentence(
   board: BoardValues,
   { tasks = true, held = null }: { tasks?: boolean; held?: HeldGroup[] | null } = {},
 ): string {
-  const order = board.order.length === 0 ? [{ kind: 'points' as const }] : board.order;
-  const rank = order.map((key, at) => keyWords(key, at === 0)).join(', ');
-  const using =
-    board.select === 'best_per_group'
-      ? 'using each entrant’s best result on each test group'
-      : board.select === 'marked'
-        ? 'using the best of the submissions each entrant marks'
-        : 'using each entrant’s best submission';
   const covers =
     board.tasks === null
       ? 'every task'
@@ -249,9 +269,13 @@ export function boardSentence(
       ? held
       : held.filter((group) => board.tasks?.includes(group.task) === true);
   const named = tasks && board.tasks?.length !== 1;
-  const first = `${rank}, ${using}${tasks ? `, on ${covers}` : ''}.`;
+  const first = `${rankWords(board.order, covers)}.`;
   return [
     tasks ? first.replace(/^./, (letter) => letter.toUpperCase()) : first,
+    selectWords(
+      board.select,
+      !tasks ? 'this task' : board.tasks?.length === 1 ? 'the task' : 'each task',
+    ),
     whoWords(board),
     scopeWords(board.over, covered, named, !tasks),
   ]

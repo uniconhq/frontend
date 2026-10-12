@@ -10,6 +10,7 @@ import {
   ZERO,
   type Ratio,
 } from '@/lib/exact';
+import { listed } from '@/lib/listed';
 import { percentOf } from '../contest/percent';
 import type { GroupValues, TaskValues } from '../forms/task-values';
 
@@ -203,11 +204,63 @@ function leastOf(share: Ratio, tests: number): number {
   return Number((scaledUp + share.den - 1n) / share.den);
 }
 
+const COUNTS = [
+  '',
+  'One',
+  'Two',
+  'Three',
+  'Four',
+  'Five',
+  'Six',
+  'Seven',
+  'Eight',
+  'Nine',
+  'Ten',
+];
+
+/**
+ * A task's test groups in one line, before each is said (M65): "One test
+ * group: main, 100 points." or "Three test groups: samples (0 points), small
+ * (40) and large (60)." Their points are as an entrant sees them under the
+ * contest's `worth` (none: the task's total).
+ */
+export function groupsLine(groups: GroupValues[], worth: Ratio | null): string {
+  const total = taskWeight(groups);
+  const points = (group: GroupValues) => scaled(groupWeight(group), total, worth);
+  if (groups.length === 0) return 'It has no test groups.';
+  const count = COUNTS[groups.length] ?? String(groups.length);
+  const [only] = groups;
+  if (groups.length === 1 && only !== undefined) {
+    return `One test group: ${only.name}, ${pointsWords(points(only))}.`;
+  }
+  const named = groups.map(
+    (group, at) =>
+      `${group.name} (${at === 0 ? pointsWords(points(group)) : pointsText(points(group))})`,
+  );
+  return `${count} test groups: ${listed(named)}.`;
+}
+
+/**
+ * What heads a group before its rule: how many tests it has, when known, and
+ * its points, "3 tests, 100 points", or "no points" for one that gives none.
+ */
+export function groupHeading(
+  group: GroupValues,
+  context: { total: Ratio; worth: Ratio | null; tests: number | null },
+): string {
+  const points = scaled(groupWeight(group), context.total, context.worth);
+  const said = points.num === 0n ? 'no points' : pointsWords(points);
+  return context.tests === null
+    ? said
+    : `${n(context.tests, 'test', 'tests')}, ${said}`;
+}
+
 /**
  * How a group earns its points, in the words an entrant and an organiser
- * both read (M48, M52): `rule`, what earns them, in a sentence or two that
- * speak of "an entrant", never "you", and do not name the group, so a page
- * heads it as it heads its own boxes; and `example`, a worked case from the
+ * both read (M48, M52, M65): `rule`, what earns them, in a sentence or two
+ * that speak of "an entrant", never "you", and do not name the group or
+ * repeat its size and points where they need not, since a page heads the
+ * rule with them (`groupHeading`); and `example`, a worked case from the
  * group's own number of tests where one helps, or null. Its points are as
  * an entrant sees them under the contest's `worth` (none: the task's total).
  * `tests` is how many tests the group has, when known.
@@ -226,18 +279,27 @@ export function groupWords(
   const p = (text: string) => pointsWords(real(text));
   const weighted = group.weights.length > 0;
   const many = tests !== null && tests >= 2 ? tests : null;
-  const share = weighted ? 'a share by its weight' : 'an equal share';
   const shareOf = (passAt: string) => `${percentOf(passAt)}%`;
   const none = {
-    rule: 'No points: its tests are for entrants to practise on.',
+    rule: 'Its tests are for entrants to practise on.',
     example: null,
   };
 
-  /** Points by each test: passed, scored from 0 to 1, or against the best. */
-  const byTest = (each: string): { rule: string; example: string | null } => {
+  /**
+   * Points by each test: passed, scored from 0 to 1, or against the best.
+   * `own` is set when they are all the group's points, which its heading
+   * already gives, so a test passed is given its share as a number (M65).
+   */
+  const byTest = (
+    each: string,
+    own: boolean,
+  ): { rule: string; example: string | null } => {
+    const share = weighted
+      ? `a share of ${p(each)} by its weight`
+      : `an equal share of ${p(each)}`;
     if (credit === 'value') {
       return {
-        rule: `Each test is worth ${share} of ${p(each)}, times its score from 0 to 1.`,
+        rule: `Each test earns ${share}, times its score from 0 to 1.`,
         example: weighted
           ? null
           : `An entrant whose tests all score 0.5 gets ${pointsText(mulRatio(real(each), { num: 1n, den: 2n }))}.`,
@@ -245,14 +307,21 @@ export function groupWords(
     }
     if (credit === 'relative') {
       return {
-        rule: `Each test is worth ${share} of ${p(each)}, times its result against the best any entrant reached.`,
+        rule: `Each test earns ${share}, times its result against the best any entrant reached.`,
         example: weighted
           ? null
           : `An entrant who reaches 80% of the best on every test gets ${pointsText(mulRatio(real(each), { num: 4n, den: 5n }))}.`,
       };
     }
+    const one =
+      own && !weighted && tests !== null && tests >= 1
+        ? divRatio(real(each), { num: BigInt(tests), den: 1n })
+        : null;
     return {
-      rule: `Each test passed is worth ${share} of ${p(each)}.`,
+      rule:
+        one === null
+          ? `Each test passed earns ${share}.`
+          : `Each test passed earns an equal share, ${pointsText(one)}.`,
       example:
         weighted || many === null
           ? null
@@ -287,9 +356,9 @@ export function groupWords(
       };
     }
     case 'each':
-      return byTest(group.each);
+      return byTest(group.each, true);
     case 'bonus': {
-      const each = byTest(group.each);
+      const each = byTest(group.each, false);
       return {
         rule: `${each.rule} Passing every test earns ${p(group.pass)} more.`,
         example:

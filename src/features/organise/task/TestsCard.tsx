@@ -420,7 +420,8 @@ function GroupItem({
   const showProblem = showRefusal(group.show, group, credit.kind);
   const verdictRefusal = showRefusal('verdict', group, credit.kind);
   const required = graded && !group.read;
-  const points = pointsWords(scaled(groupWeight(group), total, worth));
+  const most = scaled(groupWeight(group), total, worth);
+  const points = most.num === 0n ? 'no points' : `up to ${pointsWords(most)}`;
   const pick = (next: string) => {
     if (next === 'advanced') {
       onAdvanced(true);
@@ -442,7 +443,7 @@ function GroupItem({
       <div className={classes.itemHead}>
         <h4 className={classes.itemTitle}>{group.name}</h4>
         <BodyText tone="secondary">
-          {count === 1 ? '1 test' : `${String(count)} tests`} · up to {points}
+          {count === 1 ? '1 test' : `${String(count)} tests`} · {points}
           {!group.read && ' · new'}
         </BodyText>
       </div>
