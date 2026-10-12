@@ -46,6 +46,10 @@ const stuck: Grading = {
   deadline_at: null,
   cancel_reason: null,
   automatic: false,
+  limit: null,
+  retry_limit: null,
+  regrade: null,
+  change: null,
   last_good: null,
   submitted_by: null,
 };
@@ -587,6 +591,7 @@ describe("the organisers' scored view of a submission", () => {
       values: reported(),
       folded: {},
       reason: null,
+      limit: null,
       points: { shown: '100', pending: '0', pending_until: null },
       factor: '1',
       groups: [

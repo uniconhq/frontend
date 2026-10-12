@@ -15,7 +15,7 @@ import {
   taskState,
 } from '@/test/organiser';
 
-type Change = components['schemas']['Change'];
+type Change = components['schemas']['forge__domain__content__Change'];
 
 /** The task's Settings page, which holds its settings as stored, with their history. */
 const SETTINGS = '/orgs/acme/contests/spring/tasks/sum/settings';

@@ -15,6 +15,7 @@ const done: GradingResult = {
   groups: [],
   values: { numbers: {}, texts: {} },
   reason: null,
+  limit: null,
   points: null,
   factor: null,
   folded: {},

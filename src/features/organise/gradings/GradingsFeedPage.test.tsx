@@ -43,6 +43,10 @@ const grading: Grading = {
   deadline_at: null,
   cancel_reason: null,
   automatic: false,
+  limit: null,
+  retry_limit: null,
+  regrade: null,
+  change: null,
   last_good: null,
   submitted_by: null,
 };
