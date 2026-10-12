@@ -210,7 +210,7 @@ function WayCard({
                   <>
                     <TextInput
                       label="Email domains"
-                      description="Separate them with commas. Only confirmed addresses count, and each domain matches exactly: u.nus.edu does not let in comp.u.nus.edu."
+                      description="Separate them with commas. Only confirmed addresses count. u.nus.edu lets in addresses at u.nus.edu alone; *.nus.edu.sg lets in nus.edu.sg and every domain under it, such as comp.nus.edu.sg."
                       placeholder="u.nus.edu"
                       value={way.domains}
                       onChange={(domains) => signup({ domains })}

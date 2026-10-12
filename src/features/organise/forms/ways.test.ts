@@ -70,8 +70,38 @@ describe('the ways into a contest', () => {
     ).toEqual([
       'There is already a way in by invite, and a contest has at most one.',
       'Two sign-ups have the same name.',
-      '“nus” is not a domain. Write one such as u.nus.edu.',
+      '“nus” is not a domain. Write one such as u.nus.edu, or *.nus.edu.sg to take nus.edu.sg and every domain under it.',
     ]);
+  });
+
+  it('takes a domain and every domain under it as the forge does, *. as the whole first part', () => {
+    const problems = (domains: string) => wayProblems([newSignup({ domains })]);
+    expect(problems('*.nus.edu.sg, u.nus.edu, a-b.c9.org')).toEqual([]);
+    expect(problems('*.sg')).toEqual([
+      '“*.sg” is not a domain. Write one such as u.nus.edu, or *.nus.edu.sg to take nus.edu.sg and every domain under it.',
+    ]);
+    for (const domain of [
+      '*nus.edu.sg',
+      'a.*.edu',
+      '*.*.edu.sg',
+      '-a.edu',
+      'a-.edu',
+      'a..edu',
+    ]) {
+      expect(problems(domain)).toHaveLength(1);
+    }
+  });
+
+  it('says a domain and every domain under it in words', () => {
+    expect(whoWords(newSignup({ domains: '*.nus.edu.sg' }))).toBe(
+      'anyone with an email at nus.edu.sg or any domain under it',
+    );
+    expect(whoWords(newSignup({ domains: 'u.nus.edu, *.nus.edu.sg', code: 'x' }))).toBe(
+      'anyone with an @u.nus.edu email, or an email at nus.edu.sg or any domain under it, and the code',
+    );
+    expect(whoWords(newSignup({ domains: '*.nus.edu.sg', emailPattern: '^e' }))).toBe(
+      'anyone with an email at nus.edu.sg or any domain under it, matching the pattern',
+    );
   });
 
   it('says who each way lets in, everything it asks together', () => {
