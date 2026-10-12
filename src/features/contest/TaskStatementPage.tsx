@@ -12,7 +12,7 @@ import { SectionTitle } from '@/ui/SectionTitle';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
 import { contestHomePath } from '@/lib/contest-paths';
-import { formatExact } from '@/lib/exact';
+import { formatWorth } from '@/lib/exact';
 import { useTaskParams } from '@/lib/route-params';
 import { contestViewSectionPath } from '@/lib/sections';
 import { formatDateTime } from '@/lib/time';
@@ -49,7 +49,7 @@ function LimitList({ page }: { page: TaskPage }) {
         <>
           <dt>Worth</dt>
           <dd>
-            {formatExact(page.worth)} {page.worth === '1' ? 'point' : 'points'}
+            {formatWorth(page.worth)} {page.worth === '1' ? 'point' : 'points'}
           </dd>
         </>
       )}

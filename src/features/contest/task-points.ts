@@ -1,28 +1,15 @@
 import type { BoardPoints, TaskEntry } from '@/api/types';
-import { compareDecimal, cut, formatExact } from '@/lib/exact';
+import { compareDecimal, formatPoints, formatWorth } from '@/lib/exact';
 import { formatWhen } from '@/lib/time';
-
-/** How many decimals points are shown to. */
-const PLACES = 2;
 
 /** An entrant's points on a task as a line reads them, and when held-back points are shown. */
 export type PointsText = { score: string; pending: string | null };
-
-/**
- * Points shown out of the most: cut, never rounded up, so points short of
- * the most never read as it; points that are the most read as it.
- */
-function shownOf(shown: string, most: string): string {
-  return compareDecimal(shown, most) === 0
-    ? formatExact(most, PLACES)
-    : formatExact(cut(shown, PLACES), PLACES);
-}
 
 /** A task's worth alone, "100 points", for a reader the contest counts no points for. */
 function worthText(worth: string): PointsText {
   const one = compareDecimal(worth, '1') === 0;
   return {
-    score: `${formatExact(worth, PLACES)} ${one ? 'point' : 'points'}`,
+    score: `${formatWorth(worth)} ${one ? 'point' : 'points'}`,
     pending: null,
   };
 }
@@ -36,7 +23,7 @@ function worthText(worth: string): PointsText {
  * with nothing shown yet (`shown` null; a shown 0 reads as 0), `—` over the
  * most and "Shown at 14:00". "—" alone where the board does not cover the
  * task, or counts nothing from it. Null on a task that gives no points.
- * Exact numbers, the points cut and the most rounded only for reading.
+ * Exact numbers, cut only for reading, as every page cuts points (R17).
  */
 export function boardPointsText(
   cell: BoardPoints,
@@ -50,7 +37,7 @@ export function boardPointsText(
   }
   if (cell.points === null) return null;
   const { shown, pending_until: until } = cell.points;
-  const score = `${shown === null ? '—' : shownOf(shown, most)} / ${formatExact(most, PLACES)}`;
+  const score = `${shown === null ? '—' : formatPoints(shown, most)} / ${formatWorth(most)}`;
   if (until === null) return { score, pending: null };
   const at = formatWhen(new Date(until), now);
   return { score, pending: `${shown === null ? 'Shown' : 'More shown'} at ${at}` };

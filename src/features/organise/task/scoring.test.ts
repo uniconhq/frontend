@@ -215,7 +215,7 @@ describe('a task’s points', () => {
     ) => groupSentence(g, { total: r('210'), worth: null, credit, tests });
     const mix = group('main', { each: '100', worst: '10', pass: '100', passAt: '0.8' });
     expect(say(mix, 3)).toBe(
-      `An entrant earns 100 points shared among the tests passed, plus 10 points times the lowest test score, plus 100 points when at least 80% of the tests pass. An entrant who passes 2 of 3 gets about ${formatExact('66.67')} (${formatExact('66.67')} + 0 + 0); one who passes all 3 gets 210.`,
+      `An entrant earns 100 points shared among the tests passed, plus 10 points times the lowest test score, plus 100 points when at least 80% of the tests pass. An entrant who passes 2 of 3 gets about ${formatExact('66.66')} (${formatExact('66.66')} + 0 + 0); one who passes all 3 gets 210.`,
     );
     // Enough tests pass for the bar: its part counts in the example.
     expect(say(group('main', { each: '60', pass: '40', passAt: '0.5' }), 4)).toBe(
@@ -277,7 +277,7 @@ describe('a task’s points', () => {
         tests: 3,
       }),
     ).toBe(
-      `Each test passed earns an equal share, about ${formatExact('33.33')}. An entrant who passes 2 of 3 gets about ${formatExact('66.67')}.`,
+      `Each test passed earns an equal share, about ${formatExact('33.33')}. An entrant who passes 2 of 3 gets about ${formatExact('66.66')}.`,
     );
   });
 

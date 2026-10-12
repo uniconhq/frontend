@@ -1,5 +1,5 @@
 import type { GradingResult, SubmissionState, Submission } from '@/api/types';
-import { formatExact } from '@/lib/exact';
+import { formatPoints } from '@/lib/exact';
 import { formatWhen, serverNow } from '@/lib/time';
 
 /**
@@ -129,11 +129,11 @@ export function pointsLine(
     return '—';
   }
   const { shown, pending_until: until } = grading.points;
-  if (until === null) return shown === null ? '—' : formatExact(shown, 2);
+  if (until === null) return shown === null ? '—' : formatPoints(shown);
   const at = formatWhen(new Date(until), now);
   return shown === null
     ? `shown at ${at}`
-    : `${formatExact(shown, 2)} so far, more shown at ${at}`;
+    : `${formatPoints(shown)} so far, more shown at ${at}`;
 }
 
 /** How late a submission was, in started days after the person's due. */

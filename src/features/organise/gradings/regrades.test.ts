@@ -125,6 +125,10 @@ describe('a result a regrade compares', () => {
       'COMPILE ERROR, 0 points',
     );
     expect(sideWords({ ...side, points: null })).toBe('5 of 8 tests passed');
+    // Cut as every page shows points (R17).
+    expect(sideWords({ ...side, points: '73.336' })).toBe(
+      `${formatExact('73.33', 2)} points`,
+    );
     expect(sideWords(null)).toBe('—');
   });
 });

@@ -63,6 +63,36 @@ const right = grading({
   ],
 });
 
+describe("a result's points", () => {
+  it('are cut to two decimals, as every page shows them, the run’s and each group’s (R17)', () => {
+    const third = grading({
+      status: 'graded',
+      outcome: 'wrong_answer',
+      points: { shown: '36.666666', pending: '0', pending_until: null },
+      factor: '1',
+      folded: {},
+      groups: [
+        {
+          group: 'main',
+          show: 'always',
+          outcome: 'wrong_answer',
+          tests: [graded('main/1', 'accepted', reported({}), '1')],
+          shown_at: null,
+          ran: true,
+          points: '36.666666',
+          max: '110',
+        },
+      ],
+    });
+    renderWithProviders(<ScoredResult grading={third} />);
+    expect(screen.getByText(`${formatExact('36.66', 2)} points`)).toBeVisible();
+    expect(
+      screen.getByText(`${formatExact('36.66', 2)} / 110 points`, { exact: false }),
+    ).toBeVisible();
+    expect(screen.queryByText(/36[.,]67/)).toBeNull();
+  });
+});
+
 describe("a result's values over its tests", () => {
   it('says nothing of a fold a wrong answer has no value for while the task names no values, each test keeping its own', () => {
     const { container } = renderWithProviders(<ScoredResult grading={wrong} />);

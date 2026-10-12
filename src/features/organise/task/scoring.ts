@@ -2,9 +2,11 @@ import {
   addRatio,
   compareRatio,
   divRatio,
-  formatExact,
-  formatRatio,
+  formatPoints,
+  formatPointsRatio,
+  formatWorthRatio,
   mulRatio,
+  POINTS_PLACES,
   ratioDigits,
   ratioOf,
   ZERO,
@@ -184,18 +186,30 @@ export function scaled(value: Ratio, total: Ratio, worth: Ratio | null): Ratio {
   return mulRatio(worth, divRatio(value, total));
 }
 
-/** A number of points for reading, exactly or "about" when it does not end. */
+/**
+ * Points an entrant earns, for reading: cut, as every page cuts them (R17),
+ * exactly or "about" when they do not end.
+ */
 export function pointsText(value: Ratio): string {
-  return formatRatio(value);
+  return formatPointsRatio(value);
+}
+
+/**
+ * The most points something gives, a task or a group or a rule's part, for
+ * reading: rounded, as every page shows a worth, exactly or "about" when it
+ * does not end.
+ */
+export function worthText(value: Ratio): string {
+  return formatWorthRatio(value);
 }
 
 function n(count: number, one: string, many: string): string {
   return `${String(count)} ${count === 1 ? one : many}`;
 }
 
-/** Points in words, exactly or "about" when they do not end: "100 points", "1 point". */
+/** A worth in words, exactly or "about" when it does not end: "100 points", "1 point". */
 export function pointsWords(value: Ratio): string {
-  return `${pointsText(value)} ${value.num === value.den ? 'point' : 'points'}`;
+  return `${worthText(value)} ${value.num === value.den ? 'point' : 'points'}`;
 }
 
 /** The least whole number of `tests` a share of them comes to, rounded up. */
@@ -235,7 +249,7 @@ export function groupsLine(groups: GroupValues[], worth: Ratio | null): string {
   }
   const named = groups.map(
     (group, at) =>
-      `${group.name} (${at === 0 ? pointsWords(points(group)) : pointsText(points(group))})`,
+      `${group.name} (${at === 0 ? pointsWords(points(group)) : worthText(points(group))})`,
   );
   return `${count} test groups: ${listed(named)}.`;
 }
@@ -371,7 +385,7 @@ export function groupWords(
                   num: BigInt(many - 1),
                   den: BigInt(many),
                 }),
-              )}; one who passes all ${String(many)}, ${pointsText(addRatio(real(group.each), real(group.pass)))}.`,
+              )}; one who passes all ${String(many)}, ${worthText(addRatio(real(group.each), real(group.pass)))}.`,
       };
     }
     case 'worst':
@@ -425,16 +439,16 @@ export function mixWords(
   };
 }
 
-/** A number of points as bare digits, for a sum's parts: "66.67". */
+/** A number of points as bare digits, for a sum's parts: "66.66". */
 function digitsOf(value: Ratio): string {
-  return formatExact(ratioDigits(value).digits, 2);
+  return formatPoints(ratioDigits(value, POINTS_PLACES, 'cut').digits);
 }
 
 /**
  * A mix's worked example (M59): what an entrant gets when a part of the tests
  * go well, each part's points in brackets when there are two or more, and,
  * for tests that pass or fail, what passing every one gets: "An entrant who
- * passes 2 of 3 gets about 66.67 (66.67 + 0 + 0); one who passes all 3 gets
+ * passes 2 of 3 gets about 66.66 (66.66 + 0 + 0); one who passes all 3 gets
  * 210." Null when the group's number of tests is not known for tests that
  * pass or fail.
  */
@@ -474,7 +488,7 @@ function mixExample(
   if (many === null) return null;
   const share = { num: BigInt(many - 1), den: BigInt(many) };
   const all = parts(ONE, ONE, ONE).reduce(addRatio, ZERO);
-  return `An entrant who passes ${String(many - 1)} of ${String(many)} gets ${said(parts(share, ZERO, share))}; one who passes all ${String(many)} gets ${pointsText(all)}.`;
+  return `An entrant who passes ${String(many - 1)} of ${String(many)} gets ${said(parts(share, ZERO, share))}; one who passes all ${String(many)} gets ${worthText(all)}.`;
 }
 
 /** How a group earns its points, as one passage: its rule, then its worked example. */

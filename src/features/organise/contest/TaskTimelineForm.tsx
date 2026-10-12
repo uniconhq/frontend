@@ -3,7 +3,7 @@ import type { TaskStanding } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
 import { RadioGroup } from '@/ui/RadioGroup';
-import { formatExact } from '@/lib/exact';
+import { formatWorth } from '@/lib/exact';
 import {
   readContest,
   writeContest,
@@ -78,7 +78,7 @@ function EntryForm({
   const noPoints = standing.timeline.worth === null && standing.state.latest !== null;
   const total =
     entry.worth === '' && standing.timeline.worth !== null
-      ? `${formatExact(standing.timeline.worth)}, its test groups’ total`
+      ? `${formatWorth(standing.timeline.worth)}, its test groups’ total`
       : 'Its test groups’ total';
   const marks = markedBoardCovers(read.values, entry.id);
   const after: ContestValues = {

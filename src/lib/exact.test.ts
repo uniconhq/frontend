@@ -5,7 +5,10 @@ import {
   compareRatio,
   divRatio,
   formatExact,
-  formatRatio,
+  formatPoints,
+  formatPointsRatio,
+  formatWorth,
+  formatWorthRatio,
   mulRatio,
   placesToTell,
   ratioDigits,
@@ -146,9 +149,43 @@ describe('exact fractions', () => {
       digits: '1',
       exact: false,
     });
-    expect(formatRatio(r('72'))).toBe('72');
-    expect(formatRatio(divRatio(r('200'), r('3')))).toBe(
+    expect(ratioDigits(divRatio(r('200'), r('3')), 2, 'cut')).toEqual({
+      digits: '66.66',
+      exact: false,
+    });
+  });
+});
+
+describe('points for reading (R17)', () => {
+  const r = (text: string) => ratioOf(text) ?? ZERO;
+
+  it('cuts points to two decimals, never rounding them up, one way everywhere', () => {
+    expect(formatPoints('36.666666')).toBe(formatExact('36.66'));
+    expect(formatPoints('99.999')).toBe(formatExact('99.99'));
+    expect(formatPoints('110')).toBe('110');
+    expect(formatPoints('82.5')).toBe(formatExact('82.5'));
+    expect(formatPoints('33.33333', null, 4)).toBe(formatExact('33.3333'));
+  });
+
+  it('reads full marks as the worth beside them, and a worth rounded', () => {
+    expect(formatWorth('99.996')).toBe('100');
+    expect(formatPoints('99.996', '99.996')).toBe('100');
+    expect(formatPoints('99.995', '99.996')).toBe(formatExact('99.99'));
+    expect(formatWorthRatio(divRatio(r('200'), r('3')))).toBe(
       `about ${formatExact('66.67')}`,
     );
+  });
+
+  it('cuts a fraction of points as well, saying when the digits are not exact', () => {
+    expect(formatPointsRatio(r('72'))).toBe('72');
+    expect(formatPointsRatio(divRatio(r('200'), r('3')))).toBe(
+      `about ${formatExact('66.66')}`,
+    );
+  });
+
+  it('tells neighbours apart as they are cut', () => {
+    // Rounded to two, 36.666 and 36.674 both read 36.67; cut, they differ.
+    expect(placesToTell(['36.674', '36.666'], 2, 'cut')).toBe(2);
+    expect(placesToTell(['36.669', '36.661'], 2, 'cut')).toBe(3);
   });
 });
