@@ -381,6 +381,72 @@ describe('the workflow editor', () => {
     );
   });
 
+  it('offers a unit only for a number, and drops it when the type changes away (M54)', async () => {
+    server.use(
+      signedIn,
+      ...workflowBackend(
+        CLASSIC_V2.replace(
+          '  memory_limit: number\n',
+          '  memory_limit: number\n  episodes: {type: number, unit: runs}\n',
+        ),
+      ).handlers,
+    );
+    const user = userEvent.setup();
+    renderApp(EDITOR_PAGE);
+
+    await stepBox('run');
+    await user.click(toolButton('Inputs'));
+    const row = (id: string) =>
+      within(drawer('Inputs')).getByLabelText(`The input ${id}`, { selector: 'li' });
+    expect(
+      within(row('submission')).queryByRole('textbox', { name: 'Unit' }),
+    ).toBeNull();
+    expect(within(row('language')).queryByRole('textbox', { name: 'Unit' })).toBeNull();
+    expect(within(row('episodes')).getByRole('textbox', { name: 'Unit' })).toHaveValue(
+      'runs',
+    );
+
+    await user.selectOptions(
+      within(row('episodes')).getByRole('combobox', { name: 'Type' }),
+      'file',
+    );
+    await waitFor(() =>
+      expect(
+        within(row('episodes')).queryByRole('textbox', { name: 'Unit' }),
+      ).toBeNull(),
+    );
+    const text = await fileText(user);
+    expect(text).toContain('episodes: file');
+    expect(text).not.toContain('unit: runs');
+  });
+
+  it('shows a unit a file left on another type, to clear it', async () => {
+    server.use(
+      signedIn,
+      ...workflowBackend(
+        CLASSIC_V2.replace(
+          '  memory_limit: number\n',
+          '  memory_limit: number\n  data: {type: file, unit: MB}\n',
+        ),
+      ).handlers,
+    );
+    const user = userEvent.setup();
+    renderApp(EDITOR_PAGE);
+
+    await stepBox('run');
+    await user.click(toolButton('Inputs'));
+    const row = within(drawer('Inputs')).getByLabelText('The input data', {
+      selector: 'li',
+    });
+    const unit = within(row).getByRole('textbox', { name: 'Unit' });
+    expect(unit).toHaveAccessibleDescription(
+      'Only a number takes a unit, so clear this one.',
+    );
+    await user.clear(unit);
+    await user.type(unit, '{Enter}');
+    expect(await fileText(user)).toContain('data: file');
+  });
+
   it('gives a port text with a test’s value written in', async () => {
     server.use(
       signedIn,

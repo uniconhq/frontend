@@ -8,6 +8,7 @@ import {
   ZERO,
   type Ratio,
 } from '@/lib/exact';
+import { listed } from '@/lib/listed';
 import { percentOf } from '../contest/percent';
 import type { GroupValues, TaskValues } from '../forms/task-values';
 
@@ -88,7 +89,6 @@ export function ruleRefusal(rule: Rule, credit: CreditKind): string | null {
   }
   return null;
 }
-
 /** The weight a rule's points box writes to, and its bonus box when it has one. */
 function mainWeight(group: GroupValues): string {
   const rule = ruleOf(group);
@@ -191,13 +191,27 @@ function n(count: number, one: string, many: string): string {
   return `${String(count)} ${count === 1 ? one : many}`;
 }
 
+/** Points in words, exactly or "about" when they do not end: "100 points", "1 point". */
+export function pointsWords(value: Ratio): string {
+  return `${pointsText(value)} ${value.num === value.den ? 'point' : 'points'}`;
+}
+
+/** The least whole number of `tests` a share of them comes to, rounded up. */
+function leastOf(share: Ratio, tests: number): number {
+  const scaledUp = share.num * BigInt(tests);
+  return Number((scaledUp + share.den - 1n) / share.den);
+}
+
 /**
- * What one group says it does, in one sentence, with its points as an
- * entrant sees them under the contest's `worth` (none: the task's total),
- * and an example where it helps: "small earns its 30 when every test
- * passes." `tests` is how many tests the group has, when known.
+ * How a group earns its points, in the words an entrant and an organiser
+ * both read (M48, M52): `rule`, what earns them, in a sentence or two that
+ * speak of "an entrant", never "you", and do not name the group, so a page
+ * heads it as it heads its own boxes; and `example`, a worked case from the
+ * group's own number of tests where one helps, or null. Its points are as
+ * an entrant sees them under the contest's `worth` (none: the task's total).
+ * `tests` is how many tests the group has, when known.
  */
-export function groupSentence(
+export function groupWords(
   group: GroupValues,
   context: {
     total: Ratio;
@@ -205,80 +219,149 @@ export function groupSentence(
     credit: CreditKind;
     tests: number | null;
   },
-): string {
+): { rule: string; example: string | null } {
   const { total, worth, credit, tests } = context;
   const real = (text: string) => scaled(weight(text), total, worth);
-  const p = (text: string) => pointsText(real(text));
-  const name = group.name;
+  const p = (text: string) => pointsWords(real(text));
   const weighted = group.weights.length > 0;
-  const passed =
-    credit === 'none'
-      ? `the share of its tests you passed${weighted ? ', counted by test weight' : ''}`
-      : `the mean of its tests' scores, each from 0 to 1${weighted ? ', weighted by test weight' : ''}`;
+  const many = tests !== null && tests >= 2 ? tests : null;
+  const share = weighted ? 'a share by its weight' : 'an equal share';
   const shareOf = (passAt: string) => `${percentOf(passAt)}%`;
-  const example = (each: string, bonus: string | null) => {
-    if (credit !== 'none' || weighted || tests === null || tests < 2) return '';
-    const got = mulRatio(real(each), { num: BigInt(tests - 1), den: BigInt(tests) });
-    const all = addRatio(real(each), bonus === null ? ZERO : real(bonus));
-    return ` Passing ${String(tests - 1)} of ${n(tests, 'test', 'tests')} gets ${pointsText(got)}; passing all of them, ${pointsText(all)}.`;
+  const none = {
+    rule: 'No points: its tests are for entrants to practise on.',
+    example: null,
+  };
+
+  /** Points by each test: passed, scored from 0 to 1, or against the best. */
+  const byTest = (each: string): { rule: string; example: string | null } => {
+    if (credit === 'value') {
+      return {
+        rule: `Each test is worth ${share} of ${p(each)}, times its score from 0 to 1.`,
+        example: weighted
+          ? null
+          : `An entrant whose tests all score 0.5 gets ${pointsText(mulRatio(real(each), { num: 1n, den: 2n }))}.`,
+      };
+    }
+    if (credit === 'relative') {
+      return {
+        rule: `Each test is worth ${share} of ${p(each)}, times its result against the best any entrant reached.`,
+        example: weighted
+          ? null
+          : `An entrant who reaches 80% of the best on every test gets ${pointsText(mulRatio(real(each), { num: 4n, den: 5n }))}.`,
+      };
+    }
+    return {
+      rule: `Each test passed is worth ${share} of ${p(each)}.`,
+      example:
+        weighted || many === null
+          ? null
+          : `An entrant who passes ${String(many - 1)} of ${String(many)} gets ${pointsText(
+              mulRatio(real(each), { num: BigInt(many - 1), den: BigInt(many) }),
+            )}.`,
+    };
   };
 
   switch (ruleOf(group)) {
     case 'none':
-      return `${name} gives no points; its tests are there to try.`;
+      return none;
     case 'all':
-      return p(group.pass).startsWith('about')
-        ? `${name} earns ${p(group.pass)} when every test passes.`
-        : `${name} earns its ${p(group.pass)} when every test passes.`;
-    case 'share':
-      return `${name} earns ${p(group.pass)} when at least ${shareOf(group.passAt)} of its tests pass${weighted ? ', counted by test weight' : ''}.`;
+      return {
+        rule: `An entrant earns ${p(group.pass)} when every test passes, and nothing otherwise.`,
+        example:
+          many === null
+            ? null
+            : `An entrant who passes ${String(many - 1)} of ${String(many)} gets nothing.`,
+      };
+    case 'share': {
+      const least =
+        weighted || tests === null || tests < 1
+          ? null
+          : leastOf(ratioOf(group.passAt) ?? ZERO, tests);
+      return {
+        rule: `An entrant earns ${p(group.pass)} when at least ${shareOf(group.passAt)} of its tests pass${weighted ? ', counted by weight' : ''}, and nothing otherwise.`,
+        example:
+          least === null || tests === null || least < 1
+            ? null
+            : `An entrant who passes ${String(least)} of ${n(tests, 'test', 'tests')} gets ${pointsText(real(group.pass))}; one who passes ${least === 1 ? 'none' : String(least - 1)}, nothing.`,
+      };
+    }
     case 'each':
-      return `${name} earns ${p(group.each)} times ${passed}.${example(group.each, null)}`;
-    case 'bonus':
-      return `${name} earns ${p(group.each)} times ${passed}, and ${p(group.pass)} more when you pass them all.${example(group.each, group.pass)}`;
+      return byTest(group.each);
+    case 'bonus': {
+      const each = byTest(group.each);
+      return {
+        rule: `${each.rule} Passing every test earns ${p(group.pass)} more.`,
+        example:
+          credit !== 'none' || weighted || many === null
+            ? null
+            : `An entrant who passes ${String(many - 1)} of ${String(many)} gets ${pointsText(
+                mulRatio(real(group.each), {
+                  num: BigInt(many - 1),
+                  den: BigInt(many),
+                }),
+              )}; one who passes all ${String(many)}, ${pointsText(addRatio(real(group.each), real(group.pass)))}.`,
+      };
+    }
     case 'worst':
-      return `${name} earns ${p(group.worst)} times your worst test's score.`;
+      return {
+        rule: `An entrant earns ${p(group.worst)} times their lowest test score, from 0 to 1.`,
+        example: `An entrant whose lowest test score is 0.5 gets ${pointsText(mulRatio(real(group.worst), { num: 1n, den: 2n }))}.`,
+      };
     case 'advanced': {
+      const perTest =
+        credit === 'none'
+          ? `shared among the tests passed${weighted ? ' by weight' : ''}`
+          : credit === 'value'
+            ? `times the ${weighted ? 'weighted ' : ''}mean of its tests' scores`
+            : `times the ${weighted ? 'weighted ' : ''}mean of its tests' results against the best any entrant reached`;
       const parts = [
-        set(group.each) ? `${p(group.each)} times ${passed}` : null,
-        set(group.worst) ? `${p(group.worst)} times your worst test's score` : null,
+        set(group.each) ? `${p(group.each)} ${perTest}` : null,
+        set(group.worst) ? `${p(group.worst)} times their lowest test score` : null,
         set(group.pass)
           ? everyTest(group.passAt)
             ? `${p(group.pass)} when every test passes`
             : `${p(group.pass)} when at least ${shareOf(group.passAt)} of its tests pass`
           : null,
       ].filter((part): part is string => part !== null);
-      if (parts.length === 0)
-        return `${name} gives no points; its tests are there to try.`;
-      const said =
-        parts.length === 1
-          ? parts[0]
-          : `${parts.slice(0, -1).join(', ')} and ${parts.at(-1) ?? ''}`;
-      return `${name} earns ${said ?? ''}.`;
+      if (parts.length === 0) return none;
+      return { rule: `An entrant earns ${listed(parts)}.`, example: null };
     }
   }
 }
 
-/** When entrants see a group's results, as the form offers it. */
+/** How a group earns its points, as one passage: its rule, then its worked example. */
+export function groupSentence(
+  group: GroupValues,
+  context: Parameters<typeof groupWords>[1],
+): string {
+  const { rule, example } = groupWords(group, context);
+  return example === null ? rule : `${rule} ${example}`;
+}
+
+/**
+ * When entrants see a group's results, as the form offers it: each choice by
+ * the one name it has everywhere, and what entrants then see.
+ */
 export const SHOWS = [
-  { value: 'always', label: 'Right away' },
+  {
+    value: 'always',
+    label: 'Right away',
+    description:
+      'Entrants see each test’s result and the group’s points as soon as a submission is graded.',
+  },
   {
     value: 'verdict',
     label: 'Pass or fail right away, the tests once the task closes',
+    description:
+      'Entrants see at once whether the group passed and its points, and each test’s result once the task closes.',
   },
-  { value: 'after_close', label: 'Once the task closes' },
+  {
+    value: 'after_close',
+    label: 'Once the task closes',
+    description:
+      'Entrants see the group’s name and the most points it gives now, and its results once the task closes.',
+  },
 ];
-
-/** When entrants see a group's results, as a sentence. */
-export function showSentence(show: string): string {
-  if (show === 'verdict') {
-    return 'Entrants see whether it passed and its points right away, and its tests once the task closes.';
-  }
-  if (show === 'after_close') {
-    return 'Entrants see its name and its most points now, and everything else once the task closes.';
-  }
-  return 'Entrants see its results right away.';
-}
 
 /**
  * Why the save would refuse showing a group's pass or fail alone (T6): its
@@ -300,14 +383,27 @@ export function showRefusal(
   return null;
 }
 
+/**
+ * A task none of whose groups earns, in the words the Tests card and how the
+ * contest is scored both use.
+ */
+export const NO_POINTS =
+  'The task gives no points: no group earns any. It is ranked on what its workflow reports, if a leaderboard says so.';
+
+/**
+ * A contest's worth for a task that differs from its groups' total, in the
+ * words the Tests card and how the contest is scored both use.
+ */
+export function scalingSentence(worth: Ratio): string {
+  return `Its contest makes the task worth ${pointsWords(worth)}, so each test group's points are scaled to that.`;
+}
+
 /** The task's points in one line: "Total: 100 points". */
 export function totalSentence(total: Ratio, worth: Ratio | null): string {
-  if (total.num === 0n) {
-    return 'The task gives no points: no group earns any. It is ranked on what its workflow reports, if a leaderboard says so.';
-  }
-  const own = `Total: ${pointsText(total)} ${total.num === total.den ? 'point' : 'points'}`;
+  if (total.num === 0n) return NO_POINTS;
+  const own = `Total: ${pointsWords(total)}`;
   if (worth === null) return `${own}.`;
   return compareRatio(worth, total) === 0
     ? `${own}, as its contest gives it.`
-    : `${own} here. Its contest makes the task worth ${pointsText(worth)}, so each test group's points are scaled to that.`;
+    : `${own} here. ${scalingSentence(worth)}`;
 }

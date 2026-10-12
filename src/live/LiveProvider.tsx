@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useQueryClient, type Query, type QueryClient } from '@tanstack/react-query';
 import { useSession, useSessionExpired } from '@/session';
+import { isEdited } from './edited';
 import { LiveContext, type LiveState } from './live-context';
 
 const LIVE_PATH = '/api/v1/live';
@@ -13,7 +14,8 @@ const REOPEN_MS = [5_000, 10_000, 20_000, 40_000, 60_000];
 /**
  * Which reads each kind of nudge makes stale, by the route the read was
  * made at: a grading moves a contestant's submissions, an organiser's
- * gradings and a contest's queue, but not a submission's files, which a
+ * gradings, a contest's queue and the contest home, whose tasks carry the
+ * entrant's points, but not a submission's files, which a
  * grading never changes, nor a grading's log, kept once it is written
  * (`.../gradings/{grading}/log`); an announcement the announcement lists; and a
  * clarification the asker's questions and the organisers' inbox.
@@ -22,7 +24,8 @@ const STALE: Record<string, (path: string) => boolean> = {
   grading: (path) =>
     (path.includes('/submissions') && !path.endsWith('/files')) ||
     path.endsWith('/gradings') ||
-    path.endsWith('/gradings/queue'),
+    path.endsWith('/gradings/queue') ||
+    path.endsWith('/home'),
   announcement: (path) => path.includes('/announcements'),
   clarification: (path) =>
     path.endsWith('/questions') || path.includes('/clarifications'),
@@ -44,8 +47,12 @@ function useVisible(): boolean {
   return visible;
 }
 
+/** Every read, but those a form or an editor is editing from (`EDITED`). */
 function refetchAll(client: QueryClient) {
-  void client.invalidateQueries(undefined, { cancelRefetch: false });
+  void client.invalidateQueries(
+    { predicate: (query) => !isEdited(query) },
+    { cancelRefetch: false },
+  );
 }
 
 /**
@@ -60,11 +67,12 @@ function refetchAll(client: QueryClient) {
  *
  * Every opening after the tab's first, a tab brought back to the front
  * included, and `resync` refetch everything, since nudges may have been
- * missed meanwhile. The browser reopens a stream that
- * dropped on its own; one that was refused, a deploy's moment of errors or a
- * session that ended, it gives up on, so it is opened again after a wait that
- * grows, and the session is read again so a signed-out tab stops: once a
- * read finds it ended, no stream is opened again. While no
+ * missed meanwhile, except the reads a form or an editor is editing from
+ * (`EDITED`), whose changes are met at their save. The browser reopens a
+ * stream that dropped on its own; one that was refused, a deploy's moment of
+ * errors or a session that ended, it gives up on, so it is opened again
+ * after a wait that grows, and the session is read again so a signed-out
+ * tab stops: once a read finds it ended, no stream is opened again. While no
  * stream is open, `useLiveConnected` is false and pages poll, and while one
  * waits after a refusal `useLiveRefused` is true and they poll less often.
  */

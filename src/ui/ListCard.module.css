@@ -29,19 +29,30 @@
   width: 220px;
 }
 
-/* About six two-line rows, scrolling inside past that, whatever the count. */
+/*
+ * As tall as its rows, up to about six two-line ones, scrolling inside past
+ * that. Once it cannot scroll further the wheel moves the page, so it never
+ * holds the page still.
+ */
 .rows {
-  height: 336px;
+  max-height: 336px;
   overflow-y: auto;
-  overscroll-behavior: contain;
+}
+
+/* While more rows are below, the bottom edge fades out, so it reads as a list that scrolls. */
+.rows[data-more] {
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 48px), transparent);
 }
 
 /* On a narrow screen the list grows with the page instead. */
 @media (max-width: 760px) {
   .rows {
-    height: auto;
-    min-height: 56px;
+    max-height: none;
     overflow: visible;
+  }
+
+  .rows[data-more] {
+    mask-image: none;
   }
 }
 

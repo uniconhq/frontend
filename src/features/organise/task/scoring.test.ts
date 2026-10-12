@@ -2,12 +2,15 @@ import { describe, expect, it } from 'vitest';
 import { formatExact, ratioOf, ZERO } from '@/lib/exact';
 import type { GroupValues } from '../forms/task-values';
 import {
+  NO_POINTS,
   groupSentence,
   groupWeight,
+  pointsWords,
   readsWeights,
   ruleOf,
   ruleRefusal,
   scaled,
+  scalingSentence,
   showRefusal,
   taskWeight,
   totalSentence,
@@ -100,11 +103,32 @@ describe('a task’s points', () => {
     expect(scaled(groupWeight(small[0]!), taskWeight(small), null)).toEqual(r('3'));
   });
 
+  it('says a task that gives no points, and the scaling to the contest’s worth, in one set of words', () => {
+    expect(totalSentence(ZERO, r('100'))).toBe(NO_POINTS);
+    expect(NO_POINTS).toBe(
+      'The task gives no points: no group earns any. It is ranked on what its workflow reports, if a leaderboard says so.',
+    );
+    expect(scalingSentence(r('50'))).toBe(
+      `Its contest makes the task worth ${formatExact('50')} points, so each test group's points are scaled to that.`,
+    );
+    expect(scalingSentence(r('1'))).toBe(
+      "Its contest makes the task worth 1 point, so each test group's points are scaled to that.",
+    );
+    expect(totalSentence(r('100'), r('50'))).toBe(
+      `Total: ${formatExact('100')} points here. ${scalingSentence(r('50'))}`,
+    );
+    expect(totalSentence(r('1'), null)).toBe('Total: 1 point.');
+    expect(pointsWords({ num: 2n, den: 2n })).toBe('1 point');
+    expect(pointsWords({ num: 1n, den: 3n })).toBe(
+      `about ${formatExact('0.33')} points`,
+    );
+  });
+
   it('scales each group to the contest’s worth, exactly', () => {
     const groups = [group('a', { pass: '30' }), group('b', { pass: '90' })];
     expect(scaled(r('30'), taskWeight(groups), r('100'))).toEqual(r('25'));
     expect(totalSentence(taskWeight(groups), r('100'))).toMatch(
-      /Its contest makes the task worth 100, so each test group's points are scaled/,
+      /Its contest makes the task worth 100 points, so each test group's points are scaled/,
     );
     const thirds = [
       group('a', { pass: '1' }),
@@ -118,20 +142,31 @@ describe('a task’s points', () => {
         credit: 'none',
         tests: null,
       }),
-    ).toBe(`a earns about ${formatExact('33.33')} when every test passes.`);
+    ).toBe(
+      `An entrant earns about ${formatExact('33.33')} points when every test passes, and nothing otherwise.`,
+    );
   });
 
-  it('says what each group does, as an entrant is told (TASK-FORMAT section 3)', () => {
+  it('says what each group does in plain words, speaking of an entrant, with a worked example from its tests (M48)', () => {
     const say = (
       g: GroupValues,
       tests: number | null = null,
-      credit: 'none' | 'value' = 'none',
+      credit: 'none' | 'value' | 'relative' = 'none',
     ) => groupSentence(g, { total: r('100'), worth: null, credit, tests });
+    expect(say(group('main', { each: '100' }), 4)).toBe(
+      'Each test passed is worth an equal share of 100 points. An entrant who passes 3 of 4 gets 75.',
+    );
     expect(say(group('small', { pass: '30' }))).toBe(
-      'small earns its 30 when every test passes.',
+      'An entrant earns 30 points when every test passes, and nothing otherwise.',
+    );
+    expect(say(group('small', { pass: '30' }), 3)).toBe(
+      'An entrant earns 30 points when every test passes, and nothing otherwise. An entrant who passes 2 of 3 gets nothing.',
     );
     expect(say(group('main', { each: '80', pass: '20' }), 10)).toBe(
-      'main earns 80 times the share of its tests you passed, and 20 more when you pass them all. Passing 9 of 10 tests gets 72; passing all of them, 100.',
+      'Each test passed is worth an equal share of 80 points. Passing every test earns 20 points more. An entrant who passes 9 of 10 gets 72; one who passes all 10, 100.',
+    );
+    expect(say(group('core', { pass: '100', passAt: '0.8' }), 5)).toBe(
+      'An entrant earns 100 points when at least 80% of its tests pass, and nothing otherwise. An entrant who passes 4 of 5 tests gets 100; one who passes 3, nothing.',
     );
     expect(
       say(
@@ -140,25 +175,26 @@ describe('a task’s points', () => {
           passAt: '0.8',
           weights: [{ test: '1', weight: '2' }],
         }),
+        5,
       ),
     ).toBe(
-      'core earns 100 when at least 80% of its tests pass, counted by test weight.',
+      'An entrant earns 100 points when at least 80% of its tests pass, counted by weight, and nothing otherwise.',
     );
     const weights = [{ test: '7', weight: '3' }];
     expect(say(group('main', { each: '42', weights }), 10)).toBe(
-      'main earns 42 times the share of its tests you passed, counted by test weight.',
+      'Each test passed is worth a share by its weight of 42 points.',
     );
-    expect(say(group('main', { each: '42', weights }), null, 'value')).toBe(
-      "main earns 42 times the mean of its tests' scores, each from 0 to 1, weighted by test weight.",
+    expect(say(group('main', { each: '42' }), null, 'value')).toBe(
+      'Each test is worth an equal share of 42 points, times its score from 0 to 1. An entrant whose tests all score 0.5 gets 21.',
     );
-    expect(say(group('main', { each: '80', pass: '20', weights }), 10)).toBe(
-      'main earns 80 times the share of its tests you passed, counted by test weight, and 20 more when you pass them all.',
+    expect(say(group('main', { each: '50' }), 3, 'relative')).toBe(
+      'Each test is worth an equal share of 50 points, times its result against the best any entrant reached. An entrant who reaches 80% of the best on every test gets 40.',
     );
     expect(say(group('main', { worst: '100' }), null, 'value')).toBe(
-      "main earns 100 times your worst test's score.",
+      'An entrant earns 100 points times their lowest test score, from 0 to 1. An entrant whose lowest test score is 0.5 gets 50.',
     );
     expect(say(group('samples'))).toBe(
-      'samples gives no points; its tests are there to try.',
+      'No points: its tests are for entrants to practise on.',
     );
     expect(
       say(
@@ -167,7 +203,31 @@ describe('a task’s points', () => {
         'value',
       ),
     ).toBe(
-      "mix earns 50 times the mean of its tests' scores, each from 0 to 1, 30 times your worst test's score and 20 when at least 80% of its tests pass.",
+      "An entrant earns 50 points times the mean of its tests' scores, 30 points times their lowest test score and 20 points when at least 80% of its tests pass.",
     );
+  });
+
+  it('never speaks to the reader as you, and never names the group', () => {
+    const rules: Partial<GroupValues>[] = [
+      {},
+      { pass: '30' },
+      { pass: '100', passAt: '0.8' },
+      { each: '100' },
+      { each: '80', pass: '20' },
+      { worst: '70' },
+      { each: '50', worst: '50' },
+    ];
+    for (const credit of ['none', 'value', 'relative'] as const) {
+      for (const weights of rules) {
+        const said = groupSentence(group('zebra', weights), {
+          total: r('100'),
+          worth: null,
+          credit,
+          tests: 4,
+        });
+        expect(said).not.toMatch(/\byou(r)?\b/i);
+        expect(said).not.toContain('zebra');
+      }
+    }
   });
 });

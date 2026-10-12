@@ -1,5 +1,5 @@
 import type { GradingResult, SubmissionState, Submission } from '@/api/types';
-import { compareDecimal, formatExact } from '@/lib/exact';
+import { formatExact } from '@/lib/exact';
 import { formatWhen, serverNow } from '@/lib/time';
 
 /**
@@ -24,7 +24,19 @@ const MEANWHILE_MS = 60_000;
  */
 const REFUSED_MS = 5_000;
 
-const UNFINISHED = new Set<SubmissionState>(['queued', 'grading']);
+/**
+ * Where a submission still waits for a result. A delayed one is among them:
+ * Unicon tries it again by itself, and the page should see it move on.
+ */
+const UNFINISHED = new Set<SubmissionState>(['queued', 'grading', 'delayed']);
+
+/**
+ * What an entrant reads under a delayed grading's badge (#442): the grading
+ * failed on Unicon's side, which says nothing of their submission, so no
+ * more than the wait already says of a hidden step.
+ */
+export const DELAYED_SENTENCE =
+  "A problem on Unicon's side. Nothing is lost, and it does not use up a submission.";
 
 function unfinished(submission: Submission): boolean {
   return submission.grading !== null && UNFINISHED.has(submission.grading.status);
@@ -92,10 +104,10 @@ export function justFinished(
 
 /**
  * A submission's points as its row in the list says them: what is shown,
- * such as `75`; `—` while it is still being graded, or when it never will be;
- * and while some of its points wait for a reveal, when they are shown, such
- * as `shown at 14:00`, or `30 so far, more shown at 14:00` when some
- * are shown already. Exact numbers, rounded for reading as the opened submission
+ * such as `75`, a shown 0 as `0`; `—` while it is still being graded, when
+ * it never will be, or while nothing is shown and no time is known; and
+ * while some of its points wait for a reveal, when they are shown, such as
+ * `shown at 14:00` while none are, or `30 so far, more shown at 14:00`. Exact numbers, rounded for reading as the opened submission
  * rounds them.
  */
 export function pointsLine(
@@ -106,9 +118,9 @@ export function pointsLine(
     return '—';
   }
   const { shown, pending_until: until } = grading.points;
-  if (until === null) return formatExact(shown, 2);
+  if (until === null) return shown === null ? '—' : formatExact(shown, 2);
   const at = formatWhen(new Date(until), now);
-  return compareDecimal(shown, '0') === 0
+  return shown === null
     ? `shown at ${at}`
     : `${formatExact(shown, 2)} so far, more shown at ${at}`;
 }

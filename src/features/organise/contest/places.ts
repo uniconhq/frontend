@@ -49,7 +49,6 @@ const SETTINGS: Record<string, [string, string]> = {
   description: ['Basics', 'Description'],
   start: ['Schedule', 'Start'],
   end: ['Schedule', 'End'],
-  on_system_error: ['When grading fails', 'A submission whose grading failed'],
 };
 
 const TEAMS: Record<string, string> = {
@@ -72,7 +71,7 @@ const REGISTRATION: Record<string, string> = {
 
 const WAY: Record<string, string> = {
   approval: 'Approval',
-  name: 'Name',
+  name: 'Name of this sign-up',
   code: 'Code',
   domains: 'Email domains',
   email_pattern: 'Email pattern',
@@ -206,7 +205,13 @@ export function placeHref(org: string, contest: string, place: ContestPlace): st
   return query === '' ? base : `${base}?${query}`;
 }
 
-/** The contest's settings as they are stored, read-only, in its files. */
+/** The anchor of a Settings page's part that holds the settings as stored. */
+export const STORED = 'file';
+
+/**
+ * The contest's settings as they are stored, to read, with every change to
+ * them: the last part of its Settings page.
+ */
 export function viewFilePath(org: string, contest: string): string {
-  return `${contestSectionPath(org, contest, 'files')}?file=contest.yaml`;
+  return `${contestSectionPath(org, contest, 'settings')}#${STORED}`;
 }

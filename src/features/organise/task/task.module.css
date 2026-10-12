@@ -138,6 +138,26 @@
   gap: 4px 12px;
 }
 
+/* A setting that is a file or a folder: its name, what it holds and its buttons. */
+.fileSetting {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.settingTitle {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--unicon-text-primary);
+}
+
+/* A box's title with its ⓘ beside it. */
+.titleRow {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
 .itemTitle {
   margin: 0;
   font-size: 14px;
@@ -202,9 +222,74 @@
   font-size: 13px;
 }
 
+/* A test's name, which opens it in place. */
 .testName {
   min-width: 64px;
+  padding: 2px 4px;
+  border: 0;
+  border-radius: var(--mantine-radius-xs);
+  background: transparent;
+  color: var(--unicon-text-primary);
+  font: inherit;
   font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.testName:hover {
+  background: var(--unicon-hover);
+}
+
+.testName:focus-visible {
+  outline: 2px solid var(--unicon-text-accent);
+}
+
+/* A test opened in place, the width of its row: its parts side by side, then its values. */
+.testView {
+  flex-basis: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 8px 0 4px;
+}
+
+.parts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+}
+
+.testValues {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.values {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 2px 12px;
+  margin: 0;
+  font-size: 13px;
+}
+
+.values div {
+  display: contents;
+}
+
+.values dt {
+  color: var(--unicon-text-secondary);
+}
+
+.values dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.folderFiles {
+  margin: 0;
+  padding-left: 16px;
+  font-size: 13px;
 }
 
 .testFiles {
@@ -216,6 +301,45 @@
 
 .weight {
   width: 110px;
+}
+
+/* How files are named for a test's parts, under the drop box. */
+.naming {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* What the files make, a row per test and a column per part. */
+.preview {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  color: var(--unicon-text-body);
+}
+
+.preview th,
+.preview td {
+  padding: 4px 10px 4px 0;
+  border-bottom: 1px solid var(--unicon-border);
+  text-align: left;
+  vertical-align: top;
+}
+
+.preview thead th {
+  font-weight: 600;
+  color: var(--unicon-text-secondary);
+}
+
+.missing {
+  color: var(--unicon-text-danger);
+  font-weight: 600;
+}
+
+/* Why a button is greyed, or what it will do, beside it. */
+.why {
+  font-size: 13px;
+  color: var(--unicon-text-secondary);
 }
 
 /* What files were matched to tests, before they are added. */

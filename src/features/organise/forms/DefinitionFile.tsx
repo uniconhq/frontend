@@ -5,7 +5,8 @@ import { BodyText } from '@/ui/BodyText';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
 import { PageLink } from '@/ui/PageLink';
-import { contestSectionPath, taskSectionPath } from '@/lib/sections';
+import { taskSectionPath } from '@/lib/sections';
+import { STORED, viewFilePath } from '../contest/places';
 import { SaveOutcome, type Outcome } from '../files/SaveOutcome';
 import { UploadedFile } from '../files/UploadedFile';
 import type { Place } from '../files/place';
@@ -33,8 +34,8 @@ type Merge = { base: string; mine: string };
 /** Where a place's settings are kept as stored, which an admin mends as text when they do not read. */
 function mendAt(place: Place): string {
   return place.kind === 'task'
-    ? taskSectionPath(place.org, place.contest, place.task, 'settings')
-    : `${contestSectionPath(place.org, place.contest, 'files')}?file=contest.yaml`;
+    ? `${taskSectionPath(place.org, place.contest, place.task, 'settings')}#${STORED}`
+    : viewFilePath(place.org, place.contest);
 }
 
 /**
@@ -66,28 +67,35 @@ export function DefinitionForm({
   bare?: boolean;
 }) {
   const query = useOwnFile(place, path);
-  const { write, pending } = useFileWrite(place, path);
+  const { write } = useFileWrite(place, path);
   const [outcome, setOutcome] = useState<Outcome | null>(null);
   const [merge, setMerge] = useState<Merge | null>(null);
-  const busy = pending || query.isFetching;
+  // From Save until the file is read back, as saved or as the save that beat
+  // it, the form is busy: nothing else makes it so.
+  const [busy, setBusy] = useState(false);
 
   const send = async (file: FileContent, body: WriteFile) => {
     setOutcome(null);
-    const answer = await write(body);
-    if (answer.kind === 'refused' && answer.error.code === 'conflict') {
-      setMerge({ base: file.content, mine: body.content });
-      await query.refetch();
-      return;
-    }
-    if (answer.kind === 'refused' && merge !== null) {
-      // A merged version refused for what it holds keeps the merge and its
-      // choices open beside the reason, as the form keeps what was typed.
+    setBusy(true);
+    try {
+      const answer = await write(body);
+      if (answer.kind === 'refused' && answer.error.code === 'conflict') {
+        setMerge({ base: file.content, mine: body.content });
+        await query.refetch();
+        return;
+      }
+      if (answer.kind === 'refused' && merge !== null) {
+        // A merged version refused for what it holds keeps the merge and its
+        // choices open beside the reason, as the form keeps what was typed.
+        setOutcome(answer);
+        return;
+      }
+      setMerge(null);
       setOutcome(answer);
-      return;
+      if (answer.kind !== 'refused') await query.refetch();
+    } finally {
+      setBusy(false);
     }
-    setMerge(null);
-    setOutcome(answer);
-    if (answer.kind !== 'refused') await query.refetch();
   };
 
   const save = (file: FileContent, content: string) =>

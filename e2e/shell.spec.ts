@@ -98,6 +98,80 @@ test('a guarded page sends a signed-out visitor to login, remembering it', async
   ).toHaveAttribute('href', '/api/v1/auth/login?next=%2Faccount');
 });
 
+test('a list card is as tall as its rows, fades while more are below, and lets the page scroll', async ({
+  page,
+}) => {
+  // A window short enough that the page scrolls past the two cards.
+  await page.setViewportSize({ width: 1280, height: 420 });
+  await stubApi(page, { signedIn: true });
+  await page.route('**/api/v1/workflows', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(
+        Array.from({ length: 12 }, (_, at) => ({
+          owner: 'kenny',
+          name: `flow-${String(at + 1)}`,
+          versions: ['v1'],
+          editable: true,
+          visibility: 'private',
+        })),
+      ),
+    }),
+  );
+  await page.goto('/workflows');
+
+  const long = page.getByRole('region', { name: 'Workflows you can change' });
+  const empty = page.getByRole('region', { name: 'Workflows you can use' });
+  await expect(long.getByRole('listitem')).toHaveCount(12);
+  await expect(empty).toContainText('Nobody has shared a workflow with you');
+  const rows = long
+    .getByRole('list', { name: 'Workflows you can change' })
+    .locator('..');
+  // The box the rows scroll in, as the browser runs it, since these tests are
+  // typed without the DOM's types.
+  const box = `document.querySelector('ul[aria-label="Workflows you can change"]').parentElement`;
+  const inBox = <T>(script: string) =>
+    page.evaluate<T>(`(() => { const box = ${box}; return ${script}; })()`);
+
+  // Twelve rows show about six and scroll inside; none leave no tall blank box.
+  const sizes = await inBox<{ height: number; content: number; overscroll: string }>(
+    '({ height: box.clientHeight, content: box.scrollHeight, overscroll: getComputedStyle(box).overscrollBehaviorY })',
+  );
+  expect(sizes.height).toBeGreaterThan(280);
+  expect(sizes.height).toBeLessThanOrEqual(340);
+  expect(sizes.content).toBeGreaterThan(sizes.height);
+  expect(sizes.overscroll).toBe('auto');
+  const emptyBox = await empty.boundingBox();
+  expect(emptyBox?.height ?? 0).toBeLessThan(120);
+
+  // The bottom edge fades while more rows are below, and not at the end.
+  const mask = () => inBox<string>('getComputedStyle(box).maskImage');
+  expect(await mask()).not.toBe('none');
+  await inBox('box.scrollTop = box.scrollHeight');
+  await expect.poll(mask).toBe('none');
+  await inBox('box.scrollTop = 0');
+  await expect.poll(mask).not.toBe('none');
+
+  // Over a list with nothing to scroll, and over one at its top when the
+  // wheel goes up, the page scrolls.
+  const scrolled = () => page.evaluate<number>('window.scrollY');
+  const toBottom = () =>
+    page.evaluate('window.scrollTo(0, document.body.scrollHeight)');
+  await toBottom();
+  const bottom = await scrolled();
+  expect(bottom).toBeGreaterThan(0);
+  await empty.hover();
+  await page.mouse.wheel(0, -60);
+  await expect.poll(scrolled).toBeLessThan(bottom);
+
+  await toBottom();
+  await rows.hover();
+  await page.mouse.wheel(0, -60);
+  await expect.poll(scrolled).toBeLessThan(bottom);
+  expect(await inBox<number>('box.scrollTop')).toBe(0);
+});
+
 test('a signed-in person sees their account page', async ({ page }) => {
   await stubApi(page, { signedIn: true });
   await page.route('**/api/v1/me/sessions', (route) =>

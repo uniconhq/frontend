@@ -37,11 +37,7 @@ describe('where a refused setting of the contest is changed', () => {
       'Settings, Teams: Fewest people in a team',
       '/orgs/acme/contests/spring/settings?field=fewest',
     ],
-    [
-      'on_system_error',
-      'Settings, When grading fails: A submission whose grading failed',
-      '/orgs/acme/contests/spring/settings?field=on_system_error',
-    ],
+    ['on_system_error', 'Settings', '/orgs/acme/contests/spring/settings'],
     [
       'state',
       'Status: Open, draft or archived',
@@ -61,6 +57,11 @@ describe('where a refused setting of the contest is changed', () => {
       'registration.ways[1].signup.domains[0]',
       'How people enter, way 2: Email domains',
       '/orgs/acme/contests/spring/entry?field=domains&item=1',
+    ],
+    [
+      'registration.ways[1].signup.name',
+      'How people enter, way 2: Name of this sign-up',
+      '/orgs/acme/contests/spring/entry?field=name&item=1',
     ],
     [
       'registration.ways[0]',

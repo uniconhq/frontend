@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react';
-import type { Fallback, FeedEntry } from '@/api/types';
+import type { FeedEntry, Grading } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { PageLink } from '@/ui/PageLink';
 import { OutLink } from '@/ui/OutLink';
@@ -33,17 +33,25 @@ function TaskCell({ path, entry }: { path: ContestPath; entry: FeedEntry }) {
   );
 }
 
-/** Who has a broken attempt use its submission's last good result. */
-const FALLBACK_BY: Record<Fallback, string> = {
-  staff: 'as an organiser chose',
-  contest: "as the contest's settings say",
-};
+/**
+ * Which result a latest attempt with none leaves standing: while it is
+ * graded, after it failed or once it was cancelled, the submission keeps the
+ * result of its latest earlier attempt that finished with one, on the
+ * leaderboards and for its entrant.
+ */
+function standsLine(grading: Grading): string | null {
+  if (grading.last_good === null) return null;
+  const earlier = `attempt ${String(grading.last_good)}'s result`;
+  return grading.status === 'cancelled'
+    ? `The entrant and the leaderboards keep ${earlier}.`
+    : `The entrant and the leaderboards see ${earlier} until a newer attempt finishes with one.`;
+}
 
 /**
  * Where an attempt stands: its status, the reason a system error gave the
- * organisers, the sentence a cancel told the entrant, the last good result
- * used in its place, what a finished run came to, and its log where its run
- * wrote one.
+ * organisers, the sentence a cancel told the entrant, the earlier result
+ * that stands while it has none, what a finished run came to, and its log
+ * where its run wrote one.
  */
 function StatusCell({
   path,
@@ -55,6 +63,7 @@ function StatusCell({
   name: string;
 }) {
   const { grading } = entry;
+  const stands = standsLine(grading);
   return (
     <>
       <span>{STATUS[grading.status]}</span>
@@ -64,12 +73,7 @@ function StatusCell({
           Told the entrant: &ldquo;{grading.cancel_reason}&rdquo;
         </BodyText>
       )}
-      {grading.fallback !== null && grading.last_good !== null && (
-        <BodyText tone="secondary">
-          Uses the last good result, attempt {grading.last_good}&apos;s,{' '}
-          {FALLBACK_BY[grading.fallback]}.
-        </BodyText>
-      )}
+      {stands !== null && <BodyText tone="secondary">{stands}</BodyText>}
       {grading.status === 'done' && grading.result !== null && (
         <BodyText tone="secondary">{verdictLabel(resultOf(grading.result))}</BodyText>
       )}
@@ -182,6 +186,11 @@ function AttemptRow({
       <td>
         {grading.attempt}
         <BodyText tone="meta">publication {grading.publication}</BodyText>
+        {grading.automatic && (
+          <BodyText tone="meta">
+            Retried by Unicon after attempt {grading.attempt - 1} failed
+          </BodyText>
+        )}
       </td>
       <td>
         <StatusCell path={path} entry={entry} name={name} />

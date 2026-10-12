@@ -178,10 +178,13 @@ async function stubContestantApi(page: Page, signedIn: boolean) {
       return json(route, entrantOf('pending'), 201);
     }
     if (path.endsWith('/home')) {
+      const entry = registration();
+      const approved =
+        (entry.entrant as { status?: string } | null)?.status === 'approved';
       return json(route, {
         ...CONTEST,
         state: 'published',
-        registration: registration(),
+        registration: entry,
         organises: false,
         now: '2026-09-29T10:00:00Z',
         tasks: [
@@ -190,6 +193,10 @@ async function stubContestantApi(page: Page, signedIn: boolean) {
             label: 'A',
             title: 'Sum of Two',
             worth: '100',
+            // Points only for an approved entrant, a held-back group's part pending.
+            points: approved
+              ? { shown: '62', pending: '38', pending_until: CONTEST.end }
+              : null,
             release: OPEN,
             due: null,
             closes: CONTEST.end,
@@ -287,7 +294,8 @@ test('a contestant registers, waits, is let in and reads the task', async ({
 
   // In race order: the time left, then the tasks, the leaderboard and the way to ask.
   const tasks = page.getByRole('list', { name: 'Tasks' });
-  await expect(tasks).toContainText('100 points');
+  await expect(tasks).toContainText('62 / 100');
+  await expect(tasks).toContainText('More shown at');
   await expect(tasks).toContainText('Closes in');
   await expect(
     page.getByRole('region', { name: 'Leaderboard' }).getByText('You are 1st.'),

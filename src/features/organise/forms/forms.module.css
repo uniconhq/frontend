@@ -100,12 +100,6 @@
 /* One key of a board's order: its kind, its setting and its buttons. */
 .orderKey {
   display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
+  flex-direction: column;
   gap: 10px;
-}
-
-/* Its buttons level with the boxes, below the boxes' labels, whatever their hints. */
-.orderKey > button {
-  margin-top: 23px;
 }

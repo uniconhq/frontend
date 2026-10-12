@@ -575,6 +575,8 @@ function InputRow({
     if (merged.type !== 'enum') merged.options = null;
     else if (merged.options === null || merged.options?.length === 0)
       merged.options = ['a', 'b'];
+    // A unit goes after a number's title on the task's form, and only there (M54).
+    if (merged.type !== 'number') merged.unit = null;
     if (!(merged.contestant && merged.type === 'file')) merged.per_test = false;
     if (merged.contestant) merged.optional = false;
     const written = setInput(text, input.id, merged);
@@ -656,15 +658,23 @@ function InputRow({
             return null;
           }}
         />
-        <CommitField
-          label="Unit"
-          value={input.unit ?? ''}
-          placeholder="seconds"
-          apply={(written) => {
-            update({ unit: formText(written) });
-            return null;
-          }}
-        />
+        {(input.type === 'number' || input.unit !== null) && (
+          // Only a number takes one; another type shows one only to clear it.
+          <CommitField
+            label="Unit"
+            value={input.unit ?? ''}
+            placeholder="seconds"
+            description={
+              input.type === 'number'
+                ? undefined
+                : 'Only a number takes a unit, so clear this one.'
+            }
+            apply={(written) => {
+              update({ unit: formText(written) });
+              return null;
+            }}
+          />
+        )}
       </div>
       <CommitField
         label="Help on the task’s form"

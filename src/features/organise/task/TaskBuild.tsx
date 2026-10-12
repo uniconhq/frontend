@@ -40,7 +40,8 @@ import {
 } from './build-data';
 import type { TaskSave } from './build-save';
 import { changeLines } from './changes';
-import { InputsCard } from './InputsCard';
+import { stageInputFiles, type StagedInput } from './input-files';
+import { InputsCard, type InputFiles } from './InputsCard';
 import { taskMergeWords } from './merge-words';
 import { taskPlace, taskPlaceOf } from './places';
 import { SaveBar } from './SaveBar';
@@ -91,10 +92,12 @@ function inputsFor(
 }
 
 /** A file this save writes or takes out, in the words the conflict names it by. */
-function movedLabel(path: string): string {
+function movedLabel(path: string, titles: ReadonlyMap<string, string>): string {
+  const place = taskPlace(path, '', titles);
   const parts = path.split('/');
-  const entry = parts.length > 3 ? `: ${parts.slice(3).join('/')}` : '';
-  return `${taskPlace(path).label}${entry}`;
+  const entry =
+    place.card !== 'inputs' && parts.length > 3 ? `: ${parts.slice(3).join('/')}` : '';
+  return `${place.label}${entry}`;
 }
 
 /**
@@ -130,6 +133,7 @@ function BuildForm({
   const [values, setValues] = useState<TaskValues>(read.values);
   const queryClient = useQueryClient();
   const [staged, setStaged] = useState<Staged>(NOTHING_STAGED);
+  const [inputFiles, setInputFiles] = useState<StagedInput[]>([]);
   const [advanced, setAdvanced] = useState<Set<string>>(
     () =>
       new Set(
@@ -168,11 +172,23 @@ function BuildForm({
   // Another workflow chosen, its inputs come in its own types, and those it
   // does not have go; back to the saved one, the settings' own come back.
   const [typedFor, setTypedFor] = useState(picked);
+  // A file chosen for a setting stays while the new one still takes that
+  // input as the same kind, a file or a folder, the setting naming it; else
+  // it goes with the input.
   if (declared !== null && typedFor !== picked) {
     setTypedFor(picked);
+    const kept = inputFiles.filter((change) => {
+      const input = declared.inputs.find((found) => found.id === change.id);
+      const kind = change.value.endsWith('/') ? 'folder' : 'file';
+      return input !== undefined && !input.contestant && input.type === kind;
+    });
+    if (kept.length !== inputFiles.length) setInputFiles(kept);
     setValues((before) => ({
       ...before,
-      inputs: inputsFor(doc, names, declared, picked === saved),
+      inputs: inputsFor(doc, names, declared, picked === saved).map((input) => {
+        const change = kept.find((each) => each.id === input.id);
+        return change === undefined ? input : { ...input, value: change.value };
+      }),
     }));
   }
 
@@ -295,7 +311,40 @@ function BuildForm({
       removeTests(name, folder.tests);
   };
 
-  const lines = changeLines(read.values, values, staged, titles);
+  /** Files chosen for a setting wait for the save, which writes them and points the setting at them. */
+  const files: InputFiles = {
+    place,
+    staged: inputFiles,
+    onChoose: (input, chosen, was) => {
+      setReading(null);
+      stageInputFiles(place, input, chosen, was)
+        .then((change) => {
+          setInputFiles((before) => [
+            ...before.filter((each) => each.id !== change.id),
+            {
+              ...change,
+              was: before.find((each) => each.id === change.id)?.was ?? was,
+            },
+          ]);
+          setInput(change.id, { value: change.value });
+        })
+        .catch((error: unknown) => setReading(error));
+    },
+    onUndo: (id) => {
+      const undone = inputFiles.find((each) => each.id === id);
+      setInputFiles((before) => before.filter((each) => each.id !== id));
+      if (undone !== undefined) setInput(id, { value: undone.was });
+    },
+  };
+
+  // A setting given a new file is one change, said once.
+  const lines = changeLines(
+    read.values,
+    values,
+    staged,
+    titles,
+    inputFiles.map((change) => change.id),
+  );
   const changed = lines.length > 0 || values.inputs.some(heldTheOtherWay);
   const problems = [
     values.credit.kind !== 'none' && values.credit.name.trim() === ''
@@ -350,7 +399,10 @@ function BuildForm({
         content === file.content
           ? null
           : { content, base: file.content, token: file.token },
-      planned: plannedChanges(staged, declared?.test ?? []),
+      planned: [
+        ...plannedChanges(staged, declared?.test ?? []),
+        ...inputFiles.flatMap((change) => change.planned),
+      ],
     });
   };
 
@@ -402,6 +454,7 @@ function BuildForm({
           set({ inputs: values.inputs.filter((input) => input.id !== id) })
         }
         onAdd={(id, kind) => set({ inputs: [...values.inputs, emptyInput(id, kind)] })}
+        files={files}
         disabled={disabled}
       />
       <TestsCard
@@ -452,6 +505,7 @@ function BuildForm({
         onDiscard={() => {
           setValues(read.values);
           setStaged(NOTHING_STAGED);
+          setInputFiles([]);
           saving.forget();
         }}
       >
@@ -468,6 +522,7 @@ function BuildForm({
               // My changes go, and the cards read the task as it is now.
               setValues(read.values);
               setStaged(NOTHING_STAGED);
+              setInputFiles([]);
               saving.drop();
               for (const queryKey of [
                 fileQuery(place, PATH).queryKey,
@@ -542,7 +597,7 @@ function SaveAnswer({
   if (saving.conflicts !== null) {
     const files: MovedFile[] = saving.conflicts.files.map(({ change }) => ({
       path: change.path,
-      label: movedLabel(change.path),
+      label: movedLabel(change.path, titles),
       mine:
         'remove' in change
           ? 'Taken out'
@@ -625,8 +680,8 @@ export function TaskBuild({
   manager: boolean;
 }) {
   const file = useOwnFile(place, PATH);
-  const workflowForm = useWorkflowForm(place);
-  const folders = useTestFolders(place);
+  const workflowForm = useWorkflowForm(place, true);
+  const folders = useTestFolders(place, true);
   if (file.isPending || workflowForm.isPending || folders.state === 'loading') {
     return <PageSkeleton rows={8} />;
   }

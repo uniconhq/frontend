@@ -120,7 +120,12 @@ export function SaveOutcome<Body = WriteFile>({
       return (
         <Panel role="status">
           <BodyText>Saved and published as publication {result.number}.</BodyText>
-          {result.grading_changed ? (
+          {result.number === 1 ? (
+            // The first publication is what makes the task grade at all.
+            <BodyText>
+              Entrants’ submissions are graded against it from now on.
+            </BodyText>
+          ) : result.grading_changed ? (
             <>
               <BodyText>It changes how the task grades:</BodyText>
               <ul className={classes.named} aria-label="What changed">

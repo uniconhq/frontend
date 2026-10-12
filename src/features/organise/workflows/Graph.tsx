@@ -40,6 +40,7 @@ import {
   type Point,
 } from './layout';
 import { sourceAt, targetAt, type Notice, type Target } from './ends';
+import { NOTICE_MS } from './notice';
 import { NumberText } from '../forms/yaml-doc';
 import { type Ref, type Workflow } from './model';
 import type { Pinned } from './pins';
@@ -98,8 +99,8 @@ type RowView = {
   problems: DefinitionProblem[];
   /** Its type, its marks and its value, in words. */
   said: string;
-  /** Why the wire last dropped here was refused. */
-  notice: string | null;
+  /** Whether the wire last dropped here was refused, while its box says why. */
+  noticed: boolean;
 };
 
 /** What the head of a box shows. */
@@ -126,6 +127,8 @@ type BoxData = {
   header: number;
   head: HeadView;
   rows: RowView[];
+  /** Why the wire last dropped on one of its ports was refused, while that shows. */
+  notice: { reason: string; count: number } | null;
 };
 
 type BoxNode = Node<BoxData, 'box'>;
@@ -223,10 +226,8 @@ function rowView(
           : box.kind === 'report'
             ? (pinned.entries.get(port) ?? [])
             : [];
-  const notice =
-    seen.notice !== null && seen.notice.box === box.key && seen.notice.port === port
-      ? seen.notice.reason
-      : null;
+  const noticed =
+    seen.notice !== null && seen.notice.box === box.key && seen.notice.port === port;
   const value = side === 'left' ? shownValue(workflow, box, port, seen.drawn) : null;
   const input =
     box.kind === 'inputs'
@@ -264,7 +265,7 @@ function rowView(
     optional: decl?.optional === true || input?.optional === true,
     problems,
     said,
-    notice,
+    noticed,
   };
 }
 
@@ -307,6 +308,10 @@ function boxData(seen: Seen, box: Box): BoxData {
         rowView(seen, box, primitive, port, rowOf(box, 'right', port), 'right'),
       ),
     ],
+    notice:
+      seen.notice !== null && seen.notice.box === box.key
+        ? { reason: seen.notice.reason, count: seen.notice.count }
+        : null,
   };
 }
 
@@ -396,14 +401,9 @@ const PortRow = memo(function PortRow({ box, row }: { box: string; row: RowView 
           )}
         </>
       )}
-      {row.refused !== null && (
+      {(row.refused !== null || row.noticed) && (
         <span className={classes.refusedMark} aria-hidden>
           ✕
-        </span>
-      )}
-      {row.notice !== null && (
-        <span className={classes.notice} role="alert">
-          {row.notice}
         </span>
       )}
     </div>
@@ -499,6 +499,22 @@ const BoxView = memo(function BoxView({ data }: NodeProps<BoxNode>) {
           row={row}
         />
       ))}
+      {data.notice !== null && (
+        // Over the box's own title, which holds no port, growing upwards when
+        // it is longer, so it covers no port; the refused port keeps its ✕.
+        <p
+          key={data.notice.count}
+          className={classes.notice}
+          role="alert"
+          style={{
+            bottom: `calc(100% - ${String(data.header)}px)`,
+            minHeight: data.header,
+            animationDuration: `${String(NOTICE_MS)}ms`,
+          }}
+        >
+          {data.notice.reason}
+        </p>
+      )}
     </div>
   );
 });
@@ -691,6 +707,8 @@ export function Graph({
       data: boxData(seen, box),
       draggable: false,
       className: 'nopan',
+      // Above its neighbours while it says why a wire was refused.
+      ...(seen.notice?.box === box.key && { zIndex: 10 }),
     });
   for (const slot of layout.slots)
     found.push({

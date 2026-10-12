@@ -12,8 +12,12 @@ export type Target =
   | { kind: 'port'; step: number; port: string }
   | { kind: 'report'; entry: string | null };
 
-/** A refusal said at the port a wire was dropped on. */
-export type Notice = { box: string; port: string; reason: string };
+/**
+ * A refusal said at the box of the port a wire was dropped on. `count`
+ * tells one drop from the next, so the same refusal said again starts its
+ * time again.
+ */
+export type Notice = { box: string; port: string; reason: string; count: number };
 
 export function sourceAt(box: Box, port: string, workflow: Workflow): Ref | null {
   if (box.kind === 'inputs') return { kind: 'inputs', name: port };

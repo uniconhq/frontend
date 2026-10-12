@@ -1,12 +1,13 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@/test/user-event';
 import { http, HttpResponse } from 'msw';
 import { parse } from 'yaml';
 import type { FileContent } from '@/api/types';
 import { renderApp } from '@/test/render';
-import { problem, server, signedIn, someone } from '@/test/server';
+import { afterAnswers, problem, server, signedIn, someone } from '@/test/server';
 import { CONTEST_API, repoFiles, taskList } from '@/test/organiser';
+import { comeBackToTab, fakeLiveStream, openStream, realLiveStream } from '@/test/live';
 import { isoOf } from './times';
 
 const CONTEST = `name: Spring   # the page's title
@@ -47,6 +48,7 @@ function contestBackend({
     content: current,
     token: 'token-1',
     upload: null,
+    version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
   };
   let conflicted = conflictWith === undefined;
   const sent: { content: string; token: string }[] = [];
@@ -64,13 +66,19 @@ function contestBackend({
         file = { ...file, content: conflictWith, token: 'token-2' };
         return problem(409, 'conflict');
       }
+      // A save made with the token of a version since saved over is refused.
+      if (body.token !== file.token) return problem(409, 'conflict');
       const token = `token-${String(sent.length + 2)}`;
       file = { ...file, content: body.content, token };
       return HttpResponse.json({ version: `version-${token}`, notes });
     }),
     ...repoFiles,
   );
-  return { sent };
+  /** Someone else saving the settings as `content`. */
+  const elsewhere = (content: string) => {
+    file = { ...file, content, token: 'token-elsewhere' };
+  };
+  return { sent, elsewhere };
 }
 
 /** Set a field's value at once, as a paste would. */
@@ -111,12 +119,12 @@ describe('the contest settings form', { timeout: 20_000 }, () => {
         .getAllByRole('group')
         .filter((group) => group.tagName === 'FIELDSET')
         .map((group) => group.querySelector('legend')?.textContent),
-    ).toEqual(['Basics', 'Schedule', 'Teams', 'When grading fails']);
+    ).toEqual(['Basics', 'Schedule', 'Teams']);
     expect(within(form).queryByLabelText('State')).toBeNull();
     expect(within(form).queryByLabelText('Who sees it')).toBeNull();
     expect(screen.getByRole('link', { name: 'View file' })).toHaveAttribute(
       'href',
-      '/orgs/acme/contests/spring/files?file=contest.yaml',
+      '/orgs/acme/contests/spring/settings#file',
     );
   });
 
@@ -138,11 +146,6 @@ describe('the contest settings form', { timeout: 20_000 }, () => {
     await userEvent.click(
       teams.getByRole('radio', { name: 'At a team’s first submission' }),
     );
-    await userEvent.click(
-      inBox(form, 'When grading fails').getByRole('radio', {
-        name: 'Uses its last good result',
-      }),
-    );
     await userEvent.click(within(form).getByRole('button', { name: 'Save settings' }));
 
     expect(await screen.findByText('Saved.')).toBeVisible();
@@ -163,7 +166,6 @@ describe('the contest settings form', { timeout: 20_000 }, () => {
         { id: 'sort', worth: 50 },
       ],
       entrants: { most: 3, fewest: 2, locks: 'first_submission' },
-      on_system_error: 'last_result',
     });
     expect(write?.content).toContain("# the page's title");
   });
@@ -180,6 +182,20 @@ describe('the contest settings form', { timeout: 20_000 }, () => {
 
     await screen.findByText('Saved.');
     expect(parse(sent[0]?.content ?? '')).not.toHaveProperty('entrants');
+  });
+
+  it('offers nothing for a grading that fails, and takes the retired setting out of a file that still has it', async () => {
+    const { sent } = contestBackend({
+      current: `${CONTEST}on_system_error: last_result\n`,
+    });
+    const form = await openForm();
+
+    expect(within(form).queryByText(/grading fails/i)).toBeNull();
+    fill(inBox(form, 'Basics').getByLabelText('Name'), 'Spring 2026');
+    await userEvent.click(within(form).getByRole('button', { name: 'Save settings' }));
+
+    await screen.findByText('Saved.');
+    expect(parse(sent[0]?.content ?? '')).not.toHaveProperty('on_system_error');
   });
 
   it('will not save a team whose fewest is more than its most', async () => {
@@ -397,6 +413,43 @@ describe('the contest settings form', { timeout: 20_000 }, () => {
       ),
     ).toBeVisible();
     expect(screen.queryByRole('form', { name: 'Contest settings' })).toBeNull();
-    expect(screen.queryByRole('textbox', { name: 'contest.yaml' })).toBeNull();
+    // The text is offered to an admin only where the settings are stored, below.
+    const stored = screen.getByRole('region', { name: 'The settings as stored' });
+    const texts = await screen.findAllByRole('textbox', { name: 'contest.yaml' });
+    expect(texts).toHaveLength(1);
+    expect(stored).toContainElement(texts[0] ?? null);
   });
 });
+
+describe(
+  'the contest settings while they are being changed',
+  { timeout: 20_000 },
+  () => {
+    beforeEach(fakeLiveStream);
+    afterEach(realLiveStream);
+
+    it('keeps what was changed, and does not spin, when the tab comes back, and meets someone else’s save at the save', async () => {
+      const { sent, elsewhere } = contestBackend();
+      const form = await openForm();
+      openStream();
+      fill(inBox(form, 'Basics').getByLabelText('Name'), 'My spring');
+
+      elsewhere(CONTEST.replace('name: Spring', 'name: Their spring'));
+      await afterAnswers(comeBackToTab);
+
+      const now = screen.getByRole('form', { name: 'Contest settings' });
+      expect(inBox(now, 'Basics').getByLabelText('Name')).toHaveValue('My spring');
+      const save = within(now).getByRole('button', { name: 'Save settings' });
+      expect(save).not.toHaveAttribute('data-loading');
+      expect(save).toBeEnabled();
+
+      await userEvent.click(save);
+
+      const merge = await screen.findByRole('list', { name: 'Fields that differ' });
+      expect(
+        within(merge).getByRole('radiogroup', { name: 'Name (both changed it)' }),
+      ).toBeVisible();
+      expect(sent).toEqual([expect.objectContaining({ token: 'token-1' })]);
+    });
+  },
+);

@@ -168,8 +168,8 @@ function WayCard({
               </BodyText>
               <FieldBox name="name">
                 <TextInput
-                  label="Name"
-                  description="Shown beside everyone who came in this way, on the Entrants page."
+                  label="Name of this sign-up"
+                  description="Optional. Shown beside each person who came in this way: to you on the Entrants page, and to their teammates."
                   placeholder="Such as NUS students"
                   value={way.name}
                   onChange={(name) => signup({ name })}

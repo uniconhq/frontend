@@ -56,7 +56,7 @@
  */
 .task {
   display: grid;
-  grid-template-columns: 2ch minmax(0, 1fr) 7rem minmax(0, 1.4fr);
+  grid-template-columns: 2ch minmax(0, 1fr) 8rem minmax(0, 1.4fr);
   gap: 4px 12px;
   align-items: baseline;
   padding: 10px 0;
@@ -67,10 +67,20 @@
   border-bottom: none;
 }
 
-.worth {
+/* An entrant's points on a task out of its worth, and when more are shown. */
+.points {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 8px;
   font-size: 13px;
+  font-weight: 600;
   color: var(--unicon-text-body);
   font-variant-numeric: tabular-nums;
+}
+
+.pending {
+  font-weight: 400;
+  color: var(--unicon-text-secondary);
 }
 
 .standing {
@@ -87,7 +97,7 @@
     grid-template-columns: 2ch minmax(0, 1fr);
   }
 
-  .worth,
+  .points,
   .standing {
     grid-column: 2;
   }

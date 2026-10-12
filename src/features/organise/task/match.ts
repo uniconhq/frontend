@@ -20,7 +20,7 @@ export type MatchedTest = {
   group: string | null;
   test: string;
   files: TestFile[];
-  /** What is wrong with it, such as a field no file fills; empty when it is whole. */
+  /** What is wrong with it, such as a field no file fills; empty when it is complete. */
   problems: string[];
 };
 
@@ -45,6 +45,39 @@ const ALIASES: Record<string, string[]> = {
   a: ['answer'],
   expected: ['answer', 'expected'],
 };
+
+/**
+ * How a test's file parts are named when files are added by name, from the
+ * workflow's own parts (M47): each file part's usual ending, the one an
+ * example shows (`in` for `input`, `out` for `answer`, else the part's own
+ * name), and the other endings taken for it, in the order `fieldOf` tries
+ * them; a folder part, which only a zip's folders can hold, has none.
+ */
+export type PartNaming = {
+  name: string;
+  folder: boolean;
+  ending: string | null;
+  also: string[];
+};
+
+export function namingOf(fields: DeclaredField[]): PartNaming[] {
+  const files = fields.filter((field) => field.type === 'file');
+  return fields
+    .filter((field) => field.type === 'file' || field.type === 'folder')
+    .map((field) => {
+      if (field.type === 'folder') {
+        return { name: field.name, folder: true, ending: null, also: [] };
+      }
+      const endings = [
+        ...Object.keys(ALIASES).filter(
+          (ending) => fieldOf(ending, files)?.name === field.name,
+        ),
+        field.name,
+      ].filter((ending, at, all) => all.indexOf(ending) === at);
+      const [ending = field.name, ...also] = endings;
+      return { name: field.name, folder: false, ending, also };
+    });
+}
 
 /** The field an ending names, among the workflow's file and folder fields. */
 function fieldOf(ending: string, fields: DeclaredField[]): DeclaredField | undefined {

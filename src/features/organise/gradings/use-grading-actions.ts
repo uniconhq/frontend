@@ -6,17 +6,14 @@ type ContestPath = { org: string; contest: string };
 
 /**
  * What a manager is being asked to confirm, each about one task: a retry or a
- * cancel of a submission's latest attempt, the cancel with the sentence its
- * contestant will read; falling back to a broken attempt's last good result
- * or clearing that; or a rejudge of the whole task. A rejudge asked from the
- * contest's gradings carries the tasks to `choose` from, its `task` empty
- * until one is chosen.
+ * cancel of a submission's latest attempt, the cancel with its sentence,
+ * which the contestant reads unless an earlier result stands; or a rejudge
+ * of the whole task. A rejudge asked from the contest's gradings carries the
+ * tasks to `choose` from, its `task` empty until one is chosen.
  */
 export type Asking =
   | { kind: 'retry'; task: string; entry: FeedEntry }
   | { kind: 'cancel'; task: string; entry: FeedEntry; reason: string }
-  | { kind: 'fallBack'; task: string; entry: FeedEntry }
-  | { kind: 'clearFallback'; task: string; entry: FeedEntry }
   | {
       kind: 'rejudge';
       task: string;
@@ -30,9 +27,6 @@ const READS = [
   '/api/v1/orgs/{org}/contests/{contest}/gradings',
   '/api/v1/orgs/{org}/contests/{contest}/gradings/queue',
 ] as const;
-
-const FALLBACK =
-  '/api/v1/orgs/{org}/contests/{contest}/tasks/{task}/gradings/{grading}/fallback';
 
 /**
  * The changes, through the task's own routes, each making a task's gradings,
@@ -59,14 +53,12 @@ export function useGradingActions(path: ContestPath) {
     '/api/v1/orgs/{org}/contests/{contest}/tasks/{task}/gradings/{grading}/retry',
     readAgain,
   );
-  const fallBack = $api.useMutation('put', FALLBACK, readAgain);
-  const clearFallback = $api.useMutation('delete', FALLBACK, readAgain);
   const rejudge = $api.useMutation(
     'post',
     '/api/v1/orgs/{org}/contests/{contest}/tasks/{task}/rejudge',
     readAgain,
   );
-  const all = [cancel, retry, fallBack, clearFallback, rejudge];
+  const all = [cancel, retry, rejudge];
 
   const reset = () => {
     for (const each of all) each.reset();
@@ -80,9 +72,6 @@ export function useGradingActions(path: ContestPath) {
         return await rejudge.mutateAsync({ params: { path: task } });
       const params = { path: { ...task, grading: asking.entry.grading.id } };
       if (asking.kind === 'retry') await retry.mutateAsync({ params });
-      else if (asking.kind === 'fallBack') await fallBack.mutateAsync({ params });
-      else if (asking.kind === 'clearFallback')
-        await clearFallback.mutateAsync({ params });
       else await cancel.mutateAsync({ params, body: { reason: asking.reason.trim() } });
       return true;
     } catch {

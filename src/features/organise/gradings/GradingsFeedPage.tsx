@@ -5,6 +5,7 @@ import type { OrganisedEntrant, QueueDepth } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
 import { Card } from '@/ui/Card';
+import { Checkbox } from '@/ui/Checkbox';
 import { PageLink } from '@/ui/PageLink';
 import { SectionTitle } from '@/ui/SectionTitle';
 import { Select } from '@/ui/Select';
@@ -18,6 +19,7 @@ import { useEntrants } from '../entrants/names';
 import { SectionPage } from '../SectionPage';
 import { GradingsList } from './GradingsList';
 import {
+  FAILED_SEARCH,
   STATUS,
   STATUSES,
   feedQuery,
@@ -55,8 +57,17 @@ function useEntrantList(path: ContestPath): OrganisedEntrant[] {
   return useEntrants(path.org, path.contest).data ?? [];
 }
 
-/** How many of the contest's gradings wait, by status. */
-function QueueDepthPanel({ path }: { path: ContestPath }) {
+/**
+ * How many of the contest's gradings wait, by status, and how many failed,
+ * with a link to the failed ones unless the feed already shows them.
+ */
+function QueueDepthPanel({
+  path,
+  showingFailed,
+}: {
+  path: ContestPath;
+  showingFailed: boolean;
+}) {
   const live = useLiveConnected();
   const view = queryView(
     $api.useQuery(
@@ -89,7 +100,23 @@ function QueueDepthPanel({ path }: { path: ContestPath }) {
             <dt>{STATUS.dispatched}</dt>
             <dd>{view.data.dispatched}</dd>
           </div>
+          <div>
+            <dt>Failed</dt>
+            <dd>{view.data.failed}</dd>
+          </div>
         </dl>
+      )}
+      {view.state === 'ready' && view.data.failed > 0 && (
+        <BodyText tone="secondary">
+          Unicon tries a failed grading again once by itself. If that fails too, it
+          waits for you to retry or cancel it.
+          {!showingFailed && (
+            <>
+              {' '}
+              <PageLink to={`?${FAILED_SEARCH}`}>Show the failed gradings</PageLink>
+            </>
+          )}
+        </BodyText>
       )}
     </div>
   );
@@ -153,6 +180,12 @@ function FilterBar({
         placeholder="Every status"
         onChange={(value) => set('status', value)}
       />
+      <Checkbox
+        label="Latest attempts only"
+        description="Each submission's latest attempt, without the earlier ones."
+        checked={filters.latest !== null}
+        onChange={(checked) => set('latest', checked ? 'true' : '')}
+      />
       {(entrantOptions.length > 0 || filters.entrant !== null) && (
         <Select
           label="Entrant"
@@ -188,13 +221,14 @@ function FilterBar({
 
 /**
  * Every grading of the contest, newest first, for anyone with a role at the
- * contest or one of its tasks: the queue above, the filters by task,
- * entrant, the member who submitted and status kept in the page's address, and the gradings as
- * `GradingsList` shows them, with Rejudge always there, asking which task in
- * its confirmation, the one the feed is filtered to chosen to begin with. The
- * live stream makes the feed and the queue stale as gradings move;
- * while it is down both are read again every ten seconds while something is
- * still to finish.
+ * contest or one of its tasks: the queue above, with the failed gradings
+ * that wait and a link to them; the filters by task, entrant, the member who
+ * submitted, status and latest attempts only, kept in the page's address;
+ * and the gradings as `GradingsList` shows them, with Rejudge always there,
+ * asking which task in its confirmation, the one the feed is filtered to
+ * chosen to begin with. The live stream makes the feed and the queue stale
+ * as gradings move; while it is down both are read again every ten seconds
+ * while something is still to finish.
  */
 export function GradingsFeedPage() {
   const path = useContestParams();
@@ -216,7 +250,10 @@ export function GradingsFeedPage() {
   return (
     <SectionPage section={sectionOf(CONTEST_SECTIONS, 'gradings')}>
       <Card>
-        <QueueDepthPanel path={path} />
+        <QueueDepthPanel
+          path={path}
+          showingFailed={filters.status === 'system_error' && filters.latest === true}
+        />
       </Card>
       <Card>
         <div className={classes.stack}>

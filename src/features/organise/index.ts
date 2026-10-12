@@ -2,7 +2,6 @@ import type { ComponentType } from 'react';
 import type { ContestSectionKey, OrgSectionKey, TaskSectionKey } from '@/lib/sections';
 import {
   ContestAnnouncementsPage,
-  ContestFilesPage,
   ContestOrganisersPage,
   ContestQuestionsPage,
   ContestSettingsPage,
@@ -12,7 +11,6 @@ import { OrganisedBoardsPage } from './boards/OrganisedBoardsPage';
 import { OrgOrganisersPage, OrgSettingsPage } from './org/OrgSections';
 import {
   TaskAnnouncementsPage,
-  TaskFilesPage,
   TaskGradingsPage,
   TaskOrganisersPage,
   TaskPublicationsPage,
@@ -29,6 +27,7 @@ export { ContestPage } from './contest/ContestPage';
 export { TaskPage } from './task/TaskPage';
 export { WorkflowsPage } from './workflows/WorkflowsPage';
 export { WorkflowPage } from './workflows/WorkflowPage';
+export { viewFilePath } from './contest/places';
 
 /**
  * Each section's page, by its key in its level's list, so the route table
@@ -48,7 +47,6 @@ export const CONTEST_SECTION_PAGES: Record<ContestSectionKey, ComponentType> = {
   boards: OrganisedBoardsPage,
   announcements: ContestAnnouncementsPage,
   questions: ContestQuestionsPage,
-  files: ContestFilesPage,
   organisers: ContestOrganisersPage,
 };
 
@@ -56,7 +54,6 @@ export const TASK_SECTION_PAGES: Record<TaskSectionKey, ComponentType> = {
   gradings: TaskGradingsPage,
   publications: TaskPublicationsPage,
   announcements: TaskAnnouncementsPage,
-  files: TaskFilesPage,
   organisers: TaskOrganisersPage,
   settings: TaskSettingsPage,
 };

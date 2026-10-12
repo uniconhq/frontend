@@ -10,7 +10,7 @@ import { Card } from '@/ui/Card';
 import { Modal } from '@/ui/Modal';
 import { PageLink } from '@/ui/PageLink';
 import { SectionTitle } from '@/ui/SectionTitle';
-import { Select } from '@/ui/Select';
+import { RadioGroup } from '@/ui/RadioGroup';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { Loaded } from '@/ui/feedback/Loaded';
 import { useMe } from '@/session';
@@ -36,11 +36,15 @@ import { holdersQuery, useHolders, useRoleChanges } from './holders';
 import classes from './people.module.css';
 
 /**
- * The roles the caller may give, as Invite offers them: only an admin gives
- * the admin role.
+ * The roles the caller may give, as Invite offers them, each with what it
+ * lets its holder do: only an admin gives the admin role.
  */
 function roleOptions(administers: boolean) {
-  return offered(administers).map((role) => ({ value: role, label: ROLE_LABEL[role] }));
+  return offered(administers).map((role) => ({
+    value: role,
+    label: ROLE_LABEL[role],
+    description: ROLE_MEANS[role],
+  }));
 }
 
 /** The broader scope a role was given at, which reaches the place it is listed at. */
@@ -211,13 +215,12 @@ function HolderRow({
               onSubmit={submitRole}
               aria-label={`Change role of ${name}`}
             >
-              <Select
+              <RadioGroup
                 label="Role"
                 value={role}
                 options={roleOptions(administers)}
                 onChange={(value) => setRole(value as RoleName)}
               />
-              <BodyText tone="secondary">{ROLE_MEANS[role]}</BodyText>
               <div className={classes.actions}>
                 <Button size="xs" type="submit" loading={pending}>
                   Save

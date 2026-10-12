@@ -63,6 +63,21 @@ describe('how often submissions are read again', () => {
     ).toEqual([1]);
   });
 
+  it('follows a delayed grading, which Unicon tries again by itself, and says when it is graded', () => {
+    const delayed: Submission = {
+      ...submitted(600, 'grading'),
+      grading: { ...done, status: 'delayed' },
+    };
+    expect(pollEvery([delayed], NOW)).toBe(15_000);
+    expect(
+      justFinished([submitted(600, 'grading')], [delayed]).map((found) => found.number),
+    ).toEqual([]);
+    expect(
+      justFinished([delayed], [submitted(600, 'graded')]).map((found) => found.number),
+    ).toEqual([1]);
+    expect(pointsLine(delayed.grading)).toBe('—');
+  });
+
   it('is once a minute when nothing is being graded', () => {
     expect(pollEvery([submitted(3, 'graded')], NOW)).toBe(60_000);
     expect(pollEvery(undefined, NOW)).toBe(60_000);
@@ -86,7 +101,7 @@ describe('the verdict a grading shows', () => {
 });
 
 describe('a submission’s points in its row', () => {
-  const points = (shown: string, pendingUntil: string | null = null) => ({
+  const points = (shown: string | null, pendingUntil: string | null = null) => ({
     ...done,
     points: {
       shown,
@@ -111,7 +126,16 @@ describe('a submission’s points in its row', () => {
   it('says when points held back are shown', () => {
     const at = '2026-09-26T14:00:00Z';
     const when = formatWhen(new Date(at), NOW);
-    expect(pointsLine(points('0', at), NOW)).toBe(`shown at ${when}`);
+    expect(pointsLine(points(null, at), NOW)).toBe(`shown at ${when}`);
     expect(pointsLine(points('40', at), NOW)).toBe(`40 so far, more shown at ${when}`);
+  });
+
+  it('gives a shown 0 as 0, apart from nothing shown yet', () => {
+    const at = '2026-09-26T14:00:00Z';
+    const when = formatWhen(new Date(at), NOW);
+    expect(pointsLine(points('0'), NOW)).toBe('0');
+    expect(pointsLine(points('0', at), NOW)).toBe(`0 so far, more shown at ${when}`);
+    // Held by a sealed step, with no time it is shown at yet.
+    expect(pointsLine(points(null), NOW)).toBe('—');
   });
 });

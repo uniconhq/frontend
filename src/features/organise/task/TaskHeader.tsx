@@ -81,6 +81,7 @@ function readiness(
           content: settings,
           token: '',
           upload: null,
+          version: null,
         });
   const values =
     read === null || 'error' in read

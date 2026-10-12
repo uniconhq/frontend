@@ -3,6 +3,7 @@ import { fireEvent, screen } from '@testing-library/react';
 import userEvent from '@/test/user-event';
 import { renderWithProviders } from '@/test/render';
 import { DateTimeInput } from './DateTimeInput';
+import { RadioGroup } from './RadioGroup';
 import { Select } from './Select';
 import { TextInput } from './TextInput';
 
@@ -123,5 +124,58 @@ describe('a field with background behind an ⓘ', () => {
     expect(await screen.findByText('The most points the task gives.')).toBeVisible();
     fireEvent.mouseLeave(screen.getByRole('button', { name: 'About Worth' }));
     expect(screen.queryByText('The most points the task gives.')).toBeNull();
+  });
+});
+
+describe('a choice of a few, as radio options', () => {
+  const options = [
+    { value: 'all', label: 'Every test must pass', description: 'All or nothing.' },
+    {
+      value: 'worst',
+      label: 'The lowest test score counts',
+      description: 'A test scored 0.4 gives 40%.',
+      disabled: true,
+      reason: 'Needs tests that earn part of their points.',
+    },
+  ];
+
+  it('says under each option what it means, and under a greyed one why', () => {
+    renderWithProviders(
+      <RadioGroup label="Rule" value="all" options={options} onChange={noop} />,
+    );
+
+    expect(screen.getByRole('radio', { name: 'Every test must pass' })).toBeChecked();
+    expect(
+      screen.getByRole('radio', { name: 'Every test must pass' }),
+    ).toHaveAccessibleDescription('All or nothing.');
+    const greyed = screen.getByRole('radio', { name: 'The lowest test score counts' });
+    expect(greyed).toBeDisabled();
+    expect(greyed).toHaveAccessibleDescription(
+      'A test scored 0.4 gives 40%. Needs tests that earn part of their points.',
+    );
+    expect(
+      screen.getByRole('radiogroup', { name: 'Rule' }),
+    ).not.toHaveAccessibleDescription(/Needs tests/);
+  });
+
+  it('says what was refused about the option chosen under the options', () => {
+    renderWithProviders(
+      <RadioGroup
+        label="Rule"
+        value="all"
+        options={options}
+        onChange={noop}
+        error="Not with these tests."
+      />,
+    );
+
+    const group = screen.getByRole('radiogroup', { name: 'Rule' });
+    expect(
+      follows(
+        screen.getByRole('radio', { name: 'Every test must pass' }),
+        screen.getByText('Not with these tests.'),
+      ),
+    ).toBe(true);
+    expect(group).toBeInTheDocument();
   });
 });

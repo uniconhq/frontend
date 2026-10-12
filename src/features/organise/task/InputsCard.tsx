@@ -3,13 +3,16 @@ import type { DeclaredInput } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
 import { Checkbox } from '@/ui/Checkbox';
+import { InfoTip } from '@/ui/InfoTip';
 import { Select } from '@/ui/Select';
 import { TextInput } from '@/ui/TextInput';
 import { FieldBox } from '../contest/ContestFile';
 import { NumberField } from '../forms/fields';
 import { heldTheOtherWay, type InputValues } from '../forms/task-values';
 import { BuildCard, CardPart } from './BuildCard';
-import { inputTitle } from './build-data';
+import { inputTitle, type TaskPlace } from './build-data';
+import { FileSetting } from './FileSetting';
+import type { StagedInput } from './input-files';
 import shared from '../organise.module.css';
 import classes from './task.module.css';
 
@@ -35,6 +38,18 @@ function chosenOf(text: string): string[] {
 type Change = (change: Partial<InputValues>) => void;
 
 /**
+ * What a setting that is a file or a folder is chosen with (M51): the task,
+ * the files chosen for settings and waiting for the save, and what choosing
+ * and undoing do.
+ */
+export type InputFiles = {
+  place: TaskPlace;
+  staged: StagedInput[];
+  onChoose: (declared: DeclaredInput, files: File[], was: string) => void;
+  onUndo: (id: string) => void;
+};
+
+/**
  * What the task gives an input the workflow asks it for, as a field of the
  * input's type: a number, yes or no, one of its options, text or one of the
  * org's secrets, or a file or folder of the task by its path.
@@ -43,11 +58,13 @@ function ValueField({
   declared,
   input,
   onChange,
+  files,
   disabled,
 }: {
   declared: DeclaredInput;
   input: InputValues;
   onChange: Change;
+  files: InputFiles | undefined;
   disabled: boolean;
 }) {
   const label = inputTitle(declared);
@@ -83,6 +100,21 @@ function ValueField({
         description={hint}
         info={info}
         onChange={(value) => onChange({ value })}
+        disabled={disabled}
+      />
+    );
+  }
+  if ((type === 'file' || type === 'folder') && files !== undefined) {
+    return (
+      <FileSetting
+        place={files.place}
+        declared={declared}
+        value={input.value}
+        staged={files.staged.find((each) => each.id === declared.id)}
+        hint={hint}
+        onChoose={(chosen) => files.onChoose(declared, chosen, input.value)}
+        onUndo={() => files.onUndo(declared.id)}
+        onClear={declared.optional ? () => onChange({ value: '' }) : null}
         disabled={disabled}
       />
     );
@@ -162,7 +194,7 @@ function EntrantFields({
           label="Label shown to entrants"
           value={input.label}
           onChange={(label) => onChange({ label })}
-          placeholder={declared.id}
+          placeholder={declared.title ?? declared.id}
           disabled={disabled}
         />
         {type === 'text' && (
@@ -244,16 +276,23 @@ function EntrantFields({
   );
 }
 
-/** One input the workflow declares, as a box of its own named for it. */
+/**
+ * One input the workflow declares, as a box of its own named for it: by its
+ * title, or its key where the workflow gives it none, with its help behind
+ * an ⓘ, as each setting's field has it (M45). The key is the workflow
+ * author's word, so it is not shown beside a title.
+ */
 function DeclaredItem({
   declared,
   input,
   onChange,
+  files,
   disabled,
 }: {
   declared: DeclaredInput;
   input: InputValues;
   onChange: Change;
+  files: InputFiles | undefined;
   disabled: boolean;
 }) {
   const other = heldTheOtherWay(input);
@@ -262,11 +301,15 @@ function DeclaredItem({
       <div className={classes.item} role="group" aria-label={inputTitle(declared)}>
         {declared.contestant && (
           <div className={classes.itemHead}>
-            <h4 className={classes.itemTitle}>{declared.title ?? declared.id}</h4>
-            <span className={classes.id}>
-              {declared.id}
-              {declared.per_test ? ', one file per test' : ''}
-            </span>
+            <div className={classes.titleRow}>
+              <h4 className={classes.itemTitle}>{declared.title ?? declared.id}</h4>
+              {declared.help !== null && (
+                <InfoTip about={declared.title ?? declared.id}>{declared.help}</InfoTip>
+              )}
+            </div>
+            {declared.per_test && (
+              <BodyText tone="secondary">One file for each test</BodyText>
+            )}
           </div>
         )}
         {other && (
@@ -288,10 +331,10 @@ function DeclaredItem({
             <ValueField
               declared={declared}
               input={input}
+              files={files}
               onChange={onChange}
               disabled={disabled}
             />
-            <span className={classes.id}>{declared.id}</span>
           </div>
         )}
       </div>
@@ -468,9 +511,11 @@ function AddUnknown({
  * organiser thinks of them. First what entrants submit (the inputs they
  * give: what they see of each, the choices they have and how much they may
  * send), then the limits and settings the task gives a value. Each input is
- * named by its title and unit from the workflow, its help behind an ⓘ, and
- * its id small beside it. When the workflow cannot be read, the inputs the
- * settings have are shown as they are, to keep or remove.
+ * named by its title from the workflow, a number's unit after it, its help
+ * behind an ⓘ; a setting that is a file or a folder has its own box to
+ * view, upload and replace it (`FileSetting`). When the workflow cannot be
+ * read, the inputs the settings have are shown as they are, to keep or
+ * remove.
  */
 export function InputsCard({
   declared,
@@ -479,10 +524,13 @@ export function InputsCard({
   onChange,
   onRemove,
   onAdd,
+  files,
   disabled,
 }: {
   /** The inputs the workflow declares, or null when it cannot be read. */
   declared: DeclaredInput[] | null;
+  /** How a setting that is a file or a folder is chosen, when the task can take one. */
+  files?: InputFiles;
   /** Why the workflow cannot be read, when it cannot. */
   workflowProblem: string | null;
   inputs: InputValues[];
@@ -533,6 +581,7 @@ export function InputsCard({
         declared={each}
         input={input}
         onChange={(change) => onChange(each.id, change)}
+        files={files}
         disabled={disabled}
       />
     );

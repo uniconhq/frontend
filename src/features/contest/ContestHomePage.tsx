@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { $api, queryView } from '@/api/query';
 import { useServerClock } from '@/api/use-server-time';
@@ -12,7 +12,6 @@ import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
 import { taskPagePath } from '@/lib/contest-paths';
 import { inTeams } from '@/lib/entrants';
-import { formatExact } from '@/lib/exact';
 import { contestPath } from '@/lib/organiser-paths';
 import { useContestParams } from '@/lib/route-params';
 import { contestViewSectionPath } from '@/lib/sections';
@@ -26,14 +25,9 @@ import { entryPollEvery } from './entry/poll';
 import { YourEntry } from './entry/YourEntry';
 import { SignInButtons, SignInPrompt } from './SignInPrompt';
 import { labelOf } from './task-names';
+import { taskPointsText } from './task-points';
 import { taskTimeLines } from './time-left';
 import classes from './contest.module.css';
-
-/** What a task gives, in points, on a task that gives any. */
-function worthText(worth: string | null): string | null {
-  if (worth === null) return null;
-  return `${formatExact(worth)} ${worth === '1' ? 'point' : 'points'}`;
-}
 
 /** Where a task stands for the reader, when it is not simply open. */
 const NOT_OPEN: Record<NonNullable<TaskEntry['release']['closed']>, string | null> = {
@@ -77,21 +71,53 @@ function Standing({
   );
 }
 
+/** The reader's points on a task out of its worth, and when held-back points are shown. */
+function TaskPoints({ task, at }: { task: TaskEntry; at: number }) {
+  const text = taskPointsText(task, new Date(at));
+  return (
+    <span className={classes.points}>
+      {text !== null && <span>{text.score}</span>}
+      {text?.pending != null && <span className={classes.pending}>{text.pending}</span>}
+    </span>
+  );
+}
+
+/**
+ * Calls `onReveal` as the server's clock passes a time a task's held-back
+ * points are shown, so the page reads them then, not at its next read.
+ */
+function useReveals(tasks: TaskEntry[], at: number, onReveal: () => void) {
+  const passed = tasks.filter((task) => {
+    const until = task.points?.pending_until;
+    return until != null && Date.parse(until) <= at;
+  }).length;
+  const last = useRef(passed);
+  useEffect(() => {
+    if (passed > last.current) onReveal();
+    last.current = passed;
+  }, [passed, onReveal]);
+}
+
 /**
  * A contest's released tasks as a signed-in person works from them, in the
- * contest's order: each a link to its page, with what it is worth and where
- * it stands for them, the time left on it counted down by the server's clock.
+ * contest's order: each a link to its page, with their points on it out of
+ * its worth once they are in an approved entrant, read again as held-back
+ * points are shown, its worth alone before then, and where it stands for them, the time left on it
+ * counted down by the server's clock.
  */
 function TaskList({
   org,
   contest,
   tasks,
+  onReveal,
 }: {
   org: string;
   contest: string;
   tasks: TaskEntry[];
+  onReveal: () => void;
 }) {
   const { at, measured } = useServerClock();
+  useReveals(tasks, at, onReveal);
   if (tasks.length === 0) {
     return <BodyText tone="secondary">No tasks are released yet.</BodyText>;
   }
@@ -101,7 +127,7 @@ function TaskList({
         <li key={task.name} className={classes.task}>
           <span className={classes.label}>{labelOf(task)}</span>
           <PageLink to={taskPagePath(org, contest, task.name)}>{task.title}</PageLink>
-          <span className={classes.worth}>{worthText(task.worth)}</span>
+          <TaskPoints task={task} at={at} />
           <Standing task={task} at={at} counting={measured} />
         </li>
       ))}
@@ -365,7 +391,12 @@ function Home({
       <Card>
         <div className={classes.stack}>
           <SectionTitle>Tasks</SectionTitle>
-          <TaskList org={org} contest={contest} tasks={home.tasks} />
+          <TaskList
+            org={org}
+            contest={contest}
+            tasks={home.tasks}
+            onReveal={onBoundary}
+          />
         </div>
       </Card>
       <LeaderboardCard
