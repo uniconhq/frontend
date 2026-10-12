@@ -1,5 +1,6 @@
 import type { GradingResult, SubmissionState, Submission } from '@/api/types';
-import { serverNow } from '@/lib/time';
+import { compareDecimal, formatExact } from '@/lib/exact';
+import { formatWhen, serverNow } from '@/lib/time';
 
 /**
  * How often a contestant's submissions are read again: soon while a grading
@@ -87,6 +88,29 @@ export function justFinished(
   if (before === undefined || after === undefined) return [];
   const waiting = new Set(before.filter(unfinished).map((found) => found.number));
   return after.filter((found) => waiting.has(found.number) && !unfinished(found));
+}
+
+/**
+ * A submission's points as its row in the list says them: what is shown,
+ * such as `75`; `—` while it is still being graded, or when it never will be;
+ * and while some of its points wait for a reveal, when they are shown, such
+ * as `shown at 14:00`, or `30 so far, more shown at 14:00` when some
+ * are shown already. Exact numbers, rounded for reading as the opened submission
+ * rounds them.
+ */
+export function pointsLine(
+  grading: GradingResult | null,
+  now: Date = serverNow(),
+): string {
+  if (grading === null || grading.status !== 'graded' || grading.points === null) {
+    return '—';
+  }
+  const { shown, pending_until: until } = grading.points;
+  if (until === null) return formatExact(shown, 2);
+  const at = formatWhen(new Date(until), now);
+  return compareDecimal(shown, '0') === 0
+    ? `shown at ${at}`
+    : `${formatExact(shown, 2)} so far, more shown at ${at}`;
 }
 
 /** How late a submission was, in started days after the person's due. */

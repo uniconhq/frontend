@@ -6,8 +6,8 @@ import type { Clarification } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
 import { Card } from '@/ui/Card';
-import { PageLink } from '@/ui/PageLink';
-import { PageTitle } from '@/ui/PageTitle';
+import { Checkbox } from '@/ui/Checkbox';
+import { Modal } from '@/ui/Modal';
 import { SectionTitle } from '@/ui/SectionTitle';
 import { TextInput } from '@/ui/TextInput';
 import { Textarea } from '@/ui/Textarea';
@@ -15,11 +15,12 @@ import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
 import { useMe } from '@/session';
 import { useFallbackPoll } from '@/live';
-import { clarificationsPath, orgPath } from '@/lib/organiser-paths';
 import { useOrgParam } from '@/lib/route-params';
+import { ORG_SECTIONS, sectionOf } from '@/lib/sections';
 import { holdsAtContest } from '../roles';
+import { SectionPage } from '../SectionPage';
 import { QuestionThread } from '@/ui/threads/ThreadParts';
-import { isTeams } from '@/ui/threads/asker';
+import { useEntrantName } from '../entrants/names';
 import classes from '@/ui/threads/threads.module.css';
 
 const INBOX = '/api/v1/orgs/{org}/clarifications';
@@ -38,20 +39,28 @@ function isThreadRead(path: unknown): boolean {
   );
 }
 
+/** Whether the organisers have written anything under a question yet. */
+function replied(clarification: Clarification): boolean {
+  return clarification.messages.some((message) => !message.from_asker);
+}
+
 /**
  * One question for an organiser and, for a manager of its contest, what can
- * be done with it: Reply, which leaves it open and so still in the inbox;
- * Mark as answered, which closes it with or without a reply and takes it out
- * of the inbox; Unmark on an answered one, which opens it again; and Answer
- * publicly, which posts an announcement every contestant reads, pointing at
- * the question, which stays private.
+ * be done with it. Reply marks it answered as it sends, unless the manager
+ * unticks that, so an answer takes it out of the open questions in one step.
+ * Mark as answered closes it without a reply, and asks first while nobody
+ * has replied, since the entrant then reads no answer. Reopen opens an
+ * answered one again. Answer publicly posts an announcement every entrant
+ * reads, pointing at the question, which stays private.
  */
 function ClarificationCard({
   clarification,
   manages,
+  showContest,
 }: {
   clarification: Clarification;
   manages: boolean;
+  showContest: boolean;
 }) {
   const queryClient = useQueryClient();
   const reply = $api.useMutation('post', `${QUESTION}/replies`);
@@ -59,6 +68,8 @@ function ClarificationCard({
   const unmark = $api.useMutation('delete', `${QUESTION}/answered`);
   const publish = $api.useMutation('post', `${QUESTION}/announcement`);
   const [body, setBody] = useState('');
+  const [markToo, setMarkToo] = useState(true);
+  const [asking, setAsking] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [title, setTitle] = useState(clarification.title);
   const [answer, setAnswer] = useState('');
@@ -77,13 +88,24 @@ function ClarificationCard({
     number: clarification.number,
   };
   const name = clarification.title;
+  const asker = useEntrantName(org, contest, clarification.asker);
+  const open = !clarification.answered;
 
   const sendReply = async (event: FormEvent) => {
     event.preventDefault();
-    const outcome = await change.run('reply', () =>
-      reply.mutateAsync({ params: { path }, body: { body } }),
-    );
+    const answering = open && markToo;
+    const outcome = await change.run('reply', async () => {
+      await reply.mutateAsync({ params: { path }, body: { body } });
+      if (answering) await mark.mutateAsync({ params: { path } });
+    });
     if (outcome.ok) setBody('');
+  };
+
+  const markAnswered = async () => {
+    const outcome = await change.run('mark', () =>
+      mark.mutateAsync({ params: { path } }),
+    );
+    if (outcome.ok) setAsking(false);
   };
 
   const sendAnswer = async (event: FormEvent) => {
@@ -99,13 +121,12 @@ function ClarificationCard({
 
   return (
     <li className={classes.item}>
-      <BodyText tone="meta">
-        {org}/{contest}
-      </BodyText>
-      <QuestionThread
-        clarification={clarification}
-        asker={isTeams(clarification) ? 'Team' : 'Contestant'}
-      />
+      {showContest && (
+        <BodyText tone="meta">
+          {org}/{contest}
+        </BodyText>
+      )}
+      <QuestionThread clarification={clarification} asker={asker} named />
       {manages && (
         <>
           <form
@@ -114,20 +135,40 @@ function ClarificationCard({
             aria-label={`Reply to ${name}`}
           >
             <Textarea label="Reply" value={body} onChange={setBody} rows={2} required />
+            {open && (
+              <Checkbox
+                label="Mark it answered"
+                checked={markToo}
+                onChange={setMarkToo}
+                description={
+                  markToo
+                    ? 'It leaves the open questions as the reply is sent.'
+                    : 'It stays open after the reply, for a fuller answer later.'
+                }
+              />
+            )}
             <div className={classes.actions}>
-              <Button
-                type="submit"
-                size="xs"
-                variant="secondary"
-                loading={busy === 'reply'}
-              >
+              <Button type="submit" size="xs" loading={busy === 'reply'}>
                 Reply
               </Button>
-              {clarification.answered ? (
+              {open ? (
                 <Button
                   size="xs"
                   variant="secondary"
-                  label={`Unmark ${name}`}
+                  label={`Mark as answered ${name}`}
+                  loading={busy === 'mark'}
+                  onClick={() => {
+                    if (replied(clarification)) void markAnswered();
+                    else setAsking(true);
+                  }}
+                >
+                  Mark as answered
+                </Button>
+              ) : (
+                <Button
+                  size="xs"
+                  variant="secondary"
+                  label={`Reopen ${name}`}
                   loading={busy === 'unmark'}
                   onClick={() =>
                     void change.run('unmark', () =>
@@ -135,20 +176,7 @@ function ClarificationCard({
                     )
                   }
                 >
-                  Unmark
-                </Button>
-              ) : (
-                <Button
-                  size="xs"
-                  label={`Mark as answered ${name}`}
-                  loading={busy === 'mark'}
-                  onClick={() =>
-                    void change.run('mark', () =>
-                      mark.mutateAsync({ params: { path } }),
-                    )
-                  }
-                >
-                  Mark as answered
+                  Reopen
                 </Button>
               )}
               <Button
@@ -168,7 +196,7 @@ function ClarificationCard({
               aria-label={`Answer publicly ${name}`}
             >
               <BodyText tone="secondary">
-                Every contestant reads this announcement. The question itself stays
+                Every entrant reads this announcement. The question itself stays
                 private.
               </BodyText>
               <TextInput
@@ -192,17 +220,41 @@ function ClarificationCard({
               </div>
             </form>
           )}
+          <Modal
+            opened={asking}
+            onClose={() => setAsking(false)}
+            title="Mark it answered without a reply?"
+          >
+            <div className={classes.stack}>
+              <BodyText>
+                Nobody has replied to &ldquo;{name}&rdquo;. The entrant sees it answered
+                with no answer from you, and it leaves the open questions.
+              </BodyText>
+              <BodyText tone="secondary">
+                You can reopen it later. To answer it, write a reply instead.
+              </BodyText>
+              {change.error !== null && <ErrorBlock error={change.error} compact />}
+              <div className={classes.actions}>
+                <Button loading={busy === 'mark'} onClick={() => void markAnswered()}>
+                  Mark as answered
+                </Button>
+                <Button variant="secondary" onClick={() => setAsking(false)}>
+                  Not now
+                </Button>
+              </div>
+            </div>
+          </Modal>
         </>
       )}
-      {change.error !== null && <ErrorBlock error={change.error} compact />}
+      {change.error !== null && !asking && <ErrorBlock error={change.error} compact />}
     </li>
   );
 }
 
 /**
  * The organisers' inbox: every question still open across the org, oldest
- * first, so the one waiting longest is on top. Replying keeps a question
- * here; only marking it answered takes it off.
+ * first, so the one waiting longest is on top. A reply takes a question off
+ * unless the manager keeps it open; so does marking it answered.
  */
 export function InboxPage() {
   const org = useOrgParam();
@@ -217,13 +269,16 @@ export function InboxPage() {
   );
 
   return (
-    <div className={classes.stack}>
-      <PageLink to={orgPath(org)}>Back to the org</PageLink>
-      <PageTitle>Questions</PageTitle>
-      <BodyText tone="secondary">
-        Every question still open across the org. A reply keeps a question here; only
-        Mark as answered takes it off.
-      </BodyText>
+    <SectionPage
+      section={sectionOf(ORG_SECTIONS, 'questions')}
+      intro={
+        <BodyText tone="secondary">
+          Every question still open across the org, the one waiting longest first.
+          Replying marks a question answered and takes it off this list, unless you
+          untick Mark it answered.
+        </BodyText>
+      }
+    >
       <Card>
         {view.state === 'loading' && <PageSkeleton rows={3} />}
         {view.state === 'error' && (
@@ -231,13 +286,14 @@ export function InboxPage() {
         )}
         {view.state === 'ready' &&
           (view.data.length === 0 ? (
-            <BodyText>No question is waiting.</BodyText>
+            <BodyText>No questions are waiting for an answer.</BodyText>
           ) : (
             <ol className={classes.list} aria-label="Open questions">
               {view.data.map((clarification) => (
                 <ClarificationCard
                   key={`${clarification.contest.contest ?? ''}/${clarification.asker}/${String(clarification.number)}`}
                   clarification={clarification}
+                  showContest
                   manages={holdsAtContest(
                     roles,
                     clarification.contest.org,
@@ -249,13 +305,14 @@ export function InboxPage() {
             </ol>
           ))}
       </Card>
-    </div>
+    </SectionPage>
   );
 }
 
 /**
- * Every question of one contest, newest first, answered ones included, for
- * its organisers, beside the contest's other settings.
+ * Every question of one contest for its organisers: the open ones first, the
+ * one waiting longest on top, and the answered ones under them, folded away
+ * until asked for, newest first.
  */
 export function ContestClarifications({
   org,
@@ -265,6 +322,7 @@ export function ContestClarifications({
   contest: string;
 }) {
   const manages = holdsAtContest(useMe().roles, org, contest, 'manager');
+  const [showAnswered, setShowAnswered] = useState(false);
   const view = queryView(
     $api.useQuery(
       'get',
@@ -274,26 +332,56 @@ export function ContestClarifications({
     ),
   );
 
+  const card = (clarification: Clarification) => (
+    <ClarificationCard
+      key={`${clarification.asker}/${String(clarification.number)}`}
+      clarification={clarification}
+      manages={manages}
+      showContest={false}
+    />
+  );
+
+  if (view.state === 'loading') return <PageSkeleton rows={2} />;
+  if (view.state === 'error')
+    return <ErrorBlock error={view.error} onRetry={view.retry} />;
+  if (view.data.length === 0) {
+    return <BodyText tone="secondary">Nobody has asked anything yet.</BodyText>;
+  }
+  const open = view.data
+    .filter((found) => !found.answered)
+    .sort((a, b) => Date.parse(a.asked_at) - Date.parse(b.asked_at));
+  const answered = view.data
+    .filter((found) => found.answered)
+    .sort((a, b) => Date.parse(b.asked_at) - Date.parse(a.asked_at));
+  const count = (n: number) =>
+    `${String(n)} answered ${n === 1 ? 'question' : 'questions'}`;
+
   return (
     <div className={classes.stack}>
-      <SectionTitle>Questions</SectionTitle>
-      <PageLink to={clarificationsPath(org)}>Open questions across the org</PageLink>
-      {view.state === 'loading' && <PageSkeleton rows={2} />}
-      {view.state === 'error' && <ErrorBlock error={view.error} onRetry={view.retry} />}
-      {view.state === 'ready' &&
-        (view.data.length === 0 ? (
-          <BodyText tone="secondary">Nobody has asked anything yet.</BodyText>
-        ) : (
-          <ol className={classes.list} aria-label="Questions">
-            {[...view.data].reverse().map((clarification) => (
-              <ClarificationCard
-                key={`${clarification.asker}/${String(clarification.number)}`}
-                clarification={clarification}
-                manages={manages}
-              />
-            ))}
-          </ol>
-        ))}
+      <SectionTitle>Open</SectionTitle>
+      {open.length === 0 ? (
+        <BodyText tone="secondary">Every question is answered.</BodyText>
+      ) : (
+        <ol className={classes.list} aria-label="Open questions">
+          {open.map(card)}
+        </ol>
+      )}
+      {answered.length > 0 && (
+        <>
+          <div className={classes.actions}>
+            <Button variant="secondary" onClick={() => setShowAnswered(!showAnswered)}>
+              {showAnswered
+                ? 'Hide the answered questions'
+                : `Show ${count(answered.length)}`}
+            </Button>
+          </div>
+          {showAnswered && (
+            <ol className={classes.list} aria-label="Answered questions">
+              {answered.map(card)}
+            </ol>
+          )}
+        </>
+      )}
     </div>
   );
 }

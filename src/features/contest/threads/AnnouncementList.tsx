@@ -33,7 +33,7 @@ function Listed({
   showPlace: boolean;
 }) {
   if (announcements.length === 0) {
-    return <BodyText tone="secondary">No announcements.</BodyText>;
+    return <BodyText tone="secondary">There are no announcements yet.</BodyText>;
   }
   return (
     <ol className={classes.list} aria-label="Announcements">

@@ -35,13 +35,44 @@
 .active {
   background: var(--unicon-hover);
   color: var(--unicon-text-primary);
+  font-weight: 600;
 }
 
-.upcoming {
-  color: var(--unicon-text-faint);
-  cursor: default;
+/* A long name, such as an org's or a task's, stays on its line. */
+.item {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.upcoming:hover {
-  background: transparent;
+/*
+ * On a narrow screen the sidebar runs across the top, each group one row
+ * that slides sideways, so the page below keeps the screen's width.
+ */
+@media (max-width: 760px) {
+  .sidebar {
+    width: 100%;
+    gap: 6px;
+    padding: 8px 12px;
+    border-right: 0;
+    border-bottom: 1px solid var(--unicon-border);
+  }
+
+  .group {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    overflow-x: auto;
+  }
+
+  .groupLabel {
+    flex: none;
+    margin: 0 4px 0 0;
+    padding: 0;
+  }
+
+  .item {
+    flex: none;
+    max-width: 160px;
+  }
 }

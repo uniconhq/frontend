@@ -95,8 +95,9 @@ export function InvitesPage() {
       <PageTitle>Invites</PageTitle>
       <BodyText>
         Organisers invite people to a role at an org, a contest or a task, or to a place
-        in a contest. Accepting takes what the invite offers; declining leaves things as
-        they are.
+        in a contest, and members of a team invite people into it. Accepting a place
+        registers you for the contest; accepting a role gives it to you. Declining
+        leaves things as they are.
       </BodyText>
       {token !== null && <OpenedInvite view={opened} />}
       <section className={classes.section}>

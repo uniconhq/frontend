@@ -2,16 +2,17 @@ import { useState, type ReactNode } from 'react';
 import { toApiError } from '@/api/problem';
 import type { DefinitionError, FileContent, WriteFile } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
-import { Tabs } from '@/ui/Tabs';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
-import { FileEditor } from '../files/FileEditor';
+import { PageLink } from '@/ui/PageLink';
+import { contestSectionPath, taskSectionPath } from '@/lib/sections';
 import { SaveOutcome, type Outcome } from '../files/SaveOutcome';
 import { UploadedFile } from '../files/UploadedFile';
 import type { Place } from '../files/place';
 import { useFileWrite, useOwnFile } from './file-hooks';
 import { definitionErrorsOf } from '../files/refusals';
-import { MergeView } from './MergeView';
+import type { PlaceOf } from '../DefinitionErrors';
+import { MergeView, type MergeWords } from './MergeView';
 import { parseYaml, topMap, writeOver, type Doc } from './yaml-doc';
 
 /**
@@ -27,65 +28,42 @@ export type FormProps = {
   refused: DefinitionError[];
 };
 
-/**
- * A definition file as a form, with the file as text in a tab beside it,
- * since some keys have no field. The form gets the file parsed as a YAML
- * document; one that is not YAML, or not a mapping, falls back to the text
- * with the reason. Saving writes the changed document with the version it
- * was read at. A save refused as a conflict opens the merge view over the file
- * as it is now; any other answer is SaveOutcome's, as in the file editor.
- * A file that is an upload shows as one, by its size and digest, not as a form.
- */
-export function DefinitionFile({
-  place,
-  path,
-  label,
-  admin,
-  children,
-}: {
-  place: Place;
-  path: string;
-  /** What the tabs are views of, such as "The contest's settings". */
-  label: string;
-  /** Whether the organiser is an admin at the scope, which the merge view needs. */
-  admin: boolean;
-  children: (props: FormProps) => ReactNode;
-}) {
-  return (
-    <Tabs
-      label={label}
-      tabs={[
-        {
-          value: 'form',
-          label: 'Form',
-          panel: (
-            <FormView place={place} path={path} admin={admin}>
-              {children}
-            </FormView>
-          ),
-        },
-        {
-          value: 'text',
-          label: path,
-          panel: <FileEditor place={place} path={path} />,
-        },
-      ]}
-    />
-  );
-}
-
 type Merge = { base: string; mine: string };
 
-function FormView({
+/** Where a place's settings are kept as stored, which an admin mends as text when they do not read. */
+function mendAt(place: Place): string {
+  return place.kind === 'task'
+    ? taskSectionPath(place.org, place.contest, place.task, 'settings')
+    : `${contestSectionPath(place.org, place.contest, 'files')}?file=contest.yaml`;
+}
+
+/**
+ * A definition file as a form. The form gets the file parsed as a YAML
+ * document. Saving writes the changed document with the version it was read
+ * at; a save refused as a conflict opens the merge view over the file as it
+ * is now, and any other answer is SaveOutcome's. A file that is an upload
+ * shows as one, by its size and digest, not as a form.
+ * `words` names the fields and values of the merge as the form does, and
+ * `placeOf` each problem a refused save lists, with a link that opens it;
+ * `bare` says a save in words alone. A file the form cannot read is no form:
+ * it says why, and where an admin mends it as text.
+ */
+export function DefinitionForm({
   place,
   path,
   admin,
   children,
+  words,
+  placeOf,
+  bare = false,
 }: {
   place: Place;
   path: string;
   admin: boolean;
   children: (props: FormProps) => ReactNode;
+  words?: MergeWords;
+  placeOf?: PlaceOf;
+  bare?: boolean;
 }) {
   const query = useOwnFile(place, path);
   const { write, pending } = useFileWrite(place, path);
@@ -152,12 +130,18 @@ function FormView({
           busy={busy}
           onSave={(content) => save(file, content)}
           onDrop={() => setMerge(null)}
+          words={words}
         />
       ) : 'error' in read ? (
         <div role="alert">
-          <BodyText>The form cannot read {path}, so it is open as text below.</BodyText>
+          <BodyText>
+            These settings cannot be read, so they cannot be changed here.
+          </BodyText>
           <BodyText tone="secondary">{read.error}</BodyText>
-          <FileEditor place={place} path={path} />
+          <BodyText tone="secondary">
+            An admin can fix them as text in{' '}
+            <PageLink to={mendAt(place)}>the stored settings</PageLink>.
+          </BodyText>
         </div>
       ) : (
         <div key={file.token}>
@@ -180,6 +164,8 @@ function FormView({
       {outcome !== null && (
         <SaveOutcome
           outcome={outcome}
+          placeOf={placeOf}
+          bare={bare}
           onConfirm={(body) => void send(file, { ...body, confirm: true })}
           onKeepAsDraft={(body) => void send(file, { ...body, keep_as_draft: true })}
           onReload={() => {
@@ -194,10 +180,10 @@ function FormView({
 
 /** The file as a document the form can show, or why it is not one. */
 function readForm(file: FileContent): { doc: Doc } | { error: string } {
-  if (file.encoding !== 'utf-8') return { error: 'It is not text.' };
+  if (file.encoding !== 'utf-8') return { error: 'The file is not text.' };
   const parsed = parseYaml(file.content);
   if ('error' in parsed) return parsed;
   return topMap(parsed.doc) === 'not-a-mapping'
-    ? { error: 'Its top level is not a mapping of keys.' }
+    ? { error: 'The file does not hold a list of settings.' }
     : parsed;
 }

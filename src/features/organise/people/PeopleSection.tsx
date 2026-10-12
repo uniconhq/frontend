@@ -6,51 +6,65 @@ import { isApiError } from '@/api/problem';
 import type { Holder, RoleName, ScopeNames } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
+import { Card } from '@/ui/Card';
 import { Modal } from '@/ui/Modal';
 import { PageLink } from '@/ui/PageLink';
 import { SectionTitle } from '@/ui/SectionTitle';
 import { Select } from '@/ui/Select';
-import { TextInput } from '@/ui/TextInput';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
-import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
+import { Loaded } from '@/ui/feedback/Loaded';
 import { useMe } from '@/session';
-import { contestPath, orgPath, taskPath } from '@/lib/organiser-paths';
-import { scopeName } from '@/lib/scope-name';
-import { holdsAt, isPlace, ROLE_LABEL, ROLE_MEANS, type RolePlace } from '../roles';
+import {
+  CONTEST_SECTIONS,
+  ORG_SECTIONS,
+  TASK_SECTIONS,
+  contestSectionPath,
+  orgSectionPath,
+  sectionOf,
+  taskSectionPath,
+} from '@/lib/sections';
+import {
+  holdsAt,
+  isPlace,
+  offered,
+  ROLE_LABEL,
+  ROLE_MEANS,
+  type RolePlace,
+} from '../roles';
 import { InvitesSection } from '../invites/InvitesSection';
 import { holdersQuery, useHolders, useRoleChanges } from './holders';
 import classes from './people.module.css';
 
 /**
- * Every role, to a manager as well as an admin: only an admin may give the
- * admin role, and a manager who tries is told so by the forge's refusal
- * rather than finding the choice missing.
+ * The roles the caller may give, as Invite offers them: only an admin gives
+ * the admin role.
  */
-const ROLE_OPTIONS = (['admin', 'manager', 'observer'] as const).map((role) => ({
-  value: role,
-  label: ROLE_LABEL[role],
-}));
+function roleOptions(administers: boolean) {
+  return offered(administers).map((role) => ({ value: role, label: ROLE_LABEL[role] }));
+}
 
-function pagePath(names: ScopeNames): string {
-  if (names.contest === null) return orgPath(names.org);
-  if (names.task === null) return contestPath(names.org, names.contest);
-  return taskPath(names.org, names.contest, names.task);
+/** The broader scope a role was given at, which reaches the place it is listed at. */
+function givenAt(names: ScopeNames): string {
+  if (names.contest === null) return 'The org';
+  if (names.task === null) return 'The contest';
+  return 'The task';
+}
+
+/** The organisers page of the scope a role was given at, where it is changed. */
+function organisersOf(names: ScopeNames): string {
+  if (names.contest === null) return orgSectionPath(names.org, 'organisers');
+  if (names.task === null) {
+    return contestSectionPath(names.org, names.contest, 'organisers');
+  }
+  return taskSectionPath(names.org, names.contest, names.task, 'organisers');
 }
 
 /**
- * A refusal in words. Three read better here than the general sentence: the
- * admin role asked for by someone who is not an admin here, the last admin of
- * a scope, whose reason names the scope, and a username nobody has.
+ * A refusal in words. Two read better here than the general sentence: the
+ * admin role asked for by someone who is not an admin here, and the last
+ * admin of a scope, whose reason names the scope.
  */
-function Refusal({
-  error,
-  username,
-  role,
-}: {
-  error: unknown;
-  username?: string;
-  role?: RoleName;
-}) {
+function Refusal({ error, role }: { error: unknown; role?: RoleName }) {
   if (isApiError(error) && error.code === 'forbidden' && role === 'admin') {
     return (
       <div role="alert">
@@ -67,16 +81,6 @@ function Refusal({
         <BodyText tone="secondary">That would leave no admin</BodyText>
         <BodyText tone="secondary">
           {error.detail ?? 'Someone else has to be an admin here first.'}
-        </BodyText>
-      </div>
-    );
-  }
-  if (isApiError(error) && error.code === 'not_found' && username !== undefined) {
-    return (
-      <div role="alert">
-        <BodyText tone="secondary">
-          Nobody has the username {username}. They need an account first, and the name
-          as they sign in with it.
         </BodyText>
       </div>
     );
@@ -170,13 +174,13 @@ function HolderRow({
       <td>
         {inherited ? (
           <div className={classes.person}>
-            <span className={classes.mono}>{scopeName(holder.at_names)}</span>
+            <span>{givenAt(holder.at_names)}</span>
             {manages && (
-              <PageLink to={pagePath(holder.at_names)}>Change it there</PageLink>
+              <PageLink to={organisersOf(holder.at_names)}>Change it there</PageLink>
             )}
           </div>
         ) : (
-          'Here'
+          `This ${place.kind}`
         )}
       </td>
       {manages && (
@@ -210,7 +214,7 @@ function HolderRow({
               <Select
                 label="Role"
                 value={role}
-                options={ROLE_OPTIONS}
+                options={roleOptions(administers)}
                 onChange={(value) => setRole(value as RoleName)}
               />
               <BodyText tone="secondary">{ROLE_MEANS[role]}</BodyText>
@@ -259,77 +263,26 @@ function HolderRow({
   );
 }
 
-/**
- * Someone new, or someone already here moved to another role: granting a
- * role to a person who holds one directly here replaces it.
- */
-function AddPerson({ place }: { place: RolePlace }) {
-  const { grant } = useRoleChanges(place);
-  const afterChange = useAfterChange(place);
-  const me = useMe();
-  const [username, setUsername] = useState('');
-  const [role, setRole] = useState<RoleName>('manager');
-  const [tried, setTried] = useState<{ username: string; role: RoleName } | null>(null);
-  const change = useChange({
-    reread: () => afterChange(username.trim() === me.user.username),
-  });
-
-  const submit = async (event: FormEvent) => {
-    event.preventDefault();
-    const name = username.trim();
-    if (name === '') return;
-    setTried({ username: name, role });
-    if ((await change.run('add', () => grant(name, role))).ok) setUsername('');
-  };
-
-  return (
-    <form
-      className={classes.add}
-      onSubmit={(event) => void submit(event)}
-      aria-label="Add someone"
-    >
-      <div className={classes.addFields}>
-        <TextInput
-          label="Username"
-          description="Their username at Forgejo, as they sign in with it."
-          value={username}
-          onChange={setUsername}
-          required
-        />
-        <Select
-          label="Role"
-          value={role}
-          options={ROLE_OPTIONS}
-          onChange={(value) => setRole(value as RoleName)}
-        />
-      </div>
-      <BodyText tone="secondary">{ROLE_MEANS[role]}</BodyText>
-      <div className={classes.actions}>
-        <Button size="xs" type="submit" loading={change.pending !== null}>
-          Add
-        </Button>
-      </div>
-      {change.error !== null && (
-        <Refusal error={change.error} username={tried?.username} role={tried?.role} />
-      )}
-    </form>
-  );
-}
+/** Each level's own list of organisers, by the name its card and its page have. */
+const ORGANISERS_OF: Record<RolePlace['kind'], string> = {
+  org: sectionOf(ORG_SECTIONS, 'organisers').label,
+  contest: sectionOf(CONTEST_SECTIONS, 'organisers').label,
+  task: sectionOf(TASK_SECTIONS, 'organisers').label,
+};
 
 /**
- * Who holds a role at an org, a contest or a task, for the people who
- * organise it: each person once, with the highest role they hold here and
- * where they hold it, here or at a broader scope that reaches here. A
- * manager also adds someone by username, changes a role and removes one; a
- * role held at a broader scope is changed on that scope's page. Only an
- * admin may change or remove an admin. The admin role is offered to a
- * manager too, and the forge refuses it from one, which the section says,
- * as it says why the last admin of a scope cannot be removed or demoted. The
- * rules are the forge's, and each refusal is shown where the change was
- * tried. The forge leaves the orgs' service accounts out of every list, so
- * they are not shown here. Below them are the invites to a role here, which a manager makes by
- * username or email address. Someone who does not observe the place is not
- * shown the section.
+ * Who organises an org, a contest or a task: each person once, with the
+ * highest role they hold here and where it was given, here or at a broader
+ * scope that reaches here. Someone becomes an organiser only by accepting an
+ * invite, which a manager makes below by username or email address; a
+ * manager also changes a role and removes one, and a role given at a broader
+ * scope is changed on that scope's page. Only an admin may change or remove
+ * an admin. The admin role is offered to a manager too, and the forge refuses
+ * it from one, which the section says, as it says why the last admin of a
+ * scope cannot be removed or demoted. The rules are the forge's, and each
+ * refusal is shown where the change was tried. The forge leaves the orgs'
+ * service accounts out of every list, so they are not shown here. Someone
+ * who does not observe the place is told whose list it is.
  */
 export function PeopleSection({ place }: { place: RolePlace }) {
   const me = useMe();
@@ -337,46 +290,60 @@ export function PeopleSection({ place }: { place: RolePlace }) {
   const manages = holdsAt(me.roles, place, 'manager');
   const administers = holdsAt(me.roles, place, 'admin');
   const view = queryView(useHolders(place, { enabled: observes }));
+  const title = ORGANISERS_OF[place.kind];
 
-  if (!observes) return null;
+  if (!observes) {
+    return (
+      <Card>
+        <BodyText>Only the {place.kind}&apos;s own organisers see this list.</BodyText>
+      </Card>
+    );
+  }
 
   return (
-    <div className={classes.stack}>
-      <SectionTitle>Organisers</SectionTitle>
-      {view.state === 'loading' && <PageSkeleton rows={3} />}
-      {view.state === 'error' && <ErrorBlock error={view.error} onRetry={view.retry} />}
-      {view.state === 'ready' && (
-        <table className={classes.table} aria-label="Organisers">
-          <thead>
-            <tr>
-              <th scope="col">Person</th>
-              <th scope="col">Role</th>
-              <th scope="col">Held at</th>
-              {manages && <th scope="col">Actions</th>}
-            </tr>
-          </thead>
-          <tbody>
-            {view.data.map((holder) => (
-              <HolderRow
-                key={holder.user.id}
-                place={place}
-                holder={holder}
-                manages={manages}
-                administers={administers}
-                me={me.user.id}
-              />
-            ))}
-          </tbody>
-        </table>
-      )}
-      {manages && <AddPerson place={place} />}
-      <SectionTitle order={3}>Invites</SectionTitle>
-      <InvitesSection
-        place={place}
-        audience="organisers"
-        manages={manages}
-        administers={administers}
-      />
-    </div>
+    <>
+      <Card>
+        <Loaded view={view}>
+          {(holders) => (
+            <table className={classes.table} aria-label={title}>
+              <thead>
+                <tr>
+                  <th scope="col">Person</th>
+                  <th scope="col">Role</th>
+                  <th scope="col">Given at</th>
+                  {manages && <th scope="col">Actions</th>}
+                </tr>
+              </thead>
+              <tbody>
+                {holders.map((holder) => (
+                  <HolderRow
+                    key={holder.user.id}
+                    place={place}
+                    holder={holder}
+                    manages={manages}
+                    administers={administers}
+                    me={me.user.id}
+                  />
+                ))}
+              </tbody>
+            </table>
+          )}
+        </Loaded>
+      </Card>
+      <Card>
+        <div className={classes.stack}>
+          <SectionTitle>Invites</SectionTitle>
+          <BodyText tone="secondary">
+            Someone becomes an organiser here by accepting an invite.
+          </BodyText>
+          <InvitesSection
+            place={place}
+            audience="organisers"
+            manages={manages}
+            administers={administers}
+          />
+        </div>
+      </Card>
+    </>
   );
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fireEvent, screen, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@/test/user-event';
 import { http, HttpResponse } from 'msw';
 import { parse } from 'yaml';
@@ -16,7 +16,7 @@ end: 2026-06-01T14:00:00Z
 state: draft
 visibility: signed-in
 registration:
-  approval: manual
+  capacity: 100
 leaderboards:
   - name: Standings
     who: contestants
@@ -27,6 +27,7 @@ tasks:
 `;
 
 const FILE = `${CONTEST_API}/files/:path`;
+const PAGE = '/orgs/acme/contests/spring/settings';
 
 /**
  * The spring contest with `contest.yaml` holding `current`. Each write is
@@ -77,50 +78,74 @@ function fill(field: HTMLElement, value: string) {
   fireEvent.change(field, { target: { value } });
 }
 
+/** The fields of one section of the form, found by its title. */
+function inBox(form: HTMLElement, name: string | RegExp) {
+  return within(within(form).getByRole('group', { name }));
+}
+
 async function openForm() {
-  renderApp('/orgs/acme/contests/spring');
-  await userEvent.click(
-    await screen.findByRole('button', { name: 'Edit the settings' }),
-  );
+  renderApp(PAGE);
   return screen.findByRole('form', { name: 'Contest settings' });
 }
 
+function asManager() {
+  server.use(
+    http.get('/api/v1/me', () =>
+      HttpResponse.json({
+        ...someone,
+        roles: [
+          { names: { org: 'acme', contest: 'spring', task: null }, role: 'manager' },
+        ],
+      }),
+    ),
+  );
+}
+
 describe('the contest settings form', { timeout: 20_000 }, () => {
-  it("lets an admin change every key, and writes only those into the organiser's file", async () => {
+  it('holds the settings in sections, each saying what it is for', async () => {
+    contestBackend();
+    const form = await openForm();
+
+    expect(
+      within(form)
+        .getAllByRole('group')
+        .filter((group) => group.tagName === 'FIELDSET')
+        .map((group) => group.querySelector('legend')?.textContent),
+    ).toEqual(['Basics', 'Schedule', 'Teams', 'When grading fails']);
+    expect(within(form).queryByLabelText('State')).toBeNull();
+    expect(within(form).queryByLabelText('Who sees it')).toBeNull();
+    expect(screen.getByRole('link', { name: 'View file' })).toHaveAttribute(
+      'href',
+      '/orgs/acme/contests/spring/files?file=contest.yaml',
+    );
+  });
+
+  it("lets an admin change every setting here, and writes only those into the organiser's file", async () => {
     const { sent } = contestBackend();
     const form = await openForm();
-    const field = (name: string) => within(form).getByLabelText(name);
 
-    fill(field('Name'), 'Spring 2026');
-    fill(field('Description'), 'Two lines\nof description');
-    await userEvent.selectOptions(field('State'), 'published');
-    await userEvent.selectOptions(field('Who sees it'), 'everyone');
+    fill(inBox(form, 'Basics').getByLabelText('Name'), 'Spring 2026');
+    fill(
+      inBox(form, 'Basics').getByLabelText('Description'),
+      'Two lines\nof description',
+    );
+    fill(inBox(form, 'Schedule').getByLabelText(/^Start/), '2026-06-01T10:00');
+    fill(inBox(form, 'Schedule').getByLabelText(/^End/), '2026-06-01T23:30');
+    const teams = inBox(form, 'Teams');
+    await userEvent.click(teams.getByRole('radio', { name: 'In teams' }));
+    fill(teams.getByLabelText('Most people in a team'), '3');
+    fill(teams.getByLabelText('Fewest people in a team'), '2');
     await userEvent.click(
-      within(form).getByRole('checkbox', { name: 'By invitation only' }),
+      teams.getByRole('radio', { name: 'At a team’s first submission' }),
     );
-    fill(field('Registration opens'), '2026-05-01T08:00');
-    await userEvent.selectOptions(field('Approval'), 'auto');
-    fill(field('Capacity'), '500');
-    fill(field('Code'), 'olympiad');
-    fill(field('Email pattern'), '.*@u\\.nus\\.edu');
-    fill(field('Registration closes'), '2026-06-01T09:00');
-    fill(field('Start'), '2026-06-01T10:00');
-    fill(field('A released at'), '2026-06-01T11:00');
-    fill(field('A closes'), '2026-06-01T22:00');
-    fill(field('A marks'), '2');
-    fill(field('End'), '2026-06-01T23:30');
-    fill(field('Team size'), '3');
-    await userEvent.selectOptions(
-      field('A submission whose grading broke counts as'),
-      'last_result',
+    await userEvent.click(
+      inBox(form, 'When grading fails').getByRole('radio', {
+        name: 'Uses its last good result',
+      }),
     );
-    fill(field('B worth'), '70');
-    fill(field('B due'), '2026-06-01T20:00');
-    fill(field('B taken off per late day'), '0.1');
-    await userEvent.click(within(form).getByRole('button', { name: 'Move sort up' }));
     await userEvent.click(within(form).getByRole('button', { name: 'Save settings' }));
 
-    expect(await screen.findByText(/Saved as version/)).toBeVisible();
+    expect(await screen.findByText('Saved.')).toBeVisible();
     expect(sent).toHaveLength(1);
     const [write] = sent;
     expect(write?.token).toBe('token-1');
@@ -129,127 +154,134 @@ describe('the contest settings form', { timeout: 20_000 }, () => {
       description: 'Two lines\nof description',
       start: isoOf('2026-06-01T10:00'),
       end: isoOf('2026-06-01T23:30'),
-      state: 'published',
-      visibility: 'everyone',
-      registration: {
-        approval: 'auto',
-        invite_only: true,
-        opens: isoOf('2026-05-01T08:00'),
-        closes: isoOf('2026-06-01T09:00'),
-        code: 'olympiad',
-        email_pattern: '.*@u\\.nus\\.edu',
-        capacity: 500,
-      },
+      state: 'draft',
+      visibility: 'signed-in',
+      registration: { capacity: 100 },
       leaderboards: [{ name: 'Standings', who: 'contestants' }],
       tasks: [
-        { id: 'sort', worth: 70, due: isoOf('2026-06-01T20:00'), late_per_day: 0.1 },
-        {
-          id: 'sum',
-          worth: 100,
-          release_at: isoOf('2026-06-01T11:00'),
-          closes: isoOf('2026-06-01T22:00'),
-          marks: 2,
-        },
+        { id: 'sum', worth: 100 },
+        { id: 'sort', worth: 50 },
       ],
-      team_size: 3,
+      entrants: { most: 3, fewest: 2, locks: 'first_submission' },
       on_system_error: 'last_result',
     });
     expect(write?.content).toContain("# the page's title");
-    expect(write?.content).toContain('leaderboards:\n  - name: Standings\n');
+  });
+
+  it('takes the team settings away when people enter alone again', async () => {
+    const { sent } = contestBackend({
+      current: `${CONTEST}entrants:\n  most: 3\n  fewest: 2\n`,
+    });
+    const form = await openForm();
+
+    await userEvent.click(inBox(form, 'Teams').getByRole('radio', { name: 'Alone' }));
+    expect(inBox(form, 'Teams').queryByLabelText('Most people in a team')).toBeNull();
+    await userEvent.click(within(form).getByRole('button', { name: 'Save settings' }));
+
+    await screen.findByText('Saved.');
+    expect(parse(sent[0]?.content ?? '')).not.toHaveProperty('entrants');
+  });
+
+  it('will not save a team whose fewest is more than its most', async () => {
+    contestBackend({ current: `${CONTEST}entrants: {most: 3}\n` });
+    const form = await openForm();
+
+    fill(inBox(form, 'Teams').getByLabelText('Fewest people in a team'), '4');
+
+    expect(
+      inBox(form, 'Teams').getByLabelText('Fewest people in a team'),
+    ).toBeInvalid();
+    expect(within(form).getByRole('button', { name: 'Save settings' })).toBeDisabled();
   });
 
   it('shows the notes the boards report once the save is written', async () => {
     contestBackend({ notes: ['Standings counts nothing from sort.'] });
     const form = await openForm();
 
-    fill(within(form).getByLabelText('Name'), 'Spring 2026');
+    fill(inBox(form, 'Basics').getByLabelText('Name'), 'Spring 2026');
     await userEvent.click(within(form).getByRole('button', { name: 'Save settings' }));
 
-    expect(await screen.findByText(/Saved as version/)).toBeVisible();
+    expect(await screen.findByText('Saved.')).toBeVisible();
     const notes = screen.getByRole('list', { name: 'Notes' });
     expect(
       within(notes).getByText('Standings counts nothing from sort.'),
     ).toBeVisible();
   });
 
-  it('shows no notes after a save the boards report nothing of', async () => {
-    contestBackend();
-    const form = await openForm();
-
-    fill(within(form).getByLabelText('Name'), 'Spring 2026');
-    await userEvent.click(within(form).getByRole('button', { name: 'Save settings' }));
-
-    expect(await screen.findByText(/Saved as version/)).toBeVisible();
-    expect(screen.queryByRole('list', { name: 'Notes' })).toBeNull();
-  });
-
-  it("shows a manager the admin's keys read-only and saves the manager's own", async () => {
+  it("shows a manager the admin's settings read-only and saves the manager's own", async () => {
     const { sent } = contestBackend();
-    server.use(
-      http.get('/api/v1/me', () =>
-        HttpResponse.json({
-          ...someone,
-          roles: [
-            { names: { org: 'acme', contest: 'spring', task: null }, role: 'manager' },
-          ],
-        }),
-      ),
-    );
+    asManager();
     const form = await openForm();
-    const field = (name: string) => within(form).getByLabelText(name);
 
-    for (const name of [
-      'Name',
-      'State',
-      'Who sees it',
-      'Approval',
-      'Code',
-      'Capacity',
-    ]) {
-      expect(field(name)).toBeDisabled();
-    }
-    expect(
-      within(form).getByRole('checkbox', { name: 'By invitation only' }),
-    ).toBeDisabled();
-    expect(field('Description')).toHaveAttribute('readonly');
+    expect(inBox(form, 'Basics').getByLabelText('Name')).toBeDisabled();
+    expect(inBox(form, 'Basics').getByLabelText('Description')).toHaveAttribute(
+      'readonly',
+    );
+    expect(form).toHaveTextContent('Only an admin of the contest can change these.');
 
-    await userEvent.clear(field('A worth'));
-    await userEvent.type(field('A worth'), '120');
+    fill(inBox(form, 'Schedule').getByLabelText(/^End/), '2026-06-01T15:00');
     await userEvent.click(within(form).getByRole('button', { name: 'Save settings' }));
 
-    await screen.findByText(/Saved as version/);
+    await screen.findByText('Saved.');
     expect(parse(sent[0]?.content ?? '')).toEqual({
       ...(parse(CONTEST) as object),
-      tasks: [
-        { id: 'sum', worth: 120 },
-        { id: 'sort', worth: 50 },
-      ],
+      end: isoOf('2026-06-01T15:00'),
     });
   });
 
-  it('shows both versions field by field on a conflict, and saves the fields picked', async () => {
+  it('names a refused setting in words and opens it with the field focused', async () => {
+    contestBackend();
+    server.use(
+      http.put(FILE, () =>
+        problem(422, 'invalid_definition', {
+          errors: [{ path: 'end', message: 'Must be after start.' }],
+        }),
+      ),
+    );
+    const user = userEvent.setup();
+    const form = await openForm();
+    fill(inBox(form, 'Schedule').getByLabelText(/^End/), '2026-06-01T08:00');
+    await user.click(within(form).getByRole('button', { name: 'Save settings' }));
+
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('Nothing was saved');
+    const link = within(alert).getByRole('link', { name: 'Settings, Schedule: End' });
+    expect(link).toHaveAttribute('href', `${PAGE}?field=end`);
+    expect(alert).toHaveTextContent('Settings, Schedule: End: Must be after start.');
+    await user.click(link);
+
+    await waitFor(() => expect(screen.getByLabelText(/^End/)).toHaveFocus());
+  });
+
+  it('shows both versions field by field in words on a conflict, and saves the fields picked', async () => {
     const theirs = CONTEST.replace('state: draft', 'state: published').replace(
       'name: Spring',
       'name: Their spring',
     );
     const { sent } = contestBackend({ conflictWith: theirs });
     const form = await openForm();
-    const field = (name: string) => within(form).getByLabelText(name);
 
-    await userEvent.clear(field('Name'));
-    await userEvent.type(field('Name'), 'My spring');
-    await userEvent.type(field('Team size'), '2');
+    fill(inBox(form, 'Basics').getByLabelText('Name'), 'My spring');
+    await userEvent.click(
+      inBox(form, 'Teams').getByRole('radio', { name: 'In teams' }),
+    );
+    fill(inBox(form, 'Teams').getByLabelText('Most people in a team'), '2');
     await userEvent.click(within(form).getByRole('button', { name: 'Save settings' }));
 
     const merge = await screen.findByRole('list', { name: 'Fields that differ' });
     const name = within(merge).getByRole('radiogroup', {
-      name: 'name (both changed it)',
+      name: 'Name (both changed it)',
     });
     expect(within(name).getByRole('radio', { name: 'Yours: My spring' })).toBeChecked();
-    const state = within(merge).getByRole('radiogroup', { name: 'state' });
-    expect(within(state).getByRole('radio', { name: 'Now: published' })).toBeChecked();
-    const teams = within(merge).getByRole('radiogroup', { name: 'team_size' });
-    expect(within(teams).getByRole('radio', { name: 'Yours: 2' })).toBeChecked();
+    const state = within(merge).getByRole('radiogroup', {
+      name: 'Open, draft or archived',
+    });
+    expect(within(state).getByRole('radio', { name: 'Now: Open' })).toBeChecked();
+    const teams = within(merge).getByRole('radiogroup', { name: 'Teams' });
+    expect(
+      within(teams).getByRole('radio', { name: 'Yours: Most people in a team: 2' }),
+    ).toBeChecked();
+    expect(merge).not.toHaveTextContent('entrants');
     expect(sent).toHaveLength(1);
 
     await userEvent.click(
@@ -259,26 +291,49 @@ describe('the contest settings form', { timeout: 20_000 }, () => {
       screen.getByRole('button', { name: 'Save the merged version' }),
     );
 
-    await screen.findByText(/Saved as version/);
+    await screen.findByText('Saved.');
     expect(sent).toHaveLength(2);
     expect(sent[1]?.token).toBe('token-2');
     expect(parse(sent[1]?.content ?? '')).toEqual({
       ...(parse(theirs) as object),
-      team_size: 2,
+      entrants: { most: 2 },
     });
+  });
+
+  it('saves the whole of one’s own version over theirs only after a warning', async () => {
+    const theirs = CONTEST.replace('name: Spring', 'name: Their spring');
+    const { sent } = contestBackend({ conflictWith: theirs });
+    const form = await openForm();
+    fill(inBox(form, 'Basics').getByLabelText('Name'), 'My spring');
+    await userEvent.click(within(form).getByRole('button', { name: 'Save settings' }));
+
+    await screen.findByRole('list', { name: 'Fields that differ' });
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Save mine over theirs' }),
+    );
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Save yours over theirs?',
+    });
+    expect(dialog).toHaveTextContent(
+      'This throws away what the other person changed in Name.',
+    );
+    await userEvent.click(
+      within(dialog).getByRole('button', { name: 'Save mine over theirs' }),
+    );
+
+    await screen.findByText('Saved.');
+    expect((parse(sent[1]?.content ?? '') as { name: string }).name).toBe('My spring');
   });
 
   it('keeps the merge open with the choices made when the merged version is refused', async () => {
     const theirs = CONTEST.replace('name: Spring', 'name: Their spring');
     contestBackend({ conflictWith: theirs });
     const form = await openForm();
-    const field = (name: string) => within(form).getByLabelText(name);
-    await userEvent.clear(field('Name'));
-    await userEvent.type(field('Name'), 'My spring');
+    fill(inBox(form, 'Basics').getByLabelText('Name'), 'My spring');
     await userEvent.click(within(form).getByRole('button', { name: 'Save settings' }));
     const merge = await screen.findByRole('list', { name: 'Fields that differ' });
     const name = within(merge).getByRole('radiogroup', {
-      name: 'name (both changed it)',
+      name: 'Name (both changed it)',
     });
     await userEvent.click(
       within(name).getByRole('radio', { name: 'Now: Their spring' }),
@@ -308,159 +363,40 @@ describe('the contest settings form', { timeout: 20_000 }, () => {
       'start: 2026-06-01T17:00:00+08:00',
     );
     const { sent } = contestBackend({ conflictWith: theirs });
-    server.use(
-      http.get('/api/v1/me', () =>
-        HttpResponse.json({
-          ...someone,
-          roles: [
-            { names: { org: 'acme', contest: 'spring', task: null }, role: 'manager' },
-          ],
-        }),
-      ),
-    );
+    asManager();
     const form = await openForm();
-    fill(within(form).getByLabelText('B worth'), '70');
+    fill(inBox(form, 'Schedule').getByLabelText(/^End/), '2026-06-01T15:00');
     await userEvent.click(within(form).getByRole('button', { name: 'Save settings' }));
 
     const merge = await screen.findByRole('list', { name: 'Fields that differ' });
-    // The start names the same moment on both sides, so it is no row.
-    expect(within(merge).getAllByRole('radiogroup')).toHaveLength(2);
-    const name = within(merge).getByRole('radiogroup', { name: 'name' });
+    const name = within(merge).getByRole('radiogroup', { name: 'Name' });
     expect(
       within(name).getByRole('radio', { name: 'Now: Their spring' }),
     ).toBeChecked();
-    expect(within(name).getByRole('radio', { name: 'Yours: Spring' })).toBeDisabled();
-    const worth = within(merge).getByRole('radiogroup', { name: 'tasks[sort].worth' });
-    expect(within(worth).getByRole('radio', { name: 'Yours: 70' })).toBeChecked();
+    for (const radio of within(name).getAllByRole('radio'))
+      expect(radio).toBeDisabled();
+    expect(within(merge).queryByRole('radiogroup', { name: 'Start' })).toBeNull();
 
     await userEvent.click(
       screen.getByRole('button', { name: 'Save the merged version' }),
     );
-    await screen.findByText(/Saved as version/);
+    await screen.findByText('Saved.');
     expect(parse(sent[1]?.content ?? '')).toEqual({
       ...(parse(theirs) as object),
-      tasks: [
-        { id: 'sum', worth: 100 },
-        { id: 'sort', worth: 70 },
-      ],
+      end: isoOf('2026-06-01T15:00'),
     });
   });
 
-  it('builds a board from its fields that reads as the same board written by hand', async () => {
-    const { sent } = contestBackend();
-    const form = await openForm();
-    const field = (name: string) => within(form).getByLabelText(name);
-
-    await userEvent.click(within(form).getByRole('button', { name: 'Add a board' }));
-    fill(field('Board 2 name'), 'ICPC');
-    await userEvent.selectOptions(field('Board 2 shown to'), 'everyone');
-    await userEvent.click(
-      within(form).getByRole('checkbox', { name: 'Board 2 covers every task' }),
-    );
-    await userEvent.click(
-      within(form).getByRole('checkbox', { name: 'Board 2 covers sort' }),
-    );
-    await userEvent.click(
-      within(form).getByRole('button', { name: 'Add a key to Board 2' }),
-    );
-    await userEvent.selectOptions(field('Board 2 key 2'), 'penalty');
-    fill(field('Board 2 key 2 minutes per earlier attempt'), '20');
-    await userEvent.click(within(form).getByRole('button', { name: 'Save settings' }));
-
-    expect(await screen.findByText(/Saved as version/)).toBeVisible();
-    const byHand = parse(`
-- name: Standings
-  who: contestants
-- {name: ICPC, tasks: [sum], order: [points, {by: penalty, per_attempt: 20}], who: everyone}
-`) as unknown;
-    const written = sent[0]?.content ?? '';
-    expect((parse(written) as { leaderboards: unknown }).leaderboards).toEqual(byHand);
-    expect(written).toContain('    order: [points, {by: penalty, per_attempt: 20}]\n');
-    expect(written).toContain(
-      'leaderboards:\n  - name: Standings\n    who: contestants\n',
-    );
-  });
-
-  it('says on the key itself that a save refused penalty as the first key', async () => {
-    contestBackend();
-    server.use(
-      http.put(FILE, () =>
-        problem(422, 'invalid_definition', {
-          errors: [
-            {
-              path: 'leaderboards[0].order[0]',
-              message:
-                'penalty is never the first key: it breaks ties among rows equal on the keys before it.',
-            },
-          ],
-        }),
-      ),
-    );
-    const form = await openForm();
-    const field = (name: string) => within(form).getByLabelText(name);
-
-    expect(within(form).getByText('Points alone, the default.')).toBeVisible();
-    await userEvent.click(
-      within(form).getByRole('button', { name: 'Add a key to Board 1' }),
-    );
-    await userEvent.selectOptions(field('Board 1 key 1'), 'penalty');
-    await userEvent.click(within(form).getByRole('button', { name: 'Save settings' }));
-
-    expect(await screen.findByText('leaderboards[0].order[0]')).toBeVisible();
-    const key = field('Board 1 key 1');
-    expect(key).toBeInvalid();
-    expect(key).toHaveAccessibleDescription(/penalty is never the first key/);
-    expect(field('Board 1 name')).toBeValid();
-  });
-
-  it('removes a board, and the key with the last of them', async () => {
-    const { sent } = contestBackend();
-    const form = await openForm();
-
-    await userEvent.click(within(form).getByRole('button', { name: 'Remove Board 1' }));
-    expect(within(form).getByText('No leaderboards yet.')).toBeVisible();
-    await userEvent.click(within(form).getByRole('button', { name: 'Save settings' }));
-
-    await screen.findByText(/Saved as version/);
-    const written = parse(sent[0]?.content ?? '') as Record<string, unknown>;
-    expect(written).not.toHaveProperty('leaderboards');
-    expect(written['tasks']).toEqual([
-      { id: 'sum', worth: 100 },
-      { id: 'sort', worth: 50 },
-    ]);
-  });
-
-  it('leaves boards it cannot read to the text tab', async () => {
-    contestBackend({
-      current: CONTEST.replace(
-        '  - name: Standings\n    who: contestants\n',
-        '  - name: Standings\n    order: [{metric: points}]\n',
-      ),
-    });
-    const form = await openForm();
-
-    expect(
-      within(form).getByText(
-        'leaderboards is not a list of boards the form can read; edit it as text.',
-      ),
-    ).toBeVisible();
-    expect(within(form).queryByRole('button', { name: 'Add a board' })).toBeNull();
-  });
-
-  it('falls back to the text with the reason when the file is not YAML', async () => {
+  it('says settings that cannot be read cannot be changed, rather than offering the text', async () => {
     contestBackend({ current: 'name: [Spring\n' });
-    renderApp('/orgs/acme/contests/spring');
-    await userEvent.click(
-      await screen.findByRole('button', { name: 'Edit the settings' }),
-    );
+    renderApp(PAGE);
 
     expect(
       await screen.findByText(
-        'The form cannot read contest.yaml, so it is open as text below.',
+        'These settings cannot be read, so they cannot be changed here.',
       ),
     ).toBeVisible();
-    expect(
-      screen.queryByRole('form', { name: 'Contest settings' }),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByRole('form', { name: 'Contest settings' })).toBeNull();
+    expect(screen.queryByRole('textbox', { name: 'contest.yaml' })).toBeNull();
   });
 });

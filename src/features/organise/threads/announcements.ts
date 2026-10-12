@@ -39,7 +39,7 @@ export function useManagedAnnouncements(
 type Text = { title: string; body: string };
 
 /**
- * Post, edit and close at the place. Every mutation exists on every render,
+ * Post, edit, close and reopen at the place. Every mutation exists on every render,
  * since hooks cannot be chosen between, and the place picks which one runs.
  */
 export function useAnnouncementChanges(place: AnnouncementPlace) {
@@ -49,6 +49,8 @@ export function useAnnouncementChanges(place: AnnouncementPlace) {
   const editTask = $api.useMutation('patch', `${TASK}/{number}`);
   const closeContest = $api.useMutation('post', `${CONTEST}/{number}/close`);
   const closeTask = $api.useMutation('post', `${TASK}/{number}/close`);
+  const reopenContest = $api.useMutation('post', `${CONTEST}/{number}/reopen`);
+  const reopenTask = $api.useMutation('post', `${TASK}/{number}/reopen`);
 
   const contestPath = { org: place.org, contest: place.contest };
   const post = (body: Text): Promise<Announcement> =>
@@ -71,5 +73,11 @@ export function useAnnouncementChanges(place: AnnouncementPlace) {
       : closeTask.mutateAsync({
           params: { path: { ...contestPath, task: place.task, number } },
         });
-  return { post, edit, close };
+  const reopen = (number: number): Promise<Announcement> =>
+    place.kind === 'contest'
+      ? reopenContest.mutateAsync({ params: { path: { ...contestPath, number } } })
+      : reopenTask.mutateAsync({
+          params: { path: { ...contestPath, task: place.task, number } },
+        });
+  return { post, edit, close, reopen };
 }

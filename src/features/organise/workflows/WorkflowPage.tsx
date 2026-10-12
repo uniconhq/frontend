@@ -1,44 +1,40 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Link, useNavigate, useSearchParams } from 'react-router';
+import { useSearchParams } from 'react-router';
 import { $api, queryView } from '@/api/query';
-import { toApiError, type ApiError } from '@/api/problem';
-import type { Primitive, WorkflowPage as Page } from '@/api/types';
+import { toApiError } from '@/api/problem';
+import type { Primitive, WorkflowPage as Workflow } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
 import { Card } from '@/ui/Card';
-import { CodeEditor } from '@/ui/CodeEditor';
-import { PageTitle } from '@/ui/PageTitle';
+import { Chip } from '@/ui/Chip';
+import { Page, PageHeader } from '@/ui/Page';
+import { PageLink } from '@/ui/PageLink';
 import { SectionTitle } from '@/ui/SectionTitle';
-import { Select } from '@/ui/Select';
-import { TextInput } from '@/ui/TextInput';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
-import { useMarkColours } from '@/ui/brand/mark-colours';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
-import { useMe } from '@/session';
-import { WORKFLOWS_PATH, workflowPath } from '@/lib/organiser-paths';
+import { WORKFLOWS_PATH } from '@/lib/organiser-paths';
 import { useWorkflowParams } from '@/lib/route-params';
-import { exactJS, parseYaml } from '../forms/yaml-doc';
+import { parseYaml } from '../forms/yaml-doc';
 import { DefinitionErrors } from '../DefinitionErrors';
-import { workflowOwners } from '../roles';
+import { WorkflowBar } from './Bar';
 import { checkQuery } from './check';
-import { Combine } from './Combine';
 import { Editor } from './Editor';
-import { Graph } from './Graph';
-import { layoutWorkflow } from './layout';
+import { FileView } from './FileView';
+import type { Box } from './layout';
+import { DrawnGraph } from './DrawnGraph';
 import { linesOf, type Selected } from './lines';
-import { readWorkflow } from './model';
-import { pinned } from './pins';
-import { byRef } from './primitives';
-import { SharePanel } from './SharePanel';
+import { NewWorkflowButton } from './NewWorkflow';
+import { ShareButton } from './SharePanel';
 import { latestVersion } from './versions';
-import shared from '../organise.module.css';
+import { visibilityWords } from './words';
 import classes from './workflows.module.css';
 
 /**
- * A workflow's page. For someone who may edit it, the editor over its draft;
- * for anyone else, and for any version asked for by `?version=`, the version
- * drawn the same way, read-only, with a copy into a workflow of one's own.
+ * A workflow's page: its name, who reads it, and its bar (M32). For someone
+ * who may edit it, the editor over its draft; for anyone else, and for any
+ * version asked for by `?version=`, the version drawn the same way at its
+ * actual size, read-only, with a copy into a workflow of one's own.
  */
 export function WorkflowPage() {
   const { owner, name } = useWorkflowParams();
@@ -54,13 +50,25 @@ export function WorkflowPage() {
   );
 
   return (
-    <div className={classes.editor}>
-      <PageTitle>
-        {owner}/{name}
-      </PageTitle>
-      <div className={shared.actions}>
-        <Link to={WORKFLOWS_PATH}>Every workflow you may read</Link>
-      </div>
+    <Page>
+      <PageHeader
+        title={`${owner}/${name}`}
+        meta={
+          page.state === 'ready' ? (
+            <>
+              <Chip>{visibilityWords(page.data)}</Chip>
+              <BodyText size="sm" tone="secondary">
+                {page.data.versions.length === 0
+                  ? 'No version yet'
+                  : page.data.versions.length === 1
+                    ? 'One version'
+                    : `${String(page.data.versions.length)} versions`}
+              </BodyText>
+            </>
+          ) : undefined
+        }
+        links={<PageLink to={WORKFLOWS_PATH}>All workflows</PageLink>}
+      />
       {(page.state === 'loading' || primitives.state === 'loading') && (
         <PageSkeleton rows={6} />
       )}
@@ -71,7 +79,7 @@ export function WorkflowPage() {
       {page.state === 'ready' && primitives.state === 'ready' && (
         <Shown page={page.data} primitives={primitives.data} asked={asked} />
       )}
-    </div>
+    </Page>
   );
 }
 
@@ -80,50 +88,24 @@ function Shown({
   primitives,
   asked,
 }: {
-  page: Page;
+  page: Workflow;
   primitives: Primitive[];
   asked: string | null;
 }) {
-  const versions = page.versions;
+  if (page.editable && asked === null && page.draft !== null)
+    return (
+      <Editor
+        key={`${page.owner}/${page.name}`}
+        page={{ ...page, draft: page.draft }}
+        primitives={primitives}
+      />
+    );
   return (
-    <>
-      <BodyText size="sm" tone="secondary">
-        {page.visibility === 'public'
-          ? 'Public: everyone reads it.'
-          : page.visibility === 'shared'
-            ? 'Shared with the people its owner lists.'
-            : 'Private: only its owner reads it.'}{' '}
-        {versions.length === 0 ? 'No version yet.' : 'Versions: '}
-        {versions.map((version, at) => (
-          <span key={version}>
-            {at > 0 && ', '}
-            <Link to={workflowPath(page.owner, page.name, version)}>{version}</Link>
-          </span>
-        ))}
-        {asked !== null && page.editable && (
-          <>
-            {' · '}
-            <Link to={workflowPath(page.owner, page.name)}>Back to the draft</Link>
-          </>
-        )}
-      </BodyText>
-      {page.editable && asked === null && page.draft !== null ? (
-        <>
-          <Editor
-            key={`${page.owner}/${page.name}`}
-            page={{ ...page, draft: page.draft }}
-            primitives={primitives}
-          />
-          <CombineHere page={page} />
-        </>
-      ) : (
-        <VersionView
-          page={page}
-          primitives={primitives}
-          version={asked ?? latestVersion(versions) ?? null}
-        />
-      )}
-    </>
+    <VersionView
+      page={page}
+      primitives={primitives}
+      version={asked ?? latestVersion(page.versions) ?? null}
+    />
   );
 }
 
@@ -132,7 +114,7 @@ function VersionView({
   primitives,
   version,
 }: {
-  page: Page;
+  page: Workflow;
   primitives: Primitive[];
   version: string | null;
 }) {
@@ -154,12 +136,24 @@ function VersionView({
       </BodyText>
     );
   const ref = `${owner}/${name}@${version}`;
+  const bar = (actions: ReactNode) => (
+    <WorkflowBar page={page} version={version}>
+      {actions}
+    </WorkflowBar>
+  );
   if (read.state === 'loading') return <PageSkeleton rows={6} />;
   if (read.state === 'error')
     return (
-      <Unopenable label={ref} onRetry={read.retry}>
-        <BodyText>{read.error.detail ?? read.error.message}</BodyText>
-      </Unopenable>
+      <>
+        {bar(null)}
+        <Unopenable
+          label={ref}
+          // A version that is not there will not be there on asking again.
+          onRetry={read.error.code === 'not_found' ? undefined : read.retry}
+        >
+          <BodyText>{read.error.detail ?? read.error.message}</BodyText>
+        </Unopenable>
+      </>
     );
   if (checked.isPending) return <PageSkeleton rows={6} />;
   if (checked.isError)
@@ -172,29 +166,24 @@ function VersionView({
   const parsed = parseYaml(read.data.content);
   if (checked.data.length > 0 || 'error' in parsed)
     return (
-      <Unopenable label={ref}>
-        {checked.data.length > 0 ? (
-          <DefinitionErrors errors={checked.data} />
-        ) : (
-          'error' in parsed && <BodyText>{parsed.error}</BodyText>
-        )}
-      </Unopenable>
+      <>
+        {bar(null)}
+        <Unopenable label={ref}>
+          {checked.data.length > 0 ? (
+            <DefinitionErrors errors={checked.data} />
+          ) : (
+            'error' in parsed && <BodyText>{parsed.error}</BodyText>
+          )}
+        </Unopenable>
+      </>
     );
   return (
-    <>
-      <SectionTitle>{ref}</SectionTitle>
-      <Drawn text={read.data.content} primitives={primitives} />
-      <div className={classes.work}>
-        <Card>
-          <CopyForm source={`${owner}/${name}@${version}`} />
-        </Card>
-        {page.editable && (
-          <Card>
-            <SharePanel page={page} />
-          </Card>
-        )}
-      </div>
-    </>
+    <Drawn
+      page={page}
+      version={version}
+      text={read.data.content}
+      primitives={primitives}
+    />
   );
 }
 
@@ -203,7 +192,7 @@ function VersionView({
  * serve it, it does not parse, or the forge's check refuses it, as it refuses
  * a version in the format before 2026-10-07. A version passed every check
  * when it was made and never changes, so one the check refuses now is one
- * nothing can use; the forge's reason says why, and its owner makes a new
+ * nothing can use; the reason says why, and its owner publishes a new
  * version.
  */
 function Unopenable({
@@ -219,11 +208,11 @@ function Unopenable({
     <Card>
       <div className={classes.stack} role="alert">
         <SectionTitle>{label}</SectionTitle>
-        <BodyText>This version cannot be opened. The forge says:</BodyText>
+        <BodyText>This version cannot be opened, because:</BodyText>
         {children}
         {onRetry !== undefined && (
           <div>
-            <Button size="xs" variant="secondary" onClick={onRetry}>
+            <Button variant="secondary" onClick={onRetry}>
               Try again
             </Button>
           </div>
@@ -234,17 +223,19 @@ function Unopenable({
 }
 
 /** A version drawn as the editor draws a draft, with nothing to change. */
-function Drawn({ text, primitives }: { text: string; primitives: Primitive[] }) {
-  const colours = useMarkColours();
-  const map = useMemo(() => byRef(primitives), [primitives]);
-  const parsed = useMemo(() => parseYaml(text), [text]);
-  const workflow = useMemo(
-    () => readWorkflow('error' in parsed ? null : exactJS(parsed.doc)),
-    [parsed],
-  );
-  const layout = useMemo(() => layoutWorkflow(workflow, map), [workflow, map]);
+function Drawn({
+  page,
+  version,
+  text,
+  primitives,
+}: {
+  page: Workflow;
+  version: string;
+  text: string;
+  primitives: Primitive[];
+}) {
   const [selected, setSelected] = useState<string | null>(null);
-  const box = layout.boxes.find((found) => found.key === selected);
+  const [box, setBox] = useState<Box | undefined>(undefined);
   const lines: Selected | null =
     box === undefined
       ? null
@@ -255,95 +246,29 @@ function Drawn({ text, primitives }: { text: string; primitives: Primitive[] }) 
           : box.kind === 'test'
             ? { kind: 'test', names: box.right }
             : { kind: 'report' };
+  const ref = `${page.owner}/${page.name}@${version}`;
   return (
-    <div className={classes.work}>
-      <Graph
-        layout={layout}
-        workflow={workflow}
-        primitives={map}
-        pinned={pinned([], 0, [], [], [])}
-        colours={colours}
+    <>
+      <WorkflowBar page={page} version={version}>
+        <NewWorkflowButton source={ref} label="Copy into a new workflow" />
+        {page.editable && <ShareButton page={page} />}
+        <FileView
+          title={`The file of ${version}`}
+          label={`The file of ${version}`}
+          text={text}
+          marked={linesOf(text, lines)}
+        />
+      </WorkflowBar>
+      <SectionTitle>{ref}</SectionTitle>
+      <DrawnGraph
+        text={text}
+        primitives={primitives}
         selected={selected}
-        readOnly
-        dragging={null}
-        notice={null}
-        refusal={() => null}
-        menu={(_, port) => <span className={classes.port}>{port}</span>}
-        onSelect={setSelected}
-        onDragStart={() => undefined}
-        onDrop={() => undefined}
+        onSelect={(key, found) => {
+          setSelected(key);
+          setBox(found);
+        }}
       />
-      <CodeEditor
-        label="workflow.yaml"
-        value={text}
-        readOnly
-        language="yaml"
-        rows={24}
-        marked={linesOf(text, lines)}
-      />
-    </div>
-  );
-}
-
-/** A copy of a version into a new private workflow of the person's own. */
-function CopyForm({ source }: { source: string }) {
-  const me = useMe();
-  const owners = workflowOwners(me);
-  const [owner, setOwner] = useState(owners[0] ?? '');
-  const [name, setName] = useState('');
-  const [error, setError] = useState<ApiError | null>(null);
-  const navigate = useNavigate();
-  const copy = $api.useMutation('post', '/api/v1/workflow-copies');
-  return (
-    <form
-      className={classes.stack}
-      aria-label="Copy it"
-      onSubmit={(event) => {
-        event.preventDefault();
-        setError(null);
-        copy
-          .mutateAsync({ body: { source, owner, name: name.trim() } })
-          .then((made) => navigate(workflowPath(made.owner, made.name)))
-          .catch((caught: unknown) => setError(toApiError(caught)));
-      }}
-    >
-      <SectionTitle order={3}>Copy it</SectionTitle>
-      <BodyText size="sm" tone="secondary">
-        A new private workflow of your own from {source}, yours to edit and version.
-      </BodyText>
-      <Select
-        label="Owner"
-        value={owner}
-        options={owners.map((each) => ({ value: each, label: each }))}
-        onChange={setOwner}
-      />
-      <TextInput label="Name" value={name} onChange={setName} required />
-      <div>
-        <Button
-          size="xs"
-          type="submit"
-          loading={copy.isPending}
-          disabled={name.trim() === ''}
-        >
-          Copy
-        </Button>
-      </div>
-      {error !== null && <ErrorBlock error={error} />}
-    </form>
-  );
-}
-
-/** Combine, from a workflow's own page, its latest version chosen to start with. */
-function CombineHere({ page }: { page: Page }) {
-  const listed = queryView($api.useQuery('get', '/api/v1/workflows'));
-  const latest = latestVersion(page.versions);
-  if (listed.state !== 'ready') return null;
-  return (
-    <Card>
-      <Combine
-        items={listed.data}
-        chosen={latest === undefined ? [] : [`${page.owner}/${page.name}@${latest}`]}
-      />
-    </Card>
+    </>
   );
 }

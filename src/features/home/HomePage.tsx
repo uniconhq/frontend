@@ -24,8 +24,8 @@ export function HomePage() {
     <div className={classes.page}>
       <PageTitle>Unicon</PageTitle>
       <BodyText size="md">
-        Run a contest of any shape, whether algorithms, models or notebooks, on repos,
-        pipelines and verdicts you can inspect.
+        Enter a contest, submit your work to its tasks and see how each submission is
+        graded. Organisers set up and run their contests here too.
       </BodyText>
 
       {session.status === 'loading' && <PageSkeleton rows={1} />}

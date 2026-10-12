@@ -94,21 +94,21 @@ describe('the organisers’ invites', () => {
         mailed_at: null,
       }),
     ]);
-    renderApp('/orgs/acme');
+    renderApp('/orgs/acme/organisers');
 
     const eve = await row('eve');
     expect(eve).toHaveTextContent('Manager');
     expect(eve).toHaveTextContent('Pending');
-    expect(eve).toHaveTextContent('Lapses');
+    expect(eve).toHaveTextContent('Expires');
     expect(eve).toHaveTextContent('Sent');
     expect(eve).toHaveTextContent('By kenny');
     const zed = await row('zed@example.org');
     expect(zed).toHaveTextContent('Observer');
-    expect(zed).toHaveTextContent('Lapsed');
+    expect(zed).toHaveTextContent('Expired');
     expect(zed).toHaveTextContent('Failed to send');
     const fay = await row('fay');
     expect(fay).toHaveTextContent('Accepted');
-    expect(fay).toHaveTextContent('No mail server');
+    expect(fay).toHaveTextContent('Not sent: no mail server');
   });
 
   it('offers Send again and Withdraw only on an invite still pending', async () => {
@@ -118,7 +118,7 @@ describe('the organisers’ invites', () => {
       invite({ id: 'c', username: 'fay', mail_status: 'off', mailed_at: null }),
       invite({ id: 'd', username: 'gus', status: 'declined' }),
     ]);
-    renderApp('/orgs/acme');
+    renderApp('/orgs/acme/organisers');
 
     const eve = await row('eve');
     expect(
@@ -138,7 +138,7 @@ describe('the organisers’ invites', () => {
   it('invites a username to the role chosen', async () => {
     const sent = orgInvites([]);
     const user = userEvent.setup();
-    renderApp('/orgs/acme');
+    renderApp('/orgs/acme/organisers');
 
     const form = await screen.findByRole('form', { name: 'Invite someone' });
     expect(await screen.findByText('No invites yet.')).toBeVisible();
@@ -167,7 +167,7 @@ describe('the organisers’ invites', () => {
   it('invites an email address when what is typed has an @', async () => {
     const sent = orgInvites([]);
     const user = userEvent.setup();
-    renderApp('/orgs/acme');
+    renderApp('/orgs/acme/organisers');
 
     const form = await screen.findByRole('form', { name: 'Invite someone' });
     await user.type(
@@ -184,7 +184,7 @@ describe('the organisers’ invites', () => {
     orgInvites([]);
     server.use(http.post(ORG_INVITES, () => problem(404, 'not_found')));
     const user = userEvent.setup();
-    renderApp('/orgs/acme');
+    renderApp('/orgs/acme/organisers');
 
     const form = await screen.findByRole('form', { name: 'Invite someone' });
     await user.type(
@@ -204,7 +204,7 @@ describe('the organisers’ invites', () => {
       http.post(ORG_INVITES, () => problem(409, 'already_invited', { invite: 'a' })),
     );
     const user = userEvent.setup();
-    renderApp('/orgs/acme');
+    renderApp('/orgs/acme/organisers');
 
     const form = await screen.findByRole('form', { name: 'Invite someone' });
     await user.type(
@@ -221,7 +221,7 @@ describe('the organisers’ invites', () => {
   it('sends an invite again and withdraws one, each row as it comes back', async () => {
     const sent = orgInvites([invite()]);
     const user = userEvent.setup();
-    renderApp('/orgs/acme');
+    renderApp('/orgs/acme/organisers');
 
     await user.click(
       within(await row('eve')).getByRole('button', { name: 'Send again to eve' }),
@@ -251,7 +251,7 @@ describe('the organisers’ invites', () => {
       ),
     );
     const user = userEvent.setup();
-    renderApp('/orgs/acme');
+    renderApp('/orgs/acme/organisers');
 
     await user.click(
       within(await row('eve')).getByRole('button', { name: /Withdraw/ }),
@@ -269,7 +269,7 @@ describe('the organisers’ invites', () => {
       contestList,
       http.get(ORG_INVITES, () => HttpResponse.json([invite()])),
     );
-    renderApp('/orgs/acme');
+    renderApp('/orgs/acme/organisers');
 
     const eve = await row('eve');
     expect(within(eve).queryByRole('button')).toBeNull();
@@ -291,7 +291,7 @@ describe('the organisers’ invites', () => {
         ]),
       ),
     );
-    renderApp('/orgs/acme/contests/spring');
+    renderApp('/orgs/acme/contests/spring/organisers');
 
     expect(within(await row('eve')).queryByRole('button')).toBeNull();
     const form = screen.getByRole('form', { name: 'Invite someone' });
@@ -304,37 +304,61 @@ describe('the organisers’ invites', () => {
 });
 
 describe('the contestants’ invites', () => {
-  it('invites someone to a place in the contest, and lists only those invites', async () => {
+  it('invites someone to a place in the contest, and lists only places, into a team or not', async () => {
     let body: unknown = null;
     const spring = { org: 'acme', contest: 'spring', task: null };
     server.use(
       signedIn,
-      http.get('/api/v1/orgs/:org/contests/:contest/contestants', () =>
-        HttpResponse.json([]),
-      ),
       http.get(CONTEST_INVITES, () =>
         HttpResponse.json([
           invite({ id: 'a', username: 'cal', grants: 'contestant', where: spring }),
           invite({ id: 'b', username: 'org', grants: 'observer', where: spring }),
+          invite({
+            id: 'c',
+            username: 'dee',
+            grants: 'member',
+            where: spring,
+            entrant: { id: 'e-red', name: 'Red' },
+          }),
         ]),
       ),
       http.post(CONTEST_INVITES, async ({ request }) => {
         body = await request.json();
         return HttpResponse.json(invite({ grants: 'contestant' }), { status: 201 });
       }),
+      // Invites are made in the contest's invite way, under How people enter.
+      http.get('/api/v1/orgs/:org/contests/:contest/files/:path', () =>
+        HttpResponse.json({
+          path: 'contest.yaml',
+          encoding: 'utf-8',
+          content: [
+            'name: Spring',
+            'start: 2026-10-01T09:00:00Z',
+            'end: 2026-10-01T14:00:00Z',
+            'state: draft',
+            'visibility: signed-in',
+            'registration: {ways: [{invite: {}}]}',
+            '',
+          ].join('\n'),
+          token: 'token-contest',
+          upload: null,
+        }),
+      ),
     );
     const user = userEvent.setup();
-    renderApp('/orgs/acme/contests/spring/contestants');
+    renderApp('/orgs/acme/contests/spring/entry');
 
     const cal = await row('cal');
     expect(cal).toHaveTextContent('Pending');
+    expect(cal).toHaveTextContent('An entry of their own');
+    expect(await row('dee')).toHaveTextContent('Red, from a member');
     const table = screen.getByRole('table', { name: 'Invites' });
     expect(within(table).queryByText('org')).toBeNull();
     expect(
       within(table)
         .getAllByRole('columnheader')
         .map((header) => header.textContent),
-    ).toEqual(['Invited', 'Status', 'Mail', 'Actions']);
+    ).toEqual(['Invited', 'Place', 'Status', 'Mail', 'Actions']);
 
     const form = screen.getByRole('form', { name: 'Invite someone' });
     expect(within(form).queryByLabelText('Role')).toBeNull();

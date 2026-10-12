@@ -6,7 +6,8 @@ import classes from './threads.module.css';
 
 /**
  * One announcement's title, when it was posted, which task it is on when
- * `showPlace` asks, whether it is closed or answers a question, and its text.
+ * `showPlace` asks, whether it is closed or answers a question, and its text,
+ * which on a task's announcement draws the task's own pictures.
  * The contestant's lists and the organisers' section both show it so.
  */
 export function AnnouncementContent({
@@ -17,6 +18,8 @@ export function AnnouncementContent({
   showPlace?: boolean;
 }) {
   const place = showPlace ? announcement.where.task : null;
+  const { org, contest, task } = announcement.where;
+  const owner = contest !== null && task !== null ? { org, contest, task } : undefined;
   return (
     <>
       <strong>{announcement.title}</strong>
@@ -26,7 +29,7 @@ export function AnnouncementContent({
         {announcement.closed && ' · closed'}
         {announcement.answers_question && ' · answers a question'}
       </BodyText>
-      <Markdown>{announcement.body}</Markdown>
+      <Markdown task={owner}>{announcement.body}</Markdown>
     </>
   );
 }
@@ -34,19 +37,24 @@ export function AnnouncementContent({
 /**
  * One question as its asker or an organiser reads it: what was asked, about
  * which task, whether it is answered, and every message under it, each
- * marked as the asker's, under the name `asker` gives, or the organisers'.
+ * marked as the asker's, under the name `asker` gives, or the organisers';
+ * `named` says who asked on the question itself too.
  */
 export function QuestionThread({
   clarification,
   asker,
+  named = false,
 }: {
   clarification: Clarification;
   asker: string;
+  /** Whether to say who asked, for organisers, who answer many entrants. */
+  named?: boolean;
 }) {
   return (
     <>
       <strong>{clarification.title}</strong>
       <BodyText tone="meta">
+        {named && `Asked by ${asker} · `}
         {formatDateTime(new Date(clarification.asked_at))}
         {clarification.task !== null && ` · task ${clarification.task}`}
         {' · '}

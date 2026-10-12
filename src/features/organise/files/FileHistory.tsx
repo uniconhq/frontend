@@ -205,12 +205,13 @@ function Versions({
       >
         <div className={shared.stack}>
           <BodyText>
-            {path} is written as it was at version <code>{short(rolling ?? '')}</code>,
-            as a new version on top of the history, which keeps every version before it.
+            {path} goes back to how it was at version{' '}
+            <code>{short(rolling ?? '')}</code>. This is saved as a new version, and
+            every earlier version stays in the history.
           </BodyText>
           <BodyText tone="secondary">
-            It is a save of the task: it publishes, or keeps a draft, like any other.
-            Unsaved text in the editor is replaced.
+            Like any save of the task, it publishes the task, or keeps it as a draft if
+            it has problems. Unsaved text in the editor is replaced.
           </BodyText>
           <div className={shared.actions}>
             <Button onClick={() => rolling !== null && void rollBack(rolling)}>
@@ -271,7 +272,7 @@ function OldVersion({
   if (view.data.encoding === 'base64')
     return (
       <BodyText tone="secondary">
-        Binary at this version. It cannot be shown as text.
+        At this version the file is not text, so it cannot be shown here.
       </BodyText>
     );
   return (

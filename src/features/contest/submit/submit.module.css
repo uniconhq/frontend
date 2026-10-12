@@ -46,6 +46,12 @@
   color: var(--unicon-text-body);
 }
 
+/* A row's points, in figures that line up down the column. */
+.points {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
 .verdict {
   display: flex;
   gap: 8px;

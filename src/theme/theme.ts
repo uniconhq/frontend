@@ -240,5 +240,16 @@ export const theme = createTheme({
 
   shadows: { xs: 'none', sm: 'none', md: 'none', lg: 'none', xl: 'none' },
 
+  components: {
+    /**
+     * Every field's hint and error under its box, never between its label
+     * and its box, so fields side by side start their boxes on one line
+     * whatever each one's hint says. Every input Mantine draws reads this.
+     */
+    InputWrapper: {
+      defaultProps: { inputWrapperOrder: ['label', 'input', 'description', 'error'] },
+    },
+  },
+
   other: uniconTokens,
 });

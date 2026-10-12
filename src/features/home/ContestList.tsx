@@ -21,16 +21,16 @@ type Listed = {
 
 /** What a person's own registration says, beside the contest in the list. */
 const STATUS: Record<Status, string> = {
-  pending: 'Registration waiting',
+  pending: 'Registration waiting for approval',
   approved: 'Registered',
-  rejected: 'Not accepted',
+  rejected: 'Registration not accepted',
   withdrawn: 'Withdrawn',
-  removed: 'Removed',
+  removed: 'Removed by the organisers',
 };
 
 function Contests({ label, contests }: { label: string; contests: Listed[] }) {
   if (contests.length === 0) {
-    return <BodyText tone="secondary">No contest to show yet.</BodyText>;
+    return <BodyText tone="secondary">There are no contests to show yet.</BodyText>;
   }
   return (
     <ul className={classes.contests} aria-label={label}>

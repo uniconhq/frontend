@@ -1,5 +1,6 @@
-/* The editor fills the width the shell leaves it: the graph, then the
- * selected box's panel and the file a save writes. */
+/* The editor fills the width the shell leaves it: the bar, the toolbar, the
+ * problems, then the graph across the whole width, the selected box's
+ * drawer over it on the right. */
 .editor {
   display: flex;
   flex-direction: column;
@@ -7,38 +8,283 @@
   min-width: 0;
 }
 
-.toolbar {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  align-items: flex-end;
-}
-
-.work {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 360px;
-  gap: 12px;
-  align-items: start;
-}
-
-@media (max-width: 1100px) {
-  .work {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
-
-.side {
+/* The bar stays at the top of the window as the page scrolls down a tall
+ * graph, so Save is always in reach. */
+.barFrame {
+  position: sticky;
+  top: 0;
+  z-index: 10;
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  min-width: 0;
+  gap: 4px;
+  padding: 8px 0;
+  background: var(--unicon-canvas);
 }
 
-.canvas {
-  height: 620px;
+.bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px 16px;
+}
+
+.switch {
+  min-width: 220px;
+}
+
+.status {
+  padding-bottom: 8px;
+}
+
+.barActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.where {
+  margin: 0;
+  color: var(--unicon-text-secondary);
+  font-size: 13px;
+}
+
+.tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.toolGap {
+  width: 12px;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* What stops the draft from becoming a version, each linked to its box. */
+.banner {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 14px;
   border: 1px solid var(--unicon-border);
   border-radius: var(--mantine-radius-sm);
   background: var(--unicon-body);
+}
+
+.banner[data-tone='problem'] {
+  border-left: 3px solid var(--unicon-text-danger);
+}
+
+.banner[data-tone='warn'] {
+  border-left: 3px solid var(--unicon-border-strong);
+}
+
+.problemList {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13px;
+  color: var(--unicon-text-body);
+}
+
+.problemLink {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--unicon-text-accent);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.problemLink:hover {
+  text-decoration: underline;
+}
+
+.problemLink:focus-visible {
+  outline: 2px solid var(--mantine-primary-color-filled);
+}
+
+/* A draft that does not read, mended as text. */
+.mend {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.unreadable {
+  margin: 0;
+  padding: 8px 12px;
+  border-left: 3px solid var(--unicon-text-danger);
+  background: var(--unicon-body);
+  color: var(--unicon-text-body);
+  font-family: var(--mantine-font-family-monospace);
+  font-size: 12px;
+  white-space: pre-wrap;
+}
+
+/* The selected box's drawer, from the right, over the graph: its top is set
+ * below the workflow's bar as the page scrolls (Drawer.tsx). */
+.drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  max-width: 100vw;
+  border-left: 1px solid var(--unicon-border-strong);
+  background: var(--unicon-body);
+  box-shadow: -8px 0 24px rgb(0 0 0 / 0.18);
+}
+
+.drawerHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--unicon-border);
+}
+
+.drawerTitle {
+  flex: 1;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--unicon-text-primary);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.drawerTitle:focus {
+  outline: none;
+}
+
+.drawerClose {
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--unicon-border);
+  border-radius: var(--mantine-radius-sm);
+  background: transparent;
+  color: var(--unicon-text-body);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.drawerClose:hover {
+  background: var(--unicon-hover);
+}
+
+.drawerBody {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.part {
+  margin: 6px 0 0;
+  color: var(--unicon-text-primary);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.portValue {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.outputs {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+}
+
+.details summary {
+  cursor: pointer;
+  color: var(--unicon-text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.detailList {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  color: var(--unicon-text-secondary);
+  font-size: 13px;
+}
+
+/* One input, test file or report entry in its drawer. */
+.declaration {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--unicon-border);
+  border-radius: var(--mantine-radius-sm);
+}
+
+.formText {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  gap: 8px;
+}
+
+.add {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--unicon-border);
+}
+
+/* A primitive in the "Add step" menu: its title, what it does, its reference. */
+.addTitle,
+.addDescription {
+  display: block;
+}
+
+.addTitle {
+  font-weight: 700;
+}
+
+.addDescription {
+  color: var(--unicon-text-secondary);
+  font-size: 12px;
+  white-space: normal;
+}
+
+/* The graph's frame: the page's whole width, the graph at its actual size
+ * inside it, sliding sideways when it is wider. */
+.frame {
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  border: 1px solid var(--unicon-border);
+  border-radius: var(--mantine-radius-sm);
+  background: var(--unicon-body);
+}
+
+.canvas {
+  min-width: 100%;
 }
 
 .band {
@@ -67,27 +313,78 @@
   opacity: 0.55;
 }
 
+/* A box's head: its name and how often it runs, its primitive's title with
+ * the reference small beside it, and what the primitive does, or the box's
+ * problem in its place. */
 .header {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
+  padding: 6px 10px 0;
+  border-bottom: 1px solid var(--unicon-border);
+  overflow: hidden;
+}
+
+.headButton {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 1px;
   width: 100%;
-  height: 44px;
-  padding: 4px 10px;
+  padding: 0;
   border: 0;
   background: transparent;
   color: inherit;
+  font: inherit;
   text-align: left;
   cursor: pointer;
 }
 
+.headButton:focus-visible {
+  outline: 2px solid var(--mantine-primary-color-filled);
+}
+
+.titleLine,
+.primitiveLine {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  white-space: nowrap;
+}
+
 .title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 13px;
   font-weight: 700;
   color: var(--unicon-text-primary);
 }
 
-.detail {
+.runs {
+  margin-left: auto;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--unicon-hover);
+  color: var(--unicon-text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.primitiveTitle {
+  color: var(--unicon-text-body);
+  font-weight: 600;
+}
+
+.ref {
+  overflow: hidden;
+  text-overflow: ellipsis;
   color: var(--unicon-text-meta);
+  font-family: var(--mantine-font-family-monospace);
+  font-size: 10px;
+}
+
+.detail {
+  color: var(--unicon-text-secondary);
   font-size: 11px;
   white-space: nowrap;
   overflow: hidden;
@@ -95,8 +392,25 @@
   max-width: 100%;
 }
 
-/* A step's input and output rows share a line; each row lets the pointer
- * through to the other, and only what it holds takes it. */
+.description,
+.headProblem {
+  display: -webkit-box;
+  margin: 4px 0 0;
+  overflow: hidden;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  color: var(--unicon-text-secondary);
+  font-size: 11px;
+  line-height: 15px;
+}
+
+.headProblem {
+  color: var(--unicon-text-danger);
+}
+
+/* Every port has a row of its own across the box: inputs first, outputs
+ * under them, their handles on the left and on the right. The row lets the
+ * pointer through to the box, and only what it holds takes it. */
 .row {
   position: absolute;
   left: 0;
@@ -140,19 +454,24 @@
   outline: 2px solid var(--mantine-primary-color-filled);
 }
 
-.type,
-.marks {
+/* What a row says of its port: its type, what it does, what it is given;
+ * cut short when it runs out of room, and whole when hovered. */
+.said {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--unicon-text-secondary);
+  font-size: 11px;
+}
+
+.optional {
   color: var(--unicon-text-meta);
   font-size: 11px;
 }
 
-.value {
-  color: var(--unicon-text-secondary);
-  font-family: var(--mantine-font-family-monospace);
-  font-size: 11px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 110px;
+/* A step's outputs, under its inputs, with a line above the first. */
+.row[data-first-output] {
+  border-top: 1px dashed var(--unicon-border);
 }
 
 .drop {
@@ -160,9 +479,9 @@
   font-style: italic;
 }
 
-.problem,
-.boxProblem {
+.problem {
   display: inline-flex;
+  flex: none;
   align-items: center;
   justify-content: center;
   width: 16px;
@@ -174,10 +493,17 @@
   font-size: 11px;
 }
 
-.boxProblem {
-  position: absolute;
-  top: 6px;
-  right: 8px;
+.problemBeside {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--unicon-text-danger);
+  font-size: 11px;
+}
+
+.headProblem .problem {
+  margin-right: 4px;
+  vertical-align: -3px;
 }
 
 .refusedMark {
@@ -208,31 +534,8 @@
   position: absolute;
   top: -2px;
   left: 6px;
-  font-family: var(--mantine-font-family-monospace);
-  font-size: 10px;
-}
-
-.palette {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.primitive {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 8px;
-  border: 1px solid var(--unicon-border);
-  border-radius: var(--mantine-radius-sm);
-}
-
-.ports {
-  margin: 0;
-  padding-left: 16px;
-  font-family: var(--mantine-font-family-monospace);
   font-size: 11px;
-  color: var(--unicon-text-body);
+  font-weight: 600;
 }
 
 .problems {

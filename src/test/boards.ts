@@ -12,7 +12,12 @@ export function cell(overrides: Partial<BoardCell> = {}): BoardCell {
   };
 }
 
-/** A contestant's row, by user id and name. */
+/** The id of the entrant of one person, by their user id, as the tests name it. */
+export function entrantOf(userId: number): string {
+  return `0e000000-0000-4000-8000-${String(userId).padStart(12, '0')}`;
+}
+
+/** An entrant's row, by its one member's user id and its name. */
 export function row(
   rank: number,
   user_id: number,
@@ -20,7 +25,7 @@ export function row(
   keys: (string | null)[],
   cells: Record<string, BoardCell>,
 ): BoardRow {
-  return { rank, row: { user_id, team: null, name }, keys, cells };
+  return { rank, row: { entrant: entrantOf(user_id), name }, keys, cells };
 }
 
 /**

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Menu, UnstyledButton } from '@mantine/core';
 import { Link, useLocation } from 'react-router';
 import { Avatar } from '@/ui/Avatar';
+import { Button } from '@/ui/Button';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import {
   currentPath,
@@ -38,9 +39,9 @@ export function AccountMenu() {
 
   if (session.status === 'signed-out') {
     return (
-      <a href={loginHref(currentPath(location))} className={classes.signIn}>
+      <Button href={loginHref(currentPath(location))} size="xs">
         Sign in
-      </a>
+      </Button>
     );
   }
 

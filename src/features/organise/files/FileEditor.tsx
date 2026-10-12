@@ -4,16 +4,38 @@ import { $api, queryView } from '@/api/query';
 import { toApiError } from '@/api/problem';
 import type { FileContent, RollbackFile, WriteFile } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
+import { UnsavedNote } from '@/ui/UnsavedNote';
 import { Button } from '@/ui/Button';
 import { CodeEditor, type CodeLanguage } from '@/ui/CodeEditor';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
 import { FileHistory } from './FileHistory';
-import { fileQuery, staleAfterWrite, type Place } from './place';
+import { fileQuery, settingsPath, staleAfterWrite, type Place } from './place';
 import { SaveOutcome, type Outcome } from './SaveOutcome';
+import { TextConflict } from './TextConflict';
 import { UploadedFile } from './UploadedFile';
+import { SettingsText } from './SettingsText';
+import { useMe } from '@/session';
+import { holdsAt } from '../roles';
+import { placeOfIn } from '../task/places';
 import shared from '../organise.module.css';
 import classes from './Files.module.css';
+
+/**
+ * Why a file of a task is shown to read and not to edit: a test is changed
+ * on the task's Tests and scoring card, and what is under `plans/` is the
+ * platform's own, written at each save. Null for a file edited here.
+ */
+function readOnlyBecause(place: Place, path: string): string | null {
+  if (place.kind !== 'task') return null;
+  if (path.startsWith('tests/')) {
+    return 'A test’s files are changed on the task’s page, in its Tests and scoring card.';
+  }
+  if (path.startsWith('plans/')) {
+    return 'Unicon writes this file each time the task is saved, from its settings and its workflow.';
+  }
+  return null;
+}
 
 /** Bytes a base64 string decodes to, without decoding it. */
 function decodedSize(base64: string): number {
@@ -47,6 +69,8 @@ type Sent = WriteFile | RollbackFile;
  * busy: the read replaces the text with the file as saved, and a second save
  * would carry the old token.
  *
+ * The settings files, `contest.yaml` and `task.yaml`, are read here and edited only by an
+ * admin while they do not read (SettingsText); a test's files and `plans/` are only read.
  * At a contest a save answers with the new version. At a task it is a save of
  * the task, which publishes or keeps a draft; the answer and the refusals are
  * SaveOutcome's, and the answer takes the focus. A task's file also has its
@@ -56,6 +80,7 @@ type Sent = WriteFile | RollbackFile;
  */
 export function FileEditor({ place, path }: { place: Place; path: string }) {
   const queryClient = useQueryClient();
+  const admin = holdsAt(useMe().roles, place, 'admin');
   const query = useQuery({
     ...fileQuery(place, path),
     staleTime: Infinity,
@@ -83,11 +108,16 @@ export function FileEditor({ place, path }: { place: Place; path: string }) {
     rollBackTask.isPending ||
     query.isFetching;
   const [outcome, setOutcome] = useState<Outcome<Sent> | null>(null);
+  /** The text a save someone else's beat tried to write, while both are shown. */
+  const [conflict, setConflict] = useState<WriteFile | null>(null);
+  /** The organiser's own text, kept beside theirs to copy from once they go on from it. */
+  const [kept, setKept] = useState<string | null>(null);
   /** Set by Reload, so the text read again takes the focus. */
   const [focusText, setFocusText] = useState(false);
 
   const save = async (body: Sent) => {
     setOutcome(null);
+    setConflict(null);
     setFocusText(false);
     try {
       if (place.kind === 'task') {
@@ -107,7 +137,9 @@ export function FileEditor({ place, path }: { place: Place; path: string }) {
         setOutcome({ kind: 'written', version: written.version, notes: written.notes });
       }
     } catch (caught) {
-      setOutcome({ kind: 'refused', error: toApiError(caught), body });
+      const error = toApiError(caught);
+      if (error.code === 'conflict' && 'content' in body) setConflict(body);
+      else setOutcome({ kind: 'refused', error, body });
       return;
     }
     await Promise.all([
@@ -129,6 +161,23 @@ export function FileEditor({ place, path }: { place: Place; path: string }) {
     return <ErrorBlock error={view.error} onRetry={view.retry} />;
 
   const file = view.data;
+  const textEditor = (
+    <TextEditor
+      key={file.token}
+      file={file}
+      busy={busy}
+      autoFocus={focusText}
+      onSave={(content) =>
+        void save({
+          content,
+          encoding: 'utf-8',
+          token: file.token,
+          confirm: false,
+          keep_as_draft: false,
+        })
+      }
+    />
+  );
 
   return (
     <div className={classes.editor}>
@@ -139,28 +188,64 @@ export function FileEditor({ place, path }: { place: Place; path: string }) {
           upload={file.upload}
           token={file.token}
         />
+      ) : path === settingsPath(place) ? (
+        <SettingsText place={place} file={file} admin={admin} editor={textEditor} />
+      ) : readOnlyBecause(place, path) !== null ? (
+        <>
+          <BodyText tone="secondary">{readOnlyBecause(place, path)}</BodyText>
+          {file.encoding === 'utf-8' && (
+            <CodeEditor
+              label={path}
+              value={file.content}
+              language={languageOf(path)}
+              rows={12}
+              readOnly
+            />
+          )}
+        </>
       ) : file.encoding === 'base64' ? (
         <>
           <BodyText mono>{file.path}</BodyText>
           <BodyText tone="secondary">
-            Binary, {decodedSize(file.content)} bytes. It cannot be edited as text.
+            This file is not text ({decodedSize(file.content)} bytes), so it cannot be
+            edited here.
           </BodyText>
         </>
       ) : (
-        <TextEditor
-          key={file.token}
-          file={file}
+        textEditor
+      )}
+      {kept !== null && (
+        <div className={shared.stack}>
+          <CodeEditor
+            label="Your text from before, to copy from"
+            value={kept}
+            language={languageOf(path)}
+            rows={10}
+            readOnly
+          />
+          <div className={shared.actions}>
+            <Button size="xs" variant="secondary" onClick={() => setKept(null)}>
+              Done with it
+            </Button>
+          </div>
+        </div>
+      )}
+      {conflict !== null && (
+        <TextConflict
+          place={place}
+          path={path}
+          mine={conflict.content ?? ''}
+          language={languageOf(path)}
           busy={busy}
-          autoFocus={focusText}
-          onSave={(content) =>
-            void save({
-              content,
-              encoding: 'utf-8',
-              token: file.token,
-              confirm: false,
-              keep_as_draft: false,
-            })
-          }
+          onTakeTheirs={() => {
+            setKept(conflict.content ?? '');
+            setConflict(null);
+            void reload();
+          }}
+          onOverwrite={(theirs) => {
+            setConflict(null);
+            void save({ ...conflict, token: theirs.token });
+          }}
         />
       )}
       {outcome !== null && (
@@ -169,6 +254,7 @@ export function FileEditor({ place, path }: { place: Place; path: string }) {
           onConfirm={(body) => void save({ ...body, confirm: true })}
           onKeepAsDraft={(body) => void save({ ...body, keep_as_draft: true })}
           onReload={() => void reload()}
+          placeOf={placeOfIn(place)}
         />
       )}
       {place.kind === 'task' && (
@@ -220,7 +306,7 @@ function TextEditor({
         <Button loading={busy} disabled={!changed} onClick={() => onSave(text)}>
           Save
         </Button>
-        {changed && <BodyText tone="secondary">Unsaved changes</BodyText>}
+        {changed && <UnsavedNote />}
       </div>
     </>
   );

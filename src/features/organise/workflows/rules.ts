@@ -1,7 +1,6 @@
 import { compareDecimal } from '@/lib/exact';
 import { NumberText } from '../forms/yaml-doc';
 import {
-  refLabel,
   refText,
   refsOf,
   sameRef,
@@ -24,11 +23,28 @@ import {
  * into a once step, a once step reading a per-test step, a contestant input
  * or a step output into a port a limit is raised from, and a loop. Each
  * answer is the reason in a sentence, or null when the wire may be drawn.
- * The sentences are the forge's (`forge.domain.plans.check_workflow`), so
- * the page and the version say the same thing.
+ * The sentences are the forge's (`forge.domain.plans.check_workflow` and
+ * `forge.domain.workflow_definition`), so the page and the version say the
+ * same thing; the few the forge has no need of, such as a loop the page
+ * would draw, are the page's own, in the same voice.
  */
 
 const SCALARS = ['text', 'number', 'boolean', 'enum'];
+
+/** A type as a sentence names one value of it, as the forge's `_a` does. */
+function a(type: string): string {
+  return (
+    {
+      text: 'text',
+      number: 'a number',
+      boolean: 'true or false',
+      enum: 'one of a list',
+      file: 'a file',
+      folder: 'a folder',
+      outcome: 'an outcome',
+    }[type] ?? type
+  );
+}
 
 /** What a source is, to check it against the port it would feed. */
 type Kind = {
@@ -97,9 +113,9 @@ function kindOf(
     stepIndex === 'report' ? true : (workflow.steps[stepIndex]?.perTest ?? false);
   if (ref.kind === 'inputs') {
     const input = workflow.inputs.find((found) => found.id === ref.name);
-    if (input === undefined) return `${ref.name} is not an input of the workflow.`;
+    if (input === undefined) return `The workflow has no input called ${ref.name}.`;
     if (input.perTest && !perTest)
-      return `${ref.name} is given once per test, so only a per-test step reads it.`;
+      return `${ref.name} is given once for each test, so only a step that runs for each test can read it.`;
     return {
       type: input.type,
       options: input.options,
@@ -110,8 +126,9 @@ function kindOf(
   if (ref.kind === 'test') {
     const field = workflow.test.find((found) => found.name === ref.name);
     if (field === undefined)
-      return `${ref.name} is not a field of the workflow's tests.`;
-    if (!perTest) return 'test.<field> is there only in a step that runs per test.';
+      return `${ref.name} is not one of the workflow's test fields.`;
+    if (!perTest)
+      return "Only a step that runs for each test can read a test's fields.";
     return {
       type: field.type,
       options: field.options,
@@ -122,19 +139,21 @@ function kindOf(
   const read = indexOf(workflow).get(ref.name);
   const source = read !== undefined ? workflow.steps[read] : undefined;
   if (read === undefined || source === undefined)
-    return `${ref.name} is not a step before this one.`;
+    return `There is no step called ${ref.name} before this one.`;
   if (stepIndex !== 'report') {
-    if (read === stepIndex) return `${ref.name} is not a step before this one.`;
+    if (read === stepIndex)
+      return `There is no step called ${ref.name} before this one.`;
     if (upstream(workflow, read).has(stepIndex))
-      return `That makes a loop: ${ref.name} reads this step already.`;
+      return `That would make a loop: ${ref.name} already reads this step.`;
   }
   const primitive = declared(primitives, source.use);
   const port = primitive?.outputs[ref.output];
-  if (port === undefined) return `The step ${ref.name} has no output ${ref.output}.`;
+  if (port === undefined)
+    return `The step ${ref.name} has no output called ${ref.output}.`;
   if (source.perTest && !perTest)
-    return `The step ${ref.name} runs per test, and a step that runs once cannot read it.`;
+    return `The step ${ref.name} runs for each test, so a step that runs once cannot read it.`;
   if (port.type === 'outcome')
-    return "A step's outcome is read by the harness, not given to another step.";
+    return "A step's outcome is read by Unicon itself, and cannot be given to another step.";
   return {
     type: port.type,
     options: port.options,
@@ -150,13 +169,14 @@ function fits(kind: Kind, port: PortDecl): string | null {
   if (port.type === 'enum') {
     const allowed = port.options ?? [];
     if (kind.type === 'enum' && kind.options !== null) {
-      const extra = kind.options.filter((option) => !allowed.includes(option));
+      const extra = kind.options.filter((option) => !allowed.includes(option)).sort();
       if (extra.length === 0) return null;
-      return `Takes one of ${allowed.join(', ')}, not ${extra.join(', ')}.`;
+      return `This takes one of ${allowed.join(', ')}, not ${extra.join(', ')}.`;
     }
-    return `Takes one of ${allowed.join(', ')}.`;
+    return `This takes one of ${allowed.join(', ')}.`;
   }
-  if (kind.type !== port.type) return `Takes ${port.type}, not ${kind.type}.`;
+  if (kind.type !== port.type)
+    return `This takes ${a(port.type)}, not ${a(kind.type)}.`;
   return null;
 }
 
@@ -174,23 +194,27 @@ export function wireRefusal(
   const step = workflow.steps[stepIndex];
   if (step === undefined) return 'There is no such step.';
   const primitive = declared(primitives, step.use);
-  if (primitive === null) return `${step.use} is not a primitive the platform has.`;
+  if (primitive === null)
+    return `${step.use} is not a primitive Unicon knows. Check its owner, name and version.`;
   const target = primitive.inputs[port];
-  if (target === undefined) return `${step.use} has no input ${port}.`;
+  if (target === undefined) return `${step.use} has no input called ${port}.`;
   const kind = kindOf(workflow, primitives, stepIndex, source);
   if (typeof kind === 'string') return kind;
   if (raisingPorts(primitive).has(port)) {
-    if (kind.source === 'contestant')
-      return 'This port raises a limit, so the task must give it, not the contestant.';
-    if (kind.source === 'step')
-      return 'This port raises a limit, so it must be known at the save.';
+    if (kind.source === 'contestant') return LIMIT_FROM_ENTRANT;
+    if (kind.source === 'step') return LIMIT_AT_SAVE;
   }
   if (kind.optional && !target.optional)
     return kind.source === 'step'
-      ? 'The output may be absent, so it feeds only an optional port.'
-      : 'The input is optional, so it feeds only an optional port.';
+      ? 'That output may be missing, so it can be given only to an optional port.'
+      : 'That input is optional, so it can be given only to an optional port.';
   return fits(kind, target);
 }
+
+const LIMIT_FROM_ENTRANT =
+  'This value raises a limit, so the task must give it, not the entrant.';
+const LIMIT_AT_SAVE =
+  'This value raises a limit, so it must be known when the task is saved.';
 
 /** Why an output may not be reported, or null when it may. */
 export function reportRefusal(
@@ -199,11 +223,12 @@ export function reportRefusal(
   source: Ref,
   entry: ReportEntry | null = null,
 ): string | null {
-  if (source.kind !== 'steps') return 'A report reads a step’s output.';
+  if (source.kind !== 'steps')
+    return "Only a step's output can be reported, not an input or a test's field.";
   const kind = kindOf(workflow, primitives, 'report', source);
   if (typeof kind === 'string') return kind;
   if (kind.type !== 'text' && kind.type !== 'number')
-    return `steps.${refLabel(source)} is ${kind.type}; a report holds text or numbers.`;
+    return `steps.${source.name}.${source.output} is ${a(kind.type)}, and only text or a number can be reported.`;
   if (entry === null) return null;
   const better = betterProblem(workflow, entry);
   if (better !== null) return better;
@@ -212,17 +237,20 @@ export function reportRefusal(
     entry.atMost !== null &&
     compareDecimal(entry.atLeast.text, entry.atMost.text) > 0
   )
-    return 'Must be at least at_least.';
+    return BOUNDS;
   const meant = [entry.fold, entry.better, entry.atLeast, entry.atMost].some(
     (value) => value !== null,
   );
   if (meant && kind.type !== 'number')
-    return 'fold, better, at_least and at_most say what a number means; this is text.';
+    return 'fold, better, at_least and at_most apply only to a number, and this is text.';
   const step = workflow.steps.find((found) => found.id === source.name);
   if ((entry.fold !== null || entry.better !== null) && step?.perTest !== true)
-    return 'fold and better are for a number reported per test; this step runs once.';
+    return 'fold and better apply only to a number reported for each test, and this step runs once.';
   return null;
 }
+
+/** The forge's words for an upper bound below the lower one. */
+export const BOUNDS = 'The upper bound must be at least the lower bound.';
 
 /**
  * Why an entry's `better` is not one a version takes (W3), in the forge's
@@ -233,17 +261,17 @@ function betterProblem(workflow: Workflow, entry: ReportEntry): string | null {
   if (better === null || better === 'higher' || better === 'lower') return null;
   const ref = entry.betterRef;
   if (ref === null || ref.kind !== 'inputs')
-    return "Must be higher, lower, or ${{ inputs.<id> }} naming a task's enum input.";
+    return 'Choose higher or lower, or name an enum input the task gives, as ${{ inputs.<id> }}.';
   const input = workflow.inputs.find((found) => found.id === ref.name);
-  if (input === undefined) return `${ref.name} is not an input of the workflow.`;
+  if (input === undefined) return `The workflow has no input called ${ref.name}.`;
   if (input.contestant || input.type !== 'enum')
-    return `${ref.name} must be an enum input the task gives, not the contestant.`;
+    return `${ref.name} must be an enum input that the task gives, not the entrant.`;
   if (input.optional)
-    return `${ref.name} is optional, so it is given whole to optional ports, never read for which way is better.`;
+    return `${ref.name} is optional, so it cannot say which way is better. Choose an input that is not optional.`;
   if (
     !(input.options ?? []).every((option) => option === 'higher' || option === 'lower')
   )
-    return `The options of ${ref.name} must be higher and lower.`;
+    return `The options of ${ref.name} must be higher and lower, and nothing else.`;
   return null;
 }
 
@@ -267,36 +295,35 @@ export function valueRefusal(
   if (written.length > 0) {
     for (const ref of written) {
       if (ref.kind === 'steps')
-        return "A step's output is given whole, never written into text.";
+        return "A step's output can be given only whole, not written into text.";
       const kind = kindOf(workflow, primitives, stepIndex, ref);
       if (typeof kind === 'string') return kind;
       if (!SCALARS.includes(kind.type))
-        return `${refText(ref)} is a ${kind.type}, and only text, a number, true or false or an enum is written into text.`;
+        return `${refText(ref)} is ${a(kind.type)}, and only text, a number, true or false or an enum can be written into text.`;
       if (kind.optional)
-        return `${refText(ref)} is optional, so it is given whole to optional ports, never written into text.`;
+        return `${refText(ref)} is optional, so it can be given only whole, to an optional port, not written into text.`;
     }
-    if (raisingPorts(primitive).has(port))
-      return 'This port raises a limit, so it must be known at the save.';
+    if (raisingPorts(primitive).has(port)) return LIMIT_AT_SAVE;
     if (target.type === 'enum')
-      return `Takes one of ${(target.options ?? []).join(', ')}.`;
-    if (target.type !== 'text') return `Takes ${target.type}, not text.`;
+      return `This takes one of ${(target.options ?? []).join(', ')}.`;
+    if (target.type !== 'text') return `This takes ${a(target.type)}, not text.`;
     return null;
   }
   if (target.type === 'enum' && typeof value !== 'string')
-    return `Takes one of ${(target.options ?? []).join(', ')}.`;
+    return `This takes one of ${(target.options ?? []).join(', ')}.`;
   if (typeof value === 'boolean')
     return ['boolean', 'text'].includes(target.type)
       ? null
-      : `Takes ${target.type}, not boolean.`;
+      : `This takes ${a(target.type)}, not true or false.`;
   if (value instanceof NumberText)
     return ['number', 'text'].includes(target.type)
       ? null
-      : `Takes ${target.type}, not number.`;
+      : `This takes ${a(target.type)}, not a number.`;
   if (target.type === 'enum') {
     const allowed = target.options ?? [];
-    return allowed.includes(value) ? null : `Takes one of ${allowed.join(', ')}.`;
+    return allowed.includes(value) ? null : `This takes one of ${allowed.join(', ')}.`;
   }
-  if (target.type !== 'text') return `Takes ${target.type}, not text.`;
+  if (target.type !== 'text') return `This takes ${a(target.type)}, not text.`;
   return null;
 }
 
@@ -311,23 +338,23 @@ export function switchRefusal(workflow: Workflow, index: number): string | null 
     for (const value of Object.values(step.with))
       for (const ref of refsOf(value)) {
         if (ref.kind === 'test')
-          return `It reads test.${ref.name}, which only a per-test step reads.`;
+          return `It reads the test's ${ref.name}, which only a step that runs for each test can read.`;
         if (
           ref.kind === 'inputs' &&
           workflow.inputs.find((input) => input.id === ref.name)?.perTest
         )
-          return `It reads ${ref.name}, which is given once per test.`;
+          return `It reads ${ref.name}, which is given once for each test.`;
         if (ref.kind === 'steps') {
           const read = indexOf(workflow).get(ref.name);
           if (read !== undefined && workflow.steps[read]?.perTest)
-            return `It reads ${ref.name}, which runs per test.`;
+            return `It reads ${ref.name}, which runs for each test.`;
         }
       }
     return foldedRefusal(workflow, index);
   }
   for (const [at, other] of workflow.steps.entries())
     if (!other.perTest && at !== index && stepsRead(workflow, at).has(index))
-      return `${other.id} runs once and reads it.`;
+      return `${other.id} runs once and reads it, so this step runs once too.`;
   return null;
 }
 
@@ -345,7 +372,7 @@ function foldedRefusal(workflow: Workflow, index: number): string | null {
   );
   return folded === undefined
     ? null
-    : `The report's ${folded.name} folds it over tests, so it runs per test.`;
+    : `The report's ${folded.name} folds it over the tests, so this step runs for each test.`;
 }
 
 /**

@@ -1,6 +1,8 @@
 import {
   createBrowserRouter,
+  Navigate,
   Outlet,
+  useLocation,
   useRouteError,
   type RouteObject,
 } from 'react-router';
@@ -11,22 +13,82 @@ import { NotFound } from '@/ui/feedback/NotFound';
 import { HomePage, InviteLink, InvitesPage } from '@/features/home';
 import { LoginPage } from '@/features/auth';
 import { AccountPage } from '@/features/account';
-import { BoardsPage, ContestHomePage, TaskStatementPage } from '@/features/contest';
 import {
-  ContestantsPage,
+  BoardsPage,
+  ContestHomePage,
+  QuestionsPage,
+  TaskStatementPage,
+} from '@/features/contest';
+import {
+  CONTEST_SECTION_PAGES,
   ContestPage,
-  GradingsFeedPage,
-  InboxPage,
   NewOrgPage,
-  OrganisedBoardsPage,
+  ORG_SECTION_PAGES,
   OrgPage,
   OrgsPage,
+  TASK_SECTION_PAGES,
   TaskPage,
-  TeamsPage,
   WorkflowPage,
   WorkflowsPage,
 } from '@/features/organise';
 import { RequireSession, SessionExpiredModal, SessionProvider } from '@/session';
+import {
+  CONTEST_SECTIONS,
+  contestSectionPath,
+  ORG_SECTIONS,
+  TASK_SECTIONS,
+  taskCardPath,
+} from '@/lib/sections';
+import { useContestParams, useTaskParams } from '@/lib/route-params';
+
+const ORG = ':org';
+const CONTEST = `${ORG}/contests/:contest`;
+const TASK = `${CONTEST}/tasks/:task`;
+
+/**
+ * A route for each section of an org, a contest or a task, from the same
+ * list that draws their cards, their sidebar entries and their crumbs.
+ */
+const sectionRoutes: RouteObject[] = [
+  ...ORG_SECTIONS.map((section) => {
+    const Page = ORG_SECTION_PAGES[section.key];
+    return { path: `${ORG}/${section.segment}`, element: <Page /> };
+  }),
+  ...CONTEST_SECTIONS.map((section) => {
+    const Page = CONTEST_SECTION_PAGES[section.key];
+    return { path: `${CONTEST}/${section.segment}`, element: <Page /> };
+  }),
+  ...TASK_SECTIONS.map((section) => {
+    const Page = TASK_SECTION_PAGES[section.key];
+    return { path: `${TASK}/${section.segment}`, element: <Page /> };
+  }),
+];
+
+/**
+ * The contest's Contestants and Teams pages, now its one Entrants page: an
+ * old link lands there, its filters kept.
+ */
+function ToEntrants() {
+  const { org, contest } = useContestParams();
+  const { search } = useLocation();
+  return (
+    <Navigate to={`${contestSectionPath(org, contest, 'entrants')}${search}`} replace />
+  );
+}
+
+/** A task's Statement page, now the Statement card on the task's own page. */
+function ToStatement() {
+  const { org, contest, task } = useTaskParams();
+  return <Navigate to={taskCardPath(org, contest, task, 'statement')} replace />;
+}
+
+const movedRoutes: RouteObject[] = [
+  ...['contestants', 'teams'].map((segment) => ({
+    path: `${CONTEST}/${segment}`,
+    element: <ToEntrants />,
+  })),
+  { path: `${TASK}/statement`, element: <ToStatement /> },
+];
 
 /**
  * Data-router mode, because the route tree is about to get deep and loaders are
@@ -86,6 +148,7 @@ export const routes: RouteObject[] = [
            */
           { path: 'contests/:org/:contest', element: <ContestHomePage /> },
           { path: 'contests/:org/:contest/boards', element: <BoardsPage /> },
+          { path: 'contests/:org/:contest/questions', element: <QuestionsPage /> },
           {
             path: 'contests/:org/:contest/tasks/:task',
             element: <TaskStatementPage />,
@@ -124,29 +187,11 @@ export const routes: RouteObject[] = [
                 children: [
                   { index: true, element: <OrgsPage /> },
                   { path: 'new', element: <NewOrgPage /> },
-                  { path: ':org', element: <OrgPage /> },
-                  { path: ':org/clarifications', element: <InboxPage /> },
-                  { path: ':org/contests/:contest', element: <ContestPage /> },
-                  {
-                    path: ':org/contests/:contest/contestants',
-                    element: <ContestantsPage />,
-                  },
-                  {
-                    path: ':org/contests/:contest/teams',
-                    element: <TeamsPage />,
-                  },
-                  {
-                    path: ':org/contests/:contest/gradings',
-                    element: <GradingsFeedPage />,
-                  },
-                  {
-                    path: ':org/contests/:contest/boards',
-                    element: <OrganisedBoardsPage />,
-                  },
-                  {
-                    path: ':org/contests/:contest/tasks/:task',
-                    element: <TaskPage />,
-                  },
+                  { path: ORG, element: <OrgPage /> },
+                  { path: CONTEST, element: <ContestPage /> },
+                  { path: TASK, element: <TaskPage /> },
+                  ...sectionRoutes,
+                  ...movedRoutes,
                 ],
               },
             ],

@@ -117,17 +117,16 @@ function problemOf(input: InputField, entry: Entry): string | null {
   }
   if (input.type === 'text') {
     return new TextEncoder().encode(entry.text).length > TEXT_MAX
-      ? `Must be at most ${TEXT_MAX} bytes.`
+      ? `This must be at most ${TEXT_MAX} bytes.`
       : null;
   }
   const trimmed = entry.text.trim();
-  if (trimmed === '') return 'Give a number.';
   if (!PLAIN_DECIMAL.test(trimmed))
-    return 'Must be a number written as plain decimal digits, such as 2.5.';
+    return 'Give a number in plain digits, such as 2.5.';
   if (input.min !== null && compareDecimal(trimmed, input.min) < 0)
-    return `Must be at least ${input.min}.`;
+    return `This must be at least ${input.min}.`;
   if (input.max !== null && compareDecimal(trimmed, input.max) > 0)
-    return `Must be at most ${input.max}.`;
+    return `This must be at most ${input.max}.`;
   return null;
 }
 

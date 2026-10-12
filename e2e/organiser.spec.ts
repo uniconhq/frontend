@@ -1,5 +1,17 @@
 import { expect, test, type Page, type Route } from '@playwright/test';
 
+/** unicon/classic@v2 as deploy seeds it, its inputs titled for the task's form (#434). */
+const CLASSIC = `inputs:
+  submission: {type: file, contestant: true, title: Solution}
+  language: {type: enum, options: [c, cpp, java, python], contestant: true, title: Language}
+  time_limit: {type: number, title: Time limit, unit: seconds, help: The CPU time the program may use on each test.}
+  memory_limit: {type: number, title: Memory limit, unit: MB}
+test:
+  input: file
+  answer: file
+steps: []
+`;
+
 /**
  * The organiser path against the dev server with the API stubbed, so it needs
  * no backend: make an org and land on its page, walk down to a task, open a
@@ -8,7 +20,17 @@ import { expect, test, type Page, type Route } from '@playwright/test';
  * The stub keeps just enough state for each answer to follow from the last.
  */
 async function stubOrganiserApi(page: Page) {
-  const state = { orgMade: false, published: 1, saved: null as unknown };
+  const state = {
+    orgMade: false,
+    published: 1,
+    saved: null as unknown,
+    contestYaml:
+      'name: Spring 2026\nstart: 2030-10-01T09:00:00Z\nend: 2030-10-01T14:00:00Z\nstate: draft\nvisibility: signed-in\ntasks:\n  - id: sum\n',
+    contestSaves: 0,
+    taskYaml:
+      'name: Sum\nworkflow: unicon/classic@v2\ninputs:\n  submission: {label: Your solution}\n  language: {options: [python]}\n  time_limit: 2\n  memory_limit: 256\ntest_groups:\n  main: {each: 100}\n',
+    taskSaves: [] as unknown[],
+  };
 
   const taskState = () => ({
     head: `head-${String(state.published)}`,
@@ -34,6 +56,21 @@ async function stubOrganiserApi(page: Page) {
   await page.route('**/api/v1/time', (route) =>
     json(route, { now: '2026-09-29T10:00:00Z' }),
   );
+  await page.route('**/api/v1/workflows', (route) =>
+    json(route, [
+      {
+        owner: 'unicon',
+        name: 'classic',
+        versions: ['v2'],
+        editable: false,
+        visibility: 'public',
+      },
+    ]),
+  );
+  await page.route('**/api/v1/workflows/unicon/classic/versions/v2', (route) =>
+    json(route, { content: CLASSIC }),
+  );
+  await page.route('**/api/v1/primitives', (route) => json(route, []));
   await page.route('**/api/v1/me', (route) =>
     json(route, {
       user: {
@@ -64,11 +101,113 @@ async function stubOrganiserApi(page: Page) {
       state.orgMade = true;
       return json(route, { name: 'acme' }, 201);
     }
-    if (path.endsWith('/roles')) return json(route, []);
+    if (path.endsWith('/roles') || path.endsWith('/invites')) return json(route, []);
     if (path === '/api/v1/orgs/acme') {
       return json(route, { display_name: '', description: '' });
     }
-    if (path === '/api/v1/orgs/acme/contests') return json(route, [{ name: 'spring' }]);
+    if (path === '/api/v1/orgs/acme/clarifications') return json(route, []);
+    if (path === '/api/v1/orgs/acme/contests/spring/home') {
+      return json(route, {
+        where: { org: 'acme', contest: 'spring' },
+        name: 'Spring 2026',
+        description: '',
+        start: '2026-10-01T09:00:00Z',
+        end: '2026-10-01T14:00:00Z',
+        state: 'draft',
+        now: '2026-09-29T10:00:00Z',
+        registration: {
+          entrant: null,
+          invitations: [],
+          registration_open: false,
+          can_register: false,
+          asks_code: false,
+          refused: null,
+          most: 1,
+          fewest: 1,
+          locks: 'start',
+        },
+        organises: true,
+        tasks: [],
+      });
+    }
+    if (path === '/api/v1/orgs/acme/contests/spring/files/contest.yaml') {
+      if (request.method() === 'PUT') {
+        state.contestYaml = (request.postDataJSON() as { content: string }).content;
+        state.contestSaves += 1;
+        return json(route, { version: `v${String(state.contestSaves)}`, notes: [] });
+      }
+      return json(route, {
+        path: 'contest.yaml',
+        encoding: 'utf-8',
+        content: state.contestYaml,
+        token: `token-contest-${String(state.contestSaves)}`,
+        upload: null,
+      });
+    }
+    const contest = '/api/v1/orgs/acme/contests/spring';
+    if (
+      [
+        `${contest}/organise/entrants`,
+        `${contest}/organise/boards`,
+        `${contest}/announcements`,
+        `${contest}/clarifications`,
+        `${task}/announcements`,
+        `${task}/gradings`,
+      ].includes(path)
+    ) {
+      return json(route, []);
+    }
+    if (path === `${contest}/gradings/queue`) {
+      return json(route, { queued: 0, dispatched: 0 });
+    }
+    if (path === `${task}/workflow-form`) {
+      const input = (id: string, type: string, more: object) => ({
+        id,
+        type,
+        contestant: false,
+        options: null,
+        per_test: false,
+        optional: false,
+        title: null,
+        help: null,
+        unit: null,
+        ...more,
+      });
+      return json(route, {
+        workflow: 'unicon/classic@v2',
+        newer: null,
+        problem: null,
+        inputs: [
+          input('submission', 'file', { contestant: true, title: 'Solution' }),
+          input('language', 'enum', {
+            contestant: true,
+            title: 'Language',
+            options: ['c', 'cpp', 'java', 'python'],
+          }),
+          input('time_limit', 'number', {
+            title: 'Time limit',
+            unit: 'seconds',
+            help: 'The CPU time the program may use on each test.',
+          }),
+          input('memory_limit', 'number', { title: 'Memory limit', unit: 'MB' }),
+        ],
+        test: [
+          { name: 'input', type: 'file', options: null },
+          { name: 'answer', type: 'file', options: null },
+        ],
+        graded: false,
+      });
+    }
+    if (path === '/api/v1/orgs/acme/contests') {
+      return json(route, [
+        {
+          name: 'spring',
+          state: 'draft',
+          start: '2026-10-01T09:00:00Z',
+          end: '2026-10-01T14:00:00Z',
+        },
+      ]);
+    }
     if (path === '/api/v1/orgs/acme/contests/spring/tasks') {
       return json(route, [{ name: 'sum' }]);
     }
@@ -95,10 +234,46 @@ async function stubOrganiserApi(page: Page) {
     }
     if (path === task) return json(route, taskState());
     if (path === `${task}/publications`) return json(route, []);
+    if (path === `${task}/history`) return json(route, []);
+    if (path === `${task}/save` && request.method() === 'POST') {
+      state.taskSaves.push(request.postDataJSON());
+      state.published += 1;
+      return json(route, {
+        publication: `pub-${String(state.published)}`,
+        number: state.published,
+        grading_changed: true,
+        changes: [],
+        notes: [],
+        regraded: 0,
+      });
+    }
     if (path === `${task}/tree`) {
-      return json(route, [
-        { path: 'statement.md', kind: 'file', size: 30, upload: null },
-      ]);
+      const folder = new URL(request.url()).searchParams.get('path') ?? '';
+      const tree: Record<string, unknown[]> = {
+        '': [
+          { path: 'statement.md', kind: 'file', size: 30, upload: null },
+          { path: 'task.yaml', kind: 'file', size: 120, upload: null },
+          { path: 'tests', kind: 'directory', size: null, upload: null },
+        ],
+        tests: [{ path: 'tests/main', kind: 'directory', size: null, upload: null }],
+        'tests/main': [
+          { path: 'tests/main/1', kind: 'directory', size: null, upload: null },
+        ],
+        'tests/main/1': [
+          { path: 'tests/main/1/input', kind: 'file', size: 4, upload: null },
+          { path: 'tests/main/1/answer', kind: 'file', size: 2, upload: null },
+        ],
+      };
+      return json(route, tree[folder] ?? []);
+    }
+    if (path === `${task}/files/task.yaml`) {
+      return json(route, {
+        path: 'task.yaml',
+        encoding: 'utf-8',
+        content: state.taskYaml,
+        token: `token-task-${String(state.published)}`,
+        upload: null,
+      });
     }
     if (path === `${task}/files/statement.md`) {
       if (request.method() === 'PUT') {
@@ -133,20 +308,33 @@ test('an organiser makes an org, walks to a task and publishes a file', async ({
   const state = await stubOrganiserApi(page);
   await page.goto('/orgs');
 
-  await expect(page.getByText('You do not hold a role at any org yet.')).toBeVisible();
-  await page.getByRole('link', { name: 'New org' }).click();
+  await expect(page.getByText('You do not have a role at any org yet.')).toBeVisible();
+  await page.getByRole('button', { name: 'New org' }).click();
 
-  await page.getByRole('textbox', { name: /^Name/ }).fill('acme');
-  await page.getByRole('button', { name: 'Create org' }).click();
+  const form = page.getByRole('form', { name: 'New org' });
+  await form.getByRole('textbox', { name: /^Name/ }).fill('acme');
+  await form.getByRole('button', { name: 'Create org' }).click();
 
   await expect(page).toHaveURL(/\/orgs\/acme$/, { timeout: 10_000 });
   await expect(page.getByRole('heading', { name: 'acme', level: 1 })).toBeVisible();
-  await page.getByRole('link', { name: 'spring' }).click();
-  await page.getByRole('link', { name: 'sum' }).click();
+  await page
+    .getByRole('list', { name: 'Contests' })
+    .getByRole('link', { name: 'spring' })
+    .click();
+  await expect(
+    page.getByRole('heading', { name: 'Spring 2026', level: 1 }),
+  ).toBeVisible();
+  await page
+    .getByRole('list', { name: 'Tasks' })
+    .getByRole('link', { name: 'A · sum' })
+    .click();
 
-  await expect(page.getByText('Latest publication: 1.')).toBeVisible();
+  const standing = page.getByLabel('Where the task stands');
+  await expect(standing).toContainText('Entrants are graded on publication 1');
+  const sidebar = page.getByRole('navigation', { name: 'Sections' });
+  await sidebar.getByRole('link', { name: 'Files' }).click();
   await page.getByRole('link', { name: 'statement.md' }).click();
-  await expect(page).toHaveURL(/\?file=statement\.md$/);
+  await expect(page).toHaveURL(/\/files\?file=statement\.md$/);
 
   await page
     .getByRole('textbox', { name: 'statement.md' })
@@ -154,16 +342,68 @@ test('an organiser makes an org, walks to a task and publishes a file', async ({
   await page.getByRole('button', { name: 'Save' }).click();
 
   const outcome = page.getByRole('status').filter({
-    hasText: 'Published as publication 2.',
+    hasText: 'Saved and published as publication 2.',
   });
   await expect(outcome).toBeVisible();
   await expect(outcome).toBeFocused();
-  await expect(page.getByText('Latest publication: 2.')).toBeVisible();
   expect(state.saved).toMatchObject({
     content: 'Write the sum of two.\n',
     token: 'token-1',
   });
+  await sidebar.getByRole('link', { name: 'sum' }).click();
+  await expect(standing).toContainText('Entrants are graded on publication 2');
 
-  await page.getByRole('link', { name: 'orgs', exact: true }).click();
+  const trail = page.getByRole('navigation', { name: 'Breadcrumb' });
+  await trail.getByRole('link', { name: 'Orgs', exact: true }).click();
   await expect(page.getByRole('list', { name: 'Your orgs' })).toContainText('acme');
+});
+
+test('an organiser opens a contest from its checklist', async ({ page }) => {
+  const state = await stubOrganiserApi(page);
+  state.orgMade = true;
+  await page.goto('/orgs/acme/contests/spring');
+
+  const status = page.getByRole('region', { name: 'Status' });
+  await expect(status).toContainText('Only its organisers can see it.');
+  const checklist = status.getByRole('list', { name: 'Before it opens' });
+  await expect(checklist).toContainText('A · sum: published');
+  await status.getByRole('button', { name: 'Open the contest' }).click();
+
+  const dialog = page.getByRole('dialog', { name: 'Open the contest?' });
+  await expect(dialog).toContainText('Anyone signed in can see it.');
+  await expect(dialog).toContainText('Registration opens now.');
+  await dialog.getByRole('button', { name: 'Open the contest' }).click();
+
+  await expect(status).toContainText('Live');
+  expect(state.contestYaml).toContain('state: published');
+});
+
+test('an organiser sets a task up on its cards and saves them in one save', async ({
+  page,
+}) => {
+  const state = await stubOrganiserApi(page);
+  state.orgMade = true;
+  await page.goto('/orgs/acme/contests/spring/tasks/sum');
+
+  const inputs = page.getByRole('region', { name: 'Inputs' });
+  const limit = inputs
+    .getByRole('group', { name: 'Time limit (seconds)' })
+    .getByRole('textbox', { name: /^Time limit/ });
+  await expect(limit).toHaveValue('2');
+  await limit.fill('3');
+  const scoring = page.getByRole('region', { name: 'Tests and scoring' });
+  await expect(scoring.getByRole('group', { name: 'main' })).toContainText(
+    'main earns 100 times the share of its tests you passed.',
+  );
+
+  const bar = page.getByRole('region', { name: 'Save the task' });
+  await expect(bar.getByRole('list', { name: 'What changed' })).toContainText(
+    'Inputs: Time limit (seconds)',
+  );
+  await bar.getByRole('button', { name: 'Save' }).click();
+
+  await expect(page.getByText('Saved and published as publication 2.')).toBeVisible();
+  const [saved] = state.taskSaves as { changes: { path: string; content: string }[] }[];
+  expect(saved?.changes.map((change) => change.path)).toEqual(['task.yaml']);
+  expect(saved?.changes[0]?.content).toContain('time_limit: 3');
 });

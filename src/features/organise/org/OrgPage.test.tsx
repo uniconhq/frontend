@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@/test/user-event';
 import { delay, http, HttpResponse } from 'msw';
+import { formatDateTime } from '@/lib/time';
 import { renderApp } from '@/test/render';
 import { problem, server, signedIn, someone } from '@/test/server';
 import { ORG_API, contestList, contests, listAndCreate } from '@/test/organiser';
@@ -15,10 +16,36 @@ describe('the org page', () => {
     const list = await screen.findByRole('list', { name: 'Contests' });
     const links = within(list).getAllByRole('link');
     expect(links.map((link) => link.getAttribute('href'))).toEqual([
-      '/orgs/acme/contests/autumn',
       '/orgs/acme/contests/spring',
+      '/orgs/acme/contests/autumn',
     ]);
     expect(screen.getByRole('heading', { name: 'acme', level: 1 })).toBeVisible();
+  });
+
+  it('says each contest’s state and dates as the list gives them, the soonest draft first', async () => {
+    server.use(
+      signedIn,
+      http.get(`${ORG_API}/contests`, () =>
+        HttpResponse.json([
+          ...contests,
+          { name: 'broken', state: null, start: null, end: null },
+        ]),
+      ),
+    );
+    renderApp('/orgs/acme');
+
+    const list = await screen.findByRole('list', { name: 'Contests' });
+    const rows = within(list).getAllByRole('listitem');
+    expect(rows.map((row) => within(row).getByRole('link').textContent)).toEqual([
+      'spring',
+      'autumn',
+      'broken',
+    ]);
+    expect(rows[0]).toHaveTextContent('Draft');
+    expect(rows[0]).toHaveTextContent(
+      `${formatDateTime(new Date('2026-10-01T09:00:00Z'))} to ${formatDateTime(new Date('2026-10-01T14:00:00Z'))}`,
+    );
+    expect(rows[2]).toHaveTextContent('Its settings cannot be read');
   });
 
   it('shows a skeleton while the contests load', async () => {
@@ -31,11 +58,9 @@ describe('the org page', () => {
     );
     renderApp('/orgs/acme');
 
-    const heading = await screen.findByRole('heading', { name: 'Contests' });
+    const contests = await screen.findByRole('region', { name: 'Contests' });
     expect(
-      within(heading.parentElement as HTMLElement).getByRole('status', {
-        name: 'Loading',
-      }),
+      within(contests).getByRole('status', { name: 'Loading' }),
     ).toBeInTheDocument();
   });
 
@@ -66,7 +91,7 @@ describe('the org page', () => {
     expect(screen.getByRole('button', { name: 'New contest' })).toHaveFocus();
   });
 
-  it('shows the refusal to someone who is not an observer, with the contests they can reach', async () => {
+  it('shows someone who organises only some of its contests those contests, plainly', async () => {
     server.use(
       signedIn,
       http.get(`${ORG_API}/contests`, () =>
@@ -75,9 +100,13 @@ describe('the org page', () => {
     );
     renderApp('/orgs/acme');
 
-    expect(await screen.findByText('You cannot do that')).toBeVisible();
-    expect(screen.getByText('You need the observer role at acme.')).toBeVisible();
-    const own = screen.getByRole('list', { name: 'Your contests' });
+    expect(
+      await screen.findByText('You organise these contests of acme:'),
+    ).toBeVisible();
+    expect(screen.queryByText('You cannot do that')).not.toBeInTheDocument();
+    expect(screen.queryByText(/forbidden/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Try again' })).not.toBeInTheDocument();
+    const own = screen.getByRole('list', { name: 'Contests' });
     expect(within(own).getByRole('link', { name: 'spring' })).toHaveAttribute(
       'href',
       '/orgs/acme/contests/spring',
@@ -148,7 +177,7 @@ describe("the org's display name and description", () => {
   it('shows them as the forge holds them', async () => {
     server.use(signedIn, contestList);
     profileAt();
-    renderApp('/orgs/acme');
+    renderApp('/orgs/acme/settings');
 
     const fields = await screen.findByLabelText('About the org');
     expect(fields).toHaveTextContent('Display nameAcme Contests');
@@ -159,7 +188,7 @@ describe("the org's display name and description", () => {
     server.use(signedIn, contestList);
     const sent = profileAt();
     const user = userEvent.setup();
-    renderApp('/orgs/acme');
+    renderApp('/orgs/acme/settings');
 
     await user.click(await screen.findByRole('button', { name: 'Edit' }));
     const form = screen.getByRole('form', { name: 'Edit the org' });
@@ -188,13 +217,15 @@ describe("the org's display name and description", () => {
     server.use(signedIn, contestList);
     const sent = profileAt();
     const user = userEvent.setup();
-    renderApp('/orgs/acme');
+    renderApp('/orgs/acme/settings');
 
     await user.click(await screen.findByRole('button', { name: 'Edit' }));
     await user.clear(screen.getByRole('textbox', { name: /^Display name/ }));
     await user.click(screen.getByRole('button', { name: 'Save' }));
 
-    expect(await screen.findByText('None; the name shows.')).toBeVisible();
+    expect(
+      await screen.findByText('Not set, so the org’s name is shown.'),
+    ).toBeVisible();
     expect(sent).toEqual([
       { display_name: '', description: 'Contests for Acme engineers.' },
     ]);
@@ -206,7 +237,7 @@ describe("the org's display name and description", () => {
       problem(403, 'forbidden', { detail: 'This needs the admin role at acme.' }),
     );
     const user = userEvent.setup();
-    renderApp('/orgs/acme');
+    renderApp('/orgs/acme/settings');
 
     await user.click(await screen.findByRole('button', { name: 'Edit' }));
     const form = screen.getByRole('form', { name: 'Edit the org' });
@@ -232,13 +263,15 @@ describe("the org's display name and description", () => {
     async (role) => {
       server.use(asRole(role), contestList);
       profileAt();
-      renderApp('/orgs/acme');
+      renderApp('/orgs/acme/settings');
 
       expect(await screen.findByLabelText('About the org')).toHaveTextContent(
         'Acme Contests',
       );
       expect(screen.queryByRole('button', { name: 'Edit' })).toBeNull();
-      expect(screen.getByText('Only an admin of the org changes these.')).toBeVisible();
+      expect(
+        screen.getByText('Only an admin of the org can change these.'),
+      ).toBeVisible();
     },
   );
 
@@ -257,19 +290,45 @@ describe("the org's display name and description", () => {
       ),
     );
     profileAt();
-    renderApp('/orgs/acme');
+    renderApp('/orgs/acme/settings');
 
     const fields = await screen.findByLabelText('About the org');
     expect(fields).toHaveTextContent('Display nameAcme Contests');
     expect(fields).toHaveTextContent('DescriptionContests for Acme engineers.');
     expect(screen.queryByRole('button', { name: 'Edit' })).toBeNull();
-    expect(screen.getByText('Only an admin of the org changes these.')).toBeVisible();
     expect(
-      within(screen.getByRole('list', { name: 'Your contests' })).getByRole('link', {
-        name: 'spring',
-      }),
+      screen.getByText('Only an admin of the org can change these.'),
     ).toBeVisible();
   });
+
+  it("heads the org's page with them, and gives its admin a small Edit", async () => {
+    server.use(signedIn, contestList);
+    profileAt();
+    renderApp('/orgs/acme');
+
+    expect(
+      await screen.findByRole('heading', { name: 'Acme Contests', level: 1 }),
+    ).toBeVisible();
+    expect(screen.getByText('Contests for Acme engineers.')).toBeVisible();
+    expect(screen.getByRole('link', { name: 'Edit the org' })).toHaveAttribute(
+      'href',
+      '/orgs/acme/settings',
+    );
+  });
+
+  it.each(['manager', 'observer'] as const)(
+    "heads the org's page with them, with no Edit for a %s",
+    async (role) => {
+      server.use(asRole(role), contestList);
+      profileAt();
+      renderApp('/orgs/acme');
+
+      expect(
+        await screen.findByRole('heading', { name: 'Acme Contests', level: 1 }),
+      ).toBeVisible();
+      expect(screen.queryByRole('link', { name: 'Edit the org' })).toBeNull();
+    },
+  );
 });
 
 describe('creating a contest', () => {
@@ -321,14 +380,14 @@ describe('creating a contest', () => {
           roles: [
             {
               names: { org: 'acme', contest: null, task: null },
-              role: 'observer',
+              role: 'manager',
             },
           ],
         }),
       ),
       contestList,
       http.post('/api/v1/orgs/acme/contests', () =>
-        problem(403, 'forbidden', { detail: 'You need the manager role at acme.' }),
+        problem(409, 'conflict', { detail: 'The contest summer already exists.' }),
       ),
     );
     renderApp('/orgs/acme');
@@ -336,8 +395,26 @@ describe('creating a contest', () => {
     const form = await submitContest('summer');
 
     expect(await within(form).findByRole('alert')).toHaveTextContent(
-      'You need the manager role at acme.',
+      'The contest summer already exists.',
     );
     expect(within(form).getByRole('textbox', { name: /^Name/ })).toHaveValue('summer');
+  });
+
+  it('offers no New contest to an observer, who may not make one', async () => {
+    server.use(
+      http.get('/api/v1/me', () =>
+        HttpResponse.json({
+          ...someone,
+          roles: [
+            { names: { org: 'acme', contest: null, task: null }, role: 'observer' },
+          ],
+        }),
+      ),
+      contestList,
+    );
+    renderApp('/orgs/acme');
+
+    await screen.findByRole('list', { name: 'Contests' });
+    expect(screen.queryByRole('button', { name: 'New contest' })).toBeNull();
   });
 });

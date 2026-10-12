@@ -13,7 +13,9 @@ describe('routes', () => {
   it('renders the 404 page inside the shell for an unknown address', async () => {
     renderApp('/no-such-page');
 
-    expect(await screen.findByText('404')).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { name: 'Page not found', level: 1 }),
+    ).toBeInTheDocument();
     expect(screen.getByText('unicon')).toBeInTheDocument();
   });
 

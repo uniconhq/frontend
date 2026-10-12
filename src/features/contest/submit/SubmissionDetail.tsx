@@ -2,7 +2,7 @@ import { $api, queryView } from '@/api/query';
 import type { GradingResult } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { PageLink } from '@/ui/PageLink';
-import { TextLink } from '@/ui/TextLink';
+import { OutLink } from '@/ui/OutLink';
 import { SectionTitle } from '@/ui/SectionTitle';
 import { VerdictBadge } from '@/ui/VerdictBadge';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
@@ -87,7 +87,7 @@ function Files({ where }: { where: Where }) {
         <ul className={classes.files} aria-label="Files">
           {files.map(({ id, path }) => (
             <li key={path}>
-              {id}: <TextLink href={downloadHref(where, path)}>{nameOf(path)}</TextLink>
+              {id}: <OutLink href={downloadHref(where, path)}>{nameOf(path)}</OutLink>
             </li>
           ))}
         </ul>

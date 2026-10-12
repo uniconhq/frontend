@@ -60,7 +60,7 @@ function orgWith(start: Holder[]) {
 
 /** The row a person's username heads, with or without "(you)". */
 function row(name: string): HTMLElement {
-  const table = screen.getByRole('table', { name: 'Organisers' });
+  const table = screen.getByRole('table', { name: / organisers$/ });
   const found = within(table)
     .getAllByRole('rowheader')
     .find((header) => {
@@ -73,81 +73,41 @@ function row(name: string): HTMLElement {
 }
 
 describe('the organisers section', () => {
-  it('lists who holds a role at the org, with the role and where it is held', async () => {
+  it('lists who holds a role at the org, with the role and where it was given', async () => {
     orgWith([kennyAdmin, holder()]);
-    renderApp('/orgs/acme');
+    renderApp('/orgs/acme/organisers');
 
-    await screen.findByRole('table', { name: 'Organisers' });
+    await screen.findByRole('table', { name: 'Org organisers' });
+    expect(
+      within(screen.getByRole('table', { name: 'Org organisers' }))
+        .getAllByRole('columnheader')
+        .map((header) => header.textContent),
+    ).toEqual(['Person', 'Role', 'Given at', 'Actions']);
     expect(within(row('kenny')).getByText('kenny (you)')).toBeVisible();
     expect(within(row('kenny')).getByText('Admin')).toBeVisible();
     expect(within(row('dee')).getByText('Manager')).toBeVisible();
-    expect(within(row('dee')).getByText('Here')).toBeVisible();
+    expect(within(row('dee')).getByText('This org')).toBeVisible();
   });
 
-  it('adds someone by username with the role chosen', async () => {
-    const sent = orgWith([kennyAdmin]);
-    const user = userEvent.setup();
-    renderApp('/orgs/acme');
-
-    const form = await screen.findByRole('form', { name: 'Add someone' });
-    await user.type(within(form).getByLabelText('Username', { exact: false }), ' eve ');
-    await user.selectOptions(within(form).getByLabelText('Role'), 'observer');
-    await user.click(within(form).getByRole('button', { name: 'Add' }));
-
-    expect(await screen.findByText('eve')).toBeVisible();
-    expect(sent).toEqual([
-      {
-        method: 'POST',
-        body: { username: 'eve', role: 'observer' },
-        path: '/api/v1/orgs/acme/roles',
-      },
-    ]);
-    expect(within(form).getByLabelText('Username', { exact: false })).toHaveValue('');
-  });
-
-  it('says so when nobody has the username', async () => {
+  it('offers no way to add someone: a person joins only by accepting an invite', async () => {
     orgWith([kennyAdmin]);
-    server.use(http.post(ORG_ROLES, () => problem(404, 'not_found')));
-    const user = userEvent.setup();
-    renderApp('/orgs/acme');
+    renderApp('/orgs/acme/organisers');
 
-    const form = await screen.findByRole('form', { name: 'Add someone' });
-    await user.type(
-      within(form).getByLabelText('Username', { exact: false }),
-      'nobody',
-    );
-    await user.click(within(form).getByRole('button', { name: 'Add' }));
-
-    expect(await within(form).findByRole('alert')).toHaveTextContent(
-      'Nobody has the username nobody.',
-    );
-  });
-
-  it('explains why a contestant cannot be given a role', async () => {
-    orgWith([kennyAdmin]);
-    server.use(
-      http.post(ORG_ROLES, () =>
-        problem(409, 'contestant_conflict', { contests: ['acme/spring'] }),
-      ),
-    );
-    const user = userEvent.setup();
-    renderApp('/orgs/acme');
-
-    const form = await screen.findByRole('form', { name: 'Add someone' });
-    await user.type(within(form).getByLabelText('Username', { exact: false }), 'carol');
-    await user.click(within(form).getByRole('button', { name: 'Add' }));
-
-    expect(await within(form).findByRole('alert')).toHaveTextContent(
-      'They are a contestant here',
-    );
+    await screen.findByRole('table', { name: 'Org organisers' });
+    expect(screen.queryByRole('form', { name: 'Add someone' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Add' })).not.toBeInTheDocument();
+    expect(screen.getByRole('form', { name: 'Invite someone' })).toBeVisible();
+    expect(
+      screen.getByText('Someone becomes an organiser here by accepting an invite.'),
+    ).toBeVisible();
   });
 
   it('moves someone to another role', async () => {
     const sent = orgWith([kennyAdmin, holder()]);
     const user = userEvent.setup();
-    renderApp('/orgs/acme');
+    renderApp('/orgs/acme/organisers');
 
-    await screen.findByRole('table', { name: 'Organisers' });
+    await screen.findByRole('table', { name: / organisers$/ });
     await user.click(screen.getByRole('button', { name: 'Change role of dee' }));
     const form = screen.getByRole('form', { name: 'Change role of dee' });
     await user.selectOptions(within(form).getByLabelText('Role'), 'observer');
@@ -165,16 +125,16 @@ describe('the organisers section', () => {
   it('removes a role after asking', async () => {
     const sent = orgWith([kennyAdmin, holder()]);
     const user = userEvent.setup();
-    renderApp('/orgs/acme');
+    renderApp('/orgs/acme/organisers');
 
-    await screen.findByRole('table', { name: 'Organisers' });
+    await screen.findByRole('table', { name: / organisers$/ });
     await user.click(screen.getByRole('button', { name: 'Remove dee' }));
     const dialog = await screen.findByRole('dialog', { name: 'Remove this role?' });
     await user.click(within(dialog).getByRole('button', { name: 'Remove' }));
 
-    await screen.findByRole('table', { name: 'Organisers' });
+    await screen.findByRole('table', { name: / organisers$/ });
     expect(
-      within(screen.getByRole('table', { name: 'Organisers' })).queryByText('dee'),
+      within(screen.getByRole('table', { name: 'Org organisers' })).queryByText('dee'),
     ).not.toBeInTheDocument();
     expect(sent).toEqual([{ method: 'DELETE', path: '/api/v1/orgs/acme/roles/21' }]);
   });
@@ -190,9 +150,9 @@ describe('the organisers section', () => {
       ),
     );
     const user = userEvent.setup();
-    renderApp('/orgs/acme');
+    renderApp('/orgs/acme/organisers');
 
-    await screen.findByRole('table', { name: 'Organisers' });
+    await screen.findByRole('table', { name: / organisers$/ });
     await user.click(screen.getByRole('button', { name: 'Remove kenny' }));
     const dialog = await screen.findByRole('dialog', {
       name: 'Give up your role here?',
@@ -215,9 +175,9 @@ describe('the organisers section', () => {
       ),
     );
     const user = userEvent.setup();
-    renderApp('/orgs/acme');
+    renderApp('/orgs/acme/organisers');
 
-    await screen.findByRole('table', { name: 'Organisers' });
+    await screen.findByRole('table', { name: / organisers$/ });
     await user.click(screen.getByRole('button', { name: 'Change role of kenny' }));
     const form = screen.getByRole('form', { name: 'Change role of kenny' });
     await user.selectOptions(within(form).getByLabelText('Role'), 'manager');
@@ -229,8 +189,7 @@ describe('the organisers section', () => {
     expect(within(row('kenny')).getByRole('cell', { name: 'Admin' })).toBeVisible();
   });
 
-  it('offers a manager the admin role, and shows why the forge refuses it', async () => {
-    const sent: unknown[] = [];
+  it('offers a manager only the roles a manager may give, as Invite does', async () => {
     server.use(
       signedInAs([
         { names: { org: 'acme', contest: 'spring', task: null }, role: 'manager' },
@@ -248,43 +207,32 @@ describe('the organisers section', () => {
           ),
         ]),
       ),
-      http.post(CONTEST_ROLES, async ({ request }) => {
-        sent.push(await request.json());
-        return problem(403, 'forbidden', {
-          detail: 'Only an admin of acme/spring may grant admin there.',
-        });
-      }),
     );
     const user = userEvent.setup();
-    renderApp('/orgs/acme/contests/spring');
+    renderApp('/orgs/acme/contests/spring/organisers');
 
-    await screen.findByRole('table', { name: 'Organisers' });
-    expect(within(row('lee')).getByText('acme')).toBeVisible();
+    await screen.findByRole('table', { name: 'Contest organisers' });
+    expect(within(row('lee')).getByText('The org')).toBeVisible();
+    expect(
+      within(row('lee')).getByRole('link', { name: 'Change it there' }),
+    ).toHaveAttribute('href', '/orgs/acme/organisers');
     expect(within(row('lee')).queryByRole('button')).not.toBeInTheDocument();
-    const form = screen.getByRole('form', { name: 'Add someone' });
+    expect(within(row('kenny')).getByText('This contest')).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'Change role of kenny' }));
+    const form = screen.getByRole('form', { name: 'Change role of kenny' });
     const roles = within(form).getByLabelText('Role');
     expect(
       within(roles)
         .getAllByRole('option')
         .map((option) => option.textContent),
-    ).toEqual(['Admin', 'Manager', 'Observer']);
-
-    await user.type(within(form).getByLabelText(/Username/), 'dee');
-    await user.selectOptions(roles, 'admin');
-    await user.click(within(form).getByRole('button', { name: 'Add' }));
-
-    const alert = await within(form).findByRole('alert');
-    expect(alert).toHaveTextContent('Only an admin gives the admin role');
-    expect(alert).toHaveTextContent(
-      'Only an admin of acme/spring may grant admin there.',
-    );
-    expect(sent).toEqual([{ username: 'dee', role: 'admin' }]);
+    ).toEqual(['Manager', 'Observer']);
   });
 
   it('keeps a refusal about the role that was sent while another is picked', async () => {
     server.use(
+      // An admin whose admin role was taken away since the page was read.
       signedInAs([
-        { names: { org: 'acme', contest: 'spring', task: null }, role: 'manager' },
+        { names: { org: 'acme', contest: 'spring', task: null }, role: 'admin' },
       ]),
       taskList,
       http.get(CONTEST_ROLES, () =>
@@ -305,9 +253,9 @@ describe('the organisers section', () => {
       ),
     );
     const user = userEvent.setup();
-    renderApp('/orgs/acme/contests/spring');
+    renderApp('/orgs/acme/contests/spring/organisers');
 
-    await screen.findByRole('table', { name: 'Organisers' });
+    await screen.findByRole('table', { name: / organisers$/ });
     await user.click(screen.getByRole('button', { name: 'Change role of kim' }));
     const form = screen.getByRole('form', { name: 'Change role of kim' });
     await user.selectOptions(within(form).getByLabelText('Role'), 'admin');
@@ -315,6 +263,9 @@ describe('the organisers section', () => {
 
     const alert = await within(row('kim')).findByRole('alert');
     expect(alert).toHaveTextContent('Only an admin gives the admin role');
+    expect(alert).toHaveTextContent(
+      'Only an admin of acme/spring may grant admin there.',
+    );
     await user.selectOptions(within(form).getByLabelText('Role'), 'observer');
     expect(within(row('kim')).getByRole('alert')).toHaveTextContent(
       'Only an admin gives the admin role',
@@ -329,13 +280,15 @@ describe('the organisers section', () => {
       contestList,
       http.get(ORG_ROLES, () => HttpResponse.json([holder()])),
     );
-    renderApp('/orgs/acme');
+    renderApp('/orgs/acme/organisers');
 
-    await screen.findByRole('table', { name: 'Organisers' });
+    await screen.findByRole('table', { name: / organisers$/ });
     expect(
       screen.queryByRole('button', { name: /Change role/ }),
     ).not.toBeInTheDocument();
-    expect(screen.queryByRole('form', { name: 'Add someone' })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('form', { name: 'Invite someone' }),
+    ).not.toBeInTheDocument();
   });
 
   it('is not shown to someone whose role is only at one of the tasks', async () => {
@@ -347,11 +300,12 @@ describe('the organisers section', () => {
         problem(403, 'forbidden'),
       ),
     );
-    renderApp('/orgs/acme/contests/spring');
+    renderApp('/orgs/acme/contests/spring/organisers');
 
-    await screen.findByRole('heading', { name: 'spring', level: 1 });
+    await screen.findByRole('heading', { name: 'Contest organisers', level: 1 });
     expect(
-      screen.queryByRole('heading', { name: 'Organisers' }),
-    ).not.toBeInTheDocument();
+      screen.getByText("Only the contest's own organisers see this list."),
+    ).toBeVisible();
+    expect(screen.queryByRole('table')).not.toBeInTheDocument();
   });
 });

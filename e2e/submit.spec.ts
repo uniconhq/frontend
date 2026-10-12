@@ -436,10 +436,10 @@ test('a submission that did not compile shows that as its verdict', async ({
   await page.goto(`${PAGE}?submission=1`);
 
   await expect(
-    page.getByRole('table', { name: 'Your submissions' }).getByText('COMPILE ERR'),
+    page.getByRole('table', { name: 'Your submissions' }).getByText('COMPILE ERROR'),
   ).toBeVisible();
   const detail = page.getByRole('region', { name: 'Submission 1' });
-  await expect(detail.getByText('COMPILE ERR')).toBeVisible();
+  await expect(detail.getByText('COMPILE ERROR')).toBeVisible();
   await expect(detail.getByLabel('log', { exact: true })).toHaveText(
     'main.cpp:1: error',
   );
@@ -470,7 +470,7 @@ test('an earlier submission lists its files, each a download through the door', 
 const REFUSALS: [string, number, Record<string, unknown>, string][] = [
   ['task_closed', 403, { reason: 'closed' }, 'This task has closed for you'],
   ['archived', 403, {}, 'The contest is archived'],
-  ['not_approved', 403, {}, 'You are not a contestant here yet'],
+  ['not_approved', 403, {}, 'Your registration is not approved yet'],
   ['submission_limit', 409, { limit: 50 }, 'This task takes 50 submissions in all'],
   [
     'rate_limited',
@@ -485,7 +485,7 @@ const REFUSALS: [string, number, Record<string, unknown>, string][] = [
     'may be at most 1 MB in all',
   ],
   ['upload_not_yours', 404, { uploads: [] }, 'A file is not one you uploaded'],
-  ['upload_not_ready', 409, { uploads: [] }, 'A file did not arrive whole'],
+  ['upload_not_ready', 409, { uploads: [] }, 'A file did not arrive in full'],
   [
     'invalid_inputs',
     422,

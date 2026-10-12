@@ -17,6 +17,8 @@ import { NumberText } from '../forms/yaml-doc';
 const CHECKER: PrimitiveInfo = {
   ref: 'unicon/checker-like@v1',
   name: 'checker-like',
+  title: null,
+  description: null,
   version: 'v1',
   batch: true,
   network: false,
@@ -29,8 +31,16 @@ const CHECKER: PrimitiveInfo = {
       optional: false,
       runs: null,
       secret: false,
+      description: null,
     },
-    note: { type: 'text', optional: true, options: null, runs: null, secret: false },
+    note: {
+      type: 'text',
+      optional: true,
+      options: null,
+      runs: null,
+      secret: false,
+      description: null,
+    },
   },
   outputs: {
     fraction: {
@@ -39,6 +49,7 @@ const CHECKER: PrimitiveInfo = {
       options: null,
       runs: null,
       secret: false,
+      description: null,
     },
     outcome: {
       type: 'outcome',
@@ -46,6 +57,7 @@ const CHECKER: PrimitiveInfo = {
       options: null,
       runs: null,
       secret: false,
+      description: null,
     },
   },
   problem: null,
@@ -106,76 +118,82 @@ describe('the drag rules', () => {
   });
 
   it.each([
-    ['the wrong type', 0, 'source', input('limit'), 'Takes folder, not number.'],
+    [
+      'the wrong type',
+      0,
+      'source',
+      input('limit'),
+      'This takes a folder, not a number.',
+    ],
     [
       'a boolean into a file port',
       1,
       'binary',
       input('flag'),
-      'Takes file, not boolean.',
+      'This takes a file, not true or false.',
     ],
     [
       'an enum outside the port’s options',
       0,
       'language',
       input('wide'),
-      'Takes one of c, cpp, java, python, not rust.',
+      'This takes one of c, cpp, java, python, not rust.',
     ],
     [
       'a once step reading a per-test step',
       3,
       'entry',
       output('check', 'fraction'),
-      'The step check runs per test, and a step that runs once cannot read it.',
+      'The step check runs for each test, so a step that runs once cannot read it.',
     ],
     [
       'a test field into a once step',
       0,
       'source',
       field('input'),
-      'test.<field> is there only in a step that runs per test.',
+      "Only a step that runs for each test can read a test's fields.",
     ],
     [
       'a per-test input into a once step',
       0,
       'source',
       input('answers'),
-      'answers is given once per test, so only a per-test step reads it.',
+      'answers is given once for each test, so only a step that runs for each test can read it.',
     ],
     [
       'a contestant input into a port that raises a limit',
       1,
       'time_limit',
       input('guess'),
-      'This port raises a limit, so the task must give it, not the contestant.',
+      'This value raises a limit, so the task must give it, not the entrant.',
     ],
     [
       'a step reading its own output',
       1,
       'memory_limit',
       output('run', 'time_ms'),
-      'run is not a step before this one.',
+      'There is no step called run before this one.',
     ],
     [
       'a number into an enum port',
       2,
       'mode',
       output('run', 'time_ms'),
-      'Takes one of exact, tokens.',
+      'This takes one of exact, tokens.',
     ],
     [
       'an optional input into a required port',
       1,
       'input',
       input('key'),
-      'The input is optional, so it feeds only an optional port.',
+      'That input is optional, so it can be given only to an optional port.',
     ],
     [
       'a loop',
       0,
       'source',
       output('run', 'output'),
-      'That makes a loop: run reads this step already.',
+      'That would make a loop: run already reads this step.',
     ],
   ] as const)('refuses %s with its reason', (_, step, port, source, reason) => {
     expect(wireRefusal(WORKFLOW, primitives, step, port, source)).toBe(reason);
@@ -194,7 +212,7 @@ steps:
 
     expect(
       wireRefusal(workflow, primitives, 1, 'time_limit', output('first', 'time_ms')),
-    ).toBe('This port raises a limit, so it must be known at the save.');
+    ).toBe('This value raises a limit, so it must be known when the task is saved.');
   });
 
   it('refuses an optional output into a required port', () => {
@@ -209,13 +227,13 @@ steps:
 
     expect(
       wireRefusal(workflow, primitives, 1, 'time_limit', output('check', 'fraction')),
-    ).toBe('This port raises a limit, so it must be known at the save.');
+    ).toBe('This value raises a limit, so it must be known when the task is saved.');
     expect(
       wireRefusal(workflow, primitives, 1, 'args', output('check', 'fraction')),
     ).toBeNull();
     expect(
       wireRefusal(workflow, primitives, 1, 'input', output('check', 'fraction')),
-    ).toBe('The output may be absent, so it feeds only an optional port.');
+    ).toBe('That output may be missing, so it can be given only to an optional port.');
   });
 
   it('lets a step read one listed after it when that makes no loop', () => {
@@ -227,7 +245,10 @@ steps:
   it('reports only text and numbers', () => {
     expect(reportRefusal(WORKFLOW, primitives, output('run', 'time_ms'))).toBeNull();
     expect(reportRefusal(WORKFLOW, primitives, output('run', 'output'))).toBe(
-      'steps.run.output is file; a report holds text or numbers.',
+      'steps.run.output is a file, and only text or a number can be reported.',
+    );
+    expect(reportRefusal(WORKFLOW, primitives, input('limit'))).toBe(
+      "Only a step's output can be reported, not an input or a test's field.",
     );
   });
 
@@ -241,27 +262,35 @@ steps:
       valueRefusal(WORKFLOW, primitives, 1, 'time_limit', '${{ inputs.limit }}s', [
         input('limit'),
       ]),
-    ).toBe('This port raises a limit, so it must be known at the save.');
+    ).toBe('This value raises a limit, so it must be known when the task is saved.');
     expect(
       valueRefusal(WORKFLOW, primitives, 0, 'language', '${{ inputs.limit }}s', [
         input('limit'),
       ]),
-    ).toBe('Takes one of c, cpp, java, python.');
+    ).toBe('This takes one of c, cpp, java, python.');
     expect(
       valueRefusal(WORKFLOW, primitives, 0, 'entry', 'x ${{ test.episodes }}', [
         field('episodes'),
       ]),
-    ).toBe('test.<field> is there only in a step that runs per test.');
+    ).toBe("Only a step that runs for each test can read a test's fields.");
     expect(
       valueRefusal(WORKFLOW, primitives, 1, 'args', 'x ${{ inputs.key }}', [
         input('key'),
       ]),
     ).toBe(
-      '${{ inputs.key }} is optional, so it is given whole to optional ports, never written into text.',
+      '${{ inputs.key }} is optional, so it can be given only whole, to an optional port, not written into text.',
     );
     expect(valueRefusal(WORKFLOW, primitives, 0, 'language', 'rust', [])).toBe(
-      'Takes one of c, cpp, java, python.',
+      'This takes one of c, cpp, java, python.',
     );
+    expect(valueRefusal(WORKFLOW, primitives, 1, 'binary', true, [])).toBe(
+      'This takes a file, not true or false.',
+    );
+    expect(
+      valueRefusal(WORKFLOW, primitives, 1, 'binary', 'x ${{ steps.run.output }}', [
+        output('run', 'output'),
+      ]),
+    ).toBe("A step's output can be given only whole, not written into text.");
     expect(
       valueRefusal(WORKFLOW, primitives, 1, 'time_limit', new NumberText('2'), []),
     ).toBeNull();
@@ -271,7 +300,7 @@ steps:
     const workflow = readWorkflow(parse(CLASSIC_V2));
 
     expect(switchRefusal(workflow, 1)).toBe(
-      'It reads test.input, which only a per-test step reads.',
+      "It reads the test's input, which only a step that runs for each test can read.",
     );
     expect(switchRefusal(workflow, 0)).toBeNull();
     const once = readWorkflow(
@@ -282,7 +311,9 @@ steps:
   - {id: b, use: unicon/compile@v2, with: {source: "\${{ steps.a.binary }}"}}
 `),
     );
-    expect(switchRefusal(once, 0)).toBe('b runs once and reads it.');
+    expect(switchRefusal(once, 0)).toBe(
+      'b runs once and reads it, so this step runs once too.',
+    );
   });
 
   it('moves the fewest steps when a step comes to read a later one', () => {
@@ -323,7 +354,9 @@ steps:
 
     expect(
       reportRefusal(workflow, primitives, output('compile', 'compile_log'), time),
-    ).toBe('fold, better, at_least and at_most say what a number means; this is text.');
+    ).toBe(
+      'fold, better, at_least and at_most apply only to a number, and this is text.',
+    );
     expect(
       reportRefusal(workflow, primitives, output('run', 'memory_kb'), time),
     ).toBeNull();
@@ -341,7 +374,7 @@ report:
     );
 
     expect(switchRefusal(workflow, 0)).toBe(
-      "The report's time folds it over tests, so it runs per test.",
+      "The report's time folds it over the tests, so this step runs for each test.",
     );
   });
 
@@ -362,10 +395,10 @@ report:
 
     expect(
       reportRefusal(workflow, primitives, output('run', 'time_ms'), score ?? null),
-    ).toBe('dir must be an enum input the task gives, not the contestant.');
+    ).toBe('dir must be an enum input that the task gives, not the entrant.');
     expect(
       reportRefusal(workflow, primitives, output('run', 'time_ms'), bounded ?? null),
-    ).toBe('Must be at least at_least.');
+    ).toBe('The upper bound must be at least the lower bound.');
     const close = bounded && {
       ...bounded,
       atLeast: new NumberText('1.00000000000000000002'),
@@ -373,7 +406,7 @@ report:
     };
     expect(
       reportRefusal(workflow, primitives, output('run', 'time_ms'), close ?? null),
-    ).toBe('Must be at least at_least.');
+    ).toBe('The upper bound must be at least the lower bound.');
   });
 
   it('names what a change of a declaration newly breaks', () => {
@@ -389,7 +422,7 @@ report:
 
     expect(newProblem(before, before, primitives)).toBeNull();
     expect(newProblem(before, after, primitives)).toBe(
-      'run.time_limit: This port raises a limit, so the task must give it, not the contestant.',
+      'run.time_limit: This value raises a limit, so the task must give it, not the entrant.',
     );
   });
 });

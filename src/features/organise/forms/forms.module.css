@@ -15,6 +15,15 @@
   border-radius: var(--mantine-radius-sm);
 }
 
+/*
+ * A field alone on its line is as wide as a field needs, not the page; fields
+ * side by side share a grid instead.
+ */
+.fieldset > :global(.mantine-InputWrapper-root),
+.fieldset > div:not(.grid):has(> :global(.mantine-InputWrapper-root)) {
+  max-width: 640px;
+}
+
 .legend {
   padding: 0 4px;
   font-size: 13px;
@@ -92,6 +101,11 @@
 .orderKey {
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-end;
+  align-items: flex-start;
   gap: 10px;
+}
+
+/* Its buttons level with the boxes, below the boxes' labels, whatever their hints. */
+.orderKey > button {
+  margin-top: 23px;
 }

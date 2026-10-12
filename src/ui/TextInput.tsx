@@ -1,22 +1,31 @@
 import { TextInput as MantineTextInput } from '@mantine/core';
-import type { Ref } from 'react';
+import type { ReactNode, Ref } from 'react';
+import { useFieldLabel } from './FieldLabel';
 
 /**
  * A one-line field with its label always shown, since a placeholder is gone
- * the moment someone types. `description` is the helper line under the label,
- * and `maxLength`, when given, is the most characters the field takes.
+ * the moment someone types. `placeholder` is for a format or a default
+ * ("10 MB"), which helps only until something is typed; what is needed while
+ * typing goes in `description`, a short line under the box. Hints sit under
+ * the box, as the theme puts them for every field, so fields side by side
+ * start their boxes on one line. `info` is background behind an ⓘ beside the
+ * label. `maxLength`, when given, is the most characters the field takes.
  * `inputMode="decimal"` asks a phone for its number keys, for a field that
  * takes a number. `ref` is the input itself, for moving the focus to it.
  * `error`, when given, is what the server refused about the field: it reads
  * under it and marks the field invalid. `onCommit`, when given, is called
  * when the field is left or Enter is pressed in it, for a field whose change
- * applies once the person is done typing.
+ * applies once the person is done typing. `autoFocus` takes the focus as
+ * the field appears, inside a dialog too, which otherwise gives it to its
+ * first button.
  */
 export function TextInput({
   label,
   value,
   onChange,
   description,
+  placeholder,
+  info,
   error,
   required = false,
   maxLength,
@@ -24,11 +33,14 @@ export function TextInput({
   disabled = false,
   ref,
   onCommit,
+  autoFocus = false,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   description?: string;
+  placeholder?: string;
+  info?: ReactNode;
   error?: string;
   required?: boolean;
   maxLength?: number;
@@ -36,12 +48,16 @@ export function TextInput({
   disabled?: boolean;
   ref?: Ref<HTMLInputElement>;
   onCommit?: () => void;
+  autoFocus?: boolean;
 }) {
-  return (
+  const { inputLabel, id, wrap } = useFieldLabel({ label, info, required });
+  return wrap(
     <MantineTextInput
       ref={ref}
-      label={label}
+      id={id}
+      label={inputLabel}
       description={description}
+      placeholder={placeholder}
       error={error}
       value={value}
       onChange={(event) => onChange(event.currentTarget.value)}
@@ -51,12 +67,14 @@ export function TextInput({
       disabled={disabled}
       radius="sm"
       onBlur={onCommit}
+      autoFocus={autoFocus}
+      data-autofocus={autoFocus ? true : undefined}
       onKeyDown={(event) => {
         if (event.key === 'Enter' && onCommit !== undefined) {
           event.preventDefault();
           onCommit();
         }
       }}
-    />
+    />,
   );
 }

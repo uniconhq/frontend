@@ -108,7 +108,7 @@ describe('the checks before anything is sent', () => {
     expect(refused?.extensions['errors']).toEqual([
       { input: 'submission', message: 'This input needs a file.' },
       { input: 'program', message: 'This input needs at least one file.' },
-      { input: 'alpha', message: 'Must be at most 1.' },
+      { input: 'alpha', message: 'This must be at most 1.' },
       { input: 'language', message: 'Choose one of c, cpp.' },
     ]);
   });
@@ -116,7 +116,7 @@ describe('the checks before anything is sent', () => {
   it('asks for a number', () => {
     const refused = checkDraft([alpha], { alpha: { kind: 'text', text: ' ' } });
     expect(refused?.extensions['errors']).toEqual([
-      { input: 'alpha', message: 'Give a number.' },
+      { input: 'alpha', message: 'Give a number in plain digits, such as 2.5.' },
     ]);
   });
 
@@ -126,7 +126,7 @@ describe('the checks before anything is sent', () => {
       expect(refused?.extensions['errors'], text).toEqual([
         {
           input: 'alpha',
-          message: 'Must be a number written as plain decimal digits, such as 2.5.',
+          message: 'Give a number in plain digits, such as 2.5.',
         },
       ]);
     }
@@ -140,7 +140,7 @@ describe('the checks before anything is sent', () => {
     });
     expect(at).toBeNull();
     expect(past?.extensions['errors']).toEqual([
-      { input: 'ratio', message: `Must be at most ${THIRTY}.` },
+      { input: 'ratio', message: `This must be at most ${THIRTY}.` },
     ]);
   });
 

@@ -4,7 +4,7 @@ import type { SaveResult, WriteFile } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
-import { DefinitionErrors } from '../DefinitionErrors';
+import { DefinitionErrors, type PlaceOf } from '../DefinitionErrors';
 import classes from '../organise.module.css';
 import { countOf, definitionErrorsOf, stringsOf } from './refusals';
 
@@ -68,7 +68,7 @@ function Notes({ notes }: { notes: string[] }) {
   if (notes.length === 0) return null;
   return (
     <>
-      <BodyText>Of note:</BodyText>
+      <BodyText>Notes:</BodyText>
       <ul className={classes.named} aria-label="Notes">
         {notes.map((note) => (
           <li key={note}>{note}</li>
@@ -78,23 +78,37 @@ function Notes({ notes }: { notes: string[] }) {
   );
 }
 
+/**
+ * What a save came back with, in words. `placeOf`, when given, names each
+ * problem a refused save lists by the part of the page and the field it is
+ * about, with a link that opens it; `bare` says a written save in words
+ * alone, for a form whose versions the organiser never sees.
+ */
 export function SaveOutcome<Body = WriteFile>({
   outcome,
   onConfirm,
   onKeepAsDraft,
   onReload,
+  placeOf,
+  bare = false,
 }: {
   outcome: Outcome<Body>;
   onConfirm: (body: Body) => void;
   onKeepAsDraft: (body: Body) => void;
   onReload: () => void;
+  placeOf?: PlaceOf;
+  bare?: boolean;
 }) {
   if (outcome.kind === 'written') {
     return (
       <Panel role="status">
-        <BodyText>
-          Saved as version <code>{short(outcome.version)}</code>.
-        </BodyText>
+        {bare ? (
+          <BodyText>Saved.</BodyText>
+        ) : (
+          <BodyText>
+            Saved as version <code>{short(outcome.version)}</code>.
+          </BodyText>
+        )}
         <Notes notes={outcome.notes} />
       </Panel>
     );
@@ -105,7 +119,7 @@ export function SaveOutcome<Body = WriteFile>({
     if ('number' in result) {
       return (
         <Panel role="status">
-          <BodyText>Published as publication {result.number}.</BodyText>
+          <BodyText>Saved and published as publication {result.number}.</BodyText>
           {result.grading_changed ? (
             <>
               <BodyText>It changes how the task grades:</BodyText>
@@ -132,12 +146,13 @@ export function SaveOutcome<Body = WriteFile>({
     return (
       <Panel role="status">
         <BodyText>
-          Saved as a draft. Nothing was published; the last publication keeps grading.
+          Saved as a draft. Nothing was published, so entrants are still graded on the
+          last publication.
         </BodyText>
         {result.errors.length > 0 && (
           <>
-            <BodyText>What keeps it from publishing:</BodyText>
-            <DefinitionErrors errors={result.errors} />
+            <BodyText>What stops it from publishing:</BodyText>
+            <DefinitionErrors errors={result.errors} placeOf={placeOf} />
           </>
         )}
         {result.held_back.length > 0 && (
@@ -165,7 +180,7 @@ export function SaveOutcome<Body = WriteFile>({
           and replaces your text, so copy anything you want to keep first.
         </BodyText>
         <div className={classes.actions}>
-          <Button size="xs" variant="secondary" onClick={onReload}>
+          <Button variant="secondary" onClick={onReload}>
             Reload the file
           </Button>
         </div>
@@ -185,14 +200,12 @@ export function SaveOutcome<Body = WriteFile>({
         </ul>
         <BodyText tone="secondary">
           Publishing changes the grading of a running contest:{' '}
-          {regradedSentence(countOf(error, 'regrades'))} Keeping it as a draft writes
-          the files and publishes nothing.
+          {regradedSentence(countOf(error, 'regrades'))} Keeping it as a draft saves the
+          changes without publishing them.
         </BodyText>
         <div className={classes.actions}>
-          <Button size="xs" onClick={() => onConfirm(body)}>
-            Publish the change
-          </Button>
-          <Button size="xs" variant="secondary" onClick={() => onKeepAsDraft(body)}>
+          <Button onClick={() => onConfirm(body)}>Publish the change</Button>
+          <Button variant="secondary" onClick={() => onKeepAsDraft(body)}>
             Keep as draft
           </Button>
         </div>
@@ -216,7 +229,7 @@ export function SaveOutcome<Body = WriteFile>({
         </ul>
       )}
       {error.code === 'invalid_definition' && (
-        <DefinitionErrors errors={definitionErrorsOf(error)} />
+        <DefinitionErrors errors={definitionErrorsOf(error)} placeOf={placeOf} />
       )}
     </Panel>
   );

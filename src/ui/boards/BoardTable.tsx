@@ -8,10 +8,9 @@ import { formatDateTime } from '@/lib/time';
 import { cellLines, cellPlaces, gradingText, keyLabel, keyPlaces } from './board-text';
 import classes from './boards.module.css';
 
-/** What a row is called: a team's own name or a contestant's username. */
+/** What a row is called: its entrant's own name, or its one member's username. */
 function rowName(row: BoardRow): string {
-  if (row.row.name !== '') return row.row.name;
-  return row.row.team !== null ? 'A team' : `Contestant ${String(row.row.user_id)}`;
+  return row.row.name !== '' ? row.row.name : 'An entrant';
 }
 
 /**
@@ -88,9 +87,7 @@ export function BoardTable({
     submissionTo === undefined || !own ? (
       `#${number}`
     ) : (
-      <PageLink to={submissionTo(task, number)} mono>
-        #{number}
-      </PageLink>
+      <PageLink to={submissionTo(task, number)}>#{number}</PageLink>
     );
 
   if (board.nothing_shown) {
@@ -99,7 +96,7 @@ export function BoardTable({
         <SectionTitle>{title}</SectionTitle>
         <BodyText tone="secondary">
           {board.shown_at === null
-            ? 'None of the tasks on this board is released yet.'
+            ? 'None of the tasks on this leaderboard is released yet.'
             : `Shown from ${formatDateTime(new Date(board.shown_at))}.`}
         </BodyText>
       </section>
@@ -117,7 +114,7 @@ export function BoardTable({
       <SectionTitle>{title}</SectionTitle>
       <NotInView board={board} />
       {board.rows.length === 0 ? (
-        <BodyText tone="secondary">Nobody is on this board yet.</BodyText>
+        <BodyText tone="secondary">Nobody is on this leaderboard yet.</BodyText>
       ) : (
         <div className={classes.scroll}>
           <table className={classes.table} aria-label={title}>
@@ -142,7 +139,7 @@ export function BoardTable({
                 const own = !everyGiven && isOwn(row);
                 return (
                   <tr
-                    key={`${String(row.row.user_id)}-${String(row.row.team)}`}
+                    key={row.row.entrant}
                     className={own ? classes.own : undefined}
                     aria-current={own ? 'true' : undefined}
                   >

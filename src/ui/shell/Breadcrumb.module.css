@@ -2,18 +2,22 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  font-family: var(--mantine-font-family-monospace);
+  min-width: 0;
+  overflow: hidden;
   font-size: 12px;
+  white-space: nowrap;
 }
 
 .segment {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
+  display: inline-block;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
   padding: 2px 8px;
   border-radius: var(--mantine-radius-xs);
   background: var(--unicon-hover);
   color: var(--unicon-text-body);
+  vertical-align: middle;
 }
 
 .caret {
@@ -24,6 +28,7 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  min-width: 0;
 }
 
 .link {
@@ -32,4 +37,10 @@
 
 .link:hover {
   color: var(--unicon-text-primary);
+  text-decoration: underline;
+}
+
+.link[aria-current='page'] {
+  color: var(--unicon-text-primary);
+  font-weight: 600;
 }

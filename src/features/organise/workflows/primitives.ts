@@ -1,7 +1,7 @@
 import type { Primitive, PrimitivePort } from '@/api/types';
 
 /**
- * The platform's primitives as the palette and the drag checks read them:
+ * The platform's primitives as the Add step menu and the drag checks read them:
  * each version with its declared ports and the limits it raises, or the
  * reason a version in a format no longer read cannot be used.
  */

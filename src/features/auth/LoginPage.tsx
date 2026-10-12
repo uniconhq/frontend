@@ -53,9 +53,8 @@ export function LoginPage() {
       </div>
 
       <BodyText tone="secondary">
-        You will sign in through{' '}
-        {forge === null ? 'Forgejo' : <a href={forge}>{new URL(forge).host}</a>}, where
-        your account, your repositories and your submissions live.
+        You will sign in through {forge === null ? 'Forgejo' : new URL(forge).host},
+        where your account and the work you submit are kept.
       </BodyText>
 
       <BodyText tone="secondary">Unicon never sees your password.</BodyText>

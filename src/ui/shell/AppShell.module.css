@@ -17,6 +17,20 @@
   background: var(--unicon-canvas);
 }
 
+/*
+ * On a narrow screen the sidebar runs across the top, above the page, so the
+ * page keeps the screen's whole width.
+ */
+@media (max-width: 760px) {
+  .main {
+    flex-direction: column;
+  }
+
+  .content {
+    padding: 16px;
+  }
+}
+
 .skip {
   position: absolute;
   top: -100px;

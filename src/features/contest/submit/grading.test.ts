@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { GradingResult, Submission } from '@/api/types';
-import { justFinished, pollEvery, verdictOf } from './grading';
+import { justFinished, pointsLine, pollEvery, verdictOf } from './grading';
+import { formatExact } from '@/lib/exact';
+import { formatWhen } from '@/lib/time';
 
 const NOW = new Date('2026-09-26T10:10:00Z');
 
@@ -80,5 +82,36 @@ describe('the verdict a grading shows', () => {
     );
     expect(verdictOf({ ...done, outcome: 'wrong_answer' })).toBe('wrong_answer');
     expect(verdictOf(done)).toBe('graded');
+  });
+});
+
+describe('a submission’s points in its row', () => {
+  const points = (shown: string, pendingUntil: string | null = null) => ({
+    ...done,
+    points: {
+      shown,
+      pending: pendingUntil === null ? '0' : '30',
+      pending_until: pendingUntil,
+    },
+  });
+
+  it('gives the points shown, exactly as served', () => {
+    expect(pointsLine(points('75'), NOW)).toBe('75');
+    expect(pointsLine(points('82.5'), NOW)).toBe(formatExact('82.5', 2));
+  });
+
+  it('gives a dash while it is graded, and when it never will be', () => {
+    expect(pointsLine(null, NOW)).toBe('—');
+    expect(pointsLine({ ...done, status: 'queued' }, NOW)).toBe('—');
+    expect(pointsLine({ ...done, status: 'grading' }, NOW)).toBe('—');
+    expect(pointsLine({ ...done, status: 'cancelled' }, NOW)).toBe('—');
+    expect(pointsLine(done, NOW)).toBe('—');
+  });
+
+  it('says when points held back are shown', () => {
+    const at = '2026-09-26T14:00:00Z';
+    const when = formatWhen(new Date(at), NOW);
+    expect(pointsLine(points('0', at), NOW)).toBe(`shown at ${when}`);
+    expect(pointsLine(points('40', at), NOW)).toBe(`40 so far, more shown at ${when}`);
   });
 });
