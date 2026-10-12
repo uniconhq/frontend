@@ -37,11 +37,7 @@ describe('where a refused setting of the contest is changed', () => {
       'Settings, Teams: Fewest people in a team',
       '/orgs/acme/contests/spring/settings?field=fewest',
     ],
-    [
-      'on_system_error',
-      'Settings, When grading fails: A submission whose grading failed',
-      '/orgs/acme/contests/spring/settings?field=on_system_error',
-    ],
+    ['on_system_error', 'Settings', '/orgs/acme/contests/spring/settings'],
     [
       'state',
       'Status: Open, draft or archived',

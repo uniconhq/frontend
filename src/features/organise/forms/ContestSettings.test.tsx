@@ -118,7 +118,7 @@ describe('the contest settings form', { timeout: 20_000 }, () => {
         .getAllByRole('group')
         .filter((group) => group.tagName === 'FIELDSET')
         .map((group) => group.querySelector('legend')?.textContent),
-    ).toEqual(['Basics', 'Schedule', 'Teams', 'When grading fails']);
+    ).toEqual(['Basics', 'Schedule', 'Teams']);
     expect(within(form).queryByLabelText('State')).toBeNull();
     expect(within(form).queryByLabelText('Who sees it')).toBeNull();
     expect(screen.getByRole('link', { name: 'View file' })).toHaveAttribute(
@@ -145,11 +145,6 @@ describe('the contest settings form', { timeout: 20_000 }, () => {
     await userEvent.click(
       teams.getByRole('radio', { name: 'At a team’s first submission' }),
     );
-    await userEvent.click(
-      inBox(form, 'When grading fails').getByRole('radio', {
-        name: 'Uses its last good result',
-      }),
-    );
     await userEvent.click(within(form).getByRole('button', { name: 'Save settings' }));
 
     expect(await screen.findByText('Saved.')).toBeVisible();
@@ -170,7 +165,6 @@ describe('the contest settings form', { timeout: 20_000 }, () => {
         { id: 'sort', worth: 50 },
       ],
       entrants: { most: 3, fewest: 2, locks: 'first_submission' },
-      on_system_error: 'last_result',
     });
     expect(write?.content).toContain("# the page's title");
   });
@@ -187,6 +181,20 @@ describe('the contest settings form', { timeout: 20_000 }, () => {
 
     await screen.findByText('Saved.');
     expect(parse(sent[0]?.content ?? '')).not.toHaveProperty('entrants');
+  });
+
+  it('offers nothing for a grading that fails, and takes the retired setting out of a file that still has it', async () => {
+    const { sent } = contestBackend({
+      current: `${CONTEST}on_system_error: last_result\n`,
+    });
+    const form = await openForm();
+
+    expect(within(form).queryByText(/grading fails/i)).toBeNull();
+    fill(inBox(form, 'Basics').getByLabelText('Name'), 'Spring 2026');
+    await userEvent.click(within(form).getByRole('button', { name: 'Save settings' }));
+
+    await screen.findByText('Saved.');
+    expect(parse(sent[0]?.content ?? '')).not.toHaveProperty('on_system_error');
   });
 
   it('will not save a team whose fewest is more than its most', async () => {

@@ -49,7 +49,6 @@ const SETTINGS: Record<string, [string, string]> = {
   description: ['Basics', 'Description'],
   start: ['Schedule', 'Start'],
   end: ['Schedule', 'End'],
-  on_system_error: ['When grading fails', 'A submission whose grading failed'],
 };
 
 const TEAMS: Record<string, string> = {
