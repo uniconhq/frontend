@@ -361,6 +361,20 @@ function BuildForm({
   useEffect(() => {
     if (stale) forget();
   }, [stale, forget]);
+  // Once a save from these cards went through, what it sent is saved: nothing
+  // is left to save while the task is read again, unless changed since (M66).
+  const [sent, setSent] = useState<{
+    values: TaskValues;
+    staged: Staged;
+    inputFiles: StagedInput[];
+  } | null>(null);
+  const through =
+    saving.outcome?.kind === 'saved' &&
+    saving.outcome !== answered &&
+    sent?.values === values &&
+    sent.staged === staged &&
+    sent.inputFiles === inputFiles;
+  const toSave = changed && !through;
   const problems = [
     values.credit.kind !== 'none' && values.credit.name.trim() === ''
       ? 'Choose which value a test earns, under How a test earns.'
@@ -409,6 +423,7 @@ function BuildForm({
     if ('error' in fresh) return;
     writeTask(fresh.doc, read.values, values, { admin, unreadable: read.unreadable });
     const content = writeOver(file.content, fresh.doc);
+    setSent({ values, staged, inputFiles });
     void saving.save({
       yaml:
         content === file.content
@@ -512,8 +527,8 @@ function BuildForm({
         />
       )}
       <SaveBar
-        lines={changed ? lines : []}
-        notices={changed ? notices : []}
+        lines={toSave ? lines : []}
+        notices={toSave ? notices : []}
         problems={problems}
         state={saving.state}
         onSave={save}
