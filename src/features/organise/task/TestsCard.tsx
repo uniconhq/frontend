@@ -382,9 +382,12 @@ function MixFields({
           <span>%{words.passAfter}</span>
         </MixLine>
       </ul>
-      <BodyText tone="secondary">
-        The parts add up: up to {pointsWords(groupWeight(group))}.
-      </BodyText>
+      {/* With no points yet, the group's sentence says its tests are for practice. */}
+      {groupWeight(group).num !== 0n && (
+        <BodyText tone="secondary">
+          The parts add up: up to {pointsWords(groupWeight(group))}.
+        </BodyText>
+      )}
     </div>
   );
 }
