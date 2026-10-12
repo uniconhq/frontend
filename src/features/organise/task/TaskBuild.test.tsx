@@ -1398,6 +1398,84 @@ function fieldGroup(scope: HTMLElement, name: string): HTMLElement {
   return within(scope).getByRole('group', { name });
 }
 
+describe('the save’s answer (M66)', { timeout: 30_000 }, () => {
+  it('stands in the page at the bar’s place once nothing is left to save, with Close', async () => {
+    taskBackend({ form: { ...CHECKED, inputs: [] } });
+    const { tests } = await openTask();
+
+    fill(fieldIn(tests, 'small', 'Points'), '40');
+    const bar = await screen.findByRole('region', { name: 'Save the task' });
+    // While there is something to save, the bar stays in view at the window's foot.
+    expect(bar).not.toHaveClass(/saveSettled/);
+    await save();
+
+    expect(
+      await screen.findByText('Saved and published as publication 4.'),
+    ).toBeVisible();
+    const answer = screen.getByRole('region', { name: 'Save the task' });
+    await waitFor(() => expect(answer).toHaveClass(/saveSettled/));
+    await userEvent.click(
+      within(answer).getByRole('button', { name: 'Close the save’s answer' }),
+    );
+    expect(screen.queryByRole('region', { name: 'Save the task' })).toBeNull();
+  });
+
+  it('goes once something is changed again, rather than standing beside changes it does not cover', async () => {
+    taskBackend({ form: { ...CHECKED, inputs: [] } });
+    const { tests } = await openTask();
+
+    fill(fieldIn(tests, 'small', 'Points'), '40');
+    await save();
+    expect(
+      await screen.findByText('Saved and published as publication 4.'),
+    ).toBeVisible();
+    await waitFor(() =>
+      expect(screen.getByRole('region', { name: 'Save the task' })).toHaveClass(
+        /saveSettled/,
+      ),
+    );
+
+    fill(
+      fieldIn(
+        screen.getByRole('region', { name: 'Tests and scoring' }),
+        'small',
+        'Points',
+      ),
+      '50',
+    );
+    const bar = await screen.findByRole('region', { name: 'Save the task' });
+    await waitFor(() =>
+      expect(bar).not.toHaveTextContent('Saved and published as publication 4.'),
+    );
+    expect(bar).not.toHaveClass(/saveSettled/);
+    expect(within(bar).getByRole('button', { name: 'Save' })).toBeEnabled();
+  });
+
+  it('stays in view while it asks to publish or keep a draft, with no Close', async () => {
+    taskBackend({
+      form: { ...CHECKED, inputs: [] },
+      answer: () =>
+        problem(409, 'confirmation_required', {
+          detail: 'The contest is running and this changes how the task grades.',
+          changes: ['limits.time changed'],
+          regrades: 2,
+        }),
+    });
+    const { tests } = await openTask();
+
+    fill(fieldIn(tests, 'small', 'Points'), '40');
+    await save();
+    const bar = screen.getByRole('region', { name: 'Save the task' });
+    expect(
+      await within(bar).findByRole('button', { name: 'Publish the change' }),
+    ).toBeVisible();
+    expect(bar).not.toHaveClass(/saveSettled/);
+    expect(
+      within(bar).queryByRole('button', { name: 'Close the save’s answer' }),
+    ).toBeNull();
+  });
+});
+
 describe('the tests of a task', { timeout: 30_000 }, () => {
   it('offers to add a test, not a count of none, before any file is chosen', async () => {
     taskBackend({ form: { ...CHECKED, inputs: [] } });

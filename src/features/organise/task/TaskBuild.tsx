@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { queryView } from '@/api/query';
 import { toApiError } from '@/api/problem';
@@ -346,6 +346,21 @@ function BuildForm({
     inputFiles.map((change) => change.id),
   );
   const changed = lines.length > 0 || values.inputs.some(heldTheOtherWay);
+  // A save's answer is about that save: once something is changed again, it
+  // goes, rather than standing in the bar beside changes it does not cover.
+  // The cards read the task afresh once a save is through, so an answer that
+  // was there when they did is one the organiser has seen beside no change.
+  const [answered] = useState(() => saving.outcome);
+  const stale =
+    changed &&
+    saving.state.stage === 'idle' &&
+    saving.outcome !== null &&
+    saving.outcome === answered &&
+    saving.outcome.kind === 'saved';
+  const { forget } = saving;
+  useEffect(() => {
+    if (stale) forget();
+  }, [stale, forget]);
   const problems = [
     values.credit.kind !== 'none' && values.credit.name.trim() === ''
       ? 'Choose which value a test earns, under How a test earns.'
@@ -508,6 +523,13 @@ function BuildForm({
           setInputFiles([]);
           saving.forget();
         }}
+        pinned={
+          saving.merge !== null ||
+          saving.conflicts !== null ||
+          (saving.outcome?.kind === 'refused' &&
+            saving.outcome.error.code === 'confirmation_required')
+        }
+        onClose={saving.drop}
       >
         {(saving.outcome !== null ||
           saving.merge !== null ||

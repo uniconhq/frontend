@@ -216,7 +216,8 @@
   color: var(--unicon-text-danger);
 }
 
-/* The one save bar, in view at the foot of the window while there is something to save. */
+/* The one save bar, in view at the foot of the window while there is something to save
+ * or an answer to choose from. */
 .saveBar {
   position: sticky;
   bottom: 0;
@@ -229,6 +230,13 @@
   border-radius: var(--mantine-radius-md);
   background: var(--unicon-body);
   box-shadow: 0 -4px 16px rgb(0 0 0 / 12%);
+}
+
+/* Once nothing is left to save, the last save's answer stands in the page. */
+.saveSettled {
+  position: static;
+  border-color: var(--unicon-border);
+  box-shadow: none;
 }
 
 .changes {

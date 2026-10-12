@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
 import { Progress } from '@/ui/Progress';
@@ -10,7 +10,10 @@ import classes from './task.module.css';
  * there is something to save: what changed, a line each, what the save will
  * do that the organiser should know first, and Save, which publishes the
  * task, or keeps it as a draft when it has problems. While larger files are
- * sent, how many have gone.
+ * sent, how many have gone. Once nothing is left to save, the last save's
+ * answer leaves the foot of the window and stands in the page at the bar's
+ * place, with Close (M66); an answer that asks for a choice, `pinned`, stays
+ * in view until it is made.
  */
 export function SaveBar({
   lines,
@@ -19,6 +22,8 @@ export function SaveBar({
   state,
   onSave,
   onDiscard,
+  pinned,
+  onClose,
   children,
 }: {
   /** What changed, a line each. */
@@ -30,15 +35,30 @@ export function SaveBar({
   state: SaveState;
   onSave: () => void;
   onDiscard: () => void;
+  /** Whether the last save's answer asks for a choice, such as to publish or keep a draft. */
+  pinned: boolean;
+  /** Put the last save's answer away. */
+  onClose: () => void;
   /** The last save's answer, under the bar. */
   children?: ReactNode;
 }) {
+  const section = useRef<HTMLElement>(null);
   const busy = state.stage !== 'idle';
-  if (lines.length === 0 && !busy && (children === undefined || children === false)) {
-    return null;
-  }
+  const answer = children !== undefined && children !== false;
+  const settled = lines.length === 0 && !busy && !pinned && answer;
+  // The answer is where the keyboard is; keep it in view as it settles.
+  useEffect(() => {
+    if (settled) section.current?.scrollIntoView?.({ block: 'nearest' });
+  }, [settled]);
+  if (lines.length === 0 && !busy && !answer) return null;
   return (
-    <section className={classes.saveBar} aria-label="Save the task">
+    <section
+      ref={section}
+      className={
+        settled ? `${classes.saveBar} ${classes.saveSettled}` : classes.saveBar
+      }
+      aria-label="Save the task"
+    >
       {lines.length > 0 && (
         <>
           <BodyText>
@@ -84,6 +104,13 @@ export function SaveBar({
         </div>
       )}
       {children}
+      {settled && (
+        <div className={classes.statusLine}>
+          <Button variant="secondary" onClick={onClose} label="Close the save’s answer">
+            Close
+          </Button>
+        </div>
+      )}
     </section>
   );
 }
