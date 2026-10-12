@@ -9,6 +9,7 @@ import { Loaded } from '@/ui/feedback/Loaded';
 import { taskCardPath } from '@/lib/sections';
 import { formatDateTime } from '@/lib/time';
 import { DefinitionErrors } from '../DefinitionErrors';
+import { TaskInContest } from '../contest/TaskEntry';
 import { fileQuery, treeQuery } from '../files/place';
 import { readTask } from '../forms/task-values';
 import {
@@ -226,8 +227,9 @@ function NextStep({
 }
 
 /**
- * The top of a task's page: where its files stand and when they were last
- * saved, by whom; a tick for each part of the task that is done, or what it
+ * The top of a task's page: where it stands in its contest, its worth and
+ * timeline, changed from there (M68); where its files stand and when they
+ * were last saved, by whom; a tick for each part of the task that is done, or what it
  * lacks, each going to its card; what entrants are graded on (M21); and what
  * to do next when a save is stuck.
  */
@@ -260,6 +262,7 @@ export function TaskStanding({
     <Loaded view={state} rows={2}>
       {(task) => (
         <div className={classes.status} aria-label="Where the task stands">
+          <TaskInContest org={place.org} contest={place.contest} task={place.task} />
           <div className={classes.statusLine}>
             <StateChip state={task} />
             {last !== undefined && (

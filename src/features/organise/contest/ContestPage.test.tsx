@@ -743,7 +743,7 @@ describe('how the contest is scored, as published', () => {
   });
 });
 
-describe("a task's timeline, edited on its row", () => {
+describe("a task's place in the contest, changed from its row", () => {
   /** The contest's settings, each save taken and the file becoming it. */
   function settingsSaved(content?: string) {
     let file = files['contest.yaml']!;
@@ -770,9 +770,11 @@ describe("a task's timeline, edited on its row", () => {
     renderApp(CONTEST);
 
     await user.click(
-      await screen.findByRole('button', { name: 'Edit the timeline of A · sort' }),
+      await screen.findByRole('button', { name: 'Change A · sort in this contest' }),
     );
-    const dialog = await screen.findByRole('dialog', { name: 'Timeline of A · sort' });
+    const dialog = await screen.findByRole('dialog', {
+      name: 'A · sort in this contest',
+    });
     const worth = await within(dialog).findByRole('textbox', { name: 'Worth' });
     expect(worth).toHaveAttribute('placeholder', '100, its test groups’ total');
     await user.type(worth, '120');
@@ -782,7 +784,7 @@ describe("a task's timeline, edited on its row", () => {
       within(dialog).getByRole('textbox', { name: /Taken off per started late day/ }),
       '12.5',
     );
-    await user.click(within(dialog).getByRole('button', { name: 'Save the timeline' }));
+    await user.click(within(dialog).getByRole('button', { name: 'Save' }));
 
     expect(await within(dialog).findByText('Saved.')).toBeVisible();
     const [saved] = sent;
@@ -802,9 +804,11 @@ describe("a task's timeline, edited on its row", () => {
     renderApp(CONTEST);
 
     await user.click(
-      await screen.findByRole('button', { name: 'Edit the timeline of B · sum' }),
+      await screen.findByRole('button', { name: 'Change B · sum in this contest' }),
     );
-    const dialog = await screen.findByRole('dialog', { name: 'Timeline of B · sum' });
+    const dialog = await screen.findByRole('dialog', {
+      name: 'B · sum in this contest',
+    });
     const worth = await within(dialog).findByRole('textbox', { name: 'Worth' });
     expect(worth).toBeDisabled();
     expect(worth).toHaveAccessibleDescription(
@@ -820,44 +824,81 @@ describe("a task's timeline, edited on its row", () => {
     ).toBeDisabled();
   });
 
-  it('moves a task down the list, which saves at once', async () => {
+  it('moves a task down the list from its row, which saves at once', async () => {
     server.use(signedIn, standingList, ...repoFiles);
     const sent = settingsSaved();
     const user = userEvent.setup();
     renderApp(CONTEST);
 
-    await user.click(
-      await screen.findByRole('button', { name: 'Edit the timeline of A · sort' }),
-    );
-    const dialog = await screen.findByRole('dialog', { name: 'Timeline of A · sort' });
-    expect(within(dialog).getByRole('button', { name: 'Move up' })).toBeDisabled();
-    await user.click(within(dialog).getByRole('button', { name: 'Move down' }));
+    const row = await screen.findByRole('listitem', { name: 'A · sort' });
+    expect(
+      within(row).getByRole('button', { name: 'Move A · sort up' }),
+    ).toBeDisabled();
+    await user.click(within(row).getByRole('button', { name: 'Move A · sort down' }));
 
     await waitFor(() => expect(sent).toHaveLength(1));
     expect((parse(sent[0] ?? '') as { tasks: { id: string }[] }).tasks).toEqual([
       { id: 'sum' },
       { id: 'sort' },
     ]);
+    expect(
+      within(screen.getByRole('listitem', { name: 'B · sum' })).getByRole('button', {
+        name: 'Move B · sum down',
+      }),
+    ).toBeDisabled();
   });
 
-  it('says in a task’s timeline that it cannot be taken out of the contest yet', async () => {
+  it('opens the dialog from the row’s second line, which ends in Change, and has no Edit button', async () => {
+    server.use(signedIn, standingList, ...repoFiles);
+    settingsSaved();
+    renderApp(CONTEST);
+
+    const row = await screen.findByRole('listitem', { name: 'A · sort' });
+    const line = within(row).getByRole('button', {
+      name: 'Change A · sort in this contest',
+    });
+    expect(line).toHaveTextContent(/^100 points, .*·Change$/);
+    expect(within(row).queryByRole('button', { name: /^Edit/ })).toBeNull();
+  });
+
+  it('offers no arrows while the contest has one task', async () => {
+    server.use(
+      signedIn,
+      http.get(`${CONTEST_API}/organise/tasks`, () =>
+        HttpResponse.json(standings.slice(0, 1)),
+      ),
+      ...repoFiles,
+    );
+    settingsSaved();
+    renderApp(CONTEST);
+
+    const row = await screen.findByRole('listitem', { name: 'A · sort' });
+    expect(within(row).queryByRole('button', { name: /^Move/ })).toBeNull();
+    expect(
+      within(row).getByRole('button', { name: 'Change A · sort in this contest' }),
+    ).toBeVisible();
+  });
+
+  it('says in a task’s dialog that it cannot be taken out of the contest yet', async () => {
     server.use(signedIn, standingList, ...repoFiles);
     settingsSaved();
     const user = userEvent.setup();
     renderApp(CONTEST);
 
     await user.click(
-      await screen.findByRole('button', { name: 'Edit the timeline of A · sort' }),
+      await screen.findByRole('button', { name: 'Change A · sort in this contest' }),
     );
-    const dialog = await screen.findByRole('dialog', { name: 'Timeline of A · sort' });
+    const dialog = await screen.findByRole('dialog', {
+      name: 'A · sort in this contest',
+    });
     expect(
       within(dialog).getByText(
-        'Every task in this list is part of the contest: a task cannot be taken out of it yet, so the contest opens only once each is published.',
+        'A task cannot be taken out of its contest yet, so the contest opens only once every one of its tasks is published.',
       ),
     ).toBeVisible();
   });
 
-  it('moves the task it was opened for, wherever the list read fresh has it', async () => {
+  it('moves the task whose arrow was pressed, wherever the list read fresh has it', async () => {
     server.use(signedIn, standingList, ...repoFiles);
     // Someone else put a task ahead of sort since the page read its list.
     const sent = settingsSaved(
@@ -866,11 +907,8 @@ describe("a task's timeline, edited on its row", () => {
     const user = userEvent.setup();
     renderApp(CONTEST);
 
-    await user.click(
-      await screen.findByRole('button', { name: 'Edit the timeline of A · sort' }),
-    );
-    const dialog = await screen.findByRole('dialog', { name: 'Timeline of A · sort' });
-    await user.click(within(dialog).getByRole('button', { name: 'Move down' }));
+    const row = await screen.findByRole('listitem', { name: 'A · sort' });
+    await user.click(within(row).getByRole('button', { name: 'Move A · sort down' }));
 
     await waitFor(() => expect(sent).toHaveLength(1));
     expect((parse(sent[0] ?? '') as { tasks: { id: string }[] }).tasks).toEqual([
@@ -880,18 +918,20 @@ describe("a task's timeline, edited on its row", () => {
     ]);
   });
 
-  it("opens a task's timeline from a link that names one of its fields", async () => {
+  it("opens a task's dialog from a link that names one of its fields", async () => {
     server.use(signedIn, standingList, ...repoFiles);
     settingsSaved();
     renderApp(`${CONTEST}?part=tasks&field=worth&item=0`);
 
-    const dialog = await screen.findByRole('dialog', { name: 'Timeline of A · sort' });
+    const dialog = await screen.findByRole('dialog', {
+      name: 'A · sort in this contest',
+    });
     await waitFor(() =>
       expect(within(dialog).getByRole('textbox', { name: 'Worth' })).toHaveFocus(),
     );
   });
 
-  it("opens a task's timeline from such a link followed while the page is open", async () => {
+  it("opens a task's dialog from such a link followed while the page is open", async () => {
     server.use(signedIn, standingList, ...repoFiles);
     settingsSaved();
     const { router } = renderApp(CONTEST);
@@ -900,11 +940,11 @@ describe("a task's timeline, edited on its row", () => {
     await router.navigate(`${CONTEST}?part=tasks&field=closes&item=1`);
 
     expect(
-      await screen.findByRole('dialog', { name: 'Timeline of B · sum' }),
+      await screen.findByRole('dialog', { name: 'B · sum in this contest' }),
     ).toBeVisible();
   });
 
-  it('offers an observer no way to edit a timeline', async () => {
+  it('offers an observer the line as text, with no way to change or move a task', async () => {
     server.use(
       http.get('/api/v1/me', () =>
         HttpResponse.json({
@@ -919,8 +959,9 @@ describe("a task's timeline, edited on its row", () => {
     );
     renderApp(CONTEST);
 
-    await screen.findByRole('listitem', { name: 'A · sort' });
-    expect(screen.queryByRole('button', { name: /^Edit the timeline/ })).toBeNull();
+    const row = await screen.findByRole('listitem', { name: 'A · sort' });
+    expect(within(row).getByText(/^100 points, /)).toBeVisible();
+    expect(within(row).queryByRole('button')).toBeNull();
   });
 });
 

@@ -1,12 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
-import { useQueries, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import { isMap, isSeq } from 'yaml';
 import { $api, queryView } from '@/api/query';
 import type { TaskStanding } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
-import { Button } from '@/ui/Button';
-import { Modal } from '@/ui/Modal';
+import { IconButton } from '@/ui/IconButton';
 import { Chip } from '@/ui/Chip';
 import { ListCard, type ListRow } from '@/ui/ListCard';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
@@ -17,9 +16,6 @@ import { formatDateTime } from '@/lib/time';
 import { CreateButton } from '../Create';
 import { DefinitionErrors } from '../DefinitionErrors';
 import { definitionErrorsOf } from '../files/refusals';
-import { fileQuery } from '../files/place';
-import { readTask } from '../forms/task-values';
-import { readSettings } from '../task/build-data';
 import { holdsAtContest, tasksReached } from '../roles';
 import type { ContestValues } from '../forms/contest-values';
 import type { Doc } from '../forms/yaml-doc';
@@ -27,16 +23,14 @@ import { contestPlaceOf } from './opened';
 import { FIELD_PARAM, ITEM_PARAM, viewFilePath } from './places';
 import { useContestChange } from './save';
 import { useContestSettings } from './settings';
-import { TaskTimelineForm } from './TaskTimelineForm';
+import { EntryLine, TaskEntryDialog } from './TaskEntry';
+import { STANDINGS, entrySentence, labelOf, useTaskTitles } from './task-entry';
 import { FIRST_KIND, STARTER, startOn, type Kind } from '../task/new-task';
 import { TaskKind } from '../task/TaskKind';
 import { PageLink } from '@/ui/PageLink';
 import { taskCardPath } from '@/lib/sections';
-import { markedBoardCovers, timelineSentence } from './timeline';
-import shared from '../organise.module.css';
 import classes from './contest.module.css';
 
-const STANDINGS = '/api/v1/orgs/{org}/contests/{contest}/organise/tasks';
 const TASKS = '/api/v1/orgs/{org}/contests/{contest}/tasks';
 
 function when(at: string): string {
@@ -68,56 +62,26 @@ function TaskState({ standing }: { standing: TaskStanding }) {
   );
 }
 
-/**
- * Each task's title, as its settings give it, by its name: read for every
- * task listed, as its own page reads it. A task whose settings are not read
- * yet, or give no title, is called by its name.
- */
-function useTaskTitles(
-  org: string,
-  contest: string,
-  names: string[],
-): ReadonlyMap<string, string> {
-  const files = useQueries({
-    queries: names.map((task) => ({
-      ...fileQuery({ kind: 'task', org, contest, task }, 'task.yaml'),
-      retry: false,
-    })),
-  });
-  return new Map(
-    names.map((task, at) => {
-      const data = files[at]?.data;
-      const read = data === undefined ? null : readSettings(data);
-      const title =
-        read === null || 'error' in read
-          ? ''
-          : readTask(read.doc, []).values.name.trim();
-      return [task, title === '' ? task : title];
-    }),
-  );
-}
-
-/** A task as its row and its timeline call it: its letter and its title. */
-function labelOf(standing: TaskStanding, titles: ReadonlyMap<string, string>): string {
-  return `${standing.label} · ${titles.get(standing.task.name) ?? standing.task.name}`;
-}
+/** Who may change the contest's tasks, and how: open a task's dialog, or move it. */
+type Changing = {
+  open: () => void;
+  move: (by: -1 | 1) => void;
+  first: boolean;
+  last: boolean;
+  /** Whether there is more than one task to move it among. */
+  movable: boolean;
+  moving: boolean;
+};
 
 function rowOf(
   org: string,
   contest: string,
   standing: TaskStanding,
   values: ContestValues | null,
-  onEdit: (() => void) | null,
+  changing: Changing | null,
   titles: ReadonlyMap<string, string>,
 ): ListRow {
   const label = labelOf(standing, titles);
-  const entry = values?.tasks.find((found) => found.id === standing.task.name);
-  const marks =
-    values !== null && markedBoardCovers(values, standing.task.name)
-      ? entry === undefined || entry.marks === ''
-        ? '1'
-        : entry.marks
-      : null;
   return {
     key: standing.task.name,
     to: taskPath(org, contest, standing.task.name),
@@ -130,20 +94,30 @@ function rowOf(
           <TaskState standing={standing} />
         </span>
         <span className={classes.line}>
-          {timelineSentence(standing, values, marks)}
+          <EntryLine
+            sentence={entrySentence(standing, values)}
+            label={label}
+            onOpen={changing === null ? null : changing.open}
+          />
         </span>
       </>
     ),
     action:
-      onEdit === null ? undefined : (
-        <Button
-          size="xs"
-          variant="secondary"
-          label={`Edit the timeline of ${label}`}
-          onClick={onEdit}
-        >
-          Edit
-        </Button>
+      changing === null || !changing.movable ? undefined : (
+        <div className={classes.moves}>
+          <IconButton
+            sign="↑"
+            label={`Move ${label} up`}
+            disabled={changing.first || changing.moving}
+            onClick={() => changing.move(-1)}
+          />
+          <IconButton
+            sign="↓"
+            label={`Move ${label} down`}
+            disabled={changing.last || changing.moving}
+            onClick={() => changing.move(1)}
+          />
+        </div>
       ),
   };
 }
@@ -167,95 +141,14 @@ function moved(id: string, by: -1 | 1) {
 }
 
 /**
- * The dialog a task's timeline is edited in, from its row, with the buttons
- * that move it up and down the contest's list, which save at once, since
- * its place is its letter.
- */
-function EditTimeline({
-  org,
-  contest,
-  standings,
-  editing,
-  titles,
-  onClose,
-}: {
-  org: string;
-  contest: string;
-  standings: TaskStanding[];
-  editing: number | null;
-  titles: ReadonlyMap<string, string>;
-  onClose: () => void;
-}) {
-  const { apply, pending } = useContestChange(org, contest);
-  const [refused, setRefused] = useState<unknown>(null);
-  const standing = editing === null ? undefined : standings[editing];
-  const label = standing === undefined ? '' : labelOf(standing, titles);
-  const move = async (by: -1 | 1) => {
-    if (standing === undefined) return;
-    setRefused(null);
-    const outcome = await apply(moved(standing.task.name, by));
-    if (outcome.kind === 'refused') setRefused(outcome.error);
-    else onClose();
-  };
-  return (
-    <Modal
-      opened={standing !== undefined}
-      onClose={onClose}
-      title={`Timeline of ${label}`}
-    >
-      {standing !== undefined && editing !== null && (
-        <div className={shared.stack}>
-          <TaskTimelineForm
-            org={org}
-            contest={contest}
-            standing={standing}
-            label={label}
-          />
-          <div className={shared.actions}>
-            <Button
-              size="xs"
-              variant="secondary"
-              disabled={editing === 0}
-              loading={pending}
-              onClick={() => void move(-1)}
-            >
-              Move up
-            </Button>
-            <Button
-              size="xs"
-              variant="secondary"
-              disabled={editing === standings.length - 1}
-              loading={pending}
-              onClick={() => void move(1)}
-            >
-              Move down
-            </Button>
-            <BodyText tone="secondary">
-              A task’s letter is its place in the list.
-            </BodyText>
-          </div>
-          <BodyText tone="secondary">
-            Every task in this list is part of the contest: a task cannot be taken out
-            of it yet, so the contest opens only once each is published.
-          </BodyText>
-          {refused !== null && (
-            <div role="alert">
-              <ErrorBlock error={refused} compact />
-            </div>
-          )}
-        </div>
-      )}
-    </Modal>
-  );
-}
-
-/**
  * A contest's tasks as a list card, in the contest's order, each row its
- * letter and name, where its files stand and its timeline in the contest as
- * one line, which a manager edits from the row; "New task" at the bottom
- * for a manager, which also adds it to the contest's tasks. A link to a
- * task's timeline (`?part=tasks&item=` its place) opens it. Listing needs
- * the observer role at the contest;
+ * letter and name, where its files stand, and its worth and timeline in the
+ * contest as one line, which a manager presses to change them in a dialog;
+ * with two tasks or more, arrows on each row move it up or down the list,
+ * saving at once, since a task's letter is its place. "New task" sits at the
+ * bottom for a manager, which also adds it to the contest's tasks. A link to
+ * a task's place in the contest (`?part=tasks&item=` its place in the list)
+ * opens its dialog. Listing needs the observer role at the contest;
  * someone who holds a role only at one of its tasks is refused the list, so
  * the refusal comes with the tasks their own roles reach. A `contest.yaml`
  * that does not pass validation shows its errors and lists the tasks by
@@ -311,6 +204,14 @@ export function ContestTasks({ org, contest }: { org: string; contest: string })
     $api.useQuery('get', TASKS, { params: { path } }, { enabled: unreadable }),
   );
   const queryClient = useQueryClient();
+  const change = useContestChange(org, contest);
+  const [moveRefused, setMoveRefused] = useState<unknown>(null);
+  const move = async (task: string, by: -1 | 1) => {
+    setMoveRefused(null);
+    const outcome = await change.apply(moved(task, by));
+    if (outcome.kind === 'refused') setMoveRefused(outcome.error);
+    await queryClient.invalidateQueries({ queryKey: standingsKey });
+  };
   const create = $api.useMutation('post', TASKS, {
     onSuccess: () =>
       Promise.all([
@@ -330,13 +231,22 @@ export function ContestTasks({ org, contest }: { org: string; contest: string })
     }));
   const rows: ListRow[] =
     view.state === 'ready'
-      ? view.data.map((standing, at) =>
+      ? view.data.map((standing, at, all) =>
           rowOf(
             org,
             contest,
             standing,
             values,
-            manages ? () => setEditing(at) : null,
+            manages
+              ? {
+                  open: () => setEditing(at),
+                  move: (by) => void move(standing.task.name, by),
+                  first: at === 0,
+                  last: at === all.length - 1,
+                  movable: all.length > 1,
+                  moving: change.pending,
+                }
+              : null,
             titles,
           ),
         )
@@ -349,7 +259,11 @@ export function ContestTasks({ org, contest }: { org: string; contest: string })
           : [];
 
   const notice =
-    startFailed !== null ? (
+    moveRefused !== null ? (
+      <div role="alert">
+        <ErrorBlock error={moveRefused} compact />
+      </div>
+    ) : startFailed !== null ? (
       <div className={classes.panel} role="alert">
         <BodyText>
           {startFailed.task} was created, but its workflow could not be set to{' '}
@@ -390,6 +304,8 @@ export function ContestTasks({ org, contest }: { org: string; contest: string })
       </>
     );
 
+  const editingStanding =
+    editing === null || view.state !== 'ready' ? undefined : view.data[editing];
   const closeEditing = () => {
     setEditing(null);
     if (search.has('part')) {
@@ -402,12 +318,11 @@ export function ContestTasks({ org, contest }: { org: string; contest: string })
 
   return (
     <div ref={card}>
-      <EditTimeline
+      <TaskEntryDialog
         org={org}
         contest={contest}
-        standings={view.state === 'ready' ? view.data : []}
-        editing={editing}
-        titles={titles}
+        standing={editingStanding}
+        label={editingStanding === undefined ? '' : labelOf(editingStanding, titles)}
         onClose={closeEditing}
       />
       <ListCard

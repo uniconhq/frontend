@@ -5,13 +5,14 @@ import { delay, http, HttpResponse } from 'msw';
 import { TASK_BUILD_CARDS, TASK_SECTIONS } from '@/lib/sections';
 import { formatDateTime } from '@/lib/time';
 import { renderApp } from '@/test/render';
-import { problem, server, signedIn } from '@/test/server';
+import { problem, server, signedIn, someone } from '@/test/server';
 import {
   TASK_API,
   draftTask,
   publicationList,
   publishedTask,
   repoFiles,
+  standingList,
   taskState,
 } from '@/test/organiser';
 
@@ -31,6 +32,52 @@ describe('the task page', () => {
     expect(status).toHaveTextContent(
       `Entrants are graded on publication 2, saved ${at('2026-09-21T10:00:00Z')}.`,
     );
+  });
+
+  it('says under its title where it stands in its contest, which a manager changes from there', async () => {
+    server.use(signedIn, taskState, publicationList, standingList, ...repoFiles);
+    const user = userEvent.setup();
+    renderApp(TASK);
+
+    const status = await screen.findByLabelText('Where the task stands');
+    const line = await within(status).findByRole('button', {
+      name: 'Change B · sum in this contest',
+    });
+    expect(within(status).getByText('In Spring:')).toBeVisible();
+    expect(line).toHaveTextContent('no points, open for the whole contest·Change');
+    await user.click(line);
+    const dialog = await screen.findByRole('dialog', {
+      name: 'B · sum in this contest',
+    });
+    expect(
+      await within(dialog).findByRole('textbox', { name: 'Worth' }),
+    ).toBeDisabled();
+  });
+
+  it('says where it stands in its contest as text to an observer of the contest', async () => {
+    server.use(
+      http.get('/api/v1/me', () =>
+        HttpResponse.json({
+          ...someone,
+          roles: [
+            { names: { org: 'acme', contest: 'spring', task: null }, role: 'observer' },
+          ],
+        }),
+      ),
+      taskState,
+      publicationList,
+      standingList,
+      ...repoFiles,
+    );
+    renderApp(TASK);
+
+    const status = await screen.findByLabelText('Where the task stands');
+    expect(
+      await within(status).findByText('no points, open for the whole contest'),
+    ).toBeVisible();
+    expect(
+      within(status).queryByRole('button', { name: /in this contest$/ }),
+    ).toBeNull();
   });
 
   it('lists what kept the last save from publishing, each where it is', async () => {
