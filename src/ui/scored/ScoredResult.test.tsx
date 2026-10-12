@@ -86,7 +86,7 @@ describe("a result's values over its tests", () => {
     expect(screen.queryByRole('group', { name: 'Over all tests' })).toBeNull();
     expect(
       screen.getByText(
-        'Run time and Memory used are counted over all tests only once every test is accepted.',
+        'Run time and memory used are counted over all tests only once every test is accepted.',
       ),
     ).toBeVisible();
     const tests = screen.getByRole('table', { name: 'Tests main' });

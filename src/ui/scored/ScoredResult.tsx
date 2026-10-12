@@ -7,6 +7,7 @@ import {
   foldWords,
   inReportOrder,
   meaningOf,
+  titleInSentence,
   valueTitle,
   withUnit,
 } from '@/lib/values';
@@ -94,8 +95,9 @@ function FoldedValues({
         .filter(
           (meaning) => meaning.fold !== null && folded[meaning.name] === undefined,
         )
-        .map((meaning) => valueTitle(meaning.name, meaning))
+        .map((meaning) => titleInSentence(meaning.name, meaning))
     : [];
+  const said = joined(missing);
   if (names.length === 0 && missing.length === 0) return null;
   return (
     <div className={classes.folded}>
@@ -124,8 +126,9 @@ function FoldedValues({
       )}
       {missing.length > 0 && (
         <BodyText tone="secondary">
-          {joined(missing)} {missing.length === 1 ? 'is' : 'are'} counted over all tests
-          only once every test is accepted.
+          {`${said.charAt(0).toUpperCase()}${said.slice(1)}`}{' '}
+          {missing.length === 1 ? 'is' : 'are'} counted over all tests only once every
+          test is accepted.
         </BodyText>
       )}
     </div>
