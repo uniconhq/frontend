@@ -48,6 +48,18 @@ describe('what Add tests says of a task’s parts (M47)', () => {
     );
   });
 
+  it('says "a" before a part whose name sounds like "you", and "an" before another vowel', () => {
+    const parts = namingOf([
+      field('user_output'),
+      field('unit_answer'),
+      field('expected'),
+      field('upper'),
+    ]);
+    expect(namingSentences(parts)[0]).toBe(
+      'Each test needs a user_output, a unit_answer, an expected and an upper.',
+    );
+  });
+
   it('keeps a folder part to a zip, and says why files by name cannot hold it', () => {
     const parts = namingOf([field('input'), field('data', 'folder')]);
     expect(pairedRefusal(parts)).toBe(

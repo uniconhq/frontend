@@ -7,8 +7,12 @@ import type { PartNaming } from './match';
  * each way of adding asks for, and how files are named for it.
  */
 
-/** "a" or "an", as a part's name begins. */
+/**
+ * "a" or "an", as a part's name sounds: "an" before a vowel sound, "a"
+ * before a vowel said as "you" or "w", such as user, unit or one.
+ */
 function article(name: string): string {
+  if (/^(uni|use|usu|uti|ure|uro|eu|ewe|one(?![a-z]))/i.test(name)) return 'a';
   return /^[aeiou]/i.test(name) ? 'an' : 'a';
 }
 
