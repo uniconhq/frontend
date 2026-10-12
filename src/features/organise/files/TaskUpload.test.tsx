@@ -291,7 +291,7 @@ describe('uploading a file of a task again', { timeout: 20_000 }, () => {
     const panel = await uploadAndSave();
 
     const files = await within(panel).findByRole('list', { name: 'Files that differ' });
-    const row = within(files).getByRole('radiogroup', { name: 'statement.md' });
+    const row = within(files).getByRole('radiogroup', { name: 'Statement' });
     expect(row).toHaveTextContent('Yours: Your upload, 4 bytes');
     expect(
       await within(row).findByText(/^Now: 2 KB, saved by alice on /),
@@ -303,7 +303,7 @@ describe('uploading a file of a task again', { timeout: 20_000 }, () => {
       name: 'Save yours over theirs?',
     });
     expect(warning).toHaveTextContent(
-      'This throws away what the other person saved in statement.md.',
+      'This throws away what the other person saved in Statement.',
     );
     await userEvent.click(
       within(warning).getByRole('button', { name: 'Save mine over theirs' }),
