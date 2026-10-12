@@ -203,7 +203,43 @@ describe('a task’s points', () => {
         'value',
       ),
     ).toBe(
-      "An entrant earns 50 points times the mean of its tests' scores, 30 points times their lowest test score and 20 points when at least 80% of its tests pass.",
+      'An entrant earns 50 points shared among the tests, each times its score from 0 to 1, plus 30 points times the lowest test score, plus 20 points when at least 80% of the tests pass. An entrant whose tests all score 0.5 gets 40 (25 + 15 + 0).',
+    );
+  });
+
+  it('says a hand-set mix part by part in the simple rules’ words, the parts adding up, with a worked example from its tests (M59)', () => {
+    const say = (
+      g: GroupValues,
+      tests: number | null,
+      credit: 'none' | 'value' | 'relative' = 'none',
+    ) => groupSentence(g, { total: r('210'), worth: null, credit, tests });
+    const mix = group('main', { each: '100', worst: '10', pass: '100', passAt: '0.8' });
+    expect(say(mix, 3)).toBe(
+      `An entrant earns 100 points shared among the tests passed, plus 10 points times the lowest test score, plus 100 points when at least 80% of the tests pass. An entrant who passes 2 of 3 gets about ${formatExact('66.67')} (${formatExact('66.67')} + 0 + 0); one who passes all 3 gets 210.`,
+    );
+    // Enough tests pass for the bar: its part counts in the example.
+    expect(say(group('main', { each: '60', pass: '40', passAt: '0.5' }), 4)).toBe(
+      'An entrant earns 60 points shared among the tests passed, plus 40 points when at least 50% of the tests pass. An entrant who passes 3 of 4 gets 85 (45 + 40); one who passes all 4 gets 100.',
+    );
+    expect(say(mix, null)).toBe(
+      'An entrant earns 100 points shared among the tests passed, plus 10 points times the lowest test score, plus 100 points when at least 80% of the tests pass.',
+    );
+    expect(say(group('main', { each: '50', worst: '50' }), 4, 'relative')).toBe(
+      'An entrant earns 50 points shared among the tests, each times its result against the best any entrant reached, plus 50 points times the lowest test score. An entrant who reaches 80% of the best on every test gets 80 (40 + 40).',
+    );
+    // Weighted tests: the parts say so, and no example is worked out.
+    expect(
+      say(
+        group('main', {
+          each: '50',
+          pass: '50',
+          passAt: '0.5',
+          weights: [{ test: '1', weight: '2' }],
+        }),
+        4,
+      ),
+    ).toBe(
+      'An entrant earns 50 points shared among the tests passed, by weight, plus 50 points when at least 50% of the tests pass, counted by weight.',
     );
   });
 

@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { useSearchParams } from 'react-router';
 import type { DeclaredField } from '@/api/types';
 import { ratioOf, type Ratio } from '@/lib/exact';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
+import { InlineField } from '@/ui/InlineField';
 import { RadioGroup } from '@/ui/RadioGroup';
 import { Select } from '@/ui/Select';
 import { TextInput } from '@/ui/TextInput';
@@ -11,6 +12,7 @@ import { FieldBox } from '../contest/ContestFile';
 import { FIELD_PARAM, ITEM_PARAM } from '../contest/places';
 import { fractionOf, percentOf } from '../contest/percent';
 import { NumberField } from '../forms/fields';
+import { numberProblem } from '../forms/yaml-doc';
 import type { GroupValues, TaskValues } from '../forms/task-values';
 import type { ReportEntry } from '../workflows/model';
 import { BuildCard, CardPart } from './BuildCard';
@@ -18,6 +20,7 @@ import type { GroupFolder, TaskPlace } from './build-data';
 import {
   groupSentence,
   groupWeight,
+  mixWords,
   pointsOf,
   pointsWords,
   readsWeights,
@@ -32,6 +35,7 @@ import {
   totalSentence,
   withPoints,
   withRule,
+  type CreditKind,
   type Rule,
 } from './scoring';
 import type { Staged } from './staged';
@@ -180,6 +184,26 @@ function CreditPart({
   );
 }
 
+/**
+ * A share typed as a percentage, and back as the fraction the settings hold:
+ * the percentage as typed, so a point or a trailing zero holds while the next
+ * digit is typed, or the settings' fraction when they hold another.
+ */
+function usePercent(
+  value: string,
+  onChange: (fraction: string) => void,
+): [string, (percent: string) => void] {
+  const [typed, setTyped] = useState(() => percentOf(value));
+  const shown = fractionOf(typed) === value ? typed : percentOf(value);
+  return [
+    shown,
+    (percent) => {
+      setTyped(percent);
+      onChange(fractionOf(percent));
+    },
+  ];
+}
+
 /** A share as a percentage typed in, and back as the fraction the settings hold. */
 function ShareField({
   label,
@@ -192,18 +216,12 @@ function ShareField({
   onChange: (fraction: string) => void;
   disabled: boolean;
 }) {
-  // The percentage as typed, so a point or a trailing zero holds while the
-  // next digit is typed; the settings' fraction when they hold another.
-  const [typed, setTyped] = useState(() => percentOf(value));
-  const shown = fractionOf(typed) === value ? typed : percentOf(value);
+  const [shown, setShown] = usePercent(value, onChange);
   return (
     <NumberField
       label={label}
       value={shown}
-      onChange={(percent) => {
-        setTyped(percent);
-        onChange(fractionOf(percent));
-      }}
+      onChange={setShown}
       placeholder="100"
       hint="A percentage, such as 80."
       error={shareProblem(value)}
@@ -212,42 +230,119 @@ function ShareField({
   );
 }
 
-/** The three rule weights and the threshold as they are, for a group of another mix. */
-function AdvancedFields({
+/** One part of a mix: its line with its boxes in it, and what is wrong with them under it. */
+function MixLine({
+  problems,
+  children,
+}: {
+  problems: (string | null | undefined)[];
+  children: ReactNode;
+}) {
+  const found = problems.filter(
+    (problem): problem is string => typeof problem === 'string',
+  );
+  return (
+    <li className={classes.mixPart}>
+      <div className={classes.mixLine}>{children}</div>
+      {found.map((problem) => (
+        <span key={problem} className={classes.mixProblem}>
+          {problem}
+        </span>
+      ))}
+    </li>
+  );
+}
+
+/**
+ * A group's hand-set mix (M59): one line per part, in the simple rules' words,
+ * each with its points box inside it and the pass bar inside the third; the
+ * lowest test score only where a test can earn part of its points, as the
+ * simple rule offers it, or while it is set, saying why it cannot stay; then
+ * what the parts add up to.
+ */
+function MixFields({
   group,
+  credit,
   onChange,
   disabled,
 }: {
   group: GroupValues;
+  credit: CreditKind;
   onChange: (change: Partial<GroupValues>) => void;
   disabled: boolean;
 }) {
+  const words = mixWords(credit, group.weights.length > 0);
+  const [share, setShare] = usePercent(group.passAt, (passAt) => onChange({ passAt }));
+  const worst = credit !== 'none' || group.worst.trim() !== '';
+  const box = (
+    label: string,
+    value: string,
+    change: (value: string) => void,
+    problem: string | undefined,
+    placeholder?: string,
+  ) => (
+    <InlineField
+      label={label}
+      value={value}
+      onChange={change}
+      placeholder={placeholder}
+      invalid={problem !== undefined}
+      inputMode="decimal"
+      disabled={disabled}
+    />
+  );
   return (
-    <div className={classes.grid}>
-      <NumberField
-        label="Points by the share of tests passed"
-        value={group.each}
-        onChange={(each) => onChange({ each })}
-        disabled={disabled}
-      />
-      <NumberField
-        label="Points by the worst test"
-        value={group.worst}
-        onChange={(worst) => onChange({ worst })}
-        disabled={disabled}
-      />
-      <NumberField
-        label="Points when enough tests pass"
-        value={group.pass}
-        onChange={(pass) => onChange({ pass })}
-        disabled={disabled}
-      />
-      <ShareField
-        label="Share of tests that must pass (%)"
-        value={group.passAt}
-        onChange={(passAt) => onChange({ passAt })}
-        disabled={disabled}
-      />
+    <div className={classes.mix}>
+      <ul className={classes.mixParts} aria-label="The parts of the mix">
+        <MixLine problems={[numberProblem(group.each)]}>
+          {box(
+            'Points shared among the tests',
+            group.each,
+            (each) => onChange({ each }),
+            numberProblem(group.each),
+          )}
+          <span>points {words.each}</span>
+        </MixLine>
+        {worst && (
+          <MixLine
+            problems={[numberProblem(group.worst), ruleRefusal('worst', credit)]}
+          >
+            {box(
+              'Points times the lowest test score',
+              group.worst,
+              (value) => onChange({ worst: value }),
+              numberProblem(group.worst) ?? ruleRefusal('worst', credit) ?? undefined,
+            )}
+            <span>points {words.worst}</span>
+          </MixLine>
+        )}
+        <MixLine
+          problems={[
+            numberProblem(group.pass),
+            numberProblem(share),
+            shareProblem(group.passAt),
+          ]}
+        >
+          {box(
+            'Points when enough tests pass',
+            group.pass,
+            (pass) => onChange({ pass }),
+            numberProblem(group.pass),
+          )}
+          <span>points {words.passBefore}</span>
+          {box(
+            'Share of tests that must pass (%)',
+            share,
+            setShare,
+            numberProblem(share) ?? shareProblem(group.passAt),
+            '100',
+          )}
+          <span>%{words.passAfter}</span>
+        </MixLine>
+      </ul>
+      <BodyText tone="secondary">
+        The parts add up: up to {pointsWords(groupWeight(group))}.
+      </BodyText>
     </div>
   );
 }
@@ -368,7 +463,10 @@ function GroupItem({
                   disabled: greyed,
                 };
               }),
-              { value: 'advanced', label: 'Another mix of these, set by hand' },
+              {
+                value: 'advanced',
+                label: 'A mix of these, each part with its own points',
+              },
             ]}
             error={rule === 'worst' && refusal !== null ? refusal : undefined}
             onChange={pick}
@@ -400,11 +498,16 @@ function GroupItem({
               )}
             </div>
           )}
+          {rule === 'advanced' && (
+            <MixFields
+              group={group}
+              credit={credit.kind}
+              onChange={onChange}
+              disabled={disabled}
+            />
+          )}
         </div>
       </FieldBox>
-      {rule === 'advanced' && (
-        <AdvancedFields group={group} onChange={onChange} disabled={disabled} />
-      )}
       <p className={classes.sentence}>
         {groupSentence(group, { total, worth, credit: credit.kind, tests: count })}
       </p>

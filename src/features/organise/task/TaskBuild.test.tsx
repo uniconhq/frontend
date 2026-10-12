@@ -1131,6 +1131,78 @@ describe('scoring a task', { timeout: 30_000 }, () => {
     });
   });
 
+  it('sets a hand-set mix one line per part, its bar inside its line, and says what the parts add up to (M59)', async () => {
+    const { sent } = taskBackend({ form: { ...CHECKED, inputs: [] } });
+    const { tests } = await openTask();
+
+    const rule = fieldIn(tests, 'small', 'How does this group earn points?');
+    fill(rule, 'advanced');
+    expect(rule).toHaveDisplayValue('A mix of these, each part with its own points');
+    const small = fieldGroup(tests, 'small');
+    const lines = within(
+      within(small).getByRole('list', { name: 'The parts of the mix' }),
+    ).getAllByRole('listitem');
+    expect(lines).toHaveLength(3);
+    expect(lines[0]).toHaveTextContent(
+      'points shared among the tests, each times its score from 0 to 1',
+    );
+    expect(lines[1]).toHaveTextContent('points times the lowest test score');
+    expect(lines[2]).toHaveTextContent('points when at least% of the tests pass');
+    fill(within(lines[0]!).getByLabelText('Points shared among the tests'), '100');
+    fill(within(lines[1]!).getByLabelText('Points times the lowest test score'), '10');
+    const share = within(lines[2]!).getByLabelText('Share of tests that must pass (%)');
+    await userEvent.type(share, '80');
+
+    expect(
+      within(small).getByText('The parts add up: up to 140 points.'),
+    ).toBeVisible();
+    expect(
+      within(small).getByText(
+        /An entrant whose tests all score 0\.5 gets 55 \(50 \+ 5 \+ 0\)\./,
+      ),
+    ).toBeVisible();
+    await save();
+    expect(
+      await screen.findByText('Saved and published as publication 4.'),
+    ).toBeVisible();
+    expect(written(sent[0])['test_groups']).toMatchObject({
+      small: { each: 100, worst: 10, pass: 30, pass_at: 0.8 },
+    });
+  });
+
+  it('leaves the lowest test score out of a mix while tests only pass or fail, and says why one set cannot stay (M59)', async () => {
+    taskBackend({
+      form: { ...CHECKED, inputs: [] },
+      content: TASK.replace('credit: fraction\n', '').replace(
+        'old: {each: 5}',
+        'old: {each: 5, worst: 5}',
+      ),
+    });
+    const { tests } = await openTask();
+
+    fill(fieldIn(tests, 'small', 'How does this group earn points?'), 'advanced');
+    const small = within(fieldGroup(tests, 'small')).getByRole('list', {
+      name: 'The parts of the mix',
+    });
+    expect(within(small).getAllByRole('listitem')).toHaveLength(2);
+    expect(
+      within(small).queryByLabelText('Points times the lowest test score'),
+    ).toBeNull();
+    expect(within(small).getAllByRole('listitem')[0]).toHaveTextContent(
+      'points shared among the tests passed',
+    );
+
+    const old = within(fieldGroup(tests, 'old')).getByRole('list', {
+      name: 'The parts of the mix',
+    });
+    expect(
+      within(old).getByLabelText('Points times the lowest test score'),
+    ).toHaveValue('5');
+    expect(old).toHaveTextContent(
+      'Only available when a test can earn part of its points. Set how a test earns first.',
+    );
+  });
+
   it('offers how a test earns as options with an example each, and says in a value’s own name why it cannot be one', async () => {
     taskBackend({ form: { ...CHECKED, inputs: [] } });
     const { tests } = await openTask();
