@@ -622,7 +622,13 @@ export interface paths {
         /**
          * Turn an answer into an announcement every contestant reads
          * @description On the task the question names, or else on the contest, pointing at
-         *     the question, which stays private.
+         *     the question, which stays private. The question is marked answered
+         *     unless `mark` is false, and gets a message, "Answered publicly in the
+         *     announcement" and its title, which only its readers see, with the
+         *     announcement's `task` and `number` as the message's `announcement`, so
+         *     the page links to it. Answers with the announcement and the question as
+         *     it now stands. Sent again after a failure part way, it finishes the
+         *     announcement it posted rather than posting a second.
          */
         post: operations["answerQuestionPublicly"];
         delete?: never;
@@ -2060,10 +2066,13 @@ export interface paths {
         /**
          * Save the task's files, publishing them when they are valid
          * @description A valid save publishes and one that is not is kept as a draft with its
-         *     errors. While the contest runs, a save that changes how the task grades
-         *     is refused as `confirmation_required`, with `changes`, what would change,
-         *     and `regrades`, how many submissions it would grade again, unless it is
-         *     confirmed or kept as a draft. A change naming an upload writes the pointer to the file the
+         *     errors. Once the contest has started, until it is archived, every save
+         *     that would publish something new is refused as `confirmation_required`
+         *     unless it is confirmed or kept as a draft, with `changes`, what would
+         *     change how the task grades, `regrades`, how many submissions it would
+         *     grade again, and what the save does, as a published save's `effect`
+         *     gives it: `results_change`, `summary`, `runs_again`, `scores` and
+         *     `reading`. A change naming an upload writes the pointer to the file the
          *     caller uploaded for that path; one that is not theirs for this task and
          *     path is `invalid_inputs`, and one whose bytes have not arrived
          *     `upload_not_ready`. A change with `remove: true` removes the file it
@@ -2840,6 +2849,17 @@ export interface components {
             where: components["schemas"]["ScopeNames"];
         };
         /**
+         * AnnouncementLink
+         * @description The announcement a message names: on the question's contest, or on
+         *     the task of it named `task`, by its number there.
+         */
+        AnnouncementLink: {
+            /** Number */
+            number: number;
+            /** Task */
+            task: string | null;
+        };
+        /**
          * AnnouncementRequest
          * @description An announcement's title and text, as posted or as edited.
          */
@@ -2919,7 +2939,10 @@ export interface components {
          *     `penalty` or a declared value, which way is better, null for a value no
          *     covered task gives a direction, and, on `penalty`, the minutes each
          *     attempt before the counted submission charges; a `per_attempt` of 0
-         *     charges nothing, so the minute submitted is all it ranks on.
+         *     charges nothing, so the minute submitted is all it ranks on. On a value,
+         *     `title` and `unit` name its column, "Run time" and "ms", as the first
+         *     covered task giving them says; both null on `points`, on `penalty` and
+         *     on a value no covered task names, which a page names by `by`.
          */
         BoardKey: {
             better: components["schemas"]["Better"] | null;
@@ -2927,6 +2950,10 @@ export interface components {
             by: string;
             /** Per Attempt */
             per_attempt: number | null;
+            /** Title */
+            title: string | null;
+            /** Unit */
+            unit: string | null;
         };
         /**
          * BoardPoints
@@ -3016,10 +3043,33 @@ export interface components {
         };
         /**
          * Change
+         * @description One entry of a place's history: the version it made, who made it, what
+         *     they said about it and when. `author` is the username of `author_id`,
+         *     which the history names whether or not they still hold a role there, and
+         *     none when the forge knows no such account, the change has no author, or
+         *     the platform made it, which is no person (a new task's first files).
+         */
+        Change: {
+            /**
+             * At
+             * Format: date-time
+             */
+            at: string;
+            /** Author */
+            author: string | null;
+            /** Author Id */
+            author_id: number | null;
+            /** Message */
+            message: string;
+            /** Version */
+            version: string;
+        };
+        /**
+         * ChangeKind
          * @description What a regrade did to one submission, as the module says.
          * @enum {string}
          */
-        "Change-Input": "up" | "down" | "stopped" | "unchanged" | "new" | "running" | "failed" | "over_limit";
+        ChangeKind: "up" | "down" | "stopped" | "unchanged" | "new" | "running" | "failed" | "over_limit";
         /**
          * CheckDefinition
          * @description A `workflow.yaml` to check as a version would be, writing nothing.
@@ -3492,35 +3542,6 @@ export interface components {
             /** Version */
             version: string | null;
         };
-        /**
-         * Change
-         * @description One entry of a place's history: the version it made, who made it, what
-         *     they said about it and when. `author` is the username of `author_id`,
-         *     which the history names whether or not they still hold a role there, and
-         *     none when the forge knows no such account, the change has no author, or
-         *     the platform made it, which is no person (a new task's first files).
-         */
-        forge__domain__content__Change: {
-            /**
-             * At
-             * Format: date-time
-             */
-            at: string;
-            /** Author */
-            author: string | null;
-            /** Author Id */
-            author_id: number | null;
-            /** Message */
-            message: string;
-            /** Version */
-            version: string;
-        };
-        /**
-         * Change
-         * @description What a regrade did to one submission, as the module says.
-         * @enum {string}
-         */
-        forge__domain__regrades__Change: "up" | "down" | "stopped" | "unchanged" | "new" | "running" | "failed" | "over_limit";
         /**
          * ForgeUrl
          * @description Where a browser reaches the forge's own pages: sign-in and the account
@@ -4006,9 +4027,11 @@ export interface components {
         /**
          * Message
          * @description One message under a question: whether the asker wrote it, what it
-         *     says, and when.
+         *     says, when, and, on the message a public answer leaves, the
+         *     announcement it was answered in.
          */
         Message: {
+            announcement: components["schemas"]["AnnouncementLink"] | null;
             /**
              * At
              * Format: date-time
@@ -4209,6 +4232,8 @@ export interface components {
             id: string;
             /** Limit */
             limit: number | null;
+            /** Meanings */
+            meanings: components["schemas"]["ValueMeaning"][];
             /** Outcome */
             outcome: ("accepted" | "wrong_answer" | "time_limit" | "memory_limit" | "output_limit" | "runtime_error" | "compile_error" | "skipped" | "system_error") | null;
             points: components["schemas"]["Points"] | null;
@@ -4341,7 +4366,11 @@ export interface components {
          * @description One port: its type, the options an enum takes, whether it may be left
          *     out, on an input whether the primitive runs what arrives there and
          *     whether it keeps it from the program it runs, and a sentence saying what
-         *     it takes or gives back, none when the primitive gives none.
+         *     it takes or gives back, none when the primitive gives none. The
+         *     `outcome` port may carry `outcomes`: each outcome the step can report,
+         *     in the declaration's order, with a line saying when (`accepted`: "the
+         *     source compiles"), for the step's drawer to say what it reports; none
+         *     when the primitive does not say, and on every other port.
          */
         PrimitivePort: {
             /** Description */
@@ -4350,6 +4379,10 @@ export interface components {
             optional: boolean;
             /** Options */
             options: string[] | null;
+            /** Outcomes */
+            outcomes: {
+                [key: string]: string;
+            } | null;
             /** Runs */
             runs: boolean | null;
             /** Secret */
@@ -4379,10 +4412,40 @@ export interface components {
             [key: string]: unknown;
         };
         /**
+         * PublicAnswer
+         * @description A public answer: the announcement every entrant reads, and the
+         *     question as it now stands, with the message naming it.
+         */
+        PublicAnswer: {
+            announcement: components["schemas"]["Announcement"];
+            question: components["schemas"]["Clarification"];
+        };
+        /**
+         * PublicAnswerRequest
+         * @description An answer made public: the announcement's title and text, and
+         *     whether to mark the question answered, as a reply's "Mark it answered"
+         *     does; it is unless `mark` is false.
+         */
+        PublicAnswerRequest: {
+            /** Body */
+            body: string;
+            /**
+             * Mark
+             * @default true
+             */
+            mark: boolean;
+            /** Title */
+            title: string;
+        };
+        /**
          * Publication
          * @description One publication: its number among the task's publications, the version
-         *     it froze, whether it changed how the task grades and what, and when.
-         *     Which workflow each of its workflow names was at the forge stays out.
+         *     it froze, whether it changed how the task grades and what, and when;
+         *     and `meanings`, every value its workflow reports, in the workflow's
+         *     order, with the words it froze for each, which a form picking a value
+         *     lists. A publication made before those words were kept lists its values
+         *     reported for each test by name alone. Which workflow each of its
+         *     workflow names was at the forge stays out.
          */
         Publication: {
             /**
@@ -4394,6 +4457,8 @@ export interface components {
             changes: string[];
             /** Grading Changed */
             grading_changed: boolean;
+            /** Meanings */
+            meanings: components["schemas"]["ValueMeaning"][];
             /** Number */
             number: number;
             /** Version */
@@ -4451,12 +4516,14 @@ export interface components {
          * @description A save that published: the new publication's number among the task's,
          *     whether it changed how the task grades, and what, the notes the save
          *     makes of the task beside publishing it, such as which steps it seals
-         *     until the reveal, and how many submissions it `regraded`, queued to be
-         *     graded again against it.
+         *     until the reveal, how many submissions it `regraded`, queued to be
+         *     graded again against it, and what it did, `effect`, in the words the
+         *     question before a save in a running contest uses.
          */
         Published: {
             /** Changes */
             changes: string[];
+            effect: components["schemas"]["SaveEffect"];
             /** Grading Changed */
             grading_changed: boolean;
             /** Notes */
@@ -4586,7 +4653,7 @@ export interface components {
          *     entrant at the task's most submissions.
          */
         RegradeChange: {
-            change: components["schemas"]["forge__domain__regrades__Change"];
+            change: components["schemas"]["ChangeKind"];
             earlier: components["schemas"]["RegradeSide"] | null;
             now: components["schemas"]["RegradeSide"] | null;
         };
@@ -4740,7 +4807,10 @@ export interface components {
          *     with a fold, folded over the tests shown, a test that was not accepted
          *     or did not report it counting as its worst bound, and the value absent
          *     when it declares none, so a wrong answer has no time; each test's row
-         *     still carries what it reported. `status` is in the contestant's words: `queued` until
+         *     still carries what it reported; and `meanings`, every value the
+         *     workflow reports, in its order, with the title and unit a page names it
+         *     by, falling back to its name, a value a sealed step holds back left out
+         *     until the reveal. `status` is in the contestant's words: `queued` until
          *     its run is started, `grading` while it is graded, `graded` once it has
          *     a result, `delayed` while it has none and its grading failed on the
          *     platform's side, `over_limit` once it was to be graded again with no
@@ -4778,6 +4848,8 @@ export interface components {
             id: string;
             /** Limit */
             limit: number | null;
+            /** Meanings */
+            meanings: components["schemas"]["ValueMeaning"][];
             /** Outcome */
             outcome: ("accepted" | "wrong_answer" | "time_limit" | "memory_limit" | "output_limit" | "runtime_error" | "compile_error" | "skipped" | "system_error") | null;
             points: components["schemas"]["Points"] | null;
@@ -4842,6 +4914,26 @@ export interface components {
             content: string;
             /** Token */
             token: string | null;
+        };
+        /**
+         * SaveEffect
+         * @description What a save does, in the words and parts a running contest's
+         *     `confirmation_required` asks with: `summary`, "Results change." or
+         *     "Nobody's result changes.", with `results_change` its flag; and the
+         *     sentences under "Runs again", "Scores" and "What entrants read", each
+         *     list holding at least one, a "nothing changes" line when nothing does.
+         */
+        SaveEffect: {
+            /** Reading */
+            reading: string[];
+            /** Results Change */
+            results_change: boolean;
+            /** Runs Again */
+            runs_again: string[];
+            /** Scores */
+            scores: string[];
+            /** Summary */
+            summary: string;
         };
         /**
          * SaveRequest
@@ -5241,7 +5333,10 @@ export interface components {
          *     publication or none, and whether the head is a draft, a state no
          *     publication froze. A draft carries the errors that keep it from
          *     publishing; a draft with none was held back, or has not been saved since
-         *     it was made.
+         *     it was made. `statement_written` says whether the latest publication
+         *     holds a statement, there, not blank and not the starter's placeholder,
+         *     false when nothing is published, and `head_statement_written` the same
+         *     of the head.
          */
         TaskState: {
             /** Draft */
@@ -5250,7 +5345,11 @@ export interface components {
             errors: components["schemas"]["DefinitionError"][];
             /** Head */
             head: string;
+            /** Head Statement Written */
+            head_statement_written: boolean;
             latest: components["schemas"]["Publication"] | null;
+            /** Statement Written */
+            statement_written: boolean;
         };
         /**
          * Timeline
@@ -5289,6 +5388,10 @@ export interface components {
          *     holds and that commit, the one that last changed it, which holds it as
          *     listed whatever the head has moved to since (none when the forge does
          *     not say), or a folder. `upload` tells an uploaded file from a typed one.
+         *     `token` is the file's `ConflictToken`, as a read gives it, plain text so the
+         *     entry is served as it is; `start` is how a small text
+         *     file begins (`start_of`), none for any other file and for an upload,
+         *     whose commit holds only the pointer to its bytes.
          */
         TreeEntry: {
             kind: components["schemas"]["EntryKind"];
@@ -5296,6 +5399,10 @@ export interface components {
             path: string;
             /** Size */
             size: number | null;
+            /** Start */
+            start: string | null;
+            /** Token */
+            token: string | null;
             upload: components["schemas"]["UploadInfo"] | null;
             /** Version */
             version: string | null;
@@ -5381,6 +5488,25 @@ export interface components {
          * @enum {string}
          */
         UploadStatus: "waiting" | "verified" | "consumed";
+        /**
+         * ValueMeaning
+         * @description One value the task's workflow reports, as a page names it: its `name`
+         *     in the report, its `title` ("Run time") and its `unit` ("ms", only on a
+         *     number), each null where the workflow gives none, so the page names it
+         *     by `name`; and, on a number reported for each test, how it `fold`s over
+         *     the tests and which way is `better`, both null otherwise.
+         */
+        ValueMeaning: {
+            better: components["schemas"]["Better"] | null;
+            /** Fold */
+            fold: ("sum" | "mean" | "max") | null;
+            /** Name */
+            name: string;
+            /** Title */
+            title: string | null;
+            /** Unit */
+            unit: string | null;
+        };
         /** Version */
         Version: {
             /** Version */
@@ -6687,7 +6813,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["AnnouncementRequest"];
+                "application/json": components["schemas"]["PublicAnswerRequest"];
             };
         };
         responses: {
@@ -6697,7 +6823,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Announcement"];
+                    "application/json": components["schemas"]["PublicAnswer"];
                 };
             };
             /** @description An error, as an RFC 9457 problem document. `code` names it. */
@@ -7134,7 +7260,7 @@ export interface operations {
         parameters: {
             query?: {
                 /** @description With regrade, what it did to the submission */
-                change?: components["schemas"]["Change-Input"] | null;
+                change?: components["schemas"]["ChangeKind"] | null;
                 /** @description One entrant's submissions */
                 entrant?: string | null;
                 /** @description Only each submission's latest attempt */
@@ -7263,7 +7389,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["forge__domain__content__Change"][];
+                    "application/json": components["schemas"]["Change"][];
                 };
             };
             /** @description An error, as an RFC 9457 problem document. `code` names it. */
@@ -8642,7 +8768,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["forge__domain__content__Change"][];
+                    "application/json": components["schemas"]["Change"][];
                 };
             };
             /** @description An error, as an RFC 9457 problem document. `code` names it. */
