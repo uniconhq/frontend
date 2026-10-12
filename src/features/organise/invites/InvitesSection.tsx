@@ -6,7 +6,7 @@ import { isApiError } from '@/api/problem';
 import type { Grant, Invite, OfferedGrant } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
-import { Select } from '@/ui/Select';
+import { RadioGroup } from '@/ui/RadioGroup';
 import { TextInput } from '@/ui/TextInput';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
@@ -250,10 +250,10 @@ function InviteForm({ place, grants }: { place: RolePlace; grants: OfferedGrant[
     }
   };
 
-  const means =
-    grant === 'contestant'
+  const meansOf = (offer: OfferedGrant) =>
+    offer === 'contestant'
       ? 'Accepting registers them for this contest.'
-      : ROLE_MEANS[grant];
+      : ROLE_MEANS[offer];
 
   return (
     <form
@@ -269,20 +269,22 @@ function InviteForm({ place, grants }: { place: RolePlace; grants: OfferedGrant[
           onChange={setTyped}
           required
         />
-        {grants.length > 1 && (
-          <Select
-            label="Role"
-            value={grant}
-            options={grants.map((value) => ({
-              value,
-              label: GRANT_LABEL[value],
-            }))}
-            onChange={(value) => setGrant(value as OfferedGrant)}
-          />
-        )}
       </div>
+      {grants.length > 1 && (
+        <RadioGroup
+          label="Role"
+          value={grant}
+          options={grants.map((value) => ({
+            value,
+            label: GRANT_LABEL[value],
+            description: meansOf(value),
+          }))}
+          onChange={(value) => setGrant(value as OfferedGrant)}
+        />
+      )}
       <BodyText tone="secondary">
-        {means} The invite expires after {STANDS_DAYS} days.
+        {grants.length > 1 ? '' : `${meansOf(grant)} `}The invite expires after{' '}
+        {STANDS_DAYS} days.
       </BodyText>
       <div className={classes.actions}>
         <Button type="submit" loading={change.pending !== null}>
