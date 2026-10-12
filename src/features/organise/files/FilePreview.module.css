@@ -1,0 +1,75 @@
+/* One part of a test, or one file: its name and size over what it holds. */
+.part {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0;
+  font-size: 13px;
+}
+
+.name {
+  font-weight: 600;
+  color: var(--unicon-text-primary);
+}
+
+.size {
+  font-size: 12px;
+  color: var(--unicon-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* A text's first lines, or all of it, scrolling inside past a screenful. */
+.text {
+  margin: 0;
+  max-height: 320px;
+  overflow: auto;
+  padding: 8px 10px;
+  border: 1px solid var(--unicon-border);
+  border-radius: var(--mantine-radius-sm);
+  background: var(--unicon-hover);
+  font-family: var(--mantine-font-family-monospace);
+  font-size: 12px;
+  white-space: pre;
+  color: var(--unicon-text-body);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* A folder as a small tree. */
+.tree {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0 12px;
+  font-size: 13px;
+}
+
+.entry {
+  padding: 2px 4px;
+  border: 0;
+  border-radius: var(--mantine-radius-xs);
+  background: transparent;
+  color: var(--unicon-text-body);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.entry:hover,
+.entry[aria-pressed='true'] {
+  background: var(--unicon-hover);
+}
+
+.entry:focus-visible {
+  outline: 2px solid var(--unicon-text-accent);
+}

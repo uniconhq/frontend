@@ -4,6 +4,7 @@ import type { DeclaredField, SaveChange } from '@/api/types';
 import { tokenNow } from '../files/use-task-upload';
 import { parseYaml, numberText, writeAt, writeYaml } from '../forms/yaml-doc';
 import type { TaskPlace } from './build-data';
+import { partOf } from './parts';
 import type { Source, TestFile } from './match';
 
 /**
@@ -73,10 +74,7 @@ export function existingOf(place: TaskPlace, group: string, test: string) {
 
 /** The field a file of a test fills, by its path in the test's folder: `answer.txt` fills `answer`. */
 function fieldOfEntry(entry: string): string {
-  const [first = ''] = entry.split('/');
-  if (first === 'test.yaml') return first;
-  const dot = first.indexOf('.');
-  return dot < 0 ? first : first.slice(0, dot);
+  return entry.split('/')[0] === 'test.yaml' ? 'test.yaml' : partOf(entry);
 }
 
 /** A test's values as its `test.yaml`, each written as its field's type. */

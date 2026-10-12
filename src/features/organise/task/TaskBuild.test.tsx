@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@/test/user-event';
 import { http, HttpResponse } from 'msw';
@@ -24,6 +24,14 @@ import {
 } from '@/test/organiser';
 import { makeZip } from '@/test/zip';
 import { comeBackToTab, fakeLiveStream, openStream, realLiveStream } from '@/test/live';
+
+/** The names of the files handed to the browser to save, in turn. */
+const saved = vi.hoisted((): string[] => []);
+vi.mock('@/lib/save-file', () => ({
+  saveFile: (name: string) => {
+    saved.push(name);
+  },
+}));
 
 const TASK = `name: Shortest Path   # the title
 workflow: unicon/checked@v1
@@ -1437,5 +1445,164 @@ describe('the tests of a task', { timeout: 30_000 }, () => {
       remove: true,
       encoding: 'utf-8',
     });
+  });
+});
+
+describe('a test opened in place (M50)', { timeout: 30_000 }, () => {
+  const LONG = Array.from({ length: 30 }, (_, at) => `line ${String(at + 1)}`).join(
+    '\n',
+  );
+
+  /** Test 1 of small with an input as long text, an uploaded answer, a binary note, a folder and values. */
+  function richTest() {
+    server.use(
+      http.get(`${TASK_API}/tree`, ({ request }) => {
+        const at = new URL(request.url).searchParams.get('path') ?? '';
+        if (at === 'tests/small/1') {
+          return HttpResponse.json([
+            file('tests/small/1/answer', 130),
+            {
+              path: 'tests/small/1/input',
+              kind: 'file',
+              size: LONG.length,
+              upload: null,
+            },
+            {
+              path: 'tests/small/1/expected',
+              kind: 'file',
+              size: 130,
+              upload: { size: 50_000_000, digest: 'ab'.repeat(32) },
+            },
+            folder('tests/small/1/data'),
+            file('tests/small/1/test.yaml', 20),
+          ]);
+        }
+        if (at === 'tests/small/1/data') {
+          return HttpResponse.json([file('tests/small/1/data/a.csv', 6)]);
+        }
+        return undefined;
+      }),
+      http.get(`${TASK_API}/files/:path`, ({ params }) => {
+        const path = decodeURIComponent(String(params['path']));
+        const read = (content: string, encoding: 'utf-8' | 'base64' = 'utf-8') =>
+          HttpResponse.json({
+            path,
+            encoding,
+            content,
+            token: `t-${path}`,
+            upload: null,
+          });
+        if (path === 'tests/small/1/input') return read(LONG);
+        if (path === 'tests/small/1/answer')
+          return read(btoa('\u0000\u0001'), 'base64');
+        if (path === 'tests/small/1/data/a.csv') return read('x,y\n1,2\n');
+        if (path === 'tests/small/1/test.yaml') return read('episodes: 12\nseed: 7\n');
+        return undefined;
+      }),
+    );
+  }
+
+  it('shows each part side by side, the first lines of a text, a binary and an upload by size, a folder as a tree, and the test’s values', async () => {
+    taskBackend({
+      form: {
+        ...CHECKED,
+        inputs: [],
+        test: [
+          { name: 'input', type: 'file', options: null },
+          { name: 'answer', type: 'file', options: null },
+          { name: 'expected', type: 'file', options: null },
+          { name: 'data', type: 'folder', options: null },
+          { name: 'episodes', type: 'number', options: null },
+        ],
+      },
+    });
+    richTest();
+    saved.length = 0;
+    {
+      const user = userEvent.setup();
+      const { tests } = await openTask();
+      const rows = within(fieldGroup(tests, 'small')).getByRole('list', {
+        name: 'Tests of small',
+      });
+      const row = within(rows).getByRole('listitem', { name: 'Test 1' });
+      const name = within(row).getByRole('button', { name: /Test 1/ });
+      expect(name).toHaveAttribute('aria-expanded', 'false');
+      await user.click(name);
+      expect(name).toHaveAttribute('aria-expanded', 'true');
+
+      const view = await within(row).findByRole('region', {
+        name: 'What test 1 holds',
+      });
+      const parts = await within(view).findAllByRole('region');
+      expect(parts.map((part) => part.getAttribute('aria-label'))).toEqual([
+        'input',
+        'answer',
+        'expected',
+        'data',
+        'Its values',
+      ]);
+      const input = within(view).getByRole('region', { name: 'input' });
+      const text = await within(input).findByLabelText('What input holds');
+      expect(text).toHaveTextContent('line 12');
+      expect(text).not.toHaveTextContent('line 13');
+      await user.click(within(input).getByRole('button', { name: 'Show all' }));
+      expect(text).toHaveTextContent('line 30');
+      await user.click(within(input).getByRole('button', { name: 'Download input' }));
+      expect(saved).toEqual(['input']);
+
+      const answer = within(view).getByRole('region', { name: 'answer' });
+      expect(
+        await within(answer).findByText('It is not text, so it is not shown here.'),
+      ).toBeVisible();
+      expect(
+        within(answer).getByRole('button', { name: 'Download answer' }),
+      ).toBeVisible();
+
+      const expected = within(view).getByRole('region', { name: 'expected' });
+      expect(expected).toHaveTextContent('47.7 MB');
+      expect(expected).toHaveTextContent(
+        'It was uploaded, so it is kept by its size and not shown here.',
+      );
+
+      const data = within(view).getByRole('region', { name: 'data' });
+      await user.click(await within(data).findByRole('button', { name: /a\.csv/ }));
+      expect(await within(data).findByLabelText('What a.csv holds')).toHaveTextContent(
+        'x,y 1,2',
+      );
+
+      const values = within(view).getByRole('region', { name: 'Its values' });
+      await waitFor(() => expect(values).toHaveTextContent('episodes12'));
+      expect(values).not.toHaveTextContent('seed');
+    }
+  });
+
+  it('shows a test added and not saved yet from the files chosen for it', async () => {
+    taskBackend({ form: { ...CHECKED, inputs: [] } });
+    const user = userEvent.setup();
+    const { tests } = await openTask();
+
+    await user.click(
+      within(fieldGroup(tests, 'small')).getByRole('button', {
+        name: 'Add tests to small',
+      }),
+    );
+    const dialog = await screen.findByRole('dialog', { name: 'Add tests' });
+    await user.click(within(dialog).getByRole('radio', { name: 'Many files at once' }));
+    await user.upload(within(dialog).getByLabelText('Test files'), [
+      new File(['3 4\n'], '9.in'),
+      new File(['7\n'], '9.out'),
+    ]);
+    await user.click(within(dialog).getByRole('button', { name: 'Add tests' }));
+
+    const rows = within(fieldGroup(tests, 'small')).getByRole('list', {
+      name: 'Tests of small',
+    });
+    const row = within(rows).getByRole('listitem', { name: 'Test 9' });
+    expect(row).toHaveTextContent('Test 9 · input 4 B, answer 2 B');
+    await user.click(within(row).getByRole('button', { name: /Test 9/ }));
+    const answer = await within(row).findByRole('region', { name: 'answer' });
+    expect(await within(answer).findByLabelText('What answer holds')).toHaveTextContent(
+      '7',
+    );
   });
 });
