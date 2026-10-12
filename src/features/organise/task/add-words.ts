@@ -47,6 +47,13 @@ export function waysOf(parts: PartNaming[]): {
   };
 }
 
+/** How a zip of tests holds its groups, said with the task's own first part. */
+export function zipFolders(parts: PartNaming[]): string {
+  const first = parts[0];
+  const example = first === undefined ? 'small/1' : `small/1/${first.name}`;
+  return `A folder per test group holds its tests, such as ${example}; files at the top go into the group chosen above.`;
+}
+
 /**
  * Why files dropped by name cannot make the task's tests, or null when they
  * can: a part that is a folder comes only in a zip's folders.

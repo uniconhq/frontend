@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { DeclaredField } from '@/api/types';
-import { namingSentences, pairedRefusal, waysOf } from './add-words';
+import { namingSentences, pairedRefusal, waysOf, zipFolders } from './add-words';
 import { namingOf } from './match';
 
 const field = (name: string, type = 'file'): DeclaredField => ({
@@ -45,6 +45,18 @@ describe('what Add tests says of a task’s parts (M47)', () => {
     );
     expect(waysOf(parts).paired).toBe(
       'Drop sets like 1.in, 1.out and 1.config. Each number becomes one test.',
+    );
+  });
+
+  it('says how a zip holds its groups with the task’s own first part', () => {
+    expect(zipFolders(CLASSIC)).toBe(
+      'A folder per test group holds its tests, such as small/1/input; files at the top go into the group chosen above.',
+    );
+    expect(zipFolders(namingOf([field('source'), field('expected')]))).toBe(
+      'A folder per test group holds its tests, such as small/1/source; files at the top go into the group chosen above.',
+    );
+    expect(zipFolders([])).toBe(
+      'A folder per test group holds its tests, such as small/1; files at the top go into the group chosen above.',
     );
   });
 

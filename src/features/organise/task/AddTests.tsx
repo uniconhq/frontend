@@ -15,7 +15,7 @@ import { fileQuery } from '../files/place';
 import { NumberField } from '../forms/fields';
 import { isRecord, parseYaml, textAt, valueAt } from '../forms/yaml-doc';
 import type { TaskPlace } from './build-data';
-import { namingSentences, pairedRefusal, waysOf } from './add-words';
+import { namingSentences, pairedRefusal, waysOf, zipFolders } from './add-words';
 import {
   matchFiles,
   NAME,
@@ -519,7 +519,7 @@ export function AddTests({
           <>
             <FileDrop
               label="Zip of tests"
-              description="A folder per test group holds its tests, such as small/1/input; files at the top go into the group chosen above."
+              description={zipFolders(parts)}
               accept=".zip,application/zip"
               files={zip === null ? [] : [zip]}
               onChange={(next) => chooseZip(next[0] ?? null)}
