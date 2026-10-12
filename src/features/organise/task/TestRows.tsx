@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { queryView } from '@/api/query';
-import type { TreeEntry } from '@/api/types';
+import type { DeclaredField, TreeEntry } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
 import { Chip } from '@/ui/Chip';
@@ -15,57 +15,102 @@ import type { StagedTest } from './staged';
 import shared from '../organise.module.css';
 import classes from './task.module.css';
 
-/** A file of a test as a row shows it: its name and size. */
-function fileText(name: string, size: number | null, folder = false): string {
-  if (folder) return `${name}/`;
-  return size === null ? name : `${name} (${formatSize(size)})`;
+/** A size as short as a test's row says it: "4 B" below a kilobyte, then as everywhere. */
+function shortSize(bytes: number): string {
+  return bytes < 1024 ? `${String(bytes)} B` : formatSize(bytes);
 }
 
-/** The files a test holds now, read when its row is shown. */
-function SavedFiles({ place, path }: { place: TaskPlace; path: string }) {
+/** The part of a test a file in its folder is, by its name: `answer.txt` is `answer`. */
+export function partOf(entry: string): string {
+  const [first = ''] = entry.split('/');
+  const dot = first.indexOf('.');
+  return dot < 0 ? first : first.slice(0, dot);
+}
+
+/** One part of a test as its row names it: its name and size, or that it is a folder. */
+type Part = { part: string; size: number | null; folder: boolean };
+
+/**
+ * A test's parts in the workflow's order, each with its size: "input 4 B,
+ * answer 2 B". Its values (`test.yaml`) show once the test is opened.
+ */
+function partsText(parts: Part[], order: string[]): string {
+  const rank = (part: string) => {
+    const at = order.indexOf(part);
+    return at < 0 ? order.length : at;
+  };
+  const shown = parts
+    .filter((each) => each.part !== 'test')
+    .sort((a, b) => rank(a.part) - rank(b.part) || a.part.localeCompare(b.part));
+  if (shown.length === 0) return 'no files';
+  return shown
+    .map((each) =>
+      each.folder
+        ? `${each.part}, a folder`
+        : each.size === null
+          ? each.part
+          : `${each.part} ${shortSize(each.size)}`,
+    )
+    .join(', ');
+}
+
+/** The parts a test holds now, read when its row is shown. */
+function SavedParts({
+  place,
+  path,
+  order,
+}: {
+  place: TaskPlace;
+  path: string;
+  order: string[];
+}) {
   const view = queryView(useQuery({ ...treeQuery(place, path), retry: false }));
   return (
     <Loaded view={view} compact>
       {(entries: TreeEntry[]) => (
         <>
-          {entries.length === 0
-            ? 'No files.'
-            : entries
-                .map((entry) =>
-                  fileText(
-                    lastPart(entry.path),
-                    entry.size,
-                    entry.kind === 'directory',
-                  ),
-                )
-                .join(', ')}
+          {partsText(
+            entries.map((entry) => ({
+              part: partOf(lastPart(entry.path)),
+              size: entry.upload?.size ?? entry.size,
+              folder: entry.kind === 'directory',
+            })),
+            order,
+          )}
         </>
       )}
     </Loaded>
   );
 }
 
-/** What a staged test writes, as a row shows it. */
-function stagedText(test: StagedTest): string {
-  const files = test.files.map((file) => fileText(file.entry, file.source.size));
-  const values =
-    test.values === null
-      ? []
-      : Object.entries(test.values)
-          .filter(([, value]) => value.trim() !== '')
-          .map(([field, value]) => `${field}: ${value}`);
-  return [...files, ...values].join(', ');
+/** What a staged test writes, as a row shows it: its parts, a folder's files together. */
+function stagedText(test: StagedTest, order: string[]): string {
+  const parts = new Map<string, Part>();
+  for (const file of test.files) {
+    const before = parts.get(file.field);
+    parts.set(file.field, {
+      part: file.field,
+      size: (before?.size ?? 0) + file.source.size,
+      folder: file.entry.includes('/') || (before?.folder ?? false),
+    });
+  }
+  return partsText([...parts.values()], order);
 }
 
+const WEIGHT_INFO =
+  'How much this test counts against the others. 1 by default; a test of weight 2 counts twice.';
+
 /**
- * A test group's tests, a row each in natural order: its name, its files and
- * their sizes, a test's weight where the group's rule reads weights, and
+ * A test group's tests, a row each in natural order: "Test 1 · input 4 B,
+ * answer 2 B", its parts in the workflow's order; its weight where the
+ * group's rule reads weights, with what a weight does behind an ⓘ; and
  * Replace and Remove. A test added, replaced or taken out says so on its row
  * until the save, with Undo.
  */
 export function TestRows({
   place,
   group,
+  fields,
   saved,
   staged,
   removed,
@@ -78,6 +123,8 @@ export function TestRows({
 }: {
   place: TaskPlace;
   group: GroupValues;
+  /** The fields each test has, from the workflow, which order a row's parts. */
+  fields: DeclaredField[] | null;
   /** The tests the group's folder holds now. */
   saved: string[];
   /** The tests the save adds or replaces in this group. */
@@ -95,6 +142,7 @@ export function TestRows({
   const names = [...new Set([...saved, ...staged.map((test) => test.test)])].sort(
     (a, b) => a.localeCompare(b, undefined, { numeric: true }),
   );
+  const order = (fields ?? []).map((field) => field.name);
   if (names.length === 0) {
     return (
       <BodyText tone="secondary">
@@ -110,13 +158,23 @@ export function TestRows({
         const out = removed.includes(name);
         const weight = group.weights.find((row) => row.test === name)?.weight ?? '';
         return (
-          <li key={name} className={classes.test} data-field={testField(name)}>
-            <span className={classes.testName}>{name}</span>
+          <li
+            key={name}
+            className={classes.test}
+            data-field={testField(name)}
+            aria-label={`Test ${name}`}
+          >
+            <span className={classes.testName}>Test {name}</span>{' '}
             <span className={classes.testFiles}>
+              ·{' '}
               {change !== undefined ? (
-                stagedText(change)
+                stagedText(change, order)
               ) : (
-                <SavedFiles place={place} path={`tests/${group.name}/${name}`} />
+                <SavedParts
+                  place={place}
+                  path={`tests/${group.name}/${name}`}
+                  order={order}
+                />
               )}
             </span>
             {isNew && <Chip tone="live">New</Chip>}
@@ -125,10 +183,11 @@ export function TestRows({
             {weights && !out && (
               <div className={classes.weight}>
                 <NumberField
-                  label={`Test weight of ${name}`}
+                  label="Weight"
                   value={weight}
                   onChange={(value) => onWeight(name, value)}
                   placeholder="1"
+                  info={WEIGHT_INFO}
                   disabled={disabled}
                 />
               </div>

@@ -1234,7 +1234,11 @@ describe('the tests of a task', { timeout: 30_000 }, () => {
     await userEvent.click(
       within(rows).getByRole('button', { name: 'Undo the change to test 2' }),
     );
-    expect(await within(rows).findByLabelText('Test weight of 2')).toHaveValue('3');
+    expect(
+      await within(
+        within(rows).getByRole('listitem', { name: 'Test 2' }),
+      ).findByLabelText('Weight'),
+    ).toHaveValue('3');
 
     await userEvent.click(within(rows).getByRole('button', { name: 'Remove test 2' }));
     expect(await within(rows).findByText('To be removed')).toBeVisible();
@@ -1257,8 +1261,34 @@ describe('the tests of a task', { timeout: 30_000 }, () => {
       '/orgs/acme/contests/spring/tasks/sum?card=tests&item=small&field=test:2',
     );
 
-    const weight = await screen.findByLabelText('Test weight of 2');
+    const rows = await screen.findByRole('list', { name: 'Tests of small' });
+    const row = within(rows).getByRole('listitem', { name: 'Test 2' });
+    const weight = await within(row).findByLabelText('Weight');
     await waitFor(() => expect(weight).toHaveFocus());
+  });
+
+  it('reads each test as its parts and sizes, and says what a weight does behind an ⓘ (M48)', async () => {
+    taskBackend({
+      form: { ...CHECKED, inputs: [] },
+      content: TASK.replace('small: {pass: 30, show: verdict}', 'small: {each: 30}'),
+    });
+    const user = userEvent.setup();
+    const { tests } = await openTask();
+
+    const rows = within(fieldGroup(tests, 'small')).getByRole('list', {
+      name: 'Tests of small',
+    });
+    const row = within(rows).getByRole('listitem', { name: 'Test 1' });
+    await waitFor(() =>
+      expect(row).toHaveTextContent('Test 1 · input 4 B, answer 2 B'),
+    );
+    expect(within(row).getByLabelText('Weight')).toHaveAttribute('placeholder', '1');
+    await user.click(within(row).getByRole('button', { name: 'About Weight' }));
+    expect(
+      await screen.findByText(
+        'How much this test counts against the others. 1 by default; a test of weight 2 counts twice.',
+      ),
+    ).toBeVisible();
   });
 
   it('shows whose a test file is when someone else changed it first, and saves over it only when chosen', async () => {
