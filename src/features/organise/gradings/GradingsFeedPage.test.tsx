@@ -340,12 +340,17 @@ describe("the contest's gradings feed", () => {
     renderApp(FEED);
 
     const depth = await screen.findByLabelText('Queue');
-    await waitFor(() => expect(depth).toHaveTextContent('Failed, waiting for you2'));
+    await waitFor(() => expect(depth).toHaveTextContent('Failed2'));
+    expect(depth).not.toHaveTextContent('waiting for you');
     expect(
       screen.getByText(/again once by itself\. If that fails too, it waits for you/),
     ).toBeVisible();
     await user.click(screen.getByRole('link', { name: 'Show the failed gradings' }));
     await waitFor(() => expect(asked.at(-1)).toBe('status=system_error&latest=true'));
+    expect(screen.queryByRole('link', { name: 'Show the failed gradings' })).toBeNull();
+    expect(
+      screen.getByText(/again once by itself\. If that fails too, it waits for you/),
+    ).toBeVisible();
   });
 
   it('is linked from the contest page', async () => {

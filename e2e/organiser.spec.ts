@@ -489,7 +489,7 @@ test('an organiser follows the failed gradings from the contest page', async ({
   await expect(
     page.getByRole('checkbox', { name: 'Latest attempts only' }),
   ).toBeChecked();
-  await expect(page.getByLabel('Queue')).toContainText('Failed, waiting for you2');
+  await expect(page.getByLabel('Queue')).toContainText('Failed2');
   await expect(page.getByText('No grading matches these filters.')).toBeVisible();
   expect(state.feedAsked).toContain('status=system_error&latest=true');
 });

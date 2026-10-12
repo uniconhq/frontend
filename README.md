@@ -433,9 +433,10 @@ with everything filled in (`GET <task>/organise/submissions/{number}`, the
 row by its `user_id` or `team`): the contestant's own payload, drawn by the
 same `ui/scored/ScoredResult` the contestant's page draws it with, every
 group's outcome, tests and points shown, each saying when its row sees it,
-and the grading's own status. Above it are how many gradings wait, queued,
-waiting for a machine, and failed and waiting for staff, with a link to the
-failed ones, and filters by task, status, latest attempts only, team and a
+and the grading's own status, naming the attempt whose result it is when that
+is an earlier one than the row's. Above it are how many gradings wait, queued,
+waiting for a machine, and failed, whether or not Unicon has tried them again
+yet, with a link to the failed ones unless the feed already shows them, and filters by task, status, latest attempts only, team and a
 contestant's username, kept in the
 address so a link or a reload keeps them; a username applies once sent and
 finds the user's own submissions and their team's, by the team they were in
