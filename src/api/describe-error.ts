@@ -127,10 +127,10 @@ export function describeError(error: ApiError): ErrorDescription {
       };
     case 'confirmation_required':
       return {
-        title: 'This changes how the task grades',
+        title: 'The contest is running. Publish this change now?',
         message:
           error.detail ??
-          'The contest is running, so a change to grading has to be confirmed.',
+          'The contest is running, so a save asks before it publishes. Publish it, or keep it as a draft.',
       };
     case 'admin_only':
       return {

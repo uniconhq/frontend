@@ -4,9 +4,11 @@ import type {
   ListedContest,
   Named,
   Publication,
+  SaveEffect,
   TaskStanding,
   TaskState,
   TreeEntry,
+  ValueMeaning,
 } from '@/api/types';
 import { problem } from './server';
 
@@ -70,6 +72,22 @@ export function listAndCreate(path: string, existing: { name: string }[]) {
 
 // A task's state and publications
 
+/** What a published save does when it moves nobody's result, in the forge's words. */
+export const unchanged: SaveEffect = {
+  results_change: false,
+  summary: "Nobody's result changes.",
+  runs_again: ['No submission runs again: the tests and how they run are the same.'],
+  scores: ['No score changes.'],
+  reading: ['Nothing entrants read changes.'],
+};
+
+/** What classic reports, as a publication names its values (M58), in its report order. */
+export const classicMeanings: ValueMeaning[] = [
+  { name: 'time_ms', title: 'Run time', unit: 'ms', fold: 'max', better: 'lower' },
+  { name: 'memory_kb', title: 'Memory used', unit: 'KB', fold: 'max', better: 'lower' },
+  { name: 'log', title: 'Compile log', unit: null, fold: null, better: null },
+];
+
 export const publications: Publication[] = [
   {
     number: 1,
@@ -77,7 +95,7 @@ export const publications: Publication[] = [
     grading_changed: true,
     changes: ['plans/default.json added'],
     at: '2026-09-20T10:00:00Z',
-    meanings: [],
+    meanings: classicMeanings,
   },
   {
     number: 2,
@@ -85,7 +103,7 @@ export const publications: Publication[] = [
     grading_changed: false,
     changes: [],
     at: '2026-09-21T10:00:00Z',
-    meanings: [],
+    meanings: classicMeanings,
   },
 ];
 

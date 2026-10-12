@@ -13,7 +13,7 @@ import { Loaded } from '@/ui/feedback/Loaded';
 import { useMe } from '@/session';
 import { STANDING_WORD, standingOf, type ContestStanding } from '@/lib/contest-state';
 import { contestPath, taskPath } from '@/lib/organiser-paths';
-import { contestSectionPath } from '@/lib/sections';
+import { contestSectionPath, taskCardPath } from '@/lib/sections';
 import { formatDateTime, serverNow } from '@/lib/time';
 import { DefinitionErrors } from '../DefinitionErrors';
 import type { Outcome } from '../files/SaveOutcome';
@@ -81,9 +81,14 @@ type Check = {
   to: string;
 };
 
-/** How a task stands for opening the contest: published without errors, or what stops it. */
+/**
+ * How a task stands for opening the contest: published without errors, with
+ * a statement written, or what stops it. A published statement that is blank
+ * or still the one a new task starts with stops it too (M57), and its line
+ * goes to the task's Statement card.
+ */
 function taskCheck(org: string, contest: string, standing: TaskStanding): Check {
-  const { latest, draft, errors } = standing.state;
+  const { latest, draft, errors, statement_written } = standing.state;
   const name = `${standing.label} · ${standing.task.name}`;
   const to = taskPath(org, contest, standing.task.name);
   if (draft && errors.length > 0) {
@@ -91,6 +96,14 @@ function taskCheck(org: string, contest: string, standing: TaskStanding): Check 
   }
   if (latest === null)
     return { key: name, ok: false, text: `${name}: not published yet`, to };
+  if (!statement_written) {
+    return {
+      key: name,
+      ok: false,
+      text: `${name}: statement not written yet`,
+      to: taskCardPath(org, contest, standing.task.name, 'statement'),
+    };
+  }
   return { key: name, ok: true, text: `${name}: published`, to };
 }
 

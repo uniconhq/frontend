@@ -4,6 +4,7 @@ import { listed } from '@/lib/listed';
 import type { Box } from './layout';
 import type { FieldDecl, InputDecl, Ref, ReportEntry, Workflow } from './model';
 import type { PrimitiveInfo } from './primitives';
+import { verdictLabel } from '@/ui/verdicts';
 
 /**
  * How the workflow editor names what a workflow holds, in words rather than
@@ -21,6 +22,34 @@ export const DRAFT_FILE = 'The draft’s file';
 /** A primitive as a person names it: its title, or its name without one (#436). */
 export function primitiveTitle(primitive: PrimitiveInfo): string {
   return primitive.title ?? primitive.name;
+}
+
+/** An outcome word as a sentence names it: "Compile error", from its badge's "COMPILE ERROR". */
+function outcomeName(outcome: string): string {
+  const label = verdictLabel(outcome).toLowerCase();
+  return `${label.charAt(0).toUpperCase()}${label.slice(1)}`;
+}
+
+/**
+ * The results a step can report, from the primitive's own words for each
+ * (M56): "Accepted if the source compiles." for one; "Accepted if the source
+ * compiles, otherwise Compile error." for two, since the second is all the
+ * first is not; and for more, one line each, "Time limit if it runs out of
+ * time". Falls back to the port's own sentence for a primitive that says
+ * none, and null where it says nothing at all.
+ */
+export function outcomeWords(primitive: PrimitiveInfo): string | string[] | null {
+  const port = primitive.outputs.outcome;
+  const outcomes = Object.entries(port?.outcomes ?? {});
+  if (outcomes.length === 0) return port?.description ?? null;
+  const [first, second] = outcomes;
+  if (first !== undefined && outcomes.length <= 2) {
+    const [word, when] = first;
+    return second === undefined
+      ? `${outcomeName(word)} if ${when}.`
+      : `${outcomeName(word)} if ${when}, otherwise ${outcomeName(second[0])}.`;
+  }
+  return outcomes.map(([word, when]) => `${outcomeName(word)} if ${when}`);
 }
 
 /** What the shaded band on the graph says it is: the steps in it run once for each test (M55). */

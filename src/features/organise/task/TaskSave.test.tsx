@@ -10,9 +10,26 @@ import {
   publications,
   publishedTask,
   repoFiles,
+  unchanged,
 } from '@/test/organiser';
 
 const WRITE = `${TASK_API}/files/:path`;
+
+/** What a save that grades submissions again does, in the forge's words. */
+const REGRADED = {
+  results_change: true,
+  summary: 'Results change.',
+  runs_again: ['4 submissions are graded again: the time limit changes.'],
+  scores: ['The leaderboard Standings is counted again.'],
+  reading: ['Nothing entrants read changes.'],
+};
+
+/** The lines of the list named `name` inside `inside`. */
+function linesOf(inside: HTMLElement, name: string): (string | null)[] {
+  return within(within(inside).getByRole('list', { name }))
+    .getAllByRole('listitem')
+    .map((item) => item.textContent);
+}
 
 /**
  * The sum task with its state, its publications and its top folder counted,
@@ -92,14 +109,15 @@ async function toPublications() {
 }
 
 describe('saving a task file', () => {
-  it('shows the publication and what changed in grading, then refetches the task', async () => {
+  it('shows the publication and what it does, then refetches the task', async () => {
     const { reads, sent } = taskBackend(() =>
       HttpResponse.json({
         number: 3,
         grading_changed: true,
-        changes: ['plans/default.json changed'],
+        changes: ['The time limit changes.'],
         notes: [],
-        regraded: 0,
+        regraded: 4,
+        effect: REGRADED,
       }),
     );
 
@@ -107,10 +125,16 @@ describe('saving a task file', () => {
 
     const status = await screen.findByText('Saved and published as publication 3.');
     const outcome = status.parentElement as HTMLElement;
-    expect(outcome).toHaveTextContent('It changes how the task grades:');
-    expect(
-      within(outcome).getByRole('list', { name: 'What changed' }),
-    ).toHaveTextContent('plans/default.json changed');
+    expect(outcome).toHaveTextContent('Results change.');
+    expect(linesOf(outcome, 'Runs again')).toEqual([
+      '4 submissions are graded again: the time limit changes.',
+    ]);
+    expect(linesOf(outcome, 'Scores')).toEqual([
+      'The leaderboard Standings is counted again.',
+    ]);
+    expect(linesOf(outcome, 'What entrants read')).toEqual([
+      'Nothing entrants read changes.',
+    ]);
     expect(sent).toEqual([
       {
         content: 'Write the sum of two numbers.\n Now.',
@@ -127,7 +151,7 @@ describe('saving a task file', () => {
     expect(reads.publications).toBeGreaterThan(before.publications);
   });
 
-  it('says when a publication leaves grading as it was', async () => {
+  it('says when a publication moves nobody’s result, in the same parts and never that grading is unchanged', async () => {
     taskBackend(() =>
       HttpResponse.json({
         number: 3,
@@ -135,6 +159,7 @@ describe('saving a task file', () => {
         changes: [],
         notes: [],
         regraded: 0,
+        effect: unchanged,
       }),
     );
 
@@ -142,10 +167,16 @@ describe('saving a task file', () => {
 
     const outcome = (await screen.findByText('Saved and published as publication 3.'))
       .parentElement as HTMLElement;
-    expect(outcome).toHaveTextContent('It does not change how the task grades.');
+    expect(outcome).toHaveTextContent("Nobody's result changes.");
+    expect(linesOf(outcome, 'Runs again')).toEqual([
+      'No submission runs again: the tests and how they run are the same.',
+    ]);
+    expect(linesOf(outcome, 'Scores')).toEqual(['No score changes.']);
+    expect(outcome).not.toHaveTextContent('does not change how the task grades');
+    expect(outcome).not.toHaveTextContent('Notes:');
   });
 
-  it('says a first publication is what entrants are now graded on, never that it changes nothing', async () => {
+  it('says what a first publication does: nothing runs again, and entrants read it from its release', async () => {
     taskBackend(() =>
       HttpResponse.json({
         number: 1,
@@ -153,6 +184,14 @@ describe('saving a task file', () => {
         changes: [],
         notes: [],
         regraded: 0,
+        effect: {
+          ...unchanged,
+          runs_again: [
+            "No submission runs again: this is the task's first publication.",
+          ],
+          scores: ['Points: main is worth up to 100.'],
+          reading: ['Entrants read the task from its release.'],
+        },
       }),
     );
 
@@ -160,23 +199,27 @@ describe('saving a task file', () => {
 
     const outcome = (await screen.findByText('Saved and published as publication 1.'))
       .parentElement as HTMLElement;
-    expect(outcome).toHaveTextContent(
-      'Entrants’ submissions are graded against it from now on.',
-    );
-    expect(outcome).not.toHaveTextContent('does not change how the task grades');
+    expect(linesOf(outcome, 'Runs again')).toEqual([
+      "No submission runs again: this is the task's first publication.",
+    ]);
+    expect(linesOf(outcome, 'Scores')).toEqual(['Points: main is worth up to 100.']);
+    expect(linesOf(outcome, 'What entrants read')).toEqual([
+      'Entrants read the task from its release.',
+    ]);
   });
 
-  it('shows how many submissions a publication grades again, and the notes it makes', async () => {
+  it('shows the notes a publication makes under a label that says what they are', async () => {
     taskBackend(() =>
       HttpResponse.json({
         number: 3,
         grading_changed: true,
-        changes: ['plans/default.json changed'],
+        changes: ['The time limit changes.'],
         notes: [
-          'step run is sealed: its values and stop wait for the reveal',
-          'test group main shows its outcomes after the reveal',
+          'sum shows its hidden results on 15 October 2026, 09:00.',
+          'The leaderboard Practice ranks by points but counts none from sum.',
         ],
-        regraded: 12,
+        regraded: 4,
+        effect: REGRADED,
       }),
     );
 
@@ -184,18 +227,15 @@ describe('saving a task file', () => {
 
     const outcome = (await screen.findByText('Saved and published as publication 3.'))
       .parentElement as HTMLElement;
-    expect(outcome).toHaveTextContent('12 submissions are graded again.');
-    expect(
-      within(within(outcome).getByRole('list', { name: 'Notes' }))
-        .getAllByRole('listitem')
-        .map((item) => item.textContent),
-    ).toEqual([
-      'step run is sealed: its values and stop wait for the reveal',
-      'test group main shows its outcomes after the reveal',
+    expect(outcome).toHaveTextContent('About the task as published:');
+    expect(linesOf(outcome, 'About the task as published')).toEqual([
+      'sum shows its hidden results on 15 October 2026, 09:00.',
+      'The leaderboard Practice ranks by points but counts none from sum.',
     ]);
+    expect(outcome).not.toHaveTextContent('Notes:');
   });
 
-  it('says nothing of notes or regrading when a publication has none', async () => {
+  it('says nothing of notes when a publication has none', async () => {
     taskBackend(() =>
       HttpResponse.json({
         number: 3,
@@ -203,6 +243,7 @@ describe('saving a task file', () => {
         changes: [],
         notes: [],
         regraded: 0,
+        effect: unchanged,
       }),
     );
 
@@ -210,7 +251,9 @@ describe('saving a task file', () => {
 
     const outcome = (await screen.findByText('Saved and published as publication 3.'))
       .parentElement as HTMLElement;
-    expect(within(outcome).queryByRole('list', { name: 'Notes' })).toBeNull();
+    expect(
+      within(outcome).queryByRole('list', { name: 'About the task as published' }),
+    ).toBeNull();
     expect(outcome).not.toHaveTextContent('graded again');
   });
 
@@ -236,7 +279,7 @@ describe('saving a task file', () => {
     await expect.poll(() => reads.state).toBeGreaterThan(before.state);
   });
 
-  it('asks before a grading change during the contest, and publishes once confirmed', async () => {
+  it('asks first during the contest in the words of what the save does, and publishes once confirmed', async () => {
     const { sent } = taskBackend(({ request }) =>
       request
         .clone()
@@ -246,14 +289,17 @@ describe('saving a task file', () => {
             ? HttpResponse.json({
                 number: 3,
                 grading_changed: true,
-                changes: ['plans/default.json changed'],
+                changes: ['The time limit changes.'],
                 notes: [],
-                regraded: 0,
+                regraded: 4,
+                effect: REGRADED,
               })
             : problem(409, 'confirmation_required', {
-                detail: 'The contest is running and this changes how the task grades.',
-                changes: ['plans/default.json changed', 'limits.time changed'],
-                regrades: 12,
+                detail:
+                  'The contest is running, so this save asks before it publishes. Publish it, or keep it as a draft.',
+                changes: ['The time limit changes.'],
+                regrades: 4,
+                ...REGRADED,
               }),
         ),
     );
@@ -261,18 +307,20 @@ describe('saving a task file', () => {
     await editAndSave();
 
     const alert = await screen.findByRole('alert');
-    expect(alert).toHaveTextContent(
-      'The contest is running and this changes how the task grades.',
+    // The first line, then each part with its lines, then the question.
+    expect(alert.textContent).toMatch(
+      /^Results change\.Runs again4 submissions .*Scores.*What entrants read.*The contest is running\. Publish this change now\?/,
     );
-    expect(alert).toHaveTextContent(
-      '12 submissions to the task are graded again against the new publication.',
-    );
-    const changes = within(alert).getByRole('list', { name: 'What would change' });
-    expect(
-      within(changes)
-        .getAllByRole('listitem')
-        .map((item) => item.textContent),
-    ).toEqual(['plans/default.json changed', 'limits.time changed']);
+    expect(linesOf(alert, 'Runs again')).toEqual([
+      '4 submissions are graded again: the time limit changes.',
+    ]);
+    expect(linesOf(alert, 'Scores')).toEqual([
+      'The leaderboard Standings is counted again.',
+    ]);
+    expect(linesOf(alert, 'What entrants read')).toEqual([
+      'Nothing entrants read changes.',
+    ]);
+    expect(alert).not.toHaveTextContent('changes how the task grades');
 
     await userEvent.click(
       within(alert).getByRole('button', { name: 'Publish the change' }),
@@ -284,6 +332,44 @@ describe('saving a task file', () => {
     expect(sent).toHaveLength(2);
     expect(sent[1]).toEqual({ ...(sent[0] as object), confirm: true });
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('asks before a statement fix that moves nobody’s result too', async () => {
+    taskBackend(() =>
+      problem(409, 'confirmation_required', {
+        changes: [],
+        regrades: 0,
+        ...unchanged,
+        reading: ['The statement changes.'],
+      }),
+    );
+
+    await editAndSave();
+
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent("Nobody's result changes.");
+    expect(linesOf(alert, 'What entrants read')).toEqual(['The statement changes.']);
+    expect(within(alert).getByRole('button', { name: 'Keep as draft' })).toBeVisible();
+  });
+
+  it('names what would change, from a backend that does not yet say what a save does', async () => {
+    taskBackend(() =>
+      problem(409, 'confirmation_required', {
+        changes: ['plans/default.json changed', 'limits.time changed'],
+        regrades: 12,
+      }),
+    );
+
+    await editAndSave();
+
+    const alert = await screen.findByRole('alert');
+    expect(linesOf(alert, 'What would change')).toEqual([
+      'plans/default.json changed',
+      'limits.time changed',
+    ]);
+    expect(
+      within(alert).getByRole('button', { name: 'Publish the change' }),
+    ).toBeVisible();
   });
 
   it('keeps a grading change as a draft instead, saying what it held back', async () => {

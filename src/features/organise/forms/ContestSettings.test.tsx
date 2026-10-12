@@ -218,7 +218,7 @@ describe('the contest settings form', { timeout: 20_000 }, () => {
     await userEvent.click(within(form).getByRole('button', { name: 'Save settings' }));
 
     expect(await screen.findByText('Saved.')).toBeVisible();
-    const notes = screen.getByRole('list', { name: 'Notes' });
+    const notes = screen.getByRole('list', { name: 'About the leaderboards' });
     expect(
       within(notes).getByText('Standings counts nothing from sort.'),
     ).toBeVisible();

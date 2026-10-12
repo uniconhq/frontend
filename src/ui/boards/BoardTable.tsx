@@ -3,9 +3,15 @@ import type { Board, BoardRow } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { PageLink } from '@/ui/PageLink';
 import { SectionTitle } from '@/ui/SectionTitle';
-import { formatExact } from '@/lib/exact';
 import { formatDateTime } from '@/lib/time';
-import { cellLines, cellPlaces, gradingText, keyLabel, keyPlaces } from './board-text';
+import {
+  cellLines,
+  cellPlaces,
+  gradingText,
+  keyLabel,
+  keyNumber,
+  keyPlaces,
+} from './board-text';
 import classes from './boards.module.css';
 
 /** What a row is called: its entrant's own name, or its one member's username. */
@@ -152,7 +158,9 @@ export function BoardTable({
                       const exact = row.keys[index] ?? null;
                       return (
                         <td key={key.by} className={classes.number}>
-                          {exact === null ? '—' : formatExact(exact, places[index])}
+                          {exact === null
+                            ? '—'
+                            : keyNumber(key, exact, places[index] ?? 2)}
                         </td>
                       );
                     })}

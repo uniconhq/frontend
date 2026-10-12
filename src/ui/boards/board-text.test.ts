@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { BoardKey } from '@/api/types';
 import { formatExact } from '@/lib/exact';
 import { cell, icpc } from '@/test/boards';
-import { cellLines, cellPlaces, keyLabel, keyPlaces } from './board-text';
+import { cellLines, cellPlaces, keyLabel, keyNumber, keyPlaces } from './board-text';
 
 const POINTS: BoardKey = {
   by: 'points',
@@ -40,6 +40,29 @@ describe('a board key', () => {
       'Penalty',
       'Submitted at minute',
       'time_ms',
+    ]);
+  });
+});
+
+describe('a value a board ranks by (M58)', () => {
+  const RUN_TIME: BoardKey = { ...TIME, title: 'Run time', unit: 'ms' };
+  const SCORE: BoardKey = { ...TIME, by: 'score', title: 'Score', unit: null };
+
+  it('is named by its title, its key only until it has one', () => {
+    expect([RUN_TIME, SCORE, TIME].map(keyLabel)).toEqual([
+      'Run time',
+      'Score',
+      'time_ms',
+    ]);
+  });
+
+  it('reads its number with its unit after it, in its column and in a cell', () => {
+    expect(keyNumber(RUN_TIME, '28', 2)).toBe('28 ms');
+    expect(keyNumber(POINTS, '28', 2)).toBe('28');
+    const fast = cell({ counting: true, numbers: { time_ms: '28', score: '0.5' } });
+    expect(cellLines([RUN_TIME, SCORE], fast, {})).toEqual([
+      '28 ms',
+      `${formatExact('0.5', 2)} Score`,
     ]);
   });
 });

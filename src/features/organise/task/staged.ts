@@ -39,7 +39,7 @@ export const NOTHING_STAGED: Staged = { tests: [], removals: [] };
 
 const TREE = '/api/v1/orgs/{org}/contests/{contest}/tasks/{task}/tree';
 
-/** Every file under a folder of the task, each with its token, read now. */
+/** Every file under a folder of the task, each with its token, listed now. */
 export async function filesUnder(
   place: TaskPlace,
   folder: string,
@@ -58,7 +58,9 @@ export async function filesUnder(
   const found = await Promise.all(
     entries.map(async (entry): Promise<Existing[]> => {
       if (entry.kind === 'directory') return filesUnder(place, entry.path);
-      const token = await tokenNow(place, entry.path);
+      // The listing gives each file's token as a read does; a listing that
+      // does not is read past, file by file.
+      const token = entry.token ?? (await tokenNow(place, entry.path));
       return token === null ? [] : [{ path: entry.path, token, size: entry.size }];
     }),
   );

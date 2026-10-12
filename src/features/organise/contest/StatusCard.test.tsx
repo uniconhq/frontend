@@ -125,6 +125,38 @@ describe("the contest's status", () => {
     ).toBeEnabled();
   });
 
+  it('stops the contest opening while a published statement is not written, linking to the task’s Statement card (M57)', async () => {
+    const [sort, sum] = ready;
+    if (sort === undefined || sum === undefined) throw new Error('two tasks');
+    server.use(
+      signedIn,
+      ...repoFiles,
+      http.get(`${CONTEST_API}/organise/tasks`, () =>
+        HttpResponse.json([
+          sort,
+          { ...sum, state: { ...sum.state, statement_written: false } },
+        ]),
+      ),
+    );
+    settingsAt(DRAFT);
+    renderApp(CONTEST);
+
+    const card = await status();
+    const list = await within(card).findByRole('list', { name: 'Before it opens' });
+    await waitFor(() =>
+      expect(within(list).getByRole('link', { name: /B · sum/ })).toHaveTextContent(
+        'B · sum: statement not written yet',
+      ),
+    );
+    expect(within(list).getByRole('link', { name: /B · sum/ })).toHaveAttribute(
+      'href',
+      '/orgs/acme/contests/spring/tasks/sum?card=statement',
+    );
+    expect(
+      within(card).getByRole('button', { name: 'Open the contest' }),
+    ).toBeDisabled();
+  });
+
   it('opens the contest after saying what will happen', async () => {
     server.use(
       signedIn,

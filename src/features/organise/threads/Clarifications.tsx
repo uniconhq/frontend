@@ -8,6 +8,7 @@ import { Button } from '@/ui/Button';
 import { Card } from '@/ui/Card';
 import { Checkbox } from '@/ui/Checkbox';
 import { Modal } from '@/ui/Modal';
+import { RadioGroup } from '@/ui/RadioGroup';
 import { SectionTitle } from '@/ui/SectionTitle';
 import { TextInput } from '@/ui/TextInput';
 import { Textarea } from '@/ui/Textarea';
@@ -19,7 +20,9 @@ import { useOrgParam } from '@/lib/route-params';
 import { ORG_SECTIONS, sectionOf } from '@/lib/sections';
 import { holdsAtContest } from '../roles';
 import { SectionPage } from '../SectionPage';
+import { announcementAnchor } from '@/ui/threads/anchors';
 import { QuestionThread } from '@/ui/threads/ThreadParts';
+import { contestPath, taskPath } from '@/lib/organiser-paths';
 import { useEntrantName } from '../entrants/names';
 import classes from '@/ui/threads/threads.module.css';
 
@@ -39,6 +42,22 @@ function isThreadRead(path: unknown): boolean {
   );
 }
 
+/** Who an answer is for: the asker alone, or every entrant (M62). */
+const READERS = [
+  {
+    value: 'asker',
+    label: 'Only the asker',
+    description:
+      'A reply under the question, which only the asker and the organisers read.',
+  },
+  {
+    value: 'everyone',
+    label: 'Every entrant (posted as an announcement)',
+    description:
+      'The question stays private; a message on it links to the announcement.',
+  },
+];
+
 /** Whether the organisers have written anything under a question yet. */
 function replied(clarification: Clarification): boolean {
   return clarification.messages.some((message) => !message.from_asker);
@@ -46,14 +65,15 @@ function replied(clarification: Clarification): boolean {
 
 /**
  * One question for an organiser, in its own box, and, for a manager of its
- * contest, what can be done with it at the box's foot. Reply opens the reply
- * form in place; sending marks the question answered, unless the manager
- * unticks that, so an answer takes it out of the open questions in one step.
- * Mark as answered closes it without a reply, and asks first while nobody
- * has replied, since the entrant then reads no answer. Reopen opens an
- * answered one again. Answer publicly, beside the reply's Send, posts an
- * announcement every entrant reads, pointing at the question, which stays
- * private.
+ * contest, what can be done with it at the box's foot. Reply opens the one
+ * form to answer it in place (M62): who reads the answer, only the asker, as
+ * a reply under the question, or every entrant, posted as an announcement
+ * under the title given, the question itself staying private and a message
+ * on it naming the announcement. Either way sending marks the question
+ * answered, unless the manager unticks that, so an answer takes it out of
+ * the open questions in one step. Mark as answered closes it without a
+ * reply, and asks first while nobody has replied, since the entrant then
+ * reads no answer. Reopen opens an answered one again.
  */
 function ClarificationCard({
   clarification,
@@ -72,10 +92,9 @@ function ClarificationCard({
   const [body, setBody] = useState('');
   const [markToo, setMarkToo] = useState(true);
   const [asking, setAsking] = useState(false);
-  const [publishing, setPublishing] = useState(false);
+  const [readers, setReaders] = useState<'asker' | 'everyone'>('asker');
   const [replying, setReplying] = useState(false);
   const [title, setTitle] = useState(clarification.title);
-  const [answer, setAnswer] = useState('');
   const change = useChange({
     reread: () =>
       queryClient.invalidateQueries({
@@ -97,12 +116,21 @@ function ClarificationCard({
   const sendReply = async (event: FormEvent) => {
     event.preventDefault();
     const answering = open && markToo;
-    const outcome = await change.run('reply', async () => {
-      await reply.mutateAsync({ params: { path }, body: { body } });
-      if (answering) await mark.mutateAsync({ params: { path } });
-    });
+    const outcome =
+      readers === 'everyone'
+        ? await change.run('reply', () =>
+            publish.mutateAsync({
+              params: { path },
+              body: { title, body, mark: answering },
+            }),
+          )
+        : await change.run('reply', async () => {
+            await reply.mutateAsync({ params: { path }, body: { body } });
+            if (answering) await mark.mutateAsync({ params: { path } });
+          });
     if (outcome.ok) {
       setBody('');
+      setReaders('asker');
       setReplying(false);
     }
   };
@@ -112,21 +140,6 @@ function ClarificationCard({
       mark.mutateAsync({ params: { path } }),
     );
     if (outcome.ok) setAsking(false);
-  };
-
-  const sendAnswer = async (event: FormEvent) => {
-    event.preventDefault();
-    const outcome = await change.run('publish', () =>
-      publish.mutateAsync({
-        params: { path },
-        body: { title, body: answer, mark: true },
-      }),
-    );
-    if (outcome.ok) {
-      setPublishing(false);
-      setReplying(false);
-      setAnswer('');
-    }
   };
 
   const markOrReopen = open ? (
@@ -163,6 +176,9 @@ function ClarificationCard({
         asker={asker}
         organisers
         where={showContest ? `${org}/${contest ?? ''}` : undefined}
+        announcementHref={(link) =>
+          `${link.task === null ? contestPath(org, contest ?? '') : taskPath(org, contest ?? '', link.task)}/announcements#${announcementAnchor(link)}`
+        }
       >
         {manages && (
           <>
@@ -187,13 +203,30 @@ function ClarificationCard({
                 aria-label={`Reply to ${name}`}
               >
                 <Textarea
-                  label="Reply"
+                  label="Answer"
                   value={body}
                   onChange={setBody}
                   rows={3}
                   required
                   autoFocus
                 />
+                <RadioGroup
+                  label="Who reads the answer"
+                  value={readers}
+                  options={READERS}
+                  onChange={(next) =>
+                    setReaders(next === 'everyone' ? 'everyone' : 'asker')
+                  }
+                />
+                {readers === 'everyone' && (
+                  <TextInput
+                    label="Announcement title"
+                    value={title}
+                    onChange={setTitle}
+                    maxLength={200}
+                    required
+                  />
+                )}
                 {open && (
                   <Checkbox
                     label="Mark it answered"
@@ -201,63 +234,24 @@ function ClarificationCard({
                     onChange={setMarkToo}
                     description={
                       markToo
-                        ? 'It leaves the open questions as the reply is sent.'
-                        : 'It stays open after the reply, for a fuller answer later.'
+                        ? 'It leaves the open questions as the answer is sent.'
+                        : 'It stays open after the answer, for a fuller one later.'
                     }
                   />
                 )}
                 <div className={classes.actions}>
                   <Button type="submit" size="xs" loading={busy === 'reply'}>
-                    Send reply
-                  </Button>
-                  <Button
-                    size="xs"
-                    variant="secondary"
-                    label={`Answer publicly ${name}`}
-                    onClick={() => setPublishing(!publishing)}
-                  >
-                    Answer publicly
+                    {readers === 'everyone' ? 'Post the announcement' : 'Send reply'}
                   </Button>
                   <Button
                     size="xs"
                     variant="secondary"
                     onClick={() => {
                       setReplying(false);
-                      setPublishing(false);
+                      setReaders('asker');
                     }}
                   >
                     Cancel
-                  </Button>
-                </div>
-              </form>
-            )}
-            {replying && publishing && (
-              <form
-                className={classes.form}
-                onSubmit={(event) => void sendAnswer(event)}
-                aria-label={`Answer publicly ${name}`}
-              >
-                <BodyText tone="secondary">
-                  Every entrant reads this announcement. The question itself stays
-                  private.
-                </BodyText>
-                <TextInput
-                  label="Title"
-                  value={title}
-                  onChange={setTitle}
-                  maxLength={200}
-                  required
-                />
-                <Textarea
-                  label="Answer"
-                  value={answer}
-                  onChange={setAnswer}
-                  rows={3}
-                  required
-                />
-                <div className={classes.actions}>
-                  <Button type="submit" size="xs" loading={busy === 'publish'}>
-                    Post announcement
                   </Button>
                 </div>
               </form>

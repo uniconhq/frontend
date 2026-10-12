@@ -28,6 +28,12 @@ export type RollbackFile = Schemas['RollbackFile'];
 export type SaveRequest = Schemas['SaveRequest'];
 /** A task save's answer: published, or kept as a draft. */
 export type SaveResult = Schemas['Published'] | Schemas['Draft'];
+/**
+ * What a save does, in words: whether anyone's result changes, and what runs
+ * again, the scores and what entrants read. A running contest asks with it
+ * before a save publishes, and a published save answers with it.
+ */
+export type SaveEffect = Schemas['SaveEffect'];
 
 export type TaskRelease = Schemas['TaskRelease'];
 /**
@@ -84,6 +90,11 @@ export type OrganisedSubmission = Schemas['OrganisedSubmission'];
 export type GroupShown = Schemas['GroupShown'];
 /** A run's reported values by name, its numbers exact and its texts apart. */
 export type Reported = Schemas['Reported'];
+/**
+ * One value a task's workflow reports, as pages name it: its key, its title
+ * and unit, and how it folds over the tests and which way is better.
+ */
+export type ValueMeaning = Schemas['ValueMeaning'];
 /** One test's row of a result, with its credit once scored. */
 export type GradedTest = Schemas['GradedTest'];
 export type Grading = Schemas['Grading'];
@@ -99,6 +110,8 @@ export type FeedEntry = Schemas['FeedEntry'];
 export type Submitter = Schemas['Submitter'];
 export type QueueDepth = Schemas['QueueDepth'];
 export type Announcement = Schemas['Announcement'];
+/** The announcement a public answer posted, which its message on the question names. */
+export type AnnouncementLink = Schemas['AnnouncementLink'];
 /** One change in a place's history, its author named. */
 export type FileChange = Schemas['Change'];
 export type Clarification = Schemas['Clarification'];

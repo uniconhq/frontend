@@ -252,9 +252,9 @@ describe("the boards' settings", { timeout: 20_000 }, () => {
       board(form, 'Standings').getByRole('combobox', { name: 'Way to rank 1' }),
       'value',
     );
-    fireEvent.change(
-      board(form, 'Standings').getByRole('textbox', { name: 'Which value' }),
-      { target: { value: 'time_ms' } },
+    await user.selectOptions(
+      await board(form, 'Standings').findByRole('combobox', { name: 'Which value' }),
+      'time_ms',
     );
     await user.click(within(form).getByRole('button', { name: 'Save leaderboards' }));
 
@@ -409,7 +409,67 @@ describe("the boards' settings", { timeout: 20_000 }, () => {
     );
     expect(
       within(order.getByRole('group', { name: 'Way to rank 3' })).getByRole('alert'),
-    ).toHaveTextContent('Way 2 already ranks by time_ms, so this one changes nothing.');
+    ).toHaveTextContent(
+      'Way 2 already ranks by run time, so this one changes nothing.',
+    );
+  });
+
+  it('offers the values the tasks report by their titles, and words the board by them (M58)', async () => {
+    server.use(signedIn);
+    settings(
+      CONTEST.replace(
+        '    who: contestants\n',
+        '    who: contestants\n    order: [points, time_ms]\n',
+      ),
+    );
+    renderApp(PAGE);
+
+    const form = await screen.findByRole('form', { name: 'Leaderboards' });
+    const standings = board(form, 'Standings');
+    const which = await standings.findByRole('combobox', { name: 'Which value' });
+    expect(
+      within(which)
+        .getAllByRole('option')
+        .map((option) => option.textContent),
+    ).toEqual([
+      'Choose a value',
+      'Run time (lower is better)',
+      'Memory used (lower is better)',
+    ]);
+    expect(which).toHaveValue('time_ms');
+    expect(
+      within(standings.getByRole('group', { name: 'Ranked by' })).getByText(
+        'Ranks by points, most first; ties broken by run time, lowest first.',
+      ),
+    ).toBeVisible();
+    await waitFor(() =>
+      expect(
+        within(form).getByRole('status', { name: 'What Standings ranks' }),
+      ).toHaveTextContent(
+        'Ranks entrants by their total points over every task, highest first; ties are broken by their total run time, lowest first.',
+      ),
+    );
+    expect(form).not.toHaveTextContent('time_ms');
+  });
+
+  it('keeps a value no task reports in view, and flags it', async () => {
+    server.use(signedIn);
+    settings(
+      CONTEST.replace(
+        '    who: contestants\n',
+        '    who: contestants\n    order: [points, score]\n',
+      ),
+    );
+    renderApp(PAGE);
+
+    const form = await screen.findByRole('form', { name: 'Leaderboards' });
+    const key = board(form, 'Standings').getByRole('group', { name: 'Way to rank 2' });
+    const which = await within(key).findByRole('combobox', { name: 'Which value' });
+    expect(which).toHaveValue('score');
+    expect(within(which).getAllByRole('option')[1]).toHaveTextContent('score');
+    expect(within(key).getByRole('alert')).toHaveTextContent(
+      'No task this leaderboard covers reports score for each test.',
+    );
   });
 
   it('removes a board only once asked, and the key with the last of them', async () => {

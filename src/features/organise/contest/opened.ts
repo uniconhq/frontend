@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useSearchParams } from 'react-router';
 import type { ProblemPlace } from '../DefinitionErrors';
+import { whenDrawn } from '@/ui/anchor';
 import { contestPlace, FIELD_PARAM, ITEM_PARAM, placeHref } from './places';
 
 /** Where each problem a refused save of the contest's settings lists is fixed. */
@@ -9,30 +10,6 @@ export function contestPlaceOf(org: string, contest: string) {
     const place = contestPlace(path);
     return { label: place.label, to: placeHref(org, contest, place) };
   };
-}
-
-/**
- * Call `then` with what `find` finds, now or as soon as the page draws it,
- * since a card may show its fields only once its data has come; the
- * returned function stops looking.
- */
-export function whenDrawn<T>(
-  find: () => T | null,
-  then: (found: T) => void,
-): () => void {
-  const now = find();
-  if (now !== null) {
-    then(now);
-    return () => {};
-  }
-  const watch = new MutationObserver(() => {
-    const found = find();
-    if (found === null) return;
-    watch.disconnect();
-    then(found);
-  });
-  watch.observe(document.body, { childList: true, subtree: true });
-  return () => watch.disconnect();
 }
 
 /**

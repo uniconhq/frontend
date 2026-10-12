@@ -1,3 +1,5 @@
+import type { ValueMeaning } from '@/api/types';
+import { meaningOf, titleInSentence, valueFirst, valueTitle } from '@/lib/values';
 import type { OrderKeyValues } from './board-values';
 import { KINDS } from './board-words';
 
@@ -79,7 +81,11 @@ export function nextKey(rows: OrderKeyValues[]): OrderKeyValues | null {
  * value named twice. Whether higher or lower is better is the workflow's,
  * so the second can never break a tie the first left.
  */
-export function repeatedValue(rows: OrderKeyValues[], at: number): string | null {
+export function repeatedValue(
+  rows: OrderKeyValues[],
+  at: number,
+  values: ValueMeaning[] | null = null,
+): string | null {
   const key = rows[at];
   if (key?.kind !== 'value' || key.name.trim() === '') return null;
   const earlier = rows.findIndex(
@@ -88,15 +94,47 @@ export function repeatedValue(rows: OrderKeyValues[], at: number): string | null
   );
   return earlier < 0
     ? null
-    : `Way ${String(earlier + 1)} already ranks by ${key.name.trim()}, so this one changes nothing.`;
+    : `Way ${String(earlier + 1)} already ranks by ${titleInSentence(key.name.trim(), meaningOf(values ?? [], key.name.trim()))}, so this one changes nothing.`;
 }
 
-/** One way of ranking in the summary: "points, most first". */
-function keySaid(key: OrderKeyValues): string {
+/**
+ * The values a board may rank by: each the tasks it covers report as a
+ * number for each test, named once, in the order the tasks first report
+ * them. `tasks` null is every task.
+ */
+export function rankableValues(
+  reported: { task: string; meanings: ValueMeaning[] }[],
+  tasks: string[] | null,
+): ValueMeaning[] {
+  const found = new Map<string, ValueMeaning>();
+  for (const each of reported) {
+    if (tasks !== null && !tasks.includes(each.task)) continue;
+    for (const meaning of each.meanings) {
+      if (meaning.fold !== null && !found.has(meaning.name)) {
+        found.set(meaning.name, meaning);
+      }
+    }
+  }
+  return [...found.values()];
+}
+
+/** A value as its row's dropdown offers it: "Run time (lower is better)". */
+export function valueOption(meaning: ValueMeaning): string {
+  const title = valueTitle(meaning.name, meaning);
+  return meaning.better === null ? title : `${title} (${meaning.better} is better)`;
+}
+
+/**
+ * One way of ranking in the summary: "points, most first", "run time,
+ * lowest first", a value by its title where `values` give one (M58).
+ */
+function keySaid(key: OrderKeyValues, values: ValueMeaning[] | null): string {
   if (key.kind === 'points') return 'points, most first';
   if (key.kind === 'value') {
     const name = key.name.trim();
-    return name === '' ? 'a value the tasks report' : `${name}, best first`;
+    if (name === '') return 'a value the tasks report';
+    const meaning = meaningOf(values ?? [], name);
+    return `${titleInSentence(name, meaning)}, ${valueFirst(meaning)}`;
   }
   const minutes = key.perAttempt.trim();
   return minutes === '' || minutes === '0'
@@ -108,11 +146,14 @@ function keySaid(key: OrderKeyValues): string {
  * The whole order in one sentence, above its rows: "Ranks by points, most
  * first; ties broken by penalty minutes, fewest first."
  */
-export function orderSummary(order: OrderKeyValues[]): string {
-  const [first, ...rest] = shownOrder(order).map(keySaid);
+export function orderSummary(
+  order: OrderKeyValues[],
+  values: ValueMeaning[] | null = null,
+): string {
+  const [first, ...rest] = shownOrder(order).map((key) => keySaid(key, values));
   const ties =
     rest.length === 0
       ? ''
       : `; ties broken by ${rest.map((said, at) => (at === 0 ? said : `then by ${said}`)).join(', ')}`;
-  return `Ranks by ${first ?? keySaid({ kind: 'points' })}${ties}.`;
+  return `Ranks by ${first ?? keySaid({ kind: 'points' }, values)}${ties}.`;
 }

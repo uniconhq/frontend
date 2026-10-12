@@ -1,4 +1,6 @@
+import type { ValueMeaning } from '@/api/types';
 import { formatDateTime } from '@/lib/time';
+import { meaningOf, titleInSentence, valueFirst } from '@/lib/values';
 import type { BoardValues, OrderKeyValues } from './board-values';
 import { listed } from '@/lib/listed';
 
@@ -107,15 +109,22 @@ export function perGroupRefusal(order: OrderKeyValues[]): string | null {
 /**
  * One key of a board's order in words, saying a total of what: "their total
  * points over every task, highest first". `over` is the tasks the total runs
- * over, said with the first key only. A value is named by its key until a
- * workflow's report gives it a title (M58).
+ * over, said with the first key only. A value is named by its title where
+ * `values` give one, "their total run time", by its key until then (M58),
+ * and ranks lowest or highest first as its workflow says is better.
  */
-function keyWords(key: OrderKeyValues, over: string | null): string {
+function keyWords(
+  key: OrderKeyValues,
+  over: string | null,
+  values: ValueMeaning[] | null,
+): string {
   const across = over === null ? '' : ` over ${over}`;
   if (key.kind === 'points') return `their total points${across}, highest first`;
   if (key.kind === 'value') {
-    const name = key.name.trim() === '' ? 'value' : key.name.trim();
-    return `their total ${name}${across}, best first`;
+    const name = key.name.trim();
+    if (name === '') return `their total value${across}, best first`;
+    const meaning = meaningOf(values ?? [], name);
+    return `their total ${titleInSentence(name, meaning)}${across}, ${valueFirst(meaning)}`;
   }
   const minutes = key.perAttempt.trim();
   const attempts =
@@ -130,11 +139,15 @@ function keyWords(key: OrderKeyValues, over: string | null): string {
  * by their total points over every task, highest first; ties are broken by
  * penalty minutes, fewest first, counting 20 for each earlier attempt".
  */
-function rankWords(order: OrderKeyValues[], covers: string): string {
+function rankWords(
+  order: OrderKeyValues[],
+  covers: string,
+  values: ValueMeaning[] | null,
+): string {
   const [first, ...ties] = order;
-  const ranks = `ranks entrants by ${first === undefined ? keyWords({ kind: 'points' }, covers) : keyWords(first, covers)}`;
+  const ranks = `ranks entrants by ${keyWords(first ?? { kind: 'points' }, covers, values)}`;
   if (ties.length === 0) return ranks;
-  return `${ranks}; ties are broken by ${ties.map((key) => keyWords(key, null)).join(', then by ')}`;
+  return `${ranks}; ties are broken by ${ties.map((key) => keyWords(key, null, values)).join(', then by ')}`;
 }
 
 /**
@@ -252,11 +265,20 @@ function selectWords(select: string, task: string): string {
  * the sentence is said under one task, after the board's name and a colon,
  * and `held` is that task's alone; `held` is the test groups of those tasks
  * whose results come out once their task closes, said only where they change
- * what the board counts, or null when they are not known.
+ * what the board counts, or null when they are not known; `values` are the
+ * values the tasks report, which name a value the board ranks by (M58).
  */
 export function boardSentence(
   board: BoardValues,
-  { tasks = true, held = null }: { tasks?: boolean; held?: HeldGroup[] | null } = {},
+  {
+    tasks = true,
+    held = null,
+    values = null,
+  }: {
+    tasks?: boolean;
+    held?: HeldGroup[] | null;
+    values?: ValueMeaning[] | null;
+  } = {},
 ): string {
   const covers =
     board.tasks === null
@@ -269,7 +291,7 @@ export function boardSentence(
       ? held
       : held.filter((group) => board.tasks?.includes(group.task) === true);
   const named = tasks && board.tasks?.length !== 1;
-  const first = `${rankWords(board.order, covers)}.`;
+  const first = `${rankWords(board.order, covers, values)}.`;
   return [
     tasks ? first.replace(/^./, (letter) => letter.toUpperCase()) : first,
     selectWords(

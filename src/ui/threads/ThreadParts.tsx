@@ -1,11 +1,34 @@
 import type { ReactNode } from 'react';
-import type { Announcement, Clarification } from '@/api/types';
+import type { Announcement, AnnouncementLink, Clarification } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { Chip } from '@/ui/Chip';
 import { Markdown } from '@/ui/Markdown';
+import { PageLink } from '@/ui/PageLink';
 import { formatDateTime, serverNow } from '@/lib/time';
 import { waitedWords, waitingSince } from './waiting';
 import classes from './threads.module.css';
+
+/**
+ * The message a public answer leaves on its question, "Answered publicly in
+ * the announcement ‘On n’", with the announcement's title a link to it
+ * (M62); the whole message the link where it does not quote the title.
+ */
+function AnsweredPublicly({ body, href }: { body: string; href: string }) {
+  const quoted = /^(.*?)(‘.*’)\s*$/su.exec(body);
+  if (quoted === null) {
+    return (
+      <p className={classes.publicAnswer}>
+        <PageLink to={href}>{body}</PageLink>
+      </p>
+    );
+  }
+  return (
+    <p className={classes.publicAnswer}>
+      {quoted[1]}
+      <PageLink to={href}>{quoted[2]}</PageLink>
+    </p>
+  );
+}
 
 /**
  * One announcement's title, when it was posted, which task it is on when
@@ -67,26 +90,35 @@ function QuestionBadge({
  * wrote it in bold, the organisers' set apart from the asker's. `asker` is
  * the name the asker's messages go under ("You", "Your team", or the
  * entrant's name for the organisers); `organisers` says the box is read by
- * them, whose badge says how long an open question has waited. `children`
- * is what can be done with it, at the box's foot.
+ * them, whose badge says how long an open question has waited.
+ * `announcementHref` is where the announcement a public answer posted is
+ * read, which its message on the question links to. `children` is what can
+ * be done with it, at the box's foot.
  */
 export function QuestionThread({
   clarification,
   asker,
   organisers = false,
   where,
+  announcementHref,
   children,
 }: {
   clarification: Clarification;
   asker: string;
   organisers?: boolean;
+  announcementHref?: (link: AnnouncementLink) => string;
   /** Which contest it was asked in, where questions of several are listed. */
   where?: string;
   children?: ReactNode;
 }) {
   const { title } = clarification;
   const said = [
-    { from_asker: true, body: clarification.body, at: clarification.asked_at },
+    {
+      from_asker: true,
+      body: clarification.body,
+      at: clarification.asked_at,
+      announcement: null,
+    },
     ...clarification.messages,
   ];
   return (
@@ -119,7 +151,14 @@ export function QuestionThread({
                 {formatDateTime(new Date(message.at))}
               </span>
             </p>
-            <Markdown>{message.body}</Markdown>
+            {message.announcement !== null && announcementHref !== undefined ? (
+              <AnsweredPublicly
+                body={message.body}
+                href={announcementHref(message.announcement)}
+              />
+            ) : (
+              <Markdown>{message.body}</Markdown>
+            )}
           </li>
         ))}
       </ol>

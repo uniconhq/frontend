@@ -15,6 +15,7 @@ import { Loaded } from '@/ui/feedback/Loaded';
 import { useMe } from '@/session';
 import { useFallbackPoll } from '@/live';
 import { holdsAt } from '../roles';
+import { announcementAnchor } from '@/ui/threads/anchors';
 import { AnnouncementContent } from '@/ui/threads/ThreadParts';
 import { itemClass } from '@/ui/threads/item-class';
 import {
@@ -129,7 +130,13 @@ function Managed({
     );
   }
   return (
-    <li className={itemClass(announcement)}>
+    <li
+      className={itemClass(announcement)}
+      id={announcementAnchor({
+        task: announcement.where.task,
+        number: announcement.number,
+      })}
+    >
       <AnnouncementContent announcement={announcement} />
       {manages && !announcement.closed && (
         <div className={classes.actions}>

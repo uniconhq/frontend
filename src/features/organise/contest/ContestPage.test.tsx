@@ -16,6 +16,7 @@ import {
   standingList,
   standings,
   taskList,
+  unchanged,
 } from '@/test/organiser';
 
 const CONTEST = '/orgs/acme/contests/spring';
@@ -1232,6 +1233,7 @@ describe('creating a task', () => {
             changes: [],
             notes: [],
             regraded: 0,
+            effect: unchanged,
           });
         },
       ),
