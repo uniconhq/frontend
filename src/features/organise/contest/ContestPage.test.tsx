@@ -278,22 +278,24 @@ describe("the contest's tasks", () => {
   });
 
   it("reads the tasks afresh on coming back from saving the contest's settings", async () => {
-    let reads = 0;
+    // The tasks as read once the save is in, which the contest's page must show.
+    let readsAfterSave = 0;
+    let saved = false;
     server.use(
       signedIn,
       ...repoFiles,
       http.get(`${CONTEST_API}/organise/tasks`, () => {
-        reads += 1;
+        if (saved) readsAfterSave += 1;
         return HttpResponse.json(standings);
       }),
-      http.put(`${CONTEST_API}/files/:path`, () =>
-        HttpResponse.json({ version: '9f8e7d6c5b4a39281706', notes: [] }),
-      ),
+      http.put(`${CONTEST_API}/files/:path`, () => {
+        saved = true;
+        return HttpResponse.json({ version: '9f8e7d6c5b4a39281706', notes: [] });
+      }),
     );
     renderApp(`${CONTEST}/settings`);
 
     const form = await screen.findByRole('form', { name: 'Contest settings' });
-    expect(reads).toBe(0);
     await userEvent.type(
       within(form).getByRole('textbox', { name: 'Description' }),
       'Ours',
@@ -304,7 +306,7 @@ describe("the contest's tasks", () => {
     const trail = screen.getByRole('navigation', { name: 'Breadcrumb' });
     await userEvent.click(within(trail).getByRole('link', { name: 'spring' }));
     await screen.findByRole('list', { name: 'Tasks' });
-    expect(reads).toBe(1);
+    expect(readsAfterSave).toBeGreaterThan(0);
   });
 
   it('shows a skeleton while the tasks load', async () => {
@@ -339,8 +341,10 @@ describe("the contest's tasks", () => {
       await screen.findByText('You need the observer role at acme/spring.'),
     ).toBeVisible();
     const cards = screen.getByRole('group', { name: "The contest's sections" });
-    expect(within(cards).getByRole('link', { name: 'Files' })).toBeVisible();
-    expect(await within(cards).findByText('No files yet.')).toBeVisible();
+    expect(
+      within(cards).getByRole('link', { name: 'Contest organisers' }),
+    ).toBeVisible();
+    expect(await within(cards).findByText('0 organisers')).toBeVisible();
   });
 
   it("shows the settings' errors at their paths and lists the tasks by name when the settings do not read", async () => {
@@ -371,7 +375,7 @@ describe("the contest's tasks", () => {
     );
     expect(
       within(alert).getByRole('link', { name: 'the stored settings' }),
-    ).toHaveAttribute('href', '/orgs/acme/contests/spring/files?file=contest.yaml');
+    ).toHaveAttribute('href', '/orgs/acme/contests/spring/settings#file');
     const errors = within(alert).getByRole('list', { name: 'Errors' });
     expect(
       within(errors)
@@ -828,8 +832,9 @@ describe("the contest's sections", () => {
     await says('Announcements', '2 posted; the latest is “Task B fixed”.');
     await says('Questions', 'Nobody has asked anything yet.');
     await says('Leaderboards', 'No leaderboard yet.');
-    await says('Files', 'No files yet.');
     await says('Contest organisers', '0 organisers');
+    // A contest holds no file but its settings, so it has no Files card (M43).
+    expect(screen.queryByRole('region', { name: 'Files' })).toBeNull();
     // No button and no form on the page but the tasks' one button.
     const sections = screen.getByRole('group', { name: "The contest's sections" });
     expect(within(sections).queryByRole('button')).toBeNull();

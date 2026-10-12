@@ -1,9 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 import { $api, queryView } from '@/api/query';
 import { useFallbackPoll } from '@/live';
-import { treeQuery } from '../files/place';
 import { count } from '../hub/count';
-import { AnnouncementsLine, FilesLine, Line } from '../hub/lines';
+import { AnnouncementsLine, Line } from '../hub/lines';
 import { announcementsQuery } from '../threads/announcements';
 import { entrantsLine, useEntrants } from '../entrants/names';
 import { useInvites } from '../invites/invites';
@@ -162,14 +161,6 @@ export function QuestionsCard({ path }: { path: Path }) {
           ? `All ${String(questions.length)} answered.`
           : `${count(open, 'question waits', 'questions wait')} for an answer, of ${String(questions.length)}.`;
       }}
-    />
-  );
-}
-
-export function FilesCard({ path }: { path: Path }) {
-  return (
-    <FilesLine
-      view={queryView(useQuery(treeQuery({ kind: 'contest', ...path }, '')))}
     />
   );
 }

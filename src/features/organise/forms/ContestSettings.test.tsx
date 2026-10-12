@@ -123,7 +123,7 @@ describe('the contest settings form', { timeout: 20_000 }, () => {
     expect(within(form).queryByLabelText('Who sees it')).toBeNull();
     expect(screen.getByRole('link', { name: 'View file' })).toHaveAttribute(
       'href',
-      '/orgs/acme/contests/spring/files?file=contest.yaml',
+      '/orgs/acme/contests/spring/settings#file',
     );
   });
 
@@ -412,7 +412,11 @@ describe('the contest settings form', { timeout: 20_000 }, () => {
       ),
     ).toBeVisible();
     expect(screen.queryByRole('form', { name: 'Contest settings' })).toBeNull();
-    expect(screen.queryByRole('textbox', { name: 'contest.yaml' })).toBeNull();
+    // The text is offered to an admin only where the settings are stored, below.
+    const stored = screen.getByRole('region', { name: 'The settings as stored' });
+    const texts = await screen.findAllByRole('textbox', { name: 'contest.yaml' });
+    expect(texts).toHaveLength(1);
+    expect(stored).toContainElement(texts[0] ?? null);
   });
 });
 

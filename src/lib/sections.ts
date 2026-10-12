@@ -44,7 +44,6 @@ export const CONTEST_SECTIONS = [
     card: 'grid',
   },
   { key: 'questions', label: 'Questions', segment: 'questions', card: 'grid' },
-  { key: 'files', label: 'Files', segment: 'files', card: 'grid' },
   {
     key: 'organisers',
     label: 'Contest organisers',

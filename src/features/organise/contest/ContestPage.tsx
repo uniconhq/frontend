@@ -21,7 +21,6 @@ import {
   EntrantsCard,
   EntryCard,
   FailedGradings,
-  FilesCard,
   GradingsCard,
   QuestionsCard,
 } from './ContestCards';
@@ -55,7 +54,6 @@ const CARDS: Record<
   boards: BoardsCard,
   announcements: AnnouncementsCard,
   questions: QuestionsCard,
-  files: FilesCard,
   organisers: ({ path }) => <OrganisersLine place={{ kind: 'contest', ...path }} />,
 };
 

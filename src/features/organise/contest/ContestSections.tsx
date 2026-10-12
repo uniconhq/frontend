@@ -2,19 +2,21 @@ import { Card } from '@/ui/Card';
 import { PageLink } from '@/ui/PageLink';
 import { useContestParams } from '@/lib/route-params';
 import { CONTEST_SECTIONS, orgSectionPath, sectionOf } from '@/lib/sections';
-import { FileBrowser } from '../files/FileBrowser';
+import { FileEditor } from '../files/FileEditor';
 import { ContestSettings } from '../forms/ContestSettings';
 import { PeopleSection } from '../people/PeopleSection';
-import { viewFilePath } from './places';
+import { STORED, viewFilePath } from './places';
 import { SectionPage } from '../SectionPage';
 import { AnnouncementsSection } from '../threads/AnnouncementsSection';
 import { ContestClarifications } from '../threads/Clarifications';
 
 /**
  * The contest's settings as a form in sections, read as the page opens, so
- * the version it saves against is the one the organiser started from, with
- * the way to read them as they are stored. A manager sees the admin's
- * settings and cannot change them.
+ * the version it saves against is the one the organiser started from; then
+ * the settings as they are stored, to read with every change to them, which
+ * View file leads to and where an admin fixes them as text when the pages
+ * cannot read them. A manager sees the admin's settings and cannot change
+ * them.
  */
 export function ContestSettingsPage() {
   const { org, contest } = useContestParams();
@@ -26,6 +28,11 @@ export function ContestSettingsPage() {
       <Card>
         <ContestSettings org={org} contest={contest} />
       </Card>
+      <section aria-label="The settings as stored" id={STORED}>
+        <Card>
+          <FileEditor place={{ kind: 'contest', org, contest }} path="contest.yaml" />
+        </Card>
+      </section>
     </SectionPage>
   );
 }
@@ -54,18 +61,6 @@ export function ContestQuestionsPage() {
     >
       <Card>
         <ContestClarifications org={org} contest={contest} />
-      </Card>
-    </SectionPage>
-  );
-}
-
-/** The contest's files, the tree beside the open file. */
-export function ContestFilesPage() {
-  const { org, contest } = useContestParams();
-  return (
-    <SectionPage section={sectionOf(CONTEST_SECTIONS, 'files')}>
-      <Card>
-        <FileBrowser place={{ kind: 'contest', org, contest }} />
       </Card>
     </SectionPage>
   );

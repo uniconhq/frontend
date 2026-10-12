@@ -15,6 +15,7 @@ import type { Place } from '../files/place';
 import { PageLink } from '@/ui/PageLink';
 import { taskPath } from '@/lib/organiser-paths';
 import { savedBy } from './published';
+import { STORED } from '../contest/places';
 import { TitleForm } from './TitleForm';
 import { PeopleSection } from '../people/PeopleSection';
 import { holdsAt } from '../roles';
@@ -49,7 +50,7 @@ export function TaskSettingsPage() {
       <Card>
         <TitleForm place={place} admin={admin} />
       </Card>
-      <section aria-label="The settings as stored" id="file">
+      <section aria-label="The settings as stored" id={STORED}>
         <Card>
           <FileEditor place={place} path="task.yaml" />
         </Card>

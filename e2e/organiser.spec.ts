@@ -380,6 +380,25 @@ test('an organiser makes an org, walks to a task and publishes its statement', a
   await expect(page.getByRole('list', { name: 'Your orgs' })).toContainText('acme');
 });
 
+test('a contest has no Files page: an old link to one lands on its stored settings', async ({
+  page,
+}) => {
+  const state = await stubOrganiserApi(page);
+  state.orgMade = true;
+  await page.goto('/orgs/acme/contests/spring');
+  const sidebar = page.getByRole('navigation', { name: 'Sections' });
+  await expect(sidebar.getByRole('link', { name: 'Settings' })).toBeVisible();
+  await expect(sidebar.getByRole('link', { name: 'Files' })).toHaveCount(0);
+
+  await page.goto('/orgs/acme/contests/spring/files?file=contest.yaml');
+  await expect(page).toHaveURL(/\/orgs\/acme\/contests\/spring\/settings#file$/);
+  const stored = page.getByRole('region', { name: 'The settings as stored' });
+  await expect(
+    stored.getByRole('textbox', { name: 'The contest’s settings' }),
+  ).toBeVisible();
+  await expect(stored).toBeInViewport();
+});
+
 test('an organiser opens a contest from its checklist', async ({ page }) => {
   const state = await stubOrganiserApi(page);
   state.orgMade = true;

@@ -12,6 +12,7 @@ import { readTask } from '../forms/task-values';
 import { readSettings } from './build-data';
 import { TaskStanding } from './TaskHeader';
 import { useOpenedField, whenDrawn } from '../contest/opened';
+import { STORED } from '../contest/places';
 import { fileQuery } from '../files/place';
 import { StatementEditor } from '../forms/StatementEditor';
 import { OrganisersLine } from '../hub/lines';
@@ -105,7 +106,7 @@ export function TaskPage() {
       <PageHeader
         title={<TaskTitle place={place} />}
         links={
-          <PageLink to={`${taskSectionPath(org, contest, task, 'settings')}#file`}>
+          <PageLink to={`${taskSectionPath(org, contest, task, 'settings')}#${STORED}`}>
             View file
           </PageLink>
         }
