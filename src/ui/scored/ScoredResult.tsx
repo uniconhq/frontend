@@ -1,7 +1,7 @@
 import type { GroupShown, Reported, ScoredGrading, ValueMeaning } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { VerdictBadge } from '@/ui/VerdictBadge';
-import { formatExact } from '@/lib/exact';
+import { formatExact, formatPoints } from '@/lib/exact';
 import { formatDateTime } from '@/lib/time';
 import {
   foldWords,
@@ -275,11 +275,11 @@ export function ScoredResult({
         <BodyText>
           {grading.points.shown === null
             ? 'No points shown yet'
-            : `${formatExact(grading.points.shown, 2)} points`}
+            : `${formatPoints(grading.points.shown)} points`}
           {grading.points.pending_until !== null &&
             (grading.points.shown === null
-              ? `: up to ${formatExact(grading.points.pending, 2)}, shown at ${formatDateTime(new Date(grading.points.pending_until))}`
-              : `, and up to ${formatExact(grading.points.pending, 2)} more shown at ${formatDateTime(new Date(grading.points.pending_until))}`)}
+              ? `: up to ${formatPoints(grading.points.pending)}, shown at ${formatDateTime(new Date(grading.points.pending_until))}`
+              : `, and up to ${formatPoints(grading.points.pending)} more shown at ${formatDateTime(new Date(grading.points.pending_until))}`)}
           {grading.factor !== null &&
             grading.factor !== '1' &&
             `, at ${formatExact(grading.factor, 4)} for lateness`}

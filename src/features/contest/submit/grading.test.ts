@@ -117,6 +117,11 @@ describe('a submission’s points in its row', () => {
     expect(pointsLine(points('82.5'), NOW)).toBe(formatExact('82.5', 2));
   });
 
+  it('cuts points to two decimals, as every page shows them (R17)', () => {
+    expect(pointsLine(points('36.666666'), NOW)).toBe(formatExact('36.66', 2));
+    expect(pointsLine(points('99.999'), NOW)).toBe(formatExact('99.99', 2));
+  });
+
   it('gives a dash while it is graded, and when it never will be', () => {
     expect(pointsLine(null, NOW)).toBe('—');
     expect(pointsLine({ ...done, status: 'queued' }, NOW)).toBe('—');

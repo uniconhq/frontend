@@ -10,6 +10,7 @@ import { compareDecimal } from '@/lib/exact';
 import { NumberText, numberText } from '../forms/yaml-doc';
 import {
   clearPort,
+  entryFields,
   freeName,
   removeEntry,
   removeField,
@@ -26,6 +27,7 @@ import {
   setUse,
   setValue,
   wire,
+  type EntryFields,
   type FieldFields,
   type InputFields,
   workflowOf,
@@ -48,6 +50,7 @@ import {
   BOUNDS,
   mayBeOptional,
   newProblem,
+  outputType,
   reportable,
   reportRefusal,
   switchRefusal,
@@ -1016,31 +1019,23 @@ function EntryRow({
     from?.kind === 'steps'
       ? workflow.steps.find((found) => found.id === from.name)
       : undefined;
-  const port =
-    step !== undefined && from?.kind === 'steps'
-      ? declared(primitives, step.use)?.outputs[from.output]
-      : undefined;
-  const isNumber = port?.type === 'number';
+  const type = outputType(workflow, primitives, from);
+  const isNumber = type === 'number';
   const perTest = step?.perTest === true;
   const sources = reportable(workflow, primitives);
-  const write = (
-    next: Partial<{
-      fold: string | null;
-      better: string | null;
-      at_least: NumberText | null;
-      at_most: NumberText | null;
-      from: typeof from;
-    }>,
-  ) => {
-    const merged = {
-      from: next.from !== undefined ? next.from : from,
-      fold: 'fold' in next ? next.fold : entry.fold,
-      better: 'better' in next ? next.better : entry.better,
-      at_least: 'at_least' in next ? next.at_least : entry.atLeast,
-      at_most: 'at_most' in next ? next.at_most : entry.atMost,
-    };
-    if (merged.from === null || merged.from === undefined) return;
-    change(setEntry(text, entry.name, { ...merged, from: merged.from }));
+  const write = (next: Partial<EntryFields>) => {
+    const reads = next.from ?? from;
+    if (reads === null) return;
+    change(
+      setEntry(
+        text,
+        entry.name,
+        entryFields(entry, outputType(workflow, primitives, reads), {
+          ...next,
+          from: reads,
+        }),
+      ),
+    );
   };
   const betterInputs = workflow.inputs.filter(
     (input) =>
@@ -1085,7 +1080,7 @@ function EntryRow({
       <CommitField
         label="Name"
         value={entry.name}
-        description="Leaderboards and results name it by this."
+        description="Tasks and leaderboards pick it by this name."
         apply={(name) => {
           if (!REPORT_NAME.test(name))
             return "A reported value's name may use only lower case letters, digits and underscores (_), starting with a letter.";
@@ -1115,6 +1110,35 @@ function EntryRow({
           if (refused === null) write({ from: ref });
         }}
       />
+      <div className={classes.formText}>
+        <CommitField
+          label="Title"
+          value={entry.title ?? ''}
+          placeholder={entry.name}
+          description="What pages call it, such as Run time. Without one, they use its name."
+          apply={(written) => {
+            write({ title: formText(written) });
+            return null;
+          }}
+        />
+        {(isNumber || entry.unit !== null) && (
+          // Only a number takes one; text shows one only to clear it.
+          <CommitField
+            label="Unit"
+            value={entry.unit ?? ''}
+            placeholder="ms"
+            description={
+              type === null || isNumber
+                ? undefined
+                : 'Only a number takes a unit, so clear this one.'
+            }
+            apply={(written) => {
+              write({ unit: formText(written) });
+              return null;
+            }}
+          />
+        )}
+      </div>
       {isNumber && perTest && (
         <Select
           label="Over the tests, report"

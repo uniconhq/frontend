@@ -21,6 +21,7 @@ import { Drawer, DRAWER_WIDTH } from './Drawer';
 import {
   addStep,
   clearPort,
+  entryFields,
   freeName,
   setEntry,
   setField,
@@ -40,7 +41,7 @@ import { pinned as pinProblems, placed } from './pins';
 import { Problems } from './Problems';
 import { byRef, declared, type PrimitiveInfo } from './primitives';
 import { PublishVersion } from './Publish';
-import { reportable, reportRefusal, wireRefusal } from './rules';
+import { outputType, reportable, reportRefusal, wireRefusal } from './rules';
 import { ShareButton } from './SharePanel';
 import { DRAFT_FILE, refWords } from './words';
 import classes from './workflows.module.css';
@@ -375,13 +376,13 @@ export function Editor({
     const existing = workflow.report.find((entry) => entry.name === target.entry);
     if (existing !== undefined) {
       change(
-        setEntry(text, existing.name, {
-          from: source,
-          fold: existing.fold,
-          better: existing.better,
-          at_least: existing.atLeast,
-          at_most: existing.atMost,
-        }),
+        setEntry(
+          text,
+          existing.name,
+          entryFields(existing, outputType(workflow, primitiveMap, source), {
+            from: source,
+          }),
+        ),
       );
       return;
     }

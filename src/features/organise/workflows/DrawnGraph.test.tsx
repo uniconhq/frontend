@@ -82,6 +82,24 @@ describe('a workflow drawn', () => {
     expect(screen.getAllByRole('group', { name: 'Each test’s files' }).length).toBe(2);
   });
 
+  it('names each report entry by its title, by its key only where it has none (M58)', async () => {
+    const titled = CLASSIC_V2.replace(
+      'time_ms: {from:',
+      'time_ms: {title: Run time, unit: ms, from:',
+    );
+    renderWithProviders(<DrawnGraph text={titled} primitives={PRIMITIVES} />);
+
+    const report = await screen.findByRole('group', { name: 'Report' });
+    const rows = [...report.querySelectorAll<HTMLElement>('[data-side="left"]')];
+    const names = rows.map(
+      (row) => row.firstElementChild?.nextElementSibling?.textContent,
+    );
+    expect(names).toContain('Run time');
+    expect(names).toContain('memory_kb');
+    expect(names).toContain('log');
+    expect(names).not.toContain('time_ms');
+  });
+
   it('labels a long wire by where its value comes from, in words', async () => {
     renderWithProviders(<DrawnGraph text={CLASSIC_V2} primitives={PRIMITIVES} />);
 

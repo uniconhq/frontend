@@ -544,7 +544,7 @@ test('an organiser reads a test in place, its parts side by side, and is told ho
 
   const scoring = page.getByRole('region', { name: 'Tests and scoring' });
   const row = scoring.getByRole('listitem', { name: 'Test 1' });
-  await expect(row).toContainText('Test 1 · 1 2 → 3 → expected 10 MB');
+  await expect(row).toContainText('Test 1 · 1 2 → 3, expected 10 MB');
   await row.getByRole('button', { name: /Test 1/ }).click();
   const view = row.getByRole('region', { name: 'What test 1 holds' });
   await expect(view.getByLabel('What input holds')).toHaveText('1 2');

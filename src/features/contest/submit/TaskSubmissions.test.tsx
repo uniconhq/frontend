@@ -12,6 +12,7 @@ import {
   accepted,
   grading,
   inputField,
+  languageField,
   reported,
   submission,
   TASK_API,
@@ -1152,6 +1153,44 @@ describe('a submission opened from the list', () => {
         .getAllByRole('listitem')
         .map((item) => item.textContent),
     ).toEqual(['language: cpp', 'n: 5', 'strict: true']);
+  });
+
+  it('names each input as the form does, by its label, its key only for an input the task no longer has (M13)', async () => {
+    server.use(
+      signedIn,
+      withPage({
+        inputs: [inputField(), inputField({ ...languageField, label: 'Language' })],
+      }),
+      listing([submission(1, accepted)]),
+      http.get(`${TASK_API}/submissions/:number`, () =>
+        HttpResponse.json(submission(1, accepted)),
+      ),
+      http.get(`${TASK_API}/submissions/:number/files`, () =>
+        HttpResponse.json({
+          number: 1,
+          inputs: {
+            submission: { files: ['files/submission/main.py'], value: null },
+            language: { files: [], value: 'python' },
+            old: { files: [], value: '3' },
+          },
+        }),
+      ),
+    );
+    renderApp(`${PAGE}?submission=1`);
+
+    const detail = await screen.findByRole('region', { name: 'Submission 1' });
+    const files = await within(detail).findByRole('list', { name: 'Files' });
+    expect(
+      within(files)
+        .getAllByRole('listitem')
+        .map((item) => item.textContent),
+    ).toEqual(['Your solution: main.py']);
+    const given = within(detail).getByRole('list', { name: 'Values given' });
+    expect(
+      within(given)
+        .getAllByRole('listitem')
+        .map((item) => item.textContent),
+    ).toEqual(['Language: python', 'old: 3']);
   });
 
   it('names each file by its path under its input, so files of one name differ', async () => {

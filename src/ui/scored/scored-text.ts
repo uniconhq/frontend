@@ -1,5 +1,5 @@
 import type { GroupShown, Reported } from '@/api/types';
-import { formatExact } from '@/lib/exact';
+import { formatExact, formatPoints, formatWorth } from '@/lib/exact';
 
 /**
  * A test's reported value by name as read: a number to at most four
@@ -16,8 +16,8 @@ export function valueText(values: Reported, name: string): string | undefined {
  */
 export function pointsText(group: GroupShown): string | null {
   if (group.max === null) return null;
-  const most = formatExact(group.max, 2);
+  const most = formatWorth(group.max);
   return group.points === null
     ? `of ${most}`
-    : `${formatExact(group.points, 2)} / ${most}`;
+    : `${formatPoints(group.points, group.max)} / ${most}`;
 }

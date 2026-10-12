@@ -794,15 +794,19 @@ file from the forge.
 A contest's home shows its open announcements and those of every task
 released to the contestant, each task's named, and a task's page shows its
 own. An approved contestant also gets a form to ask the organisers a
-question, optionally about one task, and their own questions with every
-reply under them; commenting on an answered one opens it again. In a team
+question, optionally about one task, and their own questions, each in its
+own box with every message under it and Follow up folded until asked for;
+following up on an answered one opens it again. A public answer's message
+on the question links to its announcement, or says the organisers have
+since closed it, since the contest home lists only open ones. In a team
 the questions are the team's, marked as the team's on both sides. The
 organiser's contest and task pages have an announcements card with a
 composer, Edit and Close, and no delete; the contest page lists its
 questions, and the org page links to the inbox, `/orgs/<org>/clarifications`,
-every question still open across the org with Reply, Mark as answered,
-Unmark and Answer publicly. Each form sends once at a time, until the list
-has been read again, so a second click never posts twice. The parts both
+every question still open across the org with Reply, which opens one form
+to answer only the asker or every entrant as an announcement, Mark it
+answered and Reopen. Each form sends once at a time, until the list has
+been read again, so a second click never posts twice. The parts both
 sides show are in `src/ui/threads/`; the contestant's pages are in
 `features/contest/threads/` and the organiser's in
 `features/organise/threads/`, since a feature does not import another.

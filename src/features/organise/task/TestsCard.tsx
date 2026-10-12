@@ -98,9 +98,9 @@ const CREDITS = [
   },
   {
     value: 'relative',
-    label: 'Its result against the best anyone reached',
+    label: 'Its result against the best any entrant reached',
     description:
-      'For optimisation. Where higher is better, reaching 80 on a test where the best anyone reached is 100 earns 80% of it; where lower is better, as with run time, the fastest earns all of it and one twice as slow earns half. Its points move as others do better.',
+      'For optimisation. Where higher is better, reaching 80 on a test where the best any entrant reached is 100 earns 80% of it; where lower is better, as with run time, the fastest earns all of it and one twice as slow earns half. Its points move as others do better.',
   },
 ];
 

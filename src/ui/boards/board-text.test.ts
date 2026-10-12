@@ -123,4 +123,26 @@ describe('the decimals a board is shown to', () => {
     expect(keyPlaces(board)).toEqual([3]);
     expect(cellPlaces(board, 'sum')).toEqual({ points: 3 });
   });
+
+  it('cuts points, as every page shows them, and tells rows apart as they are cut (R17)', () => {
+    expect(keyNumber(POINTS, '36.666666', 2)).toBe(formatExact('36.66', 2));
+    expect(
+      cellLines([POINTS], cell({ counting: true, numbers: { points: '36.666666' } }), {
+        points: 2,
+      }),
+    ).toEqual([`${formatExact('36.66', 2)} points`]);
+    // Rounded to two, both rows would read 36.67; cut, they read apart.
+    const board = icpc({
+      keys: [POINTS],
+      rows: icpc().rows.map((found, index) => ({
+        ...found,
+        keys: [['36.674', '36.666', '10'][index] ?? null],
+        cells: {
+          sum: cell({ numbers: { points: ['36.674', '36.666', '10'][index] ?? '0' } }),
+        },
+      })),
+    });
+    expect(keyPlaces(board)).toEqual([2]);
+    expect(cellPlaces(board, 'sum')).toEqual({ points: 2 });
+  });
 });

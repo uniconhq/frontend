@@ -7,7 +7,7 @@ import type {
 } from '@/api/types';
 import { useFallbackPoll } from '@/live';
 import { verdictLabel } from '@/ui/verdicts';
-import { formatExact } from '@/lib/exact';
+import { formatPoints } from '@/lib/exact';
 import { formatDateTime } from '@/lib/time';
 
 /** Each task's latest regrade of many, newest first. */
@@ -200,7 +200,7 @@ export function sideWords(side: RegradeSide | null): string {
   const stopped = side.stopped === null ? null : verdictLabel(side.stopped);
   const tally =
     side.points !== null
-      ? `${formatExact(side.points, 2)} ${side.points === '1' ? 'point' : 'points'}`
+      ? `${formatPoints(side.points)} ${side.points === '1' ? 'point' : 'points'}`
       : `${String(side.accepted)} of ${String(side.tests)} tests passed`;
   return stopped === null ? tally : `${stopped}, ${tally}`;
 }

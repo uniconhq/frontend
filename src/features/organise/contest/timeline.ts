@@ -1,5 +1,5 @@
 import type { TaskStanding } from '@/api/types';
-import { formatExact } from '@/lib/exact';
+import { formatWorth } from '@/lib/exact';
 import { formatDateTime } from '@/lib/time';
 import type { ContestValues } from '../forms/contest-values';
 import { percentOf } from './percent';
@@ -28,7 +28,7 @@ export function timelineWords(
 ): { worth: string; when: string } {
   const worth =
     timeline.worth !== null
-      ? `${formatExact(timeline.worth)} ${timeline.worth === '1' ? 'point' : 'points'}`
+      ? `${formatWorth(timeline.worth)} ${timeline.worth === '1' ? 'point' : 'points'}`
       : state.latest === null
         ? 'points known once the task is published'
         : 'no points';

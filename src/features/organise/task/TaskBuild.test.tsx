@@ -237,6 +237,8 @@ function taskBackend(
     contest?: string;
     /** The settings as stored, in place of the ones above. */
     content?: string;
+    /** What the settings' read waits for once a save went through. */
+    readAfterSave?: Promise<void>;
   } = {},
 ) {
   const { answer = () => HttpResponse.json(PUBLISHED), form = UNREAD } = options;
@@ -259,9 +261,12 @@ function taskBackend(
       const at = new URL(request.url).searchParams.get('path') ?? '';
       return at.startsWith('tests') ? HttpResponse.json(tree[at] ?? []) : undefined;
     }),
-    http.get(`${TASK_API}/files/:path`, ({ params }) => {
+    http.get(`${TASK_API}/files/:path`, async ({ params }) => {
       const path = decodeURIComponent(String(params['path']));
-      if (path === 'task.yaml') return HttpResponse.json(settings);
+      if (path === 'task.yaml') {
+        if (sent.length > 0) await options.readAfterSave;
+        return HttpResponse.json(settings);
+      }
       if (path.startsWith('tests/')) {
         return HttpResponse.json({
           path,
@@ -297,14 +302,16 @@ function taskBackend(
       if (yaml !== undefined && yaml.token !== settings.token) {
         return problem(409, 'conflict');
       }
-      if (yaml?.content != null) {
+      const answered = answer();
+      // A refused save, such as one asking to confirm, writes nothing.
+      if (yaml?.content != null && answered.ok) {
         settings = {
           ...settings,
           content: yaml.content,
           token: `token-${String(sent.length)}`,
         };
       }
-      return answer();
+      return answered;
     }),
     ...repoFiles,
   );
@@ -1257,7 +1264,7 @@ describe('scoring a task', { timeout: 30_000 }, () => {
 
     await userEvent.click(
       within(earns).getByRole('radio', {
-        name: 'Its result against the best anyone reached',
+        name: 'Its result against the best any entrant reached',
       }),
     );
     // Against the best, each value says which way is better.
@@ -1289,7 +1296,7 @@ describe('scoring a task', { timeout: 30_000 }, () => {
     const earns = within(tests).getByRole('radiogroup', { name: 'A test earns' });
     expect(
       within(earns).getByRole('radio', {
-        name: 'Its result against the best anyone reached',
+        name: 'Its result against the best any entrant reached',
       }),
     ).toHaveAccessibleDescription(
       /where lower is better, as with run time, the fastest earns all of it and one twice as slow earns half\./,
@@ -1308,7 +1315,7 @@ describe('scoring a task', { timeout: 30_000 }, () => {
     // A value is named by its title where the workflow gives one.
     await userEvent.click(
       within(earns).getByRole('radio', {
-        name: 'Its result against the best anyone reached',
+        name: 'Its result against the best any entrant reached',
       }),
     );
     expect(
@@ -1469,6 +1476,53 @@ describe('the save’s answer (M66)', { timeout: 30_000 }, () => {
     );
     expect(bar).not.toHaveClass(/saveSettled/);
     expect(within(bar).getByRole('button', { name: 'Save' })).toBeEnabled();
+  });
+
+  it('leaves nothing to save once a confirmed publish answered, while the task is read again (M66)', async () => {
+    let release = () => {};
+    const readAfterSave = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let asked = false;
+    taskBackend({
+      form: { ...CHECKED, inputs: [] },
+      readAfterSave,
+      answer: () => {
+        if (asked) return HttpResponse.json(PUBLISHED);
+        asked = true;
+        return problem(409, 'confirmation_required', {
+          detail: 'The contest is running and this changes how the task grades.',
+          changes: ['limits.time changed'],
+          regrades: 2,
+        });
+      },
+    });
+    const { tests } = await openTask();
+
+    fill(fieldIn(tests, 'small', 'Points'), '40');
+    await save();
+    const bar = screen.getByRole('region', { name: 'Save the task' });
+    await userEvent.click(
+      await within(bar).findByRole('button', { name: 'Publish the change' }),
+    );
+
+    expect(
+      await screen.findByText('Saved and published as publication 4.'),
+    ).toBeVisible();
+    // The task is still being read again, and nothing is left to save.
+    expect(bar).not.toHaveTextContent(/to save/);
+    expect(within(bar).queryByRole('button', { name: 'Save' })).toBeNull();
+    expect(within(bar).queryByRole('button', { name: 'Discard changes' })).toBeNull();
+
+    release();
+    await waitFor(() =>
+      expect(screen.getByRole('region', { name: 'Save the task' })).toHaveClass(
+        /saveSettled/,
+      ),
+    );
+    expect(screen.getByRole('region', { name: 'Save the task' })).toHaveTextContent(
+      'Saved and published as publication 4.',
+    );
   });
 
   it('stays in view while it asks to publish or keep a draft, with no Close', async () => {

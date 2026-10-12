@@ -99,20 +99,22 @@ export function compareRatio(a: Ratio, b: Ratio): number {
 }
 
 /**
- * A fraction as plain decimal digits, rounded half away from zero to at
- * most `places` decimals, and whether that is the fraction exactly: `1/4` is
- * `0.25` exactly, `100/3` is `33.33` and not exact.
+ * A fraction as plain decimal digits, rounded half away from zero, or cut
+ * toward zero, to at most `places` decimals, and whether that is the
+ * fraction exactly: `1/4` is `0.25` exactly, `100/3` is `33.33` and not
+ * exact, `200/3` is `66.67` rounded and `66.66` cut.
  */
 export function ratioDigits(
   value: Ratio,
   places = 2,
+  how: 'round' | 'cut' = 'round',
 ): { digits: string; exact: boolean } {
   const negative = value.num < 0n;
   const num = negative ? -value.num : value.num;
   const scale = 10n ** BigInt(places);
   const whole = (num * scale) / value.den;
   const left = (num * scale) % value.den;
-  const units = 2n * left >= value.den ? whole + 1n : whole;
+  const units = how === 'round' && 2n * left >= value.den ? whole + 1n : whole;
   const text = units.toString().padStart(places + 1, '0');
   const digits =
     places === 0 ? text : `${text.slice(0, -places)}.${text.slice(-places)}`;
@@ -124,12 +126,24 @@ export function ratioDigits(
 }
 
 /**
- * A fraction for reading, as `formatExact` writes a number, with "about"
- * before it when the digits shown are not the fraction exactly.
+ * A fraction of points earned for reading, cut as `formatPoints` cuts them,
+ * with "about" before it when the digits shown are not the fraction exactly.
  */
-export function formatRatio(value: Ratio, places = 2): string {
-  const { digits, exact } = ratioDigits(value, places);
-  return exact ? formatExact(digits, places) : `about ${formatExact(digits, places)}`;
+export function formatPointsRatio(value: Ratio): string {
+  const { digits, exact } = ratioDigits(value, POINTS_PLACES, 'cut');
+  const shown = formatExact(digits, POINTS_PLACES);
+  return exact ? shown : `about ${shown}`;
+}
+
+/**
+ * A fraction of points something is worth for reading, rounded as
+ * `formatWorth` rounds a worth, with "about" before it when the digits shown
+ * are not the fraction exactly.
+ */
+export function formatWorthRatio(value: Ratio): string {
+  const { digits, exact } = ratioDigits(value, POINTS_PLACES);
+  const shown = formatExact(digits, POINTS_PLACES);
+  return exact ? shown : `about ${shown}`;
 }
 
 /** The digits of an exact number split at its point, its sign apart. */
@@ -188,13 +202,47 @@ export function formatExact(exact: string, places = 4): string {
   return negative ? `-${digits}` : digits;
 }
 
+/** How many decimals points are shown to. */
+export const POINTS_PLACES = 2;
+
+/**
+ * Points earned for reading, the one way every page shows them (R17): cut,
+ * never rounded up, to `places` decimals, so a result short of full marks
+ * never reads as them and the same points read the same everywhere:
+ * `36.666…` is `36.66`. Points that are `most`, where it is known, read as
+ * `formatWorth` writes it, so full marks read as the worth beside them.
+ * Written as `formatExact` writes a number.
+ */
+export function formatPoints(
+  exact: string,
+  most: string | null = null,
+  places = POINTS_PLACES,
+): string {
+  if (most !== null && compareDecimal(exact, most) === 0) return formatWorth(most);
+  return formatExact(cut(exact, places), places);
+}
+
+/**
+ * The most points something gives, a task's worth or a group's, for reading,
+ * the one way every page shows it: rounded to two decimals, so points short
+ * of it, cut, read below it.
+ */
+export function formatWorth(exact: string): string {
+  return formatExact(exact, POINTS_PLACES);
+}
+
 /**
  * The fewest decimals, from `places` up, at which no two neighbours in
- * `column` that differ show alike, so a ranking shown rounded never hides
- * why one row is above the next. Null entries, a row with no number, are
- * passed over.
+ * `column` that differ show alike, rounded or, for points, cut as they are
+ * shown, so a ranking never hides why one row is above the next. Null
+ * entries, a row with no number, are passed over.
  */
-export function placesToTell(column: (string | null)[], places = 2): number {
+export function placesToTell(
+  column: (string | null)[],
+  places = 2,
+  how: 'round' | 'cut' = 'round',
+): number {
+  const shown = how === 'cut' ? cut : rounded;
   const present = column.filter((value): value is string => value !== null);
   const longest = Math.max(
     places,
@@ -205,7 +253,7 @@ export function placesToTell(column: (string | null)[], places = 2): number {
       (value, index) =>
         index > 0 &&
         value !== present[index - 1] &&
-        rounded(value, tried) === rounded(present[index - 1] ?? value, tried),
+        shown(value, tried) === shown(present[index - 1] ?? value, tried),
     );
     if (!alike) return tried;
   }

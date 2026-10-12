@@ -45,7 +45,7 @@ import { InputsCard, type InputFiles } from './InputsCard';
 import { taskMergeWords } from './merge-words';
 import { taskPlace, taskPlaceOf } from './places';
 import { SaveBar } from './SaveBar';
-import { pointsText, ruleOf, shareProblem, taskWeight } from './scoring';
+import { ruleOf, shareProblem, taskWeight, worthText } from './scoring';
 import {
   existingOf,
   NOTHING_STAGED,
@@ -361,6 +361,20 @@ function BuildForm({
   useEffect(() => {
     if (stale) forget();
   }, [stale, forget]);
+  // Once a save from these cards went through, what it sent is saved: nothing
+  // is left to save while the task is read again, unless changed since (M66).
+  const [sent, setSent] = useState<{
+    values: TaskValues;
+    staged: Staged;
+    inputFiles: StagedInput[];
+  } | null>(null);
+  const through =
+    saving.outcome?.kind === 'saved' &&
+    saving.outcome !== answered &&
+    sent?.values === values &&
+    sent.staged === staged &&
+    sent.inputFiles === inputFiles;
+  const toSave = changed && !through;
   const problems = [
     values.credit.kind !== 'none' && values.credit.name.trim() === ''
       ? 'Choose which value a test earns, under How a test earns.'
@@ -409,6 +423,7 @@ function BuildForm({
     if ('error' in fresh) return;
     writeTask(fresh.doc, read.values, values, { admin, unreadable: read.unreadable });
     const content = writeOver(file.content, fresh.doc);
+    setSent({ values, staged, inputFiles });
     void saving.save({
       yaml:
         content === file.content
@@ -512,8 +527,8 @@ function BuildForm({
         />
       )}
       <SaveBar
-        lines={changed ? lines : []}
-        notices={changed ? notices : []}
+        lines={toSave ? lines : []}
+        notices={toSave ? notices : []}
         problems={problems}
         state={saving.state}
         onSave={save}
@@ -571,7 +586,7 @@ function pointsNotice(
   known: boolean,
 ): string[] {
   if (compareRatio(before, after) === 0 || worth !== null) return [];
-  const change = `the task will be worth ${pointsText(after)} points, not ${pointsText(before)}`;
+  const change = `the task will be worth ${worthText(after)} points, not ${worthText(before)}`;
   return known
     ? [
         `This changes the task’s points: its contest gives it no worth of its own, so ${change}.`,
