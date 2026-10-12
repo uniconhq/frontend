@@ -2,9 +2,15 @@ import { describe, expect, it } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@/test/user-event';
 import { http, HttpResponse } from 'msw';
-import type { TaskEntry, TaskRelease } from '@/api/types';
+import type { BoardPoints, TaskRelease } from '@/api/types';
 
-type Points = NonNullable<TaskEntry['points']>;
+type Points = NonNullable<BoardPoints['points']>;
+
+/** The entrant's points on a task as the one leaderboard, Standings, counts them. */
+const standings = (points: Points): BoardPoints[] => [
+  { board: 'Standings', covers: true, points, most: '100' },
+];
+
 import { formatWhen } from '@/lib/time';
 import { icpc } from '@/test/boards';
 import { renderApp } from '@/test/render';
@@ -223,7 +229,7 @@ describe('the contest page for a signed-in person', () => {
                 label: 'A',
                 title: 'Sum of Two',
                 worth: '100',
-                points: null,
+                points: [],
                 release: { released: true, visible: true, open: true, closed: null },
                 due: '2026-09-12T10:45:00Z',
                 closes: '2026-09-12T11:00:00Z',
@@ -233,7 +239,7 @@ describe('the contest page for a signed-in person', () => {
                 label: 'B',
                 title: 'Maximum',
                 worth: null,
-                points: null,
+                points: [],
                 release: { released: true, visible: true, open: true, closed: null },
                 due: null,
                 closes: '2026-09-12T11:00:00Z',
@@ -263,7 +269,7 @@ describe('the contest page for a signed-in person', () => {
       label: name.toUpperCase(),
       title: name,
       worth: '100',
-      points: null,
+      points: [],
       release: { released: true, visible: true, open: true, closed: null },
       due: null,
       closes: '2026-09-12T11:00:00Z',
@@ -276,17 +282,28 @@ describe('the contest page for a signed-in person', () => {
         HttpResponse.json(
           home({
             registration: registration({ status: 'approved' }),
+            boards: ['Standings'],
             tasks: [
-              task('a', { points: { shown: '62', pending: '0', pending_until: null } }),
+              task('a', {
+                points: standings({ shown: '62', pending: '0', pending_until: null }),
+              }),
               task('b', {
-                points: { shown: '30', pending: '70', pending_until: reveal },
+                points: standings({
+                  shown: '30',
+                  pending: '70',
+                  pending_until: reveal,
+                }),
               }),
               task('c', {
-                points: { shown: null, pending: '100', pending_until: reveal },
+                points: standings({
+                  shown: null,
+                  pending: '100',
+                  pending_until: reveal,
+                }),
               }),
               task('d', { worth: null }),
               task('e', {
-                points: { shown: '0', pending: '40', pending_until: reveal },
+                points: standings({ shown: '0', pending: '40', pending_until: reveal }),
               }),
             ],
           }),
@@ -311,6 +328,116 @@ describe('the contest page for a signed-in person', () => {
     expect(e).toHaveTextContent(/More shown at \S/);
   });
 
+  it('gives a column of points for each leaderboard the entrant sees, each as that board counts the task', async () => {
+    const reveal = '2026-09-12T14:00:00Z';
+    const task = (name: string, points: BoardPoints[]) => ({
+      name,
+      label: name.toUpperCase(),
+      title: `Task ${name}`,
+      worth: '100',
+      points,
+      release: { released: true, visible: true, open: true, closed: null },
+      due: null,
+      closes: '2026-09-12T11:00:00Z',
+    });
+    server.use(
+      signedIn,
+      http.get(`${CONTEST_API}/home`, () =>
+        HttpResponse.json(
+          home({
+            registration: registration({ status: 'approved' }),
+            boards: ['Standings', 'Live groups'],
+            tasks: [
+              task('a', [
+                {
+                  board: 'Standings',
+                  covers: true,
+                  points: { shown: '62', pending: '0', pending_until: null },
+                  most: '100',
+                },
+                {
+                  board: 'Live groups',
+                  covers: true,
+                  points: { shown: '40', pending: '0', pending_until: null },
+                  most: '60',
+                },
+              ]),
+              task('b', [
+                {
+                  board: 'Standings',
+                  covers: true,
+                  points: { shown: null, pending: '100', pending_until: reveal },
+                  most: '100',
+                },
+                { board: 'Live groups', covers: false, points: null, most: null },
+              ]),
+            ],
+          }),
+        ),
+      ),
+    );
+    renderApp(PAGE);
+
+    const table = await screen.findByRole('table', { name: 'Tasks' });
+    expect(
+      within(table)
+        .getAllByRole('columnheader')
+        .map((header) => header.textContent),
+    ).toEqual(['Task', 'Standings', 'Live groups']);
+    const [, a, b] = within(table).getAllByRole('row');
+    if (a === undefined || b === undefined) throw new Error('two tasks');
+    const cells = (row: HTMLElement) =>
+      within(row)
+        .getAllByRole('cell')
+        .map((cell) => cell.textContent);
+    expect(within(a).getByRole('rowheader')).toHaveTextContent('ATask a');
+    expect(within(a).getByRole('link', { name: 'Task a' })).toHaveAttribute(
+      'href',
+      '/contests/acme/spring/tasks/a',
+    );
+    expect(within(a).getByRole('rowheader')).toHaveTextContent(/Closes (in|at) /);
+    // Each board counts the task over what it covers: the live groups give 60 at most.
+    expect(cells(a)).toEqual(['62 / 100', '40 / 60']);
+    const [held, uncovered] = cells(b);
+    expect(held).toMatch(/^— \/ 100Shown at \S/);
+    expect(uncovered).toBe('—');
+  });
+
+  it('reads one number with one leaderboard, saying so where it does not cover a task', async () => {
+    server.use(
+      signedIn,
+      http.get(`${CONTEST_API}/home`, () =>
+        HttpResponse.json(
+          home({
+            registration: registration({ status: 'approved' }),
+            boards: ['Standings'],
+            tasks: [
+              {
+                name: 'sum',
+                label: 'A',
+                title: 'Sum of Two',
+                worth: '100',
+                points: [
+                  { board: 'Standings', covers: false, points: null, most: null },
+                ],
+                release: { released: true, visible: true, open: true, closed: null },
+                due: null,
+                closes: '2026-09-12T11:00:00Z',
+              },
+            ],
+          }),
+        ),
+      ),
+    );
+    renderApp(PAGE);
+
+    const tasks = await screen.findByRole('list', { name: 'Tasks' });
+    expect(within(tasks).getByRole('listitem')).toHaveTextContent(
+      'Not on the leaderboard',
+    );
+    expect(screen.queryByRole('columnheader')).toBeNull();
+  });
+
   it('reads the tasks again once held-back points are shown', async () => {
     const soon = new Date(Date.parse('2026-09-12T10:00:00Z') + 1_500).toISOString();
     const sum = (points: Points) => ({
@@ -318,7 +445,7 @@ describe('the contest page for a signed-in person', () => {
       label: 'A',
       title: 'Sum of Two',
       worth: '100',
-      points,
+      points: standings(points),
       release: { released: true, visible: true, open: true, closed: null },
       due: null,
       closes: '2026-09-12T11:00:00Z',
@@ -328,10 +455,12 @@ describe('the contest page for a signed-in person', () => {
       homesInTurn([
         home({
           registration: registration({ status: 'approved' }),
+          boards: ['Standings'],
           tasks: [sum({ shown: '30', pending: '70', pending_until: soon })],
         }),
         home({
           registration: registration({ status: 'approved' }),
+          boards: ['Standings'],
           tasks: [sum({ shown: '100', pending: '0', pending_until: null })],
         }),
       ]),
@@ -366,7 +495,7 @@ describe('the contest page for a signed-in person', () => {
                 label: 'A',
                 title: 'Sum of Two',
                 worth: '100',
-                points: null,
+                points: [],
                 release: { released: true, visible: true, open: true, closed: null },
                 due: '2026-09-12T10:45:00Z',
                 closes: '2026-09-12T11:00:00Z',
@@ -402,7 +531,7 @@ describe('the contest page for a signed-in person', () => {
       label: name.toUpperCase(),
       title: name,
       worth: '100',
-      points: null,
+      points: [],
       release: { released: true, visible: true, open: false, closed },
       due: null,
       closes: '2026-09-12T11:00:00Z',
