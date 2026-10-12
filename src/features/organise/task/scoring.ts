@@ -88,7 +88,6 @@ export function ruleRefusal(rule: Rule, credit: CreditKind): string | null {
   }
   return null;
 }
-
 /** The weight a rule's points box writes to, and its bonus box when it has one. */
 function mainWeight(group: GroupValues): string {
   const rule = ruleOf(group);
@@ -259,26 +258,30 @@ export function groupSentence(
   }
 }
 
-/** When entrants see a group's results, as the form offers it. */
+/**
+ * When entrants see a group's results, as the form offers it: each choice by
+ * the one name it has everywhere, and what entrants then see.
+ */
 export const SHOWS = [
-  { value: 'always', label: 'Right away' },
+  {
+    value: 'always',
+    label: 'Right away',
+    description:
+      'Entrants see each test’s result and the group’s points as soon as a submission is graded.',
+  },
   {
     value: 'verdict',
     label: 'Pass or fail right away, the tests once the task closes',
+    description:
+      'Entrants see at once whether the group passed and its points, and each test’s result once the task closes.',
   },
-  { value: 'after_close', label: 'Once the task closes' },
+  {
+    value: 'after_close',
+    label: 'Once the task closes',
+    description:
+      'Entrants see the group’s name and the most points it gives now, and its results once the task closes.',
+  },
 ];
-
-/** When entrants see a group's results, as a sentence. */
-export function showSentence(show: string): string {
-  if (show === 'verdict') {
-    return 'Entrants see whether it passed and its points right away, and its tests once the task closes.';
-  }
-  if (show === 'after_close') {
-    return 'Entrants see its name and its most points now, and everything else once the task closes.';
-  }
-  return 'Entrants see its results right away.';
-}
 
 /**
  * Why the save would refuse showing a group's pass or fail alone (T6): its

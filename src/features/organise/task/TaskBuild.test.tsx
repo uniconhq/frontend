@@ -570,16 +570,32 @@ describe('the cards that build a task', { timeout: 30_000 }, () => {
   });
 
   it('asks when entrants see a group added once the task is graded, and of no other', async () => {
-    const { sent } = taskBackend({ form: { ...UNREAD, graded: true } });
+    const { sent } = taskBackend({ form: { ...CHECKED, inputs: [], graded: true } });
     const { tests } = await openTask();
-    const show = (group: string) => fieldIn(tests, group, /^When entrants see results/);
+    const show = (group: string) =>
+      within(within(tests).getByRole('group', { name: group })).getByRole(
+        'radiogroup',
+        { name: /^When entrants see results/ },
+      );
 
-    expect(show('large')).toBeRequired();
-    expect(show('small')).not.toBeRequired();
+    expect(within(show('large')).queryByRole('radio', { checked: true })).toBeNull();
+    expect(show('large')).toHaveAccessibleDescription(
+      'The task has graded submissions, so a test group added now must say when its results are shown.',
+    );
+    expect(
+      within(show('small')).getByRole('radio', {
+        name: 'Pass or fail right away, the tests once the task closes',
+      }),
+    ).toBeChecked();
+    expect(show('small')).not.toHaveAccessibleDescription(/must say/);
     const bar = await screen.findByRole('region', { name: 'Save the task' });
     expect(within(bar).getByRole('button', { name: 'Save' })).toBeDisabled();
     expect(bar).toHaveTextContent('Choose when entrants see large’s results.');
-    fill(show('large'), 'verdict');
+    await userEvent.click(
+      within(show('large')).getByRole('radio', {
+        name: 'Pass or fail right away, the tests once the task closes',
+      }),
+    );
     expect(within(bar).getByRole('button', { name: 'Save' })).toBeEnabled();
     await save();
 
@@ -783,20 +799,32 @@ describe('scoring a task', { timeout: 30_000 }, () => {
     taskBackend({ form: { ...CHECKED, inputs: [] } });
     const { tests } = await openTask();
 
-    fill(within(tests).getByLabelText(/^A test earns/), 'none');
+    await userEvent.click(
+      within(tests).getByRole('radio', {
+        name: 'All when it passes, nothing when it fails',
+      }),
+    );
     const rule = fieldIn(tests, 'small', 'How does this group earn points?');
     expect(
-      within(rule).getByRole('option', { name: 'The lowest test score counts' }),
+      within(rule).getByRole('option', {
+        name: 'The lowest test score counts (needs tests that earn part of their points)',
+      }),
     ).toBeDisabled();
-    expect(rule).toHaveAccessibleDescription(
-      'The lowest test score counts: Only available when a test can earn part of its points. Set how a test earns first.',
+    expect(rule).not.toHaveAccessibleDescription(/lowest/);
+
+    // A group that earns by each test cannot show its pass or fail alone: the
+    // choice is greyed with its reason under it.
+    const shown = () =>
+      within(within(tests).getByRole('group', { name: 'old' })).getByRole('radio', {
+        name: 'Pass or fail right away, the tests once the task closes',
+      });
+    expect(shown()).toBeDisabled();
+    expect(shown()).toHaveAccessibleDescription(
+      /Only available for a test group that earns all or nothing/,
     );
     fill(fieldIn(tests, 'old', 'How does this group earn points?'), 'all');
-    expect(
-      within(fieldIn(tests, 'old', /^When entrants see results/)).getByRole('option', {
-        name: 'Pass or fail right away, the tests once the task closes',
-      }),
-    ).toBeEnabled();
+    expect(shown()).toBeEnabled();
+    expect(shown()).not.toHaveAccessibleDescription(/Only available/);
   });
 
   it('keeps the bonus rule chosen while its bonus is still empty', async () => {
@@ -839,6 +867,51 @@ describe('scoring a task', { timeout: 30_000 }, () => {
     });
   });
 
+  it('offers how a test earns as options with an example each, and says in a value’s own name why it cannot be one', async () => {
+    taskBackend({ form: { ...CHECKED, inputs: [] } });
+    const { tests } = await openTask();
+
+    const earns = within(tests).getByRole('radiogroup', { name: 'A test earns' });
+    expect(
+      within(earns)
+        .getAllByRole('radio')
+        .map((radio) => radio.getAttribute('value')),
+    ).toEqual(['none', 'value', 'relative']);
+    expect(
+      within(earns).getByRole('radio', {
+        name: 'A score the workflow gives it, from 0 to 1',
+      }),
+    ).toBeChecked();
+    expect(
+      within(earns).getByRole('radio', {
+        name: 'All when it passes, nothing when it fails',
+      }),
+    ).toHaveAccessibleDescription(
+      'Every test is worth the same; it passes when its answer is accepted, or it does not.',
+    );
+
+    const value = await within(tests).findByRole('combobox', { name: 'Which value' });
+    expect(within(value).getByRole('option', { name: 'fraction' })).toBeEnabled();
+    expect(
+      within(value).getByRole('option', {
+        name: 'time_ms (not promised to be 1 or less)',
+      }),
+    ).toBeDisabled();
+    expect(value).not.toHaveAccessibleDescription(/time_ms/);
+
+    await userEvent.click(
+      within(earns).getByRole('radio', {
+        name: 'Its result against the best anyone reached',
+      }),
+    );
+    expect(
+      within(within(tests).getByRole('combobox', { name: 'Which value' })).getByRole(
+        'option',
+        { name: 'time_ms' },
+      ),
+    ).toBeEnabled();
+  });
+
   it('will not save a score the workflow gives until its value is chosen', async () => {
     taskBackend({
       form: { ...CHECKED, inputs: [] },
@@ -846,7 +919,11 @@ describe('scoring a task', { timeout: 30_000 }, () => {
     });
     const { tests } = await openTask();
 
-    fill(within(tests).getByLabelText('A test earns'), 'value');
+    await userEvent.click(
+      within(tests).getByRole('radio', {
+        name: 'A score the workflow gives it, from 0 to 1',
+      }),
+    );
 
     const bar = await screen.findByRole('region', { name: 'Save the task' });
     expect(bar).toHaveTextContent(
