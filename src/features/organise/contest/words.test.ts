@@ -103,8 +103,18 @@ describe("a task's timeline as one line", () => {
         null,
       ),
     ).toBe(
-      `1 point · opens with the contest · due ${formatDateTime(new Date('2026-10-02T09:00:00Z'))} · loses 25% per started day late · closes ${formatDateTime(new Date('2026-10-03T09:00:00Z'))}`,
+      `1 point, opens with the contest; due ${formatDateTime(new Date('2026-10-02T09:00:00Z'))}, then 25% less per started day late; closes ${formatDateTime(new Date('2026-10-03T09:00:00Z'))}`,
     );
+  });
+
+  it('says a task open for the whole contest in so many words (M52)', () => {
+    expect(
+      timelineSentence(
+        { ...standing, timeline: { ...standing.timeline, worth: '100', due: null } },
+        { start: '2026-10-01T09:00:00Z', end: '2026-10-03T09:00:00Z' },
+        null,
+      ),
+    ).toBe('100 points, open for the whole contest');
   });
 
   it('says a task not yet published has its points then, and the marks a board counts', () => {
@@ -115,7 +125,7 @@ describe("a task's timeline as one line", () => {
         '1',
       ),
     ).toBe(
-      `points known once the task is published · opens ${formatDateTime(new Date('2026-10-01T09:00:00Z'))} · closes ${formatDateTime(new Date('2026-10-03T09:00:00Z'))} · up to 1 marked submission`,
+      `points known once the task is published, opens ${formatDateTime(new Date('2026-10-01T09:00:00Z'))}; closes ${formatDateTime(new Date('2026-10-03T09:00:00Z'))}; an entrant may mark up to 1 submission`,
     );
   });
 });

@@ -5,7 +5,8 @@ import { http, HttpResponse } from 'msw';
 import { parse } from 'yaml';
 import type { FileContent } from '@/api/types';
 import { icpc, organised, row, cell, entrantOf } from '@/test/boards';
-import { CONTEST_API, repoFiles, taskList } from '@/test/organiser';
+import { CONTEST_API, repoFiles, standingList, taskList } from '@/test/organiser';
+import { formatDateTime } from '@/lib/time';
 import { renderApp } from '@/test/render';
 import { problem, server, signedIn, someone } from '@/test/server';
 
@@ -58,6 +59,7 @@ function settings(current = CONTEST) {
   const sent: string[] = [];
   server.use(
     taskList,
+    standingList,
     http.get(FILE, ({ params }) =>
       params['path'] === 'contest.yaml' ? HttpResponse.json(file) : undefined,
     ),
@@ -89,10 +91,13 @@ describe("the boards' settings", { timeout: 20_000 }, () => {
     renderApp(PAGE);
 
     const form = await screen.findByRole('form', { name: 'Leaderboards' });
-    expect(
-      within(form).getByRole('status', { name: 'What Standings ranks' }),
-    ).toHaveTextContent(
-      'Ranks entrants by points and penalty minutes, 20 for each earlier attempt, from each entrant’s best submission on every task, counting only the results shown once each task closes. Entrants and organisers see it, each entrant only their own row.',
+    // Once the tasks' published groups are read: none is held back.
+    await waitFor(() =>
+      expect(
+        within(form).getByRole('status', { name: 'What Standings ranks' }),
+      ).toHaveTextContent(
+        'Highest total first, then fewest penalty minutes, counting 20 for each earlier attempt, using each entrant’s best submission, on every task. Organisers see the whole board, and each entrant only their own row. It counts nothing: it counts only test groups whose results entrants see once their task closes, and no task it covers has one.',
+      ),
     );
     const standings = board(form, 'Standings');
     const chosen = (name: string) =>
@@ -104,6 +109,39 @@ describe("the boards' settings", { timeout: 20_000 }, () => {
       'Results shown once each task closes',
     );
     expect(standings.getByRole('radio', { name: 'Only their own row' })).toBeChecked();
+  });
+
+  it('names a published group hidden until its task closes, and when its results join, in the words how the contest is scored uses (M52)', async () => {
+    server.use(signedIn);
+    settings();
+    server.use(
+      http.get(`${CONTEST_API}/tasks/:task/files/:path`, ({ params }) =>
+        params['path'] === 'task.yaml'
+          ? HttpResponse.json({
+              path: 'task.yaml',
+              encoding: 'utf-8',
+              content:
+                params['task'] === 'sum'
+                  ? 'name: Sum\nworkflow: unicon/classic@v2\ntest_groups:\n  open: {pass: 40}\n  hidden: {pass: 60, show: after_close}\n'
+                  : 'name: Sort\nworkflow: unicon/classic@v2\ntest_groups:\n  all: {pass: 100}\n',
+              token: 'token-task',
+              upload: null,
+              version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
+            })
+          : undefined,
+      ),
+    );
+    renderApp(PAGE);
+
+    const form = await screen.findByRole('form', { name: 'Leaderboards' });
+    // sum closes after the contest's end here, so its own close is named.
+    await waitFor(() =>
+      expect(
+        within(form).getByRole('status', { name: 'What Standings ranks' }),
+      ).toHaveTextContent(
+        `Highest total first, using each entrant’s best submission, on every task. Entrants and organisers see the whole board. Results from test group “hidden” of task B join it when task B closes, ${formatDateTime(new Date('2026-10-15T09:00:00Z'))}.`,
+      ),
+    );
   });
 
   it('offers each choice once with what it means, an unset one shown as the default it means', async () => {
@@ -266,7 +304,7 @@ describe("the boards' settings", { timeout: 20_000 }, () => {
     expect(
       within(form).getByRole('status', { name: 'What Standings ranks' }),
     ).toHaveTextContent(
-      'Entrants and organisers see it, the top 10 rows, every row tied with the last of them, and each entrant’s own row.',
+      'Organisers see the whole board; entrants see the top 10 rows and any row tied with the last of them, and an entrant their own row as well.',
     );
   });
 

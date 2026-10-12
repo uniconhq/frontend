@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { $api, queryView } from '@/api/query';
 import type { TaskStanding } from '@/api/types';
-import { ratioOf, type Ratio } from '@/lib/exact';
+import { compareRatio, ratioOf } from '@/lib/exact';
 import { BodyText } from '@/ui/BodyText';
 import { Card } from '@/ui/Card';
 import { PageLink } from '@/ui/PageLink';
@@ -10,26 +10,29 @@ import { Loaded } from '@/ui/feedback/Loaded';
 import { taskCardPath } from '@/lib/sections';
 import type { ContestValues } from '../forms/contest-values';
 import { boardSentence } from '../forms/board-words';
-import { readTask } from '../forms/task-values';
-import { readSettings } from '../task/build-data';
+import { useTestFolders } from '../task/build-data';
 import { groupSentence, pointsText, taskWeight } from '../task/scoring';
+import { heldOf, publishedQuery, readPublished } from './published';
 import { useContestSettings } from './settings';
-import { markedBoardCovers, timelineSentence } from './timeline';
+import { markedBoardCovers, timelineWords } from './timeline';
 import shared from '../organise.module.css';
 import classes from './contest.module.css';
 
 const STANDINGS = '/api/v1/orgs/{org}/contests/{contest}/organise/tasks';
+const ONE = { num: 1n, den: 1n };
 
-/** A number of points with its word: "1 point", "2.5 points". */
-function pointsOf(value: Ratio): string {
-  const text = pointsText(value);
-  return `${text} ${text === '1' ? 'point' : 'points'}`;
+/** A sentence put after a colon, its first letter made small. */
+function afterColon(sentence: string): string {
+  return sentence.replace(/^./, (first) => first.toLowerCase());
 }
 
 /**
- * One task as the contest scores it, as its latest publication has it: what it is worth and why, how each of
- * its groups earns points, as an entrant is told, its timeline, and each
- * board that counts it, a sentence each.
+ * One task as the contest scores it, as its latest publication has it: in
+ * its heading, what it is worth and when it is open; then each test group,
+ * its points and what earns them, with a worked example from its own tests,
+ * in the words the task's Tests card uses; and each board that counts it,
+ * in the words of the Leaderboards page, saying when results join it only
+ * where that changes something (M52).
  */
 function TaskScoring({
   org,
@@ -44,25 +47,18 @@ function TaskScoring({
 }) {
   const task = standing.task.name;
   const latest = standing.state.latest;
-  // What entrants are told is the latest publication, not a draft saved since.
   const file = queryView(
     useQuery({
-      ...$api.queryOptions(
-        'get',
-        '/api/v1/orgs/{org}/contests/{contest}/tasks/{task}/files/{path}',
-        {
-          params: {
-            path: { org, contest, task, path: 'task.yaml' },
-            query: { at: latest?.version ?? '' },
-          },
-        },
-      ),
+      ...publishedQuery(org, contest, task, latest?.version ?? ''),
       enabled: latest !== null,
-      // A publication never changes, so once read it is never read again.
-      staleTime: Infinity,
-      retry: false,
     }),
   );
+  // The tests as they are now are the published ones while no draft is on top.
+  const folders = useTestFolders({ kind: 'task', org, contest, task });
+  const counts =
+    folders.state === 'ready' && !standing.state.draft
+      ? new Map(folders.data.map((folder) => [folder.name, folder.tests.length]))
+      : null;
   const entry = values?.tasks.find((found) => found.id === task);
   const worthText = entry?.worth.trim() ?? '';
   const worth = worthText === '' ? null : ratioOf(worthText);
@@ -76,11 +72,15 @@ function TaskScoring({
     (board) => board.tasks === null || board.tasks.includes(task),
   );
   const label = `${standing.label} · ${task}`;
+  const timeline = timelineWords(standing, values, marks);
 
   return (
     <section className={shared.stack} aria-label={label}>
       <SectionTitle order={3}>
         <PageLink to={taskCardPath(org, contest, task, 'tests')}>{label}</PageLink>
+        <span className={classes.titleRest}>
+          : {timeline.worth}, {timeline.when}
+        </span>
       </SectionTitle>
       {latest === null ? (
         <BodyText tone="secondary">
@@ -89,52 +89,58 @@ function TaskScoring({
       ) : (
         <Loaded view={file} rows={2}>
           {(read) => {
-            const settings = readSettings(read);
-            if ('error' in settings) {
-              return <BodyText tone="secondary">Its settings cannot be read.</BodyText>;
-            }
-            const { values: parsed, unreadable } = readTask(settings.doc, []);
-            if (unreadable.includes('test_groups')) {
+            const published = readPublished(read);
+            if ('unreadable' in published) {
               return (
-                <BodyText tone="secondary">Its test groups cannot be read.</BodyText>
+                <BodyText tone="secondary">
+                  {published.unreadable === 'settings'
+                    ? 'Its settings cannot be read.'
+                    : 'Its test groups cannot be read.'}
+                </BodyText>
               );
             }
-            const { groups, credit } = parsed;
+            const { groups, credit } = published;
             const total = taskWeight(groups);
+            const held = heldOf(standing, groups, values);
             return (
               <ul className={shared.named}>
-                <li>
-                  {total.num === 0n
-                    ? 'It gives no points: it is ranked on what its workflow reports.'
-                    : worth === null
-                      ? `Worth ${pointsOf(total)}, its test groups’ total.`
-                      : `Worth ${pointsOf(worth)}, as the contest sets it. Its test groups total ${pointsText(total)}.`}
-                </li>
-                {total.num !== 0n &&
-                  groups.map((group) => (
-                    <li key={group.name}>
-                      Test group “{group.name}”:{' '}
-                      {groupSentence(group, {
-                        total,
-                        worth,
-                        credit: credit.kind,
-                        tests: null,
-                      })}
-                    </li>
-                  ))}
-                <li>
-                  {timelineSentence(standing, values, marks).replace(/^./, (first) =>
-                    first.toUpperCase(),
-                  )}
-                  .
-                </li>
+                {total.num === 0n ? (
+                  <li>
+                    It gives no points: it is ranked on what its workflow reports.
+                  </li>
+                ) : (
+                  <>
+                    {worth !== null && compareRatio(worth, total) !== 0 && (
+                      <li>
+                        {`The contest makes it worth ${pointsText(worth)} ${
+                          compareRatio(worth, ONE) === 0 ? 'point' : 'points'
+                        }, so its test groups’ ${pointsText(total)} are scaled to that.`}
+                      </li>
+                    )}
+                    {groups.map((group) => (
+                      <li key={group.name}>
+                        <strong>Test group “{group.name}”</strong>:{' '}
+                        {afterColon(
+                          groupSentence(group, {
+                            total,
+                            worth,
+                            credit: credit.kind,
+                            tests: counts?.get(group.name) ?? null,
+                          }),
+                        )}
+                      </li>
+                    ))}
+                  </>
+                )}
                 {boards.length === 0 ? (
                   <li>No leaderboard counts it.</li>
                 ) : (
                   boards.map((board) => (
                     <li key={board.name}>
-                      {board.name === '' ? 'A leaderboard' : board.name}:{' '}
-                      {boardSentence(board)}
+                      <strong>
+                        Counted on {board.name === '' ? 'a leaderboard' : board.name}:
+                      </strong>{' '}
+                      {boardSentence(board, { tasks: false, held })}
                     </li>
                   ))
                 )}
@@ -148,9 +154,10 @@ function TaskScoring({
 }
 
 /**
- * How this contest is scored (M35): each task, in the contest's order, with
- * its worth, its groups' rules, its timeline and the boards that count it,
- * each a sentence. The one place to check the whole contest before it starts.
+ * How this contest is scored (M35, M52): each task, in the contest's order,
+ * with what it is worth and when it is open, how its test groups earn
+ * points, and the leaderboards that count it, in plain words. The one place
+ * to check the whole contest before it starts.
  */
 export function ContestScoring({ org, contest }: { org: string; contest: string }) {
   const view = queryView(
@@ -169,9 +176,8 @@ export function ContestScoring({ org, contest }: { org: string; contest: string 
       <section className={shared.stack} aria-label="How this contest is scored">
         <SectionTitle>How this contest is scored</SectionTitle>
         <BodyText tone="secondary">
-          How each task scores, as entrants are told it: what it is worth, how its test
-          groups earn points, when it opens and closes, and the leaderboards that count
-          it.
+          Check this before the contest starts. It says how each task earns points and
+          which leaderboards count them, as entrants are told.
         </BodyText>
         <Loaded view={view} rows={3}>
           {(standings) =>

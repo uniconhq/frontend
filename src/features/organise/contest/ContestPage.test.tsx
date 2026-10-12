@@ -6,7 +6,6 @@ import type { TaskStanding } from '@/api/types';
 import { parse } from 'yaml';
 import { isoOf, localOf } from '../forms/times';
 import { CONTEST_SECTIONS } from '@/lib/sections';
-import { formatExact } from '@/lib/exact';
 import { formatDateTime } from '@/lib/time';
 import { renderApp } from '@/test/render';
 import { problem, server, signedIn, someone } from '@/test/server';
@@ -149,13 +148,11 @@ describe("the contest's tasks", () => {
     expect(sort).toHaveTextContent(`Publication 1, ${at('2026-09-20T10:00:00Z')}`);
     expect(sort).not.toHaveTextContent(/grades|grading/);
     expect(sort).toHaveTextContent(
-      `100 points · opens with the contest · due ${at('2026-10-08T09:00:00Z')} · loses 10% per started day late · closes with the contest`,
+      `100 points, open for the whole contest; due ${at('2026-10-08T09:00:00Z')}, then 10% less per started day late`,
     );
 
     const sum = screen.getByRole('listitem', { name: 'B · sum' });
-    expect(sum).toHaveTextContent(
-      'gives no points · opens with the contest · closes with the contest',
-    );
+    expect(sum).toHaveTextContent('no points, open for the whole contest');
   });
 
   it('names a time of its own, and the marks a marked board lets each entrant make', async () => {
@@ -195,7 +192,7 @@ describe("the contest's tasks", () => {
     renderApp(CONTEST);
 
     expect(await screen.findByRole('listitem', { name: 'A · sort' })).toHaveTextContent(
-      `100 points · opens ${at('2026-10-02T09:00:00Z')} · due ${at('2026-10-08T09:00:00Z')} · earns nothing once late · closes with the contest · up to 2 marked submissions`,
+      `100 points, opens ${at('2026-10-02T09:00:00Z')}; due ${at('2026-10-08T09:00:00Z')}, nothing once late; closes with the contest; an entrant may mark up to 2 submissions`,
     );
   });
 
@@ -216,8 +213,8 @@ describe("the contest's tasks", () => {
     renderApp(CONTEST);
 
     const items = await screen.findAllByRole('listitem', { name: /sort$/ });
-    expect(items[0]).toHaveTextContent('loses 0.01% per started day late');
-    expect(items[1]).toHaveTextContent('loses 0.05% per started day late');
+    expect(items[0]).toHaveTextContent('then 0.01% less per started day late');
+    expect(items[1]).toHaveTextContent('then 0.05% less per started day late');
   });
 
   it("says how many problems hold back a task's last save, which its own page lists", async () => {
@@ -436,45 +433,95 @@ describe("the contest's tasks", () => {
   });
 });
 
-describe('how the contest is scored', () => {
-  it('says for each task its worth, how each group earns, its timeline and the boards that count it', async () => {
+/** A line of a scoring card whose words are `text`, however they are marked up. */
+async function line(region: HTMLElement, text: string): Promise<HTMLElement> {
+  return within(region).findByText(
+    (_, element) => element?.tagName === 'LI' && element.textContent === text,
+  );
+}
+
+/** A contest's settings, as its file holds them, from `lines`. */
+function contestFile(lines: string[]) {
+  return http.get(`${CONTEST_API}/files/:path`, () =>
+    HttpResponse.json({
+      ...files['contest.yaml'],
+      content: [...lines, ''].join('\n'),
+      token: 'token-contest',
+    }),
+  );
+}
+
+/** Each task's published settings, by task, and its tests by group, as `tests/` holds them. */
+function publishedTasks(
+  settings: Record<string, string>,
+  tests: Record<string, Record<string, number>> = {},
+) {
+  return [
+    http.get(`${CONTEST_API}/tasks/:task/files/:path`, ({ params }) =>
+      HttpResponse.json({
+        path: 'task.yaml',
+        encoding: 'utf-8',
+        content: settings[String(params['task'])] ?? '',
+        token: 'token-task',
+        upload: null,
+        version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
+      }),
+    ),
+    http.get(`${CONTEST_API}/tasks/:task/tree`, ({ params, request }) => {
+      const groups = tests[String(params['task'])];
+      const at = new URL(request.url).searchParams.get('path') ?? '';
+      if (groups === undefined) return problem(404, 'not_found');
+      const entry = (path: string) => ({
+        path,
+        kind: 'directory',
+        size: null,
+        upload: null,
+      });
+      if (at === 'tests') {
+        return HttpResponse.json(
+          Object.keys(groups).map((group) => entry(`tests/${group}`)),
+        );
+      }
+      const group = at.slice('tests/'.length);
+      return HttpResponse.json(
+        Array.from({ length: groups[group] ?? 0 }, (_, n) =>
+          entry(`${at}/${String(n + 1)}`),
+        ),
+      );
+    }),
+  ];
+}
+
+describe('how the contest is scored (M52)', () => {
+  it('heads each task with its worth and when it is open, then says each group and each board that counts it in plain words', async () => {
+    const [sort, sum] = standings;
+    if (sort === undefined || sum === undefined) throw new Error('standings has two');
     server.use(
       signedIn,
-      standingList,
-      http.get(`${CONTEST_API}/files/:path`, () =>
-        HttpResponse.json({
-          path: 'contest.yaml',
-          encoding: 'utf-8',
-          content: [
-            'name: Spring',
-            'start: 2026-10-01T09:00:00Z',
-            'end: 2026-10-15T09:00:00Z',
-            'tasks:',
-            '  - id: sort',
-            '    worth: 50',
-            '  - id: sum',
-            'leaderboards:',
-            '  - name: Standings',
-            '    tasks: [sort]',
-            '',
-          ].join('\n'),
-          token: 'token-contest',
-          upload: null,
-          version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
-        }),
+      http.get(`${CONTEST_API}/organise/tasks`, () =>
+        HttpResponse.json([
+          { ...sort, timeline: { ...sort.timeline, worth: '50' } },
+          { ...sum, timeline: { ...sum.timeline, worth: '100' } },
+        ]),
       ),
-      http.get(`${CONTEST_API}/tasks/:task/files/:path`, ({ params }) =>
-        HttpResponse.json({
-          path: 'task.yaml',
-          encoding: 'utf-8',
-          content:
-            params['task'] === 'sort'
-              ? 'name: Sort\nworkflow: unicon/classic@v2\ntest_groups:\n  small: {pass: 30}\n  large: {pass: 70}\n'
-              : 'name: Sum\nworkflow: unicon/classic@v2\ntest_groups:\n  main: {each: 80, pass: 20}\n',
-          token: 'token-task',
-          upload: null,
-          version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
-        }),
+      contestFile([
+        'name: Spring',
+        'start: 2026-10-01T09:00:00Z',
+        'end: 2026-10-15T09:00:00Z',
+        'tasks:',
+        '  - id: sort',
+        '    worth: 50',
+        '  - id: sum',
+        'leaderboards:',
+        '  - name: Standings',
+        '    tasks: [sort]',
+      ]),
+      ...publishedTasks(
+        {
+          sort: 'name: Sort\nworkflow: unicon/classic@v2\ntest_groups:\n  small: {pass: 30}\n  large: {pass: 70}\n',
+          sum: 'name: Sum\nworkflow: unicon/classic@v2\ntest_groups:\n  main: {each: 80, pass: 20}\n',
+        },
+        { sort: { small: 4, large: 2 } },
       ),
       ...repoFiles,
     );
@@ -483,28 +530,100 @@ describe('how the contest is scored', () => {
     const card = await screen.findByRole('region', {
       name: 'How this contest is scored',
     });
-    const sort = await within(card).findByRole('region', { name: 'A · sort' });
-    expect(
-      await within(sort).findByText(
-        'Test group “small”: An entrant earns 15 points when every test passes, and nothing otherwise.',
+    expect(card).toHaveTextContent(
+      'Check this before the contest starts. It says how each task earns points and which leaderboards count them, as entrants are told.',
+    );
+    const sortPart = await within(card).findByRole('region', { name: 'A · sort' });
+    expect(within(sortPart).getByRole('heading', { level: 3 })).toHaveTextContent(
+      `A · sort: 50 points, open for the whole contest; due ${at('2026-10-08T09:00:00Z')}, then 10% less per started day late`,
+    );
+    await line(
+      sortPart,
+      'The contest makes it worth 50 points, so its test groups’ 100 are scaled to that.',
+    );
+    // A worked example from the group's own number of tests.
+    await line(
+      sortPart,
+      'Test group “small”: an entrant earns 15 points when every test passes, and nothing otherwise. An entrant who passes 3 of 4 gets nothing.',
+    );
+    await line(
+      sortPart,
+      'Counted on Standings: highest total first, using each entrant’s best submission. Only organisers see it.',
+    );
+    expect(sortPart).not.toHaveTextContent(/\byou\b/i);
+
+    const sumPart = within(card).getByRole('region', { name: 'B · sum' });
+    expect(within(sumPart).getByRole('heading', { level: 3 })).toHaveTextContent(
+      'B · sum: 100 points, open for the whole contest',
+    );
+    // Where the worth comes from is said only where the contest sets it.
+    expect(sumPart).not.toHaveTextContent('scaled');
+    // A draft on top of its publication: its tests now are not the published ones.
+    await line(
+      sumPart,
+      'Test group “main”: each test passed is worth an equal share of 80 points. Passing every test earns 20 points more.',
+    );
+    await line(sumPart, 'No leaderboard counts it.');
+  });
+
+  it('names a group hidden until the end on each board where it changes what the board counts, and nowhere else', async () => {
+    const [, sum] = standings;
+    if (sum === undefined) throw new Error('standings has sum');
+    server.use(
+      signedIn,
+      http.get(`${CONTEST_API}/organise/tasks`, () =>
+        HttpResponse.json([
+          {
+            ...sum,
+            label: 'A',
+            state: { ...sum.state, draft: false, errors: [] },
+            timeline: { ...sum.timeline, worth: '100' },
+          },
+        ]),
       ),
-    ).toBeVisible();
-    expect(sort).toHaveTextContent(
-      `Worth 50 points, as the contest sets it. Its test groups total ${formatExact('100')}.`,
-    );
-    expect(sort).toHaveTextContent(
-      'Standings: Ranks entrants by points, from each entrant’s best submission on task sort',
-    );
-    const sum = within(card).getByRole('region', { name: 'B · sum' });
-    expect(
-      await within(sum).findByText(
-        'Test group “main”: Each test passed is worth an equal share of 80 points. Passing every test earns 20 points more.',
+      contestFile([
+        'name: Spring',
+        'start: 2026-10-01T09:00:00Z',
+        'end: 2026-10-15T09:00:00Z',
+        'tasks: [{id: sum}]',
+        'leaderboards:',
+        '  - {name: Live, over: live, who: contestants}',
+        '  - {name: Final, who: everyone}',
+        '  - {name: Practice, over: all, tasks: []}',
+      ]),
+      ...publishedTasks(
+        {
+          sum: 'name: Sum\nworkflow: unicon/classic@v2\ntest_groups:\n  samples: {show: always}\n  hidden: {each: 100, show: after_close}\n',
+        },
+        { sum: { samples: 2, hidden: 4 } },
       ),
-    ).toBeVisible();
-    expect(sum).toHaveTextContent(
-      `Worth ${formatExact('100')} points, its test groups’ total.`,
+      ...repoFiles,
     );
-    expect(sum).toHaveTextContent('No leaderboard counts it.');
+    renderApp(CONTEST);
+
+    const card = await screen.findByRole('region', {
+      name: 'How this contest is scored',
+    });
+    const part = await within(card).findByRole('region', { name: 'A · sum' });
+    await line(
+      part,
+      'Test group “samples”: no points: its tests are for entrants to practise on.',
+    );
+    // The same words the task's Tests card gives the group.
+    await line(
+      part,
+      'Test group “hidden”: each test passed is worth an equal share of 100 points. An entrant who passes 3 of 4 gets 75.',
+    );
+    await line(
+      part,
+      'Counted on Live: highest total first, using each entrant’s best submission. Entrants and organisers see the whole board. It leaves out test group “hidden”, whose results entrants see only once the task closes.',
+    );
+    await line(
+      part,
+      'Counted on Final: highest total first, using each entrant’s best submission. Everyone who can see the contest sees the whole board. Results from test group “hidden” join it when the contest ends.',
+    );
+    // A board that does not cover the task is not listed under it.
+    expect(part).not.toHaveTextContent('Practice');
   });
 });
 
@@ -515,6 +634,8 @@ describe('how the contest is scored, as published', () => {
       task: { name: 'new' },
       label: 'C',
       state: { head: 'f0', latest: null, draft: true, errors: [] },
+      // A task never published has no worth yet.
+      timeline: { ...standings[0]!.timeline, worth: null },
     };
     server.use(
       signedIn,
@@ -538,6 +659,7 @@ describe('how the contest is scored, as published', () => {
           version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
         });
       }),
+      http.get(`${CONTEST_API}/tasks/:task/tree`, () => problem(404, 'not_found')),
       ...repoFiles,
     );
     renderApp(CONTEST);
@@ -546,22 +668,22 @@ describe('how the contest is scored, as published', () => {
       name: 'How this contest is scored',
     });
     const sum = await within(card).findByRole('region', { name: 'B · sum' });
-    expect(
-      await within(sum).findByText(
-        'Test group “main”: Each test passed is worth an equal share of 80 points. Passing every test earns 20 points more.',
-      ),
-    ).toBeVisible();
-    expect(sum).toHaveTextContent(
-      `Worth ${formatExact('100')} points, its test groups’ total.`,
+    await line(
+      sum,
+      'Test group “main”: each test passed is worth an equal share of 80 points. Passing every test earns 20 points more.',
     );
     const sort = within(card).getByRole('region', { name: 'A · sort' });
-    expect(
-      await within(sort).findByText('Worth 1 point, its test groups’ total.'),
-    ).toBeVisible();
+    await line(
+      sort,
+      'Test group “judge”: an entrant earns 1 point when every test passes, and nothing otherwise.',
+    );
     const fresh = within(card).getByRole('region', { name: 'C · new' });
     expect(
       within(fresh).getByText('Not published yet, so entrants are told nothing of it.'),
     ).toBeVisible();
+    expect(within(fresh).getByRole('heading', { level: 3 })).toHaveTextContent(
+      'C · new: points known once the task is published',
+    );
   });
 });
 

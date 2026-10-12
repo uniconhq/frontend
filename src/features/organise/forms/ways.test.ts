@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { formatDateTime } from '@/lib/time';
 import { newBoard } from './board-values';
-import { boardSentence } from './board-words';
+import { boardSentence, type HeldGroup } from './board-words';
 import {
   domainsOf,
   newSignup,
@@ -104,14 +105,20 @@ describe('the ways into a contest', () => {
   });
 });
 
-describe('a board in a sentence', () => {
+describe('a board in a sentence (M52)', () => {
+  /** sum's group "hidden", shown once sum closes with the contest; sort's "final", closing earlier. */
+  const held: HeldGroup[] = [
+    { task: 'sum', label: 'A', group: 'hidden', closes: null },
+    { task: 'sort', label: 'B', group: 'final', closes: '2026-10-03T09:00:00Z' },
+  ];
+
   it('says the default board, seen by organisers only', () => {
     expect(boardSentence({ ...newBoard(), name: 'Standings' })).toBe(
-      'Ranks entrants by points, from each entrant’s best submission on every task, counting every result once it is shown. Only organisers see it.',
+      'Highest total first, using each entrant’s best submission, on every task. Only organisers see it.',
     );
   });
 
-  it('says the keys in turn, the tasks, the results counted and the rows shown', () => {
+  it('says the keys in turn, the tasks, the rows shown and what it leaves out, in general when the groups are not known', () => {
     expect(
       boardSentence({
         ...newBoard(),
@@ -123,7 +130,56 @@ describe('a board in a sentence', () => {
         rows: '10',
       }),
     ).toBe(
-      'Ranks entrants by points and the minute its counted submission was made, from the best submission on each test group on tasks sum and sort, counting only the results shown during the contest. Everyone who can see the contest sees it, the top 10 rows, every row tied with the last of them, and each entrant’s own row.',
+      'Highest total first, then fewest penalty minutes, counting nothing for earlier attempts, using each entrant’s best result on each test group, on tasks sum and sort. Organisers see the whole board; everyone else who can see the contest sees the top 10 rows and any row tied with the last of them, and an entrant their own row as well. It leaves out every test group whose results entrants see only once its task closes.',
+    );
+  });
+
+  it('says without the tasks, as how the contest is scored says it of one task, and nothing of when while nothing is held back', () => {
+    expect(
+      boardSentence({ ...newBoard(), who: 'contestants' }, { tasks: false, held: [] }),
+    ).toBe(
+      'highest total first, using each entrant’s best submission. Entrants and organisers see the whole board.',
+    );
+  });
+
+  it('names a held group that joins it once shown, and when, only where it changes something', () => {
+    const board = { ...newBoard(), who: 'contestants' };
+    expect(boardSentence(board, { tasks: false, held: held.slice(0, 1) })).toBe(
+      'highest total first, using each entrant’s best submission. Entrants and organisers see the whole board. Results from test group “hidden” join it when the contest ends.',
+    );
+    expect(boardSentence(board, { held })).toBe(
+      `Highest total first, using each entrant’s best submission, on every task. Entrants and organisers see the whole board. Results from test group “hidden” of task A join it when the contest ends. Results from test group “final” of task B join it when task B closes, ${formatDateTime(new Date('2026-10-03T09:00:00Z'))}.`,
+    );
+  });
+
+  it('names the held groups a board of the results shown during the contest leaves out, of the tasks it covers', () => {
+    expect(
+      boardSentence(
+        {
+          ...newBoard(),
+          tasks: ['sum'],
+          over: 'live',
+          who: 'contestants',
+          rows: 'own',
+        },
+        { held },
+      ),
+    ).toBe(
+      'Highest total first, using each entrant’s best submission, on task sum. Organisers see the whole board, and each entrant only their own row. It leaves out test group “hidden”, whose results entrants see only once the task closes.',
+    );
+  });
+
+  it('names the only groups a board of the results shown once each task closes counts, or that it counts nothing', () => {
+    const board = {
+      ...newBoard(),
+      over: 'after_close',
+      order: [{ kind: 'value' as const, name: 'time' }],
+    };
+    expect(boardSentence(board, { tasks: false, held: held.slice(0, 1) })).toBe(
+      'best time first, using each entrant’s best submission. Only organisers see it. It counts only test group “hidden”, when the contest ends.',
+    );
+    expect(boardSentence(board, { tasks: false, held: [] })).toBe(
+      'best time first, using each entrant’s best submission. Only organisers see it. It counts nothing: it counts only test groups whose results entrants see once their task closes, and no task it covers has one.',
     );
   });
 });
