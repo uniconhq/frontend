@@ -13,7 +13,7 @@ import type {
 } from '@/api/types';
 import { formatExact } from '@/lib/exact';
 import { renderApp } from '@/test/render';
-import { problem, server, signedIn, someone } from '@/test/server';
+import { afterAnswers, problem, server, signedIn, someone } from '@/test/server';
 import {
   TASK_API,
   CONTEST_API,
@@ -824,8 +824,7 @@ describe('the cards while the task is being changed', { timeout: 30_000 }, () =>
       groups: { ...FOLDERS, extra: ['1'] },
       form: { ...UNREAD, graded: true },
     });
-    comeBackToTab();
-    await new Promise((resolve) => setTimeout(resolve, 500));
+    await afterAnswers(comeBackToTab);
 
     const cards = screen.getByRole('region', { name: 'Inputs' });
     expect(fieldIn(cards, 'time_limit', 'Value')).toHaveValue('3');

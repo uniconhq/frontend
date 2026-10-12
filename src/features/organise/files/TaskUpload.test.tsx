@@ -4,7 +4,7 @@ import userEvent from '@/test/user-event';
 import { http, HttpResponse } from 'msw';
 import type { SaveRequest, Upload } from '@/api/types';
 import { renderApp } from '@/test/render';
-import { problem, server, signedIn, someone } from '@/test/server';
+import { afterAnswers, problem, server, signedIn, someone } from '@/test/server';
 import { TASK_API, publicationList, repoFiles, taskState } from '@/test/organiser';
 
 /** The task's page, opened at its Statement card. */
@@ -462,7 +462,7 @@ describe('uploading a file of a task again', { timeout: 20_000 }, () => {
     expect(within(all).getByRole('button', { name: /^notes\.md/ })).toHaveTextContent(
       'notes.md 12 bytes',
     );
-    await user.click(train);
+    await afterAnswers(() => user.click(train));
     const shown = await within(all).findByRole('region', { name: 'train.csv' });
     expect(
       within(shown).getByText(
@@ -471,8 +471,7 @@ describe('uploading a file of a task again', { timeout: 20_000 }, () => {
     ).toBeVisible();
     expect(shown).toHaveTextContent('300 MB');
     // With no version to download it at, its size alone is shown.
-    await expect.poll(() => read).toBe(true);
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(read).toBe(true);
     expect(within(shown).queryByRole('link', { name: /Download/ })).toBeNull();
   });
 

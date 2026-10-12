@@ -3,7 +3,7 @@ import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@/test/user-event';
 import { http, HttpResponse } from 'msw';
 import { renderApp } from '@/test/render';
-import { problem, server, signedIn, someone } from '@/test/server';
+import { afterAnswers, problem, server, signedIn, someone } from '@/test/server';
 import {
   CONTEST_API,
   TASK_API,
@@ -393,8 +393,7 @@ describe('settings someone else saved first', () => {
         params['path'] === 'contest.yaml' ? HttpResponse.json(THEIRS) : undefined,
       ),
     );
-    comeBackToTab();
-    await new Promise((resolve) => setTimeout(resolve, 300));
+    await afterAnswers(comeBackToTab);
 
     const text = screen.getByRole('textbox', { name: 'contest.yaml' });
     expect(text).toHaveValue('name: Spring\nstart: [\nmine');
