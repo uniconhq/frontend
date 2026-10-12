@@ -179,8 +179,7 @@ where an admin fixes them as text when the forms cannot read them.
 | `/orgs/new`                                | the new org form, then the new org                                                    |
 | `/orgs/:org`                               | the org's display name and description, its contests, New contest, and its organisers |
 | `/orgs/:org/contests/:contest`             | failed gradings, where each task stands, New task, how it is scored, and the sections |
-| `/orgs/:org/contests/:contest/contestants` | every registration, with approve, reject, undo a rejection, remove and extend         |
-| `/orgs/:org/contests/:contest/teams`       | every team, with make, delete, add, move, remove and change the leader                |
+| `/orgs/:org/contests/:contest/entrants`    | every entrant, one person or a team, with approve, reject, undo, remove and manage    |
 | `/orgs/:org/contests/:contest/gradings`    | every grading of the contest, its queue, and retry, cancel and rejudge                |
 | `/orgs/:org/contests/:contest/tasks/:task` | the task's state, the cards that build it, and a card for each section                |
 
@@ -192,8 +191,8 @@ proxy changes first. Every address above is built in one
 place, `src/lib/organiser-paths.ts`, which the pages and the breadcrumb share.
 
 The pages live in `src/features/organise/`: a sub-folder for each page
-(`orgs/` holds `/orgs` and `/orgs/new`, then `org/`, `contest/`, `contestants/`,
-`teams/`, `gradings/` and `task/`), one for reading, previewing and saving the files the
+(`orgs/` holds `/orgs` and `/orgs/new`, then `org/`, `contest/`, `entrants/`,
+`gradings/` and `task/`), one for reading, previewing and saving the files the
 contest and task pages share (`files/`), one for the settings forms and the statement (`forms/`),
 and one for the organisers section all three pages share (`people/`). The pieces more than one of those use sit at its top:
 the create form and `Create`, which keeps it behind a New button and
@@ -220,7 +219,7 @@ orgs' service accounts out of every list, so they never show. A change to the pe
 reads the session again, since those decide what every page offers. Someone
 who does not observe the place is not shown the section.
 
-Below the organisers are the invites to a role there, and the contestants
+Below the organisers are the invites to a role there, and the Entrants
 page has the invites to a place in the contest: who each is for, what it
 grants, whether it is pending, lapsed, accepted, declined or withdrawn, and
 what became of its mail. A manager invites by username or by email address,
@@ -465,26 +464,17 @@ is sent as empty, which leaves the org showing its name. Anyone else with a
 role in the org, at the org or at one of its contests or tasks, reads them
 with no edit control, also when the contest list refuses them.
 
-The contestants page shows an observer the table and a manager its actions
-too, which the routes check again underneath. Each action's answer replaces
-its row and takes the focus back to it; a refusal shows on the row, or inside
-the confirmation for a removal, and a registration that moved on under the
-organiser is read again. A rejected registration offers Undo rejection, which
-leaves it pending again.
-
-The teams page lists every team of a contest with its leader, its members
-and the people asked in or asking, for anyone who observes the contest. A
-manager makes a team, empty or led by an approved contestant named by
-username, deletes one that has submitted nothing, adds an approved
-contestant, moves a member to another team, removes one, turns down a
-request, takes back an invitation and makes a member the leader. Adding,
-moving, removing and deleting each ask first, naming the team, since they
-change who reaches that team's work. The list is read again every half minute
-and whenever a confirmation opens. The routes give the page no team size,
-so a move into a full team is refused by the server and the refusal stays in
-the dialog. A contest has teams only when its `contest.yaml` sets
-`team_size`, the most people a team holds; until it does, a new team is
-refused with `teams_off`.
+The Entrants page (`entrants/EntrantsPage.tsx`) lists every entrant of a
+contest, one person or a team, for anyone who observes it: its members, the
+way each came in, with the sign-up's name when it has one, where its
+registration stands and its extension, filtered by status, kept in the
+address. A manager approves, rejects, undoes a rejection, removes, and under
+Manage extends an entrant's time and, in a contest of teams, moves a member
+to another entrant or takes one out; each asks first where it changes who
+reaches the entrant's work, and the routes check it again underneath. A
+refusal shows where it happened, and one that shows the list was behind
+reads it again; nothing pushes a change of entrant, so the list is read again
+every half minute. The old `/contestants` and `/teams` addresses lead here.
 
 ## Workflows
 
@@ -662,39 +652,27 @@ back from Forgejo, the page opens that invite first. A link that is not the
 signed-in account's says so and to sign in with the account it was sent to.
 The proxy in `deploy` has to send `/invites` to this app as well.
 
-### Teams
+### Your entry
 
-For a contest whose `contest.yaml` sets `team_size`, an approved contestant's
-contest page has a team section (`features/contest/teams/`). The home does
-not say whether a contest has teams, so the section reads `my-team` and is
-not there at all when it answers `teams_off`, nor while the first answer is
-on its way, and it is not read again after that answer. Someone in no team
-sees their invitations, with Accept and Decline, their requests, with
-Withdraw, a form to make a team they then lead, and every team with how
-many places it has taken, with Ask to join. Someone in a team sees its
-members and the people waiting, and Leave, which says first who leads next
-or that the team goes with nobody left. The leader also approves or refuses
-a request, takes back an invitation, removes a member and invites by
-username; inviting someone who had asked to join lets them in at once, and
-the form says so. A full team's Accept, Ask to join, Approve and Invite are
-off, with the reason beside them. A team's name is checked once trimmed, at
+A contest's page holds the person's entry (`entry/YourEntry.tsx`):
+registering, with a name in a contest of teams, which the team goes by, and
+the code only when a code is their way in; then where the registration
+stands. In a contest of teams it shows the team, its members and how each
+came in, with the sign-up's name when it has one (M42), the invites
+waiting, and inviting, renaming and leaving until the team is fixed, and
+the invitations the person holds into other teams. The team's name has Edit
+beside it while the team can still change, which turns it into a box with
+Save and Cancel in place (M41). A team's name is checked once trimmed, at
 most 60 characters, and a username field takes at most 40, Forgejo's limit.
-Your entry (`entry/YourEntry.tsx`) shows the team's name with Edit beside
-it while the team can still change, which turns it into a box with Save and
-Cancel in place (M41); each member's line says how they came in, with the
-sign-up's name when it has one (M42).
 
 Once in a team, a person's submissions, the caps they count against, their
 extra time and their questions are the team's, and every member sees all of
-them on the existing pages. Nothing
-pushes a change of team, so the section is read again every ten seconds
-while someone waits on an answer and every thirty otherwise. When the team
-the person is in changes between two reads, by their own hand or by a
-leader's or an organiser's, every read of the contest is read again, so the
-submissions and questions shown follow the team. From the contest's end, or
-once it is archived, the forge refuses every contestant's change of team,
-so the section shows the team as it stands and says teams stand as they
-are. A refusal stays in the section until it is dismissed.
+them on the existing pages. Every change of entry reads the contest's reads
+again, so the submissions and questions shown follow the team. Nothing
+pushes a change of entry, so the page reads it again every ten seconds
+while the person waits on an organiser or an invite, and every minute
+otherwise. A refusal is said in words until it is dismissed, and one that
+shows the page was behind reads it again.
 
 ### Submitting
 
