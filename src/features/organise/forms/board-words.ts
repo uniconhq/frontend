@@ -167,11 +167,14 @@ function byWhen(groups: HeldGroup[], named: boolean): [string, HeldGroup[]][] {
  * results shown during the contest, so a held group is left out; or only
  * the held groups, from when they are shown. `held` is null when the
  * groups are not known, and the board's choice is then said in general.
+ * `oneTask` is set where `held` is one task's alone, under that task, so
+ * the sentence speaks of what the board takes from it, never of the board.
  */
 function scopeWords(
   over: string,
   held: HeldGroup[] | null,
   named: boolean,
+  oneTask: boolean,
 ): string | null {
   if (held === null) {
     if (over === 'live')
@@ -186,9 +189,12 @@ function scopeWords(
       : `It leaves out ${groupsWords(held, named)}, whose results entrants see only once the task closes.`;
   }
   if (over === 'after_close') {
-    return held.length === 0
-      ? 'It counts nothing: it counts only test groups whose results entrants see once their task closes, and no task it covers has one.'
-      : `It counts only ${list(byWhen(held, named).map(([when, groups]) => `${groupsWords(groups, named)}, ${when}`))}.`;
+    if (held.length === 0) {
+      return oneTask
+        ? 'It takes nothing from this task: it counts only test groups whose results entrants see once their task closes, and this task has none.'
+        : 'It counts nothing: it counts only test groups whose results entrants see once their task closes, and no task it covers has one.';
+    }
+    return `It counts only ${list(byWhen(held, named).map(([when, groups]) => `${groupsWords(groups, named)}, ${when}`))}.`;
   }
   if (held.length === 0) return null;
   return byWhen(held, named)
@@ -219,7 +225,8 @@ function whoWords(board: BoardValues): string {
  * Leaderboards page and in how the contest is scored: "highest total first,
  * using each entrant’s best submission. Entrants and organisers see the
  * whole leaderboard." `tasks` says which tasks it covers, for a page that shows
- * the board on its own; `held` is the test groups of those tasks whose
+ * the board on its own; left out, the sentence is said under one task, and
+ * `held` is that task's alone; `held` is the test groups of those tasks whose
  * results come out once their task closes, said only where they change
  * what the board counts, or null when they are not known.
  */
@@ -250,7 +257,7 @@ export function boardSentence(
   return [
     tasks ? first.replace(/^./, (letter) => letter.toUpperCase()) : first,
     whoWords(board),
-    scopeWords(board.over, covered, named),
+    scopeWords(board.over, covered, named, !tasks),
   ]
     .filter((part) => part !== null)
     .join(' ');
