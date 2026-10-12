@@ -354,22 +354,8 @@ describe('what the task has, under its name', { timeout: 20_000 }, () => {
     );
   });
 
-  it('does not tick a statement that is still the one a new task starts with', async () => {
-    readyBackend();
-    server.use(
-      http.get(`${TASK_API}/files/:path`, ({ params }) =>
-        params['path'] === 'statement.md'
-          ? HttpResponse.json({
-              path: 'statement.md',
-              encoding: 'utf-8',
-              content: 'Write the statement entrants read here.\n',
-              token: 'token-statement',
-              upload: null,
-              version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
-            })
-          : undefined,
-      ),
-    );
+  it('does not tick a statement the forge says is not written yet: blank, or the one a new task starts with (M57)', async () => {
+    readyBackend({ ...publishedTask, head_statement_written: false });
     renderApp(TASK);
 
     const row = await screen.findByRole('list', { name: 'What the task has' });
