@@ -12,6 +12,8 @@ export type Named = Schemas['Named'];
 export type TaskState = Schemas['TaskState'];
 /** A task of a contest with its letter, its state and its timeline. */
 export type TaskStanding = Schemas['TaskStanding'];
+/** What taking a task out of its contest does: remove it, or withdraw it. */
+export type TakeOut = Schemas['TakeOut'];
 export type Publication = Schemas['Publication'];
 export type DefinitionError = Schemas['DefinitionError'];
 export type TreeEntry = Schemas['TreeEntry'];
@@ -86,13 +88,19 @@ export type Reported = Schemas['Reported'];
 export type GradedTest = Schemas['GradedTest'];
 export type Grading = Schemas['Grading'];
 export type Rejudged = Schemas['Rejudged'];
+/** A task's latest regrade of many, summed up by what it did to each submission. */
+export type RegradeSummary = Schemas['RegradeSummary'];
+/** One result a regrade compares: the one it replaced, or its own. */
+export type RegradeSide = Schemas['RegradeSide'];
+/** What a regrade did to one submission: up, down, now stopped, and so on. */
+export type RegradeChangeKind = Schemas['ChangeKind'];
 /** One attempt in a contest's gradings feed, with its task and who submitted. */
 export type FeedEntry = Schemas['FeedEntry'];
 export type Submitter = Schemas['Submitter'];
 export type QueueDepth = Schemas['QueueDepth'];
 export type Announcement = Schemas['Announcement'];
 /** One change in a place's history, its author named. */
-export type FileChange = Schemas['forge__domain__content__Change'];
+export type FileChange = Schemas['Change'];
 export type Clarification = Schemas['Clarification'];
 /** Where a grading stands, as organisers read it. */
 export type GradingStatus = Schemas['GradingStatus'];

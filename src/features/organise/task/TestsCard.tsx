@@ -29,6 +29,7 @@ import {
   RULES,
   scaled,
   shareProblem,
+  showGreyedWords,
   showRefusal,
   SHOWS,
   taskWeight,
@@ -467,8 +468,10 @@ function GroupItem({
   const rule: Rule = advanced ? 'advanced' : held ? picked : read;
   const refusal = ruleRefusal('worst', credit.kind);
   const showProblem = showRefusal(group.show, group, credit.kind);
-  const verdictRefusal = showRefusal('verdict', group, credit.kind);
+  const greyedWords = showGreyedWords(group, credit.kind);
   const required = graded && !group.read;
+  const unchosen = required && group.show === '';
+  const shown = group.show === '' && !required ? 'always' : group.show;
   const most = scaled(groupWeight(group), total, worth);
   const points = most.num === 0n ? 'no points' : `up to ${pointsWords(most)}`;
   const pick = (next: string) => {
@@ -562,21 +565,25 @@ function GroupItem({
         {groupSentence(group, { total, worth, credit: credit.kind, tests: count })}
       </p>
       <FieldBox name="show">
-        <RadioGroup
+        <Select
           label="When entrants see results"
-          value={group.show === '' && !required ? 'always' : group.show}
-          options={SHOWS.map((option) => ({
-            ...option,
-            disabled:
+          value={shown}
+          placeholder={unchosen ? 'Choose when' : undefined}
+          options={SHOWS.map((option) => {
+            const greyed =
               option.value === 'verdict' &&
-              verdictRefusal !== null &&
-              group.show !== 'verdict',
-            reason: option.value === 'verdict' ? verdictRefusal : null,
-          }))}
+              greyedWords !== null &&
+              group.show !== 'verdict';
+            return {
+              value: option.value,
+              label: greyed ? `${option.label} ${greyedWords}` : option.label,
+              disabled: greyed,
+            };
+          })}
           description={
-            required && group.show === ''
+            unchosen
               ? 'The task has graded submissions, so a test group added now must say when its results are shown.'
-              : undefined
+              : SHOWS.find((option) => option.value === shown)?.description
           }
           error={showProblem ?? undefined}
           required={required}

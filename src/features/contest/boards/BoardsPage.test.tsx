@@ -117,8 +117,8 @@ describe("a contest's boards for a signed-in person", () => {
   it('labels a penalty that charges nothing for an attempt by the minute', async () => {
     const minute = icpc({
       keys: [
-        { by: 'points', better: 'higher', per_attempt: null },
-        { by: 'penalty', better: 'lower', per_attempt: 0 },
+        { by: 'points', better: 'higher', per_attempt: null, title: null, unit: null },
+        { by: 'penalty', better: 'lower', per_attempt: 0, title: null, unit: null },
       ],
     });
     server.use(

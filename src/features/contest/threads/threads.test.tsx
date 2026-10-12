@@ -116,7 +116,12 @@ describe('questions', () => {
     let mine = [
       question({
         messages: [
-          { from_asker: false, body: 'Up to 10^5.', at: '2026-09-12T09:20:00Z' },
+          {
+            from_asker: false,
+            body: 'Up to 10^5.',
+            at: '2026-09-12T09:20:00Z',
+            announcement: null,
+          },
         ],
       }),
     ];
@@ -178,7 +183,12 @@ describe('questions', () => {
           question({
             asker: 'entrant.0b9d6a5200004000800000000000001a',
             messages: [
-              { from_asker: true, body: 'And m?', at: '2026-09-12T09:15:00Z' },
+              {
+                from_asker: true,
+                body: 'And m?',
+                at: '2026-09-12T09:15:00Z',
+                announcement: null,
+              },
             ],
           }),
         ]),

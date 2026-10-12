@@ -5,8 +5,11 @@ import { Button } from '@/ui/Button';
 import { Modal } from '@/ui/Modal';
 import { Select } from '@/ui/Select';
 import { TextInput } from '@/ui/TextInput';
+import { PageLink } from '@/ui/PageLink';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
+import { contestSectionPath } from '@/lib/sections';
 import { STATUS, UNFINISHED, submitterOf } from './feed';
+import { regradeSearch } from './regrades';
 import type { Asking } from './use-grading-actions';
 import shared from '../organise.module.css';
 import classes from './feed.module.css';
@@ -201,8 +204,9 @@ function OverLimitRetry({
       </BodyText>
       <BodyText tone="secondary">
         {submission} then has no result and counts on no leaderboard, and {entrant}{' '}
-        reads that they had reached the limit. A submission is graded past a delay only
-        while its entrant has room under the limit, so the earliest ones count.
+        reads that they had reached the limit. A delayed submission is graded only while
+        its entrant has room under the limit, so their earliest submissions are the ones
+        that count.
       </BodyText>
     </>
   );
@@ -374,11 +378,18 @@ export function ConfirmDialog({
   );
 }
 
-/** What a rejudge did, said once it has. */
+/**
+ * What a rejudge did, said once it has: how many it queued, cancelled and
+ * left running, how many ended not graded since their entrants had reached
+ * the task's limit (#445), and the way to what it changes, as Gradings sums
+ * it up (#448).
+ */
 export function RejudgeOutcome({
+  path,
   title,
   rejudged,
 }: {
+  path: { org: string; contest: string };
   title: string;
   rejudged: Rejudged;
 }) {
@@ -399,6 +410,20 @@ export function RejudgeOutcome({
         <BodyText tone="secondary">
           {attempts(rejudged.left_running)} already grading against it left to finish.
         </BodyText>
+      )}
+      {rejudged.over_limit > 0 && (
+        <BodyText tone="secondary">
+          {rejudged.over_limit === 1
+            ? '1 submission ended not graded, since its entrant had reached the task’s limit on submissions.'
+            : `${String(rejudged.over_limit)} submissions ended not graded, since their entrants had reached the task’s limit on submissions.`}
+        </BodyText>
+      )}
+      {rejudged.regrade !== null && (
+        <PageLink
+          to={`${contestSectionPath(path.org, path.contest, 'gradings')}?${regradeSearch(rejudged.regrade, null)}`}
+        >
+          See what the rejudge changes
+        </PageLink>
       )}
     </div>
   );

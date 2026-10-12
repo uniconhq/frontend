@@ -138,7 +138,11 @@ function TaskScoring({
                       })}
                     </>
                   )}
-                  {boards.length === 0 ? (
+                  {standing.withdrawn ? (
+                    <li>
+                      Withdrawn: entrants do not see it, and no leaderboard counts it.
+                    </li>
+                  ) : boards.length === 0 ? (
                     <li>No leaderboard counts it.</li>
                   ) : (
                     boards.map((board) => (

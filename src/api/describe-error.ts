@@ -297,6 +297,24 @@ export function describeError(error: ApiError): ErrorDescription {
         title: 'This task has closed for you',
         message: 'It takes no more submissions from you.',
       };
+    case 'task_withdrawn':
+      return {
+        title: 'This task was withdrawn',
+        message:
+          'The organisers took it out of the contest, so it takes no submissions. Nothing was submitted.',
+      };
+    case 'take_out_changed':
+      return {
+        title: 'Someone submitted meanwhile',
+        message:
+          error.detail ??
+          'The task’s submissions changed since this was asked. Look again and try again.',
+      };
+    case 'take_out_refused':
+      return {
+        title: 'The task cannot be taken out as things stand',
+        message: error.detail ?? 'Check the contest’s leaderboards and settings first.',
+      };
     case 'archived':
       return {
         title: 'The contest is archived',

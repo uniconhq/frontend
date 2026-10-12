@@ -110,9 +110,15 @@ const noGradings = http.get(
   () => HttpResponse.json([]),
 );
 
-/** Contests with no gradings, nothing waiting and no tasks, until a test says otherwise. */
+/**
+ * Contests with no gradings, nothing waiting, no regrade and no tasks, until
+ * a test says otherwise.
+ */
 const emptyOrganising = [
   http.get('/api/v1/orgs/:org/contests/:contest/gradings', () => HttpResponse.json([])),
+  http.get('/api/v1/orgs/:org/contests/:contest/gradings/regrades', () =>
+    HttpResponse.json([]),
+  ),
   http.get('/api/v1/orgs/:org/contests/:contest/gradings/queue', () =>
     HttpResponse.json({ queued: 0, dispatched: 0, failed: 0 }),
   ),

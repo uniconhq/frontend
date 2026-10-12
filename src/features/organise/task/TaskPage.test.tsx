@@ -54,6 +54,40 @@ describe('the task page', () => {
     ).toBeDisabled();
   });
 
+  it('goes back to the contest once the task is removed from its own page', async () => {
+    server.use(
+      signedIn,
+      taskState,
+      publicationList,
+      standingList,
+      ...repoFiles,
+      http.post(`${TASK_API}/take-out`, () => HttpResponse.json({ done: 'remove' })),
+    );
+    const user = userEvent.setup();
+    renderApp(TASK);
+
+    const status = await screen.findByLabelText('Where the task stands');
+    await user.click(
+      await within(status).findByRole('button', {
+        name: 'Change B · sum in this contest',
+      }),
+    );
+    const dialog = await screen.findByRole('dialog', {
+      name: 'B · sum in this contest',
+    });
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Remove B · sum from the contest' }),
+    );
+    const asked = await screen.findByRole('dialog', {
+      name: 'Remove B · sum from the contest?',
+    });
+    await user.click(within(asked).getByRole('button', { name: 'Remove it' }));
+
+    expect(
+      await screen.findByRole('heading', { name: 'spring', level: 1 }),
+    ).toBeVisible();
+  });
+
   it('says where it stands in its contest as text to an observer of the contest', async () => {
     server.use(
       http.get('/api/v1/me', () =>

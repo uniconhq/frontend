@@ -89,6 +89,42 @@ describe("the contest's status", () => {
     ).toBeDisabled();
   });
 
+  it('counts only the tasks not withdrawn, so a withdrawn one with problems does not hold it back', async () => {
+    const [sort, sum] = standings;
+    if (sort === undefined || sum === undefined) throw new Error('two tasks');
+    server.use(
+      signedIn,
+      ...repoFiles,
+      http.get(`${CONTEST_API}/organise/tasks`, () =>
+        HttpResponse.json([
+          { ...sort, state: { ...sort.state, draft: false, errors: [] } },
+          { ...sum, withdrawn: true, submissions: 3, take_out: null },
+        ]),
+      ),
+    );
+    settingsAt(DRAFT);
+    renderApp(CONTEST);
+
+    const card = await status();
+    const list = await within(card).findByRole('list', { name: 'Before it opens' });
+    await waitFor(() =>
+      expect(
+        within(list)
+          .getAllByRole('listitem')
+          .map((item) => item.textContent),
+      ).toEqual([
+        '✓Name and times set',
+        '✓At least one task',
+        '✓A · sort: published',
+        '✓Anyone with an account can register from when the contest opens until the contest ends. An organiser approves each one.',
+        '✓A leaderboard',
+      ]),
+    );
+    expect(
+      within(card).getByRole('button', { name: 'Open the contest' }),
+    ).toBeEnabled();
+  });
+
   it('opens the contest after saying what will happen', async () => {
     server.use(
       signedIn,

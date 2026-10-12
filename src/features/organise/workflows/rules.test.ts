@@ -32,6 +32,7 @@ const CHECKER: PrimitiveInfo = {
       runs: null,
       secret: false,
       description: null,
+      outcomes: null,
     },
     note: {
       type: 'text',
@@ -40,6 +41,7 @@ const CHECKER: PrimitiveInfo = {
       runs: null,
       secret: false,
       description: null,
+      outcomes: null,
     },
   },
   outputs: {
@@ -50,6 +52,7 @@ const CHECKER: PrimitiveInfo = {
       runs: null,
       secret: false,
       description: null,
+      outcomes: null,
     },
     outcome: {
       type: 'outcome',
@@ -58,6 +61,7 @@ const CHECKER: PrimitiveInfo = {
       runs: null,
       secret: false,
       description: null,
+      outcomes: null,
     },
   },
   problem: null,

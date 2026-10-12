@@ -5,6 +5,7 @@ import { isMap, isSeq } from 'yaml';
 import { $api, queryView } from '@/api/query';
 import type { TaskStanding } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
+import { Button } from '@/ui/Button';
 import { IconButton } from '@/ui/IconButton';
 import { Chip } from '@/ui/Chip';
 import { ListCard, type ListRow } from '@/ui/ListCard';
@@ -37,7 +38,10 @@ function when(at: string): string {
   return formatDateTime(new Date(at));
 }
 
-/** Where its files stand: published, a draft kept back, or a save with problems. */
+/**
+ * Where its files stand: published, a draft kept back, or a save with
+ * problems; and "Withdrawn" first for a task withdrawn from the contest.
+ */
 function TaskState({ standing }: { standing: TaskStanding }) {
   const { latest, draft, errors } = standing.state;
   const published =
@@ -50,6 +54,7 @@ function TaskState({ standing }: { standing: TaskStanding }) {
           }`;
   return (
     <>
+      {standing.withdrawn && <Chip tone="warn">Withdrawn</Chip>}
       {draft && errors.length > 0 && (
         <Chip tone="warn">
           {errors.length === 1 ? '1 problem' : `${String(errors.length)} problems`} in
@@ -62,9 +67,13 @@ function TaskState({ standing }: { standing: TaskStanding }) {
   );
 }
 
-/** Who may change the contest's tasks, and how: open a task's dialog, or move it. */
+/**
+ * Who may change the contest's tasks, and how: open a task's dialog, put a
+ * withdrawn one back, or move it.
+ */
 type Changing = {
   open: () => void;
+  putBack: () => void;
   move: (by: -1 | 1) => void;
   first: boolean;
   last: boolean;
@@ -103,20 +112,34 @@ function rowOf(
       </>
     ),
     action:
-      changing === null || !changing.movable ? undefined : (
+      changing === null || (!changing.movable && !standing.withdrawn) ? undefined : (
         <div className={classes.moves}>
-          <IconButton
-            sign="↑"
-            label={`Move ${label} up`}
-            disabled={changing.first || changing.moving}
-            onClick={() => changing.move(-1)}
-          />
-          <IconButton
-            sign="↓"
-            label={`Move ${label} down`}
-            disabled={changing.last || changing.moving}
-            onClick={() => changing.move(1)}
-          />
+          {standing.withdrawn && (
+            <Button
+              size="xs"
+              variant="secondary"
+              label={`Put ${label} back in the contest`}
+              onClick={changing.putBack}
+            >
+              Put back
+            </Button>
+          )}
+          {changing.movable && (
+            <>
+              <IconButton
+                sign="↑"
+                label={`Move ${label} up`}
+                disabled={changing.first || changing.moving}
+                onClick={() => changing.move(-1)}
+              />
+              <IconButton
+                sign="↓"
+                label={`Move ${label} down`}
+                disabled={changing.last || changing.moving}
+                onClick={() => changing.move(1)}
+              />
+            </>
+          )}
         </div>
       ),
   };
@@ -143,7 +166,9 @@ function moved(id: string, by: -1 | 1) {
 /**
  * A contest's tasks as a list card, in the contest's order, each row its
  * letter and name, where its files stand, and its worth and timeline in the
- * contest as one line, which a manager presses to change them in a dialog;
+ * contest as one line, which a manager presses to change them, or take the
+ * task out of the contest, in a dialog; a withdrawn task says so, with Put
+ * back on its row;
  * with two tasks or more, arrows on each row move it up or down the list,
  * saving at once, since a task's letter is its place. "New task" sits at the
  * bottom for a manager, which also adds it to the contest's tasks. A link to
@@ -164,6 +189,8 @@ export function ContestTasks({ org, contest }: { org: string; contest: string })
   const [editing, setEditing] = useState<number | null>(
     opened === null ? null : Number(opened),
   );
+  // Opened by a withdrawn task's Put back, on its question.
+  const [puttingBack, setPuttingBack] = useState(false);
   // A link to a task's timeline followed while the page is open opens it too.
   const [shownOpened, setShownOpened] = useState(opened);
   if (shownOpened !== opened) {
@@ -239,7 +266,14 @@ export function ContestTasks({ org, contest }: { org: string; contest: string })
             values,
             manages
               ? {
-                  open: () => setEditing(at),
+                  open: () => {
+                    setPuttingBack(false);
+                    setEditing(at);
+                  },
+                  putBack: () => {
+                    setPuttingBack(true);
+                    setEditing(at);
+                  },
                   move: (by) => void move(standing.task.name, by),
                   first: at === 0,
                   last: at === all.length - 1,
@@ -308,6 +342,7 @@ export function ContestTasks({ org, contest }: { org: string; contest: string })
     editing === null || view.state !== 'ready' ? undefined : view.data[editing];
   const closeEditing = () => {
     setEditing(null);
+    setPuttingBack(false);
     if (search.has('part')) {
       const next = new URLSearchParams(search);
       for (const key of ['part', ITEM_PARAM, FIELD_PARAM]) next.delete(key);
@@ -323,6 +358,7 @@ export function ContestTasks({ org, contest }: { org: string; contest: string })
         contest={contest}
         standing={editingStanding}
         label={editingStanding === undefined ? '' : labelOf(editingStanding, titles)}
+        start={puttingBack ? 'put-back' : null}
         onClose={closeEditing}
       />
       <ListCard

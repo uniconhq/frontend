@@ -94,13 +94,18 @@ function taskCheck(org: string, contest: string, standing: TaskStanding): Check 
   return { key: name, ok: true, text: `${name}: published`, to };
 }
 
-/** What opening the contest needs, each item linking to where it is fixed. */
+/**
+ * What opening the contest needs, each item linking to where it is fixed. A
+ * withdrawn task is not counted (#450): entrants never see it, so it needs
+ * nothing to open.
+ */
 function checksOf(
   org: string,
   contest: string,
   values: ContestValues,
-  tasks: TaskStanding[],
+  listed: TaskStanding[],
 ): Check[] {
+  const tasks = listed.filter((task) => !task.withdrawn);
   const settings = contestSectionPath(org, contest, 'settings');
   const timed =
     values.name.trim() !== '' &&

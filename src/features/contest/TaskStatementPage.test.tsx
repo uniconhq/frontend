@@ -321,7 +321,7 @@ describe('a task page for a signed-in person', () => {
     expect(container.querySelectorAll('main img')).toHaveLength(2);
   });
 
-  it('answers not found for a task that is not released', async () => {
+  it('says in words that a task not released, or taken out of the contest, is not there', async () => {
     server.use(
       signedIn,
       noSubmissions,
@@ -329,7 +329,19 @@ describe('a task page for a signed-in person', () => {
     );
     renderApp(PAGE);
 
-    expect(await screen.findByRole('heading', { name: 'Not found' })).toBeVisible();
+    expect(
+      await screen.findByRole('heading', { name: 'Task not found' }),
+    ).toBeVisible();
+    expect(
+      screen.getByText(
+        'It is not released yet, the organisers took it out of the contest, or the address is wrong. The contest’s page lists the tasks you can open.',
+      ),
+    ).toBeVisible();
+    expect(screen.getByRole('link', { name: 'Back to the contest' })).toHaveAttribute(
+      'href',
+      '/contests/acme/spring',
+    );
+    expect(screen.queryByText(/not_found/)).toBeNull();
   });
 });
 

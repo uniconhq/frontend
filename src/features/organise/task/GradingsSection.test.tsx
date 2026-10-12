@@ -594,6 +594,7 @@ describe("the organisers' scored view of a submission", () => {
       limit: null,
       points: { shown: '100', pending: '0', pending_until: null },
       factor: '1',
+      meanings: [],
       groups: [
         {
           group: 'main',

@@ -19,6 +19,7 @@ const done: GradingResult = {
   points: null,
   factor: null,
   folded: {},
+  meanings: [],
 };
 
 function submitted(secondsAgo: number, status: 'grading' | 'graded'): Submission {
