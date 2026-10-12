@@ -73,6 +73,14 @@ function creditRefusal(entry: ReportEntry, kind: 'value' | 'relative'): string |
   return entry.better === null ? 'says neither higher nor lower is better' : null;
 }
 
+/**
+ * A reported value as a page names it: its title, "Run time", or its key
+ * until the workflow's report gives it one (M58).
+ */
+function valueName(entry: ReportEntry): string {
+  return entry.title ?? entry.name;
+}
+
 /** How a test can earn, each with an example of what choosing it means. */
 const CREDITS = [
   {
@@ -91,15 +99,34 @@ const CREDITS = [
     value: 'relative',
     label: 'Its result against the best anyone reached',
     description:
-      'For optimisation: where higher is better, reaching 80 on a test where the best anyone reached is 100 earns 80% of it. Its points move as others do better.',
+      'For optimisation. Where higher is better, reaching 80 on a test where the best anyone reached is 100 earns 80% of it; where lower is better, as with run time, the fastest earns all of it and one twice as slow earns half. Its points move as others do better.',
   },
 ];
 
 /**
+ * Why the workflow offers nothing a test can earn by, said in its own line
+ * rather than as a list of values all greyed out (M58), or null when it
+ * offers one.
+ */
+function nothingToEarnBy(
+  report: ReportEntry[] | null,
+  kind: 'value' | 'relative',
+): string | null {
+  if (report === null || report.some((entry) => creditRefusal(entry, kind) === null)) {
+    return null;
+  }
+  return kind === 'value'
+    ? 'This workflow’s checker only says right or wrong, so it gives no score from 0 to 1.'
+    : 'This workflow reports no number for each test that is better higher or lower, so there is no best to measure against.';
+}
+
+/**
  * How a test earns, in words: 1 when it passes; or a score the workflow
  * reports, from 0 to 1, such as a checker's; or its value against the best
- * any entrant reached on it. A reported value that cannot be one is listed
- * greyed out, with why in its own name.
+ * any entrant reached on it. A way the workflow offers nothing for is
+ * greyed out with why under it; a reported value that cannot be one is
+ * listed greyed out, with why in its own name, and one against the best
+ * says which way is better.
  */
 function CreditPart({
   credit,
@@ -118,11 +145,16 @@ function CreditPart({
       ? []
       : report.map((entry) => ({
           value: entry.name,
-          label: entry.name,
+          label:
+            kind === 'relative' &&
+            (entry.better === 'lower' || entry.better === 'higher')
+              ? `${valueName(entry)} (${entry.better} is better)`
+              : valueName(entry),
           reason: creditRefusal(entry, kind),
         }));
   const chosenRefusal =
     options.find((option) => option.value === credit.name)?.reason ?? null;
+  const nothing = kind === 'none' ? null : nothingToEarnBy(report, kind);
   return (
     <CardPart
       title="How a test earns"
@@ -133,7 +165,18 @@ function CreditPart({
           <RadioGroup
             label="A test earns"
             value={kind}
-            options={CREDITS}
+            options={CREDITS.map((option) => {
+              const why =
+                option.value === 'value' || option.value === 'relative'
+                  ? nothingToEarnBy(report, option.value)
+                  : null;
+              return {
+                ...option,
+                disabled: why !== null && option.value !== kind,
+                reason: why,
+              };
+            })}
+            error={nothing === null ? undefined : `${nothing} Choose another way.`}
             onChange={(next) =>
               onChange({
                 ...credit,
@@ -143,6 +186,7 @@ function CreditPart({
             disabled={disabled}
           />
           {kind !== 'none' &&
+            nothing === null &&
             (report === null ? (
               <div className={classes.single}>
                 <TextInput
@@ -166,9 +210,6 @@ function CreditPart({
                   disabled: option.reason !== null && option.value !== credit.name,
                 }))}
                 placeholder="Choose one"
-                description={
-                  options.length === 0 ? 'The workflow reports no value.' : undefined
-                }
                 error={
                   chosenRefusal === null
                     ? undefined

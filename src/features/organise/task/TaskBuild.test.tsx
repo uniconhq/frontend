@@ -1240,10 +1240,61 @@ describe('scoring a task', { timeout: 30_000 }, () => {
         name: 'Its result against the best anyone reached',
       }),
     );
+    // Against the best, each value says which way is better.
     expect(
       within(within(tests).getByRole('combobox', { name: 'Which value' })).getByRole(
         'option',
-        { name: 'time_ms' },
+        { name: 'time_ms (lower is better)' },
+      ),
+    ).toBeEnabled();
+  });
+
+  it('gives the lower-is-better case against the best, and says in its own line that a workflow gives no score rather than greying every value (M58)', async () => {
+    taskBackend({
+      form: { ...CHECKED, inputs: [] },
+      content: TASK.replace('credit: fraction\n', ''),
+    });
+    server.use(
+      http.get('/api/v1/workflows/:owner/:name/versions/:version', () =>
+        HttpResponse.json({
+          content: CHECKED_YAML.replace(/ {2}fraction: .*\n/, '').replace(
+            'fold: max,',
+            'fold: max, title: Run time, unit: ms,',
+          ),
+        }),
+      ),
+    );
+    const { tests } = await openTask();
+
+    const earns = within(tests).getByRole('radiogroup', { name: 'A test earns' });
+    expect(
+      within(earns).getByRole('radio', {
+        name: 'Its result against the best anyone reached',
+      }),
+    ).toHaveAccessibleDescription(
+      /where lower is better, as with run time, the fastest earns all of it and one twice as slow earns half\./,
+    );
+    const score = within(earns).getByRole('radio', {
+      name: 'A score the workflow gives it, from 0 to 1',
+    });
+    await waitFor(() => expect(score).toBeDisabled());
+    expect(score).toHaveAccessibleDescription(
+      /This workflow’s checker only says right or wrong, so it gives no score from 0 to 1\.$/,
+    );
+    expect(
+      within(tests).queryByRole('combobox', { name: 'Which value' }),
+    ).not.toBeInTheDocument();
+
+    // A value is named by its title where the workflow gives one.
+    await userEvent.click(
+      within(earns).getByRole('radio', {
+        name: 'Its result against the best anyone reached',
+      }),
+    );
+    expect(
+      within(within(tests).getByRole('combobox', { name: 'Which value' })).getByRole(
+        'option',
+        { name: 'Run time (lower is better)' },
       ),
     ).toBeEnabled();
   });
