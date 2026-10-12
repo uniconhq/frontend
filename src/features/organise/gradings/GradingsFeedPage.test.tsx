@@ -668,11 +668,17 @@ describe('acting on the feed', () => {
       }),
     );
     const asked = await screen.findByRole('dialog', {
-      name: 'Cancel this submission?',
+      name: 'Cancel this attempt?',
     });
     expect(asked).toHaveTextContent(
       "Attempt 2 of ada's submission 3 to sum ends as cancelled. The submission keeps attempt 1's result, which its entrant and the leaderboards go on seeing.",
     );
+    expect(
+      within(asked).getByRole('button', { name: 'Cancel the attempt' }),
+    ).toBeVisible();
+    expect(
+      within(asked).queryByRole('button', { name: 'Cancel the submission' }),
+    ).toBeNull();
     expect(within(asked).getByLabelText(/^Why it was cancelled/)).toBeVisible();
     expect(within(asked).queryByLabelText(/^What the entrant reads/)).toBeNull();
   });
