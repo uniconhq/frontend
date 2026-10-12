@@ -113,6 +113,25 @@ describe('the workflows page', () => {
     expect(copy).toBeDisabled();
   });
 
+  it('greys out a copy, saying the workflows could not be read, when their list fails', async () => {
+    server.use(
+      signedIn,
+      http.get('/api/v1/workflows', () => problem(403, 'forbidden')),
+    );
+    const user = userEvent.setup();
+    renderApp('/workflows');
+
+    await user.click(await screen.findByRole('button', { name: 'New workflow' }));
+    const form = await screen.findByRole('form', { name: 'New workflow' });
+    const copy = within(form).getByRole('radio', { name: 'A copy of a version' });
+    await waitFor(() =>
+      expect(copy).toHaveAccessibleDescription(
+        'Every step of a workflow you can read, as it is at that version. The list of workflows you can read did not load. Close this and open it again to try again.',
+      ),
+    );
+    expect(copy).toBeDisabled();
+  });
+
   it('makes a workflow as a copy of a version, from the same form', async () => {
     let asked: unknown = null;
     server.use(

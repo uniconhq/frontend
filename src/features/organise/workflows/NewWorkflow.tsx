@@ -77,7 +77,9 @@ function NewWorkflowForm({
           reason:
             listed.state === 'ready'
               ? 'No workflow you can read has a version yet.'
-              : 'The workflows you can read are still loading.',
+              : listed.state === 'error'
+                ? 'The list of workflows you can read did not load. Close this and open it again to try again.'
+                : 'The workflows you can read are still loading.',
         }))}
         onChange={setStart}
       />
