@@ -11,9 +11,18 @@ import classes from './threads.module.css';
 /**
  * The message a public answer leaves on its question, "Answered publicly in
  * the announcement ‘On n’", with the announcement's title a link to it
- * (M62); the whole message the link where it does not quote the title.
+ * (M62); the whole message the link where it does not quote the title. With
+ * no `href`, the reader can no longer open the announcement, since the
+ * organisers closed it, and the message says so in place of the link.
  */
-function AnsweredPublicly({ body, href }: { body: string; href: string }) {
+function AnsweredPublicly({ body, href }: { body: string; href: string | null }) {
+  if (href === null) {
+    return (
+      <p className={classes.publicAnswer}>
+        {body.trimEnd()}, which the organisers have since closed.
+      </p>
+    );
+  }
   const quoted = /^(.*?)(‘.*’)\s*$/su.exec(body);
   if (quoted === null) {
     return (
@@ -92,7 +101,8 @@ function QuestionBadge({
  * entrant's name for the organisers); `organisers` says the box is read by
  * them, whose badge says how long an open question has waited.
  * `announcementHref` is where the announcement a public answer posted is
- * read, which its message on the question links to. `children` is what can
+ * read, which its message on the question links to, or null where the
+ * reader can no longer read it there. `children` is what can
  * be done with it, at the box's foot.
  */
 export function QuestionThread({
@@ -106,7 +116,7 @@ export function QuestionThread({
   clarification: Clarification;
   asker: string;
   organisers?: boolean;
-  announcementHref?: (link: AnnouncementLink) => string;
+  announcementHref?: (link: AnnouncementLink) => string | null;
   /** Which contest it was asked in, where questions of several are listed. */
   where?: string;
   children?: ReactNode;

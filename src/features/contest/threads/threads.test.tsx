@@ -170,23 +170,34 @@ describe('questions', () => {
     expect(within(answered).getByRole('textbox', { name: 'Follow up' })).toHaveFocus();
   });
 
+  const answeredPublicly = http.get(`${CONTEST_API}/questions`, () =>
+    HttpResponse.json([
+      question({
+        answered: true,
+        closed: true,
+        messages: [
+          {
+            from_asker: false,
+            body: 'Answered publicly in the announcement ‘On n’',
+            at: '2026-09-12T09:20:00Z',
+            announcement: { task: 'sum', number: 3 },
+          },
+        ],
+      }),
+    ]),
+  );
+
   it('shows a public answer on the asker’s question, linking to its announcement on the contest page (M62)', async () => {
     server.use(
       signedIn,
       approvedHome,
-      http.get(`${CONTEST_API}/questions`, () =>
+      answeredPublicly,
+      http.get(`${CONTEST_API}/home/announcements`, () =>
         HttpResponse.json([
-          question({
-            answered: true,
-            closed: true,
-            messages: [
-              {
-                from_asker: false,
-                body: 'Answered publicly in the announcement ‘On n’',
-                at: '2026-09-12T09:20:00Z',
-                announcement: { task: 'sum', number: 3 },
-              },
-            ],
+          announcement({
+            number: 3,
+            title: 'On n',
+            where: { org: 'acme', contest: 'spring', task: 'sum' },
           }),
         ]),
       ),
@@ -198,6 +209,18 @@ describe('questions', () => {
     expect(link.closest('p')).toHaveTextContent(
       'Answered publicly in the announcement ‘On n’',
     );
+  });
+
+  it('says a public answer’s announcement was closed rather than link to a page that no longer shows it', async () => {
+    server.use(signedIn, approvedHome, answeredPublicly);
+    renderApp(QUESTIONS);
+
+    expect(
+      await screen.findByText(
+        'Answered publicly in the announcement ‘On n’, which the organisers have since closed.',
+      ),
+    ).toBeVisible();
+    expect(screen.queryByRole('link', { name: '‘On n’' })).toBeNull();
   });
 
   it('marks a team’s messages as the team’s', async () => {
