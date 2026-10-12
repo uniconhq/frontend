@@ -1088,6 +1088,23 @@ describe('a submission opened from the list', () => {
     expect(within(detail).queryByText(/does not count against/)).toBeNull();
   });
 
+  it('says a submission graded again in an entrant’s words, not as an attempt', async () => {
+    const again = { ...accepted, attempt: 3 };
+    server.use(
+      signedIn,
+      withPage({}),
+      listing([submission(1, again)]),
+      http.get(`${TASK_API}/submissions/:number`, () =>
+        HttpResponse.json(submission(1, again)),
+      ),
+    );
+    renderApp(`${PAGE}?submission=1`);
+
+    const detail = await screen.findByRole('region', { name: 'Submission 1' });
+    expect(await within(detail).findByText('Graded again')).toBeVisible();
+    expect(detail).not.toHaveTextContent(/attempt/i);
+  });
+
   it('lists the files it was made with, each a download through the door', async () => {
     server.use(
       signedIn,

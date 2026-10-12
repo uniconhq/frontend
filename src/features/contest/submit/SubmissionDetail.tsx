@@ -82,9 +82,8 @@ function Grading({ grading }: { grading: GradingResult }) {
     <>
       <div className={classes.verdict}>
         <VerdictBadge verdict={verdictOf(grading)} />
-        {grading.attempt > 1 && (
-          <BodyText tone="secondary">Attempt {grading.attempt}</BodyText>
-        )}
+        {/* Entrants' pages speak of a submission, not of its gradings' attempts. */}
+        {grading.attempt > 1 && <BodyText tone="secondary">Graded again</BodyText>}
       </div>
       <ScoredResult grading={grading} />
     </>
