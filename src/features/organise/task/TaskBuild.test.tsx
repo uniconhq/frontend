@@ -1257,7 +1257,7 @@ describe('scoring a task', { timeout: 30_000 }, () => {
 
     await userEvent.click(
       within(earns).getByRole('radio', {
-        name: 'Its result against the best anyone reached',
+        name: 'Its result against the best any entrant reached',
       }),
     );
     // Against the best, each value says which way is better.
@@ -1289,7 +1289,7 @@ describe('scoring a task', { timeout: 30_000 }, () => {
     const earns = within(tests).getByRole('radiogroup', { name: 'A test earns' });
     expect(
       within(earns).getByRole('radio', {
-        name: 'Its result against the best anyone reached',
+        name: 'Its result against the best any entrant reached',
       }),
     ).toHaveAccessibleDescription(
       /where lower is better, as with run time, the fastest earns all of it and one twice as slow earns half\./,
@@ -1308,7 +1308,7 @@ describe('scoring a task', { timeout: 30_000 }, () => {
     // A value is named by its title where the workflow gives one.
     await userEvent.click(
       within(earns).getByRole('radio', {
-        name: 'Its result against the best anyone reached',
+        name: 'Its result against the best any entrant reached',
       }),
     );
     expect(

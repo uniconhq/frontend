@@ -55,7 +55,7 @@ function valueWords(path: MergePath, value: unknown): string | null {
   if (key === 'credit') {
     if (typeof value === 'string') return `A score the workflow gives it: ${value}`;
     if (isRecord(value) && typeof value['relative'] === 'string') {
-      return `Its ${value['relative']} against the best anyone reached`;
+      return `Its ${value['relative']} against the best any entrant reached`;
     }
   }
   if (typeof value === 'boolean') return value ? 'Yes' : 'No';

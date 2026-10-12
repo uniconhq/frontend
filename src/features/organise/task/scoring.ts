@@ -523,7 +523,7 @@ export function showRefusal(
 ): string | null {
   if (show !== 'verdict') return null;
   if (credit === 'relative') {
-    return 'Not available while a test earns against the best anyone reached, since its points move as others improve.';
+    return 'Not available while a test earns against the best any entrant reached, since its points move as others improve.';
   }
   if (set(group.each) || set(group.worst)) {
     return 'Only available for a test group that earns all or nothing, since its points would reveal how its hidden tests went.';
