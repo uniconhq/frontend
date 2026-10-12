@@ -225,6 +225,45 @@
   width: 110px;
 }
 
+/* How files are named for a test's parts, under the drop box. */
+.naming {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* What the files make, a row per test and a column per part. */
+.preview {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  color: var(--unicon-text-body);
+}
+
+.preview th,
+.preview td {
+  padding: 4px 10px 4px 0;
+  border-bottom: 1px solid var(--unicon-border);
+  text-align: left;
+  vertical-align: top;
+}
+
+.preview thead th {
+  font-weight: 600;
+  color: var(--unicon-text-secondary);
+}
+
+.missing {
+  color: var(--unicon-text-danger);
+  font-weight: 600;
+}
+
+/* Why a button is greyed, or what it will do, beside it. */
+.why {
+  font-size: 13px;
+  color: var(--unicon-text-secondary);
+}
+
 /* What files were matched to tests, before they are added. */
 .matched {
   max-height: 320px;

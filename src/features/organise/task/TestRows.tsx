@@ -21,7 +21,7 @@ function shortSize(bytes: number): string {
 }
 
 /** The part of a test a file in its folder is, by its name: `answer.txt` is `answer`. */
-export function partOf(entry: string): string {
+function partOf(entry: string): string {
   const [first = ''] = entry.split('/');
   const dot = first.indexOf('.');
   return dot < 0 ? first : first.slice(0, dot);
