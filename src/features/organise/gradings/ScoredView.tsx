@@ -12,10 +12,12 @@ type ContestPath = { org: string; contest: string };
 
 /**
  * A submission as its row reads it, with everything filled in (TASK-FORMAT.md
- * section 1.7), opened beside its grading: the same payload its contestant
- * reads, scored by the same code, with every group's outcome, tests and
- * points shown and each group saying when its row sees it. The row is the
- * entrant that made it, as the feed names it.
+ * section 1.7), opened under the submission in the feed: the same payload its
+ * contestant reads, scored by the same code, with every group's outcome,
+ * tests and points shown and each group saying when its row sees it. The row
+ * is the entrant that made it, as the feed names it. It is the attempt that
+ * counts (#442), an earlier one than the feed's head while a later attempt
+ * has no result; the view then says which attempt it shows.
  */
 export function ScoredView({
   path,
@@ -56,6 +58,11 @@ export function ScoredView({
                 <VerdictBadge verdict={view.data.grading.outcome} />
               )}
               <BodyText tone="secondary">{STATUS[view.data.grading.status]}</BodyText>
+              {view.data.grading.attempt !== entry.grading.attempt && (
+                <BodyText tone="secondary">
+                  {`Attempt ${String(view.data.grading.attempt)}'s result, the one that stands while attempt ${String(entry.grading.attempt)} has none.`}
+                </BodyText>
+              )}
             </div>
             <ScoredResult
               grading={view.data.grading}
