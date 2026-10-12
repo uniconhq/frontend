@@ -539,7 +539,7 @@ describe('how the contest is scored (M52)', () => {
     );
     await line(
       sortPart,
-      'The contest makes it worth 50 points, so its test groups’ 100 points are scaled to that.',
+      "Its contest makes the task worth 50 points, so each test group's points are scaled to that.",
     );
     // A worked example from the group's own number of tests.
     await line(
@@ -564,6 +564,47 @@ describe('how the contest is scored (M52)', () => {
       'Test group “main”: each test passed is worth an equal share of 80 points. Passing every test earns 20 points more.',
     );
     await line(sumPart, 'No leaderboard counts it.');
+  });
+
+  it('says a task gives no points in the Tests card’s words', async () => {
+    const [, sum] = standings;
+    if (sum === undefined) throw new Error('standings has sum');
+    server.use(
+      signedIn,
+      http.get(`${CONTEST_API}/organise/tasks`, () =>
+        HttpResponse.json([
+          {
+            ...sum,
+            label: 'A',
+            state: { ...sum.state, draft: false, errors: [] },
+            timeline: { ...sum.timeline, worth: null },
+          },
+        ]),
+      ),
+      contestFile([
+        'name: Spring',
+        'start: 2026-10-01T09:00:00Z',
+        'end: 2026-10-15T09:00:00Z',
+        'tasks: [{id: sum}]',
+      ]),
+      ...publishedTasks(
+        {
+          sum: 'name: Sum\nworkflow: unicon/classic@v2\ntest_groups:\n  samples: {show: always}\n',
+        },
+        { sum: { samples: 2 } },
+      ),
+      ...repoFiles,
+    );
+    renderApp(CONTEST);
+
+    const card = await screen.findByRole('region', {
+      name: 'How this contest is scored',
+    });
+    const part = await within(card).findByRole('region', { name: 'A · sum' });
+    await line(
+      part,
+      'The task gives no points: no group earns any. It is ranked on what its workflow reports, if a leaderboard says so.',
+    );
   });
 
   it('names a group hidden until the end on each board where it changes what the board counts, and nowhere else', async () => {

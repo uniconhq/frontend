@@ -1,4 +1,6 @@
+import { act, waitFor } from '@testing-library/react';
 import { setupServer } from 'msw/node';
+import { expect } from 'vitest';
 import { http, HttpResponse } from 'msw';
 import type { ContestHome, Me, SessionInfo, WorkflowForm } from '@/api/types';
 
@@ -238,3 +240,37 @@ export const server = setupServer(
   ...noThreads,
   ...noBoards,
 );
+
+/**
+ * Runs `step`, then waits until the page has asked the fake backend for
+ * something and had every answer, and those answers have reached the page.
+ * For a test that then checks something did not change: it checks only once
+ * the reads that could have changed it are in, never after a guessed wait.
+ */
+export async function afterAnswers(step: () => unknown): Promise<void> {
+  let started = 0;
+  let ended = 0;
+  const start = () => {
+    started += 1;
+  };
+  const end = () => {
+    ended += 1;
+  };
+  server.events.on('request:start', start);
+  server.events.on('request:end', end);
+  try {
+    await step();
+    // An answer reaches the reads and the page a few turns after it is sent,
+    // and may lead to more reads, which are waited for in turn.
+    do {
+      await waitFor(() => {
+        expect(started).toBeGreaterThan(0);
+        expect(ended).toBe(started);
+      });
+      await act(() => new Promise((resolve) => setTimeout(resolve, 20)));
+    } while (ended !== started);
+  } finally {
+    server.events.removeListener('request:start', start);
+    server.events.removeListener('request:end', end);
+  }
+}

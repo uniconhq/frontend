@@ -11,7 +11,7 @@ import { taskCardPath } from '@/lib/sections';
 import type { ContestValues } from '../forms/contest-values';
 import { boardSentence } from '../forms/board-words';
 import { useTestFolders } from '../task/build-data';
-import { groupSentence, pointsText, taskWeight } from '../task/scoring';
+import { NO_POINTS, groupSentence, scalingSentence, taskWeight } from '../task/scoring';
 import { heldOf, publishedQuery, readPublished } from './published';
 import { useContestSettings } from './settings';
 import { markedBoardCovers, timelineWords } from './timeline';
@@ -19,7 +19,6 @@ import shared from '../organise.module.css';
 import classes from './contest.module.css';
 
 const STANDINGS = '/api/v1/orgs/{org}/contests/{contest}/organise/tasks';
-const ONE = { num: 1n, den: 1n };
 
 /** A sentence put after a colon, its first letter made small. */
 function afterColon(sentence: string): string {
@@ -105,19 +104,11 @@ function TaskScoring({
             return (
               <ul className={shared.named}>
                 {total.num === 0n ? (
-                  <li>
-                    It gives no points: it is ranked on what its workflow reports.
-                  </li>
+                  <li>{NO_POINTS}</li>
                 ) : (
                   <>
                     {worth !== null && compareRatio(worth, total) !== 0 && (
-                      <li>
-                        {`The contest makes it worth ${pointsText(worth)} ${
-                          compareRatio(worth, ONE) === 0 ? 'point' : 'points'
-                        }, so its test groups’ ${pointsText(total)} ${
-                          compareRatio(total, ONE) === 0 ? 'point is' : 'points are'
-                        } scaled to that.`}
-                      </li>
+                      <li>{scalingSentence(worth)}</li>
                     )}
                     {groups.map((group) => (
                       <li key={group.name}>

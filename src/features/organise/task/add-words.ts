@@ -7,8 +7,12 @@ import type { PartNaming } from './match';
  * each way of adding asks for, and how files are named for it.
  */
 
-/** "a" or "an", as a part's name begins. */
+/**
+ * "a" or "an", as a part's name sounds: "an" before a vowel sound, "a"
+ * before a vowel said as "you" or "w", such as user, unit or one.
+ */
 function article(name: string): string {
+  if (/^(uni|use|usu|uti|ure|uro|eu|ewe|one(?![a-z]))/i.test(name)) return 'a';
   return /^[aeiou]/i.test(name) ? 'an' : 'a';
 }
 
@@ -41,6 +45,13 @@ export function waysOf(parts: PartNaming[]): {
         ? `A folder per test in a zip (${folders}).`
         : `The same ${set} in a zip, or a folder per test (${folders}).`,
   };
+}
+
+/** How a zip of tests holds its groups, said with the task's own first part. */
+export function zipFolders(parts: PartNaming[]): string {
+  const first = parts[0];
+  const example = first === undefined ? 'small/1' : `small/1/${first.name}`;
+  return `A folder per test group holds its tests, such as ${example}; files at the top go into the group chosen above.`;
 }
 
 /**

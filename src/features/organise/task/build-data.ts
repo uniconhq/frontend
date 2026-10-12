@@ -34,12 +34,18 @@ export type Declared = {
   report: ReportEntry[];
 };
 
-/** An input as the organiser's form names it: its title and unit, or its id (#434). */
+/**
+ * An input as the organiser's form names it: its title, or its id (#434),
+ * and a number's unit after it. A unit on another type, left by a version
+ * made before a unit was for a number alone (M54), is not shown.
+ */
 export function inputTitle(
-  input: Pick<DeclaredInput, 'id' | 'title' | 'unit'>,
+  input: Pick<DeclaredInput, 'id' | 'title' | 'unit' | 'type'>,
 ): string {
   const title = input.title ?? input.id;
-  return input.unit === null ? title : `${title} (${input.unit})`;
+  return input.unit === null || input.type !== 'number'
+    ? title
+    : `${title} (${input.unit})`;
 }
 
 /** The settings file as a document the cards can show, or why it is not one. */

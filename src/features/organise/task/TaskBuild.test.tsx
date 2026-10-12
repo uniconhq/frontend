@@ -13,7 +13,7 @@ import type {
 } from '@/api/types';
 import { formatExact } from '@/lib/exact';
 import { renderApp } from '@/test/render';
-import { problem, server, signedIn, someone } from '@/test/server';
+import { afterAnswers, problem, server, signedIn, someone } from '@/test/server';
 import {
   TASK_API,
   CONTEST_API,
@@ -507,7 +507,7 @@ describe('the cards that build a task', { timeout: 30_000 }, () => {
     const { inputs } = await openTask();
 
     const checker = within(inputs).getByRole('group', { name: 'checker' });
-    expect(await within(checker).findByText('checker.cpp, 21 bytes')).toBeVisible();
+    expect(await within(checker).findByText('checker.cpp, 21 B')).toBeVisible();
     expect(within(checker).queryByRole('textbox')).toBeNull();
     await user.click(within(checker).getByRole('button', { name: 'View checker' }));
     expect(
@@ -519,13 +519,17 @@ describe('the cards that build a task', { timeout: 30_000 }, () => {
       within(checker).getByLabelText('checker: a new file'),
       new File(['print(1)\n'], 'checker.py'),
     );
-    expect(await within(checker).findByText('checker.py, 9 bytes')).toBeVisible();
+    expect(await within(checker).findByText('checker.py, 9 B')).toBeVisible();
     // Waiting for the save, marked as a replaced test's row is.
     expect(within(checker).getByText('Replaced')).toBeVisible();
     const bar = await screen.findByRole('region', { name: 'Save the task' });
-    expect(within(bar).getByRole('list', { name: 'What changed' })).toHaveTextContent(
-      'Inputs: checker, a new file',
-    );
+    // One change, said once.
+    expect(
+      within(within(bar).getByRole('list', { name: 'What changed' }))
+        .getAllByRole('listitem')
+        .map((item) => item.textContent)
+        .filter((line) => line?.startsWith('Inputs:')),
+    ).toEqual(['Inputs: checker, a new file']);
     await save();
 
     const body = await waitForSave(sent);
@@ -563,7 +567,7 @@ describe('the cards that build a task', { timeout: 30_000 }, () => {
     const { inputs } = await openTask();
 
     const checker = within(inputs).getByRole('group', { name: 'checker' });
-    await within(checker).findByText('checker.cpp, 21 bytes');
+    await within(checker).findByText('checker.cpp, 21 B');
     await user.click(within(checker).getByRole('button', { name: 'Replace checker' }));
     await user.upload(
       within(checker).getByLabelText('checker: a new file'),
@@ -574,7 +578,7 @@ describe('the cards that build a task', { timeout: 30_000 }, () => {
         name: 'Undo the new file of checker',
       }),
     );
-    expect(await within(checker).findByText('checker.cpp, 21 bytes')).toBeVisible();
+    expect(await within(checker).findByText('checker.cpp, 21 B')).toBeVisible();
     expect(
       await screen.findByRole('list', { name: 'What changed' }),
     ).not.toHaveTextContent('checker');
@@ -824,8 +828,7 @@ describe('the cards while the task is being changed', { timeout: 30_000 }, () =>
       groups: { ...FOLDERS, extra: ['1'] },
       form: { ...UNREAD, graded: true },
     });
-    comeBackToTab();
-    await new Promise((resolve) => setTimeout(resolve, 500));
+    await afterAnswers(comeBackToTab);
 
     const cards = screen.getByRole('region', { name: 'Inputs' });
     expect(fieldIn(cards, 'time_limit', 'Value')).toHaveValue('3');
@@ -1226,7 +1229,7 @@ describe('the tests of a task', { timeout: 30_000 }, () => {
       within(five!)
         .getAllByRole('cell')
         .map((cell) => cell.textContent),
-    ).toEqual(['5.in, 4 bytes', 'Missing', 'A part is missing.']);
+    ).toEqual(['5.in, 4 B', 'Missing', 'A part is missing.']);
     const add = within(dialog).getByRole('button', { name: 'Add tests' });
     expect(add).toBeDisabled();
     expect(add).toHaveAccessibleDescription(
@@ -1277,7 +1280,7 @@ describe('the tests of a task', { timeout: 30_000 }, () => {
         .map((header) => header.textContent),
     ).toEqual(['Test', 'input', 'answer', 'Notes']);
     expect(within(table).getByRole('row', { name: /small, test 4/ })).toHaveTextContent(
-      'small, test 44.in, 4 bytes4.out, 2 bytesComplete',
+      'small, test 44.in, 4 B4.out, 2 BComplete',
     );
     expect(
       within(matched).getByRole('list', { name: 'Not matched' }),
@@ -1313,6 +1316,71 @@ describe('the tests of a task', { timeout: 30_000 }, () => {
     ]);
   });
 
+  it('says a zip is being read while it is, never that it holds no files', async () => {
+    taskBackend({ form: { ...CHECKED, inputs: [] } });
+    const { tests } = await openTask();
+    let release = () => {};
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const zip = await makeZip([
+      { name: '1.in', text: '1 1\n' },
+      { name: '1.out', text: '2\n' },
+    ]);
+    // A zip whose bytes come only once the test lets them, as a big one's do.
+    const slow = new File([zip], 'tests.zip', { type: 'application/zip' });
+    const slice = slow.slice.bind(slow);
+    slow.slice = (...args: Parameters<Blob['slice']>) => {
+      const part = slice(...args);
+      const read = part.arrayBuffer.bind(part);
+      part.arrayBuffer = async () => {
+        await held;
+        return read();
+      };
+      return part;
+    };
+
+    await userEvent.click(within(tests).getByRole('button', { name: 'Add tests' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Add tests' });
+    await userEvent.click(within(dialog).getByRole('radio', { name: 'A zip' }));
+    await userEvent.upload(within(dialog).getByLabelText('Zip of tests'), slow);
+
+    const made = within(dialog).getByRole('region', { name: 'What the files make' });
+    expect(made).toHaveTextContent('Reading the zip…');
+    expect(made).not.toHaveTextContent('holds no files');
+    const add = within(dialog).getByRole('button', { name: 'Add tests' });
+    expect(add).toHaveAccessibleDescription('The zip is still being read.');
+
+    release();
+    expect(await within(dialog).findByRole('row', { name: /test 1/ })).toBeVisible();
+    expect(made).not.toHaveTextContent('Reading the zip');
+  });
+
+  it('shows no empty table for files that make no test, and says so beside the button', async () => {
+    taskBackend({ form: { ...CHECKED, inputs: [] } });
+    const { tests } = await openTask();
+
+    await userEvent.click(within(tests).getByRole('button', { name: 'Add tests' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Add tests' });
+    await userEvent.click(
+      within(dialog).getByRole('radio', { name: 'Many files at once' }),
+    );
+    await userEvent.upload(within(dialog).getByLabelText('Test files'), [
+      new File(['x'], 'readme.txt'),
+    ]);
+
+    const made = within(dialog).getByRole('region', { name: 'What the files make' });
+    expect(within(made).queryByRole('table')).toBeNull();
+    expect(within(made).getByRole('list', { name: 'Not matched' })).toHaveTextContent(
+      'readme.txt',
+    );
+    expect(
+      within(dialog).getByRole('button', { name: 'Add tests' }),
+    ).toHaveAccessibleDescription(
+      'None of the files dropped makes a test: the list says why for each.',
+    );
+  });
+
   it('adds a new group’s tests from a zip, and the group shows in scoring', async () => {
     const { sent } = taskBackend({ form: { ...CHECKED, inputs: [] } });
     const { tests } = await openTask();
@@ -1329,7 +1397,7 @@ describe('the tests of a task', { timeout: 30_000 }, () => {
     );
     expect(
       await within(dialog).findByRole('row', { name: /huge, test 1/ }),
-    ).toHaveTextContent('huge, test 1input, 4 bytesanswer, 3 bytesIn a new group.');
+    ).toHaveTextContent('huge, test 1input, 4 Banswer, 3 BIn a new group.');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Add tests' }));
 
     const group = fieldGroup(tests, 'huge');
@@ -1532,9 +1600,7 @@ describe('the tests of a task', { timeout: 30_000 }, () => {
       name: 'Tests, small, test 2: answer',
     });
     expect(answer).toHaveTextContent('Yours: Taken out');
-    expect(
-      await within(answer).findByText(/Now: 7 bytes, saved by alice/),
-    ).toBeVisible();
+    expect(await within(answer).findByText(/Now: 7 B, saved by alice/)).toBeVisible();
     await userEvent.click(within(answer).getByRole('radio', { name: /^Yours/ }));
     await userEvent.click(
       screen.getByRole('button', { name: 'Save the merged version' }),

@@ -4,7 +4,7 @@ import userEvent from '@/test/user-event';
 import { http, HttpResponse } from 'msw';
 import type { SaveRequest, Upload } from '@/api/types';
 import { renderApp } from '@/test/render';
-import { problem, server, signedIn, someone } from '@/test/server';
+import { afterAnswers, problem, server, signedIn, someone } from '@/test/server';
 import { TASK_API, publicationList, repoFiles, taskState } from '@/test/organiser';
 
 /** The task's page, opened at its Statement card. */
@@ -293,7 +293,7 @@ describe('uploading a file of a task again', { timeout: 20_000 }, () => {
 
     const files = await within(panel).findByRole('list', { name: 'Files that differ' });
     const row = within(files).getByRole('radiogroup', { name: 'Statement' });
-    expect(row).toHaveTextContent('Yours: Your upload, 4 bytes');
+    expect(row).toHaveTextContent('Yours: Your upload, 4 B');
     expect(
       await within(row).findByText(/^Now: 2 KB, saved by alice on /),
     ).toBeVisible();
@@ -372,7 +372,7 @@ describe('uploading a file of a task again', { timeout: 20_000 }, () => {
       // Reading a file to send it takes a while beside a full run of the suite.
       { timeout: 5000 },
     );
-    expect(unsaved).toHaveTextContent('statement.md, 4 bytes,');
+    expect(unsaved).toHaveTextContent('statement.md, 4 B,');
     expect(
       within(panel).getByRole('button', { name: 'Upload and save' }),
     ).toBeDisabled();
@@ -460,9 +460,9 @@ describe('uploading a file of a task again', { timeout: 20_000 }, () => {
     const train = await within(all).findByRole('button', { name: /^train\.csv/ });
     expect(train).toHaveTextContent('train.csv 300 MB');
     expect(within(all).getByRole('button', { name: /^notes\.md/ })).toHaveTextContent(
-      'notes.md 12 bytes',
+      'notes.md 12 B',
     );
-    await user.click(train);
+    await afterAnswers(() => user.click(train));
     const shown = await within(all).findByRole('region', { name: 'train.csv' });
     expect(
       within(shown).getByText(
@@ -471,8 +471,7 @@ describe('uploading a file of a task again', { timeout: 20_000 }, () => {
     ).toBeVisible();
     expect(shown).toHaveTextContent('300 MB');
     // With no version to download it at, its size alone is shown.
-    await expect.poll(() => read).toBe(true);
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(read).toBe(true);
     expect(within(shown).queryByRole('link', { name: /Download/ })).toBeNull();
   });
 

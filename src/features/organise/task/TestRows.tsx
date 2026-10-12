@@ -18,11 +18,6 @@ import { TestView } from './TestView';
 import shared from '../organise.module.css';
 import classes from './task.module.css';
 
-/** A size as short as a test's row says it: "4 B" below a kilobyte, then as everywhere. */
-function shortSize(bytes: number): string {
-  return bytes < 1024 ? `${String(bytes)} B` : formatSize(bytes);
-}
-
 /** One part of a test as its row names it: its name and size, or that it is a folder. */
 type Part = { part: string; size: number | null; folder: boolean };
 
@@ -45,7 +40,7 @@ function partsText(parts: Part[], order: string[]): string {
         ? `${each.part}, a folder`
         : each.size === null
           ? each.part
-          : `${each.part} ${shortSize(each.size)}`,
+          : `${each.part} ${formatSize(each.size)}`,
     )
     .join(', ');
 }

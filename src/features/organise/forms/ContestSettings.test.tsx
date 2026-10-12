@@ -5,7 +5,7 @@ import { http, HttpResponse } from 'msw';
 import { parse } from 'yaml';
 import type { FileContent } from '@/api/types';
 import { renderApp } from '@/test/render';
-import { problem, server, signedIn, someone } from '@/test/server';
+import { afterAnswers, problem, server, signedIn, someone } from '@/test/server';
 import { CONTEST_API, repoFiles, taskList } from '@/test/organiser';
 import { comeBackToTab, fakeLiveStream, openStream, realLiveStream } from '@/test/live';
 import { isoOf } from './times';
@@ -435,8 +435,7 @@ describe(
       fill(inBox(form, 'Basics').getByLabelText('Name'), 'My spring');
 
       elsewhere(CONTEST.replace('name: Spring', 'name: Their spring'));
-      comeBackToTab();
-      await new Promise((resolve) => setTimeout(resolve, 300));
+      await afterAnswers(comeBackToTab);
 
       const now = screen.getByRole('form', { name: 'Contest settings' });
       expect(inBox(now, 'Basics').getByLabelText('Name')).toHaveValue('My spring');

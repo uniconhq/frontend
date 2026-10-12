@@ -3,7 +3,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import { delay, http, HttpResponse } from 'msw';
 import userEvent from '@/test/user-event';
 import { renderApp } from '@/test/render';
-import { server, signedIn } from '@/test/server';
+import { afterAnswers, server, signedIn } from '@/test/server';
 import { CLASSIC_V2, workflowBackend } from '@/test/workflows';
 import { comeBackToTab, fakeLiveStream, openStream, realLiveStream } from '@/test/live';
 import {
@@ -310,8 +310,7 @@ describe('saving and publishing a workflow', () => {
         'fold: sum, better: lower',
       );
       backend.state.token = 'someone-else';
-      comeBackToTab();
-      await new Promise((resolve) => setTimeout(resolve, 300));
+      await afterAnswers(comeBackToTab);
 
       const bar = part('[role="toolbar"]', 'The workflow');
       expect(

@@ -92,10 +92,12 @@ function inputsFor(
 }
 
 /** A file this save writes or takes out, in the words the conflict names it by. */
-function movedLabel(path: string): string {
+function movedLabel(path: string, titles: ReadonlyMap<string, string>): string {
+  const place = taskPlace(path, '', titles);
   const parts = path.split('/');
-  const entry = parts.length > 3 ? `: ${parts.slice(3).join('/')}` : '';
-  return `${taskPlace(path).label}${entry}`;
+  const entry =
+    place.card !== 'inputs' && parts.length > 3 ? `: ${parts.slice(3).join('/')}` : '';
+  return `${place.label}${entry}`;
 }
 
 /**
@@ -323,12 +325,14 @@ function BuildForm({
     },
   };
 
-  const lines = [
-    ...changeLines(read.values, values, staged, titles),
-    ...inputFiles.map(
-      (change) => `Inputs: ${titles.get(change.id) ?? change.id}, a new file`,
-    ),
-  ];
+  // A setting given a new file is one change, said once.
+  const lines = changeLines(
+    read.values,
+    values,
+    staged,
+    titles,
+    inputFiles.map((change) => change.id),
+  );
   const changed = lines.length > 0 || values.inputs.some(heldTheOtherWay);
   const problems = [
     values.credit.kind !== 'none' && values.credit.name.trim() === ''
@@ -581,7 +585,7 @@ function SaveAnswer({
   if (saving.conflicts !== null) {
     const files: MovedFile[] = saving.conflicts.files.map(({ change }) => ({
       path: change.path,
-      label: movedLabel(change.path),
+      label: movedLabel(change.path, titles),
       mine:
         'remove' in change
           ? 'Taken out'

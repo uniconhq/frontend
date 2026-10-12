@@ -270,7 +270,7 @@ describe('the submit panel', () => {
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent('Too large for this input');
     expect(alert).toHaveTextContent(
-      'The files for this input may be at most 4 bytes in all.',
+      'The files for this input may be at most 4 B in all.',
     );
     expect(alert).toHaveTextContent('Too large: Your solution');
     expect(store.seen.slots).toHaveLength(0);
