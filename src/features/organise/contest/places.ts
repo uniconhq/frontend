@@ -71,7 +71,7 @@ const REGISTRATION: Record<string, string> = {
 
 const WAY: Record<string, string> = {
   approval: 'Approval',
-  name: 'Name',
+  name: 'Name of this sign-up',
   code: 'Code',
   domains: 'Email domains',
   email_pattern: 'Email pattern',
