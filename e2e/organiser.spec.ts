@@ -30,6 +30,10 @@ async function stubOrganiserApi(page: Page) {
     taskYaml:
       'name: Sum\nworkflow: unicon/classic@v2\ninputs:\n  submission: {label: Your solution}\n  language: {options: [python]}\n  time_limit: 2\n  memory_limit: 256\ntest_groups:\n  main: {each: 100}\n',
     taskSaves: [] as unknown[],
+    /** How many gradings failed and wait, as the queue counts them. */
+    failed: 0,
+    /** The feed's queries, each as the page asked it. */
+    feedAsked: [] as string[],
   };
 
   const taskState = () => ({
@@ -158,7 +162,11 @@ async function stubOrganiserApi(page: Page) {
       return json(route, []);
     }
     if (path === `${contest}/gradings/queue`) {
-      return json(route, { queued: 0, dispatched: 0, failed: 0 });
+      return json(route, { queued: 0, dispatched: 0, failed: state.failed });
+    }
+    if (path === `${contest}/gradings`) {
+      state.feedAsked.push(new URL(request.url()).searchParams.toString());
+      return json(route, []);
     }
     if (path === `${task}/workflow-form`) {
       const input = (id: string, type: string, more: object) => ({
@@ -406,4 +414,25 @@ test('an organiser sets a task up on its cards and saves them in one save', asyn
   const [saved] = state.taskSaves as { changes: { path: string; content: string }[] }[];
   expect(saved?.changes.map((change) => change.path)).toEqual(['task.yaml']);
   expect(saved?.changes[0]?.content).toContain('time_limit: 3');
+});
+
+test('an organiser follows the failed gradings from the contest page', async ({
+  page,
+}) => {
+  const state = await stubOrganiserApi(page);
+  state.orgMade = true;
+  state.failed = 2;
+  await page.goto('/orgs/acme/contests/spring');
+
+  const failed = page.getByRole('region', { name: 'Failed gradings' });
+  await expect(failed).toContainText("2 gradings failed on Unicon's side.");
+  await failed.getByRole('link', { name: 'Show the failed gradings' }).click();
+
+  await expect(page).toHaveURL(/\/gradings\?status=system_error&latest=true$/);
+  await expect(
+    page.getByRole('checkbox', { name: 'Latest attempts only' }),
+  ).toBeChecked();
+  await expect(page.getByLabel('Queue')).toContainText('Failed, waiting for you2');
+  await expect(page.getByText('No grading matches these filters.')).toBeVisible();
+  expect(state.feedAsked).toContain('status=system_error&latest=true');
 });
