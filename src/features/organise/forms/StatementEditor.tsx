@@ -32,13 +32,17 @@ type AddedPicture = Extract<StagedPicture, { kind: 'add' }>;
 
 /**
  * The task's files under `public/`, its pictures, none while it has no such
- * folder; null while they are read.
+ * folder; null while they are read. A file whose name starts with a dot,
+ * such as the `.gitkeep` a task made before kept the folder with (M60), is
+ * no picture and is left out.
  */
 function usePublicFiles(place: Place): TreeEntry[] | null {
   const read = useQuery({ ...treeQuery(place, 'public'), retry: false });
   if (place.kind !== 'task') return [];
   if (read.isPending) return null;
-  return read.data ?? [];
+  return (read.data ?? []).filter(
+    (entry) => !(entry.path.split('/').at(-1) ?? '').startsWith('.'),
+  );
 }
 
 /**

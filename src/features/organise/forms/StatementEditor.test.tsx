@@ -142,7 +142,7 @@ describe('the statement beside its preview', { timeout: 20_000 }, () => {
 
     /**
      * The statement, its pictures under `public/` (`my-diagram.png` and
-     * `old.png`, each read with its token) and the task's save, kept in
+     * `old.png`, each read with its token, beside a `.gitkeep`) and the task's save, kept in
      * `saves`, answered by `answer` in turn.
      */
     function picturesBackend(answers: (() => Response)[] = []) {
@@ -153,7 +153,13 @@ describe('the statement beside its preview', { timeout: 20_000 }, () => {
         http.get(`${TASK_API}/tree`, ({ request }) =>
           new URL(request.url).searchParams.get('path') === 'public'
             ? HttpResponse.json(
-                pictures.map((path) => ({ path, kind: 'file', size: 9, upload: null })),
+                // The empty file a task made before kept the folder with (M60).
+                [...pictures, 'public/.gitkeep'].map((path) => ({
+                  path,
+                  kind: 'file',
+                  size: path.endsWith('.gitkeep') ? 0 : 9,
+                  upload: null,
+                })),
               )
             : undefined,
         ),
@@ -327,6 +333,9 @@ describe('the statement beside its preview', { timeout: 20_000 }, () => {
       const old = within(listed).getByRole('listitem', { name: 'old.png' });
       expect(shown).not.toHaveTextContent('Not shown');
       expect(old).toHaveTextContent('Not shown in the statement.');
+      // A file whose name starts with a dot is no picture (M60).
+      expect(within(listed).getAllByRole('listitem')).toHaveLength(2);
+      expect(listed).not.toHaveTextContent('.gitkeep');
 
       await user.click(within(old).getByRole('button', { name: 'Remove old.png' }));
       expect(within(old).getByText('To be removed')).toBeVisible();
