@@ -273,7 +273,7 @@ move and save. A setting that is a file or a folder, such as a checker, has
 its own box on the Inputs card (`task/FileSetting.tsx`): what it names, with
 View, Replace and, for an optional one, Use none; a file chosen is marked New
 or Replaced and waits for the task's save, which writes it under the input's
-own folder, `<input>/`, points the setting at it and takes out what the
+own folder, `<input>/` (`inputs/<input>/` for an older version's input named `tests`, `public` or `plans`), points the setting at it and takes out what the
 setting named before in that folder (`task/input-files.ts`). A task's admins
 read every file it holds with "View all files" on its Settings page, a tree
 with a file chosen shown below, nothing in it editable.
