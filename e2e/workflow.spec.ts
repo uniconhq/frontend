@@ -228,13 +228,63 @@ test('a wire dragged onto a port edits the file, and a refused one says why', as
     '.react-flow__handle[data-handleid="out:submission"]',
   );
   await drag(page, submission, handle(page, 'step:1', 'in:memory_limit'));
-  await expect(
-    page.getByRole('alert').filter({
-      hasText: 'This value raises a limit, so the task must give it, not the entrant.',
-    }),
-  ).toBeVisible();
+  const refused = page.getByRole('alert').filter({
+    hasText: 'This value raises a limit, so the task must give it, not the entrant.',
+  });
+  await expect(refused).toBeVisible();
   expect(await file(page)).toContain('memory_limit: ${{ inputs.memory_limit }}');
   expect(inputs).not.toBeNull();
+});
+
+test('a refused wire’s message covers no port, and goes on a click, on Escape or by itself (M53)', async ({
+  page,
+}) => {
+  await stubWorkflowApi(page);
+  await page.setViewportSize({ width: 1600, height: 1000 });
+  await page.goto('/workflows/kenny/tuned');
+  await expect(page.getByRole('group', { name: 'Step run' })).toBeVisible();
+  const submission = page.locator(
+    '.react-flow__handle[data-handleid="out:submission"]',
+  );
+  const target = handle(page, 'step:1', 'in:memory_limit');
+  const refused = page.getByRole('alert').filter({
+    hasText: 'This value raises a limit, so the task must give it, not the entrant.',
+  });
+
+  await drag(page, submission, target);
+  await expect(refused).toBeVisible();
+  // It sits clear of every port, the refused one marked where it is.
+  const said = await refused.boundingBox();
+  if (said === null) throw new Error('the message is not drawn');
+  for (const port of await page.locator('.react-flow__handle').all()) {
+    const at = await port.boundingBox();
+    if (at === null) continue;
+    const apart =
+      at.x + at.width <= said.x ||
+      said.x + said.width <= at.x ||
+      at.y + at.height <= said.y ||
+      said.y + said.height <= at.y;
+    expect(apart).toBe(true);
+  }
+  await expect(
+    page.locator('.react-flow__node[data-id="step:1"]').getByText('✕'),
+  ).toBeVisible();
+
+  // A click anywhere puts it away.
+  await page
+    .getByRole('toolbar', { name: 'Editing' })
+    .click({ position: { x: 4, y: 4 } });
+  await expect(refused).toBeHidden();
+
+  await drag(page, submission, target);
+  await expect(refused).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(refused).toBeHidden();
+
+  // And it fades away by itself.
+  await drag(page, submission, target);
+  await expect(refused).toBeVisible();
+  await expect(refused).toBeHidden({ timeout: 8_000 });
 });
 
 test('a step added from the toolbar opens in the drawer clear of its box, and is wired by dragging', async ({

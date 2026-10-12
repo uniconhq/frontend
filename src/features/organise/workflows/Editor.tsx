@@ -28,7 +28,8 @@ import {
   wire,
   workflowOf,
 } from './edit';
-import { sourceAt, targetAt, type Notice, type Target } from './ends';
+import { sourceAt, targetAt, type Target } from './ends';
+import { useNotice } from './notice';
 import { FileView } from './FileView';
 import { Graph } from './Graph';
 import { layoutWorkflow, type Box } from './layout';
@@ -243,7 +244,7 @@ export function Editor({
   const [chosen, setChosen] = useState<Chosen | null>(null);
   const [nonce, setNonce] = useState(0);
   const [dragging, setDragging] = useState<Ref | null>(null);
-  const [notice, setNotice] = useState<Notice | null>(null);
+  const { notice, show: showNotice, clear: clearNotice } = useNotice();
   const [conflict, setConflict] = useState<{
     base: string;
     mine: string;
@@ -303,7 +304,7 @@ export function Editor({
   const drawing = !mending;
 
   const change = (next: string) => {
-    setNotice(null);
+    clearNotice();
     setPublished(null);
     dispatch({ kind: 'change', text: next });
   };
@@ -363,7 +364,7 @@ export function Editor({
   const connect = (source: Ref, target: Target, box: string, port: string) => {
     const refused = refusal(source, target);
     if (refused !== null) {
-      setNotice({ box, port, reason: refused });
+      showNotice({ box, port, reason: refused });
       return;
     }
     if (target.kind === 'port') {
@@ -752,7 +753,11 @@ export function Editor({
           onSelect={(key) =>
             select(selectionOf(layout.boxes.find((box) => box.key === key)))
           }
-          onDragStart={setDragging}
+          onDragStart={(source) => {
+            // Starting another wire puts the last refusal away.
+            if (source !== null) clearNotice();
+            setDragging(source);
+          }}
           onDrop={connect}
           reveal={reveal}
           cover={selected === null ? 0 : DRAWER_WIDTH}
