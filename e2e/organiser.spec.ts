@@ -458,7 +458,7 @@ test('an organiser sets a task up on its cards and saves them in one save', asyn
   await limit.fill('3');
   const scoring = page.getByRole('region', { name: 'Tests and scoring' });
   await expect(scoring.getByRole('group', { name: 'main' })).toContainText(
-    'Each test passed earns an equal share',
+    'Its one test earns 100 points when it passes.',
   );
 
   const bar = page.getByRole('region', { name: 'Save the task' });

@@ -321,7 +321,9 @@ export function groupWords(
       rule:
         one === null
           ? `Each test passed earns ${share}.`
-          : `Each test passed earns an equal share, ${pointsText(one)}.`,
+          : tests === 1
+            ? `Its one test earns ${p(each)} when it passes.`
+            : `Each test passed earns an equal share, ${pointsText(one)}.`,
       example:
         weighted || many === null
           ? null

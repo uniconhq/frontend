@@ -260,6 +260,13 @@ describe('a task’s points', () => {
     );
     expect(groupsLine([], null)).toBe('It has no test groups.');
     const context = { total: r('100'), worth: null };
+    expect(
+      groupSentence(group('main', { each: '100' }), {
+        ...context,
+        credit: 'none',
+        tests: 1,
+      }),
+    ).toBe('Its one test earns 100 points when it passes.');
     expect(groupHeading(ioi[1]!, { ...context, tests: 3 })).toBe('3 tests, 40 points');
     expect(groupHeading(ioi[0]!, { ...context, tests: 1 })).toBe('1 test, no points');
     expect(groupHeading(ioi[2]!, { ...context, tests: null })).toBe('60 points');
