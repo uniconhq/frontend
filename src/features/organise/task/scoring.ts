@@ -532,6 +532,18 @@ export function showRefusal(
 }
 
 /**
+ * Why showing a group's pass or fail alone is greyed, in a few words for its
+ * option's own label: "(needs a group that earns all or nothing)". Null
+ * where the save would take it.
+ */
+export function showGreyedWords(group: GroupValues, credit: CreditKind): string | null {
+  if (showRefusal('verdict', group, credit) === null) return null;
+  return credit === 'relative'
+    ? '(not while a test earns against the best)'
+    : '(needs a group that earns all or nothing)';
+}
+
+/**
  * A task none of whose groups earns, in the words the Tests card and how the
  * contest is scored both use.
  */

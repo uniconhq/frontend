@@ -835,30 +835,21 @@ describe('the cards that build a task', { timeout: 30_000 }, () => {
   it('asks when entrants see a group added once the task is graded, and of no other', async () => {
     const { sent } = taskBackend({ form: { ...CHECKED, inputs: [], graded: true } });
     const { tests } = await openTask();
-    const show = (group: string) =>
-      within(within(tests).getByRole('group', { name: group })).getByRole(
-        'radiogroup',
-        { name: /^When entrants see results/ },
-      );
+    const show = (group: string) => fieldIn(tests, group, /^When entrants see results/);
 
-    expect(within(show('large')).queryByRole('radio', { checked: true })).toBeNull();
+    expect(show('large')).toHaveValue('');
     expect(show('large')).toHaveAccessibleDescription(
       'The task has graded submissions, so a test group added now must say when its results are shown.',
     );
-    expect(
-      within(show('small')).getByRole('radio', {
-        name: 'Pass or fail right away, the tests once the task closes',
-      }),
-    ).toBeChecked();
-    expect(show('small')).not.toHaveAccessibleDescription(/must say/);
+    expect(show('small')).toHaveValue('verdict');
+    // The chosen option's meaning reads under the box.
+    expect(show('small')).toHaveAccessibleDescription(
+      'Entrants see at once whether the group passed and its points, and each test’s result once the task closes.',
+    );
     const bar = await screen.findByRole('region', { name: 'Save the task' });
     expect(within(bar).getByRole('button', { name: 'Save' })).toBeDisabled();
     expect(bar).toHaveTextContent('Choose when entrants see large’s results.');
-    await userEvent.click(
-      within(show('large')).getByRole('radio', {
-        name: 'Pass or fail right away, the tests once the task closes',
-      }),
-    );
+    fill(show('large'), 'verdict');
     expect(within(bar).getByRole('button', { name: 'Save' })).toBeEnabled();
     await save();
 
@@ -1075,18 +1066,19 @@ describe('scoring a task', { timeout: 30_000 }, () => {
     expect(rule).not.toHaveAccessibleDescription(/lowest/);
 
     // A group that earns by each test cannot show its pass or fail alone: the
-    // choice is greyed with its reason under it.
-    const shown = () =>
-      within(within(tests).getByRole('group', { name: 'old' })).getByRole('radio', {
-        name: 'Pass or fail right away, the tests once the task closes',
-      });
-    expect(shown()).toBeDisabled();
-    expect(shown()).toHaveAccessibleDescription(
-      /Only available for a test group that earns all or nothing/,
-    );
+    // choice is greyed with its reason in its own label.
+    const shows = () => fieldIn(tests, 'old', /^When entrants see results/);
+    expect(
+      within(shows()).getByRole('option', {
+        name: 'Pass or fail right away, the tests once the task closes (needs a group that earns all or nothing)',
+      }),
+    ).toBeDisabled();
     fill(fieldIn(tests, 'old', 'How does this group earn points?'), 'all');
-    expect(shown()).toBeEnabled();
-    expect(shown()).not.toHaveAccessibleDescription(/Only available/);
+    expect(
+      within(shows()).getByRole('option', {
+        name: 'Pass or fail right away, the tests once the task closes',
+      }),
+    ).toBeEnabled();
   });
 
   it('keeps the bonus rule chosen while its bonus is still empty', async () => {
