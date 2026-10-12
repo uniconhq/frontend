@@ -114,7 +114,7 @@ describe('a board in a sentence (M52)', () => {
 
   it('says the default board, seen by organisers only', () => {
     expect(boardSentence({ ...newBoard(), name: 'Standings' })).toBe(
-      'Ranks entrants by their total points over every task, highest first. Each entrant’s best submission to each task counts. Only organisers see it.',
+      'Ranks entrants by their total points over every task, most first. Each entrant’s best submission to each task counts. Only organisers see it.',
     );
   });
 
@@ -130,7 +130,7 @@ describe('a board in a sentence (M52)', () => {
         rows: '10',
       }),
     ).toBe(
-      'Ranks entrants by their total points over tasks sum and sort, highest first; ties are broken by penalty minutes, fewest first, counting nothing for earlier attempts. Each entrant’s best result on each test group of each task counts. Organisers see all of it; everyone else who can see the contest sees the top 10 rows and any row tied with the last of them, and an entrant their own row as well. It leaves out every test group whose results entrants see only once its task closes.',
+      'Ranks entrants by their total points over tasks sum and sort, most first; ties broken by penalty minutes, fewest first. Each entrant’s best result on each test group of each task counts. Organisers see all of it; everyone else who can see the contest sees the top 10 rows and any row tied with the last of them, and an entrant their own row as well. It leaves out every test group whose results entrants see only once its task closes.',
     );
   });
 
@@ -138,17 +138,17 @@ describe('a board in a sentence (M52)', () => {
     expect(
       boardSentence({ ...newBoard(), who: 'contestants' }, { tasks: false, held: [] }),
     ).toBe(
-      'ranks entrants by their total points over every task, highest first. Each entrant’s best submission to this task counts. Entrants and organisers see all of it.',
+      'ranks entrants by their total points over every task, most first. Each entrant’s best submission to this task counts. Entrants and organisers see all of it.',
     );
   });
 
   it('names a held group that joins it once shown, and when, only where it changes something', () => {
     const board = { ...newBoard(), who: 'contestants' };
     expect(boardSentence(board, { tasks: false, held: held.slice(0, 1) })).toBe(
-      'ranks entrants by their total points over every task, highest first. Each entrant’s best submission to this task counts. Entrants and organisers see all of it. Results from test group “hidden” join it when the contest ends.',
+      'ranks entrants by their total points over every task, most first. Each entrant’s best submission to this task counts. Entrants and organisers see all of it. Results from test group “hidden” join it when the contest ends.',
     );
     expect(boardSentence(board, { held })).toBe(
-      `Ranks entrants by their total points over every task, highest first. Each entrant’s best submission to each task counts. Entrants and organisers see all of it. Results from test group “hidden” of task A join it when the contest ends. Results from test group “final” of task B join it when task B closes, ${formatDateTime(new Date('2026-10-03T09:00:00Z'))}.`,
+      `Ranks entrants by their total points over every task, most first. Each entrant’s best submission to each task counts. Entrants and organisers see all of it. Results from test group “hidden” of task A join it when the contest ends. Results from test group “final” of task B join it when task B closes, ${formatDateTime(new Date('2026-10-03T09:00:00Z'))}.`,
     );
   });
 
@@ -165,7 +165,7 @@ describe('a board in a sentence (M52)', () => {
         { held },
       ),
     ).toBe(
-      'Ranks entrants by their total points over task sum, highest first. Each entrant’s best submission to the task counts. Organisers see all of it, and each entrant only their own row. It leaves out test group “hidden”, whose results entrants see only once the task closes.',
+      'Ranks entrants by their total points over task sum, most first. Each entrant’s best submission to the task counts. Organisers see all of it, and each entrant only their own row. It leaves out test group “hidden”, whose results entrants see only once the task closes.',
     );
   });
 

@@ -84,7 +84,7 @@ export const KINDS = [
     value: 'value',
     label: 'A value the tasks report',
     description:
-      'A number the tasks’ workflow reports, such as running time. The workflow says whether higher or lower is better.',
+      'A number the tasks’ workflow reports, such as run time. The workflow says whether higher or lower is better.',
   },
 ];
 
@@ -108,10 +108,12 @@ export function perGroupRefusal(order: OrderKeyValues[]): string | null {
 
 /**
  * One key of a board's order in words, saying a total of what: "their total
- * points over every task, highest first". `over` is the tasks the total runs
+ * points over every task, most first". `over` is the tasks the total runs
  * over, said with the first key only. A value is named by its title where
  * `values` give one, "their total run time", by its key until then (M58),
- * and ranks lowest or highest first as its workflow says is better.
+ * and ranks lowest or highest first as its workflow says is better. Points
+ * and penalty minutes read as the ways to rank say them in the board's form
+ * (`orderSummary`).
  */
 function keyWords(
   key: OrderKeyValues,
@@ -119,7 +121,7 @@ function keyWords(
   values: ValueMeaning[] | null,
 ): string {
   const across = over === null ? '' : ` over ${over}`;
-  if (key.kind === 'points') return `their total points${across}, highest first`;
+  if (key.kind === 'points') return `their total points${across}, most first`;
   if (key.kind === 'value') {
     const name = key.name.trim();
     if (name === '') return `their total value${across}, best first`;
@@ -127,17 +129,15 @@ function keyWords(
     return `their total ${titleInSentence(name, meaning)}${across}, ${valueFirst(meaning)}`;
   }
   const minutes = key.perAttempt.trim();
-  const attempts =
-    minutes === '' || minutes === '0'
-      ? 'counting nothing for earlier attempts'
-      : `counting ${minutes} for each earlier attempt`;
-  return `penalty minutes${across}, fewest first, ${attempts}`;
+  return minutes === '' || minutes === '0'
+    ? `penalty minutes${across}, fewest first`
+    : `penalty minutes${across}, fewest first, with ${minutes} more for each earlier attempt`;
 }
 
 /**
  * How a board ranks, its first key and then what breaks ties: "ranks entrants
- * by their total points over every task, highest first; ties are broken by
- * penalty minutes, fewest first, counting 20 for each earlier attempt".
+ * by their total points over every task, most first; ties broken by penalty
+ * minutes, fewest first, with 20 more for each earlier attempt".
  */
 function rankWords(
   order: OrderKeyValues[],
@@ -147,7 +147,7 @@ function rankWords(
   const [first, ...ties] = order;
   const ranks = `ranks entrants by ${keyWords(first ?? { kind: 'points' }, covers, values)}`;
   if (ties.length === 0) return ranks;
-  return `${ranks}; ties are broken by ${ties.map((key) => keyWords(key, null, values)).join(', then by ')}`;
+  return `${ranks}; ties broken by ${ties.map((key) => keyWords(key, null, values)).join(', then by ')}`;
 }
 
 /**
@@ -259,7 +259,7 @@ function selectWords(select: string, task: string): string {
  * counts, and who sees how much of it, as a few plain sentences an organiser
  * can check the board against, the same on the Leaderboards page and in how
  * the contest is scored (M65): "ranks entrants by their total points over
- * every task, highest first. Each entrant’s best submission to this task
+ * every task, most first. Each entrant’s best submission to this task
  * counts. Entrants and organisers see all of it." `tasks` is set for a page
  * that shows the board on its own, which starts it as a sentence; left out,
  * the sentence is said under one task, after the board's name and a colon,

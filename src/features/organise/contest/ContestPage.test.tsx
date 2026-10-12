@@ -558,7 +558,7 @@ describe('how the contest is scored (M52)', () => {
     );
     await line(
       sortPart,
-      'Leaderboard “Standings”: ranks entrants by their total points over task sort, highest first. Each entrant’s best submission to this task counts. Only organisers see it.',
+      'Leaderboard “Standings”: ranks entrants by their total points over task sort, most first. Each entrant’s best submission to this task counts. Only organisers see it.',
     );
     expect(sortPart).not.toHaveTextContent(/\byou\b/i);
     // The whole card opens Leaderboards; each task's heading keeps its own link.
@@ -724,11 +724,11 @@ describe('how the contest is scored (M52)', () => {
     );
     await line(
       part,
-      'Leaderboard “Live”: ranks entrants by their total points over every task, highest first. Each entrant’s best submission to this task counts. Entrants and organisers see all of it. It leaves out test group “hidden”, whose results entrants see only once the task closes.',
+      'Leaderboard “Live”: ranks entrants by their total points over every task, most first. Each entrant’s best submission to this task counts. Entrants and organisers see all of it. It leaves out test group “hidden”, whose results entrants see only once the task closes.',
     );
     await line(
       part,
-      'Leaderboard “Final”: ranks entrants by their total points over every task, highest first. Each entrant’s best submission to this task counts. Everyone who can see the contest sees all of it. Results from test group “hidden” join it when the contest ends.',
+      'Leaderboard “Final”: ranks entrants by their total points over every task, most first. Each entrant’s best submission to this task counts. Everyone who can see the contest sees all of it. Results from test group “hidden” join it when the contest ends.',
     );
     // A board that does not cover the task is not listed under it.
     expect(part).not.toHaveTextContent('Practice');
