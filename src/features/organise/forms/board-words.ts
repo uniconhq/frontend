@@ -11,7 +11,7 @@ export const OVER = [
     value: 'all',
     label: 'Every result',
     description:
-      'Every test group’s points, each group’s joining once entrants can see its results.',
+      'Every test group’s points. A group’s points join once entrants can see its results.',
   },
   {
     value: 'live',
@@ -177,7 +177,7 @@ function scopeWords(
     if (over === 'live')
       return 'It leaves out every test group whose results entrants see only once its task closes.';
     if (over === 'after_close')
-      return 'It counts only the test groups whose results entrants see once their task closes, from then.';
+      return 'It counts only the test groups whose results entrants see once their task closes, from when they are shown.';
     return null;
   }
   if (over === 'live') {

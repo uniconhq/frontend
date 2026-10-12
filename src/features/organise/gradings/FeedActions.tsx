@@ -110,7 +110,7 @@ function Consequence({ asking }: { asking: Asking }) {
         {grading.last_good !== null && (
           <BodyText tone="secondary">
             Until the new attempt finishes with a result, the entrant and the
-            leaderboards see attempt {grading.last_good}&apos;s.
+            leaderboards see attempt {grading.last_good}&apos;s result.
           </BodyText>
         )}
       </>

@@ -189,7 +189,7 @@ export function SavedFile({
       {upload !== null ? (
         <>
           <BodyText tone="secondary">
-            It was uploaded, so it is not shown here.
+            It was uploaded, so it is shown by its size rather than as text.
           </BodyText>
           <DownloadLink
             place={place}

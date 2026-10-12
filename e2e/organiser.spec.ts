@@ -522,7 +522,9 @@ test('an organiser reads a test in place, its parts side by side, and is told ho
     }),
   );
   const expected = view.getByRole('region', { name: 'expected' });
-  await expect(expected).toContainText('It was uploaded, so it is not shown here.');
+  await expect(expected).toContainText(
+    'It was uploaded, so it is shown by its size rather than as text.',
+  );
   const download = expected.getByRole('link', { name: 'Download expected' });
   await expect(download).toHaveAttribute(
     'href',

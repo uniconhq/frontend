@@ -105,7 +105,12 @@ export function FileSetting({
       {staged !== undefined ? (
         <div className={shared.actions}>
           <BodyText>{staged.summary}</BodyText>
-          <Chip tone="live">Saved with the task</Chip>
+          {/* Waiting for the task's save, marked as a test's row marks one. */}
+          {staged.was === '' ? (
+            <Chip tone="live">New</Chip>
+          ) : (
+            <Chip tone="warn">Replaced</Chip>
+          )}
           {!disabled && (
             <Button
               size="xs"

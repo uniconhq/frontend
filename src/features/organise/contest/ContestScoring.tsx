@@ -114,7 +114,9 @@ function TaskScoring({
                       <li>
                         {`The contest makes it worth ${pointsText(worth)} ${
                           compareRatio(worth, ONE) === 0 ? 'point' : 'points'
-                        }, so its test groups’ ${pointsText(total)} are scaled to that.`}
+                        }, so its test groups’ ${pointsText(total)} ${
+                          compareRatio(total, ONE) === 0 ? 'point is' : 'points are'
+                        } scaled to that.`}
                       </li>
                     )}
                     {groups.map((group) => (
@@ -177,7 +179,7 @@ export function ContestScoring({ org, contest }: { org: string; contest: string 
         <SectionTitle>How this contest is scored</SectionTitle>
         <BodyText tone="secondary">
           Check this before the contest starts. It says how each task earns points and
-          which leaderboards count them, as entrants are told.
+          which leaderboards count them, as each task&apos;s latest publication has it.
         </BodyText>
         <Loaded view={view} rows={3}>
           {(standings) =>

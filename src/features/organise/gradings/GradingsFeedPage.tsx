@@ -99,8 +99,8 @@ function QueueDepthPanel({ path }: { path: ContestPath }) {
       )}
       {view.state === 'ready' && view.data.failed > 0 && (
         <BodyText tone="secondary">
-          A grading that fails on Unicon&apos;s side is tried again once by itself;
-          after that it waits for you to retry or cancel it.{' '}
+          Unicon tries a failed grading again once by itself. If that fails too, it
+          waits for you to retry or cancel it.{' '}
           <PageLink to={`?${FAILED_SEARCH}`}>Show the failed gradings</PageLink>
         </BodyText>
       )}
@@ -207,14 +207,14 @@ function FilterBar({
 
 /**
  * Every grading of the contest, newest first, for anyone with a role at the
- * contest or one of its tasks: the queue above, the filters by task,
- * entrant, the member who submitted, status and latest attempts only kept in
- * the page's address, and the gradings as
- * `GradingsList` shows them, with Rejudge always there, asking which task in
- * its confirmation, the one the feed is filtered to chosen to begin with. The
- * live stream makes the feed and the queue stale as gradings move;
- * while it is down both are read again every ten seconds while something is
- * still to finish.
+ * contest or one of its tasks: the queue above, with the failed gradings
+ * that wait and a link to them; the filters by task, entrant, the member who
+ * submitted, status and latest attempts only, kept in the page's address;
+ * and the gradings as `GradingsList` shows them, with Rejudge always there,
+ * asking which task in its confirmation, the one the feed is filtered to
+ * chosen to begin with. The live stream makes the feed and the queue stale
+ * as gradings move; while it is down both are read again every ten seconds
+ * while something is still to finish.
  */
 export function GradingsFeedPage() {
   const path = useContestParams();

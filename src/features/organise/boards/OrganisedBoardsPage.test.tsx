@@ -160,7 +160,7 @@ describe("the boards' settings", { timeout: 20_000 }, () => {
       [
         'Counts',
         'Every result',
-        'Every test group’s points, each group’s joining once entrants can see its results.',
+        'Every test group’s points. A group’s points join once entrants can see its results.',
       ],
       [
         'Which submission counts',

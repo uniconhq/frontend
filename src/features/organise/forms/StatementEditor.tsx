@@ -23,11 +23,13 @@ const PATH = 'statement.md';
 
 /**
  * `statement.md`, the text contestants read, beside the same rendering their
- * task page gives it, the task's own pictures drawn as they will see them. The statement is the task admin's, so a manager reads
- * it here and changes nothing. A save is the save of the task, answered as
- * any other; one someone else's save beat shows both versions, as the
- * file editor does, and never swaps the text being edited for theirs. A
- * statement that is an upload shows as one, never as text.
+ * task page gives it, the task's own pictures drawn as they will see them,
+ * with Add a picture under it (M51). The statement is the task admin's, so
+ * a manager reads it here and changes nothing. A save is the save of the
+ * task, answered as any other; one someone else's save beat shows both
+ * versions, as the stored settings do, and never swaps the text being
+ * edited for theirs. A statement that is an upload shows as one, never as
+ * text.
  */
 export function StatementEditor({ place, admin }: { place: Place; admin: boolean }) {
   const query = useOwnFile(place, PATH);
@@ -183,9 +185,9 @@ function Source({
         <>
           <BodyText tone="secondary">
             A picture shows where the statement has a line such as{' '}
-            <code>![What it shows](public/diagram.png)</code>, for a picture in the
-            task. Add a picture to save one in the task and write that line for it. A
-            picture from anywhere else shows as a link.
+            <code>![What it shows](public/diagram.png)</code>, for a picture saved with
+            the task. &ldquo;Add a picture&rdquo; saves one and writes its line for you.
+            A picture from anywhere else shows as a link.
           </BodyText>
           <AddPicture
             task={{ kind: 'task', ...task }}

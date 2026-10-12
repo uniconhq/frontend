@@ -20,7 +20,7 @@ export type MatchedTest = {
   group: string | null;
   test: string;
   files: TestFile[];
-  /** What is wrong with it, such as a field no file fills; empty when it is whole. */
+  /** What is wrong with it, such as a field no file fills; empty when it is complete. */
   problems: string[];
 };
 

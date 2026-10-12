@@ -465,7 +465,9 @@ describe('uploading a file of a task again', { timeout: 20_000 }, () => {
     await user.click(train);
     const shown = await within(all).findByRole('region', { name: 'train.csv' });
     expect(
-      within(shown).getByText('It was uploaded, so it is not shown here.'),
+      within(shown).getByText(
+        'It was uploaded, so it is shown by its size rather than as text.',
+      ),
     ).toBeVisible();
     expect(shown).toHaveTextContent('300 MB');
     // With no version to download it at, its size alone is shown.

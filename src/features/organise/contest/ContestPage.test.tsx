@@ -531,7 +531,7 @@ describe('how the contest is scored (M52)', () => {
       name: 'How this contest is scored',
     });
     expect(card).toHaveTextContent(
-      'Check this before the contest starts. It says how each task earns points and which leaderboards count them, as entrants are told.',
+      "Check this before the contest starts. It says how each task earns points and which leaderboards count them, as each task's latest publication has it.",
     );
     const sortPart = await within(card).findByRole('region', { name: 'A · sort' });
     expect(within(sortPart).getByRole('heading', { level: 3 })).toHaveTextContent(
@@ -539,7 +539,7 @@ describe('how the contest is scored (M52)', () => {
     );
     await line(
       sortPart,
-      'The contest makes it worth 50 points, so its test groups’ 100 are scaled to that.',
+      'The contest makes it worth 50 points, so its test groups’ 100 points are scaled to that.',
     );
     // A worked example from the group's own number of tests.
     await line(
@@ -912,6 +912,9 @@ describe("the contest's sections", () => {
 
     const notice = await screen.findByRole('region', { name: 'Failed gradings' });
     expect(notice).toHaveTextContent("2 gradings failed on Unicon's side.");
+    expect(notice).toHaveTextContent(
+      'Unicon tries a failed grading again once by itself. If that fails too, it waits for you to retry or cancel it; meanwhile its entrant sees “Grading delayed”.',
+    );
     expect(
       within(notice).getByRole('link', { name: 'Show the failed gradings' }),
     ).toHaveAttribute(

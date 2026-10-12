@@ -520,6 +520,8 @@ describe('the cards that build a task', { timeout: 30_000 }, () => {
       new File(['print(1)\n'], 'checker.py'),
     );
     expect(await within(checker).findByText('checker.py, 9 bytes')).toBeVisible();
+    // Waiting for the save, marked as a replaced test's row is.
+    expect(within(checker).getByText('Replaced')).toBeVisible();
     const bar = await screen.findByRole('region', { name: 'Save the task' });
     expect(within(bar).getByRole('list', { name: 'What changed' })).toHaveTextContent(
       'Inputs: checker, a new file',
@@ -1203,7 +1205,7 @@ describe('the tests of a task', { timeout: 30_000 }, () => {
     );
   });
 
-  it('shows a test a file is missing from as Missing in its column, and adds only the whole ones', async () => {
+  it('shows a test a file is missing from as Missing in its column, and adds only the complete ones', async () => {
     const { sent } = taskBackend({ form: { ...CHECKED, inputs: [] } });
     const { tests } = await openTask();
 
@@ -1228,7 +1230,7 @@ describe('the tests of a task', { timeout: 30_000 }, () => {
     const add = within(dialog).getByRole('button', { name: 'Add tests' });
     expect(add).toBeDisabled();
     expect(add).toHaveAccessibleDescription(
-      'No test is whole yet: the table says what each one lacks.',
+      'No test is complete yet: the table says what each one is missing.',
     );
 
     await userEvent.upload(drop, [
@@ -1237,7 +1239,7 @@ describe('the tests of a task', { timeout: 30_000 }, () => {
     ]);
     expect(add).toBeEnabled();
     expect(add).toHaveAccessibleDescription(
-      'Adds 1 test; 1 test that is not whole is left out.',
+      'Adds 1 test; 1 test that is not complete is left out.',
     );
     await userEvent.click(add);
     await save();
@@ -1275,7 +1277,7 @@ describe('the tests of a task', { timeout: 30_000 }, () => {
         .map((header) => header.textContent),
     ).toEqual(['Test', 'input', 'answer', 'Notes']);
     expect(within(table).getByRole('row', { name: /small, test 4/ })).toHaveTextContent(
-      'small, test 44.in, 4 bytes4.out, 2 bytesWhole',
+      'small, test 44.in, 4 bytes4.out, 2 bytesComplete',
     );
     expect(
       within(matched).getByRole('list', { name: 'Not matched' }),
@@ -1685,7 +1687,9 @@ describe('a test opened in place (M50)', { timeout: 30_000 }, () => {
 
       const expected = within(view).getByRole('region', { name: 'expected' });
       expect(expected).toHaveTextContent('47.7 MB');
-      expect(expected).toHaveTextContent('It was uploaded, so it is not shown here.');
+      expect(expected).toHaveTextContent(
+        'It was uploaded, so it is shown by its size rather than as text.',
+      );
       // Downloaded whole through the door, at the version its read says (#444).
       expect(
         await within(expected).findByRole('link', { name: 'Download expected' }),

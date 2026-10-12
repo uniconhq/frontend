@@ -87,8 +87,9 @@ export function FailedGradings({ path }: { path: Path }) {
         {count(failed, 'grading', 'gradings')} failed on Unicon&apos;s side.
       </BodyText>
       <BodyText tone="secondary">
-        A grading that fails is tried again once by itself; after that it waits for you
-        to retry or cancel it. Until then its entrant reads that it is delayed.
+        Unicon tries a failed grading again once by itself. If that fails too, it waits
+        for you to retry or cancel it; meanwhile its entrant sees &ldquo;Grading
+        delayed&rdquo;.
       </BodyText>
       <PageLink
         to={`${contestSectionPath(path.org, path.contest, 'gradings')}?${FAILED_SEARCH}`}

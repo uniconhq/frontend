@@ -145,7 +145,11 @@ describe('the statement beside its preview', { timeout: 20_000 }, () => {
       new File(['PNGBYTES'], 'my diagram.png', { type: 'image/png' }),
     );
 
-    expect(await screen.findByText(/my-diagram-2\.png is in the task/)).toBeVisible();
+    expect(
+      await screen.findByText(
+        'my-diagram-2.png is saved with the task, and the line that shows it is at the end of the statement. Move the line to where the picture belongs, then save the statement.',
+      ),
+    ).toBeVisible();
     expect(saves).toEqual([
       [
         {
