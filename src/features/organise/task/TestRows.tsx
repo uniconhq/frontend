@@ -64,18 +64,36 @@ function startText(start: string): string {
   return `${line.slice(0, START)}${cut ? '…' : ''}`;
 }
 
+/** Whether a part shows how it begins rather than its name: a small text file. */
+function showsStart(each: Part): boolean {
+  return (
+    !each.folder &&
+    each.size !== 0 &&
+    typeof each.start === 'string' &&
+    (each.size === null || each.size <= LARGE)
+  );
+}
+
 /**
- * One part on a test's row: a small text file's start, "`1 2`"; its size
- * only where it says something, a file over 1 KB or one that is not text,
- * "input 12.4 MB"; an empty file, "answer is empty", in the warning colour;
- * otherwise its name alone.
+ * One part on a test's row: a small text file's start, "`1 2`", after its
+ * name where `named` ("expected `ok`"); its size only where it says
+ * something, a file over 1 KB or one that is not text, "input 12.4 MB"; an
+ * empty file, "answer is empty", in the warning colour; otherwise its name
+ * alone.
  */
-function partPiece(each: Part): ReactNode {
+function partPiece(each: Part, named: boolean): ReactNode {
   if (each.folder) return `${each.part}, a folder`;
   if (each.size === 0)
     return <span className={classes.emptyPart}>{each.part} is empty</span>;
-  if (typeof each.start === 'string' && (each.size === null || each.size <= LARGE)) {
-    return <code className={classes.partStart}>{startText(each.start)}</code>;
+  if (showsStart(each) && typeof each.start === 'string') {
+    const start = <code className={classes.partStart}>{startText(each.start)}</code>;
+    return named ? (
+      <>
+        {each.part} {start}
+      </>
+    ) : (
+      start
+    );
   }
   if (each.size !== null && (each.size > LARGE || each.start === null)) {
     return `${each.part} ${formatSize(each.size)}`;
@@ -84,10 +102,13 @@ function partPiece(each: Part): ReactNode {
 }
 
 /**
- * A test's parts in the workflow's order, each as `partPiece` says: "`1 2` →
- * `3`" once a part shows its start, from what goes in to what comes out;
- * "input, answer" while none does. Its values (`test.yaml`) show once the
- * test is opened.
+ * A test's parts in the workflow's order, each as `partPiece` says. The
+ * arrow stands only between what goes in and what is expected, the first
+ * two parts the workflow names, once either shows its start: "`1 2` →
+ * `3`". Every other part follows after a comma under its own name, "`1 2`
+ * → `3`, expected 10 MB"; with no start shown, or the first two not both
+ * there, each part is named: "input, answer". Its values (`test.yaml`) show
+ * once the test is opened.
  */
 function partsText(parts: Part[], order: string[]): ReactNode {
   const rank = (part: string) => {
@@ -98,11 +119,17 @@ function partsText(parts: Part[], order: string[]): ReactNode {
     .filter((each) => each.part !== 'test')
     .sort((a, b) => rank(a.part) - rank(b.part) || a.part.localeCompare(b.part));
   if (shown.length === 0) return 'no files';
-  const between = shown.some((each) => typeof each.start === 'string') ? ' → ' : ', ';
+  const [goesIn, expected] = shown;
+  const arrow =
+    goesIn !== undefined &&
+    expected !== undefined &&
+    goesIn.part === order[0] &&
+    expected.part === order[1] &&
+    (showsStart(goesIn) || showsStart(expected));
   return shown.map((each, at) => (
     <Fragment key={each.part}>
-      {at > 0 && between}
-      {partPiece(each)}
+      {at === 1 && arrow ? ' → ' : at > 0 && ', '}
+      {partPiece(each, !(arrow && at < 2))}
     </Fragment>
   ));
 }
