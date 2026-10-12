@@ -1,8 +1,7 @@
 .page {
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  max-width: 640px;
+  gap: 16px;
 }
 
 .actions {

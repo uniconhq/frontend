@@ -1,26 +1,17 @@
-import { useEffect, useRef, useState } from 'react';
-import { BY_DEVICE, useServerTime } from '@/api/use-server-time';
+import { useEffect, useRef } from 'react';
+import { BY_DEVICE, useServerClock } from '@/api/use-server-time';
 import { BodyText } from '@/ui/BodyText';
-import { formatDuration, serverNow } from '@/lib/time';
-
-const TICK_MS = 1000;
-
-type Phase = 'before_due' | 'late' | 'open' | 'closed';
-
-function phaseAt(at: number, due: number | null, closes: number | null): Phase {
-  if (closes !== null && at >= closes) return 'closed';
-  if (due === null) return 'open';
-  return at < due ? 'before_due' : 'late';
-}
+import { taskPhase, taskTimeLines, type TaskPhase } from './time-left';
+import classes from './contest.module.css';
 
 /**
  * How long until the task falls due for the reader and until it closes for
- * them, by the server's clock: `due` and `closes` are the row's own, its
- * extension on the task included. Past the due, a submission is still taken
- * and is late, and it says so. Like the contest's countdown it counts nothing
- * until the server's time is asked for, says so when it goes by the browser's
- * clock because that did not come in, and calls `onBoundary` as it crosses the due
- * or the close, when what the server takes changes.
+ * them, by the server's clock, at the top of the task's page: `due` and
+ * `closes` are the reader's own, their extra time on the task included.
+ * Until the server's time is in it says when each falls; it says so when it
+ * counts by the browser's clock because that did not come in, and calls
+ * `onBoundary` as it crosses the due or the close, when what the server
+ * takes changes.
  */
 export function TaskCountdown({
   due,
@@ -31,45 +22,28 @@ export function TaskCountdown({
   closes: string | null;
   onBoundary?: () => void;
 }) {
-  const { measured, byDevice } = useServerTime();
-  const [, setTicks] = useState(0);
+  const { at, measured, byDevice } = useServerClock();
+  const phase = taskPhase(
+    at,
+    due === null ? null : Date.parse(due),
+    closes === null ? null : Date.parse(closes),
+  );
 
-  useEffect(() => {
-    if (!measured) return;
-    const tick = setInterval(() => setTicks((ticks) => ticks + 1), TICK_MS);
-    return () => clearInterval(tick);
-  }, [measured]);
-
-  const at = serverNow().getTime();
-  const dueAt = due === null ? null : Date.parse(due);
-  const closesAt = closes === null ? null : Date.parse(closes);
-  const phase = phaseAt(at, dueAt, closesAt);
-
-  const last = useRef<Phase | null>(null);
+  const last = useRef<TaskPhase | null>(null);
   useEffect(() => {
     if (!measured) return;
     if (last.current !== null && last.current !== phase) onBoundary?.();
     last.current = phase;
   }, [measured, phase, onBoundary]);
 
-  if (!measured || (dueAt === null && closesAt === null)) return null;
-
-  const lines: [key: string, text: string][] = [];
-  if (phase === 'before_due' && dueAt !== null) {
-    lines.push(['due', `Due in ${formatDuration(dueAt - at)}`]);
-  }
-  if (phase === 'late') lines.push(['late', 'Past due: a submission now is late.']);
-  if (phase !== 'closed' && closesAt !== null) {
-    lines.push(['closes', `Closes in ${formatDuration(closesAt - at)}`]);
-  }
-  if (phase === 'closed') lines.push(['closed', 'Closed for you']);
-
+  const lines = taskTimeLines(due, closes, at, measured);
+  if (lines.length === 0) return null;
   return (
-    <div role="timer" aria-label="Task countdown">
-      {lines.map(([key, text]) => (
-        <BodyText key={key} size="md" mono>
+    <div role="timer" aria-label="Task countdown" className={classes.timeLeft}>
+      {lines.map(({ key, text }) => (
+        <span key={key} className={classes.timeLine}>
           {text}
-        </BodyText>
+        </span>
       ))}
       {byDevice && <BodyText tone="secondary">{BY_DEVICE}</BodyText>}
     </div>

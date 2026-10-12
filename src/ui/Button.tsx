@@ -1,5 +1,5 @@
 import { Button as MantineButton } from '@mantine/core';
-import type { CSSProperties, ReactNode } from 'react';
+import type { CSSProperties, HTMLAttributes, ReactNode, Ref } from 'react';
 
 /**
  * Primary is a flat sunset fill with dark ink: the pink is light enough that
@@ -15,6 +15,17 @@ import type { CSSProperties, ReactNode } from 'react';
  * fill taken away. `href` turns the
  * button into a real anchor, for the trips out of the app the browser has to
  * perform.
+ *
+ * The rules every page keeps: a button does something, and a link (PageLink,
+ * OutLink) goes somewhere; a card or a form has at most one primary button;
+ * a destructive one never sits on a hub. Every action of a page, a card, a
+ * form or a dialog is `sm`, the default, so equal actions side by side are
+ * one size; `xs` is only for an action on one item of a list or one row of a
+ * table, which keeps the row low.
+ *
+ * A button that opens a menu or a popover is its target: `ref` and the
+ * attributes the menu adds (`aria-expanded`, its key handling) pass through
+ * to the button itself.
  */
 export function Button({
   children,
@@ -26,6 +37,8 @@ export function Button({
   loading = false,
   type = 'button',
   label,
+  ref,
+  ...passed
 }: {
   children: ReactNode;
   onClick?: () => void;
@@ -37,7 +50,11 @@ export function Button({
   type?: 'button' | 'submit';
   /** A fuller name for a screen reader, when the text alone is one of many alike. */
   label?: string;
-}) {
+  ref?: Ref<HTMLButtonElement>;
+} & Omit<
+  HTMLAttributes<HTMLButtonElement>,
+  'children' | 'onClick' | 'color' | 'style' | 'className'
+>) {
   const color =
     variant === 'primary'
       ? 'var(--unicon-text-on-accent)'
@@ -51,22 +68,26 @@ export function Button({
     '--button-hover': 'var(--unicon-hover)',
   } as CSSProperties;
 
-  const asAnchor = href === undefined ? {} : { component: 'a' as const, href };
+  const look = {
+    'aria-label': label,
+    disabled,
+    loading,
+    size,
+    fw: 600,
+    fz: 13,
+    variant: variant === 'primary' ? 'filled' : 'default',
+    style: variant === 'primary' ? undefined : outline,
+    c: disabled && !loading ? undefined : color,
+  } as const;
 
+  if (href !== undefined)
+    return (
+      <MantineButton component="a" href={href} {...look}>
+        {children}
+      </MantineButton>
+    );
   return (
-    <MantineButton
-      {...asAnchor}
-      {...(href === undefined ? { type, onClick } : {})}
-      aria-label={label}
-      disabled={disabled}
-      loading={loading}
-      size={size}
-      fw={600}
-      fz={13}
-      variant={variant === 'primary' ? 'filled' : 'default'}
-      style={variant === 'primary' ? undefined : outline}
-      c={disabled && !loading ? undefined : color}
-    >
+    <MantineButton {...passed} ref={ref} type={type} onClick={onClick} {...look}>
       {children}
     </MantineButton>
   );

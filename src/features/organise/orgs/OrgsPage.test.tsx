@@ -28,6 +28,9 @@ describe('the org list', () => {
     expect(links.map((link) => link.textContent)).toEqual(['acme', 'beta']);
     expect(links[0]).toHaveAttribute('href', '/orgs/acme');
     expect(links[1]).toHaveAttribute('href', '/orgs/beta');
+    const rows = within(list).getAllByRole('listitem');
+    expect(rows[0]).toHaveTextContent('Admin of the org');
+    expect(rows[1]).toHaveTextContent('Observer of sum, in cup');
   });
 
   it('offers a new org, and says so when there are none yet', async () => {
@@ -37,12 +40,9 @@ describe('the org list', () => {
     renderApp('/orgs');
 
     expect(
-      await screen.findByText('You do not hold a role at any org yet.'),
+      await screen.findByText('You do not have a role at any org yet.'),
     ).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'New org' })).toHaveAttribute(
-      'href',
-      '/orgs/new',
-    );
+    expect(screen.getByRole('button', { name: 'New org' })).toBeVisible();
   });
 
   it('waits on the session rather than rendering a blank', async () => {
@@ -103,7 +103,7 @@ describe('the shell for an organiser', () => {
     const trail = await screen.findByRole('navigation', { name: 'Breadcrumb' });
     const links = within(trail).getAllByRole('link');
     expect(links.map((link) => [link.textContent, link.getAttribute('href')])).toEqual([
-      ['orgs', '/orgs'],
+      ['Orgs', '/orgs'],
       ['acme', '/orgs/acme'],
       ['spring', '/orgs/acme/contests/spring'],
       ['sum', '/orgs/acme/contests/spring/tasks/sum'],
@@ -111,14 +111,18 @@ describe('the shell for an organiser', () => {
     expect(links[3]).toHaveAttribute('aria-current', 'page');
   });
 
-  it('marks no crumb as the page on the new org form, which has none of its own', async () => {
+  it('gives the new org form a crumb of its own, under the orgs', async () => {
     server.use(signedIn);
     renderApp('/orgs/new');
 
     await screen.findByRole('heading', { name: 'New org', level: 1 });
     const trail = screen.getByRole('navigation', { name: 'Breadcrumb' });
-    const orgs = within(trail).getByRole('link', { name: 'orgs' });
+    const orgs = within(trail).getByRole('link', { name: 'Orgs' });
     expect(orgs).toHaveAttribute('href', '/orgs');
     expect(orgs).not.toHaveAttribute('aria-current');
+    expect(within(trail).getByRole('link', { name: 'New org' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
   });
 });

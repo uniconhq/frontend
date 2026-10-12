@@ -219,20 +219,32 @@ export function readTask(
     unreadable.push('submissions');
   }
 
+  const given = isRecord(inputs)
+    ? Object.entries(inputs).map(([id, entry]) =>
+        readInput(
+          id,
+          entry,
+          declared?.find((input) => input.id === id),
+        ),
+      )
+    : [];
+  // Every input the workflow declares has its fields, the ones the file
+  // leaves out empty, so each is filled in where it is shown.
+  const missing =
+    isRecord(inputs) || inputs === undefined
+      ? (declared ?? [])
+          .filter((input) => !given.some((found) => found.id === input.id))
+          .map((input) =>
+            emptyInput(input.id, input.contestant ? 'details' : 'value', input.type),
+          )
+      : [];
+
   return {
     unreadable,
     values: {
       name: at('name'),
       workflow: at('workflow'),
-      inputs: isRecord(inputs)
-        ? Object.entries(inputs).map(([id, entry]) =>
-            readInput(
-              id,
-              entry,
-              declared?.find((input) => input.id === id),
-            ),
-          )
-        : [],
+      inputs: [...given, ...missing],
       credit: creditValues,
       groups: groupValues,
       max: isRecord(submissions) ? at('submissions', 'max') : '',
@@ -280,7 +292,8 @@ function typedValue(type: string | null, text: string): unknown {
  */
 function inputEntry(input: InputValues): unknown {
   if (input.kind === 'value') {
-    if (input.secret) return { secret: input.value };
+    if (input.secret)
+      return input.value.trim() === '' ? undefined : { secret: input.value };
     return typedValue(input.type, input.value);
   }
   const details: Record<string, unknown> = {};
@@ -294,6 +307,12 @@ function inputEntry(input: InputValues): unknown {
   add('max', numberText(input.max));
   add('max_size', text(input.maxSize));
   return details;
+}
+
+/** Whether an entry holds nothing to write: no value, or no form detail. */
+function emptyEntry(input: InputValues): boolean {
+  const entry = inputEntry(input);
+  return entry === undefined || (isRecord(entry) && Object.keys(entry).length === 0);
 }
 
 function weightsOf(rows: GroupValues['weights']): Record<string, unknown> | undefined {
@@ -390,6 +409,7 @@ export function writeTask(
       const was = before.inputs.find((old) => old.id === input.id);
       const path = (key?: string) =>
         key === undefined ? ['inputs', input.id] : ['inputs', input.id, key];
+      if (was === undefined && emptyEntry(input)) continue;
       if (was === undefined || was.shape !== input.kind) {
         writeAt(doc, path(), inputEntry(input), { prune: true });
       } else if (input.kind === 'value') {
@@ -397,14 +417,20 @@ export function writeTask(
           writeAt(doc, path(), inputEntry(input), { prune: true });
         }
       } else {
-        put(path('label'), was.label, input.label, text);
-        put(path('options'), was.options, input.options, optionsOf);
-        put(path('default'), was.default, input.default, (value) =>
-          typedValue(input.type, value),
+        // An entrant's input left with no detail goes from the settings, as
+        // one never given details is never written.
+        put(path('label'), was.label, input.label, text, true);
+        put(path('options'), was.options, input.options, optionsOf, true);
+        put(
+          path('default'),
+          was.default,
+          input.default,
+          (value) => typedValue(input.type, value),
+          true,
         );
-        put(path('min'), was.min, input.min, numberText);
-        put(path('max'), was.max, input.max, numberText);
-        put(path('max_size'), was.maxSize, input.maxSize, text);
+        put(path('min'), was.min, input.min, numberText, true);
+        put(path('max'), was.max, input.max, numberText, true);
+        put(path('max_size'), was.maxSize, input.maxSize, text, true);
       }
     }
   }

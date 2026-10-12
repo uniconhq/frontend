@@ -47,8 +47,9 @@ export const ROLE_LABEL: Record<RoleName, string> = {
 /** What each role lets its holder do, under a choice of role. */
 export const ROLE_MEANS: Record<RoleName, string> = {
   admin: 'Everything a manager does, and gives or takes the admin role.',
-  manager: 'Edits, publishes, decides registrations and gives the roles below admin.',
-  observer: 'Reads everything here and changes nothing.',
+  manager:
+    'Changes and publishes, approves registrations, and gives the manager and observer roles.',
+  observer: 'Sees everything here and changes nothing.',
 };
 
 /** The roles a person may hand out, or invite someone to: admin only by an admin. */

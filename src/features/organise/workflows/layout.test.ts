@@ -4,6 +4,7 @@ import { CLASSIC_FOLDER, CLASSIC_V2, PRIMITIVES } from '@/test/workflows';
 import {
   colourOf,
   layoutWorkflow,
+  rowOf,
   wirePath,
   type Box,
   type Layout,
@@ -137,6 +138,30 @@ describe('the layout', () => {
     },
   );
 
+  it('gives every port a row of its own, a step’s outputs under its inputs', () => {
+    const layout = laid(CLASSIC_V2);
+    const run = layout.boxes.find((box) => box.key === 'step:1');
+    if (run === undefined) throw new Error('run is not drawn');
+    const into = (port: string) =>
+      layout.wires.find((wire) => wire.to.box === run.key && wire.to.port === port);
+    const out = (port: string) =>
+      layout.wires.find((wire) => wire.from.box === run.key && wire.from.port === port);
+    const ys = [
+      ...run.left.map((port) => into(port)?.points.at(-1)?.y),
+      ...['output', 'time_ms', 'memory_kb'].map((port) => out(port)?.points[0]?.y),
+    ];
+
+    expect(run.left).toEqual(['binary', 'input', 'args', 'time_limit', 'memory_limit']);
+    expect(run.right).toEqual(['output', 'time_ms', 'memory_kb']);
+    // args is given nothing, so it has no wire; every other row is one row down.
+    const drawn = ys.filter((y): y is number => y !== undefined);
+    expect(drawn).toHaveLength(7);
+    expect([...drawn].sort((a, b) => a - b)).toEqual(drawn);
+    expect(new Set(drawn).size).toBe(drawn.length);
+    expect(run.height).toBeGreaterThan(8 * 28);
+    expect(rowOf(run, 'right', 'output')).toBe(5);
+  });
+
   it('puts classic@v2 in columns by what each step reads', () => {
     const layout = laid(CLASSIC_V2);
 
@@ -159,7 +184,11 @@ describe('the layout', () => {
 
     const log = layout.slots.filter((slot) => slot.source === 'steps:0.compile_log');
     expect(log.map((slot) => slot.column)).toEqual([2, 3, 4]);
-    expect(log.map((slot) => slot.label)).toEqual(['compile.compile_log', null, null]);
+    expect(log.map((slot) => slot.label)).toEqual([
+      'compile_log from compile',
+      null,
+      null,
+    ]);
     const wire = layout.wires.find((found) => found.target === 'report:log');
     expect(wire?.points).toHaveLength(2 + 2 * 3);
   });
@@ -182,7 +211,7 @@ steps:
     ]);
     const skipped = layout.slots.filter((slot) => slot.source === 'steps:0.output');
     expect(skipped.map((slot) => slot.column)).toEqual([2, 3]);
-    expect(skipped[0]?.label).toBe('a.output');
+    expect(skipped[0]?.label).toBe('output from a');
     expect(behind(layout)).toEqual([]);
   });
 

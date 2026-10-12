@@ -16,7 +16,7 @@ import {
 
 type Change = components['schemas']['Change'];
 
-const TASK = '/orgs/acme/contests/spring/tasks/sum';
+const TASK = '/orgs/acme/contests/spring/tasks/sum/files';
 const LATEST = '3c4d5e6f7a8b9c0d1e2f';
 /** Publication 2's version, and publication 1's. */
 const SECOND = publications[1]?.version ?? '';
@@ -88,7 +88,7 @@ function history() {
 
 async function openHistory() {
   renderApp(`${TASK}?file=task.yaml`);
-  await screen.findByRole('textbox', { name: 'task.yaml' });
+  await screen.findByRole('textbox', { name: 'The task’s settings' });
   await userEvent.click(
     screen.getByRole('button', { name: 'Show the history of task.yaml' }),
   );
@@ -194,12 +194,12 @@ describe("a task file's history", () => {
     );
     const dialog = await screen.findByRole('dialog', { name: 'Roll this file back?' });
     expect(dialog).toHaveTextContent(
-      'task.yaml is written as it was at version 1a2b3c4',
+      'task.yaml goes back to how it was at version 1a2b3c4',
     );
     expect(sent).toEqual([]);
     await userEvent.click(within(dialog).getByRole('button', { name: 'Roll back' }));
 
-    const answer = await screen.findByText('Published as publication 3.');
+    const answer = await screen.findByText('Saved and published as publication 3.');
     expect(answer.closest('[role="status"]')).toHaveFocus();
     expect(sent).toEqual([
       {
@@ -245,7 +245,9 @@ describe("a task file's history", () => {
       within(alert).getByRole('button', { name: 'Publish the change' }),
     );
 
-    expect(await screen.findByText('Published as publication 3.')).toBeVisible();
+    expect(
+      await screen.findByText('Saved and published as publication 3.'),
+    ).toBeVisible();
     expect(sent.map(({ confirm, version }) => ({ confirm, version }))).toEqual([
       { confirm: false, version: SECOND },
       { confirm: true, version: SECOND },

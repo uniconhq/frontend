@@ -5,11 +5,13 @@ import { queryView } from '@/api/query';
 import type { Announcement } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
+import { Card } from '@/ui/Card';
+import { Modal } from '@/ui/Modal';
 import { SectionTitle } from '@/ui/SectionTitle';
 import { TextInput } from '@/ui/TextInput';
 import { Textarea } from '@/ui/Textarea';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
-import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
+import { Loaded } from '@/ui/feedback/Loaded';
 import { useMe } from '@/session';
 import { useFallbackPoll } from '@/live';
 import { holdsAt } from '../roles';
@@ -69,11 +71,11 @@ function Composer({
       <Textarea label="Text" value={body} onChange={setBody} rows={4} required />
       {change.error !== null && <ErrorBlock error={change.error} compact />}
       <div className={classes.actions}>
-        <Button type="submit" size="xs" loading={change.pending !== null}>
+        <Button type="submit" loading={change.pending !== null}>
           {label}
         </Button>
         {onCancel !== undefined && (
-          <Button size="xs" variant="secondary" onClick={onCancel}>
+          <Button variant="secondary" onClick={onCancel}>
             Cancel
           </Button>
         )}
@@ -82,21 +84,33 @@ function Composer({
   );
 }
 
-/** One announcement with, for a manager, Edit and Close; there is no delete. */
+/**
+ * One announcement with, for a manager, Edit and Close while it is open, and
+ * Reopen once it is closed; there is no delete. Close asks first, saying what
+ * entrants will then see, on the contest's page or the task's (`where`).
+ */
 function Managed({
   announcement,
   manages,
+  where,
   changes,
   onChanged,
 }: {
   announcement: Announcement;
   manages: boolean;
+  where: string;
   changes: ReturnType<typeof useAnnouncementChanges>;
   onChanged: () => Promise<void>;
 }) {
   const [editing, setEditing] = useState(false);
+  const [closing, setClosing] = useState(false);
   const change = useChange({ reread: onChanged });
   const name = announcement.title;
+
+  const close = async () => {
+    const outcome = await change.run('close', () => changes.close(announcement.number));
+    if (outcome.ok) setClosing(false);
+  };
 
   if (editing) {
     return (
@@ -131,25 +145,64 @@ function Managed({
             size="xs"
             variant="secondary"
             label={`Close ${name}`}
-            loading={change.pending === 'close'}
-            onClick={() =>
-              void change.run('close', () => changes.close(announcement.number))
-            }
+            onClick={() => {
+              change.dismiss();
+              setClosing(true);
+            }}
           >
             Close
           </Button>
         </div>
       )}
-      {change.error !== null && <ErrorBlock error={change.error} compact />}
+      {manages && announcement.closed && (
+        <div className={classes.actions}>
+          <Button
+            size="xs"
+            variant="secondary"
+            label={`Reopen ${name}`}
+            loading={change.pending === 'reopen'}
+            onClick={() =>
+              void change.run('reopen', () => changes.reopen(announcement.number))
+            }
+          >
+            Reopen
+          </Button>
+        </div>
+      )}
+      {change.error !== null && !closing && <ErrorBlock error={change.error} compact />}
+      <Modal
+        opened={closing}
+        onClose={() => setClosing(false)}
+        title="Close this announcement?"
+      >
+        <div className={classes.stack}>
+          <BodyText>
+            Entrants will no longer see &ldquo;{name}&rdquo; on {where}. Those who have
+            read it are not told it was closed.
+          </BodyText>
+          <BodyText tone="secondary">
+            It stays here for the organisers, marked closed, and you can reopen it.
+          </BodyText>
+          {change.error !== null && <ErrorBlock error={change.error} compact />}
+          <div className={classes.actions}>
+            <Button loading={change.pending === 'close'} onClick={() => void close()}>
+              Close it
+            </Button>
+            <Button variant="secondary" onClick={() => setClosing(false)}>
+              Not now
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </li>
   );
 }
 
 /**
  * The announcements of a contest or a task for its organisers: every one,
- * newest first, closed ones kept and marked so, with a composer, Edit and
- * Close for a manager. There is no delete anywhere, since a message people
- * have already read should not vanish.
+ * newest first, closed ones kept and marked so, with a composer, Edit, Close
+ * and Reopen for a manager. There is no delete anywhere, since a message
+ * people have already read should not vanish.
  */
 export function AnnouncementsSection({ place }: { place: AnnouncementPlace }) {
   const queryClient = useQueryClient();
@@ -160,36 +213,48 @@ export function AnnouncementsSection({ place }: { place: AnnouncementPlace }) {
     queryClient.invalidateQueries({ queryKey: announcementsQuery(place).queryKey });
 
   return (
-    <div className={classes.stack}>
-      <SectionTitle>Announcements</SectionTitle>
+    <>
       {manages && (
-        <Composer
-          label="Post announcement"
-          initial={{ title: '', body: '' }}
-          onSend={async (text) => {
-            await changes.post(text);
-            await readAgain();
-          }}
-        />
+        <Card>
+          <div className={classes.stack}>
+            <SectionTitle>Post an announcement</SectionTitle>
+            <Composer
+              label="Post announcement"
+              initial={{ title: '', body: '' }}
+              onSend={async (text) => {
+                await changes.post(text);
+                await readAgain();
+              }}
+            />
+          </div>
+        </Card>
       )}
-      {view.state === 'loading' && <PageSkeleton rows={2} />}
-      {view.state === 'error' && <ErrorBlock error={view.error} onRetry={view.retry} />}
-      {view.state === 'ready' &&
-        (view.data.length === 0 ? (
-          <BodyText tone="secondary">No announcements yet.</BodyText>
-        ) : (
-          <ol className={classes.list} aria-label="Announcements">
-            {[...view.data].reverse().map((announcement) => (
-              <Managed
-                key={announcement.number}
-                announcement={announcement}
-                manages={manages}
-                changes={changes}
-                onChanged={readAgain}
-              />
-            ))}
-          </ol>
-        ))}
-    </div>
+      <Card>
+        <Loaded view={view} rows={2}>
+          {(posted) =>
+            posted.length === 0 ? (
+              <BodyText tone="secondary">No announcements yet.</BodyText>
+            ) : (
+              <ol className={classes.list} aria-label="Announcements">
+                {[...posted].reverse().map((announcement) => (
+                  <Managed
+                    key={announcement.number}
+                    announcement={announcement}
+                    manages={manages}
+                    where={
+                      place.kind === 'contest'
+                        ? 'the contest’s page'
+                        : 'the task’s page or the contest’s'
+                    }
+                    changes={changes}
+                    onChanged={readAgain}
+                  />
+                ))}
+              </ol>
+            )
+          }
+        </Loaded>
+      </Card>
+    </>
   );
 }

@@ -1,43 +1,49 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Button } from '@/ui/Button';
+import { Modal } from '@/ui/Modal';
 import { CreateForm, type SecondField } from './CreateForm';
-import classes from './organise.module.css';
 
 /**
- * Making one org, contest or task. The form is behind a button that opens
- * it, or open from the start on a page that is only the form. The thing is
- * made before the create answers, so the form closes as soon as it has, and
- * the new thing is in the list above; a refusal keeps the form open with
- * what was typed and says why, for the person to try again.
+ * Making one org, contest or task: the list's one button, which opens the
+ * form in a dialog over the page, so no form sits open on a hub. The thing is
+ * made before the create answers, so the dialog closes as soon as it has, and
+ * the new thing is in the list or its page is open; a refusal keeps the
+ * dialog with what was typed and says why, for the person to try again.
+ * Closing the dialog drops what was typed, and puts the focus back on the
+ * button.
  */
-export function Create({
+export function CreateButton({
   openLabel,
-  title,
+  intro,
   second,
   submitLabel,
   pending,
   error,
-  startOpen = false,
+  onOpen,
   onSubmit,
+  children,
 }: {
-  /** The button that opens the form, such as "New contest". */
+  /** The button, and the dialog's title, such as "New contest". */
   openLabel: string;
-  title: string;
+  /** A line above the form, about what is being made. */
+  intro?: ReactNode;
   second: SecondField;
   submitLabel: string;
   pending: boolean;
   error: unknown;
-  /** Open the form at once, with no way to close it, for a page that is only the form. */
-  startOpen?: boolean;
+  /** Called as the dialog opens, to forget the last refusal. */
+  onOpen: () => void;
+  /** More of the form, under its two lines, such as the kind of task. */
+  children?: ReactNode;
   /** Resolves once the thing is made. */
   onSubmit: (name: string, second: string) => Promise<void>;
 }) {
-  const [open, setOpen] = useState(startOpen);
+  const [open, setOpen] = useState(false);
   const opener = useRef<HTMLDivElement>(null);
   const moveFocus = useRef(false);
 
   useEffect(() => {
-    if (!moveFocus.current) return;
+    if (open || !moveFocus.current) return;
     moveFocus.current = false;
     opener.current?.querySelector('button')?.focus();
   }, [open]);
@@ -47,28 +53,34 @@ export function Create({
     setOpen(false);
   };
 
-  if (open) {
-    return (
-      <CreateForm
-        title={title}
-        second={second}
-        submitLabel={submitLabel}
-        pending={pending}
-        error={error}
-        onCancel={startOpen ? undefined : close}
-        onSubmit={async (name, other) => {
-          await onSubmit(name, other);
-          if (!startOpen) close();
-        }}
-      />
-    );
-  }
-
   return (
-    <div ref={opener} className={classes.actions}>
-      <Button variant="secondary" onClick={() => setOpen(true)}>
+    <div ref={opener}>
+      <Button
+        onClick={() => {
+          onOpen();
+          setOpen(true);
+        }}
+      >
         {openLabel}
       </Button>
+      <Modal opened={open} onClose={close} title={openLabel}>
+        {open && (
+          <CreateForm
+            title={openLabel}
+            intro={intro}
+            second={second}
+            submitLabel={submitLabel}
+            pending={pending}
+            error={error}
+            onCancel={close}
+            extra={children}
+            onSubmit={async (name, other) => {
+              await onSubmit(name, other);
+              close();
+            }}
+          />
+        )}
+      </Modal>
     </div>
   );
 }

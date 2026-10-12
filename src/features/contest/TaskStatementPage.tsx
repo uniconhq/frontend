@@ -6,16 +6,20 @@ import { Card } from '@/ui/Card';
 import { Markdown } from '@/ui/Markdown';
 import { PageLink } from '@/ui/PageLink';
 import { PageTitle } from '@/ui/PageTitle';
+import { BackToOrganising } from './BackToOrganising';
 import { SectionTitle } from '@/ui/SectionTitle';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
 import { contestHomePath } from '@/lib/contest-paths';
 import { formatExact } from '@/lib/exact';
 import { useTaskParams } from '@/lib/route-params';
+import { contestViewSectionPath } from '@/lib/sections';
 import { formatDateTime } from '@/lib/time';
 import { TaskAnnouncements } from './threads/AnnouncementList';
+import { ASK_ABOUT } from './threads/questions';
 import { BySession } from './BySession';
 import { SignInPrompt } from './SignInPrompt';
+import { TaskCountdown } from './TaskCountdown';
 import { TaskSubmissions } from './submit/TaskSubmissions';
 import { headingOf } from './task-names';
 import classes from './contest.module.css';
@@ -28,7 +32,7 @@ const PAGE = '/api/v1/orgs/{org}/contests/{contest}/tasks/{task}/page';
 /** At most `count` in any window of `seconds`, in words. */
 function rate(count: number, seconds: number): string {
   const window = seconds === 1 ? 'second' : `${seconds} seconds`;
-  return `${count} in any ${window}`;
+  return `At most ${count} in any ${window}`;
 }
 
 /**
@@ -60,9 +64,9 @@ function LimitList({ page }: { page: TaskPage }) {
           <dd>{formatDateTime(new Date(page.closes))}</dd>
         </>
       )}
-      <dt>Submissions</dt>
+      <dt>Submissions allowed</dt>
       <dd>{submissions.max} in all</dd>
-      <dt>How often</dt>
+      <dt>Submission rate</dt>
       <dd>{rate(submissions.rate.count, submissions.rate.per)}</dd>
     </dl>
   );
@@ -73,10 +77,12 @@ function Back({ org, contest }: { org: string; contest: string }) {
 }
 
 /**
- * A released task as a signed-in person reads it: the statement, its times
- * and limits, the panel they submit from while the task is open, or why it
- * is not, with the countdowns to its due and close, and their submissions.
- * Crossing the due or the close reads the page again at once.
+ * A released task as a signed-in person reads it: first the time left on it
+ * for them, counted to its due and its close, and the way to ask the
+ * organisers about it; then its announcements, the statement, its times and
+ * limits, the panel they submit from while the task is open, or why it is
+ * not, and their submissions. Crossing the due or the close reads the page
+ * again at once.
  */
 function SignedInTask({
   org,
@@ -109,13 +115,27 @@ function SignedInTask({
     return <ErrorBlock error={view.error} onRetry={view.retry} />;
 
   const page = view.data;
+  const asks = page.release.closed !== 'not_approved';
   return (
     <div className={classes.page}>
-      <Back org={org} contest={contest} />
+      <div className={classes.links}>
+        <Back org={org} contest={contest} />
+        <BackToOrganising org={org} contest={contest} />
+      </div>
       <PageTitle>{headingOf(page)}</PageTitle>
+      <TaskCountdown due={page.due} closes={page.closes} onBoundary={readAgain} />
+      {asks && (
+        <div className={classes.links}>
+          <PageLink
+            to={`${contestViewSectionPath(org, contest, 'questions')}?${ASK_ABOUT}=${encodeURIComponent(task)}`}
+          >
+            Ask a question about this task
+          </PageLink>
+        </div>
+      )}
       <TaskAnnouncements org={org} contest={contest} task={task} />
       <Card>
-        <Markdown>{page.statement}</Markdown>
+        <Markdown task={{ org, contest, task }}>{page.statement}</Markdown>
       </Card>
       <Card>
         <div className={classes.stack}>
@@ -123,13 +143,7 @@ function SignedInTask({
           <LimitList page={page} />
         </div>
       </Card>
-      <TaskSubmissions
-        org={org}
-        contest={contest}
-        task={task}
-        page={page}
-        onBoundary={readAgain}
-      />
+      <TaskSubmissions org={org} contest={contest} task={task} page={page} />
     </div>
   );
 }
@@ -172,7 +186,7 @@ function PublicTask({
       <Back org={org} contest={contest} />
       <PageTitle>{headingOf(found)}</PageTitle>
       <Card>
-        <Markdown>{statement}</Markdown>
+        <Markdown task={{ org, contest, task }}>{statement}</Markdown>
       </Card>
     </div>
   );

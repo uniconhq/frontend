@@ -1,6 +1,7 @@
 import { http, HttpResponse } from 'msw';
 import type {
   FileContent,
+  ListedContest,
   Named,
   Publication,
   TaskStanding,
@@ -21,7 +22,21 @@ export const TASK_API = `${CONTEST_API}/tasks/:task`;
 
 // Lists
 
-export const contests: Named[] = [{ name: 'autumn' }, { name: 'spring' }];
+/** The org's contests as the list gives them, both drafts in October 2026. */
+export const contests: ListedContest[] = [
+  {
+    name: 'autumn',
+    state: 'draft',
+    start: '2026-10-20T09:00:00Z',
+    end: '2026-10-20T14:00:00Z',
+  },
+  {
+    name: 'spring',
+    state: 'draft',
+    start: '2026-10-01T09:00:00Z',
+    end: '2026-10-01T14:00:00Z',
+  },
+];
 const tasks: Named[] = [{ name: 'sort' }, { name: 'sum' }];
 
 export const contestList = http.get(`${ORG_API}/contests`, () =>
@@ -46,7 +61,7 @@ export function listAndCreate(path: string, existing: { name: string }[]) {
     http.post(path, async ({ request }) => {
       const body = (await request.json()) as { name: string };
       sent.push(body);
-      listed.push({ name: body.name });
+      listed.push({ ...existing[0], name: body.name });
       return HttpResponse.json({ name: body.name }, { status: 201 });
     }),
   ];
@@ -187,7 +202,17 @@ export const files: Record<string, FileContent> = {
   'contest.yaml': {
     path: 'contest.yaml',
     encoding: 'utf-8',
-    content: 'name: Spring\nvisibility: signed-in\n',
+    content: [
+      'name: Spring',
+      'start: 2026-10-01T09:00:00Z',
+      'end: 2026-10-15T09:00:00Z',
+      'state: draft',
+      'visibility: signed-in',
+      'tasks:',
+      '  - id: sort',
+      '  - id: sum',
+      '',
+    ].join('\n'),
     token: 'token-contest-yaml',
     upload: null,
   },
@@ -200,8 +225,17 @@ function treeAnswer(tree: Record<string, TreeEntry[]>) {
 
 /** The client sends a file's path as one segment, its slashes encoded. */
 function fileAnswer({ params }: { params: Record<string, unknown> }) {
-  const file = files[decodeURIComponent(String(params['path']))];
-  return file === undefined ? problem(404, 'not_found') : HttpResponse.json(file);
+  const path = decodeURIComponent(String(params['path']));
+  const file = files[path];
+  if (file === undefined) return problem(404, 'not_found');
+  // Each task's settings give it its own name as its title.
+  const task = params['task'];
+  return path === 'task.yaml' && typeof task === 'string'
+    ? HttpResponse.json({
+        ...file,
+        content: file.content.replace(/^name: .*$/m, `name: ${task}`),
+      })
+    : HttpResponse.json(file);
 }
 
 /** Both repos' trees and files, read-only; a test adds the writes it needs. */

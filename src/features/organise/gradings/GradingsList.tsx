@@ -16,13 +16,21 @@ import classes from './feed.module.css';
 type ContestPath = { org: string; contest: string };
 
 /**
+ * Where a Rejudge is offered: for one task, with the button's own words when
+ * not its title; or, on the contest's gradings, for whichever of `tasks` the
+ * manager chooses in its confirmation, `task` chosen to begin with.
+ */
+export type RejudgeOffer =
+  { task: string; button?: string } | { tasks: string[]; task: string | null };
+
+/**
  * Gradings as the contest's feed and a task's page both show them: each
  * submission once, headed by its highest attempt, with the earlier ones
  * opening below it. A manager of a row's task gets its latest attempt's
- * Retry and, for a system error, Cancel, and Rejudge for `rejudge.task`;
- * each asks first in a dialog through the task's own routes, which shows a
- * refusal and closes once the change has gone through. An observer reads
- * the table alone.
+ * Retry and, for a system error, Cancel; and Rejudge as `rejudge` offers it,
+ * of the tasks they manage. Each asks first in a dialog through the task's
+ * own routes, which shows a refusal and closes once the change has gone
+ * through. An observer reads the table alone.
  */
 export function GradingsList({
   path,
@@ -36,8 +44,7 @@ export function GradingsList({
   view: QueryView<FeedEntry[]>;
   /** False where every row is of one task. */
   showTask: boolean;
-  /** The task a Rejudge is offered for, and the button's own words when not its title. */
-  rejudge: { task: string; button?: string } | null;
+  rejudge: RejudgeOffer | null;
   empty: string;
   footer?: (entries: FeedEntry[]) => ReactNode;
 }) {
@@ -77,25 +84,48 @@ export function GradingsList({
         ) : null
     : null;
 
-  const rejudging = rejudge !== null && manages(rejudge.task) ? rejudge : null;
+  /** The Rejudge button's words and what it asks, or null where none is offered. */
+  const offer = ((): { words: string; asking: Asking } | null => {
+    if (rejudge === null) return null;
+    if ('tasks' in rejudge) {
+      const choose = rejudge.tasks
+        .filter(manages)
+        .map((task) => ({ value: task, label: titleFor(task) }));
+      if (choose.length === 0) return null;
+      const first =
+        rejudge.task !== null && choose.some((task) => task.value === rejudge.task)
+          ? rejudge.task
+          : '';
+      return {
+        words: 'Rejudge a task',
+        asking: {
+          kind: 'rejudge',
+          task: first,
+          title: first === '' ? '' : titleFor(first),
+          choose,
+        },
+      };
+    }
+    if (!manages(rejudge.task)) return null;
+    return {
+      words: rejudge.button ?? `Rejudge ${titleFor(rejudge.task)}`,
+      asking: { kind: 'rejudge', task: rejudge.task, title: titleFor(rejudge.task) },
+    };
+  })();
 
   return (
     <>
-      {rejudging !== null && (
+      {offer !== null && (
         <div className={classes.actions}>
           <Button
             size="xs"
             variant="secondary"
             onClick={() => {
               setRejudged(null);
-              ask({
-                kind: 'rejudge',
-                task: rejudging.task,
-                title: titleFor(rejudging.task),
-              });
+              ask(offer.asking);
             }}
           >
-            {rejudging.button ?? `Rejudge ${titleFor(rejudging.task)}`}
+            {offer.words}
           </Button>
         </div>
       )}

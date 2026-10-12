@@ -44,7 +44,7 @@ export function ErrorBlock({
         {apiError.status > 0 ? ` · ${String(apiError.status)}` : ''}
       </Code>
       {onRetry !== undefined && (
-        <Button size="xs" variant="secondary" onClick={onRetry}>
+        <Button variant="secondary" onClick={onRetry}>
           Try again
         </Button>
       )}

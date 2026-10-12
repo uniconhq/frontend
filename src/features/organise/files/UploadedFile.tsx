@@ -54,13 +54,12 @@ export function UploadedFile({
         <dd className={classes.digest}>{upload.digest}</dd>
       </dl>
       <BodyText tone="secondary">
-        Its bytes are in the forge&apos;s store and its commit holds a pointer to them,
-        so it does not open as text.
+        It was uploaded, so it is shown by its size rather than opened as text.
         {token !== null && ' To change it, upload it again.'}
       </BodyText>
       {manages && !again && (
         <div className={shared.actions}>
-          <Button size="xs" variant="secondary" onClick={() => setAgain(true)}>
+          <Button variant="secondary" onClick={() => setAgain(true)}>
             Upload again
           </Button>
         </div>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { screen, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@/test/user-event';
 import { http, HttpResponse } from 'msw';
 import type { SaveRequest, Upload } from '@/api/types';
@@ -7,7 +7,7 @@ import { renderApp } from '@/test/render';
 import { problem, server, signedIn, someone } from '@/test/server';
 import { TASK_API, publicationList, repoFiles, taskState } from '@/test/organiser';
 
-const TASK = '/orgs/acme/contests/spring/tasks/sum';
+const TASK = '/orgs/acme/contests/spring/tasks/sum/files';
 const UPLOAD = '0199a2c1-6b7e-7c3a-9f10-5d2e4b8a6c99';
 const DOOR = `/-/uploads/${UPLOAD}`;
 /** The SHA-256 of `1 2\n`, the file the tests upload. */
@@ -83,13 +83,14 @@ function uploadRoutes({
   return { seen, handlers };
 }
 
-/** A task whose top folder holds `train.csv`, an upload of 300 MB. */
+/** A task whose top folder holds `train.csv`, an upload of 300 MB, beside a typed note. */
 const DIGEST = 'b'.repeat(64);
 const withUploadedFile = [
   http.get(`${TASK_API}/tree`, ({ request }) =>
     new URL(request.url).searchParams.get('path') === ''
       ? HttpResponse.json([
           { path: 'task.yaml', kind: 'file', size: 120, upload: null },
+          { path: 'notes.md', kind: 'file', size: 12, upload: null },
           {
             path: 'train.csv',
             kind: 'file',
@@ -116,7 +117,7 @@ async function openUpload() {
 }
 
 describe("uploading a file into a task's tree", () => {
-  it('sends the file through the door into the folder picked, and saves it into the task by its upload', async () => {
+  it('uploads the file into the folder picked and saves it into the task in one step, by its upload', async () => {
     const routes = uploadRoutes();
     server.use(signedIn, taskState, publicationList, ...repoFiles, ...routes.handlers);
     renderApp(TASK);
@@ -126,13 +127,17 @@ describe("uploading a file into a task's tree", () => {
     const panel = await openUpload();
     await userEvent.upload(within(panel).getByLabelText('File to upload'), dataset());
     expect(
-      within(panel).getByRole('textbox', { name: /Path in the task/ }),
+      within(panel).getByRole('textbox', { name: /Where to save it/ }),
     ).toHaveValue('data/train.csv');
-    await userEvent.click(within(panel).getByRole('button', { name: 'Upload' }));
+    await userEvent.click(
+      within(panel).getByRole('button', { name: 'Upload and save' }),
+    );
 
-    const arrived = await within(panel).findByText(/has arrived/);
-    expect(arrived).toHaveTextContent('data/train.csv has arrived, 4 bytes.');
-    expect(within(panel).getByText(/It is not in the task yet/)).toBeVisible();
+    expect(
+      await within(panel).findByText('Saved and published as publication 3.'),
+    ).toBeVisible();
+    expect(panel).not.toHaveTextContent(/SHA-256|hash/i);
+    expect(within(panel).queryByText(/Leaving this page loses it/)).toBeNull();
     expect(routes.seen.slots).toEqual([
       {
         path: 'data/train.csv',
@@ -142,17 +147,16 @@ describe("uploading a file into a task's tree", () => {
       },
     ]);
     expect(routes.seen.puts).toBe(1);
-    expect(routes.seen.saves).toEqual([]);
-
-    await userEvent.click(
-      within(panel).getByRole('button', { name: 'Save into the task' }),
-    );
-
-    expect(await within(panel).findByText('Published as publication 3.')).toBeVisible();
     expect(routes.seen.saves).toEqual([
       {
         changes: [
-          { path: 'data/train.csv', upload: UPLOAD, token: null, encoding: 'utf-8' },
+          {
+            path: 'data/train.csv',
+            upload: UPLOAD,
+            token: null,
+            encoding: 'utf-8',
+            remove: false,
+          },
         ],
         confirm: false,
         keep_as_draft: false,
@@ -167,11 +171,13 @@ describe("uploading a file into a task's tree", () => {
 
     const panel = await openUpload();
     await userEvent.upload(within(panel).getByLabelText('File to upload'), dataset());
-    await userEvent.click(within(panel).getByRole('button', { name: 'Upload' }));
-
-    expect(await within(panel).findByText(/has arrived/)).toHaveTextContent(
-      'train.csv has arrived',
+    await userEvent.click(
+      within(panel).getByRole('button', { name: 'Upload and save' }),
     );
+
+    expect(
+      await within(panel).findByText('Saved and published as publication 3.'),
+    ).toBeVisible();
     expect(routes.seen.puts).toBe(0);
     expect(routes.seen.completes).toBe(1);
   });
@@ -185,9 +191,13 @@ describe("uploading a file into a task's tree", () => {
 
     const panel = await openUpload();
     await userEvent.upload(within(panel).getByLabelText('File to upload'), dataset());
-    await userEvent.click(within(panel).getByRole('button', { name: 'Upload' }));
+    await userEvent.click(
+      within(panel).getByRole('button', { name: 'Upload and save' }),
+    );
 
-    expect(await within(panel).findByText(/has arrived/)).toBeVisible();
+    expect(
+      await within(panel).findByText('Saved and published as publication 3.'),
+    ).toBeVisible();
     expect(routes.seen.puts).toBe(2);
     expect(routes.seen.slots).toHaveLength(1);
   });
@@ -201,7 +211,9 @@ describe("uploading a file into a task's tree", () => {
 
     const panel = await openUpload();
     await userEvent.upload(within(panel).getByLabelText('File to upload'), dataset());
-    await userEvent.click(within(panel).getByRole('button', { name: 'Upload' }));
+    await userEvent.click(
+      within(panel).getByRole('button', { name: 'Upload and save' }),
+    );
 
     const alert = await within(panel).findByRole('alert');
     expect(alert).toHaveTextContent('The upload did not go through');
@@ -216,17 +228,14 @@ describe("uploading a file into a task's tree", () => {
 
     const panel = await openUpload();
     await userEvent.upload(within(panel).getByLabelText('File to upload'), dataset());
-    const path = within(panel).getByRole('textbox', { name: /Path in the task/ });
+    const path = within(panel).getByRole('textbox', { name: /Where to save it/ });
     await userEvent.clear(path);
     await userEvent.type(path, 'data/testcases/1.in');
-    await userEvent.click(within(panel).getByRole('button', { name: 'Upload' }));
-
-    expect(await within(panel).findByText(/replaces the file there now/)).toBeVisible();
     await userEvent.click(
-      within(panel).getByRole('button', { name: 'Save into the task' }),
+      within(panel).getByRole('button', { name: 'Upload and save' }),
     );
 
-    await within(panel).findByText('Published as publication 3.');
+    await within(panel).findByText('Saved and published as publication 3.');
     expect(routes.seen.saves).toMatchObject([
       {
         changes: [{ path: 'data/testcases/1.in', upload: UPLOAD, token: 'token-1-in' }],
@@ -234,14 +243,18 @@ describe("uploading a file into a task's tree", () => {
     ]);
   });
 
-  it('says when someone changed the file meanwhile, and saves over it once asked', async () => {
+  /**
+   * The upload door and a save refused the first time as a conflict, someone
+   * else, alice, having saved a train.csv of their own meanwhile.
+   */
+  function theirsSavedFirst() {
     const routes = uploadRoutes();
-    let writes = 0;
+    const saves: SaveRequest[] = [];
     server.use(signedIn, taskState, publicationList, ...repoFiles, ...routes.handlers);
     server.use(
-      http.post(`${TASK_API}/save`, () => {
-        writes += 1;
-        if (writes === 1) return problem(409, 'conflict');
+      http.post(`${TASK_API}/save`, async ({ request }) => {
+        saves.push((await request.json()) as SaveRequest);
+        if (saves.length === 1) return problem(409, 'conflict');
         return HttpResponse.json({
           number: 4,
           version: 'def5678abc',
@@ -251,29 +264,94 @@ describe("uploading a file into a task's tree", () => {
           regraded: 0,
         });
       }),
+      http.get(`${TASK_API}/files/:path`, ({ params }) =>
+        params['path'] === 'train.csv' && saves.length > 0
+          ? HttpResponse.json({
+              path: 'train.csv',
+              encoding: 'utf-8',
+              content: 'pointer',
+              token: 'token-theirs',
+              upload: { size: 2048, digest: 'b'.repeat(64) },
+            })
+          : undefined,
+      ),
+      http.get(`${TASK_API}/history`, () =>
+        HttpResponse.json([
+          {
+            version: 'theirs1',
+            at: '2026-10-11T14:02:00Z',
+            author: 'alice',
+            author_id: 3,
+            message: 'Upload train.csv',
+          },
+        ]),
+      ),
     );
-    renderApp(TASK);
+    return saves;
+  }
 
+  async function uploadAndSave() {
+    renderApp(TASK);
     const panel = await openUpload();
     await userEvent.upload(within(panel).getByLabelText('File to upload'), dataset());
-    await userEvent.click(within(panel).getByRole('button', { name: 'Upload' }));
     await userEvent.click(
-      await within(panel).findByRole('button', { name: 'Save into the task' }),
+      within(panel).getByRole('button', { name: 'Upload and save' }),
+    );
+    return panel;
+  }
+
+  it('shows whose the file is when someone saved it meanwhile, and saves over it after a warning', async () => {
+    const saves = theirsSavedFirst();
+    const panel = await uploadAndSave();
+
+    const files = await within(panel).findByRole('list', { name: 'Files that differ' });
+    const row = within(files).getByRole('radiogroup', { name: 'train.csv' });
+    expect(row).toHaveTextContent('Yours: Your upload, 4 bytes');
+    expect(
+      await within(row).findByText(/^Now: 2 KB, saved by alice on /),
+    ).toBeVisible();
+    await userEvent.click(
+      within(panel).getByRole('button', { name: 'Save mine over theirs' }),
+    );
+    const warning = await screen.findByRole('dialog', {
+      name: 'Save yours over theirs?',
+    });
+    expect(warning).toHaveTextContent(
+      'This throws away what the other person saved in train.csv.',
+    );
+    await userEvent.click(
+      within(warning).getByRole('button', { name: 'Save mine over theirs' }),
     );
 
-    const alert = await within(panel).findByRole('alert');
-    expect(alert).toHaveTextContent(
-      'Someone else changed train.csv since the upload began.',
-    );
-    await userEvent.click(
-      within(alert).getByRole('button', { name: 'Save over their version' }),
-    );
-
-    expect(await within(panel).findByText('Published as publication 4.')).toBeVisible();
-    expect(writes).toBe(2);
+    expect(
+      await within(panel).findByText('Saved and published as publication 4.'),
+    ).toBeVisible();
+    expect(saves[1]?.changes).toMatchObject([
+      { path: 'train.csv', upload: UPLOAD, token: 'token-theirs' },
+    ]);
   });
 
-  it('keeps uploads waiting and saves them with the next one, in one save and one confirmation', async () => {
+  it('keeps their file when theirs is chosen, saying the upload is lost on leaving until discarded', async () => {
+    const saves = theirsSavedFirst();
+    const panel = await uploadAndSave();
+
+    await within(panel).findByRole('list', { name: 'Files that differ' });
+    expect(within(panel).getByText(/Leaving this page loses it/)).toBeVisible();
+    await userEvent.click(
+      within(panel).getByRole('button', { name: 'Save the merged version' }),
+    );
+
+    await waitFor(() =>
+      expect(
+        within(panel).queryByRole('list', { name: 'Files that differ' }),
+      ).toBeNull(),
+    );
+    expect(saves).toHaveLength(1);
+    await userEvent.click(within(panel).getByRole('button', { name: 'Discard it' }));
+    expect(within(panel).queryByText(/Leaving this page loses it/)).toBeNull();
+  });
+
+  it('holds an upload a running contest asks to confirm, saying leaving loses it, and saves it once confirmed', async () => {
     const routes = uploadRoutes();
     server.use(signedIn, taskState, publicationList, ...repoFiles, ...routes.handlers);
     server.use(
@@ -281,12 +359,12 @@ describe("uploading a file into a task's tree", () => {
         const body = (await request.json()) as SaveRequest;
         routes.seen.saves.push(body);
         if (!body.confirm)
-          return problem(409, 'confirmation_required', { changes: ['the tests'] });
+          return problem(409, 'confirmation_required', { changes: ['the data'] });
         return HttpResponse.json({
           number: 5,
           version: 'abc1234def',
           grading_changed: true,
-          changes: ['the tests'],
+          changes: ['the data'],
           notes: [],
           regraded: 0,
         });
@@ -295,89 +373,77 @@ describe("uploading a file into a task's tree", () => {
     renderApp(TASK);
 
     const panel = await openUpload();
-    const upload = async (path: string) => {
-      await userEvent.upload(within(panel).getByLabelText('File to upload'), dataset());
-      const field = within(panel).getByRole('textbox', { name: /Path in the task/ });
-      await userEvent.clear(field);
-      await userEvent.type(field, path);
-      await userEvent.click(within(panel).getByRole('button', { name: 'Upload' }));
-      await within(panel).findByText(/has arrived/);
-    };
-    await upload('tests/main/1/input');
+    await userEvent.upload(within(panel).getByLabelText('File to upload'), dataset());
     await userEvent.click(
-      within(panel).getByRole('button', { name: 'Keep it waiting' }),
+      within(panel).getByRole('button', { name: 'Upload and save' }),
     );
 
-    const waiting = screen.getByRole('region', { name: 'Waiting to be saved' });
-    expect(
-      within(waiting).getByRole('list', { name: 'Uploads waiting to be saved' }),
-    ).toHaveTextContent('tests/main/1/input');
-    expect(within(waiting).getByText(/kept on this page only/)).toBeVisible();
-    expect(routes.seen.saves).toEqual([]);
-
-    await upload('tests/main/1/answer');
-    expect(
-      within(panel).getByText(/waiting to be saved go in the same save/),
-    ).toBeVisible();
-    expect(
-      within(waiting).queryByRole('button', { name: 'Save into the task' }),
-    ).toBeNull();
-    await userEvent.click(
-      within(panel).getByRole('button', { name: 'Save into the task' }),
+    const unsaved = await within(panel).findByText(
+      /has been uploaded but is not saved into the task\. Leaving this page loses it\./,
+      {},
+      // Reading a file to send it takes a while beside a full run of the suite.
+      { timeout: 5000 },
     );
+    expect(unsaved).toHaveTextContent('train.csv, 4 bytes,');
+    expect(
+      within(panel).getByRole('button', { name: 'Upload and save' }),
+    ).toBeDisabled();
     await userEvent.click(
       await within(panel).findByRole('button', { name: 'Publish the change' }),
     );
 
-    expect(await within(panel).findByText('Published as publication 5.')).toBeVisible();
+    expect(
+      await within(panel).findByText('Saved and published as publication 5.'),
+    ).toBeVisible();
+    expect(within(panel).queryByText(/Leaving this page loses it/)).toBeNull();
     expect(routes.seen.saves).toHaveLength(2);
     expect(routes.seen.saves[1]).toEqual({
       changes: [
-        { path: 'tests/main/1/input', upload: UPLOAD, token: null, encoding: 'utf-8' },
-        { path: 'tests/main/1/answer', upload: UPLOAD, token: null, encoding: 'utf-8' },
+        {
+          path: 'train.csv',
+          upload: UPLOAD,
+          token: null,
+          encoding: 'utf-8',
+          remove: false,
+        },
       ],
       confirm: true,
       keep_as_draft: false,
     });
-    expect(screen.queryByRole('region', { name: 'Waiting to be saved' })).toBeNull();
   });
 
-  it('saves the waiting uploads from their list, leaving out one discarded', async () => {
+  it('takes no test and no settings, saying where each is changed instead', async () => {
     const routes = uploadRoutes();
     server.use(signedIn, taskState, publicationList, ...repoFiles, ...routes.handlers);
     renderApp(TASK);
 
     const panel = await openUpload();
-    for (const path of ['data/a.csv', 'data/b.csv']) {
-      await userEvent.upload(within(panel).getByLabelText('File to upload'), dataset());
-      const field = within(panel).getByRole('textbox', { name: /Path in the task/ });
-      await userEvent.clear(field);
-      await userEvent.type(field, path);
-      await userEvent.click(within(panel).getByRole('button', { name: 'Upload' }));
-      await userEvent.click(
-        await within(panel).findByRole('button', { name: 'Keep it waiting' }),
-      );
-    }
-    await userEvent.click(within(panel).getByRole('button', { name: 'Close' }));
-
-    const waiting = screen.getByRole('region', { name: 'Waiting to be saved' });
-    expect(within(waiting).getByText(/2 uploads are waiting/)).toBeVisible();
-    await userEvent.click(
-      within(waiting).getByRole('button', { name: 'Discard data/a.csv' }),
-    );
-    await userEvent.click(
-      within(waiting).getByRole('button', { name: 'Save into the task' }),
-    );
+    await userEvent.upload(within(panel).getByLabelText('File to upload'), dataset());
+    const field = within(panel).getByRole('textbox', { name: /Where to save it/ });
+    await userEvent.clear(field);
+    await userEvent.type(field, 'tests/main/1/input');
 
     expect(
-      await within(waiting).findByText('Published as publication 3.'),
+      within(panel).getByText(
+        'Tests are added on the task’s page, in its Tests and scoring card.',
+      ),
     ).toBeVisible();
-    expect(routes.seen.saves).toMatchObject([
-      { changes: [{ path: 'data/b.csv', upload: UPLOAD, token: null }] },
-    ]);
     expect(
-      within(waiting).queryByRole('list', { name: 'Uploads waiting to be saved' }),
-    ).toBeNull();
+      within(panel).getByRole('link', { name: 'Go to Tests and scoring' }),
+    ).toHaveAttribute('href', '/orgs/acme/contests/spring/tasks/sum?card=tests');
+    expect(
+      within(panel).getByRole('button', { name: 'Upload and save' }),
+    ).toBeDisabled();
+
+    await userEvent.clear(field);
+    await userEvent.type(field, 'task.yaml');
+    expect(
+      within(panel).getByText('The task’s settings are changed on its page.'),
+    ).toBeVisible();
+    expect(
+      within(panel).getByRole('button', { name: 'Upload and save' }),
+    ).toBeDisabled();
+    expect(routes.seen.slots).toEqual([]);
   });
 
   it('shows a refused slot in words for the organiser', async () => {
@@ -392,7 +458,9 @@ describe("uploading a file into a task's tree", () => {
 
     const panel = await openUpload();
     await userEvent.upload(within(panel).getByLabelText('File to upload'), dataset());
-    await userEvent.click(within(panel).getByRole('button', { name: 'Upload' }));
+    await userEvent.click(
+      within(panel).getByRole('button', { name: 'Upload and save' }),
+    );
 
     expect(await within(panel).findByRole('alert')).toHaveTextContent(
       'That path cannot be used',
@@ -407,7 +475,7 @@ describe("uploading a file into a task's tree", () => {
     expect(
       await within(tree).findByRole('link', { name: 'train.csv uploaded, 300 MB' }),
     ).toBeVisible();
-    expect(within(tree).getByRole('link', { name: 'task.yaml' })).toBeVisible();
+    expect(within(tree).getByRole('link', { name: 'notes.md' })).toBeVisible();
   });
 
   it('shows an uploaded file as its size and digest, never in the editor, and uploads it again', async () => {
@@ -430,16 +498,15 @@ describe("uploading a file into a task's tree", () => {
 
     await userEvent.click(within(shown).getByRole('button', { name: 'Upload again' }));
     const panel = within(shown).getByRole('region', { name: 'Upload train.csv again' });
-    const path = within(panel).getByRole('textbox', { name: /Path in the task/ });
+    const path = within(panel).getByRole('textbox', { name: /Where to save it/ });
     expect(path).toHaveValue('train.csv');
     expect(path).toBeDisabled();
     await userEvent.upload(within(panel).getByLabelText('New train.csv'), dataset());
-    await userEvent.click(within(panel).getByRole('button', { name: 'Upload' }));
     await userEvent.click(
-      await within(panel).findByRole('button', { name: 'Save into the task' }),
+      within(panel).getByRole('button', { name: 'Upload and save' }),
     );
 
-    await within(panel).findByText('Published as publication 3.');
+    await within(panel).findByText('Saved and published as publication 3.');
     expect(routes.seen.saves).toMatchObject([
       { changes: [{ path: 'train.csv', upload: UPLOAD, token: 'token-train' }] },
     ]);

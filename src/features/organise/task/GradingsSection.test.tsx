@@ -8,9 +8,14 @@ import { problem, server, signedIn, someone } from '@/test/server';
 import { graded, reported } from '@/test/contestant';
 import { TASK_API, publicationList, repoFiles, taskState } from '@/test/organiser';
 
-const TASK = '/orgs/acme/contests/spring/tasks/sum';
+const TASK = '/orgs/acme/contests/spring/tasks/sum/gradings';
 
-const ada: Submitter = { user_id: 11, name: 'ada', team: null };
+const ada: Submitter = {
+  entrant: 'e-ada',
+  entrant_name: 'ada',
+  user_id: 11,
+  username: 'ada',
+};
 
 /** A grading of sum, the contest's task B, as the route answers it. */
 function entry(grading: Grading, by: Submitter = ada): FeedEntry {
@@ -43,6 +48,7 @@ const stuck: Grading = {
   falls_back: false,
   last_good: null,
   fallback: null,
+  submitted_by: null,
 };
 
 const waiting: Grading = {
@@ -121,9 +127,9 @@ describe("the task's gradings", () => {
 
     const table = await screen.findByRole('table', { name: 'Gradings' });
     const [, stopped, passed, failed] = within(table).getAllByRole('row');
-    expect(stopped).toHaveTextContent('compile_error');
-    expect(passed).toHaveTextContent('accepted');
-    expect(failed).toHaveTextContent('time_limit');
+    expect(stopped).toHaveTextContent('COMPILE ERROR');
+    expect(passed).toHaveTextContent('ACCEPTED');
+    expect(failed).toHaveTextContent('TIME LIMIT');
     expect(within(table).queryByRole('columnheader', { name: 'Stage' })).toBeNull();
   });
 
@@ -238,7 +244,7 @@ describe("the task's gradings", () => {
     ).toBeNull();
   });
 
-  it('cancels only once asked, with the sentence the contestant reads', async () => {
+  it('cancels only once asked, with the sentence the entrant reads', async () => {
     const cancelled: { grading: string; body: unknown }[] = [];
     server.use(
       signedIn,
@@ -277,7 +283,7 @@ describe("the task's gradings", () => {
     });
     expect(confirm).toBeDisabled();
     const field = within(dialog).getByRole('textbox', {
-      name: /What the contestant reads/,
+      name: /What the entrant reads/,
     });
     expect(field).toBeRequired();
     expect(field).toHaveAttribute('maxlength', '500');
@@ -307,7 +313,7 @@ describe("the task's gradings", () => {
 
     const table = await screen.findByRole('table', { name: 'Gradings' });
     expect(table).toHaveTextContent('Cancelled');
-    expect(table).toHaveTextContent('Told the contestant: “The checker crashed.”');
+    expect(table).toHaveTextContent('Told the entrant: “The checker crashed.”');
   });
 
   it.each([
@@ -336,7 +342,7 @@ describe("the task's gradings", () => {
       );
       const dialog = await screen.findByRole('dialog');
       await userEvent.type(
-        within(dialog).getByRole('textbox', { name: /What the contestant reads/ }),
+        within(dialog).getByRole('textbox', { name: /What the entrant reads/ }),
         'The checker crashed.',
       );
       await userEvent.click(
@@ -381,7 +387,7 @@ describe("the task's gradings", () => {
       name: 'B submission 3 by ada',
     });
     expect(within(third).getAllByRole('row')).toHaveLength(1);
-    expect(third).toHaveTextContent('compile_error');
+    expect(third).toHaveTextContent('COMPILE ERROR');
     expect(third).toHaveTextContent('publication 3');
 
     const toggle = within(third).getByRole('button', {
@@ -426,7 +432,12 @@ describe("the task's gradings", () => {
       status: 'queued',
       error: null,
     };
-    const grace: Submitter = { user_id: 12, name: 'grace', team: null };
+    const grace: Submitter = {
+      entrant: 'e-grace',
+      entrant_name: 'grace',
+      user_id: 12,
+      username: 'grace',
+    };
     server.use(
       signedIn,
       taskState,
@@ -613,12 +624,11 @@ describe("the organisers' scored view of a submission", () => {
     );
 
     const view = await screen.findByRole('region', { name: 'Submission 3, scored' });
-    expect(asked[0]?.get('user_id')).toBe('11');
-    expect(asked[0]?.has('team')).toBe(false);
+    expect(asked[0]?.get('entrant')).toBe('e-ada');
     const main = within(view).getByRole('region', { name: 'Group main' });
     expect(main).toHaveTextContent('100 / 100 points');
-    expect(main).toHaveTextContent(/Its row sees this at/);
-    expect(main).not.toHaveTextContent(/Its row sees its tests at/);
+    expect(main).toHaveTextContent(/Its entrant sees this at/);
+    expect(main).not.toHaveTextContent(/Its entrant sees its tests at/);
     expect(within(main).getByRole('table', { name: 'Tests main' })).toHaveTextContent(
       'main/1',
     );
@@ -626,7 +636,7 @@ describe("the organisers' scored view of a submission", () => {
     expect(view).toHaveTextContent('Done');
   });
 
-  it("asks for a team's submission by its team", async () => {
+  it("asks for a team's submission by its entrant", async () => {
     const asked: URLSearchParams[] = [];
     const team = '0192f4a4-7b7e-7000-8000-000000000001';
     server.use(
@@ -635,7 +645,14 @@ describe("the organisers' scored view of a submission", () => {
       publicationList,
       ...repoFiles,
       http.get(`${TASK_API}/gradings`, () =>
-        HttpResponse.json([entry(done, { user_id: null, team, name: 'Byte Me' })]),
+        HttpResponse.json([
+          entry(done, {
+            entrant: team,
+            entrant_name: 'Byte Me',
+            user_id: 12,
+            username: 'grace',
+          }),
+        ]),
       ),
       http.get(`${TASK_API}/organise/submissions/:number`, ({ request }) => {
         asked.push(new URL(request.url).searchParams);
@@ -650,7 +667,6 @@ describe("the organisers' scored view of a submission", () => {
     );
 
     await screen.findByRole('region', { name: 'Submission 3, scored' });
-    expect(asked[0]?.get('team')).toBe(team);
-    expect(asked[0]?.has('user_id')).toBe(false);
+    expect(asked[0]?.get('entrant')).toBe(team);
   });
 });

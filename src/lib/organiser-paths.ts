@@ -26,26 +26,6 @@ export function taskPath(org: string, contest: string, task: string): string {
   return `${contestPath(org, contest)}/tasks/${part(task)}`;
 }
 
-export function clarificationsPath(org: string): string {
-  return `${orgPath(org)}/clarifications`;
-}
-
-export function contestantsPath(org: string, contest: string): string {
-  return `${contestPath(org, contest)}/contestants`;
-}
-
-export function teamsPath(org: string, contest: string): string {
-  return `${contestPath(org, contest)}/teams`;
-}
-
-export function gradingsPath(org: string, contest: string): string {
-  return `${contestPath(org, contest)}/gradings`;
-}
-
-export function boardsPath(org: string, contest: string): string {
-  return `${contestPath(org, contest)}/boards`;
-}
-
 /**
  * The workflow pages, at `/workflows` and `/workflows/<owner>/<name>`, which
  * the proxy sends here as well: a workflow is a person's or an org's, so it

@@ -1,6 +1,10 @@
-import { Anchor, Typography } from '@mantine/core';
+import { useMemo } from 'react';
+import { Typography } from '@mantine/core';
 import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { taskPictureHref, type TaskWhere } from '@/lib/task-pictures';
+import { OutLink } from './OutLink';
+import classes from './Markdown.module.css';
 
 /** Whether a link leaves this site, and so opens apart from it. */
 function external(href: string | undefined): boolean {
@@ -12,48 +16,74 @@ function external(href: string | undefined): boolean {
  * page that has its own title: a statement's `# Sum` is the page's second
  * level, and the page keeps one first-level heading. A link out of the site
  * opens in a tab of its own and tells the other site nothing about this one.
- * An image is a link to it rather than a picture, so reading a statement
- * fetches nothing from a host its author picked, which would hand that host
- * every reader's address; a statement's own files are not served here anyway.
+ *
+ * An image is drawn only when it is one of the task's own pictures, a file
+ * under its `public/` folder named as `public/diagram.png`, and only in what
+ * belongs to a task (`task`); it is read from the task's own route, under
+ * the same rights as the statement. Any other image is a link to it with its
+ * alt text, so reading a statement fetches nothing from a host its author
+ * picked, which would hand that host every reader's address.
  */
-const COMPONENTS: Components = {
-  h1: 'h2',
-  h2: 'h3',
-  h3: 'h4',
-  h4: 'h5',
-  h5: 'h6',
-  a: ({ href, children }) =>
-    external(href) ? (
-      <Anchor href={href} target="_blank" rel="noopener noreferrer">
-        {children}
-      </Anchor>
-    ) : (
-      <Anchor href={href}>{children}</Anchor>
-    ),
-  img: ({ src, alt }) => {
-    const target = typeof src === 'string' ? src : undefined;
-    const text = alt !== undefined && alt !== '' ? alt : target;
-    return target === undefined ? (
-      <span>{text}</span>
-    ) : (
-      <Anchor href={target} target="_blank" rel="noopener noreferrer">
-        {text}
-      </Anchor>
-    );
-  },
-};
+function componentsFor(task: TaskWhere | null): Components {
+  return {
+    h1: 'h2',
+    h2: 'h3',
+    h3: 'h4',
+    h4: 'h5',
+    h5: 'h6',
+    a: ({ href, children }) =>
+      href === undefined ? (
+        <span>{children}</span>
+      ) : (
+        <OutLink href={href} newTab={external(href)}>
+          {children}
+        </OutLink>
+      ),
+    img: ({ src, alt }) => {
+      const target = typeof src === 'string' ? src : undefined;
+      const own =
+        task === null || target === undefined ? null : taskPictureHref(task, target);
+      if (own !== null) {
+        return (
+          <img src={own} alt={alt ?? ''} loading="lazy" className={classes.picture} />
+        );
+      }
+      const text = alt !== undefined && alt !== '' ? alt : target;
+      return target === undefined ? (
+        <span>{text}</span>
+      ) : (
+        <OutLink href={target} newTab>
+          {text}
+        </OutLink>
+      );
+    },
+  };
+}
 
 /**
  * A statement or any other Markdown an organiser wrote, with GitHub's tables
  * and task lists. Raw HTML inside it is left out, never run, and links keep
  * only the safe kinds react-markdown lets through, since the author is not
- * the person reading it. Application code imports this, never react-markdown,
- * which the lint rules hold it to.
+ * the person reading it. `task` is the task it belongs to, for a statement or
+ * a task's announcement, whose own pictures it draws. Application code
+ * imports this, never react-markdown, which the lint rules hold it to.
  */
-export function Markdown({ children }: { children: string }) {
+export function Markdown({ children, task }: { children: string; task?: TaskWhere }) {
+  const org = task?.org;
+  const contest = task?.contest;
+  const name = task?.task;
+  const components = useMemo(
+    () =>
+      componentsFor(
+        org === undefined || contest === undefined || name === undefined
+          ? null
+          : { org, contest, task: name },
+      ),
+    [org, contest, name],
+  );
   return (
     <Typography>
-      <ReactMarkdown remarkPlugins={[remarkGfm]} components={COMPONENTS} skipHtml>
+      <ReactMarkdown remarkPlugins={[remarkGfm]} components={components} skipHtml>
         {children}
       </ReactMarkdown>
     </Typography>

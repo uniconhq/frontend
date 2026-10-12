@@ -11,9 +11,11 @@ describe('LoginPage', () => {
     const button = await screen.findByRole('link', { name: 'Sign in with Forgejo' });
     expect(button).toHaveAttribute('href', '/api/v1/auth/login?next=%2Faccount');
     expect(screen.getByText(/You will sign in through/)).toBeInTheDocument();
+    // The host is said, not linked: Forgejo's front page starts a sign-in of its own.
     expect(
-      await screen.findByRole('link', { name: 'forge.localhost:8080' }),
-    ).toHaveAttribute('href', 'http://forge.localhost:8080');
+      await screen.findByText(/You will sign in through forge\.localhost:8080,/),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'forge.localhost:8080' })).toBeNull();
   });
 
   it.each([

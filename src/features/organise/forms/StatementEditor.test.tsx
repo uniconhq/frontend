@@ -40,12 +40,14 @@ function statementBackend(
 describe('the statement beside its preview', { timeout: 20_000 }, () => {
   it('shows a statement that is an upload by its size and digest, never as text', async () => {
     statementBackend(() => HttpResponse.json({}), { size: 40, digest: 'c'.repeat(64) });
-    renderApp('/orgs/acme/contests/spring/tasks/sum');
-    await userEvent.click(
-      await screen.findByRole('button', { name: 'Edit the statement' }),
-    );
+    renderApp('/orgs/acme/contests/spring/tasks/sum/statement');
 
-    const shown = await screen.findByRole('region', { name: 'Uploaded statement.md' });
+    // The statement is a card of the task's whole page, which takes its reads first.
+    const shown = await screen.findByRole(
+      'region',
+      { name: 'Uploaded statement.md' },
+      { timeout: 5000 },
+    );
     expect(within(shown).getByText('c'.repeat(64))).toBeVisible();
     expect(screen.queryByRole('textbox', { name: 'Statement source' })).toBeNull();
   });
@@ -60,13 +62,10 @@ describe('the statement beside its preview', { timeout: 20_000 }, () => {
         regraded: 0,
       }),
     );
-    renderApp('/orgs/acme/contests/spring/tasks/sum');
-    await userEvent.click(
-      await screen.findByRole('button', { name: 'Edit the statement' }),
-    );
+    renderApp('/orgs/acme/contests/spring/tasks/sum/statement');
 
     const source = await screen.findByRole('textbox', { name: 'Statement source' });
-    const preview = screen.getByRole('region', { name: 'What contestants see' });
+    const preview = screen.getByRole('region', { name: 'What entrants see' });
     expect(within(preview).getByRole('heading', { name: 'Sum' })).toBeVisible();
 
     fireEvent.change(source, { target: { value: '# Sum of two\n\nAdd **both**.\n' } });
@@ -74,7 +73,9 @@ describe('the statement beside its preview', { timeout: 20_000 }, () => {
     expect(within(preview).getByText('both').tagName).toBe('STRONG');
     await userEvent.click(screen.getByRole('button', { name: 'Save statement' }));
 
-    expect(await screen.findByText('Published as publication 3.')).toBeVisible();
+    expect(
+      await screen.findByText('Saved and published as publication 3.'),
+    ).toBeVisible();
     expect(sent).toEqual([
       {
         content: '# Sum of two\n\nAdd **both**.\n',
@@ -84,6 +85,28 @@ describe('the statement beside its preview', { timeout: 20_000 }, () => {
         keep_as_draft: false,
       },
     ]);
+  });
+
+  it('draws the task’s own pictures in the preview and says how to show one', async () => {
+    statementBackend(() => HttpResponse.json({}));
+    renderApp('/orgs/acme/contests/spring/tasks/sum/statement');
+
+    const source = await screen.findByRole('textbox', { name: 'Statement source' });
+    const preview = screen.getByRole('region', { name: 'What entrants see' });
+    fireEvent.change(source, {
+      target: { value: '![the tree](public/tree.png) ![afar](https://a.test/x.png)\n' },
+    });
+    expect(within(preview).getByRole('img', { name: 'the tree' })).toHaveAttribute(
+      'src',
+      '/api/v1/orgs/acme/contests/spring/tasks/sum/public/tree.png',
+    );
+    expect(within(preview).getByRole('link', { name: 'afar' })).toBeVisible();
+    const hint = screen.getByText(/To show a picture, upload it in the task/);
+    expect(hint).toBeVisible();
+    expect(within(hint).getByRole('link', { name: 'Files' })).toHaveAttribute(
+      'href',
+      '/orgs/acme/contests/spring/tasks/sum/files',
+    );
   });
 
   it('shows a manager the statement read-only, with no way to save it', async () => {
@@ -98,16 +121,13 @@ describe('the statement beside its preview', { timeout: 20_000 }, () => {
         }),
       ),
     );
-    renderApp('/orgs/acme/contests/spring/tasks/sum');
-    await userEvent.click(
-      await screen.findByRole('button', { name: 'Read the statement' }),
-    );
+    renderApp('/orgs/acme/contests/spring/tasks/sum/statement');
 
     expect(
       await screen.findByRole('textbox', { name: 'Statement source' }),
     ).toHaveAttribute('readonly');
     expect(
-      screen.getByText('Only an admin of the task changes the statement.'),
+      screen.getByText('Only an admin of the task can change the statement.'),
     ).toBeVisible();
     expect(
       screen.queryByRole('button', { name: 'Save statement' }),

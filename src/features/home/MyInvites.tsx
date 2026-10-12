@@ -1,10 +1,12 @@
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
+import { isApiError } from '@/api/problem';
 import { queryView } from '@/api/query';
-import type { Invite } from '@/api/types';
+import type { Entered, Invite } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
 import { PageLink } from '@/ui/PageLink';
 import { SectionTitle } from '@/ui/SectionTitle';
+import { TextInput } from '@/ui/TextInput';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { contestHomePath } from '@/lib/contest-paths';
 import { contestPath, orgPath, taskPath } from '@/lib/organiser-paths';
@@ -13,24 +15,61 @@ import { formatDateTime } from '@/lib/time';
 import { useDecide, useMyInvites } from './my-invites';
 import classes from './invites.module.css';
 
-const ROLE: Record<Exclude<Invite['grants'], 'contestant'>, string> = {
+type Role = Exclude<Invite['grants'], 'contestant' | 'member'>;
+
+const ROLE: Record<Role, string> = {
   admin: 'The admin role',
   manager: 'The manager role',
   observer: 'The observer role',
 };
 
-const NOW_HOLDS: Record<Exclude<Invite['grants'], 'contestant'>, string> = {
+const NOW_HOLDS: Record<Role, string> = {
   admin: 'You are now an admin at',
   manager: 'You are now a manager at',
   observer: 'You are now an observer at',
 };
 
+/** Whether an invite is to a place in a contest, alone or in a team, rather than a role. */
+function isPlace(grants: Invite['grants']): grants is 'contestant' | 'member' {
+  return grants === 'contestant' || grants === 'member';
+}
+
+/**
+ * Where an invite is, as people know it: its contest by its title, a task in
+ * it by its name and the contest's title, an org by its name.
+ */
+function whereOf(invite: Invite): string {
+  const { where, contest_title: title } = invite;
+  if (title === null || where.contest === null) return scopeName(where);
+  return where.task === null ? title : `${where.task}, a task of ${title}`;
+}
+
 /** What an invite offers and where, in a few words. */
 function offer(invite: Invite): string {
-  const where = scopeName(invite.where);
-  return invite.grants === 'contestant'
+  const where = whereOf(invite);
+  if (!isPlace(invite.grants)) return `${ROLE[invite.grants]} at ${where}`;
+  return invite.entrant === null
     ? `A place in the contest ${where}`
-    : `${ROLE[invite.grants]} at ${where}`;
+    : `A place in the team ${invite.entrant.name}, in the contest ${where}`;
+}
+
+/** What accepting a place did, in a sentence, with where the registration stands. */
+function enteredSentence(entered: Entered, where: string): string {
+  const { name } = entered.entrant;
+  const then =
+    entered.status === 'approved'
+      ? ' You are in.'
+      : entered.status === 'pending'
+        ? ' An organiser approves each registration, and the contest’s page will say when yours is.'
+        : '';
+  switch (entered.how) {
+    case 'joined':
+      return `You joined ${name} in ${where}.${then}`;
+    case 'already':
+      return `You were in ${name} in ${where} already.`;
+    case 'made':
+      return `You are registered for ${where} as ${name}.${then}`;
+  }
 }
 
 /** The organiser's page of the place a role was accepted at. */
@@ -40,15 +79,21 @@ function placePath({ where }: Invite): string {
   return taskPath(where.org, where.contest, where.task);
 }
 
-/** What became of an invite that is no longer waiting, with where to go next. */
-function Outcome({ invite }: { invite: Invite }) {
-  const where = scopeName(invite.where);
+/**
+ * What became of an invite that is no longer waiting, with where to go next.
+ * An accepted place says what accepting did, from `entered` when this page
+ * accepted it, and leads to the contest.
+ */
+function Outcome({ invite, entered }: { invite: Invite; entered: Entered | null }) {
+  const where = whereOf(invite);
   const { grants } = invite;
-  if (invite.status === 'accepted' && grants === 'contestant') {
+  if (invite.status === 'accepted' && isPlace(grants)) {
     return (
       <>
         <BodyText>
-          You have a place in {where}. Register on the contest’s page to take part.
+          {entered === null
+            ? `You accepted your place in ${where}.`
+            : enteredSentence(entered, where)}
         </BodyText>
         {invite.where.contest !== null && (
           <PageLink to={contestHomePath(invite.where.org, invite.where.contest)}>
@@ -58,7 +103,7 @@ function Outcome({ invite }: { invite: Invite }) {
       </>
     );
   }
-  if (invite.status === 'accepted' && grants !== 'contestant') {
+  if (invite.status === 'accepted' && !isPlace(grants)) {
     return (
       <>
         <BodyText>
@@ -76,9 +121,12 @@ function Outcome({ invite }: { invite: Invite }) {
 
 /**
  * One invite for the signed-in person: what it offers and where, who sent it
- * and when it lapses, with Accept and Decline while it is open. A lapsed one
- * says to ask for a new one, and one decided here says what came of it. The
- * focus moves to the card once a choice is answered.
+ * and when it lapses, with Accept and Decline while it is open. Accepting a
+ * place registers them, or puts them in the team that invited them; a
+ * contest that asks for its code, for which accepting is refused, asks for
+ * it here and accepts again with it. A lapsed one says to ask for a new
+ * one, and one decided here says what came of it. The focus moves to the
+ * card once a choice is answered.
  */
 export function InviteCard({
   invite,
@@ -88,9 +136,21 @@ export function InviteCard({
   highlighted?: boolean;
 }) {
   const card = useRef<HTMLLIElement>(null);
-  const { pending, error, decide } = useDecide(card);
+  const [entered, setEntered] = useState<Entered | null>(null);
+  const { pending, error, decide } = useDecide(card, setEntered);
+  const [code, setCode] = useState('');
   const name = offer(invite);
   const open = invite.status === 'pending' && !invite.expired;
+  // Once asked for, the code stays asked for, through the next try too.
+  const [asksCode, setAsksCode] = useState(false);
+  if (
+    !asksCode &&
+    isPlace(invite.grants) &&
+    isApiError(error) &&
+    error.code === 'wrong_invite_code'
+  ) {
+    setAsksCode(true);
+  }
 
   return (
     <li
@@ -106,20 +166,29 @@ export function InviteCard({
           : `Sent by ${invite.invited_by.username}.`}{' '}
         {invite.status === 'pending' &&
           (invite.expired
-            ? `It lapsed on ${formatDateTime(new Date(invite.expires_at))}. Ask the organisers for a new one.`
-            : `It lapses on ${formatDateTime(new Date(invite.expires_at))}.`)}
+            ? `It expired on ${formatDateTime(new Date(invite.expires_at))}. Ask the organisers for a new one.`
+            : `It expires on ${formatDateTime(new Date(invite.expires_at))}.`)}
       </BodyText>
-      {invite.status !== 'pending' && <Outcome invite={invite} />}
+      {invite.status !== 'pending' && <Outcome invite={invite} entered={entered} />}
+      {open && asksCode && (
+        <TextInput
+          label="Contest code"
+          description="This contest asks for the code its organisers gave you."
+          value={code}
+          onChange={setCode}
+          required
+        />
+      )}
       {open && (
         <div className={classes.actions}>
           <Button
             size="xs"
             label={`Accept: ${name}`}
             loading={pending === 'accept'}
-            disabled={pending === 'decline'}
-            onClick={() => void decide(invite, 'accept')}
+            disabled={pending === 'decline' || (asksCode && code.trim() === '')}
+            onClick={() => void decide(invite, 'accept', asksCode ? code : undefined)}
           >
-            Accept
+            {asksCode ? 'Accept with the code' : 'Accept'}
           </Button>
           <Button
             size="xs"

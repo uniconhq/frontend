@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { $api, widenQuery } from '@/api/query';
-import type { Grant, Invite } from '@/api/types';
+import type { Invite, OfferedGrant } from '@/api/types';
 import type { RolePlace } from '../roles';
 
 /**
@@ -85,8 +85,13 @@ export function useInviteChanges(place: RolePlace) {
     `${TASK}/{invite_id}/withdraw` as const,
   );
 
-  const create = async (grants: Grant, target: Target): Promise<Invite> => {
-    const body = { grants, ...target };
+  /** `entrant`, at a contest, puts the person straight into that entrant once they accept. */
+  const create = async (
+    grants: OfferedGrant,
+    target: Target,
+    entrant?: string,
+  ): Promise<Invite> => {
+    const body = { grants, ...target, ...(entrant !== undefined && { entrant }) };
     switch (place.kind) {
       case 'org':
         return createOrg.mutateAsync({ params: { path: { org: place.org } }, body });

@@ -1,42 +1,118 @@
-import { Fragment } from 'react';
+import { Fragment, memo, useCallback, useLayoutEffect, useRef, useState } from 'react';
 import { Menu } from '@mantine/core';
+import { Button } from './Button';
 import classes from './ActionMenu.module.css';
 
 /**
- * A menu of actions behind a small button: headings, dividers and items, an
- * item that cannot be chosen shown with the reason it cannot. The workflow
- * editor's ports use it as the keyboard's way to do what a drag does.
+ * A menu of actions behind a button: headings, dividers and items, an item
+ * that cannot be chosen shown with the reason it cannot. An item may carry a
+ * line saying what it is and a small note, such as a primitive's
+ * description and its reference. The workflow editor's ports use it, behind
+ * a small plain button, as the keyboard's way to do what a drag does; its
+ * toolbar's "Add step" uses it behind a page's button (`button`).
+ *
+ * `entries` may be a function, called only while the menu is open: a graph
+ * draws a menu on every port, and building every one's entries, and drawing
+ * every menu again, on each change made the editor slow. A menu whose
+ * entries are a function is drawn again only when its button's words change
+ * or it opens, and reads the entries as they are then.
  */
 export type MenuEntry =
   | { kind: 'heading'; text: string }
-  | { kind: 'item'; text: string; reason?: string | null; onSelect: () => void }
+  | {
+      kind: 'item';
+      text: string;
+      reason?: string | null;
+      /** A line under the item's text, saying what it is. */
+      detail?: string | null;
+      /** A small note under that, such as a reference. */
+      note?: string;
+      onSelect: () => void;
+    }
   | { kind: 'divider' };
 
-export function ActionMenu({
-  text,
-  label,
-  entries,
-  className,
-}: {
+type Props = {
   /** What the button shows. */
   text: string;
   className?: string;
-  /** What the button is called for a screen reader: the port and its box. */
+  /** What the button and the menu are called for a screen reader. */
   label: string;
-  entries: MenuEntry[];
-}) {
+  entries: MenuEntry[] | (() => MenuEntry[]);
+  /** The button is a page's secondary Button rather than a small plain one. */
+  button?: boolean;
+  disabled?: boolean;
+  /** What the menu says when it has no entries. */
+  empty?: string;
+};
+
+export function ActionMenu({ entries, ...rest }: Props) {
+  // The latest entries, read when the menu opens, so a menu drawn once
+  // still offers what holds now.
+  const latest = useRef(entries);
+  useLayoutEffect(() => {
+    latest.current = entries;
+  });
+  const read = useCallback(
+    () => (typeof latest.current === 'function' ? latest.current() : latest.current),
+    [],
+  );
   return (
-    <Menu position="bottom-start" withinPortal shadow="md" width={300}>
+    <DrawnMenu
+      {...rest}
+      read={read}
+      entries={typeof entries === 'function' ? null : entries}
+    />
+  );
+}
+
+const DrawnMenu = memo(function DrawnMenu({
+  text,
+  label,
+  read,
+  className,
+  button = false,
+  disabled = false,
+  empty,
+}: Omit<Props, 'entries'> & {
+  read: () => MenuEntry[];
+  /** The entries when they are a list, so a new list draws the menu again. */
+  entries: MenuEntry[] | null;
+}) {
+  const [opened, setOpened] = useState(false);
+  const entries = opened ? read() : [];
+  return (
+    <Menu
+      position="bottom-start"
+      withinPortal
+      shadow="md"
+      width={button ? 380 : 300}
+      opened={opened}
+      onChange={setOpened}
+    >
       <Menu.Target>
-        <button
-          type="button"
-          className={`${className ?? classes.button} nodrag nopan`}
-          aria-label={label}
-        >
-          {text}
-        </button>
+        {button ? (
+          <Button
+            variant="secondary"
+            disabled={disabled}
+            label={label === text ? undefined : label}
+          >
+            {text}
+          </Button>
+        ) : (
+          <button
+            type="button"
+            className={`${className ?? classes.button} nodrag nopan`}
+            aria-label={label}
+            disabled={disabled}
+          >
+            {text}
+          </button>
+        )}
       </Menu.Target>
       <Menu.Dropdown aria-label={label} className={classes.menu}>
+        {entries.length === 0 && empty !== undefined && (
+          <Menu.Label>{empty}</Menu.Label>
+        )}
         {entries.map((entry, at) => (
           <Fragment key={`${entry.kind} ${String(at)}`}>
             {entry.kind === 'heading' && <Menu.Label>{entry.text}</Menu.Label>}
@@ -47,7 +123,15 @@ export function ActionMenu({
                 onClick={entry.onSelect}
                 title={entry.reason ?? undefined}
               >
-                <span className={classes.menuText}>{entry.text}</span>
+                <span className={button ? classes.menuTitle : classes.menuText}>
+                  {entry.text}
+                </span>
+                {entry.detail !== undefined && entry.detail !== null && (
+                  <span className={classes.menuDetail}>{entry.detail}</span>
+                )}
+                {entry.note !== undefined && (
+                  <span className={classes.menuNote}>{entry.note}</span>
+                )}
                 {entry.reason !== undefined && entry.reason !== null && (
                   <span className={classes.menuReason}>{entry.reason}</span>
                 )}
@@ -58,4 +142,4 @@ export function ActionMenu({
       </Menu.Dropdown>
     </Menu>
   );
-}
+});

@@ -36,8 +36,8 @@ function isStatus(value: string): value is GradingStatus {
 /** The filters, each a search parameter of the page, so a link keeps them. */
 export type Filters = {
   task: string | null;
+  entrant: string | null;
   user: string | null;
-  team: string | null;
   status: GradingStatus | null;
 };
 
@@ -51,8 +51,8 @@ export function readFilters(search: URLSearchParams): Filters {
   const status = read('status');
   return {
     task: read('task'),
+    entrant: read('entrant'),
     user: read('user'),
-    team: read('team'),
     status: status !== null && isStatus(status) ? status : null,
   };
 }
@@ -71,19 +71,24 @@ export function withFilter(
 }
 
 /** The filters as the feed's query, leaving out the ones not set. */
-export function feedQuery({ task, user, team, status }: Filters) {
+export function feedQuery({ task, entrant, user, status }: Filters) {
   return {
     ...(task !== null && { task }),
+    ...(entrant !== null && { entrant }),
     ...(user !== null && { user }),
-    ...(team !== null && { team }),
     ...(status !== null && { status }),
   };
 }
 
-/** Who made a submission, by username or by team name. */
+/**
+ * Whose a submission is: its entrant by name, with the member who made it
+ * where that is someone else's name, as in a team: "Red (carol)".
+ */
 export function submitterOf(by: Submitter): string {
-  if (by.team !== null) return `${by.name ?? 'A deleted team'} (team)`;
-  return by.name ?? 'A deleted account';
+  const entrant = by.entrant_name ?? 'An entrant';
+  return by.username === null || by.username === by.entrant_name
+    ? entrant
+    : `${entrant} (${by.username})`;
 }
 
 /** A task by its letter and name, or its name alone where it has no letter. */
@@ -100,17 +105,16 @@ export function nameOf(entry: FeedEntry): string {
 
 /**
  * A submission's attempts together, the highest first, in the order the feed
- * gives them, which is newest first. A submission is its task, who made it and
- * its number, since each contestant or team numbers their own; the time it
- * was made plays no part.
+ * gives them, which is newest first. A submission is its task, its entrant
+ * and its number, since each entrant numbers its own; the time it was made
+ * plays no part.
  */
 export function bySubmission(
   entries: FeedEntry[],
 ): { key: string; attempts: FeedEntry[] }[] {
   const groups = new Map<string, FeedEntry[]>();
   for (const entry of entries) {
-    const who = entry.by.team ?? `user:${String(entry.by.user_id)}`;
-    const key = `${entry.task ?? ''}\n${who}\n${String(entry.grading.submission_number)}`;
+    const key = `${entry.task ?? ''}\n${entry.by.entrant}\n${String(entry.grading.submission_number)}`;
     groups.set(key, [...(groups.get(key) ?? []), entry]);
   }
   return [...groups].map(([key, attempts]) => ({

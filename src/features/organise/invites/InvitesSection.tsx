@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useChange } from '@/api/change';
 import { queryView } from '@/api/query';
 import { isApiError } from '@/api/problem';
-import type { Grant, Invite } from '@/api/types';
+import type { Grant, Invite, OfferedGrant } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
 import { Select } from '@/ui/Select';
@@ -17,21 +17,24 @@ import classes from './invites.module.css';
 
 /**
  * Whose invites a section is about: the organisers', with a role to choose,
- * on the people section, or the contestants', each a place in the contest,
- * on the contestants page. A contest's one list holds both.
+ * on the people section, or the entrants', each a place in the contest, on
+ * the contest's How people enter. A contest's one list holds both. The
+ * entrants' list also holds the invites members of a team made into it,
+ * which organisers see, send again and withdraw.
  */
 type Audience = 'organisers' | 'contestants';
 
 const GRANT_LABEL: Record<Grant, string> = {
   ...ROLE_LABEL,
-  contestant: 'A contestant’s place',
+  contestant: 'A place in the contest',
+  member: 'A place in a team',
 };
 
 const MAIL: Record<Invite['mail_status'], string> = {
   waiting: 'Waiting to send',
   sent: 'Sent',
   failed: 'Failed to send',
-  off: 'No mail server',
+  off: 'Not sent: no mail server',
 };
 
 /** Refusals that mean the list is behind: the invite was decided or lapsed. */
@@ -41,7 +44,18 @@ const BEHIND = new Set(['wrong_status', 'invite_expired']);
 const STANDS_DAYS = 14;
 
 function shownTo(audience: Audience, invite: Invite): boolean {
-  return (invite.grants === 'contestant') === (audience === 'contestants');
+  const place = invite.grants === 'contestant' || invite.grants === 'member';
+  return place === (audience === 'contestants');
+}
+
+/** Where a place leads: into a team by name, or a place of their own. */
+function intoText(invite: Invite): string {
+  if (invite.entrant !== null) {
+    return invite.grants === 'member'
+      ? `${invite.entrant.name}, from a member`
+      : invite.entrant.name;
+  }
+  return 'An entry of their own';
 }
 
 /** Where an invite stands, a lapsed one apart from one still open. */
@@ -51,20 +65,20 @@ function standing(invite: Invite): string {
       invite.status
     ];
   }
-  return invite.expired ? 'Lapsed' : 'Pending';
+  return invite.expired ? 'Expired' : 'Pending';
 }
 
 /** The date beside the standing: when it lapses or lapsed, or when it was decided. */
 function standingDate(invite: Invite): string {
   if (invite.status === 'pending') {
     const at = formatDateTime(new Date(invite.expires_at));
-    return invite.expired ? `Lapsed ${at}` : `Lapses ${at}`;
+    return invite.expired ? `Expired ${at}` : `Expires ${at}`;
   }
   return invite.decided_at === null ? '' : formatDateTime(new Date(invite.decided_at));
 }
 
 function who(invite: Invite): string {
-  return invite.username ?? invite.email ?? 'Nobody named';
+  return invite.username ?? invite.email ?? 'Unknown';
 }
 
 /** A username, or an email address when what was typed has an `@`. */
@@ -151,7 +165,11 @@ function InviteRow({
           </BodyText>
         </div>
       </th>
-      {audience === 'organisers' && <td>{GRANT_LABEL[invite.grants]}</td>}
+      {audience === 'organisers' ? (
+        <td>{GRANT_LABEL[invite.grants]}</td>
+      ) : (
+        <td>{intoText(invite)}</td>
+      )}
       <td>
         <div className={classes.cell}>
           <span>{standing(invite)}</span>
@@ -206,11 +224,11 @@ function InviteRow({
  * place in the contest. One field takes either: a Forgejo username has no
  * `@`, so what has one is an address.
  */
-function InviteForm({ place, grants }: { place: RolePlace; grants: Grant[] }) {
+function InviteForm({ place, grants }: { place: RolePlace; grants: OfferedGrant[] }) {
   const queryClient = useQueryClient();
   const { create } = useInviteChanges(place);
   const [typed, setTyped] = useState('');
-  const [grant, setGrant] = useState<Grant>(
+  const [grant, setGrant] = useState<OfferedGrant>(
     grants.includes('manager') ? 'manager' : (grants[0] ?? 'contestant'),
   );
   const [tried, setTried] = useState('');
@@ -234,7 +252,7 @@ function InviteForm({ place, grants }: { place: RolePlace; grants: Grant[] }) {
 
   const means =
     grant === 'contestant'
-      ? 'They get a place in this contest and register from its page.'
+      ? 'Accepting registers them for this contest.'
       : ROLE_MEANS[grant];
 
   return (
@@ -259,15 +277,15 @@ function InviteForm({ place, grants }: { place: RolePlace; grants: Grant[] }) {
               value,
               label: GRANT_LABEL[value],
             }))}
-            onChange={(value) => setGrant(value as Grant)}
+            onChange={(value) => setGrant(value as OfferedGrant)}
           />
         )}
       </div>
       <BodyText tone="secondary">
-        {means} The invite stands for {STANDS_DAYS} days.
+        {means} The invite expires after {STANDS_DAYS} days.
       </BodyText>
       <div className={classes.actions}>
-        <Button size="xs" type="submit" loading={change.pending !== null}>
+        <Button type="submit" loading={change.pending !== null}>
           Invite
         </Button>
       </div>
@@ -301,7 +319,7 @@ export function InvitesSection({
   administers: boolean;
 }) {
   const view = queryView(useInvites(place));
-  const grants: Grant[] =
+  const grants: OfferedGrant[] =
     audience === 'contestants' ? ['contestant'] : offered(administers);
 
   return (
@@ -343,7 +361,11 @@ function InviteTable({
       <thead>
         <tr>
           <th scope="col">Invited</th>
-          {audience === 'organisers' && <th scope="col">Grants</th>}
+          {audience === 'organisers' ? (
+            <th scope="col">Role</th>
+          ) : (
+            <th scope="col">Place</th>
+          )}
           <th scope="col">Status</th>
           <th scope="col">Mail</th>
           {manages && <th scope="col">Actions</th>}

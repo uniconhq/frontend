@@ -15,9 +15,9 @@ type Action = 'deactivate' | 'delete';
 
 const EXPLANATION: Record<Action, string> = {
   deactivate:
-    'Your account is switched off in Forgejo, so you cannot sign in or push until a platform admin turns it back on. A platform admin can undo this.',
+    'Your account is switched off, so you cannot sign in until a platform admin turns it back on.',
   delete:
-    'Your Forgejo account is removed. Your results stay on the leaderboards as "Deleted user" and your commits keep the name they were made with. This cannot be undone.',
+    'Your account is removed for good. Your results stay on the leaderboards as “Deleted user”, and the files you saved or submitted keep the name they were made under. This cannot be undone.',
 };
 
 const CONFIRM: Record<Action, string> = {
@@ -59,9 +59,10 @@ export function DangerZone() {
 
   return (
     <div className={classes.zone}>
-      <SectionTitle>Leaving</SectionTitle>
+      <SectionTitle>Deactivate or delete your account</SectionTitle>
       <BodyText size="md">
-        Deactivating can be undone by a platform admin. Deleting cannot.
+        A platform admin can turn a deactivated account back on. A deleted account is
+        gone for good.
       </BodyText>
       <div className={classes.actions}>
         <Button variant="secondary" onClick={() => setAction('deactivate')}>

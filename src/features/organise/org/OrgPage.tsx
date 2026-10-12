@@ -1,108 +1,120 @@
-import { useQueryClient } from '@tanstack/react-query';
+import type { ReactNode } from 'react';
 import { $api, queryView } from '@/api/query';
-import { Card } from '@/ui/Card';
 import { BodyText } from '@/ui/BodyText';
+import { CardGrid, HubCard } from '@/ui/HubCard';
+import { Page, PageHeader } from '@/ui/Page';
 import { PageLink } from '@/ui/PageLink';
-import { PageTitle } from '@/ui/PageTitle';
-import { SectionTitle } from '@/ui/SectionTitle';
-import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
-import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
+import { Loaded } from '@/ui/feedback/Loaded';
+import { useFallbackPoll } from '@/live';
 import { useMe } from '@/session';
-import { clarificationsPath, contestPath } from '@/lib/organiser-paths';
-import { Create } from '../Create';
-import { PeopleSection } from '../people/PeopleSection';
-import { LinkList } from '../LinkList';
-import { OrgProfile } from './OrgProfile';
 import { useOrgParam } from '@/lib/route-params';
-import { contestsReached } from '../roles';
-import classes from '../organise.module.css';
+import { ORG_SECTIONS, orgSectionPath, type OrgSectionKey } from '@/lib/sections';
+import { useOrganisersLine } from '../people/summary';
+import { holdsAt } from '../roles';
+import { OrgContests } from './OrgContests';
+
+const ORG = '/api/v1/orgs/{org}';
+
+/** The name an org shows: its display name, or its own name when it has none. */
+function shownName(org: string, displayName: string | null | undefined): string {
+  return displayName !== null && displayName !== undefined && displayName !== ''
+    ? displayName
+    : org;
+}
+
+function OrganisersCard({ org }: { org: string }) {
+  return (
+    <Loaded view={useOrganisersLine({ kind: 'org', org })} compact>
+      {(line) => <BodyText>{line}</BodyText>}
+    </Loaded>
+  );
+}
+
+function QuestionsCard({ org }: { org: string }) {
+  const view = queryView(
+    $api.useQuery(
+      'get',
+      '/api/v1/orgs/{org}/clarifications',
+      { params: { path: { org } } },
+      { refetchInterval: useFallbackPoll(60_000) },
+    ),
+  );
+  return (
+    <Loaded view={view} compact>
+      {(open) => (
+        <BodyText>
+          {open.length === 0
+            ? 'No questions are waiting for an answer.'
+            : `${String(open.length)} ${open.length === 1 ? 'question waits' : 'questions wait'} for an answer.`}
+        </BodyText>
+      )}
+    </Loaded>
+  );
+}
+
+function SettingsCard({ org }: { org: string }) {
+  const view = queryView($api.useQuery('get', ORG, { params: { path: { org } } }));
+  return (
+    <Loaded view={view} compact>
+      {(profile) => (
+        <BodyText>
+          Shown as {shownName(org, profile.display_name)}
+          {profile.description === '' ? ', with no description.' : '.'}
+        </BodyText>
+      )}
+    </Loaded>
+  );
+}
+
+/** Each section's card on the org's page, one per entry of its list. */
+const CARDS: Record<OrgSectionKey, (props: { org: string }) => ReactNode> = {
+  organisers: OrganisersCard,
+  questions: QuestionsCard,
+  settings: SettingsCard,
+};
 
 /**
- * An org's display name and description, which its admin edits in place, its
- * contests, each linking to its page, and the button that opens the form for
- * a new one.
- * Listing needs the observer role at the org. Someone who holds a role only
- * at one of its contests or tasks is refused the list, so the refusal comes
- * with the contests their own roles reach, and the path through the org still
- * works.
+ * An org's page: its name and description, with a small Edit for its admin;
+ * its contests, full width; and a card for each of its sections, each going
+ * to its own page. Nothing here changes anything: the forms are on the
+ * sections' pages.
  */
 export function OrgPage() {
   const org = useOrgParam();
-  const reached = contestsReached(useMe().roles, org);
-  const view = queryView(
-    $api.useQuery('get', '/api/v1/orgs/{org}/contests', { params: { path: { org } } }),
-  );
-  const queryClient = useQueryClient();
-  const create = $api.useMutation('post', '/api/v1/orgs/{org}/contests', {
-    onSuccess: () =>
-      queryClient.invalidateQueries({
-        queryKey: $api.queryOptions('get', '/api/v1/orgs/{org}/contests', {
-          params: { path: { org } },
-        }).queryKey,
-      }),
-  });
-
-  const links = (names: string[]) =>
-    names.map((name) => ({ name, to: contestPath(org, name) }));
+  const administers = holdsAt(useMe().roles, { kind: 'org', org }, 'admin');
+  const profile = $api.useQuery('get', ORG, { params: { path: { org } } }).data;
 
   return (
-    <div className={classes.page}>
-      <PageTitle>{org}</PageTitle>
-      <div className={classes.actions}>
-        <PageLink to={clarificationsPath(org)}>Open questions</PageLink>
-      </div>
-      <Card>
-        <OrgProfile org={org} />
-      </Card>
-      <Card>
-        <div className={classes.stack}>
-          <SectionTitle>Contests</SectionTitle>
-          {view.state === 'loading' && <PageSkeleton rows={3} />}
-          {view.state === 'error' && (
-            <>
-              <ErrorBlock error={view.error} onRetry={view.retry} />
-              {reached.length > 0 && (
-                <>
-                  <BodyText>Contests of this org you hold a role at:</BodyText>
-                  <LinkList label="Your contests" links={links(reached)} />
-                </>
-              )}
-            </>
-          )}
-          {view.state === 'ready' && (
-            <>
-              {view.data.length === 0 ? (
-                <BodyText>No contests yet.</BodyText>
-              ) : (
-                <LinkList
-                  label="Contests"
-                  links={links(view.data.map((contest) => contest.name))}
-                />
-              )}
-              <Create
-                openLabel="New contest"
-                title="New contest"
-                second={{
-                  label: 'Title',
-                  description: 'Optional. The name is used when there is none.',
-                }}
-                submitLabel="Create contest"
-                pending={create.isPending}
-                error={create.error}
-                onSubmit={async (name, title) => {
-                  await create.mutateAsync({
-                    params: { path: { org } },
-                    body: { name, title: title === '' ? null : title },
-                  });
-                }}
-              />
-            </>
-          )}
-        </div>
-      </Card>
-      <Card>
-        <PeopleSection place={{ kind: 'org', org }} />
-      </Card>
-    </div>
+    <Page>
+      <PageHeader
+        title={shownName(org, profile?.display_name)}
+        links={
+          administers ? (
+            <PageLink to={orgSectionPath(org, 'settings')} label="Edit the org">
+              Edit
+            </PageLink>
+          ) : undefined
+        }
+      >
+        {profile !== undefined && profile.description !== '' && (
+          <BodyText size="md">{profile.description}</BodyText>
+        )}
+      </PageHeader>
+      <OrgContests org={org} />
+      <CardGrid label="The org's sections">
+        {ORG_SECTIONS.map((section) => {
+          const Card = CARDS[section.key];
+          return (
+            <HubCard
+              key={section.key}
+              title={section.label}
+              to={orgSectionPath(org, section.key)}
+            >
+              <Card org={org} />
+            </HubCard>
+          );
+        })}
+      </CardGrid>
+    </Page>
   );
 }

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { $api } from '@/api/query';
 import { toApiError } from '@/api/problem';
@@ -61,24 +61,38 @@ export function useSaveUploads(place: TaskPlace, onSaved: (paths: string[]) => v
     );
   };
 
-  const save = (uploads: ArrivedUpload[]) =>
-    send({
+  /** Each upload's size by its path, from the last save, for a conflict to show. */
+  const sizes = useRef(new Map<string, number | null>());
+  const save = (uploads: ArrivedUpload[]) => {
+    sizes.current = new Map(uploads.map((upload) => [upload.path, upload.size]));
+    return send({
       changes: uploads.map(({ upload, path, token }) => ({
         path,
         token,
         upload,
         encoding: 'utf-8',
+        remove: false,
       })),
       confirm: false,
       keep_as_draft: false,
     });
+  };
 
-  /** The same save again, each path presenting the token its file has now. */
-  const saveOver = async (body: SaveRequest) => {
+  /**
+   * The same save again with the uploads whose paths `overwrite` names, each
+   * presenting the token its file has now, so it is saved over theirs; the
+   * rest are left out, the files theirs. With none left, nothing is saved.
+   */
+  const saveOver = async (body: SaveRequest, overwrite: ReadonlySet<string>) => {
+    const kept = body.changes.filter((change) => overwrite.has(change.path));
+    if (kept.length === 0) {
+      setOutcome(null);
+      return;
+    }
     setRereading(true);
     try {
       const changes = await Promise.all(
-        body.changes.map(async (change) => ({
+        kept.map(async (change) => ({
           ...change,
           token: await tokenNow(place, change.path),
         })),
@@ -98,5 +112,7 @@ export function useSaveUploads(place: TaskPlace, onSaved: (paths: string[]) => v
     saveOver,
     pending: saveTask.isPending || rereading,
     forget: () => setOutcome(null),
+    /** The size of the upload saved for a path, when the page knew it. */
+    sizeOf: (path: string) => sizes.current.get(path) ?? null,
   };
 }

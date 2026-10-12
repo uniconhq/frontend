@@ -1,11 +1,12 @@
 import { http, HttpResponse } from 'msw';
 import type {
   ContestHome,
-  Contestant,
+  Entrant,
   GradedTest,
   GradingResult,
   InputField,
-  MyRegistration,
+  MyEntry,
+  OrganisedEntrant,
   Outcome,
   Reported,
   Submission,
@@ -27,16 +28,62 @@ export const PUBLIC_API = '/api/v1/public/contests';
 
 const OPEN: TaskRelease = { released: true, visible: true, open: true, closed: null };
 
-export function registration(overrides: Partial<MyRegistration> = {}): MyRegistration {
+const ENTRANT_ID = '0e000000-0000-4000-8000-000000000007';
+
+/**
+ * The signed-in kenny's entrant: kenny alone, signed up, pending, until a
+ * test says otherwise.
+ */
+export function entrant(overrides: Partial<Entrant> = {}): Entrant {
   return {
+    id: ENTRANT_ID,
+    name: null,
+    display_name: 'kenny',
     status: 'pending',
-    reason: null,
     registered_at: '2026-09-12T09:00:00Z',
     decided_at: null,
+    reason: null,
+    invites: [],
     time_extension: 0,
     extension_tasks: null,
+    submitted: false,
+    complete: true,
+    locked: false,
+    members: [
+      {
+        user_id: 7,
+        user: { id: 7, username: 'kenny', name: 'Kenny Lewi', avatar_url: null },
+        way_kind: 'signup',
+        way_name: null,
+        joined_at: '2026-09-12T09:00:00Z',
+      },
+    ],
     ...overrides,
   };
+}
+
+/**
+ * The caller's part in a contest where everyone enters alone and anyone may
+ * sign up: in no entrant, free to register, until a test says otherwise.
+ */
+export function entry(overrides: Partial<MyEntry> = {}): MyEntry {
+  return {
+    entrant: null,
+    invitations: [],
+    registration_open: true,
+    can_register: true,
+    asks_code: false,
+    refused: null,
+    most: 1,
+    fewest: 1,
+    locks: 'start',
+    ...overrides,
+  };
+}
+
+/** The caller registered, their entrant as `overrides` says. */
+export function registration(overrides: Partial<Entrant> = {}): MyEntry {
+  return entry({ entrant: entrant(overrides), can_register: false });
 }
 
 export function home(overrides: Partial<ContestHome> = {}): ContestHome {
@@ -47,11 +94,8 @@ export function home(overrides: Partial<ContestHome> = {}): ContestHome {
     start: '2026-09-12T09:00:00Z',
     end: '2026-09-12T10:30:00Z',
     state: 'published',
-    registration: null,
+    registration: entry(),
     organises: false,
-    registration_open: true,
-    invite_only: false,
-    asks_code: false,
     now: '2026-09-12T10:00:00Z',
     tasks: [
       {
@@ -115,17 +159,29 @@ export const publicContest: components['schemas']['PublicContest'] = {
   tasks: [{ name: 'sum', label: 'A', title: 'Sum of Two' }],
 };
 
-export function contestant(overrides: Partial<Contestant> = {}): Contestant {
+/** An entrant as organisers read it: carol alone, signed up, pending, until a test says otherwise. */
+export function organisedEntrant(
+  overrides: Partial<OrganisedEntrant> = {},
+): OrganisedEntrant {
   return {
-    ...registration(),
-    user_id: 20,
-    user: {
-      id: 20,
-      username: 'carol',
-      name: 'Carol',
-      email: 'carol@example.org',
-      avatar_url: null,
-    },
+    ...entrant(),
+    id: '0e000000-0000-4000-8000-000000000020',
+    display_name: 'carol',
+    members: [
+      {
+        user_id: 20,
+        user: {
+          id: 20,
+          username: 'carol',
+          name: 'Carol',
+          email: 'carol@example.org',
+          avatar_url: null,
+        },
+        way_kind: 'signup',
+        way_name: null,
+        joined_at: '2026-09-12T09:00:00Z',
+      },
+    ],
     ...overrides,
   };
 }

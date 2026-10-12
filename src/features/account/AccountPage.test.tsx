@@ -42,7 +42,7 @@ describe('AccountPage', () => {
     expect(screen.queryByRole('link', { name: 'SSH keys' })).not.toBeInTheDocument();
   });
 
-  it('lists the roles by scope name', async () => {
+  it('lists the roles by scope name, each leading to its place', async () => {
     server.use(signedIn, sessionList);
     renderApp('/account');
 
@@ -50,9 +50,14 @@ describe('AccountPage', () => {
     const list = within(heading.parentElement as HTMLElement).getByRole('list');
     const rows = within(list).getAllByRole('listitem');
     expect(rows.map((row) => row.textContent)).toEqual([
-      'acmeadmin',
-      'acme/springmanager',
+      'acmeAdmin',
+      'acme/springManager',
     ]);
+    expect(
+      within(list)
+        .getAllByRole('link')
+        .map((link) => link.getAttribute('href')),
+    ).toEqual(['/orgs/acme', '/orgs/acme/contests/spring']);
   });
 
   it('leaves the roles section out when there are none', async () => {
@@ -78,9 +83,9 @@ describe('AccountPage', () => {
     expect(current).toHaveTextContent('This device');
     expect(current).toHaveTextContent('last seen');
     expect(other).not.toHaveTextContent('This device');
-    expect(screen.getAllByRole('button', { name: 'Revoke' })).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: 'Sign out there' })).toHaveLength(1);
     expect(
-      within(other as HTMLElement).getByRole('button', { name: 'Revoke' }),
+      within(other as HTMLElement).getByRole('button', { name: 'Sign out there' }),
     ).toBeVisible();
     expect(
       within(current as HTMLElement).getByRole('button', { name: 'Sign out' }),

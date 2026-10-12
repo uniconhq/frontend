@@ -105,7 +105,11 @@ function declarationNode(declaration: Record<string, unknown>): unknown {
   const kept = Object.fromEntries(
     Object.entries(declaration).filter(
       ([key, value]) =>
-        value !== undefined && value !== null && value !== false && key !== '',
+        value !== undefined &&
+        value !== null &&
+        value !== false &&
+        value !== '' &&
+        key !== '',
     ),
   );
   return Object.keys(kept).length === 1 && typeof kept.type === 'string'
@@ -267,8 +271,15 @@ export function setPerTest(text: string, index: number, perTest: boolean): strin
   return edited(text, (doc) => {
     const node = stepNode(doc, index);
     if (node === null) return;
-    if (perTest) node.set('per_test', true);
-    else node.delete('per_test');
+    if (!perTest) node.delete('per_test');
+    else if (!node.has('per_test')) {
+      // Where the format writes it: after `use`, before `with`.
+      const at = node.items.findIndex(
+        (pair) => isScalar(pair.key) && pair.key.value === 'with',
+      );
+      if (at < 0) node.set('per_test', true);
+      else node.items.splice(at, 0, doc.createPair('per_test', true));
+    } else node.set('per_test', true);
     const others = workflow.steps.map((_, at) => at).filter((at) => at !== index);
     const where = others.findIndex((at) => at > index);
     let place = where < 0 ? others.length : where;
@@ -332,12 +343,20 @@ export function clearPort(text: string, index: number, port: string): string {
 
 // Inputs and test fields
 
+/**
+ * An input's declaration: its type and what the format allows with it, and
+ * what the task's form names it (#434), each left out of the file when it is
+ * empty, false or null.
+ */
 export type InputFields = {
   type: string;
   contestant?: boolean;
   options?: string[] | null;
   per_test?: boolean;
   optional?: boolean;
+  title?: string | null;
+  help?: string | null;
+  unit?: string | null;
 };
 
 export type FieldFields = { type: string; options?: string[] | null; public?: boolean };

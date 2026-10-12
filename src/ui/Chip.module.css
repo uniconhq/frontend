@@ -1,0 +1,36 @@
+.chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 8px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 18px;
+  white-space: nowrap;
+}
+
+.quiet {
+  background: var(--unicon-hover);
+  color: var(--unicon-text-body);
+}
+
+/* The accepted and running verdicts' colours, the theme's two greens and golds. */
+.live {
+  background: #e3f2e8;
+  color: #156034;
+}
+
+.warn {
+  background: #faeecd;
+  color: #6f4e05;
+}
+
+:global([data-mantine-color-scheme='dark']) .live {
+  background: #1d3326;
+  color: #6ede9b;
+}
+
+:global([data-mantine-color-scheme='dark']) .warn {
+  background: #3a3117;
+  color: #ffc93c;
+}

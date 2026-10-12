@@ -8,14 +8,33 @@
 }
 
 .menu {
-  max-height: 360px;
+  max-height: 420px;
   overflow-y: auto;
 }
 
 .menuText {
   display: block;
-  font-family: var(--mantine-font-family-monospace);
+  font-size: 13px;
+}
+
+.menuTitle {
+  display: block;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.menuDetail {
+  display: block;
+  color: var(--unicon-text-secondary);
   font-size: 12px;
+  white-space: normal;
+}
+
+.menuNote {
+  display: block;
+  color: var(--unicon-text-meta);
+  font-family: var(--mantine-font-family-monospace);
+  font-size: 10px;
 }
 
 .menuReason {

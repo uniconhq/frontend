@@ -45,6 +45,10 @@ export type InputDecl = {
   options: string[] | null;
   perTest: boolean;
   optional: boolean;
+  /** What the task's form names it, a line of help and its unit (#434); null when not given. */
+  title: string | null;
+  help: string | null;
+  unit: string | null;
 };
 
 export type FieldDecl = {
@@ -143,10 +147,10 @@ export function refProblem(text: string): string | null {
   for (const match of found) {
     const expression = match[1] ?? '';
     if (parseRef(expression) === null)
-      return `\${{ ${expression} }} is not a reference a workflow makes: inputs.<id>, test.<field> or steps.<id>.<output>.`;
+      return `Unicon cannot read \${{ ${expression} }}. Write \${{ inputs.<id> }}, \${{ test.<field> }} or \${{ steps.<id>.<output> }}.`;
   }
   if (text.split('${{').length - 1 !== found.length)
-    return 'A ${{ is not closed with }}, or holds a brace of its own.';
+    return 'A ${{ is not closed with }}, or has a brace inside it. Close each one, and remove any brace inside.';
   return null;
 }
 
@@ -204,6 +208,9 @@ function inputOf(id: string, raw: unknown): InputDecl {
     options: strings(found.options),
     perTest: found.per_test === true,
     optional: found.optional === true,
+    title: text(found.title),
+    help: text(found.help),
+    unit: text(found.unit),
   };
 }
 

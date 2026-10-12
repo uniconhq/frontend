@@ -1,12 +1,17 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useRef, useState, type FormEvent, type ReactNode } from 'react';
+import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
-import { SectionTitle } from '@/ui/SectionTitle';
 import { TextInput } from '@/ui/TextInput';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import classes from './organise.module.css';
 
 /** The second line, with the most characters it takes when there is a limit. */
-export type SecondField = { label: string; description?: string; maxLength?: number };
+export type SecondField = {
+  label: string;
+  description?: string;
+  placeholder?: string;
+  maxLength?: number;
+};
 
 /**
  * The one form behind New org, New contest and New task: a name, which forge
@@ -22,28 +27,30 @@ export type SecondField = { label: string; description?: string; maxLength?: num
  */
 export function CreateForm({
   title,
+  intro,
   second,
   submitLabel,
   pending,
   error,
   onSubmit,
   onCancel,
+  extra,
 }: {
+  /** What the form is called, for a screen reader. */
   title: string;
+  intro?: ReactNode;
   second: SecondField;
   submitLabel: string;
   pending: boolean;
   error: unknown;
   onSubmit: (name: string, second: string) => Promise<unknown>;
   onCancel?: () => void;
+  /** More of the form, under its two lines. */
+  extra?: ReactNode;
 }) {
   const [name, setName] = useState('');
   const [other, setOther] = useState('');
   const nameField = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    nameField.current?.focus();
-  }, []);
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -61,11 +68,12 @@ export function CreateForm({
       onSubmit={(event) => void submit(event)}
       aria-label={title}
     >
-      <SectionTitle order={3}>{title}</SectionTitle>
+      {intro !== undefined && <BodyText size="md">{intro}</BodyText>}
       <TextInput
         ref={nameField}
+        autoFocus
         label="Name"
-        description="Part of every address, so it cannot change later."
+        description="Used in the web address, so it cannot be changed later."
         value={name}
         onChange={setName}
         required
@@ -73,10 +81,12 @@ export function CreateForm({
       <TextInput
         label={second.label}
         description={second.description}
+        placeholder={second.placeholder}
         maxLength={second.maxLength}
         value={other}
         onChange={setOther}
       />
+      {extra}
       {error !== null && error !== undefined && (
         <div className={classes.panel} role="alert">
           <ErrorBlock error={error} compact />

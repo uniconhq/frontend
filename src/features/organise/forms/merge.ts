@@ -238,6 +238,11 @@ export function defaultSide(diff: FieldDiff): Side {
   return changedBy(diff, 'mine') ? 'mine' : 'theirs';
 }
 
+/** Whether the other side changed the field since the organiser read it. */
+export function changedByThem(diff: FieldDiff): boolean {
+  return changedBy(diff, 'theirs');
+}
+
 /** Whether both sides changed the field since the organiser read it. */
 export function bothChanged(diff: FieldDiff): boolean {
   return changedBy(diff, 'mine') && changedBy(diff, 'theirs');

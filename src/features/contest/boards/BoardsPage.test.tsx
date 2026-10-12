@@ -156,7 +156,9 @@ describe("a contest's boards for a signed-in person", () => {
     renderApp(PAGE);
 
     const board = await screen.findByRole('region', { name: 'Final' });
-    expect(board).toHaveTextContent('None of the tasks on this board is released yet.');
+    expect(board).toHaveTextContent(
+      'None of the tasks on this leaderboard is released yet.',
+    );
     expect(within(board).queryByRole('table')).toBeNull();
   });
 
@@ -165,7 +167,7 @@ describe("a contest's boards for a signed-in person", () => {
     renderApp(PAGE);
 
     expect(
-      await screen.findByText('This contest has no board you can see.'),
+      await screen.findByText('This contest has no leaderboard you can see.'),
     ).toBeVisible();
   });
 });

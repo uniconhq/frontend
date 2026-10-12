@@ -17,6 +17,8 @@ export type DefinitionError = Schemas['DefinitionError'];
 export type TreeEntry = Schemas['TreeEntry'];
 export type FileContent = Schemas['FileContent'];
 export type WriteFile = Schemas['WriteFile'];
+/** One file a task's save writes or removes. */
+export type SaveChange = Schemas['FileChange'];
 /** What a file that is an upload holds: its size and SHA-256. */
 export type UploadInfo = Schemas['UploadInfo'];
 export type RollbackFile = Schemas['RollbackFile'];
@@ -26,18 +28,37 @@ export type SaveRequest = Schemas['SaveRequest'];
 export type SaveResult = Schemas['Published'] | Schemas['Draft'];
 
 export type TaskRelease = Schemas['TaskRelease'];
-export type MyRegistration = Schemas['MyRegistration'];
-export type Contestant = Schemas['Contestant'];
+/**
+ * The caller's part in a contest: their entrant, if any, their invites into
+ * other entrants, whether and how they may register, and the contest's sizes.
+ */
+export type MyEntry = Schemas['MyEntry'];
+/** One or more people who enter a contest together, as its members read it. */
+export type Entrant = Schemas['Entrant'];
+export type EntrantMember = Schemas['Member'];
+/** An entrant as its contest's organisers read it, its members with their email. */
+export type OrganisedEntrant = Schemas['OrganisedEntrant'];
+export type OrganisedMember = Schemas['OrganisedMember'];
+/** One of the caller's own invites into an entrant of the contest. */
+export type Invitation = Schemas['Invitation'];
+export type EntrantStatus = Entrant['status'];
 export type Holder = Schemas['Holder'];
 export type RoleName = Holder['role'];
 export type Invite = Schemas['Invite'];
-/** What an invite gives once accepted: a contestant's place, or a role. */
+/**
+ * What an invite gives once accepted: a place in a contest, a member's place
+ * in an entrant, or a role.
+ */
 export type Grant = Invite['grants'];
-export type Team = Schemas['Team'];
-export type TeamMember = Schemas['Member'];
-export type ListedTeam = Schemas['ListedTeam'];
-export type MyTeams = Schemas['MyTeams'];
+/** What an organiser's invite may give: a role, or a place in a contest. */
+export type OfferedGrant = Schemas['InviteRequest']['grants'];
+/** What accepting an invite did: the invite, and the entrant it put the person in. */
+export type AcceptedInvite = Schemas['AcceptedInvite'];
+export type Entered = Schemas['Entered'];
 export type ContestSummary = Schemas['ContestSummary'];
+/** A contest in its org's list, with its state and dates as its settings say. */
+export type ListedContest = Schemas['ListedContest'];
+
 export type ContestHome = Schemas['ContestHome'];
 export type PublicTask = Schemas['PublicTask'];
 export type TaskPage = Schemas['TaskPage'];

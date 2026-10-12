@@ -2,7 +2,8 @@ import { useState, type ReactNode } from 'react';
 import type { Fallback, FeedEntry } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { PageLink } from '@/ui/PageLink';
-import { TextLink } from '@/ui/TextLink';
+import { OutLink } from '@/ui/OutLink';
+import { verdictLabel } from '@/ui/verdicts';
 import { formatDateTime } from '@/lib/time';
 import { taskPath } from '@/lib/organiser-paths';
 import { STATUS, bySubmission, logHref, nameOf, resultOf, submitterOf } from './feed';
@@ -27,24 +28,22 @@ function TaskCell({ path, entry }: { path: ContestPath; entry: FeedEntry }) {
   return (
     <span className={classes.task}>
       {label !== null && <span className={classes.letter}>{label}</span>}
-      <PageLink to={taskPath(path.org, path.contest, task)} mono>
-        {task}
-      </PageLink>
+      <PageLink to={taskPath(path.org, path.contest, task)}>{task}</PageLink>
     </span>
   );
 }
 
-/** Who has a broken attempt count as its submission's last good result. */
+/** Who has a broken attempt use its submission's last good result. */
 const FALLBACK_BY: Record<Fallback, string> = {
-  staff: 'as staff asked',
+  staff: 'as an organiser chose',
   contest: "as the contest's settings say",
 };
 
 /**
- * Where an attempt stands: its status, the reason a system error gave staff,
- * the sentence a cancel told the contestant, the earlier result a fallback
- * counts in its place, what a finished run came to, and its log where its
- * run wrote one.
+ * Where an attempt stands: its status, the reason a system error gave the
+ * organisers, the sentence a cancel told the entrant, the last good result
+ * used in its place, what a finished run came to, and its log where its run
+ * wrote one.
  */
 function StatusCell({
   path,
@@ -62,26 +61,26 @@ function StatusCell({
       {grading.error !== null && <BodyText tone="secondary">{grading.error}</BodyText>}
       {grading.cancel_reason !== null && (
         <BodyText tone="secondary">
-          Told the contestant: &ldquo;{grading.cancel_reason}&rdquo;
+          Told the entrant: &ldquo;{grading.cancel_reason}&rdquo;
         </BodyText>
       )}
       {grading.fallback !== null && grading.last_good !== null && (
         <BodyText tone="secondary">
-          Counts as attempt {grading.last_good}&apos;s result,{' '}
+          Uses the last good result, attempt {grading.last_good}&apos;s,{' '}
           {FALLBACK_BY[grading.fallback]}.
         </BodyText>
       )}
       {grading.status === 'done' && grading.result !== null && (
-        <BodyText tone="secondary">{resultOf(grading.result)}</BodyText>
+        <BodyText tone="secondary">{verdictLabel(resultOf(grading.result))}</BodyText>
       )}
       {grading.log && entry.task !== null && (
-        <TextLink
+        <OutLink
           href={logHref({ ...path, task: entry.task }, grading.id)}
           label={`Log of ${name}`}
           newTab
         >
           Log
-        </TextLink>
+        </OutLink>
       )}
     </>
   );
@@ -211,7 +210,6 @@ function Submission({
   const [head, ...earlier] = attempts;
   if (head === undefined) return null;
   const task = head.task;
-  const row = head.by.user_id !== null || head.by.team !== null;
   const columns = (showTask ? 6 : 5) + (actions !== null ? 1 : 0);
   return (
     <tbody aria-label={nameOf(head).replace(/, attempt \d+$/, '')}>
@@ -222,7 +220,7 @@ function Submission({
         showTask={showTask}
         earlier={{ count: earlier.length, shown, toggle: () => setShown(!shown) }}
         scored={
-          task !== null && row
+          task !== null
             ? { shown: scored, toggle: () => setScored(!scored) }
             : undefined
         }

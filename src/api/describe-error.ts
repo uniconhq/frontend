@@ -100,15 +100,15 @@ export function describeError(error: ApiError): ErrorDescription {
       };
     case 'sole_admin':
       return {
-        title: 'You are the only admin somewhere',
-        message: 'Someone else has to take the role before you can do this.',
+        title: 'You are the only admin of an org, contest or task',
+        message: 'Give someone else the admin role there before you do this.',
       };
     case 'contestant_conflict':
       return {
-        title: 'They are a contestant here',
+        title: 'They have entered this contest',
         message:
           error.detail ??
-          'Nobody can organise a contest they are registered in. Their registration has to go first.',
+          'Someone who has entered a contest cannot also organise it. Their entry has to be removed first.',
       };
     case 'shared_workflow_owner':
       return {
@@ -117,13 +117,13 @@ export function describeError(error: ApiError): ErrorDescription {
       };
     case 'conflict':
       return {
-        title: 'That clashes with something already there',
+        title: 'That conflicts with something already there',
         message: error.detail ?? 'Reload the page to see the current state.',
       };
     case 'invalid_name':
       return {
-        title: 'That name will not do',
-        message: error.detail ?? 'Pick a different name.',
+        title: 'That name cannot be used',
+        message: error.detail ?? 'Choose a different name.',
       };
     case 'confirmation_required':
       return {
@@ -135,22 +135,26 @@ export function describeError(error: ApiError): ErrorDescription {
     case 'admin_only':
       return {
         title: 'Only an admin can change that',
-        message: error.detail ?? 'Ask an admin of this scope to make the change.',
+        message: error.detail ?? 'Ask an admin here to make the change.',
       };
     case 'reserved_path':
       return {
         title: 'Unicon writes those files itself',
-        message: error.detail ?? 'Files under plans/ come from the save, not by hand.',
+        message:
+          error.detail ??
+          'Files in the plans folder are written each time the task is saved, not by hand.',
       };
     case 'invalid_definition':
       return {
-        title: 'The settings file has errors',
-        message: error.detail ?? 'Nothing was saved. Fix the errors and save again.',
+        title: 'Nothing was saved',
+        message: 'Some settings have problems. Fix each one listed and save again.',
       };
     case 'invalid_path':
       return {
         title: 'That path cannot be used',
-        message: error.detail ?? 'A path stays inside the repo and names a file.',
+        message:
+          error.detail ??
+          'Give a folder and file name inside the task, such as public/diagram.png.',
       };
     case 'registration_closed':
       return {
@@ -160,11 +164,11 @@ export function describeError(error: ApiError): ErrorDescription {
     case 'is_staff':
       return {
         title: 'You organise this contest',
-        message: 'Someone with a role in a contest cannot also enter it.',
+        message: 'Organisers of a contest cannot also enter it.',
       };
     case 'invite_required':
       return {
-        title: 'This contest is by invitation',
+        title: 'This contest is by invite only',
         message: 'Only people the organisers invite may register.',
       };
     case 'wrong_invite_code':
@@ -186,17 +190,17 @@ export function describeError(error: ApiError): ErrorDescription {
     case 'contest_full':
       return {
         title: 'The contest is full',
-        message: 'Every place is taken.',
+        message: 'Every place its organisers allowed is taken.',
       };
     case 'wrong_status':
       return {
-        title: 'That has moved on',
+        title: 'That has changed meanwhile',
         message: error.detail ?? 'Reload the list to see where it stands now.',
       };
     case 'invalid_invite':
       return {
         title: 'That invite cannot be made',
-        message: error.detail ?? 'Check who it is for and what it grants.',
+        message: error.detail ?? 'Check who it is for and what it offers.',
       };
     case 'already_invited':
       return {
@@ -205,68 +209,88 @@ export function describeError(error: ApiError): ErrorDescription {
       };
     case 'invite_expired':
       return {
-        title: 'This invite has lapsed',
+        title: 'This invite has expired',
         message: 'Ask the organisers to send a new one.',
       };
     case 'invalid_reason':
       return {
-        title: 'That reason will not do',
+        title: 'That reason cannot be used',
         message:
-          error.detail ??
-          'The person reads it, so give one of at most 1000 characters.',
+          error.detail ?? 'The person reads it, so keep it to at most 1000 characters.',
       };
     case 'invalid_extension':
       return {
-        title: 'That extension will not do',
-        message: error.detail ?? 'Give between no time and a year.',
+        title: 'That extra time cannot be used',
+        message: error.detail ?? 'Give from 0 minutes up to a year.',
       };
-    case 'teams_off':
+    case 'entrants_alone':
       return {
-        title: 'This contest has no teams',
-        message: 'The contest’s settings do not turn teams on.',
+        title: 'Everyone enters this contest alone',
+        message: 'Nobody is invited into a team here, and a registration has no name.',
       };
-    case 'invalid_team_name':
+    case 'invalid_entrant_name':
       return {
-        title: 'That team name will not do',
-        message:
-          error.detail ?? 'A team’s name is one to 60 characters that can be printed.',
+        title: 'That name cannot be used',
+        message: error.detail ?? 'A name is 1 to 60 characters of ordinary text.',
       };
-    case 'team_name_taken':
+    case 'entrant_name_required':
       return {
-        title: 'That team name is taken',
-        message: 'Another team in this contest has it. Pick a different name.',
+        title: 'Give your team a name',
+        message: 'People enter this contest in teams, and each team has a name.',
       };
-    case 'team_full': {
+    case 'entrant_name_taken':
+      return {
+        title: 'That name is taken',
+        message: 'Another team in this contest has it. Choose a different name.',
+      };
+    case 'entrant_full': {
       const limit = numberOf(error, 'limit');
       return {
         title: 'The team is full',
         message:
           limit === null
-            ? 'The team holds as many people as the contest allows.'
-            : `A team in this contest holds at most ${limit}.`,
+            ? 'Its members and the people invited into it already fill it.'
+            : `A team in this contest holds at most ${String(limit)}, counting the people invited into it.`,
       };
     }
-    case 'in_team':
+    case 'in_entrant':
       return {
-        title: 'Already in a team',
-        message: error.detail ?? 'Someone is in one team at most in a contest.',
-      };
-    case 'submitted_alone':
-      return {
-        title: 'Submitted on their own',
+        title: 'Already in a team here',
         message:
-          'Someone who has submitted on their own cannot join a team, since those results are theirs.',
+          error.detail ??
+          'A person is in one team per contest, and can leave it only before the team submits or is fixed.',
       };
-    case 'team_changed':
+    case 'roster_locked':
       return {
-        title: 'Your team changed',
-        message: 'Your team changed while this was being done; do it again.',
+        title: 'The team is fixed now',
+        message:
+          'Who is in it no longer changes, except by the organisers. Ask them if someone has to join or leave.',
       };
-    case 'team_has_submissions':
+    case 'entrant_incomplete': {
+      const fewest = numberOf(error, 'fewest');
+      return {
+        title: 'The team is not complete',
+        message:
+          fewest === null
+            ? 'It needs more people before it can be approved or submit.'
+            : `A team in this contest needs at least ${String(fewest)} people before it can be approved or submit.`,
+      };
+    }
+    case 'no_invite_way':
+      return {
+        title: 'This contest has no way in by invite',
+        message:
+          'Add “People you invite” under How people enter first, so an invite lets someone in.',
+      };
+    case 'entrant_has_submissions':
       return {
         title: 'This team has submitted',
-        message:
-          'A team that has submitted stays with its results, so it is not deleted.',
+        message: error.detail ?? 'A team that has submitted stays with its results.',
+      };
+    case 'entrant_changed':
+      return {
+        title: 'Your team changed meanwhile',
+        message: 'Someone changed who is in it while this was being done. Try again.',
       };
     case 'task_closed':
       return {
@@ -280,10 +304,10 @@ export function describeError(error: ApiError): ErrorDescription {
       };
     case 'not_approved':
       return {
-        title: 'You are not a contestant here yet',
+        title: 'Your registration is not approved yet',
         message:
           error.detail ??
-          "Only an approved contestant submits. The contest's page says where your registration stands.",
+          "Only an approved entrant can submit. The contest's page says where your registration stands.",
       };
     case 'submission_limit': {
       const limit = numberOf(error, 'limit');
@@ -305,7 +329,7 @@ export function describeError(error: ApiError): ErrorDescription {
     case 'marks_off':
       return {
         title: 'This task takes no marks',
-        message: 'No board of the contest counts the submissions you mark on it.',
+        message: 'No leaderboard of the contest counts the submissions you mark on it.',
       };
     case 'marks_frozen':
       return {
@@ -315,7 +339,7 @@ export function describeError(error: ApiError): ErrorDescription {
     case 'mark_limit': {
       const limit = numberOf(error, 'limit');
       return {
-        title: 'You have marked as many as you may',
+        title: 'You have marked as many as you can',
         message:
           limit === null
             ? 'Take a mark off another submission first.'
@@ -329,8 +353,8 @@ export function describeError(error: ApiError): ErrorDescription {
       };
     case 'upload_not_ready':
       return {
-        title: 'A file did not arrive whole',
-        message: 'Nothing was submitted. Submit again and the files are sent again.',
+        title: 'A file did not arrive in full',
+        message: 'Nothing was submitted. Submit again to send the files again.',
       };
     case 'upload_limit':
       return {
@@ -345,7 +369,7 @@ export function describeError(error: ApiError): ErrorDescription {
       };
     case 'invalid_idempotency_key':
       return {
-        title: 'That submit could not be sent',
+        title: 'That submission could not be sent',
         message: 'Reload the page and submit again.',
       };
     case 'upload_failed':
@@ -358,7 +382,7 @@ export function describeError(error: ApiError): ErrorDescription {
       return {
         title: 'A file did not arrive as it was sent',
         message:
-          'The forge has not got the file. Send it again. Nothing was submitted.',
+          'Unicon did not receive the file as it was sent. Send it again. Nothing was submitted.',
       };
     case 'not_found':
       return {
@@ -372,7 +396,7 @@ export function describeError(error: ApiError): ErrorDescription {
       };
     case 'internal_error':
       return {
-        title: 'Unicon hit a problem',
+        title: 'Unicon ran into a problem',
         message: 'Nothing you did caused it. Try again in a moment.',
       };
     case 'network_error':

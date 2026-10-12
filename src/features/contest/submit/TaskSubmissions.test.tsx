@@ -4,6 +4,7 @@ import userEvent from '@/test/user-event';
 import { http, HttpResponse } from 'msw';
 import type { GradingResult, Submission, TaskPage } from '@/api/types';
 import { formatExact } from '@/lib/exact';
+import { formatWhen } from '@/lib/time';
 import { renderApp } from '@/test/render';
 import { problem, server, signedIn } from '@/test/server';
 import { fakeTimerUser, passTime, withFakeTimers } from '@/test/timers';
@@ -271,7 +272,7 @@ describe('the submit panel', () => {
     expect(alert).toHaveTextContent(
       'The files for this input may be at most 4 bytes in all.',
     );
-    expect(alert).toHaveTextContent('The input: Your solution');
+    expect(alert).toHaveTextContent('Too large: Your solution');
     expect(store.seen.slots).toHaveLength(0);
   });
 
@@ -333,7 +334,8 @@ describe('the submit panel', () => {
           errors: [
             {
               input: 'answers',
-              message: '1.txt is not named for a test, as <group>/<test>.',
+              message:
+                'Name each file of this input after a test, as <group>/<test>, such as main/1.txt.',
             },
           ],
         });
@@ -350,7 +352,7 @@ describe('the submit panel', () => {
 
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent(
-      'Your answers: 1.txt is not named for a test, as <group>/<test>.',
+      'Your answers: Name each file of this input after a test, as <group>/<test>, such as main/1.txt.',
     );
     expect(slots).toEqual([expect.objectContaining({ filename: '1.txt' })]);
   });
@@ -474,9 +476,9 @@ describe('the submit panel', () => {
     ['archived', {}, 'The contest is archived', 'they take no submissions'],
     [
       'not_approved',
-      { detail: 'Only an approved contestant of the contest submits to it.' },
-      'You are not a contestant here yet',
-      'Only an approved contestant',
+      { detail: 'Only approved entrants of this contest can submit to its tasks.' },
+      'Your registration is not approved yet',
+      'Only approved entrants of this contest can submit to its tasks.',
     ],
     [
       'submission_limit',
@@ -505,7 +507,7 @@ describe('the submit panel', () => {
     [
       'upload_not_ready',
       { uploads: ['x'] },
-      'A file did not arrive whole',
+      'A file did not arrive in full',
       'Nothing was submitted.',
     ],
     [
@@ -517,16 +519,16 @@ describe('the submit panel', () => {
     [
       'invalid_idempotency_key',
       {},
-      'That submit could not be sent',
+      'That submission could not be sent',
       'Reload the page and submit again.',
     ],
     [
       'invalid_inputs',
       {
-        errors: [{ input: 'language', message: 'Must be one of python.' }],
+        errors: [{ input: 'language', message: 'Choose one of python.' }],
       },
       'The submission does not fit the task',
-      'language: Must be one of python.',
+      'language: Choose one of python.',
     ],
   ];
 
@@ -579,8 +581,8 @@ describe('the submit panel', () => {
       http.post(`${TASK_API}/uploads/:upload/complete`, () =>
         problem(409, 'upload_not_ready', { uploads: ['x'] }),
       ),
-      'A file did not arrive whole',
-      'Submit again and the files are sent again.',
+      'A file did not arrive in full',
+      'Submit again to send the files again.',
     ],
     [
       'an upload the forge does not hold',
@@ -596,7 +598,7 @@ describe('the submit panel', () => {
         }),
       ),
       'A file did not arrive as it was sent',
-      'The forge has not got the file.',
+      'Unicon did not receive the file as it was sent.',
     ],
   ];
 
@@ -659,7 +661,7 @@ describe('the submit panel', () => {
     renderApp(PAGE);
 
     expect(
-      await screen.findByText('Only approved contestants submit to this task.'),
+      await screen.findByText('You can submit once your registration is approved.'),
     ).toBeVisible();
     expect(screen.queryByRole('form', { name: 'Submit' })).not.toBeInTheDocument();
   });
@@ -766,11 +768,58 @@ describe('the submissions list', () => {
     const list = await screen.findByRole('table', { name: 'Your submissions' });
     const rows = within(list).getAllByRole('row').slice(1);
     expect(rows.map((row) => row.textContent)).toEqual([
-      expect.stringMatching(/^#4.*GRADING$/),
-      expect.stringMatching(/^#3.*2 days lateWRONG ANSWER$/),
-      expect.stringMatching(/^#2.*COMPILE ERR$/),
-      expect.stringMatching(/^#1.*ACCEPTED$/),
+      expect.stringMatching(/^#4.*GRADING—$/),
+      expect.stringMatching(/^#3.*2 days lateWRONG ANSWER—$/),
+      expect.stringMatching(/^#2.*COMPILE ERROR—$/),
+      expect.stringMatching(/^#1.*ACCEPTED100$/),
     ]);
+  });
+
+  it('says each submission’s points in its row, or when held-back points are shown', async () => {
+    const held = (shown: string) =>
+      grading({
+        ...accepted,
+        points: { shown, pending: '70', pending_until: '2026-09-12T14:00:00Z' },
+      });
+    server.use(
+      signedIn,
+      withPage({}),
+      listing([
+        submission(
+          1,
+          grading({
+            ...accepted,
+            points: { shown: '82.5', pending: '0', pending_until: null },
+          }),
+        ),
+        submission(2, held('0')),
+        submission(3, held('30')),
+        submission(4, grading({ status: 'queued' })),
+      ]),
+    );
+    renderApp(PAGE);
+
+    const list = await screen.findByRole('table', { name: 'Your submissions' });
+    const at = formatWhen(new Date('2026-09-12T14:00:00Z'));
+    const cells = within(list)
+      .getAllByRole('row')
+      .slice(1)
+      .map((row) => row.lastElementChild?.textContent);
+    expect(cells).toEqual([
+      '—',
+      `30 so far, more shown at ${at}`,
+      `shown at ${at}`,
+      formatExact('82.5', 2),
+    ]);
+    expect(within(list).getByRole('columnheader', { name: 'Points' })).toBeVisible();
+  });
+
+  it('leaves points out of the list on a task that gives none', async () => {
+    server.use(signedIn, withPage({ worth: null }), listing([submission(1, accepted)]));
+    renderApp(PAGE);
+
+    const list = await screen.findByRole('table', { name: 'Your submissions' });
+    expect(within(list).queryByRole('columnheader', { name: 'Points' })).toBeNull();
   });
 });
 
@@ -1070,7 +1119,7 @@ describe('a submission opened from the list', () => {
     renderApp(`${PAGE}?submission=1`);
 
     const detail = await screen.findByRole('region', { name: 'Submission 1' });
-    expect(await within(detail).findByText('COMPILE ERR')).toBeVisible();
+    expect(await within(detail).findByText('COMPILE ERROR')).toBeVisible();
     expect(within(detail).getByText(/, 1 day late$/)).toBeVisible();
     expect(within(detail).getByLabelText('log')).toHaveTextContent(
       '<img src=x onerror="alert(1)">',

@@ -9,6 +9,7 @@ import { CONTEST_API, TASK_API, home, registration, taskPage } from '@/test/cont
 import { passTime, withFakeTimers } from '@/test/timers';
 
 const HOME = '/contests/acme/spring';
+const QUESTIONS = `${HOME}/questions`;
 
 function announcement(overrides: Partial<Announcement> = {}): Announcement {
   return {
@@ -82,6 +83,31 @@ describe('announcements', () => {
 
     expect(await screen.findByText('Read n first')).toBeVisible();
   });
+
+  it('draws a task’s own pictures in its announcements, and none in the contest’s', async () => {
+    server.use(
+      signedIn,
+      approvedHome,
+      http.get(`${CONTEST_API}/home/announcements`, () =>
+        HttpResponse.json([
+          announcement({ body: '![the map](public/map.png)' }),
+          announcement({
+            number: 2,
+            title: 'On sum',
+            body: '![the tree](public/tree.png)',
+            where: { org: 'acme', contest: 'spring', task: 'sum' },
+          }),
+        ]),
+      ),
+    );
+    renderApp(HOME);
+
+    expect(await screen.findByRole('img', { name: 'the tree' })).toHaveAttribute(
+      'src',
+      '/api/v1/orgs/acme/contests/spring/tasks/sum/public/tree.png',
+    );
+    expect(screen.getByRole('link', { name: 'the map' })).toBeVisible();
+  });
 });
 
 describe('questions', () => {
@@ -105,8 +131,11 @@ describe('questions', () => {
         return HttpResponse.json(made, { status: 201 });
       }),
     );
-    renderApp(HOME);
+    renderApp(QUESTIONS);
 
+    expect(
+      await screen.findByRole('heading', { name: 'Questions', level: 1 }),
+    ).toBeVisible();
     const form = await screen.findByRole('form', { name: 'Ask' });
     await userEvent.type(within(form).getByLabelText(/Question/), 'And m?');
     await userEvent.type(within(form).getByLabelText(/Details/), 'Is m bounded?');
@@ -126,11 +155,15 @@ describe('questions', () => {
   it('marks a team’s messages as the team’s', async () => {
     server.use(
       signedIn,
-      approvedHome,
+      http.get(`${CONTEST_API}/home`, () =>
+        HttpResponse.json(
+          home({ registration: { ...registration({ status: 'approved' }), most: 3 } }),
+        ),
+      ),
       http.get(`${CONTEST_API}/questions`, () =>
         HttpResponse.json([
           question({
-            asker: 'team.0b9d6a52-0000-4000-8000-000000000001',
+            asker: 'entrant.0b9d6a5200004000800000000000001a',
             messages: [
               { from_asker: true, body: 'And m?', at: '2026-09-12T09:15:00Z' },
             ],
@@ -138,10 +171,53 @@ describe('questions', () => {
         ]),
       ),
     );
-    renderApp(HOME);
+    renderApp(QUESTIONS);
 
     const list = await screen.findByRole('list', { name: 'Your questions' });
     expect(await within(list).findByText(/Your team/)).toBeVisible();
+    expect(
+      screen.getByRole('heading', { name: 'Your team’s questions' }),
+    ).toBeVisible();
+  });
+
+  it('asks about the task a task’s page links from', async () => {
+    const asked: unknown[] = [];
+    server.use(
+      signedIn,
+      approvedHome,
+      http.post(`${CONTEST_API}/questions`, async ({ request }) => {
+        asked.push(await request.json());
+        return HttpResponse.json(question({ task: 'sum' }), { status: 201 });
+      }),
+    );
+    renderApp(`${QUESTIONS}?task=sum`);
+
+    const form = await screen.findByRole('form', { name: 'Ask' });
+    await userEvent.type(within(form).getByLabelText(/Question/), 'Is n positive?');
+    await userEvent.type(within(form).getByLabelText(/Details/), 'Or zero?');
+    await userEvent.click(within(form).getByRole('button', { name: 'Ask' }));
+
+    await waitFor(() => expect(asked).toHaveLength(1));
+    expect(asked[0]).toMatchObject({ task: 'sum' });
+  });
+
+  it('says how many questions were asked and answered on the contest’s page', async () => {
+    server.use(
+      signedIn,
+      approvedHome,
+      http.get(`${CONTEST_API}/questions`, () =>
+        HttpResponse.json([question(), question({ number: 2, answered: true })]),
+      ),
+    );
+    renderApp(HOME);
+
+    const card = await screen.findByRole('region', {
+      name: 'Questions to the organisers',
+    });
+    expect(await within(card).findByText('2 asked, 1 answered.')).toBeVisible();
+    expect(
+      within(card).getByRole('link', { name: 'Ask a question or read the answers' }),
+    ).toHaveAttribute('href', QUESTIONS);
   });
 
   it('offers no questions to someone who is not an approved contestant', async () => {
@@ -149,10 +225,24 @@ describe('questions', () => {
       signedIn,
       http.get(`${CONTEST_API}/home`, () => HttpResponse.json(home())),
     );
-    renderApp(HOME);
+    renderApp(QUESTIONS);
 
-    await screen.findByRole('heading', { name: 'Tasks' });
+    expect(
+      await screen.findByText(
+        'You can ask the organisers questions once your registration is approved.',
+      ),
+    ).toBeVisible();
     expect(screen.queryByRole('form', { name: 'Ask' })).toBeNull();
+  });
+
+  it('asks a visitor to sign in first', async () => {
+    renderApp(QUESTIONS);
+
+    expect(
+      await screen.findByRole('heading', {
+        name: 'Sign in to ask the organisers a question',
+      }),
+    ).toBeVisible();
   });
 });
 

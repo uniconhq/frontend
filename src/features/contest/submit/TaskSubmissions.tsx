@@ -6,7 +6,6 @@ import type { Submission, TaskPage, TaskRelease } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { Card } from '@/ui/Card';
 import { SectionTitle } from '@/ui/SectionTitle';
-import { TaskCountdown } from '../TaskCountdown';
 import { emptyDraft, type Draft } from './draft';
 import { newestFirst } from './grading';
 import { SubmissionDetail } from './SubmissionDetail';
@@ -20,39 +19,36 @@ import shared from '../contest.module.css';
  * Why a task takes no submission from this person now, said where the panel
  * would be: a task is open to a row only while it is released, its contest
  * is not archived, and the row's close of it has not passed; and only an
- * approved contestant holds a row to submit from.
+ * approved entrant holds a row to submit from.
  */
 const CLOSED: Record<NonNullable<TaskRelease['closed']>, string> = {
   not_released: 'This task is not released yet.',
   archived: 'The contest is archived, so its tasks take no submissions.',
   closed: 'This task has closed for you, so it takes no more submissions from you.',
-  not_approved: 'Only approved contestants submit to this task.',
+  not_approved: 'You can submit once your registration is approved.',
 };
 
 function closedReason(closed: TaskRelease['closed']): string {
-  return closed === null ? 'This task takes no submission now.' : CLOSED[closed];
+  return closed === null ? 'This task takes no submissions right now.' : CLOSED[closed];
 }
 
 /**
- * The contestant's half of a task page below its statement: the countdowns
- * to the row's due and close, the panel they submit from while the task is
- * open or why it is not in its place, the submission the address opens, and
- * the list of their own submissions. The panel's contents live here, so a
- * submission that goes through empties it and joins the top of the list at
- * once.
+ * The contestant's half of a task page below its statement: the panel they
+ * submit from while the task is open or why it is not in its place, the
+ * submission the address opens, and the list of their own submissions. The
+ * panel's contents live here, so a submission that goes through empties it
+ * and joins the top of the list at once.
  */
 export function TaskSubmissions({
   org,
   contest,
   task,
   page,
-  onBoundary,
 }: {
   org: string;
   contest: string;
   task: string;
   page: TaskPage;
-  onBoundary?: () => void;
 }) {
   const queryClient = useQueryClient();
   const { pathname } = useLocation();
@@ -102,7 +98,6 @@ export function TaskSubmissions({
       <Card>
         <div className={shared.stack}>
           <SectionTitle>Submit</SectionTitle>
-          <TaskCountdown due={page.due} closes={page.closes} onBoundary={onBoundary} />
           {open ? (
             <SubmitPanel
               inputs={inputs}
@@ -140,6 +135,7 @@ export function TaskSubmissions({
             contest={contest}
             task={task}
             marked={page.marks !== null}
+            points={page.worth !== null}
           />
         </div>
       </Card>
