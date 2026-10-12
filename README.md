@@ -817,7 +817,8 @@ connections to one host and a stream in every background tab would use
 them up. Each event names a kind of thing that changed and its id, never
 what changed. The events of a moment are gathered, and each kind marks
 stale the reads whose route shows it: a grading the submissions and
-gradings lists, a contest's queue and a submission, but not its files; an announcement
+gradings lists, a contest's queue, a submission, but not its files, and the
+contest home, whose tasks carry the entrant's points; an announcement
 every announcements list; a clarification the questions and the inbox.
 `resync`, and every opening of the stream after the tab's first, marks
 everything stale but the reads a form or an editor edits from (`EDITED`),

@@ -187,6 +187,7 @@ describe('where the live stream stands', () => {
         `${task}/gradings`,
         `${contest}/gradings`,
         `${contest}/gradings/queue`,
+        `${contest}/home`,
       ];
       const announced = [
         `${contest}/announcements`,
@@ -234,6 +235,44 @@ describe('where the live stream stands', () => {
 
       act(() => source?.listeners.get('resync')?.());
       expect(stale()).toEqual(reads);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('marks stale, on any nudge, none of the reads a form or an editor edits from', () => {
+    vi.useFakeTimers();
+    try {
+      const client = new QueryClient();
+      const contest = '/api/v1/orgs/{org}/contests/{contest}';
+      const task = `${contest}/tasks/{task}`;
+      // Every read marked EDITED, under the keys the forms and the task's
+      // build cards give them.
+      const edited = [
+        ['get', `${contest}/files/{path}`, 'own'],
+        ['get', `${task}/files/{path}`, 'own'],
+        ['get', `${task}/files/{path}`, 'editor'],
+        ['get', `${task}/workflow-form`, 'build'],
+        ['get', `${task}/tree`, 'build'],
+      ];
+      for (const key of edited) {
+        client.getQueryCache().build(client, { queryKey: key, meta: EDITED });
+        client.setQueryData(key, {});
+      }
+      renderProvider(client);
+      const source = FakeSource.last;
+      act(() => source?.onopen?.());
+
+      act(() => {
+        for (const kind of ['grading', 'announcement', 'clarification']) {
+          source?.listeners.get(kind)?.();
+        }
+        vi.advanceTimersByTime(300);
+      });
+
+      expect(
+        edited.filter((key) => client.getQueryState(key)?.isInvalidated),
+      ).toEqual([]);
     } finally {
       vi.useRealTimers();
     }
