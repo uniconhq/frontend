@@ -1,5 +1,5 @@
 import { $api, queryView } from '@/api/query';
-import type { GradingResult } from '@/api/types';
+import type { GradingResult, InputField } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { PageLink } from '@/ui/PageLink';
 import { OutLink } from '@/ui/OutLink';
@@ -93,10 +93,11 @@ function Grading({ grading }: { grading: GradingResult }) {
 
 /**
  * What the submission was made with, input by input: each file a download of
- * the file as it was submitted, whatever its size, named with its input, and
- * each value given, as it was given.
+ * the file as it was submitted, whatever its size, named with its input as
+ * the form names it (its label; its key only for an input the task no longer
+ * has), and each value given, as it was given.
  */
-function Files({ where }: { where: Where }) {
+function Files({ where, inputs: fields }: { where: Where; inputs: InputField[] }) {
   const view = queryView(
     $api.useQuery(
       'get',
@@ -106,6 +107,7 @@ function Files({ where }: { where: Where }) {
   );
   if (view.state === 'loading') return <PageSkeleton rows={1} />;
   if (view.state === 'error') return <ErrorBlock error={view.error} compact />;
+  const labelOf = (id: string) => fields.find((field) => field.id === id)?.label ?? id;
   const inputs = Object.entries(view.data.inputs);
   const files = inputs.flatMap(([id, input]) =>
     input.files.map((path) => ({ id, path })),
@@ -119,7 +121,8 @@ function Files({ where }: { where: Where }) {
         <ul className={classes.files} aria-label="Files">
           {files.map(({ id, path }) => (
             <li key={path}>
-              {id}: <OutLink href={downloadHref(where, path)}>{nameOf(path)}</OutLink>
+              {labelOf(id)}:{' '}
+              <OutLink href={downloadHref(where, path)}>{nameOf(path)}</OutLink>
             </li>
           ))}
         </ul>
@@ -128,7 +131,7 @@ function Files({ where }: { where: Where }) {
         <ul className={classes.files} aria-label="Values given">
           {values.map(({ id, value }) => (
             <li key={id}>
-              {id}: {value}
+              {labelOf(id)}: {value}
             </li>
           ))}
         </ul>
@@ -148,9 +151,12 @@ export function SubmissionDetail({
   task,
   number,
   closeTo,
+  inputs,
 }: Where & {
   /** Where closing it goes: the task page without the submission open. */
   closeTo: string;
+  /** The task's inputs as its form names them. */
+  inputs: InputField[];
 }) {
   const live = useLiveConnected();
   const refused = useLiveRefused();
@@ -181,7 +187,7 @@ export function SubmissionDetail({
             Submitted {formatDateTime(new Date(view.data.submitted_at))}
             {view.data.late_days > 0 && `, ${lateness(view.data.late_days)}`}
           </BodyText>
-          <Files where={where} />
+          <Files where={where} inputs={inputs} />
           {view.data.grading === null ? (
             <BodyText tone="secondary">Not graded</BodyText>
           ) : (

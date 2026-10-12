@@ -126,6 +126,7 @@ export function TaskSubmissions({
             task={task}
             number={opened}
             closeTo={pathname}
+            inputs={inputs}
           />
         </Card>
       )}
