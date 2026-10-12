@@ -203,11 +203,14 @@ describe("the boards' settings", { timeout: 20_000 }, () => {
     await user.click(
       within(form).getByRole('button', { name: 'Add a way to rank ICPC' }),
     );
-    const key = within(icpcBoard().getByRole('group', { name: 'Then by (2)' }));
-    await user.click(key.getByRole('radio', { name: 'Penalty minutes, fewest first' }));
-    fireEvent.change(key.getByLabelText('Minutes per earlier attempt'), {
-      target: { value: '20' },
-    });
+    const key = within(icpcBoard().getByRole('group', { name: 'Way to rank 2' }));
+    expect(key.getByRole('combobox', { name: 'Way to rank 2' })).toHaveValue('penalty');
+    fireEvent.change(
+      key.getByRole('textbox', { name: 'Minutes per earlier attempt' }),
+      {
+        target: { value: '20' },
+      },
+    );
     await user.click(within(form).getByRole('button', { name: 'Save leaderboards' }));
 
     expect(await screen.findByText('Saved.')).toBeVisible();
@@ -241,21 +244,18 @@ describe("the boards' settings", { timeout: 20_000 }, () => {
 
     const form = await screen.findByRole('form', { name: 'Leaderboards' });
     expect(
-      within(form).getByText(
-        'Ranked by points alone, unless you add another way to rank.',
-      ),
-    ).toBeVisible();
-    await user.click(
-      within(form).getByRole('button', { name: 'Add a way to rank Standings' }),
-    );
-    await user.click(
       within(
-        board(form, 'Standings').getByRole('radiogroup', { name: 'Ranked first by' }),
-      ).getByRole('radio', { name: 'A value the tasks report' }),
+        board(form, 'Standings').getByRole('group', { name: 'Ranked by' }),
+      ).getByText('Ranks by points, most first.'),
+    ).toBeVisible();
+    await user.selectOptions(
+      board(form, 'Standings').getByRole('combobox', { name: 'Way to rank 1' }),
+      'value',
     );
-    fireEvent.change(board(form, 'Standings').getByLabelText('Value'), {
-      target: { value: 'time_ms' },
-    });
+    fireEvent.change(
+      board(form, 'Standings').getByRole('textbox', { name: 'Which value' }),
+      { target: { value: 'time_ms' } },
+    );
     await user.click(within(form).getByRole('button', { name: 'Save leaderboards' }));
 
     expect(
@@ -264,7 +264,7 @@ describe("the boards' settings", { timeout: 20_000 }, () => {
       }),
     ).toHaveAttribute('href', `${PAGE}?field=order&item=0`);
     const key = board(form, 'Standings').getByRole('group', {
-      name: 'Ranked first by',
+      name: 'Way to rank 1',
     });
     expect(within(key).getByText(/No covered task reports time_ms/)).toBeVisible();
   });
@@ -281,16 +281,18 @@ describe("the boards' settings", { timeout: 20_000 }, () => {
 
     const form = await screen.findByRole('form', { name: 'Leaderboards' });
     const standings = board(form, 'Standings');
-    const penalty = (name: string) =>
-      within(standings.getByRole('radiogroup', { name })).getByRole('radio', {
-        name: 'Penalty minutes, fewest first',
-      });
-    expect(penalty('Ranked first by')).toBeDisabled();
-    expect(penalty('Ranked first by')).toHaveAccessibleDescription(
-      /Penalty minutes only break ties, so they are never the first way to rank\.$/,
-    );
-    expect(penalty('Then by (2)')).toBeEnabled();
-    expect(penalty('Then by (2)')).not.toHaveAccessibleDescription(/never the first/);
+    const offered = (name: string) =>
+      within(standings.getByRole('combobox', { name }))
+        .getAllByRole('option')
+        .map((option) => option.textContent);
+    expect(offered('Way to rank 1')).toEqual([
+      'Points, most first',
+      'A value the tasks report',
+    ]);
+    expect(offered('Way to rank 2')).toEqual([
+      'Penalty minutes, fewest first',
+      'A value the tasks report',
+    ]);
     const perGroup = within(
       standings.getByRole('radiogroup', { name: 'Which submission counts' }),
     ).getByRole('radio', { name: 'Best submission on each test group' });
@@ -306,6 +308,108 @@ describe("the boards' settings", { timeout: 20_000 }, () => {
     ).toHaveTextContent(
       'Organisers see all of it; entrants see the top 10 rows and any row tied with the last of them, and an entrant their own row as well.',
     );
+  });
+
+  it('shows each way to rank as one row under a summary, offering each way once', async () => {
+    server.use(signedIn);
+    const sent = settings(
+      CONTEST.replace(
+        '    who: contestants\n',
+        '    who: contestants\n    order: [points, {by: penalty, per_attempt: 20}]\n',
+      ),
+    );
+    const user = userEvent.setup();
+    renderApp(PAGE);
+
+    const form = await screen.findByRole('form', { name: 'Leaderboards' });
+    const standings = board(form, 'Standings');
+    const order = within(standings.getByRole('group', { name: 'Ranked by' }));
+    expect(
+      order.getByText(
+        'Ranks by points, most first; ties broken by penalty minutes, fewest first, with 20 more for each earlier attempt.',
+      ),
+    ).toBeVisible();
+    const second = within(order.getByRole('group', { name: 'Way to rank 2' }));
+    expect(
+      second.getByRole('textbox', { name: 'Minutes per earlier attempt' }),
+    ).toHaveValue('20');
+    expect(
+      second.getByText(
+        'The minutes from the start to each counted submission, and a set number more for each earlier attempt. Fewer ranks higher.',
+      ),
+    ).toBeVisible();
+    expect(order.queryAllByRole('radio')).toHaveLength(0);
+
+    // Points and penalty minutes are used, so Add brings a value, and then goes.
+    await user.click(
+      order.getByRole('button', { name: 'Add a way to rank Standings' }),
+    );
+    expect(order.getByRole('combobox', { name: 'Way to rank 3' })).toHaveValue('value');
+    expect(order.queryByRole('button', { name: /^Add a way to rank/ })).toBeNull();
+
+    await user.click(
+      order.getByRole('button', { name: 'Remove way to rank 3 of Standings' }),
+    );
+    await user.click(
+      order.getByRole('button', { name: 'Move way to rank 2 of Standings up' }),
+    );
+    expect(
+      within(order.getByRole('group', { name: 'Way to rank 1' })).getByRole('alert'),
+    ).toHaveTextContent(
+      'Penalty minutes only break ties, so they are never the first way to rank.',
+    );
+    await user.click(
+      order.getByRole('button', { name: 'Move way to rank 2 of Standings up' }),
+    );
+    fireEvent.change(
+      within(order.getByRole('group', { name: 'Way to rank 2' })).getByRole('textbox', {
+        name: 'Minutes per earlier attempt',
+      }),
+      { target: { value: '30' } },
+    );
+    await user.click(within(form).getByRole('button', { name: 'Save leaderboards' }));
+
+    expect(await screen.findByText('Saved.')).toBeVisible();
+    expect(sent[0]).toContain('    order: [points, {by: penalty, per_attempt: 30}]\n');
+  });
+
+  it('keeps a board that names no way to rank as it is, showing points as its one way', async () => {
+    server.use(signedIn);
+    settings();
+    renderApp(PAGE);
+
+    const form = await screen.findByRole('form', { name: 'Leaderboards' });
+    const order = within(
+      board(form, 'Standings').getByRole('group', { name: 'Ranked by' }),
+    );
+    expect(order.getByRole('combobox', { name: 'Way to rank 1' })).toHaveValue(
+      'points',
+    );
+    expect(
+      order.getByRole('button', { name: 'Remove way to rank 1 of Standings' }),
+    ).toBeDisabled();
+    expect(
+      within(form).getByRole('button', { name: 'Save leaderboards' }),
+    ).toBeDisabled();
+  });
+
+  it('says a value ranked by twice changes nothing', async () => {
+    server.use(signedIn);
+    settings(
+      CONTEST.replace(
+        '    who: contestants\n',
+        '    who: contestants\n    order: [points, time_ms, time_ms]\n',
+      ),
+    );
+    renderApp(PAGE);
+
+    const form = await screen.findByRole('form', { name: 'Leaderboards' });
+    const order = within(
+      board(form, 'Standings').getByRole('group', { name: 'Ranked by' }),
+    );
+    expect(
+      within(order.getByRole('group', { name: 'Way to rank 3' })).getByRole('alert'),
+    ).toHaveTextContent('Way 2 already ranks by time_ms, so this one changes nothing.');
   });
 
   it('removes a board only once asked, and the key with the last of them', async () => {
