@@ -265,11 +265,19 @@ with the same props in for it (`src/test/code-editor.tsx`), and
 
 **A task's files are changed only on its cards** (M51). Tests are added,
 opened and replaced on Tests and scoring (below). A picture for the statement
-is added with "Add a picture" on the Statement card, which saves it into the
-task's `public/` folder at once under a name no file there has
-(`forms/picture-name.ts`) and adds the line that shows it,
-`![name](public/name.png)`, at the end of the statement, for the organiser to
-move and save. A setting that is a file or a folder, such as a checker, has
+is added with "Add a picture" on the Statement card, which takes only a
+picture the page can show (by its ending, as the backend serves `public/`)
+of at most 10 MB, refusing anything else in words, names it so no file
+under `public/` has its name (`forms/picture-name.ts`) and adds the line
+that shows it, `![name](public/name.png)`, at the end of the statement, for
+the organiser to move. The card lists the pictures under `public/`, saying
+of one the statement does not show that it is not shown, with Remove; a
+picture added or removed is marked New or To be removed, with Undo, and the
+preview draws an added one from its own bytes. The statement's Save writes
+`statement.md` and every picture with it in one save of the task
+(`POST <task>/save`), answered as any other (`forms/StatementEditor.tsx`,
+`forms/statement-pictures.ts`), so a picture never publishes on its own. A
+setting that is a file or a folder, such as a checker, has
 its own box on the Inputs card (`task/FileSetting.tsx`): what it names, with
 View, Replace and, for an optional one, Use none; a file chosen is marked New
 or Replaced and waits for the task's save, which writes it under the input's

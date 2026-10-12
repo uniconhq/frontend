@@ -109,71 +109,270 @@ describe('the statement beside its preview', { timeout: 20_000 }, () => {
     expect(screen.getByRole('button', { name: 'Add a picture' })).toBeVisible();
   });
 
-  it('adds a picture into the task under a name of its own, and writes the line that shows it (M51)', async () => {
-    statementBackend(() => HttpResponse.json({}));
-    const saves: { path: string; content?: string | null; encoding: string }[][] = [];
-    server.use(
-      http.get(`${TASK_API}/tree`, ({ request }) =>
-        new URL(request.url).searchParams.get('path') === 'public'
-          ? HttpResponse.json([
-              { path: 'public/my-diagram.png', kind: 'file', size: 9, upload: null },
-            ])
-          : undefined,
-      ),
-      http.post(`${TASK_API}/save`, async ({ request }) => {
-        const body = (await request.json()) as {
-          changes: { path: string; content?: string | null; encoding: string }[];
-        };
-        saves.push(body.changes);
-        return HttpResponse.json({
-          publication: 'p',
-          number: 4,
-          grading_changed: false,
-          changes: [],
-          notes: [],
-          regraded: 0,
-        });
-      }),
-    );
-    const user = userEvent.setup();
-    renderApp('/orgs/acme/contests/spring/tasks/sum/statement');
+  describe('its pictures (M51)', () => {
+    type Change = {
+      path: string;
+      token: string | null;
+      content?: string | null;
+      encoding: string;
+      remove: boolean;
+    };
+    type Save = { changes: Change[]; confirm: boolean; keep_as_draft: boolean };
 
-    const source = await screen.findByRole('textbox', { name: 'Statement source' });
-    await user.click(screen.getByRole('button', { name: 'Add a picture' }));
-    await user.upload(
-      screen.getByLabelText('Picture'),
-      new File(['PNGBYTES'], 'my diagram.png', { type: 'image/png' }),
-    );
+    // jsdom makes no address for a file's bytes; each picture gets one of its own.
+    const made = Object.getOwnPropertyDescriptor(URL, 'createObjectURL');
+    const revoked = Object.getOwnPropertyDescriptor(URL, 'revokeObjectURL');
+    beforeEach(() => {
+      let made = 0;
+      URL.createObjectURL = () => {
+        made += 1;
+        return `blob:picture-${String(made)}`;
+      };
+      URL.revokeObjectURL = () => undefined;
+    });
+    afterEach(() => {
+      for (const [name, was] of [
+        ['createObjectURL', made],
+        ['revokeObjectURL', revoked],
+      ] as const) {
+        if (was === undefined) Reflect.deleteProperty(URL, name);
+        else Object.defineProperty(URL, name, was);
+      }
+    });
 
-    expect(
-      await screen.findByText(
-        'my-diagram-2.png is saved with the task, and the line that shows it is at the end of the statement. Move the line to where the picture belongs, then save the statement.',
-      ),
-    ).toBeVisible();
-    expect(saves).toEqual([
-      [
+    /**
+     * The statement, its pictures under `public/` (`my-diagram.png` and
+     * `old.png`, each read with its token) and the task's save, kept in
+     * `saves`, answered by `answer` in turn.
+     */
+    function picturesBackend(answers: (() => Response)[] = []) {
+      const { sent } = statementBackend(() => HttpResponse.json({}));
+      const saves: Save[] = [];
+      const pictures = ['public/my-diagram.png', 'public/old.png'];
+      server.use(
+        http.get(`${TASK_API}/tree`, ({ request }) =>
+          new URL(request.url).searchParams.get('path') === 'public'
+            ? HttpResponse.json(
+                pictures.map((path) => ({ path, kind: 'file', size: 9, upload: null })),
+              )
+            : undefined,
+        ),
+        http.get(`${TASK_API}/files/:path`, ({ params }) => {
+          const path = decodeURIComponent(String(params['path']));
+          return pictures.includes(path)
+            ? HttpResponse.json({
+                path,
+                encoding: 'utf-8',
+                content: 'x',
+                token: `token-${path}`,
+                upload: null,
+                version: null,
+              })
+            : undefined;
+        }),
+        http.post(`${TASK_API}/save`, async ({ request }) => {
+          saves.push((await request.json()) as Save);
+          const answer = answers[saves.length - 1];
+          return answer !== undefined
+            ? answer()
+            : HttpResponse.json({
+                publication: 'p',
+                number: 4,
+                grading_changed: false,
+                changes: [],
+                notes: [],
+                regraded: 0,
+              });
+        }),
+      );
+      return { sent, saves };
+    }
+
+    async function addPicture(user: ReturnType<typeof userEvent.setup>, file: File) {
+      await user.click(screen.getByRole('button', { name: 'Add a picture' }));
+      await user.upload(screen.getByLabelText('Picture'), file);
+    }
+
+    it('stages a picture under a name of its own, draws it from its own bytes, and saves it with the statement in one save', async () => {
+      const { sent, saves } = picturesBackend();
+      const user = userEvent.setup();
+      renderApp('/orgs/acme/contests/spring/tasks/sum/statement');
+      const source = await screen.findByRole('textbox', { name: 'Statement source' });
+      await screen.findByRole('list', { name: 'Pictures' });
+
+      await addPicture(
+        user,
+        new File(['PNGBYTES'], 'my diagram.png', { type: 'image/png' }),
+      );
+
+      // Nothing is saved until the statement is.
+      expect(saves).toEqual([]);
+      expect(source).toHaveValue(
+        '# Sum\n\nWrite the sum of two numbers.\n\n![my diagram](public/my-diagram-2.png)\n',
+      );
+      expect(
+        within(screen.getByRole('region', { name: 'What entrants see' })).getByRole(
+          'img',
+          { name: 'my diagram' },
+        ),
+      ).toHaveAttribute('src', 'blob:picture-1');
+      const listed = screen.getByRole('list', { name: 'Pictures' });
+      const added = within(listed).getByRole('listitem', { name: 'my-diagram-2.png' });
+      expect(within(added).getByText('New')).toBeVisible();
+
+      await user.click(screen.getByRole('button', { name: 'Save statement' }));
+
+      expect(
+        await screen.findByText('Saved and published as publication 4.'),
+      ).toBeVisible();
+      expect(sent).toEqual([]);
+      expect(saves).toEqual([
         {
-          path: 'public/my-diagram-2.png',
-          token: null,
-          content: btoa('PNGBYTES'),
-          encoding: 'base64',
+          changes: [
+            {
+              path: 'statement.md',
+              token: 'token-statement',
+              content:
+                '# Sum\n\nWrite the sum of two numbers.\n\n![my diagram](public/my-diagram-2.png)\n',
+              encoding: 'utf-8',
+              remove: false,
+            },
+            {
+              path: 'public/my-diagram-2.png',
+              token: null,
+              content: btoa('PNGBYTES'),
+              encoding: 'base64',
+              remove: false,
+            },
+          ],
+          confirm: false,
+          keep_as_draft: false,
+        },
+      ]);
+    });
+
+    it('answers a save with pictures as any save of the task, a confirmation it asks for included', async () => {
+      const { saves } = picturesBackend([
+        () =>
+          problem(409, 'confirmation_required', {
+            changes: ['tests/main changed'],
+            regrades: 3,
+          }),
+      ]);
+      const user = userEvent.setup();
+      renderApp('/orgs/acme/contests/spring/tasks/sum/statement');
+      await screen.findByRole('textbox', { name: 'Statement source' });
+      await screen.findByRole('list', { name: 'Pictures' });
+
+      await addPicture(user, new File(['GIF89a'], 'tree.gif', { type: 'image/gif' }));
+      await user.click(screen.getByRole('button', { name: 'Save statement' }));
+
+      const asked = await screen.findByRole('alert');
+      expect(asked).toHaveTextContent('3 submissions to the task are graded again');
+      await user.click(within(asked).getByRole('button', { name: /Publish/ }));
+
+      expect(
+        await screen.findByText('Saved and published as publication 4.'),
+      ).toBeVisible();
+      expect(saves.map((save) => save.confirm)).toEqual([false, true]);
+      expect(saves[1]?.changes.map((change) => change.path)).toEqual([
+        'statement.md',
+        'public/tree.gif',
+      ]);
+    });
+
+    it('refuses in words a file that is not a picture the page can show, or is larger than 10 MB', async () => {
+      const { saves } = picturesBackend();
+      // A file dropped on the box is not held to what its picker offers.
+      const user = userEvent.setup({ applyAccept: false });
+      renderApp('/orgs/acme/contests/spring/tasks/sum/statement');
+      const source = await screen.findByRole('textbox', { name: 'Statement source' });
+      await screen.findByRole('list', { name: 'Pictures' });
+
+      await addPicture(
+        user,
+        new File(['%PDF'], 'notes.pdf', { type: 'application/pdf' }),
+      );
+      expect(
+        await screen.findByText(
+          'notes.pdf is not a picture this page can show. Choose a PNG, JPEG, GIF, WebP, AVIF, APNG, BMP, ICO or SVG file.',
+        ),
+      ).toBeVisible();
+
+      const big = new File(['x'], 'huge.png', { type: 'image/png' });
+      Object.defineProperty(big, 'size', { value: 10 * 1024 * 1024 + 1 });
+      await user.upload(screen.getByLabelText('Picture'), big);
+      expect(
+        await screen.findByText(
+          'huge.png is larger than 10 MB, the most a picture may be. Make it smaller first.',
+        ),
+      ).toBeVisible();
+
+      expect(source).toHaveValue(STATEMENT);
+      expect(screen.getByRole('button', { name: 'Save statement' })).toBeDisabled();
+      expect(saves).toEqual([]);
+    });
+
+    it('lists the pictures, says which the statement does not show, and takes one out with the statement’s save', async () => {
+      const { saves } = picturesBackend();
+      const user = userEvent.setup();
+      renderApp('/orgs/acme/contests/spring/tasks/sum/statement');
+      const source = await screen.findByRole('textbox', { name: 'Statement source' });
+      fireEvent.change(source, {
+        target: { value: `${STATEMENT}\n![diagram](public/my-diagram.png)\n` },
+      });
+
+      const listed = await screen.findByRole('list', { name: 'Pictures' });
+      const shown = within(listed).getByRole('listitem', { name: 'my-diagram.png' });
+      const old = within(listed).getByRole('listitem', { name: 'old.png' });
+      expect(shown).not.toHaveTextContent('Not shown');
+      expect(old).toHaveTextContent('Not shown in the statement.');
+
+      await user.click(within(old).getByRole('button', { name: 'Remove old.png' }));
+      expect(within(old).getByText('To be removed')).toBeVisible();
+      await user.click(screen.getByRole('button', { name: 'Save statement' }));
+
+      expect(
+        await screen.findByText('Saved and published as publication 4.'),
+      ).toBeVisible();
+      expect(saves[0]?.changes).toEqual([
+        {
+          path: 'statement.md',
+          token: 'token-statement',
+          content: `${STATEMENT}\n![diagram](public/my-diagram.png)\n`,
+          encoding: 'utf-8',
           remove: false,
         },
-      ],
-    ]);
-    expect(source).toHaveValue(
-      '# Sum\n\nWrite the sum of two numbers.\n\n![my diagram](public/my-diagram-2.png)\n',
-    );
-    expect(
-      within(screen.getByRole('region', { name: 'What entrants see' })).getByRole(
-        'img',
-        { name: 'my diagram' },
-      ),
-    ).toHaveAttribute(
-      'src',
-      '/api/v1/orgs/acme/contests/spring/tasks/sum/public/my-diagram-2.png',
-    );
-    expect(screen.getByRole('button', { name: 'Save statement' })).toBeEnabled();
+        {
+          path: 'public/old.png',
+          token: 'token-public/old.png',
+          remove: true,
+          encoding: 'utf-8',
+        },
+      ]);
+    });
+
+    it('takes a staged picture back out, with its line, on Undo', async () => {
+      const { saves } = picturesBackend();
+      const user = userEvent.setup();
+      renderApp('/orgs/acme/contests/spring/tasks/sum/statement');
+      const source = await screen.findByRole('textbox', { name: 'Statement source' });
+      await screen.findByRole('list', { name: 'Pictures' });
+
+      await addPicture(user, new File(['PNG'], 'tree.png', { type: 'image/png' }));
+      const listed = screen.getByRole('list', { name: 'Pictures' });
+      await user.click(
+        within(within(listed).getByRole('listitem', { name: 'tree.png' })).getByRole(
+          'button',
+          { name: 'Undo tree.png' },
+        ),
+      );
+
+      expect(within(listed).queryByRole('listitem', { name: 'tree.png' })).toBeNull();
+      expect(source).toHaveValue(STATEMENT);
+      expect(screen.getByRole('button', { name: 'Save statement' })).toBeDisabled();
+      expect(saves).toEqual([]);
+    });
   });
 
   it('shows a manager the statement read-only, with no way to save it', async () => {

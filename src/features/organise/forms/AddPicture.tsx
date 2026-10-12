@@ -1,99 +1,39 @@
 import { useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
-import { apiClient } from '@/api/client';
-import { toApiError, type ApiError } from '@/api/problem';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
 import { FileDrop } from '@/ui/FileDrop';
-import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
-import { staleAfterWrite, type Place } from '../files/place';
-import { sendToTask } from '../files/use-task-upload';
-import { fileChanges } from '../task/staged';
 import shared from '../organise.module.css';
 import { freeName, pictureLine, pictureName } from './picture-name';
-
-type TaskPlace = Extract<Place, { kind: 'task' }>;
-
-/** The names of the files under the task's `public/` now, none when it has no such folder. */
-async function picturesNow(task: TaskPlace): Promise<Set<string>> {
-  try {
-    const { data } = await apiClient.GET(
-      '/api/v1/orgs/{org}/contests/{contest}/tasks/{task}/tree',
-      {
-        params: {
-          path: { org: task.org, contest: task.contest, task: task.task },
-          query: { path: 'public' },
-        },
-      },
-    );
-    return new Set((data ?? []).map((entry) => entry.path.slice('public/'.length)));
-  } catch (error) {
-    if (toApiError(error).code === 'not_found') return new Set();
-    throw error;
-  }
-}
+import { pictureRefusal } from './statement-pictures';
 
 /**
- * "Add a picture" on the Statement card (M51): a picture chosen is saved
- * into the task's `public/` folder at once, under a name of its own, a large
- * one through the upload door as a test's file is, and the statement's text
- * gets the line that shows it, `![diagram](public/diagram.png)`, at its end,
- * for the organiser to move and to save with the statement.
+ * "Add a picture" on the Statement card (M51): a picture chosen, once it is
+ * one the page can show and no larger than the forge serves, waits for the
+ * statement's save under a name no file under `public/` has (`taken`), and
+ * the line that shows it, `![diagram](public/diagram.png)`, goes at the end
+ * of the statement's text, for the organiser to move. Anything else is
+ * refused in words and nothing is staged.
  */
 export function AddPicture({
-  task,
-  onAdded,
+  taken,
+  onStaged,
   disabled,
 }: {
-  task: TaskPlace;
-  /** The line that shows the picture, for the statement's text. */
-  onAdded: (line: string) => void;
+  /** The names under `public/` now, with those already waiting for the save. */
+  taken: ReadonlySet<string>;
+  onStaged: (picture: { name: string; file: File; line: string }) => void;
   disabled: boolean;
 }) {
-  const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [refused, setRefused] = useState<ApiError | null>(null);
-  const [added, setAdded] = useState<string | null>(null);
+  const [refused, setRefused] = useState<string | null>(null);
 
-  const add = async (file: File) => {
-    setBusy(true);
-    setRefused(null);
-    setAdded(null);
-    try {
-      const name = freeName(pictureName(file.name), await picturesNow(task));
-      const path = `public/${name}`;
-      const changes = await fileChanges(
-        [
-          {
-            path,
-            token: null,
-            source: {
-              path: file.name,
-              size: file.size,
-              read: () => Promise.resolve(file),
-            },
-          },
-        ],
-        (at) => sendToTask(task, file, at),
-      );
-      await apiClient.POST('/api/v1/orgs/{org}/contests/{contest}/tasks/{task}/save', {
-        params: { path: { org: task.org, contest: task.contest, task: task.task } },
-        body: { changes, confirm: false, keep_as_draft: false },
-      });
-      await Promise.all(
-        staleAfterWrite(task).map((queryKey) =>
-          queryClient.invalidateQueries({ queryKey }),
-        ),
-      );
-      onAdded(pictureLine(file.name, path));
-      setAdded(name);
-      setOpen(false);
-    } catch (error) {
-      setRefused(toApiError(error));
-    } finally {
-      setBusy(false);
-    }
+  const stage = (file: File) => {
+    const why = pictureRefusal(file);
+    setRefused(why);
+    if (why !== null) return;
+    const name = freeName(pictureName(file.name), taken);
+    onStaged({ name, file, line: pictureLine(file.name, `public/${name}`) });
+    setOpen(false);
   };
 
   return (
@@ -109,31 +49,33 @@ export function AddPicture({
         <>
           <FileDrop
             label="Picture"
-            description="It is saved with the task at once, and a line that shows it is added at the end of the statement, for you to move."
+            description="A PNG, JPEG, GIF, WebP or SVG file of at most 10 MB. A line that shows it goes at the end of the statement, for you to move; both are saved when the statement is."
             accept="image/*"
             files={[]}
             onChange={(chosen) => {
               const [file] = chosen;
-              if (file !== undefined) void add(file);
+              if (file !== undefined) stage(file);
             }}
-            disabled={busy}
+            disabled={disabled}
           />
           <div className={shared.actions}>
-            {busy && <BodyText tone="secondary">Adding the picture…</BodyText>}
-            <Button variant="secondary" onClick={() => setOpen(false)} disabled={busy}>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setOpen(false);
+                setRefused(null);
+              }}
+            >
               Cancel
             </Button>
           </div>
         </>
       )}
-      {added !== null && (
-        <BodyText tone="secondary">
-          {added} is saved with the task, and the line that shows it is at the end of
-          the statement. Move the line to where the picture belongs, then save the
-          statement.
-        </BodyText>
+      {refused !== null && (
+        <div role="alert">
+          <BodyText tone="secondary">{refused}</BodyText>
+        </div>
       )}
-      {refused !== null && <ErrorBlock error={refused} compact />}
     </div>
   );
 }
