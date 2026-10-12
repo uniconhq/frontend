@@ -24,7 +24,19 @@ const MEANWHILE_MS = 60_000;
  */
 const REFUSED_MS = 5_000;
 
-const UNFINISHED = new Set<SubmissionState>(['queued', 'grading']);
+/**
+ * Where a submission still waits for a result. A delayed one is among them:
+ * Unicon tries it again by itself, and the page should see it move on.
+ */
+const UNFINISHED = new Set<SubmissionState>(['queued', 'grading', 'delayed']);
+
+/**
+ * What an entrant reads under a delayed grading's badge (#442): the grading
+ * failed on Unicon's side, which says nothing of their submission, so no
+ * more than the wait already says of a hidden step.
+ */
+export const DELAYED_SENTENCE =
+  "A problem on Unicon's side. Nothing is lost, and it does not use up a submission.";
 
 function unfinished(submission: Submission): boolean {
   return submission.grading !== null && UNFINISHED.has(submission.grading.status);
