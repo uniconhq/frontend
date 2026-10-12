@@ -122,6 +122,15 @@ function Consequence({ asking }: { asking: Asking }) {
   const submission = `${submitterOf(asking.entry.by)}'s submission ${String(grading.submission_number)}`;
   if (asking.kind === 'retry') {
     const standing = grading.status === 'done' || grading.last_good !== null;
+    if (grading.retry_limit !== null) {
+      return (
+        <OverLimitRetry
+          asking={asking}
+          submission={submission}
+          limit={grading.retry_limit}
+        />
+      );
+    }
     return (
       <>
         <BodyText>
@@ -162,6 +171,38 @@ function Consequence({ asking }: { asking: Asking }) {
       )}
       <BodyText tone="secondary">
         This is final: neither a retry nor a rejudge grades it again.
+      </BodyText>
+    </>
+  );
+}
+
+/**
+ * What a retry of a submission with no result says when it would end over
+ * the limit (#445): its entrant has as many submissions with a result as the
+ * task takes, so the retry grades nothing and the submission ends not
+ * graded. It is asked all the same, since room may open before it runs.
+ */
+function OverLimitRetry({
+  asking,
+  submission,
+  limit,
+}: {
+  asking: Extract<Asking, { kind: 'retry' }>;
+  submission: string;
+  limit: number;
+}) {
+  const entrant = entrantOf(asking.entry);
+  const most = `${String(limit)} ${limit === 1 ? 'submission' : 'submissions'}`;
+  return (
+    <>
+      <BodyText>
+        A retry now ends not graded: {entrant} has reached the limit of {most} for{' '}
+        {asking.task}, counting the submissions with a result and those waiting.
+      </BodyText>
+      <BodyText tone="secondary">
+        {submission} then has no result and counts on no leaderboard, and {entrant}{' '}
+        reads that they had reached the limit. A submission is graded past a delay only
+        while its entrant has room under the limit, so the earliest ones count.
       </BodyText>
     </>
   );

@@ -6,7 +6,15 @@ import { OutLink } from '@/ui/OutLink';
 import { verdictLabel } from '@/ui/verdicts';
 import { formatDateTime } from '@/lib/time';
 import { taskPath } from '@/lib/organiser-paths';
-import { STATUS, bySubmission, logHref, nameOf, resultOf, submitterOf } from './feed';
+import {
+  STATUS,
+  bySubmission,
+  logHref,
+  nameOf,
+  overLimitSentence,
+  resultOf,
+  submitterOf,
+} from './feed';
 import { ScoredView } from './ScoredView';
 import classes from './feed.module.css';
 
@@ -48,8 +56,8 @@ function standsLine(grading: Grading): string | null {
 }
 
 /**
- * Where an attempt stands: its status, the reason a system error gave the
- * organisers, the sentence a cancel told the entrant, the earlier result
+ * Where an attempt stands: its status, why one over the limit was not
+ * graded, the reason a system error gave the organisers, the sentence a cancel told the entrant, the earlier result
  * that stands while it has none, what a finished run came to, and its log
  * where its run wrote one.
  */
@@ -67,6 +75,9 @@ function StatusCell({
   return (
     <>
       <span>{STATUS[grading.status]}</span>
+      {grading.status === 'over_limit' && (
+        <BodyText tone="secondary">{overLimitSentence(grading.limit)}</BodyText>
+      )}
       {grading.error !== null && <BodyText tone="secondary">{grading.error}</BodyText>}
       {grading.cancel_reason !== null && (
         <BodyText tone="secondary">

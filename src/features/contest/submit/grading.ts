@@ -38,6 +38,17 @@ const UNFINISHED = new Set<SubmissionState>(['queued', 'grading', 'delayed']);
 export const DELAYED_SENTENCE =
   "A problem on Unicon's side. Nothing is lost, and it does not use up a submission.";
 
+/**
+ * What an entrant reads of a submission past the task's limit (#445): it was
+ * graded again after a delay, when the entrant already had as many
+ * submissions with a result as the task takes, so it was not graded.
+ */
+export function overLimitSentence(limit: number | null): string {
+  return limit === null
+    ? 'Not graded: you had reached the limit of submissions for this task.'
+    : `Not graded: you had reached the limit of ${String(limit)} ${limit === 1 ? 'submission' : 'submissions'} for this task.`;
+}
+
 function unfinished(submission: Submission): boolean {
   return submission.grading !== null && UNFINISHED.has(submission.grading.status);
 }

@@ -16,6 +16,7 @@ import {
   DELAYED_SENTENCE,
   cancelReason,
   lateness,
+  overLimitSentence,
   pollEvery,
   verdictOf,
 } from './grading';
@@ -31,7 +32,8 @@ type Where = { org: string; contest: string; task: string; number: number };
  * and says the submission no longer counts against the task's limit: a cancel
  * with a sentence is the one the forge leaves out of the limit, so one
  * without (made before cancels carried one) says nothing about the limit. A
- * delayed one says its grading failed on Unicon's side, and nothing else.
+ * delayed one says its grading failed on Unicon's side, and nothing else;
+ * one over the limit, that it was not graded and why (#445).
  */
 function Grading({ grading }: { grading: GradingResult }) {
   if (grading.status === 'delayed') {
@@ -41,6 +43,19 @@ function Grading({ grading }: { grading: GradingResult }) {
           <VerdictBadge verdict="delayed" />
         </div>
         <BodyText>{DELAYED_SENTENCE}</BodyText>
+      </>
+    );
+  }
+  if (grading.status === 'over_limit') {
+    return (
+      <>
+        <div className={classes.verdict}>
+          <VerdictBadge verdict="over_limit" />
+        </div>
+        <BodyText>{overLimitSentence(grading.limit)}</BodyText>
+        <BodyText tone="secondary">
+          It has no result and counts on no leaderboard.
+        </BodyText>
       </>
     );
   }

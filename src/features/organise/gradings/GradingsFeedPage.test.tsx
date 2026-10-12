@@ -724,6 +724,46 @@ describe('acting on the feed', () => {
     );
   });
 
+  it('names an attempt over the limit, and says before a retry that it would end so and why', async () => {
+    server.use(signedIn, taskList);
+    const over: FeedEntry = {
+      ...retried,
+      grading: {
+        ...stuckFirst.grading,
+        attempt: 2,
+        status: 'over_limit',
+        error: null,
+        limit: 10,
+        retry_limit: 10,
+      },
+    };
+    feedAnswering(() => [over]);
+    const user = userEvent.setup();
+    renderApp(FEED);
+
+    const table = await screen.findByRole('table', { name: 'Gradings' });
+    const row = await within(table).findByRole('rowgroup', {
+      name: 'B submission 3 by ada',
+    });
+    expect(row).toHaveTextContent('Over the limit');
+    expect(row).toHaveTextContent(
+      'Not graded: the entrant had reached the limit of 10 submissions for this task.',
+    );
+
+    await user.click(
+      within(row).getByRole('button', {
+        name: 'Retry B submission 3 by ada, attempt 2',
+      }),
+    );
+    const asked = await screen.findByRole('dialog', {
+      name: 'Grade submission 3 again?',
+    });
+    expect(asked).toHaveTextContent(
+      'A retry now ends not graded: ada has reached the limit of 10 submissions for sum, counting the submissions with a result and those waiting.',
+    );
+    expect(asked).not.toHaveTextContent('runs again on the same version');
+  });
+
   it('keeps a refused retry in the dialog with its sentence', async () => {
     server.use(
       signedIn,

@@ -1035,6 +1035,33 @@ describe('a submission opened from the list', () => {
     expect(within(detail).queryByRole('table')).toBeNull();
   });
 
+  it('says a submission past the limit was not graded and why, in its row and opened, with no points', async () => {
+    const over = grading({ status: 'over_limit', limit: 10 });
+    server.use(
+      signedIn,
+      withPage({}),
+      listing([submission(1, over)]),
+      http.get(`${TASK_API}/submissions/:number`, () =>
+        HttpResponse.json(submission(1, over)),
+      ),
+    );
+    renderApp(`${PAGE}?submission=1`);
+
+    const sentence =
+      'Not graded: you had reached the limit of 10 submissions for this task.';
+    const list = await screen.findByRole('table', { name: 'Your submissions' });
+    const [, row] = within(list).getAllByRole('row');
+    expect(row).toHaveTextContent(`OVER THE LIMIT${sentence}`);
+    const detail = await screen.findByRole('region', { name: 'Submission 1' });
+    expect(await within(detail).findByText('OVER THE LIMIT')).toBeVisible();
+    expect(within(detail).getByText(sentence)).toBeVisible();
+    expect(
+      within(detail).getByText('It has no result and counts on no leaderboard.'),
+    ).toBeVisible();
+    expect(within(detail).queryByRole('table')).toBeNull();
+    expect(within(detail).queryByText(/points/)).toBeNull();
+  });
+
   it('says nothing of the limit for a cancel that carries no sentence', async () => {
     const cancelled = grading({ status: 'cancelled', reason: null });
     server.use(
