@@ -20,7 +20,7 @@ const PICTURE_ENDINGS = new Set([
 ]);
 
 /** The most a picture under `public/` may be for a page to show it: the forge's limit. */
-export const PICTURE_MOST = 10 * 1024 * 1024;
+const PICTURE_MOST = 10 * 1024 * 1024;
 
 /** Why a file chosen cannot be a statement's picture, in words, or null when it can. */
 export function pictureRefusal(file: File): string | null {
