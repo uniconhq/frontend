@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@/test/user-event';
 import { http, HttpResponse } from 'msw';
@@ -13,6 +13,7 @@ import {
   taskList,
   taskState,
 } from '@/test/organiser';
+import { comeBackToTab, fakeLiveStream, openStream, realLiveStream } from '@/test/live';
 
 const CONTEST = '/orgs/acme/contests/spring/files';
 const TASK = '/orgs/acme/contests/spring/tasks/sum/files';
@@ -351,6 +352,9 @@ describe('saving a contest file', () => {
 });
 
 describe('a text file someone else saved first', () => {
+  beforeEach(fakeLiveStream);
+  afterEach(realLiveStream);
+
   /** The note, theirs once the first save is refused as a conflict; `sent` holds each save. */
   function conflicting() {
     let theirs = false;
@@ -378,6 +382,7 @@ describe('a text file someone else saved first', () => {
             detail: 'The file changed since it was read.',
           });
         }
+        if (body.token !== 'token-theirs') return problem(409, 'conflict');
         return HttpResponse.json({ version: '1a2b3c4d5e6f', notes: [] });
       }),
     );
@@ -420,6 +425,44 @@ describe('a text file someone else saved first', () => {
       screen.getByRole('textbox', { name: 'Your text from before, to copy from' }),
     ).toHaveValue('Rooms open at 8.\nMine.\n');
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('keeps the text, and does not spin, when the tab comes back after they saved, and meets theirs at the save', async () => {
+    const sent = conflicting();
+    renderApp(`${CONTEST}?file=notes.md`);
+    const editor = await screen.findByRole('textbox', { name: 'notes.md' });
+    openStream();
+    await userEvent.type(editor, 'Mine.\n');
+
+    // Their save lands while this tab is in the background.
+    server.use(
+      http.get(CONTEST_FILE, ({ params }) =>
+        params['path'] === 'notes.md'
+          ? HttpResponse.json({
+              ...NOTES,
+              content: 'Rooms open at 9.\n',
+              token: 'token-theirs',
+            })
+          : undefined,
+      ),
+    );
+    comeBackToTab();
+    await new Promise((resolve) => setTimeout(resolve, 300));
+
+    const text = screen.getByRole('textbox', { name: 'notes.md' });
+    expect(text).toHaveValue('Rooms open at 8.\nMine.\n');
+    expect(text).not.toHaveAttribute('readonly');
+    const save = screen.getByRole('button', { name: 'Save' });
+    expect(save).not.toHaveAttribute('data-loading');
+
+    await userEvent.click(save);
+    const alert = await screen.findByRole('alert');
+    expect(
+      await within(alert).findByRole('textbox', {
+        name: 'Their version, as it is now',
+      }),
+    ).toHaveValue('Rooms open at 9.\n');
+    expect(sent[0]).toMatchObject({ token: 'token-notes' });
   });
 
   it('saves one’s own over theirs only after a warning', async () => {

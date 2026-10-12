@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@/test/user-event';
 import { http, HttpResponse } from 'msw';
@@ -23,6 +23,7 @@ import {
   taskState,
 } from '@/test/organiser';
 import { makeZip } from '@/test/zip';
+import { comeBackToTab, fakeLiveStream, openStream, realLiveStream } from '@/test/live';
 
 const TASK = `name: Shortest Path   # the title
 workflow: unicon/checked@v1
@@ -200,7 +201,8 @@ function taskBackend(
   } = {},
 ) {
   const { answer = () => HttpResponse.json(PUBLISHED), form = UNREAD } = options;
-  const tree = testsTree(options.groups ?? FOLDERS);
+  let tree = testsTree(options.groups ?? FOLDERS);
+  let declaredNow = form;
   let settings: FileContent = {
     path: 'task.yaml',
     encoding: 'utf-8',
@@ -231,7 +233,7 @@ function taskBackend(
       }
       return undefined;
     }),
-    http.get(`${TASK_API}/workflow-form`, () => HttpResponse.json(form)),
+    http.get(`${TASK_API}/workflow-form`, () => HttpResponse.json(declaredNow)),
     http.get('/api/v1/workflows', () => HttpResponse.json(WORKFLOWS)),
     http.get('/api/v1/workflows/:owner/:name/versions/:version', ({ params }) =>
       HttpResponse.json({
@@ -250,6 +252,10 @@ function taskBackend(
         return problem(409, 'conflict');
       }
       const yaml = body.changes.find((change) => change.path === 'task.yaml');
+      // A save made with the token of settings since saved over is refused.
+      if (yaml !== undefined && yaml.token !== settings.token) {
+        return problem(409, 'conflict');
+      }
       if (yaml?.content != null) {
         settings = {
           ...settings,
@@ -274,7 +280,17 @@ function taskBackend(
       ),
     );
   }
-  return { sent };
+  /** Someone else saving the task: its settings, its tests and what its workflow declares. */
+  const elsewhere = (now: {
+    content: string;
+    groups: Record<string, string[]>;
+    form: WorkflowForm;
+  }) => {
+    settings = { ...settings, content: now.content, token: 'token-theirs' };
+    tree = testsTree(now.groups);
+    declaredNow = now.form;
+  };
+  return { sent, elsewhere };
 }
 
 function asManager() {
@@ -626,6 +642,53 @@ describe('the cards that build a task', { timeout: 30_000 }, () => {
     };
     expect(saved.inputs['time_limit']).toBe(5);
     expect(saved.test_groups['small']).toEqual({ pass: 40, show: 'verdict' });
+  });
+});
+
+describe('the cards while the task is being changed', { timeout: 30_000 }, () => {
+  beforeEach(fakeLiveStream);
+  afterEach(realLiveStream);
+
+  it('keep what was changed, and do not spin, when the tab comes back, and meet someone else’s save at the save', async () => {
+    const { sent, elsewhere } = taskBackend();
+    const { inputs, tests } = await openTask();
+    openStream();
+    fill(fieldIn(inputs, 'time_limit', 'Value'), '3');
+    fill(fieldIn(tests, 'small', 'Points'), '40');
+
+    // Someone else saves the task meanwhile, with a new group and a graded submission.
+    elsewhere({
+      content: TASK.replace('time_limit: 2', 'time_limit: 5'),
+      groups: { ...FOLDERS, extra: ['1'] },
+      form: { ...UNREAD, graded: true },
+    });
+    comeBackToTab();
+    await new Promise((resolve) => setTimeout(resolve, 500));
+
+    const cards = screen.getByRole('region', { name: 'Inputs' });
+    expect(fieldIn(cards, 'time_limit', 'Value')).toHaveValue('3');
+    expect(
+      fieldIn(
+        screen.getByRole('region', { name: 'Tests and scoring' }),
+        'small',
+        'Points',
+      ),
+    ).toHaveValue('40');
+    const bar = screen.getByRole('region', { name: 'Save the task' });
+    const button = within(bar).getByRole('button', { name: 'Save' });
+    expect(button).not.toHaveAttribute('data-loading');
+    expect(button).toBeEnabled();
+
+    await userEvent.click(button);
+
+    const merge = await screen.findByRole('list', { name: 'Fields that differ' });
+    expect(
+      within(merge).getByRole('radiogroup', {
+        name: 'Inputs: time_limit (both changed it)',
+      }),
+    ).toBeVisible();
+    const yaml = sent[0]?.changes.find((change) => change.path === 'task.yaml');
+    expect(yaml?.token).toBe('token-task');
   });
 });
 

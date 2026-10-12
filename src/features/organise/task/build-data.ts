@@ -8,6 +8,7 @@ import type {
   WorkflowForm,
 } from '@/api/types';
 import { ratioOf, type Ratio } from '@/lib/exact';
+import { EDITED } from '@/live';
 import { useContestSettings } from '../contest/settings';
 import { treeQuery, type Place } from '../files/place';
 import { exactJS, isRecord, parseYaml, topMap, type Doc } from '../forms/yaml-doc';
@@ -93,10 +94,11 @@ export function declaredOf(text: string): Declared | null {
  * The inputs and test fields the task's saved workflow declares, as the
  * backend reads them, with whether the task has graded submissions and
  * whether a newer version is out. Read afresh each time the page opens and
- * after each save, never while the organiser types.
+ * after each save, never while the organiser types. `built` reads it for the
+ * build cards (`builtFrom`).
  */
-export function useWorkflowForm(place: TaskPlace) {
-  return $api.useQuery(
+export function useWorkflowForm(place: TaskPlace, built = false) {
+  const options = $api.queryOptions(
     'get',
     `${TASK}/workflow-form`,
     { params: { path: taskPath(place) } },
@@ -107,6 +109,19 @@ export function useWorkflowForm(place: TaskPlace) {
       refetchOnReconnect: false,
     },
   );
+  return useQuery(built ? builtFrom(options) : options);
+}
+
+/**
+ * A read as the task's build cards make it: under a key of its own, which
+ * the re-read when the live stream opens again passes over (`EDITED`), so
+ * coming back to the tab never builds the cards again over what the
+ * organiser has changed. The rest of the page reads the same route under its
+ * plain key, kept up to date; a save reads both again, its key being the
+ * start of this one.
+ */
+function builtFrom<T extends { queryKey: readonly unknown[] }>(options: T) {
+  return { ...options, queryKey: [...options.queryKey, 'build'], meta: EDITED };
 }
 
 /** One version's `workflow.yaml`, which never changes once made. */
@@ -161,16 +176,22 @@ export type GroupFolder = { name: string; tests: string[]; strays: string[] };
 /**
  * The test groups the task's `tests/` folder holds, each with its tests, in
  * the order the format reads them. One read for `tests/` and one per group,
- * since a folder's listing is one level deep.
+ * since a folder's listing is one level deep. `built` reads them for the
+ * build cards (`builtFrom`).
  */
-export function useTestFolders(place: TaskPlace): QueryView<GroupFolder[]> {
-  const top = useQuery({ ...treeQuery(place, 'tests'), retry: false });
+export function useTestFolders(
+  place: TaskPlace,
+  built = false,
+): QueryView<GroupFolder[]> {
+  const read = <T extends { queryKey: readonly unknown[] }>(options: T) =>
+    built ? builtFrom(options) : options;
+  const top = useQuery({ ...read(treeQuery(place, 'tests')), retry: false });
   const folders = (top.data ?? [])
     .filter((entry) => entry.kind === 'directory')
     .map((entry) => lastPart(entry.path));
   const groups = useQueries({
     queries: folders.map((group) => ({
-      ...treeQuery(place, `tests/${group}`),
+      ...read(treeQuery(place, `tests/${group}`)),
       retry: false,
     })),
   });

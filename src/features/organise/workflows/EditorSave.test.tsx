@@ -5,6 +5,7 @@ import userEvent from '@/test/user-event';
 import { renderApp } from '@/test/render';
 import { server, signedIn } from '@/test/server';
 import { CLASSIC_V2, workflowBackend } from '@/test/workflows';
+import { comeBackToTab, fakeLiveStream, openStream, realLiveStream } from '@/test/live';
 import {
   EDITOR_PAGE,
   part,
@@ -287,6 +288,48 @@ describe('saving and publishing a workflow', () => {
       expect(backend.state.draft).toContain('args: ${{ inputs.time_limit }}'),
     );
     expect(backend.state.draft).toContain('fold: sum');
+  });
+
+  it('keeps the unsaved draft when the tab comes back after someone else saved, and meets theirs at the save', async () => {
+    fakeLiveStream();
+    try {
+      const backend = workflowBackend(CLASSIC_V2);
+      server.use(signedIn, ...backend.handlers);
+      const user = userEvent.setup();
+      renderApp(EDITOR_PAGE);
+
+      await user.click(await portButton('run', 'args'));
+      openStream();
+      await user.click(
+        within(await openMenu('The port args of run')).getByRole('menuitem', {
+          name: /^time_limit from the inputs/,
+        }),
+      );
+      backend.state.draft = CLASSIC_V2.replace(
+        'fold: max, better: lower',
+        'fold: sum, better: lower',
+      );
+      backend.state.token = 'someone-else';
+      comeBackToTab();
+      await new Promise((resolve) => setTimeout(resolve, 300));
+
+      const bar = part('[role="toolbar"]', 'The workflow');
+      expect(
+        within(bar).getByText('Not saved yet: leaving this page loses these changes.'),
+      ).toBeInTheDocument();
+      expect(await fileText(user)).toContain('args: ${{ inputs.time_limit }}');
+      expect(barButton('Save')).not.toHaveAttribute('data-loading');
+
+      await user.click(barButton('Save'));
+      expect(
+        await screen.findByText('Someone else saved a change since you opened this.'),
+      ).toBeInTheDocument();
+      expect(backend.state.saves).toEqual([
+        expect.objectContaining({ token: 'token-1' }),
+      ]);
+    } finally {
+      realLiveStream();
+    }
   });
 
   it('merges again over a second save by someone else, from the file merged over', async () => {

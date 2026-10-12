@@ -12,6 +12,37 @@ import shared from '../organise.module.css';
 import classes from './Files.module.css';
 
 /**
+ * The organiser's own text from a save someone else's beat, kept read-only
+ * beside their version once the organiser goes on from it, to copy from.
+ */
+export function KeptText({
+  text,
+  language,
+  onDone,
+}: {
+  text: string;
+  language: CodeLanguage;
+  onDone: () => void;
+}) {
+  return (
+    <div className={shared.stack}>
+      <CodeEditor
+        label="Your text from before, to copy from"
+        value={text}
+        language={language}
+        rows={10}
+        readOnly
+      />
+      <div className={shared.actions}>
+        <Button size="xs" variant="secondary" onClick={onDone}>
+          Done with it
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+/**
  * What a save of a text file someone else saved first turns into: both
  * versions side by side, theirs as it is now and the organiser's, nothing
  * saved yet. They go on from theirs, keeping their own text beside it to

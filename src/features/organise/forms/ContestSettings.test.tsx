@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@/test/user-event';
 import { http, HttpResponse } from 'msw';
@@ -7,6 +7,7 @@ import type { FileContent } from '@/api/types';
 import { renderApp } from '@/test/render';
 import { problem, server, signedIn, someone } from '@/test/server';
 import { CONTEST_API, repoFiles, taskList } from '@/test/organiser';
+import { comeBackToTab, fakeLiveStream, openStream, realLiveStream } from '@/test/live';
 import { isoOf } from './times';
 
 const CONTEST = `name: Spring   # the page's title
@@ -64,13 +65,19 @@ function contestBackend({
         file = { ...file, content: conflictWith, token: 'token-2' };
         return problem(409, 'conflict');
       }
+      // A save made with the token of a version since saved over is refused.
+      if (body.token !== file.token) return problem(409, 'conflict');
       const token = `token-${String(sent.length + 2)}`;
       file = { ...file, content: body.content, token };
       return HttpResponse.json({ version: `version-${token}`, notes });
     }),
     ...repoFiles,
   );
-  return { sent };
+  /** Someone else saving the settings as `content`. */
+  const elsewhere = (content: string) => {
+    file = { ...file, content, token: 'token-elsewhere' };
+  };
+  return { sent, elsewhere };
 }
 
 /** Set a field's value at once, as a paste would. */
@@ -400,3 +407,37 @@ describe('the contest settings form', { timeout: 20_000 }, () => {
     expect(screen.queryByRole('textbox', { name: 'contest.yaml' })).toBeNull();
   });
 });
+
+describe(
+  'the contest settings while they are being changed',
+  { timeout: 20_000 },
+  () => {
+    beforeEach(fakeLiveStream);
+    afterEach(realLiveStream);
+
+    it('keeps what was changed, and does not spin, when the tab comes back, and meets someone else’s save at the save', async () => {
+      const { sent, elsewhere } = contestBackend();
+      const form = await openForm();
+      openStream();
+      fill(inBox(form, 'Basics').getByLabelText('Name'), 'My spring');
+
+      elsewhere(CONTEST.replace('name: Spring', 'name: Their spring'));
+      comeBackToTab();
+      await new Promise((resolve) => setTimeout(resolve, 300));
+
+      const now = screen.getByRole('form', { name: 'Contest settings' });
+      expect(inBox(now, 'Basics').getByLabelText('Name')).toHaveValue('My spring');
+      const save = within(now).getByRole('button', { name: 'Save settings' });
+      expect(save).not.toHaveAttribute('data-loading');
+      expect(save).toBeEnabled();
+
+      await userEvent.click(save);
+
+      const merge = await screen.findByRole('list', { name: 'Fields that differ' });
+      expect(
+        within(merge).getByRole('radiogroup', { name: 'Name (both changed it)' }),
+      ).toBeVisible();
+      expect(sent).toEqual([expect.objectContaining({ token: 'token-1' })]);
+    });
+  },
+);
