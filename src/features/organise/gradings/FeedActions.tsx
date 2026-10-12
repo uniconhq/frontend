@@ -58,6 +58,11 @@ export function AttemptActions({
   );
 }
 
+/** A cancel that leaves an earlier result standing ends only the attempt. */
+function endsAttempt(asking: Asking): boolean {
+  return asking.kind === 'cancel' && asking.entry.grading.last_good !== null;
+}
+
 const TITLE: Record<Asking['kind'], string> = {
   retry: 'Retry this grading?',
   cancel: 'Cancel this submission?',
@@ -247,7 +252,9 @@ export function ConfirmDialog({
           ? ''
           : asking.kind === 'rejudge' && asking.choose !== undefined
             ? 'Rejudge every submission of a task?'
-            : TITLE[asking.kind]
+            : endsAttempt(asking)
+              ? 'Cancel this attempt?'
+              : TITLE[asking.kind]
       }
     >
       {asking !== null && (
@@ -298,7 +305,7 @@ export function ConfirmDialog({
               }
               onClick={onConfirm}
             >
-              {CONFIRM[asking.kind]}
+              {endsAttempt(asking) ? 'Cancel the attempt' : CONFIRM[asking.kind]}
             </Button>
             <Button variant="secondary" onClick={onClose}>
               Not now

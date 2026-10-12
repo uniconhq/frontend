@@ -635,6 +635,64 @@ describe("the organisers' scored view of a submission", () => {
     expect(view).toHaveTextContent('Done');
   });
 
+  it('says which attempt it shows when an earlier result stands under a later attempt', async () => {
+    const failedAgain: Grading = {
+      ...stuck,
+      attempt: 3,
+      automatic: true,
+      last_good: 2,
+    };
+    const standing: OrganisedSubmission = {
+      ...filledIn,
+      grading: filledIn.grading && { ...filledIn.grading, attempt: 2 },
+    };
+    server.use(
+      signedIn,
+      taskState,
+      publicationList,
+      ...repoFiles,
+      http.get(`${TASK_API}/gradings`, () => asEntries([failedAgain])),
+      http.get(`${TASK_API}/organise/submissions/:number`, () =>
+        HttpResponse.json(standing),
+      ),
+    );
+    const user = userEvent.setup();
+    renderApp(TASK);
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Scored view of submission 3' }),
+    );
+
+    const view = await screen.findByRole('region', { name: 'Submission 3, scored' });
+    expect(view).toHaveTextContent('Done');
+    expect(view).toHaveTextContent(
+      "Attempt 2's result, the one that stands while attempt 3 has none.",
+    );
+  });
+
+  it('names no attempt when it shows the latest one', async () => {
+    server.use(
+      signedIn,
+      taskState,
+      publicationList,
+      ...repoFiles,
+      http.get(`${TASK_API}/gradings`, () => asEntries([done])),
+      http.get(`${TASK_API}/organise/submissions/:number`, () =>
+        HttpResponse.json(filledIn),
+      ),
+    );
+    const user = userEvent.setup();
+    renderApp(TASK);
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Scored view of submission 3' }),
+    );
+
+    const view = await screen.findByRole('region', { name: 'Submission 3, scored' });
+    expect(view).toHaveTextContent('Done');
+    expect(view).not.toHaveTextContent(/Attempt \d/);
+  });
+
   it("asks for a team's submission by its entrant", async () => {
     const asked: URLSearchParams[] = [];
     const team = '0192f4a4-7b7e-7000-8000-000000000001';

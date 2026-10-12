@@ -57,8 +57,17 @@ function useEntrantList(path: ContestPath): OrganisedEntrant[] {
   return useEntrants(path.org, path.contest).data ?? [];
 }
 
-/** How many of the contest's gradings wait, by status. */
-function QueueDepthPanel({ path }: { path: ContestPath }) {
+/**
+ * How many of the contest's gradings wait, by status, and how many failed,
+ * with a link to the failed ones unless the feed already shows them.
+ */
+function QueueDepthPanel({
+  path,
+  showingFailed,
+}: {
+  path: ContestPath;
+  showingFailed: boolean;
+}) {
   const live = useLiveConnected();
   const view = queryView(
     $api.useQuery(
@@ -92,7 +101,7 @@ function QueueDepthPanel({ path }: { path: ContestPath }) {
             <dd>{view.data.dispatched}</dd>
           </div>
           <div>
-            <dt>Failed, waiting for you</dt>
+            <dt>Failed</dt>
             <dd>{view.data.failed}</dd>
           </div>
         </dl>
@@ -100,8 +109,13 @@ function QueueDepthPanel({ path }: { path: ContestPath }) {
       {view.state === 'ready' && view.data.failed > 0 && (
         <BodyText tone="secondary">
           Unicon tries a failed grading again once by itself. If that fails too, it
-          waits for you to retry or cancel it.{' '}
-          <PageLink to={`?${FAILED_SEARCH}`}>Show the failed gradings</PageLink>
+          waits for you to retry or cancel it.
+          {!showingFailed && (
+            <>
+              {' '}
+              <PageLink to={`?${FAILED_SEARCH}`}>Show the failed gradings</PageLink>
+            </>
+          )}
         </BodyText>
       )}
     </div>
@@ -236,7 +250,10 @@ export function GradingsFeedPage() {
   return (
     <SectionPage section={sectionOf(CONTEST_SECTIONS, 'gradings')}>
       <Card>
-        <QueueDepthPanel path={path} />
+        <QueueDepthPanel
+          path={path}
+          showingFailed={filters.status === 'system_error' && filters.latest === true}
+        />
       </Card>
       <Card>
         <div className={classes.stack}>

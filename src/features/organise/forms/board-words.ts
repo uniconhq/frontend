@@ -1,5 +1,6 @@
 import { formatDateTime } from '@/lib/time';
 import type { BoardValues, OrderKeyValues } from './board-values';
+import { listed } from '@/lib/listed';
 
 /**
  * A board's settings in plain words, for its form and for the sentence that
@@ -119,11 +120,6 @@ function keyWords(key: OrderKeyValues, first: boolean): string {
   return `${first ? 'fewest penalty minutes first' : 'then fewest penalty minutes'}, ${attempts}`;
 }
 
-function list(items: string[]): string {
-  if (items.length <= 1) return items.join('');
-  return `${items.slice(0, -1).join(', ')} and ${items.at(-1) ?? ''}`;
-}
-
 /**
  * A test group whose results entrants see only once its task closes, so a
  * board counts its points from then: its task's id and letter, its name,
@@ -148,7 +144,7 @@ function groupsWords(groups: HeldGroup[], named: boolean): string {
   const names = groups.map(
     (group) => `“${group.group}”${named ? ` of task ${group.label}` : ''}`,
   );
-  return `${groups.length === 1 ? 'test group' : 'test groups'} ${list(names)}`;
+  return `${groups.length === 1 ? 'test group' : 'test groups'} ${listed(names)}`;
 }
 
 /** The held groups, by when they come out, in the order first given. */
@@ -167,11 +163,14 @@ function byWhen(groups: HeldGroup[], named: boolean): [string, HeldGroup[]][] {
  * results shown during the contest, so a held group is left out; or only
  * the held groups, from when they are shown. `held` is null when the
  * groups are not known, and the board's choice is then said in general.
+ * `oneTask` is set where `held` is one task's alone, under that task, so
+ * the sentence speaks of what the board takes from it, never of the board.
  */
 function scopeWords(
   over: string,
   held: HeldGroup[] | null,
   named: boolean,
+  oneTask: boolean,
 ): string | null {
   if (held === null) {
     if (over === 'live')
@@ -186,9 +185,12 @@ function scopeWords(
       : `It leaves out ${groupsWords(held, named)}, whose results entrants see only once the task closes.`;
   }
   if (over === 'after_close') {
-    return held.length === 0
-      ? 'It counts nothing: it counts only test groups whose results entrants see once their task closes, and no task it covers has one.'
-      : `It counts only ${list(byWhen(held, named).map(([when, groups]) => `${groupsWords(groups, named)}, ${when}`))}.`;
+    if (held.length === 0) {
+      return oneTask
+        ? 'It takes nothing from this task: it counts only test groups whose results entrants see once their task closes, and this task has none.'
+        : 'It counts nothing: it counts only test groups whose results entrants see once their task closes, and no task it covers has one.';
+    }
+    return `It counts only ${listed(byWhen(held, named).map(([when, groups]) => `${groupsWords(groups, named)}, ${when}`))}.`;
   }
   if (held.length === 0) return null;
   return byWhen(held, named)
@@ -219,7 +221,8 @@ function whoWords(board: BoardValues): string {
  * Leaderboards page and in how the contest is scored: "highest total first,
  * using each entrant’s best submission. Entrants and organisers see the
  * whole leaderboard." `tasks` says which tasks it covers, for a page that shows
- * the board on its own; `held` is the test groups of those tasks whose
+ * the board on its own; left out, the sentence is said under one task, and
+ * `held` is that task's alone; `held` is the test groups of those tasks whose
  * results come out once their task closes, said only where they change
  * what the board counts, or null when they are not known.
  */
@@ -240,7 +243,7 @@ export function boardSentence(
       ? 'every task'
       : board.tasks.length === 0
         ? 'no task'
-        : `${board.tasks.length === 1 ? 'task' : 'tasks'} ${list(board.tasks)}`;
+        : `${board.tasks.length === 1 ? 'task' : 'tasks'} ${listed(board.tasks)}`;
   const covered =
     held === null || board.tasks === null
       ? held
@@ -250,7 +253,7 @@ export function boardSentence(
   return [
     tasks ? first.replace(/^./, (letter) => letter.toUpperCase()) : first,
     whoWords(board),
-    scopeWords(board.over, covered, named),
+    scopeWords(board.over, covered, named, !tasks),
   ]
     .filter((part) => part !== null)
     .join(' ');

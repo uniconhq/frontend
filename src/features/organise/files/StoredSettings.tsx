@@ -184,6 +184,7 @@ export function StoredSettings({ place }: { place: Place }) {
         <TextConflict
           place={place}
           path={path}
+          what="these settings"
           mine={conflict.content ?? ''}
           language="yaml"
           busy={busy}

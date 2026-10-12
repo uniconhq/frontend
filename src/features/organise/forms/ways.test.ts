@@ -169,7 +169,7 @@ describe('a board in a sentence (M52)', () => {
     );
   });
 
-  it('names the only groups a board of the results shown once each task closes counts, or that it counts nothing', () => {
+  it('names the only groups a board of the results shown once each task closes counts, or that it takes nothing from the one task', () => {
     const board = {
       ...newBoard(),
       over: 'after_close',
@@ -179,7 +179,10 @@ describe('a board in a sentence (M52)', () => {
       'best time first, using each entrant’s best submission. Only organisers see it. It counts only test group “hidden”, when the contest ends.',
     );
     expect(boardSentence(board, { tasks: false, held: [] })).toBe(
-      'best time first, using each entrant’s best submission. Only organisers see it. It counts nothing: it counts only test groups whose results entrants see once their task closes, and no task it covers has one.',
+      'best time first, using each entrant’s best submission. Only organisers see it. It takes nothing from this task: it counts only test groups whose results entrants see once their task closes, and this task has none.',
+    );
+    expect(boardSentence(board, { held: [] })).toBe(
+      'Best time first, using each entrant’s best submission, on every task. Only organisers see it. It counts nothing: it counts only test groups whose results entrants see once their task closes, and no task it covers has one.',
     );
   });
 });

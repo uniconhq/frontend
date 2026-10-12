@@ -433,9 +433,10 @@ with everything filled in (`GET <task>/organise/submissions/{number}`, the
 row by its `user_id` or `team`): the contestant's own payload, drawn by the
 same `ui/scored/ScoredResult` the contestant's page draws it with, every
 group's outcome, tests and points shown, each saying when its row sees it,
-and the grading's own status. Above it are how many gradings wait, queued,
-waiting for a machine, and failed and waiting for staff, with a link to the
-failed ones, and filters by task, status, latest attempts only, team and a
+and the grading's own status, naming the attempt whose result it is when that
+is an earlier one than the row's. Above it are how many gradings wait, queued,
+waiting for a machine, and failed, whether or not Unicon has tried them again
+yet, with a link to the failed ones unless the feed already shows them, and filters by task, status, latest attempts only, team and a
 contestant's username, kept in the
 address so a link or a reload keeps them; a username applies once sent and
 finds the user's own submissions and their team's, by the team they were in
@@ -637,7 +638,10 @@ entrant, each task also shows their points out of its worth, "62 / 100", as
 a leaderboard over that task counts them, so nothing a leaderboard holds
 back (#440, `task-points.ts`): while some are held back it says when they
 are shown, "More shown at 14:00", or "— / 100" and "Shown at 14:00" while
-none are, and the page reads them again as that time passes. Every
+none are, and the page reads them again as that time passes. The points are
+cut to two decimals, never rounded up, so points short of the worth never
+read as it. Anyone else, such as someone waiting for approval, reads each
+task's worth alone, "100 points". Every
 refusal code has its own sentence in `src/api/describe-error.ts`. A statement
 is Markdown, rendered by `src/ui/Markdown.tsx` with raw HTML dropped, links
 out of the site opened apart, a picture saved with the task under `public/`
@@ -817,7 +821,8 @@ connections to one host and a stream in every background tab would use
 them up. Each event names a kind of thing that changed and its id, never
 what changed. The events of a moment are gathered, and each kind marks
 stale the reads whose route shows it: a grading the submissions and
-gradings lists, a contest's queue and a submission, but not its files; an announcement
+gradings lists, a contest's queue, a submission, but not its files, and the
+contest home, whose tasks carry the entrant's points; an announcement
 every announcements list; a clarification the questions and the inbox.
 `resync`, and every opening of the stream after the tab's first, marks
 everything stale but the reads a form or an editor edits from (`EDITED`),

@@ -53,13 +53,43 @@ describe("an entrant's points on a task", () => {
     ).toEqual({ score: '— / 100', pending: `Shown at ${at}` });
   });
 
-  it('is nothing on a task that gives no points, or for someone given none', () => {
+  it('never reads as the worth while the points are short of it', () => {
+    const score = (shown: string, worth = '100') =>
+      taskPointsText(
+        { worth, points: { shown, pending: '0', pending_until: null } },
+        NOW,
+      )?.score;
+    expect(score('99.996')).toBe(`${formatExact('99.99')} / 100`);
+    expect(score('99.999999')).toBe(`${formatExact('99.99')} / 100`);
+    expect(score('62.678')).toBe(`${formatExact('62.67')} / 100`);
+    expect(score('100')).toBe('100 / 100');
+    expect(score('99.996', '99.996')).toBe(
+      `${formatExact('100')} / ${formatExact('100')}`,
+    );
+    expect(score('99.995', '99.996')).toBe(
+      `${formatExact('99.99')} / ${formatExact('100')}`,
+    );
+  });
+
+  it('is nothing on a task that gives no points', () => {
     expect(
       taskPointsText(
         { worth: null, points: { shown: '0', pending: '0', pending_until: null } },
         NOW,
       ),
     ).toBeNull();
-    expect(taskPointsText({ worth: '100', points: null }, NOW)).toBeNull();
+    expect(taskPointsText({ worth: null, points: null }, NOW)).toBeNull();
+  });
+
+  it('reads as the worth alone for someone the contest gives no points', () => {
+    expect(taskPointsText({ worth: '100', points: null }, NOW)).toEqual({
+      score: '100 points',
+      pending: null,
+    });
+    expect(taskPointsText({ worth: '1', points: null }, NOW)).toEqual({
+      score: '1 point',
+      pending: null,
+    });
+    expect(taskPointsText({ worth: '1.0', points: null }, NOW)?.score).toBe('1 point');
   });
 });

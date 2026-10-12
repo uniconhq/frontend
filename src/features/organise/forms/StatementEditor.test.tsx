@@ -286,9 +286,11 @@ describe('the statement while it is being edited', { timeout: 20_000 }, () => {
     await userEvent.click(screen.getByRole('button', { name: 'Save statement' }));
 
     const conflict = await screen.findByRole('alert');
+    // The statement is named as the statement, never as a file (M13).
     expect(conflict).toHaveTextContent(
-      'Someone else changed this file since you opened it.',
+      'Someone else changed the statement since you opened it.',
     );
+    expect(conflict).not.toHaveTextContent(/file|statement\.md/);
     expect(
       await within(conflict).findByRole('textbox', {
         name: 'Their version, as it is now',
@@ -307,6 +309,10 @@ describe('the statement while it is being edited', { timeout: 20_000 }, () => {
     const warning = await screen.findByRole('dialog', {
       name: 'Save yours over theirs?',
     });
+    expect(warning).toHaveTextContent(
+      'Their change to the statement is thrown away, and yours is saved in its place.',
+    );
+    expect(warning).not.toHaveTextContent(/file|statement\.md/);
     await userEvent.click(
       within(warning).getByRole('button', { name: 'Save yours over theirs' }),
     );

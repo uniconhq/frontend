@@ -216,7 +216,7 @@ async function settingsText(): Promise<HTMLElement> {
 /** The panel that says someone else saved first, once a save has met it. */
 async function conflict(): Promise<HTMLElement> {
   const said = await within(await stored()).findByText(
-    'Someone else changed this file since you opened it.',
+    'Someone else changed these settings since you opened it.',
   );
   return said.closest('[role="alert"]') as HTMLElement;
 }
@@ -426,7 +426,7 @@ describe('settings someone else saved first', () => {
     const dialog = await screen.findByRole('dialog', {
       name: 'Save yours over theirs?',
     });
-    expect(dialog).toHaveTextContent('Their change to contest.yaml is thrown away');
+    expect(dialog).toHaveTextContent('Their change to these settings is thrown away');
     await user.click(
       within(dialog).getByRole('button', { name: 'Save yours over theirs' }),
     );
