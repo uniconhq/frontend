@@ -247,22 +247,31 @@ describe('the inbox', () => {
     );
     renderApp('/orgs/acme/clarifications');
 
+    // The reply form is folded until Reply opens it, in place.
+    expect(screen.queryByRole('form', { name: 'Reply to Input size?' })).toBeNull();
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Reply to Input size?' }),
+    );
     const first = await screen.findByRole('form', { name: 'Reply to Input size?' });
     expect(
       within(first).getByRole('checkbox', { name: /Mark it answered/ }),
     ).toBeChecked();
     await userEvent.type(within(first).getByLabelText(/Reply/), 'Up to 10^5.');
-    await userEvent.click(within(first).getByRole('button', { name: 'Reply' }));
+    await userEvent.click(within(first).getByRole('button', { name: 'Send reply' }));
     await waitFor(() => expect(did).toEqual(['reply 1', 'mark 1']));
 
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Reply to Output format?' }),
+    );
     const second = screen.getByRole('form', { name: 'Reply to Output format?' });
     await userEvent.click(
       within(second).getByRole('checkbox', { name: /Mark it answered/ }),
     );
     await userEvent.type(within(second).getByLabelText(/Reply/), 'Looking into it.');
-    await userEvent.click(within(second).getByRole('button', { name: 'Reply' }));
+    await userEvent.click(within(second).getByRole('button', { name: 'Send reply' }));
     await waitFor(() => expect(did).toEqual(['reply 1', 'mark 1', 'reply 2']));
     expect(await screen.findByText('Looking into it.')).toBeVisible();
+    expect(screen.queryByRole('form', { name: 'Reply to Output format?' })).toBeNull();
 
     // Replied to already, so marking it asks nothing.
     await userEvent.click(
@@ -289,9 +298,13 @@ describe("a contest's questions, for its organisers", () => {
     renderApp('/orgs/acme/contests/spring/questions');
 
     const open = await screen.findByRole('list', { name: 'Open questions' });
+    const box = within(open).getByRole('article', { name: 'Input size?' });
     await waitFor(() =>
-      expect(within(open).getByRole('listitem')).toHaveTextContent('Asked by Red'),
+      expect(
+        within(box).getAllByRole('listitem')[0]?.querySelector('strong'),
+      ).toHaveTextContent('Red'),
     );
+    expect(within(box).getByText(/^Open, waiting /)).toBeVisible();
   });
 
   it('puts the open ones first, folds the answered away, and reopens one', async () => {
@@ -315,8 +328,8 @@ describe("a contest's questions, for its organisers", () => {
 
     const open = await screen.findByRole('list', { name: 'Open questions' });
     const titles = within(open)
-      .getAllByRole('listitem')
-      .map((item) => item.querySelector('strong')?.textContent);
+      .getAllByRole('heading', { level: 3 })
+      .map((heading) => heading.textContent);
     expect(titles).toEqual(['Waiting long', 'Waiting less']);
     expect(screen.queryByText('Old answered')).toBeNull();
 
@@ -325,6 +338,11 @@ describe("a contest's questions, for its organisers", () => {
     );
     const answered = screen.getByRole('list', { name: 'Answered questions' });
     expect(within(answered).getByText('Old answered')).toBeVisible();
+    expect(
+      within(within(answered).getByRole('article', { name: 'Old answered' })).getByText(
+        'Answered',
+      ),
+    ).toBeVisible();
     expect(screen.queryByRole('button', { name: /^Unmark/ })).toBeNull();
     await userEvent.click(
       within(answered).getByRole('button', { name: 'Reopen Old answered' }),

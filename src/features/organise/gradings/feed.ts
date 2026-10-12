@@ -8,6 +8,7 @@ export const STATUS: Record<GradingStatus, string> = {
   done: 'Done',
   cancelled: 'Cancelled',
   system_error: 'System error',
+  over_limit: 'Over the limit',
 };
 
 export const STATUSES = Object.keys(STATUS) as GradingStatus[];
@@ -99,6 +100,17 @@ export function submitterOf(by: Submitter): string {
   return by.username === null || by.username === by.entrant_name
     ? entrant
     : `${entrant} (${by.username})`;
+}
+
+/**
+ * Why an attempt over the limit was not graded (#445), in the organisers'
+ * words: "Not graded: the entrant had reached the limit of 10 submissions
+ * for this task."
+ */
+export function overLimitSentence(limit: number | null): string {
+  return limit === null
+    ? 'Not graded: the entrant had reached the task’s limit on submissions.'
+    : `Not graded: the entrant had reached the limit of ${String(limit)} ${limit === 1 ? 'submission' : 'submissions'} for this task.`;
 }
 
 /** A task by its letter and name, or its name alone where it has no letter. */

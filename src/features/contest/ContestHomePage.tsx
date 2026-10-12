@@ -25,7 +25,7 @@ import { entryPollEvery } from './entry/poll';
 import { YourEntry } from './entry/YourEntry';
 import { SignInButtons, SignInPrompt } from './SignInPrompt';
 import { labelOf } from './task-names';
-import { taskPointsText } from './task-points';
+import { boardPointsText, taskPointsText, type PointsText } from './task-points';
 import { taskTimeLines } from './time-left';
 import classes from './contest.module.css';
 
@@ -35,6 +35,7 @@ const NOT_OPEN: Record<NonNullable<TaskEntry['release']['closed']>, string | nul
   archived: 'No longer takes submissions',
   closed: null,
   not_approved: 'Open once your registration is approved',
+  withdrawn: 'Withdrawn from the contest',
 };
 
 /**
@@ -71,9 +72,8 @@ function Standing({
   );
 }
 
-/** The reader's points on a task out of its worth, and when held-back points are shown. */
-function TaskPoints({ task, at }: { task: TaskEntry; at: number }) {
-  const text = taskPointsText(task, new Date(at));
+/** Points as a line reads them, and when held-back points are shown. */
+function Points({ text }: { text: PointsText | null }) {
   return (
     <span className={classes.points}>
       {text !== null && <span>{text.score}</span>}
@@ -84,13 +84,16 @@ function TaskPoints({ task, at }: { task: TaskEntry; at: number }) {
 
 /**
  * Calls `onReveal` as the server's clock passes a time a task's held-back
- * points are shown, so the page reads them then, not at its next read.
+ * points are shown on any leaderboard, so the page reads them then, not at
+ * its next read.
  */
 function useReveals(tasks: TaskEntry[], at: number, onReveal: () => void) {
-  const passed = tasks.filter((task) => {
-    const until = task.points?.pending_until;
-    return until != null && Date.parse(until) <= at;
-  }).length;
+  const passed = tasks
+    .flatMap((task) => task.points)
+    .filter((cell) => {
+      const until = cell.points?.pending_until;
+      return until != null && Date.parse(until) <= at;
+    }).length;
   const last = useRef(passed);
   useEffect(() => {
     if (passed > last.current) onReveal();
@@ -99,21 +102,96 @@ function useReveals(tasks: TaskEntry[], at: number, onReveal: () => void) {
 }
 
 /**
+ * The tasks with a column of points for each leaderboard the entrant sees
+ * (#447), headed by its name, each cell the points as that board counts
+ * them; each task's row headed by its letter and name, with where it stands
+ * under it. The columns scroll sideways inside the card when there are more
+ * than fit, the tasks' names staying in view.
+ */
+function BoardColumns({
+  org,
+  contest,
+  tasks,
+  boards,
+  at,
+  counting,
+}: {
+  org: string;
+  contest: string;
+  tasks: TaskEntry[];
+  boards: string[];
+  at: number;
+  counting: boolean;
+}) {
+  const now = new Date(at);
+  return (
+    <div className={classes.columns}>
+      <table className={classes.taskTable} aria-label="Tasks">
+        <thead>
+          <tr>
+            <th scope="col">Task</th>
+            {boards.map((board) => (
+              <th key={board} scope="col">
+                {board}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {tasks.map((task) => (
+            <tr key={task.name}>
+              <th scope="row">
+                <div className={classes.taskCell}>
+                  <span className={classes.taskName}>
+                    <span className={classes.label}>{labelOf(task)}</span>
+                    <PageLink to={taskPagePath(org, contest, task.name)}>
+                      {task.title}
+                    </PageLink>
+                  </span>
+                  <Standing task={task} at={at} counting={counting} />
+                </div>
+              </th>
+              {boards.map((board, index) => {
+                const cell = task.points[index];
+                return (
+                  <td key={board}>
+                    <Points
+                      text={
+                        cell === undefined
+                          ? null
+                          : boardPointsText(cell, task.worth, now)
+                      }
+                    />
+                  </td>
+                );
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/**
  * A contest's released tasks as a signed-in person works from them, in the
- * contest's order: each a link to its page, with their points on it out of
- * its worth once they are in an approved entrant, read again as held-back
- * points are shown, its worth alone before then, and where it stands for them, the time left on it
- * counted down by the server's clock.
+ * contest's order: each a link to its page, with their points on it once
+ * they are in an approved entrant, read again as held-back points are
+ * shown, its worth alone before then, and where it stands for them, the
+ * time left on it counted down by the server's clock. With one leaderboard
+ * the points are one number, that board's; with several, a column each.
  */
 function TaskList({
   org,
   contest,
   tasks,
+  boards,
   onReveal,
 }: {
   org: string;
   contest: string;
   tasks: TaskEntry[];
+  boards: string[];
   onReveal: () => void;
 }) {
   const { at, measured } = useServerClock();
@@ -121,13 +199,25 @@ function TaskList({
   if (tasks.length === 0) {
     return <BodyText tone="secondary">No tasks are released yet.</BodyText>;
   }
+  if (boards.length > 1) {
+    return (
+      <BoardColumns
+        org={org}
+        contest={contest}
+        tasks={tasks}
+        boards={boards}
+        at={at}
+        counting={measured}
+      />
+    );
+  }
   return (
     <ul className={classes.tasks} aria-label="Tasks">
       {tasks.map((task) => (
         <li key={task.name} className={classes.task}>
           <span className={classes.label}>{labelOf(task)}</span>
           <PageLink to={taskPagePath(org, contest, task.name)}>{task.title}</PageLink>
-          <TaskPoints task={task} at={at} />
+          <Points text={taskPointsText(task, new Date(at))} />
           <Standing task={task} at={at} counting={measured} />
         </li>
       ))}
@@ -395,6 +485,7 @@ function Home({
             org={org}
             contest={contest}
             tasks={home.tasks}
+            boards={home.boards}
             onReveal={onBoundary}
           />
         </div>

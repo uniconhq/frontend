@@ -1,7 +1,10 @@
+import type { ReactNode } from 'react';
 import type { Announcement, Clarification } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
+import { Chip } from '@/ui/Chip';
 import { Markdown } from '@/ui/Markdown';
-import { formatDateTime } from '@/lib/time';
+import { formatDateTime, serverNow } from '@/lib/time';
+import { waitedWords, waitingSince } from './waiting';
 import classes from './threads.module.css';
 
 /**
@@ -35,48 +38,92 @@ export function AnnouncementContent({
 }
 
 /**
- * One question as its asker or an organiser reads it: what was asked, about
- * which task, whether it is answered, and every message under it, each
- * marked as the asker's, under the name `asker` gives, or the organisers';
- * `named` says who asked on the question itself too.
+ * Where a question stands, in a badge at its top right: "Answered", or
+ * "Open", with how long it has waited on the organisers' side.
+ */
+function QuestionBadge({
+  clarification,
+  organisers,
+}: {
+  clarification: Clarification;
+  organisers: boolean;
+}) {
+  if (clarification.answered)
+    return <Chip tone={organisers ? 'quiet' : 'live'}>Answered</Chip>;
+  const since = organisers ? waitingSince(clarification) : null;
+  return (
+    <Chip tone={organisers ? 'warn' : 'quiet'}>
+      {since === null
+        ? 'Open'
+        : `Open, waiting ${waitedWords(serverNow().getTime() - Date.parse(since))}`}
+    </Chip>
+  );
+}
+
+/**
+ * One question in its own box, as its asker or an organiser reads it: its
+ * title, which task it is about, a badge saying whether it is answered, and
+ * the conversation under it, the question first, each message under who
+ * wrote it in bold, the organisers' set apart from the asker's. `asker` is
+ * the name the asker's messages go under ("You", "Your team", or the
+ * entrant's name for the organisers); `organisers` says the box is read by
+ * them, whose badge says how long an open question has waited. `children`
+ * is what can be done with it, at the box's foot.
  */
 export function QuestionThread({
   clarification,
   asker,
-  named = false,
+  organisers = false,
+  where,
+  children,
 }: {
   clarification: Clarification;
   asker: string;
-  /** Whether to say who asked, for organisers, who answer many entrants. */
-  named?: boolean;
+  organisers?: boolean;
+  /** Which contest it was asked in, where questions of several are listed. */
+  where?: string;
+  children?: ReactNode;
 }) {
+  const { title } = clarification;
+  const said = [
+    { from_asker: true, body: clarification.body, at: clarification.asked_at },
+    ...clarification.messages,
+  ];
   return (
-    <>
-      <strong>{clarification.title}</strong>
-      <BodyText tone="meta">
-        {named && `Asked by ${asker} · `}
-        {formatDateTime(new Date(clarification.asked_at))}
-        {clarification.task !== null && ` · task ${clarification.task}`}
-        {' · '}
-        {clarification.answered ? 'Answered' : 'Open'}
-      </BodyText>
-      <Markdown>{clarification.body}</Markdown>
-      {clarification.messages.length > 0 && (
-        <ol
-          className={classes.messages}
-          aria-label={`Messages on ${clarification.title}`}
-        >
-          {clarification.messages.map((message, index) => (
-            <li key={index}>
-              <BodyText tone="meta">
-                {message.from_asker ? asker : 'Organisers'} ·{' '}
+    <article className={classes.question} aria-label={title}>
+      <div className={classes.questionHead}>
+        <div className={classes.questionTitle}>
+          <h3 className={classes.title}>{title}</h3>
+          {(where !== undefined || clarification.task !== null) && (
+            <BodyText tone="meta">
+              {[
+                where === undefined ? null : `In ${where}`,
+                clarification.task === null ? null : `About task ${clarification.task}`,
+              ]
+                .filter((part) => part !== null)
+                .join(' · ')}
+            </BodyText>
+          )}
+        </div>
+        <QuestionBadge clarification={clarification} organisers={organisers} />
+      </div>
+      <ol className={classes.conversation} aria-label={`Messages on ${title}`}>
+        {said.map((message, index) => (
+          <li
+            key={index}
+            className={message.from_asker ? classes.fromAsker : classes.fromOrganisers}
+          >
+            <p className={classes.who}>
+              <strong>{message.from_asker ? asker : 'Organisers'}</strong>
+              <span className={classes.when}>
                 {formatDateTime(new Date(message.at))}
-              </BodyText>
-              <Markdown>{message.body}</Markdown>
-            </li>
-          ))}
-        </ol>
-      )}
-    </>
+              </span>
+            </p>
+            <Markdown>{message.body}</Markdown>
+          </li>
+        ))}
+      </ol>
+      {children}
+    </article>
   );
 }

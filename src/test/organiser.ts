@@ -123,6 +123,9 @@ export const standings: TaskStanding[] = [
   {
     task: { name: 'sort' },
     label: 'A',
+    withdrawn: false,
+    submissions: 0,
+    take_out: 'remove',
     state: { ...publishedTask, latest: publications[0] ?? null },
     timeline: {
       release_at: '2026-10-01T09:00:00Z',
@@ -135,6 +138,9 @@ export const standings: TaskStanding[] = [
   {
     task: { name: 'sum' },
     label: 'B',
+    withdrawn: false,
+    submissions: 0,
+    take_out: 'remove',
     state: draftTask,
     timeline: {
       release_at: '2026-10-01T09:00:00Z',

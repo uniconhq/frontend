@@ -220,7 +220,7 @@ export function MergeView({
         )}
         {choosable && theirs.length > 0 && (
           <Button variant="danger" disabled={busy} onClick={() => setOverwriting(true)}>
-            Save mine over theirs
+            Save yours over theirs
           </Button>
         )}
         <Button variant="secondary" disabled={busy} onClick={onDrop}>
@@ -257,7 +257,7 @@ export function MergeView({
                 }
               }}
             >
-              Save mine over theirs
+              Save yours over theirs
             </Button>
             <Button variant="secondary" onClick={() => setOverwriting(false)}>
               Cancel

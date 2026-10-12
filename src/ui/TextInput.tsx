@@ -17,7 +17,8 @@ import { useFieldLabel } from './FieldLabel';
  * when the field is left or Enter is pressed in it, for a field whose change
  * applies once the person is done typing. `autoFocus` takes the focus as
  * the field appears, inside a dialog too, which otherwise gives it to its
- * first button.
+ * first button. `labelHidden` names the field for a screen reader alone, for
+ * a field whose row already says what it is.
  */
 export function TextInput({
   label,
@@ -34,6 +35,7 @@ export function TextInput({
   ref,
   onCommit,
   autoFocus = false,
+  labelHidden = false,
 }: {
   label: string;
   value: string;
@@ -49,13 +51,15 @@ export function TextInput({
   ref?: Ref<HTMLInputElement>;
   onCommit?: () => void;
   autoFocus?: boolean;
+  labelHidden?: boolean;
 }) {
   const { inputLabel, id, wrap } = useFieldLabel({ label, info, required });
   return wrap(
     <MantineTextInput
       ref={ref}
       id={id}
-      label={inputLabel}
+      label={labelHidden ? undefined : inputLabel}
+      aria-label={labelHidden ? label : undefined}
       description={description}
       placeholder={placeholder}
       error={error}

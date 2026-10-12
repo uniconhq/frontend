@@ -68,6 +68,8 @@ export type WorkflowForm = Schemas['WorkflowForm'];
 export type DeclaredInput = Schemas['DeclaredInput'];
 export type DeclaredField = Schemas['DeclaredField'];
 export type TaskEntry = Schemas['TaskEntry'];
+/** An entrant's points on a task as one leaderboard counts them. */
+export type BoardPoints = Schemas['BoardPoints'];
 
 export type Upload = Schemas['Upload'];
 export type SubmittedInput = Schemas['SubmittedInput'];
@@ -90,7 +92,7 @@ export type Submitter = Schemas['Submitter'];
 export type QueueDepth = Schemas['QueueDepth'];
 export type Announcement = Schemas['Announcement'];
 /** One change in a place's history, its author named. */
-export type FileChange = Schemas['Change'];
+export type FileChange = Schemas['forge__domain__content__Change'];
 export type Clarification = Schemas['Clarification'];
 /** Where a grading stands, as organisers read it. */
 export type GradingStatus = Schemas['GradingStatus'];

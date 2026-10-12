@@ -233,6 +233,9 @@ describe("the contest's tasks", () => {
     const fresh: TaskStanding = {
       task: { name: 'max' },
       label: 'C',
+      withdrawn: false,
+      submissions: 0,
+      take_out: 'remove',
       state: {
         head: 'a1',
         latest: null,
@@ -1086,6 +1089,9 @@ describe('creating a task', () => {
         listed.push({
           task: { name: body.name },
           label: 'C',
+          withdrawn: false,
+          submissions: 0,
+          take_out: 'remove',
           state: { head: 'a1', latest: null, draft: false, errors: [] },
           timeline: {
             release_at: '2026-10-01T09:00:00Z',

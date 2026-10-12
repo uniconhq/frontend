@@ -376,12 +376,16 @@ export function StatusCard({ org, contest }: { org: string; contest: string }) {
               <Modal
                 opened={asking === 'draft'}
                 onClose={() => setAsking(null)}
-                title="Back to draft?"
+                title="Put the contest back to draft?"
               >
                 <div className={shared.stack}>
                   <BodyText>
-                    Only its organisers will see it again, until it is opened once more.
-                    Registrations stay. Once it starts, it can no longer go back.
+                    Only its organisers see it until it is opened again: entrants can no
+                    longer reach it, and nobody new can register. Those already
+                    registered stay registered.
+                  </BodyText>
+                  <BodyText tone="secondary">
+                    Once the contest starts, it can no longer go back to draft.
                   </BodyText>
                   <div className={shared.actions}>
                     <Button
@@ -406,8 +410,8 @@ export function StatusCard({ org, contest }: { org: string; contest: string }) {
               >
                 <div className={shared.stack}>
                   <BodyText>
-                    Its tasks can still be read, and they take no submissions. Its
-                    entrants and their results stay as they are.
+                    Nobody can submit to its tasks any more, though they can still be
+                    read. Its entrants and their results stay as they are.
                   </BodyText>
                   <div className={shared.actions}>
                     <Button

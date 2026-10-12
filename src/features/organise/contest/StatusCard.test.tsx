@@ -149,7 +149,9 @@ describe("the contest's status", () => {
     await user.click(
       await within(card).findByRole('button', { name: 'Back to draft' }),
     );
-    const dialog = await screen.findByRole('dialog', { name: 'Back to draft?' });
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Put the contest back to draft?',
+    });
     await user.click(within(dialog).getByRole('button', { name: 'Back to draft' }));
 
     // The refusal is about this card's own setting: said on its own, here.

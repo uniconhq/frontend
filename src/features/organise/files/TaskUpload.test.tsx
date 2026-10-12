@@ -298,7 +298,7 @@ describe('uploading a file of a task again', { timeout: 20_000 }, () => {
       await within(row).findByText(/^Now: 2 KB, saved by alice on /),
     ).toBeVisible();
     await userEvent.click(
-      within(panel).getByRole('button', { name: 'Save mine over theirs' }),
+      within(panel).getByRole('button', { name: 'Save yours over theirs' }),
     );
     const warning = await screen.findByRole('dialog', {
       name: 'Save yours over theirs?',
@@ -307,7 +307,7 @@ describe('uploading a file of a task again', { timeout: 20_000 }, () => {
       'This throws away what the other person saved in Statement.',
     );
     await userEvent.click(
-      within(warning).getByRole('button', { name: 'Save mine over theirs' }),
+      within(warning).getByRole('button', { name: 'Save yours over theirs' }),
     );
 
     expect(
