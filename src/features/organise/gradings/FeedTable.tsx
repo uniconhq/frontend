@@ -324,7 +324,7 @@ export function FeedTable({
             {compared && (
               <>
                 <th scope="col">Before the regrade</th>
-                <th scope="col">After it</th>
+                <th scope="col">After the regrade</th>
               </>
             )}
             <th scope="col">Attempt</th>

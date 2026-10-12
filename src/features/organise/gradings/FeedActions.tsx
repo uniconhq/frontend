@@ -204,8 +204,9 @@ function OverLimitRetry({
       </BodyText>
       <BodyText tone="secondary">
         {submission} then has no result and counts on no leaderboard, and {entrant}{' '}
-        reads that they had reached the limit. A submission is graded past a delay only
-        while its entrant has room under the limit, so the earliest ones count.
+        reads that they had reached the limit. A delayed submission is graded only while
+        its entrant has room under the limit, so their earliest submissions are the ones
+        that count.
       </BodyText>
     </>
   );

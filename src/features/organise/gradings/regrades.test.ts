@@ -106,7 +106,7 @@ describe("a regrade's summary", () => {
     expect(runningWords(summary())).toBeNull();
     expect(
       runningWords(summary({ running: true, counts: { ...counts, running: 8 } })),
-    ).toBe('Still running: 8 submissions are still being graded.');
+    ).toBe('Still running: 8 submissions are being graded.');
   });
 });
 

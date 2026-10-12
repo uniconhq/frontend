@@ -177,7 +177,7 @@ function FilterBar({
             value,
             label,
           }))}
-          placeholder="Anything"
+          placeholder="Every submission it graded"
           onChange={(value) => set('change', value)}
         />
       ) : (

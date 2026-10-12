@@ -964,7 +964,7 @@ describe('what a regrade changed', () => {
       within(table)
         .getAllByRole('columnheader')
         .map((header) => header.textContent),
-    ).toEqual(expect.arrayContaining(['Before the regrade', 'After it']));
+    ).toEqual(expect.arrayContaining(['Before the regrade', 'After the regrade']));
     const row = within(table).getByRole('rowgroup', { name: 'B submission 3 by ada' });
     expect(row).toHaveTextContent(`${formatExact('62.5', 2)} points`);
     expect(row).toHaveTextContent('COMPILE ERROR, 0 points');
@@ -1016,7 +1016,7 @@ describe('what a regrade changed', () => {
 
     const summary = await screen.findByRole('listitem', { name: 'Regrade of B' });
     expect(summary).toHaveTextContent(
-      /After a save that changed how the task grades, .*, against publication 3\. Still running: 20 submissions are still being graded\./,
+      /After a save that changed how the task grades, .*, against publication 3\. Still running: 20 submissions are being graded\./,
     );
     expect(within(summary).queryByRole('button', { name: /Dismiss/ })).toBeNull();
   });

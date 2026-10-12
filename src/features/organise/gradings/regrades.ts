@@ -174,7 +174,7 @@ export function runningWords(summary: RegradeSummary): string | null {
   if (!summary.running) return null;
   const left = summary.counts.running;
   return left > 0
-    ? `Still running: ${counted(left, 'submission is', 'submissions are')} still being graded.`
+    ? `Still running: ${counted(left, 'submission is', 'submissions are')} being graded.`
     : 'Still running.';
 }
 
