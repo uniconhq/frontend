@@ -277,6 +277,16 @@ describe('questions', () => {
     expect(asked[0]).toMatchObject({ task: 'sum' });
   });
 
+  it('names each task it can ask about by its letter and title, as the contest’s page does', async () => {
+    server.use(signedIn, approvedHome);
+    renderApp(`${QUESTIONS}?task=sum`);
+
+    const form = await screen.findByRole('form', { name: 'Ask' });
+    expect(
+      within(form).getByRole('combobox', { name: 'About the task' }),
+    ).toHaveDisplayValue('A · Sum of Two');
+  });
+
   it('says how many questions were asked and answered on the contest’s page', async () => {
     server.use(
       signedIn,

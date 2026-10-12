@@ -23,6 +23,7 @@ import { CONTEST_VIEW_SECTIONS, contestSectionPath, sectionOf } from '@/lib/sect
 import { announcementAnchor } from '@/ui/threads/anchors';
 import { QuestionThread } from '@/ui/threads/ThreadParts';
 import { BySession } from '../BySession';
+import { labelOf } from '../task-names';
 import { SignInPrompt } from '../SignInPrompt';
 import { ASK_ABOUT, QUESTIONS, useMyQuestions } from './questions';
 import classes from '@/ui/threads/threads.module.css';
@@ -209,7 +210,14 @@ function Questions({
   const queryClient = useQueryClient();
   const [search] = useSearchParams();
   const team = inTeams(home.registration);
-  const tasks = home.tasks.map((task) => ({ name: task.name, title: task.title }));
+  // Named as the contest's page names them: its letter, then its title.
+  const tasks = home.tasks.map((task) => {
+    const label = labelOf(task);
+    return {
+      name: task.name,
+      title: label === null ? task.title : `${label} · ${task.title}`,
+    };
+  });
   const named = search.get(ASK_ABOUT);
   const about = tasks.some((task) => task.name === named) ? (named ?? '') : '';
   const view = queryView(useMyQuestions(org, contest));
