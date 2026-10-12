@@ -1,0 +1,4 @@
+/* Each sentence under an option on a line of its own: what it means, then why it is greyed. */
+.line {
+  display: block;
+}
