@@ -19,6 +19,10 @@ import {
   taskPage,
   DOOR_URL,
   uploadStore,
+  CONTEST_API,
+  entry,
+  home,
+  registration,
 } from '@/test/contestant';
 
 const PAGE = '/contests/acme/spring/tasks/sum';
@@ -657,21 +661,52 @@ describe('the submit panel', () => {
     expect(screen.queryByRole('form', { name: 'Submit' })).not.toBeInTheDocument();
   });
 
-  it('says only approved contestants submit, to a reader who is not one', async () => {
-    server.use(
-      signedIn,
-      listing([]),
-      withPage({
-        release: { released: true, visible: true, open: false, closed: 'not_approved' },
+  it.each([
+    [
+      'waits for approval',
+      registration(),
+      'You can submit once your registration is approved.',
+    ],
+    [
+      'may register',
+      entry(),
+      'You can submit once you register for the contest, on its page.',
+    ],
+    [
+      'is refused by the contest’s email rule',
+      entry({
+        can_register: false,
+        refused: {
+          code: 'domain_not_allowed',
+          detail: 'This contest takes only some email addresses, and not yours.',
+        },
       }),
-    );
-    renderApp(PAGE);
+      'Only the contest’s entrants can submit to this task.',
+    ],
+  ])(
+    'says what is true for a reader who %s, not an approved entrant',
+    async (_, mine, said) => {
+      server.use(
+        signedIn,
+        listing([]),
+        withPage({
+          release: {
+            released: true,
+            visible: true,
+            open: false,
+            closed: 'not_approved',
+          },
+        }),
+        http.get(`${CONTEST_API}/home`, () =>
+          HttpResponse.json(home({ registration: mine })),
+        ),
+      );
+      renderApp(PAGE);
 
-    expect(
-      await screen.findByText('You can submit once your registration is approved.'),
-    ).toBeVisible();
-    expect(screen.queryByRole('form', { name: 'Submit' })).not.toBeInTheDocument();
-  });
+      expect(await screen.findByText(said)).toBeVisible();
+      expect(screen.queryByRole('form', { name: 'Submit' })).not.toBeInTheDocument();
+    },
+  );
 });
 
 describe('the submissions list', () => {

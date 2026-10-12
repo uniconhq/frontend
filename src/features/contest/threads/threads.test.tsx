@@ -5,7 +5,14 @@ import { http, HttpResponse } from 'msw';
 import type { Announcement, Clarification } from '@/api/types';
 import { renderApp } from '@/test/render';
 import { server, signedIn } from '@/test/server';
-import { CONTEST_API, TASK_API, home, registration, taskPage } from '@/test/contestant';
+import {
+  CONTEST_API,
+  TASK_API,
+  entry,
+  home,
+  registration,
+  taskPage,
+} from '@/test/contestant';
 import { passTime, withFakeTimers } from '@/test/timers';
 
 const HOME = '/contests/acme/spring';
@@ -306,20 +313,35 @@ describe('questions', () => {
     ).toHaveAttribute('href', QUESTIONS);
   });
 
-  it('offers no questions to someone who is not an approved contestant', async () => {
-    server.use(
-      signedIn,
-      http.get(`${CONTEST_API}/home`, () => HttpResponse.json(home())),
-    );
-    renderApp(QUESTIONS);
+  it.each([
+    [
+      'waits for approval',
+      { registration: registration() },
+      'You can ask the organisers questions once your registration is approved.',
+    ],
+    [
+      'may register',
+      {},
+      'You can ask the organisers questions once you register for the contest, on its page.',
+    ],
+    [
+      'is refused by the contest’s email rule',
+      { registration: entry({ can_register: false }) },
+      'Only the contest’s entrants can ask the organisers questions.',
+    ],
+  ])(
+    'offers no questions to someone who %s, saying what is true for them',
+    async (_, who, said) => {
+      server.use(
+        signedIn,
+        http.get(`${CONTEST_API}/home`, () => HttpResponse.json(home(who))),
+      );
+      renderApp(QUESTIONS);
 
-    expect(
-      await screen.findByText(
-        'You can ask the organisers questions once your registration is approved.',
-      ),
-    ).toBeVisible();
-    expect(screen.queryByRole('form', { name: 'Ask' })).toBeNull();
-  });
+      expect(await screen.findByText(said)).toBeVisible();
+      expect(screen.queryByRole('form', { name: 'Ask' })).toBeNull();
+    },
+  );
 
   it('asks a visitor to sign in first', async () => {
     renderApp(QUESTIONS);

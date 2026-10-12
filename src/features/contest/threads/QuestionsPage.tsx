@@ -23,6 +23,7 @@ import { CONTEST_VIEW_SECTIONS, contestSectionPath, sectionOf } from '@/lib/sect
 import { announcementAnchor } from '@/ui/threads/anchors';
 import { QuestionThread } from '@/ui/threads/ThreadParts';
 import { BySession } from '../BySession';
+import { ASK_WORDS, notIn, type NotIn } from '../entry/not-in';
 import { labelOf } from '../task-names';
 import { SignInPrompt } from '../SignInPrompt';
 import { ASK_ABOUT, QUESTIONS, useMyQuestions } from './questions';
@@ -362,7 +363,7 @@ function SignedInQuestions({ org, contest }: { org: string; contest: string }) {
               </BodyText>
             ) : (
               <BodyText>
-                You can ask the organisers questions once your registration is approved.
+                {ASK_WORDS[notIn(view.data) as Exclude<NotIn, 'organises'>]}
               </BodyText>
             )}
           </Card>
