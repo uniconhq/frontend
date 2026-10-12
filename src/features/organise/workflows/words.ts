@@ -1,4 +1,5 @@
 import type { WorkflowItem } from '@/api/types';
+import { listed } from '@/lib/listed';
 import type { Box } from './layout';
 import type { FieldDecl, InputDecl, Ref, ReportEntry, Workflow } from './model';
 import type { PrimitiveInfo } from './primitives';
@@ -45,7 +46,7 @@ function limitWords(primitive: PrimitiveInfo, port: string): string | null {
   ];
   if (limits.length === 0) return null;
   if (limits.length === 1) return `sets the ${limits[0] ?? ''} limit`;
-  return `sets the ${limits.slice(0, -1).join(', ')} and ${limits.at(-1) ?? ''} limits`;
+  return `sets the ${listed(limits)} limits`;
 }
 
 /** What a step's input port does that the author acts on, in words. */
@@ -123,5 +124,5 @@ export function boxName(box: Box, workflow: Workflow): string {
 export function readersWords(readers: string[]): string {
   if (readers.length === 0) return 'Nothing uses these yet';
   if (readers.length === 1) return `Used by ${readers[0] ?? ''}`;
-  return `Used by ${readers.slice(0, -1).join(', ')} and ${readers.at(-1) ?? ''}`;
+  return `Used by ${listed(readers)}`;
 }

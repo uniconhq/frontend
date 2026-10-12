@@ -1,5 +1,6 @@
 import { formatDateTime } from '@/lib/time';
 import type { BoardValues, OrderKeyValues } from './board-values';
+import { listed } from '@/lib/listed';
 
 /**
  * A board's settings in plain words, for its form and for the sentence that
@@ -119,11 +120,6 @@ function keyWords(key: OrderKeyValues, first: boolean): string {
   return `${first ? 'fewest penalty minutes first' : 'then fewest penalty minutes'}, ${attempts}`;
 }
 
-function list(items: string[]): string {
-  if (items.length <= 1) return items.join('');
-  return `${items.slice(0, -1).join(', ')} and ${items.at(-1) ?? ''}`;
-}
-
 /**
  * A test group whose results entrants see only once its task closes, so a
  * board counts its points from then: its task's id and letter, its name,
@@ -148,7 +144,7 @@ function groupsWords(groups: HeldGroup[], named: boolean): string {
   const names = groups.map(
     (group) => `“${group.group}”${named ? ` of task ${group.label}` : ''}`,
   );
-  return `${groups.length === 1 ? 'test group' : 'test groups'} ${list(names)}`;
+  return `${groups.length === 1 ? 'test group' : 'test groups'} ${listed(names)}`;
 }
 
 /** The held groups, by when they come out, in the order first given. */
@@ -194,7 +190,7 @@ function scopeWords(
         ? 'It takes nothing from this task: it counts only test groups whose results entrants see once their task closes, and this task has none.'
         : 'It counts nothing: it counts only test groups whose results entrants see once their task closes, and no task it covers has one.';
     }
-    return `It counts only ${list(byWhen(held, named).map(([when, groups]) => `${groupsWords(groups, named)}, ${when}`))}.`;
+    return `It counts only ${listed(byWhen(held, named).map(([when, groups]) => `${groupsWords(groups, named)}, ${when}`))}.`;
   }
   if (held.length === 0) return null;
   return byWhen(held, named)
@@ -247,7 +243,7 @@ export function boardSentence(
       ? 'every task'
       : board.tasks.length === 0
         ? 'no task'
-        : `${board.tasks.length === 1 ? 'task' : 'tasks'} ${list(board.tasks)}`;
+        : `${board.tasks.length === 1 ? 'task' : 'tasks'} ${listed(board.tasks)}`;
   const covered =
     held === null || board.tasks === null
       ? held

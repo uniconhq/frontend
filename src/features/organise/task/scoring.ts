@@ -8,6 +8,7 @@ import {
   ZERO,
   type Ratio,
 } from '@/lib/exact';
+import { listed } from '@/lib/listed';
 import { percentOf } from '../contest/percent';
 import type { GroupValues, TaskValues } from '../forms/task-values';
 
@@ -323,11 +324,7 @@ export function groupWords(
           : null,
       ].filter((part): part is string => part !== null);
       if (parts.length === 0) return none;
-      const said =
-        parts.length === 1
-          ? (parts[0] ?? '')
-          : `${parts.slice(0, -1).join(', ')} and ${parts.at(-1) ?? ''}`;
-      return { rule: `An entrant earns ${said}.`, example: null };
+      return { rule: `An entrant earns ${listed(parts)}.`, example: null };
     }
   }
 }

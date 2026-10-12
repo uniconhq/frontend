@@ -1,3 +1,4 @@
+import { listed } from '@/lib/listed';
 import type { PartNaming } from './match';
 
 /**
@@ -9,12 +10,6 @@ import type { PartNaming } from './match';
 /** "a" or "an", as a part's name begins. */
 function article(name: string): string {
   return /^[aeiou]/i.test(name) ? 'an' : 'a';
-}
-
-/** Words joined as a list is said: "a, b and c". */
-function listed(words: string[]): string {
-  if (words.length <= 1) return words.join('');
-  return `${words.slice(0, -1).join(', ')} and ${words.at(-1) ?? ''}`;
 }
 
 /** The example file of test 1 for each part named by an ending: `1.in`, `1.out`. */
