@@ -145,6 +145,27 @@ describe('saving a task file', () => {
     expect(outcome).toHaveTextContent('It does not change how the task grades.');
   });
 
+  it('says a first publication is what entrants are now graded on, never that it changes nothing', async () => {
+    taskBackend(() =>
+      HttpResponse.json({
+        number: 1,
+        grading_changed: false,
+        changes: [],
+        notes: [],
+        regraded: 0,
+      }),
+    );
+
+    await editAndSave();
+
+    const outcome = (await screen.findByText('Saved and published as publication 1.'))
+      .parentElement as HTMLElement;
+    expect(outcome).toHaveTextContent(
+      'Entrants’ submissions are graded against it from now on.',
+    );
+    expect(outcome).not.toHaveTextContent('does not change how the task grades');
+  });
+
   it('shows how many submissions a publication grades again, and the notes it makes', async () => {
     taskBackend(() =>
       HttpResponse.json({
