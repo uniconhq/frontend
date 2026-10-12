@@ -266,6 +266,15 @@ describe('the workflow editor', () => {
     expect(
       within(added).getByText(/before the tests, such as compiling/),
     ).toBeVisible();
+    // The drawer says how the step runs, and that one for each test stands in the band (M55).
+    expect(
+      within(added).getByRole('radiogroup', { name: 'Run it' }),
+    ).toHaveAccessibleDescription('Runs once, for the whole submission.');
+    expect(
+      within(added).getByRole('radio', { name: 'Once for each test' }),
+    ).toHaveAccessibleDescription(
+      /It stands in the shaded band on the graph, “Runs once for each test”\.$/,
+    );
     await user.click(within(added).getByRole('radio', { name: 'Once for each test' }));
 
     expect(
@@ -273,6 +282,11 @@ describe('the workflow editor', () => {
         name: 'Once for each test',
       }),
     ).toBeChecked();
+    expect(
+      within(drawer('Step compile-2')).getByRole('radiogroup', { name: 'Run it' }),
+    ).toHaveAccessibleDescription(
+      'Runs once for each test, so it stands in the shaded band on the graph.',
+    );
     expect(await fileText(user)).toContain(
       '- id: compile-2\n    use: unicon/compile@v2\n    per_test: true',
     );

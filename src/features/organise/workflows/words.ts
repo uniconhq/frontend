@@ -21,9 +21,19 @@ export function primitiveTitle(primitive: PrimitiveInfo): string {
   return primitive.title ?? primitive.name;
 }
 
-/** How often a step runs, as its box and drawer say it. */
+/** What the shaded band on the graph says it is: the steps in it run once for each test (M55). */
+export const BAND_LABEL = 'Runs once for each test';
+
+/** How often a step runs, as its box says it. */
 export function runsWords(perTest: boolean): string {
   return perTest ? 'For each test' : 'Once';
+}
+
+/** How often a step runs, as its drawer says it, in the band's words (M55). */
+export function runsSentence(perTest: boolean): string {
+  return perTest
+    ? `${BAND_LABEL}, so it stands in the shaded band on the graph.`
+    : 'Runs once, for the whole submission.';
 }
 
 const LIMIT_WORDS: Record<string, string> = {

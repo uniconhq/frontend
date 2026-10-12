@@ -40,6 +40,8 @@ describe('a workflow drawn', () => {
     const compile = screen.getByRole('group', { name: 'Step compile' });
     expect(within(compile).getByText('Compile')).toBeInTheDocument();
     expect(within(compile).getByText('Once')).toBeInTheDocument();
+    // The band behind what runs for each test says what it is (M55).
+    expect(screen.getByText('Runs once for each test')).toBeInTheDocument();
   });
 
   it('shows a primitive without a title by its name and reference', async () => {

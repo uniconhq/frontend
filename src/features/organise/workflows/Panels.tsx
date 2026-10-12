@@ -54,7 +54,7 @@ import {
   valueRefusal,
   wireRefusal,
 } from './rules';
-import { portMarks, primitiveTitle, refWords } from './words';
+import { portMarks, primitiveTitle, refWords, runsSentence } from './words';
 import classes from './workflows.module.css';
 
 /**
@@ -355,7 +355,7 @@ const RUNS = [
     value: 'each',
     label: 'Once for each test',
     description:
-      'It runs for every test, given that test’s files, such as running the program on the test’s input.',
+      'It runs for every test, given that test’s files, such as running the program on the test’s input. It stands in the shaded band on the graph, “Runs once for each test”.',
   },
 ];
 
@@ -429,7 +429,9 @@ export function StepPanel({
         value={step.perTest ? 'each' : 'once'}
         options={RUNS}
         disabled={switching !== null}
-        description={switching ?? undefined}
+        description={[runsSentence(step.perTest), switching]
+          .filter((line) => line !== null)
+          .join(' ')}
         onChange={(chosen) => change(setPerTest(text, index, chosen === 'each'))}
       />
       <CommitField
