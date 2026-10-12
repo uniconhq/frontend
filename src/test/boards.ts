@@ -41,8 +41,8 @@ export function icpc(overrides: Partial<Board> = {}): Board {
     select: 'best',
     who: 'contestants',
     keys: [
-      { by: 'points', better: 'higher', per_attempt: null },
-      { by: 'penalty', better: 'lower', per_attempt: 20 },
+      { by: 'points', better: 'higher', per_attempt: null, title: null, unit: null },
+      { by: 'penalty', better: 'lower', per_attempt: 20, title: null, unit: null },
     ],
     tasks: [
       { id: 'sum', label: 'A', worth: '1' },

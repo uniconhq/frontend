@@ -98,6 +98,7 @@ function port(type: string, more: Partial<PortDecl> = {}): PortDecl {
     runs: null,
     secret: false,
     description: null,
+    outcomes: null,
     ...more,
   };
 }

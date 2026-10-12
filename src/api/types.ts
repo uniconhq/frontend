@@ -93,14 +93,14 @@ export type RegradeSummary = Schemas['RegradeSummary'];
 /** One result a regrade compares: the one it replaced, or its own. */
 export type RegradeSide = Schemas['RegradeSide'];
 /** What a regrade did to one submission: up, down, now stopped, and so on. */
-export type RegradeChangeKind = Schemas['forge__domain__regrades__Change'];
+export type RegradeChangeKind = Schemas['ChangeKind'];
 /** One attempt in a contest's gradings feed, with its task and who submitted. */
 export type FeedEntry = Schemas['FeedEntry'];
 export type Submitter = Schemas['Submitter'];
 export type QueueDepth = Schemas['QueueDepth'];
 export type Announcement = Schemas['Announcement'];
 /** One change in a place's history, its author named. */
-export type FileChange = Schemas['forge__domain__content__Change'];
+export type FileChange = Schemas['Change'];
 export type Clarification = Schemas['Clarification'];
 /** Where a grading stands, as organisers read it. */
 export type GradingStatus = Schemas['GradingStatus'];

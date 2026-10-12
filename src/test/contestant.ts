@@ -222,6 +222,7 @@ export function grading(overrides: Partial<GradingResult> = {}): GradingResult {
     points: null,
     factor: null,
     folded: {},
+    meanings: [],
     ...overrides,
   };
 }

@@ -241,6 +241,8 @@ describe("the contest's tasks", () => {
         latest: null,
         draft: true,
         errors: [{ path: '', message: 'task.yaml is missing.' }],
+        statement_written: false,
+        head_statement_written: false,
       },
       timeline: {
         release_at: '2026-10-01T09:00:00Z',
@@ -738,7 +740,14 @@ describe('how the contest is scored, as published', () => {
       ...standings[0]!,
       task: { name: 'new' },
       label: 'C',
-      state: { head: 'f0', latest: null, draft: true, errors: [] },
+      state: {
+        head: 'f0',
+        latest: null,
+        draft: true,
+        errors: [],
+        statement_written: false,
+        head_statement_written: false,
+      },
       // A task never published has no worth yet.
       timeline: { ...standings[0]!.timeline, worth: null },
     };
@@ -1119,7 +1128,14 @@ describe('creating a task', () => {
           withdrawn: false,
           submissions: 0,
           take_out: 'remove',
-          state: { head: 'a1', latest: null, draft: false, errors: [] },
+          state: {
+            head: 'a1',
+            latest: null,
+            draft: false,
+            errors: [],
+            statement_written: false,
+            head_statement_written: false,
+          },
           timeline: {
             release_at: '2026-10-01T09:00:00Z',
             due: null,

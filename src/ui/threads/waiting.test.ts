@@ -21,6 +21,7 @@ const at = (time: string, fromAsker: boolean) => ({
   at: `2026-09-12T${time}:00Z`,
   body: 'text',
   from_asker: fromAsker,
+  announcement: null,
 });
 
 describe('how long an open question has waited', () => {

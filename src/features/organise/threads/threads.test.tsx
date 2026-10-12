@@ -197,7 +197,7 @@ function questionRoutes(start: Clarification[], list: string) {
       return update(params.number, {
         messages: [
           ...(found?.messages ?? []),
-          { from_asker: false, body, at: '2026-09-12T09:30:00Z' },
+          { from_asker: false, body, at: '2026-09-12T09:30:00Z', announcement: null },
         ],
       });
     }),

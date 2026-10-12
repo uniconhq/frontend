@@ -4,10 +4,34 @@ import { formatExact } from '@/lib/exact';
 import { cell, icpc } from '@/test/boards';
 import { cellLines, cellPlaces, keyLabel, keyPlaces } from './board-text';
 
-const POINTS: BoardKey = { by: 'points', better: 'higher', per_attempt: null };
-const PENALTY: BoardKey = { by: 'penalty', better: 'lower', per_attempt: 20 };
-const MINUTE: BoardKey = { by: 'penalty', better: 'lower', per_attempt: 0 };
-const TIME: BoardKey = { by: 'time_ms', better: 'lower', per_attempt: null };
+const POINTS: BoardKey = {
+  by: 'points',
+  better: 'higher',
+  per_attempt: null,
+  title: null,
+  unit: null,
+};
+const PENALTY: BoardKey = {
+  by: 'penalty',
+  better: 'lower',
+  per_attempt: 20,
+  title: null,
+  unit: null,
+};
+const MINUTE: BoardKey = {
+  by: 'penalty',
+  better: 'lower',
+  per_attempt: 0,
+  title: null,
+  unit: null,
+};
+const TIME: BoardKey = {
+  by: 'time_ms',
+  better: 'lower',
+  per_attempt: null,
+  title: null,
+  unit: null,
+};
 
 describe('a board key', () => {
   it('is named by what it ranks by, a free penalty by the minute submitted', () => {

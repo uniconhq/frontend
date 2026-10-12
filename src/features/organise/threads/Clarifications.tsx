@@ -117,7 +117,10 @@ function ClarificationCard({
   const sendAnswer = async (event: FormEvent) => {
     event.preventDefault();
     const outcome = await change.run('publish', () =>
-      publish.mutateAsync({ params: { path }, body: { title, body: answer } }),
+      publish.mutateAsync({
+        params: { path },
+        body: { title, body: answer, mark: true },
+      }),
     );
     if (outcome.ok) {
       setPublishing(false);

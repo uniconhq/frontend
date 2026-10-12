@@ -59,14 +59,22 @@ const FOLDERS: Record<string, string[]> = {
 };
 
 function folder(path: string): TreeEntry {
-  return { path, kind: 'directory', size: null, upload: null, version: null };
+  return {
+    path,
+    kind: 'directory',
+    size: null,
+    upload: null,
+    start: null,
+    token: null,
+    version: null,
+  };
 }
 
 /** The commit a listed file was last changed at, as the tree names it. */
 const LISTED_AT = '9f8e7d6c5b4a39281706f5e4d3c2b1a098765432';
 
 function file(path: string, size = 4, version: string | null = LISTED_AT): TreeEntry {
-  return { path, kind: 'file', size, upload: null, version };
+  return { path, kind: 'file', size, upload: null, start: null, token: null, version };
 }
 
 /** The tree of the task's tests as `GET <task>/tree?path=` answers it, folder by folder. */
