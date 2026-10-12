@@ -9,7 +9,7 @@ import { useMe } from '@/session';
 import { useTaskParams } from '@/lib/route-params';
 import { TASK_SECTIONS, sectionOf } from '@/lib/sections';
 import { formatDateTime } from '@/lib/time';
-import { FileEditor } from '../files/FileEditor';
+import { StoredSettings } from '../files/StoredSettings';
 import { SavedFolder } from '../files/FilePreview';
 import type { Place } from '../files/place';
 import { PageLink } from '@/ui/PageLink';
@@ -52,7 +52,7 @@ export function TaskSettingsPage() {
       </Card>
       <section aria-label="The settings as stored" id={STORED}>
         <Card>
-          <FileEditor place={place} path="task.yaml" />
+          <StoredSettings place={place} />
         </Card>
       </section>
       {admin && <AllFiles place={place} />}

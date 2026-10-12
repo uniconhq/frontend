@@ -2,7 +2,7 @@ import { Card } from '@/ui/Card';
 import { PageLink } from '@/ui/PageLink';
 import { useContestParams } from '@/lib/route-params';
 import { CONTEST_SECTIONS, orgSectionPath, sectionOf } from '@/lib/sections';
-import { FileEditor } from '../files/FileEditor';
+import { StoredSettings } from '../files/StoredSettings';
 import { ContestSettings } from '../forms/ContestSettings';
 import { PeopleSection } from '../people/PeopleSection';
 import { STORED, viewFilePath } from './places';
@@ -30,7 +30,7 @@ export function ContestSettingsPage() {
       </Card>
       <section aria-label="The settings as stored" id={STORED}>
         <Card>
-          <FileEditor place={{ kind: 'contest', org, contest }} path="contest.yaml" />
+          <StoredSettings place={{ kind: 'contest', org, contest }} />
         </Card>
       </section>
     </SectionPage>
