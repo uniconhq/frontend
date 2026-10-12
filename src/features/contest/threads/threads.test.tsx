@@ -149,7 +149,20 @@ describe('questions', () => {
     });
     const list = await screen.findByRole('list', { name: 'Your questions' });
     expect(await within(list).findByText('And m?')).toBeVisible();
-    expect(within(list).getByText('Up to 10^5.')).toBeVisible();
+    const answered = within(list).getByRole('article', { name: 'Input size?' });
+    const messages = within(answered).getAllByRole('listitem');
+    expect(
+      messages.map((message) => message.querySelector('strong')?.textContent),
+    ).toEqual(['You', 'Organisers']);
+    expect(messages[1]).toHaveTextContent('Up to 10^5.');
+    expect(within(answered).getByText('Open')).toBeVisible();
+
+    // The follow-up is folded until asked for, and opens in place.
+    expect(within(answered).queryByRole('textbox')).toBeNull();
+    await userEvent.click(
+      within(answered).getByRole('button', { name: 'Follow up Input size?' }),
+    );
+    expect(within(answered).getByRole('textbox', { name: 'Follow up' })).toHaveFocus();
   });
 
   it('marks a team’s messages as the team’s', async () => {
@@ -174,7 +187,7 @@ describe('questions', () => {
     renderApp(QUESTIONS);
 
     const list = await screen.findByRole('list', { name: 'Your questions' });
-    expect(await within(list).findByText(/Your team/)).toBeVisible();
+    expect(await within(list).findAllByText('Your team')).toHaveLength(2);
     expect(
       screen.getByRole('heading', { name: 'Your team’s questions' }),
     ).toBeVisible();
