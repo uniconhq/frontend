@@ -13,9 +13,10 @@ import classes from './Files.module.css';
 /**
  * A file that is an upload: what it holds, its size and SHA-256, and never
  * an editor, since its commit holds a pointer to the bytes and typing over it
- * would commit text where the pointer belongs. Every view of a file shows an
- * upload this way: the file editor, the statement, the settings forms and an
- * older version in the history.
+ * would commit text where the pointer belongs. Every view of a file to edit
+ * shows an upload this way: the stored settings, the statement, the settings
+ * forms and an older version in the history. A file only shown to read is
+ * `FilePreview`'s, by its size and Download.
  *
  * The file as it is now carries the `token` it was read with, and a manager
  * of the task changes it by uploading it again at the same path with that

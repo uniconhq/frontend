@@ -511,9 +511,11 @@ function AddUnknown({
  * organiser thinks of them. First what entrants submit (the inputs they
  * give: what they see of each, the choices they have and how much they may
  * send), then the limits and settings the task gives a value. Each input is
- * named by its title and unit from the workflow, its help behind an ⓘ. When
- * the workflow cannot be read, the inputs the
- * settings have are shown as they are, to keep or remove.
+ * named by its title from the workflow, a number's unit after it, its help
+ * behind an ⓘ; a setting that is a file or a folder has its own box to
+ * view, upload and replace it (`FileSetting`). When the workflow cannot be
+ * read, the inputs the settings have are shown as they are, to keep or
+ * remove.
  */
 export function InputsCard({
   declared,

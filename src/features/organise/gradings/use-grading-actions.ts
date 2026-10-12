@@ -6,10 +6,10 @@ type ContestPath = { org: string; contest: string };
 
 /**
  * What a manager is being asked to confirm, each about one task: a retry or a
- * cancel of a submission's latest attempt, the cancel with the sentence its
- * contestant will read; or a rejudge of the whole task. A rejudge asked from the
- * contest's gradings carries the tasks to `choose` from, its `task` empty
- * until one is chosen.
+ * cancel of a submission's latest attempt, the cancel with its sentence,
+ * which the contestant reads unless an earlier result stands; or a rejudge
+ * of the whole task. A rejudge asked from the contest's gradings carries the
+ * tasks to `choose` from, its `task` empty until one is chosen.
  */
 export type Asking =
   | { kind: 'retry'; task: string; entry: FeedEntry }

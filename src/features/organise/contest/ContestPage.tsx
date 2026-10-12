@@ -60,9 +60,10 @@ const CARDS: Record<
 /**
  * A contest's page for its organisers: a header with its name, where it
  * stands, the time to its start or end and the page its contestants see;
- * how many gradings failed, while any wait; its status, with what opening it needs and the buttons that open, take
- * back and archive it; its settings at a glance; its tasks; and a card for
- * each of its sections, each going to its own page. The forms are on the
+ * how many gradings failed, while any wait; its status, with what opening
+ * it needs and the buttons that open, take back and archive it; its
+ * settings at a glance; its tasks; how it is scored; and a card for each of
+ * its sections, each going to its own page. The forms are on the
  * sections' pages, but for a task's timeline, edited on its row, and the
  * status's buttons, each asked in a dialog. Each part loads and fails on its
  * own, so a refused task list still leaves the rest of the page.
