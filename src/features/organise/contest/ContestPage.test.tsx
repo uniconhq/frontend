@@ -768,13 +768,44 @@ describe("the contest's sections", () => {
     );
   });
 
+  it('says how many gradings failed, linking to them on Gradings, and nothing while none has', async () => {
+    let failed = 2;
+    server.use(
+      signedIn,
+      standingList,
+      http.get(`${CONTEST_API}/gradings/queue`, () =>
+        HttpResponse.json({ queued: 0, dispatched: 0, failed }),
+      ),
+    );
+    const { unmount } = renderApp(CONTEST);
+
+    const notice = await screen.findByRole('region', { name: 'Failed gradings' });
+    expect(notice).toHaveTextContent("2 gradings failed on Unicon's side.");
+    expect(
+      within(notice).getByRole('link', { name: 'Show the failed gradings' }),
+    ).toHaveAttribute(
+      'href',
+      '/orgs/acme/contests/spring/gradings?status=system_error&latest=true',
+    );
+    unmount();
+
+    failed = 0;
+    renderApp(CONTEST);
+    expect(
+      await within(await screen.findByRole('region', { name: 'Gradings' })).findByText(
+        'Nothing is waiting to be graded.',
+      ),
+    ).toBeVisible();
+    expect(screen.queryByRole('region', { name: 'Failed gradings' })).toBeNull();
+  });
+
   it('says on each card whether it needs going into', async () => {
     server.use(
       signedIn,
       standingList,
       ...repoFiles,
       http.get(`${CONTEST_API}/gradings/queue`, () =>
-        HttpResponse.json({ queued: 3, dispatched: 1 }),
+        HttpResponse.json({ queued: 3, dispatched: 1, failed: 0 }),
       ),
       http.get(`${CONTEST_API}/announcements`, () =>
         HttpResponse.json([

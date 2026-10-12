@@ -158,7 +158,7 @@ async function stubOrganiserApi(page: Page) {
       return json(route, []);
     }
     if (path === `${contest}/gradings/queue`) {
-      return json(route, { queued: 0, dispatched: 0 });
+      return json(route, { queued: 0, dispatched: 0, failed: 0 });
     }
     if (path === `${task}/workflow-form`) {
       const input = (id: string, type: string, more: object) => ({

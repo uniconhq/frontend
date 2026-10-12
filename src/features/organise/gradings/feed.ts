@@ -33,12 +33,17 @@ function isStatus(value: string): value is GradingStatus {
   return Object.hasOwn(STATUS, value);
 }
 
-/** The filters, each a search parameter of the page, so a link keeps them. */
+/**
+ * The filters, each a search parameter of the page, so a link keeps them.
+ * `latest` keeps each submission's latest attempt alone, as the contest
+ * page's count of failed gradings counts them; null for every attempt.
+ */
 export type Filters = {
   task: string | null;
   entrant: string | null;
   user: string | null;
   status: GradingStatus | null;
+  latest: true | null;
 };
 
 export type FilterKey = keyof Filters;
@@ -54,8 +59,12 @@ export function readFilters(search: URLSearchParams): Filters {
     entrant: read('entrant'),
     user: read('user'),
     status: status !== null && isStatus(status) ? status : null,
+    latest: read('latest') === 'true' ? true : null,
   };
 }
+
+/** The gradings that failed and wait for a retry or for staff, as the queue's `failed` counts them. */
+export const FAILED_SEARCH = 'status=system_error&latest=true';
 
 /** The filters with one changed, as a search the page navigates to. */
 export function withFilter(
@@ -71,12 +80,13 @@ export function withFilter(
 }
 
 /** The filters as the feed's query, leaving out the ones not set. */
-export function feedQuery({ task, entrant, user, status }: Filters) {
+export function feedQuery({ task, entrant, user, status, latest }: Filters) {
   return {
     ...(task !== null && { task }),
     ...(entrant !== null && { entrant }),
     ...(user !== null && { user }),
     ...(status !== null && { status }),
+    ...(latest !== null && { latest }),
   };
 }
 

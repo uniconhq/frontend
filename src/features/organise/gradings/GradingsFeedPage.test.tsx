@@ -139,7 +139,7 @@ describe("the contest's gradings feed", () => {
         return HttpResponse.json([]);
       }),
       http.get(`${CONTEST_API}/gradings/queue`, () =>
-        HttpResponse.json({ queued: 4, dispatched: 2 }),
+        HttpResponse.json({ queued: 4, dispatched: 2, failed: 0 }),
       ),
     );
     feedAnswering(() => feed);
@@ -294,6 +294,60 @@ describe("the contest's gradings feed", () => {
     );
   });
 
+  it('keeps to the latest attempts once asked, and reads it from the address the contest page links to', async () => {
+    server.use(signedIn, taskList);
+    const asked = feedAnswering((query) =>
+      query.get('latest') === 'true'
+        ? feed.filter((entry) => entry.grading.latest)
+        : feed,
+    );
+    const user = userEvent.setup();
+    const { router } = renderApp(`${FEED}?status=system_error&latest=true`);
+
+    await waitFor(() => expect(asked).toEqual(['status=system_error&latest=true']));
+    const latest = screen.getByRole('checkbox', { name: 'Latest attempts only' });
+    expect(latest).toBeChecked();
+    expect(screen.getByRole('combobox', { name: 'Status' })).toHaveValue(
+      'system_error',
+    );
+
+    await user.click(latest);
+    await waitFor(() =>
+      expect(router.state.location.search).toBe('?status=system_error'),
+    );
+    expect(asked.at(-1)).toBe('status=system_error');
+    await user.click(screen.getByRole('checkbox', { name: 'Latest attempts only' }));
+    await waitFor(() =>
+      expect(router.state.location.search).toBe('?status=system_error&latest=true'),
+    );
+    await user.click(screen.getByRole('link', { name: 'Clear filters' }));
+    await waitFor(() => expect(router.state.location.search).toBe(''));
+    expect(
+      screen.getByRole('checkbox', { name: 'Latest attempts only' }),
+    ).not.toBeChecked();
+  });
+
+  it('counts the failed gradings beside the queue, and shows them on asking', async () => {
+    server.use(
+      signedIn,
+      taskList,
+      http.get(`${CONTEST_API}/gradings/queue`, () =>
+        HttpResponse.json({ queued: 0, dispatched: 0, failed: 2 }),
+      ),
+    );
+    const asked = feedAnswering(() => []);
+    const user = userEvent.setup();
+    renderApp(FEED);
+
+    const depth = await screen.findByLabelText('Queue');
+    await waitFor(() => expect(depth).toHaveTextContent('Failed, waiting for you2'));
+    expect(
+      screen.getByText(/is tried again once by itself; after that it waits for you/),
+    ).toBeVisible();
+    await user.click(screen.getByRole('link', { name: 'Show the failed gradings' }));
+    await waitFor(() => expect(asked.at(-1)).toBe('status=system_error&latest=true'));
+  });
+
   it('is linked from the contest page', async () => {
     server.use(signedIn, standingList);
     renderApp('/orgs/acme/contests/spring');
@@ -320,7 +374,7 @@ describe('acting on the feed', () => {
       taskList,
       http.get(`${CONTEST_API}/gradings/queue`, () => {
         queueReads += 1;
-        return HttpResponse.json({ queued: 0, dispatched: 0 });
+        return HttpResponse.json({ queued: 0, dispatched: 0, failed: 0 });
       }),
       http.post(`${CONTEST_API}/tasks/:task/gradings/:grading/retry`, ({ params }) => {
         retriedAt.push(`${String(params.task)}/${String(params.grading)}`);
@@ -709,7 +763,7 @@ describe('the feed without the stream', () => {
 
   it('reads the feed and the queue again every ten seconds while one is to finish', async () => {
     let now: FeedEntry[] = [retried];
-    let depth = { queued: 1, dispatched: 0 };
+    let depth = { queued: 1, dispatched: 0, failed: 0 };
     server.use(
       signedIn,
       taskList,
@@ -720,7 +774,7 @@ describe('the feed without the stream', () => {
 
     const sum = await screen.findByRole('rowgroup', { name: 'B submission 3 by ada' });
     now = [{ ...retried, grading: { ...retried.grading, status: 'done' } }];
-    depth = { queued: 0, dispatched: 0 };
+    depth = { queued: 0, dispatched: 0, failed: 0 };
     await passTime(10_000);
 
     await waitFor(() => expect(sum).toHaveTextContent('Done'));
@@ -766,7 +820,7 @@ describe('the feed kept up to date', () => {
 
   it('shows a grading that changed, and the queue, once the stream says one did', async () => {
     let now: FeedEntry[] = [retried];
-    let depth = { queued: 1, dispatched: 0 };
+    let depth = { queued: 1, dispatched: 0, failed: 0 };
     server.use(
       signedIn,
       taskList,
@@ -781,7 +835,7 @@ describe('the feed kept up to date', () => {
     FakeSource.last?.onopen?.();
 
     now = [{ ...retried, grading: { ...retried.grading, status: 'running' } }];
-    depth = { queued: 0, dispatched: 0 };
+    depth = { queued: 0, dispatched: 0, failed: 0 };
     FakeSource.last?.emit('grading');
 
     await waitFor(() => expect(sum).toHaveTextContent('Running'));

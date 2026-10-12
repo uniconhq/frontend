@@ -112,7 +112,7 @@ const noGradings = http.get(
 const emptyOrganising = [
   http.get('/api/v1/orgs/:org/contests/:contest/gradings', () => HttpResponse.json([])),
   http.get('/api/v1/orgs/:org/contests/:contest/gradings/queue', () =>
-    HttpResponse.json({ queued: 0, dispatched: 0 }),
+    HttpResponse.json({ queued: 0, dispatched: 0, failed: 0 }),
   ),
   /** No task standing in any contest, until a test lists some. */
   http.get('/api/v1/orgs/:org/contests/:contest/organise/tasks', () =>
