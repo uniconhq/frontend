@@ -435,6 +435,41 @@ describe('the cards that build a task', { timeout: 30_000 }, () => {
     );
   });
 
+  it('shows an entrant input’s help behind an ⓘ, and no input’s key beside its title (M45)', async () => {
+    taskBackend({
+      form: {
+        ...CHECKED,
+        inputs: [
+          declared('submission', 'file', {
+            contestant: true,
+            title: 'Solution',
+            help: 'The source file the contestant submits.',
+          }),
+          ...CHECKED.inputs.slice(1),
+        ],
+      },
+    });
+    const user = userEvent.setup();
+    const { inputs } = await openTask();
+
+    const entrants = within(inputs).getByRole('region', {
+      name: 'What entrants submit',
+    });
+    const solution = within(entrants).getByRole('group', { name: 'Solution' });
+    await user.click(within(solution).getByRole('button', { name: 'About Solution' }));
+    expect(
+      await screen.findByText('The source file the contestant submits.'),
+    ).toBeVisible();
+    expect(within(solution).queryByText('submission')).toBeNull();
+    // An input the workflow gives no title keeps its key as its title, and no ⓘ.
+    const language = within(entrants).getByRole('group', { name: 'language' });
+    expect(within(language).getByRole('heading', { name: 'language' })).toBeVisible();
+    expect(within(language).queryByRole('button', { name: /^About/ })).toBeNull();
+    const limits = within(inputs).getByRole('region', { name: 'Limits and settings' });
+    expect(within(limits).queryByText('time_limit')).toBeNull();
+    expect(fieldIn(limits, 'Time limit (seconds)', /^Time limit/)).toBeVisible();
+  });
+
   it('says a newer version of the workflow is out and takes it only when asked', async () => {
     const { sent } = taskBackend({ form: { ...CHECKED, newer: 'v3' } });
     asManager();

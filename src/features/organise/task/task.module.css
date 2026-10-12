@@ -138,6 +138,13 @@
   gap: 4px 12px;
 }
 
+/* A box's title with its ⓘ beside it. */
+.titleRow {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
 .itemTitle {
   margin: 0;
   font-size: 14px;

@@ -3,6 +3,7 @@ import type { DeclaredInput } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
 import { Checkbox } from '@/ui/Checkbox';
+import { InfoTip } from '@/ui/InfoTip';
 import { Select } from '@/ui/Select';
 import { TextInput } from '@/ui/TextInput';
 import { FieldBox } from '../contest/ContestFile';
@@ -244,7 +245,12 @@ function EntrantFields({
   );
 }
 
-/** One input the workflow declares, as a box of its own named for it. */
+/**
+ * One input the workflow declares, as a box of its own named for it: by its
+ * title, or its key where the workflow gives it none, with its help behind
+ * an ⓘ, as each setting's field has it (M45). The key is the workflow
+ * author's word, so it is not shown beside a title.
+ */
 function DeclaredItem({
   declared,
   input,
@@ -262,11 +268,15 @@ function DeclaredItem({
       <div className={classes.item} role="group" aria-label={inputTitle(declared)}>
         {declared.contestant && (
           <div className={classes.itemHead}>
-            <h4 className={classes.itemTitle}>{declared.title ?? declared.id}</h4>
-            <span className={classes.id}>
-              {declared.id}
-              {declared.per_test ? ', one file per test' : ''}
-            </span>
+            <div className={classes.titleRow}>
+              <h4 className={classes.itemTitle}>{declared.title ?? declared.id}</h4>
+              {declared.help !== null && (
+                <InfoTip about={declared.title ?? declared.id}>{declared.help}</InfoTip>
+              )}
+            </div>
+            {declared.per_test && (
+              <BodyText tone="secondary">One file for each test</BodyText>
+            )}
           </div>
         )}
         {other && (
@@ -291,7 +301,6 @@ function DeclaredItem({
               onChange={onChange}
               disabled={disabled}
             />
-            <span className={classes.id}>{declared.id}</span>
           </div>
         )}
       </div>
@@ -468,8 +477,8 @@ function AddUnknown({
  * organiser thinks of them. First what entrants submit (the inputs they
  * give: what they see of each, the choices they have and how much they may
  * send), then the limits and settings the task gives a value. Each input is
- * named by its title and unit from the workflow, its help behind an ⓘ, and
- * its id small beside it. When the workflow cannot be read, the inputs the
+ * named by its title and unit from the workflow, its help behind an ⓘ. When
+ * the workflow cannot be read, the inputs the
  * settings have are shown as they are, to keep or remove.
  */
 export function InputsCard({
