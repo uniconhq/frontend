@@ -2,7 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@/test/user-event';
 import { http, HttpResponse } from 'msw';
-import type { FeedEntry, Grading } from '@/api/types';
+import type { FeedEntry, Grading, RegradeSummary } from '@/api/types';
+import { formatExact } from '@/lib/exact';
 import { renderApp } from '@/test/render';
 import { problem, server, signedIn, someone } from '@/test/server';
 import { organisedEntrant } from '@/test/contestant';
@@ -118,6 +119,63 @@ const superseded: FeedEntry = {
 };
 
 const feed = [retried, sortByTeam, superseded, cancelled];
+
+/** A rejudge of sum that took 120 submissions: 4 went down, 2 now fail to compile, 1 went up. */
+const REGRADE: RegradeSummary = {
+  id: '0199a2c1-0000-7000-8000-0000000000aa',
+  task: 'sum',
+  label: 'B',
+  cause: 'rejudge',
+  publication: 3,
+  started_at: '2026-10-12T14:00:00Z',
+  started_by: 7,
+  started_by_name: 'alice',
+  total: 120,
+  graded: 120,
+  running: false,
+  counts: {
+    up: 1,
+    down: 4,
+    stopped: 2,
+    unchanged: 113,
+    new: 0,
+    running: 0,
+    failed: 0,
+    over_limit: 0,
+  },
+};
+
+/** ada's submission 3 to sum, which passed five tests before the regrade and now fails to compile. */
+const nowStopped: FeedEntry = {
+  task: 'sum',
+  label: 'B',
+  by: ada,
+  grading: {
+    ...grading,
+    id: 'g-sum-regraded',
+    attempt: 2,
+    regrade: REGRADE.id,
+    change: {
+      change: 'stopped',
+      earlier: {
+        attempt: 1,
+        points: '62.5',
+        accepted: 5,
+        tests: 8,
+        stopped: null,
+        values: {},
+      },
+      now: {
+        attempt: 2,
+        points: '0',
+        accepted: 0,
+        tests: 8,
+        stopped: 'compile_error',
+        values: {},
+      },
+    },
+  },
+};
 
 /** The feed's requests, each by its query, and the answer it gives. */
 function feedAnswering(answer: (query: URLSearchParams) => FeedEntry[]) {
@@ -530,6 +588,8 @@ describe('acting on the feed', () => {
           queued: 3,
           cancelled: 1,
           left_running: 0,
+          over_limit: 2,
+          regrade: REGRADE.id,
         });
       }),
     );
@@ -561,6 +621,14 @@ describe('acting on the feed', () => {
     expect(
       screen.getByText('1 attempt against an older publication cancelled first.'),
     ).toBeVisible();
+    expect(
+      screen.getByText(
+        '2 submissions ended not graded, since their entrants had reached the task’s limit on submissions.',
+      ),
+    ).toBeVisible();
+    expect(
+      screen.getByRole('link', { name: 'See what the rejudge changes' }),
+    ).toHaveAttribute('href', `${FEED}?regrade=${REGRADE.id}`);
     expect(rejudgedAt).toEqual(['sum']);
   });
 
@@ -829,6 +897,139 @@ describe('acting on the feed', () => {
         name: 'Retry A submission 1 by Lovelaces (grace), attempt 1',
       }),
     ).toBeNull();
+  });
+});
+
+describe('what a regrade changed', () => {
+  function regrades(list: RegradeSummary[]) {
+    let shown = list;
+    const dismissed: string[] = [];
+    server.use(
+      http.get(`${CONTEST_API}/gradings/regrades`, () => HttpResponse.json(shown)),
+      http.post(
+        `${CONTEST_API}/tasks/:task/regrades/:regrade/dismiss`,
+        ({ params }) => {
+          dismissed.push(`${String(params['task'])} ${String(params['regrade'])}`);
+          shown = shown.filter((found) => found.id !== params['regrade']);
+          return new HttpResponse(null, { status: 204 });
+        },
+      ),
+    );
+    return dismissed;
+  }
+
+  it('sums up each task’s latest regrade, each count a link to those submissions', async () => {
+    server.use(signedIn, taskList);
+    regrades([REGRADE]);
+    const asked = feedAnswering((query) =>
+      query.get('change') === 'stopped' ? [nowStopped, nowStopped] : feed,
+    );
+    renderApp(FEED);
+
+    const summary = await screen.findByRole('listitem', { name: 'Regrade of B' });
+    await waitFor(() =>
+      expect(summary).toHaveTextContent(
+        'Regrade of B: 120 graded · 4 went down · 2 now fail to compile · 1 went up',
+      ),
+    );
+    expect(summary).toHaveTextContent(
+      /After a rejudge by alice, .*, against publication 3\./,
+    );
+    const link = (name: string) => within(summary).getByRole('link', { name });
+    expect(link('120 graded')).toHaveAttribute('href', `${FEED}?regrade=${REGRADE.id}`);
+    expect(link('4 went down')).toHaveAttribute(
+      'href',
+      `${FEED}?regrade=${REGRADE.id}&change=down`,
+    );
+    expect(link('2 now fail to compile')).toHaveAttribute(
+      'href',
+      `${FEED}?regrade=${REGRADE.id}&change=stopped`,
+    );
+    expect(asked).toContain(`regrade=${REGRADE.id}&change=stopped`);
+  });
+
+  it('lists a regrade’s submissions with their results before and after it', async () => {
+    server.use(signedIn, taskList);
+    regrades([REGRADE]);
+    const asked = feedAnswering((query) =>
+      query.get('regrade') === null ? feed : [nowStopped],
+    );
+    renderApp(`${FEED}?regrade=${REGRADE.id}&change=stopped`);
+
+    expect(
+      await screen.findByRole('heading', { name: 'What the regrade of B changed' }),
+    ).toBeVisible();
+    const table = await screen.findByRole('table', { name: 'Gradings' });
+    expect(
+      within(table)
+        .getAllByRole('columnheader')
+        .map((header) => header.textContent),
+    ).toEqual(expect.arrayContaining(['Before the regrade', 'After it']));
+    const row = within(table).getByRole('rowgroup', { name: 'B submission 3 by ada' });
+    expect(row).toHaveTextContent(`${formatExact('62.5', 2)} points`);
+    expect(row).toHaveTextContent('COMPILE ERROR, 0 points');
+    expect(row).toHaveTextContent('Now fails to compile');
+    expect(asked).toContain(`regrade=${REGRADE.id}&change=stopped`);
+    expect(screen.queryByRole('combobox', { name: 'Status' })).toBeNull();
+    expect(screen.getByRole('combobox', { name: 'What the regrade did' })).toHaveValue(
+      'stopped',
+    );
+    expect(screen.getByRole('link', { name: 'Show every grading' })).toBeVisible();
+  });
+
+  it('takes a summary off for everyone once a manager dismisses it', async () => {
+    server.use(signedIn, taskList);
+    const dismissed = regrades([REGRADE]);
+    feedAnswering(() => feed);
+    const user = userEvent.setup();
+    renderApp(FEED);
+
+    const summary = await screen.findByRole('listitem', { name: 'Regrade of B' });
+    await user.click(
+      within(summary).getByRole('button', { name: 'Dismiss the regrade of B' }),
+    );
+
+    await waitFor(() =>
+      expect(screen.queryByRole('listitem', { name: 'Regrade of B' })).toBeNull(),
+    );
+    expect(dismissed).toEqual([`sum ${REGRADE.id}`]);
+  });
+
+  it('offers an observer the summary without Dismiss, and says while it still runs', async () => {
+    server.use(
+      signedInAs([
+        { names: { org: 'acme', contest: null, task: null }, role: 'observer' },
+      ]),
+      taskList,
+    );
+    regrades([
+      {
+        ...REGRADE,
+        cause: 'save',
+        running: true,
+        graded: 100,
+        counts: { ...REGRADE.counts, unchanged: 93, running: 20 },
+      },
+    ]);
+    feedAnswering(() => feed);
+    renderApp(FEED);
+
+    const summary = await screen.findByRole('listitem', { name: 'Regrade of B' });
+    expect(summary).toHaveTextContent(
+      /After a save that changed how the task grades, .*, against publication 3\. Still running: 20 submissions are still being graded\./,
+    );
+    expect(within(summary).queryByRole('button', { name: /Dismiss/ })).toBeNull();
+  });
+
+  it('shows on the contest page too', async () => {
+    server.use(signedIn, standingList, taskList);
+    regrades([REGRADE]);
+    feedAnswering(() => []);
+    renderApp('/orgs/acme/contests/spring');
+
+    expect(
+      await screen.findByRole('listitem', { name: 'Regrade of B' }),
+    ).toHaveTextContent(/120 graded · 4 went down/);
   });
 });
 

@@ -88,6 +88,12 @@ export type Reported = Schemas['Reported'];
 export type GradedTest = Schemas['GradedTest'];
 export type Grading = Schemas['Grading'];
 export type Rejudged = Schemas['Rejudged'];
+/** A task's latest regrade of many, summed up by what it did to each submission. */
+export type RegradeSummary = Schemas['RegradeSummary'];
+/** One result a regrade compares: the one it replaced, or its own. */
+export type RegradeSide = Schemas['RegradeSide'];
+/** What a regrade did to one submission: up, down, now stopped, and so on. */
+export type RegradeChangeKind = Schemas['forge__domain__regrades__Change'];
 /** One attempt in a contest's gradings feed, with its task and who submitted. */
 export type FeedEntry = Schemas['FeedEntry'];
 export type Submitter = Schemas['Submitter'];

@@ -187,6 +187,7 @@ describe('where the live stream stands', () => {
         `${task}/gradings`,
         `${contest}/gradings`,
         `${contest}/gradings/queue`,
+        `${contest}/gradings/regrades`,
         `${contest}/home`,
       ];
       const announced = [

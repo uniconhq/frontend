@@ -24,6 +24,7 @@ import {
   GradingsCard,
   QuestionsCard,
 } from './ContestCards';
+import { RegradeSummaries } from '../gradings/RegradeSummaries';
 import { ContestScoring } from './ContestScoring';
 import { ContestSummary } from './ContestSummary';
 import { ContestTasks } from './ContestTasks';
@@ -60,7 +61,8 @@ const CARDS: Record<
 /**
  * A contest's page for its organisers: a header with its name, where it
  * stands, the time to its start or end and the page its contestants see;
- * how many gradings failed, while any wait; its status, with what opening
+ * how many gradings failed, while any wait; what each task's latest regrade
+ * changed, until it is dismissed; its status, with what opening
  * it needs and the buttons that open, take back and archive it; its
  * settings at a glance; its tasks; how it is scored; and a card for each of
  * its sections, each going to its own page. The forms are on the
@@ -97,6 +99,7 @@ export function ContestPage() {
         }
       />
       <FailedGradings path={{ org, contest }} />
+      <RegradeSummaries path={{ org, contest }} />
       <StatusCard org={org} contest={contest} />
       <ContestSummary org={org} contest={contest} />
       <ContestTasks org={org} contest={contest} />

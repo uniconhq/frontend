@@ -15,6 +15,7 @@ import {
   resultOf,
   submitterOf,
 } from './feed';
+import { changeOf, sideWords } from './regrades';
 import { ScoredView } from './ScoredView';
 import classes from './feed.module.css';
 
@@ -101,6 +102,24 @@ function StatusCell({
   );
 }
 
+/**
+ * What a regrade did to the submission, on Gradings read by regrade: the
+ * result it replaced and its own, side by side, the kind of change under
+ * the new one.
+ */
+function ChangeCells({ entry }: { entry: FeedEntry }) {
+  const change = entry.grading.change;
+  return (
+    <>
+      <td>{change === null ? '—' : sideWords(change.earlier)}</td>
+      <td>
+        {change === null ? '—' : sideWords(change.now)}
+        <BodyText tone="meta">{changeOf(entry)}</BodyText>
+      </td>
+    </>
+  );
+}
+
 function TimesCell({ entry }: { entry: FeedEntry }) {
   const { grading } = entry;
   const times = [
@@ -132,6 +151,7 @@ function AttemptRow({
   entry,
   head,
   showTask,
+  compared,
   earlier,
   scored,
   actions,
@@ -140,6 +160,7 @@ function AttemptRow({
   entry: FeedEntry;
   head: boolean;
   showTask: boolean;
+  compared: boolean;
   earlier?: { count: number; shown: boolean; toggle: () => void };
   scored?: { shown: boolean; toggle: () => void };
   actions: RowActions | null;
@@ -194,6 +215,7 @@ function AttemptRow({
           </span>
         )}
       </th>
+      {compared && <ChangeCells entry={entry} />}
       <td>
         {grading.attempt}
         <BodyText tone="meta">publication {grading.publication}</BodyText>
@@ -218,11 +240,13 @@ function Submission({
   path,
   attempts,
   showTask,
+  compared,
   actions,
 }: {
   path: ContestPath;
   attempts: FeedEntry[];
   showTask: boolean;
+  compared: boolean;
   actions: RowActions | null;
 }) {
   const [shown, setShown] = useState(false);
@@ -230,7 +254,7 @@ function Submission({
   const [head, ...earlier] = attempts;
   if (head === undefined) return null;
   const task = head.task;
-  const columns = (showTask ? 6 : 5) + (actions !== null ? 1 : 0);
+  const columns = (showTask ? 6 : 5) + (compared ? 2 : 0) + (actions !== null ? 1 : 0);
   return (
     <tbody aria-label={nameOf(head).replace(/, attempt \d+$/, '')}>
       <AttemptRow
@@ -238,6 +262,7 @@ function Submission({
         entry={head}
         head
         showTask={showTask}
+        compared={compared}
         earlier={{ count: earlier.length, shown, toggle: () => setShown(!shown) }}
         scored={
           task !== null
@@ -261,6 +286,7 @@ function Submission({
             entry={entry}
             head={false}
             showTask={showTask}
+            compared={compared}
             actions={actions}
           />
         ))}
@@ -271,8 +297,9 @@ function Submission({
 /**
  * Gradings, each submission once, headed by its highest attempt, with its
  * earlier attempts opening below it. The task column is left out where every
- * row is of one task. `actions`, when given, draws what a latest attempt
- * offers in a column of its own.
+ * row is of one task. Read by a regrade, each row also gives the result the
+ * regrade replaced and its own, side by side (#448). `actions`, when given,
+ * draws what a latest attempt offers in a column of its own.
  */
 export function FeedTable({
   path,
@@ -285,6 +312,7 @@ export function FeedTable({
   showTask: boolean;
   actions: RowActions | null;
 }) {
+  const compared = entries.some((entry) => entry.grading.change !== null);
   return (
     <div className={classes.scroll}>
       <table className={classes.table} aria-label="Gradings">
@@ -293,6 +321,12 @@ export function FeedTable({
             {showTask && <th scope="col">Task</th>}
             <th scope="col">Submitted by</th>
             <th scope="col">Submission</th>
+            {compared && (
+              <>
+                <th scope="col">Before the regrade</th>
+                <th scope="col">After it</th>
+              </>
+            )}
             <th scope="col">Attempt</th>
             <th scope="col">Status</th>
             <th scope="col">Times</th>
@@ -305,6 +339,7 @@ export function FeedTable({
             path={path}
             attempts={attempts}
             showTask={showTask}
+            compared={compared}
             actions={actions}
           />
         ))}
