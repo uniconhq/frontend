@@ -63,59 +63,83 @@ function endsAttempt(asking: Asking): boolean {
   return asking.kind === 'cancel' && asking.entry.grading.last_good !== null;
 }
 
-const TITLE: Record<Asking['kind'], string> = {
-  retry: 'Retry this grading?',
-  cancel: 'Cancel this submission?',
-  rejudge: 'Rejudge every submission of this task?',
-};
+/** The entrant a submission is from, by the name entrants know them by. */
+function entrantOf(entry: FeedEntry): string {
+  return entry.by.entrant_name ?? entry.by.username ?? 'the entrant';
+}
 
-const CONFIRM: Record<Asking['kind'], string> = {
-  retry: 'Retry',
-  cancel: 'Cancel the submission',
-  rejudge: 'Rejudge',
-};
+/**
+ * The question a dialog asks, in the organiser's words, naming the
+ * submission or the task: "Grade submission 2 again?" (M64).
+ */
+function titleOf(asking: Asking): string {
+  if (asking.kind === 'rejudge') {
+    return asking.choose !== undefined || asking.task === ''
+      ? 'Grade every submission to a task again?'
+      : `Grade every submission to ${asking.title} again?`;
+  }
+  const number = String(asking.entry.grading.submission_number);
+  if (asking.kind === 'retry') return `Grade submission ${number} again?`;
+  return endsAttempt(asking)
+    ? `Keep submission ${number}’s earlier result?`
+    : `Cancel submission ${number}?`;
+}
 
-/** What confirming does, in words. */
+/** The button that does it, saying what it does. */
+function confirmOf(asking: Asking): string {
+  if (asking.kind === 'rejudge') return 'Rejudge';
+  if (asking.kind === 'retry') return 'Grade it again';
+  return endsAttempt(asking) ? 'Keep the earlier result' : 'Cancel the submission';
+}
+
+/**
+ * What confirming does, in words: what runs, on which version of the task,
+ * why one would, and what the entrant and the leaderboards see meanwhile.
+ */
 function Consequence({ asking }: { asking: Asking }) {
   if (asking.kind === 'rejudge') {
-    if (asking.task === '') {
-      return (
-        <BodyText>
-          Choose the task to rejudge. Every submission of it has its latest attempt
-          graded again against the task&apos;s current publication, as a new attempt.
-        </BodyText>
-      );
-    }
+    const task = asking.task === '' ? 'the task' : asking.title;
     return (
       <>
+        {asking.task === '' && <BodyText>Choose the task to rejudge.</BodyText>}
         <BodyText>
-          Every submission of {asking.title} has its latest attempt graded again against
-          the task&apos;s current publication, as a new attempt.
+          Every submission to {task} runs again on the task as it is now, its latest
+          publication. For when its tests, its checker or its scoring changed. To grade
+          one submission again on the version it was graded on, retry it instead.
         </BodyText>
         <BodyText tone="secondary">
-          The earlier attempts stay for the record. An attempt still being graded
-          against an older publication is cancelled first; one already grading against
-          the current publication is left to finish.
+          Each new result replaces the one before, which stays in the list, marked as
+          replaced. Until each new run finishes, entrants and the leaderboards keep
+          seeing the current results. A submission still being graded on an older
+          version of the task is stopped first; one already running on the latest is
+          left to finish.
         </BodyText>
       </>
     );
   }
   const { grading } = asking.entry;
+  const entrant = entrantOf(asking.entry);
   const submission = `${submitterOf(asking.entry.by)}'s submission ${String(grading.submission_number)}`;
   if (asking.kind === 'retry') {
+    const standing = grading.status === 'done' || grading.last_good !== null;
     return (
       <>
         <BodyText>
-          {submission} to {asking.task} is graded again as a new attempt, against
-          publication {grading.publication}, as attempt {grading.attempt} was.
+          {submission} to {asking.task} runs again on the same version of the task it
+          was graded on (publication {grading.publication}). For when the grading itself
+          went wrong, such as a system error. To grade it against the task as it is now,
+          rejudge the task.
         </BodyText>
         <BodyText tone="secondary">
-          Attempt {grading.attempt} stays in the list for the record.
+          {grading.status === 'done'
+            ? 'The new result replaces this one.'
+            : 'The new result counts in place of this grading, which has none.'}{' '}
+          This one stays in the list, marked as replaced.
         </BodyText>
-        {grading.last_good !== null && (
+        {standing && (
           <BodyText tone="secondary">
-            Until the new attempt finishes with a result, the entrant and the
-            leaderboards see attempt {grading.last_good}&apos;s result.
+            Until the new run finishes, {entrant} and the leaderboards keep seeing the
+            current result.
           </BodyText>
         )}
       </>
@@ -125,19 +149,19 @@ function Consequence({ asking }: { asking: Asking }) {
     <>
       {grading.last_good === null ? (
         <BodyText>
-          {submission} to {asking.task} ends as cancelled. Its entrant reads the
-          sentence below in place of a result, and the submission no longer counts
-          against the task&apos;s limit.
+          {submission} to {asking.task} is not graded. {entrant} reads the sentence
+          below in place of a result, and the submission no longer counts towards the
+          task’s limit on submissions.
         </BodyText>
       ) : (
         <BodyText>
-          Attempt {grading.attempt} of {submission} to {asking.task} ends as cancelled.
-          The submission keeps attempt {grading.last_good}&apos;s result, which its
-          entrant and the leaderboards go on seeing.
+          The grading of {submission} to {asking.task} that failed is stopped, and the
+          submission keeps the result it had, which {entrant} and the leaderboards go on
+          seeing.
         </BodyText>
       )}
       <BodyText tone="secondary">
-        A cancel is final: neither a retry nor a rejudge grades it again.
+        This is final: neither a retry nor a rejudge grades it again.
       </BodyText>
     </>
   );
@@ -247,15 +271,7 @@ export function ConfirmDialog({
     <Modal
       opened={asking !== null}
       onClose={onClose}
-      title={
-        asking === null
-          ? ''
-          : asking.kind === 'rejudge' && asking.choose !== undefined
-            ? 'Rejudge every submission of a task?'
-            : endsAttempt(asking)
-              ? 'Cancel this attempt?'
-              : TITLE[asking.kind]
-      }
+      title={asking === null ? '' : titleOf(asking)}
     >
       {asking !== null && (
         <div className={shared.stack}>
@@ -305,7 +321,7 @@ export function ConfirmDialog({
               }
               onClick={onConfirm}
             >
-              {endsAttempt(asking) ? 'Cancel the attempt' : CONFIRM[asking.kind]}
+              {confirmOf(asking)}
             </Button>
             <Button variant="secondary" onClick={onClose}>
               Not now

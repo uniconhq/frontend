@@ -179,7 +179,7 @@ function AttemptRow({
           </>
         ) : (
           <span className={classes.earlierName}>
-            Submission {grading.submission_number}, earlier
+            Submission {grading.submission_number}, replaced
           </span>
         )}
       </th>

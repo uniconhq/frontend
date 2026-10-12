@@ -403,12 +403,22 @@ describe('acting on the feed', () => {
     expect(await screen.findByRole('button', { name: `Retry ${name}` })).toBeVisible();
     expect(screen.queryByRole('button', { name: `Cancel ${name}` })).toBeNull();
     await userEvent.click(screen.getByRole('button', { name: `Retry ${name}` }));
-    const dialog = await screen.findByRole('dialog', { name: 'Retry this grading?' });
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Grade submission 1 again?',
+    });
     expect(dialog).toHaveTextContent(
-      "Lovelaces (grace)'s submission 1 to sort is graded again as a new attempt, against publication 2, as attempt 1 was.",
+      "Lovelaces (grace)'s submission 1 to sort runs again on the same version of the task it was graded on (publication 2). For when the grading itself went wrong, such as a system error. To grade it against the task as it is now, rejudge the task.",
+    );
+    expect(dialog).toHaveTextContent(
+      'The new result replaces this one. This one stays in the list, marked as replaced.',
+    );
+    expect(dialog).toHaveTextContent(
+      'Until the new run finishes, Lovelaces and the leaderboards keep seeing the current result.',
     );
     expect(retriedAt).toEqual([]);
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Retry' }));
+    await userEvent.click(
+      within(dialog).getByRole('button', { name: 'Grade it again' }),
+    );
 
     const group = await screen.findByRole('rowgroup', {
       name: 'A submission 1 by Lovelaces (grace)',
@@ -445,9 +455,11 @@ describe('acting on the feed', () => {
       }),
     );
     const dialog = await screen.findByRole('dialog', {
-      name: 'Cancel this submission?',
+      name: 'Cancel submission 3?',
     });
-    expect(dialog).toHaveTextContent("ada's submission 3 to sum ends as cancelled.");
+    expect(dialog).toHaveTextContent(
+      "ada's submission 3 to sum is not graded. ada reads the sentence below in place of a result",
+    );
     const confirm = within(dialog).getByRole('button', {
       name: 'Cancel the submission',
     });
@@ -486,7 +498,7 @@ describe('acting on the feed', () => {
       }),
     );
     const dialog = await screen.findByRole('dialog', {
-      name: 'Cancel this submission?',
+      name: 'Cancel submission 3?',
     });
     await user.type(
       within(dialog).getByRole('textbox', { name: /^What the entrant reads/ }),
@@ -524,7 +536,7 @@ describe('acting on the feed', () => {
     await screen.findByRole('table', { name: 'Gradings' });
     await user.click(screen.getByRole('button', { name: 'Rejudge a task' }));
     const dialog = await screen.findByRole('dialog', {
-      name: 'Rejudge every submission of a task?',
+      name: 'Grade every submission to a task again?',
     });
     const confirm = within(dialog).getByRole('button', { name: 'Rejudge' });
     expect(confirm).toBeDisabled();
@@ -534,7 +546,7 @@ describe('acting on the feed', () => {
       'sum',
     );
     expect(dialog).toHaveTextContent(
-      "Every submission of B · sum has its latest attempt graded again against the task's current publication, as a new attempt.",
+      'Every submission to B · sum runs again on the task as it is now, its latest publication.',
     );
     await user.click(confirm);
 
@@ -668,13 +680,13 @@ describe('acting on the feed', () => {
       }),
     );
     const asked = await screen.findByRole('dialog', {
-      name: 'Cancel this attempt?',
+      name: 'Keep submission 3’s earlier result?',
     });
     expect(asked).toHaveTextContent(
-      "Attempt 2 of ada's submission 3 to sum ends as cancelled. The submission keeps attempt 1's result, which its entrant and the leaderboards go on seeing.",
+      "The grading of ada's submission 3 to sum that failed is stopped, and the submission keeps the result it had, which ada and the leaderboards go on seeing.",
     );
     expect(
-      within(asked).getByRole('button', { name: 'Cancel the attempt' }),
+      within(asked).getByRole('button', { name: 'Keep the earlier result' }),
     ).toBeVisible();
     expect(
       within(asked).queryByRole('button', { name: 'Cancel the submission' }),
@@ -696,10 +708,15 @@ describe('acting on the feed', () => {
         name: 'Retry B submission 3 by ada, attempt 2',
       }),
     );
-    const asked = await screen.findByRole('dialog', { name: 'Retry this grading?' });
+    const asked = await screen.findByRole('dialog', {
+      name: 'Grade submission 3 again?',
+    });
 
     expect(asked).toHaveTextContent(
-      "Until the new attempt finishes with a result, the entrant and the leaderboards see attempt 1's result.",
+      'The new result counts in place of this grading, which has none. This one stays in the list, marked as replaced.',
+    );
+    expect(asked).toHaveTextContent(
+      'Until the new run finishes, ada and the leaderboards keep seeing the current result.',
     );
   });
 
@@ -720,8 +737,10 @@ describe('acting on the feed', () => {
         name: 'Retry A submission 1 by Lovelaces (grace), attempt 1',
       }),
     );
-    const dialog = await screen.findByRole('dialog', { name: 'Retry this grading?' });
-    await user.click(within(dialog).getByRole('button', { name: 'Retry' }));
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Grade submission 1 again?',
+    });
+    await user.click(within(dialog).getByRole('button', { name: 'Grade it again' }));
 
     const alert = await within(dialog).findByRole('alert');
     expect(alert).toHaveTextContent('Not the attempt to retry');

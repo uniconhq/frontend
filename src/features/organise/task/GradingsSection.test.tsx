@@ -196,12 +196,16 @@ describe("the task's gradings", () => {
         name: 'Retry B submission 3 by ada, attempt 1',
       }),
     );
-    const dialog = await screen.findByRole('dialog', { name: 'Retry this grading?' });
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Grade submission 3 again?',
+    });
     expect(dialog).toHaveTextContent(
-      "ada's submission 3 to sum is graded again as a new attempt, against publication 2, as attempt 1 was.",
+      "ada's submission 3 to sum runs again on the same version of the task it was graded on (publication 2).",
     );
     expect(retried).toEqual([]);
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Retry' }));
+    await userEvent.click(
+      within(dialog).getByRole('button', { name: 'Grade it again' }),
+    );
 
     expect(
       await screen.findByRole('button', { name: 'Show earlier attempts (1)' }),
@@ -267,16 +271,16 @@ describe("the task's gradings", () => {
     });
     await userEvent.click(cancel);
     const first = await screen.findByRole('dialog', {
-      name: 'Cancel this submission?',
+      name: 'Cancel submission 3?',
     });
     await userEvent.click(within(first).getByRole('button', { name: 'Not now' }));
     expect(cancelled).toEqual([]);
 
     await userEvent.click(cancel);
     const dialog = await screen.findByRole('dialog', {
-      name: 'Cancel this submission?',
+      name: 'Cancel submission 3?',
     });
-    expect(dialog).toHaveTextContent("ada's submission 3 to sum ends as cancelled.");
+    expect(dialog).toHaveTextContent("ada's submission 3 to sum is not graded.");
     const confirm = within(dialog).getByRole('button', {
       name: 'Cancel the submission',
     });
@@ -397,7 +401,7 @@ describe("the task's gradings", () => {
 
     const earlier = within(third).getAllByRole('row')[1];
     if (earlier === undefined) throw new Error('no earlier attempt shown');
-    expect(earlier).toHaveTextContent('Submission 3, earlier');
+    expect(earlier).toHaveTextContent('Submission 3, replaced');
     expect(earlier).toHaveTextContent('System error');
     expect(earlier).toHaveTextContent(
       'The grading machine lost its run before it began.',
@@ -492,10 +496,10 @@ describe("the task's gradings", () => {
     await screen.findByRole('table', { name: 'Gradings' });
     await userEvent.click(screen.getByRole('button', { name: 'Rejudge' }));
     const dialog = await screen.findByRole('dialog', {
-      name: 'Rejudge every submission of this task?',
+      name: 'Grade every submission to B · sum again?',
     });
     expect(dialog).toHaveTextContent(
-      "Every submission of B · sum has its latest attempt graded again against the task's current publication, as a new attempt.",
+      'Every submission to B · sum runs again on the task as it is now, its latest publication.',
     );
     expect(rejudged).toBe(0);
     await userEvent.click(within(dialog).getByRole('button', { name: 'Rejudge' }));
