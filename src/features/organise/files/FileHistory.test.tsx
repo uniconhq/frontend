@@ -4,6 +4,7 @@ import userEvent from '@/test/user-event';
 import { http, HttpResponse } from 'msw';
 import type { Holder } from '@/api/types';
 import type { components } from '@/api/schema';
+import { formatDateTime } from '@/lib/time';
 import { renderApp } from '@/test/render';
 import { problem, server, signedIn, someone } from '@/test/server';
 import {
@@ -197,7 +198,7 @@ describe("a task file's history", () => {
     );
     const dialog = await screen.findByRole('dialog', { name: 'Roll this file back?' });
     expect(dialog).toHaveTextContent(
-      'task.yaml goes back to how it was at version 1a2b3c4',
+      `task.yaml goes back to how it was on ${formatDateTime(new Date('2026-09-20T10:00:00Z'))}, after “Make the task”. This is saved as a new change`,
     );
     expect(sent).toEqual([]);
     await userEvent.click(within(dialog).getByRole('button', { name: 'Roll back' }));

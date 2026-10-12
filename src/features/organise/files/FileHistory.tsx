@@ -132,6 +132,7 @@ function Versions({
     ]);
   }
   const current = history.data[0]?.version;
+  const rollingTo = history.data.find((change) => change.version === rolling);
 
   const rollBack = async (version: string) => {
     setRolling(null);
@@ -205,9 +206,11 @@ function Versions({
       >
         <div className={shared.stack}>
           <BodyText>
-            {path} goes back to how it was at version{' '}
-            <code>{short(rolling ?? '')}</code>. This is saved as a new version, and
-            every earlier version stays in the history.
+            {path} goes back to how it was{' '}
+            {rollingTo === undefined
+              ? 'at the version chosen'
+              : `on ${formatDateTime(new Date(rollingTo.at))}, after “${rollingTo.message}”`}
+            . This is saved as a new change, and every earlier one stays in the history.
           </BodyText>
           <BodyText tone="secondary">
             Like any save of the task, it publishes the task, or keeps it as a draft if
