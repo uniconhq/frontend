@@ -47,10 +47,26 @@ describe("an entrant's points on a task", () => {
     ).toEqual({ score: '62 / 100', pending: `More shown at ${at}` });
     expect(
       taskPointsText(
-        { worth: '100', points: { shown: '0', pending: '100', pending_until: REVEAL } },
+        { worth: '100', points: { shown: null, pending: '100', pending_until: REVEAL } },
         NOW,
       ),
     ).toEqual({ score: '— / 100', pending: `Shown at ${at}` });
+  });
+
+  it('reads a shown 0 as 0, and only nothing shown yet as —', () => {
+    const at = formatWhen(new Date(REVEAL), NOW);
+    expect(
+      taskPointsText(
+        { worth: '100', points: { shown: '0', pending: '40', pending_until: REVEAL } },
+        NOW,
+      ),
+    ).toEqual({ score: '0 / 100', pending: `More shown at ${at}` });
+    expect(
+      taskPointsText(
+        { worth: '100', points: { shown: null, pending: '0', pending_until: null } },
+        NOW,
+      ),
+    ).toEqual({ score: '— / 100', pending: null });
   });
 
   it('never reads as the worth while the points are short of it', () => {

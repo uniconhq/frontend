@@ -181,9 +181,13 @@ export function ScoredResult({
     <>
       {grading.points !== null && (
         <BodyText>
-          {formatExact(grading.points.shown, 2)} points
+          {grading.points.shown === null
+            ? 'No points shown yet'
+            : `${formatExact(grading.points.shown, 2)} points`}
           {grading.points.pending_until !== null &&
-            `, and up to ${formatExact(grading.points.pending, 2)} more shown at ${formatDateTime(new Date(grading.points.pending_until))}`}
+            (grading.points.shown === null
+              ? `: up to ${formatExact(grading.points.pending, 2)}, shown at ${formatDateTime(new Date(grading.points.pending_until))}`
+              : `, and up to ${formatExact(grading.points.pending, 2)} more shown at ${formatDateTime(new Date(grading.points.pending_until))}`)}
           {grading.factor !== null &&
             grading.factor !== '1' &&
             `, at ${formatExact(grading.factor, 4)} for lateness`}

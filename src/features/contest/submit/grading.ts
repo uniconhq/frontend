@@ -1,5 +1,5 @@
 import type { GradingResult, SubmissionState, Submission } from '@/api/types';
-import { compareDecimal, formatExact } from '@/lib/exact';
+import { formatExact } from '@/lib/exact';
 import { formatWhen, serverNow } from '@/lib/time';
 
 /**
@@ -104,10 +104,10 @@ export function justFinished(
 
 /**
  * A submission's points as its row in the list says them: what is shown,
- * such as `75`; `—` while it is still being graded, or when it never will be;
- * and while some of its points wait for a reveal, when they are shown, such
- * as `shown at 14:00`, or `30 so far, more shown at 14:00` when some
- * are shown already. Exact numbers, rounded for reading as the opened submission
+ * such as `75`, a shown 0 as `0`; `—` while it is still being graded, when
+ * it never will be, or while nothing is shown and no time is known; and
+ * while some of its points wait for a reveal, when they are shown, such as
+ * `shown at 14:00` while none are, or `30 so far, more shown at 14:00`. Exact numbers, rounded for reading as the opened submission
  * rounds them.
  */
 export function pointsLine(
@@ -118,9 +118,9 @@ export function pointsLine(
     return '—';
   }
   const { shown, pending_until: until } = grading.points;
-  if (until === null) return formatExact(shown, 2);
+  if (until === null) return shown === null ? '—' : formatExact(shown, 2);
   const at = formatWhen(new Date(until), now);
-  return compareDecimal(shown, '0') === 0
+  return shown === null
     ? `shown at ${at}`
     : `${formatExact(shown, 2)} so far, more shown at ${at}`;
 }

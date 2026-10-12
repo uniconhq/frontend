@@ -18,7 +18,6 @@ import {
   TASK_API,
   CONTEST_API,
   draftTask,
-  publishedTask,
   publicationList,
   repoFiles,
   taskState,
@@ -60,11 +59,14 @@ const FOLDERS: Record<string, string[]> = {
 };
 
 function folder(path: string): TreeEntry {
-  return { path, kind: 'directory', size: null, upload: null };
+  return { path, kind: 'directory', size: null, upload: null, version: null };
 }
 
-function file(path: string, size = 4): TreeEntry {
-  return { path, kind: 'file', size, upload: null };
+/** The commit a listed file was last changed at, as the tree names it. */
+const LISTED_AT = '9f8e7d6c5b4a39281706f5e4d3c2b1a098765432';
+
+function file(path: string, size = 4, version: string | null = LISTED_AT): TreeEntry {
+  return { path, kind: 'file', size, upload: null, version };
 }
 
 /** The tree of the task's tests as `GET <task>/tree?path=` answers it, folder by folder. */
@@ -439,10 +441,15 @@ describe('the cards that build a task', { timeout: 30_000 }, () => {
     const entrants = within(inputs).getByRole('region', {
       name: 'What entrants submit',
     });
-    // An empty label shows entrants the input's name, not the workflow's title.
+    // An empty label shows entrants the workflow's title, and its key only
+    // where it gives none.
     expect(fieldIn(entrants, 'Solution', 'Label shown to entrants')).toHaveAttribute(
       'placeholder',
-      'submission',
+      'Solution',
+    );
+    expect(fieldIn(entrants, 'language', 'Label shown to entrants')).toHaveAttribute(
+      'placeholder',
+      'language',
     );
   });
 
@@ -1748,12 +1755,14 @@ describe('a test opened in place (M50)', { timeout: 30_000 }, () => {
               kind: 'file',
               size: LONG.length,
               upload: null,
+              version: LISTED_AT,
             },
             {
               path: 'tests/small/1/expected',
               kind: 'file',
               size: 130,
               upload: { size: 50_000_000, digest: 'ab'.repeat(32) },
+              version: UPLOADED_AT,
             },
             folder('tests/small/1/data'),
             file('tests/small/1/test.yaml', 20),
@@ -1870,14 +1879,14 @@ describe('a test opened in place (M50)', { timeout: 30_000 }, () => {
         `/-/downloads/acme/spring/sum/versions/${UPLOADED_AT}/tests/small/1/expected`,
       );
 
-      // A file too big to show is downloaded at the task's head, never read.
+      // A file too big to show is downloaded at the version it was listed at, never read.
       const log = within(view).getByRole('region', { name: 'run log' });
       expect(log).toHaveTextContent('It is too big to show here.');
       expect(
         await within(log).findByRole('link', { name: 'Download run log.txt' }),
       ).toHaveAttribute(
         'href',
-        `/-/downloads/acme/spring/sum/versions/${publishedTask.head}/tests/small/1/run%20log.txt`,
+        `/-/downloads/acme/spring/sum/versions/${LISTED_AT}/tests/small/1/run%20log.txt`,
       );
 
       const data = within(view).getByRole('region', { name: 'data' });

@@ -3345,11 +3345,12 @@ export interface components {
          * @description One file at one version, with the token a write presents back, and
          *     `upload` when it is a file an organiser uploaded: its `content` is then
          *     the pointer to the bytes, never opened as text, and `upload` the size
-         *     and SHA-256 of what it holds. A typed file has none. `version` is a
-         *     version holding the file as read, the one it was read at or the latest
-         *     change to it, which a task's file is downloaded at
+         *     and SHA-256 of what it holds. A typed file has none. `version` is the
+         *     commit holding the file as read, the latest change to it or the one it
+         *     was read at, which a task's file is downloaded at
          *     (`/-/downloads/<org>/<contest>/<task>/versions/<version>/<path>`); null
-         *     when the forge did not say.
+         *     when the forge names no commit and it was not read at one. A tree's
+         *     entries name their `version` the same way.
          */
         FileContent: {
             /** Content */
@@ -3565,7 +3566,8 @@ export interface components {
         /**
          * InputField
          * @description One input the contestant gives, with what its form shows: its
-         *     `type`, its `label`, the `options` of an enum, whether it takes one file
+         *     `type`, its `label`, the task's, else the workflow's title for the
+         *     input, else its key, the `options` of an enum, whether it takes one file
          *     per test, `per_test`, named for the test as `<group>/<test>`, the
          *     `default` a value takes when it is left out, `min` and `max` of a
          *     number, exactly, and `max_size`, the most its files may total in bytes. A
@@ -4094,8 +4096,10 @@ export interface components {
         /**
          * Points
          * @description Points as a contestant sees them, a submission's or their entrant's on
-         *     a task: those shown, those still pending on groups whose verdict is not
-         *     shown yet, and when they are shown, null when none are pending.
+         *     a task: those shown, null while no group's verdict is shown yet, so a
+         *     shown 0 reads apart from nothing shown; those still pending on groups
+         *     whose verdict is not shown yet; and when they are shown, null when none
+         *     are pending.
          */
         Points: {
             /**
@@ -4105,11 +4109,8 @@ export interface components {
             pending: string;
             /** Pending Until */
             pending_until: string | null;
-            /**
-             * Shown
-             * @example 82.5
-             */
-            shown: string;
+            /** Shown */
+            shown: string | null;
         };
         /**
          * Primitive
@@ -4777,12 +4778,14 @@ export interface components {
          *
          *     `points` is their entrant's points on it, for a member of an approved
          *     entrant, as a board over that task alone counts them now, every group,
-         *     the best submission by points: `shown`, over the groups whose results
-         *     are shown, and `pending`, the most the groups not shown yet could still
-         *     add, until `pending_until`, the task's reveal, null when nothing is
-         *     pending. A group whose results are not shown yet never counts in
-         *     `shown`, as on every board. Null for anyone else, and on a task that
-         *     gives no points.
+         *     the submissions counted as the contest's leaderboard for the task
+         *     counts them (the first entrants see that covers it and ranks by points
+         *     first): `shown`, over the groups whose results are shown, null while
+         *     no group of the task is shown yet, and `pending`, the most the groups
+         *     not shown yet could still add, until `pending_until`, the task's
+         *     reveal, null when nothing is pending. A group whose results are not
+         *     shown yet never counts in `shown`, as on every board. Null for anyone
+         *     else, and on a task that gives no points.
          */
         TaskEntry: {
             /** Closes */
@@ -4928,7 +4931,9 @@ export interface components {
         /**
          * TreeEntry
          * @description One entry of a folder: a file, with the size of what its commit
-         *     holds, or a folder. `upload` tells an uploaded file from a typed one.
+         *     holds and that commit, the one that last changed it, which holds it as
+         *     listed whatever the head has moved to since (none when the forge does
+         *     not say), or a folder. `upload` tells an uploaded file from a typed one.
          */
         TreeEntry: {
             kind: components["schemas"]["EntryKind"];
@@ -4937,6 +4942,8 @@ export interface components {
             /** Size */
             size: number | null;
             upload: components["schemas"]["UploadInfo"] | null;
+            /** Version */
+            version: string | null;
         };
         /**
          * UpdateOrg

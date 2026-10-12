@@ -292,7 +292,9 @@ that is an upload, or larger than 1 MB, is not read whole: its Download is a
 link through the proxy's download door,
 `/-/downloads/<org>/<contest>/<task>/versions/<version>/<path>`, at the
 version a read of the file named (#444) or, for a file too big to read, at
-the task's head, which streams it whatever its size.
+the version the listing it was found in named, the commit that last changed
+it, so the link fetches the file whose size was shown, whatever its size.
+No link is made where neither names a version.
 
 A file that is an upload opens as its size and SHA-256
 (`files/UploadedFile.tsx`), never as text, since its commit holds a pointer

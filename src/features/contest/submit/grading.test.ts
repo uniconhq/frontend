@@ -101,7 +101,7 @@ describe('the verdict a grading shows', () => {
 });
 
 describe('a submission’s points in its row', () => {
-  const points = (shown: string, pendingUntil: string | null = null) => ({
+  const points = (shown: string | null, pendingUntil: string | null = null) => ({
     ...done,
     points: {
       shown,
@@ -126,7 +126,16 @@ describe('a submission’s points in its row', () => {
   it('says when points held back are shown', () => {
     const at = '2026-09-26T14:00:00Z';
     const when = formatWhen(new Date(at), NOW);
-    expect(pointsLine(points('0', at), NOW)).toBe(`shown at ${when}`);
+    expect(pointsLine(points(null, at), NOW)).toBe(`shown at ${when}`);
     expect(pointsLine(points('40', at), NOW)).toBe(`40 so far, more shown at ${when}`);
+  });
+
+  it('gives a shown 0 as 0, apart from nothing shown yet', () => {
+    const at = '2026-09-26T14:00:00Z';
+    const when = formatWhen(new Date(at), NOW);
+    expect(pointsLine(points('0'), NOW)).toBe('0');
+    expect(pointsLine(points('0', at), NOW)).toBe(`0 so far, more shown at ${when}`);
+    // Held by a sealed step, with no time it is shown at yet.
+    expect(pointsLine(points(null), NOW)).toBe('—');
   });
 });

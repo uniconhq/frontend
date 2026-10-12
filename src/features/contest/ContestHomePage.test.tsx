@@ -282,9 +282,12 @@ describe('the contest page for a signed-in person', () => {
                 points: { shown: '30', pending: '70', pending_until: reveal },
               }),
               task('c', {
-                points: { shown: '0', pending: '100', pending_until: reveal },
+                points: { shown: null, pending: '100', pending_until: reveal },
               }),
               task('d', { worth: null }),
+              task('e', {
+                points: { shown: '0', pending: '40', pending_until: reveal },
+              }),
             ],
           }),
         ),
@@ -293,7 +296,7 @@ describe('the contest page for a signed-in person', () => {
     renderApp(PAGE);
 
     const tasks = await screen.findByRole('list', { name: 'Tasks' });
-    const [a, b, c, d] = within(tasks).getAllByRole('listitem');
+    const [a, b, c, d, e] = within(tasks).getAllByRole('listitem');
     expect(a).toHaveTextContent('62 / 100');
     expect(a).not.toHaveTextContent('shown at');
     expect(b).toHaveTextContent('30 / 100');
@@ -303,6 +306,9 @@ describe('the contest page for a signed-in person', () => {
     expect(c).toHaveTextContent(/Shown at \S/);
     expect(d).not.toHaveTextContent('/');
     expect(d).not.toHaveTextContent('points');
+    // A shown 0 is a result the entrant can see.
+    expect(e).toHaveTextContent('0 / 100');
+    expect(e).toHaveTextContent(/More shown at \S/);
   });
 
   it('reads the tasks again once held-back points are shown', async () => {

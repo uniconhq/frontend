@@ -123,6 +123,7 @@ function SavedTest({
                       title={title}
                       size={entry.size}
                       upload={entry.upload}
+                      listedAt={entry.version}
                     />
                   );
                 })}

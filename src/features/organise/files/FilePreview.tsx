@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { $api, queryView } from '@/api/query';
+import { queryView } from '@/api/query';
 import type { FileContent, TreeEntry, UploadInfo } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
@@ -108,29 +108,6 @@ function Head({ name, size }: { name: string; size: number | null }) {
 }
 
 /**
- * The version a file too big to read was listed at, to download it at: the
- * task's head, which its folder is listed at. Null until it is known, and
- * at a contest, whose files the door does not serve.
- */
-function useHead(place: Place, wanted: boolean): string | null {
-  const task = $api.useQuery(
-    'get',
-    '/api/v1/orgs/{org}/contests/{contest}/tasks/{task}',
-    {
-      params: {
-        path: {
-          org: place.org,
-          contest: place.contest,
-          task: place.kind === 'task' ? place.task : '',
-        },
-      },
-    },
-    { enabled: wanted && place.kind === 'task' },
-  );
-  return place.kind === 'task' ? (task.data?.head ?? null) : null;
-}
-
-/**
  * Download for a file the page does not read whole, as a link to the
  * download door at `version`; nothing at a contest or without a version,
  * where the file's size alone is shown.
@@ -160,7 +137,9 @@ function DownloadLink({
 /**
  * One saved file, read once it is shown: an upload for the version it holds
  * its pointer at, to download it whole through the download door; a file
- * too big to read here not at all, downloaded at the task's head; and any
+ * too big to read here not at all, downloaded at the version its listing
+ * named (`listedAt`, the commit that last changed it), so the link fetches
+ * the file whose size was shown whatever has been saved since; and any
  * other file whole, its first lines shown.
  */
 export function SavedFile({
@@ -169,6 +148,7 @@ export function SavedFile({
   title = nameOf(path),
   size,
   upload,
+  listedAt,
 }: {
   place: Place;
   path: string;
@@ -176,11 +156,12 @@ export function SavedFile({
   title?: string;
   size: number | null;
   upload: UploadInfo | null;
+  /** The version the listing the file was found in names it at, or null. */
+  listedAt: string | null;
 }) {
   const big = upload === null && size !== null && size > READ_AT_MOST;
   // An upload reads as its pointer, which is small, and says its version.
   const read = useQuery({ ...fileQuery(place, path), enabled: !big });
-  const head = useHead(place, big);
   const name = nameOf(path);
 
   return (
@@ -200,7 +181,7 @@ export function SavedFile({
       ) : big ? (
         <>
           <BodyText tone="secondary">It is too big to show here.</BodyText>
-          <DownloadLink place={place} path={path} version={head} />
+          <DownloadLink place={place} path={path} version={listedAt} />
         </>
       ) : (
         <Loaded view={queryView(read)} compact>
@@ -399,6 +380,7 @@ export function SavedFolder({
           title={path === '' ? chosen.path : chosen.path.slice(path.length + 1)}
           size={chosen.size}
           upload={chosen.upload}
+          listedAt={chosen.version}
         />
       )}
     </section>
