@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import { useSearchParams } from 'react-router';
 import type { DeclaredField } from '@/api/types';
-import { ratioOf, type Ratio } from '@/lib/exact';
+import { compareRatio, ratioOf, type Ratio } from '@/lib/exact';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
 import { InlineField } from '@/ui/InlineField';
@@ -456,6 +456,14 @@ function GroupItem({
   const strays = group.weights.filter(
     (row) => !saved.includes(row.test) && !added.some((test) => test.test === row.test),
   );
+  // Weights show on each row once asked for, and stay while any differs
+  // from 1, the weight a test has by default (M67).
+  const [weighing, setWeighing] = useState(false);
+  const differs = group.weights.some((row) => {
+    const weight = ratioOf(row.weight);
+    return weight === null || compareRatio(weight, { num: 1n, den: 1n }) !== 0;
+  });
+  const weighed = readsWeights(group) && (weighing || differs);
   const rule: Rule = advanced ? 'advanced' : held ? picked : read;
   const refusal = ruleRefusal('worst', credit.kind);
   const showProblem = showRefusal(group.show, group, credit.kind);
@@ -586,7 +594,7 @@ function GroupItem({
           saved={saved}
           staged={added}
           removed={removed}
-          weights={readsWeights(group)}
+          weights={weighed}
           onWeight={(test, weight) => {
             const rows = group.weights.filter((row) => row.test !== test);
             onChange({
@@ -603,6 +611,19 @@ function GroupItem({
         {count > 0 && (
           <Button size="xs" variant="secondary" onClick={() => setOpen(!open)}>
             {open ? 'Hide its tests' : `Show its ${String(count)} tests`}
+          </Button>
+        )}
+        {!disabled && count > 0 && readsWeights(group) && !weighed && (
+          <Button
+            size="xs"
+            variant="secondary"
+            onClick={() => {
+              setWeighing(true);
+              setOpen(true);
+            }}
+            label={`Weigh the tests of ${group.name} differently`}
+          >
+            Weigh tests differently
           </Button>
         )}
         {!disabled && (

@@ -339,6 +339,27 @@
   width: 110px;
 }
 
+/* A test's part that is empty, usually a mistake: in the warning colour. */
+.emptyPart {
+  color: #6f4e05;
+  font-weight: 600;
+}
+
+:global([data-mantine-color-scheme='dark']) .emptyPart {
+  color: #ffc93c;
+}
+
+/* The start of a small text file, as it reads. */
+.partStart {
+  padding: 0 4px;
+  border-radius: var(--mantine-radius-xs);
+  background: var(--unicon-hover);
+  color: var(--unicon-text-body);
+  font-family: var(--mantine-font-family-monospace);
+  font-size: 12px;
+  white-space: pre;
+}
+
 /* How files are named for a test's parts, under the drop box. */
 .naming {
   display: flex;

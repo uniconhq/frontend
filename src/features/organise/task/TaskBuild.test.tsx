@@ -1761,7 +1761,7 @@ describe('the tests of a task', { timeout: 30_000 }, () => {
     await waitFor(() => expect(weight).toHaveFocus());
   });
 
-  it('reads each test as its parts and sizes, and says what a weight does behind an ⓘ (M48)', async () => {
+  it('reads each test as its parts, hides the weights until asked for, and says what a weight does behind an ⓘ (M48, M67)', async () => {
     taskBackend({
       form: { ...CHECKED, inputs: [] },
       content: TASK.replace('small: {pass: 30, show: verdict}', 'small: {each: 30}'),
@@ -1769,20 +1769,67 @@ describe('the tests of a task', { timeout: 30_000 }, () => {
     const user = userEvent.setup();
     const { tests } = await openTask();
 
-    const rows = within(fieldGroup(tests, 'small')).getByRole('list', {
-      name: 'Tests of small',
-    });
+    const small = fieldGroup(tests, 'small');
+    const rows = within(small).getByRole('list', { name: 'Tests of small' });
     const row = within(rows).getByRole('listitem', { name: 'Test 1' });
-    await waitFor(() =>
-      expect(row).toHaveTextContent('Test 1 · input 4 B, answer 2 B'),
+    // Small files: a size would say nothing.
+    await waitFor(() => expect(row).toHaveTextContent('Test 1 · input, answer'));
+    expect(row).not.toHaveTextContent(/\d B/);
+    // Every test weighs 1, so no row has a weight box until asked.
+    expect(within(rows).queryByLabelText('Weight')).toBeNull();
+    await user.click(
+      within(small).getByRole('button', {
+        name: 'Weigh the tests of small differently',
+      }),
     );
     expect(within(row).getByLabelText('Weight')).toHaveAttribute('placeholder', '1');
+    expect(
+      within(small).queryByRole('button', {
+        name: 'Weigh the tests of small differently',
+      }),
+    ).toBeNull();
     await user.click(within(row).getByRole('button', { name: 'About Weight' }));
     expect(
       await screen.findByText(
         'How much this test counts against the others. 1 by default; a test of weight 2 counts twice.',
       ),
     ).toBeVisible();
+  });
+
+  it('gives a file’s size on its row only where it says something: a large file, and an empty one in the warning colour (M67)', async () => {
+    taskBackend({ form: { ...CHECKED, inputs: [] } });
+    server.use(
+      http.get(`${TASK_API}/tree`, ({ request }) => {
+        const at = new URL(request.url).searchParams.get('path');
+        if (at === 'tests/small/2') {
+          return HttpResponse.json([
+            file('tests/small/2/input', 12_400_000),
+            file('tests/small/2/answer', 5),
+          ]);
+        }
+        if (at === 'tests/small/3') {
+          return HttpResponse.json([
+            file('tests/small/3/input', 1024),
+            file('tests/small/3/answer', 0),
+          ]);
+        }
+        return undefined;
+      }),
+    );
+    const { tests } = await openTask();
+
+    const rows = within(fieldGroup(tests, 'small')).getByRole('list', {
+      name: 'Tests of small',
+    });
+    const large = within(rows).getByRole('listitem', { name: 'Test 2' });
+    await waitFor(() =>
+      expect(large).toHaveTextContent('Test 2 · input 11.8 MB, answer'),
+    );
+    const empty = within(rows).getByRole('listitem', { name: 'Test 3' });
+    await waitFor(() =>
+      expect(empty).toHaveTextContent('Test 3 · input, answer is empty'),
+    );
+    expect(within(empty).getByText('answer is empty')).toHaveClass(/emptyPart/);
   });
 
   it('shows whose a test file is when someone else changed it first, and saves over it only when chosen', async () => {
@@ -2046,7 +2093,7 @@ describe('a test opened in place (M50)', { timeout: 30_000 }, () => {
       name: 'Tests of small',
     });
     const row = within(rows).getByRole('listitem', { name: 'Test 9' });
-    expect(row).toHaveTextContent('Test 9 · input 4 B, answer 2 B');
+    expect(row).toHaveTextContent('Test 9 · input, answer');
     await user.click(within(row).getByRole('button', { name: /Test 9/ }));
     const answer = await within(row).findByRole('region', { name: 'answer' });
     expect(await within(answer).findByLabelText('What answer holds')).toHaveTextContent(
