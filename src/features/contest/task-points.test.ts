@@ -47,7 +47,10 @@ describe("an entrant's points on a task", () => {
     ).toEqual({ score: '62 / 100', pending: `More shown at ${at}` });
     expect(
       taskPointsText(
-        { worth: '100', points: { shown: null, pending: '100', pending_until: REVEAL } },
+        {
+          worth: '100',
+          points: { shown: null, pending: '100', pending_until: REVEAL },
+        },
         NOW,
       ),
     ).toEqual({ score: '— / 100', pending: `Shown at ${at}` });
