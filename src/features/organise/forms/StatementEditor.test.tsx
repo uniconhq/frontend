@@ -102,12 +102,73 @@ describe('the statement beside its preview', { timeout: 20_000 }, () => {
       '/api/v1/orgs/acme/contests/spring/tasks/sum/public/tree.png',
     );
     expect(within(preview).getByRole('link', { name: 'afar' })).toBeVisible();
-    const hint = screen.getByText(/To show a picture, upload it in the task/);
-    expect(hint).toBeVisible();
-    expect(within(hint).getByRole('link', { name: 'Files' })).toHaveAttribute(
-      'href',
-      '/orgs/acme/contests/spring/tasks/sum/files',
+    expect(
+      screen.getByText(/A picture shows where the statement has a line/),
+    ).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Add a picture' })).toBeVisible();
+  });
+
+  it('adds a picture into the task under a name of its own, and writes the line that shows it (M51)', async () => {
+    statementBackend(() => HttpResponse.json({}));
+    const saves: { path: string; content?: string | null; encoding: string }[][] = [];
+    server.use(
+      http.get(`${TASK_API}/tree`, ({ request }) =>
+        new URL(request.url).searchParams.get('path') === 'public'
+          ? HttpResponse.json([
+              { path: 'public/my-diagram.png', kind: 'file', size: 9, upload: null },
+            ])
+          : undefined,
+      ),
+      http.post(`${TASK_API}/save`, async ({ request }) => {
+        const body = (await request.json()) as {
+          changes: { path: string; content?: string | null; encoding: string }[];
+        };
+        saves.push(body.changes);
+        return HttpResponse.json({
+          publication: 'p',
+          number: 4,
+          grading_changed: false,
+          changes: [],
+          notes: [],
+          regraded: 0,
+        });
+      }),
     );
+    const user = userEvent.setup();
+    renderApp('/orgs/acme/contests/spring/tasks/sum/statement');
+
+    const source = await screen.findByRole('textbox', { name: 'Statement source' });
+    await user.click(screen.getByRole('button', { name: 'Add a picture' }));
+    await user.upload(
+      screen.getByLabelText('Picture'),
+      new File(['PNGBYTES'], 'my diagram.png', { type: 'image/png' }),
+    );
+
+    expect(await screen.findByText(/my-diagram-2\.png is in the task/)).toBeVisible();
+    expect(saves).toEqual([
+      [
+        {
+          path: 'public/my-diagram-2.png',
+          token: null,
+          content: btoa('PNGBYTES'),
+          encoding: 'base64',
+          remove: false,
+        },
+      ],
+    ]);
+    expect(source).toHaveValue(
+      '# Sum\n\nWrite the sum of two numbers.\n\n![my diagram](public/my-diagram-2.png)\n',
+    );
+    expect(
+      within(screen.getByRole('region', { name: 'What entrants see' })).getByRole(
+        'img',
+        { name: 'my diagram' },
+      ),
+    ).toHaveAttribute(
+      'src',
+      '/api/v1/orgs/acme/contests/spring/tasks/sum/public/my-diagram-2.png',
+    );
+    expect(screen.getByRole('button', { name: 'Save statement' })).toBeEnabled();
   });
 
   it('shows a manager the statement read-only, with no way to save it', async () => {
