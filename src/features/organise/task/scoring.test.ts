@@ -2,12 +2,15 @@ import { describe, expect, it } from 'vitest';
 import { formatExact, ratioOf, ZERO } from '@/lib/exact';
 import type { GroupValues } from '../forms/task-values';
 import {
+  NO_POINTS,
   groupSentence,
   groupWeight,
+  pointsWords,
   readsWeights,
   ruleOf,
   ruleRefusal,
   scaled,
+  scalingSentence,
   showRefusal,
   taskWeight,
   totalSentence,
@@ -100,11 +103,32 @@ describe('a task’s points', () => {
     expect(scaled(groupWeight(small[0]!), taskWeight(small), null)).toEqual(r('3'));
   });
 
+  it('says a task that gives no points, and the scaling to the contest’s worth, in one set of words', () => {
+    expect(totalSentence(ZERO, r('100'))).toBe(NO_POINTS);
+    expect(NO_POINTS).toBe(
+      'The task gives no points: no group earns any. It is ranked on what its workflow reports, if a leaderboard says so.',
+    );
+    expect(scalingSentence(r('50'))).toBe(
+      `Its contest makes the task worth ${formatExact('50')} points, so each test group's points are scaled to that.`,
+    );
+    expect(scalingSentence(r('1'))).toBe(
+      "Its contest makes the task worth 1 point, so each test group's points are scaled to that.",
+    );
+    expect(totalSentence(r('100'), r('50'))).toBe(
+      `Total: ${formatExact('100')} points here. ${scalingSentence(r('50'))}`,
+    );
+    expect(totalSentence(r('1'), null)).toBe('Total: 1 point.');
+    expect(pointsWords({ num: 2n, den: 2n })).toBe('1 point');
+    expect(pointsWords({ num: 1n, den: 3n })).toBe(
+      `about ${formatExact('0.33')} points`,
+    );
+  });
+
   it('scales each group to the contest’s worth, exactly', () => {
     const groups = [group('a', { pass: '30' }), group('b', { pass: '90' })];
     expect(scaled(r('30'), taskWeight(groups), r('100'))).toEqual(r('25'));
     expect(totalSentence(taskWeight(groups), r('100'))).toMatch(
-      /Its contest makes the task worth 100, so each test group's points are scaled/,
+      /Its contest makes the task worth 100 points, so each test group's points are scaled/,
     );
     const thirds = [
       group('a', { pass: '1' }),

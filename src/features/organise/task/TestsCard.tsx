@@ -19,7 +19,7 @@ import {
   groupSentence,
   groupWeight,
   pointsOf,
-  pointsText,
+  pointsWords,
   readsWeights,
   ruleOf,
   ruleRefusal,
@@ -325,7 +325,7 @@ function GroupItem({
   const showProblem = showRefusal(group.show, group, credit.kind);
   const verdictRefusal = showRefusal('verdict', group, credit.kind);
   const required = graded && !group.read;
-  const points = pointsText(scaled(groupWeight(group), total, worth));
+  const points = pointsWords(scaled(groupWeight(group), total, worth));
   const pick = (next: string) => {
     if (next === 'advanced') {
       onAdvanced(true);
@@ -347,8 +347,7 @@ function GroupItem({
       <div className={classes.itemHead}>
         <h4 className={classes.itemTitle}>{group.name}</h4>
         <BodyText tone="secondary">
-          {count === 1 ? '1 test' : `${String(count)} tests`} · up to {points}{' '}
-          {points === '1' ? 'point' : 'points'}
+          {count === 1 ? '1 test' : `${String(count)} tests`} · up to {points}
           {!group.read && ' · new'}
         </BodyText>
       </div>

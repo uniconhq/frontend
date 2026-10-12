@@ -192,7 +192,7 @@ function n(count: number, one: string, many: string): string {
 }
 
 /** Points in words, exactly or "about" when they do not end: "100 points", "1 point". */
-function pointsWords(value: Ratio): string {
+export function pointsWords(value: Ratio): string {
   return `${pointsText(value)} ${value.num === value.den ? 'point' : 'points'}`;
 }
 
@@ -383,14 +383,27 @@ export function showRefusal(
   return null;
 }
 
+/**
+ * A task none of whose groups earns, in the words the Tests card and how the
+ * contest is scored both use.
+ */
+export const NO_POINTS =
+  'The task gives no points: no group earns any. It is ranked on what its workflow reports, if a leaderboard says so.';
+
+/**
+ * A contest's worth for a task that differs from its groups' total, in the
+ * words the Tests card and how the contest is scored both use.
+ */
+export function scalingSentence(worth: Ratio): string {
+  return `Its contest makes the task worth ${pointsWords(worth)}, so each test group's points are scaled to that.`;
+}
+
 /** The task's points in one line: "Total: 100 points". */
 export function totalSentence(total: Ratio, worth: Ratio | null): string {
-  if (total.num === 0n) {
-    return 'The task gives no points: no group earns any. It is ranked on what its workflow reports, if a leaderboard says so.';
-  }
-  const own = `Total: ${pointsText(total)} ${total.num === total.den ? 'point' : 'points'}`;
+  if (total.num === 0n) return NO_POINTS;
+  const own = `Total: ${pointsWords(total)}`;
   if (worth === null) return `${own}.`;
   return compareRatio(worth, total) === 0
     ? `${own}, as its contest gives it.`
-    : `${own} here. Its contest makes the task worth ${pointsText(worth)}, so each test group's points are scaled to that.`;
+    : `${own} here. ${scalingSentence(worth)}`;
 }
