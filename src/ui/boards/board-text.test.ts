@@ -37,6 +37,17 @@ describe('a cell', () => {
     ).toEqual(['1 point', 'minute 45']);
   });
 
+  it('shows only the numbers a cell has, so a wrong answer with no time reads as its points', () => {
+    // #441: a counted submission with a test not accepted has no time.
+    expect(
+      cellLines(
+        [POINTS, TIME],
+        cell({ counting: true, numbers: { points: '50' } }),
+        {},
+      ),
+    ).toEqual(['50 points']);
+  });
+
   it('shows how often a cell that counts nothing was tried, or a dash', () => {
     expect(cellLines([POINTS], cell({ attempts: 3 }), {})).toEqual(['3 attempts']);
     expect(cellLines([POINTS], cell(), {})).toEqual(['—']);
