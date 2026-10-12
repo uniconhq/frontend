@@ -94,9 +94,22 @@ function wholePlace(message: string): TaskPlace {
 }
 
 /**
+ * The input a file belongs to by its folder: a setting's own files go under
+ * `<input>/` (M51), or `inputs/<input>/` for an input whose id is a folder
+ * the format gives meaning to. Null for a path in no input's folder.
+ */
+function inputOfFile(path: string, titles: ReadonlyMap<string, string>): string | null {
+  const parts = path.split('/');
+  if (parts.length < 2) return null;
+  const [first = '', second = ''] = parts;
+  if (first === 'inputs' && parts.length >= 3 && titles.has(second)) return second;
+  return titles.has(first) ? first : null;
+}
+
+/**
  * Where a setting or file of the task, by the place a refusal names it at,
- * is changed. `titles` names each input as its workflow does ("Time limit"),
- * where it gives one; `message` is the problem's sentence, which says what
+ * is changed. `titles` names each input the workflow declares as it does
+ * ("Time limit"), by its id where it gives no title; `message` is the problem's sentence, which says what
  * a problem of the whole file is about.
  */
 export function taskPlace(
@@ -109,6 +122,15 @@ export function taskPlace(
     return { card: 'statement', label: 'Statement', field: null, item: null };
   }
   if (path === '' || path === 'task.yaml') return wholePlace(message);
+  const input = inputOfFile(path, titles);
+  if (input !== null) {
+    return {
+      card: 'inputs',
+      label: `Inputs: ${titles.get(input) ?? input}`,
+      field: input,
+      item: null,
+    };
+  }
   const [top, second, third, fourth] = stepsOf(path);
   switch (top) {
     case 'name':

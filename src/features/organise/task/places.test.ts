@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { taskPlace, taskPlaceOf } from './places';
 
-const TITLES = new Map([['time_limit', 'Time limit']]);
+const TITLES = new Map([
+  ['time_limit', 'Time limit'],
+  ['checker', 'Checker'],
+  ['tests', 'Tests to run'],
+]);
 const PAGE = '/orgs/acme/contests/spring/tasks/sum';
 
 describe('where a refused setting or file of the task is changed', () => {
@@ -60,11 +64,26 @@ describe('where a refused setting or file of the task is changed', () => {
       `${PAGE}?card=tests&field=test%3A3&item=large`,
     ],
     ['statement.md', 'Statement', `${PAGE}?card=statement`],
+    // A setting's own files, under its folder (M51), or under inputs/ for an
+    // input whose id is a folder the format gives meaning to.
+    ['checker/checker.py', 'Inputs: Checker', `${PAGE}?card=inputs&field=checker`],
+    ['checker/lib/util.h', 'Inputs: Checker', `${PAGE}?card=inputs&field=checker`],
+    [
+      'inputs/tests/runner.py',
+      'Inputs: Tests to run',
+      `${PAGE}?card=inputs&field=tests`,
+    ],
+    ['inputs/checker/a.py', 'Inputs: Checker', `${PAGE}?card=inputs&field=checker`],
   ])('%s is %s', (path, label, to) => {
     expect(taskPlaceOf('acme', 'spring', 'sum', TITLES)(path, '')).toEqual({
       label,
       to,
     });
+  });
+
+  it('places a file in a folder no input is named for as before', () => {
+    expect(taskPlace('notes/plan.txt', '', TITLES).card).toBe('settings');
+    expect(taskPlace('checker/checker.py').card).toBe('settings');
   });
 
   it('places a problem of the whole file by what its sentence is about', () => {
