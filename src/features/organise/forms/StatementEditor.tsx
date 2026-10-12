@@ -116,6 +116,7 @@ export function StatementEditor({ place, admin }: { place: Place; admin: boolean
         <TextConflict
           place={place}
           path={PATH}
+          what="the statement"
           mine={conflict.content ?? ''}
           language="markdown"
           busy={saving}

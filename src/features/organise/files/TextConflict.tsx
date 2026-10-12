@@ -53,6 +53,7 @@ export function KeptText({
 export function TextConflict({
   place,
   path,
+  what,
   mine,
   language,
   busy,
@@ -61,6 +62,8 @@ export function TextConflict({
 }: {
   place: Place;
   path: string;
+  /** What the text is, as the page names it: "the statement", "these settings". */
+  what: string;
   /** What the organiser tried to save. */
   mine: string;
   language: CodeLanguage;
@@ -81,7 +84,7 @@ export function TextConflict({
 
   return (
     <div ref={panel} className={shared.panel} role="alert" tabIndex={-1}>
-      <BodyText>Someone else changed this file since you opened it.</BodyText>
+      <BodyText>Someone else changed {what} since you opened it.</BodyText>
       <BodyText tone="secondary">
         Nothing was saved. Their version is on the left and yours on the right. Continue
         from theirs and copy in what you want to keep of yours, or save yours over
@@ -119,8 +122,8 @@ export function TextConflict({
             >
               <div className={shared.stack}>
                 <BodyText>
-                  Their change to {path} is thrown away, and yours is saved in its
-                  place. It stays in the file’s history.
+                  Their change to {what} is thrown away, and yours is saved in its
+                  place. Theirs is still kept among the earlier versions.
                 </BodyText>
                 <div className={shared.actions}>
                   <Button
