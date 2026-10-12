@@ -622,6 +622,52 @@ describe('how the contest is scored (M52)', () => {
     );
   });
 
+  it('says a withdrawn task is counted on no leaderboard, in place of the boards that name it', async () => {
+    const [, sum] = standings;
+    if (sum === undefined) throw new Error('standings has sum');
+    server.use(
+      signedIn,
+      http.get(`${CONTEST_API}/organise/tasks`, () =>
+        HttpResponse.json([
+          {
+            ...sum,
+            label: 'A',
+            withdrawn: true,
+            submissions: 3,
+            take_out: null,
+            state: { ...sum.state, draft: false, errors: [] },
+            timeline: { ...sum.timeline, worth: '100' },
+          },
+        ]),
+      ),
+      contestFile([
+        'name: Spring',
+        'start: 2026-10-01T09:00:00Z',
+        'end: 2026-10-15T09:00:00Z',
+        'tasks: [{id: sum, withdrawn: true}]',
+        'leaderboards: [{name: Standings}]',
+      ]),
+      ...publishedTasks(
+        {
+          sum: 'name: Sum\nworkflow: unicon/classic@v2\ntest_groups:\n  main: {pass: 100}\n',
+        },
+        { sum: { main: 2 } },
+      ),
+      ...repoFiles,
+    );
+    renderApp(CONTEST);
+
+    const card = await screen.findByRole('region', {
+      name: 'How this contest is scored',
+    });
+    const part = await within(card).findByRole('region', { name: 'A · sum' });
+    await line(
+      part,
+      'Withdrawn: entrants do not see it, and no leaderboard counts it.',
+    );
+    expect(part).not.toHaveTextContent('Leaderboard “Standings”');
+  });
+
   it('names a group hidden until the end on each board where it changes what the board counts, and nowhere else', async () => {
     const [, sum] = standings;
     if (sum === undefined) throw new Error('standings has sum');
