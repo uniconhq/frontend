@@ -56,6 +56,7 @@ import {
 } from './rules';
 import {
   limitsWords,
+  outcomeWords,
   portMarks,
   primitiveTitle,
   refWords,
@@ -325,9 +326,7 @@ function Details({
   workflow: Workflow;
 }) {
   const secret = Object.entries(primitive.inputs).filter(([, port]) => port.secret);
-  // The outcome port's own sentence until the primitive says each outcome in
-  // words of its own (M56, the second wave).
-  const outcome = primitive.outputs.outcome?.description ?? null;
+  const outcome = outcomeWords(primitive);
   const limits = limitsWords(primitive, step, workflow);
   return (
     <details className={classes.details}>
@@ -343,7 +342,17 @@ function Details({
           </li>
         )}
         {primitive.network && <li>It can reach the network.</li>}
-        {outcome !== null && <li>Result it reports: {outcome}</li>}
+        {typeof outcome === 'string' && <li>Result it reports: {outcome}</li>}
+        {Array.isArray(outcome) && (
+          <li>
+            Result it reports, one of:
+            <ul className={classes.detailList} aria-label="Results it reports">
+              {outcome.map((line) => (
+                <li key={line}>{line}</li>
+              ))}
+            </ul>
+          </li>
+        )}
         {secret.map(([name]) => (
           <li key={name}>
             {name} is kept from the entrant’s program, so a task may give it a secret.
