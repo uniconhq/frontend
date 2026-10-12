@@ -1,17 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { screen, within } from '@testing-library/react';
-import type { ValueMeaning } from '@/api/types';
 import { formatExact } from '@/lib/exact';
+import { classicMeanings } from '@/test/organiser';
 import { renderWithProviders } from '@/test/render';
 import { graded, grading, reported } from '@/test/contestant';
 import { ScoredResult } from './ScoredResult';
 
 /** Classic's values as its workflow names them, in its report order (M58). */
-const MEANINGS: ValueMeaning[] = [
-  { name: 'time_ms', title: 'Run time', unit: 'ms', fold: 'max', better: 'lower' },
-  { name: 'memory_kb', title: 'Memory used', unit: 'KB', fold: 'max', better: 'lower' },
-  { name: 'log', title: 'Compile log', unit: null, fold: null, better: null },
-];
+const MEANINGS = classicMeanings;
 
 /**
  * A wrong answer on a task that folds its tests' times (#441): a test that

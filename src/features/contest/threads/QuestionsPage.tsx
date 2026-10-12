@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { useSearchParams } from 'react-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { $api, queryView } from '@/api/query';
-import type { Clarification, ContestHome } from '@/api/types';
+import type { AnnouncementLink, Clarification, ContestHome } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
 import { Card } from '@/ui/Card';
@@ -17,6 +17,7 @@ import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
 import { contestHomePath } from '@/lib/contest-paths';
 import { inTeams } from '@/lib/entrants';
+import { useFallbackPoll } from '@/live';
 import { useContestParams } from '@/lib/route-params';
 import { CONTEST_VIEW_SECTIONS, contestSectionPath, sectionOf } from '@/lib/sections';
 import { announcementAnchor } from '@/ui/threads/anchors';
@@ -212,6 +213,7 @@ function Questions({
   const named = search.get(ASK_ABOUT);
   const about = tasks.some((task) => task.name === named) ? (named ?? '') : '';
   const view = queryView(useMyQuestions(org, contest));
+  const openAnnouncement = useOpenAnnouncements(org, contest);
   const readAgain = () =>
     queryClient.invalidateQueries({
       queryKey: $api.queryOptions('get', QUESTIONS, {
@@ -259,7 +261,9 @@ function Questions({
                     clarification={clarification}
                     asker={team ? 'Your team' : 'You'}
                     announcementHref={(link) =>
-                      `${contestHomePath(org, contest)}#${announcementAnchor(link)}`
+                      openAnnouncement(link)
+                        ? `${contestHomePath(org, contest)}#${announcementAnchor(link)}`
+                        : null
                     }
                   >
                     <FollowUp
@@ -277,6 +281,31 @@ function Questions({
       </Card>
     </>
   );
+}
+
+/**
+ * Whether an announcement a public answer posted can still be read on the
+ * contest's page, which lists only open announcements: false once the
+ * organisers closed it, so its message on the question says so rather than
+ * link to nothing. Taken as open until the list is read. The list is the one
+ * the contest's page reads, so it is read once for both.
+ */
+function useOpenAnnouncements(
+  org: string,
+  contest: string,
+): (link: AnnouncementLink) => boolean {
+  const open = $api.useQuery(
+    'get',
+    '/api/v1/orgs/{org}/contests/{contest}/home/announcements',
+    { params: { path: { org, contest } } },
+    { refetchInterval: useFallbackPoll(60_000) },
+  );
+  return (link) =>
+    open.data === undefined ||
+    open.data.some(
+      (announcement) =>
+        announcement.number === link.number && announcement.where.task === link.task,
+    );
 }
 
 const TITLE = sectionOf(CONTEST_VIEW_SECTIONS, 'questions').label;

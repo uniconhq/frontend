@@ -164,7 +164,7 @@ export function SaveOutcome<Body = WriteFile>({
         )}
         {result.held_back.length > 0 && (
           <>
-            <BodyText>Held back from grading until it is confirmed:</BodyText>
+            <BodyText>What waits in the draft until it is published:</BodyText>
             <ul className={classes.named} aria-label="Held back">
               {result.held_back.map((change) => (
                 <li key={change}>{change}</li>

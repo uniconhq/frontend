@@ -96,7 +96,7 @@ describe("the boards' settings", { timeout: 20_000 }, () => {
       expect(
         within(form).getByRole('status', { name: 'What Standings ranks' }),
       ).toHaveTextContent(
-        'Ranks entrants by their total points over every task, highest first; ties are broken by penalty minutes, fewest first, counting 20 for each earlier attempt. Each entrant’s best submission to each task counts. Organisers see all of it, and each entrant only their own row. It counts nothing: it counts only test groups whose results entrants see once their task closes, and no task it covers has one.',
+        'Ranks entrants by their total points over every task, most first; ties broken by penalty minutes, fewest first, with 20 more for each earlier attempt. Each entrant’s best submission to each task counts. Organisers see all of it, and each entrant only their own row. It counts nothing: it counts only test groups whose results entrants see once their task closes, and no task it covers has one.',
       ),
     );
     const standings = board(form, 'Standings');
@@ -139,7 +139,7 @@ describe("the boards' settings", { timeout: 20_000 }, () => {
       expect(
         within(form).getByRole('status', { name: 'What Standings ranks' }),
       ).toHaveTextContent(
-        `Ranks entrants by their total points over every task, highest first. Each entrant’s best submission to each task counts. Entrants and organisers see all of it. Results from test group “hidden” of task B join it when task B closes, ${formatDateTime(new Date('2026-10-15T09:00:00Z'))}.`,
+        `Ranks entrants by their total points over every task, most first. Each entrant’s best submission to each task counts. Entrants and organisers see all of it. Results from test group “hidden” of task B join it when task B closes, ${formatDateTime(new Date('2026-10-15T09:00:00Z'))}.`,
       ),
     );
   });
@@ -446,7 +446,7 @@ describe("the boards' settings", { timeout: 20_000 }, () => {
       expect(
         within(form).getByRole('status', { name: 'What Standings ranks' }),
       ).toHaveTextContent(
-        'Ranks entrants by their total points over every task, highest first; ties are broken by their total run time, lowest first.',
+        'Ranks entrants by their total points over every task, most first; ties broken by their total run time, lowest first.',
       ),
     );
     expect(form).not.toHaveTextContent('time_ms');

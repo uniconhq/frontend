@@ -312,7 +312,7 @@ export function describeError(error: ApiError): ErrorDescription {
       };
     case 'take_out_refused':
       return {
-        title: 'The task cannot be taken out as things stand',
+        title: 'The task cannot be taken out of the contest as it stands',
         message: error.detail ?? 'Check the contest’s leaderboards and settings first.',
       };
     case 'archived':

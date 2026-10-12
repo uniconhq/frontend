@@ -518,7 +518,7 @@ function OrderKey({
                 labelHidden
                 value={value.name}
                 onChange={(text) => onChange({ kind: 'value', name: text })}
-                placeholder="Its name, such as time_ms"
+                placeholder="The name the workflow reports it under"
                 disabled={disabled}
               />
             ) : (

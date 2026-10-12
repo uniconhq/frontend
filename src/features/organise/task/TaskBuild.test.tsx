@@ -1929,6 +1929,49 @@ describe('the tests of a task', { timeout: 30_000 }, () => {
     expect(within(empty).getByText('answer is empty')).toHaveClass(/emptyPart/);
   });
 
+  it('puts the arrow only between what goes in and what is expected, naming every other part', async () => {
+    taskBackend({
+      form: {
+        ...CHECKED,
+        inputs: [],
+        test: [...CHECKED.test, { name: 'expected', type: 'file', options: null }],
+      },
+    });
+    server.use(
+      http.get(`${TASK_API}/tree`, ({ request }) => {
+        const at = new URL(request.url).searchParams.get('path');
+        if (at === 'tests/small/2') {
+          return HttpResponse.json([
+            file('tests/small/2/expected', 10_485_760),
+            file('tests/small/2/input'),
+            file('tests/small/2/answer', 2),
+          ]);
+        }
+        if (at === 'tests/small/3') {
+          return HttpResponse.json([
+            file('tests/small/3/answer', 2),
+            file('tests/small/3/expected', 2),
+          ]);
+        }
+        return undefined;
+      }),
+    );
+    const { tests } = await openTask();
+
+    const rows = within(fieldGroup(tests, 'small')).getByRole('list', {
+      name: 'Tests of small',
+    });
+    const three = within(rows).getByRole('listitem', { name: 'Test 2' });
+    await waitFor(() =>
+      expect(three).toHaveTextContent('Test 2 · 1 2 → 3, expected 10 MB'),
+    );
+    // With nothing going in, no arrow: each part under its own name.
+    const noInput = within(rows).getByRole('listitem', { name: 'Test 3' });
+    await waitFor(() =>
+      expect(noInput).toHaveTextContent('Test 3 · answer 3, expected 3'),
+    );
+  });
+
   it('shows whose a test file is when someone else changed it first, and saves over it only when chosen', async () => {
     const { sent } = taskBackend({ form: { ...CHECKED, inputs: [] } });
     let moved = false;

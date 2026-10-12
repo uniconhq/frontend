@@ -7,6 +7,7 @@ import { problem, server, signedIn, someone } from '@/test/server';
 import {
   TASK_API,
   publicationList,
+  publishedTask,
   repoFiles,
   taskState,
   unchanged,
@@ -435,11 +436,14 @@ describe('the statement while it is being edited', { timeout: 20_000 }, () => {
   /** The statement as stored, which someone else may save over, and the reads and saves of it. */
   function sharedStatement() {
     const stored = { content: STATEMENT, token: 'token-statement' };
-    const asked = { reads: 0 };
+    const asked = { reads: 0, states: 0 };
     const sent: { content: string; token: string }[] = [];
     server.use(
       signedIn,
-      taskState,
+      http.get(TASK_API, () => {
+        asked.states += 1;
+        return HttpResponse.json(publishedTask);
+      }),
       publicationList,
       http.get(`${TASK_API}/files/:path`, ({ params }) => {
         if (params['path'] !== 'statement.md') return undefined;
@@ -481,11 +485,11 @@ describe('the statement while it is being edited', { timeout: 20_000 }, () => {
     // Someone else saves the statement while this tab is in the background.
     stored.content = THEIRS;
     stored.token = 'token-theirs';
-    const before = asked.reads;
+    const before = asked.states;
     comeBackToTab();
-    // The page reads again what it shows of the statement, such as whether
-    // the task has one; the editor keeps what it is editing.
-    await waitFor(() => expect(asked.reads).toBeGreaterThan(before));
+    // The page reads again what it shows of the task, such as whether its
+    // statement is written (M57); the editor keeps what it is editing.
+    await waitFor(() => expect(asked.states).toBeGreaterThan(before));
     await new Promise((resolve) => setTimeout(resolve, 200));
 
     expect(screen.getByRole('textbox', { name: 'Statement source' })).toHaveValue(MINE);

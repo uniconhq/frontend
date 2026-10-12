@@ -238,7 +238,8 @@ export function TakingOutBody({
         <BodyText>
           Entrants see it again, and every leaderboard counts it as before.
         </BodyText>
-        <ul className={shared.named} aria-label="Notes">
+        <BodyText>About the leaderboards:</BodyText>
+        <ul className={shared.named} aria-label="About the leaderboards">
           {asking.notes.map((note) => (
             <li key={note}>{note}</li>
           ))}
