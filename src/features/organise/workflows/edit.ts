@@ -15,7 +15,13 @@ import {
   writeYaml,
   type NumberText,
 } from '../forms/yaml-doc';
-import { readWorkflow, refText, type Ref, type Workflow } from './model';
+import {
+  readWorkflow,
+  refText,
+  type Ref,
+  type ReportEntry,
+  type Workflow,
+} from './model';
 import type { PrimitiveInfo } from './primitives';
 import { orderAfterWire } from './rules';
 
@@ -420,11 +426,38 @@ export function removeField(text: string, name: string): string {
 
 export type EntryFields = {
   from: Ref;
+  /** What pages call the value, "Run time", and what it is counted in, "ms" (M58). */
+  title?: string | null;
+  unit?: string | null;
   fold?: string | null;
   better?: string | null;
   at_least?: NumberText | null;
   at_most?: NumberText | null;
 };
+
+/**
+ * An entry's fields with `changed` written over them, its unit dropped when
+ * what it reads is known not to be a number, as an input's is when its type
+ * changes away (M54); `type` is the type of the output it reads, or null when
+ * the primitive's declaration is not known.
+ */
+export function entryFields(
+  entry: ReportEntry,
+  type: string | null,
+  changed: Partial<EntryFields> & { from: Ref },
+): EntryFields {
+  const fields: EntryFields = {
+    title: entry.title,
+    unit: entry.unit,
+    fold: entry.fold,
+    better: entry.better,
+    at_least: entry.atLeast,
+    at_most: entry.atMost,
+    ...changed,
+  };
+  if (type !== null && type !== 'number') fields.unit = null;
+  return fields;
+}
 
 /** A report entry written, in the short form when it only reads an output. */
 export function setEntry(text: string, name: string, fields: EntryFields): string {

@@ -586,6 +586,125 @@ describe('the workflow editor', () => {
     ).not.toBeInTheDocument();
   });
 
+  it('names a reported value for the pages that show it: its title, and a number’s unit (M58)', async () => {
+    server.use(signedIn, ...workflowBackend(CLASSIC_V2).handlers);
+    const user = userEvent.setup();
+    renderApp(EDITOR_PAGE);
+
+    await stepBox('run');
+    await user.click(toolButton('Report'));
+    const row = (name: string) =>
+      within(drawer('Report')).getByLabelText(`The report entry ${name}`, {
+        selector: 'li',
+      });
+    expect(within(row('log')).queryByRole('textbox', { name: 'Unit' })).toBeNull();
+    await user.type(
+      within(row('time_ms')).getByRole('textbox', { name: 'Title' }),
+      'Run time{Enter}',
+    );
+    await user.type(
+      within(row('time_ms')).getByRole('textbox', { name: 'Unit' }),
+      'ms{Enter}',
+    );
+    await user.type(
+      within(row('log')).getByRole('textbox', { name: 'Title' }),
+      'Compile log{Enter}',
+    );
+
+    const named = await fileText(user);
+    expect(named).toContain(
+      'time_ms: {from: "${{ steps.run.time_ms }}", fold: max, better: lower, at_least: 0, title: Run time, unit: ms}',
+    );
+    expect(named).toContain(
+      'log: {from: "${{ steps.compile.compile_log }}", title: Compile log}',
+    );
+
+    const title = within(row('log')).getByRole('textbox', { name: 'Title' });
+    await user.clear(title);
+    await user.type(title, '{Enter}');
+    expect(await fileText(user)).toContain('log: ${{ steps.compile.compile_log }}\n');
+  });
+
+  it('drops a reported value’s unit when it comes to read text, and shows one a file left on text, to clear it (M58)', async () => {
+    server.use(
+      signedIn,
+      ...workflowBackend(
+        CLASSIC_V2.replace(
+          '  log: ${{ steps.compile.compile_log }}\n',
+          '  log: {from: "${{ steps.compile.compile_log }}", title: Compile log, unit: lines}\n  total_ms: {from: "${{ steps.run.time_ms }}", title: Run time, unit: ms}\n',
+        ),
+      ).handlers,
+    );
+    const user = userEvent.setup();
+    renderApp(EDITOR_PAGE);
+
+    await stepBox('run');
+    await user.click(toolButton('Report'));
+    const row = (name: string) =>
+      within(drawer('Report')).getByLabelText(`The report entry ${name}`, {
+        selector: 'li',
+      });
+    const stray = within(row('log')).getByRole('textbox', { name: 'Unit' });
+    expect(stray).toHaveValue('lines');
+    expect(stray).toHaveAccessibleDescription(
+      'Only a number takes a unit, so clear this one.',
+    );
+    await user.clear(stray);
+    await user.type(stray, '{Enter}');
+    expect(await fileText(user)).toContain(
+      'log: {from: "${{ steps.compile.compile_log }}", title: Compile log}',
+    );
+
+    expect(within(row('total_ms')).getByRole('textbox', { name: 'Unit' })).toHaveValue(
+      'ms',
+    );
+    await user.selectOptions(
+      within(row('total_ms')).getByRole('combobox', { name: 'Reads' }),
+      'compile.compile_log',
+    );
+    await waitFor(() =>
+      expect(
+        within(row('total_ms')).queryByRole('textbox', { name: 'Unit' }),
+      ).toBeNull(),
+    );
+    expect(await fileText(user)).toContain(
+      'total_ms: {from: "${{ steps.compile.compile_log }}", title: Run time}',
+    );
+  });
+
+  it('keeps a reported value’s title, and its unit while it reads a number, when it is wired to read another output', async () => {
+    server.use(
+      signedIn,
+      ...workflowBackend(
+        CLASSIC_V2.replace(
+          '  log: ${{ steps.compile.compile_log }}\n',
+          '  log: ${{ steps.compile.compile_log }}\n  peak: {from: "${{ steps.run.time_ms }}", title: Peak, unit: ms}\n',
+        ),
+      ).handlers,
+    );
+    const user = userEvent.setup();
+    renderApp(EDITOR_PAGE);
+    const readFrom = async (output: string) => {
+      await user.click(
+        await screen.findByRole('button', { name: 'The report entry peak' }),
+      );
+      await user.click(
+        within(await openMenu('The report entry peak')).getByRole('menuitem', {
+          name: output,
+        }),
+      );
+    };
+
+    await readFrom('memory_kb from run');
+    expect(await fileText(user)).toContain(
+      'peak: {from: "${{ steps.run.memory_kb }}", title: Peak, unit: ms}',
+    );
+    await readFrom('compile_log from compile');
+    expect(await fileText(user)).toContain(
+      'peak: {from: "${{ steps.compile.compile_log }}", title: Peak}',
+    );
+  });
+
   it('keeps a step chosen when an edit moves it in the list', async () => {
     const two = [
       'steps:',
