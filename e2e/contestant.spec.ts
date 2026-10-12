@@ -20,7 +20,7 @@ const CONTEST = {
 const OPEN = { released: true, visible: true, open: true, closed: null };
 const ENTRANT = '0e000000-0000-4000-8000-000000000007';
 
-/** The contest's one leaderboard, the caller's entrant first of two, its numbers exact strings. */
+/** The contest's one leaderboard, the caller's entrant, carol's, first of two, its numbers exact strings. */
 const STANDINGS = {
   board: 'Standings',
   over: 'all',
@@ -32,7 +32,7 @@ const STANDINGS = {
   rows: [
     {
       rank: 1,
-      row: { entrant: ENTRANT, name: 'kenny' },
+      row: { entrant: ENTRANT, name: 'carol' },
       keys: ['100'],
       cells: {
         sum: {
@@ -125,6 +125,32 @@ async function stubContestantApi(page: Page, signedIn: boolean) {
     ]),
   );
 
+  /** The caller's entrant, carol alone, as the backend answers it. */
+  const entrantOf = (status: 'pending' | 'approved') => ({
+    id: ENTRANT,
+    name: null,
+    display_name: 'carol',
+    status,
+    registered_at: '2026-09-29T10:00:00Z',
+    decided_at: null,
+    reason: null,
+    invites: [],
+    time_extension: 0,
+    extension_tasks: null,
+    submitted: false,
+    complete: true,
+    locked: false,
+    members: [
+      {
+        user_id: 20,
+        user: { id: 20, username: 'carol', name: 'Carol', avatar_url: null },
+        way_kind: 'signup',
+        way_name: null,
+        joined_at: '2026-09-29T10:00:00Z',
+      },
+    ],
+  });
+
   /** The caller's entry: free to register, then registered alone, pending, then approved. */
   const registration = () => {
     const entry = {
@@ -140,30 +166,7 @@ async function stubContestantApi(page: Page, signedIn: boolean) {
     };
     if (!state.registered) return entry;
     state.homeReads += 1;
-    const entrant = {
-      id: ENTRANT,
-      name: null,
-      display_name: 'kenny',
-      status: state.homeReads < 2 ? 'pending' : 'approved',
-      registered_at: '2026-09-29T10:00:00Z',
-      decided_at: null,
-      reason: null,
-      invites: [],
-      time_extension: 0,
-      extension_tasks: null,
-      submitted: false,
-      complete: true,
-      locked: false,
-      members: [
-        {
-          user_id: 7,
-          user: { id: 7, username: 'kenny', name: null, avatar_url: null },
-          way_kind: 'signup',
-          way_name: null,
-          joined_at: '2026-09-29T10:00:00Z',
-        },
-      ],
-    };
+    const entrant = entrantOf(state.homeReads < 2 ? 'pending' : 'approved');
     return { ...entry, entrant, can_register: false };
   };
 
@@ -172,13 +175,14 @@ async function stubContestantApi(page: Page, signedIn: boolean) {
     const path = new URL(request.url()).pathname;
     if (path.endsWith('/entrants') && request.method() === 'POST') {
       state.registered = true;
-      return json(route, {}, 201);
+      return json(route, entrantOf('pending'), 201);
     }
     if (path.endsWith('/home')) {
       return json(route, {
         ...CONTEST,
         state: 'published',
         registration: registration(),
+        organises: false,
         now: '2026-09-29T10:00:00Z',
         tasks: [
           {

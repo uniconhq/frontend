@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { screen, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@/test/user-event';
 import { http, HttpResponse } from 'msw';
 import type { ContestHome, MyEntry } from '@/api/types';
@@ -379,6 +379,37 @@ describe('your entry in a contest everyone enters alone', () => {
       within(await yourEntry()).getByRole('status', { name: 'Registration' }),
     ).toHaveTextContent('Your email address is not accepted');
     expect(screen.queryByRole('button', { name: 'Register' })).toBeNull();
+  });
+
+  it('says Forgejo did not answer, not that the address is refused, and offers to try again', async () => {
+    let reads = 0;
+    server.use(
+      signedIn,
+      homeWith(() => {
+        reads += 1;
+        return entry({
+          can_register: false,
+          refused: {
+            code: 'forge_unavailable',
+            detail: 'Your email addresses could not be checked just now.',
+          },
+        });
+      }),
+    );
+    const user = userEvent.setup();
+    renderApp(PAGE);
+
+    const status = within(await yourEntry()).getByRole('status', {
+      name: 'Registration',
+    });
+    expect(status).toHaveTextContent('Forgejo did not answer');
+    expect(status).toHaveTextContent(
+      'Your email addresses could not be checked just now, so whether you can register is not known yet.',
+    );
+    expect(status).not.toHaveTextContent('not accepted');
+    const before = reads;
+    await user.click(within(status).getByRole('button', { name: 'Try again' }));
+    await waitFor(() => expect(reads).toBeGreaterThan(before));
   });
 
   it('says the extra time the organisers gave', async () => {

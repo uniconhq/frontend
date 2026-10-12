@@ -7,7 +7,6 @@ import { layoutWorkflow, type Box } from './layout';
 import { readWorkflow } from './model';
 import { pinned } from './pins';
 import { byRef } from './primitives';
-import classes from './workflows.module.css';
 
 const NO_PROBLEMS = pinned([], 0, [], [], []);
 
@@ -46,7 +45,6 @@ export function DrawnGraph({
       dragging={null}
       notice={null}
       refusal={() => null}
-      menu={(_, port) => <span className={classes.port}>{port}</span>}
       onSelect={(key) =>
         onSelect(
           key,

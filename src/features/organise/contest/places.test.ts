@@ -28,6 +28,11 @@ describe('where a refused setting of the contest is changed', () => {
     ],
     ['end', 'Settings, Schedule: End', '/orgs/acme/contests/spring/settings?field=end'],
     [
+      'entrants.most',
+      'Settings, Teams: Most people in a team',
+      '/orgs/acme/contests/spring/settings?field=most',
+    ],
+    [
       'entrants.fewest',
       'Settings, Teams: Fewest people in a team',
       '/orgs/acme/contests/spring/settings?field=fewest',

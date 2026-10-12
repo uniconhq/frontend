@@ -1,6 +1,6 @@
 {
   "name": "unicon-frontend",
-  "version": "0.7.1",
+  "version": "0.8.0",
   "private": true,
   "type": "module",
   "packageManager": "pnpm@12.4.1",
@@ -47,6 +47,7 @@
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
+    "@floating-ui/dom": "1.8.0",
     "@playwright/test": "1.63.0",
     "@testing-library/dom": "10.4.1",
     "@testing-library/jest-dom": "7.0.1",
