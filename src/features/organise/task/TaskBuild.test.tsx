@@ -523,9 +523,13 @@ describe('the cards that build a task', { timeout: 30_000 }, () => {
     // Waiting for the save, marked as a replaced test's row is.
     expect(within(checker).getByText('Replaced')).toBeVisible();
     const bar = await screen.findByRole('region', { name: 'Save the task' });
-    expect(within(bar).getByRole('list', { name: 'What changed' })).toHaveTextContent(
-      'Inputs: checker, a new file',
-    );
+    // One change, said once.
+    expect(
+      within(within(bar).getByRole('list', { name: 'What changed' }))
+        .getAllByRole('listitem')
+        .map((item) => item.textContent)
+        .filter((line) => line?.startsWith('Inputs:')),
+    ).toEqual(['Inputs: checker, a new file']);
     await save();
 
     const body = await waitForSave(sent);

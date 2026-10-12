@@ -323,12 +323,14 @@ function BuildForm({
     },
   };
 
-  const lines = [
-    ...changeLines(read.values, values, staged, titles),
-    ...inputFiles.map(
-      (change) => `Inputs: ${titles.get(change.id) ?? change.id}, a new file`,
-    ),
-  ];
+  // A setting given a new file is one change, said once.
+  const lines = changeLines(
+    read.values,
+    values,
+    staged,
+    titles,
+    inputFiles.map((change) => change.id),
+  );
   const changed = lines.length > 0 || values.inputs.some(heldTheOtherWay);
   const problems = [
     values.credit.kind !== 'none' && values.credit.name.trim() === ''
