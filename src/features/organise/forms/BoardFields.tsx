@@ -5,7 +5,6 @@ import { Button } from '@/ui/Button';
 import { Checkbox } from '@/ui/Checkbox';
 import { Modal } from '@/ui/Modal';
 import { RadioGroup } from '@/ui/RadioGroup';
-import { Select } from '@/ui/Select';
 import { TextInput } from '@/ui/TextInput';
 import { FieldBox } from '../contest/ContestFile';
 import shared from '../organise.module.css';
@@ -178,52 +177,52 @@ function BoardEntry({
               disabled={disabled}
             />
           </FieldBox>
-          <FieldBox name="who">
-            <Select
-              label="Shown to"
-              value={board.who}
-              options={choices(board.who, WHO)}
-              placeholder="Organisers only, until chosen"
-              onChange={(who) =>
-                onChange({
-                  who,
-                  ...(who === 'everyone' && board.rows === 'own' && { rows: '' }),
-                })
-              }
-              error={said('who')}
-              disabled={disabled}
-            />
-          </FieldBox>
-          <FieldBox name="over">
-            <Select
-              label="Counts"
-              value={board.over === '' ? 'all' : board.over}
-              options={choices(board.over, OVER)}
-              onChange={(over) => onChange({ over: over === 'all' ? '' : over })}
-              error={said('over')}
-              disabled={disabled}
-            />
-          </FieldBox>
-          <FieldBox name="select">
-            <Select
-              label="Which submission counts"
-              value={board.select === '' ? 'best' : board.select}
-              options={choices(board.select, SELECT).map((option) => ({
-                ...option,
-                disabled:
-                  option.value === 'best_per_group' &&
-                  perGroup !== null &&
-                  board.select !== 'best_per_group',
-              }))}
-              description={perGroup ?? undefined}
-              onChange={(select) =>
-                onChange({ select: select === 'best' ? '' : select })
-              }
-              error={said('select')}
-              disabled={disabled}
-            />
-          </FieldBox>
         </div>
+        <FieldBox name="who">
+          <RadioGroup
+            label="Shown to"
+            value={board.who === '' ? 'organisers' : board.who}
+            options={choices(board.who, WHO)}
+            onChange={(who) =>
+              onChange({
+                who,
+                ...(who === 'everyone' && board.rows === 'own' && { rows: '' }),
+              })
+            }
+            error={said('who')}
+            disabled={disabled}
+          />
+        </FieldBox>
+        <FieldBox name="over">
+          <RadioGroup
+            label="Counts"
+            value={board.over === '' ? 'all' : board.over}
+            options={choices(board.over, OVER)}
+            onChange={(over) => onChange({ over: over === 'all' ? '' : over })}
+            error={said('over')}
+            disabled={disabled}
+          />
+        </FieldBox>
+        <FieldBox name="select">
+          <RadioGroup
+            label="Which submission counts"
+            value={board.select === '' ? 'best' : board.select}
+            options={choices(board.select, SELECT).map((option) => ({
+              ...option,
+              disabled:
+                option.value === 'best_per_group' &&
+                perGroup !== null &&
+                board.select !== 'best_per_group',
+              reason: option.value === 'best_per_group' ? perGroup : null,
+            }))}
+            onChange={(select) => onChange({ select: select === 'best' ? '' : select })}
+            error={
+              said('select') ??
+              (board.select === 'best_per_group' ? (perGroup ?? undefined) : undefined)
+            }
+            disabled={disabled}
+          />
+        </FieldBox>
 
         <FieldBox name="rows">
           <RadioGroup
@@ -410,7 +409,7 @@ function OrderKey({
 }) {
   return (
     <li className={classes.orderKey} role="group" aria-label={label}>
-      <Select
+      <RadioGroup
         label={label}
         value={value.kind}
         options={KINDS.map((option) => ({
@@ -419,10 +418,13 @@ function OrderKey({
             option.value === 'penalty' &&
             penaltyRefusal(first) !== null &&
             value.kind !== 'penalty',
+          reason: option.value === 'penalty' ? penaltyRefusal(first) : null,
         }))}
-        description={penaltyRefusal(first) ?? undefined}
         onChange={(kind) => onChange(keyOfKind(kind))}
-        error={error}
+        error={
+          error ??
+          (value.kind === 'penalty' ? (penaltyRefusal(first) ?? undefined) : undefined)
+        }
         disabled={disabled}
       />
       {value.kind === 'value' && (
@@ -448,7 +450,7 @@ function OrderKey({
         />
       )}
       {!disabled && (
-        <>
+        <div className={shared.actions}>
           <Button
             size="xs"
             variant="secondary"
@@ -475,7 +477,7 @@ function OrderKey({
           >
             Remove
           </Button>
-        </>
+        </div>
       )}
     </li>
   );
