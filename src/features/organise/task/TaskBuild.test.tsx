@@ -18,7 +18,6 @@ import {
   TASK_API,
   CONTEST_API,
   draftTask,
-  publishedTask,
   publicationList,
   repoFiles,
   taskState,
@@ -60,11 +59,14 @@ const FOLDERS: Record<string, string[]> = {
 };
 
 function folder(path: string): TreeEntry {
-  return { path, kind: 'directory', size: null, upload: null };
+  return { path, kind: 'directory', size: null, upload: null, version: null };
 }
 
-function file(path: string, size = 4): TreeEntry {
-  return { path, kind: 'file', size, upload: null };
+/** The commit a listed file was last changed at, as the tree names it. */
+const LISTED_AT = '9f8e7d6c5b4a39281706f5e4d3c2b1a098765432';
+
+function file(path: string, size = 4, version: string | null = LISTED_AT): TreeEntry {
+  return { path, kind: 'file', size, upload: null, version };
 }
 
 /** The tree of the task's tests as `GET <task>/tree?path=` answers it, folder by folder. */
@@ -439,10 +441,15 @@ describe('the cards that build a task', { timeout: 30_000 }, () => {
     const entrants = within(inputs).getByRole('region', {
       name: 'What entrants submit',
     });
-    // An empty label shows entrants the input's name, not the workflow's title.
+    // An empty label shows entrants the workflow's title, and its key only
+    // where it gives none.
     expect(fieldIn(entrants, 'Solution', 'Label shown to entrants')).toHaveAttribute(
       'placeholder',
-      'submission',
+      'Solution',
+    );
+    expect(fieldIn(entrants, 'language', 'Label shown to entrants')).toHaveAttribute(
+      'placeholder',
+      'language',
     );
   });
 
@@ -582,6 +589,112 @@ describe('the cards that build a task', { timeout: 30_000 }, () => {
     expect(
       await screen.findByRole('list', { name: 'What changed' }),
     ).not.toHaveTextContent('checker');
+  });
+
+  describe('a file chosen for a setting, through a change of workflow', () => {
+    /** The checker replaced by checker.py, waiting for the save. */
+    async function replaceChecker(form: WorkflowForm) {
+      const backend = taskBackend({ form });
+      asManager();
+      server.use(
+        http.get(`${TASK_API}/tree`, ({ request }) =>
+          new URL(request.url).searchParams.get('path') === 'checker'
+            ? HttpResponse.json([file('checker/checker.cpp', 21)])
+            : undefined,
+        ),
+        http.get(`${TASK_API}/files/:path`, ({ params }) =>
+          decodeURIComponent(String(params['path'])) === 'checker/checker.cpp'
+            ? HttpResponse.json({
+                path: 'checker/checker.cpp',
+                encoding: 'utf-8',
+                content: 'int main() { return 0; }\n',
+                token: 'token-checker',
+                upload: null,
+                version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
+              })
+            : undefined,
+        ),
+      );
+      const user = userEvent.setup();
+      const opened = await openTask();
+      const checker = within(opened.inputs).getByRole('group', { name: 'checker' });
+      await within(checker).findByText('checker.cpp, 21 B');
+      await user.click(
+        within(checker).getByRole('button', { name: 'Replace checker' }),
+      );
+      await user.upload(
+        within(checker).getByLabelText('checker: a new file'),
+        new File(['print(1)\n'], 'checker.py'),
+      );
+      await within(checker).findByText('checker.py, 9 B');
+      return { ...backend, ...opened };
+    }
+
+    it('stays, the setting naming it, when the new version still takes that input as a file', async () => {
+      const { sent, workflow } = await replaceChecker({
+        ...CHECKED,
+        newer: 'v3',
+      });
+
+      await userEvent.click(
+        within(
+          within(workflow).getByRole('status', { name: 'A newer version' }),
+        ).getByRole('button', { name: 'Use v3' }),
+      );
+
+      // The card is drawn again from the new version once it is read.
+      const checker = () =>
+        within(
+          within(screen.getByRole('region', { name: 'Inputs' })).getByRole('group', {
+            name: 'checker',
+          }),
+        );
+      await waitFor(() =>
+        expect(screen.getByRole('combobox', { name: 'Version' })).toHaveValue('v3'),
+      );
+      await waitFor(() => expect(checker().getByText('checker.py, 9 B')).toBeVisible());
+      expect(checker().getByText('Replaced')).toBeVisible();
+      await save();
+      const body = await waitForSave(sent);
+      expect(written(body)['workflow']).toBe('unicon/checked@v3');
+      expect(written(body)['inputs']).toMatchObject({ checker: 'checker/checker.py' });
+      expect(
+        body.changes
+          .filter((change) => change.path.startsWith('checker/'))
+          .map((change) => change.path),
+      ).toEqual(['checker/checker.py', 'checker/checker.cpp']);
+    });
+
+    it('goes with the input when the new version does not have it', async () => {
+      const { sent, workflow } = await replaceChecker({ ...CHECKED, newer: 'v3' });
+      server.use(
+        http.get('/api/v1/workflows/:owner/:name/versions/:version', ({ params }) =>
+          params['version'] === 'v3'
+            ? HttpResponse.json({
+                content: CHECKED_YAML.replace('  checker: file\n', ''),
+              })
+            : undefined,
+        ),
+      );
+
+      await userEvent.click(
+        within(
+          within(workflow).getByRole('status', { name: 'A newer version' }),
+        ).getByRole('button', { name: 'Use v3' }),
+      );
+
+      const bar = await screen.findByRole('region', { name: 'Save the task' });
+      await waitFor(() =>
+        expect(
+          within(bar).getByRole('list', { name: 'What changed' }),
+        ).not.toHaveTextContent('a new file'),
+      );
+      await save();
+      const body = await waitForSave(sent);
+      expect(
+        body.changes.filter((change) => change.path.startsWith('checker/')),
+      ).toEqual([]);
+    });
   });
 
   it('says a newer version of the workflow is out and takes it only when asked', async () => {
@@ -906,7 +1019,7 @@ describe('scoring a task', { timeout: 30_000 }, () => {
 
     const small = fieldGroup(tests, 'small');
     expect(small).toHaveTextContent(
-      'Test weights are set for tests the group does not have: 9 (4).',
+      'Weights are set for tests the group does not have: 9 (4).',
     );
     await userEvent.click(
       within(small).getByRole('button', {
@@ -1642,12 +1755,14 @@ describe('a test opened in place (M50)', { timeout: 30_000 }, () => {
               kind: 'file',
               size: LONG.length,
               upload: null,
+              version: LISTED_AT,
             },
             {
               path: 'tests/small/1/expected',
               kind: 'file',
               size: 130,
               upload: { size: 50_000_000, digest: 'ab'.repeat(32) },
+              version: UPLOADED_AT,
             },
             folder('tests/small/1/data'),
             file('tests/small/1/test.yaml', 20),
@@ -1764,14 +1879,14 @@ describe('a test opened in place (M50)', { timeout: 30_000 }, () => {
         `/-/downloads/acme/spring/sum/versions/${UPLOADED_AT}/tests/small/1/expected`,
       );
 
-      // A file too big to show is downloaded at the task's head, never read.
+      // A file too big to show is downloaded at the version it was listed at, never read.
       const log = within(view).getByRole('region', { name: 'run log' });
       expect(log).toHaveTextContent('It is too big to show here.');
       expect(
         await within(log).findByRole('link', { name: 'Download run log.txt' }),
       ).toHaveAttribute(
         'href',
-        `/-/downloads/acme/spring/sum/versions/${publishedTask.head}/tests/small/1/run%20log.txt`,
+        `/-/downloads/acme/spring/sum/versions/${LISTED_AT}/tests/small/1/run%20log.txt`,
       );
 
       const data = within(view).getByRole('region', { name: 'data' });

@@ -172,11 +172,23 @@ function BuildForm({
   // Another workflow chosen, its inputs come in its own types, and those it
   // does not have go; back to the saved one, the settings' own come back.
   const [typedFor, setTypedFor] = useState(picked);
+  // A file chosen for a setting stays while the new one still takes that
+  // input as the same kind, a file or a folder, the setting naming it; else
+  // it goes with the input.
   if (declared !== null && typedFor !== picked) {
     setTypedFor(picked);
+    const kept = inputFiles.filter((change) => {
+      const input = declared.inputs.find((found) => found.id === change.id);
+      const kind = change.value.endsWith('/') ? 'folder' : 'file';
+      return input !== undefined && !input.contestant && input.type === kind;
+    });
+    if (kept.length !== inputFiles.length) setInputFiles(kept);
     setValues((before) => ({
       ...before,
-      inputs: inputsFor(doc, names, declared, picked === saved),
+      inputs: inputsFor(doc, names, declared, picked === saved).map((input) => {
+        const change = kept.find((each) => each.id === input.id);
+        return change === undefined ? input : { ...input, value: change.value };
+      }),
     }));
   }
 

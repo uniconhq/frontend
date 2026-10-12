@@ -21,7 +21,8 @@ function shownOf(shown: string, worth: string): string {
  * counts them, so nothing a leaderboard holds back. While some of the task's
  * points wait for a reveal, `pending` says when they are shown, as a
  * submission's row says it (M18): "More shown at 14:00", or, with nothing
- * shown yet, `—` over the worth and "Shown at 14:00". For anyone the contest
+ * shown yet (`shown` null; a shown 0 reads as 0), `—` over the worth and
+ * "Shown at 14:00". For anyone the contest
  * gives no points, such as someone not yet approved or a visitor, the worth
  * alone, "100 points". Null on a task that gives no points. Exact numbers,
  * the points cut and the worth rounded only for reading.
@@ -40,15 +41,9 @@ export function taskPointsText(
     };
   }
   const out = formatExact(worth, PLACES);
-  const until = points.pending_until;
-  if (until === null) {
-    return { score: `${shownOf(points.shown, worth)} / ${out}`, pending: null };
-  }
+  const { shown, pending_until: until } = points;
+  const score = `${shown === null ? '—' : shownOf(shown, worth)} / ${out}`;
+  if (until === null) return { score, pending: null };
   const at = formatWhen(new Date(until), now);
-  return compareDecimal(points.shown, '0') === 0
-    ? { score: `— / ${out}`, pending: `Shown at ${at}` }
-    : {
-        score: `${shownOf(points.shown, worth)} / ${out}`,
-        pending: `More shown at ${at}`,
-      };
+  return { score, pending: `${shown === null ? 'Shown' : 'More shown'} at ${at}` };
 }

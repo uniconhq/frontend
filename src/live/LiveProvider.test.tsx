@@ -270,9 +270,9 @@ describe('where the live stream stands', () => {
         vi.advanceTimersByTime(300);
       });
 
-      expect(
-        edited.filter((key) => client.getQueryState(key)?.isInvalidated),
-      ).toEqual([]);
+      expect(edited.filter((key) => client.getQueryState(key)?.isInvalidated)).toEqual(
+        [],
+      );
     } finally {
       vi.useRealTimers();
     }

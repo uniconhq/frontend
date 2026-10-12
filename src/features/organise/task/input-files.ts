@@ -8,7 +8,7 @@ import { filesUnder, type PlannedChange } from './staged';
 /**
  * A file or a folder chosen for a setting of the task on the Inputs card
  * (M51), waiting for the one save of the task: the files written under the
- * input's own folder, `<input>/`, and what the setting then names; the
+ * input's own folder (`ownFolder`), and what the setting then names; the
  * file or files it named before, when they were under that folder too, are
  * taken out, so a replaced checker leaves nothing behind. Files elsewhere in
  * the task are left as they are.
@@ -24,6 +24,23 @@ export type StagedInput = {
   summary: string;
 };
 
+/**
+ * The folders of a task the format gives a meaning of its own (TASK-FORMAT
+ * 1.2), which the forge refuses as an input's id when a workflow version is
+ * made or checked.
+ */
+const RESERVED_FOLDERS = new Set(['tests', 'public', 'plans']);
+
+/**
+ * The folder a setting's own files go in: `<input>/`, or `inputs/<input>/`
+ * for an input of a version made before the forge refused an id that is a
+ * reserved folder, so its files never mix with the tests, the files every
+ * contestant is served, or the plan.
+ */
+function ownFolder(id: string): string {
+  return RESERVED_FOLDERS.has(id) ? `inputs/${id}` : id;
+}
+
 /** A file chosen on the disk as a source of the save. */
 function sourceOf(file: File): Source {
   return { path: file.name, size: file.size, read: () => Promise.resolve(file) };
@@ -38,8 +55,8 @@ function insideFolder(file: File): string {
 
 /**
  * The files chosen for an input as one change of the save: each written at
- * `<input>/<name>`, with the token of a file already there, and what the
- * setting named before taken out when it was under `<input>/` and is not
+ * `<own folder>/<name>`, with the token of a file already there, and what the
+ * setting named before taken out when it was under that folder and is not
  * written over.
  */
 export async function stageInputFiles(
@@ -49,13 +66,14 @@ export async function stageInputFiles(
   was: string,
 ): Promise<StagedInput> {
   const id = declared.id;
+  const home = ownFolder(id);
   const folder = declared.type === 'folder';
   const chosen = files.map((file) => ({
-    path: `${id}/${folder ? insideFolder(file) : file.name}`,
+    path: `${home}/${folder ? insideFolder(file) : file.name}`,
     source: sourceOf(file),
   }));
-  const value = folder ? `${id}/` : (chosen[0]?.path ?? '');
-  const own = was.startsWith(`${id}/`);
+  const value = folder ? `${home}/` : (chosen[0]?.path ?? '');
+  const own = was.startsWith(`${home}/`);
   const before = !own
     ? []
     : was.endsWith('/')

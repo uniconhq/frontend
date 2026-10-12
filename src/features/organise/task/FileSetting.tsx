@@ -184,6 +184,7 @@ export function FileSetting({
                 title={lastPart(named.path)}
                 size={named.size}
                 upload={named.upload}
+                listedAt={named.version}
               />
             ))}
           {replacing && !disabled && drop}

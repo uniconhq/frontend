@@ -484,7 +484,7 @@ function GroupItem({
       {strays.length > 0 && (
         <div className={shared.actions}>
           <BodyText tone="secondary">
-            Test weights are set for tests the group does not have:{' '}
+            Weights are set for tests the group does not have:{' '}
             {strays.map((row) => `${row.test} (${row.weight})`).join(', ')}. The task
             cannot be saved until they are removed or the tests are added.
           </BodyText>

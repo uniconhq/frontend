@@ -46,7 +46,7 @@ const GROUP_FIELDS: Record<string, [string, string]> = {
   pass: ['rule', 'Points'],
   pass_at: ['rule', 'Share of tests that must pass'],
   show: ['show', 'When entrants see results'],
-  test_weights: ['rule', 'Test weights'],
+  test_weights: ['rule', 'Weights'],
 };
 
 const SUBMISSION_FIELDS: Record<string, [string, string]> = {
@@ -170,7 +170,7 @@ export function taskPlace(
       if (third === 'test_weights' && typeof fourth === 'string') {
         return {
           card: 'tests',
-          label: `${group}, test ${fourth}: Test weight`,
+          label: `${group}, test ${fourth}: Weight`,
           field: testField(fourth),
           item: second,
         };

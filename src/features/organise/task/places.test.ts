@@ -43,7 +43,7 @@ describe('where a refused setting or file of the task is changed', () => {
     ],
     [
       'test_groups.main.test_weights.7',
-      'Tests and scoring, main, test 7: Test weight',
+      'Tests and scoring, main, test 7: Weight',
       `${PAGE}?card=tests&field=test%3A7&item=main`,
     ],
     [

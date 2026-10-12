@@ -2,9 +2,11 @@ import { useMemo } from 'react';
 import { Typography } from '@mantine/core';
 import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { taskPictureHref, type TaskWhere } from '@/lib/task-pictures';
+import { publicPathOf, taskPictureHref, type TaskWhere } from '@/lib/task-pictures';
 import { OutLink } from './OutLink';
 import classes from './Markdown.module.css';
+
+const NONE_STAGED: ReadonlyMap<string, string> = new Map();
 
 /** Whether a link leaves this site, and so opens apart from it. */
 function external(href: string | undefined): boolean {
@@ -24,7 +26,10 @@ function external(href: string | undefined): boolean {
  * alt text, so reading a statement fetches nothing from a host its author
  * picked, which would hand that host every reader's address.
  */
-function componentsFor(task: TaskWhere | null): Components {
+function componentsFor(
+  task: TaskWhere | null,
+  staged: ReadonlyMap<string, string>,
+): Components {
   return {
     h1: 'h2',
     h2: 'h3',
@@ -41,8 +46,11 @@ function componentsFor(task: TaskWhere | null): Components {
       ),
     img: ({ src, alt }) => {
       const target = typeof src === 'string' ? src : undefined;
+      const parts = target === undefined ? null : publicPathOf(target);
+      const waiting = parts === null ? undefined : staged.get(parts.join('/'));
       const own =
-        task === null || target === undefined ? null : taskPictureHref(task, target);
+        waiting ??
+        (task === null || target === undefined ? null : taskPictureHref(task, target));
       if (own !== null) {
         return (
           <img src={own} alt={alt ?? ''} loading="lazy" className={classes.picture} />
@@ -65,10 +73,20 @@ function componentsFor(task: TaskWhere | null): Components {
  * and task lists. Raw HTML inside it is left out, never run, and links keep
  * only the safe kinds react-markdown lets through, since the author is not
  * the person reading it. `task` is the task it belongs to, for a statement or
- * a task's announcement, whose own pictures it draws. Application code
+ * a task's announcement, whose own pictures it draws; `staged` draws, by
+ * their names under `public/`, pictures not saved yet from addresses of
+ * their own bytes, as the statement's editor previews them. Application code
  * imports this, never react-markdown, which the lint rules hold it to.
  */
-export function Markdown({ children, task }: { children: string; task?: TaskWhere }) {
+export function Markdown({
+  children,
+  task,
+  staged = NONE_STAGED,
+}: {
+  children: string;
+  task?: TaskWhere;
+  staged?: ReadonlyMap<string, string>;
+}) {
   const org = task?.org;
   const contest = task?.contest;
   const name = task?.task;
@@ -78,8 +96,9 @@ export function Markdown({ children, task }: { children: string; task?: TaskWher
         org === undefined || contest === undefined || name === undefined
           ? null
           : { org, contest, task: name },
+        staged,
       ),
-    [org, contest, name],
+    [org, contest, name, staged],
   );
   return (
     <Typography>
