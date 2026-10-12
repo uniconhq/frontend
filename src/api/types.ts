@@ -12,6 +12,8 @@ export type Named = Schemas['Named'];
 export type TaskState = Schemas['TaskState'];
 /** A task of a contest with its letter, its state and its timeline. */
 export type TaskStanding = Schemas['TaskStanding'];
+/** What taking a task out of its contest does: remove it, or withdraw it. */
+export type TakeOut = Schemas['TakeOut'];
 export type Publication = Schemas['Publication'];
 export type DefinitionError = Schemas['DefinitionError'];
 export type TreeEntry = Schemas['TreeEntry'];

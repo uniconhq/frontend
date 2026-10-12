@@ -67,6 +67,12 @@
   gap: 4px;
 }
 
+/* Taking a task out of its contest, apart from its timeline at the dialog's foot. */
+.foot {
+  padding-top: 12px;
+  border-top: 1px solid var(--unicon-border);
+}
+
 /* Where a task stands in its contest, under its title on its own page. */
 .inContest {
   display: flex;

@@ -475,6 +475,12 @@ describe('the submit panel', () => {
     ],
     ['archived', {}, 'The contest is archived', 'they take no submissions'],
     [
+      'task_withdrawn',
+      { reason: 'withdrawn' },
+      'This task was withdrawn',
+      'The organisers took it out of the contest, so it takes no submissions.',
+    ],
+    [
       'not_approved',
       { detail: 'Only approved entrants of this contest can submit to its tasks.' },
       'Your registration is not approved yet',

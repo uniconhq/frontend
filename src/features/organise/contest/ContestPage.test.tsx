@@ -882,25 +882,6 @@ describe("a task's place in the contest, changed from its row", () => {
     ).toBeVisible();
   });
 
-  it('says in a task’s dialog that it cannot be taken out of the contest yet', async () => {
-    server.use(signedIn, standingList, ...repoFiles);
-    settingsSaved();
-    const user = userEvent.setup();
-    renderApp(CONTEST);
-
-    await user.click(
-      await screen.findByRole('button', { name: 'Change A · sort in this contest' }),
-    );
-    const dialog = await screen.findByRole('dialog', {
-      name: 'A · sort in this contest',
-    });
-    expect(
-      within(dialog).getByText(
-        'A task cannot be taken out of its contest yet, so the contest opens only once every one of its tasks is published.',
-      ),
-    ).toBeVisible();
-  });
-
   it('moves the task whose arrow was pressed, wherever the list read fresh has it', async () => {
     server.use(signedIn, standingList, ...repoFiles);
     // Someone else put a task ahead of sort since the page read its list.
@@ -1284,5 +1265,283 @@ describe('creating a task', () => {
       'The task acme/spring/sum already exists.',
     );
     expect(within(form).getByRole('textbox', { name: /^Name/ })).toHaveValue('sum');
+  });
+});
+
+describe('taking a task out of the contest', () => {
+  /** The spring contest's tasks, `sort` as `change` makes it. */
+  function sortAs(change: Partial<TaskStanding>) {
+    const [sort, ...rest] = standings;
+    if (sort === undefined) throw new Error('sort is listed');
+    return http.get(`${CONTEST_API}/organise/tasks`, () =>
+      HttpResponse.json([{ ...sort, ...change }, ...rest]),
+    );
+  }
+
+  /** Each take-out asked, and its answer: done, unless `answer` refuses it. */
+  function takeOuts(answer?: (asked: number) => Response | undefined) {
+    const sent: unknown[] = [];
+    server.use(
+      http.post(`${CONTEST_API}/tasks/:task/take-out`, async ({ request, params }) => {
+        const body = (await request.json()) as { confirmed: string };
+        sent.push({ task: params['task'], ...body });
+        return answer?.(sent.length) ?? HttpResponse.json({ done: body.confirmed });
+      }),
+    );
+    return sent;
+  }
+
+  async function openDialog(user: ReturnType<typeof userEvent.setup>) {
+    await user.click(
+      await screen.findByRole('button', { name: 'Change A · sort in this contest' }),
+    );
+    return screen.findByRole('dialog', { name: 'A · sort in this contest' });
+  }
+
+  it('removes a task nobody has submitted to, after saying it is deleted for good', async () => {
+    server.use(signedIn, standingList, ...repoFiles);
+    const sent = takeOuts();
+    const user = userEvent.setup();
+    renderApp(CONTEST);
+
+    const dialog = await openDialog(user);
+    expect(within(dialog).queryByText(/cannot be taken out/)).toBeNull();
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Remove A · sort from the contest' }),
+    );
+    const asked = await screen.findByRole('dialog', {
+      name: 'Remove A · sort from the contest?',
+    });
+    expect(asked).toHaveTextContent(
+      'Nobody has submitted to A · sort. Removing it deletes the task and its files for good, and the tasks after it each move up a letter.',
+    );
+    expect(asked).toHaveTextContent('This cannot be undone.');
+    await user.click(within(asked).getByRole('button', { name: 'Remove it' }));
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(sent).toEqual([{ task: 'sort', confirmed: 'remove' }]);
+  });
+
+  it('goes back to the timeline from the question on Not now', async () => {
+    server.use(signedIn, standingList, ...repoFiles);
+    const sent = takeOuts();
+    const user = userEvent.setup();
+    renderApp(CONTEST);
+
+    const dialog = await openDialog(user);
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Remove A · sort from the contest' }),
+    );
+    const asked = await screen.findByRole('dialog', {
+      name: 'Remove A · sort from the contest?',
+    });
+    await user.click(within(asked).getByRole('button', { name: 'Not now' }));
+
+    expect(
+      await screen.findByRole('dialog', { name: 'A · sort in this contest' }),
+    ).toBeVisible();
+    expect(sent).toEqual([]);
+  });
+
+  it('withdraws a task with submissions, saying what entrants lose and that it can be put back', async () => {
+    server.use(
+      signedIn,
+      sortAs({ submissions: 14, take_out: 'withdraw' }),
+      ...repoFiles,
+    );
+    const sent = takeOuts();
+    const user = userEvent.setup();
+    renderApp(CONTEST);
+
+    const dialog = await openDialog(user);
+    await user.click(
+      within(dialog).getByRole('button', {
+        name: 'Withdraw A · sort from the contest',
+      }),
+    );
+    const asked = await screen.findByRole('dialog', {
+      name: 'Withdraw A · sort from the contest?',
+    });
+    expect(asked).toHaveTextContent(
+      'A · sort has 14 submissions. Withdrawing it hides it from entrants and takes its points off every leaderboard. Its submissions are kept, and you can put it back.',
+    );
+    await user.click(within(asked).getByRole('button', { name: 'Withdraw it' }));
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(sent).toEqual([{ task: 'sort', confirmed: 'withdraw' }]);
+  });
+
+  it('asks again when someone submitted since the dialog opened, then withdraws', async () => {
+    server.use(signedIn, standingList, ...repoFiles);
+    const sent = takeOuts((asked) =>
+      asked === 1
+        ? problem(409, 'take_out_changed', {
+            detail: 'sort has 1 submission now, so it can no longer be removed.',
+            submissions: 1,
+            take_out: 'withdraw',
+          })
+        : undefined,
+    );
+    const user = userEvent.setup();
+    renderApp(CONTEST);
+
+    const dialog = await openDialog(user);
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Remove A · sort from the contest' }),
+    );
+    await user.click(
+      within(
+        await screen.findByRole('dialog', {
+          name: 'Remove A · sort from the contest?',
+        }),
+      ).getByRole('button', { name: 'Remove it' }),
+    );
+    const again = await screen.findByRole('dialog', {
+      name: 'Withdraw A · sort from the contest?',
+    });
+    expect(again).toHaveTextContent(
+      'Someone has submitted to A · sort since this dialog opened, so it can no longer be removed, only withdrawn.',
+    );
+    expect(again).toHaveTextContent('A · sort has 1 submission.');
+    await user.click(within(again).getByRole('button', { name: 'Withdraw it' }));
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(sent).toEqual([
+      { task: 'sort', confirmed: 'remove' },
+      { task: 'sort', confirmed: 'withdraw' },
+    ]);
+  });
+
+  it('says which leaderboard stands in the way of removing a task, with the way to it', async () => {
+    server.use(signedIn, standingList, ...repoFiles);
+    takeOuts(() =>
+      problem(409, 'take_out_refused', {
+        detail:
+          'The leaderboard Practice counts sort by name. Take sort out of that leaderboard first, then remove the task.',
+        boards: ['Practice'],
+      }),
+    );
+    const user = userEvent.setup();
+    renderApp(CONTEST);
+
+    const dialog = await openDialog(user);
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Remove A · sort from the contest' }),
+    );
+    const asked = await screen.findByRole('dialog', {
+      name: 'Remove A · sort from the contest?',
+    });
+    await user.click(within(asked).getByRole('button', { name: 'Remove it' }));
+
+    const alert = await within(asked).findByRole('alert');
+    expect(alert).toHaveTextContent(
+      'The leaderboard Practice counts sort by name. Take sort out of that leaderboard first, then remove the task.',
+    );
+    expect(
+      within(alert).getByRole('link', { name: 'Open Leaderboards' }),
+    ).toHaveAttribute('href', '/orgs/acme/contests/spring/boards');
+  });
+
+  it('marks a withdrawn task on its row, and puts it back from there after asking', async () => {
+    server.use(
+      signedIn,
+      sortAs({ withdrawn: true, submissions: 14, take_out: null }),
+      ...repoFiles,
+    );
+    const sent: string[] = [];
+    server.use(
+      http.post(`${CONTEST_API}/tasks/:task/put-back`, ({ params }) => {
+        sent.push(String(params['task']));
+        return HttpResponse.json({
+          notes: ['The leaderboard Standings counts sort again.'],
+        });
+      }),
+    );
+    const user = userEvent.setup();
+    renderApp(CONTEST);
+
+    const row = await screen.findByRole('listitem', { name: 'A · sort' });
+    expect(within(row).getByText('Withdrawn')).toBeVisible();
+    await user.click(
+      within(row).getByRole('button', { name: 'Put A · sort back in the contest' }),
+    );
+    const asked = await screen.findByRole('dialog', {
+      name: 'Put A · sort back in the contest?',
+    });
+    expect(asked).toHaveTextContent(
+      'Entrants see it again and can submit to it while it is open, and every leaderboard counts it as before, its submissions included.',
+    );
+    await user.click(within(asked).getByRole('button', { name: 'Put it back' }));
+
+    const back = await screen.findByRole('dialog', {
+      name: 'A · sort is back in the contest',
+    });
+    expect(within(back).getByRole('list', { name: 'Notes' })).toHaveTextContent(
+      'The leaderboard Standings counts sort again.',
+    );
+    expect(sent).toEqual(['sort']);
+    await user.click(within(back).getByRole('button', { name: 'Done' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+  });
+
+  it('says why a withdrawn task cannot go back as the settings stand', async () => {
+    server.use(
+      signedIn,
+      sortAs({ withdrawn: true, submissions: 14, take_out: null }),
+      ...repoFiles,
+      http.post(`${CONTEST_API}/tasks/:task/put-back`, () =>
+        problem(422, 'invalid_definition', {
+          errors: [
+            {
+              path: 'tasks[0].release_at',
+              message: 'sort was released already; its release cannot move later.',
+            },
+          ],
+        }),
+      ),
+    );
+    const user = userEvent.setup();
+    renderApp(CONTEST);
+
+    const row = await screen.findByRole('listitem', { name: 'A · sort' });
+    await user.click(
+      within(row).getByRole('button', { name: 'Put A · sort back in the contest' }),
+    );
+    const asked = await screen.findByRole('dialog', {
+      name: 'Put A · sort back in the contest?',
+    });
+    await user.click(within(asked).getByRole('button', { name: 'Put it back' }));
+
+    const alert = await within(asked).findByRole('alert');
+    expect(alert).toHaveTextContent(
+      'It cannot go back as the contest’s settings stand:',
+    );
+    expect(alert).toHaveTextContent(
+      'sort was released already; its release cannot move later.',
+    );
+  });
+
+  it('says in the dialog of a withdrawn task what that means, with the way to put it back', async () => {
+    server.use(
+      signedIn,
+      sortAs({ withdrawn: true, submissions: 14, take_out: null }),
+      ...repoFiles,
+    );
+    const user = userEvent.setup();
+    renderApp(CONTEST);
+
+    const dialog = await openDialog(user);
+    expect(dialog).toHaveTextContent(
+      'Withdrawn: entrants do not see it, and no leaderboard counts it. Its 14 submissions are kept.',
+    );
+    expect(
+      within(dialog).queryByRole('button', { name: /Withdraw A · sort/ }),
+    ).toBeNull();
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Put A · sort back in the contest' }),
+    );
+    expect(
+      await screen.findByRole('dialog', { name: 'Put A · sort back in the contest?' }),
+    ).toBeVisible();
   });
 });

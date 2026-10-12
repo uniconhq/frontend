@@ -2,6 +2,7 @@ import { useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { $api, queryView } from '@/api/query';
 import type { TaskPage } from '@/api/types';
+import { BodyText } from '@/ui/BodyText';
 import { Card } from '@/ui/Card';
 import { Markdown } from '@/ui/Markdown';
 import { PageLink } from '@/ui/PageLink';
@@ -77,6 +78,27 @@ function Back({ org, contest }: { org: string; contest: string }) {
 }
 
 /**
+ * A task the person cannot open, in words with the way back to the contest:
+ * one not released yet, one the organisers withdrew or removed from the
+ * contest, as a link kept from before reaches it, or a wrong address. They
+ * read alike, so a withdrawn task says nothing of itself.
+ */
+function NoSuchTask({ org, contest }: { org: string; contest: string }) {
+  return (
+    <div className={classes.page}>
+      <div className={classes.links}>
+        <Back org={org} contest={contest} />
+      </div>
+      <PageTitle>Task not found</PageTitle>
+      <BodyText>
+        It is not released yet, the organisers took it out of the contest, or the
+        address is wrong. The contest’s page lists the tasks you can open.
+      </BodyText>
+    </div>
+  );
+}
+
+/**
  * A released task as a signed-in person reads it: first the time left on it
  * for them, counted to its due and its close, and the way to ask the
  * organisers about it; then its announcements, the statement, its times and
@@ -111,8 +133,10 @@ function SignedInTask({
   }, [queryClient, org, contest, task]);
 
   if (view.state === 'loading') return <PageSkeleton rows={6} />;
-  if (view.state === 'error')
+  if (view.state === 'error') {
+    if (view.error.status === 404) return <NoSuchTask org={org} contest={contest} />;
     return <ErrorBlock error={view.error} onRetry={view.retry} />;
+  }
 
   const page = view.data;
   const asks = page.release.closed !== 'not_approved';
