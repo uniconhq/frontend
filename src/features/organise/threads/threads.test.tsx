@@ -201,6 +201,30 @@ function questionRoutes(start: Clarification[], list: string) {
         ],
       });
     }),
+    http.post(`${QUESTION_API}/announcement`, async ({ params, request }) => {
+      const sent = (await request.json()) as { title: string; mark: boolean };
+      did.push(
+        `announce ${String(params.number)} ${sent.title} mark ${String(sent.mark)}`,
+      );
+      const found = listed.find((each) => String(each.number) === params.number);
+      const question = {
+        ...found,
+        answered: sent.mark || found?.answered === true,
+        messages: [
+          ...(found?.messages ?? []),
+          {
+            from_asker: false,
+            body: `Answered publicly in the announcement ‘${sent.title}’`,
+            at: '2026-09-12T09:30:00Z',
+            announcement: { task: null, number: 4 },
+          },
+        ],
+      };
+      listed = listed.map((each) =>
+        String(each.number) === params.number ? (question as Clarification) : each,
+      );
+      return HttpResponse.json({ announcement: {}, question }, { status: 201 });
+    }),
     http.put(`${QUESTION_API}/answered`, ({ params }) => {
       did.push(`mark ${String(params.number)}`);
       return update(params.number, { answered: true, closed: true });
@@ -256,7 +280,10 @@ describe('the inbox', () => {
     expect(
       within(first).getByRole('checkbox', { name: /Mark it answered/ }),
     ).toBeChecked();
-    await userEvent.type(within(first).getByLabelText(/Reply/), 'Up to 10^5.');
+    await userEvent.type(
+      within(first).getByRole('textbox', { name: 'Answer' }),
+      'Up to 10^5.',
+    );
     await userEvent.click(within(first).getByRole('button', { name: 'Send reply' }));
     await waitFor(() => expect(did).toEqual(['reply 1', 'mark 1']));
 
@@ -267,7 +294,10 @@ describe('the inbox', () => {
     await userEvent.click(
       within(second).getByRole('checkbox', { name: /Mark it answered/ }),
     );
-    await userEvent.type(within(second).getByLabelText(/Reply/), 'Looking into it.');
+    await userEvent.type(
+      within(second).getByRole('textbox', { name: 'Answer' }),
+      'Looking into it.',
+    );
     await userEvent.click(within(second).getByRole('button', { name: 'Send reply' }));
     await waitFor(() => expect(did).toEqual(['reply 1', 'mark 1', 'reply 2']));
     expect(await screen.findByText('Looking into it.')).toBeVisible();
@@ -281,6 +311,88 @@ describe('the inbox', () => {
       expect(did).toEqual(['reply 1', 'mark 1', 'reply 2', 'mark 2']),
     );
     expect(screen.queryByRole('dialog')).toBeNull();
+  });
+});
+
+describe('answering a question publicly (M62)', () => {
+  it('answers in the one form, for every entrant under a title, marks it answered and links the message to the announcement', async () => {
+    const did = questionRoutes([question()], `${CONTEST_API}/clarifications`);
+    renderApp('/orgs/acme/contests/spring/questions');
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Reply to Input size?' }),
+    );
+    const form = await screen.findByRole('form', { name: 'Reply to Input size?' });
+    expect(within(form).queryByRole('button', { name: /Answer publicly/ })).toBeNull();
+    const readers = within(form).getByRole('radiogroup', {
+      name: 'Who reads the answer',
+    });
+    expect(
+      within(readers).getByRole('radio', { name: 'Only the asker' }),
+    ).toBeChecked();
+    expect(
+      within(form).queryByRole('textbox', { name: 'Announcement title' }),
+    ).toBeNull();
+
+    await userEvent.click(
+      within(readers).getByRole('radio', {
+        name: 'Every entrant (posted as an announcement)',
+      }),
+    );
+    expect(
+      within(form).getByRole('textbox', { name: 'Announcement title' }),
+    ).toHaveValue('Input size?');
+    expect(
+      within(form).getByRole('checkbox', { name: /Mark it answered/ }),
+    ).toBeChecked();
+    await userEvent.type(
+      within(form).getByRole('textbox', { name: 'Answer' }),
+      'Up to 10^5.',
+    );
+    await userEvent.click(
+      within(form).getByRole('button', { name: 'Post the announcement' }),
+    );
+
+    await waitFor(() => expect(did).toEqual(['announce 1 Input size? mark true']));
+    // Answered now, so folded with the answered ones.
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Show 1 answered question' }),
+    );
+    const link = await screen.findByRole('link', { name: '‘Input size?’' });
+    expect(link).toHaveAttribute(
+      'href',
+      '/orgs/acme/contests/spring/announcements#announcement-4',
+    );
+    expect(link.closest('p')).toHaveTextContent(
+      'Answered publicly in the announcement ‘Input size?’',
+    );
+  });
+
+  it('leaves the question open when told to', async () => {
+    const did = questionRoutes([question()], `${CONTEST_API}/clarifications`);
+    renderApp('/orgs/acme/contests/spring/questions');
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Reply to Input size?' }),
+    );
+    const form = await screen.findByRole('form', { name: 'Reply to Input size?' });
+    await userEvent.click(
+      within(form).getByRole('radio', {
+        name: 'Every entrant (posted as an announcement)',
+      }),
+    );
+    await userEvent.click(
+      within(form).getByRole('checkbox', { name: /Mark it answered/ }),
+    );
+    await userEvent.type(
+      within(form).getByRole('textbox', { name: 'Answer' }),
+      'Soon.',
+    );
+    await userEvent.click(
+      within(form).getByRole('button', { name: 'Post the announcement' }),
+    );
+
+    await waitFor(() => expect(did).toEqual(['announce 1 Input size? mark false']));
   });
 });
 

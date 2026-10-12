@@ -170,6 +170,36 @@ describe('questions', () => {
     expect(within(answered).getByRole('textbox', { name: 'Follow up' })).toHaveFocus();
   });
 
+  it('shows a public answer on the asker’s question, linking to its announcement on the contest page (M62)', async () => {
+    server.use(
+      signedIn,
+      approvedHome,
+      http.get(`${CONTEST_API}/questions`, () =>
+        HttpResponse.json([
+          question({
+            answered: true,
+            closed: true,
+            messages: [
+              {
+                from_asker: false,
+                body: 'Answered publicly in the announcement ‘On n’',
+                at: '2026-09-12T09:20:00Z',
+                announcement: { task: 'sum', number: 3 },
+              },
+            ],
+          }),
+        ]),
+      ),
+    );
+    renderApp(QUESTIONS);
+
+    const link = await screen.findByRole('link', { name: '‘On n’' });
+    expect(link).toHaveAttribute('href', '/contests/acme/spring#announcement-sum-3');
+    expect(link.closest('p')).toHaveTextContent(
+      'Answered publicly in the announcement ‘On n’',
+    );
+  });
+
   it('marks a team’s messages as the team’s', async () => {
     server.use(
       signedIn,

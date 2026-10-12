@@ -90,6 +90,11 @@
   border: 1px solid var(--unicon-border);
 }
 
+/* The message a public answer leaves, as a paragraph of the thread reads. */
+.publicAnswer {
+  margin: 0;
+}
+
 .fromOrganisers {
   margin-left: 48px;
   background: var(--unicon-hover);

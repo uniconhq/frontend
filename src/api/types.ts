@@ -110,6 +110,8 @@ export type FeedEntry = Schemas['FeedEntry'];
 export type Submitter = Schemas['Submitter'];
 export type QueueDepth = Schemas['QueueDepth'];
 export type Announcement = Schemas['Announcement'];
+/** The announcement a public answer posted, which its message on the question names. */
+export type AnnouncementLink = Schemas['AnnouncementLink'];
 /** One change in a place's history, its author named. */
 export type FileChange = Schemas['Change'];
 export type Clarification = Schemas['Clarification'];

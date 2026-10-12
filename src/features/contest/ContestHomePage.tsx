@@ -20,6 +20,7 @@ import { ContestAnnouncements } from './threads/AnnouncementList';
 import { useMyQuestions } from './threads/questions';
 import { BOARDS_EVERY_MS, BoardList } from './boards/BoardList';
 import { BySession } from './BySession';
+import { useAnchor } from '@/ui/anchor';
 import { Countdown } from '@/ui/Countdown';
 import { entryPollEvery } from './entry/poll';
 import { YourEntry } from './entry/YourEntry';
@@ -577,6 +578,8 @@ function LandingBoards({ org, contest }: { org: string; contest: string }) {
  */
 export function ContestHomePage() {
   const { org, contest } = useContestParams();
+  // A link to one of its announcements, such as a public answer's, lands on it.
+  useAnchor();
   return (
     <BySession
       signedIn={<SignedInHome org={org} contest={contest} />}

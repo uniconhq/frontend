@@ -19,6 +19,7 @@ import { contestHomePath } from '@/lib/contest-paths';
 import { inTeams } from '@/lib/entrants';
 import { useContestParams } from '@/lib/route-params';
 import { CONTEST_VIEW_SECTIONS, contestSectionPath, sectionOf } from '@/lib/sections';
+import { announcementAnchor } from '@/ui/threads/anchors';
 import { QuestionThread } from '@/ui/threads/ThreadParts';
 import { BySession } from '../BySession';
 import { SignInPrompt } from '../SignInPrompt';
@@ -257,6 +258,9 @@ function Questions({
                   <QuestionThread
                     clarification={clarification}
                     asker={team ? 'Your team' : 'You'}
+                    announcementHref={(link) =>
+                      `${contestHomePath(org, contest)}#${announcementAnchor(link)}`
+                    }
                   >
                     <FollowUp
                       org={org}
