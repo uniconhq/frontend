@@ -22,9 +22,6 @@ import {
   toolButton,
 } from '@/test/workflow-editor';
 
-/** The forge's check runs 400 ms after the text settles, then answers. */
-const CHECKED = { timeout: 3_000 };
-
 describe('the workflow editor', () => {
   it('draws each step, the inputs, each test’s files and the report as boxes', async () => {
     server.use(signedIn, ...workflowBackend(CLASSIC_V2).handlers);
@@ -213,8 +210,8 @@ describe('the workflow editor', () => {
     const user = userEvent.setup();
     renderApp(EDITOR_PAGE);
 
-    const banner = await findPart('section', 'Problems', CHECKED);
-    await within(banner).findByText(/One problem to fix/, {}, CHECKED);
+    const banner = await findPart('section', 'Problems');
+    await within(banner).findByText(/One problem to fix/);
     // The next check does not answer while the test looks.
     server.use(http.post('/api/v1/workflows/check', () => delay('infinite')));
     await user.click(await outputButton('run', 'time_ms'));
@@ -227,8 +224,6 @@ describe('the workflow editor', () => {
     expect(
       await within(part('section', 'Problems')).findByText(
         'Checking the latest change…',
-        {},
-        CHECKED,
       ),
     ).toBeInTheDocument();
     expect(part('section', 'Problems')).toHaveTextContent(/One problem to fix/);
@@ -264,11 +259,9 @@ describe('the workflow editor', () => {
 
     const step = await stepBox('run');
     expect(
-      await within(step).findByRole(
-        'note',
-        { name: 'There is no step called compiler before this one.' },
-        CHECKED,
-      ),
+      await within(step).findByRole('note', {
+        name: 'There is no step called compiler before this one.',
+      }),
     ).toBeInTheDocument();
     // The message stands beside its mark, not only behind it.
     expect(
@@ -737,9 +730,7 @@ describe('the workflow editor', () => {
     );
     renderApp(EDITOR_PAGE);
 
-    expect(
-      await screen.findByText(/The check did not run/, {}, CHECKED),
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/The check did not run/)).toBeInTheDocument();
     expect(screen.queryByText(/Nothing to fix/)).not.toBeInTheDocument();
   });
 
@@ -790,7 +781,7 @@ describe('the workflow editor', () => {
       'This draft cannot be drawn, because its file cannot be read',
     );
     // Not "nothing to fix", whatever the check says of a file that cannot be read.
-    await waitFor(() => expect(backend.state.checks).toBeGreaterThan(0), CHECKED);
+    await waitFor(() => expect(backend.state.checks).toBeGreaterThan(0));
     expect(screen.queryByText(/Nothing to fix/)).toBeNull();
     expect(toolButton('Add step')).toBeDisabled();
     const back = within(mend).getByRole('button', { name: 'Back to the graph' });

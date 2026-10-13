@@ -469,9 +469,7 @@ describe('the contest page for a signed-in person', () => {
 
     const tasks = await screen.findByRole('list', { name: 'Tasks' });
     expect(await within(tasks).findByText('30 / 100')).toBeVisible();
-    expect(
-      await within(tasks).findByText('100 / 100', {}, { timeout: 5_000 }),
-    ).toBeVisible();
+    expect(await within(tasks).findByText('100 / 100')).toBeVisible();
   });
 
   it('says when each task falls due and closes before the server’s time is in', async () => {
@@ -839,9 +837,7 @@ describe('the contest page at its start', () => {
     expect(await screen.findByText('No tasks are released yet.')).toBeVisible();
     const timer = await screen.findByRole('timer', { name: 'Contest countdown' });
     await waitFor(() => expect(timer).toHaveTextContent(/^Contest starts in /));
-    expect(
-      await screen.findByRole('link', { name: 'Sum of Two' }, { timeout: 5_000 }),
-    ).toBeVisible();
+    expect(await screen.findByRole('link', { name: 'Sum of Two' })).toBeVisible();
     expect(screen.getByRole('timer', { name: 'Contest countdown' })).toHaveTextContent(
       /^Contest ends in /,
     );

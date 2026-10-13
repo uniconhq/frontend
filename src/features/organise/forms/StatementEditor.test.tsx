@@ -52,11 +52,7 @@ describe('the statement beside its preview', { timeout: 20_000 }, () => {
     renderApp('/orgs/acme/contests/spring/tasks/sum/statement');
 
     // The statement is a card of the task's whole page, which takes its reads first.
-    const shown = await screen.findByRole(
-      'region',
-      { name: 'Uploaded statement.md' },
-      { timeout: 5000 },
-    );
+    const shown = await screen.findByRole('region', { name: 'Uploaded statement.md' });
     expect(within(shown).getByText('c'.repeat(64))).toBeVisible();
     expect(screen.queryByRole('textbox', { name: 'Statement source' })).toBeNull();
   });
