@@ -54,6 +54,7 @@ import {
   primitiveTitle,
   readersWords,
   refWords,
+  BAND_LABEL,
   runsWords,
 } from './words';
 import classes from './workflows.module.css';
@@ -81,6 +82,8 @@ type Side = 'left' | 'right';
 /** What a port's row shows. */
 type RowView = {
   port: string;
+  /** What the row reads as: a report entry by its title, its key only where it has none (M58). */
+  name: string;
   side: Side;
   /** How far down its box the row stands. */
   top: number;
@@ -253,6 +256,7 @@ function rowView(
   const output = box.kind === 'step' && side === 'right';
   return {
     port,
+    name: entry?.title ?? port,
     side,
     top: headerOf(box.kind) + row * GEOMETRY.row,
     output,
@@ -380,12 +384,12 @@ const PortRow = memo(function PortRow({ box, row }: { box: string; row: RowView 
       ) : (
         <>
           {!actions.menus ? (
-            <span className={classes.port}>{port}</span>
+            <span className={classes.port}>{row.name}</span>
           ) : row.label === null ? (
-            <span>{port}</span>
+            <span>{row.name}</span>
           ) : (
             <ActionMenu
-              text={port}
+              text={row.name}
               label={row.label}
               entries={() => actions.entries(box, port, side)}
               className={classes.port}
@@ -527,8 +531,16 @@ const SlotView = memo(function SlotView({ data }: NodeProps<SlotNode>) {
   );
 });
 
+/**
+ * The shaded band behind the steps that run for each test and the test's
+ * files, labelled at its top so it says what it is (M55).
+ */
 function BandView() {
-  return <div className={classes.band} aria-hidden />;
+  return (
+    <div className={classes.band}>
+      <span className={classes.bandLabel}>{BAND_LABEL}</span>
+    </div>
+  );
 }
 
 const WireView = memo(function WireView({ data }: EdgeProps<WireEdge>) {

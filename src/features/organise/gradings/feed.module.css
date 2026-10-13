@@ -153,3 +153,23 @@
   align-items: center;
   flex-wrap: wrap;
 }
+
+/* Each task's latest regrade, a line or two each, one under the other. */
+.regrades {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.regrade {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.dot {
+  color: var(--unicon-text-secondary);
+}

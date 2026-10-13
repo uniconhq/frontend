@@ -180,7 +180,44 @@
   background: var(--unicon-hover);
 }
 
-/* The one save bar, in view at the foot of the window while there is something to save. */
+/* A hand-set mix: a line per part, each box inside its line, and what they add up to. */
+.mix {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mixParts {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mixPart {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.mixLine {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+  font-size: 14px;
+  color: var(--unicon-text-body);
+}
+
+.mixProblem {
+  font-size: 12px;
+  color: var(--unicon-text-danger);
+}
+
+/* The one save bar, in view at the foot of the window while there is something to save
+ * or an answer to choose from. */
 .saveBar {
   position: sticky;
   bottom: 0;
@@ -193,6 +230,13 @@
   border-radius: var(--mantine-radius-md);
   background: var(--unicon-body);
   box-shadow: 0 -4px 16px rgb(0 0 0 / 12%);
+}
+
+/* Once nothing is left to save, the last save's answer stands in the page. */
+.saveSettled {
+  position: static;
+  border-color: var(--unicon-border);
+  box-shadow: none;
 }
 
 .changes {
@@ -301,6 +345,27 @@
 
 .weight {
   width: 110px;
+}
+
+/* A test's part that is empty, usually a mistake: in the warning colour. */
+.emptyPart {
+  color: #6f4e05;
+  font-weight: 600;
+}
+
+:global([data-mantine-color-scheme='dark']) .emptyPart {
+  color: #ffc93c;
+}
+
+/* The start of a small text file, as it reads. */
+.partStart {
+  padding: 0 4px;
+  border-radius: var(--mantine-radius-xs);
+  background: var(--unicon-hover);
+  color: var(--unicon-text-body);
+  font-family: var(--mantine-font-family-monospace);
+  font-size: 12px;
+  white-space: pre;
 }
 
 /* How files are named for a test's parts, under the drop box. */

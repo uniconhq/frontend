@@ -23,6 +23,9 @@ describe('deactivate and delete', () => {
     await openAccount();
     await userEvent.click(screen.getByRole('button', { name: 'Delete account' }));
 
+    expect(
+      await screen.findByRole('dialog', { name: 'Delete your account?' }),
+    ).toBeVisible();
     expect(await screen.findByText(/Deleted user/)).toBeInTheDocument();
     expect(screen.getByText(/This cannot be undone/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));

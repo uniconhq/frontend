@@ -4,7 +4,14 @@ import userEvent from '@/test/user-event';
 import { http, HttpResponse } from 'msw';
 import { renderApp } from '@/test/render';
 import { problem, server, signedIn, someone } from '@/test/server';
-import { TASK_API, publicationList, repoFiles, taskState } from '@/test/organiser';
+import {
+  TASK_API,
+  publicationList,
+  publishedTask,
+  repoFiles,
+  taskState,
+  unchanged,
+} from '@/test/organiser';
 import { comeBackToTab, fakeLiveStream, openStream, realLiveStream } from '@/test/live';
 
 const STATEMENT = '# Sum\n\nWrite the sum of two numbers.\n';
@@ -45,11 +52,7 @@ describe('the statement beside its preview', { timeout: 20_000 }, () => {
     renderApp('/orgs/acme/contests/spring/tasks/sum/statement');
 
     // The statement is a card of the task's whole page, which takes its reads first.
-    const shown = await screen.findByRole(
-      'region',
-      { name: 'Uploaded statement.md' },
-      { timeout: 5000 },
-    );
+    const shown = await screen.findByRole('region', { name: 'Uploaded statement.md' });
     expect(within(shown).getByText('c'.repeat(64))).toBeVisible();
     expect(screen.queryByRole('textbox', { name: 'Statement source' })).toBeNull();
   });
@@ -62,6 +65,7 @@ describe('the statement beside its preview', { timeout: 20_000 }, () => {
         changes: [],
         notes: [],
         regraded: 0,
+        effect: unchanged,
       }),
     );
     renderApp('/orgs/acme/contests/spring/tasks/sum/statement');
@@ -142,7 +146,7 @@ describe('the statement beside its preview', { timeout: 20_000 }, () => {
 
     /**
      * The statement, its pictures under `public/` (`my-diagram.png` and
-     * `old.png`, each read with its token) and the task's save, kept in
+     * `old.png`, each read with its token, beside a `.gitkeep`) and the task's save, kept in
      * `saves`, answered by `answer` in turn.
      */
     function picturesBackend(answers: (() => Response)[] = []) {
@@ -153,7 +157,13 @@ describe('the statement beside its preview', { timeout: 20_000 }, () => {
         http.get(`${TASK_API}/tree`, ({ request }) =>
           new URL(request.url).searchParams.get('path') === 'public'
             ? HttpResponse.json(
-                pictures.map((path) => ({ path, kind: 'file', size: 9, upload: null })),
+                // The empty file a task made before kept the folder with (M60).
+                [...pictures, 'public/.gitkeep'].map((path) => ({
+                  path,
+                  kind: 'file',
+                  size: path.endsWith('.gitkeep') ? 0 : 9,
+                  upload: null,
+                })),
               )
             : undefined,
         ),
@@ -182,6 +192,7 @@ describe('the statement beside its preview', { timeout: 20_000 }, () => {
                 changes: [],
                 notes: [],
                 regraded: 0,
+                effect: unchanged,
               });
         }),
       );
@@ -255,8 +266,13 @@ describe('the statement beside its preview', { timeout: 20_000 }, () => {
       const { saves } = picturesBackend([
         () =>
           problem(409, 'confirmation_required', {
-            changes: ['tests/main changed'],
-            regrades: 3,
+            changes: [],
+            regrades: 0,
+            ...unchanged,
+            reading: [
+              'The statement changes.',
+              'The pictures and files beside the statement change.',
+            ],
           }),
       ]);
       const user = userEvent.setup();
@@ -268,7 +284,9 @@ describe('the statement beside its preview', { timeout: 20_000 }, () => {
       await user.click(screen.getByRole('button', { name: 'Save statement' }));
 
       const asked = await screen.findByRole('alert');
-      expect(asked).toHaveTextContent('3 submissions to the task are graded again');
+      expect(asked).toHaveTextContent(
+        'What entrants readThe statement changes.The pictures and files beside the statement change.',
+      );
       await user.click(within(asked).getByRole('button', { name: /Publish/ }));
 
       expect(
@@ -278,6 +296,68 @@ describe('the statement beside its preview', { timeout: 20_000 }, () => {
       expect(saves[1]?.changes.map((change) => change.path)).toEqual([
         'statement.md',
         'public/tree.gif',
+      ]);
+    });
+
+    it('sends a larger picture through the upload door once, though the save asks before it publishes', async () => {
+      const { saves } = picturesBackend([
+        () =>
+          problem(409, 'confirmation_required', {
+            changes: [],
+            regrades: 0,
+            ...unchanged,
+            reading: ['The pictures and files beside the statement change.'],
+          }),
+      ]);
+      const slots: unknown[] = [];
+      server.use(
+        http.post(`${TASK_API}/organise/uploads`, async ({ request }) => {
+          slots.push(await request.json());
+          return HttpResponse.json(
+            {
+              id: `upload-${String(slots.length)}`,
+              url: null,
+              ready: true,
+              expires_at: '2026-10-07T12:00:00Z',
+            },
+            { status: 201 },
+          );
+        }),
+        http.post(`${TASK_API}/uploads/:upload/complete`, ({ params }) =>
+          HttpResponse.json({
+            id: String(params['upload']),
+            input: '',
+            filename: 'photo.png',
+            content_type: 'image/png',
+            size: 300 * 1024,
+            sha256: 'a'.repeat(64),
+            status: 'verified',
+          }),
+        ),
+      );
+      const user = userEvent.setup();
+      renderApp('/orgs/acme/contests/spring/tasks/sum/statement');
+      await screen.findByRole('textbox', { name: 'Statement source' });
+      await screen.findByRole('list', { name: 'Pictures' });
+
+      await addPicture(
+        user,
+        new File(['x'.repeat(300 * 1024)], 'photo.png', { type: 'image/png' }),
+      );
+      await user.click(screen.getByRole('button', { name: 'Save statement' }));
+      await user.click(
+        within(await screen.findByRole('alert')).getByRole('button', {
+          name: 'Publish the change',
+        }),
+      );
+
+      expect(
+        await screen.findByText('Saved and published as publication 4.'),
+      ).toBeVisible();
+      expect(slots).toHaveLength(1);
+      expect(saves.map((save) => save.changes[1])).toMatchObject([
+        { path: 'public/photo.png', upload: 'upload-1' },
+        { path: 'public/photo.png', upload: 'upload-1' },
       ]);
     });
 
@@ -327,6 +407,9 @@ describe('the statement beside its preview', { timeout: 20_000 }, () => {
       const old = within(listed).getByRole('listitem', { name: 'old.png' });
       expect(shown).not.toHaveTextContent('Not shown');
       expect(old).toHaveTextContent('Not shown in the statement.');
+      // A file whose name starts with a dot is no picture (M60).
+      expect(within(listed).getAllByRole('listitem')).toHaveLength(2);
+      expect(listed).not.toHaveTextContent('.gitkeep');
 
       await user.click(within(old).getByRole('button', { name: 'Remove old.png' }));
       expect(within(old).getByText('To be removed')).toBeVisible();
@@ -411,11 +494,14 @@ describe('the statement while it is being edited', { timeout: 20_000 }, () => {
   /** The statement as stored, which someone else may save over, and the reads and saves of it. */
   function sharedStatement() {
     const stored = { content: STATEMENT, token: 'token-statement' };
-    const asked = { reads: 0 };
+    const asked = { reads: 0, states: 0 };
     const sent: { content: string; token: string }[] = [];
     server.use(
       signedIn,
-      taskState,
+      http.get(TASK_API, () => {
+        asked.states += 1;
+        return HttpResponse.json(publishedTask);
+      }),
       publicationList,
       http.get(`${TASK_API}/files/:path`, ({ params }) => {
         if (params['path'] !== 'statement.md') return undefined;
@@ -438,6 +524,7 @@ describe('the statement while it is being edited', { timeout: 20_000 }, () => {
               changes: [],
               notes: [],
               regraded: 0,
+              effect: unchanged,
             })
           : problem(409, 'conflict');
       }),
@@ -456,13 +543,14 @@ describe('the statement while it is being edited', { timeout: 20_000 }, () => {
     // Someone else saves the statement while this tab is in the background.
     stored.content = THEIRS;
     stored.token = 'token-theirs';
-    const before = asked.reads;
+    const before = { ...asked };
     comeBackToTab();
-    // The page reads again what it shows of the statement, such as whether
-    // the task has one; the editor keeps what it is editing.
-    await waitFor(() => expect(asked.reads).toBeGreaterThan(before));
-    await new Promise((resolve) => setTimeout(resolve, 200));
+    // The page reads again what it shows of the task, such as whether its
+    // statement is written (M57), in the same refetch that would read the
+    // file again; the editor keeps what it is editing, the file unread.
+    await waitFor(() => expect(asked.states).toBeGreaterThan(before.states));
 
+    expect(asked.reads).toBe(before.reads);
     expect(screen.getByRole('textbox', { name: 'Statement source' })).toHaveValue(MINE);
     expect(
       screen.getByRole('textbox', { name: 'Statement source' }),
@@ -521,6 +609,64 @@ describe('the statement while it is being edited', { timeout: 20_000 }, () => {
     await waitFor(() =>
       expect(sent.at(-1)).toMatchObject({ content: MINE, token: 'token-theirs' }),
     );
+  });
+
+  it('asks again about a confirmed save someone else’s beat, once it goes over theirs (#449)', async () => {
+    const { stored } = sharedStatement();
+    const sends: { token: string; confirm: boolean; asked?: string | null }[] = [];
+    server.use(
+      http.put(`${TASK_API}/files/:path`, async ({ request }) => {
+        const body = (await request.clone().json()) as (typeof sends)[number];
+        sends.push(body);
+        if (body.token !== stored.token) return problem(409, 'conflict');
+        if (body.confirm) return undefined;
+        const asked = `${stored.token}:2`;
+        // Someone else saves while the question is shown.
+        stored.content = THEIRS;
+        stored.token = 'token-theirs';
+        return problem(409, 'confirmation_required', {
+          changes: [],
+          regrades: 0,
+          ...unchanged,
+          reading: ['The statement changes.'],
+          asked,
+        });
+      }),
+    );
+    const user = userEvent.setup();
+    renderApp('/orgs/acme/contests/spring/tasks/sum/statement');
+    const source = await screen.findByRole('textbox', { name: 'Statement source' });
+    fireEvent.change(source, { target: { value: MINE } });
+
+    await user.click(screen.getByRole('button', { name: 'Save statement' }));
+    await user.click(
+      await within(await screen.findByRole('alert')).findByRole('button', {
+        name: 'Publish the change',
+      }),
+    );
+    const conflict = await screen.findByRole('alert');
+    await within(conflict).findByRole('textbox', {
+      name: 'Their version, as it is now',
+    });
+    await user.click(
+      within(conflict).getByRole('button', { name: 'Save yours over theirs' }),
+    );
+    await user.click(
+      within(
+        await screen.findByRole('dialog', { name: 'Save yours over theirs?' }),
+      ).getByRole('button', { name: 'Save yours over theirs' }),
+    );
+
+    expect(
+      await within(await screen.findByRole('alert')).findByRole('button', {
+        name: 'Publish the change',
+      }),
+    ).toBeVisible();
+    expect(sends).toMatchObject([
+      { token: 'token-statement', confirm: false },
+      { token: 'token-statement', confirm: true, asked: 'token-statement:2' },
+      { token: 'token-theirs', confirm: false },
+    ]);
   });
 
   it('goes on from their version, keeping my text beside it to copy from', async () => {

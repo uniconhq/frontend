@@ -1,12 +1,15 @@
 import { useState } from 'react';
-import type { DefinitionError } from '@/api/types';
+import type { DefinitionError, ValueMeaning } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
 import { Checkbox } from '@/ui/Checkbox';
 import { Modal } from '@/ui/Modal';
+import { IconButton } from '@/ui/IconButton';
 import { RadioGroup } from '@/ui/RadioGroup';
+import { Select } from '@/ui/Select';
 import { TextInput } from '@/ui/TextInput';
 import { FieldBox } from '../contest/ContestFile';
+import type { TaskValuesReported } from '../contest/published';
 import shared from '../organise.module.css';
 import {
   boardRefusals,
@@ -17,7 +20,6 @@ import {
 import {
   boardSentence,
   type HeldGroup,
-  KINDS,
   OVER,
   penaltyRefusal,
   perGroupRefusal,
@@ -25,6 +27,20 @@ import {
   WHO,
 } from './board-words';
 import { Fieldset, NumberField } from './fields';
+import {
+  keyOfKind,
+  kindDescription,
+  canMoveKey,
+  kindOptions,
+  nextKey,
+  orderSummary,
+  orderToWrite,
+  rankableValues,
+  repeatedValue,
+  shownOrder,
+  valueOption,
+} from './order-words';
+import { numberProblem } from './yaml-doc';
 import classes from './forms.module.css';
 
 /** The keys of a board that have a field of their own. */
@@ -34,12 +50,6 @@ function choices(value: string, options: { value: string; label: string }[]) {
   return value === '' || options.some((option) => option.value === value)
     ? options
     : [{ value, label: value }, ...options];
-}
-
-function keyOfKind(kind: string): OrderKeyValues {
-  if (kind === 'penalty') return { kind: 'penalty', perAttempt: '' };
-  if (kind === 'value') return { kind: 'value', name: '' };
-  return { kind: 'points' };
 }
 
 /** How many rows a viewer below the organisers sees, as the radio's choice. */
@@ -53,20 +63,28 @@ function rowsChoice(rows: string): 'all' | 'own' | 'top' {
  * sentence that says what it ranks, added and removed here, removing asked
  * first, and written by one save. What the last save was refused for about
  * a board reads on the field that caused it. `disabled` shows them to
- * someone who may not change them.
+ * someone who may not change them. `reported` is what each published task
+ * reports, which names the values a board may rank by (M58); null while it
+ * is not known, when a value is typed by its key. A task is called by its
+ * label in `taskLabels`, its letter and title, or by its id where it has none.
  */
 export function BoardFields({
   boards,
   taskIds,
+  taskLabels = new Map(),
   held = null,
+  reported = null,
   refused,
   onChange,
   disabled = false,
 }: {
   boards: BoardValues[];
   taskIds: string[];
+  taskLabels?: ReadonlyMap<string, string>;
   /** The published tasks' groups whose results come out once their task closes, when known. */
   held?: HeldGroup[] | null;
+  /** The values each published task reports, when known. */
+  reported?: TaskValuesReported[] | null;
   refused: DefinitionError[];
   onChange: (boards: BoardValues[]) => void;
   disabled?: boolean;
@@ -90,7 +108,9 @@ export function BoardFields({
               board={board}
               index={index}
               taskIds={taskIds}
+              taskLabels={taskLabels}
               held={held}
+              values={reported === null ? null : rankableValues(reported, board.tasks)}
               refusals={boardRefusals(refused, index)}
               disabled={disabled}
               onChange={(to) => change(index, to)}
@@ -114,11 +134,31 @@ export function BoardFields({
   );
 }
 
+/**
+ * Why row `at` names a value the board cannot rank by, or null: no task the
+ * board covers reports it as a number for each test, or none reports one at
+ * all. Nothing is said while what the tasks report is not known.
+ */
+function unreportedValue(
+  key: OrderKeyValues | undefined,
+  values: ValueMeaning[] | null,
+): string | null {
+  if (key?.kind !== 'value' || values === null) return null;
+  const name = key.name.trim();
+  if (values.length === 0) {
+    return 'No task this leaderboard covers reports a number for each test, so it cannot rank by one.';
+  }
+  if (name === '' || values.some((value) => value.name === name)) return null;
+  return `No task this leaderboard covers reports ${name} for each test.`;
+}
+
 function BoardEntry({
   board,
   index,
   taskIds,
+  taskLabels,
   held,
+  values,
   refusals,
   disabled,
   onChange,
@@ -127,7 +167,10 @@ function BoardEntry({
   board: BoardValues;
   index: number;
   taskIds: string[];
+  taskLabels: ReadonlyMap<string, string>;
   held: HeldGroup[] | null;
+  /** The values the board may rank by, or null while not known. */
+  values: ValueMeaning[] | null;
   refusals: Map<string, string[]>;
   disabled: boolean;
   onChange: (to: Partial<BoardValues>) => void;
@@ -150,15 +193,31 @@ function BoardEntry({
   ];
   const tasksSaid = said(...under('tasks'));
   const orderSaid = said('order');
+  const rows = shownOrder(board.order);
+  const writeOrder = (next: OrderKeyValues[]) =>
+    onChange({ order: orderToWrite(board.order, next) });
   const setKey = (at: number, key: OrderKeyValues) =>
-    onChange({ order: board.order.map((old, k) => (k === at ? key : old)) });
+    writeOrder(rows.map((old, k) => (k === at ? key : old)));
   const moveKey = (at: number, by: -1 | 1) => {
-    const order = [...board.order];
+    const order = [...rows];
     const [key] = order.splice(at, 1);
     if (key !== undefined) order.splice(at + by, 0, key);
-    onChange({ order });
+    writeOrder(order);
   };
-  const rows = rowsChoice(board.rows);
+  const added = nextKey(rows);
+  /** What is wrong with one way to rank: the save's refusal, or what it would refuse. */
+  const keyProblem = (at: number): string | undefined => {
+    const refusal = said(`order.${String(at)}`);
+    if (refusal !== undefined) return refusal;
+    const penaltyFirst = rows[at]?.kind === 'penalty' ? penaltyRefusal(at === 0) : null;
+    return (
+      penaltyFirst ??
+      unreportedValue(rows[at], values) ??
+      repeatedValue(rows, at, values) ??
+      undefined
+    );
+  };
+  const shownRows = rowsChoice(board.rows);
   const guests = board.who === 'everyone';
   const perGroup = perGroupRefusal(board.order);
 
@@ -166,7 +225,7 @@ function BoardEntry({
     <li data-item={index}>
       <Fieldset legend={title}>
         <div className={shared.panel} role="status" aria-label={`What ${title} ranks`}>
-          <BodyText>{boardSentence(board, { held })}</BodyText>
+          <BodyText>{boardSentence(board, { held, values })}</BodyText>
         </div>
         {elsewhere.map(([key, messages]) => (
           <p key={key} className={classes.refused} role="alert">
@@ -239,7 +298,7 @@ function BoardEntry({
                 ? 'Visitors who have not entered have no row of their own, so a leaderboard everyone can see shows them every row.'
                 : undefined
             }
-            value={rows}
+            value={shownRows}
             options={[
               { value: 'all', label: 'All rows' },
               ...(guests ? [] : [{ value: 'own', label: 'Only their own row' }]),
@@ -252,7 +311,7 @@ function BoardEntry({
             }
             disabled={disabled}
           />
-          {rows === 'top' && (
+          {shownRows === 'top' && (
             <NumberField
               label="How many top rows"
               value={board.rows}
@@ -266,7 +325,10 @@ function BoardEntry({
         </FieldBox>
 
         <FieldBox name="tasks">
-          <div role="group" aria-label="Tasks">
+          <div className={classes.checks} role="group" aria-label="Tasks">
+            <span className={classes.checksLabel} aria-hidden>
+              Tasks
+            </span>
             <Checkbox
               label="Covers every task"
               checked={board.tasks === null}
@@ -277,7 +339,7 @@ function BoardEntry({
               shownTasks.map((task) => (
                 <Checkbox
                   key={task}
-                  label={task}
+                  label={taskLabels.get(task) ?? task}
                   checked={board.tasks?.includes(task) ?? false}
                   onChange={(covered) =>
                     onChange({
@@ -300,62 +362,64 @@ function BoardEntry({
         </FieldBox>
 
         <FieldBox name="order">
-          <div role="group" aria-label="Ranked by">
-            {board.order.length === 0 ? (
-              <BodyText tone="secondary">
-                Ranked by points alone, unless you add another way to rank.
-              </BodyText>
-            ) : (
-              <ol className={classes.entries}>
-                {board.order.map((key, at) => (
-                  <OrderKey
-                    key={at}
-                    label={at === 0 ? 'Ranked first by' : `Then by (${String(at + 1)})`}
-                    of={title}
-                    value={key}
-                    first={at === 0}
-                    last={at === board.order.length - 1}
-                    error={said(`order.${String(at)}`)}
-                    minutesError={said(`order.${String(at)}.per_attempt`)}
-                    disabled={disabled}
-                    onChange={(to) => setKey(at, to)}
-                    onMove={(by) => moveKey(at, by)}
-                    onRemove={() =>
-                      onChange({ order: board.order.filter((_, k) => k !== at) })
-                    }
-                  />
-                ))}
-              </ol>
-            )}
+          <div className={classes.order} role="group" aria-label="Ranked by">
+            <span className={classes.checksLabel} aria-hidden>
+              Ranked by
+            </span>
+            <BodyText>{orderSummary(board.order, values)}</BodyText>
+            <ol className={classes.orderRows}>
+              {rows.map((key, at) => (
+                <OrderKey
+                  key={at}
+                  at={at}
+                  of={title}
+                  value={key}
+                  options={kindOptions(rows, at)}
+                  rows={rows}
+                  values={values}
+                  up={canMoveKey(rows, at, -1)}
+                  down={canMoveKey(rows, at, 1)}
+                  alone={rows.length === 1}
+                  error={keyProblem(at)}
+                  minutesError={said(`order.${String(at)}.per_attempt`)}
+                  disabled={disabled}
+                  onChange={(to) => setKey(at, to)}
+                  onMove={(by) => moveKey(at, by)}
+                  onRemove={() => writeOrder(rows.filter((_, k) => k !== at))}
+                />
+              ))}
+            </ol>
             {orderSaid !== undefined && (
               <p className={classes.refused} role="alert">
                 {orderSaid}
               </p>
             )}
-            {!disabled && (
+            {!disabled && added !== null && (
               <div className={shared.actions}>
                 <Button
                   size="xs"
                   variant="secondary"
                   label={`Add a way to rank ${title}`}
-                  onClick={() =>
-                    onChange({ order: [...board.order, { kind: 'points' }] })
-                  }
+                  onClick={() => writeOrder([...rows, added])}
                 >
                   Add a way to rank
-                </Button>
-                <Button
-                  size="xs"
-                  variant="danger"
-                  label={`Remove ${title}`}
-                  onClick={() => setRemoving(true)}
-                >
-                  Remove this leaderboard
                 </Button>
               </div>
             )}
           </div>
         </FieldBox>
+        {!disabled && (
+          <div className={classes.foot}>
+            <Button
+              size="xs"
+              variant="danger"
+              label={`Remove ${title}`}
+              onClick={() => setRemoving(true)}
+            >
+              Remove this leaderboard
+            </Button>
+          </div>
+        )}
         <Modal
           opened={removing}
           onClose={() => setRemoving(false)}
@@ -387,12 +451,47 @@ function BoardEntry({
   );
 }
 
+/**
+ * The values a row's dropdown offers, by their titles, with the one the
+ * file names kept first when no task reports it, so it stays in view. A
+ * value another row already ranks by is greyed, saying which (M69), unless
+ * it is this row's own.
+ */
+function valueChoices(
+  values: ValueMeaning[],
+  named: string,
+  rows: OrderKeyValues[],
+  at: number,
+): { value: string; label: string; disabled?: boolean }[] {
+  const offered = values.map((meaning) => {
+    const label = valueOption(meaning);
+    const other = rows.findIndex(
+      (key, k) => k !== at && key.kind === 'value' && key.name.trim() === meaning.name,
+    );
+    return other < 0 || meaning.name === named.trim()
+      ? { value: meaning.name, label }
+      : {
+          value: meaning.name,
+          label: `${label}: way ${String(other + 1)} ranks by it already`,
+          disabled: true,
+        };
+  });
+  const name = named.trim();
+  return name === '' || values.some((meaning) => meaning.name === name)
+    ? offered
+    : [{ value: named, label: name }, ...offered];
+}
+
 function OrderKey({
-  label,
+  at,
   of,
   value,
-  first,
-  last,
+  options,
+  rows,
+  values,
+  up,
+  down,
+  alone,
   error,
   minutesError,
   disabled,
@@ -400,13 +499,22 @@ function OrderKey({
   onMove,
   onRemove,
 }: {
-  /** The key's name in its board, such as "Ranked first by". */
-  label: string;
+  /** Its place in the board's order, from 0. */
+  at: number;
   /** The board it belongs to, for its buttons' names. */
   of: string;
   value: OrderKeyValues;
-  first: boolean;
-  last: boolean;
+  /** The ways this row may take. */
+  options: { value: string; label: string }[];
+  /** Every row of the board's order, this one among them. */
+  rows: OrderKeyValues[];
+  /** The values it may rank by, or null while not known. */
+  values: ValueMeaning[] | null;
+  /** Whether it may move up, and down. */
+  up: boolean;
+  down: boolean;
+  /** Whether it is the board's only way to rank, which stays. */
+  alone: boolean;
   error: string | undefined;
   minutesError: string | undefined;
   disabled: boolean;
@@ -414,78 +522,89 @@ function OrderKey({
   onMove: (by: -1 | 1) => void;
   onRemove: () => void;
 }) {
+  const place = String(at + 1);
+  const name = `Way to rank ${place}`;
   return (
-    <li className={classes.orderKey} role="group" aria-label={label}>
-      <RadioGroup
-        label={label}
-        value={value.kind}
-        options={KINDS.map((option) => ({
-          ...option,
-          disabled:
-            option.value === 'penalty' &&
-            penaltyRefusal(first) !== null &&
-            value.kind !== 'penalty',
-          reason: option.value === 'penalty' ? penaltyRefusal(first) : null,
-        }))}
-        onChange={(kind) => onChange(keyOfKind(kind))}
-        error={
-          error ??
-          (value.kind === 'penalty' ? (penaltyRefusal(first) ?? undefined) : undefined)
-        }
-        disabled={disabled}
-      />
-      {value.kind === 'value' && (
-        <TextInput
-          label="Value"
-          value={value.name}
-          onChange={(name) => onChange({ kind: 'value', name })}
-          placeholder="Such as time_ms"
-          description="Whether higher or lower is better is set by the workflow that reports it."
-          disabled={disabled}
-        />
-      )}
-      {value.kind === 'penalty' && (
-        <NumberField
-          label="Minutes per earlier attempt"
-          value={value.perAttempt}
-          onChange={(perAttempt) => onChange({ kind: 'penalty', perAttempt })}
-          placeholder="0"
-          info="Added for each earlier attempt at the task that does not count, on top of the minutes from the start to the submission that does."
-          error={minutesError}
-          whole
-          disabled={disabled}
-        />
-      )}
-      {!disabled && (
-        <div className={shared.actions}>
-          <Button
-            size="xs"
-            variant="secondary"
-            disabled={first}
-            label={`Move ${label} of ${of} up`}
-            onClick={() => onMove(-1)}
-          >
-            Up
-          </Button>
-          <Button
-            size="xs"
-            variant="secondary"
-            disabled={last}
-            label={`Move ${label} of ${of} down`}
-            onClick={() => onMove(1)}
-          >
-            Down
-          </Button>
-          <Button
-            size="xs"
-            variant="secondary"
-            label={`Remove ${label} of ${of}`}
-            onClick={onRemove}
-          >
-            Remove
-          </Button>
+    <li className={classes.orderRow} role="group" aria-label={name}>
+      <span className={classes.orderNumber} aria-hidden>
+        {place}
+      </span>
+      <div className={classes.orderBody}>
+        <div className={classes.orderLine}>
+          <Select
+            label={name}
+            labelHidden
+            value={value.kind}
+            options={options}
+            onChange={(kind) => onChange(keyOfKind(kind))}
+            disabled={disabled}
+          />
+          {value.kind === 'value' &&
+            (values === null ? (
+              <TextInput
+                label="Which value"
+                labelHidden
+                value={value.name}
+                onChange={(text) => onChange({ kind: 'value', name: text })}
+                placeholder="The name the workflow reports it under"
+                disabled={disabled}
+              />
+            ) : (
+              <Select
+                label="Which value"
+                labelHidden
+                value={value.name}
+                options={valueChoices(values, value.name, rows, at)}
+                onChange={(name) => onChange({ kind: 'value', name })}
+                placeholder="Choose a value"
+                disabled={disabled}
+              />
+            ))}
+          {value.kind === 'penalty' && (
+            <span className={classes.minutes}>
+              <TextInput
+                label="Minutes per earlier attempt"
+                labelHidden
+                value={value.perAttempt}
+                onChange={(perAttempt) => onChange({ kind: 'penalty', perAttempt })}
+                placeholder="0"
+                inputMode="decimal"
+                error={minutesError ?? numberProblem(value.perAttempt, true)}
+                disabled={disabled}
+              />
+              <span aria-hidden>minutes per earlier attempt</span>
+            </span>
+          )}
+          {!disabled && (
+            <span className={classes.orderButtons}>
+              <IconButton
+                sign="↑"
+                label={`Move way to rank ${place} of ${of} up`}
+                disabled={!up}
+                onClick={() => onMove(-1)}
+              />
+              <IconButton
+                sign="↓"
+                label={`Move way to rank ${place} of ${of} down`}
+                disabled={!down}
+                onClick={() => onMove(1)}
+              />
+              <IconButton
+                sign="✕"
+                label={`Remove way to rank ${place} of ${of}`}
+                disabled={alone}
+                onClick={onRemove}
+              />
+            </span>
+          )}
         </div>
-      )}
+        <span className={classes.note}>{kindDescription(value.kind)}</span>
+        {error !== undefined && (
+          <p className={classes.refused} role="alert">
+            {error}
+          </p>
+        )}
+      </div>
     </li>
   );
 }

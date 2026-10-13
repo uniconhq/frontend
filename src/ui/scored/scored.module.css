@@ -52,13 +52,16 @@
 
 .metrics {
   display: flex;
+  align-items: baseline;
   gap: 4px 14px;
   flex-wrap: wrap;
   margin: 0;
 }
 
+/* Each name and its number on one baseline, the number in the monospace of numbers. */
 .metric {
   display: flex;
+  align-items: baseline;
   gap: 6px;
 }
 
@@ -68,8 +71,28 @@
 
 .metric dd {
   margin: 0;
+}
+
+.number {
   font-family: var(--mantine-font-family-monospace);
   font-size: 12px;
+}
+
+/* The folds over the tests and what is said of a missing one, one under the other. */
+.folded {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* "Over the tests shown:" before the folds, on their baseline. */
+.overAll {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+  font-size: 14px;
+  color: var(--unicon-text-body);
 }
 
 /* A text the run reported once, under its name. */

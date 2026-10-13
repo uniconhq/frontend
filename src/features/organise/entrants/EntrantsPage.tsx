@@ -519,6 +519,8 @@ function Row({
   const [reason, setReason] = useState('');
   const name = entrant.display_name;
   const { pending, error } = change;
+  // What the row's dialog changes, named on its button rather than a bare "Manage".
+  const changes = teams ? 'name, members and extra time' : 'extra time';
 
   useEffect(() => {
     if (open === 'reject') field.current?.focus();
@@ -614,10 +616,10 @@ function Row({
             <Button
               size="xs"
               variant="secondary"
-              label={`Manage ${name}`}
+              label={`Change the ${changes} of ${name}`}
               onClick={() => show('manage')}
             >
-              Manage
+              {teams ? 'Name, members, extra time' : 'Extra time'}
             </Button>
           </div>
           {open === 'reject' && (
@@ -691,7 +693,7 @@ function Row({
           <Modal
             opened={open === 'manage'}
             onClose={() => show(null)}
-            title={`Manage ${name}`}
+            title={`${name}: ${changes}`}
           >
             {open === 'manage' && (
               <Manage

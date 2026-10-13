@@ -199,7 +199,7 @@ describe('the entrants page', () => {
     ]);
   });
 
-  it('gives extra time and moves a member to another team from Manage', async () => {
+  it('gives extra time and moves a member to another team from the row’s Name, members, extra time', async () => {
     server.use(
       signedIn,
       http.get(`${CONTEST_API}/tasks`, () => HttpResponse.json([{ name: 'sum' }])),
@@ -208,8 +208,14 @@ describe('the entrants page', () => {
     const user = userEvent.setup();
     renderApp(PAGE);
 
-    await user.click(await screen.findByRole('button', { name: 'Manage Red' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Manage Red' });
+    await user.click(
+      await screen.findByRole('button', {
+        name: 'Change the name, members and extra time of Red',
+      }),
+    );
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Red: name, members and extra time',
+    });
     const minutes = within(dialog).getByRole('textbox', { name: /Extra minutes/ });
     await user.clear(minutes);
     await user.type(minutes, '10');
@@ -251,8 +257,14 @@ describe('the entrants page', () => {
     const user = userEvent.setup();
     renderApp(PAGE);
 
-    await user.click(await screen.findByRole('button', { name: 'Manage Blue' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Manage Blue' });
+    await user.click(
+      await screen.findByRole('button', {
+        name: 'Change the name, members and extra time of Blue',
+      }),
+    );
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Blue: name, members and extra time',
+    });
     await user.type(
       within(dialog).getByRole('textbox', { name: /Invite someone into it/ }),
       'finn',
@@ -271,8 +283,14 @@ describe('the entrants page', () => {
     const user = userEvent.setup();
     renderApp(PAGE);
 
-    await user.click(await screen.findByRole('button', { name: 'Manage Red' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Manage Red' });
+    await user.click(
+      await screen.findByRole('button', {
+        name: 'Change the name, members and extra time of Red',
+      }),
+    );
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Red: name, members and extra time',
+    });
     expect(
       within(dialog).queryByRole('button', { name: 'Delete this entrant' }),
     ).toBeNull();
@@ -313,7 +331,11 @@ describe('the entrants page', () => {
 
     await screen.findByRole('table', { name: 'Entrants' });
     expect(screen.queryByRole('columnheader', { name: 'Actions' })).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Manage Red' })).toBeNull();
+    expect(
+      screen.queryByRole('button', {
+        name: 'Change the name, members and extra time of Red',
+      }),
+    ).toBeNull();
   });
 
   it('says when nobody has registered', async () => {

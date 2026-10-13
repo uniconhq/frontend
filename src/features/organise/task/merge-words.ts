@@ -12,8 +12,8 @@ import { SHOWS } from './scoring';
  */
 
 const RULE_WEIGHTS: Record<string, string> = {
-  each: 'Points by the share of tests passed',
-  worst: 'Points by the worst test',
+  each: 'Points shared among the tests',
+  worst: 'Points times the lowest test score',
   pass: 'Points when enough tests pass',
   pass_at: 'Share of tests that must pass',
   test_weights: 'Weights',
@@ -55,7 +55,7 @@ function valueWords(path: MergePath, value: unknown): string | null {
   if (key === 'credit') {
     if (typeof value === 'string') return `A score the workflow gives it: ${value}`;
     if (isRecord(value) && typeof value['relative'] === 'string') {
-      return `Its ${value['relative']} against the best anyone reached`;
+      return `Its ${value['relative']} against the best any entrant reached`;
     }
   }
   if (typeof value === 'boolean') return value ? 'Yes' : 'No';

@@ -13,7 +13,7 @@ import { Loaded } from '@/ui/feedback/Loaded';
 import { useMe } from '@/session';
 import { STANDING_WORD, standingOf, type ContestStanding } from '@/lib/contest-state';
 import { contestPath, taskPath } from '@/lib/organiser-paths';
-import { contestSectionPath } from '@/lib/sections';
+import { contestSectionPath, taskCardPath } from '@/lib/sections';
 import { formatDateTime, serverNow } from '@/lib/time';
 import { DefinitionErrors } from '../DefinitionErrors';
 import type { Outcome } from '../files/SaveOutcome';
@@ -27,6 +27,7 @@ import { FieldBox } from './ContestFile';
 import { contestPlaceOf, useOpenedField } from './opened';
 import { useContestChange } from './save';
 import { useContestSettings } from './settings';
+import { labelOf, useTaskTitles } from './task-entry';
 import { VISIBILITY_CHOICES, visibilitySentence } from './words';
 import shared from '../organise.module.css';
 import classes from './contest.module.css';
@@ -81,26 +82,61 @@ type Check = {
   to: string;
 };
 
-/** How a task stands for opening the contest: published without errors, or what stops it. */
-function taskCheck(org: string, contest: string, standing: TaskStanding): Check {
-  const { latest, draft, errors } = standing.state;
-  const name = `${standing.label} · ${standing.task.name}`;
+/**
+ * How a task stands for opening the contest: published without errors, with
+ * a statement written, or what stops it. A published statement that is blank
+ * or still the one a new task starts with stops it too (M57), and its line
+ * goes to the task's Statement card. A last save with problems over a
+ * publication that would open is only a warning, as the forge's opening
+ * refusal does not check it either.
+ */
+function taskCheck(
+  org: string,
+  contest: string,
+  standing: TaskStanding,
+  titles: ReadonlyMap<string, string>,
+): Check {
+  const { latest, draft, errors, statement_written } = standing.state;
+  const name = labelOf(standing, titles);
   const to = taskPath(org, contest, standing.task.name);
   if (draft && errors.length > 0) {
+    if (latest !== null && statement_written) {
+      return {
+        key: name,
+        ok: false,
+        warning: true,
+        text: `${name}: its last save has problems, so entrants get the publication before it. The contest can open with it.`,
+        to,
+      };
+    }
     return { key: name, ok: false, text: `${name}: its last save has problems`, to };
   }
   if (latest === null)
     return { key: name, ok: false, text: `${name}: not published yet`, to };
+  if (!statement_written) {
+    return {
+      key: name,
+      ok: false,
+      text: `${name}: statement not written yet`,
+      to: taskCardPath(org, contest, standing.task.name, 'statement'),
+    };
+  }
   return { key: name, ok: true, text: `${name}: published`, to };
 }
 
-/** What opening the contest needs, each item linking to where it is fixed. */
+/**
+ * What opening the contest needs, each item linking to where it is fixed. A
+ * withdrawn task is not counted (#450): entrants never see it, so it needs
+ * nothing to open.
+ */
 function checksOf(
   org: string,
   contest: string,
   values: ContestValues,
-  tasks: TaskStanding[],
+  listed: TaskStanding[],
+  titles: ReadonlyMap<string, string>,
 ): Check[] {
+  const tasks = listed.filter((task) => !task.withdrawn);
   const settings = contestSectionPath(org, contest, 'settings');
   const timed =
     values.name.trim() !== '' &&
@@ -123,7 +159,7 @@ function checksOf(
       text: tasks.length > 0 ? 'At least one task' : 'Add a task',
       to: `${contestPath(org, contest)}?part=tasks`,
     },
-    ...tasks.map((task) => taskCheck(org, contest, task)),
+    ...tasks.map((task) => taskCheck(org, contest, task, titles)),
     {
       key: 'entry',
       ok: ways.length > 0,
@@ -209,6 +245,11 @@ export function StatusCard({ org, contest }: { org: string; contest: string }) {
       { staleTime: 0 },
     ),
   );
+  const titles = useTaskTitles(
+    org,
+    contest,
+    tasks.state === 'ready' ? tasks.data.map((standing) => standing.task.name) : [],
+  );
   const admin = holdsAt(useMe().roles, { kind: 'contest', org, contest }, 'admin');
   const { apply, pending } = useContestChange(org, contest);
   const [asking, setAsking] = useState<Ask>(null);
@@ -237,7 +278,9 @@ export function StatusCard({ org, contest }: { org: string; contest: string }) {
           const now = serverNow();
           const standing = standingOf(dated(values), now);
           const checks =
-            tasks.state === 'ready' ? checksOf(org, contest, values, tasks.data) : [];
+            tasks.state === 'ready'
+              ? checksOf(org, contest, values, tasks.data, titles)
+              : [];
           const blocked = checks.some((check) => !check.ok && check.warning !== true);
           const started = Date.parse(values.start) <= now.getTime();
           const actions: ReactNode[] = [];
@@ -376,12 +419,16 @@ export function StatusCard({ org, contest }: { org: string; contest: string }) {
               <Modal
                 opened={asking === 'draft'}
                 onClose={() => setAsking(null)}
-                title="Back to draft?"
+                title="Put the contest back to draft?"
               >
                 <div className={shared.stack}>
                   <BodyText>
-                    Only its organisers will see it again, until it is opened once more.
-                    Registrations stay. Once it starts, it can no longer go back.
+                    Only its organisers see it until it is opened again: entrants can no
+                    longer reach it, and nobody new can register. Those already
+                    registered stay registered.
+                  </BodyText>
+                  <BodyText tone="secondary">
+                    Once the contest starts, it can no longer go back to draft.
                   </BodyText>
                   <div className={shared.actions}>
                     <Button
@@ -406,8 +453,8 @@ export function StatusCard({ org, contest }: { org: string; contest: string }) {
               >
                 <div className={shared.stack}>
                   <BodyText>
-                    Its tasks can still be read, and they take no submissions. Its
-                    entrants and their results stay as they are.
+                    Nobody can submit to its tasks any more, though they can still be
+                    read. Its entrants and their results stay as they are.
                   </BodyText>
                   <div className={shared.actions}>
                     <Button

@@ -187,6 +187,8 @@ async function stubContestantApi(page: Page, signedIn: boolean) {
         registration: entry,
         organises: false,
         now: '2026-09-29T10:00:00Z',
+        // The leaderboards an approved entrant sees, which each task's points follow.
+        boards: approved ? [STANDINGS.board] : [],
         tasks: [
           {
             name: 'sum',
@@ -195,8 +197,15 @@ async function stubContestantApi(page: Page, signedIn: boolean) {
             worth: '100',
             // Points only for an approved entrant, a held-back group's part pending.
             points: approved
-              ? { shown: '62', pending: '38', pending_until: CONTEST.end }
-              : null,
+              ? [
+                  {
+                    board: STANDINGS.board,
+                    covers: true,
+                    points: { shown: '62', pending: '38', pending_until: CONTEST.end },
+                    most: '100',
+                  },
+                ]
+              : [],
             release: OPEN,
             due: null,
             closes: CONTEST.end,

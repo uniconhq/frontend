@@ -97,13 +97,14 @@ export function home(overrides: Partial<ContestHome> = {}): ContestHome {
     registration: entry(),
     organises: false,
     now: '2026-09-12T10:00:00Z',
+    boards: [],
     tasks: [
       {
         name: 'sum',
         label: 'A',
         title: 'Sum of Two',
         worth: '100',
-        points: null,
+        points: [],
         release: OPEN,
         due: null,
         closes: '2026-09-12T10:30:00Z',
@@ -217,9 +218,11 @@ export function grading(overrides: Partial<GradingResult> = {}): GradingResult {
     groups: [],
     values: reported(),
     reason: null,
+    limit: null,
     points: null,
     factor: null,
     folded: {},
+    meanings: [],
     ...overrides,
   };
 }

@@ -4,9 +4,11 @@ import type {
   ListedContest,
   Named,
   Publication,
+  SaveEffect,
   TaskStanding,
   TaskState,
   TreeEntry,
+  ValueMeaning,
 } from '@/api/types';
 import { problem } from './server';
 
@@ -70,6 +72,22 @@ export function listAndCreate(path: string, existing: { name: string }[]) {
 
 // A task's state and publications
 
+/** What a published save does when it moves nobody's result, in the forge's words. */
+export const unchanged: SaveEffect = {
+  results_change: false,
+  summary: "Nobody's result changes.",
+  runs_again: ['No submission runs again: the tests and how they run are the same.'],
+  scores: ['No score changes.'],
+  reading: ['Nothing entrants read changes.'],
+};
+
+/** What classic reports, as a publication names its values (M58), in its report order. */
+export const classicMeanings: ValueMeaning[] = [
+  { name: 'time_ms', title: 'Run time', unit: 'ms', fold: 'max', better: 'lower' },
+  { name: 'memory_kb', title: 'Memory used', unit: 'KB', fold: 'max', better: 'lower' },
+  { name: 'log', title: 'Compile log', unit: null, fold: null, better: null },
+];
+
 export const publications: Publication[] = [
   {
     number: 1,
@@ -77,6 +95,7 @@ export const publications: Publication[] = [
     grading_changed: true,
     changes: ['plans/default.json added'],
     at: '2026-09-20T10:00:00Z',
+    meanings: classicMeanings,
   },
   {
     number: 2,
@@ -84,6 +103,7 @@ export const publications: Publication[] = [
     grading_changed: false,
     changes: [],
     at: '2026-09-21T10:00:00Z',
+    meanings: classicMeanings,
   },
 ];
 
@@ -92,6 +112,8 @@ export const publishedTask: TaskState = {
   latest: publications[1] ?? null,
   draft: false,
   errors: [],
+  statement_written: true,
+  head_statement_written: true,
 };
 
 export const draftTask: TaskState = {
@@ -104,6 +126,8 @@ export const draftTask: TaskState = {
       message: 'There is no file under data/hidden/ in the task.',
     },
   ],
+  statement_written: true,
+  head_statement_written: true,
 };
 
 export const taskState = http.get(TASK_API, () => HttpResponse.json(publishedTask));
@@ -123,6 +147,9 @@ export const standings: TaskStanding[] = [
   {
     task: { name: 'sort' },
     label: 'A',
+    withdrawn: false,
+    submissions: 0,
+    take_out: 'remove',
     state: { ...publishedTask, latest: publications[0] ?? null },
     timeline: {
       release_at: '2026-10-01T09:00:00Z',
@@ -135,6 +162,9 @@ export const standings: TaskStanding[] = [
   {
     task: { name: 'sum' },
     label: 'B',
+    withdrawn: false,
+    submissions: 0,
+    take_out: 'remove',
     state: draftTask,
     timeline: {
       release_at: '2026-10-01T09:00:00Z',
@@ -158,9 +188,33 @@ const LISTED_AT = '9f8e7d6c5b4a39281706f5e4d3c2b1a098765432';
 /** Folder by folder, as `GET <place>/tree?path=` answers. */
 const taskTree: Record<string, TreeEntry[]> = {
   '': [
-    { path: 'task.yaml', kind: 'file', size: 120, upload: null, version: LISTED_AT },
-    { path: 'data', kind: 'directory', size: null, upload: null, version: null },
-    { path: 'statement.md', kind: 'file', size: 40, upload: null, version: LISTED_AT },
+    {
+      path: 'task.yaml',
+      kind: 'file',
+      size: 120,
+      upload: null,
+      start: null,
+      token: null,
+      version: LISTED_AT,
+    },
+    {
+      path: 'data',
+      kind: 'directory',
+      size: null,
+      upload: null,
+      start: null,
+      token: null,
+      version: null,
+    },
+    {
+      path: 'statement.md',
+      kind: 'file',
+      size: 40,
+      upload: null,
+      start: null,
+      token: null,
+      version: LISTED_AT,
+    },
   ],
   data: [
     {
@@ -168,6 +222,8 @@ const taskTree: Record<string, TreeEntry[]> = {
       kind: 'directory',
       size: null,
       upload: null,
+      start: null,
+      token: null,
       version: null,
     },
   ],
@@ -177,6 +233,8 @@ const taskTree: Record<string, TreeEntry[]> = {
       kind: 'file',
       size: 4,
       upload: null,
+      start: null,
+      token: null,
       version: LISTED_AT,
     },
     {
@@ -184,6 +242,8 @@ const taskTree: Record<string, TreeEntry[]> = {
       kind: 'file',
       size: 11,
       upload: null,
+      start: null,
+      token: null,
       version: LISTED_AT,
     },
   ],
@@ -191,7 +251,15 @@ const taskTree: Record<string, TreeEntry[]> = {
 
 const contestTree: Record<string, TreeEntry[]> = {
   '': [
-    { path: 'contest.yaml', kind: 'file', size: 80, upload: null, version: LISTED_AT },
+    {
+      path: 'contest.yaml',
+      kind: 'file',
+      size: 80,
+      upload: null,
+      start: null,
+      token: null,
+      version: LISTED_AT,
+    },
   ],
 };
 

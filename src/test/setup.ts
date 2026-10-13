@@ -1,6 +1,6 @@
 import '@testing-library/jest-dom/vitest';
 import { afterAll, afterEach, beforeAll, vi } from 'vitest';
-import { cleanup } from '@testing-library/react';
+import { cleanup, configure } from '@testing-library/react';
 import {
   platform as floatingPlatform,
   type Platform,
@@ -16,6 +16,15 @@ import { server } from './server';
  * follow; tests read where it went from this mock instead.
  */
 vi.mock('@/lib/leave', () => ({ leaveFor: vi.fn() }));
+
+/**
+ * A `findBy*` or `waitFor` gives up after a second unless told otherwise,
+ * which a page's first render on a busy machine can take by itself, so a
+ * wait that would succeed failed under load. Ten seconds stays under the
+ * test timeout (`vitest.config.ts`), so a wait that never succeeds still
+ * prints the page rather than a bare timeout.
+ */
+configure({ asyncUtilTimeout: 10_000 });
 
 /**
  * CodeMirror measures a layout jsdom does not have, so pages are tested with

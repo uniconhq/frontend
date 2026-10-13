@@ -5,7 +5,14 @@ import { http, HttpResponse } from 'msw';
 import type { Announcement, Clarification } from '@/api/types';
 import { renderApp } from '@/test/render';
 import { server, signedIn } from '@/test/server';
-import { CONTEST_API, TASK_API, home, registration, taskPage } from '@/test/contestant';
+import {
+  CONTEST_API,
+  TASK_API,
+  entry,
+  home,
+  registration,
+  taskPage,
+} from '@/test/contestant';
 import { passTime, withFakeTimers } from '@/test/timers';
 
 const HOME = '/contests/acme/spring';
@@ -116,7 +123,12 @@ describe('questions', () => {
     let mine = [
       question({
         messages: [
-          { from_asker: false, body: 'Up to 10^5.', at: '2026-09-12T09:20:00Z' },
+          {
+            from_asker: false,
+            body: 'Up to 10^5.',
+            at: '2026-09-12T09:20:00Z',
+            announcement: null,
+          },
         ],
       }),
     ];
@@ -149,7 +161,136 @@ describe('questions', () => {
     });
     const list = await screen.findByRole('list', { name: 'Your questions' });
     expect(await within(list).findByText('And m?')).toBeVisible();
-    expect(within(list).getByText('Up to 10^5.')).toBeVisible();
+    const answered = within(list).getByRole('article', { name: 'Input size?' });
+    const messages = within(answered).getAllByRole('listitem');
+    expect(
+      messages.map((message) => message.querySelector('strong')?.textContent),
+    ).toEqual(['You', 'Organisers']);
+    expect(messages[1]).toHaveTextContent('Up to 10^5.');
+    expect(within(answered).getByText('Open')).toBeVisible();
+
+    // The follow-up is folded until asked for, and opens in place.
+    expect(within(answered).queryByRole('textbox')).toBeNull();
+    await userEvent.click(
+      within(answered).getByRole('button', { name: 'Follow up Input size?' }),
+    );
+    expect(within(answered).getByRole('textbox', { name: 'Follow up' })).toHaveFocus();
+  });
+
+  const answeredPublicly = http.get(`${CONTEST_API}/questions`, () =>
+    HttpResponse.json([
+      question({
+        answered: true,
+        closed: true,
+        messages: [
+          {
+            from_asker: false,
+            body: 'Answered publicly in the announcement ‘On n’',
+            at: '2026-09-12T09:20:00Z',
+            announcement: { task: 'sum', number: 3, title: 'On n' },
+          },
+        ],
+      }),
+    ]),
+  );
+
+  it('shows a public answer on the asker’s question, linking to its announcement on the contest page (M62)', async () => {
+    server.use(
+      signedIn,
+      approvedHome,
+      answeredPublicly,
+      http.get(`${CONTEST_API}/home/announcements`, () =>
+        HttpResponse.json([
+          announcement({
+            number: 3,
+            title: 'On n',
+            where: { org: 'acme', contest: 'spring', task: 'sum' },
+          }),
+        ]),
+      ),
+    );
+    renderApp(QUESTIONS);
+
+    const link = await screen.findByRole('link', { name: '‘On n’' });
+    expect(link).toHaveAttribute('href', '/contests/acme/spring#announcement-sum-3');
+    expect(link.closest('p')).toHaveTextContent(
+      'Answered publicly in the announcement ‘On n’',
+    );
+  });
+
+  it('links the whole of a public answer’s message that was edited at the forge, taking no title from its words', async () => {
+    server.use(
+      signedIn,
+      approvedHome,
+      http.get(`${CONTEST_API}/questions`, () =>
+        HttpResponse.json([
+          question({
+            answered: true,
+            closed: true,
+            messages: [
+              {
+                from_asker: false,
+                body: 'Answered in the announcement ‘Bounds’',
+                at: '2026-09-12T09:20:00Z',
+                announcement: { task: 'sum', number: 3, title: null },
+              },
+            ],
+          }),
+        ]),
+      ),
+      http.get(`${CONTEST_API}/home/announcements`, () =>
+        HttpResponse.json([
+          announcement({
+            number: 3,
+            title: 'On n',
+            where: { org: 'acme', contest: 'spring', task: 'sum' },
+          }),
+        ]),
+      ),
+    );
+    renderApp(QUESTIONS);
+
+    const link = await screen.findByRole('link', {
+      name: 'Answered in the announcement ‘Bounds’',
+    });
+    expect(link).toHaveAttribute('href', '/contests/acme/spring#announcement-sum-3');
+  });
+
+  it('says a public answer’s announcement was closed rather than link to a page that no longer shows it', async () => {
+    server.use(signedIn, approvedHome, answeredPublicly);
+    renderApp(QUESTIONS);
+
+    expect(
+      await screen.findByText(
+        'Answered publicly in the announcement ‘On n’, which the organisers have since closed.',
+      ),
+    ).toBeVisible();
+    expect(screen.queryByRole('link', { name: '‘On n’' })).toBeNull();
+  });
+
+  it('says a public answer’s task was withdrawn where that is why its announcement is gone (#450)', async () => {
+    const withdrawn = home({ registration: registration({ status: 'approved' }) });
+    server.use(
+      signedIn,
+      http.get(`${CONTEST_API}/home`, () =>
+        HttpResponse.json({
+          ...withdrawn,
+          tasks: withdrawn.tasks.map((task) => ({
+            ...task,
+            release: { ...task.release, open: false, closed: 'withdrawn' },
+          })),
+        }),
+      ),
+      answeredPublicly,
+    );
+    renderApp(QUESTIONS);
+
+    expect(
+      await screen.findByText(
+        'Answered publicly in the announcement ‘On n’, whose task has since been withdrawn from the contest.',
+      ),
+    ).toBeVisible();
+    expect(screen.queryByText(/organisers have since closed/)).toBeNull();
   });
 
   it('marks a team’s messages as the team’s', async () => {
@@ -165,7 +306,12 @@ describe('questions', () => {
           question({
             asker: 'entrant.0b9d6a5200004000800000000000001a',
             messages: [
-              { from_asker: true, body: 'And m?', at: '2026-09-12T09:15:00Z' },
+              {
+                from_asker: true,
+                body: 'And m?',
+                at: '2026-09-12T09:15:00Z',
+                announcement: null,
+              },
             ],
           }),
         ]),
@@ -174,7 +320,7 @@ describe('questions', () => {
     renderApp(QUESTIONS);
 
     const list = await screen.findByRole('list', { name: 'Your questions' });
-    expect(await within(list).findByText(/Your team/)).toBeVisible();
+    expect(await within(list).findAllByText('Your team')).toHaveLength(2);
     expect(
       screen.getByRole('heading', { name: 'Your team’s questions' }),
     ).toBeVisible();
@@ -201,6 +347,30 @@ describe('questions', () => {
     expect(asked[0]).toMatchObject({ task: 'sum' });
   });
 
+  it('says which task a question is about by its letter and title, as the form does', async () => {
+    server.use(
+      signedIn,
+      approvedHome,
+      http.get(`${CONTEST_API}/questions`, () =>
+        HttpResponse.json([question({ task: 'sum' })]),
+      ),
+    );
+    renderApp(QUESTIONS);
+
+    const list = await screen.findByRole('list', { name: 'Your questions' });
+    expect(within(list).getByText('About task A · Sum of Two')).toBeVisible();
+  });
+
+  it('names each task it can ask about by its letter and title, as the contest’s page does', async () => {
+    server.use(signedIn, approvedHome);
+    renderApp(`${QUESTIONS}?task=sum`);
+
+    const form = await screen.findByRole('form', { name: 'Ask' });
+    expect(
+      within(form).getByRole('combobox', { name: 'About the task' }),
+    ).toHaveDisplayValue('A · Sum of Two');
+  });
+
   it('says how many questions were asked and answered on the contest’s page', async () => {
     server.use(
       signedIn,
@@ -220,20 +390,35 @@ describe('questions', () => {
     ).toHaveAttribute('href', QUESTIONS);
   });
 
-  it('offers no questions to someone who is not an approved contestant', async () => {
-    server.use(
-      signedIn,
-      http.get(`${CONTEST_API}/home`, () => HttpResponse.json(home())),
-    );
-    renderApp(QUESTIONS);
+  it.each([
+    [
+      'waits for approval',
+      { registration: registration() },
+      'You can ask the organisers questions once your registration is approved.',
+    ],
+    [
+      'may register',
+      {},
+      'You can ask the organisers questions once you register for the contest, on its page.',
+    ],
+    [
+      'is refused by the contest’s email rule',
+      { registration: entry({ can_register: false }) },
+      'Only the contest’s entrants can ask the organisers questions.',
+    ],
+  ])(
+    'offers no questions to someone who %s, saying what is true for them',
+    async (_, who, said) => {
+      server.use(
+        signedIn,
+        http.get(`${CONTEST_API}/home`, () => HttpResponse.json(home(who))),
+      );
+      renderApp(QUESTIONS);
 
-    expect(
-      await screen.findByText(
-        'You can ask the organisers questions once your registration is approved.',
-      ),
-    ).toBeVisible();
-    expect(screen.queryByRole('form', { name: 'Ask' })).toBeNull();
-  });
+      expect(await screen.findByText(said)).toBeVisible();
+      expect(screen.queryByRole('form', { name: 'Ask' })).toBeNull();
+    },
+  );
 
   it('asks a visitor to sign in first', async () => {
     renderApp(QUESTIONS);

@@ -1,4 +1,6 @@
+import { compareRatio, divRatio, ratioOf, ZERO, type Ratio } from '@/lib/exact';
 import type { GroupValues, InputValues, TaskValues } from '../forms/task-values';
+import { groupWeight } from './scoring';
 import type { Staged } from './staged';
 
 /**
@@ -41,6 +43,41 @@ function count(n: number, one: string, many: string): string {
   return `${String(n)} ${n === 1 ? one : many}`;
 }
 
+const PARTS = ['each', 'worst', 'pass'] as const;
+
+function exactly(text: string): Ratio {
+  return text.trim() === '' ? ZERO : (ratioOf(text) ?? ZERO);
+}
+
+/**
+ * Whether how a group earns its points moved other than by its total alone,
+ * as the forge says it: each part's share of the group's total, and the
+ * share of tests that must pass where a part is earned by passing.
+ */
+function earningMoved(was: GroupValues, now: GroupValues): boolean {
+  const then = groupWeight(was);
+  const total = groupWeight(now);
+  const shape = (group: GroupValues, of: Ratio) =>
+    PARTS.map((part) => {
+      const weight = exactly(group[part]);
+      return weight.num === 0n || of.num === 0n ? ZERO : divRatio(weight, of);
+    });
+  const before = shape(was, then);
+  const after = shape(now, total);
+  if (before.some((share, at) => compareRatio(share, after[at] ?? ZERO) !== 0)) {
+    return true;
+  }
+  return (
+    exactly(now.pass).num !== 0n &&
+    compareRatio(passAtOf(was.passAt), passAtOf(now.passAt)) !== 0
+  );
+}
+
+/** The share of tests that must pass for the pass part; unset, every one. */
+function passAtOf(text: string): Ratio {
+  return text.trim() === '' ? { num: 1n, den: 1n } : exactly(text);
+}
+
 function groupLines(
   was: GroupValues | undefined,
   now: GroupValues | undefined,
@@ -51,9 +88,10 @@ function groupLines(
   }
   if (was === undefined || now === undefined) return [];
   const lines: string[] = [];
-  const rule = (group: GroupValues) =>
-    [group.each, group.worst, group.pass, group.passAt].join('|');
-  if (rule(was) !== rule(now)) lines.push(`${now.name}: how it earns points`);
+  if (compareRatio(groupWeight(was), groupWeight(now)) !== 0) {
+    lines.push(`${now.name}: points`);
+  }
+  if (earningMoved(was, now)) lines.push(`${now.name}: how it earns points`);
   if (was.show !== now.show) lines.push(`${now.name}: when entrants see results`);
   if (JSON.stringify(was.weights) !== JSON.stringify(now.weights)) {
     lines.push(`${now.name}: weights`);

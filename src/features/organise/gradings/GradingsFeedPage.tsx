@@ -18,6 +18,8 @@ import { CONTEST_SECTIONS, sectionOf } from '@/lib/sections';
 import { useEntrants } from '../entrants/names';
 import { SectionPage } from '../SectionPage';
 import { GradingsList } from './GradingsList';
+import { RegradeSummaries } from './RegradeSummaries';
+import { CHANGE_WORDS, regradedTask, useRegrades } from './regrades';
 import {
   FAILED_SEARCH,
   STATUS,
@@ -158,6 +160,7 @@ function FilterBar({
       ? options
       : [...options, { value, label: value }];
 
+  const regrade = filters.regrade !== null;
   const entrantOptions = entrants
     .map((entrant) => ({ value: entrant.id, label: entrant.display_name }))
     .sort((a, b) => a.label.localeCompare(b.label));
@@ -166,26 +169,44 @@ function FilterBar({
 
   return (
     <div className={classes.filters}>
-      <Select
-        label="Task"
-        value={filters.task ?? ''}
-        options={keep(tasks, filters.task)}
-        placeholder="Every task"
-        onChange={(value) => set('task', value)}
-      />
-      <Select
-        label="Status"
-        value={filters.status ?? ''}
-        options={STATUSES.map((status) => ({ value: status, label: STATUS[status] }))}
-        placeholder="Every status"
-        onChange={(value) => set('status', value)}
-      />
-      <Checkbox
-        label="Latest attempts only"
-        description="Each submission's latest attempt, without the earlier ones."
-        checked={filters.latest !== null}
-        onChange={(checked) => set('latest', checked ? 'true' : '')}
-      />
+      {regrade ? (
+        <Select
+          label="What the regrade did"
+          value={filters.change ?? ''}
+          options={Object.entries(CHANGE_WORDS).map(([value, label]) => ({
+            value,
+            label,
+          }))}
+          placeholder="Every submission it graded"
+          onChange={(value) => set('change', value)}
+        />
+      ) : (
+        <>
+          <Select
+            label="Task"
+            value={filters.task ?? ''}
+            options={keep(tasks, filters.task)}
+            placeholder="Every task"
+            onChange={(value) => set('task', value)}
+          />
+          <Select
+            label="Status"
+            value={filters.status ?? ''}
+            options={STATUSES.map((status) => ({
+              value: status,
+              label: STATUS[status],
+            }))}
+            placeholder="Every status"
+            onChange={(value) => set('status', value)}
+          />
+          <Checkbox
+            label="Latest attempts only"
+            description="Each submission's latest attempt, without the earlier ones."
+            checked={filters.latest !== null}
+            onChange={(checked) => set('latest', checked ? 'true' : '')}
+          />
+        </>
+      )}
       {(entrantOptions.length > 0 || filters.entrant !== null) && (
         <Select
           label="Entrant"
@@ -246,6 +267,7 @@ export function GradingsFeedPage() {
     ),
   );
   const filtered = Object.values(filters).some((value) => value !== null);
+  const regrade = useRegrades(path).data?.find((found) => found.id === filters.regrade);
 
   return (
     <SectionPage section={sectionOf(CONTEST_SECTIONS, 'gradings')}>
@@ -255,9 +277,22 @@ export function GradingsFeedPage() {
           showingFailed={filters.status === 'system_error' && filters.latest === true}
         />
       </Card>
+      <RegradeSummaries path={path} />
       <Card>
         <div className={classes.stack}>
-          <SectionTitle>Every grading</SectionTitle>
+          <SectionTitle>
+            {filters.regrade === null
+              ? 'Every grading'
+              : regrade === undefined
+                ? 'What a regrade changed'
+                : `What the regrade of ${regradedTask(regrade)} changed`}
+          </SectionTitle>
+          {filters.regrade !== null && (
+            <BodyText tone="secondary">
+              Each submission it graded, with its result before the regrade and after
+              it. <PageLink to="?">Show every grading</PageLink>
+            </BodyText>
+          )}
           <FilterBar filters={filters} tasks={tasks} entrants={entrants} />
           <GradingsList
             path={path}
@@ -265,9 +300,11 @@ export function GradingsFeedPage() {
             showTask
             rejudge={{ tasks: tasks.map((task) => task.value), task: filters.task }}
             empty={
-              filtered
-                ? 'No grading matches these filters.'
-                : 'Nothing has been graded yet.'
+              filters.regrade !== null
+                ? 'No submission of this regrade matches.'
+                : filtered
+                  ? 'No grading matches these filters.'
+                  : 'Nothing has been graded yet.'
             }
             footer={(entries) =>
               entries.length >= LIMIT && (

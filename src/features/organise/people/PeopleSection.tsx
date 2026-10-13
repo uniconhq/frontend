@@ -237,13 +237,16 @@ function HolderRow({
           <Modal
             opened={open === 'remove'}
             onClose={() => show(null)}
-            title={isMe ? 'Give up your role here?' : 'Remove this role?'}
+            title={
+              isMe
+                ? `Give up your role at this ${place.kind}?`
+                : `Remove ${name}’s role?`
+            }
           >
             <div className={classes.inline}>
               <BodyText>
-                {isMe
-                  ? 'You will no longer see or change this unless a role elsewhere covers it.'
-                  : `${name} will no longer see or change this, unless a role elsewhere covers it.`}
+                {isMe ? 'You' : name} will no longer see or change {REACHES[place.kind]}
+                , unless a role given elsewhere covers it.
               </BodyText>
               {error !== null && <Refusal error={error} />}
               <div className={classes.actions}>
@@ -265,6 +268,13 @@ function HolderRow({
     </tr>
   );
 }
+
+/** What a role at each level reaches, as a removal says what is lost. */
+const REACHES: Record<RolePlace['kind'], string> = {
+  org: 'this org and its contests',
+  contest: 'this contest and its tasks',
+  task: 'this task',
+};
 
 /** Each level's own list of organisers, by the name its card and its page have. */
 const ORGANISERS_OF: Record<RolePlace['kind'], string> = {

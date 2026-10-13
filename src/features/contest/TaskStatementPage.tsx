@@ -2,6 +2,7 @@ import { useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { $api, queryView } from '@/api/query';
 import type { TaskPage } from '@/api/types';
+import { BodyText } from '@/ui/BodyText';
 import { Card } from '@/ui/Card';
 import { Markdown } from '@/ui/Markdown';
 import { PageLink } from '@/ui/PageLink';
@@ -11,7 +12,7 @@ import { SectionTitle } from '@/ui/SectionTitle';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
 import { contestHomePath } from '@/lib/contest-paths';
-import { formatExact } from '@/lib/exact';
+import { formatWorth, withPointsWord } from '@/lib/exact';
 import { useTaskParams } from '@/lib/route-params';
 import { contestViewSectionPath } from '@/lib/sections';
 import { formatDateTime } from '@/lib/time';
@@ -47,9 +48,7 @@ function LimitList({ page }: { page: TaskPage }) {
       {page.worth !== null && (
         <>
           <dt>Worth</dt>
-          <dd>
-            {formatExact(page.worth)} {page.worth === '1' ? 'point' : 'points'}
-          </dd>
+          <dd>{withPointsWord(formatWorth(page.worth))}</dd>
         </>
       )}
       {page.due !== null && (
@@ -74,6 +73,27 @@ function LimitList({ page }: { page: TaskPage }) {
 
 function Back({ org, contest }: { org: string; contest: string }) {
   return <PageLink to={contestHomePath(org, contest)}>Back to the contest</PageLink>;
+}
+
+/**
+ * A task the person cannot open, in words with the way back to the contest:
+ * one not released yet, one the organisers withdrew or removed from the
+ * contest, as a link kept from before reaches it, or a wrong address. They
+ * read alike, so a withdrawn task says nothing of itself.
+ */
+function NoSuchTask({ org, contest }: { org: string; contest: string }) {
+  return (
+    <div className={classes.page}>
+      <div className={classes.links}>
+        <Back org={org} contest={contest} />
+      </div>
+      <PageTitle>Task not found</PageTitle>
+      <BodyText>
+        It is not released yet, the organisers took it out of the contest, or the
+        address is wrong. The contest’s page lists the tasks you can open.
+      </BodyText>
+    </div>
+  );
 }
 
 /**
@@ -111,8 +131,10 @@ function SignedInTask({
   }, [queryClient, org, contest, task]);
 
   if (view.state === 'loading') return <PageSkeleton rows={6} />;
-  if (view.state === 'error')
+  if (view.state === 'error') {
+    if (view.error.status === 404) return <NoSuchTask org={org} contest={contest} />;
     return <ErrorBlock error={view.error} onRetry={view.retry} />;
+  }
 
   const page = view.data;
   const asks = page.release.closed !== 'not_approved';

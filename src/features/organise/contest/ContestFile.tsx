@@ -4,6 +4,7 @@ import { DefinitionForm, type FormProps } from '../forms/DefinitionFile';
 import { holdsAt } from '../roles';
 import { contestFieldName, contestValueWords } from './merge-words';
 import { contestPlaceOf } from './opened';
+import shared from '../organise.module.css';
 
 /** The words the merge of two saves of the contest's settings uses. */
 const WORDS = { field: contestFieldName, value: contestValueWords };
@@ -40,7 +41,15 @@ export function ContestFile({
   );
 }
 
-/** A field's box, marked so a link naming the field can find and focus it. */
+/**
+ * A field's box, marked so a link naming the field can find and focus it.
+ * What it holds stands one under the other, a form's gap apart, such as a
+ * choice and the field it opens.
+ */
 export function FieldBox({ name, children }: { name: string; children: ReactNode }) {
-  return <div data-field={name}>{children}</div>;
+  return (
+    <div data-field={name} className={shared.fieldBox}>
+      {children}
+    </div>
+  );
 }

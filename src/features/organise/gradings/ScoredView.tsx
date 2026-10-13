@@ -5,6 +5,7 @@ import { VerdictBadge } from '@/ui/VerdictBadge';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
 import { ScoredResult } from '@/ui/scored/ScoredResult';
+import { overLimitSentence } from '@/ui/scored/scored-text';
 import { STATUS } from './feed';
 import classes from './feed.module.css';
 
@@ -57,7 +58,11 @@ export function ScoredView({
               {view.data.grading.outcome !== null && (
                 <VerdictBadge verdict={view.data.grading.outcome} />
               )}
-              <BodyText tone="secondary">{STATUS[view.data.grading.status]}</BodyText>
+              <BodyText tone="secondary">
+                {view.data.grading.status === 'over_limit'
+                  ? overLimitSentence('the entrant', view.data.grading.limit)
+                  : STATUS[view.data.grading.status]}
+              </BodyText>
               {view.data.grading.attempt !== entry.grading.attempt && (
                 <BodyText tone="secondary">
                   {`Attempt ${String(view.data.grading.attempt)}'s result, the one that stands while attempt ${String(entry.grading.attempt)} has none.`}

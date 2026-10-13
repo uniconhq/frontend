@@ -7,6 +7,13 @@ import { verdictLabel } from '@/ui/verdicts';
 import { formatDateTime } from '@/lib/time';
 import { taskPath } from '@/lib/organiser-paths';
 import { STATUS, bySubmission, logHref, nameOf, resultOf, submitterOf } from './feed';
+import { overLimitSentence } from '@/ui/scored/scored-text';
+import {
+  changeOf,
+  decidingValues,
+  sideWords,
+  usePublicationMeanings,
+} from './regrades';
 import { ScoredView } from './ScoredView';
 import classes from './feed.module.css';
 
@@ -48,8 +55,8 @@ function standsLine(grading: Grading): string | null {
 }
 
 /**
- * Where an attempt stands: its status, the reason a system error gave the
- * organisers, the sentence a cancel told the entrant, the earlier result
+ * Where an attempt stands: its status, why one over the limit was not
+ * graded, the reason a system error gave the organisers, the sentence a cancel told the entrant, the earlier result
  * that stands while it has none, what a finished run came to, and its log
  * where its run wrote one.
  */
@@ -67,6 +74,11 @@ function StatusCell({
   return (
     <>
       <span>{STATUS[grading.status]}</span>
+      {grading.status === 'over_limit' && (
+        <BodyText tone="secondary">
+          {overLimitSentence('the entrant', grading.limit)}
+        </BodyText>
+      )}
       {grading.error !== null && <BodyText tone="secondary">{grading.error}</BodyText>}
       {grading.cancel_reason !== null && (
         <BodyText tone="secondary">
@@ -86,6 +98,32 @@ function StatusCell({
           Log
         </OutLink>
       )}
+    </>
+  );
+}
+
+/**
+ * What a regrade did to the submission, on Gradings read by regrade: the
+ * result it replaced and its own, side by side, the kind of change under
+ * the new one, and the values that decided it where nothing else did.
+ */
+function ChangeCells({ path, entry }: { path: ContestPath; entry: FeedEntry }) {
+  const change = entry.grading.change;
+  const names = change === null ? [] : decidingValues(change);
+  const meanings = usePublicationMeanings(
+    path,
+    entry.task,
+    entry.grading.publication,
+    names.length > 0,
+  );
+  const values = names.length > 0 ? { names, meanings } : null;
+  return (
+    <>
+      <td>{change === null ? '—' : sideWords(change.earlier, values)}</td>
+      <td>
+        {change === null ? '—' : sideWords(change.now, values)}
+        <BodyText tone="meta">{changeOf(entry)}</BodyText>
+      </td>
     </>
   );
 }
@@ -121,6 +159,7 @@ function AttemptRow({
   entry,
   head,
   showTask,
+  compared,
   earlier,
   scored,
   actions,
@@ -129,6 +168,7 @@ function AttemptRow({
   entry: FeedEntry;
   head: boolean;
   showTask: boolean;
+  compared: boolean;
   earlier?: { count: number; shown: boolean; toggle: () => void };
   scored?: { shown: boolean; toggle: () => void };
   actions: RowActions | null;
@@ -179,10 +219,11 @@ function AttemptRow({
           </>
         ) : (
           <span className={classes.earlierName}>
-            Submission {grading.submission_number}, earlier
+            Submission {grading.submission_number}, replaced
           </span>
         )}
       </th>
+      {compared && <ChangeCells path={path} entry={entry} />}
       <td>
         {grading.attempt}
         <BodyText tone="meta">publication {grading.publication}</BodyText>
@@ -207,11 +248,13 @@ function Submission({
   path,
   attempts,
   showTask,
+  compared,
   actions,
 }: {
   path: ContestPath;
   attempts: FeedEntry[];
   showTask: boolean;
+  compared: boolean;
   actions: RowActions | null;
 }) {
   const [shown, setShown] = useState(false);
@@ -219,7 +262,7 @@ function Submission({
   const [head, ...earlier] = attempts;
   if (head === undefined) return null;
   const task = head.task;
-  const columns = (showTask ? 6 : 5) + (actions !== null ? 1 : 0);
+  const columns = (showTask ? 6 : 5) + (compared ? 2 : 0) + (actions !== null ? 1 : 0);
   return (
     <tbody aria-label={nameOf(head).replace(/, attempt \d+$/, '')}>
       <AttemptRow
@@ -227,6 +270,7 @@ function Submission({
         entry={head}
         head
         showTask={showTask}
+        compared={compared}
         earlier={{ count: earlier.length, shown, toggle: () => setShown(!shown) }}
         scored={
           task !== null
@@ -250,6 +294,7 @@ function Submission({
             entry={entry}
             head={false}
             showTask={showTask}
+            compared={compared}
             actions={actions}
           />
         ))}
@@ -260,8 +305,9 @@ function Submission({
 /**
  * Gradings, each submission once, headed by its highest attempt, with its
  * earlier attempts opening below it. The task column is left out where every
- * row is of one task. `actions`, when given, draws what a latest attempt
- * offers in a column of its own.
+ * row is of one task. Read by a regrade, each row also gives the result the
+ * regrade replaced and its own, side by side (#448). `actions`, when given,
+ * draws what a latest attempt offers in a column of its own.
  */
 export function FeedTable({
   path,
@@ -274,6 +320,7 @@ export function FeedTable({
   showTask: boolean;
   actions: RowActions | null;
 }) {
+  const compared = entries.some((entry) => entry.grading.change !== null);
   return (
     <div className={classes.scroll}>
       <table className={classes.table} aria-label="Gradings">
@@ -282,6 +329,12 @@ export function FeedTable({
             {showTask && <th scope="col">Task</th>}
             <th scope="col">Submitted by</th>
             <th scope="col">Submission</th>
+            {compared && (
+              <>
+                <th scope="col">Before the regrade</th>
+                <th scope="col">After the regrade</th>
+              </>
+            )}
             <th scope="col">Attempt</th>
             <th scope="col">Status</th>
             <th scope="col">Times</th>
@@ -294,6 +347,7 @@ export function FeedTable({
             path={path}
             attempts={attempts}
             showTask={showTask}
+            compared={compared}
             actions={actions}
           />
         ))}

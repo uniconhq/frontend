@@ -85,7 +85,17 @@ describe("a task's timeline as one line", () => {
   const standing: TaskStanding = {
     task: { name: 'sum' },
     label: 'A',
-    state: { head: 'a', latest: null, draft: false, errors: [] },
+    withdrawn: false,
+    submissions: 0,
+    take_out: 'remove',
+    state: {
+      head: 'a',
+      latest: null,
+      draft: false,
+      errors: [],
+      statement_written: false,
+      head_statement_written: false,
+    },
     timeline: {
       worth: '1',
       release_at: '2026-10-01T09:00:00Z',

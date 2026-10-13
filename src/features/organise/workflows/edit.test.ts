@@ -3,6 +3,7 @@ import { CLASSIC_V2, PRIMITIVES } from '@/test/workflows';
 import {
   addStep,
   clearPort,
+  entryFields,
   removeEntry,
   removeInput,
   removeStep,
@@ -18,6 +19,7 @@ import {
   workflowOf,
 } from './edit';
 import { NumberText } from '../forms/yaml-doc';
+import { refText } from './model';
 
 const [, compile, , diff, , run] = PRIMITIVES;
 
@@ -355,6 +357,46 @@ describe('editing the file in place', () => {
     expect(
       workflowOf(removeEntry(meant, 'time')).report.map((entry) => entry.name),
     ).toEqual(['log']);
+  });
+
+  it('writes a report entry with a title as a mapping, and short again once it has none (M58)', () => {
+    const log = workflowOf(COMMENTED).report.find((entry) => entry.name === 'log')!;
+    const from = log.from!;
+    const titled = setEntry(
+      COMMENTED,
+      'log',
+      entryFields(log, 'text', { from, title: 'Compile log', unit: 'lines' }),
+    );
+
+    expect(titled).toContain(`log: {from: "${refText(from)}", title: Compile log}`);
+    const titledLog = workflowOf(titled).report.find((entry) => entry.name === 'log')!;
+    expect(titledLog).toMatchObject({ title: 'Compile log', unit: null, short: false });
+    const plain = setEntry(
+      titled,
+      'log',
+      entryFields(titledLog, 'text', { from, title: null }),
+    );
+    expect(plain).toContain(`log: ${refText(from)}`);
+    expect(workflowOf(plain).report[0]).toMatchObject({ title: null, short: true });
+  });
+
+  it('keeps a reported unit while the entry reads a number, or what it reads is not known', () => {
+    const entry = {
+      ...workflowOf(COMMENTED).report.find((found) => found.name === 'log')!,
+      title: 'Run time',
+      unit: 'ms',
+    };
+    const time = { kind: 'steps' as const, name: 'run', output: 'time_ms' };
+
+    expect(entryFields(entry, 'number', { from: time })).toMatchObject({
+      title: 'Run time',
+      unit: 'ms',
+    });
+    expect(entryFields(entry, null, { from: time }).unit).toBe('ms');
+    expect(entryFields(entry, 'text', { from: time })).toMatchObject({
+      title: 'Run time',
+      unit: null,
+    });
   });
 
   it('builds classic from an empty file', () => {

@@ -70,8 +70,38 @@ describe('the ways into a contest', () => {
     ).toEqual([
       'There is already a way in by invite, and a contest has at most one.',
       'Two sign-ups have the same name.',
-      '“nus” is not a domain. Write one such as u.nus.edu.',
+      '“nus” is not a domain. Write one such as u.nus.edu, or *.nus.edu.sg to take nus.edu.sg and every domain under it.',
     ]);
+  });
+
+  it('takes a domain and every domain under it as the forge does, *. as the whole first part', () => {
+    const problems = (domains: string) => wayProblems([newSignup({ domains })]);
+    expect(problems('*.nus.edu.sg, u.nus.edu, a-b.c9.org')).toEqual([]);
+    expect(problems('*.sg')).toEqual([
+      '“*.sg” is not a domain. Write one such as u.nus.edu, or *.nus.edu.sg to take nus.edu.sg and every domain under it.',
+    ]);
+    for (const domain of [
+      '*nus.edu.sg',
+      'a.*.edu',
+      '*.*.edu.sg',
+      '-a.edu',
+      'a-.edu',
+      'a..edu',
+    ]) {
+      expect(problems(domain)).toHaveLength(1);
+    }
+  });
+
+  it('says a domain and every domain under it in words', () => {
+    expect(whoWords(newSignup({ domains: '*.nus.edu.sg' }))).toBe(
+      'anyone with an email at nus.edu.sg or any domain under it',
+    );
+    expect(whoWords(newSignup({ domains: 'u.nus.edu, *.nus.edu.sg', code: 'x' }))).toBe(
+      'anyone with an @u.nus.edu email, or an email at nus.edu.sg or any domain under it, and the code',
+    );
+    expect(whoWords(newSignup({ domains: '*.nus.edu.sg', emailPattern: '^e' }))).toBe(
+      'anyone with an email at nus.edu.sg or any domain under it, matching the pattern',
+    );
   });
 
   it('says who each way lets in, everything it asks together', () => {
@@ -114,7 +144,7 @@ describe('a board in a sentence (M52)', () => {
 
   it('says the default board, seen by organisers only', () => {
     expect(boardSentence({ ...newBoard(), name: 'Standings' })).toBe(
-      'Highest total first, using each entrant’s best submission, on every task. Only organisers see it.',
+      'Ranks entrants by their total points over every task, most first. Each entrant’s best submission to each task counts. Only organisers see it.',
     );
   });
 
@@ -130,7 +160,7 @@ describe('a board in a sentence (M52)', () => {
         rows: '10',
       }),
     ).toBe(
-      'Highest total first, then fewest penalty minutes, counting nothing for earlier attempts, using each entrant’s best result on each test group, on tasks sum and sort. Organisers see the whole leaderboard; everyone else who can see the contest sees the top 10 rows and any row tied with the last of them, and an entrant their own row as well. It leaves out every test group whose results entrants see only once its task closes.',
+      'Ranks entrants by their total points over tasks sum and sort, most first; ties broken by penalty minutes, fewest first. Each entrant’s best result on each test group of each task counts. Organisers see all of it; everyone else who can see the contest sees the top 10 rows and any row tied with the last of them, and an entrant their own row as well. It leaves out every test group whose results entrants see only once its task closes.',
     );
   });
 
@@ -138,17 +168,17 @@ describe('a board in a sentence (M52)', () => {
     expect(
       boardSentence({ ...newBoard(), who: 'contestants' }, { tasks: false, held: [] }),
     ).toBe(
-      'highest total first, using each entrant’s best submission. Entrants and organisers see the whole leaderboard.',
+      'ranks entrants by their total points over every task, most first. Each entrant’s best submission to this task counts. Entrants and organisers see all of it.',
     );
   });
 
   it('names a held group that joins it once shown, and when, only where it changes something', () => {
     const board = { ...newBoard(), who: 'contestants' };
     expect(boardSentence(board, { tasks: false, held: held.slice(0, 1) })).toBe(
-      'highest total first, using each entrant’s best submission. Entrants and organisers see the whole leaderboard. Results from test group “hidden” join it when the contest ends.',
+      'ranks entrants by their total points over every task, most first. Each entrant’s best submission to this task counts. Entrants and organisers see all of it. Results from test group “hidden” join it when the contest ends.',
     );
     expect(boardSentence(board, { held })).toBe(
-      `Highest total first, using each entrant’s best submission, on every task. Entrants and organisers see the whole leaderboard. Results from test group “hidden” of task A join it when the contest ends. Results from test group “final” of task B join it when task B closes, ${formatDateTime(new Date('2026-10-03T09:00:00Z'))}.`,
+      `Ranks entrants by their total points over every task, most first. Each entrant’s best submission to each task counts. Entrants and organisers see all of it. Results from test group “hidden” of task A join it when the contest ends. Results from test group “final” of task B join it when task B closes, ${formatDateTime(new Date('2026-10-03T09:00:00Z'))}.`,
     );
   });
 
@@ -165,7 +195,7 @@ describe('a board in a sentence (M52)', () => {
         { held },
       ),
     ).toBe(
-      'Highest total first, using each entrant’s best submission, on task sum. Organisers see the whole leaderboard, and each entrant only their own row. It leaves out test group “hidden”, whose results entrants see only once the task closes.',
+      'Ranks entrants by their total points over task sum, most first. Each entrant’s best submission to the task counts. Organisers see all of it, and each entrant only their own row. It leaves out test group “hidden”, whose results entrants see only once the task closes.',
     );
   });
 
@@ -176,13 +206,13 @@ describe('a board in a sentence (M52)', () => {
       order: [{ kind: 'value' as const, name: 'time' }],
     };
     expect(boardSentence(board, { tasks: false, held: held.slice(0, 1) })).toBe(
-      'best time first, using each entrant’s best submission. Only organisers see it. It counts only test group “hidden”, when the contest ends.',
+      'ranks entrants by their total time over every task, best first. Each entrant’s best submission to this task counts. Only organisers see it. It counts only test group “hidden”, when the contest ends.',
     );
     expect(boardSentence(board, { tasks: false, held: [] })).toBe(
-      'best time first, using each entrant’s best submission. Only organisers see it. It takes nothing from this task: it counts only test groups whose results entrants see once their task closes, and this task has none.',
+      'ranks entrants by their total time over every task, best first. Each entrant’s best submission to this task counts. Only organisers see it. It takes nothing from this task: it counts only test groups whose results entrants see once their task closes, and this task has none.',
     );
     expect(boardSentence(board, { held: [] })).toBe(
-      'Best time first, using each entrant’s best submission, on every task. Only organisers see it. It counts nothing: it counts only test groups whose results entrants see once their task closes, and no task it covers has one.',
+      'Ranks entrants by their total time over every task, best first. Each entrant’s best submission to each task counts. Only organisers see it. It counts nothing: it counts only test groups whose results entrants see once their task closes, and no task it covers has one.',
     );
   });
 });

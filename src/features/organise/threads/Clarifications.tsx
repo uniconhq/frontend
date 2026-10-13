@@ -8,6 +8,7 @@ import { Button } from '@/ui/Button';
 import { Card } from '@/ui/Card';
 import { Checkbox } from '@/ui/Checkbox';
 import { Modal } from '@/ui/Modal';
+import { RadioGroup } from '@/ui/RadioGroup';
 import { SectionTitle } from '@/ui/SectionTitle';
 import { TextInput } from '@/ui/TextInput';
 import { Textarea } from '@/ui/Textarea';
@@ -19,8 +20,11 @@ import { useOrgParam } from '@/lib/route-params';
 import { ORG_SECTIONS, sectionOf } from '@/lib/sections';
 import { holdsAtContest } from '../roles';
 import { SectionPage } from '../SectionPage';
+import { announcementAnchor } from '@/ui/threads/anchors';
 import { QuestionThread } from '@/ui/threads/ThreadParts';
+import { contestPath, taskPath } from '@/lib/organiser-paths';
 import { useEntrantName } from '../entrants/names';
+import { useTaskTitles } from '../contest/task-entry';
 import classes from '@/ui/threads/threads.module.css';
 
 const INBOX = '/api/v1/orgs/{org}/clarifications';
@@ -39,19 +43,38 @@ function isThreadRead(path: unknown): boolean {
   );
 }
 
+/** Who an answer is for: the asker alone, or every entrant (M62). */
+const READERS = [
+  {
+    value: 'asker',
+    label: 'Only the asker',
+    description:
+      'A reply under the question, which only the asker and the organisers read.',
+  },
+  {
+    value: 'everyone',
+    label: 'Every entrant (posted as an announcement)',
+    description:
+      'The question stays private; a message on it links to the announcement.',
+  },
+];
+
 /** Whether the organisers have written anything under a question yet. */
 function replied(clarification: Clarification): boolean {
   return clarification.messages.some((message) => !message.from_asker);
 }
 
 /**
- * One question for an organiser and, for a manager of its contest, what can
- * be done with it. Reply marks it answered as it sends, unless the manager
- * unticks that, so an answer takes it out of the open questions in one step.
- * Mark as answered closes it without a reply, and asks first while nobody
- * has replied, since the entrant then reads no answer. Reopen opens an
- * answered one again. Answer publicly posts an announcement every entrant
- * reads, pointing at the question, which stays private.
+ * One question for an organiser, in its own box, and, for a manager of its
+ * contest, what can be done with it at the box's foot. Reply opens the one
+ * form to answer it in place (M62): who reads the answer, only the asker, as
+ * a reply under the question, or every entrant, posted as an announcement
+ * under the title given, the question itself staying private and a message
+ * on it naming the announcement. Either way sending marks the question
+ * answered, unless the manager unticks that, so an answer takes it out of
+ * the open questions in one step. Mark it answered closes it without a
+ * reply, and asks first while nobody has replied, since the entrant then
+ * reads no answer. Reopen opens an answered one again.
  */
 function ClarificationCard({
   clarification,
@@ -70,9 +93,9 @@ function ClarificationCard({
   const [body, setBody] = useState('');
   const [markToo, setMarkToo] = useState(true);
   const [asking, setAsking] = useState(false);
-  const [publishing, setPublishing] = useState(false);
+  const [readers, setReaders] = useState<'asker' | 'everyone'>('asker');
+  const [replying, setReplying] = useState(false);
   const [title, setTitle] = useState(clarification.title);
-  const [answer, setAnswer] = useState('');
   const change = useChange({
     reread: () =>
       queryClient.invalidateQueries({
@@ -89,16 +112,34 @@ function ClarificationCard({
   };
   const name = clarification.title;
   const asker = useEntrantName(org, contest, clarification.asker);
+  const about = clarification.task;
+  const taskTitle = useTaskTitles(
+    org,
+    contest ?? '',
+    about === null || contest === null ? [] : [about],
+  ).get(about ?? '');
   const open = !clarification.answered;
 
   const sendReply = async (event: FormEvent) => {
     event.preventDefault();
     const answering = open && markToo;
-    const outcome = await change.run('reply', async () => {
-      await reply.mutateAsync({ params: { path }, body: { body } });
-      if (answering) await mark.mutateAsync({ params: { path } });
-    });
-    if (outcome.ok) setBody('');
+    const outcome =
+      readers === 'everyone'
+        ? await change.run('reply', () =>
+            publish.mutateAsync({
+              params: { path },
+              body: { title, body, mark: answering },
+            }),
+          )
+        : await change.run('reply', async () => {
+            await reply.mutateAsync({ params: { path }, body: { body } });
+            if (answering) await mark.mutateAsync({ params: { path } });
+          });
+    if (outcome.ok) {
+      setBody('');
+      setReaders('asker');
+      setReplying(false);
+    }
   };
 
   const markAnswered = async () => {
@@ -108,145 +149,151 @@ function ClarificationCard({
     if (outcome.ok) setAsking(false);
   };
 
-  const sendAnswer = async (event: FormEvent) => {
-    event.preventDefault();
-    const outcome = await change.run('publish', () =>
-      publish.mutateAsync({ params: { path }, body: { title, body: answer } }),
-    );
-    if (outcome.ok) {
-      setPublishing(false);
-      setAnswer('');
-    }
-  };
+  const markOrReopen = open ? (
+    <Button
+      size="xs"
+      variant="secondary"
+      label={`Mark ${name} answered`}
+      loading={busy === 'mark'}
+      onClick={() => {
+        if (replied(clarification)) void markAnswered();
+        else setAsking(true);
+      }}
+    >
+      Mark it answered
+    </Button>
+  ) : (
+    <Button
+      size="xs"
+      variant="secondary"
+      label={`Reopen ${name}`}
+      loading={busy === 'unmark'}
+      onClick={() =>
+        void change.run('unmark', () => unmark.mutateAsync({ params: { path } }))
+      }
+    >
+      Reopen
+    </Button>
+  );
 
   return (
-    <li className={classes.item}>
-      {showContest && (
-        <BodyText tone="meta">
-          {org}/{contest}
-        </BodyText>
-      )}
-      <QuestionThread clarification={clarification} asker={asker} named />
-      {manages && (
-        <>
-          <form
-            className={classes.form}
-            onSubmit={(event) => void sendReply(event)}
-            aria-label={`Reply to ${name}`}
-          >
-            <Textarea label="Reply" value={body} onChange={setBody} rows={2} required />
-            {open && (
-              <Checkbox
-                label="Mark it answered"
-                checked={markToo}
-                onChange={setMarkToo}
-                description={
-                  markToo
-                    ? 'It leaves the open questions as the reply is sent.'
-                    : 'It stays open after the reply, for a fuller answer later.'
-                }
-              />
-            )}
-            <div className={classes.actions}>
-              <Button type="submit" size="xs" loading={busy === 'reply'}>
-                Reply
-              </Button>
-              {open ? (
+    <li>
+      <QuestionThread
+        clarification={clarification}
+        asker={asker}
+        organisers
+        where={showContest ? `${org}/${contest ?? ''}` : undefined}
+        taskTitle={taskTitle}
+        announcementAt={(link) => ({
+          href: `${link.task === null ? contestPath(org, contest ?? '') : taskPath(org, contest ?? '', link.task)}/announcements#${announcementAnchor(link)}`,
+        })}
+      >
+        {manages && (
+          <>
+            {!replying ? (
+              <div className={classes.actions}>
                 <Button
                   size="xs"
-                  variant="secondary"
-                  label={`Mark as answered ${name}`}
-                  loading={busy === 'mark'}
+                  label={`Reply to ${name}`}
                   onClick={() => {
-                    if (replied(clarification)) void markAnswered();
-                    else setAsking(true);
+                    change.dismiss();
+                    setReplying(true);
                   }}
                 >
-                  Mark as answered
+                  Reply
                 </Button>
-              ) : (
-                <Button
-                  size="xs"
-                  variant="secondary"
-                  label={`Reopen ${name}`}
-                  loading={busy === 'unmark'}
-                  onClick={() =>
-                    void change.run('unmark', () =>
-                      unmark.mutateAsync({ params: { path } }),
-                    )
-                  }
-                >
-                  Reopen
-                </Button>
-              )}
-              <Button
-                size="xs"
-                variant="secondary"
-                label={`Answer publicly ${name}`}
-                onClick={() => setPublishing(!publishing)}
+                {markOrReopen}
+              </div>
+            ) : (
+              <form
+                className={classes.form}
+                onSubmit={(event) => void sendReply(event)}
+                aria-label={`Reply to ${name}`}
               >
-                Answer publicly
-              </Button>
-            </div>
-          </form>
-          {publishing && (
-            <form
-              className={classes.form}
-              onSubmit={(event) => void sendAnswer(event)}
-              aria-label={`Answer publicly ${name}`}
+                <Textarea
+                  label="Answer"
+                  value={body}
+                  onChange={setBody}
+                  rows={3}
+                  required
+                  autoFocus
+                />
+                <RadioGroup
+                  label="Who reads the answer"
+                  value={readers}
+                  options={READERS}
+                  onChange={(next) =>
+                    setReaders(next === 'everyone' ? 'everyone' : 'asker')
+                  }
+                />
+                {readers === 'everyone' && (
+                  <TextInput
+                    label="Announcement title"
+                    value={title}
+                    onChange={setTitle}
+                    maxLength={200}
+                    required
+                  />
+                )}
+                {open && (
+                  <Checkbox
+                    label="Mark it answered"
+                    checked={markToo}
+                    onChange={setMarkToo}
+                    description={
+                      markToo
+                        ? 'It leaves the open questions as the answer is sent.'
+                        : 'It stays open after the answer, for a fuller one later.'
+                    }
+                  />
+                )}
+                <div className={classes.actions}>
+                  <Button type="submit" size="xs" loading={busy === 'reply'}>
+                    {readers === 'everyone' ? 'Post the announcement' : 'Send reply'}
+                  </Button>
+                  <Button
+                    size="xs"
+                    variant="secondary"
+                    onClick={() => {
+                      setReplying(false);
+                      setReaders('asker');
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </form>
+            )}
+            <Modal
+              opened={asking}
+              onClose={() => setAsking(false)}
+              title="Mark it answered without a reply?"
             >
-              <BodyText tone="secondary">
-                Every entrant reads this announcement. The question itself stays
-                private.
-              </BodyText>
-              <TextInput
-                label="Title"
-                value={title}
-                onChange={setTitle}
-                maxLength={200}
-                required
-              />
-              <Textarea
-                label="Answer"
-                value={answer}
-                onChange={setAnswer}
-                rows={3}
-                required
-              />
-              <div className={classes.actions}>
-                <Button type="submit" size="xs" loading={busy === 'publish'}>
-                  Post announcement
-                </Button>
+              <div className={classes.stack}>
+                <BodyText>
+                  Nobody has replied to &ldquo;{name}&rdquo;. The entrant sees it
+                  answered with no answer from you, and it leaves the open questions.
+                </BodyText>
+                <BodyText tone="secondary">
+                  You can reopen it later. To answer it, write a reply instead.
+                </BodyText>
+                {change.error !== null && <ErrorBlock error={change.error} compact />}
+                <div className={classes.actions}>
+                  <Button loading={busy === 'mark'} onClick={() => void markAnswered()}>
+                    Mark it answered
+                  </Button>
+                  <Button variant="secondary" onClick={() => setAsking(false)}>
+                    Not now
+                  </Button>
+                </div>
               </div>
-            </form>
-          )}
-          <Modal
-            opened={asking}
-            onClose={() => setAsking(false)}
-            title="Mark it answered without a reply?"
-          >
-            <div className={classes.stack}>
-              <BodyText>
-                Nobody has replied to &ldquo;{name}&rdquo;. The entrant sees it answered
-                with no answer from you, and it leaves the open questions.
-              </BodyText>
-              <BodyText tone="secondary">
-                You can reopen it later. To answer it, write a reply instead.
-              </BodyText>
-              {change.error !== null && <ErrorBlock error={change.error} compact />}
-              <div className={classes.actions}>
-                <Button loading={busy === 'mark'} onClick={() => void markAnswered()}>
-                  Mark as answered
-                </Button>
-                <Button variant="secondary" onClick={() => setAsking(false)}>
-                  Not now
-                </Button>
-              </div>
-            </div>
-          </Modal>
-        </>
-      )}
-      {change.error !== null && !asking && <ErrorBlock error={change.error} compact />}
+            </Modal>
+          </>
+        )}
+        {change.error !== null && !asking && (
+          <ErrorBlock error={change.error} compact />
+        )}
+      </QuestionThread>
     </li>
   );
 }
@@ -288,7 +335,7 @@ export function InboxPage() {
           (view.data.length === 0 ? (
             <BodyText>No questions are waiting for an answer.</BodyText>
           ) : (
-            <ol className={classes.list} aria-label="Open questions">
+            <ol className={classes.questions} aria-label="Open questions">
               {view.data.map((clarification) => (
                 <ClarificationCard
                   key={`${clarification.contest.contest ?? ''}/${clarification.asker}/${String(clarification.number)}`}
@@ -362,7 +409,7 @@ export function ContestClarifications({
       {open.length === 0 ? (
         <BodyText tone="secondary">Every question is answered.</BodyText>
       ) : (
-        <ol className={classes.list} aria-label="Open questions">
+        <ol className={classes.questions} aria-label="Open questions">
           {open.map(card)}
         </ol>
       )}
@@ -376,7 +423,7 @@ export function ContestClarifications({
             </Button>
           </div>
           {showAnswered && (
-            <ol className={classes.list} aria-label="Answered questions">
+            <ol className={classes.questions} aria-label="Answered questions">
               {answered.map(card)}
             </ol>
           )}

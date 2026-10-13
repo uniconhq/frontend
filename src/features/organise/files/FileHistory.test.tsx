@@ -4,6 +4,7 @@ import userEvent from '@/test/user-event';
 import { http, HttpResponse } from 'msw';
 import type { Holder } from '@/api/types';
 import type { components } from '@/api/schema';
+import { formatDateTime } from '@/lib/time';
 import { renderApp } from '@/test/render';
 import { problem, server, signedIn, someone } from '@/test/server';
 import {
@@ -12,6 +13,7 @@ import {
   publications,
   repoFiles,
   taskState,
+  unchanged,
 } from '@/test/organiser';
 
 type Change = components['schemas']['Change'];
@@ -109,10 +111,14 @@ describe("a task file's history", () => {
     expect(items[0]).not.toHaveTextContent('Publication');
     // grace holds no role at the task any more; the history still names her.
     expect(items[1]).toHaveTextContent('grace');
-    expect(items[1]).toHaveTextContent('Publication 2 · grading unchanged');
+    // A publication that changed nothing of how the task grades says nothing of it.
+    expect(items[1]).toHaveTextContent('Publication 2');
+    expect(items[1]).not.toHaveTextContent(/unchanged|how the task grades/);
     expect(items[2]).toHaveTextContent('account 12');
     expect(items[3]).toHaveTextContent('an unknown author');
-    expect(items[3]).toHaveTextContent('Publication 1 · changed how the task grades');
+    // The first publication is how the task first grades: nothing to say of a change.
+    expect(items[3]).toHaveTextContent('Publication 1');
+    expect(items[3]).not.toHaveTextContent(/how the task grades/);
     expect(asked).toEqual(['task.yaml']);
   });
 
@@ -187,6 +193,7 @@ describe("a task file's history", () => {
           changes: [],
           notes: [],
           regraded: 0,
+          effect: unchanged,
         });
       }),
     );
@@ -197,7 +204,7 @@ describe("a task file's history", () => {
     );
     const dialog = await screen.findByRole('dialog', { name: 'Roll this file back?' });
     expect(dialog).toHaveTextContent(
-      'task.yaml goes back to how it was at version 1a2b3c4',
+      `task.yaml goes back to how it was on ${formatDateTime(new Date('2026-09-20T10:00:00Z'))}, after “Make the task”. This is saved as a new change`,
     );
     expect(sent).toEqual([]);
     await userEvent.click(within(dialog).getByRole('button', { name: 'Roll back' }));
@@ -217,10 +224,10 @@ describe("a task file's history", () => {
 
   it('sends the same rollback again when publishing it has to be confirmed', async () => {
     history();
-    const sent: { confirm: boolean; version: string }[] = [];
+    const sent: { confirm: boolean; version: string; asked?: string }[] = [];
     server.use(
       http.post(`${TASK_API}/files/:path/rollback`, async ({ request }) => {
-        const body = (await request.json()) as { confirm: boolean; version: string };
+        const body = (await request.json()) as (typeof sent)[number];
         sent.push(body);
         return body.confirm
           ? HttpResponse.json({
@@ -229,8 +236,12 @@ describe("a task file's history", () => {
               changes: ['limits changed'],
               notes: [],
               regraded: 0,
+              effect: unchanged,
             })
-          : problem(409, 'confirmation_required', { changes: ['limits changed'] });
+          : problem(409, 'confirmation_required', {
+              changes: ['limits changed'],
+              asked: 'b1c2d3e:12',
+            });
       }),
     );
     const list = await openHistory();
@@ -251,9 +262,20 @@ describe("a task file's history", () => {
     expect(
       await screen.findByText('Saved and published as publication 3.'),
     ).toBeVisible();
-    expect(sent.map(({ confirm, version }) => ({ confirm, version }))).toEqual([
-      { confirm: false, version: SECOND },
-      { confirm: true, version: SECOND },
+    expect(sent).toEqual([
+      {
+        confirm: false,
+        version: SECOND,
+        token: 'token-task-yaml',
+        keep_as_draft: false,
+      },
+      {
+        confirm: true,
+        version: SECOND,
+        token: 'token-task-yaml',
+        keep_as_draft: false,
+        asked: 'b1c2d3e:12',
+      },
     ]);
   });
 

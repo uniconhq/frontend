@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { useSearchParams } from 'react-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { $api, queryView } from '@/api/query';
-import type { Clarification, ContestHome } from '@/api/types';
+import type { AnnouncementLink, Clarification, ContestHome } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
 import { Card } from '@/ui/Card';
@@ -17,15 +17,22 @@ import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
 import { contestHomePath } from '@/lib/contest-paths';
 import { inTeams } from '@/lib/entrants';
+import { useFallbackPoll } from '@/live';
 import { useContestParams } from '@/lib/route-params';
 import { CONTEST_VIEW_SECTIONS, contestSectionPath, sectionOf } from '@/lib/sections';
+import { announcementAnchor } from '@/ui/threads/anchors';
 import { QuestionThread } from '@/ui/threads/ThreadParts';
 import { BySession } from '../BySession';
+import { ASK_WORDS, notIn, type NotIn } from '../entry/not-in';
+import { labelOf } from '../task-names';
 import { SignInPrompt } from '../SignInPrompt';
 import { ASK_ABOUT, QUESTIONS, useMyQuestions } from './questions';
 import classes from '@/ui/threads/threads.module.css';
 
-/** A contestant's follow-up, which opens an answered question again. */
+/**
+ * A contestant's follow-up, folded behind "Follow up" until it is wanted and
+ * opening in place; sending one opens an answered question again.
+ */
 function FollowUp({
   org,
   contest,
@@ -41,6 +48,7 @@ function FollowUp({
     onSuccess: () => onSent(),
   });
   const [body, setBody] = useState('');
+  const [open, setOpen] = useState(false);
 
   const send = (event: FormEvent) => {
     event.preventDefault();
@@ -50,17 +58,46 @@ function FollowUp({
         params: { path: { org, contest, number: clarification.number } },
         body: { body },
       },
-      { onSuccess: () => setBody('') },
+      {
+        onSuccess: () => {
+          setBody('');
+          setOpen(false);
+        },
+      },
     );
   };
 
+  if (!open) {
+    return (
+      <div className={classes.actions}>
+        <Button
+          size="xs"
+          variant="secondary"
+          label={`Follow up ${clarification.title}`}
+          onClick={() => {
+            followUp.reset();
+            setOpen(true);
+          }}
+        >
+          Follow up
+        </Button>
+      </div>
+    );
+  }
   return (
     <form
       className={classes.form}
       onSubmit={send}
       aria-label={`Follow up ${clarification.title}`}
     >
-      <Textarea label="Follow up" value={body} onChange={setBody} rows={2} required />
+      <Textarea
+        label="Follow up"
+        value={body}
+        onChange={setBody}
+        rows={3}
+        required
+        autoFocus
+      />
       {clarification.answered && (
         <BodyText tone="secondary">
           Sending this opens the question again for the organisers.
@@ -75,6 +112,9 @@ function FollowUp({
           loading={followUp.isPending}
         >
           Send
+        </Button>
+        <Button size="xs" variant="secondary" onClick={() => setOpen(false)}>
+          Cancel
         </Button>
       </div>
     </form>
@@ -171,10 +211,23 @@ function Questions({
   const queryClient = useQueryClient();
   const [search] = useSearchParams();
   const team = inTeams(home.registration);
-  const tasks = home.tasks.map((task) => ({ name: task.name, title: task.title }));
+  // Named as the contest's page names them: its letter, then its title.
+  const tasks = home.tasks.map((task) => {
+    const label = labelOf(task);
+    return {
+      name: task.name,
+      title: label === null ? task.title : `${label} · ${task.title}`,
+    };
+  });
   const named = search.get(ASK_ABOUT);
   const about = tasks.some((task) => task.name === named) ? (named ?? '') : '';
   const view = queryView(useMyQuestions(org, contest));
+  const openAnnouncement = useOpenAnnouncements(org, contest);
+  // A withdrawn task's announcements are off the contest's page with it.
+  const withdrawn = (task: string | null) =>
+    home.tasks.some(
+      (found) => found.name === task && found.release.closed === 'withdrawn',
+    );
   const readAgain = () =>
     queryClient.invalidateQueries({
       queryKey: $api.queryOptions('get', QUESTIONS, {
@@ -215,19 +268,30 @@ function Questions({
             <BodyText tone="secondary">No questions asked yet.</BodyText>
           )}
           {view.state === 'ready' && view.data.length > 0 && (
-            <ol className={classes.list} aria-label="Your questions">
+            <ol className={classes.questions} aria-label="Your questions">
               {[...view.data].reverse().map((clarification) => (
-                <li key={clarification.number} className={classes.item}>
+                <li key={clarification.number}>
                   <QuestionThread
                     clarification={clarification}
                     asker={team ? 'Your team' : 'You'}
-                  />
-                  <FollowUp
-                    org={org}
-                    contest={contest}
-                    clarification={clarification}
-                    onSent={readAgain}
-                  />
+                    taskTitle={
+                      tasks.find((task) => task.name === clarification.task)?.title
+                    }
+                    announcementAt={(link) =>
+                      openAnnouncement(link)
+                        ? {
+                            href: `${contestHomePath(org, contest)}#${announcementAnchor(link)}`,
+                          }
+                        : { gone: withdrawn(link.task) ? 'withdrawn' : 'closed' }
+                    }
+                  >
+                    <FollowUp
+                      org={org}
+                      contest={contest}
+                      clarification={clarification}
+                      onSent={readAgain}
+                    />
+                  </QuestionThread>
                 </li>
               ))}
             </ol>
@@ -236,6 +300,31 @@ function Questions({
       </Card>
     </>
   );
+}
+
+/**
+ * Whether an announcement a public answer posted can still be read on the
+ * contest's page, which lists only open announcements: false once the
+ * organisers closed it or its task was withdrawn, so its message on the
+ * question says why rather than link to nothing. Taken as open until the list is read. The list is the one
+ * the contest's page reads, so it is read once for both.
+ */
+function useOpenAnnouncements(
+  org: string,
+  contest: string,
+): (link: AnnouncementLink) => boolean {
+  const open = $api.useQuery(
+    'get',
+    '/api/v1/orgs/{org}/contests/{contest}/home/announcements',
+    { params: { path: { org, contest } } },
+    { refetchInterval: useFallbackPoll(60_000) },
+  );
+  return (link) =>
+    open.data === undefined ||
+    open.data.some(
+      (announcement) =>
+        announcement.number === link.number && announcement.where.task === link.task,
+    );
 }
 
 const TITLE = sectionOf(CONTEST_VIEW_SECTIONS, 'questions').label;
@@ -284,7 +373,7 @@ function SignedInQuestions({ org, contest }: { org: string; contest: string }) {
               </BodyText>
             ) : (
               <BodyText>
-                You can ask the organisers questions once your registration is approved.
+                {ASK_WORDS[notIn(view.data) as Exclude<NotIn, 'organises'>]}
               </BodyText>
             )}
           </Card>

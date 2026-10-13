@@ -1,9 +1,9 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { queryView } from '@/api/query';
 import { toApiError } from '@/api/problem';
 import type { FileContent, WorkflowForm } from '@/api/types';
-import { compareRatio, type Ratio } from '@/lib/exact';
+import { compareRatio, formatWorthRatio, type Ratio } from '@/lib/exact';
 import { formatSize } from '@/lib/size';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
@@ -45,7 +45,7 @@ import { InputsCard, type InputFiles } from './InputsCard';
 import { taskMergeWords } from './merge-words';
 import { taskPlace, taskPlaceOf } from './places';
 import { SaveBar } from './SaveBar';
-import { pointsText, ruleOf, shareProblem, taskWeight } from './scoring';
+import { pointsWords, ruleOf, shareProblem, taskWeight } from './scoring';
 import {
   existingOf,
   NOTHING_STAGED,
@@ -144,7 +144,12 @@ function BuildForm({
   );
   const [adding, setAdding] = useState<AddStart | null>(null);
   const { worth, known } = useTaskWorth(place);
-  const disabled = !manager || saving.state.stage !== 'idle';
+  // While a save asks before it publishes, its answer sends the cards as they
+  // were asked about, so they stay so until it is answered or discarded.
+  const asking =
+    saving.outcome?.kind === 'refused' &&
+    saving.outcome.error.code === 'confirmation_required';
+  const disabled = !manager || saving.state.stage !== 'idle' || asking;
 
   const picked = values.workflow.trim();
   const version = queryView(
@@ -346,6 +351,35 @@ function BuildForm({
     inputFiles.map((change) => change.id),
   );
   const changed = lines.length > 0 || values.inputs.some(heldTheOtherWay);
+  // A save's answer is about that save: once something is changed again, it
+  // goes, rather than standing in the bar beside changes it does not cover.
+  // The cards read the task afresh once a save is through, so an answer that
+  // was there when they did is one the organiser has seen beside no change.
+  const [answered] = useState(() => saving.outcome);
+  const stale =
+    changed &&
+    saving.state.stage === 'idle' &&
+    saving.outcome !== null &&
+    saving.outcome === answered &&
+    saving.outcome.kind === 'saved';
+  const { forget } = saving;
+  useEffect(() => {
+    if (stale) forget();
+  }, [stale, forget]);
+  // Once a save from these cards went through, what it sent is saved: nothing
+  // is left to save while the task is read again, unless changed since (M66).
+  const [sent, setSent] = useState<{
+    values: TaskValues;
+    staged: Staged;
+    inputFiles: StagedInput[];
+  } | null>(null);
+  const through =
+    saving.outcome?.kind === 'saved' &&
+    saving.outcome !== answered &&
+    sent?.values === values &&
+    sent.staged === staged &&
+    sent.inputFiles === inputFiles;
+  const toSave = changed && !through;
   const problems = [
     values.credit.kind !== 'none' && values.credit.name.trim() === ''
       ? 'Choose which value a test earns, under How a test earns.'
@@ -394,6 +428,7 @@ function BuildForm({
     if ('error' in fresh) return;
     writeTask(fresh.doc, read.values, values, { admin, unreadable: read.unreadable });
     const content = writeOver(file.content, fresh.doc);
+    setSent({ values, staged, inputFiles });
     void saving.save({
       yaml:
         content === file.content
@@ -497,10 +532,11 @@ function BuildForm({
         />
       )}
       <SaveBar
-        lines={changed ? lines : []}
-        notices={changed ? notices : []}
+        lines={toSave ? lines : []}
+        notices={toSave ? notices : []}
         problems={problems}
         state={saving.state}
+        asking={asking}
         onSave={save}
         onDiscard={() => {
           setValues(read.values);
@@ -508,6 +544,8 @@ function BuildForm({
           setInputFiles([]);
           saving.forget();
         }}
+        pinned={saving.merge !== null || saving.conflicts !== null || asking}
+        onClose={saving.drop}
       >
         {(saving.outcome !== null ||
           saving.merge !== null ||
@@ -549,7 +587,7 @@ function pointsNotice(
   known: boolean,
 ): string[] {
   if (compareRatio(before, after) === 0 || worth !== null) return [];
-  const change = `the task will be worth ${pointsText(after)} points, not ${pointsText(before)}`;
+  const change = `the task will be worth ${pointsWords(after)}, not ${formatWorthRatio(before)}`;
   return known
     ? [
         `This changes the task’s points: its contest gives it no worth of its own, so ${change}.`,
@@ -619,7 +657,7 @@ function SaveAnswer({
   return (
     <SaveOutcome
       outcome={saving.outcome}
-      onConfirm={(body) => saving.again(body, { confirm: true })}
+      onConfirm={(body, asked) => saving.again(body, { confirm: true, asked })}
       onKeepAsDraft={(body) => saving.again(body, { keep_as_draft: true })}
       onReload={saving.drop}
       placeOf={placeOf}
