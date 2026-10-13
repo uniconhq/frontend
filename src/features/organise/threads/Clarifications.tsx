@@ -24,6 +24,7 @@ import { announcementAnchor } from '@/ui/threads/anchors';
 import { QuestionThread } from '@/ui/threads/ThreadParts';
 import { contestPath, taskPath } from '@/lib/organiser-paths';
 import { useEntrantName } from '../entrants/names';
+import { useTaskTitles } from '../contest/task-entry';
 import classes from '@/ui/threads/threads.module.css';
 
 const INBOX = '/api/v1/orgs/{org}/clarifications';
@@ -111,6 +112,12 @@ function ClarificationCard({
   };
   const name = clarification.title;
   const asker = useEntrantName(org, contest, clarification.asker);
+  const about = clarification.task;
+  const taskTitle = useTaskTitles(
+    org,
+    contest ?? '',
+    about === null || contest === null ? [] : [about],
+  ).get(about ?? '');
   const open = !clarification.answered;
 
   const sendReply = async (event: FormEvent) => {
@@ -176,6 +183,7 @@ function ClarificationCard({
         asker={asker}
         organisers
         where={showContest ? `${org}/${contest ?? ''}` : undefined}
+        taskTitle={taskTitle}
         announcementAt={(link) => ({
           href: `${link.task === null ? contestPath(org, contest ?? '') : taskPath(org, contest ?? '', link.task)}/announcements#${announcementAnchor(link)}`,
         })}

@@ -419,6 +419,28 @@ describe("a contest's questions, for its organisers", () => {
     expect(within(box).getByText(/^Open, waiting /)).toBeVisible();
   });
 
+  it('says which task a question is about by its title, as the task’s settings give it', async () => {
+    questionRoutes([question({ task: 'sum' })], `${CONTEST_API}/clarifications`);
+    server.use(
+      http.get(`${CONTEST_API}/tasks/:task/files/:path`, ({ params }) =>
+        params['path'] === 'task.yaml'
+          ? HttpResponse.json({
+              path: 'task.yaml',
+              encoding: 'utf-8',
+              content: 'name: Sum of two\n',
+              token: 'token-task-yaml',
+              upload: null,
+              version: 'v1',
+            })
+          : undefined,
+      ),
+    );
+    renderApp('/orgs/acme/contests/spring/questions');
+
+    const box = await screen.findByRole('article', { name: 'Input size?' });
+    expect(await within(box).findByText('About task Sum of two')).toBeVisible();
+  });
+
   it('puts the open ones first, folds the answered away, and reopens one', async () => {
     const did = questionRoutes(
       [

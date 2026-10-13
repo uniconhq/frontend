@@ -199,7 +199,7 @@ describe("the boards' settings", { timeout: 20_000 }, () => {
     );
     const tasks = within(icpcBoard().getByRole('group', { name: 'Tasks' }));
     await user.click(tasks.getByRole('checkbox', { name: 'Covers every task' }));
-    await user.click(tasks.getByRole('checkbox', { name: 'sort' }));
+    await user.click(tasks.getByRole('checkbox', { name: 'B · sort' }));
     await user.click(
       within(form).getByRole('button', { name: 'Add a way to rank ICPC' }),
     );

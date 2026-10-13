@@ -21,6 +21,7 @@ import {
 } from '../task/scoring';
 import { heldOf, publishedQuery, readPublished } from './published';
 import { useContestSettings } from './settings';
+import { labelOf, useTaskTitles } from './task-entry';
 import { markedBoardCovers, timelineWords } from './timeline';
 import shared from '../organise.module.css';
 import classes from './contest.module.css';
@@ -44,11 +45,14 @@ function TaskScoring({
   org,
   contest,
   standing,
+  label,
   values,
 }: {
   org: string;
   contest: string;
   standing: TaskStanding;
+  /** Its letter and title, `A · Sum`. */
+  label: string;
   values: ContestValues | null;
 }) {
   const task = standing.task.name;
@@ -77,7 +81,6 @@ function TaskScoring({
   const boards = (values?.boards ?? []).filter(
     (board) => board.tasks === null || board.tasks.includes(task),
   );
-  const label = `${standing.label} · ${task}`;
   const timeline = timelineWords(standing, values, marks);
 
   return (
@@ -190,6 +193,11 @@ export function ContestScoring({ org, contest }: { org: string; contest: string 
   );
   const settings = useContestSettings(org, contest);
   const values = settings.state === 'ready' ? settings.data : null;
+  const titles = useTaskTitles(
+    org,
+    contest,
+    view.state === 'ready' ? view.data.map((standing) => standing.task.name) : [],
+  );
   if (view.state === 'error') return null;
   return (
     <HubCard
@@ -213,6 +221,7 @@ export function ContestScoring({ org, contest }: { org: string; contest: string 
                     org={org}
                     contest={contest}
                     standing={standing}
+                    label={labelOf(standing, titles)}
                     values={values}
                   />
                 ))}

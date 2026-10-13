@@ -64,11 +64,13 @@ function rowsChoice(rows: string): 'all' | 'own' | 'top' {
  * a board reads on the field that caused it. `disabled` shows them to
  * someone who may not change them. `reported` is what each published task
  * reports, which names the values a board may rank by (M58); null while it
- * is not known, when a value is typed by its key.
+ * is not known, when a value is typed by its key. A task is called by its
+ * label in `taskLabels`, its letter and title, or by its id where it has none.
  */
 export function BoardFields({
   boards,
   taskIds,
+  taskLabels = new Map(),
   held = null,
   reported = null,
   refused,
@@ -77,6 +79,7 @@ export function BoardFields({
 }: {
   boards: BoardValues[];
   taskIds: string[];
+  taskLabels?: ReadonlyMap<string, string>;
   /** The published tasks' groups whose results come out once their task closes, when known. */
   held?: HeldGroup[] | null;
   /** The values each published task reports, when known. */
@@ -104,6 +107,7 @@ export function BoardFields({
               board={board}
               index={index}
               taskIds={taskIds}
+              taskLabels={taskLabels}
               held={held}
               values={reported === null ? null : rankableValues(reported, board.tasks)}
               refusals={boardRefusals(refused, index)}
@@ -151,6 +155,7 @@ function BoardEntry({
   board,
   index,
   taskIds,
+  taskLabels,
   held,
   values,
   refusals,
@@ -161,6 +166,7 @@ function BoardEntry({
   board: BoardValues;
   index: number;
   taskIds: string[];
+  taskLabels: ReadonlyMap<string, string>;
   held: HeldGroup[] | null;
   /** The values the board may rank by, or null while not known. */
   values: ValueMeaning[] | null;
@@ -332,7 +338,7 @@ function BoardEntry({
               shownTasks.map((task) => (
                 <Checkbox
                   key={task}
-                  label={task}
+                  label={taskLabels.get(task) ?? task}
                   checked={board.tasks?.includes(task) ?? false}
                   onChange={(covered) =>
                     onChange({
