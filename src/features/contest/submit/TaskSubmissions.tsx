@@ -6,6 +6,7 @@ import type { Submission, TaskPage, TaskRelease } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { Card } from '@/ui/Card';
 import { SectionTitle } from '@/ui/SectionTitle';
+import { notIn, SUBMIT_WORDS } from '../entry/not-in';
 import { emptyDraft, type Draft } from './draft';
 import { newestFirst } from './grading';
 import { SubmissionDetail } from './SubmissionDetail';
@@ -22,16 +23,49 @@ import shared from '../contest.module.css';
  * have not withdrawn it; and only an approved entrant holds a row to submit
  * from.
  */
-const CLOSED: Record<NonNullable<TaskRelease['closed']>, string> = {
+const CLOSED: Record<
+  Exclude<NonNullable<TaskRelease['closed']>, 'not_approved'>,
+  string
+> = {
   not_released: 'This task is not released yet.',
   archived: 'The contest is archived, so its tasks take no submissions.',
   closed: 'This task has closed for you, so it takes no more submissions from you.',
-  not_approved: 'You can submit once your registration is approved.',
   withdrawn: 'This task was withdrawn from the contest, so it takes no submissions.',
 };
 
-function closedReason(closed: TaskRelease['closed']): string {
-  return closed === null ? 'This task takes no submissions right now.' : CLOSED[closed];
+/**
+ * Why the task takes nothing from someone who is not an approved entrant,
+ * as it stands for them (`SUBMIT_WORDS`), from the contest's home; while
+ * that is read, or when it cannot be, what holds for everyone.
+ */
+function NotApproved({ org, contest }: { org: string; contest: string }) {
+  const home = $api.useQuery('get', '/api/v1/orgs/{org}/contests/{contest}/home', {
+    params: { path: { org, contest } },
+  });
+  return (
+    <BodyText>
+      {home.data === undefined
+        ? 'Only the contest’s approved entrants can submit to this task.'
+        : SUBMIT_WORDS[notIn(home.data)]}
+    </BodyText>
+  );
+}
+
+function ClosedReason({
+  org,
+  contest,
+  closed,
+}: {
+  org: string;
+  contest: string;
+  closed: TaskRelease['closed'];
+}) {
+  if (closed === 'not_approved') return <NotApproved org={org} contest={contest} />;
+  return (
+    <BodyText>
+      {closed === null ? 'This task takes no submissions right now.' : CLOSED[closed]}
+    </BodyText>
+  );
 }
 
 /**
@@ -113,7 +147,7 @@ export function TaskSubmissions({
             />
           ) : (
             <div role="status" aria-label="Why you cannot submit">
-              <BodyText>{closedReason(page.release.closed)}</BodyText>
+              <ClosedReason org={org} contest={contest} closed={page.release.closed} />
             </div>
           )}
         </div>

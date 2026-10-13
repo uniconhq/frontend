@@ -190,7 +190,7 @@ export function scaled(value: Ratio, total: Ratio, worth: Ratio | null): Ratio {
  * Points an entrant earns, for reading: cut, as every page cuts them (R17),
  * exactly or "about" when they do not end.
  */
-export function pointsText(value: Ratio): string {
+function pointsText(value: Ratio): string {
   return formatPointsRatio(value);
 }
 

@@ -108,11 +108,7 @@ const uploadedStatement = http.get(`${TASK_API}/files/:path`, ({ params }) =>
 
 /** The uploaded statement on its card, its Upload again opened. */
 async function openUpload() {
-  const shown = await screen.findByRole(
-    'region',
-    { name: 'Uploaded statement.md' },
-    { timeout: 5000 },
-  );
+  const shown = await screen.findByRole('region', { name: 'Uploaded statement.md' });
   await userEvent.click(within(shown).getByRole('button', { name: 'Upload again' }));
   return within(shown).getByRole('region', { name: 'Upload statement.md again' });
 }
@@ -130,11 +126,7 @@ describe('uploading a file of a task again', { timeout: 20_000 }, () => {
     server.use(signedIn, taskState, publicationList, uploadedStatement, ...repoFiles);
     renderApp(STATEMENT);
 
-    const shown = await screen.findByRole(
-      'region',
-      { name: 'Uploaded statement.md' },
-      { timeout: 5000 },
-    );
+    const shown = await screen.findByRole('region', { name: 'Uploaded statement.md' });
     expect(shown).toHaveTextContent('300 MB');
     expect(shown).toHaveTextContent(DIGEST);
     expect(within(shown).queryByRole('textbox')).toBeNull();
@@ -377,9 +369,6 @@ describe('uploading a file of a task again', { timeout: 20_000 }, () => {
 
     const unsaved = await within(panel).findByText(
       /has been uploaded but is not saved into the task\. Leaving this page loses it\./,
-      {},
-      // Reading a file to send it takes a while beside a full run of the suite.
-      { timeout: 5000 },
     );
     expect(unsaved).toHaveTextContent('statement.md, 4 B,');
     expect(
@@ -504,11 +493,7 @@ describe('uploading a file of a task again', { timeout: 20_000 }, () => {
     );
     renderApp(STATEMENT);
 
-    const shown = await screen.findByRole(
-      'region',
-      { name: 'Uploaded statement.md' },
-      { timeout: 5000 },
-    );
+    const shown = await screen.findByRole('region', { name: 'Uploaded statement.md' });
     expect(within(shown).queryByRole('button', { name: 'Upload again' })).toBeNull();
   });
 });

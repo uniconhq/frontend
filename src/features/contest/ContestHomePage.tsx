@@ -24,18 +24,24 @@ import { useAnchor } from '@/ui/anchor';
 import { Countdown } from '@/ui/Countdown';
 import { entryPollEvery } from './entry/poll';
 import { YourEntry } from './entry/YourEntry';
+import { notIn, TASK_STANDING } from './entry/not-in';
 import { SignInButtons, SignInPrompt } from './SignInPrompt';
 import { labelOf } from './task-names';
 import { boardPointsText, taskPointsText, type PointsText } from './task-points';
 import { taskTimeLines } from './time-left';
 import classes from './contest.module.css';
 
-/** Where a task stands for the reader, when it is not simply open. */
-const NOT_OPEN: Record<NonNullable<TaskEntry['release']['closed']>, string | null> = {
+/**
+ * Where a task stands for the reader, when it is not simply open; for one
+ * who is not an approved entrant, what is true for them (`TASK_STANDING`).
+ */
+const NOT_OPEN: Record<
+  Exclude<NonNullable<TaskEntry['release']['closed']>, 'not_approved'>,
+  string | null
+> = {
   not_released: 'Not released yet',
   archived: 'No longer takes submissions',
   closed: null,
-  not_approved: 'Open once your registration is approved',
   withdrawn: 'Withdrawn from the contest',
 };
 
@@ -48,12 +54,16 @@ function Standing({
   task,
   at,
   counting,
+  notApproved,
 }: {
   task: TaskEntry;
   at: number;
   counting: boolean;
+  notApproved: string;
 }) {
-  const reason = task.release.closed === null ? null : NOT_OPEN[task.release.closed];
+  const { closed } = task.release;
+  const reason =
+    closed === null ? null : closed === 'not_approved' ? notApproved : NOT_OPEN[closed];
   const lines = taskTimeLines(task.due, task.closes, at, counting);
   const shown =
     reason !== null
@@ -116,6 +126,7 @@ function BoardColumns({
   boards,
   at,
   counting,
+  notApproved,
 }: {
   org: string;
   contest: string;
@@ -123,6 +134,7 @@ function BoardColumns({
   boards: string[];
   at: number;
   counting: boolean;
+  notApproved: string;
 }) {
   const now = new Date(at);
   return (
@@ -149,7 +161,12 @@ function BoardColumns({
                       {task.title}
                     </PageLink>
                   </span>
-                  <Standing task={task} at={at} counting={counting} />
+                  <Standing
+                    task={task}
+                    at={at}
+                    counting={counting}
+                    notApproved={notApproved}
+                  />
                 </div>
               </th>
               {boards.map((board, index) => {
@@ -188,12 +205,15 @@ function TaskList({
   tasks,
   boards,
   onReveal,
+  notApproved,
 }: {
   org: string;
   contest: string;
   tasks: TaskEntry[];
   boards: string[];
   onReveal: () => void;
+  /** Where a task stands for a reader who is not an approved entrant. */
+  notApproved: string;
 }) {
   const { at, measured } = useServerClock();
   useReveals(tasks, at, onReveal);
@@ -209,6 +229,7 @@ function TaskList({
         boards={boards}
         at={at}
         counting={measured}
+        notApproved={notApproved}
       />
     );
   }
@@ -219,7 +240,7 @@ function TaskList({
           <span className={classes.label}>{labelOf(task)}</span>
           <PageLink to={taskPagePath(org, contest, task.name)}>{task.title}</PageLink>
           <Points text={taskPointsText(task, new Date(at))} />
-          <Standing task={task} at={at} counting={measured} />
+          <Standing task={task} at={at} counting={measured} notApproved={notApproved} />
         </li>
       ))}
     </ul>
@@ -488,6 +509,7 @@ function Home({
             tasks={home.tasks}
             boards={home.boards}
             onReveal={onBoundary}
+            notApproved={TASK_STANDING[notIn(home)]}
           />
         </div>
       </Card>

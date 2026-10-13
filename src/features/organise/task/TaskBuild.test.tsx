@@ -1197,6 +1197,21 @@ describe('scoring a task', { timeout: 30_000 }, () => {
     });
   });
 
+  it('says one thing of a mix with no points yet: that its tests are for practice', async () => {
+    taskBackend({ form: { ...CHECKED, inputs: [] } });
+    const { tests } = await openTask();
+
+    fill(fieldIn(tests, 'samples', 'How does this group earn points?'), 'advanced');
+    const samples = fieldGroup(tests, 'samples');
+    expect(
+      within(samples).getByRole('list', { name: 'The parts of the mix' }),
+    ).toBeVisible();
+    expect(samples).not.toHaveTextContent(/add up/);
+    expect(
+      within(samples).getByText('Its tests are for entrants to practise on.'),
+    ).toBeVisible();
+  });
+
   it('leaves the lowest test score out of a mix while tests only pass or fail, and says why one set cannot stay (M59)', async () => {
     taskBackend({
       form: { ...CHECKED, inputs: [] },

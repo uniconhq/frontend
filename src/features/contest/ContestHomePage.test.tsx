@@ -469,9 +469,7 @@ describe('the contest page for a signed-in person', () => {
 
     const tasks = await screen.findByRole('list', { name: 'Tasks' });
     expect(await within(tasks).findByText('30 / 100')).toBeVisible();
-    expect(
-      await within(tasks).findByText('100 / 100', {}, { timeout: 5_000 }),
-    ).toBeVisible();
+    expect(await within(tasks).findByText('100 / 100')).toBeVisible();
   });
 
   it('says when each task falls due and closes before the server’s time is in', async () => {
@@ -541,6 +539,7 @@ describe('the contest page for a signed-in person', () => {
       http.get(`${CONTEST_API}/home`, () =>
         HttpResponse.json(
           home({
+            registration: registration(),
             tasks: [
               task('a', 'not_approved'),
               { ...task('b', 'closed'), closes: '2026-09-12T09:30:00Z' },
@@ -561,6 +560,55 @@ describe('the contest page for a signed-in person', () => {
     );
     expect(c).toHaveTextContent('No longer takes submissions');
   });
+
+  it.each([
+    ['who may register', { registration: entry() }, 'Register to submit'],
+    [
+      'whom the contest’s email rule refuses',
+      {
+        registration: entry({
+          can_register: false,
+          refused: {
+            code: 'domain_not_allowed' as const,
+            detail: 'This contest takes only some email addresses, and not yours.',
+          },
+        }),
+      },
+      'Open to the contest’s entrants only',
+    ],
+    ['who organises the contest', { organises: true }, 'Open to entrants'],
+  ])(
+    'says what is true of a task not open yet for someone %s',
+    async (_, who, said) => {
+      server.use(
+        signedIn,
+        http.get(`${CONTEST_API}/home`, () =>
+          HttpResponse.json(
+            home({
+              ...who,
+              tasks: [
+                {
+                  ...home().tasks[0]!,
+                  release: {
+                    released: true,
+                    visible: true,
+                    open: false,
+                    closed: 'not_approved',
+                  },
+                },
+              ],
+            }),
+          ),
+        ),
+      );
+      renderApp(PAGE);
+
+      const tasks = await screen.findByRole('list', { name: 'Tasks' });
+      const [a] = within(tasks).getAllByRole('listitem');
+      expect(a).toHaveTextContent(said);
+      expect(a).not.toHaveTextContent('registration is approved');
+    },
+  );
 
   it('registers and then shows the registration waiting', async () => {
     let body: unknown = null;
@@ -789,9 +837,7 @@ describe('the contest page at its start', () => {
     expect(await screen.findByText('No tasks are released yet.')).toBeVisible();
     const timer = await screen.findByRole('timer', { name: 'Contest countdown' });
     await waitFor(() => expect(timer).toHaveTextContent(/^Contest starts in /));
-    expect(
-      await screen.findByRole('link', { name: 'Sum of Two' }, { timeout: 5_000 }),
-    ).toBeVisible();
+    expect(await screen.findByRole('link', { name: 'Sum of Two' })).toBeVisible();
     expect(screen.getByRole('timer', { name: 'Contest countdown' })).toHaveTextContent(
       /^Contest ends in /,
     );

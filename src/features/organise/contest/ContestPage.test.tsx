@@ -223,9 +223,8 @@ describe("the contest's tasks", () => {
     renderApp(CONTEST);
 
     const sum = await screen.findByRole('listitem', { name: 'B · sum' });
-    expect(sum).toHaveTextContent(
-      `Publication 2, ${at('2026-09-21T10:00:00Z')}, grading unchanged`,
-    );
+    expect(sum).toHaveTextContent(`Publication 2, ${at('2026-09-21T10:00:00Z')}`);
+    expect(sum).not.toHaveTextContent(/unchanged|how it grades/);
     expect(sum).toHaveTextContent('1 problem in its last save');
     expect(within(sum).queryByRole('list', { name: 'Errors' })).toBeNull();
   });

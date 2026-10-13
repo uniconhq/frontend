@@ -8,6 +8,7 @@ import {
   CONTEST_API,
   home,
   noSubmissions,
+  registration,
   PUBLIC_API,
   TASK_API,
   taskPage,
@@ -95,6 +96,10 @@ describe('a task page for a signed-in person', () => {
       server.use(
         signedIn,
         noSubmissions,
+        // Someone whose registration waits for approval.
+        http.get(`${CONTEST_API}/home`, () =>
+          HttpResponse.json(home({ registration: registration() })),
+        ),
         http.get(`${TASK_API}/page`, () =>
           HttpResponse.json({
             ...taskPage,
@@ -109,9 +114,8 @@ describe('a task page for a signed-in person', () => {
       );
       renderApp(PAGE);
 
-      expect(
-        await screen.findByRole('status', { name: 'Why you cannot submit' }),
-      ).toHaveTextContent(said);
+      const why = await screen.findByRole('status', { name: 'Why you cannot submit' });
+      await waitFor(() => expect(why).toHaveTextContent(said));
       expect(screen.queryByRole('form', { name: 'Submit' })).not.toBeInTheDocument();
     },
   );
