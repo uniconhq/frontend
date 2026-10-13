@@ -9,7 +9,7 @@ import type {
 } from '@/api/types';
 import { useFallbackPoll } from '@/live';
 import { formatExact, formatPoints, withPointsWord } from '@/lib/exact';
-import { meaningOf, titleInSentence, withUnit } from '@/lib/values';
+import { foldWord, meaningOf, titleInSentence, withUnit } from '@/lib/values';
 import { formatDateTime } from '@/lib/time';
 
 /** Each task's latest regrade of many, newest first. */
@@ -200,15 +200,29 @@ function shareOf(side: RegradeSide): number | null {
  * with the same share of tests passed, the values that differ; none for any
  * other change.
  */
-export function decidingValues(change: RegradeChange): string[] {
+export function decidingValues(change: RegradeChange): ComparedValue[] {
   const { earlier, now } = change;
   if (earlier === null || now === null) return [];
   if (change.change !== 'up' && change.change !== 'down') return [];
   if (earlier.points !== null && now.points !== null) return [];
   const [before, after] = [shareOf(earlier), shareOf(now)];
   if (before !== null && after !== null && before !== after) return [];
-  const names = new Set([...Object.keys(earlier.values), ...Object.keys(now.values)]);
-  return [...names].filter((name) => earlier.values[name] !== now.values[name]);
+  const found: ComparedValue[] = [];
+  for (const { by, fold } of [...earlier.values, ...now.values]) {
+    if (found.some((key) => key.by === by && key.fold === fold)) continue;
+    if (valueOf(earlier, { by, fold }) !== valueOf(now, { by, fold })) {
+      found.push({ by, fold });
+    }
+  }
+  return found;
+}
+
+/** A value a regrade compares, by name and how its leaderboard folds it. */
+export type ComparedValue = Pick<RegradeSide['values'][number], 'by' | 'fold'>;
+
+function valueOf(side: RegradeSide, key: ComparedValue): string | undefined {
+  return side.values.find((each) => each.by === key.by && each.fold === key.fold)
+    ?.value;
 }
 
 /**
@@ -231,17 +245,22 @@ export function usePublicationMeanings(
   return query.data?.find((each) => each.number === publication)?.meanings ?? [];
 }
 
-/** One value a result was compared on, "run time 28 ms", or "no run time". */
+/**
+ * One value a result was compared on, "run time (highest) 28 ms", or "no
+ * run time (highest)".
+ */
 function valueWords(
   side: RegradeSide,
-  name: string,
+  key: ComparedValue,
   meanings: readonly ValueMeaning[],
 ) {
-  const meaning = meaningOf(meanings, name);
-  const value = side.values[name];
+  const meaning = meaningOf(meanings, key.by);
+  const word = foldWord(key.fold);
+  const title = `${titleInSentence(key.by, meaning)}${word === null ? '' : ` (${word})`}`;
+  const value = valueOf(side, key);
   return value === undefined
-    ? `no ${titleInSentence(name, meaning)}`
-    : `${titleInSentence(name, meaning)} ${withUnit(formatExact(value), meaning)}`;
+    ? `no ${title}`
+    : `${title} ${withUnit(formatExact(value), meaning)}`;
 }
 
 /**
@@ -252,7 +271,7 @@ function valueWords(
  */
 export function sideWords(
   side: RegradeSide | null,
-  values: { names: string[]; meanings: readonly ValueMeaning[] } | null = null,
+  values: { keys: ComparedValue[]; meanings: readonly ValueMeaning[] } | null = null,
 ): string {
   if (side === null) return '—';
   const stopped =
@@ -263,8 +282,8 @@ export function sideWords(
     side.points !== null
       ? withPointsWord(formatPoints(side.points))
       : `${String(side.accepted)} of ${String(side.tests)} tests passed`;
-  const compared = (values?.names ?? []).map((name) =>
-    valueWords(side, name, values?.meanings ?? []),
+  const compared = (values?.keys ?? []).map((key) =>
+    valueWords(side, key, values?.meanings ?? []),
   );
   return [...(stopped === null ? [] : [stopped]), tally, ...compared].join(', ');
 }

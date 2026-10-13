@@ -137,7 +137,7 @@ describe('a result a regrade compares', () => {
       accepted: 5,
       tests: 8,
       stopped: null,
-      values: {},
+      values: [],
     };
     expect(sideWords(side)).toBe(`${formatExact('62.5', 2)} points`);
     expect(sideWords({ ...side, points: '0', stopped: 'compile_error' })).toBe(
@@ -157,13 +157,27 @@ describe('a result a regrade compares', () => {
     accepted: 5,
     tests: 5,
     stopped: null,
-    values,
+    values: Object.entries(values).map(([by, value]) => ({
+      by,
+      fold: 'max' as const,
+      value,
+    })),
   });
+  const slowest = { by: 'time_ms', fold: 'max' as const };
 
   it('names the values that decided a change on a task with no points, as the forge decides it (#448)', () => {
     const earlier = passed({ time_ms: '28', memory_kb: '900' });
     const now = passed({ time_ms: '40', memory_kb: '900' });
-    expect(decidingValues({ change: 'down', earlier, now })).toEqual(['time_ms']);
+    expect(decidingValues({ change: 'down', earlier, now })).toEqual([slowest]);
+    // The same value as another board folds it is compared apart.
+    const total = { by: 'time_ms', fold: 'sum' as const, value: '50' };
+    expect(
+      decidingValues({
+        change: 'down',
+        earlier: { ...earlier, values: [...earlier.values, total] },
+        now: { ...now, values: [...now.values, total] },
+      }),
+    ).toEqual([slowest]);
     // The share of tests passed decides first, and points before it.
     expect(
       decidingValues({ change: 'down', earlier, now: { ...now, accepted: 4 } }),
@@ -185,18 +199,17 @@ describe('a result a regrade compares', () => {
         name: 'time_ms',
         title: 'Run time',
         unit: 'ms',
-        fold: 'max' as const,
         better: 'lower' as const,
       },
     ];
-    expect(sideWords(side, { names: ['time_ms'], meanings })).toBe(
-      `5 of 5 tests passed, run time ${formatExact('40.25')} ms`,
+    expect(sideWords(side, { keys: [slowest], meanings })).toBe(
+      `5 of 5 tests passed, run time (highest) ${formatExact('40.25')} ms`,
     );
-    expect(sideWords(side, { names: ['time_ms'], meanings: [] })).toBe(
-      `5 of 5 tests passed, time_ms ${formatExact('40.25')}`,
+    expect(sideWords(side, { keys: [slowest], meanings: [] })).toBe(
+      `5 of 5 tests passed, time_ms (highest) ${formatExact('40.25')}`,
     );
-    expect(sideWords(passed({}), { names: ['time_ms'], meanings })).toBe(
-      '5 of 5 tests passed, no run time',
+    expect(sideWords(passed({}), { keys: [slowest], meanings })).toBe(
+      '5 of 5 tests passed, no run time (highest)',
     );
   });
 });
