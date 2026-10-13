@@ -350,17 +350,13 @@ describe("the boards' settings", { timeout: 20_000 }, () => {
     await user.click(
       order.getByRole('button', { name: 'Remove way to rank 3 of Standings' }),
     );
-    await user.click(
-      order.getByRole('button', { name: 'Move way to rank 2 of Standings up' }),
-    );
+    // Penalty minutes only break ties, so no arrow puts them first.
     expect(
-      within(order.getByRole('group', { name: 'Way to rank 1' })).getByRole('alert'),
-    ).toHaveTextContent(
-      'Penalty minutes only break ties, so they are never the first way to rank.',
-    );
-    await user.click(
       order.getByRole('button', { name: 'Move way to rank 2 of Standings up' }),
-    );
+    ).toBeDisabled();
+    expect(
+      order.getByRole('button', { name: 'Move way to rank 1 of Standings down' }),
+    ).toBeDisabled();
     fireEvent.change(
       within(order.getByRole('group', { name: 'Way to rank 2' })).getByRole('textbox', {
         name: 'Minutes per earlier attempt',

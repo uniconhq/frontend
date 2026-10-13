@@ -30,6 +30,7 @@ import { Fieldset, NumberField } from './fields';
 import {
   keyOfKind,
   kindDescription,
+  canMoveKey,
   kindOptions,
   nextKey,
   orderSummary,
@@ -376,7 +377,8 @@ function BoardEntry({
                   options={kindOptions(rows, at)}
                   rows={rows}
                   values={values}
-                  last={at === rows.length - 1}
+                  up={canMoveKey(rows, at, -1)}
+                  down={canMoveKey(rows, at, 1)}
                   alone={rows.length === 1}
                   error={keyProblem(at)}
                   minutesError={said(`order.${String(at)}.per_attempt`)}
@@ -487,7 +489,8 @@ function OrderKey({
   options,
   rows,
   values,
-  last,
+  up,
+  down,
   alone,
   error,
   minutesError,
@@ -507,7 +510,9 @@ function OrderKey({
   rows: OrderKeyValues[];
   /** The values it may rank by, or null while not known. */
   values: ValueMeaning[] | null;
-  last: boolean;
+  /** Whether it may move up, and down. */
+  up: boolean;
+  down: boolean;
   /** Whether it is the board's only way to rank, which stays. */
   alone: boolean;
   error: string | undefined;
@@ -575,13 +580,13 @@ function OrderKey({
               <IconButton
                 sign="↑"
                 label={`Move way to rank ${place} of ${of} up`}
-                disabled={at === 0}
+                disabled={!up}
                 onClick={() => onMove(-1)}
               />
               <IconButton
                 sign="↓"
                 label={`Move way to rank ${place} of ${of} down`}
-                disabled={last}
+                disabled={!down}
                 onClick={() => onMove(1)}
               />
               <IconButton
