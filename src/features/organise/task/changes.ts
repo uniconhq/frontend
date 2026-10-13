@@ -69,8 +69,13 @@ function earningMoved(was: GroupValues, now: GroupValues): boolean {
   }
   return (
     exactly(now.pass).num !== 0n &&
-    compareRatio(exactly(was.passAt), exactly(now.passAt)) !== 0
+    compareRatio(passAtOf(was.passAt), passAtOf(now.passAt)) !== 0
   );
+}
+
+/** The share of tests that must pass for the pass part; unset, every one. */
+function passAtOf(text: string): Ratio {
+  return text.trim() === '' ? { num: 1n, den: 1n } : exactly(text);
 }
 
 function groupLines(
