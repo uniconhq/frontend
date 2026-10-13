@@ -9,32 +9,50 @@ import { waitedWords, waitingSince } from './waiting';
 import classes from './threads.module.css';
 
 /**
- * The message a public answer leaves on its question, "Answered publicly in
- * the announcement ‘On n’", with the announcement's title a link to it
- * (M62); the whole message the link where it does not quote the title. With
- * no `href`, the reader can no longer open the announcement, since the
- * organisers closed it, and the message says so in place of the link.
+ * Where the announcement a public answer posted is read, or why a reader
+ * can no longer read it there: the organisers closed it, or its task was
+ * withdrawn from the contest, which takes its announcements off.
  */
-function AnsweredPublicly({ body, href }: { body: string; href: string | null }) {
-  if (href === null) {
+export type AnnouncementAt = { href: string } | { gone: 'closed' | 'withdrawn' };
+
+const GONE: Record<'closed' | 'withdrawn', string> = {
+  closed: 'which the organisers have since closed',
+  withdrawn: 'whose task has since been withdrawn from the contest',
+};
+
+/**
+ * The message a public answer leaves on its question, "Answered publicly in
+ * the announcement ‘On n’", with the announcement's title, as the forge
+ * reads it from the message, a link to it (M62); the whole message the link
+ * where the message was edited and names no title. Where the reader can no
+ * longer open the announcement, the message says why in place of the link.
+ */
+function AnsweredPublicly({
+  body,
+  title,
+  at,
+}: {
+  body: string;
+  title: string | null;
+  at: AnnouncementAt;
+}) {
+  if ('gone' in at) {
     return (
       <p className={classes.publicAnswer}>
-        {body.trimEnd()}, which the organisers have since closed.
+        {body.trimEnd()}, {GONE[at.gone]}.
       </p>
     );
   }
-  const quoted = /^(.*?)(‘.*’)\s*$/su.exec(body);
-  if (quoted === null) {
+  if (title === null) {
     return (
       <p className={classes.publicAnswer}>
-        <PageLink to={href}>{body}</PageLink>
+        <PageLink to={at.href}>{body}</PageLink>
       </p>
     );
   }
   return (
     <p className={classes.publicAnswer}>
-      {quoted[1]}
-      <PageLink to={href}>{quoted[2]}</PageLink>
+      Answered publicly in the announcement <PageLink to={at.href}>‘{title}’</PageLink>
     </p>
   );
 }
@@ -100,23 +118,23 @@ function QuestionBadge({
  * the name the asker's messages go under ("You", "Your team", or the
  * entrant's name for the organisers); `organisers` says the box is read by
  * them, whose badge says how long an open question has waited.
- * `announcementHref` is where the announcement a public answer posted is
- * read, which its message on the question links to, or null where the
- * reader can no longer read it there. `children` is what can
- * be done with it, at the box's foot.
+ * `announcementAt` is where the announcement a public answer posted is
+ * read, which its message on the question links to, or why the reader can
+ * no longer read it there. `children` is what can be done with it, at the
+ * box's foot.
  */
 export function QuestionThread({
   clarification,
   asker,
   organisers = false,
   where,
-  announcementHref,
+  announcementAt,
   children,
 }: {
   clarification: Clarification;
   asker: string;
   organisers?: boolean;
-  announcementHref?: (link: AnnouncementLink) => string | null;
+  announcementAt?: (link: AnnouncementLink) => AnnouncementAt;
   /** Which contest it was asked in, where questions of several are listed. */
   where?: string;
   children?: ReactNode;
@@ -161,10 +179,11 @@ export function QuestionThread({
                 {formatDateTime(new Date(message.at))}
               </span>
             </p>
-            {message.announcement !== null && announcementHref !== undefined ? (
+            {message.announcement !== null && announcementAt !== undefined ? (
               <AnsweredPublicly
                 body={message.body}
-                href={announcementHref(message.announcement)}
+                title={message.announcement.title}
+                at={announcementAt(message.announcement)}
               />
             ) : (
               <Markdown>{message.body}</Markdown>

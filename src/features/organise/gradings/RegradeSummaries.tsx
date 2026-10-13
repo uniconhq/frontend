@@ -55,7 +55,8 @@ function useStops(path: ContestPath, summaries: RegradeSummary[]) {
 /**
  * One task's latest regrade in a line (#448): "Regrade of A: 120 graded · 4
  * went down · 2 now fail to compile · 1 went up", each count a link to
- * Gradings showing those submissions with their earlier and new results;
+ * Gradings showing those submissions with their earlier and new results,
+ * where it lists just them;
  * what started it, by whom and when; whether it still runs; and, for a
  * manager of the task, Dismiss, which takes it off for everyone.
  */
@@ -90,9 +91,13 @@ function Summary({
         {parts.map((part, at) => (
           <Fragment key={part.key}>
             {at > 0 && <span className={classes.dot}> · </span>}
-            <PageLink to={`${gradings}?${regradeSearch(summary.id, part.change)}`}>
-              {part.words}
-            </PageLink>
+            {part.linked ? (
+              <PageLink to={`${gradings}?${regradeSearch(summary.id, part.change)}`}>
+                {part.words}
+              </PageLink>
+            ) : (
+              part.words
+            )}
           </Fragment>
         ))}
       </BodyText>

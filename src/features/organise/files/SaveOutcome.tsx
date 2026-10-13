@@ -7,7 +7,7 @@ import { Button } from '@/ui/Button';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { DefinitionErrors, type PlaceOf } from '../DefinitionErrors';
 import classes from '../organise.module.css';
-import { definitionErrorsOf, effectOf, stringsOf } from './refusals';
+import { askedOf, definitionErrorsOf, effectOf, stringsOf } from './refusals';
 
 /**
  * What a save came back with: a contest file's new version with what its
@@ -107,7 +107,8 @@ function Effect({ effect }: { effect: SaveEffect }) {
  * What a save came back with, in words. `placeOf`, when given, names each
  * problem a refused save lists by the part of the page and the field it is
  * about, with a link that opens it; `bare` says a written save in words
- * alone, for a form whose versions the organiser never sees.
+ * alone, for a form whose versions the organiser never sees. A confirmation
+ * hears what the question was asked about (`asked`), to send back with it.
  */
 export function SaveOutcome<Body = WriteFile>({
   outcome,
@@ -118,7 +119,7 @@ export function SaveOutcome<Body = WriteFile>({
   bare = false,
 }: {
   outcome: Outcome<Body>;
-  onConfirm: (body: Body) => void;
+  onConfirm: (body: Body, asked: string | undefined) => void;
   onKeepAsDraft: (body: Body) => void;
   onReload: () => void;
   placeOf?: PlaceOf;
@@ -218,7 +219,9 @@ export function SaveOutcome<Body = WriteFile>({
           </>
         )}
         <div className={classes.actions}>
-          <Button onClick={() => onConfirm(body)}>Publish the change</Button>
+          <Button onClick={() => onConfirm(body, askedOf(error))}>
+            Publish the change
+          </Button>
           <Button variant="secondary" onClick={() => onKeepAsDraft(body)}>
             Keep as draft
           </Button>

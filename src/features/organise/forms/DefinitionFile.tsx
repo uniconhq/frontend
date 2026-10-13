@@ -174,7 +174,9 @@ export function DefinitionForm({
           outcome={outcome}
           placeOf={placeOf}
           bare={bare}
-          onConfirm={(body) => void send(file, { ...body, confirm: true })}
+          onConfirm={(body, asked) =>
+            void send(file, { ...body, confirm: true, asked })
+          }
           onKeepAsDraft={(body) => void send(file, { ...body, keep_as_draft: true })}
           onReload={() => {
             setOutcome(null);

@@ -15,7 +15,12 @@ import {
   resultOf,
   submitterOf,
 } from './feed';
-import { changeOf, sideWords } from './regrades';
+import {
+  changeOf,
+  decidingValues,
+  sideWords,
+  usePublicationMeanings,
+} from './regrades';
 import { ScoredView } from './ScoredView';
 import classes from './feed.module.css';
 
@@ -105,15 +110,23 @@ function StatusCell({
 /**
  * What a regrade did to the submission, on Gradings read by regrade: the
  * result it replaced and its own, side by side, the kind of change under
- * the new one.
+ * the new one, and the values that decided it where nothing else did.
  */
-function ChangeCells({ entry }: { entry: FeedEntry }) {
+function ChangeCells({ path, entry }: { path: ContestPath; entry: FeedEntry }) {
   const change = entry.grading.change;
+  const names = change === null ? [] : decidingValues(change);
+  const meanings = usePublicationMeanings(
+    path,
+    entry.task,
+    entry.grading.publication,
+    names.length > 0,
+  );
+  const values = names.length > 0 ? { names, meanings } : null;
   return (
     <>
-      <td>{change === null ? '—' : sideWords(change.earlier)}</td>
+      <td>{change === null ? '—' : sideWords(change.earlier, values)}</td>
       <td>
-        {change === null ? '—' : sideWords(change.now)}
+        {change === null ? '—' : sideWords(change.now, values)}
         <BodyText tone="meta">{changeOf(entry)}</BodyText>
       </td>
     </>
@@ -215,7 +228,7 @@ function AttemptRow({
           </span>
         )}
       </th>
-      {compared && <ChangeCells entry={entry} />}
+      {compared && <ChangeCells path={path} entry={entry} />}
       <td>
         {grading.attempt}
         <BodyText tone="meta">publication {grading.publication}</BodyText>

@@ -105,6 +105,8 @@ export type RegradeSummary = Schemas['RegradeSummary'];
 export type RegradeSide = Schemas['RegradeSide'];
 /** What a regrade did to one submission: up, down, now stopped, and so on. */
 export type RegradeChangeKind = Schemas['ChangeKind'];
+/** What a regrade did to one submission, with the result it replaced and its own. */
+export type RegradeChange = Schemas['RegradeChange'];
 /** One attempt in a contest's gradings feed, with its task and who submitted. */
 export type FeedEntry = Schemas['FeedEntry'];
 export type Submitter = Schemas['Submitter'];

@@ -481,13 +481,14 @@ describe('the statement while it is being edited', { timeout: 20_000 }, () => {
     // Someone else saves the statement while this tab is in the background.
     stored.content = THEIRS;
     stored.token = 'token-theirs';
-    const before = asked.states;
+    const before = { ...asked };
     comeBackToTab();
     // The page reads again what it shows of the task, such as whether its
-    // statement is written (M57); the editor keeps what it is editing.
-    await waitFor(() => expect(asked.states).toBeGreaterThan(before));
-    await new Promise((resolve) => setTimeout(resolve, 200));
+    // statement is written (M57), in the same refetch that would read the
+    // file again; the editor keeps what it is editing, the file unread.
+    await waitFor(() => expect(asked.states).toBeGreaterThan(before.states));
 
+    expect(asked.reads).toBe(before.reads);
     expect(screen.getByRole('textbox', { name: 'Statement source' })).toHaveValue(MINE);
     expect(
       screen.getByRole('textbox', { name: 'Statement source' }),
@@ -546,6 +547,64 @@ describe('the statement while it is being edited', { timeout: 20_000 }, () => {
     await waitFor(() =>
       expect(sent.at(-1)).toMatchObject({ content: MINE, token: 'token-theirs' }),
     );
+  });
+
+  it('asks again about a confirmed save someone else’s beat, once it goes over theirs (#449)', async () => {
+    const { stored } = sharedStatement();
+    const sends: { token: string; confirm: boolean; asked?: string | null }[] = [];
+    server.use(
+      http.put(`${TASK_API}/files/:path`, async ({ request }) => {
+        const body = (await request.clone().json()) as (typeof sends)[number];
+        sends.push(body);
+        if (body.token !== stored.token) return problem(409, 'conflict');
+        if (body.confirm) return undefined;
+        const asked = `${stored.token}:2`;
+        // Someone else saves while the question is shown.
+        stored.content = THEIRS;
+        stored.token = 'token-theirs';
+        return problem(409, 'confirmation_required', {
+          changes: [],
+          regrades: 0,
+          ...unchanged,
+          reading: ['The statement changes.'],
+          asked,
+        });
+      }),
+    );
+    const user = userEvent.setup();
+    renderApp('/orgs/acme/contests/spring/tasks/sum/statement');
+    const source = await screen.findByRole('textbox', { name: 'Statement source' });
+    fireEvent.change(source, { target: { value: MINE } });
+
+    await user.click(screen.getByRole('button', { name: 'Save statement' }));
+    await user.click(
+      await within(await screen.findByRole('alert')).findByRole('button', {
+        name: 'Publish the change',
+      }),
+    );
+    const conflict = await screen.findByRole('alert');
+    await within(conflict).findByRole('textbox', {
+      name: 'Their version, as it is now',
+    });
+    await user.click(
+      within(conflict).getByRole('button', { name: 'Save yours over theirs' }),
+    );
+    await user.click(
+      within(
+        await screen.findByRole('dialog', { name: 'Save yours over theirs?' }),
+      ).getByRole('button', { name: 'Save yours over theirs' }),
+    );
+
+    expect(
+      await within(await screen.findByRole('alert')).findByRole('button', {
+        name: 'Publish the change',
+      }),
+    ).toBeVisible();
+    expect(sends).toMatchObject([
+      { token: 'token-statement', confirm: false },
+      { token: 'token-statement', confirm: true, asked: 'token-statement:2' },
+      { token: 'token-theirs', confirm: false },
+    ]);
   });
 
   it('goes on from their version, keeping my text beside it to copy from', async () => {

@@ -223,6 +223,11 @@ function Questions({
   const about = tasks.some((task) => task.name === named) ? (named ?? '') : '';
   const view = queryView(useMyQuestions(org, contest));
   const openAnnouncement = useOpenAnnouncements(org, contest);
+  // A withdrawn task's announcements are off the contest's page with it.
+  const withdrawn = (task: string | null) =>
+    home.tasks.some(
+      (found) => found.name === task && found.release.closed === 'withdrawn',
+    );
   const readAgain = () =>
     queryClient.invalidateQueries({
       queryKey: $api.queryOptions('get', QUESTIONS, {
@@ -269,10 +274,12 @@ function Questions({
                   <QuestionThread
                     clarification={clarification}
                     asker={team ? 'Your team' : 'You'}
-                    announcementHref={(link) =>
+                    announcementAt={(link) =>
                       openAnnouncement(link)
-                        ? `${contestHomePath(org, contest)}#${announcementAnchor(link)}`
-                        : null
+                        ? {
+                            href: `${contestHomePath(org, contest)}#${announcementAnchor(link)}`,
+                          }
+                        : { gone: withdrawn(link.task) ? 'withdrawn' : 'closed' }
                     }
                   >
                     <FollowUp
@@ -295,8 +302,8 @@ function Questions({
 /**
  * Whether an announcement a public answer posted can still be read on the
  * contest's page, which lists only open announcements: false once the
- * organisers closed it, so its message on the question says so rather than
- * link to nothing. Taken as open until the list is read. The list is the one
+ * organisers closed it or its task was withdrawn, so its message on the
+ * question says why rather than link to nothing. Taken as open until the list is read. The list is the one
  * the contest's page reads, so it is read once for both.
  */
 function useOpenAnnouncements(

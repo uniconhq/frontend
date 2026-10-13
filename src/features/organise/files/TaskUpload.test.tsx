@@ -353,7 +353,10 @@ describe('uploading a file of a task again', { timeout: 20_000 }, () => {
         const body = (await request.json()) as SaveRequest;
         routes.seen.saves.push(body);
         if (!body.confirm)
-          return problem(409, 'confirmation_required', { changes: ['the statement'] });
+          return problem(409, 'confirmation_required', {
+            changes: ['the statement'],
+            asked: 'b1c2d3e:12',
+          });
         return HttpResponse.json({
           number: 5,
           version: 'abc1234def',
@@ -394,6 +397,7 @@ describe('uploading a file of a task again', { timeout: 20_000 }, () => {
         },
       ],
       confirm: true,
+      asked: 'b1c2d3e:12',
       keep_as_draft: false,
     });
   });

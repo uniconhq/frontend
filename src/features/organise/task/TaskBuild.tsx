@@ -656,7 +656,7 @@ function SaveAnswer({
   return (
     <SaveOutcome
       outcome={saving.outcome}
-      onConfirm={(body) => saving.again(body, { confirm: true })}
+      onConfirm={(body, asked) => saving.again(body, { confirm: true, asked })}
       onKeepAsDraft={(body) => saving.again(body, { keep_as_draft: true })}
       onReload={saving.drop}
       placeOf={placeOf}

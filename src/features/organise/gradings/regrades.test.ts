@@ -2,7 +2,13 @@ import { describe, expect, it } from 'vitest';
 import type { RegradeSummary } from '@/api/types';
 import { formatExact } from '@/lib/exact';
 import { formatDateTime } from '@/lib/time';
-import { causeWords, runningWords, sideWords, summaryParts } from './regrades';
+import {
+  causeWords,
+  decidingValues,
+  runningWords,
+  sideWords,
+  summaryParts,
+} from './regrades';
 
 const counts = {
   up: 0,
@@ -48,14 +54,13 @@ describe("a regrade's summary", () => {
     ).toEqual(['120 graded']);
   });
 
-  it('says what stopped a run before its tests in plain words, one or several', () => {
+  it('says what stopped a run before its tests in plain words, one or several, in one count with one list', () => {
     const stopped = summary({ counts: { ...counts, stopped: 3 } });
     expect(
       words(summaryParts(stopped, ['compile_error', 'time_limit', 'time_limit'])),
     ).toEqual([
       '120 graded',
-      '1 now fails to compile',
-      '2 now run out of time before their tests',
+      '1 now fails to compile, 2 now run out of time before their tests',
     ]);
     // Before the stops are read, or for a stop it has no words for.
     expect(words(summaryParts(stopped))).toEqual([
@@ -90,6 +95,20 @@ describe("a regrade's summary", () => {
       'stopped',
       'up',
     ]);
+    expect(summaryParts(summary()).every((part) => part.linked)).toBe(true);
+  });
+
+  it('links no list for the graded while it would also hold those not graded (#448)', () => {
+    const parts = summaryParts(
+      summary({
+        total: 125,
+        running: true,
+        counts: { ...counts, unchanged: 120, running: 5 },
+      }),
+    );
+    expect(parts.map((part) => [part.words, part.linked])).toEqual([
+      ['120 graded', false],
+    ]);
   });
 
   it('says what started it, by whom and when', () => {
@@ -122,7 +141,7 @@ describe('a result a regrade compares', () => {
     };
     expect(sideWords(side)).toBe(`${formatExact('62.5', 2)} points`);
     expect(sideWords({ ...side, points: '0', stopped: 'compile_error' })).toBe(
-      'COMPILE ERROR, 0 points',
+      'Failed to compile, 0 points',
     );
     expect(sideWords({ ...side, points: null })).toBe('5 of 8 tests passed');
     // Cut as every page shows points (R17).
@@ -130,5 +149,54 @@ describe('a result a regrade compares', () => {
       `${formatExact('73.33', 2)} points`,
     );
     expect(sideWords(null)).toBe('—');
+  });
+
+  const passed = (values: Record<string, string>) => ({
+    attempt: 1,
+    points: null,
+    accepted: 5,
+    tests: 5,
+    stopped: null,
+    values,
+  });
+
+  it('names the values that decided a change on a task with no points, as the forge decides it (#448)', () => {
+    const earlier = passed({ time_ms: '28', memory_kb: '900' });
+    const now = passed({ time_ms: '40', memory_kb: '900' });
+    expect(decidingValues({ change: 'down', earlier, now })).toEqual(['time_ms']);
+    // The share of tests passed decides first, and points before it.
+    expect(
+      decidingValues({ change: 'down', earlier, now: { ...now, accepted: 4 } }),
+    ).toEqual([]);
+    expect(
+      decidingValues({
+        change: 'down',
+        earlier: { ...earlier, points: '10' },
+        now: { ...now, points: '10' },
+      }),
+    ).toEqual([]);
+    expect(decidingValues({ change: 'unchanged', earlier, now })).toEqual([]);
+  });
+
+  it('says the values that decided a change by their titles and units, or their keys', () => {
+    const side = passed({ time_ms: '40.25' });
+    const meanings = [
+      {
+        name: 'time_ms',
+        title: 'Run time',
+        unit: 'ms',
+        fold: 'max' as const,
+        better: 'lower' as const,
+      },
+    ];
+    expect(sideWords(side, { names: ['time_ms'], meanings })).toBe(
+      `5 of 5 tests passed, run time ${formatExact('40.25')} ms`,
+    );
+    expect(sideWords(side, { names: ['time_ms'], meanings: [] })).toBe(
+      `5 of 5 tests passed, time_ms ${formatExact('40.25')}`,
+    );
+    expect(sideWords(passed({}), { names: ['time_ms'], meanings })).toBe(
+      '5 of 5 tests passed, no run time',
+    );
   });
 });

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQueryClient, type Query } from '@tanstack/react-query';
 import { $api } from '@/api/query';
 import { toApiError } from '@/api/problem';
 import type { TakeOut, TaskStanding } from '@/api/types';
@@ -16,6 +16,22 @@ import shared from '../organise.module.css';
 
 const TAKE_OUT = '/api/v1/orgs/{org}/contests/{contest}/tasks/{task}/take-out';
 const PUT_BACK = '/api/v1/orgs/{org}/contests/{contest}/tasks/{task}/put-back';
+
+/** Whether a read is one of the task's own, by the place its key was made at. */
+function readOfTask(
+  query: Query,
+  task: { org: string; contest: string; task: string },
+): boolean {
+  const init = query.queryKey[2] as
+    { params?: { path?: Record<string, unknown> } } | undefined;
+  const at = init?.params?.path;
+  return (
+    at !== undefined &&
+    at['org'] === task.org &&
+    at['contest'] === task.contest &&
+    at['task'] === task.task
+  );
+}
 
 /** How many submissions, in words: "1 submission", "14 submissions". */
 function submissionsWords(count: number): string {
@@ -192,8 +208,12 @@ export function TakingOutBody({
 
   // Taking a task out moves the contest's tasks, its settings, its
   // leaderboards and the roles at the task, so everything is read again;
-  // the dialog has closed by then, or still shows the same task.
-  const readAgain = () => void queryClient.invalidateQueries();
+  // the dialog has closed by then, or still shows the same task. A removed
+  // task's own reads would only be refused, its page on its way out.
+  const readAgain = (removed = false) =>
+    void queryClient.invalidateQueries({
+      predicate: (query) => !removed || !readOfTask(query, path),
+    });
 
   const confirm = async () => {
     setError(null);
@@ -204,7 +224,7 @@ export function TakingOutBody({
           body: { confirmed: asking.would },
         });
         onDone(done.done);
-        readAgain();
+        readAgain(done.done === 'remove');
         return;
       }
       if (asking.step === 'put-back') {
