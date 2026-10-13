@@ -1308,6 +1308,33 @@ describe('scoring a task', { timeout: 30_000 }, () => {
     ).toBeEnabled();
   });
 
+  it('offers a score from a step that runs for each test though its value names no fold, as the forge takes it', async () => {
+    taskBackend({ form: { ...CHECKED, inputs: [] } });
+    server.use(
+      http.get('/api/v1/workflows/:owner/:name/versions/:version', () =>
+        HttpResponse.json({
+          content: CHECKED_YAML.replace(
+            'steps: []',
+            'steps:\n  - id: check\n    use: unicon/checker-run@v1\n    per_test: true',
+          ).replace(
+            'fold: mean, better: higher, at_least: 0, at_most: 1',
+            'at_least: 0, at_most: 1',
+          ),
+        }),
+      ),
+    );
+    const { tests } = await openTask();
+
+    const earns = within(tests).getByRole('radiogroup', { name: 'A test earns' });
+    expect(
+      within(earns).getByRole('radio', {
+        name: 'A score the workflow gives it, from 0 to 1',
+      }),
+    ).toBeEnabled();
+    const value = await within(tests).findByRole('combobox', { name: 'Which value' });
+    expect(within(value).getByRole('option', { name: 'fraction' })).toBeEnabled();
+  });
+
   it('gives the lower-is-better case against the best, and says in its own line that a workflow gives no score rather than greying every value (M58)', async () => {
     taskBackend({
       form: { ...CHECKED, inputs: [] },

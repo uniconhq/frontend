@@ -14,9 +14,8 @@ import { fractionOf, percentOf } from '../contest/percent';
 import { NumberField } from '../forms/fields';
 import { numberProblem } from '../forms/yaml-doc';
 import type { GroupValues, TaskValues } from '../forms/task-values';
-import type { ReportEntry } from '../workflows/model';
 import { BuildCard, CardPart } from './BuildCard';
-import type { GroupFolder, TaskPlace } from './build-data';
+import type { GroupFolder, ReportedValue, TaskPlace } from './build-data';
 import {
   groupSentence,
   groupWeight,
@@ -61,8 +60,11 @@ const at = (text: string | null | undefined) =>
  * Whether a reported value can be what a test earns, and why not, short
  * enough to follow the value's name in the list of values.
  */
-function creditRefusal(entry: ReportEntry, kind: 'value' | 'relative'): string | null {
-  if (entry.fold === null) return 'not reported for each test';
+function creditRefusal(
+  entry: ReportedValue,
+  kind: 'value' | 'relative',
+): string | null {
+  if (!entry.perTest) return 'not reported for each test';
   const least = entry.atLeast === null ? null : at(entry.atLeast.text);
   if (least === null || least.num < 0n) return 'not promised to be 0 or more';
   if (kind === 'value') {
@@ -78,7 +80,7 @@ function creditRefusal(entry: ReportEntry, kind: 'value' | 'relative'): string |
  * A reported value as a page names it: its title, "Run time", or its key
  * until the workflow's report gives it one (M58).
  */
-function valueName(entry: ReportEntry): string {
+function valueName(entry: ReportedValue): string {
   return entry.title ?? entry.name;
 }
 
@@ -110,7 +112,7 @@ const CREDITS = [
  * offers one.
  */
 function nothingToEarnBy(
-  report: ReportEntry[] | null,
+  report: ReportedValue[] | null,
   kind: 'value' | 'relative',
 ): string | null {
   if (report === null || report.some((entry) => creditRefusal(entry, kind) === null)) {
@@ -136,7 +138,7 @@ function CreditPart({
   disabled,
 }: {
   credit: TaskValues['credit'];
-  report: ReportEntry[] | null;
+  report: ReportedValue[] | null;
   onChange: (credit: TaskValues['credit']) => void;
   disabled: boolean;
 }) {
@@ -721,7 +723,7 @@ export function TestsCard({
   values: TaskValues;
   /** The fields each test has, from the workflow, or null when it cannot be read. */
   fields: DeclaredField[] | null;
-  report: ReportEntry[] | null;
+  report: ReportedValue[] | null;
   folders: GroupFolder[];
   staged: Staged;
   /** What the task's contest makes it worth, or null when its groups' total. */
