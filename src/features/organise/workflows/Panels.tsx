@@ -992,12 +992,6 @@ export function FieldsPanel({
   );
 }
 
-const FOLDS = [
-  { value: 'sum', label: 'Their total' },
-  { value: 'mean', label: 'Their average' },
-  { value: 'max', label: 'The largest' },
-];
-
 function EntryRow({
   text,
   workflow,
@@ -1139,15 +1133,6 @@ function EntryRow({
           />
         )}
       </div>
-      {isNumber && perTest && (
-        <Select
-          label="Over the tests, report"
-          value={entry.fold ?? ''}
-          placeholder="Each test’s value"
-          options={FOLDS}
-          onChange={(fold) => write({ fold: fold === '' ? null : fold })}
-        />
-      )}
       {isNumber && perTest && (
         <Select
           label="Better is"

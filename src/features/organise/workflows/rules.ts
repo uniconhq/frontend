@@ -238,14 +238,14 @@ export function reportRefusal(
     compareDecimal(entry.atLeast.text, entry.atMost.text) > 0
   )
     return BOUNDS;
-  const meant = [entry.fold, entry.better, entry.atLeast, entry.atMost].some(
+  const meant = [entry.better, entry.atLeast, entry.atMost].some(
     (value) => value !== null,
   );
   if (meant && kind.type !== 'number')
-    return 'fold, better, at_least and at_most apply only to a number, and this is text.';
+    return 'better, at_least and at_most apply only to a number, and this is text.';
   const step = workflow.steps.find((found) => found.id === source.name);
-  if ((entry.fold !== null || entry.better !== null) && step?.perTest !== true)
-    return 'fold and better apply only to a number reported for each test, and this step runs once.';
+  if (entry.better !== null && step?.perTest !== true)
+    return 'better applies only to a number reported for each test, and this step runs once.';
   return null;
 }
 
@@ -350,7 +350,7 @@ export function switchRefusal(workflow: Workflow, index: number): string | null 
             return `It reads ${ref.name}, which runs for each test.`;
         }
       }
-    return foldedRefusal(workflow, index);
+    return rankedRefusal(workflow, index);
   }
   for (const [at, other] of workflow.steps.entries())
     if (!other.perTest && at !== index && stepsRead(workflow, at).has(index))
@@ -359,20 +359,20 @@ export function switchRefusal(workflow: Workflow, index: number): string | null 
 }
 
 /**
- * Why the step may not run once while the report folds or ranks one of its
- * outputs over tests, which only a per-test step's output can be.
+ * Why the step may not run once while the report says which way one of its
+ * outputs is better, which only a per-test step's output can say.
  */
-function foldedRefusal(workflow: Workflow, index: number): string | null {
+function rankedRefusal(workflow: Workflow, index: number): string | null {
   const step = workflow.steps[index];
-  const folded = workflow.report.find(
+  const ranked = workflow.report.find(
     (entry) =>
       entry.from?.kind === 'steps' &&
       entry.from.name === step?.id &&
-      (entry.fold !== null || entry.better !== null),
+      entry.better !== null,
   );
-  return folded === undefined
+  return ranked === undefined
     ? null
-    : `The report's ${folded.name} folds it over the tests, so this step runs for each test.`;
+    : `The report says which way ${ranked.name} is better, so this step runs for each test.`;
 }
 
 /**
