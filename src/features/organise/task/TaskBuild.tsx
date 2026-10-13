@@ -144,7 +144,12 @@ function BuildForm({
   );
   const [adding, setAdding] = useState<AddStart | null>(null);
   const { worth, known } = useTaskWorth(place);
-  const disabled = !manager || saving.state.stage !== 'idle';
+  // While a save asks before it publishes, its answer sends the cards as they
+  // were asked about, so they stay so until it is answered or discarded.
+  const asking =
+    saving.outcome?.kind === 'refused' &&
+    saving.outcome.error.code === 'confirmation_required';
+  const disabled = !manager || saving.state.stage !== 'idle' || asking;
 
   const picked = values.workflow.trim();
   const version = queryView(
@@ -531,6 +536,7 @@ function BuildForm({
         notices={toSave ? notices : []}
         problems={problems}
         state={saving.state}
+        asking={asking}
         onSave={save}
         onDiscard={() => {
           setValues(read.values);
@@ -538,12 +544,7 @@ function BuildForm({
           setInputFiles([]);
           saving.forget();
         }}
-        pinned={
-          saving.merge !== null ||
-          saving.conflicts !== null ||
-          (saving.outcome?.kind === 'refused' &&
-            saving.outcome.error.code === 'confirmation_required')
-        }
+        pinned={saving.merge !== null || saving.conflicts !== null || asking}
         onClose={saving.drop}
       >
         {(saving.outcome !== null ||

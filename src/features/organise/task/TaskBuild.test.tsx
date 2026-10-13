@@ -1563,6 +1563,31 @@ describe('the save’s answer (M66)', { timeout: 30_000 }, () => {
       within(bar).queryByRole('button', { name: 'Close the save’s answer' }),
     ).toBeNull();
   });
+
+  it('holds the cards as they were asked about while the question stands, its two answers the only way on', async () => {
+    taskBackend({
+      form: { ...CHECKED, inputs: [] },
+      answer: () =>
+        problem(409, 'confirmation_required', {
+          detail: 'The contest is running, so this save asks before it publishes.',
+          changes: [],
+          regrades: 0,
+          ...unchanged,
+          asked: 'b1c2d3e:12',
+        }),
+    });
+    const { tests } = await openTask();
+
+    fill(fieldIn(tests, 'small', 'Points'), '40');
+    await save();
+    const bar = screen.getByRole('region', { name: 'Save the task' });
+    expect(
+      await within(bar).findByRole('button', { name: 'Publish the change' }),
+    ).toBeVisible();
+    expect(fieldIn(tests, 'small', 'Points')).toBeDisabled();
+    expect(within(bar).queryByRole('button', { name: 'Save' })).toBeNull();
+    expect(within(bar).getByRole('button', { name: 'Discard changes' })).toBeEnabled();
+  });
 });
 
 describe('the tests of a task', { timeout: 30_000 }, () => {
