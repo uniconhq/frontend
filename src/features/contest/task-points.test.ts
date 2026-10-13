@@ -146,6 +146,18 @@ describe("an entrant's points on a task", () => {
     ).toEqual({ score: 'Not on the leaderboard', pending: null });
   });
 
+  it('says the leaderboard counts none of the task where the one leaderboard covers it for 0 points (#453)', () => {
+    expect(
+      taskPointsText(
+        {
+          worth: '100',
+          points: on({ shown: '0', pending: '0', pending_until: null }, '0'),
+        },
+        NOW,
+      ),
+    ).toEqual({ score: 'Counts no points on the leaderboard', pending: null });
+  });
+
   it('reads as the worth alone for someone the contest gives no points', () => {
     expect(taskPointsText({ worth: '100', points: [] }, NOW)).toEqual({
       score: '100 points',
