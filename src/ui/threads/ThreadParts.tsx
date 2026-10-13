@@ -10,12 +10,21 @@ import classes from './threads.module.css';
 
 /**
  * The message a public answer leaves on its question, "Answered publicly in
- * the announcement ‘On n’", with the announcement's title a link to it
- * (M62); the whole message the link where it does not quote the title. With
- * no `href`, the reader can no longer open the announcement, since the
- * organisers closed it, and the message says so in place of the link.
+ * the announcement ‘On n’", with the announcement's title, as the forge
+ * reads it from the message, a link to it (M62); the whole message the link
+ * where the message was edited and names no title. With no `href`, the
+ * reader can no longer open the announcement, since the organisers closed
+ * it, and the message says so in place of the link.
  */
-function AnsweredPublicly({ body, href }: { body: string; href: string | null }) {
+function AnsweredPublicly({
+  body,
+  title,
+  href,
+}: {
+  body: string;
+  title: string | null;
+  href: string | null;
+}) {
   if (href === null) {
     return (
       <p className={classes.publicAnswer}>
@@ -23,8 +32,7 @@ function AnsweredPublicly({ body, href }: { body: string; href: string | null })
       </p>
     );
   }
-  const quoted = /^(.*?)(‘.*’)\s*$/su.exec(body);
-  if (quoted === null) {
+  if (title === null) {
     return (
       <p className={classes.publicAnswer}>
         <PageLink to={href}>{body}</PageLink>
@@ -33,8 +41,7 @@ function AnsweredPublicly({ body, href }: { body: string; href: string | null })
   }
   return (
     <p className={classes.publicAnswer}>
-      {quoted[1]}
-      <PageLink to={href}>{quoted[2]}</PageLink>
+      Answered publicly in the announcement <PageLink to={href}>‘{title}’</PageLink>
     </p>
   );
 }
@@ -164,6 +171,7 @@ export function QuestionThread({
             {message.announcement !== null && announcementHref !== undefined ? (
               <AnsweredPublicly
                 body={message.body}
+                title={message.announcement.title}
                 href={announcementHref(message.announcement)}
               />
             ) : (

@@ -218,6 +218,44 @@ describe('questions', () => {
     );
   });
 
+  it('links the whole of a public answer’s message that was edited at the forge, taking no title from its words', async () => {
+    server.use(
+      signedIn,
+      approvedHome,
+      http.get(`${CONTEST_API}/questions`, () =>
+        HttpResponse.json([
+          question({
+            answered: true,
+            closed: true,
+            messages: [
+              {
+                from_asker: false,
+                body: 'Answered in the announcement ‘Bounds’',
+                at: '2026-09-12T09:20:00Z',
+                announcement: { task: 'sum', number: 3, title: null },
+              },
+            ],
+          }),
+        ]),
+      ),
+      http.get(`${CONTEST_API}/home/announcements`, () =>
+        HttpResponse.json([
+          announcement({
+            number: 3,
+            title: 'On n',
+            where: { org: 'acme', contest: 'spring', task: 'sum' },
+          }),
+        ]),
+      ),
+    );
+    renderApp(QUESTIONS);
+
+    const link = await screen.findByRole('link', {
+      name: 'Answered in the announcement ‘Bounds’',
+    });
+    expect(link).toHaveAttribute('href', '/contests/acme/spring#announcement-sum-3');
+  });
+
   it('says a public answer’s announcement was closed rather than link to a page that no longer shows it', async () => {
     server.use(signedIn, approvedHome, answeredPublicly);
     renderApp(QUESTIONS);
