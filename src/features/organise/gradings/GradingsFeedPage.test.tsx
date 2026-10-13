@@ -977,6 +977,56 @@ describe('what a regrade changed', () => {
     expect(screen.getByRole('link', { name: 'Show every grading' })).toBeVisible();
   });
 
+  it('says what went down on a task with no points, by the values that decided it (#448)', async () => {
+    const side = { points: null, accepted: 5, tests: 5, stopped: null };
+    const slower: FeedEntry = {
+      ...nowStopped,
+      grading: {
+        ...nowStopped.grading,
+        change: {
+          change: 'down',
+          earlier: { ...side, attempt: 1, values: { time_ms: '28', memory_kb: '900' } },
+          now: { ...side, attempt: 2, values: { time_ms: '40', memory_kb: '900' } },
+        },
+      },
+    };
+    server.use(
+      signedIn,
+      taskList,
+      http.get(`${CONTEST_API}/tasks/sum/publications`, () =>
+        HttpResponse.json([
+          {
+            number: slower.grading.publication,
+            version: 'abc1234',
+            at: '2026-10-12T13:00:00Z',
+            grading_changed: true,
+            changes: [],
+            meanings: [
+              {
+                name: 'time_ms',
+                title: 'Run time',
+                unit: 'ms',
+                fold: 'max',
+                better: 'lower',
+              },
+            ],
+          },
+        ]),
+      ),
+    );
+    regrades([REGRADE]);
+    feedAnswering((query) => (query.get('regrade') === null ? feed : [slower]));
+    renderApp(`${FEED}?regrade=${REGRADE.id}&change=down`);
+
+    const table = await screen.findByRole('table', { name: 'Gradings' });
+    const row = within(table).getByRole('rowgroup', { name: 'B submission 3 by ada' });
+    await waitFor(() =>
+      expect(row).toHaveTextContent('5 of 5 tests passed, run time 28 ms'),
+    );
+    expect(row).toHaveTextContent('5 of 5 tests passed, run time 40 msWent down');
+    expect(row).not.toHaveTextContent(/memory/);
+  });
+
   it('takes a summary off for everyone once a manager dismisses it', async () => {
     server.use(signedIn, taskList);
     const dismissed = regrades([REGRADE]);

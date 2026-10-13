@@ -1,13 +1,16 @@
 import { $api } from '@/api/query';
 import type {
   FeedEntry,
+  RegradeChange,
   RegradeChangeKind,
   RegradeSide,
   RegradeSummary,
+  ValueMeaning,
 } from '@/api/types';
 import { useFallbackPoll } from '@/live';
 import { verdictLabel } from '@/ui/verdicts';
-import { formatPoints } from '@/lib/exact';
+import { formatExact, formatPoints } from '@/lib/exact';
+import { meaningOf, titleInSentence, withUnit } from '@/lib/values';
 import { formatDateTime } from '@/lib/time';
 
 /** Each task's latest regrade of many, newest first. */
@@ -190,19 +193,81 @@ export const CHANGE_WORDS: Record<RegradeChangeKind, string> = {
   over_limit: 'Not graded, over the limit',
 };
 
+/** A result's share of its tests passed, null where it has no tests. */
+function shareOf(side: RegradeSide): number | null {
+  return side.tests === 0 ? null : side.accepted / side.tests;
+}
+
+/**
+ * The values that decided a regrade's change, where nothing before them did,
+ * as the forge decides it: neither result with points to compare and both
+ * with the same share of tests passed, the values that differ; none for any
+ * other change.
+ */
+export function decidingValues(change: RegradeChange): string[] {
+  const { earlier, now } = change;
+  if (earlier === null || now === null) return [];
+  if (change.change !== 'up' && change.change !== 'down') return [];
+  if (earlier.points !== null && now.points !== null) return [];
+  const [before, after] = [shareOf(earlier), shareOf(now)];
+  if (before !== null && after !== null && before !== after) return [];
+  const names = new Set([...Object.keys(earlier.values), ...Object.keys(now.values)]);
+  return [...names].filter((name) => earlier.values[name] !== now.values[name]);
+}
+
+/**
+ * The words a publication of a task froze for its values, read only when
+ * `wanted`; none while they are read, or where they do not read, so the
+ * values go by their keys.
+ */
+export function usePublicationMeanings(
+  path: { org: string; contest: string },
+  task: string | null,
+  publication: number,
+  wanted: boolean,
+): readonly ValueMeaning[] {
+  const query = $api.useQuery(
+    'get',
+    '/api/v1/orgs/{org}/contests/{contest}/tasks/{task}/publications',
+    { params: { path: { ...path, task: task ?? '' } } },
+    { enabled: wanted && task !== null },
+  );
+  return query.data?.find((each) => each.number === publication)?.meanings ?? [];
+}
+
+/** One value a result was compared on, "run time 28 ms", or "no run time". */
+function valueWords(
+  side: RegradeSide,
+  name: string,
+  meanings: readonly ValueMeaning[],
+) {
+  const meaning = meaningOf(meanings, name);
+  const value = side.values[name];
+  return value === undefined
+    ? `no ${titleInSentence(name, meaning)}`
+    : `${titleInSentence(name, meaning)} ${withUnit(formatExact(value), meaning)}`;
+}
+
 /**
  * One result a regrade compares, in a cell: its points, or on a task that
- * gives none how many tests it passed; and what stopped its run before its
- * tests, when something did.
+ * gives none how many tests it passed; what stopped its run before its
+ * tests, when something did; and the `values` that decided the change, by
+ * their titles and units where the meanings give them.
  */
-export function sideWords(side: RegradeSide | null): string {
+export function sideWords(
+  side: RegradeSide | null,
+  values: { names: string[]; meanings: readonly ValueMeaning[] } | null = null,
+): string {
   if (side === null) return '—';
   const stopped = side.stopped === null ? null : verdictLabel(side.stopped);
   const tally =
     side.points !== null
       ? `${formatPoints(side.points)} ${side.points === '1' ? 'point' : 'points'}`
       : `${String(side.accepted)} of ${String(side.tests)} tests passed`;
-  return stopped === null ? tally : `${stopped}, ${tally}`;
+  const compared = (values?.names ?? []).map((name) =>
+    valueWords(side, name, values?.meanings ?? []),
+  );
+  return [...(stopped === null ? [] : [stopped]), tally, ...compared].join(', ');
 }
 
 /** The kind of a submission's change on the feed read by regrade, in words. */

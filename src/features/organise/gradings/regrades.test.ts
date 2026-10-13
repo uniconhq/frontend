@@ -2,7 +2,13 @@ import { describe, expect, it } from 'vitest';
 import type { RegradeSummary } from '@/api/types';
 import { formatExact } from '@/lib/exact';
 import { formatDateTime } from '@/lib/time';
-import { causeWords, runningWords, sideWords, summaryParts } from './regrades';
+import {
+  causeWords,
+  decidingValues,
+  runningWords,
+  sideWords,
+  summaryParts,
+} from './regrades';
 
 const counts = {
   up: 0,
@@ -130,5 +136,54 @@ describe('a result a regrade compares', () => {
       `${formatExact('73.33', 2)} points`,
     );
     expect(sideWords(null)).toBe('—');
+  });
+
+  const passed = (values: Record<string, string>) => ({
+    attempt: 1,
+    points: null,
+    accepted: 5,
+    tests: 5,
+    stopped: null,
+    values,
+  });
+
+  it('names the values that decided a change on a task with no points, as the forge decides it (#448)', () => {
+    const earlier = passed({ time_ms: '28', memory_kb: '900' });
+    const now = passed({ time_ms: '40', memory_kb: '900' });
+    expect(decidingValues({ change: 'down', earlier, now })).toEqual(['time_ms']);
+    // The share of tests passed decides first, and points before it.
+    expect(
+      decidingValues({ change: 'down', earlier, now: { ...now, accepted: 4 } }),
+    ).toEqual([]);
+    expect(
+      decidingValues({
+        change: 'down',
+        earlier: { ...earlier, points: '10' },
+        now: { ...now, points: '10' },
+      }),
+    ).toEqual([]);
+    expect(decidingValues({ change: 'unchanged', earlier, now })).toEqual([]);
+  });
+
+  it('says the values that decided a change by their titles and units, or their keys', () => {
+    const side = passed({ time_ms: '40.25' });
+    const meanings = [
+      {
+        name: 'time_ms',
+        title: 'Run time',
+        unit: 'ms',
+        fold: 'max' as const,
+        better: 'lower' as const,
+      },
+    ];
+    expect(sideWords(side, { names: ['time_ms'], meanings })).toBe(
+      `5 of 5 tests passed, run time ${formatExact('40.25')} ms`,
+    );
+    expect(sideWords(side, { names: ['time_ms'], meanings: [] })).toBe(
+      `5 of 5 tests passed, time_ms ${formatExact('40.25')}`,
+    );
+    expect(sideWords(passed({}), { names: ['time_ms'], meanings })).toBe(
+      '5 of 5 tests passed, no run time',
+    );
   });
 });
