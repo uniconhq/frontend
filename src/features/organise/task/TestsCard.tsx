@@ -300,16 +300,19 @@ function MixLine({
  * each with its points box inside it and the pass bar inside the third; the
  * lowest test score only where a test can earn part of its points, as the
  * simple rule offers it, or while it is set, saying why it cannot stay; then
- * what the parts add up to.
+ * what the parts add up to, "here" where the contest scales the task's points.
  */
 function MixFields({
   group,
   credit,
+  here,
   onChange,
   disabled,
 }: {
   group: GroupValues;
   credit: CreditKind;
+  /** Whether the contest's worth for the task differs from its groups' total. */
+  here: boolean;
   onChange: (change: Partial<GroupValues>) => void;
   disabled: boolean;
 }) {
@@ -385,7 +388,8 @@ function MixFields({
       {/* With no points yet, the group's sentence says its tests are for practice. */}
       {groupWeight(group).num !== 0n && (
         <BodyText tone="secondary">
-          The parts add up: up to {pointsWords(groupWeight(group))}.
+          The parts add up: up to {pointsWords(groupWeight(group))}
+          {here && ' here'}.
         </BodyText>
       )}
     </div>
@@ -558,6 +562,7 @@ function GroupItem({
             <MixFields
               group={group}
               credit={credit.kind}
+              here={worth !== null && compareRatio(worth, total) !== 0}
               onChange={onChange}
               disabled={disabled}
             />

@@ -1158,6 +1158,23 @@ describe('scoring a task', { timeout: 30_000 }, () => {
     });
   });
 
+  it('says the parts add up to the points here where the contest scales the task to its own worth', async () => {
+    taskBackend({
+      form: { ...CHECKED, inputs: [] },
+      contest: 'name: Spring\ntasks:\n  - id: sort\n  - id: sum\n    worth: 70\n',
+    });
+    const { tests } = await openTask();
+
+    fill(fieldIn(tests, 'small', 'How does this group earn points?'), 'advanced');
+    const small = fieldGroup(tests, 'small');
+    fill(within(small).getByLabelText('Points shared among the tests'), '100');
+    fill(within(small).getByLabelText('Points times the lowest test score'), '10');
+
+    expect(
+      within(small).getByText('The parts add up: up to 140 points here.'),
+    ).toBeVisible();
+  });
+
   it('sets a hand-set mix one line per part, its bar inside its line, and says what the parts add up to (M59)', async () => {
     const { sent } = taskBackend({ form: { ...CHECKED, inputs: [] } });
     const { tests } = await openTask();
