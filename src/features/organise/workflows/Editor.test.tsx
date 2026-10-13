@@ -299,17 +299,18 @@ describe('the workflow editor', () => {
     expect(
       within(added).getByRole('radio', { name: 'Once per submission' }),
     ).toBeChecked();
+    // Each choice says what it is for; the drawer says once how the step
+    // runs, and that one for each test stands in the band (M55).
     expect(
-      within(added).getByText(/before the tests, such as compiling/),
-    ).toBeVisible();
-    // The drawer says how the step runs, and that one for each test stands in the band (M55).
+      within(added).getByRole('radio', { name: 'Once per submission' }),
+    ).toHaveAccessibleDescription('Before the tests, such as compiling the program.');
     expect(
       within(added).getByRole('radiogroup', { name: 'Run it' }),
     ).toHaveAccessibleDescription('Runs once, for the whole submission.');
     expect(
       within(added).getByRole('radio', { name: 'Once for each test' }),
     ).toHaveAccessibleDescription(
-      /It stands in the shaded band on the graph, “Runs once for each test”\.$/,
+      'Given each test’s files, such as running the program on the test’s input.',
     );
     await user.click(within(added).getByRole('radio', { name: 'Once for each test' }));
 

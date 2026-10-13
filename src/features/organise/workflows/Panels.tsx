@@ -375,13 +375,13 @@ const RUNS = [
   {
     value: 'once',
     label: 'Once per submission',
-    description: 'It runs one time, before the tests, such as compiling the program.',
+    description: 'Before the tests, such as compiling the program.',
   },
   {
     value: 'each',
     label: 'Once for each test',
     description:
-      'It runs for every test, given that test’s files, such as running the program on the test’s input. It stands in the shaded band on the graph, “Runs once for each test”.',
+      'Given each test’s files, such as running the program on the test’s input.',
   },
 ];
 
