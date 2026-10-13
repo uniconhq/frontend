@@ -55,14 +55,28 @@ describe('the task page', () => {
     ).toBeDisabled();
   });
 
-  it('goes back to the contest once the task is removed from its own page', async () => {
+  it('goes back to the contest once the task is removed from its own page, reading the task no more', async () => {
+    const afterRemoval: string[] = [];
+    let removed = false;
     server.use(
+      // The contest page reads each task's settings and tree, and this one
+      // is still in the contest these handlers serve.
+      http.get(`${TASK_API}*`, ({ request }) => {
+        const path = new URL(request.url).pathname;
+        const ofContest = ['/files/task.yaml', '/tree'].some((end) =>
+          path.endsWith(end),
+        );
+        if (removed && !ofContest) afterRemoval.push(path);
+      }),
       signedIn,
       taskState,
       publicationList,
       standingList,
       ...repoFiles,
-      http.post(`${TASK_API}/take-out`, () => HttpResponse.json({ done: 'remove' })),
+      http.post(`${TASK_API}/take-out`, () => {
+        removed = true;
+        return HttpResponse.json({ done: 'remove' });
+      }),
     );
     const user = userEvent.setup();
     renderApp(TASK);
@@ -87,6 +101,7 @@ describe('the task page', () => {
     expect(
       await screen.findByRole('heading', { name: 'spring', level: 1 }),
     ).toBeVisible();
+    expect(afterRemoval).toEqual([]);
   });
 
   it('says where it stands in its contest as text to an observer of the contest', async () => {
