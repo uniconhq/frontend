@@ -85,7 +85,7 @@
   gap: 4px;
 }
 
-/* "Over all tests:" before the folds, on their baseline. */
+/* "Over the tests shown:" before the folds, on their baseline. */
 .overAll {
   display: flex;
   flex-wrap: wrap;

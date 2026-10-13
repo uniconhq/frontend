@@ -73,10 +73,12 @@ function joined(items: string[]): string {
 
 /**
  * The task's folds over what the reader is shown of the run, labelled and in
- * the values' own words (M63): "Over all tests: Run time 28 ms (the longest),
- * Memory used 10,420 KB (the most)", in the workflow's report order, each
- * name on its number's baseline. A fold the run has no value for because a
- * test it shows was not accepted (#441) is said plainly under it. Nothing
+ * the values' own words (M63): "Over the tests shown: Run time 28 ms (the
+ * longest), Memory used 10,420 KB (the most)", in the workflow's report order,
+ * each name on its number's baseline. The forge folds over the tests shown,
+ * a test not accepted counting as the value's worst bound; a fold the run has
+ * no value for because such a test leaves it none (#441, TASK-FORMAT 3.4) is
+ * said plainly under it. Nothing
  * when the task folds nothing or none is shown yet.
  */
 function FoldedValues({
@@ -102,8 +104,8 @@ function FoldedValues({
   return (
     <div className={classes.folded}>
       {names.length > 0 && (
-        <div className={classes.overAll} role="group" aria-label="Over all tests">
-          <span>Over all tests:</span>
+        <div className={classes.overAll} role="group" aria-label="Over the tests shown">
+          <span>Over the tests shown:</span>
           <dl className={classes.metrics}>
             {names.map((name, at) => {
               const meaning = meaningOf(meanings, name);
@@ -127,8 +129,8 @@ function FoldedValues({
       {missing.length > 0 && (
         <BodyText tone="secondary">
           {`${said.charAt(0).toUpperCase()}${said.slice(1)}`}{' '}
-          {missing.length === 1 ? 'is' : 'are'} counted over all tests only once every
-          test is accepted.
+          {missing.length === 1 ? 'has' : 'have'} no value while a test shown is not
+          accepted.
         </BodyText>
       )}
     </div>

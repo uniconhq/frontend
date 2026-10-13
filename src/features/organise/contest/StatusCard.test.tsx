@@ -76,13 +76,41 @@ describe("the contest's status", () => {
       '✓Name and times set',
       '✓At least one task',
       '✓A · sort: published',
-      '✗B · sum: its last save has problems',
+      '!B · sum: its last save has problems, so entrants get the publication before it. The contest can open with it.',
       '✓Anyone with an account can register from when the contest opens until the contest ends. An organiser approves each one.',
       '!No leaderboard yet, so nobody sees a ranking. The contest can open without one.',
     ]);
     expect(within(list).getByRole('link', { name: /B · sum/ })).toHaveAttribute(
       'href',
       '/orgs/acme/contests/spring/tasks/sum',
+    );
+    expect(
+      within(card).getByRole('button', { name: 'Open the contest' }),
+    ).toBeEnabled();
+  });
+
+  it('stops the contest opening while a task whose last save has problems has nothing published', async () => {
+    const [sort, sum] = standings;
+    if (sort === undefined || sum === undefined) throw new Error('two tasks');
+    server.use(
+      signedIn,
+      ...repoFiles,
+      http.get(`${CONTEST_API}/organise/tasks`, () =>
+        HttpResponse.json([
+          { ...sort, state: { ...sort.state, draft: false, errors: [] } },
+          { ...sum, state: { ...sum.state, latest: null } },
+        ]),
+      ),
+    );
+    settingsAt(DRAFT);
+    renderApp(CONTEST);
+
+    const card = await status();
+    const list = await within(card).findByRole('list', { name: 'Before it opens' });
+    await waitFor(() =>
+      expect(within(list).getByRole('link', { name: /B · sum/ })).toHaveTextContent(
+        /^B · sum: its last save has problems$/,
+      ),
     );
     expect(
       within(card).getByRole('button', { name: 'Open the contest' }),

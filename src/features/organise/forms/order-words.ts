@@ -65,6 +65,18 @@ export function kindOptions(
   ).map(({ value, label }) => ({ value, label }));
 }
 
+/**
+ * Whether row `at` may move by one place: not past either end, and never
+ * so that penalty minutes become the first way to rank, which `kindOptions`
+ * never offers either.
+ */
+export function canMoveKey(rows: OrderKeyValues[], at: number, by: -1 | 1): boolean {
+  const to = at + by;
+  if (to < 0 || to >= rows.length) return false;
+  const first = to === 0 ? rows[at] : at === 0 ? rows[to] : rows[0];
+  return first?.kind !== 'penalty' || rows[0]?.kind === 'penalty';
+}
+
 /** What a way of ranking means, said under its dropdown. */
 export function kindDescription(kind: Kind): string {
   return KINDS.find((found) => found.value === kind)?.description ?? '';

@@ -98,6 +98,34 @@ describe("a contest's announcements, for its organisers", () => {
     expect(within(list).getByRole('button', { name: 'Close Welcome' })).toBeVisible();
   });
 
+  it('says closing a public answer takes it from the entrant who asked (M62)', async () => {
+    server.use(
+      signedIn,
+      http.get(`${CONTEST_API}/announcements`, () =>
+        HttpResponse.json([
+          announcement({
+            answers_question: true,
+            answers: { asker: 'entrant.0e000000000040008000000000000020', number: 3 },
+          }),
+        ]),
+      ),
+      http.get(`${CONTEST_API}/organise/entrants`, () =>
+        HttpResponse.json([organisedEntrant({ display_name: 'Red' })]),
+      ),
+    );
+    renderApp('/orgs/acme/contests/spring/announcements');
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Close Welcome' }));
+    const asked = await screen.findByRole('dialog', {
+      name: 'Close this announcement?',
+    });
+    await waitFor(() =>
+      expect(asked).toHaveTextContent(
+        'It answers a question from Red, whose question will then say the answer was closed.',
+      ),
+    );
+  });
+
   it('reopens a task’s closed announcement at the task, saying closing hides it there', async () => {
     let listed: Announcement[] = [
       announcement({

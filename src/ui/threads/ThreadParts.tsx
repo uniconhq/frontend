@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import type { Announcement, AnnouncementLink, Clarification } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { Chip } from '@/ui/Chip';
@@ -91,6 +91,19 @@ export function AnnouncementContent({
  * Where a question stands, in a badge at its top right: "Answered", or
  * "Open", with how long it has waited on the organisers' side.
  */
+/** How often a wait is read again, which it says to the minute. */
+const WAIT_TICK_MS = 30_000;
+
+/** Draws again every `ms` while `on`, so a time since something counts on. */
+function useTicking(on: boolean, ms: number): void {
+  const [, setTicks] = useState(0);
+  useEffect(() => {
+    if (!on) return;
+    const tick = setInterval(() => setTicks((ticks) => ticks + 1), ms);
+    return () => clearInterval(tick);
+  }, [on, ms]);
+}
+
 function QuestionBadge({
   clarification,
   organisers,
@@ -98,9 +111,11 @@ function QuestionBadge({
   clarification: Clarification;
   organisers: boolean;
 }) {
+  const since =
+    organisers && !clarification.answered ? waitingSince(clarification) : null;
+  useTicking(since !== null, WAIT_TICK_MS);
   if (clarification.answered)
     return <Chip tone={organisers ? 'quiet' : 'live'}>Answered</Chip>;
-  const since = organisers ? waitingSince(clarification) : null;
   return (
     <Chip tone={organisers ? 'warn' : 'quiet'}>
       {since === null

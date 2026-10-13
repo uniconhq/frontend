@@ -49,6 +49,7 @@ const queued = {
   outcome: null,
   groups: [],
   values: { numbers: {}, texts: {} },
+  meanings: [],
   reason: null,
   points: null,
   factor: null,

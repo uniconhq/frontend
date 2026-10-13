@@ -14,6 +14,7 @@ import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { Loaded } from '@/ui/feedback/Loaded';
 import { useMe } from '@/session';
 import { useFallbackPoll } from '@/live';
+import { useEntrantName } from '../entrants/names';
 import { holdsAt } from '../roles';
 import { announcementAnchor } from '@/ui/threads/anchors';
 import { AnnouncementContent } from '@/ui/threads/ThreadParts';
@@ -88,7 +89,8 @@ function Composer({
 /**
  * One announcement with, for a manager, Edit and Close while it is open, and
  * Reopen once it is closed; there is no delete. Close asks first, saying what
- * entrants will then see, on the contest's page or the task's (`where`).
+ * entrants will then see, on the contest's page or the task's (`where`), and,
+ * for a public answer (M62), that its asker loses the answer.
  */
 function Managed({
   announcement,
@@ -107,6 +109,12 @@ function Managed({
   const [closing, setClosing] = useState(false);
   const change = useChange({ reread: onChanged });
   const name = announcement.title;
+  const answers = announcement.answers;
+  const asker = useEntrantName(
+    announcement.where.org,
+    answers === null ? null : announcement.where.contest,
+    answers?.asker ?? '',
+  );
 
   const close = async () => {
     const outcome = await change.run('close', () => changes.close(announcement.number));
@@ -187,6 +195,13 @@ function Managed({
             Entrants will no longer see &ldquo;{name}&rdquo; on {where}. Those who have
             read it are not told it was closed.
           </BodyText>
+          {announcement.answers_question && (
+            <BodyText>
+              {answers === null
+                ? 'It answers a question, which will then say the answer was closed.'
+                : `It answers a question from ${asker}, whose question will then say the answer was closed.`}
+            </BodyText>
+          )}
           <BodyText tone="secondary">
             It stays here for the organisers, marked closed, and you can reopen it.
           </BodyText>
