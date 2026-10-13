@@ -128,7 +128,7 @@ describe('a result a regrade compares', () => {
     };
     expect(sideWords(side)).toBe(`${formatExact('62.5', 2)} points`);
     expect(sideWords({ ...side, points: '0', stopped: 'compile_error' })).toBe(
-      'COMPILE ERROR, 0 points',
+      'Failed to compile, 0 points',
     );
     expect(sideWords({ ...side, points: null })).toBe('5 of 8 tests passed');
     // Cut as every page shows points (R17).

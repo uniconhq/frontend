@@ -967,7 +967,7 @@ describe('what a regrade changed', () => {
     ).toEqual(expect.arrayContaining(['Before the regrade', 'After the regrade']));
     const row = within(table).getByRole('rowgroup', { name: 'B submission 3 by ada' });
     expect(row).toHaveTextContent(`${formatExact('62.5', 2)} points`);
-    expect(row).toHaveTextContent('COMPILE ERROR, 0 points');
+    expect(row).toHaveTextContent('Failed to compile, 0 points');
     expect(row).toHaveTextContent('Now fails to compile');
     expect(asked).toContain(`regrade=${REGRADE.id}&change=stopped`);
     expect(screen.queryByRole('combobox', { name: 'Status' })).toBeNull();

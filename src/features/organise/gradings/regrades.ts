@@ -8,7 +8,6 @@ import type {
   ValueMeaning,
 } from '@/api/types';
 import { useFallbackPoll } from '@/live';
-import { verdictLabel } from '@/ui/verdicts';
 import { formatExact, formatPoints } from '@/lib/exact';
 import { meaningOf, titleInSentence, withUnit } from '@/lib/values';
 import { formatDateTime } from '@/lib/time';
@@ -74,6 +73,15 @@ const STOPPED_ANYHOW: [string, string] = [
   'now stops before its tests',
   'now stop before their tests',
 ];
+
+/** What stopped a run before its tests, as a result reads in a sentence. */
+const STOPPED_RESULT: Partial<Record<string, string>> = {
+  compile_error: 'Failed to compile',
+  time_limit: 'Ran out of time before its tests',
+  memory_limit: 'Ran out of memory before its tests',
+  output_limit: 'Wrote too much before its tests',
+  runtime_error: 'Crashed before its tests',
+};
 
 /**
  * How many of the submissions a regrade now stops before their tests
@@ -259,7 +267,10 @@ export function sideWords(
   values: { names: string[]; meanings: readonly ValueMeaning[] } | null = null,
 ): string {
   if (side === null) return '—';
-  const stopped = side.stopped === null ? null : verdictLabel(side.stopped);
+  const stopped =
+    side.stopped === null
+      ? null
+      : (STOPPED_RESULT[side.stopped] ?? 'Stopped before its tests');
   const tally =
     side.points !== null
       ? `${formatPoints(side.points)} ${side.points === '1' ? 'point' : 'points'}`
