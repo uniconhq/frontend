@@ -1,5 +1,5 @@
 import type { Board, BoardCell, BoardKey } from '@/api/types';
-import { formatExact, formatPoints, placesToTell } from '@/lib/exact';
+import { formatExact, formatPoints, placesToTell, withPointsWord } from '@/lib/exact';
 import { valueTitle, withUnit } from '@/lib/values';
 
 /**
@@ -75,7 +75,7 @@ export function cellPlaces(board: Board, task: string): Record<string, number> {
  */
 function numberText(key: BoardKey, exact: string, places: number): string {
   const shown = shownNumber(key, exact, places);
-  if (key.by === 'points') return `${shown} ${exact === '1' ? 'point' : 'points'}`;
+  if (key.by === 'points') return withPointsWord(shown);
   if (key.by === 'penalty') {
     return (key.per_attempt ?? 0) === 0 ? `minute ${shown}` : `${shown} penalty`;
   }

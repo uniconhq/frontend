@@ -1,7 +1,7 @@
 import type { GroupShown, Reported, ScoredGrading, ValueMeaning } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { VerdictBadge } from '@/ui/VerdictBadge';
-import { formatExact, formatPoints } from '@/lib/exact';
+import { formatExact, formatPoints, withPointsWord } from '@/lib/exact';
 import { formatDateTime } from '@/lib/time';
 import {
   foldWords,
@@ -273,7 +273,7 @@ export function ScoredResult({
         <BodyText>
           {grading.points.shown === null
             ? 'No points shown yet'
-            : `${formatPoints(grading.points.shown)} points`}
+            : withPointsWord(formatPoints(grading.points.shown))}
           {grading.points.pending_until !== null &&
             (grading.points.shown === null
               ? `: up to ${formatPoints(grading.points.pending)}, shown at ${formatDateTime(new Date(grading.points.pending_until))}`

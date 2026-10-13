@@ -1,5 +1,5 @@
 import type { BoardPoints, TaskEntry } from '@/api/types';
-import { compareDecimal, formatPoints, formatWorth } from '@/lib/exact';
+import { compareDecimal, formatPoints, formatWorth, withPointsWord } from '@/lib/exact';
 import { formatWhen } from '@/lib/time';
 
 /** An entrant's points on a task as a line reads them, and when held-back points are shown. */
@@ -7,9 +7,8 @@ export type PointsText = { score: string; pending: string | null };
 
 /** A task's worth alone, "100 points", for a reader the contest counts no points for. */
 function worthText(worth: string): PointsText {
-  const one = compareDecimal(worth, '1') === 0;
   return {
-    score: `${formatWorth(worth)} ${one ? 'point' : 'points'}`,
+    score: withPointsWord(formatWorth(worth)),
     pending: null,
   };
 }

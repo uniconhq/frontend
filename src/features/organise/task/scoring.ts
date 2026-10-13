@@ -10,6 +10,7 @@ import {
   ratioDigits,
   ratioOf,
   ZERO,
+  withPointsWord,
   type Ratio,
 } from '@/lib/exact';
 import { listed } from '@/lib/listed';
@@ -209,7 +210,7 @@ function n(count: number, one: string, many: string): string {
 
 /** A worth in words, exactly or "about" when it does not end: "100 points", "1 point". */
 export function pointsWords(value: Ratio): string {
-  return `${worthText(value)} ${value.num === value.den ? 'point' : 'points'}`;
+  return withPointsWord(worthText(value));
 }
 
 /** The least whole number of `tests` a share of them comes to, rounded up. */

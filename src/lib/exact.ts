@@ -223,6 +223,16 @@ export function formatPoints(
 }
 
 /**
+ * Points as shown with their word after them, "1 point", "36.66 points":
+ * the word agrees with the digits read, so a worth sent as `"1.00"` or
+ * points cut to `1` read "1 point", and "about 1 point" where it is near.
+ */
+export function withPointsWord(shown: string): string {
+  const one = shown.replace(/^about /, '') === formatExact('1');
+  return `${shown} ${one ? 'point' : 'points'}`;
+}
+
+/**
  * The most points something gives, a task's worth or a group's, for reading,
  * the one way every page shows it: rounded to two decimals, so points short
  * of it, cut, read below it.

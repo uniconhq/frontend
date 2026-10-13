@@ -91,6 +91,23 @@ describe("a result's points", () => {
     ).toBeVisible();
     expect(screen.queryByText(/36[.,]67/)).toBeNull();
   });
+
+  it('read "1 point" for one, and for points that are cut to one', () => {
+    const one = (shown: string) =>
+      grading({
+        status: 'graded',
+        outcome: 'accepted',
+        points: { shown, pending: '0', pending_until: null },
+        factor: '1',
+        folded: {},
+        groups: [],
+      });
+    const { unmount } = renderWithProviders(<ScoredResult grading={one('1')} />);
+    expect(screen.getByText('1 point')).toBeVisible();
+    unmount();
+    renderWithProviders(<ScoredResult grading={one('1.0004')} />);
+    expect(screen.getByText('1 point')).toBeVisible();
+  });
 });
 
 describe("a result's values over its tests", () => {

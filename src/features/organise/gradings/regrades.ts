@@ -8,7 +8,7 @@ import type {
   ValueMeaning,
 } from '@/api/types';
 import { useFallbackPoll } from '@/live';
-import { formatExact, formatPoints } from '@/lib/exact';
+import { formatExact, formatPoints, withPointsWord } from '@/lib/exact';
 import { meaningOf, titleInSentence, withUnit } from '@/lib/values';
 import { formatDateTime } from '@/lib/time';
 
@@ -261,7 +261,7 @@ export function sideWords(
       : (STOPPED_RESULT[side.stopped] ?? 'Stopped before its tests');
   const tally =
     side.points !== null
-      ? `${formatPoints(side.points)} ${side.points === '1' ? 'point' : 'points'}`
+      ? withPointsWord(formatPoints(side.points))
       : `${String(side.accepted)} of ${String(side.tests)} tests passed`;
   const compared = (values?.names ?? []).map((name) =>
     valueWords(side, name, values?.meanings ?? []),
