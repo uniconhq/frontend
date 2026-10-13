@@ -78,19 +78,20 @@
   font-size: 12px;
 }
 
-/* The folds over the tests and what is said of a missing one, one under the other. */
-.folded {
+/* "On the leaderboards" and a line per board under it. */
+.boards {
   display: flex;
   flex-direction: column;
   gap: 4px;
 }
 
-/* "Over the tests shown:" before the folds, on their baseline. */
-.overAll {
+.boardLines {
   display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 4px 8px;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
   font-size: 14px;
   color: var(--unicon-text-body);
 }

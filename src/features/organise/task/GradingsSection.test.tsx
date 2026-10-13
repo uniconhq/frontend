@@ -589,7 +589,7 @@ describe("the organisers' scored view of a submission", () => {
       stopped: null,
       outcome: 'accepted',
       values: reported(),
-      folded: {},
+      boards: [],
       reason: null,
       limit: null,
       points: { shown: '100', pending: '0', pending_until: null },
