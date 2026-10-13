@@ -200,7 +200,8 @@ function OverLimitRetry({
     <>
       <BodyText>
         A retry now ends not graded: {entrant} has reached the limit of {most} for{' '}
-        {asking.task}, counting the submissions with a result and those waiting.
+        {asking.task}, counting their submissions with a result, those waiting that are
+        not delayed, and the delayed ones made before this one.
       </BodyText>
       <BodyText tone="secondary">
         {submission} then has no result and counts on no leaderboard, and {entrant}{' '}
