@@ -621,12 +621,14 @@ export interface paths {
         put?: never;
         /**
          * Turn an answer into an announcement every contestant reads
-         * @description On the task the question names, or else on the contest, pointing at
+         * @description On the task the question names, or else, or when that task is
+         *     withdrawn, on the contest, where every entrant reads it, pointing at
          *     the question, which stays private. The question is marked answered
          *     unless `mark` is false, and gets a message, "Answered publicly in the
          *     announcement" and its title, which only its readers see, with the
-         *     announcement's `task` and `number` as the message's `announcement`, so
-         *     the page links to it. Answers with the announcement and the question as
+         *     announcement's `task`, `number` and `title` as the message's
+         *     `announcement`, so the page writes the message with the title as a
+         *     link to it. Answers with the announcement and the question as
          *     it now stands. Sent again after a failure part way, it finishes the
          *     announcement it posted rather than posting a second.
          */
@@ -2072,8 +2074,11 @@ export interface paths {
          *     change how the task grades, `regrades`, how many submissions it would
          *     grade again, and what the save does, as a published save's `effect`
          *     gives it: `results_change`, `summary`, `runs_again`, `scores` and
-         *     `reading`. A change naming an upload writes the pointer to the file the
-         *     caller uploaded for that path; one that is not theirs for this task and
+         *     `reading`, and `asked`, the head and latest publication it was worked
+         *     out from. A confirmation sent with that `asked` is asked again when
+         *     either has moved since, so a change someone made after the question is
+         *     never published unread. A change naming an upload writes the pointer to
+         *     the file the caller uploaded for that path; one that is not theirs for this task and
          *     path is `invalid_inputs`, and one whose bytes have not arrived
          *     `upload_not_ready`. A change with `remove: true` removes the file it
          *     names, with the token it was read with, a moved one being `conflict` as
@@ -2851,13 +2856,18 @@ export interface components {
         /**
          * AnnouncementLink
          * @description The announcement a message names: on the question's contest, or on
-         *     the task of it named `task`, by its number there.
+         *     the task of it named `task`, by its number there, and its `title` as
+         *     the message names it, so a page writes the message with the title as
+         *     the link; none when the message no longer reads as the platform wrote
+         *     it, edited at the forge.
          */
         AnnouncementLink: {
             /** Number */
             number: number;
             /** Task */
             task: string | null;
+            /** Title */
+            title: string | null;
         };
         /**
          * AnnouncementRequest
@@ -4820,8 +4830,10 @@ export interface components {
          *     itself, and then waits for staff, who grade it again or end it: then it
          *     is `cancelled`, with `reason`, the sentence they gave, which is null on
          *     every other status. A delayed one is graded again only while its
-         *     entrant's submissions with a result and those still waiting are fewer
-         *     than the task's most, and otherwise it is `over_limit`, with `limit`,
+         *     entrant's submissions with a result, those waiting that are not
+         *     delayed, and the delayed ones made before it are fewer than the task's
+         *     most, so the first ones to get a result count, and otherwise it is
+         *     `over_limit`, with `limit`,
          *     the most it reached ("Not graded: you had reached the limit of 10
          *     submissions for this task."), and nothing else; `limit` is null on every
          *     other status.
@@ -4868,9 +4880,12 @@ export interface components {
         /**
          * RollbackFile
          * @description Write the file as it was at `version` back as a new change, `token`
-         *     being the one of the file as it is now.
+         *     being the one of the file as it is now, and, for a task, `confirm`,
+         *     `asked` and `keep_as_draft` doing what they do for a save.
          */
         RollbackFile: {
+            /** Asked */
+            asked?: string | null;
             /**
              * Confirm
              * @default false
@@ -4940,10 +4955,14 @@ export interface components {
          * @description The files a save writes, several at once. `keep_as_draft` writes them
          *     as a draft that says what it held back and publishes nothing, on any
          *     save. Otherwise, while the task's contest runs, `confirm` publishes a
-         *     change to how the task grades; an empty save with `confirm` publishes a
-         *     draft kept earlier.
+         *     save, which every save that would publish something new needs then; an
+         *     empty save with `confirm` publishes a draft kept earlier. `asked` is the
+         *     `confirmation_required`'s own: with it, the confirmation stands only
+         *     while the head and the latest publication are the ones asked about.
          */
         SaveRequest: {
+            /** Asked */
+            asked?: string | null;
             /**
              * Changes
              * @default []
@@ -5622,10 +5641,12 @@ export interface components {
         /**
          * WriteFile
          * @description One file written, `token` being the one it was read with or null for
-         *     a new file. For a task this is a save, and `confirm` and
+         *     a new file. For a task this is a save, and `confirm`, `asked` and
          *     `keep_as_draft` do what they do for one.
          */
         WriteFile: {
+            /** Asked */
+            asked?: string | null;
             /**
              * Confirm
              * @default false
@@ -5653,10 +5674,12 @@ export interface components {
          * WriteTaskFile
          * @description One file of a task written, as a save: typed content or an upload
          *     made for this path, `token` being the one it was read with or null for
-         *     a new file, and `confirm` and `keep_as_draft` doing what they do for a
-         *     save.
+         *     a new file, and `confirm`, `asked` and `keep_as_draft` doing what they
+         *     do for a save.
          */
         WriteTaskFile: {
+            /** Asked */
+            asked?: string | null;
             /**
              * Confirm
              * @default false

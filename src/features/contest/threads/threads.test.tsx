@@ -187,7 +187,7 @@ describe('questions', () => {
             from_asker: false,
             body: 'Answered publicly in the announcement ‘On n’',
             at: '2026-09-12T09:20:00Z',
-            announcement: { task: 'sum', number: 3 },
+            announcement: { task: 'sum', number: 3, title: 'On n' },
           },
         ],
       }),

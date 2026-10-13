@@ -216,7 +216,7 @@ function questionRoutes(start: Clarification[], list: string) {
             from_asker: false,
             body: `Answered publicly in the announcement ‘${sent.title}’`,
             at: '2026-09-12T09:30:00Z',
-            announcement: { task: null, number: 4 },
+            announcement: { task: null, number: 4, title: sent.title },
           },
         ],
       };
