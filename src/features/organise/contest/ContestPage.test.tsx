@@ -956,6 +956,46 @@ describe("a task's place in the contest, changed from its row", () => {
     ).toBeDisabled();
   });
 
+  it('asks before a move once the contest has started, saying which letters change', async () => {
+    server.use(signedIn, standingList, ...repoFiles);
+    const sent = settingsSaved(
+      [
+        'name: Spring',
+        'start: 2020-01-01T09:00:00Z',
+        'end: 2099-01-01T09:00:00Z',
+        'state: published',
+        'tasks:',
+        '  - id: sort',
+        '  - id: sum',
+        '',
+      ].join('\n'),
+    );
+    const user = userEvent.setup();
+    renderApp(CONTEST);
+
+    const row = await screen.findByRole('listitem', { name: 'B · sum' });
+    await user.click(within(row).getByRole('button', { name: 'Move B · sum up' }));
+    const asked = await screen.findByRole('dialog', { name: 'Move B · sum up?' });
+    expect(asked).toHaveTextContent(
+      'The contest has started, so entrants see this at once: B · sum becomes A, and A · sort becomes B. The leaderboards, the contest’s page and every announcement or question that names a task by its letter go by the new letters.',
+    );
+    await user.click(within(asked).getByRole('button', { name: 'Cancel' }));
+    expect(sent).toEqual([]);
+
+    await user.click(within(row).getByRole('button', { name: 'Move B · sum up' }));
+    await user.click(
+      within(await screen.findByRole('dialog', { name: 'Move B · sum up?' })).getByRole(
+        'button',
+        { name: 'Move it up' },
+      ),
+    );
+    await waitFor(() => expect(sent).toHaveLength(1));
+    expect((parse(sent[0] ?? '') as { tasks: { id: string }[] }).tasks).toEqual([
+      { id: 'sum' },
+      { id: 'sort' },
+    ]);
+  });
+
   it('opens the dialog from the row’s second line, which ends in Change, and has no Edit button', async () => {
     server.use(signedIn, standingList, ...repoFiles);
     settingsSaved();
