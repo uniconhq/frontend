@@ -91,7 +91,7 @@ export function UploadSaveAnswer({
   return (
     <SaveOutcome
       outcome={outcome}
-      onConfirm={(body) => void send({ ...body, confirm: true })}
+      onConfirm={(body, asked) => void send({ ...body, confirm: true, asked })}
       onKeepAsDraft={(body) => void send({ ...body, keep_as_draft: true })}
       onReload={() => undefined}
       placeOf={placeOf}

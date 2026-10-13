@@ -84,7 +84,12 @@ async function saveWithPictures(
       '/api/v1/orgs/{org}/contests/{contest}/tasks/{task}/save',
       {
         params: { path: { org: task.org, contest: task.contest, task: task.task } },
-        body: { changes, confirm: body.confirm, keep_as_draft: body.keep_as_draft },
+        body: {
+          changes,
+          confirm: body.confirm,
+          asked: body.asked,
+          keep_as_draft: body.keep_as_draft,
+        },
       },
     );
     if (data === undefined) throw new Error('The save gave no answer.');
@@ -155,7 +160,8 @@ export function StatementEditor({ place, admin }: { place: Place; admin: boolean
         answer = await write(body);
       }
       if (answer.kind === 'refused' && answer.error.code === 'conflict') {
-        setConflict(body);
+        // Going over theirs is another save, asked about again.
+        setConflict({ ...body, confirm: false });
         return;
       }
       setOutcome(answer);
@@ -248,7 +254,7 @@ export function StatementEditor({ place, admin }: { place: Place; admin: boolean
       {outcome !== null && (
         <SaveOutcome
           outcome={outcome}
-          onConfirm={(body) => void send({ ...body, confirm: true })}
+          onConfirm={(body, asked) => void send({ ...body, confirm: true, asked })}
           onKeepAsDraft={(body) => void send({ ...body, keep_as_draft: true })}
           onReload={() => {
             setOutcome(null);

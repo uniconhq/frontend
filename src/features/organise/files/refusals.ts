@@ -32,6 +32,17 @@ export function effectOf(error: ApiError): SaveEffect | null {
   };
 }
 
+/**
+ * What a `confirmation_required` was worked out from, the head and the
+ * latest publication, which a confirmation sends back as `asked` so it
+ * stands for nothing saved since; undefined from a backend that does not
+ * say it yet.
+ */
+export function askedOf(error: ApiError): string | undefined {
+  const asked = error.extensions['asked'];
+  return typeof asked === 'string' ? asked : undefined;
+}
+
 export function definitionErrorsOf(error: ApiError): DefinitionError[] {
   const value = error.extensions['errors'];
   if (!Array.isArray(value)) return [];

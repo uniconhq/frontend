@@ -224,10 +224,10 @@ describe("a task file's history", () => {
 
   it('sends the same rollback again when publishing it has to be confirmed', async () => {
     history();
-    const sent: { confirm: boolean; version: string }[] = [];
+    const sent: { confirm: boolean; version: string; asked?: string }[] = [];
     server.use(
       http.post(`${TASK_API}/files/:path/rollback`, async ({ request }) => {
-        const body = (await request.json()) as { confirm: boolean; version: string };
+        const body = (await request.json()) as (typeof sent)[number];
         sent.push(body);
         return body.confirm
           ? HttpResponse.json({
@@ -238,7 +238,10 @@ describe("a task file's history", () => {
               regraded: 0,
               effect: unchanged,
             })
-          : problem(409, 'confirmation_required', { changes: ['limits changed'] });
+          : problem(409, 'confirmation_required', {
+              changes: ['limits changed'],
+              asked: 'b1c2d3e:12',
+            });
       }),
     );
     const list = await openHistory();
@@ -259,9 +262,20 @@ describe("a task file's history", () => {
     expect(
       await screen.findByText('Saved and published as publication 3.'),
     ).toBeVisible();
-    expect(sent.map(({ confirm, version }) => ({ confirm, version }))).toEqual([
-      { confirm: false, version: SECOND },
-      { confirm: true, version: SECOND },
+    expect(sent).toEqual([
+      {
+        confirm: false,
+        version: SECOND,
+        token: 'token-task-yaml',
+        keep_as_draft: false,
+      },
+      {
+        confirm: true,
+        version: SECOND,
+        token: 'token-task-yaml',
+        keep_as_draft: false,
+        asked: 'b1c2d3e:12',
+      },
     ]);
   });
 

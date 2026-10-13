@@ -121,7 +121,9 @@ export function StoredSettings({ place }: { place: Place }) {
       }
     } catch (caught) {
       const error = toApiError(caught);
-      if (error.code === 'conflict' && 'content' in body) setConflict(body);
+      // Going over theirs is another save, asked about again.
+      if (error.code === 'conflict' && 'content' in body)
+        setConflict({ ...body, confirm: false });
       else setOutcome({ kind: 'refused', error, body });
       return;
     }
@@ -202,7 +204,7 @@ export function StoredSettings({ place }: { place: Place }) {
       {outcome !== null && (
         <SaveOutcome
           outcome={outcome}
-          onConfirm={(body) => void save({ ...body, confirm: true })}
+          onConfirm={(body, asked) => void save({ ...body, confirm: true, asked })}
           onKeepAsDraft={(body) => void save({ ...body, keep_as_draft: true })}
           onReload={() => void reload()}
           placeOf={placeOfIn(place)}

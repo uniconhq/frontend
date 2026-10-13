@@ -300,6 +300,7 @@ describe('saving a task file', () => {
                 changes: ['The time limit changes.'],
                 regrades: 4,
                 ...REGRADED,
+                asked: 'b1c2d3e:12',
               }),
         ),
     );
@@ -330,7 +331,12 @@ describe('saving a task file', () => {
       await screen.findByText('Saved and published as publication 3.'),
     ).toBeVisible();
     expect(sent).toHaveLength(2);
-    expect(sent[1]).toEqual({ ...(sent[0] as object), confirm: true });
+    // A confirmation stands only for the save it was asked about.
+    expect(sent[1]).toEqual({
+      ...(sent[0] as object),
+      confirm: true,
+      asked: 'b1c2d3e:12',
+    });
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 

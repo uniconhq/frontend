@@ -181,7 +181,7 @@ export function useTaskSave(place: TaskPlace, onSaved: () => Promise<void> | voi
   /** The same save again, confirmed or kept as a draft, as a refusal asked. */
   const again = (
     body: SaveRequest,
-    flags: { confirm?: boolean; keep_as_draft?: boolean },
+    flags: { confirm?: boolean; asked?: string; keep_as_draft?: boolean },
   ) => {
     setOutcome(null);
     void send({ ...body, ...flags }, last.current);
