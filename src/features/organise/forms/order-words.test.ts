@@ -4,7 +4,7 @@ import { canMoveKey } from './order-words';
 
 const points: OrderKeyValues = { kind: 'points' };
 const penalty: OrderKeyValues = { kind: 'penalty', perAttempt: '20' };
-const time: OrderKeyValues = { kind: 'value', name: 'time_ms' };
+const time: OrderKeyValues = { kind: 'value', name: 'time_ms', fold: 'max' };
 
 describe('moving a way to rank', () => {
   it('stops at either end', () => {

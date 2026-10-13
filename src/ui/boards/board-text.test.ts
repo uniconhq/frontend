@@ -10,6 +10,7 @@ const POINTS: BoardKey = {
   per_attempt: null,
   title: null,
   unit: null,
+  fold: null,
 };
 const PENALTY: BoardKey = {
   by: 'penalty',
@@ -17,6 +18,7 @@ const PENALTY: BoardKey = {
   per_attempt: 20,
   title: null,
   unit: null,
+  fold: null,
 };
 const MINUTE: BoardKey = {
   by: 'penalty',
@@ -24,6 +26,7 @@ const MINUTE: BoardKey = {
   per_attempt: 0,
   title: null,
   unit: null,
+  fold: null,
 };
 const TIME: BoardKey = {
   by: 'time_ms',
@@ -31,6 +34,7 @@ const TIME: BoardKey = {
   per_attempt: null,
   title: null,
   unit: null,
+  fold: 'max',
 };
 
 describe('a board key', () => {
@@ -39,20 +43,26 @@ describe('a board key', () => {
       'Points',
       'Penalty',
       'Submitted at minute',
-      'time_ms',
+      'time_ms, highest',
     ]);
   });
 });
 
 describe('a value a board ranks by (M58)', () => {
   const RUN_TIME: BoardKey = { ...TIME, title: 'Run time', unit: 'ms' };
-  const SCORE: BoardKey = { ...TIME, by: 'score', title: 'Score', unit: null };
+  const SCORE: BoardKey = {
+    ...TIME,
+    by: 'score',
+    title: 'Score',
+    unit: null,
+    fold: 'mean',
+  };
 
-  it('is named by its title, its key only until it has one', () => {
-    expect([RUN_TIME, SCORE, TIME].map(keyLabel)).toEqual([
-      'Run time',
-      'Score',
-      'time_ms',
+  it('is named by its title, its key only until it has one, and how its tests combine', () => {
+    expect([RUN_TIME, SCORE, { ...TIME, fold: 'sum' as const }].map(keyLabel)).toEqual([
+      'Run time, highest',
+      'Score, average',
+      'time_ms, total',
     ]);
   });
 

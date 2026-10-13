@@ -233,7 +233,7 @@ describe("the boards' settings", { timeout: 20_000 }, () => {
           errors: [
             {
               path: 'leaderboards[0].order[0]',
-              message: 'No covered task reports time_ms with a fold.',
+              message: 'No covered task reports time_ms.',
             },
           ],
         }),
@@ -255,6 +255,10 @@ describe("the boards' settings", { timeout: 20_000 }, () => {
     await user.selectOptions(
       await board(form, 'Standings').findByRole('combobox', { name: 'Which value' }),
       'time_ms',
+    );
+    await user.selectOptions(
+      board(form, 'Standings').getByRole('combobox', { name: 'How the tests combine' }),
+      'max',
     );
     await user.click(within(form).getByRole('button', { name: 'Save leaderboards' }));
 
