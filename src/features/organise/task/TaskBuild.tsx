@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { queryView } from '@/api/query';
 import { toApiError } from '@/api/problem';
 import type { FileContent, WorkflowForm } from '@/api/types';
-import { compareRatio, type Ratio } from '@/lib/exact';
+import { compareRatio, formatWorthRatio, type Ratio } from '@/lib/exact';
 import { formatSize } from '@/lib/size';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
@@ -45,7 +45,7 @@ import { InputsCard, type InputFiles } from './InputsCard';
 import { taskMergeWords } from './merge-words';
 import { taskPlace, taskPlaceOf } from './places';
 import { SaveBar } from './SaveBar';
-import { pointsWords, ruleOf, shareProblem, taskWeight, worthText } from './scoring';
+import { pointsWords, ruleOf, shareProblem, taskWeight } from './scoring';
 import {
   existingOf,
   NOTHING_STAGED,
@@ -586,7 +586,7 @@ function pointsNotice(
   known: boolean,
 ): string[] {
   if (compareRatio(before, after) === 0 || worth !== null) return [];
-  const change = `the task will be worth ${pointsWords(after)}, not ${worthText(before)}`;
+  const change = `the task will be worth ${pointsWords(after)}, not ${formatWorthRatio(before)}`;
   return known
     ? [
         `This changes the task’s points: its contest gives it no worth of its own, so ${change}.`,

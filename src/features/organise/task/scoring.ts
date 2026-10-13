@@ -2,7 +2,7 @@ import {
   addRatio,
   compareRatio,
   divRatio,
-  formatPoints,
+  formatExact,
   formatPointsRatio,
   formatWorthRatio,
   mulRatio,
@@ -187,30 +187,13 @@ export function scaled(value: Ratio, total: Ratio, worth: Ratio | null): Ratio {
   return mulRatio(worth, divRatio(value, total));
 }
 
-/**
- * Points an entrant earns, for reading: cut, as every page cuts them (R17),
- * exactly or "about" when they do not end.
- */
-function pointsText(value: Ratio): string {
-  return formatPointsRatio(value);
-}
-
-/**
- * The most points something gives, a task or a group or a rule's part, for
- * reading: rounded, as every page shows a worth, exactly or "about" when it
- * does not end.
- */
-export function worthText(value: Ratio): string {
-  return formatWorthRatio(value);
-}
-
 function n(count: number, one: string, many: string): string {
   return `${String(count)} ${count === 1 ? one : many}`;
 }
 
 /** A worth in words, exactly or "about" when it does not end: "100 points", "1 point". */
 export function pointsWords(value: Ratio): string {
-  return withPointsWord(worthText(value));
+  return withPointsWord(formatWorthRatio(value));
 }
 
 /** The least whole number of `tests` a share of them comes to, rounded up. */
@@ -250,7 +233,7 @@ export function groupsLine(groups: GroupValues[], worth: Ratio | null): string {
   }
   const named = groups.map(
     (group, at) =>
-      `${group.name} (${at === 0 ? pointsWords(points(group)) : worthText(points(group))})`,
+      `${group.name} (${at === 0 ? pointsWords(points(group)) : formatWorthRatio(points(group))})`,
   );
   return `${count} test groups: ${listed(named)}.`;
 }
@@ -317,7 +300,7 @@ export function groupWords(
         rule: `Each test earns ${share}, times its score from 0 to 1.`,
         example: weighted
           ? null
-          : `An entrant whose tests all score 0.5 gets ${pointsText(mulRatio(real(each), { num: 1n, den: 2n }))}.`,
+          : `An entrant whose tests all score 0.5 gets ${formatPointsRatio(mulRatio(real(each), { num: 1n, den: 2n }))}.`,
       };
     }
     if (credit === 'relative') {
@@ -325,7 +308,7 @@ export function groupWords(
         rule: `Each test earns ${share}, times its result against the best any entrant reached.`,
         example: weighted
           ? null
-          : `An entrant who reaches 80% of the best on every test gets ${pointsText(mulRatio(real(each), { num: 4n, den: 5n }))}.`,
+          : `An entrant who reaches 80% of the best on every test gets ${formatPointsRatio(mulRatio(real(each), { num: 4n, den: 5n }))}.`,
       };
     }
     const one =
@@ -338,11 +321,11 @@ export function groupWords(
           ? `Each test passed earns ${share}.`
           : tests === 1
             ? `Its one test earns ${p(each)} when it passes.`
-            : `Each test passed earns an equal share, ${pointsText(one)}.`,
+            : `Each test passed earns an equal share, ${formatPointsRatio(one)}.`,
       example:
         weighted || many === null
           ? null
-          : `An entrant who passes ${String(many - 1)} of ${String(many)} gets ${pointsText(
+          : `An entrant who passes ${String(many - 1)} of ${String(many)} gets ${formatPointsRatio(
               mulRatio(real(each), { num: BigInt(many - 1), den: BigInt(many) }),
             )}.`,
     };
@@ -369,7 +352,7 @@ export function groupWords(
         example:
           least === null || tests === null || least < 1
             ? null
-            : `An entrant who passes ${String(least)} of ${n(tests, 'test', 'tests')} gets ${pointsText(real(group.pass))}; one who passes ${least === 1 ? 'none' : String(least - 1)}, nothing.`,
+            : `An entrant who passes ${String(least)} of ${n(tests, 'test', 'tests')} gets ${formatPointsRatio(real(group.pass))}; one who passes ${least === 1 ? 'none' : String(least - 1)}, nothing.`,
       };
     }
     case 'each':
@@ -381,18 +364,18 @@ export function groupWords(
         example:
           credit !== 'none' || weighted || many === null
             ? null
-            : `An entrant who passes ${String(many - 1)} of ${String(many)} gets ${pointsText(
+            : `An entrant who passes ${String(many - 1)} of ${String(many)} gets ${formatPointsRatio(
                 mulRatio(real(group.each), {
                   num: BigInt(many - 1),
                   den: BigInt(many),
                 }),
-              )}; one who passes all ${String(many)}, ${worthText(addRatio(real(group.each), real(group.pass)))}.`,
+              )}; one who passes all ${String(many)}, ${formatWorthRatio(addRatio(real(group.each), real(group.pass)))}.`,
       };
     }
     case 'worst':
       return {
         rule: `An entrant earns ${p(group.worst)} times their lowest test score, from 0 to 1.`,
-        example: `An entrant whose lowest test score is 0.5 gets ${pointsText(mulRatio(real(group.worst), { num: 1n, den: 2n }))}.`,
+        example: `An entrant whose lowest test score is 0.5 gets ${formatPointsRatio(mulRatio(real(group.worst), { num: 1n, den: 2n }))}.`,
       };
     case 'advanced': {
       const words = mixWords(credit, weighted);
@@ -442,7 +425,7 @@ export function mixWords(
 
 /** A number of points as bare digits, for a sum's parts: "66.66". */
 function digitsOf(value: Ratio): string {
-  return formatPoints(ratioDigits(value, POINTS_PLACES, 'cut').digits);
+  return formatExact(ratioDigits(value, POINTS_PLACES, 'cut').digits, POINTS_PLACES);
 }
 
 /**
@@ -475,8 +458,8 @@ function mixExample(
   const said = (found: Ratio[]) => {
     const sum = found.reduce(addRatio, ZERO);
     return found.length < 2
-      ? pointsText(sum)
-      : `${pointsText(sum)} (${found.map(digitsOf).join(' + ')})`;
+      ? formatPointsRatio(sum)
+      : `${formatPointsRatio(sum)} (${found.map(digitsOf).join(' + ')})`;
   };
   if (credit === 'value') {
     const half = { num: 1n, den: 2n };
@@ -489,7 +472,7 @@ function mixExample(
   if (many === null) return null;
   const share = { num: BigInt(many - 1), den: BigInt(many) };
   const all = parts(ONE, ONE, ONE).reduce(addRatio, ZERO);
-  return `An entrant who passes ${String(many - 1)} of ${String(many)} gets ${said(parts(share, ZERO, share))}; one who passes all ${String(many)} gets ${worthText(all)}.`;
+  return `An entrant who passes ${String(many - 1)} of ${String(many)} gets ${said(parts(share, ZERO, share))}; one who passes all ${String(many)} gets ${formatWorthRatio(all)}.`;
 }
 
 /** How a group earns its points, as one passage: its rule, then its worked example. */
