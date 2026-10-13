@@ -115,7 +115,7 @@ describe("a result's values over its tests", () => {
     const { container } = renderWithProviders(<ScoredResult grading={wrong} />);
 
     expect(screen.queryByRole('definition')).toBeNull();
-    expect(screen.queryByRole('group', { name: 'Over all tests' })).toBeNull();
+    expect(screen.queryByRole('group', { name: 'Over the tests shown' })).toBeNull();
     expect(container).not.toHaveTextContent(/—/);
     const tests = screen.getByRole('table', { name: 'Tests main' });
     const [, first, second] = within(tests).getAllByRole('row');
@@ -123,13 +123,13 @@ describe("a result's values over its tests", () => {
     expect(second).toHaveTextContent('3');
   });
 
-  it('says plainly why a wrong answer has no value over all tests (#441)', () => {
+  it('says plainly why a wrong answer has no value over the tests shown (#441)', () => {
     renderWithProviders(<ScoredResult grading={{ ...wrong, meanings: MEANINGS }} />);
 
-    expect(screen.queryByRole('group', { name: 'Over all tests' })).toBeNull();
+    expect(screen.queryByRole('group', { name: 'Over the tests shown' })).toBeNull();
     expect(
       screen.getByText(
-        'Run time and memory used are counted over all tests only once every test is accepted.',
+        'Run time and memory used have no value while a test shown is not accepted.',
       ),
     ).toBeVisible();
     const tests = screen.getByRole('table', { name: 'Tests main' });
@@ -144,7 +144,7 @@ describe("a result's values over its tests", () => {
       />,
     );
 
-    const over = screen.getByRole('group', { name: 'Over all tests' });
+    const over = screen.getByRole('group', { name: 'Over the tests shown' });
     expect(
       within(over)
         .getAllByRole('term')
@@ -152,18 +152,16 @@ describe("a result's values over its tests", () => {
     ).toEqual(['Memory used']);
     expect(over).not.toHaveTextContent('Run time');
     expect(
-      screen.getByText(
-        'Run time is counted over all tests only once every test is accepted.',
-      ),
+      screen.getByText('Run time has no value while a test shown is not accepted.'),
     ).toBeVisible();
   });
 
   it('labels the folds in the values’ words and the table’s order, each with its unit (M63)', () => {
     renderWithProviders(<ScoredResult grading={right} />);
 
-    const over = screen.getByRole('group', { name: 'Over all tests' });
+    const over = screen.getByRole('group', { name: 'Over the tests shown' });
     expect(over).toHaveTextContent(
-      `Over all tests:Run time28 ms (the longest),Memory used${formatExact('10420')} KB (the most)`,
+      `Over the tests shown:Run time28 ms (the longest),Memory used${formatExact('10420')} KB (the most)`,
     );
     const tests = screen.getByRole('table', { name: 'Tests main' });
     expect(
@@ -192,7 +190,7 @@ describe("a result's values over its tests", () => {
       />,
     );
 
-    const over = screen.getByRole('group', { name: 'Over all tests' });
+    const over = screen.getByRole('group', { name: 'Over the tests shown' });
     expect(
       within(over)
         .getAllByRole('term')
