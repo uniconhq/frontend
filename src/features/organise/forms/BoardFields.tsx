@@ -374,6 +374,7 @@ function BoardEntry({
                   of={title}
                   value={key}
                   options={kindOptions(rows, at)}
+                  rows={rows}
                   values={values}
                   last={at === rows.length - 1}
                   alone={rows.length === 1}
@@ -450,16 +451,29 @@ function BoardEntry({
 
 /**
  * The values a row's dropdown offers, by their titles, with the one the
- * file names kept first when no task reports it, so it stays in view.
+ * file names kept first when no task reports it, so it stays in view. A
+ * value another row already ranks by is greyed, saying which (M69), unless
+ * it is this row's own.
  */
 function valueChoices(
   values: ValueMeaning[],
   named: string,
-): { value: string; label: string }[] {
-  const offered = values.map((meaning) => ({
-    value: meaning.name,
-    label: valueOption(meaning),
-  }));
+  rows: OrderKeyValues[],
+  at: number,
+): { value: string; label: string; disabled?: boolean }[] {
+  const offered = values.map((meaning) => {
+    const label = valueOption(meaning);
+    const other = rows.findIndex(
+      (key, k) => k !== at && key.kind === 'value' && key.name.trim() === meaning.name,
+    );
+    return other < 0 || meaning.name === named.trim()
+      ? { value: meaning.name, label }
+      : {
+          value: meaning.name,
+          label: `${label}: way ${String(other + 1)} ranks by it already`,
+          disabled: true,
+        };
+  });
   const name = named.trim();
   return name === '' || values.some((meaning) => meaning.name === name)
     ? offered
@@ -471,6 +485,7 @@ function OrderKey({
   of,
   value,
   options,
+  rows,
   values,
   last,
   alone,
@@ -488,6 +503,8 @@ function OrderKey({
   value: OrderKeyValues;
   /** The ways this row may take. */
   options: { value: string; label: string }[];
+  /** Every row of the board's order, this one among them. */
+  rows: OrderKeyValues[];
   /** The values it may rank by, or null while not known. */
   values: ValueMeaning[] | null;
   last: boolean;
@@ -532,7 +549,7 @@ function OrderKey({
                 label="Which value"
                 labelHidden
                 value={value.name}
-                options={valueChoices(values, value.name)}
+                options={valueChoices(values, value.name, rows, at)}
                 onChange={(name) => onChange({ kind: 'value', name })}
                 placeholder="Choose a value"
                 disabled={disabled}

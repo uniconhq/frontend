@@ -452,6 +452,48 @@ describe("the boards' settings", { timeout: 20_000 }, () => {
     expect(form).not.toHaveTextContent('time_ms');
   });
 
+  it('greys a value another way to rank already ranks by, saying which', async () => {
+    server.use(signedIn);
+    settings(
+      CONTEST.replace(
+        '    who: contestants\n',
+        '    who: contestants\n    order: [points, time_ms]\n',
+      ),
+    );
+    const user = userEvent.setup();
+    renderApp(PAGE);
+
+    const form = await screen.findByRole('form', { name: 'Leaderboards' });
+    const standings = board(form, 'Standings');
+    await standings.findByRole('combobox', { name: 'Which value' });
+    await user.click(
+      standings.getByRole('button', { name: 'Add a way to rank Standings' }),
+    );
+    const third = within(standings.getByRole('group', { name: 'Way to rank 3' }));
+    await user.selectOptions(
+      third.getByRole('combobox', { name: 'Way to rank 3' }),
+      'value',
+    );
+    const which = third.getByRole('combobox', { name: 'Which value' });
+    expect(
+      within(which).getByRole('option', {
+        name: 'Run time (lower is better): way 2 ranks by it already',
+      }),
+    ).toBeDisabled();
+    expect(
+      within(which).getByRole('option', { name: 'Memory used (lower is better)' }),
+    ).toBeEnabled();
+    const second = within(standings.getByRole('group', { name: 'Way to rank 2' }));
+    expect(
+      within(second.getByRole('combobox', { name: 'Which value' })).getByRole(
+        'option',
+        {
+          name: 'Run time (lower is better)',
+        },
+      ),
+    ).toBeEnabled();
+  });
+
   it('keeps a value no task reports in view, and flags it', async () => {
     server.use(signedIn);
     settings(
