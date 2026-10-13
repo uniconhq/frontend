@@ -340,8 +340,8 @@ function Details({
         </li>
         {primitive.batch && (
           <li>
-            When it runs for each test, it runs once for all the tests together, rather
-            than once for each.
+            When it runs for each test, one start serves all the tests rather than one
+            start each, and each test keeps its own limits.
           </li>
         )}
         {primitive.network && <li>It can reach the network.</li>}

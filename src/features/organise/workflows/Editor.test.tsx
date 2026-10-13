@@ -87,7 +87,7 @@ describe('the workflow editor', () => {
     const details = within(panel).getByText('Details').closest('details');
     expect(details).not.toBeNull();
     expect(details).toHaveTextContent(
-      'When it runs for each test, it runs once for all the tests together, rather than once for each.',
+      'When it runs for each test, one start serves all the tests rather than one start each, and each test keeps its own limits.',
     );
     expect(details).not.toHaveTextContent(/container/);
     // Each result in the primitive's own words, one line each (M56).
@@ -108,7 +108,7 @@ describe('the workflow editor', () => {
     // What the step gets, in seconds and whole units, the limits the task raises
     // said so, and the entrant's program inside it (M56).
     expect(details).toHaveTextContent(
-      'What this step gets each time it runs: up to 2 seconds, 256 MB of memory, 128 processes, 64 MB of output; its time grows with the task’s time_limit and its memory with the task’s memory_limit. The entrant’s program runs inside it, within the task’s time_limit and the task’s memory_limit.',
+      'What this step gets for each test: up to 2 seconds, 256 MB of memory, 128 processes, 64 MB of output; its time grows with the task’s time_limit and its memory with the task’s memory_limit. The entrant’s program runs inside it, within the task’s time_limit and the task’s memory_limit.',
     );
     expect(details).not.toHaveTextContent(/GPU|ms of/);
     expect(
