@@ -48,12 +48,14 @@ function usePublicFiles(place: Place): TreeEntry[] | null {
 /**
  * The statement and every picture staged with it as one save of the task
  * (`POST <task>/save`), a larger picture through the upload door, answered
- * as any save of the task is.
+ * as any save of the task is. A picture already sent for the same path is
+ * not sent again, so a save sent again after its question uploads nothing new.
  */
 async function saveWithPictures(
   task: TaskPlace,
   body: WriteFile,
   pictures: StagedPicture[],
+  uploads: Map<string, { file: File; id: string }>,
 ): Promise<Outcome> {
   const planned: PlannedChange[] = [
     { path: PATH, token: body.token, text: body.content ?? '' },
@@ -78,7 +80,12 @@ async function saveWithPictures(
     const changes = await fileChanges(planned, (path) => {
       const file = fileAt(path);
       if (file === undefined) throw new Error(`Nothing was chosen for ${path}.`);
-      return sendToTask(task, file, path);
+      const known = uploads.get(path);
+      if (known !== undefined && known.file === file) return Promise.resolve(known.id);
+      return sendToTask(task, file, path).then((id) => {
+        uploads.set(path, { file, id });
+        return id;
+      });
     });
     const { data } = await apiClient.POST(
       '/api/v1/orgs/{org}/contests/{contest}/tasks/{task}/save',
@@ -134,6 +141,8 @@ export function StatementEditor({ place, admin }: { place: Place; admin: boolean
   const [kept, setKept] = useState<string | null>(null);
   /** Pictures added or taken out, waiting for the statement's save. */
   const [pictures, setPictures] = useState<StagedPicture[]>([]);
+  /** Pictures already through the upload door, by path, for a save sent again. */
+  const uploads = useRef(new Map<string, { file: File; id: string }>());
   const staged = useRef(pictures);
   useEffect(() => {
     staged.current = pictures;
@@ -148,7 +157,7 @@ export function StatementEditor({ place, admin }: { place: Place; admin: boolean
       const sending = pictures;
       let answer: Outcome;
       if (place.kind === 'task' && sending.length > 0) {
-        answer = await saveWithPictures(place, body, sending);
+        answer = await saveWithPictures(place, body, sending, uploads.current);
         if (answer.kind !== 'refused') {
           await Promise.all(
             staleAfterWrite(place).map((queryKey) =>
@@ -167,6 +176,7 @@ export function StatementEditor({ place, admin }: { place: Place; admin: boolean
       setOutcome(answer);
       if (answer.kind !== 'refused') {
         letGo(sending);
+        uploads.current.clear();
         setPictures([]);
         await query.refetch();
       }
