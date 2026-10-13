@@ -1,12 +1,8 @@
 import type { GradingResult } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { VerdictBadge } from '@/ui/VerdictBadge';
-import {
-  DELAYED_SENTENCE,
-  cancelReason,
-  overLimitSentence,
-  verdictOf,
-} from './grading';
+import { DELAYED_SENTENCE, cancelReason, verdictOf } from './grading';
+import { overLimitSentence } from '@/ui/scored/scored-text';
 
 /**
  * A submission's verdict as one badge, or a line saying it has no grading. A
@@ -22,7 +18,7 @@ export function Verdict({ grading }: { grading: GradingResult | null }) {
         <BodyText tone="secondary">{DELAYED_SENTENCE}</BodyText>
       )}
       {grading.status === 'over_limit' && (
-        <BodyText tone="secondary">{overLimitSentence(grading.limit)}</BodyText>
+        <BodyText tone="secondary">{overLimitSentence('you', grading.limit)}</BodyText>
       )}
       {cancelReason(grading) !== null && (
         <BodyText tone="secondary">{cancelReason(grading)}</BodyText>

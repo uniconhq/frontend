@@ -7,6 +7,7 @@ import { Select } from '@/ui/Select';
 import { TextInput } from '@/ui/TextInput';
 import { PageLink } from '@/ui/PageLink';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
+import { submissionsWords } from '@/ui/scored/scored-text';
 import { contestSectionPath } from '@/lib/sections';
 import { STATUS, UNFINISHED, submitterOf } from './feed';
 import { regradeSearch } from './regrades';
@@ -195,13 +196,13 @@ function OverLimitRetry({
   limit: number;
 }) {
   const entrant = entrantOf(asking.entry);
-  const most = `${String(limit)} ${limit === 1 ? 'submission' : 'submissions'}`;
   return (
     <>
       <BodyText>
-        A retry now ends not graded: {entrant} has reached the limit of {most} for{' '}
-        {asking.task}, counting their submissions with a result, those waiting that are
-        not delayed, and the delayed ones made before this one.
+        A retry now ends not graded: {entrant} has reached the limit of{' '}
+        {submissionsWords(limit)} for {asking.task}, counting their submissions with a
+        result, those waiting that are not delayed, and the delayed ones made before
+        this one.
       </BodyText>
       <BodyText tone="secondary">
         {submission} then has no result and counts on no leaderboard, and {entrant}{' '}

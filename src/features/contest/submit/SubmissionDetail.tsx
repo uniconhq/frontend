@@ -16,10 +16,10 @@ import {
   DELAYED_SENTENCE,
   cancelReason,
   lateness,
-  overLimitSentence,
   pollEvery,
   verdictOf,
 } from './grading';
+import { overLimitSentence } from '@/ui/scored/scored-text';
 import shared from '../contest.module.css';
 import classes from './submit.module.css';
 
@@ -52,7 +52,7 @@ function Grading({ grading }: { grading: GradingResult }) {
         <div className={classes.verdict}>
           <VerdictBadge verdict="over_limit" />
         </div>
-        <BodyText>{overLimitSentence(grading.limit)}</BodyText>
+        <BodyText>{overLimitSentence('you', grading.limit)}</BodyText>
         <BodyText tone="secondary">
           It has no result and counts on no leaderboard.
         </BodyText>

@@ -7,6 +7,7 @@ import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
 import { PageLink } from '@/ui/PageLink';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
+import { submissionsWords } from '@/ui/scored/scored-text';
 import { contestSectionPath } from '@/lib/sections';
 import { DefinitionErrors } from '../DefinitionErrors';
 import { definitionErrorsOf } from '../files/refusals';
@@ -31,11 +32,6 @@ function readOfTask(
     at['contest'] === task.contest &&
     at['task'] === task.task
   );
-}
-
-/** How many submissions, in words: "1 submission", "14 submissions". */
-function submissionsWords(count: number): string {
-  return `${String(count)} ${count === 1 ? 'submission' : 'submissions'}`;
 }
 
 /**
