@@ -176,9 +176,9 @@ function ClarificationCard({
         asker={asker}
         organisers
         where={showContest ? `${org}/${contest ?? ''}` : undefined}
-        announcementHref={(link) =>
-          `${link.task === null ? contestPath(org, contest ?? '') : taskPath(org, contest ?? '', link.task)}/announcements#${announcementAnchor(link)}`
-        }
+        announcementAt={(link) => ({
+          href: `${link.task === null ? contestPath(org, contest ?? '') : taskPath(org, contest ?? '', link.task)}/announcements#${announcementAnchor(link)}`,
+        })}
       >
         {manages && (
           <>

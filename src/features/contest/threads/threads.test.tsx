@@ -268,6 +268,31 @@ describe('questions', () => {
     expect(screen.queryByRole('link', { name: '‘On n’' })).toBeNull();
   });
 
+  it('says a public answer’s task was withdrawn where that is why its announcement is gone (#450)', async () => {
+    const withdrawn = home({ registration: registration({ status: 'approved' }) });
+    server.use(
+      signedIn,
+      http.get(`${CONTEST_API}/home`, () =>
+        HttpResponse.json({
+          ...withdrawn,
+          tasks: withdrawn.tasks.map((task) => ({
+            ...task,
+            release: { ...task.release, open: false, closed: 'withdrawn' },
+          })),
+        }),
+      ),
+      answeredPublicly,
+    );
+    renderApp(QUESTIONS);
+
+    expect(
+      await screen.findByText(
+        'Answered publicly in the announcement ‘On n’, whose task has since been withdrawn from the contest.',
+      ),
+    ).toBeVisible();
+    expect(screen.queryByText(/organisers have since closed/)).toBeNull();
+  });
+
   it('marks a team’s messages as the team’s', async () => {
     server.use(
       signedIn,
