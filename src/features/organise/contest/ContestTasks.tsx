@@ -8,12 +8,13 @@ import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
 import { IconButton } from '@/ui/IconButton';
 import { Chip } from '@/ui/Chip';
+import { Modal } from '@/ui/Modal';
 import { ListCard, type ListRow } from '@/ui/ListCard';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
 import { useMe } from '@/session';
 import { taskPath } from '@/lib/organiser-paths';
-import { formatDateTime } from '@/lib/time';
+import { formatDateTime, serverNow } from '@/lib/time';
 import { CreateButton } from '../Create';
 import { DefinitionErrors } from '../DefinitionErrors';
 import { definitionErrorsOf } from '../files/refusals';
@@ -28,6 +29,7 @@ import { EntryLine, TaskEntryDialog } from './TaskEntry';
 import { STANDINGS, entrySentence, labelOf, useTaskTitles } from './task-entry';
 import { FIRST_KIND, STARTER, startOn, type Kind } from '../task/new-task';
 import { TaskKind } from '../task/TaskKind';
+import shared from '../organise.module.css';
 import { PageLink } from '@/ui/PageLink';
 import { taskCardPath } from '@/lib/sections';
 import classes from './contest.module.css';
@@ -80,6 +82,16 @@ type Changing = {
   /** Whether there is more than one task to move it among. */
   movable: boolean;
   moving: boolean;
+};
+
+/** A move asked about: the task, the way, and the two tasks' labels and letters. */
+type Asked = {
+  task: string;
+  by: -1 | 1;
+  label: string;
+  letter: string;
+  other: string;
+  otherLetter: string;
 };
 
 function rowOf(
@@ -170,7 +182,9 @@ function moved(id: string, by: -1 | 1) {
  * task out of the contest, in a dialog; a withdrawn task says so, with Put
  * back on its row;
  * with two tasks or more, arrows on each row move it up or down the list,
- * saving at once, since a task's letter is its place. "New task" sits at the
+ * saving at once, since a task's letter is its place; once the contest has
+ * started, entrants see the letters change, so a move asks first, as a save
+ * of a task does then (#449). "New task" sits at the
  * bottom for a manager, which also adds it to the contest's tasks. A link to
  * a task's place in the contest (`?part=tasks&item=` its place in the list)
  * opens its dialog. Listing needs the observer role at the contest;
@@ -233,8 +247,15 @@ export function ContestTasks({ org, contest }: { org: string; contest: string })
   const queryClient = useQueryClient();
   const change = useContestChange(org, contest);
   const [moveRefused, setMoveRefused] = useState<unknown>(null);
+  /** A move asked about, while the contest has started. */
+  const [asked, setAsked] = useState<Asked | null>(null);
+  const started =
+    values !== null &&
+    values.state === 'published' &&
+    Date.parse(values.start) <= serverNow().getTime();
   const move = async (task: string, by: -1 | 1) => {
     setMoveRefused(null);
+    setAsked(null);
     const outcome = await change.apply(moved(task, by));
     if (outcome.kind === 'refused') setMoveRefused(outcome.error);
     await queryClient.invalidateQueries({ queryKey: standingsKey });
@@ -274,7 +295,21 @@ export function ContestTasks({ org, contest }: { org: string; contest: string })
                     setPuttingBack(true);
                     setEditing(at);
                   },
-                  move: (by) => void move(standing.task.name, by),
+                  move: (by) => {
+                    const other = all[at + by];
+                    if (!started || other === undefined) {
+                      void move(standing.task.name, by);
+                      return;
+                    }
+                    setAsked({
+                      task: standing.task.name,
+                      by,
+                      label: labelOf(standing, titles),
+                      letter: standing.label,
+                      other: labelOf(other, titles),
+                      otherLetter: other.label,
+                    });
+                  },
                   first: at === 0,
                   last: at === all.length - 1,
                   movable: all.length > 1,
@@ -353,6 +388,35 @@ export function ContestTasks({ org, contest }: { org: string; contest: string })
 
   return (
     <div ref={card}>
+      <Modal
+        opened={asked !== null}
+        onClose={() => setAsked(null)}
+        title={
+          asked === null ? '' : `Move ${asked.label} ${asked.by < 0 ? 'up' : 'down'}?`
+        }
+      >
+        {asked !== null && (
+          <div className={shared.stack}>
+            <BodyText>
+              The contest has started, so entrants see this at once: {asked.label}{' '}
+              becomes {asked.otherLetter}, and {asked.other} becomes {asked.letter}. The
+              leaderboards, the contest’s page and every announcement or question that
+              names a task by its letter go by the new letters.
+            </BodyText>
+            <div className={shared.actions}>
+              <Button
+                loading={change.pending}
+                onClick={() => void move(asked.task, asked.by)}
+              >
+                {asked.by < 0 ? 'Move it up' : 'Move it down'}
+              </Button>
+              <Button variant="secondary" onClick={() => setAsked(null)}>
+                Cancel
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
       <TaskEntryDialog
         org={org}
         contest={contest}

@@ -188,6 +188,11 @@ describe("the contest's tasks", () => {
         ['B · Sum of two', '/orgs/acme/contests/spring/tasks/sum'],
       ]),
     );
+    const status = screen.getByRole('region', { name: 'Status' });
+    expect(
+      await within(status).findByRole('link', { name: /^A · Sorting: / }),
+    ).toBeVisible();
+    expect(await screen.findByRole('region', { name: 'B · Sum of two' })).toBeVisible();
   });
 
   it("says each task's latest publication and its timeline as one line, defaults resolved", async () => {
@@ -588,9 +593,9 @@ describe('how the contest is scored (M52)', () => {
     expect(card).toHaveTextContent(
       "Check this before the contest starts. It says how each task earns points and which leaderboards count them, as each task's latest publication has it.",
     );
-    const sortPart = await within(card).findByRole('region', { name: 'A · sort' });
+    const sortPart = await within(card).findByRole('region', { name: 'A · Sort' });
     expect(within(sortPart).getByRole('heading', { level: 3 })).toHaveTextContent(
-      `A · sort: 50 points, open for the whole contest; due ${at('2026-10-08T09:00:00Z')}, then 10% less per started day late`,
+      `A · Sort: 50 points, open for the whole contest; due ${at('2026-10-08T09:00:00Z')}, then 10% less per started day late`,
     );
     await line(
       sortPart,
@@ -614,14 +619,14 @@ describe('how the contest is scored (M52)', () => {
     expect(
       within(card).getByRole('link', { name: 'How this contest is scored' }),
     ).toHaveAttribute('href', '/orgs/acme/contests/spring/boards');
-    expect(within(sortPart).getByRole('link', { name: 'A · sort' })).toHaveAttribute(
+    expect(within(sortPart).getByRole('link', { name: 'A · Sort' })).toHaveAttribute(
       'href',
       expect.stringMatching(/^\/orgs\/acme\/contests\/spring\/tasks\/sort\b/),
     );
 
-    const sumPart = within(card).getByRole('region', { name: 'B · sum' });
+    const sumPart = within(card).getByRole('region', { name: 'B · Sum' });
     expect(within(sumPart).getByRole('heading', { level: 3 })).toHaveTextContent(
-      'B · sum: 100 points, open for the whole contest',
+      'B · Sum: 100 points, open for the whole contest',
     );
     // Where the worth comes from is said only where the contest sets it.
     expect(sumPart).not.toHaveTextContent('scaled');
@@ -811,9 +816,11 @@ describe('how the contest is scored, as published', () => {
         const content =
           params['task'] === 'sort'
             ? 'name: Sort\nworkflow: unicon/icpc@v1\ntest_groups:\n  judge: {pass: 1}\n'
-            : at === standings[1]!.state.latest?.version
-              ? 'name: Sum\nworkflow: unicon/classic@v2\ntest_groups:\n  main: {each: 80, pass: 20}\n'
-              : 'name: Sum\nworkflow: unicon/classic@v2\ntest_groups:\n  main: {each: 120}\n';
+            : params['task'] === 'new'
+              ? 'workflow: unicon/classic@v2\n'
+              : at === standings[1]!.state.latest?.version
+                ? 'name: Sum\nworkflow: unicon/classic@v2\ntest_groups:\n  main: {each: 80, pass: 20}\n'
+                : 'name: Sum\nworkflow: unicon/classic@v2\ntest_groups:\n  main: {each: 120}\n';
         return HttpResponse.json({
           path: 'task.yaml',
           encoding: 'utf-8',
@@ -831,12 +838,12 @@ describe('how the contest is scored, as published', () => {
     const card = await screen.findByRole('region', {
       name: 'How this contest is scored',
     });
-    const sum = await within(card).findByRole('region', { name: 'B · sum' });
+    const sum = await within(card).findByRole('region', { name: 'B · Sum' });
     await line(
       sum,
       'main (100 points): each test passed earns an equal share of 80 points. Passing every test earns 20 points more.',
     );
-    const sort = within(card).getByRole('region', { name: 'A · sort' });
+    const sort = within(card).getByRole('region', { name: 'A · Sort' });
     await line(
       sort,
       'judge (1 point): an entrant earns 1 point when every test passes, and nothing otherwise.',
@@ -954,6 +961,46 @@ describe("a task's place in the contest, changed from its row", () => {
         name: 'Move B · sum down',
       }),
     ).toBeDisabled();
+  });
+
+  it('asks before a move once the contest has started, saying which letters change', async () => {
+    server.use(signedIn, standingList, ...repoFiles);
+    const sent = settingsSaved(
+      [
+        'name: Spring',
+        'start: 2020-01-01T09:00:00Z',
+        'end: 2099-01-01T09:00:00Z',
+        'state: published',
+        'tasks:',
+        '  - id: sort',
+        '  - id: sum',
+        '',
+      ].join('\n'),
+    );
+    const user = userEvent.setup();
+    renderApp(CONTEST);
+
+    const row = await screen.findByRole('listitem', { name: 'B · sum' });
+    await user.click(within(row).getByRole('button', { name: 'Move B · sum up' }));
+    const asked = await screen.findByRole('dialog', { name: 'Move B · sum up?' });
+    expect(asked).toHaveTextContent(
+      'The contest has started, so entrants see this at once: B · sum becomes A, and A · sort becomes B. The leaderboards, the contest’s page and every announcement or question that names a task by its letter go by the new letters.',
+    );
+    await user.click(within(asked).getByRole('button', { name: 'Cancel' }));
+    expect(sent).toEqual([]);
+
+    await user.click(within(row).getByRole('button', { name: 'Move B · sum up' }));
+    await user.click(
+      within(await screen.findByRole('dialog', { name: 'Move B · sum up?' })).getByRole(
+        'button',
+        { name: 'Move it up' },
+      ),
+    );
+    await waitFor(() => expect(sent).toHaveLength(1));
+    expect((parse(sent[0] ?? '') as { tasks: { id: string }[] }).tasks).toEqual([
+      { id: 'sum' },
+      { id: 'sort' },
+    ]);
   });
 
   it('opens the dialog from the row’s second line, which ends in Change, and has no Edit button', async () => {

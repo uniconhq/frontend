@@ -27,6 +27,7 @@ import { FieldBox } from './ContestFile';
 import { contestPlaceOf, useOpenedField } from './opened';
 import { useContestChange } from './save';
 import { useContestSettings } from './settings';
+import { labelOf, useTaskTitles } from './task-entry';
 import { VISIBILITY_CHOICES, visibilitySentence } from './words';
 import shared from '../organise.module.css';
 import classes from './contest.module.css';
@@ -87,9 +88,14 @@ type Check = {
  * or still the one a new task starts with stops it too (M57), and its line
  * goes to the task's Statement card.
  */
-function taskCheck(org: string, contest: string, standing: TaskStanding): Check {
+function taskCheck(
+  org: string,
+  contest: string,
+  standing: TaskStanding,
+  titles: ReadonlyMap<string, string>,
+): Check {
   const { latest, draft, errors, statement_written } = standing.state;
-  const name = `${standing.label} · ${standing.task.name}`;
+  const name = labelOf(standing, titles);
   const to = taskPath(org, contest, standing.task.name);
   if (draft && errors.length > 0) {
     return { key: name, ok: false, text: `${name}: its last save has problems`, to };
@@ -117,6 +123,7 @@ function checksOf(
   contest: string,
   values: ContestValues,
   listed: TaskStanding[],
+  titles: ReadonlyMap<string, string>,
 ): Check[] {
   const tasks = listed.filter((task) => !task.withdrawn);
   const settings = contestSectionPath(org, contest, 'settings');
@@ -141,7 +148,7 @@ function checksOf(
       text: tasks.length > 0 ? 'At least one task' : 'Add a task',
       to: `${contestPath(org, contest)}?part=tasks`,
     },
-    ...tasks.map((task) => taskCheck(org, contest, task)),
+    ...tasks.map((task) => taskCheck(org, contest, task, titles)),
     {
       key: 'entry',
       ok: ways.length > 0,
@@ -227,6 +234,11 @@ export function StatusCard({ org, contest }: { org: string; contest: string }) {
       { staleTime: 0 },
     ),
   );
+  const titles = useTaskTitles(
+    org,
+    contest,
+    tasks.state === 'ready' ? tasks.data.map((standing) => standing.task.name) : [],
+  );
   const admin = holdsAt(useMe().roles, { kind: 'contest', org, contest }, 'admin');
   const { apply, pending } = useContestChange(org, contest);
   const [asking, setAsking] = useState<Ask>(null);
@@ -255,7 +267,9 @@ export function StatusCard({ org, contest }: { org: string; contest: string }) {
           const now = serverNow();
           const standing = standingOf(dated(values), now);
           const checks =
-            tasks.state === 'ready' ? checksOf(org, contest, values, tasks.data) : [];
+            tasks.state === 'ready'
+              ? checksOf(org, contest, values, tasks.data, titles)
+              : [];
           const blocked = checks.some((check) => !check.ok && check.warning !== true);
           const started = Date.parse(values.start) <= now.getTime();
           const actions: ReactNode[] = [];

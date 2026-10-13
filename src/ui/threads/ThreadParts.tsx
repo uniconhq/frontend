@@ -128,6 +128,7 @@ export function QuestionThread({
   asker,
   organisers = false,
   where,
+  taskTitle,
   announcementAt,
   children,
 }: {
@@ -137,6 +138,8 @@ export function QuestionThread({
   announcementAt?: (link: AnnouncementLink) => AnnouncementAt;
   /** Which contest it was asked in, where questions of several are listed. */
   where?: string;
+  /** What the reader calls the task it is about; its name while unknown. */
+  taskTitle?: string;
   children?: ReactNode;
 }) {
   const { title } = clarification;
@@ -158,7 +161,9 @@ export function QuestionThread({
             <BodyText tone="meta">
               {[
                 where === undefined ? null : `In ${where}`,
-                clarification.task === null ? null : `About task ${clarification.task}`,
+                clarification.task === null
+                  ? null
+                  : `About task ${taskTitle ?? clarification.task}`,
               ]
                 .filter((part) => part !== null)
                 .join(' · ')}

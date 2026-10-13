@@ -347,6 +347,20 @@ describe('questions', () => {
     expect(asked[0]).toMatchObject({ task: 'sum' });
   });
 
+  it('says which task a question is about by its letter and title, as the form does', async () => {
+    server.use(
+      signedIn,
+      approvedHome,
+      http.get(`${CONTEST_API}/questions`, () =>
+        HttpResponse.json([question({ task: 'sum' })]),
+      ),
+    );
+    renderApp(QUESTIONS);
+
+    const list = await screen.findByRole('list', { name: 'Your questions' });
+    expect(within(list).getByText('About task A · Sum of Two')).toBeVisible();
+  });
+
   it('names each task it can ask about by its letter and title, as the contest’s page does', async () => {
     server.use(signedIn, approvedHome);
     renderApp(`${QUESTIONS}?task=sum`);

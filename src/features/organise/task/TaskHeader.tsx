@@ -7,6 +7,7 @@ import { Chip } from '@/ui/Chip';
 import { PageLink } from '@/ui/PageLink';
 import { Loaded } from '@/ui/feedback/Loaded';
 import { taskCardPath } from '@/lib/sections';
+import { compareRatio, type Ratio } from '@/lib/exact';
 import { formatDateTime } from '@/lib/time';
 import { DefinitionErrors } from '../DefinitionErrors';
 import { TaskInContest } from '../contest/TaskEntry';
@@ -16,6 +17,7 @@ import {
   inputTitle,
   readSettings,
   taskPath,
+  useTaskWorth,
   useTestFolders,
   useWorkflowForm,
   type GroupFolder,
@@ -63,6 +65,7 @@ function readiness(
   form: WorkflowForm | null,
   settings: string | null,
   folders: GroupFolder[],
+  worth: Ratio | null,
 ): Item[] {
   // The forge says whether the statement saved is written: not blank, and not
   // the one a new task starts with (M57).
@@ -140,7 +143,7 @@ function readiness(
             ? 'Scoring: see the problems below'
             : total.num === 0n
               ? 'Scoring: no points, ranked on reported values'
-              : `Scoring: ${pointsWords(total)}`,
+              : `Scoring: ${pointsWords(total)}${worth !== null && compareRatio(worth, total) !== 0 ? ' here' : ''}`,
     },
   ];
 }
@@ -242,6 +245,7 @@ export function TaskStanding({
   const form = useWorkflowForm(place);
   const settings = useQuery({ ...fileQuery(place, 'task.yaml'), retry: false });
   const folders = useTestFolders(place);
+  const { worth } = useTaskWorth(place);
   const changes: FileChange[] | undefined = history.data;
   const last = changes?.[0];
 
@@ -267,6 +271,7 @@ export function TaskStanding({
                 form.isError ? null : (form.data ?? null),
                 settings.data?.encoding === 'utf-8' ? settings.data.content : null,
                 folders.data,
+                worth,
               )}
             />
           )}

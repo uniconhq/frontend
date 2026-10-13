@@ -64,11 +64,13 @@ function rowsChoice(rows: string): 'all' | 'own' | 'top' {
  * a board reads on the field that caused it. `disabled` shows them to
  * someone who may not change them. `reported` is what each published task
  * reports, which names the values a board may rank by (M58); null while it
- * is not known, when a value is typed by its key.
+ * is not known, when a value is typed by its key. A task is called by its
+ * label in `taskLabels`, its letter and title, or by its id where it has none.
  */
 export function BoardFields({
   boards,
   taskIds,
+  taskLabels = new Map(),
   held = null,
   reported = null,
   refused,
@@ -77,6 +79,7 @@ export function BoardFields({
 }: {
   boards: BoardValues[];
   taskIds: string[];
+  taskLabels?: ReadonlyMap<string, string>;
   /** The published tasks' groups whose results come out once their task closes, when known. */
   held?: HeldGroup[] | null;
   /** The values each published task reports, when known. */
@@ -104,6 +107,7 @@ export function BoardFields({
               board={board}
               index={index}
               taskIds={taskIds}
+              taskLabels={taskLabels}
               held={held}
               values={reported === null ? null : rankableValues(reported, board.tasks)}
               refusals={boardRefusals(refused, index)}
@@ -151,6 +155,7 @@ function BoardEntry({
   board,
   index,
   taskIds,
+  taskLabels,
   held,
   values,
   refusals,
@@ -161,6 +166,7 @@ function BoardEntry({
   board: BoardValues;
   index: number;
   taskIds: string[];
+  taskLabels: ReadonlyMap<string, string>;
   held: HeldGroup[] | null;
   /** The values the board may rank by, or null while not known. */
   values: ValueMeaning[] | null;
@@ -332,7 +338,7 @@ function BoardEntry({
               shownTasks.map((task) => (
                 <Checkbox
                   key={task}
-                  label={task}
+                  label={taskLabels.get(task) ?? task}
                   checked={board.tasks?.includes(task) ?? false}
                   onChange={(covered) =>
                     onChange({
@@ -368,6 +374,7 @@ function BoardEntry({
                   of={title}
                   value={key}
                   options={kindOptions(rows, at)}
+                  rows={rows}
                   values={values}
                   last={at === rows.length - 1}
                   alone={rows.length === 1}
@@ -444,16 +451,29 @@ function BoardEntry({
 
 /**
  * The values a row's dropdown offers, by their titles, with the one the
- * file names kept first when no task reports it, so it stays in view.
+ * file names kept first when no task reports it, so it stays in view. A
+ * value another row already ranks by is greyed, saying which (M69), unless
+ * it is this row's own.
  */
 function valueChoices(
   values: ValueMeaning[],
   named: string,
-): { value: string; label: string }[] {
-  const offered = values.map((meaning) => ({
-    value: meaning.name,
-    label: valueOption(meaning),
-  }));
+  rows: OrderKeyValues[],
+  at: number,
+): { value: string; label: string; disabled?: boolean }[] {
+  const offered = values.map((meaning) => {
+    const label = valueOption(meaning);
+    const other = rows.findIndex(
+      (key, k) => k !== at && key.kind === 'value' && key.name.trim() === meaning.name,
+    );
+    return other < 0 || meaning.name === named.trim()
+      ? { value: meaning.name, label }
+      : {
+          value: meaning.name,
+          label: `${label}: way ${String(other + 1)} ranks by it already`,
+          disabled: true,
+        };
+  });
   const name = named.trim();
   return name === '' || values.some((meaning) => meaning.name === name)
     ? offered
@@ -465,6 +485,7 @@ function OrderKey({
   of,
   value,
   options,
+  rows,
   values,
   last,
   alone,
@@ -482,6 +503,8 @@ function OrderKey({
   value: OrderKeyValues;
   /** The ways this row may take. */
   options: { value: string; label: string }[];
+  /** Every row of the board's order, this one among them. */
+  rows: OrderKeyValues[];
   /** The values it may rank by, or null while not known. */
   values: ValueMeaning[] | null;
   last: boolean;
@@ -526,7 +549,7 @@ function OrderKey({
                 label="Which value"
                 labelHidden
                 value={value.name}
-                options={valueChoices(values, value.name)}
+                options={valueChoices(values, value.name, rows, at)}
                 onChange={(name) => onChange({ kind: 'value', name })}
                 placeholder="Choose a value"
                 disabled={disabled}

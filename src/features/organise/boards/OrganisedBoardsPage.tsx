@@ -19,9 +19,15 @@ import { ContestFile } from '../contest/ContestFile';
 import { useOpenedField } from '../contest/opened';
 import { viewFilePath } from '../contest/places';
 import { useHeldGroups, useReportedValues } from '../contest/published';
+import { useTaskTitles } from '../contest/task-entry';
 import { boardProblems } from '../forms/board-values';
 import { BoardFields } from '../forms/BoardFields';
-import { readContest, writeContest, type ContestValues } from '../forms/contest-values';
+import {
+  letterOf,
+  readContest,
+  writeContest,
+  type ContestValues,
+} from '../forms/contest-values';
 import type { FormProps } from '../forms/DefinitionFile';
 import { holdsAtContest } from '../roles';
 import { SectionPage } from '../SectionPage';
@@ -70,6 +76,11 @@ function BoardsForm({
   const [values, setValues] = useState<ContestValues>(read.values);
   const held = useHeldGroups(org, contest, values);
   const reported = useReportedValues(org, contest);
+  const taskIds = values.tasks.map((entry) => entry.id);
+  const titles = useTaskTitles(org, contest, taskIds);
+  const taskLabels = new Map(
+    taskIds.map((id, at) => [id, `${letterOf(at)} · ${titles.get(id) ?? id}`]),
+  );
   useOpenedField(true);
   const changed = JSON.stringify(values) !== JSON.stringify(read.values);
   const problems = values.boards.flatMap(boardProblems);
@@ -88,7 +99,8 @@ function BoardsForm({
     >
       <BoardFields
         boards={values.boards}
-        taskIds={values.tasks.map((entry) => entry.id)}
+        taskIds={taskIds}
+        taskLabels={taskLabels}
         held={held}
         reported={reported}
         refused={refused}

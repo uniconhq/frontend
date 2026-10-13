@@ -299,6 +299,68 @@ describe('the statement beside its preview', { timeout: 20_000 }, () => {
       ]);
     });
 
+    it('sends a larger picture through the upload door once, though the save asks before it publishes', async () => {
+      const { saves } = picturesBackend([
+        () =>
+          problem(409, 'confirmation_required', {
+            changes: [],
+            regrades: 0,
+            ...unchanged,
+            reading: ['The pictures and files beside the statement change.'],
+          }),
+      ]);
+      const slots: unknown[] = [];
+      server.use(
+        http.post(`${TASK_API}/organise/uploads`, async ({ request }) => {
+          slots.push(await request.json());
+          return HttpResponse.json(
+            {
+              id: `upload-${String(slots.length)}`,
+              url: null,
+              ready: true,
+              expires_at: '2026-10-07T12:00:00Z',
+            },
+            { status: 201 },
+          );
+        }),
+        http.post(`${TASK_API}/uploads/:upload/complete`, ({ params }) =>
+          HttpResponse.json({
+            id: String(params['upload']),
+            input: '',
+            filename: 'photo.png',
+            content_type: 'image/png',
+            size: 300 * 1024,
+            sha256: 'a'.repeat(64),
+            status: 'verified',
+          }),
+        ),
+      );
+      const user = userEvent.setup();
+      renderApp('/orgs/acme/contests/spring/tasks/sum/statement');
+      await screen.findByRole('textbox', { name: 'Statement source' });
+      await screen.findByRole('list', { name: 'Pictures' });
+
+      await addPicture(
+        user,
+        new File(['x'.repeat(300 * 1024)], 'photo.png', { type: 'image/png' }),
+      );
+      await user.click(screen.getByRole('button', { name: 'Save statement' }));
+      await user.click(
+        within(await screen.findByRole('alert')).getByRole('button', {
+          name: 'Publish the change',
+        }),
+      );
+
+      expect(
+        await screen.findByText('Saved and published as publication 4.'),
+      ).toBeVisible();
+      expect(slots).toHaveLength(1);
+      expect(saves.map((save) => save.changes[1])).toMatchObject([
+        { path: 'public/photo.png', upload: 'upload-1' },
+        { path: 'public/photo.png', upload: 'upload-1' },
+      ]);
+    });
+
     it('refuses in words a file that is not a picture the page can show, or is larger than 10 MB', async () => {
       const { saves } = picturesBackend();
       // A file dropped on the box is not held to what its picker offers.

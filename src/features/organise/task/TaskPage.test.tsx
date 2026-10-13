@@ -408,6 +408,39 @@ describe('what the task has, under its name', { timeout: 20_000 }, () => {
     );
   });
 
+  it('says the scoring’s points are here where the contest scales the task to a worth of its own', async () => {
+    readyBackend();
+    const file = (path: string, content: string) =>
+      HttpResponse.json({
+        path,
+        encoding: 'utf-8',
+        content,
+        token: `token-${path}`,
+        upload: null,
+        version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
+      });
+    server.use(
+      http.get(`${TASK_API}/files/task.yaml`, () =>
+        file(
+          'task.yaml',
+          'name: sum\nworkflow: unicon/classic@v2\ntest_groups:\n  small:\n    pass: 100\n',
+        ),
+      ),
+      http.get(`${CONTEST_API}/files/contest.yaml`, () =>
+        file(
+          'contest.yaml',
+          'name: Spring\ntasks:\n  - id: sort\n  - id: sum\n    worth: 70\n',
+        ),
+      ),
+    );
+    renderApp(TASK);
+
+    const row = await screen.findByRole('list', { name: 'What the task has' });
+    expect(
+      await within(row).findByRole('link', { name: 'Scoring: 100 points here' }),
+    ).toBeVisible();
+  });
+
   it('does not tick a statement the forge says is not written yet: blank, or the one a new task starts with (M57)', async () => {
     readyBackend({ ...publishedTask, head_statement_written: false });
     renderApp(TASK);

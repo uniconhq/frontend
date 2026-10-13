@@ -69,4 +69,13 @@ describe('what a save changes in a test group', () => {
     ]);
     expect(lines(group({ pass: '100' }), group({ pass: '100.0' }))).toEqual([]);
   });
+
+  it('says nothing when the share of tests that must pass is written out as all of them, as it was unset', () => {
+    expect(lines(group({ pass: '100' }), group({ pass: '100', passAt: '1' }))).toEqual(
+      [],
+    );
+    expect(lines(group({ pass: '100', passAt: '1' }), group({ pass: '100' }))).toEqual(
+      [],
+    );
+  });
 });

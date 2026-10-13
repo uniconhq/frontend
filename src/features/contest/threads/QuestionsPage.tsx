@@ -274,6 +274,9 @@ function Questions({
                   <QuestionThread
                     clarification={clarification}
                     asker={team ? 'Your team' : 'You'}
+                    taskTitle={
+                      tasks.find((task) => task.name === clarification.task)?.title
+                    }
                     announcementAt={(link) =>
                       openAnnouncement(link)
                         ? {

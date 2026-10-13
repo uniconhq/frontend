@@ -46,7 +46,8 @@ export function boardPointsText(
  * An entrant's points on a task as one number, as the contest page lists
  * it while the contest shows the entrant one leaderboard: that board's
  * count, "62 / 100", or, where it does not cover the task, that it is not
- * on the leaderboard. For anyone the contest counts no points for, such as
+ * on the leaderboard, and where it covers it for 0 points, that it counts
+ * none, since no column heading gives a bare "—" its meaning. For anyone the contest counts no points for, such as
  * someone not yet approved or a visitor, or an entrant the contest shows no
  * leaderboard, the worth alone, "100 points". Null on a task that gives no
  * points. With several leaderboards, each column reads `boardPointsText`.
@@ -60,5 +61,7 @@ export function taskPointsText(
   const [only] = points;
   if (only === undefined) return worthText(worth);
   if (!only.covers) return { score: 'Not on the leaderboard', pending: null };
+  if (compareDecimal(only.most ?? worth, '0') === 0)
+    return { score: 'Counts no points on the leaderboard', pending: null };
   return boardPointsText(only, worth, now);
 }

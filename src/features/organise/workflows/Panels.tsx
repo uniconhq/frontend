@@ -340,8 +340,8 @@ function Details({
         </li>
         {primitive.batch && (
           <li>
-            When it runs for each test, it runs once for all the tests together, rather
-            than once for each.
+            When it runs for each test, one start serves all the tests rather than one
+            start each, and each test keeps its own limits.
           </li>
         )}
         {primitive.network && <li>It can reach the network.</li>}
@@ -375,13 +375,13 @@ const RUNS = [
   {
     value: 'once',
     label: 'Once per submission',
-    description: 'It runs one time, before the tests, such as compiling the program.',
+    description: 'Before the tests, such as compiling the program.',
   },
   {
     value: 'each',
     label: 'Once for each test',
     description:
-      'It runs for every test, given that test’s files, such as running the program on the test’s input. It stands in the shaded band on the graph, “Runs once for each test”.',
+      'Given each test’s files, such as running the program on the test’s input.',
   },
 ];
 
