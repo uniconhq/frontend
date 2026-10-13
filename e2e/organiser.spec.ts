@@ -467,7 +467,7 @@ test('an organiser opens a contest from its checklist', async ({ page }) => {
   const status = page.getByRole('region', { name: 'Status' });
   await expect(status).toContainText('Only its organisers can see it.');
   const checklist = status.getByRole('list', { name: 'Before it opens' });
-  await expect(checklist).toContainText('A · sum: published');
+  await expect(checklist).toContainText('A · Sum: published');
   await status.getByRole('button', { name: 'Open the contest' }).click();
 
   const dialog = page.getByRole('dialog', { name: 'Open the contest?' });
