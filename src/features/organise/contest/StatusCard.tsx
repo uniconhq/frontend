@@ -86,7 +86,9 @@ type Check = {
  * How a task stands for opening the contest: published without errors, with
  * a statement written, or what stops it. A published statement that is blank
  * or still the one a new task starts with stops it too (M57), and its line
- * goes to the task's Statement card.
+ * goes to the task's Statement card. A last save with problems over a
+ * publication that would open is only a warning, as the forge's opening
+ * refusal does not check it either.
  */
 function taskCheck(
   org: string,
@@ -98,6 +100,15 @@ function taskCheck(
   const name = labelOf(standing, titles);
   const to = taskPath(org, contest, standing.task.name);
   if (draft && errors.length > 0) {
+    if (latest !== null && statement_written) {
+      return {
+        key: name,
+        ok: false,
+        warning: true,
+        text: `${name}: its last save has problems, so entrants get the publication before it. The contest can open with it.`,
+        to,
+      };
+    }
     return { key: name, ok: false, text: `${name}: its last save has problems`, to };
   }
   if (latest === null)
