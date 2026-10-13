@@ -107,8 +107,8 @@ export function justFinished(
  * such as `75`, a shown 0 as `0`; `—` while it is still being graded, when
  * it never will be, or while nothing is shown and no time is known; and
  * while some of its points wait for a reveal, when they are shown, such as
- * `shown at 14:00` while none are, or `30 so far, more shown at 14:00`. Exact numbers, rounded for reading as the opened submission
- * rounds them.
+ * `shown at 14:00` while none are, or `30 so far, more shown at 14:00`.
+ * Exact numbers, cut for reading as every page cuts points (R17).
  */
 export function pointsLine(
   grading: GradingResult | null,

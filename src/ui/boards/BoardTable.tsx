@@ -65,7 +65,8 @@ function NotInView({ board }: { board: Board }) {
 /**
  * One board as its reader is given it: rows in rank order, tied rows under
  * one rank, each with its number on every key it is ranked on and its cell
- * on every task. Numbers are rounded for reading, with more digits where
+ * on every task. Numbers are brought to a few decimals for reading, points
+ * cut and any other number rounded, with more digits where
  * two rows next to each other would show alike. The reader's own row also
  * says how many of its submissions wait for a result and which it counts,
  * each a link where `submissionTo` gives one, and is marked `ownLabel`.
