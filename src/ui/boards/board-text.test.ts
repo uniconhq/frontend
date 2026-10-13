@@ -2,12 +2,36 @@ import { describe, expect, it } from 'vitest';
 import type { BoardKey } from '@/api/types';
 import { formatExact } from '@/lib/exact';
 import { cell, icpc } from '@/test/boards';
-import { cellLines, cellPlaces, keyLabel, keyPlaces } from './board-text';
+import { cellLines, cellPlaces, keyLabel, keyNumber, keyPlaces } from './board-text';
 
-const POINTS: BoardKey = { by: 'points', better: 'higher', per_attempt: null };
-const PENALTY: BoardKey = { by: 'penalty', better: 'lower', per_attempt: 20 };
-const MINUTE: BoardKey = { by: 'penalty', better: 'lower', per_attempt: 0 };
-const TIME: BoardKey = { by: 'time_ms', better: 'lower', per_attempt: null };
+const POINTS: BoardKey = {
+  by: 'points',
+  better: 'higher',
+  per_attempt: null,
+  title: null,
+  unit: null,
+};
+const PENALTY: BoardKey = {
+  by: 'penalty',
+  better: 'lower',
+  per_attempt: 20,
+  title: null,
+  unit: null,
+};
+const MINUTE: BoardKey = {
+  by: 'penalty',
+  better: 'lower',
+  per_attempt: 0,
+  title: null,
+  unit: null,
+};
+const TIME: BoardKey = {
+  by: 'time_ms',
+  better: 'lower',
+  per_attempt: null,
+  title: null,
+  unit: null,
+};
 
 describe('a board key', () => {
   it('is named by what it ranks by, a free penalty by the minute submitted', () => {
@@ -16,6 +40,29 @@ describe('a board key', () => {
       'Penalty',
       'Submitted at minute',
       'time_ms',
+    ]);
+  });
+});
+
+describe('a value a board ranks by (M58)', () => {
+  const RUN_TIME: BoardKey = { ...TIME, title: 'Run time', unit: 'ms' };
+  const SCORE: BoardKey = { ...TIME, by: 'score', title: 'Score', unit: null };
+
+  it('is named by its title, its key only until it has one', () => {
+    expect([RUN_TIME, SCORE, TIME].map(keyLabel)).toEqual([
+      'Run time',
+      'Score',
+      'time_ms',
+    ]);
+  });
+
+  it('reads its number with its unit after it, in its column and in a cell', () => {
+    expect(keyNumber(RUN_TIME, '28', 2)).toBe('28 ms');
+    expect(keyNumber(POINTS, '28', 2)).toBe('28');
+    const fast = cell({ counting: true, numbers: { time_ms: '28', score: '0.5' } });
+    expect(cellLines([RUN_TIME, SCORE], fast, {})).toEqual([
+      '28 ms',
+      `${formatExact('0.5', 2)} Score`,
     ]);
   });
 });
@@ -35,6 +82,17 @@ describe('a cell', () => {
     expect(
       cellLines([POINTS, MINUTE], { ...counting, attempts: 0 }, { points: 2 }),
     ).toEqual(['1 point', 'minute 45']);
+  });
+
+  it('shows only the numbers a cell has, so a wrong answer with no time reads as its points', () => {
+    // #441: a counted submission with a test not accepted has no time.
+    expect(
+      cellLines(
+        [POINTS, TIME],
+        cell({ counting: true, numbers: { points: '50' } }),
+        {},
+      ),
+    ).toEqual(['50 points']);
   });
 
   it('shows how often a cell that counts nothing was tried, or a dash', () => {
@@ -64,5 +122,27 @@ describe('the decimals a board is shown to', () => {
     });
     expect(keyPlaces(board)).toEqual([3]);
     expect(cellPlaces(board, 'sum')).toEqual({ points: 3 });
+  });
+
+  it('cuts points, as every page shows them, and tells rows apart as they are cut (R17)', () => {
+    expect(keyNumber(POINTS, '36.666666', 2)).toBe(formatExact('36.66', 2));
+    expect(
+      cellLines([POINTS], cell({ counting: true, numbers: { points: '36.666666' } }), {
+        points: 2,
+      }),
+    ).toEqual([`${formatExact('36.66', 2)} points`]);
+    // Rounded to two, both rows would read 36.67; cut, they read apart.
+    const board = icpc({
+      keys: [POINTS],
+      rows: icpc().rows.map((found, index) => ({
+        ...found,
+        keys: [['36.674', '36.666', '10'][index] ?? null],
+        cells: {
+          sum: cell({ numbers: { points: ['36.674', '36.666', '10'][index] ?? '0' } }),
+        },
+      })),
+    });
+    expect(keyPlaces(board)).toEqual([2]);
+    expect(cellPlaces(board, 'sum')).toEqual({ points: 2 });
   });
 });

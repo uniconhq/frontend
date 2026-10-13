@@ -5,7 +5,13 @@ import { http, HttpResponse } from 'msw';
 import type { SaveRequest, Upload } from '@/api/types';
 import { renderApp } from '@/test/render';
 import { afterAnswers, problem, server, signedIn, someone } from '@/test/server';
-import { TASK_API, publicationList, repoFiles, taskState } from '@/test/organiser';
+import {
+  TASK_API,
+  publicationList,
+  repoFiles,
+  taskState,
+  unchanged,
+} from '@/test/organiser';
 
 /** The task's page, opened at its Statement card. */
 const STATEMENT = '/orgs/acme/contests/spring/tasks/sum?card=statement';
@@ -79,6 +85,7 @@ function uploadRoutes({
         changes: [],
         notes: [],
         regraded: 0,
+        effect: unchanged,
       });
     }),
   ];
@@ -101,11 +108,7 @@ const uploadedStatement = http.get(`${TASK_API}/files/:path`, ({ params }) =>
 
 /** The uploaded statement on its card, its Upload again opened. */
 async function openUpload() {
-  const shown = await screen.findByRole(
-    'region',
-    { name: 'Uploaded statement.md' },
-    { timeout: 5000 },
-  );
+  const shown = await screen.findByRole('region', { name: 'Uploaded statement.md' });
   await userEvent.click(within(shown).getByRole('button', { name: 'Upload again' }));
   return within(shown).getByRole('region', { name: 'Upload statement.md again' });
 }
@@ -123,11 +126,7 @@ describe('uploading a file of a task again', { timeout: 20_000 }, () => {
     server.use(signedIn, taskState, publicationList, uploadedStatement, ...repoFiles);
     renderApp(STATEMENT);
 
-    const shown = await screen.findByRole(
-      'region',
-      { name: 'Uploaded statement.md' },
-      { timeout: 5000 },
-    );
+    const shown = await screen.findByRole('region', { name: 'Uploaded statement.md' });
     expect(shown).toHaveTextContent('300 MB');
     expect(shown).toHaveTextContent(DIGEST);
     expect(within(shown).queryByRole('textbox')).toBeNull();
@@ -257,6 +256,7 @@ describe('uploading a file of a task again', { timeout: 20_000 }, () => {
           changes: [],
           notes: [],
           regraded: 0,
+          effect: unchanged,
         });
       }),
       http.get(`${TASK_API}/files/:path`, ({ params }) =>
@@ -298,7 +298,7 @@ describe('uploading a file of a task again', { timeout: 20_000 }, () => {
       await within(row).findByText(/^Now: 2 KB, saved by alice on /),
     ).toBeVisible();
     await userEvent.click(
-      within(panel).getByRole('button', { name: 'Save mine over theirs' }),
+      within(panel).getByRole('button', { name: 'Save yours over theirs' }),
     );
     const warning = await screen.findByRole('dialog', {
       name: 'Save yours over theirs?',
@@ -307,7 +307,7 @@ describe('uploading a file of a task again', { timeout: 20_000 }, () => {
       'This throws away what the other person saved in Statement.',
     );
     await userEvent.click(
-      within(warning).getByRole('button', { name: 'Save mine over theirs' }),
+      within(warning).getByRole('button', { name: 'Save yours over theirs' }),
     );
 
     expect(
@@ -353,7 +353,10 @@ describe('uploading a file of a task again', { timeout: 20_000 }, () => {
         const body = (await request.json()) as SaveRequest;
         routes.seen.saves.push(body);
         if (!body.confirm)
-          return problem(409, 'confirmation_required', { changes: ['the statement'] });
+          return problem(409, 'confirmation_required', {
+            changes: ['the statement'],
+            asked: 'b1c2d3e:12',
+          });
         return HttpResponse.json({
           number: 5,
           version: 'abc1234def',
@@ -361,6 +364,7 @@ describe('uploading a file of a task again', { timeout: 20_000 }, () => {
           changes: ['the statement'],
           notes: [],
           regraded: 0,
+          effect: unchanged,
         });
       }),
     );
@@ -368,9 +372,6 @@ describe('uploading a file of a task again', { timeout: 20_000 }, () => {
 
     const unsaved = await within(panel).findByText(
       /has been uploaded but is not saved into the task\. Leaving this page loses it\./,
-      {},
-      // Reading a file to send it takes a while beside a full run of the suite.
-      { timeout: 5000 },
     );
     expect(unsaved).toHaveTextContent('statement.md, 4 B,');
     expect(
@@ -396,6 +397,7 @@ describe('uploading a file of a task again', { timeout: 20_000 }, () => {
         },
       ],
       confirm: true,
+      asked: 'b1c2d3e:12',
       keep_as_draft: false,
     });
   });
@@ -495,11 +497,7 @@ describe('uploading a file of a task again', { timeout: 20_000 }, () => {
     );
     renderApp(STATEMENT);
 
-    const shown = await screen.findByRole(
-      'region',
-      { name: 'Uploaded statement.md' },
-      { timeout: 5000 },
-    );
+    const shown = await screen.findByRole('region', { name: 'Uploaded statement.md' });
     expect(within(shown).queryByRole('button', { name: 'Upload again' })).toBeNull();
   });
 });

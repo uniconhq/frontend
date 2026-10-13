@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { useSearchParams } from 'react-router';
 import type { DeclaredField } from '@/api/types';
-import { ratioOf, type Ratio } from '@/lib/exact';
+import { compareRatio, ratioOf, type Ratio } from '@/lib/exact';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
+import { InlineField } from '@/ui/InlineField';
 import { RadioGroup } from '@/ui/RadioGroup';
 import { Select } from '@/ui/Select';
 import { TextInput } from '@/ui/TextInput';
@@ -11,13 +12,14 @@ import { FieldBox } from '../contest/ContestFile';
 import { FIELD_PARAM, ITEM_PARAM } from '../contest/places';
 import { fractionOf, percentOf } from '../contest/percent';
 import { NumberField } from '../forms/fields';
+import { numberProblem } from '../forms/yaml-doc';
 import type { GroupValues, TaskValues } from '../forms/task-values';
-import type { ReportEntry } from '../workflows/model';
 import { BuildCard, CardPart } from './BuildCard';
-import type { GroupFolder, TaskPlace } from './build-data';
+import type { GroupFolder, ReportedValue, TaskPlace } from './build-data';
 import {
   groupSentence,
   groupWeight,
+  mixWords,
   pointsOf,
   pointsWords,
   readsWeights,
@@ -26,12 +28,14 @@ import {
   RULES,
   scaled,
   shareProblem,
+  showGreyedWords,
   showRefusal,
   SHOWS,
   taskWeight,
   totalSentence,
   withPoints,
   withRule,
+  type CreditKind,
   type Rule,
 } from './scoring';
 import type { Staged } from './staged';
@@ -56,8 +60,11 @@ const at = (text: string | null | undefined) =>
  * Whether a reported value can be what a test earns, and why not, short
  * enough to follow the value's name in the list of values.
  */
-function creditRefusal(entry: ReportEntry, kind: 'value' | 'relative'): string | null {
-  if (entry.fold === null) return 'not reported for each test';
+function creditRefusal(
+  entry: ReportedValue,
+  kind: 'value' | 'relative',
+): string | null {
+  if (!entry.perTest) return 'not reported for each test';
   const least = entry.atLeast === null ? null : at(entry.atLeast.text);
   if (least === null || least.num < 0n) return 'not promised to be 0 or more';
   if (kind === 'value') {
@@ -67,6 +74,14 @@ function creditRefusal(entry: ReportEntry, kind: 'value' | 'relative'): string |
     return null;
   }
   return entry.better === null ? 'says neither higher nor lower is better' : null;
+}
+
+/**
+ * A reported value as a page names it: its title, "Run time", or its key
+ * until the workflow's report gives it one (M58).
+ */
+function valueName(entry: ReportedValue): string {
+  return entry.title ?? entry.name;
 }
 
 /** How a test can earn, each with an example of what choosing it means. */
@@ -85,17 +100,36 @@ const CREDITS = [
   },
   {
     value: 'relative',
-    label: 'Its result against the best anyone reached',
+    label: 'Its result against the best any entrant reached',
     description:
-      'For optimisation: where higher is better, reaching 80 on a test where the best anyone reached is 100 earns 80% of it. Its points move as others do better.',
+      'For optimisation. Where higher is better, reaching 80 on a test where the best any entrant reached is 100 earns 80% of it; where lower is better, as with run time, the fastest earns all of it and one twice as slow earns half. Its points move as others do better.',
   },
 ];
 
 /**
+ * Why the workflow offers nothing a test can earn by, said in its own line
+ * rather than as a list of values all greyed out (M58), or null when it
+ * offers one.
+ */
+function nothingToEarnBy(
+  report: ReportedValue[] | null,
+  kind: 'value' | 'relative',
+): string | null {
+  if (report === null || report.some((entry) => creditRefusal(entry, kind) === null)) {
+    return null;
+  }
+  return kind === 'value'
+    ? 'This workflow’s checker only says right or wrong, so it gives no score from 0 to 1.'
+    : 'This workflow reports no number for each test that is better higher or lower, so there is no best to measure against.';
+}
+
+/**
  * How a test earns, in words: 1 when it passes; or a score the workflow
  * reports, from 0 to 1, such as a checker's; or its value against the best
- * any entrant reached on it. A reported value that cannot be one is listed
- * greyed out, with why in its own name.
+ * any entrant reached on it. A way the workflow offers nothing for is
+ * greyed out with why under it; a reported value that cannot be one is
+ * listed greyed out, with why in its own name, and one against the best
+ * says which way is better.
  */
 function CreditPart({
   credit,
@@ -104,7 +138,7 @@ function CreditPart({
   disabled,
 }: {
   credit: TaskValues['credit'];
-  report: ReportEntry[] | null;
+  report: ReportedValue[] | null;
   onChange: (credit: TaskValues['credit']) => void;
   disabled: boolean;
 }) {
@@ -114,11 +148,16 @@ function CreditPart({
       ? []
       : report.map((entry) => ({
           value: entry.name,
-          label: entry.name,
+          label:
+            kind === 'relative' &&
+            (entry.better === 'lower' || entry.better === 'higher')
+              ? `${valueName(entry)} (${entry.better} is better)`
+              : valueName(entry),
           reason: creditRefusal(entry, kind),
         }));
   const chosenRefusal =
     options.find((option) => option.value === credit.name)?.reason ?? null;
+  const nothing = kind === 'none' ? null : nothingToEarnBy(report, kind);
   return (
     <CardPart
       title="How a test earns"
@@ -129,7 +168,18 @@ function CreditPart({
           <RadioGroup
             label="A test earns"
             value={kind}
-            options={CREDITS}
+            options={CREDITS.map((option) => {
+              const why =
+                option.value === 'value' || option.value === 'relative'
+                  ? nothingToEarnBy(report, option.value)
+                  : null;
+              return {
+                ...option,
+                disabled: why !== null && option.value !== kind,
+                reason: why,
+              };
+            })}
+            error={nothing === null ? undefined : `${nothing} Choose another way.`}
             onChange={(next) =>
               onChange({
                 ...credit,
@@ -139,6 +189,7 @@ function CreditPart({
             disabled={disabled}
           />
           {kind !== 'none' &&
+            nothing === null &&
             (report === null ? (
               <div className={classes.single}>
                 <TextInput
@@ -162,9 +213,6 @@ function CreditPart({
                   disabled: option.reason !== null && option.value !== credit.name,
                 }))}
                 placeholder="Choose one"
-                description={
-                  options.length === 0 ? 'The workflow reports no value.' : undefined
-                }
                 error={
                   chosenRefusal === null
                     ? undefined
@@ -180,6 +228,26 @@ function CreditPart({
   );
 }
 
+/**
+ * A share typed as a percentage, and back as the fraction the settings hold:
+ * the percentage as typed, so a point or a trailing zero holds while the next
+ * digit is typed, or the settings' fraction when they hold another.
+ */
+function usePercent(
+  value: string,
+  onChange: (fraction: string) => void,
+): [string, (percent: string) => void] {
+  const [typed, setTyped] = useState(() => percentOf(value));
+  const shown = fractionOf(typed) === value ? typed : percentOf(value);
+  return [
+    shown,
+    (percent) => {
+      setTyped(percent);
+      onChange(fractionOf(percent));
+    },
+  ];
+}
+
 /** A share as a percentage typed in, and back as the fraction the settings hold. */
 function ShareField({
   label,
@@ -192,18 +260,12 @@ function ShareField({
   onChange: (fraction: string) => void;
   disabled: boolean;
 }) {
-  // The percentage as typed, so a point or a trailing zero holds while the
-  // next digit is typed; the settings' fraction when they hold another.
-  const [typed, setTyped] = useState(() => percentOf(value));
-  const shown = fractionOf(typed) === value ? typed : percentOf(value);
+  const [shown, setShown] = usePercent(value, onChange);
   return (
     <NumberField
       label={label}
       value={shown}
-      onChange={(percent) => {
-        setTyped(percent);
-        onChange(fractionOf(percent));
-      }}
+      onChange={setShown}
       placeholder="100"
       hint="A percentage, such as 80."
       error={shareProblem(value)}
@@ -212,42 +274,126 @@ function ShareField({
   );
 }
 
-/** The three rule weights and the threshold as they are, for a group of another mix. */
-function AdvancedFields({
+/** One part of a mix: its line with its boxes in it, and what is wrong with them under it. */
+function MixLine({
+  problems,
+  children,
+}: {
+  problems: (string | null | undefined)[];
+  children: ReactNode;
+}) {
+  const found = problems.filter(
+    (problem): problem is string => typeof problem === 'string',
+  );
+  return (
+    <li className={classes.mixPart}>
+      <div className={classes.mixLine}>{children}</div>
+      {found.map((problem) => (
+        <span key={problem} className={classes.mixProblem}>
+          {problem}
+        </span>
+      ))}
+    </li>
+  );
+}
+
+/**
+ * A group's hand-set mix (M59): one line per part, in the simple rules' words,
+ * each with its points box inside it and the pass bar inside the third; the
+ * lowest test score only where a test can earn part of its points, as the
+ * simple rule offers it, or while it is set, saying why it cannot stay; then
+ * what the parts add up to, "here" where the contest scales the task's points.
+ */
+function MixFields({
   group,
+  credit,
+  here,
   onChange,
   disabled,
 }: {
   group: GroupValues;
+  credit: CreditKind;
+  /** Whether the contest's worth for the task differs from its groups' total. */
+  here: boolean;
   onChange: (change: Partial<GroupValues>) => void;
   disabled: boolean;
 }) {
+  const words = mixWords(credit, group.weights.length > 0);
+  const [share, setShare] = usePercent(group.passAt, (passAt) => onChange({ passAt }));
+  const worst = credit !== 'none' || group.worst.trim() !== '';
+  const box = (
+    label: string,
+    value: string,
+    change: (value: string) => void,
+    problem: string | undefined,
+    placeholder?: string,
+  ) => (
+    <InlineField
+      label={label}
+      value={value}
+      onChange={change}
+      placeholder={placeholder}
+      invalid={problem !== undefined}
+      inputMode="decimal"
+      disabled={disabled}
+    />
+  );
   return (
-    <div className={classes.grid}>
-      <NumberField
-        label="Points by the share of tests passed"
-        value={group.each}
-        onChange={(each) => onChange({ each })}
-        disabled={disabled}
-      />
-      <NumberField
-        label="Points by the worst test"
-        value={group.worst}
-        onChange={(worst) => onChange({ worst })}
-        disabled={disabled}
-      />
-      <NumberField
-        label="Points when enough tests pass"
-        value={group.pass}
-        onChange={(pass) => onChange({ pass })}
-        disabled={disabled}
-      />
-      <ShareField
-        label="Share of tests that must pass (%)"
-        value={group.passAt}
-        onChange={(passAt) => onChange({ passAt })}
-        disabled={disabled}
-      />
+    <div className={classes.mix}>
+      <ul className={classes.mixParts} aria-label="The parts of the mix">
+        <MixLine problems={[numberProblem(group.each)]}>
+          {box(
+            'Points shared among the tests',
+            group.each,
+            (each) => onChange({ each }),
+            numberProblem(group.each),
+          )}
+          <span>points {words.each}</span>
+        </MixLine>
+        {worst && (
+          <MixLine
+            problems={[numberProblem(group.worst), ruleRefusal('worst', credit)]}
+          >
+            {box(
+              'Points times the lowest test score',
+              group.worst,
+              (value) => onChange({ worst: value }),
+              numberProblem(group.worst) ?? ruleRefusal('worst', credit) ?? undefined,
+            )}
+            <span>points {words.worst}</span>
+          </MixLine>
+        )}
+        <MixLine
+          problems={[
+            numberProblem(group.pass),
+            numberProblem(share),
+            shareProblem(group.passAt),
+          ]}
+        >
+          {box(
+            'Points when enough tests pass',
+            group.pass,
+            (pass) => onChange({ pass }),
+            numberProblem(group.pass),
+          )}
+          <span>points {words.passBefore}</span>
+          {box(
+            'Share of tests that must pass (%)',
+            share,
+            setShare,
+            numberProblem(share) ?? shareProblem(group.passAt),
+            '100',
+          )}
+          <span>%{words.passAfter}</span>
+        </MixLine>
+      </ul>
+      {/* With no points yet, the group's sentence says its tests are for practice. */}
+      {groupWeight(group).num !== 0n && (
+        <BodyText tone="secondary">
+          The parts add up: up to {pointsWords(groupWeight(group))}
+          {here && ' here'}.
+        </BodyText>
+      )}
     </div>
   );
 }
@@ -320,12 +466,23 @@ function GroupItem({
   const strays = group.weights.filter(
     (row) => !saved.includes(row.test) && !added.some((test) => test.test === row.test),
   );
+  // Weights show on each row once asked for, and stay while any differs
+  // from 1, the weight a test has by default (M67).
+  const [weighing, setWeighing] = useState(false);
+  const differs = group.weights.some((row) => {
+    const weight = ratioOf(row.weight);
+    return weight === null || compareRatio(weight, { num: 1n, den: 1n }) !== 0;
+  });
+  const weighed = readsWeights(group) && (weighing || differs);
   const rule: Rule = advanced ? 'advanced' : held ? picked : read;
   const refusal = ruleRefusal('worst', credit.kind);
   const showProblem = showRefusal(group.show, group, credit.kind);
-  const verdictRefusal = showRefusal('verdict', group, credit.kind);
+  const greyedWords = showGreyedWords(group, credit.kind);
   const required = graded && !group.read;
-  const points = pointsWords(scaled(groupWeight(group), total, worth));
+  const unchosen = required && group.show === '';
+  const shown = group.show === '' && !required ? 'always' : group.show;
+  const most = scaled(groupWeight(group), total, worth);
+  const points = most.num === 0n ? 'no points' : `up to ${pointsWords(most)}`;
   const pick = (next: string) => {
     if (next === 'advanced') {
       onAdvanced(true);
@@ -347,7 +504,7 @@ function GroupItem({
       <div className={classes.itemHead}>
         <h4 className={classes.itemTitle}>{group.name}</h4>
         <BodyText tone="secondary">
-          {count === 1 ? '1 test' : `${String(count)} tests`} · up to {points}
+          {count === 1 ? '1 test' : `${String(count)} tests`} · {points}
           {!group.read && ' · new'}
         </BodyText>
       </div>
@@ -368,7 +525,10 @@ function GroupItem({
                   disabled: greyed,
                 };
               }),
-              { value: 'advanced', label: 'Another mix of these, set by hand' },
+              {
+                value: 'advanced',
+                label: 'A mix of these, each part with its own points',
+              },
             ]}
             error={rule === 'worst' && refusal !== null ? refusal : undefined}
             onChange={pick}
@@ -400,30 +560,40 @@ function GroupItem({
               )}
             </div>
           )}
+          {rule === 'advanced' && (
+            <MixFields
+              group={group}
+              credit={credit.kind}
+              here={worth !== null && compareRatio(worth, total) !== 0}
+              onChange={onChange}
+              disabled={disabled}
+            />
+          )}
         </div>
       </FieldBox>
-      {rule === 'advanced' && (
-        <AdvancedFields group={group} onChange={onChange} disabled={disabled} />
-      )}
       <p className={classes.sentence}>
         {groupSentence(group, { total, worth, credit: credit.kind, tests: count })}
       </p>
       <FieldBox name="show">
-        <RadioGroup
+        <Select
           label="When entrants see results"
-          value={group.show === '' && !required ? 'always' : group.show}
-          options={SHOWS.map((option) => ({
-            ...option,
-            disabled:
+          value={shown}
+          placeholder={unchosen ? 'Choose when' : undefined}
+          options={SHOWS.map((option) => {
+            const greyed =
               option.value === 'verdict' &&
-              verdictRefusal !== null &&
-              group.show !== 'verdict',
-            reason: option.value === 'verdict' ? verdictRefusal : null,
-          }))}
+              greyedWords !== null &&
+              group.show !== 'verdict';
+            return {
+              value: option.value,
+              label: greyed ? `${option.label} ${greyedWords}` : option.label,
+              disabled: greyed,
+            };
+          })}
           description={
-            required && group.show === ''
+            unchosen
               ? 'The task has graded submissions, so a test group added now must say when its results are shown.'
-              : undefined
+              : SHOWS.find((option) => option.value === shown)?.description
           }
           error={showProblem ?? undefined}
           required={required}
@@ -441,7 +611,7 @@ function GroupItem({
           saved={saved}
           staged={added}
           removed={removed}
-          weights={readsWeights(group)}
+          weights={weighed}
           onWeight={(test, weight) => {
             const rows = group.weights.filter((row) => row.test !== test);
             onChange({
@@ -458,6 +628,19 @@ function GroupItem({
         {count > 0 && (
           <Button size="xs" variant="secondary" onClick={() => setOpen(!open)}>
             {open ? 'Hide its tests' : `Show its ${String(count)} tests`}
+          </Button>
+        )}
+        {!disabled && count > 0 && readsWeights(group) && !weighed && (
+          <Button
+            size="xs"
+            variant="secondary"
+            onClick={() => {
+              setWeighing(true);
+              setOpen(true);
+            }}
+            label={`Weigh the tests of ${group.name} differently`}
+          >
+            Weigh tests differently
           </Button>
         )}
         {!disabled && (
@@ -540,7 +723,7 @@ export function TestsCard({
   values: TaskValues;
   /** The fields each test has, from the workflow, or null when it cannot be read. */
   fields: DeclaredField[] | null;
-  report: ReportEntry[] | null;
+  report: ReportedValue[] | null;
   folders: GroupFolder[];
   staged: Staged;
   /** What the task's contest makes it worth, or null when its groups' total. */

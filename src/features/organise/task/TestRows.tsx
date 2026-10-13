@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { Fragment, useEffect, useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { queryView } from '@/api/query';
 import type { DeclaredField, TreeEntry } from '@/api/types';
@@ -18,14 +18,99 @@ import { TestView } from './TestView';
 import shared from '../organise.module.css';
 import classes from './task.module.css';
 
-/** One part of a test as its row names it: its name and size, or that it is a folder. */
-type Part = { part: string; size: number | null; folder: boolean };
+/**
+ * One part of a test as its row names it: its name, its size, whether it is
+ * a folder, and `start`, how a small text file begins, as the forge's
+ * listing gives it for a saved file and the page reads it from a staged
+ * one's own bytes (M67): text, null for a file that is not text or is too
+ * large to give, undefined while it is not known yet.
+ */
+type Part = {
+  part: string;
+  size: number | null;
+  folder: boolean;
+  start?: string | null;
+};
+
+/** Past this a file's size says something on its row: "input 12.4 MB". */
+const LARGE = 1024;
+
+/** The longest start a row shows of a file, cut short with "…" past it or its first line. */
+const START = 40;
+
+/** How many characters of a file's start the forge's listing gives, and a staged file's read keeps. */
+const START_CHARS = 80;
 
 /**
- * A test's parts in the workflow's order, each with its size: "input 4 B,
- * answer 2 B". Its values (`test.yaml`) show once the test is opened.
+ * How a file begins, as the forge's listing says it of a saved file: its
+ * first characters when it is text, valid UTF-8 with no NUL, an empty file
+ * giving an empty start; null when it is not text.
  */
-function partsText(parts: Part[], order: string[]): string {
+function startOf(bytes: Uint8Array): string | null {
+  if (bytes.includes(0)) return null;
+  try {
+    return [...new TextDecoder('utf-8', { fatal: true }).decode(bytes)]
+      .slice(0, START_CHARS)
+      .join('');
+  } catch {
+    return null;
+  }
+}
+
+/** A file's first line, cut short past `START` characters, "…" marking the cut. */
+function startText(start: string): string {
+  const [line = ''] = start.split(/\r?\n/);
+  const cut = line.length > START || start.trimEnd().includes('\n');
+  return `${line.slice(0, START)}${cut ? '…' : ''}`;
+}
+
+/** Whether a part shows how it begins rather than its name: a small text file. */
+function showsStart(each: Part): boolean {
+  return (
+    !each.folder &&
+    each.size !== 0 &&
+    typeof each.start === 'string' &&
+    (each.size === null || each.size <= LARGE)
+  );
+}
+
+/**
+ * One part on a test's row: a small text file's start, "`1 2`", after its
+ * name where `named` ("expected `ok`"); its size only where it says
+ * something, a file over 1 KB or one that is not text, "input 12.4 MB"; an
+ * empty file, "answer is empty", in the warning colour; otherwise its name
+ * alone.
+ */
+function partPiece(each: Part, named: boolean): ReactNode {
+  if (each.folder) return `${each.part}, a folder`;
+  if (each.size === 0)
+    return <span className={classes.emptyPart}>{each.part} is empty</span>;
+  if (showsStart(each) && typeof each.start === 'string') {
+    const start = <code className={classes.partStart}>{startText(each.start)}</code>;
+    return named ? (
+      <>
+        {each.part} {start}
+      </>
+    ) : (
+      start
+    );
+  }
+  if (each.size !== null && (each.size > LARGE || each.start === null)) {
+    return `${each.part} ${formatSize(each.size)}`;
+  }
+  return each.part;
+}
+
+/**
+ * A test's parts in the workflow's order, each as `partPiece` says. The
+ * arrow stands only between what goes in and what is expected, the first
+ * two parts the workflow names, once either shows its start: "`1 2` →
+ * `3`". Every other part follows after a comma under its own name, "`1 2`
+ * → `3`, expected 10 MB"; with no start shown, or the first two not both
+ * there, each part is named: "input, answer". Its values (`test.yaml`) show
+ * once the test is opened.
+ */
+function partsText(parts: Part[], order: string[]): ReactNode {
   const rank = (part: string) => {
     const at = order.indexOf(part);
     return at < 0 ? order.length : at;
@@ -34,15 +119,19 @@ function partsText(parts: Part[], order: string[]): string {
     .filter((each) => each.part !== 'test')
     .sort((a, b) => rank(a.part) - rank(b.part) || a.part.localeCompare(b.part));
   if (shown.length === 0) return 'no files';
-  return shown
-    .map((each) =>
-      each.folder
-        ? `${each.part}, a folder`
-        : each.size === null
-          ? each.part
-          : `${each.part} ${formatSize(each.size)}`,
-    )
-    .join(', ');
+  const [goesIn, expected] = shown;
+  const arrow =
+    goesIn !== undefined &&
+    expected !== undefined &&
+    goesIn.part === order[0] &&
+    expected.part === order[1] &&
+    (showsStart(goesIn) || showsStart(expected));
+  return shown.map((each, at) => (
+    <Fragment key={each.part}>
+      {at === 1 && arrow ? ' → ' : at > 0 && ', '}
+      {partPiece(each, !(arrow && at < 2))}
+    </Fragment>
+  ));
 }
 
 /** The parts a test holds now, read when its row is shown. */
@@ -65,6 +154,7 @@ function SavedParts({
               part: partOf(lastPart(entry.path)),
               size: entry.upload?.size ?? entry.size,
               folder: entry.kind === 'directory',
+              start: entry.start,
             })),
             order,
           )}
@@ -74,27 +164,64 @@ function SavedParts({
   );
 }
 
-/** What a staged test writes, as a row shows it: its parts, a folder's files together. */
-function stagedText(test: StagedTest, order: string[]): string {
+/**
+ * How each small file a staged test writes begins, read from its own bytes,
+ * by the part it fills: so a row about to be saved reads as a saved one
+ * does. A file over 1 KB, or a folder's, is not read. Empty until read.
+ */
+function useStagedStarts(test: StagedTest): ReadonlyMap<string, string | null> {
+  const [starts, setStarts] = useState<ReadonlyMap<string, string | null>>(new Map());
+  useEffect(() => {
+    let live = true;
+    const small = test.files.filter(
+      (file) =>
+        !file.entry.includes('/') &&
+        file.source.size <= LARGE &&
+        test.files.filter((other) => other.field === file.field).length === 1,
+    );
+    void Promise.all(
+      small.map(async (file): Promise<[string, string | null]> => {
+        try {
+          const blob = await file.source.read();
+          return [file.field, startOf(new Uint8Array(await blob.arrayBuffer()))];
+        } catch {
+          return [file.field, null];
+        }
+      }),
+    ).then((read) => {
+      if (live) setStarts(new Map(read));
+    });
+    return () => {
+      live = false;
+    };
+  }, [test]);
+  return starts;
+}
+
+/** What a staged test writes, as a row shows it: its parts, a folder's files together, each small file's start. */
+function StagedParts({ test, order }: { test: StagedTest; order: string[] }) {
+  const starts = useStagedStarts(test);
   const parts = new Map<string, Part>();
   for (const file of test.files) {
     const before = parts.get(file.field);
+    const folder = file.entry.includes('/') || (before?.folder ?? false);
     parts.set(file.field, {
       part: file.field,
       size: (before?.size ?? 0) + file.source.size,
-      folder: file.entry.includes('/') || (before?.folder ?? false),
+      folder,
+      start: folder ? undefined : starts.get(file.field),
     });
   }
-  return partsText([...parts.values()], order);
+  return <>{partsText([...parts.values()], order)}</>;
 }
 
 const WEIGHT_INFO =
   'How much this test counts against the others. 1 by default; a test of weight 2 counts twice.';
 
 /**
- * A test group's tests, a row each in natural order: "Test 1 · input 4 B,
- * answer 2 B", its parts in the workflow's order; its weight where the
- * group's rule reads weights, with what a weight does behind an ⓘ; and
+ * A test group's tests, a row each in natural order: "Test 1 · input,
+ * answer", its parts in the workflow's order (`partsText`); its weight where
+ * `weights` says, with what a weight does behind an ⓘ; and
  * Replace and Remove. A test added, replaced or taken out says so on its row
  * until the save, with Undo. Its name opens it in place, below its row, to
  * read what it holds (`TestView`).
@@ -123,7 +250,7 @@ export function TestRows({
   staged: StagedTest[];
   /** The tests the save takes out of this group. */
   removed: string[];
-  /** Whether the group's rule reads test weights. */
+  /** Whether each row has a weight box: the group's rule reads weights, and they were asked for or one differs from 1. */
   weights: boolean;
   onWeight: (test: string, weight: string) => void;
   onReplace: (test: string) => void;
@@ -175,7 +302,7 @@ export function TestRows({
             <span className={classes.testFiles}>
               ·{' '}
               {change !== undefined ? (
-                stagedText(change, order)
+                <StagedParts test={change} order={order} />
               ) : (
                 <SavedParts
                   place={place}

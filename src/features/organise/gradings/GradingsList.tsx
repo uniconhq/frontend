@@ -130,7 +130,11 @@ export function GradingsList({
         </div>
       )}
       {rejudged !== null && (
-        <RejudgeOutcome title={rejudged.title} rejudged={rejudged.rejudged} />
+        <RejudgeOutcome
+          path={path}
+          title={rejudged.title}
+          rejudged={rejudged.rejudged}
+        />
       )}
       {view.state === 'loading' && <PageSkeleton rows={4} />}
       {view.state === 'error' && <ErrorBlock error={view.error} onRetry={view.retry} />}

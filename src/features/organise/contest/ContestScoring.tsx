@@ -3,17 +3,25 @@ import { $api, queryView } from '@/api/query';
 import type { TaskStanding } from '@/api/types';
 import { compareRatio, ratioOf } from '@/lib/exact';
 import { BodyText } from '@/ui/BodyText';
-import { Card } from '@/ui/Card';
+import { HubCard } from '@/ui/HubCard';
 import { PageLink } from '@/ui/PageLink';
 import { SectionTitle } from '@/ui/SectionTitle';
 import { Loaded } from '@/ui/feedback/Loaded';
-import { taskCardPath } from '@/lib/sections';
+import { contestSectionPath, taskCardPath } from '@/lib/sections';
 import type { ContestValues } from '../forms/contest-values';
 import { boardSentence } from '../forms/board-words';
 import { useTestFolders } from '../task/build-data';
-import { NO_POINTS, groupSentence, scalingSentence, taskWeight } from '../task/scoring';
+import {
+  NO_POINTS,
+  groupHeading,
+  groupSentence,
+  groupsLine,
+  scalingSentence,
+  taskWeight,
+} from '../task/scoring';
 import { heldOf, publishedQuery, readPublished } from './published';
 import { useContestSettings } from './settings';
+import { labelOf, useTaskTitles } from './task-entry';
 import { markedBoardCovers, timelineWords } from './timeline';
 import shared from '../organise.module.css';
 import classes from './contest.module.css';
@@ -37,11 +45,14 @@ function TaskScoring({
   org,
   contest,
   standing,
+  label,
   values,
 }: {
   org: string;
   contest: string;
   standing: TaskStanding;
+  /** Its letter and title, `A · Sum`. */
+  label: string;
   values: ContestValues | null;
 }) {
   const task = standing.task.name;
@@ -70,7 +81,6 @@ function TaskScoring({
   const boards = (values?.boards ?? []).filter(
     (board) => board.tasks === null || board.tasks.includes(task),
   );
-  const label = `${standing.label} · ${task}`;
   const timeline = timelineWords(standing, values, marks);
 
   return (
@@ -102,42 +112,60 @@ function TaskScoring({
             const total = taskWeight(groups);
             const held = heldOf(standing, groups, values);
             return (
-              <ul className={shared.named}>
-                {total.num === 0n ? (
-                  <li>{NO_POINTS}</li>
-                ) : (
-                  <>
-                    {worth !== null && compareRatio(worth, total) !== 0 && (
-                      <li>{scalingSentence(worth)}</li>
-                    )}
-                    {groups.map((group) => (
-                      <li key={group.name}>
-                        <strong>Test group “{group.name}”</strong>:{' '}
-                        {afterColon(
-                          groupSentence(group, {
-                            total,
-                            worth,
-                            credit: credit.kind,
-                            tests: counts?.get(group.name) ?? null,
-                          }),
-                        )}
-                      </li>
-                    ))}
-                  </>
-                )}
-                {boards.length === 0 ? (
-                  <li>No leaderboard counts it.</li>
-                ) : (
-                  boards.map((board) => (
-                    <li key={board.name}>
-                      <strong>
-                        Counted on {board.name === '' ? 'a leaderboard' : board.name}:
-                      </strong>{' '}
-                      {boardSentence(board, { tasks: false, held })}
+              <>
+                <BodyText>{groupsLine(groups, worth)}</BodyText>
+                <ul className={shared.named}>
+                  {total.num === 0n ? (
+                    <li>{NO_POINTS}</li>
+                  ) : (
+                    <>
+                      {worth !== null && compareRatio(worth, total) !== 0 && (
+                        <li>{scalingSentence(worth)}</li>
+                      )}
+                      {groups.map((group) => {
+                        const tests = counts?.get(group.name) ?? null;
+                        return (
+                          <li key={group.name}>
+                            <strong>{group.name}</strong> (
+                            {groupHeading(group, { total, worth, tests })}):{' '}
+                            {afterColon(
+                              groupSentence(group, {
+                                total,
+                                worth,
+                                credit: credit.kind,
+                                tests,
+                              }),
+                            )}
+                          </li>
+                        );
+                      })}
+                    </>
+                  )}
+                  {standing.withdrawn ? (
+                    <li>
+                      Withdrawn: entrants do not see it, and no leaderboard counts it.
                     </li>
-                  ))
-                )}
-              </ul>
+                  ) : boards.length === 0 ? (
+                    <li>No leaderboard counts it.</li>
+                  ) : (
+                    boards.map((board) => (
+                      <li key={board.name}>
+                        <strong>
+                          {board.name === ''
+                            ? 'Leaderboard'
+                            : `Leaderboard “${board.name}”`}
+                        </strong>
+                        :{' '}
+                        {boardSentence(board, {
+                          tasks: false,
+                          held,
+                          values: standing.state.latest?.meanings ?? null,
+                        })}
+                      </li>
+                    ))
+                  )}
+                </ul>
+              </>
             );
           }}
         </Loaded>
@@ -147,10 +175,12 @@ function TaskScoring({
 }
 
 /**
- * How this contest is scored (M35, M52): each task, in the contest's order,
- * with what it is worth and when it is open, how its test groups earn
- * points, and the leaderboards that count it, in plain words. The one place
- * to check the whole contest before it starts.
+ * How this contest is scored (M35, M52, M65): each task, in the contest's
+ * order, with what it is worth and when it is open, its test groups in one
+ * line and then how each earns points, and the leaderboards that count it,
+ * in plain words. The one place to check the whole contest before it starts.
+ * The whole card opens Leaderboards, as a hub's card opens its section; each
+ * task's heading keeps its own link, to the task's Tests card, above it.
  */
 export function ContestScoring({ org, contest }: { org: string; contest: string }) {
   const view = queryView(
@@ -163,11 +193,18 @@ export function ContestScoring({ org, contest }: { org: string; contest: string 
   );
   const settings = useContestSettings(org, contest);
   const values = settings.state === 'ready' ? settings.data : null;
+  const titles = useTaskTitles(
+    org,
+    contest,
+    view.state === 'ready' ? view.data.map((standing) => standing.task.name) : [],
+  );
   if (view.state === 'error') return null;
   return (
-    <Card>
-      <section className={shared.stack} aria-label="How this contest is scored">
-        <SectionTitle>How this contest is scored</SectionTitle>
+    <HubCard
+      title="How this contest is scored"
+      to={contestSectionPath(org, contest, 'boards')}
+    >
+      <div className={shared.stack}>
         <BodyText tone="secondary">
           Check this before the contest starts. It says how each task earns points and
           which leaderboards count them, as each task&apos;s latest publication has it.
@@ -184,6 +221,7 @@ export function ContestScoring({ org, contest }: { org: string; contest: string 
                     org={org}
                     contest={contest}
                     standing={standing}
+                    label={labelOf(standing, titles)}
                     values={values}
                   />
                 ))}
@@ -191,7 +229,7 @@ export function ContestScoring({ org, contest }: { org: string; contest: string 
             )
           }
         </Loaded>
-      </section>
-    </Card>
+      </div>
+    </HubCard>
   );
 }

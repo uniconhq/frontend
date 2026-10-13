@@ -121,7 +121,9 @@ export function StoredSettings({ place }: { place: Place }) {
       }
     } catch (caught) {
       const error = toApiError(caught);
-      if (error.code === 'conflict' && 'content' in body) setConflict(body);
+      // Going over theirs is another save, asked about again.
+      if (error.code === 'conflict' && 'content' in body)
+        setConflict({ ...body, confirm: false });
       else setOutcome({ kind: 'refused', error, body });
       return;
     }
@@ -163,6 +165,10 @@ export function StoredSettings({ place }: { place: Place }) {
               key={file.token}
               file={file}
               busy={busy}
+              asking={
+                outcome?.kind === 'refused' &&
+                outcome.error.code === 'confirmation_required'
+              }
               autoFocus={focusText}
               onSave={(content) =>
                 void save({
@@ -202,7 +208,7 @@ export function StoredSettings({ place }: { place: Place }) {
       {outcome !== null && (
         <SaveOutcome
           outcome={outcome}
-          onConfirm={(body) => void save({ ...body, confirm: true })}
+          onConfirm={(body, asked) => void save({ ...body, confirm: true, asked })}
           onKeepAsDraft={(body) => void save({ ...body, keep_as_draft: true })}
           onReload={() => void reload()}
           placeOf={placeOfIn(place)}
@@ -231,11 +237,17 @@ export function StoredSettings({ place }: { place: Place }) {
 function TextEditor({
   file,
   busy,
+  asking,
   autoFocus,
   onSave,
 }: {
   file: FileContent;
   busy: boolean;
+  /**
+   * Whether the save asks before it publishes: its answer sends the text as
+   * it was asked about, so it stays so until answered.
+   */
+  asking: boolean;
   autoFocus: boolean;
   onSave: (content: string) => void;
 }) {
@@ -250,11 +262,15 @@ function TextEditor({
         onChange={setText}
         language="yaml"
         rows={18}
-        readOnly={busy}
+        readOnly={busy || asking}
         autoFocus={autoFocus}
       />
       <div className={shared.actions}>
-        <Button loading={busy} disabled={!changed} onClick={() => onSave(text)}>
+        <Button
+          loading={busy}
+          disabled={!changed || asking}
+          onClick={() => onSave(text)}
+        >
           Save
         </Button>
         {changed && <UnsavedNote />}

@@ -497,6 +497,32 @@ describe('mending settings that do not read', () => {
     );
   });
 
+  it('holds the text as it was asked about while a save asks before it publishes', async () => {
+    brokenBackend(() =>
+      problem(409, 'confirmation_required', {
+        changes: [],
+        regrades: 0,
+        summary: 'Nobody’s result changes.',
+        asked: 'b1c2d3e:12',
+      }),
+    );
+    renderApp(TASK_SETTINGS);
+
+    await userEvent.type(
+      await screen.findByRole('textbox', { name: 'task.yaml' }),
+      'x',
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    expect(
+      await screen.findByRole('button', { name: 'Publish the change' }),
+    ).toBeVisible();
+    expect(screen.getByRole('textbox', { name: 'task.yaml' })).toHaveAttribute(
+      'readonly',
+    );
+    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
+  });
+
   it('shows anyone else the text to read, and who may mend it', async () => {
     brokenBackend(() => HttpResponse.json({}));
     server.use(

@@ -37,8 +37,8 @@ function authorName(change: FileChange): string {
 
 /**
  * One file's history at a task, newest first: each version with who made it,
- * what they said and when, and the publication that froze it, with whether
- * that publication changed how the task grades. A publication is marked on
+ * what they said and when, and the publication that froze it, saying when
+ * one after the first changed how the task grades. A publication is marked on
  * the version it points at; one that froze a later change to another file is
  * on that file's history instead. It is read when it is opened, and again
  * after every save.
@@ -132,6 +132,7 @@ function Versions({
     ]);
   }
   const current = history.data[0]?.version;
+  const rollingTo = history.data.find((change) => change.version === rolling);
 
   const rollBack = async (version: string) => {
     setRolling(null);
@@ -155,10 +156,10 @@ function Versions({
               </BodyText>
               {(byVersion.get(change.version) ?? []).map((publication) => (
                 <BodyText key={publication.number}>
-                  <strong>Publication {publication.number}</strong> ·{' '}
-                  {publication.grading_changed
-                    ? 'changed how the task grades'
-                    : 'grading unchanged'}
+                  <strong>Publication {publication.number}</strong>
+                  {publication.grading_changed &&
+                    publication.number > 1 &&
+                    ' · changed how the task grades'}
                 </BodyText>
               ))}
               {change.version !== current && (
@@ -205,9 +206,11 @@ function Versions({
       >
         <div className={shared.stack}>
           <BodyText>
-            {path} goes back to how it was at version{' '}
-            <code>{short(rolling ?? '')}</code>. This is saved as a new version, and
-            every earlier version stays in the history.
+            {path} goes back to how it was{' '}
+            {rollingTo === undefined
+              ? 'at the version chosen'
+              : `on ${formatDateTime(new Date(rollingTo.at))}, after “${rollingTo.message}”`}
+            . This is saved as a new change, and every earlier one stays in the history.
           </BodyText>
           <BodyText tone="secondary">
             Like any save of the task, it publishes the task, or keeps it as a draft if

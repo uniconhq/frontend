@@ -1,18 +1,21 @@
 import { describe, expect, it } from 'vitest';
-import { screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@/test/user-event';
 import { delay, http, HttpResponse } from 'msw';
 import { TASK_BUILD_CARDS, TASK_SECTIONS } from '@/lib/sections';
 import { formatDateTime } from '@/lib/time';
 import { renderApp } from '@/test/render';
-import { problem, server, signedIn } from '@/test/server';
+import { problem, server, signedIn, someone } from '@/test/server';
 import {
+  CONTEST_API,
   TASK_API,
   draftTask,
   publicationList,
   publishedTask,
   repoFiles,
+  standingList,
   taskState,
+  unchanged,
 } from '@/test/organiser';
 
 const TASK = '/orgs/acme/contests/spring/tasks/sum';
@@ -31,6 +34,139 @@ describe('the task page', () => {
     expect(status).toHaveTextContent(
       `Entrants are graded on publication 2, saved ${at('2026-09-21T10:00:00Z')}.`,
     );
+  });
+
+  it('says under its title where it stands in its contest, which a manager changes from there', async () => {
+    server.use(signedIn, taskState, publicationList, standingList, ...repoFiles);
+    const user = userEvent.setup();
+    renderApp(TASK);
+
+    const status = await screen.findByLabelText('Where the task stands');
+    const line = await within(status).findByRole('button', {
+      name: 'Change B · sum in this contest',
+    });
+    expect(within(status).getByText('In Spring:')).toBeVisible();
+    expect(line).toHaveTextContent('no points, open for the whole contest·Change');
+    await user.click(line);
+    const dialog = await screen.findByRole('dialog', {
+      name: 'B · sum in this contest',
+    });
+    expect(
+      await within(dialog).findByRole('textbox', { name: 'Worth' }),
+    ).toBeDisabled();
+  });
+
+  it('reads where the task stands in its contest again after a save, as its points can move with it', async () => {
+    let reads = 0;
+    server.use(
+      http.get(`${CONTEST_API}/organise/tasks`, () => {
+        reads += 1;
+      }),
+      signedIn,
+      taskState,
+      publicationList,
+      standingList,
+      ...repoFiles,
+      http.put(`${TASK_API}/files/:path`, () =>
+        HttpResponse.json({
+          number: 3,
+          grading_changed: true,
+          changes: ['main gives 110 points.'],
+          notes: [],
+          regraded: 0,
+          effect: unchanged,
+        }),
+      ),
+    );
+    renderApp(`${TASK}?card=statement`);
+
+    const status = await screen.findByLabelText('Where the task stands');
+    await within(status).findByText('In Spring:');
+    const before = reads;
+    fireEvent.change(await screen.findByRole('textbox', { name: 'Statement source' }), {
+      target: { value: 'Write the sum of two numbers.\n Now.' },
+    });
+    await userEvent.click(screen.getByRole('button', { name: 'Save statement' }));
+
+    expect(
+      await screen.findByText('Saved and published as publication 3.'),
+    ).toBeVisible();
+    await waitFor(() => expect(reads).toBeGreaterThan(before));
+  });
+
+  it('goes back to the contest once the task is removed from its own page, reading the task no more', async () => {
+    const afterRemoval: string[] = [];
+    let removed = false;
+    server.use(
+      // The contest page reads each task's settings and tree, and this one
+      // is still in the contest these handlers serve.
+      http.get(`${TASK_API}*`, ({ request }) => {
+        const path = new URL(request.url).pathname;
+        const ofContest = ['/files/task.yaml', '/tree'].some((end) =>
+          path.endsWith(end),
+        );
+        if (removed && !ofContest) afterRemoval.push(path);
+      }),
+      signedIn,
+      taskState,
+      publicationList,
+      standingList,
+      ...repoFiles,
+      http.post(`${TASK_API}/take-out`, () => {
+        removed = true;
+        return HttpResponse.json({ done: 'remove' });
+      }),
+    );
+    const user = userEvent.setup();
+    renderApp(TASK);
+
+    const status = await screen.findByLabelText('Where the task stands');
+    await user.click(
+      await within(status).findByRole('button', {
+        name: 'Change B · sum in this contest',
+      }),
+    );
+    const dialog = await screen.findByRole('dialog', {
+      name: 'B · sum in this contest',
+    });
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Remove B · sum from the contest' }),
+    );
+    const asked = await screen.findByRole('dialog', {
+      name: 'Remove B · sum from the contest?',
+    });
+    await user.click(within(asked).getByRole('button', { name: 'Remove it' }));
+
+    expect(
+      await screen.findByRole('heading', { name: 'spring', level: 1 }),
+    ).toBeVisible();
+    expect(afterRemoval).toEqual([]);
+  });
+
+  it('says where it stands in its contest as text to an observer of the contest', async () => {
+    server.use(
+      http.get('/api/v1/me', () =>
+        HttpResponse.json({
+          ...someone,
+          roles: [
+            { names: { org: 'acme', contest: 'spring', task: null }, role: 'observer' },
+          ],
+        }),
+      ),
+      taskState,
+      publicationList,
+      standingList,
+      ...repoFiles,
+    );
+    renderApp(TASK);
+
+    const status = await screen.findByLabelText('Where the task stands');
+    expect(
+      await within(status).findByText('no points, open for the whole contest'),
+    ).toBeVisible();
+    expect(
+      within(status).queryByRole('button', { name: /in this contest$/ }),
+    ).toBeNull();
   });
 
   it('lists what kept the last save from publishing, each where it is', async () => {
@@ -240,6 +376,7 @@ describe('what the task has, under its name', { timeout: 20_000 }, () => {
           changes: [],
           notes: [],
           regraded: 0,
+          effect: unchanged,
         });
       }),
       ...repoFiles,
@@ -271,22 +408,41 @@ describe('what the task has, under its name', { timeout: 20_000 }, () => {
     );
   });
 
-  it('does not tick a statement that is still the one a new task starts with', async () => {
+  it('says the scoring’s points are here where the contest scales the task to a worth of its own', async () => {
     readyBackend();
+    const file = (path: string, content: string) =>
+      HttpResponse.json({
+        path,
+        encoding: 'utf-8',
+        content,
+        token: `token-${path}`,
+        upload: null,
+        version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
+      });
     server.use(
-      http.get(`${TASK_API}/files/:path`, ({ params }) =>
-        params['path'] === 'statement.md'
-          ? HttpResponse.json({
-              path: 'statement.md',
-              encoding: 'utf-8',
-              content: 'Write the statement entrants read here.\n',
-              token: 'token-statement',
-              upload: null,
-              version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
-            })
-          : undefined,
+      http.get(`${TASK_API}/files/task.yaml`, () =>
+        file(
+          'task.yaml',
+          'name: sum\nworkflow: unicon/classic@v2\ntest_groups:\n  small:\n    pass: 100\n',
+        ),
+      ),
+      http.get(`${CONTEST_API}/files/contest.yaml`, () =>
+        file(
+          'contest.yaml',
+          'name: Spring\ntasks:\n  - id: sort\n  - id: sum\n    worth: 70\n',
+        ),
       ),
     );
+    renderApp(TASK);
+
+    const row = await screen.findByRole('list', { name: 'What the task has' });
+    expect(
+      await within(row).findByRole('link', { name: 'Scoring: 100 points here' }),
+    ).toBeVisible();
+  });
+
+  it('does not tick a statement the forge says is not written yet: blank, or the one a new task starts with (M57)', async () => {
+    readyBackend({ ...publishedTask, head_statement_written: false });
     renderApp(TASK);
 
     const row = await screen.findByRole('list', { name: 'What the task has' });

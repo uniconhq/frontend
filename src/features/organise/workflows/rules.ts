@@ -488,6 +488,18 @@ export function newProblem(
   return wiringProblems(after, primitives).find((problem) => !had.has(problem)) ?? null;
 }
 
+/** The type of the step output `ref` names, or null when it is not one the primitives declare. */
+export function outputType(
+  workflow: Workflow,
+  primitives: Map<string, PrimitiveInfo>,
+  ref: Ref | null,
+): string | null {
+  if (ref?.kind !== 'steps') return null;
+  const step = workflow.steps.find((found) => found.id === ref.name);
+  if (step === undefined) return null;
+  return declared(primitives, step.use)?.outputs[ref.output]?.type ?? null;
+}
+
 /** The step outputs a report can read: a text or number output of any step. */
 export function reportable(
   workflow: Workflow,

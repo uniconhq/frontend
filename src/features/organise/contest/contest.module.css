@@ -26,6 +26,63 @@
   gap: 4px 10px;
 }
 
+/*
+ * A task's worth and timeline in its contest, as one line that opens the
+ * dialog they are changed in, ending in "Change" in a link's look.
+ */
+.entryLine {
+  display: inline;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.change {
+  color: var(--unicon-text-accent);
+  white-space: nowrap;
+}
+
+.dot {
+  margin: 0 6px;
+  color: var(--unicon-text-secondary);
+}
+
+.entryLine:hover .change {
+  text-decoration: underline;
+}
+
+.entryLine:focus-visible {
+  outline: 2px solid var(--unicon-text-accent);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* The arrows that move a task up or down the contest's list, side by side. */
+.moves {
+  display: flex;
+  gap: 4px;
+}
+
+/* Taking a task out of its contest, apart from its timeline at the dialog's foot. */
+.foot {
+  padding-top: 12px;
+  border-top: 1px solid var(--unicon-border);
+}
+
+/* Where a task stands in its contest, under its title on its own page. */
+.inContest {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 6px;
+  font-size: 13px;
+  color: var(--unicon-text-body);
+}
+
 /* A contest's settings that do not read, said where its tasks would be. */
 .panel {
   display: flex;

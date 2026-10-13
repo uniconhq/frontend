@@ -60,10 +60,12 @@ describe('saving and publishing a workflow', () => {
       ),
     ).toBeInTheDocument();
     await user.click(barButton('Save'));
-    await waitFor(() => expect(backend.state.draft).toContain('memory_limit: 9'));
     expect(
-      within(part('[role="toolbar"]', 'The workflow')).getByText('All changes saved.'),
+      await within(part('[role="toolbar"]', 'The workflow')).findByText(
+        'All changes saved.',
+      ),
     ).toBeInTheDocument();
+    expect(backend.state.draft).toContain('memory_limit: 9');
     await findProblems(/One problem to fix/);
   });
 

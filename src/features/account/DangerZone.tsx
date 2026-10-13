@@ -25,6 +25,11 @@ const CONFIRM: Record<Action, string> = {
   delete: 'Delete account',
 };
 
+const QUESTION: Record<Action, string> = {
+  deactivate: 'Deactivate your account?',
+  delete: 'Delete your account?',
+};
+
 /**
  * Both are Forgejo operations underneath, so each states what it does and
  * whether it can be undone before it asks. A refusal is shown as it came: the
@@ -74,7 +79,7 @@ export function DangerZone() {
       </div>
 
       {action !== null && (
-        <Modal opened onClose={close} title={CONFIRM[action]}>
+        <Modal opened onClose={close} title={QUESTION[action]}>
           <div className={classes.dialog}>
             <BodyText size="md">{EXPLANATION[action]}</BodyText>
 

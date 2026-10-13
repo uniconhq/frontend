@@ -8,7 +8,9 @@ import { useFieldLabel } from './FieldLabel';
  * `placeholder` is an empty first option, for a choice nobody has made yet.
  * `description` reads under the box, as every field's hint does, and
  * `error`, when given, under it too, marking it invalid. `info` is
- * background behind an ⓘ beside the label.
+ * background behind an ⓘ beside the label. `labelHidden` names the box for
+ * a screen reader alone, for a box on a row whose place already says what
+ * it is, such as the second of a leaderboard's ways to rank.
  */
 export function Select({
   label,
@@ -21,6 +23,7 @@ export function Select({
   error,
   required = false,
   disabled = false,
+  labelHidden = false,
 }: {
   label: string;
   value: string;
@@ -33,6 +36,7 @@ export function Select({
   error?: string;
   required?: boolean;
   disabled?: boolean;
+  labelHidden?: boolean;
 }) {
   const { inputLabel, id, wrap } = useFieldLabel({ label, info, required });
   const data =
@@ -42,7 +46,8 @@ export function Select({
   return wrap(
     <NativeSelect
       id={id}
-      label={inputLabel}
+      label={labelHidden ? undefined : inputLabel}
+      aria-label={labelHidden ? label : undefined}
       description={description}
       error={error}
       value={value}

@@ -27,6 +27,7 @@ const LOOK: Record<Verdict, { label: string; colors: VerdictName }> = {
   graded: { label: 'GRADED', colors: 'queued' },
   delayed: { label: 'GRADING DELAYED', colors: 'queued' },
   cancelled: { label: 'CANCELLED', colors: 'queued' },
+  over_limit: { label: 'OVER THE LIMIT', colors: 'queued' },
 };
 
 function isKnown(verdict: string): verdict is Verdict {

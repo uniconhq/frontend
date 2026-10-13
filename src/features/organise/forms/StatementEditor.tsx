@@ -32,24 +32,30 @@ type AddedPicture = Extract<StagedPicture, { kind: 'add' }>;
 
 /**
  * The task's files under `public/`, its pictures, none while it has no such
- * folder; null while they are read.
+ * folder; null while they are read. A file whose name starts with a dot,
+ * such as the `.gitkeep` a task made before kept the folder with (M60), is
+ * no picture and is left out.
  */
 function usePublicFiles(place: Place): TreeEntry[] | null {
   const read = useQuery({ ...treeQuery(place, 'public'), retry: false });
   if (place.kind !== 'task') return [];
   if (read.isPending) return null;
-  return read.data ?? [];
+  return (read.data ?? []).filter(
+    (entry) => !(entry.path.split('/').at(-1) ?? '').startsWith('.'),
+  );
 }
 
 /**
  * The statement and every picture staged with it as one save of the task
  * (`POST <task>/save`), a larger picture through the upload door, answered
- * as any save of the task is.
+ * as any save of the task is. A picture already sent for the same path is
+ * not sent again, so a save sent again after its question uploads nothing new.
  */
 async function saveWithPictures(
   task: TaskPlace,
   body: WriteFile,
   pictures: StagedPicture[],
+  uploads: Map<string, { file: File; id: string }>,
 ): Promise<Outcome> {
   const planned: PlannedChange[] = [
     { path: PATH, token: body.token, text: body.content ?? '' },
@@ -74,13 +80,23 @@ async function saveWithPictures(
     const changes = await fileChanges(planned, (path) => {
       const file = fileAt(path);
       if (file === undefined) throw new Error(`Nothing was chosen for ${path}.`);
-      return sendToTask(task, file, path);
+      const known = uploads.get(path);
+      if (known !== undefined && known.file === file) return Promise.resolve(known.id);
+      return sendToTask(task, file, path).then((id) => {
+        uploads.set(path, { file, id });
+        return id;
+      });
     });
     const { data } = await apiClient.POST(
       '/api/v1/orgs/{org}/contests/{contest}/tasks/{task}/save',
       {
         params: { path: { org: task.org, contest: task.contest, task: task.task } },
-        body: { changes, confirm: body.confirm, keep_as_draft: body.keep_as_draft },
+        body: {
+          changes,
+          confirm: body.confirm,
+          asked: body.asked,
+          keep_as_draft: body.keep_as_draft,
+        },
       },
     );
     if (data === undefined) throw new Error('The save gave no answer.');
@@ -125,6 +141,8 @@ export function StatementEditor({ place, admin }: { place: Place; admin: boolean
   const [kept, setKept] = useState<string | null>(null);
   /** Pictures added or taken out, waiting for the statement's save. */
   const [pictures, setPictures] = useState<StagedPicture[]>([]);
+  /** Pictures already through the upload door, by path, for a save sent again. */
+  const uploads = useRef(new Map<string, { file: File; id: string }>());
   const staged = useRef(pictures);
   useEffect(() => {
     staged.current = pictures;
@@ -139,7 +157,7 @@ export function StatementEditor({ place, admin }: { place: Place; admin: boolean
       const sending = pictures;
       let answer: Outcome;
       if (place.kind === 'task' && sending.length > 0) {
-        answer = await saveWithPictures(place, body, sending);
+        answer = await saveWithPictures(place, body, sending, uploads.current);
         if (answer.kind !== 'refused') {
           await Promise.all(
             staleAfterWrite(place).map((queryKey) =>
@@ -151,12 +169,14 @@ export function StatementEditor({ place, admin }: { place: Place; admin: boolean
         answer = await write(body);
       }
       if (answer.kind === 'refused' && answer.error.code === 'conflict') {
-        setConflict(body);
+        // Going over theirs is another save, asked about again.
+        setConflict({ ...body, confirm: false });
         return;
       }
       setOutcome(answer);
       if (answer.kind !== 'refused') {
         letGo(sending);
+        uploads.current.clear();
         setPictures([]);
         await query.refetch();
       }
@@ -203,6 +223,9 @@ export function StatementEditor({ place, admin }: { place: Place; admin: boolean
         }
         admin={admin}
         busy={saving}
+        asking={
+          outcome?.kind === 'refused' && outcome.error.code === 'confirmation_required'
+        }
         saved={saved}
         pictures={pictures}
         onPictures={(change) =>
@@ -244,7 +267,7 @@ export function StatementEditor({ place, admin }: { place: Place; admin: boolean
       {outcome !== null && (
         <SaveOutcome
           outcome={outcome}
-          onConfirm={(body) => void send({ ...body, confirm: true })}
+          onConfirm={(body, asked) => void send({ ...body, confirm: true, asked })}
           onKeepAsDraft={(body) => void send({ ...body, keep_as_draft: true })}
           onReload={() => {
             setOutcome(null);
@@ -263,6 +286,7 @@ function Source({
   task,
   admin,
   busy,
+  asking,
   saved,
   pictures,
   onPictures,
@@ -272,6 +296,11 @@ function Source({
   task: TaskWhere | null;
   admin: boolean;
   busy: boolean;
+  /**
+   * Whether the save asks before it publishes: its answer sends the text as
+   * it was asked about, so it stays so until answered.
+   */
+  asking: boolean;
   /** The files under `public/` now, or null while they are read. */
   saved: TreeEntry[] | null;
   pictures: StagedPicture[];
@@ -298,6 +327,7 @@ function Source({
     [saved, pictures],
   );
   const named = useMemo(() => picturesNamed(text), [text]);
+  const held = busy || asking;
   const [removing, setRemoving] = useState<unknown>(null);
 
   if (file.encoding !== 'utf-8') {
@@ -339,7 +369,7 @@ function Source({
           onChange={setText}
           language="markdown"
           rows={18}
-          readOnly={!admin || busy}
+          readOnly={!admin || held}
         />
         <section className={classes.preview} aria-label="What entrants see">
           <Markdown task={task ?? undefined} staged={drawn}>
@@ -364,7 +394,7 @@ function Source({
               staged={pictures}
               named={named}
               admin={admin}
-              disabled={busy}
+              disabled={held}
               onRemove={remove}
               onUndo={undo}
             />
@@ -373,7 +403,7 @@ function Source({
           {admin && (
             <AddPicture
               taken={taken}
-              disabled={busy || saved === null}
+              disabled={held || saved === null}
               onStaged={({ name, file: chosen, line }) => {
                 setText((before) => `${before.replace(/\n*$/, '')}\n\n${line}\n`);
                 onPictures((before) => [
@@ -395,7 +425,7 @@ function Source({
         <div className={shared.actions}>
           <Button
             loading={busy}
-            disabled={!changed}
+            disabled={!changed || asking}
             onClick={() => onSave(text, file.token)}
           >
             Save statement

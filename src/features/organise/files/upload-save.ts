@@ -97,7 +97,8 @@ export function useSaveUploads(place: TaskPlace, onSaved: (paths: string[]) => v
           token: await tokenNow(place, change.path),
         })),
       );
-      await send({ ...body, changes });
+      // Going over theirs is another save, asked about again.
+      await send({ ...body, changes, confirm: false });
     } catch (error) {
       setOutcome({ kind: 'refused', error: toApiError(error), body });
     } finally {

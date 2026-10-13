@@ -24,6 +24,11 @@ import { parseYaml, topMap, writeOver, type Doc } from './yaml-doc';
 export type FormProps = {
   doc: Doc;
   busy: boolean;
+  /**
+   * Whether the last save asks before it publishes: its answer sends the
+   * file as it was asked about, so the form holds it until answered.
+   */
+  asking: boolean;
   /** Apply the form's changes to a fresh copy of the document and save it. */
   onSave: (change: (doc: Doc) => void) => void;
   refused: DefinitionError[];
@@ -156,6 +161,9 @@ export function DefinitionForm({
           {children({
             doc: read.doc,
             busy,
+            asking:
+              outcome?.kind === 'refused' &&
+              outcome.error.code === 'confirmation_required',
             refused:
               outcome?.kind === 'refused' && outcome.error.code === 'invalid_definition'
                 ? definitionErrorsOf(outcome.error)
@@ -174,7 +182,9 @@ export function DefinitionForm({
           outcome={outcome}
           placeOf={placeOf}
           bare={bare}
-          onConfirm={(body) => void send(file, { ...body, confirm: true })}
+          onConfirm={(body, asked) =>
+            void send(file, { ...body, confirm: true, asked })
+          }
           onKeepAsDraft={(body) => void send(file, { ...body, keep_as_draft: true })}
           onReload={() => {
             setOutcome(null);

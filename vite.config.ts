@@ -4,6 +4,21 @@ import react from '@vitejs/plugin-react';
 
 const apiProxyTarget = process.env.VITE_API_PROXY ?? 'http://localhost:8080';
 
+/**
+ * `VITE_API_PROXY=none` is a dev server with no backend behind it: every
+ * proxied path answers 404 at once, so what a page asks for and a test does
+ * not stub fails the same way whatever listens on :8080. The Playwright run
+ * uses it.
+ */
+const noBackend = apiProxyTarget === 'none';
+
+/** What a proxied path does: go through to the backend, or answer 404 with none. */
+function proxied(extra: Omit<ProxyOptions, 'target'> = {}): ProxyOptions {
+  return noBackend
+    ? { target: 'http://127.0.0.1', bypass: () => false }
+    : { target: apiProxyTarget, changeOrigin: false, ...extra };
+}
+
 const apiPublicOrigin = process.env.VITE_API_ORIGIN ?? 'http://localhost:8080';
 
 /**
@@ -31,27 +46,15 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
-      '/api': {
-        target: apiProxyTarget,
-        changeOrigin: false,
-        configure: presentDevServerAsApiOrigin,
-      },
+      '/api': proxied({ configure: presentDevServerAsApiOrigin }),
       // A file goes through the upload door, a path on the app's own origin
       // that the proxy in `deploy` puts through to the forge's large-file
       // store once the backend has said the upload may start.
-      '/-/uploads': {
-        target: apiProxyTarget,
-        changeOrigin: false,
-        configure: presentDevServerAsApiOrigin,
-      },
+      '/-/uploads': proxied({ configure: presentDevServerAsApiOrigin }),
       // A submitted file comes back through the download door the same way.
-      '/-/downloads': {
-        target: apiProxyTarget,
-        changeOrigin: false,
-        configure: presentDevServerAsApiOrigin,
-      },
-      '/healthz': { target: apiProxyTarget, changeOrigin: false },
-      '/readyz': { target: apiProxyTarget, changeOrigin: false },
+      '/-/downloads': proxied({ configure: presentDevServerAsApiOrigin }),
+      '/healthz': proxied(),
+      '/readyz': proxied(),
     },
   },
   build: {

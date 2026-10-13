@@ -218,7 +218,7 @@ describe('the contest settings form', { timeout: 20_000 }, () => {
     await userEvent.click(within(form).getByRole('button', { name: 'Save settings' }));
 
     expect(await screen.findByText('Saved.')).toBeVisible();
-    const notes = screen.getByRole('list', { name: 'Notes' });
+    const notes = screen.getByRole('list', { name: 'About the leaderboards' });
     expect(
       within(notes).getByText('Standings counts nothing from sort.'),
     ).toBeVisible();
@@ -325,7 +325,7 @@ describe('the contest settings form', { timeout: 20_000 }, () => {
 
     await screen.findByRole('list', { name: 'Fields that differ' });
     await userEvent.click(
-      screen.getByRole('button', { name: 'Save mine over theirs' }),
+      screen.getByRole('button', { name: 'Save yours over theirs' }),
     );
     const dialog = await screen.findByRole('dialog', {
       name: 'Save yours over theirs?',
@@ -334,7 +334,7 @@ describe('the contest settings form', { timeout: 20_000 }, () => {
       'This throws away what the other person changed in Name.',
     );
     await userEvent.click(
-      within(dialog).getByRole('button', { name: 'Save mine over theirs' }),
+      within(dialog).getByRole('button', { name: 'Save yours over theirs' }),
     );
 
     await screen.findByText('Saved.');

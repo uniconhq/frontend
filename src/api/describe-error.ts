@@ -127,10 +127,10 @@ export function describeError(error: ApiError): ErrorDescription {
       };
     case 'confirmation_required':
       return {
-        title: 'This changes how the task grades',
+        title: 'The contest is running. Publish this change now?',
         message:
           error.detail ??
-          'The contest is running, so a change to grading has to be confirmed.',
+          'The contest is running, so a save asks before it publishes. Publish it, or keep it as a draft.',
       };
     case 'admin_only':
       return {
@@ -296,6 +296,24 @@ export function describeError(error: ApiError): ErrorDescription {
       return {
         title: 'This task has closed for you',
         message: 'It takes no more submissions from you.',
+      };
+    case 'task_withdrawn':
+      return {
+        title: 'This task was withdrawn',
+        message:
+          'The organisers took it out of the contest, so it takes no submissions. Nothing was submitted.',
+      };
+    case 'take_out_changed':
+      return {
+        title: 'Someone submitted meanwhile',
+        message:
+          error.detail ??
+          'The task’s submissions changed since this was asked. Look again and try again.',
+      };
+    case 'take_out_refused':
+      return {
+        title: 'The task cannot be taken out of the contest as it stands',
+        message: error.detail ?? 'Check the contest’s leaderboards and settings first.',
       };
     case 'archived':
       return {

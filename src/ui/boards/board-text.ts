@@ -1,10 +1,12 @@
 import type { Board, BoardCell, BoardKey } from '@/api/types';
-import { formatExact, placesToTell } from '@/lib/exact';
+import { formatExact, formatPoints, placesToTell, withPointsWord } from '@/lib/exact';
+import { valueTitle, withUnit } from '@/lib/values';
 
 /**
  * What a board's numbers read as. Every key a board ranks on is a column, so
  * a contestant can see why one row is above the next; each is named by what
- * it ranks by. A `penalty` with `per_attempt: 0` charges nothing for an
+ * it ranks by: a value by its title, "Run time", or its key until it has
+ * one (M58). A `penalty` with `per_attempt: 0` charges nothing for an
  * attempt, so all it ranks on is the minute submitted, and it says so.
  */
 export function keyLabel(key: BoardKey): string {
@@ -12,7 +14,25 @@ export function keyLabel(key: BoardKey): string {
   if (key.by === 'penalty') {
     return (key.per_attempt ?? 0) === 0 ? 'Submitted at minute' : 'Penalty';
   }
-  return key.by;
+  return valueTitle(key.by, key);
+}
+
+/** A row's number on a key, as its column shows it: a value's with its unit, "28 ms". */
+export function keyNumber(key: BoardKey, exact: string, places: number): string {
+  const shown = shownNumber(key, exact, places);
+  return key.by === 'points' || key.by === 'penalty' ? shown : withUnit(shown, key);
+}
+
+/** A number as read: points cut, as every page cuts them (R17), any other rounded. */
+function shownNumber(key: BoardKey, exact: string, places: number): string {
+  return key.by === 'points'
+    ? formatPoints(exact, null, places)
+    : formatExact(exact, places);
+}
+
+/** How a key's numbers are brought to their decimals: points cut, any other rounded. */
+function howShown(key: BoardKey): 'cut' | 'round' {
+  return key.by === 'points' ? 'cut' : 'round';
 }
 
 function plural(count: number, one: string, many: string): string {
@@ -25,8 +45,12 @@ function plural(count: number, one: string, many: string): string {
  * one row is above the next.
  */
 export function keyPlaces(board: Board): number[] {
-  return board.keys.map((_, index) =>
-    placesToTell(board.rows.map((row) => row.keys[index] ?? null)),
+  return board.keys.map((key, index) =>
+    placesToTell(
+      board.rows.map((row) => row.keys[index] ?? null),
+      2,
+      howShown(key),
+    ),
   );
 }
 
@@ -35,19 +59,29 @@ export function cellPlaces(board: Board, task: string): Record<string, number> {
   return Object.fromEntries(
     board.keys.map((key) => [
       key.by,
-      placesToTell(board.rows.map((row) => row.cells[task]?.numbers[key.by] ?? null)),
+      placesToTell(
+        board.rows.map((row) => row.cells[task]?.numbers[key.by] ?? null),
+        2,
+        howShown(key),
+      ),
     ]),
   );
 }
 
-/** One of a cell's numbers, with what it is: "100 points", "minute 45", "12.5 time_ms". */
+/**
+ * One of a cell's numbers, with what it is: "100 points", "minute 45"; a
+ * value's with its unit, "28 ms", or its title where it has no unit,
+ * "12.5 Score", or its key where it has neither.
+ */
 function numberText(key: BoardKey, exact: string, places: number): string {
-  const shown = formatExact(exact, places);
-  if (key.by === 'points') return `${shown} ${exact === '1' ? 'point' : 'points'}`;
+  const shown = shownNumber(key, exact, places);
+  if (key.by === 'points') return withPointsWord(shown);
   if (key.by === 'penalty') {
     return (key.per_attempt ?? 0) === 0 ? `minute ${shown}` : `${shown} penalty`;
   }
-  return `${shown} ${key.by}`;
+  return key.unit !== null && key.unit !== ''
+    ? withUnit(shown, key)
+    : `${shown} ${valueTitle(key.by, key)}`;
 }
 
 /**

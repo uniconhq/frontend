@@ -3,9 +3,15 @@ import type { Board, BoardRow } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { PageLink } from '@/ui/PageLink';
 import { SectionTitle } from '@/ui/SectionTitle';
-import { formatExact } from '@/lib/exact';
 import { formatDateTime } from '@/lib/time';
-import { cellLines, cellPlaces, gradingText, keyLabel, keyPlaces } from './board-text';
+import {
+  cellLines,
+  cellPlaces,
+  gradingText,
+  keyLabel,
+  keyNumber,
+  keyPlaces,
+} from './board-text';
 import classes from './boards.module.css';
 
 /** What a row is called: its entrant's own name, or its one member's username. */
@@ -59,7 +65,8 @@ function NotInView({ board }: { board: Board }) {
 /**
  * One board as its reader is given it: rows in rank order, tied rows under
  * one rank, each with its number on every key it is ranked on and its cell
- * on every task. Numbers are rounded for reading, with more digits where
+ * on every task. Numbers are brought to a few decimals for reading, points
+ * cut and any other number rounded, with more digits where
  * two rows next to each other would show alike. The reader's own row also
  * says how many of its submissions wait for a result and which it counts,
  * each a link where `submissionTo` gives one, and is marked `ownLabel`.
@@ -152,7 +159,9 @@ export function BoardTable({
                       const exact = row.keys[index] ?? null;
                       return (
                         <td key={key.by} className={classes.number}>
-                          {exact === null ? '—' : formatExact(exact, places[index])}
+                          {exact === null
+                            ? '—'
+                            : keyNumber(key, exact, places[index] ?? 2)}
                         </td>
                       );
                     })}

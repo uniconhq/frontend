@@ -294,6 +294,16 @@
   background: var(--unicon-hover);
 }
 
+/* What the band is, at its top, in the space above its first box. */
+.bandLabel {
+  display: block;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 16px;
+  color: var(--unicon-text-secondary);
+}
+
 .box {
   position: relative;
   width: 100%;

@@ -1,4 +1,10 @@
-import type { FeedEntry, Grading, GradingStatus, Submitter } from '@/api/types';
+import type {
+  FeedEntry,
+  Grading,
+  GradingStatus,
+  RegradeChangeKind,
+  Submitter,
+} from '@/api/types';
 
 /** Each status as the feed and its filter name it. */
 export const STATUS: Record<GradingStatus, string> = {
@@ -8,6 +14,7 @@ export const STATUS: Record<GradingStatus, string> = {
   done: 'Done',
   cancelled: 'Cancelled',
   system_error: 'System error',
+  over_limit: 'Over the limit',
 };
 
 export const STATUSES = Object.keys(STATUS) as GradingStatus[];
@@ -33,10 +40,29 @@ function isStatus(value: string): value is GradingStatus {
   return Object.hasOwn(STATUS, value);
 }
 
+/** Each kind of change a regrade made, as the feed reads it by regrade. */
+const CHANGES: readonly RegradeChangeKind[] = [
+  'up',
+  'down',
+  'stopped',
+  'unchanged',
+  'new',
+  'running',
+  'failed',
+  'over_limit',
+];
+
+function isChange(value: string): value is RegradeChangeKind {
+  return (CHANGES as readonly string[]).includes(value);
+}
+
 /**
  * The filters, each a search parameter of the page, so a link keeps them.
  * `latest` keeps each submission's latest attempt alone, as the contest
  * page's count of failed gradings counts them; null for every attempt.
+ * `regrade` lists one regrade's submissions instead, each once with what it
+ * changed, narrowed to one kind by `change` (#448); task, status and latest
+ * do not apply with it.
  */
 export type Filters = {
   task: string | null;
@@ -44,6 +70,8 @@ export type Filters = {
   user: string | null;
   status: GradingStatus | null;
   latest: true | null;
+  regrade: string | null;
+  change: RegradeChangeKind | null;
 };
 
 export type FilterKey = keyof Filters;
@@ -54,12 +82,15 @@ export function readFilters(search: URLSearchParams): Filters {
     return value === '' ? null : value;
   };
   const status = read('status');
+  const change = read('change');
   return {
     task: read('task'),
     entrant: read('entrant'),
     user: read('user'),
     status: status !== null && isStatus(status) ? status : null,
     latest: read('latest') === 'true' ? true : null,
+    regrade: read('regrade'),
+    change: change !== null && isChange(change) ? change : null,
   };
 }
 
@@ -79,12 +110,29 @@ export function withFilter(
   return next;
 }
 
-/** The filters as the feed's query, leaving out the ones not set. */
-export function feedQuery({ task, entrant, user, status, latest }: Filters) {
-  return {
-    ...(task !== null && { task }),
+/**
+ * The filters as the feed's query, leaving out the ones not set, and those
+ * a regrade's listing does not read.
+ */
+export function feedQuery({
+  task,
+  entrant,
+  user,
+  status,
+  latest,
+  regrade,
+  change,
+}: Filters) {
+  const who = {
     ...(entrant !== null && { entrant }),
     ...(user !== null && { user }),
+  };
+  if (regrade !== null) {
+    return { regrade, ...(change !== null && { change }), ...who };
+  }
+  return {
+    ...(task !== null && { task }),
+    ...who,
     ...(status !== null && { status }),
     ...(latest !== null && { latest }),
   };

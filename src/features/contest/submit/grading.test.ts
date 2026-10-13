@@ -15,9 +15,11 @@ const done: GradingResult = {
   groups: [],
   values: { numbers: {}, texts: {} },
   reason: null,
+  limit: null,
   points: null,
   factor: null,
   folded: {},
+  meanings: [],
 };
 
 function submitted(secondsAgo: number, status: 'grading' | 'graded'): Submission {
@@ -113,6 +115,11 @@ describe('a submission’s points in its row', () => {
   it('gives the points shown, exactly as served', () => {
     expect(pointsLine(points('75'), NOW)).toBe('75');
     expect(pointsLine(points('82.5'), NOW)).toBe(formatExact('82.5', 2));
+  });
+
+  it('cuts points to two decimals, as every page shows them (R17)', () => {
+    expect(pointsLine(points('36.666666'), NOW)).toBe(formatExact('36.66', 2));
+    expect(pointsLine(points('99.999'), NOW)).toBe(formatExact('99.99', 2));
   });
 
   it('gives a dash while it is graded, and when it never will be', () => {

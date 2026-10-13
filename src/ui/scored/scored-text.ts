@@ -1,5 +1,5 @@
 import type { GroupShown, Reported } from '@/api/types';
-import { formatExact } from '@/lib/exact';
+import { formatExact, formatPoints, formatWorth } from '@/lib/exact';
 
 /**
  * A test's reported value by name as read: a number to at most four
@@ -16,8 +16,24 @@ export function valueText(values: Reported, name: string): string | undefined {
  */
 export function pointsText(group: GroupShown): string | null {
   if (group.max === null) return null;
-  const most = formatExact(group.max, 2);
+  const most = formatWorth(group.max);
   return group.points === null
     ? `of ${most}`
-    : `${formatExact(group.points, 2)} / ${most}`;
+    : `${formatPoints(group.points, group.max)} / ${most}`;
+}
+
+/** A number of submissions in words: "1 submission", "10 submissions". */
+export function submissionsWords(count: number): string {
+  return `${String(count)} ${count === 1 ? 'submission' : 'submissions'}`;
+}
+
+/**
+ * Why a submission past the task's limit was not graded (#445), said to the
+ * entrant ("you") or of them ("the entrant"): it was graded again after a
+ * delay, when they already had as many submissions with a result as the
+ * task takes.
+ */
+export function overLimitSentence(who: string, limit: number | null): string {
+  const most = limit === null ? 'submissions' : submissionsWords(limit);
+  return `Not graded: ${who} had reached the limit of ${most} for this task.`;
 }

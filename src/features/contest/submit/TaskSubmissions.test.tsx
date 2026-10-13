@@ -12,12 +12,17 @@ import {
   accepted,
   grading,
   inputField,
+  languageField,
   reported,
   submission,
   TASK_API,
   taskPage,
   DOOR_URL,
   uploadStore,
+  CONTEST_API,
+  entry,
+  home,
+  registration,
 } from '@/test/contestant';
 
 const PAGE = '/contests/acme/spring/tasks/sum';
@@ -475,6 +480,12 @@ describe('the submit panel', () => {
     ],
     ['archived', {}, 'The contest is archived', 'they take no submissions'],
     [
+      'task_withdrawn',
+      { reason: 'withdrawn' },
+      'This task was withdrawn',
+      'The organisers took it out of the contest, so it takes no submissions.',
+    ],
+    [
       'not_approved',
       { detail: 'Only approved entrants of this contest can submit to its tasks.' },
       'Your registration is not approved yet',
@@ -650,21 +661,52 @@ describe('the submit panel', () => {
     expect(screen.queryByRole('form', { name: 'Submit' })).not.toBeInTheDocument();
   });
 
-  it('says only approved contestants submit, to a reader who is not one', async () => {
-    server.use(
-      signedIn,
-      listing([]),
-      withPage({
-        release: { released: true, visible: true, open: false, closed: 'not_approved' },
+  it.each([
+    [
+      'waits for approval',
+      registration(),
+      'You can submit once your registration is approved.',
+    ],
+    [
+      'may register',
+      entry(),
+      'You can submit once you register for the contest, on its page.',
+    ],
+    [
+      'is refused by the contest’s email rule',
+      entry({
+        can_register: false,
+        refused: {
+          code: 'domain_not_allowed',
+          detail: 'This contest takes only some email addresses, and not yours.',
+        },
       }),
-    );
-    renderApp(PAGE);
+      'Only the contest’s entrants can submit to this task.',
+    ],
+  ])(
+    'says what is true for a reader who %s, not an approved entrant',
+    async (_, mine, said) => {
+      server.use(
+        signedIn,
+        listing([]),
+        withPage({
+          release: {
+            released: true,
+            visible: true,
+            open: false,
+            closed: 'not_approved',
+          },
+        }),
+        http.get(`${CONTEST_API}/home`, () =>
+          HttpResponse.json(home({ registration: mine })),
+        ),
+      );
+      renderApp(PAGE);
 
-    expect(
-      await screen.findByText('You can submit once your registration is approved.'),
-    ).toBeVisible();
-    expect(screen.queryByRole('form', { name: 'Submit' })).not.toBeInTheDocument();
-  });
+      expect(await screen.findByText(said)).toBeVisible();
+      expect(screen.queryByRole('form', { name: 'Submit' })).not.toBeInTheDocument();
+    },
+  );
 });
 
 describe('the submissions list', () => {
@@ -908,9 +950,9 @@ describe('a submission opened from the list', () => {
     expect(
       within(detail).getByText(/^100 points, and up to 70 more shown at /),
     ).toBeVisible();
-    expect(within(detail).getByLabelText('Over the tests')).toHaveTextContent(
-      `time_ms${formatExact('12.5')}`,
-    );
+    expect(
+      within(detail).getByRole('group', { name: 'Over the tests shown' }),
+    ).toHaveTextContent(`time_ms${formatExact('12.5')}`);
 
     const main = within(detail).getByRole('region', { name: 'Group main' });
     expect(within(main).getByText('ACCEPTED')).toBeVisible();
@@ -1035,6 +1077,33 @@ describe('a submission opened from the list', () => {
     expect(within(detail).queryByRole('table')).toBeNull();
   });
 
+  it('says a submission past the limit was not graded and why, in its row and opened, with no points', async () => {
+    const over = grading({ status: 'over_limit', limit: 10 });
+    server.use(
+      signedIn,
+      withPage({}),
+      listing([submission(1, over)]),
+      http.get(`${TASK_API}/submissions/:number`, () =>
+        HttpResponse.json(submission(1, over)),
+      ),
+    );
+    renderApp(`${PAGE}?submission=1`);
+
+    const sentence =
+      'Not graded: you had reached the limit of 10 submissions for this task.';
+    const list = await screen.findByRole('table', { name: 'Your submissions' });
+    const [, row] = within(list).getAllByRole('row');
+    expect(row).toHaveTextContent(`OVER THE LIMIT${sentence}`);
+    const detail = await screen.findByRole('region', { name: 'Submission 1' });
+    expect(await within(detail).findByText('OVER THE LIMIT')).toBeVisible();
+    expect(within(detail).getByText(sentence)).toBeVisible();
+    expect(
+      within(detail).getByText('It has no result and counts on no leaderboard.'),
+    ).toBeVisible();
+    expect(within(detail).queryByRole('table')).toBeNull();
+    expect(within(detail).queryByText(/points/)).toBeNull();
+  });
+
   it('says nothing of the limit for a cancel that carries no sentence', async () => {
     const cancelled = grading({ status: 'cancelled', reason: null });
     server.use(
@@ -1052,6 +1121,23 @@ describe('a submission opened from the list', () => {
       await within(detail).findByText('Cancelled by the organisers.'),
     ).toBeVisible();
     expect(within(detail).queryByText(/does not count against/)).toBeNull();
+  });
+
+  it('says a submission graded again in an entrant’s words, not as an attempt', async () => {
+    const again = { ...accepted, attempt: 3 };
+    server.use(
+      signedIn,
+      withPage({}),
+      listing([submission(1, again)]),
+      http.get(`${TASK_API}/submissions/:number`, () =>
+        HttpResponse.json(submission(1, again)),
+      ),
+    );
+    renderApp(`${PAGE}?submission=1`);
+
+    const detail = await screen.findByRole('region', { name: 'Submission 1' });
+    expect(await within(detail).findByText('Graded again')).toBeVisible();
+    expect(detail).not.toHaveTextContent(/attempt/i);
   });
 
   it('lists the files it was made with, each a download through the door', async () => {
@@ -1119,6 +1205,44 @@ describe('a submission opened from the list', () => {
         .getAllByRole('listitem')
         .map((item) => item.textContent),
     ).toEqual(['language: cpp', 'n: 5', 'strict: true']);
+  });
+
+  it('names each input as the form does, by its label, its key only for an input the task no longer has (M13)', async () => {
+    server.use(
+      signedIn,
+      withPage({
+        inputs: [inputField(), inputField({ ...languageField, label: 'Language' })],
+      }),
+      listing([submission(1, accepted)]),
+      http.get(`${TASK_API}/submissions/:number`, () =>
+        HttpResponse.json(submission(1, accepted)),
+      ),
+      http.get(`${TASK_API}/submissions/:number/files`, () =>
+        HttpResponse.json({
+          number: 1,
+          inputs: {
+            submission: { files: ['files/submission/main.py'], value: null },
+            language: { files: [], value: 'python' },
+            old: { files: [], value: '3' },
+          },
+        }),
+      ),
+    );
+    renderApp(`${PAGE}?submission=1`);
+
+    const detail = await screen.findByRole('region', { name: 'Submission 1' });
+    const files = await within(detail).findByRole('list', { name: 'Files' });
+    expect(
+      within(files)
+        .getAllByRole('listitem')
+        .map((item) => item.textContent),
+    ).toEqual(['Your solution: main.py']);
+    const given = within(detail).getByRole('list', { name: 'Values given' });
+    expect(
+      within(given)
+        .getAllByRole('listitem')
+        .map((item) => item.textContent),
+    ).toEqual(['Language: python', 'old: 3']);
   });
 
   it('names each file by its path under its input, so files of one name differ', async () => {

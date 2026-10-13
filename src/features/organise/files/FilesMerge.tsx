@@ -148,7 +148,7 @@ export function FilesMerge({
           Save the merged version
         </Button>
         <Button variant="danger" disabled={busy} onClick={() => setWarning(true)}>
-          Save mine over theirs
+          Save yours over theirs
         </Button>
         <Button variant="secondary" disabled={busy} onClick={onDrop}>
           Discard my changes
@@ -174,7 +174,7 @@ export function FilesMerge({
                 onSave(new Set(files.map((file) => file.path)));
               }}
             >
-              Save mine over theirs
+              Save yours over theirs
             </Button>
             <Button variant="secondary" onClick={() => setWarning(false)}>
               Cancel

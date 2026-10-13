@@ -129,7 +129,7 @@ describe('the organisers section', () => {
 
     await screen.findByRole('table', { name: / organisers$/ });
     await user.click(screen.getByRole('button', { name: 'Remove dee' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Remove this role?' });
+    const dialog = await screen.findByRole('dialog', { name: 'Remove dee’s role?' });
     await user.click(within(dialog).getByRole('button', { name: 'Remove' }));
 
     await screen.findByRole('table', { name: / organisers$/ });
@@ -155,7 +155,7 @@ describe('the organisers section', () => {
     await screen.findByRole('table', { name: / organisers$/ });
     await user.click(screen.getByRole('button', { name: 'Remove kenny' }));
     const dialog = await screen.findByRole('dialog', {
-      name: 'Give up your role here?',
+      name: 'Give up your role at this org?',
     });
     await user.click(within(dialog).getByRole('button', { name: 'Remove' }));
 

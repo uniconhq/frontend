@@ -1,49 +1,67 @@
-import type { TaskEntry } from '@/api/types';
-import { compareDecimal, cut, formatExact } from '@/lib/exact';
+import type { BoardPoints, TaskEntry } from '@/api/types';
+import { compareDecimal, formatPoints, formatWorth, withPointsWord } from '@/lib/exact';
 import { formatWhen } from '@/lib/time';
 
-/** How many decimals points are shown to. */
-const PLACES = 2;
+/** An entrant's points on a task as a line reads them, and when held-back points are shown. */
+export type PointsText = { score: string; pending: string | null };
 
-/**
- * Points shown out of a worth: cut, never rounded up, so points short of the
- * worth never read as the worth; points that are the worth read as it.
- */
-function shownOf(shown: string, worth: string): string {
-  return compareDecimal(shown, worth) === 0
-    ? formatExact(worth, PLACES)
-    : formatExact(cut(shown, PLACES), PLACES);
+/** A task's worth alone, "100 points", for a reader the contest counts no points for. */
+function worthText(worth: string): PointsText {
+  return {
+    score: withPointsWord(formatWorth(worth)),
+    pending: null,
+  };
 }
 
 /**
- * An entrant's points on a task out of its worth, as the contest page lists
- * it (#440): "62 / 100", the points as a leaderboard over that one task
- * counts them, so nothing a leaderboard holds back. While some of the task's
- * points wait for a reveal, `pending` says when they are shown, as a
- * submission's row says it (M18): "More shown at 14:00", or, with nothing
- * shown yet (`shown` null; a shown 0 reads as 0), `—` over the worth and
- * "Shown at 14:00". For anyone the contest
- * gives no points, such as someone not yet approved or a visitor, the worth
- * alone, "100 points". Null on a task that gives no points. Exact numbers,
- * the points cut and the worth rounded only for reading.
+ * An entrant's points on a task as one leaderboard counts them (#447):
+ * "62 / 100", over the most that board can count from the task, so a board
+ * over some of the task's groups is not read as out of the task's worth.
+ * While some of those points wait for a reveal, `pending` says when they are
+ * shown, as a submission's row says it (M18): "More shown at 14:00", or,
+ * with nothing shown yet (`shown` null; a shown 0 reads as 0), `—` over the
+ * most and "Shown at 14:00". "—" alone where the board does not cover the
+ * task, or counts nothing from it. Null on a task that gives no points.
+ * Exact numbers, cut only for reading, as every page cuts points (R17).
+ */
+export function boardPointsText(
+  cell: BoardPoints,
+  worth: string | null,
+  now: Date,
+): PointsText | null {
+  if (worth === null) return null;
+  const most = cell.most ?? worth;
+  if (!cell.covers || compareDecimal(most, '0') === 0) {
+    return { score: '—', pending: null };
+  }
+  if (cell.points === null) return null;
+  const { shown, pending_until: until } = cell.points;
+  const score = `${shown === null ? '—' : formatPoints(shown, most)} / ${formatWorth(most)}`;
+  if (until === null) return { score, pending: null };
+  const at = formatWhen(new Date(until), now);
+  return { score, pending: `${shown === null ? 'Shown' : 'More shown'} at ${at}` };
+}
+
+/**
+ * An entrant's points on a task as one number, as the contest page lists
+ * it while the contest shows the entrant one leaderboard: that board's
+ * count, "62 / 100", or, where it does not cover the task, that it is not
+ * on the leaderboard, and where it covers it for 0 points, that it counts
+ * none, since no column heading gives a bare "—" its meaning. For anyone the contest counts no points for, such as
+ * someone not yet approved or a visitor, or an entrant the contest shows no
+ * leaderboard, the worth alone, "100 points". Null on a task that gives no
+ * points. With several leaderboards, each column reads `boardPointsText`.
  */
 export function taskPointsText(
   task: Pick<TaskEntry, 'points' | 'worth'>,
   now: Date,
-): { score: string; pending: string | null } | null {
+): PointsText | null {
   const { points, worth } = task;
   if (worth === null) return null;
-  if (points === null) {
-    const one = compareDecimal(worth, '1') === 0;
-    return {
-      score: `${formatExact(worth, PLACES)} ${one ? 'point' : 'points'}`,
-      pending: null,
-    };
-  }
-  const out = formatExact(worth, PLACES);
-  const { shown, pending_until: until } = points;
-  const score = `${shown === null ? '—' : shownOf(shown, worth)} / ${out}`;
-  if (until === null) return { score, pending: null };
-  const at = formatWhen(new Date(until), now);
-  return { score, pending: `${shown === null ? 'Shown' : 'More shown'} at ${at}` };
+  const [only] = points;
+  if (only === undefined) return worthText(worth);
+  if (!only.covers) return { score: 'Not on the leaderboard', pending: null };
+  if (compareDecimal(only.most ?? worth, '0') === 0)
+    return { score: 'Counts no points on the leaderboard', pending: null };
+  return boardPointsText(only, worth, now);
 }

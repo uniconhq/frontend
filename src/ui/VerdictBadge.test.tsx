@@ -19,6 +19,7 @@ const EVERY: [Verdict, string][] = [
   ['running', 'RUNNING'],
   ['done', 'GRADED'],
   ['cancelled', 'CANCELLED'],
+  ['over_limit', 'OVER THE LIMIT'],
 ];
 
 describe('VerdictBadge', () => {

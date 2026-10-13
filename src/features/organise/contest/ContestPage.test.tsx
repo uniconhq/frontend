@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@/test/user-event';
 import { delay, http, HttpResponse } from 'msw';
-import type { TaskStanding } from '@/api/types';
+import type { RegradeSummary, TaskStanding } from '@/api/types';
 import { parse } from 'yaml';
 import { isoOf, localOf } from '../forms/times';
 import { CONTEST_SECTIONS } from '@/lib/sections';
@@ -16,6 +16,7 @@ import {
   standingList,
   standings,
   taskList,
+  unchanged,
 } from '@/test/organiser';
 
 const CONTEST = '/orgs/acme/contests/spring';
@@ -90,6 +91,56 @@ describe("the contest's settings at a glance", () => {
   });
 });
 
+describe("the contest's regrades (#448)", () => {
+  it('sums up a task’s latest regrade on the contest page, each count a link to those submissions on Gradings', async () => {
+    const regrade: RegradeSummary = {
+      id: '0199a2c1-0000-7000-8000-0000000000bb',
+      task: 'sum',
+      label: 'B',
+      cause: 'rejudge',
+      publication: 3,
+      started_at: '2026-10-12T14:00:00Z',
+      started_by: 7,
+      started_by_name: 'alice',
+      total: 12,
+      graded: 12,
+      running: false,
+      counts: {
+        up: 1,
+        down: 3,
+        stopped: 0,
+        unchanged: 8,
+        new: 0,
+        running: 0,
+        failed: 0,
+        over_limit: 0,
+      },
+    };
+    server.use(
+      signedIn,
+      standingList,
+      ...repoFiles,
+      http.get(`${CONTEST_API}/gradings/regrades`, () => HttpResponse.json([regrade])),
+    );
+    renderApp(CONTEST);
+
+    const regrades = await screen.findByRole('region', { name: 'Regrades' });
+    const summary = within(regrades).getByRole('listitem', { name: 'Regrade of B' });
+    expect(summary).toHaveTextContent(
+      'Regrade of B: 12 graded · 3 went down · 1 went up',
+    );
+    const gradings = `${CONTEST}/gradings`;
+    expect(within(summary).getByRole('link', { name: '3 went down' })).toHaveAttribute(
+      'href',
+      `${gradings}?regrade=${regrade.id}&change=down`,
+    );
+    expect(within(summary).getByRole('link', { name: '12 graded' })).toHaveAttribute(
+      'href',
+      `${gradings}?regrade=${regrade.id}`,
+    );
+  });
+});
+
 describe("the contest's tasks", () => {
   it('lists the tasks in order, each by its letter and name, linking to its page', async () => {
     server.use(signedIn, standingList, ...repoFiles);
@@ -137,6 +188,11 @@ describe("the contest's tasks", () => {
         ['B · Sum of two', '/orgs/acme/contests/spring/tasks/sum'],
       ]),
     );
+    const status = screen.getByRole('region', { name: 'Status' });
+    expect(
+      await within(status).findByRole('link', { name: /^A · Sorting: / }),
+    ).toBeVisible();
+    expect(await screen.findByRole('region', { name: 'B · Sum of two' })).toBeVisible();
   });
 
   it("says each task's latest publication and its timeline as one line, defaults resolved", async () => {
@@ -222,9 +278,8 @@ describe("the contest's tasks", () => {
     renderApp(CONTEST);
 
     const sum = await screen.findByRole('listitem', { name: 'B · sum' });
-    expect(sum).toHaveTextContent(
-      `Publication 2, ${at('2026-09-21T10:00:00Z')}, grading unchanged`,
-    );
+    expect(sum).toHaveTextContent(`Publication 2, ${at('2026-09-21T10:00:00Z')}`);
+    expect(sum).not.toHaveTextContent(/unchanged|how it grades/);
     expect(sum).toHaveTextContent('1 problem in its last save');
     expect(within(sum).queryByRole('list', { name: 'Errors' })).toBeNull();
   });
@@ -233,11 +288,16 @@ describe("the contest's tasks", () => {
     const fresh: TaskStanding = {
       task: { name: 'max' },
       label: 'C',
+      withdrawn: false,
+      submissions: 0,
+      take_out: 'remove',
       state: {
         head: 'a1',
         latest: null,
         draft: true,
         errors: [{ path: '', message: 'task.yaml is missing.' }],
+        statement_written: false,
+        head_statement_written: false,
       },
       timeline: {
         release_at: '2026-10-01T09:00:00Z',
@@ -533,35 +593,47 @@ describe('how the contest is scored (M52)', () => {
     expect(card).toHaveTextContent(
       "Check this before the contest starts. It says how each task earns points and which leaderboards count them, as each task's latest publication has it.",
     );
-    const sortPart = await within(card).findByRole('region', { name: 'A · sort' });
+    const sortPart = await within(card).findByRole('region', { name: 'A · Sort' });
     expect(within(sortPart).getByRole('heading', { level: 3 })).toHaveTextContent(
-      `A · sort: 50 points, open for the whole contest; due ${at('2026-10-08T09:00:00Z')}, then 10% less per started day late`,
+      `A · Sort: 50 points, open for the whole contest; due ${at('2026-10-08T09:00:00Z')}, then 10% less per started day late`,
     );
     await line(
       sortPart,
       "Its contest makes the task worth 50 points, so each test group's points are scaled to that.",
     );
-    // A worked example from the group's own number of tests.
+    // The groups first, in one line, at the points the contest makes them.
+    expect(
+      within(sortPart).getByText('Two test groups: small (15 points) and large (35).'),
+    ).toBeVisible();
+    // Each group's size and points before its rule, with a worked example from its own tests.
     await line(
       sortPart,
-      'Test group “small”: an entrant earns 15 points when every test passes, and nothing otherwise. An entrant who passes 3 of 4 gets nothing.',
+      'small (4 tests, 15 points): an entrant earns 15 points when every test passes, and nothing otherwise. An entrant who passes 3 of 4 gets nothing.',
     );
     await line(
       sortPart,
-      'Counted on Standings: highest total first, using each entrant’s best submission. Only organisers see it.',
+      'Leaderboard “Standings”: ranks entrants by their total points over task sort, most first. Each entrant’s best submission to this task counts. Only organisers see it.',
     );
     expect(sortPart).not.toHaveTextContent(/\byou\b/i);
+    // The whole card opens Leaderboards; each task's heading keeps its own link.
+    expect(
+      within(card).getByRole('link', { name: 'How this contest is scored' }),
+    ).toHaveAttribute('href', '/orgs/acme/contests/spring/boards');
+    expect(within(sortPart).getByRole('link', { name: 'A · Sort' })).toHaveAttribute(
+      'href',
+      expect.stringMatching(/^\/orgs\/acme\/contests\/spring\/tasks\/sort\b/),
+    );
 
-    const sumPart = within(card).getByRole('region', { name: 'B · sum' });
+    const sumPart = within(card).getByRole('region', { name: 'B · Sum' });
     expect(within(sumPart).getByRole('heading', { level: 3 })).toHaveTextContent(
-      'B · sum: 100 points, open for the whole contest',
+      'B · Sum: 100 points, open for the whole contest',
     );
     // Where the worth comes from is said only where the contest sets it.
     expect(sumPart).not.toHaveTextContent('scaled');
     // A draft on top of its publication: its tests now are not the published ones.
     await line(
       sumPart,
-      'Test group “main”: each test passed is worth an equal share of 80 points. Passing every test earns 20 points more.',
+      'main (100 points): each test passed earns an equal share of 80 points. Passing every test earns 20 points more.',
     );
     await line(sumPart, 'No leaderboard counts it.');
   });
@@ -607,6 +679,52 @@ describe('how the contest is scored (M52)', () => {
     );
   });
 
+  it('says a withdrawn task is counted on no leaderboard, in place of the boards that name it', async () => {
+    const [, sum] = standings;
+    if (sum === undefined) throw new Error('standings has sum');
+    server.use(
+      signedIn,
+      http.get(`${CONTEST_API}/organise/tasks`, () =>
+        HttpResponse.json([
+          {
+            ...sum,
+            label: 'A',
+            withdrawn: true,
+            submissions: 3,
+            take_out: null,
+            state: { ...sum.state, draft: false, errors: [] },
+            timeline: { ...sum.timeline, worth: '100' },
+          },
+        ]),
+      ),
+      contestFile([
+        'name: Spring',
+        'start: 2026-10-01T09:00:00Z',
+        'end: 2026-10-15T09:00:00Z',
+        'tasks: [{id: sum, withdrawn: true}]',
+        'leaderboards: [{name: Standings}]',
+      ]),
+      ...publishedTasks(
+        {
+          sum: 'name: Sum\nworkflow: unicon/classic@v2\ntest_groups:\n  main: {pass: 100}\n',
+        },
+        { sum: { main: 2 } },
+      ),
+      ...repoFiles,
+    );
+    renderApp(CONTEST);
+
+    const card = await screen.findByRole('region', {
+      name: 'How this contest is scored',
+    });
+    const part = await within(card).findByRole('region', { name: 'A · sum' });
+    await line(
+      part,
+      'Withdrawn: entrants do not see it, and no leaderboard counts it.',
+    );
+    expect(part).not.toHaveTextContent('Leaderboard “Standings”');
+  });
+
   it('names a group hidden until the end on each board where it changes what the board counts, and nowhere else', async () => {
     const [, sum] = standings;
     if (sum === undefined) throw new Error('standings has sum');
@@ -646,22 +764,25 @@ describe('how the contest is scored (M52)', () => {
       name: 'How this contest is scored',
     });
     const part = await within(card).findByRole('region', { name: 'A · sum' });
+    expect(
+      within(part).getByText('Two test groups: samples (0 points) and hidden (100).'),
+    ).toBeVisible();
     await line(
       part,
-      'Test group “samples”: no points: its tests are for entrants to practise on.',
+      'samples (2 tests, no points): its tests are for entrants to practise on.',
     );
     // The same words the task's Tests card gives the group.
     await line(
       part,
-      'Test group “hidden”: each test passed is worth an equal share of 100 points. An entrant who passes 3 of 4 gets 75.',
+      'hidden (4 tests, 100 points): each test passed earns an equal share, 25. An entrant who passes 3 of 4 gets 75.',
     );
     await line(
       part,
-      'Counted on Live: highest total first, using each entrant’s best submission. Entrants and organisers see the whole leaderboard. It leaves out test group “hidden”, whose results entrants see only once the task closes.',
+      'Leaderboard “Live”: ranks entrants by their total points over every task, most first. Each entrant’s best submission to this task counts. Entrants and organisers see all of it. It leaves out test group “hidden”, whose results entrants see only once the task closes.',
     );
     await line(
       part,
-      'Counted on Final: highest total first, using each entrant’s best submission. Everyone who can see the contest sees the whole leaderboard. Results from test group “hidden” join it when the contest ends.',
+      'Leaderboard “Final”: ranks entrants by their total points over every task, most first. Each entrant’s best submission to this task counts. Everyone who can see the contest sees all of it. Results from test group “hidden” join it when the contest ends.',
     );
     // A board that does not cover the task is not listed under it.
     expect(part).not.toHaveTextContent('Practice');
@@ -674,7 +795,14 @@ describe('how the contest is scored, as published', () => {
       ...standings[0]!,
       task: { name: 'new' },
       label: 'C',
-      state: { head: 'f0', latest: null, draft: true, errors: [] },
+      state: {
+        head: 'f0',
+        latest: null,
+        draft: true,
+        errors: [],
+        statement_written: false,
+        head_statement_written: false,
+      },
       // A task never published has no worth yet.
       timeline: { ...standings[0]!.timeline, worth: null },
     };
@@ -688,9 +816,11 @@ describe('how the contest is scored, as published', () => {
         const content =
           params['task'] === 'sort'
             ? 'name: Sort\nworkflow: unicon/icpc@v1\ntest_groups:\n  judge: {pass: 1}\n'
-            : at === standings[1]!.state.latest?.version
-              ? 'name: Sum\nworkflow: unicon/classic@v2\ntest_groups:\n  main: {each: 80, pass: 20}\n'
-              : 'name: Sum\nworkflow: unicon/classic@v2\ntest_groups:\n  main: {each: 120}\n';
+            : params['task'] === 'new'
+              ? 'workflow: unicon/classic@v2\n'
+              : at === standings[1]!.state.latest?.version
+                ? 'name: Sum\nworkflow: unicon/classic@v2\ntest_groups:\n  main: {each: 80, pass: 20}\n'
+                : 'name: Sum\nworkflow: unicon/classic@v2\ntest_groups:\n  main: {each: 120}\n';
         return HttpResponse.json({
           path: 'task.yaml',
           encoding: 'utf-8',
@@ -708,15 +838,15 @@ describe('how the contest is scored, as published', () => {
     const card = await screen.findByRole('region', {
       name: 'How this contest is scored',
     });
-    const sum = await within(card).findByRole('region', { name: 'B · sum' });
+    const sum = await within(card).findByRole('region', { name: 'B · Sum' });
     await line(
       sum,
-      'Test group “main”: each test passed is worth an equal share of 80 points. Passing every test earns 20 points more.',
+      'main (100 points): each test passed earns an equal share of 80 points. Passing every test earns 20 points more.',
     );
-    const sort = within(card).getByRole('region', { name: 'A · sort' });
+    const sort = within(card).getByRole('region', { name: 'A · Sort' });
     await line(
       sort,
-      'Test group “judge”: an entrant earns 1 point when every test passes, and nothing otherwise.',
+      'judge (1 point): an entrant earns 1 point when every test passes, and nothing otherwise.',
     );
     const fresh = within(card).getByRole('region', { name: 'C · new' });
     expect(
@@ -728,7 +858,7 @@ describe('how the contest is scored, as published', () => {
   });
 });
 
-describe("a task's timeline, edited on its row", () => {
+describe("a task's place in the contest, changed from its row", () => {
   /** The contest's settings, each save taken and the file becoming it. */
   function settingsSaved(content?: string) {
     let file = files['contest.yaml']!;
@@ -755,9 +885,11 @@ describe("a task's timeline, edited on its row", () => {
     renderApp(CONTEST);
 
     await user.click(
-      await screen.findByRole('button', { name: 'Edit the timeline of A · sort' }),
+      await screen.findByRole('button', { name: 'Change A · sort in this contest' }),
     );
-    const dialog = await screen.findByRole('dialog', { name: 'Timeline of A · sort' });
+    const dialog = await screen.findByRole('dialog', {
+      name: 'A · sort in this contest',
+    });
     const worth = await within(dialog).findByRole('textbox', { name: 'Worth' });
     expect(worth).toHaveAttribute('placeholder', '100, its test groups’ total');
     await user.type(worth, '120');
@@ -767,7 +899,7 @@ describe("a task's timeline, edited on its row", () => {
       within(dialog).getByRole('textbox', { name: /Taken off per started late day/ }),
       '12.5',
     );
-    await user.click(within(dialog).getByRole('button', { name: 'Save the timeline' }));
+    await user.click(within(dialog).getByRole('button', { name: 'Save' }));
 
     expect(await within(dialog).findByText('Saved.')).toBeVisible();
     const [saved] = sent;
@@ -787,9 +919,11 @@ describe("a task's timeline, edited on its row", () => {
     renderApp(CONTEST);
 
     await user.click(
-      await screen.findByRole('button', { name: 'Edit the timeline of B · sum' }),
+      await screen.findByRole('button', { name: 'Change B · sum in this contest' }),
     );
-    const dialog = await screen.findByRole('dialog', { name: 'Timeline of B · sum' });
+    const dialog = await screen.findByRole('dialog', {
+      name: 'B · sum in this contest',
+    });
     const worth = await within(dialog).findByRole('textbox', { name: 'Worth' });
     expect(worth).toBeDisabled();
     expect(worth).toHaveAccessibleDescription(
@@ -805,19 +939,63 @@ describe("a task's timeline, edited on its row", () => {
     ).toBeDisabled();
   });
 
-  it('moves a task down the list, which saves at once', async () => {
+  it('moves a task down the list from its row, which saves at once', async () => {
     server.use(signedIn, standingList, ...repoFiles);
     const sent = settingsSaved();
     const user = userEvent.setup();
     renderApp(CONTEST);
 
-    await user.click(
-      await screen.findByRole('button', { name: 'Edit the timeline of A · sort' }),
-    );
-    const dialog = await screen.findByRole('dialog', { name: 'Timeline of A · sort' });
-    expect(within(dialog).getByRole('button', { name: 'Move up' })).toBeDisabled();
-    await user.click(within(dialog).getByRole('button', { name: 'Move down' }));
+    const row = await screen.findByRole('listitem', { name: 'A · sort' });
+    expect(
+      within(row).getByRole('button', { name: 'Move A · sort up' }),
+    ).toBeDisabled();
+    await user.click(within(row).getByRole('button', { name: 'Move A · sort down' }));
 
+    await waitFor(() => expect(sent).toHaveLength(1));
+    expect((parse(sent[0] ?? '') as { tasks: { id: string }[] }).tasks).toEqual([
+      { id: 'sum' },
+      { id: 'sort' },
+    ]);
+    expect(
+      within(screen.getByRole('listitem', { name: 'B · sum' })).getByRole('button', {
+        name: 'Move B · sum down',
+      }),
+    ).toBeDisabled();
+  });
+
+  it('asks before a move once the contest has started, saying which letters change', async () => {
+    server.use(signedIn, standingList, ...repoFiles);
+    const sent = settingsSaved(
+      [
+        'name: Spring',
+        'start: 2020-01-01T09:00:00Z',
+        'end: 2099-01-01T09:00:00Z',
+        'state: published',
+        'tasks:',
+        '  - id: sort',
+        '  - id: sum',
+        '',
+      ].join('\n'),
+    );
+    const user = userEvent.setup();
+    renderApp(CONTEST);
+
+    const row = await screen.findByRole('listitem', { name: 'B · sum' });
+    await user.click(within(row).getByRole('button', { name: 'Move B · sum up' }));
+    const asked = await screen.findByRole('dialog', { name: 'Move B · sum up?' });
+    expect(asked).toHaveTextContent(
+      'The contest has started, so entrants see this at once: B · sum becomes A, and A · sort becomes B. The leaderboards, the contest’s page and every announcement or question that names a task by its letter go by the new letters.',
+    );
+    await user.click(within(asked).getByRole('button', { name: 'Cancel' }));
+    expect(sent).toEqual([]);
+
+    await user.click(within(row).getByRole('button', { name: 'Move B · sum up' }));
+    await user.click(
+      within(await screen.findByRole('dialog', { name: 'Move B · sum up?' })).getByRole(
+        'button',
+        { name: 'Move it up' },
+      ),
+    );
     await waitFor(() => expect(sent).toHaveLength(1));
     expect((parse(sent[0] ?? '') as { tasks: { id: string }[] }).tasks).toEqual([
       { id: 'sum' },
@@ -825,24 +1003,38 @@ describe("a task's timeline, edited on its row", () => {
     ]);
   });
 
-  it('says in a task’s timeline that it cannot be taken out of the contest yet', async () => {
+  it('opens the dialog from the row’s second line, which ends in Change, and has no Edit button', async () => {
     server.use(signedIn, standingList, ...repoFiles);
     settingsSaved();
-    const user = userEvent.setup();
     renderApp(CONTEST);
 
-    await user.click(
-      await screen.findByRole('button', { name: 'Edit the timeline of A · sort' }),
-    );
-    const dialog = await screen.findByRole('dialog', { name: 'Timeline of A · sort' });
-    expect(
-      within(dialog).getByText(
-        'Every task in this list is part of the contest: a task cannot be taken out of it yet, so the contest opens only once each is published.',
+    const row = await screen.findByRole('listitem', { name: 'A · sort' });
+    const line = within(row).getByRole('button', {
+      name: 'Change A · sort in this contest',
+    });
+    expect(line).toHaveTextContent(/^100 points, .*·Change$/);
+    expect(within(row).queryByRole('button', { name: /^Edit/ })).toBeNull();
+  });
+
+  it('offers no arrows while the contest has one task', async () => {
+    server.use(
+      signedIn,
+      http.get(`${CONTEST_API}/organise/tasks`, () =>
+        HttpResponse.json(standings.slice(0, 1)),
       ),
+      ...repoFiles,
+    );
+    settingsSaved();
+    renderApp(CONTEST);
+
+    const row = await screen.findByRole('listitem', { name: 'A · sort' });
+    expect(within(row).queryByRole('button', { name: /^Move/ })).toBeNull();
+    expect(
+      within(row).getByRole('button', { name: 'Change A · sort in this contest' }),
     ).toBeVisible();
   });
 
-  it('moves the task it was opened for, wherever the list read fresh has it', async () => {
+  it('moves the task whose arrow was pressed, wherever the list read fresh has it', async () => {
     server.use(signedIn, standingList, ...repoFiles);
     // Someone else put a task ahead of sort since the page read its list.
     const sent = settingsSaved(
@@ -851,11 +1043,8 @@ describe("a task's timeline, edited on its row", () => {
     const user = userEvent.setup();
     renderApp(CONTEST);
 
-    await user.click(
-      await screen.findByRole('button', { name: 'Edit the timeline of A · sort' }),
-    );
-    const dialog = await screen.findByRole('dialog', { name: 'Timeline of A · sort' });
-    await user.click(within(dialog).getByRole('button', { name: 'Move down' }));
+    const row = await screen.findByRole('listitem', { name: 'A · sort' });
+    await user.click(within(row).getByRole('button', { name: 'Move A · sort down' }));
 
     await waitFor(() => expect(sent).toHaveLength(1));
     expect((parse(sent[0] ?? '') as { tasks: { id: string }[] }).tasks).toEqual([
@@ -865,18 +1054,20 @@ describe("a task's timeline, edited on its row", () => {
     ]);
   });
 
-  it("opens a task's timeline from a link that names one of its fields", async () => {
+  it("opens a task's dialog from a link that names one of its fields", async () => {
     server.use(signedIn, standingList, ...repoFiles);
     settingsSaved();
     renderApp(`${CONTEST}?part=tasks&field=worth&item=0`);
 
-    const dialog = await screen.findByRole('dialog', { name: 'Timeline of A · sort' });
+    const dialog = await screen.findByRole('dialog', {
+      name: 'A · sort in this contest',
+    });
     await waitFor(() =>
       expect(within(dialog).getByRole('textbox', { name: 'Worth' })).toHaveFocus(),
     );
   });
 
-  it("opens a task's timeline from such a link followed while the page is open", async () => {
+  it("opens a task's dialog from such a link followed while the page is open", async () => {
     server.use(signedIn, standingList, ...repoFiles);
     settingsSaved();
     const { router } = renderApp(CONTEST);
@@ -885,11 +1076,11 @@ describe("a task's timeline, edited on its row", () => {
     await router.navigate(`${CONTEST}?part=tasks&field=closes&item=1`);
 
     expect(
-      await screen.findByRole('dialog', { name: 'Timeline of B · sum' }),
+      await screen.findByRole('dialog', { name: 'B · sum in this contest' }),
     ).toBeVisible();
   });
 
-  it('offers an observer no way to edit a timeline', async () => {
+  it('offers an observer the line as text, with no way to change or move a task', async () => {
     server.use(
       http.get('/api/v1/me', () =>
         HttpResponse.json({
@@ -904,8 +1095,9 @@ describe("a task's timeline, edited on its row", () => {
     );
     renderApp(CONTEST);
 
-    await screen.findByRole('listitem', { name: 'A · sort' });
-    expect(screen.queryByRole('button', { name: /^Edit the timeline/ })).toBeNull();
+    const row = await screen.findByRole('listitem', { name: 'A · sort' });
+    expect(within(row).getByText(/^100 points, /)).toBeVisible();
+    expect(within(row).queryByRole('button')).toBeNull();
   });
 });
 
@@ -1030,7 +1222,17 @@ describe('creating a task', () => {
         listed.push({
           task: { name: body.name },
           label: 'C',
-          state: { head: 'a1', latest: null, draft: false, errors: [] },
+          withdrawn: false,
+          submissions: 0,
+          take_out: 'remove',
+          state: {
+            head: 'a1',
+            latest: null,
+            draft: false,
+            errors: [],
+            statement_written: false,
+            head_statement_written: false,
+          },
           timeline: {
             release_at: '2026-10-01T09:00:00Z',
             due: null,
@@ -1127,6 +1329,7 @@ describe('creating a task', () => {
             changes: [],
             notes: [],
             regraded: 0,
+            effect: unchanged,
           });
         },
       ),
@@ -1222,5 +1425,283 @@ describe('creating a task', () => {
       'The task acme/spring/sum already exists.',
     );
     expect(within(form).getByRole('textbox', { name: /^Name/ })).toHaveValue('sum');
+  });
+});
+
+describe('taking a task out of the contest', () => {
+  /** The spring contest's tasks, `sort` as `change` makes it. */
+  function sortAs(change: Partial<TaskStanding>) {
+    const [sort, ...rest] = standings;
+    if (sort === undefined) throw new Error('sort is listed');
+    return http.get(`${CONTEST_API}/organise/tasks`, () =>
+      HttpResponse.json([{ ...sort, ...change }, ...rest]),
+    );
+  }
+
+  /** Each take-out asked, and its answer: done, unless `answer` refuses it. */
+  function takeOuts(answer?: (asked: number) => Response | undefined) {
+    const sent: unknown[] = [];
+    server.use(
+      http.post(`${CONTEST_API}/tasks/:task/take-out`, async ({ request, params }) => {
+        const body = (await request.json()) as { confirmed: string };
+        sent.push({ task: params['task'], ...body });
+        return answer?.(sent.length) ?? HttpResponse.json({ done: body.confirmed });
+      }),
+    );
+    return sent;
+  }
+
+  async function openDialog(user: ReturnType<typeof userEvent.setup>) {
+    await user.click(
+      await screen.findByRole('button', { name: 'Change A · sort in this contest' }),
+    );
+    return screen.findByRole('dialog', { name: 'A · sort in this contest' });
+  }
+
+  it('removes a task nobody has submitted to, after saying it is deleted for good', async () => {
+    server.use(signedIn, standingList, ...repoFiles);
+    const sent = takeOuts();
+    const user = userEvent.setup();
+    renderApp(CONTEST);
+
+    const dialog = await openDialog(user);
+    expect(within(dialog).queryByText(/cannot be taken out/)).toBeNull();
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Remove A · sort from the contest' }),
+    );
+    const asked = await screen.findByRole('dialog', {
+      name: 'Remove A · sort from the contest?',
+    });
+    expect(asked).toHaveTextContent(
+      'Nobody has submitted to A · sort. Removing it deletes the task and its files for good, and the tasks after it each move up a letter.',
+    );
+    expect(asked).toHaveTextContent('This cannot be undone.');
+    await user.click(within(asked).getByRole('button', { name: 'Remove it' }));
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(sent).toEqual([{ task: 'sort', confirmed: 'remove' }]);
+  });
+
+  it('goes back to the timeline from the question on Not now', async () => {
+    server.use(signedIn, standingList, ...repoFiles);
+    const sent = takeOuts();
+    const user = userEvent.setup();
+    renderApp(CONTEST);
+
+    const dialog = await openDialog(user);
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Remove A · sort from the contest' }),
+    );
+    const asked = await screen.findByRole('dialog', {
+      name: 'Remove A · sort from the contest?',
+    });
+    await user.click(within(asked).getByRole('button', { name: 'Not now' }));
+
+    expect(
+      await screen.findByRole('dialog', { name: 'A · sort in this contest' }),
+    ).toBeVisible();
+    expect(sent).toEqual([]);
+  });
+
+  it('withdraws a task with submissions, saying what entrants lose and that it can be put back', async () => {
+    server.use(
+      signedIn,
+      sortAs({ submissions: 14, take_out: 'withdraw' }),
+      ...repoFiles,
+    );
+    const sent = takeOuts();
+    const user = userEvent.setup();
+    renderApp(CONTEST);
+
+    const dialog = await openDialog(user);
+    await user.click(
+      within(dialog).getByRole('button', {
+        name: 'Withdraw A · sort from the contest',
+      }),
+    );
+    const asked = await screen.findByRole('dialog', {
+      name: 'Withdraw A · sort from the contest?',
+    });
+    expect(asked).toHaveTextContent(
+      'A · sort has 14 submissions. Withdrawing it hides it from entrants and takes its points off every leaderboard. Its submissions are kept, and you can put it back.',
+    );
+    await user.click(within(asked).getByRole('button', { name: 'Withdraw it' }));
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(sent).toEqual([{ task: 'sort', confirmed: 'withdraw' }]);
+  });
+
+  it('asks again when someone submitted since the dialog opened, then withdraws', async () => {
+    server.use(signedIn, standingList, ...repoFiles);
+    const sent = takeOuts((asked) =>
+      asked === 1
+        ? problem(409, 'take_out_changed', {
+            detail: 'sort has 1 submission now, so it can no longer be removed.',
+            submissions: 1,
+            take_out: 'withdraw',
+          })
+        : undefined,
+    );
+    const user = userEvent.setup();
+    renderApp(CONTEST);
+
+    const dialog = await openDialog(user);
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Remove A · sort from the contest' }),
+    );
+    await user.click(
+      within(
+        await screen.findByRole('dialog', {
+          name: 'Remove A · sort from the contest?',
+        }),
+      ).getByRole('button', { name: 'Remove it' }),
+    );
+    const again = await screen.findByRole('dialog', {
+      name: 'Withdraw A · sort from the contest?',
+    });
+    expect(again).toHaveTextContent(
+      'Someone has submitted to A · sort since this dialog opened, so it can no longer be removed, only withdrawn.',
+    );
+    expect(again).toHaveTextContent('A · sort has 1 submission.');
+    await user.click(within(again).getByRole('button', { name: 'Withdraw it' }));
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(sent).toEqual([
+      { task: 'sort', confirmed: 'remove' },
+      { task: 'sort', confirmed: 'withdraw' },
+    ]);
+  });
+
+  it('says which leaderboard stands in the way of removing a task, with the way to it', async () => {
+    server.use(signedIn, standingList, ...repoFiles);
+    takeOuts(() =>
+      problem(409, 'take_out_refused', {
+        detail:
+          'The leaderboard Practice counts sort by name. Take sort out of that leaderboard first, then remove the task.',
+        boards: ['Practice'],
+      }),
+    );
+    const user = userEvent.setup();
+    renderApp(CONTEST);
+
+    const dialog = await openDialog(user);
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Remove A · sort from the contest' }),
+    );
+    const asked = await screen.findByRole('dialog', {
+      name: 'Remove A · sort from the contest?',
+    });
+    await user.click(within(asked).getByRole('button', { name: 'Remove it' }));
+
+    const alert = await within(asked).findByRole('alert');
+    expect(alert).toHaveTextContent(
+      'The leaderboard Practice counts sort by name. Take sort out of that leaderboard first, then remove the task.',
+    );
+    expect(
+      within(alert).getByRole('link', { name: 'Open Leaderboards' }),
+    ).toHaveAttribute('href', '/orgs/acme/contests/spring/boards');
+  });
+
+  it('marks a withdrawn task on its row, and puts it back from there after asking', async () => {
+    server.use(
+      signedIn,
+      sortAs({ withdrawn: true, submissions: 14, take_out: null }),
+      ...repoFiles,
+    );
+    const sent: string[] = [];
+    server.use(
+      http.post(`${CONTEST_API}/tasks/:task/put-back`, ({ params }) => {
+        sent.push(String(params['task']));
+        return HttpResponse.json({
+          notes: ['The leaderboard Standings counts sort again.'],
+        });
+      }),
+    );
+    const user = userEvent.setup();
+    renderApp(CONTEST);
+
+    const row = await screen.findByRole('listitem', { name: 'A · sort' });
+    expect(within(row).getByText('Withdrawn')).toBeVisible();
+    await user.click(
+      within(row).getByRole('button', { name: 'Put A · sort back in the contest' }),
+    );
+    const asked = await screen.findByRole('dialog', {
+      name: 'Put A · sort back in the contest?',
+    });
+    expect(asked).toHaveTextContent(
+      'Entrants see it again and can submit to it while it is open, and every leaderboard counts it as before, its submissions included.',
+    );
+    await user.click(within(asked).getByRole('button', { name: 'Put it back' }));
+
+    const back = await screen.findByRole('dialog', {
+      name: 'A · sort is back in the contest',
+    });
+    expect(
+      within(back).getByRole('list', { name: 'About the leaderboards' }),
+    ).toHaveTextContent('The leaderboard Standings counts sort again.');
+    expect(sent).toEqual(['sort']);
+    await user.click(within(back).getByRole('button', { name: 'Done' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+  });
+
+  it('says why a withdrawn task cannot go back as the settings stand', async () => {
+    server.use(
+      signedIn,
+      sortAs({ withdrawn: true, submissions: 14, take_out: null }),
+      ...repoFiles,
+      http.post(`${CONTEST_API}/tasks/:task/put-back`, () =>
+        problem(422, 'invalid_definition', {
+          errors: [
+            {
+              path: 'tasks[0].release_at',
+              message: 'sort was released already; its release cannot move later.',
+            },
+          ],
+        }),
+      ),
+    );
+    const user = userEvent.setup();
+    renderApp(CONTEST);
+
+    const row = await screen.findByRole('listitem', { name: 'A · sort' });
+    await user.click(
+      within(row).getByRole('button', { name: 'Put A · sort back in the contest' }),
+    );
+    const asked = await screen.findByRole('dialog', {
+      name: 'Put A · sort back in the contest?',
+    });
+    await user.click(within(asked).getByRole('button', { name: 'Put it back' }));
+
+    const alert = await within(asked).findByRole('alert');
+    expect(alert).toHaveTextContent(
+      'It cannot go back as the contest’s settings stand:',
+    );
+    expect(alert).toHaveTextContent(
+      'sort was released already; its release cannot move later.',
+    );
+  });
+
+  it('says in the dialog of a withdrawn task what that means, with the way to put it back', async () => {
+    server.use(
+      signedIn,
+      sortAs({ withdrawn: true, submissions: 14, take_out: null }),
+      ...repoFiles,
+    );
+    const user = userEvent.setup();
+    renderApp(CONTEST);
+
+    const dialog = await openDialog(user);
+    expect(dialog).toHaveTextContent(
+      'Withdrawn: entrants do not see it, and no leaderboard counts it. Its 14 submissions are kept.',
+    );
+    expect(
+      within(dialog).queryByRole('button', { name: /Withdraw A · sort/ }),
+    ).toBeNull();
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Put A · sort back in the contest' }),
+    );
+    expect(
+      await screen.findByRole('dialog', { name: 'Put A · sort back in the contest?' }),
+    ).toBeVisible();
   });
 });

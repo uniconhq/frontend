@@ -1,6 +1,6 @@
 import { useQueries } from '@tanstack/react-query';
 import { $api } from '@/api/query';
-import type { FileContent, TaskStanding } from '@/api/types';
+import type { FileContent, TaskStanding, ValueMeaning } from '@/api/types';
 import type { HeldGroup } from '../forms/board-words';
 import { readTask, type GroupValues, type TaskValues } from '../forms/task-values';
 import { readSettings } from '../task/build-data';
@@ -66,6 +66,33 @@ export function heldOf(
       group: group.name,
       closes,
     }));
+}
+
+/** The values one published task's latest publication reports, by its name (M58). */
+export type TaskValuesReported = { task: string; meanings: ValueMeaning[] };
+
+/**
+ * What each published task of the contest reports, as its latest
+ * publication names the values, for a leaderboard's ways to rank and its
+ * sentence; a withdrawn task is left out, since no leaderboard counts it.
+ * Null until the tasks are read, or when they cannot be.
+ */
+export function useReportedValues(
+  org: string,
+  contest: string,
+): TaskValuesReported[] | null {
+  const standings = $api.useQuery(
+    'get',
+    STANDINGS,
+    { params: { path: { org, contest } } },
+    { retry: false },
+  );
+  if (standings.data === undefined) return null;
+  return standings.data.flatMap((standing) =>
+    standing.withdrawn || standing.state.latest === null
+      ? []
+      : [{ task: standing.task.name, meanings: standing.state.latest.meanings }],
+  );
 }
 
 /**
