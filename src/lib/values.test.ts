@@ -30,6 +30,14 @@ describe('a reported value in words (M58)', () => {
     expect(titleInSentence('Time_ms')).toBe('Time_ms');
   });
 
+  it('lowers its first letter only where a lower-case letter follows, as the forge does', () => {
+    expect(titleInSentence('r2', { ...TIME, title: 'R2 score' })).toBe('R2 score');
+    expect(titleInSentence('peak', { ...TIME, title: 'P-value' })).toBe('P-value');
+    expect(titleInSentence('size', { ...TIME, title: 'Éclat size' })).toBe(
+      'éclat size',
+    );
+  });
+
   it('puts its unit after a number, and nothing where it has none', () => {
     expect(withUnit('28', TIME)).toBe('28 ms');
     expect(withUnit('28', { ...TIME, unit: null })).toBe('28');
