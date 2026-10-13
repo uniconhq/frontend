@@ -11,7 +11,7 @@ import { taskMergeWords } from './merge-words';
 import { placeOfIn } from './places';
 import shared from '../organise.module.css';
 
-function Form({ doc, busy, onSave, admin }: FormProps & { admin: boolean }) {
+function Form({ doc, busy, asking, onSave, admin }: FormProps & { admin: boolean }) {
   const [read] = useState(() => readTask(doc, []));
   const [name, setName] = useState(read.values.name);
   useOpenedField(true);
@@ -45,7 +45,7 @@ function Form({ doc, busy, onSave, admin }: FormProps & { admin: boolean }) {
               ? 'What entrants see the task called, on its pages and in the contest.'
               : 'Only an admin of the task can change its title.'
           }
-          disabled={!admin}
+          disabled={!admin || asking}
         />
       </FieldBox>
       {admin && (
@@ -53,7 +53,7 @@ function Form({ doc, busy, onSave, admin }: FormProps & { admin: boolean }) {
           <Button
             type="submit"
             loading={busy}
-            disabled={!changed || name.trim() === ''}
+            disabled={!changed || asking || name.trim() === ''}
           >
             Save title
           </Button>
