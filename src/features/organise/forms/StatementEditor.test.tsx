@@ -481,13 +481,14 @@ describe('the statement while it is being edited', { timeout: 20_000 }, () => {
     // Someone else saves the statement while this tab is in the background.
     stored.content = THEIRS;
     stored.token = 'token-theirs';
-    const before = asked.states;
+    const before = { ...asked };
     comeBackToTab();
     // The page reads again what it shows of the task, such as whether its
-    // statement is written (M57); the editor keeps what it is editing.
-    await waitFor(() => expect(asked.states).toBeGreaterThan(before));
-    await new Promise((resolve) => setTimeout(resolve, 200));
+    // statement is written (M57), in the same refetch that would read the
+    // file again; the editor keeps what it is editing, the file unread.
+    await waitFor(() => expect(asked.states).toBeGreaterThan(before.states));
 
+    expect(asked.reads).toBe(before.reads);
     expect(screen.getByRole('textbox', { name: 'Statement source' })).toHaveValue(MINE);
     expect(
       screen.getByRole('textbox', { name: 'Statement source' }),
