@@ -267,8 +267,6 @@ export function ScoredResult({
   shownAt?: string;
   testsShownAt?: string;
 }) {
-  // A result from a backend that does not name its values yet reads them by key.
-  const meanings = grading.meanings ?? [];
   return (
     <>
       {grading.points !== null && (
@@ -285,10 +283,10 @@ export function ScoredResult({
             `, at ${formatExact(grading.factor, 4)} for lateness`}
         </BodyText>
       )}
-      <OnceValues values={grading.values} meanings={meanings} />
+      <OnceValues values={grading.values} meanings={grading.meanings} />
       <FoldedValues
         folded={grading.folded}
-        meanings={meanings}
+        meanings={grading.meanings}
         unaccepted={grading.groups.some((group) =>
           (group.tests ?? []).some((test) => test.outcome !== 'accepted'),
         )}
@@ -299,7 +297,7 @@ export function ScoredResult({
           group={group}
           shownAt={shownAt}
           testsShownAt={testsShownAt}
-          meanings={meanings}
+          meanings={grading.meanings}
         />
       ))}
     </>

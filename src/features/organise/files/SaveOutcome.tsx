@@ -201,7 +201,7 @@ export function SaveOutcome<Body = WriteFile>({
     return (
       <Panel role="alert">
         {effect === null ? (
-          // A backend that does not say what the save does yet names what changed.
+          // A body out of step with the forge's still names what changed.
           <>
             <ErrorBlock error={error} compact />
             <ul className={classes.named} aria-label="What would change">
