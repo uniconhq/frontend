@@ -33,13 +33,16 @@ export function regradeSearch(regrade: string, change: string | null): string {
 }
 
 /**
- * One count of a regrade's summary as it reads: its words, and the kind of
- * change its link filters Gradings to, null for every submission it graded.
+ * One count of a regrade's summary as it reads: its words, the kind of
+ * change its link filters Gradings to, null for every submission it took,
+ * and whether it is a link, which a count is only where the list it opens
+ * holds just those submissions.
  */
 export type SummaryPart = {
   key: string;
   words: string;
   change: RegradeChangeKind | null;
+  linked: boolean;
 };
 
 /** A count with its verb agreeing: "1 now fails to compile", "2 now fail to compile". */
@@ -87,9 +90,10 @@ const STOPPED_RESULT: Partial<Record<string, string>> = {
  * How many of the submissions a regrade now stops before their tests
  * stopped on what, from those the feed listed of them (`stops`, each
  * submission's new result's stop); the rest, or all while they are not
- * read yet, said as stopping before their tests.
+ * read yet, said as stopping before their tests. One count, since Gradings
+ * lists them together.
  */
-function stoppedParts(count: number, stops: (string | null)[] | null): SummaryPart[] {
+function stoppedPart(count: number, stops: (string | null)[] | null): SummaryPart {
   const known = (stops ?? []).slice(0, count);
   const tally = new Map<string, number>();
   for (const stop of known) {
@@ -99,14 +103,11 @@ function stoppedParts(count: number, stops: (string | null)[] | null): SummaryPa
   }
   const rest = count - known.length;
   if (rest > 0) tally.set('', (tally.get('') ?? 0) + rest);
-  return [...tally].map(([stop, many]) => {
+  const words = [...tally].map(([stop, many]) => {
     const [one, several] = STOPPED[stop] ?? STOPPED_ANYHOW;
-    return {
-      key: `stopped-${stop}`,
-      words: counted(many, one, several),
-      change: 'stopped' as const,
-    };
+    return counted(many, one, several);
   });
+  return { key: 'stopped', words: words.join(', '), change: 'stopped', linked: true };
 }
 
 /**
@@ -115,7 +116,8 @@ function stoppedParts(count: number, stops: (string | null)[] | null): SummaryPa
  * graded, and what got better or was graded for the first time; a count of
  * 0 is left out, and so are the unchanged, which "graded" holds. "120
  * graded · 4 went down · 2 now fail to compile · 1 went up". Those still
- * being graded are said apart, by `runningWords`.
+ * being graded are said apart, by `runningWords`. "Graded" links every
+ * submission the regrade took only while that is all it graded.
  */
 export function summaryParts(
   summary: RegradeSummary,
@@ -123,40 +125,26 @@ export function summaryParts(
 ): SummaryPart[] {
   const { counts } = summary;
   const parts: SummaryPart[] = [
-    { key: 'graded', words: `${String(summary.graded)} graded`, change: null },
+    {
+      key: 'graded',
+      words: `${String(summary.graded)} graded`,
+      change: null,
+      linked: summary.graded === summary.total,
+    },
   ];
-  if (counts.down > 0) {
+  const add = (change: RegradeChangeKind, words: string) =>
     parts.push({
-      key: 'down',
-      words: `${String(counts.down)} went down`,
-      change: 'down',
+      key: change,
+      words: `${String(counts[change])} ${words}`,
+      change,
+      linked: true,
     });
-  }
-  if (counts.stopped > 0) parts.push(...stoppedParts(counts.stopped, stops));
-  if (counts.failed > 0) {
-    parts.push({
-      key: 'failed',
-      words: `${String(counts.failed)} failed on Unicon’s side`,
-      change: 'failed',
-    });
-  }
-  if (counts.over_limit > 0) {
-    parts.push({
-      key: 'over_limit',
-      words: `${String(counts.over_limit)} not graded, over the limit`,
-      change: 'over_limit',
-    });
-  }
-  if (counts.up > 0) {
-    parts.push({ key: 'up', words: `${String(counts.up)} went up`, change: 'up' });
-  }
-  if (counts.new > 0) {
-    parts.push({
-      key: 'new',
-      words: `${String(counts.new)} graded for the first time`,
-      change: 'new',
-    });
-  }
+  if (counts.down > 0) add('down', 'went down');
+  if (counts.stopped > 0) parts.push(stoppedPart(counts.stopped, stops));
+  if (counts.failed > 0) add('failed', 'failed on Unicon’s side');
+  if (counts.over_limit > 0) add('over_limit', 'not graded, over the limit');
+  if (counts.up > 0) add('up', 'went up');
+  if (counts.new > 0) add('new', 'graded for the first time');
   return parts;
 }
 

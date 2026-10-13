@@ -54,14 +54,13 @@ describe("a regrade's summary", () => {
     ).toEqual(['120 graded']);
   });
 
-  it('says what stopped a run before its tests in plain words, one or several', () => {
+  it('says what stopped a run before its tests in plain words, one or several, in one count with one list', () => {
     const stopped = summary({ counts: { ...counts, stopped: 3 } });
     expect(
       words(summaryParts(stopped, ['compile_error', 'time_limit', 'time_limit'])),
     ).toEqual([
       '120 graded',
-      '1 now fails to compile',
-      '2 now run out of time before their tests',
+      '1 now fails to compile, 2 now run out of time before their tests',
     ]);
     // Before the stops are read, or for a stop it has no words for.
     expect(words(summaryParts(stopped))).toEqual([
@@ -95,6 +94,20 @@ describe("a regrade's summary", () => {
       'down',
       'stopped',
       'up',
+    ]);
+    expect(summaryParts(summary()).every((part) => part.linked)).toBe(true);
+  });
+
+  it('links no list for the graded while it would also hold those not graded (#448)', () => {
+    const parts = summaryParts(
+      summary({
+        total: 125,
+        running: true,
+        counts: { ...counts, unchanged: 120, running: 5 },
+      }),
+    );
+    expect(parts.map((part) => [part.words, part.linked])).toEqual([
+      ['120 graded', false],
     ]);
   });
 
