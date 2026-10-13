@@ -13,15 +13,16 @@ export function valueTitle(name: string, words?: ValueWords | null): string {
 }
 
 /**
- * A value's title inside a sentence, "run time": its first letter lowered,
- * unless the first word is an abbreviation such as "CPU", or the value has
- * no title and goes by its key.
+ * A value's title inside a sentence, "run time": its first letter lowered
+ * only where a lower-case letter follows it, so an abbreviation such as
+ * "CPU" or "R2" keeps its own, as the forge's sentences do; a value with no
+ * title goes by its key.
  */
 export function titleInSentence(name: string, words?: ValueWords | null): string {
   const title = valueTitle(name, words);
   if (title === name) return title;
   const [first = '', second = ''] = title;
-  return second !== '' && second === second.toLowerCase()
+  return second !== second.toUpperCase()
     ? `${first.toLowerCase()}${title.slice(1)}`
     : title;
 }

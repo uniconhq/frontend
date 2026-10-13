@@ -827,7 +827,7 @@ describe('acting on the feed', () => {
       name: 'Grade submission 3 again?',
     });
     expect(asked).toHaveTextContent(
-      'A retry now ends not graded: ada has reached the limit of 10 submissions for sum, counting the submissions with a result and those waiting.',
+      'A retry now ends not graded: ada has reached the limit of 10 submissions for sum, counting their submissions with a result, those waiting that are not delayed, and the delayed ones made before this one.',
     );
     expect(asked).not.toHaveTextContent('runs again on the same version');
   });

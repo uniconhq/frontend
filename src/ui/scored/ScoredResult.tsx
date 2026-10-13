@@ -1,7 +1,7 @@
 import type { GroupShown, Reported, ScoredGrading, ValueMeaning } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { VerdictBadge } from '@/ui/VerdictBadge';
-import { formatExact, formatPoints } from '@/lib/exact';
+import { formatExact, formatPoints, withPointsWord } from '@/lib/exact';
 import { formatDateTime } from '@/lib/time';
 import {
   foldWords,
@@ -267,15 +267,13 @@ export function ScoredResult({
   shownAt?: string;
   testsShownAt?: string;
 }) {
-  // A result from a backend that does not name its values yet reads them by key.
-  const meanings = grading.meanings ?? [];
   return (
     <>
       {grading.points !== null && (
         <BodyText>
           {grading.points.shown === null
             ? 'No points shown yet'
-            : `${formatPoints(grading.points.shown)} points`}
+            : withPointsWord(formatPoints(grading.points.shown))}
           {grading.points.pending_until !== null &&
             (grading.points.shown === null
               ? `: up to ${formatPoints(grading.points.pending)}, shown at ${formatDateTime(new Date(grading.points.pending_until))}`
@@ -285,10 +283,10 @@ export function ScoredResult({
             `, at ${formatExact(grading.factor, 4)} for lateness`}
         </BodyText>
       )}
-      <OnceValues values={grading.values} meanings={meanings} />
+      <OnceValues values={grading.values} meanings={grading.meanings} />
       <FoldedValues
         folded={grading.folded}
-        meanings={meanings}
+        meanings={grading.meanings}
         unaccepted={grading.groups.some((group) =>
           (group.tests ?? []).some((test) => test.outcome !== 'accepted'),
         )}
@@ -299,7 +297,7 @@ export function ScoredResult({
           group={group}
           shownAt={shownAt}
           testsShownAt={testsShownAt}
-          meanings={meanings}
+          meanings={grading.meanings}
         />
       ))}
     </>

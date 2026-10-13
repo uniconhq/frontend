@@ -13,13 +13,15 @@ import classes from './task.module.css';
  * sent, how many have gone. Once nothing is left to save, the last save's
  * answer leaves the foot of the window and stands in the page at the bar's
  * place, with Close (M66); an answer that asks for a choice, `pinned`, stays
- * in view until it is made.
+ * in view until it is made. While a save asks before it publishes, its two
+ * answers are the way on, and the bar has no Save of its own beside them.
  */
 export function SaveBar({
   lines,
   notices,
   problems,
   state,
+  asking,
   onSave,
   onDiscard,
   pinned,
@@ -33,6 +35,8 @@ export function SaveBar({
   /** What keeps the cards from saving, such as a number field that holds no number. */
   problems: string[];
   state: SaveState;
+  /** Whether the last save asks before it publishes, answered under the bar. */
+  asking: boolean;
   onSave: () => void;
   onDiscard: () => void;
   /** Whether the last save's answer asks for a choice, such as to publish or keep a draft. */
@@ -92,15 +96,20 @@ export function SaveBar({
       )}
       {lines.length > 0 && (
         <div className={classes.statusLine}>
-          <Button loading={busy} disabled={problems.length > 0} onClick={onSave}>
-            Save
-          </Button>
+          {!asking && (
+            <Button loading={busy} disabled={problems.length > 0} onClick={onSave}>
+              Save
+            </Button>
+          )}
           <Button variant="secondary" disabled={busy} onClick={onDiscard}>
             Discard changes
           </Button>
-          <BodyText tone="secondary">
-            Saving publishes the task; a save with problems is kept as a draft.
-          </BodyText>
+          {!asking && (
+            <BodyText tone="secondary">
+              Saving publishes the task, asking first while its contest runs; a save
+              with problems is kept as a draft.
+            </BodyText>
+          )}
         </div>
       )}
       {children}

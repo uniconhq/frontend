@@ -6,15 +6,8 @@ import { OutLink } from '@/ui/OutLink';
 import { verdictLabel } from '@/ui/verdicts';
 import { formatDateTime } from '@/lib/time';
 import { taskPath } from '@/lib/organiser-paths';
-import {
-  STATUS,
-  bySubmission,
-  logHref,
-  nameOf,
-  overLimitSentence,
-  resultOf,
-  submitterOf,
-} from './feed';
+import { STATUS, bySubmission, logHref, nameOf, resultOf, submitterOf } from './feed';
+import { overLimitSentence } from '@/ui/scored/scored-text';
 import {
   changeOf,
   decidingValues,
@@ -82,7 +75,9 @@ function StatusCell({
     <>
       <span>{STATUS[grading.status]}</span>
       {grading.status === 'over_limit' && (
-        <BodyText tone="secondary">{overLimitSentence(grading.limit)}</BodyText>
+        <BodyText tone="secondary">
+          {overLimitSentence('the entrant', grading.limit)}
+        </BodyText>
       )}
       {grading.error !== null && <BodyText tone="secondary">{grading.error}</BodyText>}
       {grading.cancel_reason !== null && (

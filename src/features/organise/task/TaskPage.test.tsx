@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@/test/user-event';
 import { delay, http, HttpResponse } from 'msw';
 import { TASK_BUILD_CARDS, TASK_SECTIONS } from '@/lib/sections';
@@ -7,6 +7,7 @@ import { formatDateTime } from '@/lib/time';
 import { renderApp } from '@/test/render';
 import { problem, server, signedIn, someone } from '@/test/server';
 import {
+  CONTEST_API,
   TASK_API,
   draftTask,
   publicationList,
@@ -53,6 +54,44 @@ describe('the task page', () => {
     expect(
       await within(dialog).findByRole('textbox', { name: 'Worth' }),
     ).toBeDisabled();
+  });
+
+  it('reads where the task stands in its contest again after a save, as its points can move with it', async () => {
+    let reads = 0;
+    server.use(
+      http.get(`${CONTEST_API}/organise/tasks`, () => {
+        reads += 1;
+      }),
+      signedIn,
+      taskState,
+      publicationList,
+      standingList,
+      ...repoFiles,
+      http.put(`${TASK_API}/files/:path`, () =>
+        HttpResponse.json({
+          number: 3,
+          grading_changed: true,
+          changes: ['main gives 110 points.'],
+          notes: [],
+          regraded: 0,
+          effect: unchanged,
+        }),
+      ),
+    );
+    renderApp(`${TASK}?card=statement`);
+
+    const status = await screen.findByLabelText('Where the task stands');
+    await within(status).findByText('In Spring:');
+    const before = reads;
+    fireEvent.change(await screen.findByRole('textbox', { name: 'Statement source' }), {
+      target: { value: 'Write the sum of two numbers.\n Now.' },
+    });
+    await userEvent.click(screen.getByRole('button', { name: 'Save statement' }));
+
+    expect(
+      await screen.findByText('Saved and published as publication 3.'),
+    ).toBeVisible();
+    await waitFor(() => expect(reads).toBeGreaterThan(before));
   });
 
   it('goes back to the contest once the task is removed from its own page, reading the task no more', async () => {

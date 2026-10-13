@@ -24,7 +24,7 @@ import {
 import type { TaskSave } from './build-save';
 import { taskPlaceOf } from './places';
 import { publishedLine, savedBy } from './published';
-import { taskWeight, worthText } from './scoring';
+import { pointsWords, taskWeight } from './scoring';
 import classes from './task.module.css';
 
 const TASK = '/api/v1/orgs/{org}/contests/{contest}/tasks/{task}';
@@ -140,7 +140,7 @@ function readiness(
             ? 'Scoring: see the problems below'
             : total.num === 0n
               ? 'Scoring: no points, ranked on reported values'
-              : `Scoring: ${worthText(total)} points`,
+              : `Scoring: ${pointsWords(total)}`,
     },
   ];
 }

@@ -165,6 +165,10 @@ export function StoredSettings({ place }: { place: Place }) {
               key={file.token}
               file={file}
               busy={busy}
+              asking={
+                outcome?.kind === 'refused' &&
+                outcome.error.code === 'confirmation_required'
+              }
               autoFocus={focusText}
               onSave={(content) =>
                 void save({
@@ -233,11 +237,17 @@ export function StoredSettings({ place }: { place: Place }) {
 function TextEditor({
   file,
   busy,
+  asking,
   autoFocus,
   onSave,
 }: {
   file: FileContent;
   busy: boolean;
+  /**
+   * Whether the save asks before it publishes: its answer sends the text as
+   * it was asked about, so it stays so until answered.
+   */
+  asking: boolean;
   autoFocus: boolean;
   onSave: (content: string) => void;
 }) {
@@ -252,11 +262,15 @@ function TextEditor({
         onChange={setText}
         language="yaml"
         rows={18}
-        readOnly={busy}
+        readOnly={busy || asking}
         autoFocus={autoFocus}
       />
       <div className={shared.actions}>
-        <Button loading={busy} disabled={!changed} onClick={() => onSave(text)}>
+        <Button
+          loading={busy}
+          disabled={!changed || asking}
+          onClick={() => onSave(text)}
+        >
           Save
         </Button>
         {changed && <UnsavedNote />}

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@/test/user-event';
 import { delay, http, HttpResponse } from 'msw';
-import type { TaskStanding } from '@/api/types';
+import type { RegradeSummary, TaskStanding } from '@/api/types';
 import { parse } from 'yaml';
 import { isoOf, localOf } from '../forms/times';
 import { CONTEST_SECTIONS } from '@/lib/sections';
@@ -87,6 +87,56 @@ describe("the contest's settings at a glance", () => {
     expect(within(card).getByRole('link', { name: 'Settings' })).toHaveAttribute(
       'href',
       '/orgs/acme/contests/spring/settings',
+    );
+  });
+});
+
+describe("the contest's regrades (#448)", () => {
+  it('sums up a task’s latest regrade on the contest page, each count a link to those submissions on Gradings', async () => {
+    const regrade: RegradeSummary = {
+      id: '0199a2c1-0000-7000-8000-0000000000bb',
+      task: 'sum',
+      label: 'B',
+      cause: 'rejudge',
+      publication: 3,
+      started_at: '2026-10-12T14:00:00Z',
+      started_by: 7,
+      started_by_name: 'alice',
+      total: 12,
+      graded: 12,
+      running: false,
+      counts: {
+        up: 1,
+        down: 3,
+        stopped: 0,
+        unchanged: 8,
+        new: 0,
+        running: 0,
+        failed: 0,
+        over_limit: 0,
+      },
+    };
+    server.use(
+      signedIn,
+      standingList,
+      ...repoFiles,
+      http.get(`${CONTEST_API}/gradings/regrades`, () => HttpResponse.json([regrade])),
+    );
+    renderApp(CONTEST);
+
+    const regrades = await screen.findByRole('region', { name: 'Regrades' });
+    const summary = within(regrades).getByRole('listitem', { name: 'Regrade of B' });
+    expect(summary).toHaveTextContent(
+      'Regrade of B: 12 graded · 3 went down · 1 went up',
+    );
+    const gradings = `${CONTEST}/gradings`;
+    expect(within(summary).getByRole('link', { name: '3 went down' })).toHaveAttribute(
+      'href',
+      `${gradings}?regrade=${regrade.id}&change=down`,
+    );
+    expect(within(summary).getByRole('link', { name: '12 graded' })).toHaveAttribute(
+      'href',
+      `${gradings}?regrade=${regrade.id}`,
     );
   });
 });

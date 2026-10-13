@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { queryView } from '@/api/query';
 import { toApiError } from '@/api/problem';
 import type { FileContent, WorkflowForm } from '@/api/types';
-import { compareRatio, type Ratio } from '@/lib/exact';
+import { compareRatio, formatWorthRatio, type Ratio } from '@/lib/exact';
 import { formatSize } from '@/lib/size';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
@@ -45,7 +45,7 @@ import { InputsCard, type InputFiles } from './InputsCard';
 import { taskMergeWords } from './merge-words';
 import { taskPlace, taskPlaceOf } from './places';
 import { SaveBar } from './SaveBar';
-import { ruleOf, shareProblem, taskWeight, worthText } from './scoring';
+import { pointsWords, ruleOf, shareProblem, taskWeight } from './scoring';
 import {
   existingOf,
   NOTHING_STAGED,
@@ -144,7 +144,12 @@ function BuildForm({
   );
   const [adding, setAdding] = useState<AddStart | null>(null);
   const { worth, known } = useTaskWorth(place);
-  const disabled = !manager || saving.state.stage !== 'idle';
+  // While a save asks before it publishes, its answer sends the cards as they
+  // were asked about, so they stay so until it is answered or discarded.
+  const asking =
+    saving.outcome?.kind === 'refused' &&
+    saving.outcome.error.code === 'confirmation_required';
+  const disabled = !manager || saving.state.stage !== 'idle' || asking;
 
   const picked = values.workflow.trim();
   const version = queryView(
@@ -531,6 +536,7 @@ function BuildForm({
         notices={toSave ? notices : []}
         problems={problems}
         state={saving.state}
+        asking={asking}
         onSave={save}
         onDiscard={() => {
           setValues(read.values);
@@ -538,12 +544,7 @@ function BuildForm({
           setInputFiles([]);
           saving.forget();
         }}
-        pinned={
-          saving.merge !== null ||
-          saving.conflicts !== null ||
-          (saving.outcome?.kind === 'refused' &&
-            saving.outcome.error.code === 'confirmation_required')
-        }
+        pinned={saving.merge !== null || saving.conflicts !== null || asking}
         onClose={saving.drop}
       >
         {(saving.outcome !== null ||
@@ -586,7 +587,7 @@ function pointsNotice(
   known: boolean,
 ): string[] {
   if (compareRatio(before, after) === 0 || worth !== null) return [];
-  const change = `the task will be worth ${worthText(after)} points, not ${worthText(before)}`;
+  const change = `the task will be worth ${pointsWords(after)}, not ${formatWorthRatio(before)}`;
   return known
     ? [
         `This changes the task’s points: its contest gives it no worth of its own, so ${change}.`,

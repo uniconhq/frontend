@@ -213,6 +213,9 @@ export function StatementEditor({ place, admin }: { place: Place; admin: boolean
         }
         admin={admin}
         busy={saving}
+        asking={
+          outcome?.kind === 'refused' && outcome.error.code === 'confirmation_required'
+        }
         saved={saved}
         pictures={pictures}
         onPictures={(change) =>
@@ -273,6 +276,7 @@ function Source({
   task,
   admin,
   busy,
+  asking,
   saved,
   pictures,
   onPictures,
@@ -282,6 +286,11 @@ function Source({
   task: TaskWhere | null;
   admin: boolean;
   busy: boolean;
+  /**
+   * Whether the save asks before it publishes: its answer sends the text as
+   * it was asked about, so it stays so until answered.
+   */
+  asking: boolean;
   /** The files under `public/` now, or null while they are read. */
   saved: TreeEntry[] | null;
   pictures: StagedPicture[];
@@ -308,6 +317,7 @@ function Source({
     [saved, pictures],
   );
   const named = useMemo(() => picturesNamed(text), [text]);
+  const held = busy || asking;
   const [removing, setRemoving] = useState<unknown>(null);
 
   if (file.encoding !== 'utf-8') {
@@ -349,7 +359,7 @@ function Source({
           onChange={setText}
           language="markdown"
           rows={18}
-          readOnly={!admin || busy}
+          readOnly={!admin || held}
         />
         <section className={classes.preview} aria-label="What entrants see">
           <Markdown task={task ?? undefined} staged={drawn}>
@@ -374,7 +384,7 @@ function Source({
               staged={pictures}
               named={named}
               admin={admin}
-              disabled={busy}
+              disabled={held}
               onRemove={remove}
               onUndo={undo}
             />
@@ -383,7 +393,7 @@ function Source({
           {admin && (
             <AddPicture
               taken={taken}
-              disabled={busy || saved === null}
+              disabled={held || saved === null}
               onStaged={({ name, file: chosen, line }) => {
                 setText((before) => `${before.replace(/\n*$/, '')}\n\n${line}\n`);
                 onPictures((before) => [
@@ -405,7 +415,7 @@ function Source({
         <div className={shared.actions}>
           <Button
             loading={busy}
-            disabled={!changed}
+            disabled={!changed || asking}
             onClick={() => onSave(text, file.token)}
           >
             Save statement

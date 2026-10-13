@@ -18,7 +18,8 @@ export function stringsOf(error: ApiError, member: string): string[] {
 
 /**
  * What a save would do, as `confirmation_required` says it beside its
- * `changes`, or null from a backend that does not say it yet: no `summary`.
+ * `changes`, or null where the body has no `summary`, which the forge always
+ * sends, so a body out of step with it still asks.
  */
 export function effectOf(error: ApiError): SaveEffect | null {
   const summary = error.extensions['summary'];

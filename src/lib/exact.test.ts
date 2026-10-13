@@ -15,6 +15,7 @@ import {
   ratioOf,
   rounded,
   cut,
+  withPointsWord,
   ZERO,
 } from './exact';
 
@@ -180,6 +181,20 @@ describe('points for reading (R17)', () => {
     expect(formatPointsRatio(r('72'))).toBe('72');
     expect(formatPointsRatio(divRatio(r('200'), r('3')))).toBe(
       `about ${formatExact('66.66')}`,
+    );
+  });
+
+  it('says "point" after a number that reads as one, however it was sent, and "points" after any other', () => {
+    expect(withPointsWord('1')).toBe('1 point');
+    expect(withPointsWord(formatWorth('1.00'))).toBe('1 point');
+    expect(withPointsWord(formatPoints('1.0004'))).toBe('1 point');
+    expect(withPointsWord(formatPoints('0.999'))).toBe(`${formatExact('0.99')} points`);
+    expect(withPointsWord('0')).toBe('0 points');
+    expect(withPointsWord(formatPointsRatio(divRatio(r('4'), r('3'))))).toBe(
+      `about ${formatExact('1.33')} points`,
+    );
+    expect(withPointsWord(formatWorthRatio(divRatio(r('2999'), r('3000'))))).toBe(
+      'about 1 point',
     );
   });
 

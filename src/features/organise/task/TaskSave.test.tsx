@@ -340,6 +340,28 @@ describe('saving a task file', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
+  it('holds the statement as it was asked about while the question stands, so nothing typed meanwhile is lost', async () => {
+    taskBackend(() =>
+      problem(409, 'confirmation_required', {
+        changes: [],
+        regrades: 0,
+        ...unchanged,
+        asked: 'b1c2d3e:12',
+      }),
+    );
+
+    await editAndSave();
+
+    const alert = await screen.findByRole('alert');
+    expect(
+      within(alert).getByRole('button', { name: 'Publish the change' }),
+    ).toBeVisible();
+    expect(screen.getByRole('textbox', { name: 'Statement source' })).toHaveAttribute(
+      'readonly',
+    );
+    expect(screen.getByRole('button', { name: 'Save statement' })).toBeDisabled();
+  });
+
   it('asks before a statement fix that moves nobody’s result too', async () => {
     taskBackend(() =>
       problem(409, 'confirmation_required', {
