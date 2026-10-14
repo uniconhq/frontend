@@ -165,9 +165,9 @@ describe('editing the file in place', () => {
       at_least: entry?.atLeast ?? null,
     });
     expect(ranked).toContain(`at_least: ${digits}`);
-    expect(workflowOf(ranked).report.find((found) => found.name === 'time')?.atLeast?.text).toBe(
-      digits,
-    );
+    expect(
+      workflowOf(ranked).report.find((found) => found.name === 'time')?.atLeast?.text,
+    ).toBe(digits);
   });
 
   it('writes the first port of a new step as a block', () => {

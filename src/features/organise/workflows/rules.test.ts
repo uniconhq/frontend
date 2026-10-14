@@ -358,9 +358,7 @@ steps:
 
     expect(
       reportRefusal(workflow, primitives, output('compile', 'compile_log'), time),
-    ).toBe(
-      'better, at_least and at_most apply only to a number, and this is text.',
-    );
+    ).toBe('better, at_least and at_most apply only to a number, and this is text.');
     expect(
       reportRefusal(workflow, primitives, output('run', 'memory_kb'), time),
     ).toBeNull();

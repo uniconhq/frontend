@@ -963,7 +963,9 @@ describe('a submission opened from the list', () => {
     ).toBeVisible();
     expect(
       within(detail).getByRole('region', { name: 'On the leaderboards' }),
-    ).toHaveTextContent(`Fastest: time_ms, highest: ${formatExact('12.5')} · counts here`);
+    ).toHaveTextContent(
+      `Fastest: time_ms, highest: ${formatExact('12.5')} · counts here`,
+    );
 
     const main = within(detail).getByRole('region', { name: 'Group main' });
     expect(within(main).getByText('ACCEPTED')).toBeVisible();

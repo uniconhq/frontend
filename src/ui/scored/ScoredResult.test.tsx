@@ -174,7 +174,10 @@ describe('a result on the leaderboards', () => {
           ...wrong,
           boards: [
             line({ board: 'Fastest', numbers: [{ ...SLOWEST, value: '15' }] }),
-            line({ board: 'Total', numbers: [{ ...SLOWEST, fold: 'sum', value: null }] }),
+            line({
+              board: 'Total',
+              numbers: [{ ...SLOWEST, fold: 'sum', value: null }],
+            }),
           ],
         }}
       />,

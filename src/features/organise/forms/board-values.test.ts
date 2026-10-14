@@ -109,10 +109,7 @@ describe('a contest’s boards as fields', () => {
       ])?.map((board) => board.order),
     ).toEqual([
       [{ kind: 'value', name: 'time_ms', fold: 'max' }],
-      [
-        { kind: 'points' },
-        { kind: 'value', name: 'time_ms', fold: '' },
-      ],
+      [{ kind: 'points' }, { kind: 'value', name: 'time_ms', fold: '' }],
     ]);
   });
 
