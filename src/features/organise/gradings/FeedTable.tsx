@@ -109,14 +109,14 @@ function StatusCell({
  */
 function ChangeCells({ path, entry }: { path: ContestPath; entry: FeedEntry }) {
   const change = entry.grading.change;
-  const names = change === null ? [] : decidingValues(change);
+  const keys = change === null ? [] : decidingValues(change);
   const meanings = usePublicationMeanings(
     path,
     entry.task,
     entry.grading.publication,
-    names.length > 0,
+    keys.length > 0,
   );
-  const values = names.length > 0 ? { names, meanings } : null;
+  const values = keys.length > 0 ? { keys, meanings } : null;
   return (
     <>
       <td>{change === null ? '—' : sideWords(change.earlier, values)}</td>

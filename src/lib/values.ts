@@ -67,36 +67,14 @@ export function valueFirst(words: { better: string | null } | undefined): string
   return 'best first';
 }
 
-/** Units of time, for which the most is said as "the longest". */
-const TIME_UNITS = new Set([
-  'ms',
-  'millisecond',
-  'milliseconds',
-  's',
-  'sec',
-  'second',
-  'seconds',
-  'min',
-  'minute',
-  'minutes',
-  'h',
-  'hour',
-  'hours',
-]);
-
 /**
- * What a value folded over a run's tests is, in its own words: "the total"
- * for a sum, "the average" for a mean; for the most of them, "the longest"
- * of a time, "the most" of anything else where lower is better (memory),
- * and "the highest" where higher is better. Null where the value is not
- * folded.
+ * How a leaderboard combines a value across each task's tests, in a word:
+ * "highest" for the highest test, "total" for the sum, "average" for the
+ * mean. Null for anything else, such as a key that is not a value.
  */
-export function foldWords(meaning: ValueMeaning): string | null {
-  if (meaning.fold === 'sum') return 'the total';
-  if (meaning.fold === 'mean') return 'the average';
-  if (meaning.fold !== 'max') return null;
-  if (meaning.better === 'higher') return 'the highest';
-  return meaning.unit !== null && TIME_UNITS.has(meaning.unit.toLowerCase())
-    ? 'the longest'
-    : 'the most';
+export function foldWord(fold: string | null | undefined): string | null {
+  if (fold === 'max') return 'highest';
+  if (fold === 'sum') return 'total';
+  if (fold === 'mean') return 'average';
+  return null;
 }

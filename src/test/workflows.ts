@@ -44,8 +44,8 @@ steps:
       actual: \${{ steps.run.output }}
       expected: \${{ test.answer }}
 report:
-  time_ms: {from: "\${{ steps.run.time_ms }}", fold: max, better: lower, at_least: 0}
-  memory_kb: {from: "\${{ steps.run.memory_kb }}", fold: max, better: lower, at_least: 0}
+  time_ms: {from: "\${{ steps.run.time_ms }}", better: lower, at_least: 0}
+  memory_kb: {from: "\${{ steps.run.memory_kb }}", better: lower, at_least: 0}
   log: \${{ steps.compile.compile_log }}
 `;
 
@@ -85,8 +85,8 @@ steps:
     per_test: true
     with: {actual: "\${{ steps.run.output }}", expected: "\${{ test.answer }}"}
 report:
-  time_ms: {from: "\${{ steps.run.time_ms }}", fold: max, better: lower, at_least: 0}
-  memory_kb: {from: "\${{ steps.run.memory_kb }}", fold: max, better: lower, at_least: 0}
+  time_ms: {from: "\${{ steps.run.time_ms }}", better: lower, at_least: 0}
+  memory_kb: {from: "\${{ steps.run.memory_kb }}", better: lower, at_least: 0}
   log: \${{ steps.compile.compile_log }}
 `;
 

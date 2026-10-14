@@ -1,7 +1,7 @@
 import type { ValueMeaning } from '@/api/types';
 import { meaningOf, titleInSentence, valueFirst, valueTitle } from '@/lib/values';
 import type { OrderKeyValues } from './board-values';
-import { KINDS } from './board-words';
+import { FOLDS, KINDS } from './board-words';
 
 /**
  * A leaderboard's ways to rank, as its form shows them: one row each, a
@@ -38,7 +38,7 @@ export function orderToWrite(
 /** A way of ranking as the form starts it when it is chosen. */
 export function keyOfKind(kind: string): OrderKeyValues {
   if (kind === 'penalty') return { kind: 'penalty', perAttempt: '' };
-  if (kind === 'value') return { kind: 'value', name: '' };
+  if (kind === 'value') return { kind: 'value', name: '', fold: '' };
   return { kind: 'points' };
 }
 
@@ -111,8 +111,8 @@ export function repeatedValue(
 
 /**
  * The values a board may rank by: each the tasks it covers report as a
- * number for each test, named once, in the order the tasks first report
- * them. `tasks` null is every task.
+ * number for each test with a way that is better, named once, in the order
+ * the tasks first report them. `tasks` null is every task.
  */
 export function rankableValues(
   reported: { task: string; meanings: ValueMeaning[] }[],
@@ -122,7 +122,7 @@ export function rankableValues(
   for (const each of reported) {
     if (tasks !== null && !tasks.includes(each.task)) continue;
     for (const meaning of each.meanings) {
-      if (meaning.fold !== null && !found.has(meaning.name)) {
+      if (meaning.better !== null && !found.has(meaning.name)) {
         found.set(meaning.name, meaning);
       }
     }
@@ -138,7 +138,8 @@ export function valueOption(meaning: ValueMeaning): string {
 
 /**
  * One way of ranking in the summary: "points, most first", "run time,
- * lowest first", a value by its title where `values` give one (M58).
+ * highest test, lowest first", a value by its title where `values` give
+ * one (M58), and how it combines across tests once chosen.
  */
 function keySaid(key: OrderKeyValues, values: ValueMeaning[] | null): string {
   if (key.kind === 'points') return 'points, most first';
@@ -146,7 +147,9 @@ function keySaid(key: OrderKeyValues, values: ValueMeaning[] | null): string {
     const name = key.name.trim();
     if (name === '') return 'a value the tasks report';
     const meaning = meaningOf(values ?? [], name);
-    return `${titleInSentence(name, meaning)}, ${valueFirst(meaning)}`;
+    const fold = FOLDS.find((each) => each.value === key.fold);
+    const across = fold === undefined ? '' : `, ${fold.said}`;
+    return `${titleInSentence(name, meaning)}${across}, ${valueFirst(meaning)}`;
   }
   const minutes = key.perAttempt.trim();
   return minutes === '' || minutes === '0'

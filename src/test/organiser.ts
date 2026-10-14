@@ -83,9 +83,9 @@ export const unchanged: SaveEffect = {
 
 /** What classic reports, as a publication names its values (M58), in its report order. */
 export const classicMeanings: ValueMeaning[] = [
-  { name: 'time_ms', title: 'Run time', unit: 'ms', fold: 'max', better: 'lower' },
-  { name: 'memory_kb', title: 'Memory used', unit: 'KB', fold: 'max', better: 'lower' },
-  { name: 'log', title: 'Compile log', unit: null, fold: null, better: null },
+  { name: 'time_ms', title: 'Run time', unit: 'ms', better: 'lower' },
+  { name: 'memory_kb', title: 'Memory used', unit: 'KB', better: 'lower' },
+  { name: 'log', title: 'Compile log', unit: null, better: null },
 ];
 
 export const publications: Publication[] = [

@@ -920,7 +920,18 @@ describe('a submission opened from the list', () => {
         },
       ],
       points: { shown: '100', pending: '70', pending_until: '2026-09-12T11:00:00Z' },
-      folded: { time_ms: '12.5' },
+      boards: [
+        {
+          board: 'Fastest',
+          over: 'live',
+          numbers: [
+            { by: 'time_ms', fold: 'max', title: null, unit: null, value: '12.5' },
+          ],
+          pending: '0',
+          shown_at: null,
+          counted: true,
+        },
+      ],
     });
     server.use(
       signedIn,
@@ -951,8 +962,10 @@ describe('a submission opened from the list', () => {
       within(detail).getByText(/^100 points, and up to 70 more shown at /),
     ).toBeVisible();
     expect(
-      within(detail).getByRole('group', { name: 'Over the tests shown' }),
-    ).toHaveTextContent(`time_ms${formatExact('12.5')}`);
+      within(detail).getByRole('region', { name: 'On the leaderboards' }),
+    ).toHaveTextContent(
+      `Fastest: time_ms, highest: ${formatExact('12.5')} · counts here`,
+    );
 
     const main = within(detail).getByRole('region', { name: 'Group main' });
     expect(within(main).getByText('ACCEPTED')).toBeVisible();

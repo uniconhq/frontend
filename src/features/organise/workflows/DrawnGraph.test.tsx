@@ -78,7 +78,8 @@ describe('a workflow drawn', () => {
     expect(inputs).toHaveTextContent('the entrant gives it');
     expect(inputs).toHaveTextContent('Used by compile');
     const report = screen.getByRole('group', { name: 'Report' });
-    expect(report).toHaveTextContent('largest over the tests · lower is better');
+    expect(report).toHaveTextContent('lower is better');
+    expect(report).not.toHaveTextContent('over the tests');
     expect(screen.getAllByRole('group', { name: 'Each test’s files' }).length).toBe(2);
   });
 
