@@ -19,6 +19,7 @@ import {
 } from './board-values';
 import {
   boardSentence,
+  FOLDS,
   type HeldGroup,
   OVER,
   penaltyRefusal,
@@ -207,7 +208,7 @@ function BoardEntry({
   const added = nextKey(rows);
   /** What is wrong with one way to rank: the save's refusal, or what it would refuse. */
   const keyProblem = (at: number): string | undefined => {
-    const refusal = said(`order.${String(at)}`);
+    const refusal = said(`order.${String(at)}`, `order.${String(at)}.by`);
     if (refusal !== undefined) return refusal;
     const penaltyFirst = rows[at]?.kind === 'penalty' ? penaltyRefusal(at === 0) : null;
     return (
@@ -382,6 +383,7 @@ function BoardEntry({
                   alone={rows.length === 1}
                   error={keyProblem(at)}
                   minutesError={said(`order.${String(at)}.per_attempt`)}
+                  foldError={said(`order.${String(at)}.fold`)}
                   disabled={disabled}
                   onChange={(to) => setKey(at, to)}
                   onMove={(by) => moveKey(at, by)}
@@ -494,6 +496,7 @@ function OrderKey({
   alone,
   error,
   minutesError,
+  foldError,
   disabled,
   onChange,
   onMove,
@@ -517,6 +520,8 @@ function OrderKey({
   alone: boolean;
   error: string | undefined;
   minutesError: string | undefined;
+  /** Why the save refused how a value combines across tests. */
+  foldError: string | undefined;
   disabled: boolean;
   onChange: (key: OrderKeyValues) => void;
   onMove: (by: -1 | 1) => void;
@@ -545,7 +550,7 @@ function OrderKey({
                 label="Which value"
                 labelHidden
                 value={value.name}
-                onChange={(text) => onChange({ kind: 'value', name: text })}
+                onChange={(text) => onChange({ ...value, name: text })}
                 placeholder="The name the workflow reports it under"
                 disabled={disabled}
               />
@@ -555,11 +560,23 @@ function OrderKey({
                 labelHidden
                 value={value.name}
                 options={valueChoices(values, value.name, rows, at)}
-                onChange={(name) => onChange({ kind: 'value', name })}
+                onChange={(name) => onChange({ ...value, name })}
                 placeholder="Choose a value"
                 disabled={disabled}
               />
             ))}
+          {value.kind === 'value' && (
+            <Select
+              label="How the tests combine"
+              labelHidden
+              value={value.fold}
+              options={choices(value.fold, FOLDS)}
+              onChange={(fold) => onChange({ ...value, fold })}
+              placeholder="How the tests combine"
+              error={foldError}
+              disabled={disabled}
+            />
+          )}
           {value.kind === 'penalty' && (
             <span className={classes.minutes}>
               <TextInput

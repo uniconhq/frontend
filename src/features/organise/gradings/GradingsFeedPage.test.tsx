@@ -163,7 +163,7 @@ const nowStopped: FeedEntry = {
         accepted: 5,
         tests: 8,
         stopped: null,
-        values: {},
+        values: [],
       },
       now: {
         attempt: 2,
@@ -171,7 +171,7 @@ const nowStopped: FeedEntry = {
         accepted: 0,
         tests: 8,
         stopped: 'compile_error',
-        values: {},
+        values: [],
       },
     },
   },
@@ -979,14 +979,18 @@ describe('what a regrade changed', () => {
 
   it('says what went down on a task with no points, by the values that decided it (#448)', async () => {
     const side = { points: null, accepted: 5, tests: 5, stopped: null };
+    const values = (time: string) => [
+      { by: 'time_ms', fold: 'max' as const, value: time },
+      { by: 'memory_kb', fold: 'max' as const, value: '900' },
+    ];
     const slower: FeedEntry = {
       ...nowStopped,
       grading: {
         ...nowStopped.grading,
         change: {
           change: 'down',
-          earlier: { ...side, attempt: 1, values: { time_ms: '28', memory_kb: '900' } },
-          now: { ...side, attempt: 2, values: { time_ms: '40', memory_kb: '900' } },
+          earlier: { ...side, attempt: 1, values: values('28') },
+          now: { ...side, attempt: 2, values: values('40') },
         },
       },
     };
@@ -1006,7 +1010,6 @@ describe('what a regrade changed', () => {
                 name: 'time_ms',
                 title: 'Run time',
                 unit: 'ms',
-                fold: 'max',
                 better: 'lower',
               },
             ],
@@ -1021,9 +1024,11 @@ describe('what a regrade changed', () => {
     const table = await screen.findByRole('table', { name: 'Gradings' });
     const row = within(table).getByRole('rowgroup', { name: 'B submission 3 by ada' });
     await waitFor(() =>
-      expect(row).toHaveTextContent('5 of 5 tests passed, run time 28 ms'),
+      expect(row).toHaveTextContent('5 of 5 tests passed, run time (highest) 28 ms'),
     );
-    expect(row).toHaveTextContent('5 of 5 tests passed, run time 40 msWent down');
+    expect(row).toHaveTextContent(
+      '5 of 5 tests passed, run time (highest) 40 msWent down',
+    );
     expect(row).not.toHaveTextContent(/memory/);
   });
 

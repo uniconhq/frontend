@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { ValueMeaning } from '@/api/types';
 import {
-  foldWords,
+  foldWord,
   inReportOrder,
   titleInSentence,
   valueFirst,
@@ -13,7 +13,6 @@ const TIME: ValueMeaning = {
   name: 'time_ms',
   title: 'Run time',
   unit: 'ms',
-  fold: 'max',
   better: 'lower',
 };
 
@@ -53,17 +52,12 @@ describe('a reported value in words (M58)', () => {
   });
 });
 
-describe('what a fold over the tests is (M63)', () => {
-  it('reads the most of a time as the longest, of anything else lower-is-better as the most', () => {
-    expect(foldWords(TIME)).toBe('the longest');
-    expect(foldWords({ ...TIME, unit: 'KB' })).toBe('the most');
-    expect(foldWords({ ...TIME, better: 'higher', unit: null })).toBe('the highest');
-  });
-
-  it('reads a sum as the total and a mean as the average, and nothing unfolded', () => {
-    expect(foldWords({ ...TIME, fold: 'sum' })).toBe('the total');
-    expect(foldWords({ ...TIME, fold: 'mean' })).toBe('the average');
-    expect(foldWords({ ...TIME, fold: null })).toBeNull();
+describe('how a leaderboard combines a value across the tests', () => {
+  it('reads max as the highest, sum as the total and mean as the average', () => {
+    expect(foldWord('max')).toBe('highest');
+    expect(foldWord('sum')).toBe('total');
+    expect(foldWord('mean')).toBe('average');
+    expect(foldWord(null)).toBeNull();
   });
 
   it('ranks lowest or highest first as the value says is better', () => {

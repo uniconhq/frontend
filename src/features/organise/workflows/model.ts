@@ -69,7 +69,6 @@ export type ReportEntry = {
   name: string;
   /** The output it reads, or null when `from` is not one reference. */
   from: Ref | null;
-  fold: string | null;
   better: string | null;
   /** `better` when it is `${{ inputs.<id> }}`. */
   betterRef: Ref | null;
@@ -235,7 +234,6 @@ function entryOf(name: string, raw: unknown): ReportEntry {
     return {
       name,
       from: wholeRef(raw),
-      fold: null,
       better: null,
       betterRef: null,
       atLeast: null,
@@ -251,7 +249,6 @@ function entryOf(name: string, raw: unknown): ReportEntry {
   return {
     name,
     from: from !== null ? wholeRef(from) : null,
-    fold: text(found.fold),
     better,
     betterRef: better !== null ? wholeRef(better) : null,
     atLeast: number(found.at_least),

@@ -15,12 +15,13 @@ import {
 /**
  * One key a board ranks on, in turn: `points`, `penalty` with the minutes
  * each earlier attempt that does not count adds, or a value its tasks
- * report, by name.
+ * report, by name, with how it combines across each task's tests (`max`,
+ * `sum` or `mean`), empty until chosen.
  */
 export type OrderKeyValues =
   | { kind: 'points' }
   | { kind: 'penalty'; perAttempt: string }
-  | { kind: 'value'; name: string };
+  | { kind: 'value'; name: string; fold: string };
 
 /**
  * A board of `contest.yaml` as fields, every one text so an empty one is
@@ -58,7 +59,7 @@ const EMPTY: BoardValues = { ...newBoard(), order: [] };
 function orderKeyOf(item: unknown): OrderKeyValues | null {
   if (item === 'points') return { kind: 'points' };
   if (item === 'penalty') return { kind: 'penalty', perAttempt: '' };
-  if (typeof item === 'string') return { kind: 'value', name: item };
+  if (typeof item === 'string') return { kind: 'value', name: item, fold: '' };
   if (isRecord(item) && item['by'] === 'penalty') {
     const minutes = item['per_attempt'];
     if (
@@ -67,6 +68,12 @@ function orderKeyOf(item: unknown): OrderKeyValues | null {
       typeof minutes === 'number'
     ) {
       return { kind: 'penalty', perAttempt: textOf(minutes) };
+    }
+  }
+  if (isRecord(item) && typeof item['by'] === 'string') {
+    const fold = item['fold'];
+    if (fold === undefined || typeof fold === 'string') {
+      return { kind: 'value', name: item['by'], fold: fold ?? '' };
     }
   }
   return null;
@@ -110,7 +117,8 @@ export function readBoards(value: unknown): BoardValues[] | null {
 
 function orderItem(key: OrderKeyValues): unknown {
   if (key.kind === 'points') return 'points';
-  if (key.kind === 'value') return key.name;
+  if (key.kind === 'value')
+    return key.fold === '' ? { by: key.name } : { by: key.name, fold: key.fold };
   const minutes = numberText(key.perAttempt);
   return minutes === undefined ? 'penalty' : { by: 'penalty', per_attempt: minutes };
 }
@@ -194,8 +202,10 @@ export function boardRefusals(
 /** Why the board's own fields cannot be saved, or nothing when they can. */
 export function boardProblems(board: BoardValues): string[] {
   return board.order.flatMap((key) => {
-    if (key.kind === 'value')
-      return key.name.trim() === '' ? ['Give the name of the value.'] : [];
+    if (key.kind === 'value') {
+      if (key.name.trim() === '') return ['Give the name of the value.'];
+      return key.fold === '' ? ['Choose how the value combines across tests.'] : [];
+    }
     if (key.kind !== 'penalty') return [];
     const minutes = numberOf(key.perAttempt);
     if (minutes === undefined) return [];

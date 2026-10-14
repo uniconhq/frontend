@@ -203,16 +203,16 @@ describe('a board in a sentence (M52)', () => {
     const board = {
       ...newBoard(),
       over: 'after_close',
-      order: [{ kind: 'value' as const, name: 'time' }],
+      order: [{ kind: 'value' as const, name: 'time', fold: 'max' }],
     };
     expect(boardSentence(board, { tasks: false, held: held.slice(0, 1) })).toBe(
-      'ranks entrants by their total time over every task, best first. Each entrant’s best submission to this task counts. Only organisers see it. It counts only test group “hidden”, when the contest ends.',
+      'ranks entrants by their total time over every task, each task’s highest test, best first. Each entrant’s best submission to this task counts. Only organisers see it. It counts only test group “hidden”, when the contest ends.',
     );
     expect(boardSentence(board, { tasks: false, held: [] })).toBe(
-      'ranks entrants by their total time over every task, best first. Each entrant’s best submission to this task counts. Only organisers see it. It takes nothing from this task: it counts only test groups whose results entrants see once their task closes, and this task has none.',
+      'ranks entrants by their total time over every task, each task’s highest test, best first. Each entrant’s best submission to this task counts. Only organisers see it. It takes nothing from this task: it counts only test groups whose results entrants see once their task closes, and this task has none.',
     );
     expect(boardSentence(board, { held: [] })).toBe(
-      'Ranks entrants by their total time over every task, best first. Each entrant’s best submission to each task counts. Only organisers see it. It counts nothing: it counts only test groups whose results entrants see once their task closes, and no task it covers has one.',
+      'Ranks entrants by their total time over every task, each task’s highest test, best first. Each entrant’s best submission to each task counts. Only organisers see it. It counts nothing: it counts only test groups whose results entrants see once their task closes, and no task it covers has one.',
     );
   });
 });

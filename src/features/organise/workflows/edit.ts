@@ -429,7 +429,6 @@ export type EntryFields = {
   /** What pages call the value, "Run time", and what it is counted in, "ms" (M58). */
   title?: string | null;
   unit?: string | null;
-  fold?: string | null;
   better?: string | null;
   at_least?: NumberText | null;
   at_most?: NumberText | null;
@@ -449,7 +448,6 @@ export function entryFields(
   const fields: EntryFields = {
     title: entry.title,
     unit: entry.unit,
-    fold: entry.fold,
     better: entry.better,
     at_least: entry.atLeast,
     at_most: entry.atMost,

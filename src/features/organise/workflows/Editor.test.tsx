@@ -610,7 +610,7 @@ describe('the workflow editor', () => {
 
     const named = await fileText(user);
     expect(named).toContain(
-      'time_ms: {from: "${{ steps.run.time_ms }}", fold: max, better: lower, at_least: 0, title: Run time, unit: ms}',
+      'time_ms: {from: "${{ steps.run.time_ms }}", better: lower, at_least: 0, title: Run time, unit: ms}',
     );
     expect(named).toContain(
       'log: {from: "${{ steps.compile.compile_log }}", title: Compile log}',

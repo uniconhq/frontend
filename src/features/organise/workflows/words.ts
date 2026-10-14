@@ -112,24 +112,14 @@ export function fieldMarks(field: FieldDecl): string[] {
   return field.public ? ['shown to entrants'] : [];
 }
 
-const FOLD_WORDS: Record<string, string> = {
-  sum: 'total over the tests',
-  mean: 'average over the tests',
-  max: 'largest over the tests',
-};
-
 /** What a report entry says its number means, in words. */
 export function entryMarks(entry: ReportEntry): string[] {
-  const better =
-    entry.better === null
-      ? null
-      : entry.better === 'higher' || entry.better === 'lower'
-        ? `${entry.better} is better`
-        : 'the task says which is better';
+  if (entry.better === null) return [];
   return [
-    entry.fold === null ? null : (FOLD_WORDS[entry.fold] ?? entry.fold),
-    better,
-  ].filter((mark): mark is string => mark !== null);
+    entry.better === 'higher' || entry.better === 'lower'
+      ? `${entry.better} is better`
+      : 'the task says which is better',
+  ];
 }
 
 /** Where a value comes from, as a wire's label and a menu say it: "time_ms from run". */

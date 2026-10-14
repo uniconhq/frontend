@@ -18,8 +18,8 @@ const done: GradingResult = {
   limit: null,
   points: null,
   factor: null,
-  folded: {},
   meanings: [],
+  boards: [],
 };
 
 function submitted(secondsAgo: number, status: 'grading' | 'graded'): Submission {

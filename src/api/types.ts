@@ -92,9 +92,11 @@ export type GroupShown = Schemas['GroupShown'];
 export type Reported = Schemas['Reported'];
 /**
  * One value a task's workflow reports, as pages name it: its key, its title
- * and unit, and how it folds over the tests and which way is better.
+ * and unit, and which way is better.
  */
 export type ValueMeaning = Schemas['ValueMeaning'];
+/** A submission's line on one leaderboard covering its task. */
+export type OnBoard = Schemas['OnBoard'];
 /** One test's row of a result, with its credit once scored. */
 export type GradedTest = Schemas['GradedTest'];
 export type Grading = Schemas['Grading'];

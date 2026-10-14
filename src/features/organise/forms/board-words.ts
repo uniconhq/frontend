@@ -84,8 +84,15 @@ export const KINDS = [
     value: 'value',
     label: 'A value the tasks report',
     description:
-      'A number the tasks’ workflow reports, such as run time. The workflow says whether higher or lower is better.',
+      'A number the tasks’ workflow reports for each test, such as run time. The workflow says whether higher or lower is better; the leaderboard says how each task’s tests combine.',
   },
+];
+
+/** How a value combines across each task's tests, as a value key chooses it. */
+export const FOLDS = [
+  { value: 'max', label: 'Highest test', said: 'highest test' },
+  { value: 'sum', label: 'Total over the tests', said: 'total over the tests' },
+  { value: 'mean', label: 'Average over the tests', said: 'average over the tests' },
 ];
 
 /** Why the save would refuse penalty minutes as the first key (C3), or null. */
@@ -126,7 +133,9 @@ function keyWords(
     const name = key.name.trim();
     if (name === '') return `their total value${across}, best first`;
     const meaning = meaningOf(values ?? [], name);
-    return `their total ${titleInSentence(name, meaning)}${across}, ${valueFirst(meaning)}`;
+    const fold = FOLDS.find((each) => each.value === key.fold);
+    const each = fold === undefined ? '' : `, each task’s ${fold.said}`;
+    return `their total ${titleInSentence(name, meaning)}${across}${each}, ${valueFirst(meaning)}`;
   }
   const minutes = key.perAttempt.trim();
   return minutes === '' || minutes === '0'

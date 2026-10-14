@@ -159,12 +159,15 @@ describe('editing the file in place', () => {
 
     expect(bounded).toContain(`at_least: ${digits}`);
     expect(entry?.atLeast?.text).toBe(digits);
-    const folded = setEntry(bounded, 'time', {
+    const ranked = setEntry(bounded, 'time', {
       from: { kind: 'steps', name: 'run', output: 'time_ms' },
-      fold: 'max',
+      better: 'lower',
       at_least: entry?.atLeast ?? null,
     });
-    expect(folded).toContain(`at_least: ${digits}, fold: max`);
+    expect(ranked).toContain(`at_least: ${digits}`);
+    expect(
+      workflowOf(ranked).report.find((found) => found.name === 'time')?.atLeast?.text,
+    ).toBe(digits);
   });
 
   it('writes the first port of a new step as a block', () => {
@@ -345,14 +348,13 @@ describe('editing the file in place', () => {
     });
     const meant = setEntry(COMMENTED, 'time', {
       from: { kind: 'steps', name: 'run', output: 'time_ms' },
-      fold: 'max',
       better: 'lower',
       at_least: new NumberText('0'),
     });
 
     expect(short).toContain('time: ${{ steps.run.time_ms }}');
     expect(meant).toContain(
-      'time: {from: "${{ steps.run.time_ms }}", fold: max, better: lower, at_least: 0}',
+      'time: {from: "${{ steps.run.time_ms }}", better: lower, at_least: 0}',
     );
     expect(
       workflowOf(removeEntry(meant, 'time')).report.map((entry) => entry.name),

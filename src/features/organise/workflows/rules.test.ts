@@ -358,27 +358,25 @@ steps:
 
     expect(
       reportRefusal(workflow, primitives, output('compile', 'compile_log'), time),
-    ).toBe(
-      'fold, better, at_least and at_most apply only to a number, and this is text.',
-    );
+    ).toBe('better, at_least and at_most apply only to a number, and this is text.');
     expect(
       reportRefusal(workflow, primitives, output('run', 'memory_kb'), time),
     ).toBeNull();
   });
 
-  it('refuses running a step once while the report folds its output', () => {
+  it('refuses running a step once while the report ranks its output', () => {
     const workflow = readWorkflow(
       parse(`
 test: {input: file}
 steps:
   - {id: run, use: unicon/sandbox-run@v2, per_test: true, with: {}}
 report:
-  time: {from: "\${{ steps.run.time_ms }}", fold: max}
+  time: {from: "\${{ steps.run.time_ms }}", better: lower}
 `),
     );
 
     expect(switchRefusal(workflow, 0)).toBe(
-      "The report's time folds it over the tests, so this step runs for each test.",
+      'The report says which way time is better, so this step runs for each test.',
     );
   });
 
@@ -391,7 +389,7 @@ test: {input: file}
 steps:
   - {id: run, use: unicon/sandbox-run@v2, per_test: true, with: {}}
 report:
-  score: {from: "\${{ steps.run.time_ms }}", fold: max, better: "\${{ inputs.dir }}"}
+  score: {from: "\${{ steps.run.time_ms }}", better: "\${{ inputs.dir }}"}
   bounded: {from: "\${{ steps.run.time_ms }}", at_least: 5, at_most: 1}
 `),
     );
