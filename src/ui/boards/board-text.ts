@@ -1,20 +1,25 @@
 import type { Board, BoardCell, BoardKey } from '@/api/types';
 import { formatExact, formatPoints, placesToTell, withPointsWord } from '@/lib/exact';
-import { valueTitle, withUnit } from '@/lib/values';
+import { foldWord, valueTitle, withUnit } from '@/lib/values';
 
 /**
  * What a board's numbers read as. Every key a board ranks on is a column, so
  * a contestant can see why one row is above the next; each is named by what
  * it ranks by: a value by its title, "Run time", or its key until it has
- * one (M58). A `penalty` with `per_attempt: 0` charges nothing for an
+ * one (M58), and how the board combines it across a task's tests, "Run
+ * time, highest". A `penalty` with `per_attempt: 0` charges nothing for an
  * attempt, so all it ranks on is the minute submitted, and it says so.
  */
-export function keyLabel(key: BoardKey): string {
+export function keyLabel(
+  key: Pick<BoardKey, 'by' | 'per_attempt' | 'title' | 'unit' | 'fold'>,
+): string {
   if (key.by === 'points') return 'Points';
   if (key.by === 'penalty') {
     return (key.per_attempt ?? 0) === 0 ? 'Submitted at minute' : 'Penalty';
   }
-  return valueTitle(key.by, key);
+  const word = foldWord(key.fold);
+  const title = valueTitle(key.by, key);
+  return word === null ? title : `${title}, ${word}`;
 }
 
 /** A row's number on a key, as its column shows it: a value's with its unit, "28 ms". */

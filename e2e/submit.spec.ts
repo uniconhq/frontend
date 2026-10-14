@@ -53,7 +53,7 @@ const queued = {
   reason: null,
   points: null,
   factor: null,
-  folded: {},
+  boards: [],
 };
 
 const ranTest = (name: string, outcome: string, timeMs: string, credit: string) => ({

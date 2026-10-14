@@ -184,10 +184,12 @@ const CHECKED_YAML = `inputs:
 test:
   input: file
   answer: file
-steps: []
+steps:
+  - {id: run, use: unicon/sandbox-run@v2, per_test: true, with: {}}
+  - {id: check, use: unicon/checker-run@v1, per_test: true, with: {}}
 report:
-  fraction: {from: "\${{ steps.check.fraction }}", fold: mean, better: higher, at_least: 0, at_most: 1}
-  time_ms: {from: "\${{ steps.run.time_ms }}", fold: max, better: lower, at_least: 0}
+  fraction: {from: "\${{ steps.check.fraction }}", better: higher, at_least: 0, at_most: 1}
+  time_ms: {from: "\${{ steps.run.time_ms }}", better: lower, at_least: 0}
 `;
 
 /** A workflow that takes the time limit from the entrant. */
@@ -1308,33 +1310,6 @@ describe('scoring a task', { timeout: 30_000 }, () => {
     ).toBeEnabled();
   });
 
-  it('offers a score from a step that runs for each test though its value names no fold, as the forge takes it', async () => {
-    taskBackend({ form: { ...CHECKED, inputs: [] } });
-    server.use(
-      http.get('/api/v1/workflows/:owner/:name/versions/:version', () =>
-        HttpResponse.json({
-          content: CHECKED_YAML.replace(
-            'steps: []',
-            'steps:\n  - id: check\n    use: unicon/checker-run@v1\n    per_test: true',
-          ).replace(
-            'fold: mean, better: higher, at_least: 0, at_most: 1',
-            'at_least: 0, at_most: 1',
-          ),
-        }),
-      ),
-    );
-    const { tests } = await openTask();
-
-    const earns = within(tests).getByRole('radiogroup', { name: 'A test earns' });
-    expect(
-      within(earns).getByRole('radio', {
-        name: 'A score the workflow gives it, from 0 to 1',
-      }),
-    ).toBeEnabled();
-    const value = await within(tests).findByRole('combobox', { name: 'Which value' });
-    expect(within(value).getByRole('option', { name: 'fraction' })).toBeEnabled();
-  });
-
   it('gives the lower-is-better case against the best, and says in its own line that a workflow gives no score rather than greying every value (M58)', async () => {
     taskBackend({
       form: { ...CHECKED, inputs: [] },
@@ -1344,8 +1319,8 @@ describe('scoring a task', { timeout: 30_000 }, () => {
       http.get('/api/v1/workflows/:owner/:name/versions/:version', () =>
         HttpResponse.json({
           content: CHECKED_YAML.replace(/ {2}fraction: .*\n/, '').replace(
-            'fold: max,',
-            'fold: max, title: Run time, unit: ms,',
+            'better: lower, at_least: 0}',
+            'better: lower, at_least: 0, title: Run time, unit: ms}',
           ),
         }),
       ),

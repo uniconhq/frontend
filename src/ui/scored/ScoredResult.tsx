@@ -1,16 +1,16 @@
-import type { GroupShown, Reported, ScoredGrading, ValueMeaning } from '@/api/types';
+import type {
+  GroupShown,
+  OnBoard,
+  Reported,
+  ScoredGrading,
+  ValueMeaning,
+} from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { VerdictBadge } from '@/ui/VerdictBadge';
+import { keyLabel } from '@/ui/boards/board-text';
 import { formatExact, formatPoints, withPointsWord } from '@/lib/exact';
 import { formatDateTime } from '@/lib/time';
-import {
-  foldWords,
-  inReportOrder,
-  meaningOf,
-  titleInSentence,
-  valueTitle,
-  withUnit,
-} from '@/lib/values';
+import { inReportOrder, meaningOf, valueTitle, withUnit } from '@/lib/values';
 import { pointsText, valueText } from './scored-text';
 import classes from './scored.module.css';
 
@@ -65,75 +65,64 @@ function OnceValues({
   );
 }
 
-/** Titles joined as a sentence lists them: "Run time and Memory used". */
-function joined(items: string[]): string {
-  if (items.length <= 1) return items.join('');
-  return `${items.slice(0, -1).join(', ')} and ${items[items.length - 1] ?? ''}`;
+/**
+ * One board's line in words: each number by what it is, "24 points", "Run
+ * time, highest: 15 ms", or "no value" where a test shown was not accepted
+ * (#441); what the board's hidden groups could still add; whether the board
+ * counts this submission; and, while the board shows nothing of the task
+ * yet, when it does instead.
+ */
+function lineText(line: OnBoard): string {
+  if (line.shown_at !== null) {
+    return [
+      `shown at ${formatDateTime(new Date(line.shown_at))}`,
+      ...(line.counted ? ['counts here'] : []),
+    ].join(' · ');
+  }
+  const numbers = line.numbers.flatMap((number) => {
+    if (number.by === 'points') {
+      return number.value === null ? [] : [withPointsWord(formatPoints(number.value))];
+    }
+    const label = keyLabel({ ...number, per_attempt: null });
+    return [
+      `${label}: ${number.value === null ? 'no value' : withUnit(formatExact(number.value), number)}`,
+    ];
+  });
+  const pending =
+    line.pending !== null && Number(line.pending) > 0
+      ? [`up to ${formatPoints(line.pending)} more at the reveal`]
+      : [];
+  return [...numbers, ...pending, ...(line.counted ? ['counts here'] : [])].join(' · ');
 }
 
 /**
- * The task's folds over what the reader is shown of the run, labelled and in
- * the values' own words (M63): "Over the tests shown: Run time 28 ms (the
- * longest), Memory used 10,420 KB (the most)", in the workflow's report order,
- * each name on its number's baseline. The forge folds over the tests shown,
- * a test not accepted counting as the value's worst bound; a fold the run has
- * no value for because such a test leaves it none (#441, TASK-FORMAT 3.4) is
- * said plainly under it. Nothing
- * when the task folds nothing or none is shown yet.
+ * Where the submission stands on each leaderboard its reader sees that covers
+ * the task, read as that board reads it: its scope, the values it ranks
+ * combined across the tests as it says, and whether it counts this one.
+ * Boards whose lines read alike share one, naming them all. Nothing when no
+ * board covers the task.
  */
-function FoldedValues({
-  folded,
-  meanings,
-  unaccepted,
-}: {
-  folded: Record<string, string>;
-  meanings: ValueMeaning[];
-  /** Whether a test the reader is shown was not accepted, so a fold may have no value. */
-  unaccepted: boolean;
-}) {
-  const names = inReportOrder(Object.keys(folded), meanings);
-  const missing = unaccepted
-    ? meanings
-        .filter(
-          (meaning) => meaning.fold !== null && folded[meaning.name] === undefined,
-        )
-        .map((meaning) => titleInSentence(meaning.name, meaning))
-    : [];
-  const said = joined(missing);
-  if (names.length === 0 && missing.length === 0) return null;
+function OnBoards({ boards }: { boards: OnBoard[] }) {
+  const lines = new Map<string, { names: string[]; text: string }>();
+  for (const line of boards) {
+    const text = lineText(line);
+    const key = `${line.over} ${text}`;
+    const found = lines.get(key);
+    if (found === undefined) lines.set(key, { names: [line.board], text });
+    else found.names.push(line.board);
+  }
+  if (lines.size === 0) return null;
   return (
-    <div className={classes.folded}>
-      {names.length > 0 && (
-        <div className={classes.overAll} role="group" aria-label="Over the tests shown">
-          <span>Over the tests shown:</span>
-          <dl className={classes.metrics}>
-            {names.map((name, at) => {
-              const meaning = meaningOf(meanings, name);
-              const words = meaning === undefined ? null : foldWords(meaning);
-              return (
-                <div key={name} className={classes.metric}>
-                  <dt>{valueTitle(name, meaning)}</dt>
-                  <dd>
-                    <span className={classes.number}>
-                      {withUnit(formatExact(folded[name] ?? '0'), meaning)}
-                    </span>
-                    {words !== null && ` (${words})`}
-                    {at < names.length - 1 && ','}
-                  </dd>
-                </div>
-              );
-            })}
-          </dl>
-        </div>
-      )}
-      {missing.length > 0 && (
-        <BodyText tone="secondary">
-          {`${said.charAt(0).toUpperCase()}${said.slice(1)}`}{' '}
-          {missing.length === 1 ? 'has' : 'have'} no value while a test shown is not
-          accepted.
-        </BodyText>
-      )}
-    </div>
+    <section className={classes.boards} aria-label="On the leaderboards">
+      <BodyText tone="secondary">On the leaderboards</BodyText>
+      <ul className={classes.boardLines}>
+        {[...lines].map(([key, { names, text }]) => (
+          <li key={key}>
+            {names.join(', ')}: {text}
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 
@@ -254,8 +243,8 @@ function Group({
 
 /**
  * What a grading's result holds beside where it stands: its points with the
- * late factor they include, what the run reported once, the folds over its
- * tests, and each test group. A contestant reads it as the task shows it now;
+ * late factor they include, what the run reported once, its line on each
+ * leaderboard covering the task, and each test group. A contestant reads it as the task shows it now;
  * organisers read the same payload with everything filled in, where each
  * group's time says when its contestant sees it (`shownAt`, and
  * `testsShownAt` for a group whose tests alone wait).
@@ -286,13 +275,7 @@ export function ScoredResult({
         </BodyText>
       )}
       <OnceValues values={grading.values} meanings={grading.meanings} />
-      <FoldedValues
-        folded={grading.folded}
-        meanings={grading.meanings}
-        unaccepted={grading.groups.some((group) =>
-          (group.tests ?? []).some((test) => test.outcome !== 'accepted'),
-        )}
-      />
+      <OnBoards boards={grading.boards} />
       {grading.groups.map((group) => (
         <Group
           key={group.group}
