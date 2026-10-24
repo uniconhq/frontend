@@ -32,6 +32,7 @@ import {
   WorkflowPage,
   WorkflowsPage,
 } from '@/features/organise';
+import { stage6Routes } from '@/features/organise/stage6/routes';
 import { RequireSession, SessionExpiredModal, SessionProvider } from '@/session';
 import {
   CONTEST_SECTIONS,
@@ -230,6 +231,7 @@ export const routes: RouteObject[] = [
               },
             ],
           },
+          ...(import.meta.env.DEV ? stage6Routes : []),
           { path: '*', element: <NotFound /> },
         ],
       },
