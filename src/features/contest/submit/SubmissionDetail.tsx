@@ -13,7 +13,7 @@ import { formatDateTime } from '@/lib/time';
 import { downloadHref, nameOf } from './download';
 import { useLiveConnected, useLiveRefused } from '@/live';
 import { serverNow } from '@/lib/time';
-import { DELAYED_SENTENCE, cancelReason, pollEvery, verdictOf } from './grading';
+import { DELAYED_SENTENCE, cancelReason, pollEvery } from './grading';
 import { overLimitSentence } from '@/ui/scored/scored-text';
 import shared from '../contest.module.css';
 import classes from './submit.module.css';
@@ -103,7 +103,7 @@ function Grading({
   return (
     <>
       <div className={classes.verdict}>
-        <VerdictBadge verdict={verdictOf(grading)} />
+        <VerdictBadge verdict={grading.status} />
         {/* Entrants' pages speak of a submission, not of its gradings' attempts. */}
         {grading.attempt > 1 && <BodyText tone="secondary">Graded again</BodyText>}
       </div>

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@/test/user-event';
-import { http, HttpResponse } from 'msw';
+import { delay, http, HttpResponse } from 'msw';
 import { parse } from 'yaml';
 import type {
   DeclaredInput,
@@ -1569,5 +1569,98 @@ describe('a publication’s checks', { timeout: 30_000 }, () => {
     expect(await screen.findByText('run-1: wrong_answer')).toBeVisible();
     expect(screen.getAllByText(/was refused/).length).toBeGreaterThan(0);
     expect(reads.length).toBeGreaterThan(settled);
+  });
+});
+
+describe('scoring while what it reads is not in', { timeout: 60_000 }, () => {
+  beforeEach(() => {
+    Range.prototype.getClientRects = () => {
+      const rects = [] as unknown as DOMRectList;
+      Object.defineProperty(rects, 'length', { value: 0 });
+      rects.item = () => null;
+      return rects;
+    };
+  });
+
+  /** Islands with a value that reads the workflow's time_ms output. */
+  const SCORED = `${ISLANDS}scoring:
+  values:
+    total: {block: sum, over: {runs: all}, of: {run: [all, time_ms]}}
+`;
+  const islands = () =>
+    runForm('unicon/classic@v3', [declared('code', 'file'), declared('input', 'file')]);
+
+  it('reads an output as a number once the workflow is read', async () => {
+    taskBackend({ content: SCORED, form: islands() });
+    await openTask();
+    const scoring = await screen.findByRole('region', { name: 'Scoring' });
+
+    expect((await within(scoring).findAllByText('number'))[0]).toBeVisible();
+    expect(within(scoring).queryByText('to fix')).toBeNull();
+  });
+
+  it('calls no output unknown while the workflow is still being read', async () => {
+    taskBackend({ content: SCORED, form: islands() });
+    server.use(
+      http.get('/api/v1/workflows/:owner/:name/versions/:version', async () => {
+        await delay('infinite');
+        return HttpResponse.json({});
+      }),
+    );
+    await openTask();
+    const scoring = await screen.findByRole('region', { name: 'Scoring' });
+
+    expect(within(scoring).queryByText('to fix')).toBeNull();
+    expect(scoring).not.toHaveTextContent('could not be read');
+    expect(screen.queryByText(/time_ms/)).toBeNull();
+  });
+
+  it('says the workflow could not be read, and calls no output unknown', async () => {
+    taskBackend({ content: SCORED, form: islands() });
+    server.use(
+      http.get('/api/v1/workflows/:owner/:name/versions/:version', () =>
+        problem(404, 'not_found'),
+      ),
+    );
+    await openTask();
+    const scoring = await screen.findByRole('region', { name: 'Scoring' });
+
+    expect(
+      await within(scoring).findByText(/The workflow could not be read/),
+    ).toBeVisible();
+    expect(within(scoring).queryByText('to fix')).toBeNull();
+  });
+
+  it('says the blocks could not be loaded, rather than hiding the formulas', async () => {
+    taskBackend({ content: SCORED, form: islands() });
+    server.use(http.get('/api/v1/blocks', () => problem(500, 'internal')));
+    await openTask();
+    const scoring = await screen.findByRole('region', { name: 'Scoring' });
+
+    expect(
+      await within(scoring).findByText(
+        /The blocks formulas are made of could not be loaded/,
+      ),
+    ).toBeVisible();
+    expect(within(scoring).getByRole('button', { name: 'Add a value' })).toBeDisabled();
+  });
+
+  it('has no Scoring or Checks card while the saved workflow cannot be read', async () => {
+    taskBackend({ content: SCORED });
+    await openTask();
+
+    expect(screen.queryByRole('region', { name: 'Scoring' })).toBeNull();
+    expect(screen.queryByRole('region', { name: 'Checks' })).toBeNull();
+  });
+
+  it('has no Scoring or Checks card when no workflow is saved', async () => {
+    taskBackend({
+      content: 'name: Islands\n',
+      form: { ...islands(), workflow: null },
+    });
+    await openTask();
+
+    expect(screen.queryByRole('region', { name: 'Scoring' })).toBeNull();
+    expect(screen.queryByRole('region', { name: 'Checks' })).toBeNull();
   });
 });

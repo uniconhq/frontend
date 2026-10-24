@@ -79,22 +79,10 @@ const WAY: Record<string, string> = {
 
 export const TASK_FIELDS: Record<string, string> = {
   id: 'Task',
-  worth: 'Worth',
   release_at: 'Opens',
   due: 'Due',
-  late_per_day: 'Taken off per late day',
   closes: 'Closes',
   marks: 'Marks',
-};
-
-export const BOARD_FIELDS: Record<string, string> = {
-  name: 'Name',
-  tasks: 'Tasks',
-  over: 'Results counted',
-  select: 'Which submission counts',
-  order: 'Ranked by',
-  who: 'Shown to',
-  rows: 'Rows shown',
 };
 
 /**
@@ -182,17 +170,6 @@ export function contestPlace(path: string): ContestPlace {
     };
   }
   if (top === 'leaderboards') {
-    // A list, as an old contest stored it: the place in the list.
-    if (typeof second === 'number') {
-      const label = typeof third === 'string' ? BOARD_FIELDS[third] : undefined;
-      const board = `Leaderboards, leaderboard ${String(second + 1)}`;
-      return {
-        part: 'boards',
-        label: label === undefined ? board : `${board}: ${label}`,
-        field: typeof third === 'string' && label !== undefined ? third : null,
-        item: second,
-      };
-    }
     if (typeof second !== 'string') {
       return { part: 'boards', label: 'Leaderboards', field: null, item: null };
     }
@@ -201,7 +178,7 @@ export function contestPlace(path: string): ContestPlace {
   return whole;
 }
 
-const BOARD_PARTS: Record<string, string> = {
+export const BOARD_PARTS: Record<string, string> = {
   title: 'Title',
   columns: 'Column',
   sort: 'Sort',

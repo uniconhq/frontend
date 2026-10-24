@@ -10,7 +10,7 @@ import { YAML_OPTIONS } from '../forms/yaml-doc';
 export type Selected =
   | { kind: 'step'; index: number }
   | { kind: 'inputs'; ids: string[] }
-  | { kind: 'report' };
+  | { kind: 'outputs' };
 
 export function linesOf(text: string, selected: Selected | null): LineRange[] {
   if (selected === null) return [];

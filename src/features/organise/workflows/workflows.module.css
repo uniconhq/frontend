@@ -232,7 +232,7 @@
   font-size: 13px;
 }
 
-/* One input, test file or report entry in its drawer. */
+/* One input or output in its drawer. */
 .declaration {
   display: flex;
   flex-direction: column;
@@ -254,22 +254,6 @@
   gap: 8px;
   padding-top: 12px;
   border-top: 1px solid var(--unicon-border);
-}
-
-/* A primitive in the "Add step" menu: its title, what it does, its reference. */
-.addTitle,
-.addDescription {
-  display: block;
-}
-
-.addTitle {
-  font-weight: 700;
-}
-
-.addDescription {
-  color: var(--unicon-text-secondary);
-  font-size: 12px;
-  white-space: normal;
 }
 
 /* The graph's frame: the page's whole width, the graph at its actual size

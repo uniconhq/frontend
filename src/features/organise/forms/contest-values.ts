@@ -1,5 +1,4 @@
 import { isSeq } from 'yaml';
-import { readBoards, writeBoards, type BoardValues } from './board-values';
 import { isoOf, localOf, unreadableTime } from './times';
 import { readWays, writeWays, type WayValues } from './ways';
 import {
@@ -37,17 +36,18 @@ export type ContestValues = {
   locks: string;
   /** The task entries in the order the form shows them. */
   tasks: TaskEntryValues[];
-  boards: BoardValues[];
+  /** The leaderboards' keys; none while `leaderboards` is not a mapping. */
+  boards: string[];
+  /** The tasks whose marked submissions a leaderboard reads. */
+  marked: string[];
 };
 
 export type TaskEntryValues = {
   id: string;
   /** Where the entry sits in the file as read. */
   at: number;
-  worth: string;
   releaseAt: string;
   due: string;
-  latePerDay: string;
   closes: string;
   marks: string;
 };
@@ -76,6 +76,28 @@ function rawTimesOf(doc: Doc, paths: (string | number)[][]): Record<string, stri
   return raw;
 }
 
+/**
+ * The tasks a leaderboard reads the marked submissions of, each named as
+ * `{value: [task, marked]}` somewhere among its columns.
+ */
+function markedTasks(node: unknown): string[] {
+  const found = new Set<string>();
+  const visit = (item: unknown) => {
+    if (Array.isArray(item)) {
+      item.forEach(visit);
+      return;
+    }
+    if (!isRecord(item)) return;
+    const value = item['value'];
+    if (Array.isArray(value) && value.length === 2 && value[1] === 'marked') {
+      if (typeof value[0] === 'string') found.add(value[0]);
+    }
+    Object.values(item).forEach(visit);
+  };
+  visit(node);
+  return [...found];
+}
+
 export function readContest(doc: Doc): ContestRead {
   const unreadable: string[] = [];
   const registration = valueAt(doc, ['registration']);
@@ -93,8 +115,7 @@ export function readContest(doc: Doc): ContestRead {
   if (!listOk) unreadable.push('tasks');
   const entries =
     listOk && Array.isArray(list) ? (list as Record<string, unknown>[]) : [];
-  const boards = readBoards(exactAt(doc, ['leaderboards']));
-  if (boards === null) unreadable.push('leaderboards');
+  const boards = exactAt(doc, ['leaderboards']);
 
   const at = (...path: (string | number)[]) => textAt(doc, path);
   const time = (...path: (string | number)[]) => localOf(valueAt(doc, path));
@@ -126,14 +147,13 @@ export function readContest(doc: Doc): ContestRead {
       tasks: entries.map((entry, index) => ({
         id: String(entry['id']),
         at: index,
-        worth: at('tasks', index, 'worth'),
         releaseAt: time('tasks', index, 'release_at'),
         due: time('tasks', index, 'due'),
-        latePerDay: at('tasks', index, 'late_per_day'),
         closes: time('tasks', index, 'closes'),
         marks: at('tasks', index, 'marks'),
       })),
-      boards: boards ?? [],
+      boards: isRecord(boards) ? Object.keys(boards) : [],
+      marked: isRecord(boards) ? markedTasks(boards) : [],
     },
   };
 }
@@ -213,15 +233,11 @@ export function writeContest(
     const was = before.tasks.find((old) => old.at === entry.at);
     if (was === undefined) return;
     const field = (key: string) => ['tasks', index, key];
-    put(field('worth'), was.worth, entry.worth, number);
     put(field('release_at'), was.releaseAt, entry.releaseAt, time);
     put(field('due'), was.due, entry.due, time);
-    put(field('late_per_day'), was.latePerDay, entry.latePerDay, number);
     put(field('closes'), was.closes, entry.closes, time);
     put(field('marks'), was.marks, entry.marks, number);
   });
-
-  writeBoards(doc, before.boards, after.boards);
 }
 
 /** A task's label: its place in the list as a letter, A to Z, then AA. */

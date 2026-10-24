@@ -93,7 +93,7 @@ function downstream(workflow: Workflow, index: number): Set<number> {
 function kindOf(
   workflow: Workflow,
   primitives: Map<string, PrimitiveInfo>,
-  stepIndex: number | 'report',
+  stepIndex: number | 'outputs',
   ref: Ref,
   boxes: ReadonlyMap<string, BoxDecl> = new Map(),
 ): Kind | string {
@@ -119,7 +119,7 @@ function kindOf(
   const source = read !== undefined ? workflow.steps[read] : undefined;
   if (read === undefined || source === undefined)
     return `There is no step called ${ref.name} before this one.`;
-  if (stepIndex !== 'report') {
+  if (stepIndex !== 'outputs') {
     if (read === stepIndex)
       return `There is no step called ${ref.name} before this one.`;
     if (upstream(workflow, read).has(stepIndex))
@@ -203,7 +203,7 @@ const LIMIT_AT_SAVE =
   'This value raises a limit, so it must be known when the task is saved.';
 
 /** Why an output may not be named as an output, or null when it may. */
-export function reportRefusal(
+export function outputRefusal(
   workflow: Workflow,
   primitives: Map<string, PrimitiveInfo>,
   source: Ref,
@@ -211,7 +211,7 @@ export function reportRefusal(
 ): string | null {
   if (source.kind !== 'steps')
     return "Only a step's output can be reported, not an input or a file of the workflow.";
-  const kind = kindOf(workflow, primitives, 'report', source, boxes);
+  const kind = kindOf(workflow, primitives, 'outputs', source, boxes);
   if (typeof kind === 'string') return kind;
   if (kind.type !== 'text' && kind.type !== 'number')
     return `steps.${source.name}.${source.output} is ${a(kind.type)}, and only text or a number can be reported.`;
@@ -303,16 +303,16 @@ export function orderAfterWire(
 function usesOf(
   workflow: Workflow,
   ref: Ref,
-): { step: number | 'report'; port: string }[] {
-  const found: { step: number | 'report'; port: string }[] = [];
+): { step: number | 'outputs'; port: string }[] {
+  const found: { step: number | 'outputs'; port: string }[] = [];
   workflow.steps.forEach((step, at) => {
     for (const [port, value] of Object.entries(step.with))
       if (refsOf(value).some((each) => sameRef(each, ref)))
         found.push({ step: at, port });
   });
-  for (const entry of workflow.report)
+  for (const entry of workflow.outputs)
     if (entry.from && sameRef(entry.from, ref))
-      found.push({ step: 'report', port: entry.name });
+      found.push({ step: 'outputs', port: entry.name });
   return found;
 }
 
@@ -329,7 +329,7 @@ export function mayBeOptional(
   if (input === undefined) return false;
   const uses = usesOf(workflow, { kind: 'inputs', name: id });
   return uses.every((use) => {
-    if (use.step === 'report') return false;
+    if (use.step === 'outputs') return false;
     const step = workflow.steps[use.step];
     const value = step?.with[use.port];
     if (step === undefined || value?.kind !== 'wire') return false;
@@ -338,7 +338,7 @@ export function mayBeOptional(
 }
 
 /**
- * Every wire, value and report entry a version would refuse that the
+ * Every wire, value and output a version would refuse that the
  * primitives' declarations decide, each said where it is: what a change on
  * a panel would newly break is refused before it is made, as a drag is.
  */
@@ -360,10 +360,10 @@ function wiringProblems(
       if (problem !== null) found.push(`${step.id}.${port}: ${problem}`);
     }
   });
-  for (const entry of workflow.report) {
+  for (const entry of workflow.outputs) {
     const problem =
-      entry.from === null ? null : reportRefusal(workflow, primitives, entry.from);
-    if (problem !== null) found.push(`report ${entry.name}: ${problem}`);
+      entry.from === null ? null : outputRefusal(workflow, primitives, entry.from);
+    if (problem !== null) found.push(`output ${entry.name}: ${problem}`);
   }
   return found;
 }
@@ -390,8 +390,8 @@ export function outputType(
   return declared(primitives, step.use)?.outputs[ref.output]?.type ?? null;
 }
 
-/** The step outputs a report can read: a text or number output of any step. */
-export function reportable(
+/** The step outputs an output can read: a text or number output of any step. */
+export function outputSources(
   workflow: Workflow,
   primitives: Map<string, PrimitiveInfo>,
 ): Extract<Ref, { kind: 'steps' }>[] {

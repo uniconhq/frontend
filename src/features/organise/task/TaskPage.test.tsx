@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@/test/user-event';
 import { delay, http, HttpResponse } from 'msw';
+import type { WorkflowForm } from '@/api/types';
 import { TASK_BUILD_CARDS, TASK_SECTIONS } from '@/lib/sections';
 import { formatDateTime } from '@/lib/time';
 import { renderApp } from '@/test/render';
@@ -51,10 +52,12 @@ describe('the task page', () => {
     const dialog = await screen.findByRole('dialog', {
       name: 'B · sum in this contest',
     });
-    expect(await within(dialog).findByRole('textbox', { name: 'Worth' })).toBeEnabled();
+    expect(
+      await within(dialog).findByRole('radiogroup', { name: 'Due' }),
+    ).toBeVisible();
   });
 
-  it('reads where the task stands in its contest again after a save, as its points can move with it', async () => {
+  it('reads where the task stands in its contest again after a save', async () => {
     let reads = 0;
     server.use(
       http.get(`${CONTEST_API}/organise/tasks`, () => {
@@ -69,7 +72,7 @@ describe('the task page', () => {
         HttpResponse.json({
           number: 3,
           grading_changed: true,
-          changes: ['main gives 110 points.'],
+          changes: ['The time limit changes.'],
           notes: [],
           regraded: 0,
           effect: unchanged,
@@ -243,7 +246,22 @@ describe('the task page', () => {
   });
 
   it('builds the task in order with cards, each leading to where its part is done', async () => {
-    server.use(signedIn, taskState, publicationList, ...repoFiles);
+    server.use(
+      signedIn,
+      taskState,
+      publicationList,
+      ...repoFiles,
+      // A saved workflow that reads, so the Scoring and Checks cards are there.
+      http.get(`${TASK_API}/workflow-form`, () =>
+        HttpResponse.json({
+          workflow: 'unicon/classic@v3',
+          newer: null,
+          problem: null,
+          graded: false,
+          inputs: [],
+        } satisfies WorkflowForm),
+      ),
+    );
     renderApp(TASK);
 
     await screen.findByRole('region', { name: 'Workflow' });
@@ -377,6 +395,16 @@ describe('what the task has, under its name', { timeout: 20_000 }, () => {
       'href',
       `${TASK}?card=inputs`,
     );
+  });
+
+  it('says nothing of what the task lacks while its workflow is still being read', async () => {
+    readyBackend();
+    server.use(http.get(`${TASK_API}/workflow-form`, () => delay('infinite')));
+    renderApp(TASK);
+
+    await screen.findByLabelText('Where the task stands');
+    expect(screen.queryByRole('list', { name: 'What the task has' })).toBeNull();
+    expect(screen.queryByText('Workflow: none chosen')).toBeNull();
   });
 
   it('does not tick a statement the forge says is not written yet: blank, or the one a new task starts with (M57)', async () => {

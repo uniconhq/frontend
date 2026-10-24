@@ -21,8 +21,6 @@ const grading: Grading = {
   status: 'done',
   error: null,
   result: runsResult(['wrong_answer']),
-  log: true,
-  progress: null,
   queued_at: '2026-10-05T10:00:00Z',
   dispatched_at: '2026-10-05T10:00:01Z',
   started_at: '2026-10-05T10:00:05Z',
@@ -59,7 +57,6 @@ const stuckFirst: FeedEntry = {
     status: 'system_error',
     error: 'The grading machine lost its run before it began.',
     result: null,
-    log: false,
     started_at: null,
     finished_at: '2026-10-05T10:05:00Z',
   },
@@ -96,7 +93,6 @@ const cancelled: FeedEntry = {
     error: 'The run did not report by its deadline.',
     cancel_reason: 'Our grader broke; this one does not count against you.',
     result: null,
-    log: false,
   },
 };
 
@@ -108,7 +104,7 @@ const superseded: FeedEntry = {
 
 const feed = [retried, sortByTeam, superseded, cancelled];
 
-/** A rejudge of sum that took 120 submissions: 4 went down, 2 now fail to compile, 1 went up. */
+/** A rejudge of sum that took 120 submissions, 5 of them graded for the first time. */
 const REGRADE: RegradeSummary = {
   id: '0199a2c1-0000-7000-8000-0000000000aa',
   task: 'sum',
@@ -122,19 +118,16 @@ const REGRADE: RegradeSummary = {
   graded: 120,
   running: false,
   counts: {
-    up: 1,
-    down: 4,
-    stopped: 2,
-    unchanged: 113,
-    new: 0,
+    regraded: 115,
+    new: 5,
     running: 0,
     failed: 0,
     over_limit: 0,
   },
 };
 
-/** ada's submission 3 to sum, which passed five tests before the regrade and now fails to compile. */
-const nowStopped: FeedEntry = {
+/** ada's submission 3 to sum, which had no result before the regrade and now has one. */
+const nowGraded: FeedEntry = {
   task: 'sum',
   label: 'B',
   by: ada,
@@ -143,21 +136,7 @@ const nowStopped: FeedEntry = {
     id: 'g-sum-regraded',
     attempt: 2,
     regrade: REGRADE.id,
-    change: {
-      change: 'stopped',
-      earlier: {
-        attempt: 1,
-        accepted: 5,
-        tests: 8,
-        stopped: null,
-      },
-      now: {
-        attempt: 2,
-        accepted: 0,
-        tests: 8,
-        stopped: 'compile_error',
-      },
-    },
+    change: { change: 'new', earlier: null, now: 2 },
   },
 };
 
@@ -210,14 +189,7 @@ describe("the contest's gradings feed", () => {
     expect(team).toHaveTextContent('Lovelaces (grace)');
     expect(team).toHaveTextContent('WRONG ANSWER');
     expect(team).not.toHaveTextContent('wrong_answer');
-    expect(
-      within(team).getByRole('link', {
-        name: 'Log of A submission 1 by Lovelaces (grace), attempt 1',
-      }),
-    ).toHaveAttribute(
-      'href',
-      '/api/v1/orgs/acme/contests/spring/tasks/sort/gradings/g-sort-1/log',
-    );
+    expect(within(team).queryByRole('link', { name: /^Log of/ })).toBeNull();
 
     expect(standingsRead).toBe(false);
     expect(sortAda).toHaveTextContent('Cancelled');
@@ -905,15 +877,13 @@ describe('what a regrade changed', () => {
   it('sums up each task’s latest regrade, each count a link to those submissions', async () => {
     server.use(signedIn, taskList);
     regrades([REGRADE]);
-    const asked = feedAnswering((query) =>
-      query.get('change') === 'stopped' ? [nowStopped, nowStopped] : feed,
-    );
+    feedAnswering(() => feed);
     renderApp(FEED);
 
     const summary = await screen.findByRole('listitem', { name: 'Regrade of B' });
     await waitFor(() =>
       expect(summary).toHaveTextContent(
-        'Regrade of B: 120 graded · 4 went down · 2 now fail to compile · 1 went up',
+        'Regrade of B: 120 graded · 5 graded for the first time',
       ),
     );
     expect(summary).toHaveTextContent(
@@ -921,24 +891,19 @@ describe('what a regrade changed', () => {
     );
     const link = (name: string) => within(summary).getByRole('link', { name });
     expect(link('120 graded')).toHaveAttribute('href', `${FEED}?regrade=${REGRADE.id}`);
-    expect(link('4 went down')).toHaveAttribute(
+    expect(link('5 graded for the first time')).toHaveAttribute(
       'href',
-      `${FEED}?regrade=${REGRADE.id}&change=down`,
+      `${FEED}?regrade=${REGRADE.id}&change=new`,
     );
-    expect(link('2 now fail to compile')).toHaveAttribute(
-      'href',
-      `${FEED}?regrade=${REGRADE.id}&change=stopped`,
-    );
-    expect(asked).toContain(`regrade=${REGRADE.id}&change=stopped`);
   });
 
-  it('lists a regrade’s submissions with their results before and after it', async () => {
+  it('lists a regrade’s submissions with what it did to each', async () => {
     server.use(signedIn, taskList);
     regrades([REGRADE]);
     const asked = feedAnswering((query) =>
-      query.get('regrade') === null ? feed : [nowStopped],
+      query.get('regrade') === null ? feed : [nowGraded],
     );
-    renderApp(`${FEED}?regrade=${REGRADE.id}&change=stopped`);
+    renderApp(`${FEED}?regrade=${REGRADE.id}&change=new`);
 
     expect(
       await screen.findByRole('heading', { name: 'What the regrade of B changed' }),
@@ -948,65 +913,16 @@ describe('what a regrade changed', () => {
       within(table)
         .getAllByRole('columnheader')
         .map((header) => header.textContent),
-    ).toEqual(expect.arrayContaining(['Before the regrade', 'After the regrade']));
+    ).toEqual(expect.arrayContaining(['What the regrade did']));
     const row = within(table).getByRole('rowgroup', { name: 'B submission 3 by ada' });
     expect(row).not.toHaveTextContent(/points/);
-    expect(row).toHaveTextContent('Failed to compile, 0 of 8 tests passed');
-    expect(row).toHaveTextContent('Now fails to compile');
-    expect(asked).toContain(`regrade=${REGRADE.id}&change=stopped`);
+    expect(row).toHaveTextContent('Graded for the first time (attempt 2)');
+    expect(asked).toContain(`regrade=${REGRADE.id}&change=new`);
     expect(screen.queryByRole('combobox', { name: 'Status' })).toBeNull();
     expect(screen.getByRole('combobox', { name: 'What the regrade did' })).toHaveValue(
-      'stopped',
+      'new',
     );
     expect(screen.getByRole('link', { name: 'Show every grading' })).toBeVisible();
-  });
-
-  it('says what went down on a task with no points, by the values that decided it (#448)', async () => {
-    const side = { accepted: 5, tests: 5, stopped: null };
-    const slower: FeedEntry = {
-      ...nowStopped,
-      grading: {
-        ...nowStopped.grading,
-        change: {
-          change: 'down',
-          earlier: { ...side, attempt: 1 },
-          now: { ...side, attempt: 2 },
-        },
-      },
-    };
-    server.use(
-      signedIn,
-      taskList,
-      http.get(`${CONTEST_API}/tasks/sum/publications`, () =>
-        HttpResponse.json([
-          {
-            number: slower.grading.publication,
-            version: 'abc1234',
-            at: '2026-10-12T13:00:00Z',
-            grading_changed: true,
-            changes: [],
-            meanings: [
-              {
-                name: 'time_ms',
-                title: 'Run time',
-                unit: 'ms',
-                fold: 'max',
-                better: 'lower',
-              },
-            ],
-          },
-        ]),
-      ),
-    );
-    regrades([REGRADE]);
-    feedAnswering((query) => (query.get('regrade') === null ? feed : [slower]));
-    renderApp(`${FEED}?regrade=${REGRADE.id}&change=down`);
-
-    const table = await screen.findByRole('table', { name: 'Gradings' });
-    const row = within(table).getByRole('rowgroup', { name: 'B submission 3 by ada' });
-    await waitFor(() => expect(row).toHaveTextContent('5 of 5 tests passed'));
-    expect(row).toHaveTextContent('Went down');
-    expect(row).not.toHaveTextContent(/memory/);
   });
 
   it('takes a summary off for everyone once a manager dismisses it', async () => {
@@ -1040,7 +956,7 @@ describe('what a regrade changed', () => {
         cause: 'save',
         running: true,
         graded: 100,
-        counts: { ...REGRADE.counts, unchanged: 93, running: 20 },
+        counts: { ...REGRADE.counts, regraded: 93, running: 20 },
       },
     ]);
     feedAnswering(() => feed);
@@ -1061,7 +977,7 @@ describe('what a regrade changed', () => {
 
     expect(
       await screen.findByRole('listitem', { name: 'Regrade of B' }),
-    ).toHaveTextContent(/120 graded · 4 went down/);
+    ).toHaveTextContent(/120 graded · 5 graded for the first time/);
   });
 });
 

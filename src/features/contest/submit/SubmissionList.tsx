@@ -10,8 +10,8 @@ import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
 import { formatDateTime } from '@/lib/time';
 import { useLiveConnected, useLiveRefused } from '@/live';
 import { serverNow } from '@/lib/time';
-import { justFinished, newestFirst, pollEvery, verdictOf } from './grading';
-import { Verdict } from './Results';
+import { justFinished, newestFirst, pollEvery } from './grading';
+import { SubmissionStatus } from './SubmissionStatus';
 import { submissionHref } from './submission-param';
 import { useMarks, type MarkState } from './use-marks';
 import classes from './submit.module.css';
@@ -37,7 +37,7 @@ function useJustFinished(submissions: Submission[] | undefined): string {
               `Submission #${found.number}: ${
                 found.grading === null
                   ? 'Not graded'
-                  : verdictLabel(verdictOf(found.grading))
+                  : verdictLabel(found.grading.status)
               }.`,
           )
           .join(' '),
@@ -155,7 +155,7 @@ function Listed({ view, marks }: { view: QueryView<Submission[]>; marks: MarkSta
         <tr>
           <th scope="col">Submission</th>
           <th scope="col">Submitted</th>
-          <th scope="col">Result</th>
+          <th scope="col">Status</th>
           {marks.kind === 'held' && <th scope="col">Mark</th>}
         </tr>
       </thead>
@@ -169,7 +169,7 @@ function Listed({ view, marks }: { view: QueryView<Submission[]>; marks: MarkSta
             </th>
             <td>{formatDateTime(new Date(submission.submitted_at))}</td>
             <td>
-              <Verdict grading={submission.grading} />
+              <SubmissionStatus grading={submission.grading} />
             </td>
             {marks.kind === 'held' && (
               <td>

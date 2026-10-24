@@ -694,11 +694,11 @@ describe('the submissions list', () => {
     await passTime(2_000);
     expect(await within(list).findByText('GRADING')).toBeVisible();
     await passTime(2_000);
-    expect(await within(list).findByText('ACCEPTED')).toBeVisible();
+    expect(await within(list).findByText('GRADED')).toBeVisible();
     expect(
       screen
         .getAllByRole('status')
-        .some((region) => region.textContent === 'Submission #1: ACCEPTED.'),
+        .some((region) => region.textContent === 'Submission #1: GRADED.'),
     ).toBe(true);
 
     const settled = asked;
@@ -746,14 +746,14 @@ describe('the submissions list', () => {
     expect(asked).toBe(settled);
   });
 
-  it('lists the newest first, each with its verdict', async () => {
+  it('lists the newest first, each with where it stands', async () => {
     server.use(
       signedIn,
       withPage({}),
       listing([
         submission(1, accepted),
-        submission(2, grading({ status: 'graded', stopped: 'compile_error' })),
-        submission(3, grading({ status: 'graded', outcome: 'wrong_answer' })),
+        submission(2, grading({ status: 'cancelled' })),
+        submission(3, grading({ status: 'over_limit' })),
         submission(4, grading({ status: 'grading' })),
       ]),
     );
@@ -763,9 +763,9 @@ describe('the submissions list', () => {
     const rows = within(list).getAllByRole('row').slice(1);
     expect(rows.map((row) => row.textContent)).toEqual([
       expect.stringMatching(/^#4.*GRADING$/),
-      expect.stringMatching(/^#3.*WRONG ANSWER$/),
-      expect.stringMatching(/^#2.*COMPILE ERROR$/),
-      expect.stringMatching(/^#1.*ACCEPTED$/),
+      expect.stringMatching(/^#3.*OVER THE LIMIT/),
+      expect.stringMatching(/^#2.*CANCELLED$/),
+      expect.stringMatching(/^#1.*GRADED$/),
     ]);
   });
 
@@ -788,7 +788,7 @@ describe('the submissions list', () => {
       .getAllByRole('row')
       .slice(1)
       .map((row) => row.lastElementChild?.textContent);
-    expect(cells).toEqual(['QUEUED', 'ACCEPTED', 'ACCEPTED', 'ACCEPTED']);
+    expect(cells).toEqual(['QUEUED', 'GRADED', 'GRADED', 'GRADED']);
     expect(list).not.toHaveTextContent(/points/);
     expect(within(list).queryByRole('columnheader', { name: 'Points' })).toBeNull();
     expect(at).toBe(formatWhen(new Date('2026-09-12T14:00:00Z')));
@@ -1117,10 +1117,9 @@ describe('a submission opened from the list', () => {
     ]);
   });
 
-  it('shows what stopped the run as its verdict, and its log as text, never as markup', async () => {
+  it('shows a graded submission’s log as text, never as markup', async () => {
     const stopped = grading({
       status: 'graded',
-      stopped: 'compile_error',
       once: { reports: {}, texts: { log: { name: null, output: null } } },
     });
     server.use(
@@ -1138,7 +1137,7 @@ describe('a submission opened from the list', () => {
     renderApp(`${PAGE}?submission=1`);
 
     const detail = await screen.findByRole('region', { name: 'Submission 1' });
-    expect(await within(detail).findByText('COMPILE ERROR')).toBeVisible();
+    expect(await within(detail).findByText('GRADED')).toBeVisible();
     await user.click(within(detail).getByRole('button', { name: 'Show log' }));
     expect(await within(detail).findByLabelText('log')).toHaveTextContent(
       '<img src=x onerror="alert(1)">',

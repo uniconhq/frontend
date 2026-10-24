@@ -2,7 +2,7 @@ import type { WorkflowItem } from '@/api/types';
 import { formatExact, ratioDigits } from '@/lib/exact';
 import { listed } from '@/lib/listed';
 import type { Box } from './layout';
-import type { Ref, ReportEntry, Workflow } from './model';
+import type { Ref, OutputEntry, Workflow } from './model';
 import type { PrimitiveInfo } from './primitives';
 import { verdictLabel } from '@/ui/verdicts';
 
@@ -31,7 +31,7 @@ function outcomeName(outcome: string): string {
 }
 
 /**
- * The results a step can report, from the primitive's own words for each
+ * The verdicts a step can give, from the primitive's own words for each
  * (M56): "Accepted if the source compiles." for one; "Accepted if the source
  * compiles, otherwise Compile error." for two, since the second is all the
  * first is not; and for more, one line each, "Time limit if it runs out of
@@ -85,7 +85,7 @@ export function portMarks(primitive: PrimitiveInfo, port: string): string[] {
 }
 
 /** A number output's unit, when the file gives one. */
-export function entryMarks(entry: ReportEntry): string[] {
+export function entryMarks(entry: OutputEntry): string[] {
   return entry.unit === null ? [] : [entry.unit];
 }
 

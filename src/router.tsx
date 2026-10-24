@@ -14,8 +14,8 @@ import { HomePage, InviteLink, InvitesPage } from '@/features/home';
 import { LoginPage } from '@/features/auth';
 import { AccountPage } from '@/features/account';
 import {
-  BoardsPage,
   ContestHomePage,
+  LeaderboardsPage,
   QuestionsPage,
   TaskStatementPage,
 } from '@/features/contest';
@@ -182,7 +182,10 @@ export const routes: RouteObject[] = [
            * signed-in person, each page reading what the caller may see.
            */
           { path: 'contests/:org/:contest', element: <ContestHomePage /> },
-          { path: 'contests/:org/:contest/leaderboards', element: <BoardsPage /> },
+          {
+            path: 'contests/:org/:contest/leaderboards',
+            element: <LeaderboardsPage />,
+          },
           { path: 'contests/:org/:contest/questions', element: <QuestionsPage /> },
           {
             path: 'contests/:org/:contest/tasks/:task',

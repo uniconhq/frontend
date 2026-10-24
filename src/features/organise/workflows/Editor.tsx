@@ -38,12 +38,12 @@ import { Inside } from './Inside';
 import { layoutWorkflow, type Box, type StepPorts } from './layout';
 import { linesOf, type Selected } from './lines';
 import { type Ref, type Workflow } from './model';
-import { InputsPanel, ReportPanel, StepPanel } from './Panels';
+import { InputsPanel, OutputsPanel, StepPanel } from './Panels';
 import { pinned as pinProblems, placed } from './pins';
 import { Problems } from './Problems';
 import { byRef, declared, type PrimitiveInfo } from './primitives';
 import { PublishVersion } from './Publish';
-import { outputType, reportable, reportRefusal, wireRefusal } from './rules';
+import { outputType, outputSources, outputRefusal, wireRefusal } from './rules';
 import { ShareButton } from './SharePanel';
 import { DRAFT_FILE, refWords } from './words';
 import classes from './workflows.module.css';
@@ -139,7 +139,7 @@ function useCheck(text: string) {
 /** The box a selection stands on now, found again after the layout moved. */
 function boxOf(boxes: Box[], selected: Selected | null): string | null {
   if (selected === null) return null;
-  if (selected.kind === 'report') return 'report';
+  if (selected.kind === 'outputs') return 'outputs';
   if (selected.kind === 'step') return `step:${String(selected.index)}`;
   const ids = selected.ids;
   return (
@@ -169,7 +169,7 @@ function selectionOf(box: Box | undefined): Selected | null {
   if (box.kind === 'step' && box.step !== null)
     return { kind: 'step', index: box.step };
   if (box.kind === 'inputs') return { kind: 'inputs', ids: box.right };
-  if (box.kind === 'report') return { kind: 'report' };
+  if (box.kind === 'outputs') return { kind: 'outputs' };
   return null;
 }
 
@@ -311,7 +311,7 @@ export function Editor({
         problems,
         workflow.steps.length,
         workflow.inputs.map((input) => input.id),
-        workflow.report.map((entry) => entry.name),
+        workflow.outputs.map((entry) => entry.name),
       ),
     [problems, workflow],
   );
@@ -392,7 +392,7 @@ export function Editor({
   const refusal = (source: Ref, target: Target): string | null =>
     target.kind === 'port'
       ? wireRefusal(workflow, primitiveMap, target.step, target.port, source, boxMap)
-      : reportRefusal(workflow, primitiveMap, source, boxMap);
+      : outputRefusal(workflow, primitiveMap, source, boxMap);
 
   const connect = (source: Ref, target: Target, box: string, port: string) => {
     const refused = refusal(source, target);
@@ -405,7 +405,7 @@ export function Editor({
       return;
     }
     if (source.kind !== 'steps') return;
-    const existing = workflow.report.find((entry) => entry.name === target.entry);
+    const existing = workflow.outputs.find((entry) => entry.name === target.entry);
     if (existing !== undefined) {
       change(
         setEntry(
@@ -423,7 +423,7 @@ export function Editor({
         text,
         freeName(
           source.output,
-          workflow.report.map((entry) => entry.name),
+          workflow.outputs.map((entry) => entry.name),
           '_',
         ),
         { from: source },
@@ -522,7 +522,7 @@ export function Editor({
           });
       } else {
         entries.push({ kind: 'heading', text: 'Read from' });
-        for (const source of reportable(workflow, primitiveMap))
+        for (const source of outputSources(workflow, primitiveMap))
           entries.push({
             kind: 'item',
             text: refWords(source),
@@ -533,20 +533,20 @@ export function Editor({
         entries.push({
           kind: 'item',
           text: 'Change it in the outputs',
-          onSelect: () => select({ kind: 'report' }),
+          onSelect: () => select({ kind: 'outputs' }),
         });
       }
     } else {
       const source = sourceAt(box, port, workflow);
       if (source === null) return entries;
       if (source.kind === 'steps') {
-        const reported = reportRefusal(workflow, primitiveMap, source, boxMap);
+        const reported = outputRefusal(workflow, primitiveMap, source, boxMap);
         entries.push({
           kind: 'item',
           text: 'Name it as an output',
           reason: reported,
           onSelect: () =>
-            connect(source, { kind: 'report', entry: null }, 'report', '+'),
+            connect(source, { kind: 'outputs', entry: null }, 'outputs', '+'),
         });
       }
       entries.push({ kind: 'heading', text: 'Wire to' });
@@ -605,7 +605,7 @@ export function Editor({
         change={change}
       />
     ) : (
-      <ReportPanel
+      <OutputsPanel
         text={text}
         workflow={workflow}
         primitives={primitiveMap}
@@ -710,7 +710,7 @@ export function Editor({
         <Button
           variant="secondary"
           disabled={!drawing || stack.length > 0}
-          onClick={() => select({ kind: 'report' })}
+          onClick={() => select({ kind: 'outputs' })}
         >
           Outputs
         </Button>

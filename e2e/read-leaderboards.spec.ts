@@ -1,4 +1,7 @@
 import { expect, test, type Page, type Route } from '@playwright/test';
+import type { components } from '../src/api/schema';
+
+type Schemas = components['schemas'];
 
 /**
  * An entrant reads the gradebook, one row and no place, and ICPC while a
@@ -35,7 +38,7 @@ const GRADEBOOK = {
       ],
     },
   ],
-};
+} satisfies Schemas['Leaderboard'];
 
 const ICPC = {
   key: 'icpc',
@@ -65,7 +68,7 @@ const ICPC = {
       ],
     },
   ],
-};
+} satisfies Schemas['Leaderboard'];
 
 function json(route: Route, body: unknown) {
   return route.fulfill({
@@ -81,7 +84,7 @@ async function stub(page: Page) {
     return route.fulfill({ status: 404, body: route.request().url() });
   });
   await page.route('**/api/v1/time', (route) =>
-    json(route, { now: '2026-10-25T00:00:00Z' }),
+    json(route, { now: '2026-10-25T00:00:00Z' } satisfies Schemas['ServerTime']),
   );
   await page.route('**/api/v1/me', (route) =>
     json(route, {
@@ -94,7 +97,7 @@ async function stub(page: Page) {
       },
       roles: [],
       degraded: false,
-    }),
+    } satisfies Schemas['Me']),
   );
   await page.route('**/api/v1/orgs/acme/contests/spring/leaderboards', (route) =>
     json(route, [GRADEBOOK, ICPC]),

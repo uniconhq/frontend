@@ -12,7 +12,7 @@ type Listed = { name: string; size: number | null; staged: StagedPicture | undef
 /**
  * The task's pictures, the files under its `public/` folder, and those
  * chosen to be added, each with its size and what waits for the statement's
- * save, marked as a test's row marks it: New, or To be removed. One the
+ * save, marked as a chip: New, or To be removed. One the
  * statement does not show says so. An admin takes one out with Remove, or
  * puts a change back with Undo; both wait for the statement's save.
  */

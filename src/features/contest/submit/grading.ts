@@ -99,17 +99,6 @@ function revealWait(submissions: Submission[], now: Date): number | null {
 }
 
 /**
- * What a grading shows as its verdict once it is done: what stopped the run,
- * when something did, or the outcome over the groups the task shows now;
- * where it stands until then, or for good when nothing is shown yet or the
- * grading never finished.
- */
-export function verdictOf(grading: GradingResult): string {
-  if (grading.status !== 'graded') return grading.status;
-  return grading.stopped ?? grading.outcome ?? grading.status;
-}
-
-/**
  * Why the organisers cancelled the grading, in their words: the sentence a
  * cancelled grading carries, or null on any other status or with none given.
  */

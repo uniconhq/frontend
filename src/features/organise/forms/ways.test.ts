@@ -5,8 +5,8 @@ import {
   readWays,
   registrationSentence,
   wayProblems,
-  whoWords,
   writeWays,
+  type WayValues,
 } from './ways';
 import { parseYaml, writeOver } from './yaml-doc';
 
@@ -88,6 +88,18 @@ describe('the ways into a contest', () => {
       expect(problems(domain)).toHaveLength(1);
     }
   });
+
+  /** Who one way lets in, as the registration sentence starts. */
+  const whoWords = (way: WayValues) => {
+    const sentence = registrationSentence({
+      ways: [way],
+      opens: '',
+      closes: '',
+      capacity: '',
+    });
+    const who = sentence.slice(0, sentence.indexOf(' can register'));
+    return who.charAt(0).toLowerCase() + who.slice(1);
+  };
 
   it('says a domain and every domain under it in words', () => {
     expect(whoWords(newSignup({ domains: '*.nus.edu.sg' }))).toBe(

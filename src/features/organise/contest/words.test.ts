@@ -3,7 +3,6 @@ import type { TaskStanding } from '@/api/types';
 import { formatDateTime } from '@/lib/time';
 import { NumberText } from '../forms/yaml-doc';
 import { contestFieldName, contestValueWords } from './merge-words';
-import { fractionOf, percentOf } from './percent';
 import { timelineSentence } from './timeline';
 import { teamsSentence } from './words';
 
@@ -28,24 +27,6 @@ describe('how big a team is, as the settings card says it', () => {
   });
 });
 
-describe('a late rate as a percentage and back, exactly', () => {
-  it.each([
-    ['0.1', '10'],
-    ['0.125', '12.5'],
-    ['1', '100'],
-    ['0.0001', '0.01'],
-    ['0.333333333333333333333', '33.3333333333333333333'],
-  ])('reads %s as %s%% and writes it back the same', (fraction, percent) => {
-    expect(percentOf(fraction)).toBe(percent);
-    expect(fractionOf(percent)).toBe(fraction);
-  });
-
-  it('leaves empty text and text that is no plain decimal as they are', () => {
-    expect(percentOf('')).toBe('');
-    expect(fractionOf('ten')).toBe('ten');
-  });
-});
-
 describe('the contest’s settings in words for the merge', () => {
   it('names each setting as its page does, a task and a board by name', () => {
     expect(contestFieldName(['name'])).toBe('Name');
@@ -54,9 +35,9 @@ describe('the contest’s settings in words for the merge', () => {
     expect(contestFieldName(['tasks', { key: 'id', value: 'sum' }, 'due'])).toBe(
       'Task sum: Due',
     );
-    expect(
-      contestFieldName(['leaderboards', { key: 'name', value: 'Standings' }, 'who']),
-    ).toBe('Leaderboard Standings: Shown to');
+    expect(contestFieldName(['leaderboards', 'standings', 'audience'])).toBe(
+      'Leaderboard standings: Who sees it',
+    );
     expect(contestFieldName(['tasks'])).toBe('Tasks');
   });
 

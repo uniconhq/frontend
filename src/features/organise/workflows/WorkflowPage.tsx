@@ -243,7 +243,7 @@ function Drawn({
         ? { kind: 'step', index: box.step }
         : box.kind === 'inputs'
           ? { kind: 'inputs', ids: box.right }
-          : { kind: 'report' };
+          : { kind: 'outputs' };
   const ref = `${page.owner}/${page.name}@${version}`;
   return (
     <>

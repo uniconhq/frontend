@@ -15,8 +15,8 @@ export function downloadHref(
 
 /**
  * A file's name as the page shows it: its path under its input's folder,
- * `files/<input>/`, so a file in a folder of its own, or a per-test file under
- * its group, is told apart from another of the same last name.
+ * `files/<input>/`, so a file in a folder of its own, or one part of a
+ * tuple, is told apart from another of the same last name.
  */
 export function nameOf(path: string): string {
   const parts = path.split('/');

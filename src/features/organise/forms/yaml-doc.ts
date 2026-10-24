@@ -452,7 +452,7 @@ export function textOf(value: unknown): string {
  * A number typed into a field: undefined when empty, NaN when it is not a
  * number, which the form shows as an error and will not save.
  */
-export function numberOf(text: string): number | undefined {
+function numberOf(text: string): number | undefined {
   const trimmed = text.trim();
   if (trimmed === '') return undefined;
   if (!CORE_NUMBER.test(trimmed)) return Number.NaN;

@@ -52,10 +52,7 @@ export function timelineSentence(
   return timelineWords(standing, contest, marks).when;
 }
 
-/** Whether a leaderboard that counts marked submissions covers the task. */
+/** Whether a leaderboard reads which of the task's submissions an entrant marks. */
 export function markedBoardCovers(values: ContestValues, task: string): boolean {
-  return values.boards.some(
-    (board) =>
-      board.select === 'marked' && (board.tasks === null || board.tasks.includes(task)),
-  );
+  return values.marked.includes(task);
 }

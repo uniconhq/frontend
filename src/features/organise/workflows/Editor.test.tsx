@@ -89,7 +89,7 @@ describe('the workflow editor', () => {
     expect(details).not.toHaveTextContent(/container/);
     // Each result in the primitive's own words, one line each (M56).
     const results = within(details as HTMLElement).getByRole('list', {
-      name: 'Results it reports',
+      name: 'Verdicts it gives',
     });
     expect(
       within(results)
@@ -131,7 +131,7 @@ describe('the workflow editor', () => {
 
     const compile = await openStep(user, 'compile');
     expect(within(compile).getByText('Details').closest('details')).toHaveTextContent(
-      'Result it reports: Accepted if the source compiles, otherwise Compile error.',
+      'Verdict it gives: Accepted if the source compiles, otherwise Compile error.',
     );
   });
 

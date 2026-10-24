@@ -47,9 +47,9 @@ export function labelOf(
 }
 
 /**
- * The task's place in its contest in one line, "110 points, open for the
- * whole contest", with how many submissions an entrant may mark when a
- * leaderboard counts marked ones.
+ * The task's place in its contest in one line, "open for the whole
+ * contest", with how many submissions an entrant may mark when a
+ * leaderboard reads marked ones.
  */
 export function entrySentence(
   standing: TaskStanding,

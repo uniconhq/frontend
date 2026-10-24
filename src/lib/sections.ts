@@ -54,7 +54,7 @@ export const CONTEST_SECTIONS = [
 
 /**
  * A task's sections for running it, each a page of its own. What builds the
- * task (its workflow, inputs, tests and scoring, and statement) is on the
+ * task (its workflow, inputs, runs, scoring and checks, and statement) is on the
  * task's own page, as the cards `TASK_BUILD_CARDS` lists, each file it holds
  * changed on the card it belongs to; its Settings page holds its title, its
  * settings as they are stored and, for its admins, every file to read (M51).
@@ -80,15 +80,17 @@ export const TASK_SECTIONS = [
 
 /**
  * The cards that build a task, on its own page, in the order one decides the
- * next: the workflow, its inputs, its runs, how many submissions it takes,
- * which share one save, and the statement, which saves on its own. Each key
- * is the card's anchor, which the sidebar and a link to one of its fields
- * open it by. `tests` stays the submissions card's anchor.
+ * next: the workflow, its inputs, its runs, its scoring and checks, how many
+ * submissions it takes, which share one save, and the statement, which saves
+ * on its own. Each key is the card's anchor, which the sidebar and a link to
+ * one of its fields open it by. `tests` stays the submissions card's anchor.
  */
 export const TASK_BUILD_CARDS = [
   { key: 'workflow', label: 'Workflow' },
   { key: 'inputs', label: 'Inputs' },
   { key: 'runs', label: 'Runs' },
+  { key: 'scoring', label: 'Scoring' },
+  { key: 'checks', label: 'Checks' },
   { key: 'tests', label: 'Submissions' },
   { key: 'statement', label: 'Statement' },
 ] as const;

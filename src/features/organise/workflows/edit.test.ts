@@ -192,7 +192,6 @@ describe('editing the file in place', () => {
     expect(ids(again)).toEqual(['compile', 'run', 'compile-2']);
     expect(workflowOf(again).steps[2]?.use).toBe('unicon/compile@v3');
     expect(ids(check)).toEqual(['compile', 'run', 'diff-check']);
-    expect(check).not.toContain('per_test');
   });
 
   it('wires a port and gives one a value or nothing', () => {
@@ -229,7 +228,7 @@ describe('editing the file in place', () => {
 
     expect(ids(removed)).toEqual(['run']);
     expect(workflowOf(removed).steps[0]?.with.program).toBeUndefined();
-    expect(workflowOf(removed).report).toEqual([]);
+    expect(workflowOf(removed).outputs).toEqual([]);
     expect(workflowOf(removed).steps[0]?.with.stdin).toBeDefined();
   });
 
@@ -332,12 +331,12 @@ describe('editing the file in place', () => {
       'time: {from: "${{ steps.run.time_ms }}", title: Run time, unit: ms}',
     );
     expect(
-      workflowOf(removeEntry(meant, 'time')).report.map((entry) => entry.name),
+      workflowOf(removeEntry(meant, 'time')).outputs.map((entry) => entry.name),
     ).toEqual(['log']);
   });
 
   it('writes an output with a title as a mapping, and short again once it has none (M58)', () => {
-    const log = workflowOf(COMMENTED).report.find((entry) => entry.name === 'log')!;
+    const log = workflowOf(COMMENTED).outputs.find((entry) => entry.name === 'log')!;
     const from = log.from!;
     const titled = setEntry(
       COMMENTED,
@@ -346,7 +345,7 @@ describe('editing the file in place', () => {
     );
 
     expect(titled).toContain(`log: {from: "${refText(from)}", title: Compile log}`);
-    const titledLog = workflowOf(titled).report.find((entry) => entry.name === 'log')!;
+    const titledLog = workflowOf(titled).outputs.find((entry) => entry.name === 'log')!;
     expect(titledLog).toMatchObject({ title: 'Compile log', unit: null, short: false });
     const plain = setEntry(
       titled,
@@ -354,12 +353,12 @@ describe('editing the file in place', () => {
       entryFields(titledLog, 'text', { from, title: null }),
     );
     expect(plain).toContain(`log: ${refText(from)}`);
-    expect(workflowOf(plain).report[0]).toMatchObject({ title: null, short: true });
+    expect(workflowOf(plain).outputs[0]).toMatchObject({ title: null, short: true });
   });
 
   it('keeps an output’s unit while it reads a number, or what it reads is not known', () => {
     const entry = {
-      ...workflowOf(COMMENTED).report.find((found) => found.name === 'log')!,
+      ...workflowOf(COMMENTED).outputs.find((found) => found.name === 'log')!,
       title: 'Run time',
       unit: 'ms',
     };
@@ -424,13 +423,13 @@ describe('editing the file in place', () => {
       kind: 'wire',
       ref: { kind: 'workflow', name: 'diff/program.yaml' },
     });
-    expect(workflow.report[0]).toMatchObject({
+    expect(workflow.outputs[0]).toMatchObject({
       name: 'time_ms',
       title: 'Run time',
       unit: 'ms',
       from: { kind: 'steps', name: 'game', output: 'entrant.time_ms' },
     });
-    const from = workflow.report[0]?.from ?? null;
+    const from = workflow.outputs[0]?.from ?? null;
     if (from === null) throw new Error('the output has no source');
     const edited = setEntry(text, 'time_ms', { from, title: 'Run time', unit: 'ms' });
     expect(edited).toContain('output: ${{ steps.solution.output }}');
