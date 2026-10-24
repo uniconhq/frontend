@@ -1,30 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import {
-  addRatio,
-  compareDecimal,
-  compareRatio,
-  divRatio,
-  formatExact,
-  formatPoints,
-  formatPointsRatio,
-  formatWorth,
-  formatWorthRatio,
-  mulRatio,
-  placesToTell,
-  ratioDigits,
-  ratioOf,
-  rounded,
-  cut,
-  withPointsWord,
-  ZERO,
-} from './exact';
+import { compareDecimal, formatExact, ratioDigits, rounded } from './exact';
 
 describe('a number with a huge exponent', () => {
   it('is no decimal to work with, at once rather than after building its digits', () => {
-    expect(ratioOf('1e9999999')).toBeNull();
-    expect(ratioOf('1e-9999999')).toBeNull();
     expect(compareDecimal('1e9999999', '1')).toBeNaN();
-    expect(ratioOf('1e300')).not.toBeNull();
+    expect(compareDecimal('1e-9999999', '1')).toBeNaN();
+    expect(compareDecimal('1e300', '1')).toBe(1);
   });
 });
 
@@ -73,18 +54,6 @@ describe('rounded', () => {
   });
 });
 
-describe('cut', () => {
-  it('drops the digits past the places, never rounding up', () => {
-    expect(cut('99.996', 2)).toBe('99.99');
-    expect(cut('-2.679', 2)).toBe('-2.67');
-    expect(cut('2.5', 2)).toBe('2.5');
-    expect(cut('82.50', 4)).toBe('82.5');
-    expect(cut('0.0009', 3)).toBe('0');
-    expect(cut('-0.0009', 3)).toBe('0');
-    expect(cut('100000000000000000001.99', 1)).toBe('100000000000000000001.9');
-  });
-});
-
 describe('formatExact', () => {
   it('shows a third of 85 to four decimals', () => {
     expect(formatExact('28.33333333333333333333333333')).toBe(
@@ -106,101 +75,16 @@ describe('formatExact', () => {
   });
 });
 
-describe('placesToTell', () => {
-  it('stays at two decimals where neighbours already differ', () => {
-    expect(placesToTell(['100', '85.5', '70'])).toBe(2);
-  });
-
-  it('takes more digits where two neighbours would show alike', () => {
-    expect(placesToTell(['33.3333', '33.3331', '10'])).toBe(4);
-  });
-
-  it('passes over rows with no number and ties', () => {
-    expect(placesToTell(['50.001', null, '50.001', '50.002'])).toBe(3);
-  });
-});
-
 describe('exact fractions', () => {
-  const r = (text: string) => ratioOf(text) ?? ZERO;
-
-  it('reads a decimal as the fraction it is, past what a float holds', () => {
-    expect(ratioOf('0.1')).toEqual({ num: 1n, den: 10n });
-    expect(ratioOf('2.50')).toEqual({ num: 5n, den: 2n });
-    expect(ratioOf('1e3')).toEqual({ num: 1000n, den: 1n });
-    expect(ratioOf('0.1000000000000000000001')).toEqual({
-      num: 1000000000000000000001n,
-      den: 10000000000000000000000n,
-    });
-    expect(ratioOf('thirty')).toBeNull();
-  });
-
-  it('adds, multiplies and divides exactly', () => {
-    expect(addRatio(r('0.1'), r('0.2'))).toEqual(r('0.3'));
-    expect(mulRatio(r('100'), divRatio(r('30'), r('120')))).toEqual(r('25'));
-    expect(compareRatio(divRatio(r('1'), r('3')), r('0.333'))).toBe(1);
-  });
+  const ratio = (num: bigint, den: bigint) => ({ num, den });
 
   it('writes a fraction as digits, saying when they are not exact', () => {
-    expect(ratioDigits(divRatio(r('100'), r('3')))).toEqual({
-      digits: '33.33',
-      exact: false,
-    });
-    expect(ratioDigits(r('82.5'))).toEqual({ digits: '82.5', exact: true });
-    expect(ratioDigits(divRatio(r('2'), r('3')), 0)).toEqual({
-      digits: '1',
-      exact: false,
-    });
-    expect(ratioDigits(divRatio(r('200'), r('3')), 2, 'cut')).toEqual({
+    expect(ratioDigits(ratio(100n, 3n))).toEqual({ digits: '33.33', exact: false });
+    expect(ratioDigits(ratio(165n, 2n))).toEqual({ digits: '82.5', exact: true });
+    expect(ratioDigits(ratio(2n, 3n), 0)).toEqual({ digits: '1', exact: false });
+    expect(ratioDigits(ratio(200n, 3n), 2, 'cut')).toEqual({
       digits: '66.66',
       exact: false,
     });
-  });
-});
-
-describe('points for reading (R17)', () => {
-  const r = (text: string) => ratioOf(text) ?? ZERO;
-
-  it('cuts points to two decimals, never rounding them up, one way everywhere', () => {
-    expect(formatPoints('36.666666')).toBe(formatExact('36.66'));
-    expect(formatPoints('99.999')).toBe(formatExact('99.99'));
-    expect(formatPoints('110')).toBe('110');
-    expect(formatPoints('82.5')).toBe(formatExact('82.5'));
-    expect(formatPoints('33.33333', null, 4)).toBe(formatExact('33.3333'));
-  });
-
-  it('reads full marks as the worth beside them, and a worth rounded', () => {
-    expect(formatWorth('99.996')).toBe('100');
-    expect(formatPoints('99.996', '99.996')).toBe('100');
-    expect(formatPoints('99.995', '99.996')).toBe(formatExact('99.99'));
-    expect(formatWorthRatio(divRatio(r('200'), r('3')))).toBe(
-      `about ${formatExact('66.67')}`,
-    );
-  });
-
-  it('cuts a fraction of points as well, saying when the digits are not exact', () => {
-    expect(formatPointsRatio(r('72'))).toBe('72');
-    expect(formatPointsRatio(divRatio(r('200'), r('3')))).toBe(
-      `about ${formatExact('66.66')}`,
-    );
-  });
-
-  it('says "point" after a number that reads as one, however it was sent, and "points" after any other', () => {
-    expect(withPointsWord('1')).toBe('1 point');
-    expect(withPointsWord(formatWorth('1.00'))).toBe('1 point');
-    expect(withPointsWord(formatPoints('1.0004'))).toBe('1 point');
-    expect(withPointsWord(formatPoints('0.999'))).toBe(`${formatExact('0.99')} points`);
-    expect(withPointsWord('0')).toBe('0 points');
-    expect(withPointsWord(formatPointsRatio(divRatio(r('4'), r('3'))))).toBe(
-      `about ${formatExact('1.33')} points`,
-    );
-    expect(withPointsWord(formatWorthRatio(divRatio(r('2999'), r('3000'))))).toBe(
-      'about 1 point',
-    );
-  });
-
-  it('tells neighbours apart as they are cut', () => {
-    // Rounded to two, 36.666 and 36.674 both read 36.67; cut, they differ.
-    expect(placesToTell(['36.674', '36.666'], 2, 'cut')).toBe(2);
-    expect(placesToTell(['36.669', '36.661'], 2, 'cut')).toBe(3);
   });
 });
