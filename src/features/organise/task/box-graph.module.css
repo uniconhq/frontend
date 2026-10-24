@@ -1,0 +1,231 @@
+/* The box graph: its boxes, pins, wires and ports. */
+
+.stage {
+  position: relative;
+}
+
+.wires {
+  position: absolute;
+  inset: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.placed {
+  position: absolute;
+}
+
+/* What a wire that skips a column carries, where it first passes under
+ * that column's boxes. */
+.slotLabel {
+  position: absolute;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.ear {
+  position: absolute;
+  height: 12px;
+  border: 2px solid var(--unicon-border-strong);
+  border-radius: var(--mantine-radius-sm);
+  background: var(--unicon-chrome);
+}
+
+.face {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  padding: 0;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.pin {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  transform: translateY(-50%);
+}
+
+.pin[data-side='in'] {
+  left: -5px;
+}
+
+.pin[data-side='out'] {
+  right: -5px;
+}
+
+/* A box's parts each keep a fixed height, so the layout knows where each
+ * wire meets it without measuring. */
+.head {
+  box-sizing: border-box;
+  flex: none;
+  justify-content: flex-start;
+}
+
+.line {
+  display: block;
+  box-sizing: border-box;
+  flex: none;
+  max-width: none;
+  margin: 0;
+  padding: 4px 10px 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* A small box: its name on one line, and a mark when it has a problem. */
+.compactHead {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  box-sizing: border-box;
+  flex: none;
+  padding: 0 10px;
+}
+
+.compactTitle {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--unicon-text-primary);
+  font-family: var(--mantine-font-family-monospace);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.compactMark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--unicon-text-danger);
+  color: var(--unicon-body);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.face[data-drop] {
+  outline: 2px solid var(--unicon-text-accent);
+  outline-offset: 3px;
+}
+
+/* A dot that drags out a wire: bigger to catch, and a hand over it. */
+[data-handle] {
+  cursor: grab;
+  touch-action: none;
+}
+
+.wireHandle {
+  pointer-events: stroke;
+  cursor: grab;
+}
+
+.pin[data-handle] {
+  width: 12px;
+  height: 12px;
+}
+
+.pin[data-side='out'][data-handle] {
+  right: -7px;
+}
+
+.face[data-problem] {
+  outline: 2px dashed var(--unicon-text-danger);
+  outline-offset: 3px;
+}
+
+.foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-sizing: border-box;
+  flex: none;
+  margin-top: auto;
+  padding: 0 10px;
+  border-top: 1px solid var(--unicon-border);
+  color: var(--unicon-text-secondary);
+  font-size: 11px;
+}
+
+.file {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  color: var(--unicon-text-primary);
+  font-family: var(--mantine-font-family-monospace);
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.file:hover {
+  color: var(--unicon-text-accent);
+  text-decoration: underline;
+}
+
+.openHint {
+  color: var(--unicon-text-accent);
+  font-weight: 700;
+}
+
+.ports {
+  display: flex;
+  flex-direction: column;
+}
+
+.portRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px;
+  color: var(--unicon-text-primary);
+  font-family: var(--mantine-font-family-monospace);
+  font-size: 12px;
+}
+
+.portRow[data-side='out'] {
+  justify-content: flex-end;
+}
+
+/* What a port is given reads as words, beside the port's name. */
+.portSaid {
+  font-family: var(--mantine-font-family);
+}
+
+.portRow > span:not(.dot) {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.portRow[data-out-first] {
+  border-top: 1px dashed var(--unicon-border);
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  flex: none;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+/* What an open box holds, such as a value's formula, above its ports. */
+.inside {
+  padding: 8px 10px 10px;
+  border-top: 1px solid var(--unicon-border);
+  cursor: auto;
+}

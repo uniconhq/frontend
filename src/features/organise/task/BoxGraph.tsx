@@ -22,7 +22,7 @@ import {
   type Palette,
   type Shape,
 } from './graph';
-import classes from './stage6.module.css';
+import classes from './box-graph.module.css';
 
 /** One end of a wire: a box, and its port when one was aimed at. */
 export type WireEnd = { box: string; port: string | null };
@@ -592,51 +592,5 @@ function PortRow({
       )}
       {side === 'out' && dot}
     </div>
-  );
-}
-
-export function PaletteGroup({
-  title,
-  tray = false,
-  children,
-}: {
-  title: string;
-  tray?: boolean;
-  children: ReactNode;
-}) {
-  return (
-    <div className={tray ? `${classes.group} ${classes.tray}` : classes.group}>
-      <h2 className={classes.groupTitle}>{title}</h2>
-      {children}
-    </div>
-  );
-}
-
-export function PaletteButton({
-  name,
-  line,
-  note,
-  disabled = false,
-  onAdd,
-}: {
-  name: string;
-  line: string;
-  /** Small under the line: a ref, or who can use it. */
-  note?: string;
-  disabled?: boolean;
-  onAdd: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      className={classes.paletteItem}
-      title={line}
-      disabled={disabled}
-      onClick={onAdd}
-    >
-      <span className={classes.paletteName}>{name}</span>
-      <span className={classes.paletteLine}>{line}</span>
-      {note !== undefined && <span className={classes.paletteNote}>{note}</span>}
-    </button>
   );
 }

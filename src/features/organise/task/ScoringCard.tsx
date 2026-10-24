@@ -9,15 +9,20 @@ import { Select } from '@/ui/Select';
 import { TextInput } from '@/ui/TextInput';
 import { FormulaLine, FormulaTiles } from '../formula/Editor';
 import type { Catalogue } from '../formula/catalogue';
-import { describeFormula, readLine, type FormulaScope, type Reading } from '../formula/parse';
+import {
+  describeFormula,
+  readLine,
+  type FormulaScope,
+  type Reading,
+} from '../formula/parse';
 import { useFormulaTarget } from '../formula/target';
 import { treeQuery } from '../files/place';
 import { FieldBox } from '../contest/ContestFile';
 import type { TaskValues } from '../forms/task-values';
 import { BuildCard, CardPart } from './BuildCard';
 import type { TaskPlace } from './build-data';
-import { BoxGraph } from '../stage6/BoxGraph';
-import { PALETTES, type GraphBox, type GraphWire, type Shape } from '../stage6/graph';
+import { BoxGraph } from './BoxGraph';
+import { PALETTES, type GraphBox, type GraphWire, type Shape } from './graph';
 import {
   FACTS,
   WHEN,
@@ -135,7 +140,9 @@ export function ScoringCard({
         line="One submission runs once on each row. The numbers here are made up, to show the shape."
       >
         {rows.length === 0 ? (
-          <BodyText>No runs yet, so a submission gives nothing until the runs have a row.</BodyText>
+          <BodyText>
+            No runs yet, so a submission gives nothing until the runs have a row.
+          </BodyText>
         ) : (
           <table className={classes.runs}>
             <thead>
@@ -163,8 +170,8 @@ export function ScoringCard({
         )}
         {more > 0 && <BodyText>and {String(more)} more runs</BodyText>}
         <BodyText size="sm">
-          Every run also gives {columns.map((column) => column.name).join(', ')}. A value
-          reads {FACTS.map((fact) => fact.name).join(', ')} too.
+          Every run also gives {columns.map((column) => column.name).join(', ')}. A
+          value reads {FACTS.map((fact) => fact.name).join(', ')} too.
         </BodyText>
       </CardPart>
       <CardPart
@@ -206,7 +213,9 @@ export function ScoringCard({
             labels={false}
             floor={0}
             inside={(box) => {
-              const value = values.scoreValues.find((item) => `v:${item.key}` === box.id);
+              const value = values.scoreValues.find(
+                (item) => `v:${item.key}` === box.id,
+              );
               if (value === undefined || chosen !== box.id) return null;
               return (
                 <FormulaLine
@@ -218,7 +227,9 @@ export function ScoringCard({
                   marks={marksFor(errors, value.name)}
                   onFocusLine={(insert) => target.focus(value.name, insert, 'graph')}
                   onChange={(text) =>
-                    setValues(editText(values.scoreValues, value.key, text, catalogue, scope))
+                    setValues(
+                      editText(values.scoreValues, value.key, text, catalogue, scope),
+                    )
                   }
                 />
               );
@@ -275,7 +286,12 @@ export function ScoringCard({
                     onCommit={() => {
                       const from = wasName[value.key];
                       if (from === undefined || catalogue === null) return;
-                      const next = renamed(values.scoreValues, from, value.name, catalogue);
+                      const next = renamed(
+                        values.scoreValues,
+                        from,
+                        value.name,
+                        catalogue,
+                      );
                       if (next === null) return;
                       setWasName((known) => {
                         const rest = { ...known };
@@ -317,7 +333,9 @@ export function ScoringCard({
                   variant="secondary"
                   disabled={disabled}
                   onClick={() =>
-                    setValues(values.scoreValues.filter((item) => item.key !== value.key))
+                    setValues(
+                      values.scoreValues.filter((item) => item.key !== value.key),
+                    )
                   }
                 >
                   Remove
@@ -334,7 +352,9 @@ export function ScoringCard({
                   marks={marksFor(errors, value.name)}
                   onFocusLine={(insert) => target.focus(value.name, insert, value.key)}
                   onChange={(text) =>
-                    setValues(editText(values.scoreValues, value.key, text, catalogue, scope))
+                    setValues(
+                      editText(values.scoreValues, value.key, text, catalogue, scope),
+                    )
                   }
                 />
               )}
@@ -395,7 +415,12 @@ function editText(
 function marksFor(errors: DefinitionError[], name: string) {
   const prefix = `scoring.values.${name}`;
   return errors
-    .filter((error) => error.path === prefix || error.path.startsWith(`${prefix}.`) || error.path.startsWith(`${prefix}[`))
+    .filter(
+      (error) =>
+        error.path === prefix ||
+        error.path.startsWith(`${prefix}.`) ||
+        error.path.startsWith(`${prefix}[`),
+    )
     .map((error) => ({
       path: error.path
         .slice(prefix.length)
@@ -434,15 +459,19 @@ function Groups({
               {groups.map((group) => (
                 <th key={group.key}>
                   <FieldBox name={`group-${group.name}`}>
-                  <TextInput
-                    label={`Name of ${group.name}`}
-                    labelHidden
-                    value={group.name}
-                    disabled={disabled}
-                    onChange={(name) =>
-                      onChange(groups.map((item) => (item.key === group.key ? { ...item, name } : item)))
-                    }
-                  />
+                    <TextInput
+                      label={`Name of ${group.name}`}
+                      labelHidden
+                      value={group.name}
+                      disabled={disabled}
+                      onChange={(name) =>
+                        onChange(
+                          groups.map((item) =>
+                            item.key === group.key ? { ...item, name } : item,
+                          ),
+                        )
+                      }
+                    />
                   </FieldBox>
                 </th>
               ))}
@@ -466,7 +495,9 @@ function Groups({
                         disabled={disabled}
                         onClick={() => {
                           const selected = new Set(
-                            rows.filter((item) => inGroup(item, group)).map((item) => item.id),
+                            rows
+                              .filter((item) => inGroup(item, group))
+                              .map((item) => item.id),
                           );
                           if (selected.has(row.id)) selected.delete(row.id);
                           else selected.add(row.id);
@@ -537,10 +568,7 @@ function flowBoxes(
       ports: [{ name: 'runs', side: 'out' }],
     },
   ];
-  const groups = [
-    ...values.scoreGroups.map((group) => group.name),
-    'all',
-  ];
+  const groups = [...values.scoreGroups.map((group) => group.name), 'all'];
   for (const name of groups) {
     boxes.push({
       id: `g:${name}`,
@@ -561,7 +589,10 @@ function flowBoxes(
   ]);
   for (const value of values.scoreValues) {
     const reading = readings[value.key];
-    const problem = troubles.get(value.key) ?? reading?.unread?.message ?? reading?.problems[0]?.message;
+    const problem =
+      troubles.get(value.key) ??
+      reading?.unread?.message ??
+      reading?.problems[0]?.message;
     const open = chosen === `v:${value.key}`;
     const sources =
       reading?.node === null || reading?.node === undefined
@@ -572,12 +603,19 @@ function flowBoxes(
       title: value.name,
       wide: 380,
       least: 2,
-      kind: problem === undefined && (reading?.kind === 'number' || reading?.kind === 'text') ? reading.kind : 'to fix',
+      kind:
+        problem === undefined &&
+        (reading?.kind === 'number' || reading?.kind === 'text')
+          ? reading.kind
+          : 'to fix',
       description: open
         ? 'Worked out as:'
         : reading?.node === null || reading?.node === undefined
           ? printed(value, null) || 'No formula yet'
-          : describeFormula(reading.node, { ...scope, names: scope.names.filter((name) => name !== value.name) }),
+          : describeFormula(reading.node, {
+              ...scope,
+              names: scope.names.filter((name) => name !== value.name),
+            }),
       warn: open ? undefined : problem,
       ports: [
         ...sources.map((name) => ({ name, side: 'in' as const })),
@@ -590,12 +628,18 @@ function flowBoxes(
     title: 'Result',
     role: 'output',
     kind: 'what it gets',
-    ports: values.scoreValues.map((value) => ({ name: value.name, side: 'in' as const })),
+    ports: values.scoreValues.map((value) => ({
+      name: value.name,
+      side: 'in' as const,
+    })),
   });
   return boxes;
 }
 
-function flowWires(values: TaskValues, readings: Record<string, Reading | undefined>): GraphWire[] {
+function flowWires(
+  values: TaskValues,
+  readings: Record<string, Reading | undefined>,
+): GraphWire[] {
   const wires: GraphWire[] = [];
   for (const group of [...values.scoreGroups.map((item) => item.name), 'all']) {
     wires.push({ from: 'runs', fromPort: 'runs', to: `g:${group}`, toPort: 'runs' });
@@ -726,7 +770,8 @@ function WhenField({
       disabled={disabled}
       options={WHEN.map((item, index) => ({
         value: item.value,
-        label: seen && index > 0 ? `${item.label}: no, entrants have seen it` : item.label,
+        label:
+          seen && index > 0 ? `${item.label}: no, entrants have seen it` : item.label,
         disabled: seen && index > 0,
       }))}
       onChange={(next) => onChange(next as When)}

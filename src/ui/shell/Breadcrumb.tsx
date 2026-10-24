@@ -115,20 +115,6 @@ function trailOf(pathname: string, params: Params): Segment[] {
     }
     return segments;
   }
-  if (
-    import.meta.env.DEV &&
-    (pathname === '/dev/stage-6' || pathname.startsWith('/dev/stage-6/'))
-  ) {
-    const names: Record<string, string> = {
-      '/dev/stage-6/workflow': 'Run workflow',
-      '/dev/stage-6/formula': 'Formula',
-      '/dev/stage-6/task': 'Task',
-    };
-    const segments: Segment[] = [{ label: 'Stage 6', to: '/dev/stage-6' }];
-    const screen = names[pathname];
-    if (screen !== undefined) segments.push({ label: screen, to: pathname });
-    return segments;
-  }
   const place = PLACES[pathname];
   // An address that is no page's is said as such, not as some other page.
   return [
