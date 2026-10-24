@@ -556,7 +556,9 @@ export function problems(
       if (name !== null) found.push({ field, message: name });
       const line = lineOf(column, catalogue);
       const reading = readings[column.key];
-      if (line.trim() === '') {
+      // The line is the tree's print, which needs the catalogue. Until it
+      // loads, a saved formula is not empty.
+      if (catalogue !== null && line.trim() === '') {
         found.push({ field, message: 'Give a formula.' });
       } else if (reading !== undefined) {
         if (reading.unread !== null) found.push({ field, message: reading.unread.message });

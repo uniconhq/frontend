@@ -180,6 +180,28 @@ describe('what the editor refuses', () => {
     );
   });
 
+  it('does not call a saved formula empty before the catalogue loads', () => {
+    const doc = open(FILE);
+    const one = draft(doc, [board({ key: 'gradebook' })], {
+      locked: false,
+      on: false,
+      from: '',
+      untilStaff: true,
+      until: '',
+    });
+    expect(
+      problems(
+        one,
+        null,
+        [],
+        [],
+        now,
+        '2030-10-01T09:00:00Z',
+        '2030-10-01T14:00:00Z',
+      ).some((item) => item.message === 'Give a formula.'),
+    ).toBe(false);
+  });
+
   it('refuses a hold that has already started', () => {
     const doc = open(FILE);
     const one = draft(doc, [], {
