@@ -59,10 +59,7 @@ type FileRules = {
 
 const FILE_RULES: Record<string, FileRules> = {
   'contest.yaml': {
-    keyed: [
-      { list: 'tasks', key: 'id' },
-      { list: 'leaderboards', key: 'name' },
-    ],
+    keyed: [{ list: 'tasks', key: 'id' }],
     adminOnly: ['name', 'description', 'state', 'visibility', 'registration'],
   },
   'task.yaml': { keyed: [], adminOnly: ['name', 'submissions'] },
@@ -103,7 +100,7 @@ function same(a: unknown, b: unknown): boolean {
   return false;
 }
 
-/** A path's shape, the form a keyed-list rule names it by: `leaderboards[].tasks`. */
+/** A path's shape, the form a keyed-list rule names it by: `tasks[].due`. */
 function shapeOf(path: MergePath): string {
   return path
     .map((step, index) =>

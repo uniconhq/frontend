@@ -173,8 +173,7 @@ export const publicationList = http.get(`${TASK_API}/publications`, () =>
 
 /**
  * The spring contest's tasks in its order: sort, on its first publication,
- * due a week after its release with a tenth off per late day and worth 100,
- * and sum, with no due, whose last save left a draft with errors on its
+ * due a week after its release, and sum, with no due, whose last save left a draft with errors on its
  * second publication.
  */
 export const standings: TaskStanding[] = [

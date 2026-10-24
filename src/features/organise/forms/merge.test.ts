@@ -18,9 +18,9 @@ start: 2026-06-01T09:00:00Z
 registration:
   approval: manual
 tasks:
-  - {id: sum, worth: 100}
+  - {id: sum, marks: 2}
   - id: sort
-    worth: 50
+    marks: 1
 `;
 
 function edit(text: string, change: (doc: ReturnType<typeof docOf>) => void) {
@@ -47,9 +47,9 @@ start: 2026-06-01T09:00:00Z
 registration:
   approval: manual
 tasks:
-  - {id: sum, worth: 100, due: 2026-06-01T12:00:00+08:00}
+  - {id: sum, marks: 2, due: 2026-06-01T12:00:00+08:00}
   - id: sort
-    worth: 50
+    marks: 1
 `,
     );
   });
@@ -133,7 +133,7 @@ describe('merging a number past what a float holds', () => {
 describe('merging two versions field by field', () => {
   const mine = edit(BASE, (doc) => {
     writeAt(doc, ['name'], 'Mine');
-    writeAt(doc, ['tasks', 1, 'worth'], 70);
+    writeAt(doc, ['tasks', 1, 'marks'], 3);
   });
   const theirs = edit(BASE, (doc) => {
     writeAt(doc, ['name'], 'Theirs');
@@ -147,7 +147,7 @@ describe('merging two versions field by field', () => {
       'name',
       'start',
       'registration.approval',
-      'tasks[sort].worth',
+      'tasks[sort].marks',
     ]);
   });
 
@@ -161,8 +161,8 @@ describe('merging two versions field by field', () => {
     expect(parse(merged)).toEqual({
       ...parse(theirs),
       tasks: [
-        { id: 'sum', worth: 100 },
-        { id: 'sort', worth: 70 },
+        { id: 'sum', marks: 2 },
+        { id: 'sort', marks: 3 },
       ],
     });
     expect(merged).toContain('# shown on the page');
@@ -206,8 +206,8 @@ describe('merging a keyed list item by item', () => {
     expect(labels(diffs)).toEqual(['order tasks', 'field tasks[sort].due']);
     expect(diffs.map(defaultSide)).toEqual(['theirs', 'mine']);
     expect(merged(theirs, diffs).tasks).toEqual([
-      { id: 'sort', worth: 50, due: '2026-06-01T12:00:00Z' },
-      { id: 'sum', worth: 100 },
+      { id: 'sort', marks: 1, due: '2026-06-01T12:00:00Z' },
+      { id: 'sum', marks: 2 },
     ]);
   });
 
@@ -230,13 +230,13 @@ describe('merging a keyed list item by item', () => {
 
   it("keeps the organiser's order when they pick it, every task moving whole", () => {
     const { theirs, diffs } = merge(swap, (doc) =>
-      writeAt(doc, ['tasks', 0, 'worth'], 90),
+      writeAt(doc, ['tasks', 0, 'marks'], 4),
     );
-    expect(labels(diffs)).toEqual(['order tasks', 'field tasks[sum].worth']);
+    expect(labels(diffs)).toEqual(['order tasks', 'field tasks[sum].marks']);
     expect(diffs.map(defaultSide)).toEqual(['mine', 'theirs']);
     expect(merged(theirs, diffs).tasks).toEqual([
-      { id: 'sort', worth: 50 },
-      { id: 'sum', worth: 90 },
+      { id: 'sort', marks: 1 },
+      { id: 'sum', marks: 4 },
     ]);
   });
 
@@ -259,22 +259,22 @@ describe('merging a keyed list item by item', () => {
   it('removes a task the other side removed, and offers back one the organiser changed', () => {
     const remove = (doc: ReturnType<typeof docOf>) =>
       writeAt(doc, ['tasks', 0], undefined);
-    const untouched = merge((doc) => writeAt(doc, ['tasks', 1, 'worth'], 60), remove);
+    const untouched = merge((doc) => writeAt(doc, ['tasks', 1, 'marks'], 5), remove);
     expect(labels(untouched.diffs)).toEqual([
-      'field tasks[sort].worth',
+      'field tasks[sort].marks',
       'item tasks[sum]',
     ]);
     expect(merged(untouched.theirs, untouched.diffs).tasks).toEqual([
-      { id: 'sort', worth: 60 },
+      { id: 'sort', marks: 5 },
     ]);
 
-    const changed = merge((doc) => writeAt(doc, ['tasks', 0, 'worth'], 80), remove);
+    const changed = merge((doc) => writeAt(doc, ['tasks', 0, 'marks'], 6), remove);
     const [item] = changed.diffs;
     expect(item && bothChanged(item)).toBe(true);
     expect(changed.diffs.map(defaultSide)).toEqual(['mine']);
     expect(merged(changed.theirs, changed.diffs).tasks).toEqual([
-      { id: 'sum', worth: 80 },
-      { id: 'sort', worth: 50 },
+      { id: 'sum', marks: 6 },
+      { id: 'sort', marks: 1 },
     ]);
   });
 
@@ -290,8 +290,8 @@ describe('merging a keyed list item by item', () => {
     const [, due] = diffs;
     expect(due && bothChanged(due)).toBe(true);
     expect(merged(theirs, diffs).tasks).toEqual([
-      { id: 'sort', worth: 50 },
-      { id: 'sum', worth: 100, due: '2026-06-01T12:00:00Z' },
+      { id: 'sort', marks: 1 },
+      { id: 'sum', marks: 2, due: '2026-06-01T12:00:00Z' },
     ]);
   });
 

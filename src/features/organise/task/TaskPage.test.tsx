@@ -51,10 +51,12 @@ describe('the task page', () => {
     const dialog = await screen.findByRole('dialog', {
       name: 'B · sum in this contest',
     });
-    expect(await within(dialog).findByRole('textbox', { name: 'Worth' })).toBeEnabled();
+    expect(
+      await within(dialog).findByRole('radiogroup', { name: 'Due' }),
+    ).toBeVisible();
   });
 
-  it('reads where the task stands in its contest again after a save, as its points can move with it', async () => {
+  it('reads where the task stands in its contest again after a save', async () => {
     let reads = 0;
     server.use(
       http.get(`${CONTEST_API}/organise/tasks`, () => {
@@ -69,7 +71,7 @@ describe('the task page', () => {
         HttpResponse.json({
           number: 3,
           grading_changed: true,
-          changes: ['main gives 110 points.'],
+          changes: ['The time limit changes.'],
           notes: [],
           regraded: 0,
           effect: unchanged,

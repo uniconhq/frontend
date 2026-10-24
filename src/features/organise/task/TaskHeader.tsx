@@ -200,7 +200,7 @@ function NextStep({
 }
 
 /**
- * The top of a task's page: where it stands in its contest, its worth and
+ * The top of a task's page: where it stands in its contest and its
  * timeline, changed from there (M68); where its files stand and when they
  * were last saved, by whom; a tick for each part of the task that is done, or what it
  * lacks, each going to its card; what entrants are graded on (M21); and what

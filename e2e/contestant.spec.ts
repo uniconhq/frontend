@@ -66,7 +66,7 @@ const STANDINGS = {
   select: 'best',
   who: 'contestants',
   keys: [{ by: 'points', better: 'higher', per_attempt: null }],
-  tasks: [{ id: 'sum', label: 'A', worth: '100' }],
+  tasks: [{ id: 'sum', label: 'A' }],
   not_in_view: [],
   rows: [
     {
@@ -234,7 +234,6 @@ async function stubContestantApi(page: Page, signedIn: boolean) {
             name: 'sum',
             label: 'A',
             title: 'Sum of Two',
-            worth: '100',
             // Points only for an approved entrant, a held-back group's part pending.
             points: approved
               ? [
@@ -258,7 +257,6 @@ async function stubContestantApi(page: Page, signedIn: boolean) {
         name: 'sum',
         label: 'A',
         title: 'Sum of Two',
-        worth: '100',
         statement: '# Sum\n\nPrint the sum of two numbers.\n',
         submissions: { max: 50, rate: { count: 1, per: 30 } },
         inputs: [

@@ -126,17 +126,17 @@ describe('the scalars as YAML 1.2 reads them', () => {
 
   it('writes a number typed into a field as its digits, all thirty of them', () => {
     const digits = '123456789012345.678901234567891';
-    const text = edited('worth: 100\n', (doc) => {
-      writeAt(doc, ['worth'], new NumberText('100.50'));
+    const text = edited('score: 100\n', (doc) => {
+      writeAt(doc, ['score'], new NumberText('100.50'));
       writeAt(doc, ['bound'], new NumberText(digits));
       writeAt(doc, ['tiny'], new NumberText('1e-9'));
     });
 
-    expect(text).toBe(`worth: 100.50\nbound: ${digits}\ntiny: 1e-9\n`);
+    expect(text).toBe(`score: 100.50\nbound: ${digits}\ntiny: 1e-9\n`);
     const parsed = parseYaml(text);
     if ('error' in parsed) throw new Error(parsed.error);
     expect(textAt(parsed.doc, ['bound'])).toBe(digits);
-    expect(textAt(parsed.doc, ['worth'])).toBe('100.50');
+    expect(textAt(parsed.doc, ['score'])).toBe('100.50');
   });
 
   it('writes a number typed over one tagged !!float or !!int as its digits', () => {

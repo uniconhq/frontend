@@ -47,9 +47,9 @@ export function EntryLine({
 
 /**
  * The dialog a task's place in its contest is changed in, from its row on
- * the contest's page or from the task's own page: what it is worth and when
- * it opens, falls due and closes; and, apart at its foot, the way to take
- * the task out of the contest, or to put a withdrawn one back (#450), each
+ * the contest's page or from the task's own page: when it opens, falls due
+ * and closes; and, apart at its foot, the way to take the task out of the
+ * contest, or to put a withdrawn one back (#450), each
  * asked in the dialog itself first. Opened while `standing` is given, on its
  * question to put the task back when `start` says so, as the row's Put back
  * opens it. `onTakenOut` hears what taking the task out did, once the
@@ -126,7 +126,7 @@ export function TaskEntryDialog({
 
 /**
  * Where a task stands in its contest, under the task's title on its own
- * page: "In Sample contest: 110 points, open for the whole contest ·
+ * page: "In Sample contest: open for the whole contest ·
  * Change", the line opening the same dialog as the task's row on the
  * contest's page, for a manager of the contest, ", withdrawn" after the
  * contest's name for a withdrawn task; removing the task from there goes

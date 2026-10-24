@@ -15,15 +15,13 @@ import { numberProblem } from '../forms/yaml-doc';
 import { ContestFile, FieldBox } from './ContestFile';
 import { useOpenedField } from './opened';
 import { markedBoardCovers } from './timeline';
-import { fractionOf, percentOf } from './percent';
 import shared from '../organise.module.css';
 import forms from '../forms/forms.module.css';
 
 /**
  * One task's place in the contest, changed from its row on the contest's
- * page or from its own page: what it is worth, when it opens, falls due and
- * closes, what a late day costs, and how many submissions may be marked
- * when a leaderboard counts marked ones.
+ * page or from its own page: when it opens, falls due and closes, and how
+ * many submissions may be marked when a leaderboard reads marked ones.
  */
 export function TaskTimelineForm({
   org,
@@ -57,7 +55,6 @@ function EntryForm({
   const [entry, setEntry] = useState<TaskEntryValues | undefined>(
     read.values.tasks[index],
   );
-  const [late, setLate] = useState(() => percentOf(entry?.latePerDay ?? ''));
   const [opensAt, setOpensAt] = useState(entry !== undefined && entry.releaseAt !== '');
   const [closesAt, setClosesAt] = useState(entry !== undefined && entry.closes !== '');
   useOpenedField(true, { byItem: false });
@@ -72,27 +69,16 @@ function EntryForm({
   const set = (change: Partial<TaskEntryValues>) =>
     setEntry((before) => (before === undefined ? before : { ...before, ...change }));
   const raw = (key: string) => read.rawTimes[`tasks.${String(entry.at)}.${key}`];
-  const total = 'Its test groups’ total';
-  const marks = markedBoardCovers(read.values, entry.id);
+  // Marks set where no leaderboard reads them stay in view, to take out.
+  const marks = markedBoardCovers(read.values, entry.id) || entry.marks !== '';
   const after: ContestValues = {
     ...read.values,
-    tasks: read.values.tasks.map((old, at) =>
-      at === index ? { ...entry, latePerDay: fractionOf(late) } : old,
-    ),
+    tasks: read.values.tasks.map((old, at) => (at === index ? entry : old)),
   };
   const changed = JSON.stringify(after) !== JSON.stringify(read.values);
-  const lateProblem =
-    late.trim() === ''
-      ? undefined
-      : (numberProblem(late) ??
-        (Number(late) <= 0 || Number(late) > 100
-          ? 'Give a percentage above 0 and at most 100.'
-          : undefined));
-  const problems = [
-    numberProblem(entry.worth),
-    numberProblem(entry.marks, true),
-    lateProblem,
-  ].filter((problem) => problem !== undefined);
+  const problems = [numberProblem(entry.marks, true)].filter(
+    (problem) => problem !== undefined,
+  );
 
   return (
     <form
@@ -103,15 +89,6 @@ function EntryForm({
         onSave((fresh) => writeContest(fresh, read.values, after, { admin }));
       }}
     >
-      <FieldBox name="worth">
-        <NumberField
-          label="Worth"
-          value={entry.worth}
-          onChange={(worth) => set({ worth })}
-          placeholder={total}
-          hint="The most points this task gives in the contest. Left empty, it is the total of its test groups’ points."
-        />
-      </FieldBox>
       <FieldBox name="release_at">
         <RadioGroup
           label="Opens"
@@ -142,10 +119,7 @@ function EntryForm({
             { value: 'none', label: 'No due time' },
             { value: 'at', label: 'At a time' },
           ]}
-          onChange={(choice) => {
-            set({ due: choice === 'at' ? read.values.end : '' });
-            if (choice !== 'at') setLate('');
-          }}
+          onChange={(choice) => set({ due: choice === 'at' ? read.values.end : '' })}
         />
         {entry.due !== '' && (
           <TimeField
@@ -157,17 +131,6 @@ function EntryForm({
           />
         )}
       </FieldBox>
-      {entry.due !== '' && (
-        <FieldBox name="late_per_day">
-          <NumberField
-            label="Taken off per started late day (%)"
-            value={late}
-            onChange={setLate}
-            placeholder="100, so a late submission earns nothing"
-            error={lateProblem}
-          />
-        </FieldBox>
-      )}
       <FieldBox name="closes">
         <RadioGroup
           label="Closes"
@@ -198,7 +161,7 @@ function EntryForm({
             value={entry.marks}
             onChange={(value) => set({ marks: value })}
             placeholder="1"
-            hint="For the leaderboards that count only the submissions each entrant marks."
+            hint="For the leaderboards that read only the submissions each entrant marks."
             whole
           />
         </FieldBox>

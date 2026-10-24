@@ -1,6 +1,6 @@
 import type { MergePath } from '../forms/merge';
 import { NumberText } from '../forms/yaml-doc';
-import { BOARD_FIELDS, TASK_FIELDS } from './places';
+import { BOARD_PARTS, TASK_FIELDS } from './places';
 
 /**
  * The contest's settings in words for the merge of two saves (M27): each
@@ -50,7 +50,7 @@ const VALUES: Record<string, Record<string, string>> = {
   approval: { auto: 'Approved straight away', manual: 'An organiser approves' },
 };
 
-/** Words for a key alone, where no page names it: `late_per_day` is "late per day". */
+/** Words for a key alone, where no page names it: `release_at` is "Release at". */
 function plain(key: string): string {
   const words = key.replaceAll('_', ' ');
   return words.charAt(0).toUpperCase() + words.slice(1);
@@ -66,16 +66,10 @@ export function contestFieldName(path: MergePath): string {
       ? `${task}: ${TASK_FIELDS[third] ?? plain(third)}`
       : task;
   }
-  if (top === 'leaderboards' && second !== undefined && typeof second !== 'string') {
-    const board = `Leaderboard ${second.value}`;
-    return typeof third === 'string'
-      ? `${board}: ${BOARD_FIELDS[third] ?? plain(third)}`
-      : board;
-  }
   if (top === 'leaderboards' && typeof second === 'string') {
     const board = `Leaderboard ${second}`;
     return typeof third === 'string'
-      ? `${board}: ${BOARD_FIELDS[third] ?? plain(third)}`
+      ? `${board}: ${BOARD_PARTS[third] ?? plain(third)}`
       : board;
   }
   if (top === 'hold') {

@@ -184,7 +184,6 @@ async function stubApi(page: Page, overrides: Partial<State> = {}): Promise<Stat
         name: 'sum',
         label: 'A',
         title: 'Sum of Two',
-        worth: '100',
         statement: '# Sum\n\nPrint the sum of two numbers.\n',
         submissions: { max: 50, rate: { count: 1, per: 30 } },
         inputs: state.inputs,

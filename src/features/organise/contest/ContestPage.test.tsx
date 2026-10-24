@@ -235,7 +235,7 @@ describe("the contest's tasks", () => {
             'end: 2026-10-15T09:00:00Z',
             'state: draft',
             'visibility: signed-in',
-            'leaderboards: [{name: Final, select: marked}]',
+            'leaderboards: {final: {columns: {marked: {value: [sort, marked]}}}}',
             'tasks: [{id: sort, marks: 2}]',
             '',
           ].join('\n'),
@@ -250,28 +250,6 @@ describe("the contest's tasks", () => {
     );
   });
 
-  it('says the late rate as the exact percentage it is, however small', async () => {
-    const [sort] = standings;
-    if (sort === undefined) throw new Error('standings has sort');
-    const rated = (late: string): TaskStanding => ({
-      ...sort,
-      timeline: { ...sort.timeline, due: late === '' ? null : sort.timeline.due },
-    });
-    server.use(
-      signedIn,
-      http.get(`${CONTEST_API}/organise/tasks`, () =>
-        HttpResponse.json([rated('0.0001'), { ...rated('0.0005'), label: 'B' }]),
-      ),
-      ...repoFiles,
-    );
-    renderApp(CONTEST);
-
-    const items = await screen.findAllByRole('listitem', { name: /sort$/ });
-    expect(items[0]).toHaveTextContent(`due ${at('2026-10-08T09:00:00Z')}`);
-    expect(items[0]).not.toHaveTextContent(/%/);
-    expect(items[1]).not.toHaveTextContent(/%/);
-  });
-
   it("says how many problems hold back a task's last save, which its own page lists", async () => {
     server.use(signedIn, standingList, ...repoFiles);
     renderApp(CONTEST);
@@ -283,7 +261,7 @@ describe("the contest's tasks", () => {
     expect(within(sum).queryByRole('list', { name: 'Errors' })).toBeNull();
   });
 
-  it('says a task that has never published so, and what it is worth once it has', async () => {
+  it('says a task that has never published so, and its timeline', async () => {
     const fresh: TaskStanding = {
       task: { name: 'max' },
       label: 'C',
@@ -511,7 +489,7 @@ describe("a task's place in the contest, changed from its row", () => {
     return sent;
   }
 
-  it('saves the worth, the due time and the late rate typed as a percentage, exactly', async () => {
+  it('saves the due time chosen, exactly', async () => {
     server.use(signedIn, standingList, ...repoFiles);
     const sent = settingsSaved();
     const user = userEvent.setup();
@@ -523,29 +501,21 @@ describe("a task's place in the contest, changed from its row", () => {
     const dialog = await screen.findByRole('dialog', {
       name: 'A · sort in this contest',
     });
-    const worth = await within(dialog).findByRole('textbox', { name: 'Worth' });
-    expect(worth).toHaveAttribute('placeholder', 'Its test groups’ total');
-    await user.type(worth, '120');
-    const due = within(dialog).getByRole('radiogroup', { name: 'Due' });
+    const due = await within(dialog).findByRole('radiogroup', { name: 'Due' });
     await user.click(within(due).getByRole('radio', { name: 'At a time' }));
-    await user.type(
-      within(dialog).getByRole('textbox', { name: /Taken off per started late day/ }),
-      '12.5',
-    );
     await user.click(within(dialog).getByRole('button', { name: 'Save' }));
 
     expect(await within(dialog).findByText('Saved.')).toBeVisible();
     const [saved] = sent;
-    expect(saved).toContain('late_per_day: 0.125');
     expect(parse(saved ?? '')).toMatchObject({
       tasks: [
-        { id: 'sort', worth: 120, due: isoOf(localOf('2026-10-15T09:00:00Z')) },
+        { id: 'sort', due: isoOf(localOf('2026-10-15T09:00:00Z')) },
         { id: 'sum' },
       ],
     });
   });
 
-  it('offers a worth and a due time', async () => {
+  it('offers when the task opens, falls due and closes, and no marks while no leaderboard reads them', async () => {
     server.use(signedIn, standingList, ...repoFiles);
     settingsSaved();
     const user = userEvent.setup();
@@ -557,16 +527,14 @@ describe("a task's place in the contest, changed from its row", () => {
     const dialog = await screen.findByRole('dialog', {
       name: 'B · sum in this contest',
     });
-    const worth = await within(dialog).findByRole('textbox', { name: 'Worth' });
-    expect(worth).toBeEnabled();
+    for (const name of ['Opens', 'Due', 'Closes']) {
+      expect(await within(dialog).findByRole('radiogroup', { name })).toBeVisible();
+    }
     expect(
-      within(within(dialog).getByRole('radiogroup', { name: 'Due' })).getByRole(
-        'radio',
-        {
-          name: 'At a time',
-        },
-      ),
-    ).toBeEnabled();
+      within(dialog).queryByRole('textbox', {
+        name: /Submissions each entrant may mark/,
+      }),
+    ).toBeNull();
   });
 
   it('moves a task down the list from its row, which saves at once', async () => {
@@ -687,13 +655,13 @@ describe("a task's place in the contest, changed from its row", () => {
   it("opens a task's dialog from a link that names one of its fields", async () => {
     server.use(signedIn, standingList, ...repoFiles);
     settingsSaved();
-    renderApp(`${CONTEST}?part=tasks&field=worth&item=0`);
+    renderApp(`${CONTEST}?part=tasks&field=due&item=0`);
 
     const dialog = await screen.findByRole('dialog', {
       name: 'A · sort in this contest',
     });
     await waitFor(() =>
-      expect(within(dialog).getByRole('textbox', { name: 'Worth' })).toHaveFocus(),
+      expect(within(dialog).getByRole('radio', { name: 'No due time' })).toHaveFocus(),
     );
   });
 

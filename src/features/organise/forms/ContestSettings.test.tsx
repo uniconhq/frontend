@@ -19,12 +19,11 @@ visibility: signed-in
 registration:
   capacity: 100
 leaderboards:
-  - name: Standings
-    who: contestants
+  standings: {title: Standings, audience: {who: entrants}}
 tasks:
-  - {id: sum, worth: 100}
+  - {id: sum}
   - id: sort
-    worth: 50
+    withdrawn: true
 `;
 
 const FILE = `${CONTEST_API}/files/:path`;
@@ -160,11 +159,10 @@ describe('the contest settings form', { timeout: 20_000 }, () => {
       state: 'draft',
       visibility: 'signed-in',
       registration: { capacity: 100 },
-      leaderboards: [{ name: 'Standings', who: 'contestants' }],
-      tasks: [
-        { id: 'sum', worth: 100 },
-        { id: 'sort', worth: 50 },
-      ],
+      leaderboards: {
+        standings: { title: 'Standings', audience: { who: 'entrants' } },
+      },
+      tasks: [{ id: 'sum' }, { id: 'sort', withdrawn: true }],
       entrants: { most: 3, fewest: 2, locks: 'first_submission' },
     });
     expect(write?.content).toContain("# the page's title");
