@@ -114,15 +114,12 @@ export function home(overrides: Partial<ContestHome> = {}): ContestHome {
  * An entrant input, a file input for the solution unless told otherwise, as
  * the task's page serves it.
  */
-export function inputField(
-  overrides: Partial<InputField> = {},
-): components['schemas']['InputField'] {
+export function inputField(overrides: Partial<InputField> = {}): InputField {
   return {
     id: 'submission',
     type: 'file',
     label: 'Your solution',
     options: null,
-    per_test: false,
     default: null,
     min: null,
     max: null,
@@ -214,10 +211,6 @@ export function grading(overrides: Partial<GradingResult> = {}): GradingResult {
     id: '5d2f0c1e-0000-4000-8000-000000000001',
     attempt: 1,
     status: 'queued',
-    stopped: null,
-    outcome: null,
-    groups: [],
-    values: { numbers: {}, texts: {} },
     reason: null,
     limit: null,
     compiled: null,
@@ -225,7 +218,6 @@ export function grading(overrides: Partial<GradingResult> = {}): GradingResult {
     reveal_at: null,
     run_values: [],
     runs: [],
-    meanings: [],
     ...overrides,
   };
 }
@@ -249,12 +241,11 @@ function sampleRun(place: number, reports: Record<string, string>): RunShown {
 }
 
 /**
- * A graded one: accepted, with the compile log written once and the two
- * runs of the samples, each with what it reported.
+ * A graded one, with the compile log written once and the two runs of the
+ * samples, each accepted with what it reported.
  */
 export const accepted = grading({
   status: 'graded',
-  outcome: 'accepted',
   once: { reports: {}, texts: { log: { name: null, output: null } } },
   runs: [sampleRun(1, { time_ms: '12', memory_kb: '2048' }), sampleRun(2, {})],
 });

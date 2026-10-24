@@ -1,7 +1,6 @@
 import { $api, queryView } from '@/api/query';
 import type { FeedEntry } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
-import { VerdictBadge } from '@/ui/VerdictBadge';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
 import { ScoredResult } from '@/ui/scored/ScoredResult';
@@ -65,9 +64,6 @@ export function ScoredView({
         ) : (
           <>
             <div className={classes.scoredHead}>
-              {view.data.grading.outcome !== null && (
-                <VerdictBadge verdict={view.data.grading.outcome} />
-              )}
               <BodyText tone="secondary">
                 {view.data.grading.status === 'over_limit'
                   ? overLimitSentence('the entrant', view.data.grading.limit)

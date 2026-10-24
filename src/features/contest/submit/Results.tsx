@@ -1,7 +1,7 @@
 import type { GradingResult } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { VerdictBadge } from '@/ui/VerdictBadge';
-import { DELAYED_SENTENCE, cancelReason, verdictOf } from './grading';
+import { DELAYED_SENTENCE, cancelReason } from './grading';
 import { overLimitSentence } from '@/ui/scored/scored-text';
 
 /**
@@ -13,7 +13,7 @@ export function Verdict({ grading }: { grading: GradingResult | null }) {
   if (grading === null) return <BodyText tone="secondary">Not graded</BodyText>;
   return (
     <>
-      <VerdictBadge verdict={verdictOf(grading)} />
+      <VerdictBadge verdict={grading.status} />
       {grading.status === 'delayed' && (
         <BodyText tone="secondary">{DELAYED_SENTENCE}</BodyText>
       )}

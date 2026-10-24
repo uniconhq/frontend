@@ -42,9 +42,6 @@ function isStatus(value: string): value is GradingStatus {
 
 /** Each kind of change a regrade made, as the feed reads it by regrade. */
 const CHANGES: readonly RegradeChangeKind[] = [
-  'up',
-  'down',
-  'stopped',
   'unchanged',
   'new',
   'running',

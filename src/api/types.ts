@@ -71,13 +71,11 @@ export type ContestHome = Schemas['ContestHome'];
 export type PublicTask = Schemas['PublicTask'];
 export type TaskPage = Schemas['TaskPage'];
 /** One input a task's submit form takes, with a file per input or per part. */
-export type InputField = Omit<Schemas['InputField'], 'per_test'>;
+export type InputField = Schemas['InputField'];
 /** What the task form is built from: the inputs its workflow declares. */
-export type WorkflowForm = Omit<Schemas['WorkflowForm'], 'runs' | 'test' | 'inputs'> & {
-  inputs: DeclaredInput[];
-};
+export type WorkflowForm = Schemas['WorkflowForm'];
 /** One input a workflow declares. Who gives it, and whether it repeats, are the task's. */
-export type DeclaredInput = Omit<Schemas['DeclaredInput'], 'contestant' | 'per_test'>;
+export type DeclaredInput = Schemas['DeclaredInput'];
 export type TaskEntry = Schemas['TaskEntry'];
 
 export type Upload = Schemas['Upload'];
@@ -89,8 +87,6 @@ export type OrganisedSubmission = Schemas['OrganisedSubmission'];
 export type RunShown = Schemas['RunShown'];
 export type RunValue = Schemas['RunValue'];
 export type OnceShown = Schemas['OnceShown'];
-/** One value a task's workflow reports, as pages name it: its key, its title and unit. */
-export type ValueMeaning = Schemas['ValueMeaning'];
 export type Grading = Schemas['Grading'];
 /** A finished grading's runs, and what its steps done once returned. */
 export type RunsResult = Schemas['RunsResult'];
@@ -99,10 +95,8 @@ export type Rejudged = Schemas['Rejudged'];
 export type RegradeSummary = Schemas['RegradeSummary'];
 /** One result a regrade compares: the one it replaced, or its own. */
 export type RegradeSide = Schemas['RegradeSide'];
-/** What a regrade did to one submission: up, down, now stopped, and so on. */
+/** What a regrade did to one submission: unchanged, new, failed, and so on. */
 export type RegradeChangeKind = Schemas['ChangeKind'];
-/** What a regrade did to one submission, with the result it replaced and its own. */
-export type RegradeChange = Schemas['RegradeChange'];
 /** One attempt in a contest's gradings feed, with its task and who submitted. */
 export type FeedEntry = Schemas['FeedEntry'];
 export type Submitter = Schemas['Submitter'];
@@ -120,7 +114,7 @@ export type SubmissionState = GradingResult['status'];
 /** The marks a row holds on a task, the most it may hold, and its close. */
 export type Marks = Schemas['Marks'];
 
-/** The runner's list of outcomes, which each run and what stopped a grading take one of. */
+/** The runner's list of outcomes, which each run takes one of. */
 export type Outcome = Schemas['RunVerdict']['verdict'];
 
 /** A primitive at one version, with its declared ports. */

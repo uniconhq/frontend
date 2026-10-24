@@ -101,8 +101,8 @@ function StatusCell({
 
 /**
  * What a regrade did to the submission, on Gradings read by regrade: the
- * result it replaced and its own, side by side, the kind of change under
- * the new one, and the values that decided it where nothing else did.
+ * result it replaced and its own, side by side, and the kind of change under
+ * the new one.
  */
 function ChangeCells({ entry }: { entry: FeedEntry }) {
   const change = entry.grading.change;

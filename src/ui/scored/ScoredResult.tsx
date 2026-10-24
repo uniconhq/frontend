@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import type { OnceShown, RunShown, RunValue, ValueMeaning } from '@/api/types';
+import type { OnceShown, RunShown, RunValue } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
 import { ShownValue } from '@/ui/number/ShownValue';
@@ -25,7 +25,6 @@ export type TextAsk = {
 /** What a result view reads: the values shown, the runs, and what was reported once. */
 type ShownResult = {
   status?: string;
-  meanings: ValueMeaning[];
   runs?: RunShown[];
   run_values?: RunValue[];
   once?: OnceShown;
@@ -39,14 +38,6 @@ const SHOWN_AT: Record<NonNullable<RunValue['show']>, string> = {
   after_close: 'After the close',
   on_release: 'On release',
 };
-
-/**
- * What a page names a value a run reports by: the title its workflow gives
- * it, "Run time", or its name until it has one.
- */
-function titleOf(name: string, meanings: readonly ValueMeaning[]): string {
-  return meanings.find((meaning) => meaning.name === name)?.title ?? name;
-}
 
 function hasFacts(grading: ShownResult): boolean {
   return Object.keys(grading.facts ?? {}).length > 0 || grading.compiled != null;
@@ -65,32 +56,6 @@ function groupsOf(runs: RunShown[]): { name: string; runs: RunShown[] }[] {
     }
   }
   return order.map((name) => ({ name, runs: by.get(name) ?? [] }));
-}
-
-/** A number as 6.1, with its unit after it when the value has one. */
-function NumberShown({
-  name,
-  number,
-  text = null,
-  waiting = false,
-  meanings,
-}: {
-  name: string;
-  number: string | null;
-  text?: string | null;
-  waiting?: boolean;
-  meanings: ValueMeaning[];
-}) {
-  const unit =
-    number === null
-      ? null
-      : (meanings.find((meaning) => meaning.name === name)?.unit ?? null);
-  return (
-    <>
-      <ShownValue number={number} text={text} waiting={waiting} />
-      {unit !== null && unit !== '' ? ` ${unit}` : null}
-    </>
-  );
 }
 
 /** A text, read the first time it is opened and then shown as the step wrote it. */
@@ -143,11 +108,9 @@ function OpenText({
 
 function RunRow({
   run,
-  meanings,
   readText,
 }: {
   run: RunShown;
-  meanings: ValueMeaning[];
   readText?: (ask: TextAsk) => Promise<string>;
 }) {
   const line = tupleLine(run.titles, run.key);
@@ -160,14 +123,13 @@ function RunRow({
       {run.dropped && <BodyText tone="secondary">Dropped</BodyText>}
       {Object.entries(run.reports).map(([name, number]) => (
         <span key={name}>
-          {titleOf(name, meanings)}{' '}
-          <NumberShown name={name} number={number} meanings={meanings} />
+          {name} <ShownValue number={number} />
         </span>
       ))}
       {Object.entries(run.texts).map(([name, ref]) => (
         <OpenText
           key={name}
-          title={titleOf(name, meanings)}
+          title={name}
           ask={{ ...ask, field: 'texts', name: ref.name ?? name, output: ref.output }}
           readText={readText}
         />
@@ -202,11 +164,9 @@ function RunRow({
 
 function OnceReports({
   once,
-  meanings,
   readText,
 }: {
   once: OnceShown;
-  meanings: ValueMeaning[];
   readText?: (ask: TextAsk) => Promise<string>;
 }) {
   const reports = Object.entries(once.reports);
@@ -218,9 +178,9 @@ function OnceReports({
         <dl className={classes.metrics} aria-label="Once">
           {reports.map(([name, number]) => (
             <div key={name} className={classes.metric}>
-              <dt>{titleOf(name, meanings)}</dt>
+              <dt>{name}</dt>
               <dd>
-                <NumberShown name={name} number={number} meanings={meanings} />
+                <ShownValue number={number} />
               </dd>
             </div>
           ))}
@@ -229,7 +189,7 @@ function OnceReports({
       {texts.map((name) => (
         <OpenText
           key={name}
-          title={titleOf(name, meanings)}
+          title={name}
           ask={{
             group: null,
             place: null,
@@ -254,7 +214,6 @@ function RunResult({
   const runs = grading.runs ?? [];
   const values = grading.run_values ?? [];
   const once = grading.once ?? { reports: {}, texts: {} };
-  const meanings = grading.meanings;
   const shown =
     runs.length > 0 ||
     values.length > 0 ||
@@ -282,14 +241,12 @@ function RunResult({
         <dl className={classes.metrics} aria-label="Values">
           {values.map((value) => (
             <div key={value.name} className={classes.metric}>
-              <dt>{titleOf(value.name, meanings)}</dt>
+              <dt>{value.name}</dt>
               <dd>
-                <NumberShown
-                  name={value.name}
+                <ShownValue
                   number={value.number}
                   text={value.text}
                   waiting={value.waiting}
-                  meanings={meanings}
                 />
                 {value.show !== null && ` ${SHOWN_AT[value.show]}`}
               </dd>
@@ -308,13 +265,12 @@ function RunResult({
             <RunRow
               key={`${run.group}:${String(run.place)}`}
               run={run}
-              meanings={meanings}
               readText={readText}
             />
           ))}
         </section>
       ))}
-      <OnceReports once={once} meanings={meanings} readText={readText} />
+      <OnceReports once={once} readText={readText} />
       <Facts facts={grading.facts} compiled={grading.compiled} />
     </div>
   );
@@ -353,7 +309,7 @@ function factTitle(name: string): string {
 /**
  * What a grading's result holds beside where it stands: the values its
  * entrant is shown, each run, and what its steps done once reported, each
- * value by its title. Staff read the same, with every value and run there
+ * value by its name. Staff read the same, with every value and run there
  * and the facts the values read.
  */
 export function ScoredResult({

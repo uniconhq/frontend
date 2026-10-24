@@ -10,7 +10,7 @@ import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
 import { formatDateTime } from '@/lib/time';
 import { useLiveConnected, useLiveRefused } from '@/live';
 import { serverNow } from '@/lib/time';
-import { justFinished, newestFirst, pollEvery, verdictOf } from './grading';
+import { justFinished, newestFirst, pollEvery } from './grading';
 import { Verdict } from './Results';
 import { submissionHref } from './submission-param';
 import { useMarks, type MarkState } from './use-marks';
@@ -37,7 +37,7 @@ function useJustFinished(submissions: Submission[] | undefined): string {
               `Submission #${found.number}: ${
                 found.grading === null
                   ? 'Not graded'
-                  : verdictLabel(verdictOf(found.grading))
+                  : verdictLabel(found.grading.status)
               }.`,
           )
           .join(' '),

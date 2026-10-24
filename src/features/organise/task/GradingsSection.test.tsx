@@ -566,9 +566,6 @@ describe("the organisers' scored view of a submission", () => {
       id: done.id,
       attempt: 1,
       status: 'done',
-      stopped: null,
-      outcome: 'accepted',
-      values: { numbers: {}, texts: {} },
       reason: null,
       limit: null,
       compiled: null,
@@ -603,8 +600,6 @@ describe("the organisers' scored view of a submission", () => {
           message: null,
         },
       ],
-      meanings: [],
-      groups: [],
     },
   };
 

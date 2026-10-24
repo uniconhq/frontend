@@ -10,7 +10,6 @@ import type {
   TaskStanding,
   TaskState,
   TreeEntry,
-  ValueMeaning,
 } from '@/api/types';
 import { problem } from './server';
 
@@ -83,13 +82,6 @@ export const unchanged: SaveEffect = {
   reading: ['Nothing entrants read changes.'],
 };
 
-/** What classic reports, as a publication names its values (M58), in its report order. */
-export const classicMeanings: ValueMeaning[] = [
-  { name: 'time_ms', title: 'Run time', unit: 'ms', fold: null, better: 'lower' },
-  { name: 'memory_kb', title: 'Memory used', unit: 'KB', fold: null, better: 'lower' },
-  { name: 'log', title: 'Compile log', unit: null, fold: null, better: null },
-];
-
 /**
  * A finished grading's result: a run for each verdict, in order, and the
  * outcome of each step done once, by its id.
@@ -125,7 +117,6 @@ export const publications: Publication[] = [
     at: '2026-09-20T10:00:00Z',
     check: null,
     failed_checks: [],
-    meanings: classicMeanings,
   },
   {
     number: 2,
@@ -135,7 +126,6 @@ export const publications: Publication[] = [
     at: '2026-09-21T10:00:00Z',
     check: null,
     failed_checks: [],
-    meanings: classicMeanings,
   },
 ];
 

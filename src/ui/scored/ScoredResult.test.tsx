@@ -2,14 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { screen, within } from '@testing-library/react';
 import userEvent from '@/test/user-event';
 import { formatExact } from '@/lib/exact';
-import { classicMeanings } from '@/test/organiser';
 import { renderWithProviders } from '@/test/render';
 import { grading } from '@/test/contestant';
 import { RESULTS_AFTER } from '@/ui/number/words';
 import { ScoredResult } from './ScoredResult';
-
-/** Classic's values as its workflow names them, in its outputs' order (M58). */
-const MEANINGS = classicMeanings;
 
 /** One run of classic, accepted, with the time and memory it reported. */
 function run(reports: Record<string, string>) {
@@ -30,12 +26,11 @@ function run(reports: Record<string, string>) {
 }
 
 describe('a run’s values', () => {
-  it('names each by its title, with its unit after its number (M63)', () => {
+  it('names each by its key, its number exact', () => {
     renderWithProviders(
       <ScoredResult
         grading={grading({
           status: 'graded',
-          meanings: MEANINGS,
           runs: [run({ time_ms: '28', memory_kb: '10420' })],
           once: { reports: { time_ms: '3' }, texts: {} },
         })}
@@ -43,30 +38,11 @@ describe('a run’s values', () => {
     );
 
     const group = screen.getByRole('region', { name: 'Group main' });
-    expect(within(group).getByText(/Run time/)).toHaveTextContent('Run time 28 ms');
-    expect(within(group).getByText(/Memory used/)).toHaveTextContent(
-      `Memory used ${formatExact('10420')} KB`,
+    expect(within(group).getByText(/time_ms/)).toHaveTextContent('time_ms 28');
+    expect(within(group).getByText(/memory_kb/)).toHaveTextContent(
+      `memory_kb ${formatExact('10420')}`,
     );
-    expect(screen.getByLabelText('Once')).toHaveTextContent('Run time3 ms');
-    expect(screen.queryByText(/time_ms|memory_kb/)).toBeNull();
-  });
-
-  it('names a value by its key where its publication gives no title', () => {
-    renderWithProviders(
-      <ScoredResult
-        grading={grading({
-          status: 'graded',
-          meanings: MEANINGS.map((meaning) => ({
-            ...meaning,
-            title: null,
-            unit: null,
-          })),
-          runs: [run({ time_ms: '28' })],
-        })}
-      />,
-    );
-
-    expect(screen.getByText(/time_ms/)).toHaveTextContent('time_ms 28');
+    expect(screen.getByLabelText('Once')).toHaveTextContent('time_ms3');
   });
 
   it('says nothing while a submission still waits for its grading', () => {
@@ -82,15 +58,6 @@ describe('a run task’s result', () => {
       <ScoredResult
         grading={grading({
           status: 'graded',
-          meanings: [
-            {
-              name: 'score',
-              title: 'Score',
-              unit: 'pts',
-              better: null,
-              fold: null,
-            },
-          ],
           run_values: [
             {
               name: 'score',
@@ -129,7 +96,7 @@ describe('a run task’s result', () => {
     );
     expect(screen.getByText('Big grid · seed 2')).toBeVisible();
     expect(screen.getByText('SKIPPED')).toBeVisible();
-    expect(screen.getByText('Score').closest('div')).toHaveTextContent('10 pts');
+    expect(screen.getByText('score').closest('div')).toHaveTextContent('10');
     expect(screen.queryByText(/penal/)).toBeNull();
     expect(screen.queryByText(/self-reported/)).toBeNull();
   });
@@ -192,7 +159,6 @@ describe('a run task’s result', () => {
       <ScoredResult
         grading={{
           status: 'done',
-          meanings: [],
           runs: [
             {
               group: 'all',

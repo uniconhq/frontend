@@ -45,7 +45,6 @@ async function stubOrganiserApi(page: Page) {
       grading_changed: state.published === 1,
       changes: [],
       at: '2026-09-29T09:00:00Z',
-      meanings: [],
     },
     draft: false,
     errors: [],

@@ -44,8 +44,6 @@ const queued = {
   id: '5d2f0c1e-0000-4000-8000-000000000001',
   attempt: 1,
   status: 'queued',
-  stopped: null,
-  outcome: null,
   reason: null,
   limit: null,
   compiled: null,
@@ -53,7 +51,6 @@ const queued = {
   reveal_at: null,
   run_values: [],
   runs: [],
-  meanings: [],
 };
 
 const runOf = (overrides: Record<string, unknown>) => ({
@@ -78,7 +75,6 @@ const LOG = { log: { name: null, output: null } };
 const graded = {
   ...queued,
   status: 'graded',
-  outcome: 'wrong_answer',
   once: { reports: {}, texts: LOG },
   runs: [
     runOf({ reports: { time_ms: '12' } }),
@@ -370,7 +366,7 @@ test('a full pass sends the files as the slot says and makes one submission', as
 
   const list = page.getByRole('table', { name: 'Your submissions' });
   await expect(list.getByText('QUEUED')).toBeVisible();
-  await expect(list.getByText('WRONG ANSWER')).toBeVisible({ timeout: 15_000 });
+  await expect(list.getByText('GRADED')).toBeVisible({ timeout: 15_000 });
 });
 
 test('a file the forge already holds is submitted without being sent', async ({
@@ -422,7 +418,7 @@ test('a submission opens with its runs and its log, read when it is shown', asyn
   );
 });
 
-test('a submission that did not compile shows that as its verdict', async ({
+test('a submission that did not compile shows that on its runs, with its log', async ({
   page,
 }) => {
   await stubApi(page, {
@@ -435,8 +431,8 @@ test('a submission that did not compile shows that as its verdict', async ({
         grading: {
           ...queued,
           status: 'graded',
-          stopped: 'compile_error',
           once: { reports: {}, texts: LOG },
+          runs: [runOf({ verdict: 'compile_error', passed: 0 })],
         },
       },
     ],
@@ -444,10 +440,12 @@ test('a submission that did not compile shows that as its verdict', async ({
   await page.goto(`${PAGE}?submission=1`);
 
   await expect(
-    page.getByRole('table', { name: 'Your submissions' }).getByText('COMPILE ERROR'),
+    page.getByRole('table', { name: 'Your submissions' }).getByText('GRADED'),
   ).toBeVisible();
   const detail = page.getByRole('region', { name: 'Submission 1' });
-  await expect(detail.getByText('COMPILE ERROR')).toBeVisible();
+  await expect(
+    detail.getByRole('region', { name: 'Group samples' }).getByText('COMPILE ERROR'),
+  ).toBeVisible();
   await detail.getByRole('button', { name: 'Show log' }).click();
   await expect(detail.getByLabel('log', { exact: true })).toHaveText(
     'main.cpp:1: error',

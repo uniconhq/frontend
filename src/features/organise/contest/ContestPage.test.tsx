@@ -106,11 +106,8 @@ describe("the contest's regrades (#448)", () => {
       graded: 12,
       running: false,
       counts: {
-        up: 1,
-        down: 3,
-        stopped: 0,
-        unchanged: 8,
-        new: 0,
+        unchanged: 9,
+        new: 3,
         running: 0,
         failed: 0,
         over_limit: 0,
@@ -127,13 +124,12 @@ describe("the contest's regrades (#448)", () => {
     const regrades = await screen.findByRole('region', { name: 'Regrades' });
     const summary = within(regrades).getByRole('listitem', { name: 'Regrade of B' });
     expect(summary).toHaveTextContent(
-      'Regrade of B: 12 graded · 3 went down · 1 went up',
+      'Regrade of B: 12 graded · 3 graded for the first time',
     );
     const gradings = `${CONTEST}/gradings`;
-    expect(within(summary).getByRole('link', { name: '3 went down' })).toHaveAttribute(
-      'href',
-      `${gradings}?regrade=${regrade.id}&change=down`,
-    );
+    expect(
+      within(summary).getByRole('link', { name: '3 graded for the first time' }),
+    ).toHaveAttribute('href', `${gradings}?regrade=${regrade.id}&change=new`);
     expect(within(summary).getByRole('link', { name: '12 graded' })).toHaveAttribute(
       'href',
       `${gradings}?regrade=${regrade.id}`,

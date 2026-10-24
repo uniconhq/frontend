@@ -1,7 +1,6 @@
 import { $api } from '@/api/query';
 import type {
   FeedEntry,
-  RegradeChange,
   RegradeChangeKind,
   RegradeSide,
   RegradeSummary,
@@ -42,84 +41,20 @@ export type SummaryPart = {
   linked: boolean;
 };
 
-/** A count with its verb agreeing: "1 now fails to compile", "2 now fail to compile". */
+/** A count with its verb agreeing: "1 submission is", "2 submissions are". */
 function counted(count: number, one: string, many: string): string {
   return `${String(count)} ${count === 1 ? one : many}`;
 }
 
 /**
- * What stopped a run before its tests, in an organiser's words, as one
- * submission and as several: a compile error is the run failing to compile;
- * any other, what it stopped on.
- */
-const STOPPED: Partial<Record<string, [one: string, many: string]>> = {
-  compile_error: ['now fails to compile', 'now fail to compile'],
-  time_limit: [
-    'now runs out of time before its tests',
-    'now run out of time before their tests',
-  ],
-  memory_limit: [
-    'now runs out of memory before its tests',
-    'now run out of memory before their tests',
-  ],
-  output_limit: [
-    'now writes too much before its tests',
-    'now write too much before their tests',
-  ],
-  runtime_error: ['now crashes before its tests', 'now crash before their tests'],
-};
-
-const STOPPED_ANYHOW: [string, string] = [
-  'now stops before its tests',
-  'now stop before their tests',
-];
-
-/** What stopped a run before its tests, as a result reads in a sentence. */
-const STOPPED_RESULT: Partial<Record<string, string>> = {
-  compile_error: 'Failed to compile',
-  time_limit: 'Ran out of time before its tests',
-  memory_limit: 'Ran out of memory before its tests',
-  output_limit: 'Wrote too much before its tests',
-  runtime_error: 'Crashed before its tests',
-};
-
-/**
- * How many of the submissions a regrade now stops before their tests
- * stopped on what, from those the feed listed of them (`stops`, each
- * submission's new result's stop); the rest, or all while they are not
- * read yet, said as stopping before their tests. One count, since Gradings
- * lists them together.
- */
-function stoppedPart(count: number, stops: (string | null)[] | null): SummaryPart {
-  const known = (stops ?? []).slice(0, count);
-  const tally = new Map<string, number>();
-  for (const stop of known) {
-    const words = stop === null ? undefined : STOPPED[stop];
-    const key = words === undefined ? '' : (stop ?? '');
-    tally.set(key, (tally.get(key) ?? 0) + 1);
-  }
-  const rest = count - known.length;
-  if (rest > 0) tally.set('', (tally.get('') ?? 0) + rest);
-  const words = [...tally].map(([stop, many]) => {
-    const [one, several] = STOPPED[stop] ?? STOPPED_ANYHOW;
-    return counted(many, one, several);
-  });
-  return { key: 'stopped', words: words.join(', '), change: 'stopped', linked: true };
-}
-
-/**
  * A regrade's summary as its counts, in the order an organiser reads them
- * (#448): how many it graded, then what got worse, what failed or was not
- * graded, and what got better or was graded for the first time; a count of
- * 0 is left out, and so are the unchanged, which "graded" holds. "120
- * graded · 4 went down · 2 now fail to compile · 1 went up". Those still
- * being graded are said apart, by `runningWords`. "Graded" links every
- * submission the regrade took only while that is all it graded.
+ * (#448): how many it graded, then what failed or was not graded, and what
+ * was graded for the first time; a count of 0 is left out, and so are the
+ * unchanged, which "graded" holds. "120 graded · 2 failed on Unicon's side".
+ * Those still being graded are said apart, by `runningWords`. "Graded" links
+ * every submission the regrade took only while that is all it graded.
  */
-export function summaryParts(
-  summary: RegradeSummary,
-  stops: (string | null)[] | null = null,
-): SummaryPart[] {
+export function summaryParts(summary: RegradeSummary): SummaryPart[] {
   const { counts } = summary;
   const parts: SummaryPart[] = [
     {
@@ -136,11 +71,8 @@ export function summaryParts(
       change,
       linked: true,
     });
-  if (counts.down > 0) add('down', 'went down');
-  if (counts.stopped > 0) parts.push(stoppedPart(counts.stopped, stops));
   if (counts.failed > 0) add('failed', 'failed on Unicon’s side');
   if (counts.over_limit > 0) add('over_limit', 'not graded, over the limit');
-  if (counts.up > 0) add('up', 'went up');
   if (counts.new > 0) add('new', 'graded for the first time');
   return parts;
 }
@@ -176,9 +108,6 @@ export function runningWords(summary: RegradeSummary): string | null {
 
 /** What each kind of change is called where Gradings lists those submissions. */
 export const CHANGE_WORDS: Record<RegradeChangeKind, string> = {
-  up: 'Went up',
-  down: 'Went down',
-  stopped: 'Now stops before its tests',
   unchanged: 'Unchanged',
   new: 'Graded for the first time',
   running: 'Still being graded',
@@ -186,39 +115,13 @@ export const CHANGE_WORDS: Record<RegradeChangeKind, string> = {
   over_limit: 'Not graded, over the limit',
 };
 
-/**
- * The values that decided a regrade's change. A result no longer carries the
- * per-value numbers this compared, so nothing is named.
- */
-export function decidingValues(change: RegradeChange): string[] {
-  if (change.earlier === null || change.now === null) return [];
-  if (change.change !== 'up' && change.change !== 'down') return [];
-  return [];
-}
-
-/** One result a regrade compares, in a cell: how many tests it passed, and what stopped its run before its tests, when something did. */
+/** One result a regrade compares, in a cell: the attempt it is. */
 export function sideWords(side: RegradeSide | null): string {
-  if (side === null) return '—';
-  const stopped =
-    side.stopped === null
-      ? null
-      : (STOPPED_RESULT[side.stopped] ?? 'Stopped before its tests');
-  const tally = `${String(side.accepted)} of ${String(side.tests)} tests passed`;
-  return [...(stopped === null ? [] : [stopped]), tally].join(', ');
+  return side === null ? '—' : `Attempt ${String(side.attempt)}`;
 }
 
 /** The kind of a submission's change on the feed read by regrade, in words. */
 export function changeOf(entry: FeedEntry): string | null {
   const change = entry.grading.change;
-  if (change === null) return null;
-  if (change.change === 'stopped') {
-    const stop = change.now?.stopped ?? null;
-    const words = stop === null ? undefined : STOPPED[stop];
-    return words === undefined ? CHANGE_WORDS.stopped : capitalised(words[0]);
-  }
-  return CHANGE_WORDS[change.change];
-}
-
-function capitalised(words: string): string {
-  return words.charAt(0).toUpperCase() + words.slice(1);
+  return change === null ? null : CHANGE_WORDS[change.change];
 }
