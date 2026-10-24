@@ -7,7 +7,7 @@ import { problem, server, signedIn } from '@/test/server';
 import { CONTEST_API, repoFiles } from '@/test/organiser';
 import userEvent from '@/test/user-event';
 
-const PAGE = '/orgs/acme/contests/spring/boards';
+const PAGE = '/orgs/acme/contests/spring/leaderboards';
 
 describe("a contest's leaderboards for its organisers", () => {
   beforeEach(() => {

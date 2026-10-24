@@ -115,7 +115,7 @@ test('writes the three leaderboards and a hold, and marks a refused column', asy
   page,
 }) => {
   const state = await stub(page);
-  await page.goto('/orgs/acme/contests/spring/boards');
+  await page.goto('/orgs/acme/contests/spring/leaderboards');
 
   const gradebook = await addBoard(page, 'gradebook', 'Course gradebook');
   await gradebook.getByRole('radio', { name: 'Entrants' }).click();

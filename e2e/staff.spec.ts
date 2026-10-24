@@ -266,7 +266,7 @@ test('a manager marks, releases, ends a hold and reads a regrade', async ({ page
   await page.getByRole('textbox', { name: 'score' }).press('Enter');
   await expect(page.getByText(/Saved /)).toBeVisible();
 
-  await page.goto('/contests/acme/spring/boards');
+  await page.goto('/contests/acme/spring/leaderboards');
   await expect(page.getByRole('table', { name: 'Gradebook' })).toContainText('7.5');
 
   await page.goto('/orgs/acme/contests/spring/tasks/sum/regrades/r1');

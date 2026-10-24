@@ -533,7 +533,7 @@ describe('the contest page for a visitor', () => {
     expect(screen.getByRole('link', { name: 'Sum of Two' })).toBeVisible();
     expect(screen.getByRole('link', { name: 'See the leaderboards' })).toHaveAttribute(
       'href',
-      '/contests/acme/spring/boards',
+      '/contests/acme/spring/leaderboards',
     );
     expect(screen.queryByRole('button', { name: 'Register' })).not.toBeInTheDocument();
     expect(screen.queryByRole('table')).toBeNull();

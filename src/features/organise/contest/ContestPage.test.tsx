@@ -617,7 +617,7 @@ describe('how the contest is scored (M52)', () => {
     // The whole card opens Leaderboards; each task's heading keeps its own link.
     expect(
       within(card).getByRole('link', { name: 'How this contest is scored' }),
-    ).toHaveAttribute('href', '/orgs/acme/contests/spring/boards');
+    ).toHaveAttribute('href', '/orgs/acme/contests/spring/leaderboards');
     expect(within(sortPart).getByRole('link', { name: 'A · Sort' })).toHaveAttribute(
       'href',
       expect.stringMatching(/^\/orgs\/acme\/contests\/spring\/tasks\/sort\b/),
@@ -1644,7 +1644,7 @@ describe('taking a task out of the contest', () => {
     );
     expect(
       within(alert).getByRole('link', { name: 'Open Leaderboards' }),
-    ).toHaveAttribute('href', '/orgs/acme/contests/spring/boards');
+    ).toHaveAttribute('href', '/orgs/acme/contests/spring/leaderboards');
   });
 
   it('marks a withdrawn task on its row, and puts it back from there after asking', async () => {

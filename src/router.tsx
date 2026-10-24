@@ -182,7 +182,7 @@ export const routes: RouteObject[] = [
            * signed-in person, each page reading what the caller may see.
            */
           { path: 'contests/:org/:contest', element: <ContestHomePage /> },
-          { path: 'contests/:org/:contest/boards', element: <BoardsPage /> },
+          { path: 'contests/:org/:contest/leaderboards', element: <BoardsPage /> },
           { path: 'contests/:org/:contest/questions', element: <QuestionsPage /> },
           {
             path: 'contests/:org/:contest/tasks/:task',

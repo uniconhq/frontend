@@ -99,7 +99,7 @@ async function stub(page: Page) {
 
 test('an entrant reads the gradebook and ICPC during a hold', async ({ page }) => {
   await stub(page);
-  await page.goto('/contests/acme/spring/boards');
+  await page.goto('/contests/acme/spring/leaderboards');
 
   const gradebook = page.getByRole('table', { name: 'Gradebook' });
   await expect(gradebook).toBeVisible();

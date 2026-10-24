@@ -4,7 +4,7 @@ import { screen } from '@testing-library/react';
 import { renderApp } from '@/test/render';
 import { server, signedIn } from '@/test/server';
 
-const PAGE = '/contests/acme/spring/boards';
+const PAGE = '/contests/acme/spring/leaderboards';
 
 const GRADEBOOK = {
   key: 'gradebook',

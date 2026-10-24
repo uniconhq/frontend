@@ -77,32 +77,32 @@ describe('where a refused setting of the contest is changed', () => {
     [
       'leaderboards[0].rows',
       'Leaderboards, leaderboard 1: Rows shown',
-      '/orgs/acme/contests/spring/boards?field=rows&item=0',
+      '/orgs/acme/contests/spring/leaderboards?field=rows&item=0',
     ],
     [
       'leaderboards.gradebook.title',
       'Leaderboards, gradebook: Title',
-      '/orgs/acme/contests/spring/boards?field=gradebook.title',
+      '/orgs/acme/contests/spring/leaderboards?field=gradebook.title',
     ],
     [
       'leaderboards.gradebook.columns.solved',
       'Leaderboards, gradebook: solved',
-      '/orgs/acme/contests/spring/boards?field=gradebook.columns.solved',
+      '/orgs/acme/contests/spring/leaderboards?field=gradebook.columns.solved',
     ],
     [
       'leaderboards.gradebook.audience.rows',
       'Leaderboards, gradebook: Rows',
-      '/orgs/acme/contests/spring/boards?field=gradebook.audience.rows',
+      '/orgs/acme/contests/spring/leaderboards?field=gradebook.audience.rows',
     ],
     [
       'hold.from',
       'Leaderboards, Hold: From',
-      '/orgs/acme/contests/spring/boards?field=hold.from',
+      '/orgs/acme/contests/spring/leaderboards?field=hold.from',
     ],
     [
       'hold.until',
       'Leaderboards, Hold: Until',
-      '/orgs/acme/contests/spring/boards?field=hold.until',
+      '/orgs/acme/contests/spring/leaderboards?field=hold.until',
     ],
     ['', 'Settings', '/orgs/acme/contests/spring/settings'],
     ['team_size', 'Settings', '/orgs/acme/contests/spring/settings'],

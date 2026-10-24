@@ -160,7 +160,6 @@ async function stubOrganiserApi(page: Page) {
     if (
       [
         `${contest}/organise/entrants`,
-        `${contest}/organise/boards`,
         `${contest}/announcements`,
         `${contest}/clarifications`,
         `${task}/announcements`,

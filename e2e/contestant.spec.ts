@@ -285,7 +285,7 @@ async function stubContestantApi(page: Page, signedIn: boolean) {
       });
     }
     if (path.endsWith('/tasks/sum/submissions')) return json(route, []);
-    if (path.endsWith('/boards')) return json(route, [STANDINGS]);
+    if (path.endsWith('/leaderboards')) return json(route, [STANDINGS]);
     if (path.endsWith('/questions') && request.method() === 'GET') {
       return json(route, []);
     }
