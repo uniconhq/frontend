@@ -270,8 +270,12 @@ async function stubApi(page: Page, overrides: Partial<State> = {}): Promise<Stat
       return json(route, {
         number: 1,
         inputs: {
-          submission: { files: ['files/submission/main.cpp'], value: null },
-          language: { files: [], value: 'cpp' },
+          submission: {
+            files: ['files/submission/main.cpp'],
+            value: null,
+            parts: null,
+          },
+          language: { files: [], value: 'cpp', parts: null },
         },
       } satisfies Schemas['SubmittedFiles']);
     }
