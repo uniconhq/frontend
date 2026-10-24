@@ -67,22 +67,6 @@
   border-bottom: none;
 }
 
-/* An entrant's points on a task out of its worth, and when more are shown. */
-.points {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 2px 8px;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--unicon-text-body);
-  font-variant-numeric: tabular-nums;
-}
-
-.pending {
-  font-weight: 400;
-  color: var(--unicon-text-secondary);
-}
-
 .standing {
   display: flex;
   flex-wrap: wrap;
@@ -97,74 +81,9 @@
     grid-template-columns: 2ch minmax(0, 1fr);
   }
 
-  .points,
   .standing {
     grid-column: 2;
   }
-}
-
-/*
- * The tasks with a column of points per leaderboard: wider than a phone with
- * a few boards, so the columns scroll inside the card, not the page, the
- * tasks' names staying in view at the left.
- */
-.columns {
-  overflow-x: auto;
-}
-
-.taskTable {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 13px;
-  color: var(--unicon-text-body);
-}
-
-.taskTable th,
-.taskTable td {
-  text-align: left;
-  vertical-align: baseline;
-  padding: 10px 16px 10px 0;
-  border-bottom: 1px solid var(--unicon-border);
-}
-
-.taskTable thead th {
-  padding-top: 0;
-  padding-bottom: 8px;
-  font-weight: 600;
-  color: var(--unicon-text-secondary);
-  white-space: nowrap;
-}
-
-.taskTable tbody tr:last-child th,
-.taskTable tbody tr:last-child td {
-  border-bottom: none;
-}
-
-/* Each row is headed by its task, which stays in view as the columns scroll. */
-.taskTable th:first-child {
-  position: sticky;
-  left: 0;
-  z-index: 1;
-  background: var(--unicon-body);
-  min-width: 12rem;
-  font-weight: 400;
-}
-
-.taskTable td {
-  white-space: nowrap;
-}
-
-.taskCell {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.taskName {
-  display: flex;
-  gap: 12px;
-  align-items: baseline;
-  font-size: 14px;
 }
 
 /* The time left on a task, at the top of its page. */
@@ -181,18 +100,6 @@
   font-weight: 600;
   color: var(--unicon-text-body);
   font-variant-numeric: tabular-nums;
-}
-
-/* Where the reader stands on each leaderboard, a line each. */
-.places {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  font-size: 13px;
-  color: var(--unicon-text-body);
 }
 
 /* A page's or a card's links, such as asking a question. */

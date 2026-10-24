@@ -256,22 +256,6 @@
   border-top: 1px solid var(--unicon-border);
 }
 
-/* A primitive in the "Add step" menu: its title, what it does, its reference. */
-.addTitle,
-.addDescription {
-  display: block;
-}
-
-.addTitle {
-  font-weight: 700;
-}
-
-.addDescription {
-  color: var(--unicon-text-secondary);
-  font-size: 12px;
-  white-space: normal;
-}
-
 /* The graph's frame: the page's whole width, the graph at its actual size
  * inside it, sliding sideways when it is wider. */
 .frame {
