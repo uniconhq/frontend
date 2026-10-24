@@ -80,6 +80,15 @@ export function contestFieldName(path: MergePath): string {
       ? `${board}: ${BOARD_FIELDS[third] ?? plain(third)}`
       : board;
   }
+  if (top === 'leaderboards' && typeof second === 'string') {
+    const board = `Leaderboard ${second}`;
+    return typeof third === 'string'
+      ? `${board}: ${BOARD_FIELDS[third] ?? plain(third)}`
+      : board;
+  }
+  if (top === 'hold') {
+    return typeof second === 'string' ? `Hold: ${plain(second)}` : 'Hold';
+  }
   if (typeof second === 'string') {
     return UNDER[top]?.[second] ?? `${TOP[top] ?? plain(top)}: ${plain(second)}`;
   }

@@ -79,6 +79,31 @@ describe('where a refused setting of the contest is changed', () => {
       'Leaderboards, leaderboard 1: Rows shown',
       '/orgs/acme/contests/spring/boards?field=rows&item=0',
     ],
+    [
+      'leaderboards.gradebook.title',
+      'Leaderboards, gradebook: Title',
+      '/orgs/acme/contests/spring/boards?field=gradebook.title',
+    ],
+    [
+      'leaderboards.gradebook.columns.solved',
+      'Leaderboards, gradebook: solved',
+      '/orgs/acme/contests/spring/boards?field=gradebook.columns.solved',
+    ],
+    [
+      'leaderboards.gradebook.audience.rows',
+      'Leaderboards, gradebook: Rows',
+      '/orgs/acme/contests/spring/boards?field=gradebook.audience.rows',
+    ],
+    [
+      'hold.from',
+      'Leaderboards, Hold: From',
+      '/orgs/acme/contests/spring/boards?field=hold.from',
+    ],
+    [
+      'hold.until',
+      'Leaderboards, Hold: Until',
+      '/orgs/acme/contests/spring/boards?field=hold.until',
+    ],
     ['', 'Settings', '/orgs/acme/contests/spring/settings'],
     ['team_size', 'Settings', '/orgs/acme/contests/spring/settings'],
   ])('says %s in words and opens it', (path, label, href) => {

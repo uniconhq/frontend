@@ -130,6 +130,16 @@ function yamlTree(tree: Tree, key: string | null = null): unknown {
   return written;
 }
 
+/** A value read from YAML as a block tree. */
+export function treeOf(value: unknown): Tree | null {
+  return asTree(value);
+}
+
+/** A block tree as the file writes it: a number's digits stay digits, a name stays text. */
+export function formulaYaml(tree: Tree): unknown {
+  return yamlTree(tree);
+}
+
 function whenOf(show: Record<string, When>, name: string): When {
   return show[name] ?? 'never';
 }
