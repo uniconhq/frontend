@@ -51,7 +51,9 @@ describe('the grading queue', () => {
     server.use(
       signedIn,
       http.get(QUEUE, () => HttpResponse.json([ROW])),
-      http.post(ENTER, () => problem(422, 'invalid_mark', { detail: 'Give a number from 0 to 10.' })),
+      http.post(ENTER, () =>
+        problem(422, 'invalid_mark', { detail: 'Give a number from 0 to 10.' }),
+      ),
     );
     renderApp(PAGE);
     const box = await screen.findByRole('textbox', { name: 'score' });
@@ -98,13 +100,20 @@ describe('the grading queue', () => {
         HttpResponse.json([
           {
             ...ROW,
-            submissions: [{ ...ROW.submissions[0], marks: [{ value: 'score', mark: '7.5' }] }],
+            submissions: [
+              { ...ROW.submissions[0], marks: [{ value: 'score', mark: '7.5' }] },
+            ],
           },
         ]),
       ),
       http.post(ENTER, async ({ request }) => {
         body = await request.json();
-        return HttpResponse.json({ value: 'score', mark: '', by: 7, at: '2026-10-25T01:00:00Z' });
+        return HttpResponse.json({
+          value: 'score',
+          mark: '',
+          by: 7,
+          at: '2026-10-25T01:00:00Z',
+        });
       }),
     );
     renderApp(PAGE);

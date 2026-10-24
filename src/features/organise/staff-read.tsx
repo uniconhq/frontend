@@ -21,7 +21,9 @@ export function StaffFiles({
     <ul aria-label="Files">
       {paths.map((path) => (
         <li key={path}>
-          <OutLink href={`${root}/${path.split('/').map(part).join('/')}`}>{path}</OutLink>
+          <OutLink href={`${root}/${path.split('/').map(part).join('/')}`}>
+            {path}
+          </OutLink>
         </li>
       ))}
     </ul>

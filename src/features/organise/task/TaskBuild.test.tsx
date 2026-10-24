@@ -24,7 +24,13 @@ import {
   taskState,
   unchanged,
 } from '@/test/organiser';
-import { comeBackToTab, fakeLiveStream, nudge, openStream, realLiveStream } from '@/test/live';
+import {
+  comeBackToTab,
+  fakeLiveStream,
+  nudge,
+  openStream,
+  realLiveStream,
+} from '@/test/live';
 import { specCatalogue } from '../formula/catalogue';
 
 /** The names of the files handed to the browser to save, in turn. */
@@ -1514,7 +1520,10 @@ describe('scoring, checks and what a save answers', { timeout: 60_000 }, () => {
   it('refuses a value named like a group, and a loop, before the save', async () => {
     const { sent } = taskBackend({
       content: ISLANDS,
-      form: runForm('unicon/classic@v3', [runInput('code', 'file'), runInput('input', 'file')]),
+      form: runForm('unicon/classic@v3', [
+        runInput('code', 'file'),
+        runInput('input', 'file'),
+      ]),
     });
     await openTask();
     const scoring = await screen.findByRole('region', { name: 'Scoring' });
@@ -1531,14 +1540,17 @@ describe('scoring, checks and what a save answers', { timeout: 60_000 }, () => {
     fill(names[1]!, 'right');
     await typeLine('left', 'right');
     await typeLine('right', 'left');
-    expect(scoring).toHaveTextContent('reads itself, round left → right → left: break the loop');
+    expect(scoring).toHaveTextContent(
+      'reads itself, round left → right → left: break the loop',
+    );
     expect(within(bar).getByRole('button', { name: 'Save' })).toBeDisabled();
     expect(sent).toEqual([]);
   });
 
   it('keeps a part shown now from being hidden later, once a submission is graded', async () => {
     taskBackend({
-      content: 'name: Islands\nworkflow: unicon/classic@v3\nscoring:\n  show:\n    now: [log]\n',
+      content:
+        'name: Islands\nworkflow: unicon/classic@v3\nscoring:\n  show:\n    now: [log]\n',
       form: {
         ...runForm('unicon/classic@v3', [runInput('code', 'file')]),
         graded: true,
@@ -1549,14 +1561,19 @@ describe('scoring, checks and what a save answers', { timeout: 60_000 }, () => {
     const when = within(scoring).getByRole('combobox', { name: 'When log is shown' });
     expect(within(when).getByRole('option', { name: 'Now' })).toBeEnabled();
     expect(
-      within(when).getByRole('option', { name: 'After the close: no, entrants have seen it' }),
+      within(when).getByRole('option', {
+        name: 'After the close: no, entrants have seen it',
+      }),
     ).toBeDisabled();
   });
 
   it('shows the summary and sends confirm and asked when a save asks first', async () => {
     const { sent } = taskBackend({
       content: ISLANDS,
-      form: runForm('unicon/classic@v3', [runInput('code', 'file'), runInput('input', 'file')]),
+      form: runForm('unicon/classic@v3', [
+        runInput('code', 'file'),
+        runInput('input', 'file'),
+      ]),
       answer: () =>
         problem(409, 'confirmation_required', {
           detail: 'The contest is running. Publish this change now?',
@@ -1571,7 +1588,9 @@ describe('scoring, checks and what a save answers', { timeout: 60_000 }, () => {
     await save();
     const bar = screen.getByRole('region', { name: 'Save the task' });
     expect(await within(bar).findByText("Nobody's result changes.")).toBeVisible();
-    await userEvent.click(within(bar).getByRole('button', { name: 'Publish the change' }));
+    await userEvent.click(
+      within(bar).getByRole('button', { name: 'Publish the change' }),
+    );
     await waitFor(() => expect(sent).toHaveLength(2));
     expect(sent[1]).toMatchObject({ confirm: true, asked: 'b1c2d3e:12' });
   });
@@ -1584,7 +1603,10 @@ describe('a publication’s checks', { timeout: 30_000 }, () => {
   it('reads never checked, and still saves', async () => {
     const { sent } = taskBackend({
       content: ISLANDS,
-      form: runForm('unicon/classic@v3', [runInput('code', 'file'), runInput('input', 'file')]),
+      form: runForm('unicon/classic@v3', [
+        runInput('code', 'file'),
+        runInput('input', 'file'),
+      ]),
     });
     const latest = publications[1];
     server.use(
@@ -1599,14 +1621,19 @@ describe('a publication’s checks', { timeout: 30_000 }, () => {
     expect(screen.getAllByText(/was never checked/).length).toBeGreaterThan(0);
     fill(fieldIn(inputs, 'code', 'Label shown to entrants'), 'Your solution');
     await save();
-    expect(await screen.findByText('Saved and published as publication 4.')).toBeVisible();
+    expect(
+      await screen.findByText('Saved and published as publication 4.'),
+    ).toBeVisible();
     expect(sent).toHaveLength(1);
   });
 
   it('turns a checking publication refused on the checks nudge, and does not poll', async () => {
     taskBackend({
       content: ISLANDS,
-      form: runForm('unicon/classic@v3', [runInput('code', 'file'), runInput('input', 'file')]),
+      form: runForm('unicon/classic@v3', [
+        runInput('code', 'file'),
+        runInput('input', 'file'),
+      ]),
     });
     const latest = publications[1];
     let refused = false;
@@ -1647,7 +1674,9 @@ describe('a publication’s checks', { timeout: 30_000 }, () => {
     );
     await openTask();
     openStream();
-    expect((await screen.findAllByText(/Its checks are still running/)).length).toBeGreaterThan(0);
+    expect(
+      (await screen.findAllByText(/Its checks are still running/)).length,
+    ).toBeGreaterThan(0);
     const settled = reads.length;
     await new Promise((resolve) => setTimeout(resolve, 400));
     expect(reads).toHaveLength(settled);

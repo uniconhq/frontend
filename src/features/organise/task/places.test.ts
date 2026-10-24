@@ -83,7 +83,11 @@ describe('where a refused setting or file of the task is changed', () => {
       'Scoring: first_failed',
       `${PAGE}?card=scoring&field=value-first_failed`,
     ],
-    ['checks[0].expect.verdict', 'Checks: check 1', `${PAGE}?card=checks&field=check-0`],
+    [
+      'checks[0].expect.verdict',
+      'Checks: check 1',
+      `${PAGE}?card=checks&field=check-0`,
+    ],
     ['statement.md', 'Statement', `${PAGE}?card=statement`],
     // A setting's own files, under its folder (M51), or under inputs/ for an
     // input whose id is a folder the format gives meaning to.

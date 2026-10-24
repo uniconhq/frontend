@@ -41,7 +41,9 @@ const ICPC = {
   key: 'icpc',
   title: 'ICPC',
   audience: { who: 'everyone', rows: 'all' },
-  headers: [{ name: 'solved', places: 0, at_least: null, at_most: null, self_reported: [] }],
+  headers: [
+    { name: 'solved', places: 0, at_least: null, at_most: null, self_reported: [] },
+  ],
   sort: [{ column: 'solved', way: 'desc' }],
   dropped: [],
   held_from: '2030-10-01T13:00:00Z',
@@ -78,7 +80,9 @@ async function stub(page: Page) {
     if (route.request().method() === 'GET') return json(route, []);
     return route.fulfill({ status: 404, body: route.request().url() });
   });
-  await page.route('**/api/v1/time', (route) => json(route, { now: '2026-10-25T00:00:00Z' }));
+  await page.route('**/api/v1/time', (route) =>
+    json(route, { now: '2026-10-25T00:00:00Z' }),
+  );
   await page.route('**/api/v1/me', (route) =>
     json(route, {
       user: {

@@ -108,7 +108,9 @@ function Summary({
       </BodyText>
       {dismiss.error !== null && <ErrorBlock error={dismiss.error} compact />}
       {task !== null && (
-        <PageLink to={`${taskPath(path.org, path.contest, task)}/regrades/${summary.id}`}>
+        <PageLink
+          to={`${taskPath(path.org, path.contest, task)}/regrades/${summary.id}`}
+        >
           What it changed
         </PageLink>
       )}

@@ -41,7 +41,11 @@ export function ChecksCard({
   const perRun = perRunEntrant(values.inputs, values.axes);
   const set = (checks: CheckDraft[]) => onChange(checks);
   const update = (key: string, change: Partial<CheckDraft>) =>
-    set(values.checks.map((check) => (check.key === key ? { ...check, ...change } : check)));
+    set(
+      values.checks.map((check) =>
+        check.key === key ? { ...check, ...change } : check,
+      ),
+    );
   return (
     <BuildCard
       id="checks"
@@ -89,14 +93,17 @@ export function ChecksCard({
           </div>
           <div className={classes.grid}>
             <FieldBox name={`check-${String(index)}`}>
-            <Select
-              label="Verdict every run gets"
-              value={check.verdict}
-              placeholder="No verdict"
-              disabled={disabled}
-              options={VERDICTS.map((verdict) => ({ value: verdict, label: verdict }))}
-              onChange={(verdict) => update(check.key, { verdict })}
-            />
+              <Select
+                label="Verdict every run gets"
+                value={check.verdict}
+                placeholder="No verdict"
+                disabled={disabled}
+                options={VERDICTS.map((verdict) => ({
+                  value: verdict,
+                  label: verdict,
+                }))}
+                onChange={(verdict) => update(check.key, { verdict })}
+              />
             </FieldBox>
             {check.values.map((expected, at) => (
               <div key={`${expected.name}:${String(at)}`} className={classes.valueHead}>

@@ -12,7 +12,10 @@ const TASK = {
   head_statement_written: true,
   latest: null,
   statement_written: true,
-  results: { released: false, history: [] as { action: string; at: string; by: number; by_name: string | null }[] },
+  results: {
+    released: false,
+    history: [] as { action: string; at: string; by: number; by_name: string | null }[],
+  },
 };
 
 function json(route: Route, body: unknown, status = 200) {
@@ -96,11 +99,21 @@ async function stub(page: Page) {
     if (route.request().method() === 'GET') return json(route, []);
     return route.fulfill({ status: 404, body: route.request().url() });
   });
-  await page.route('**/api/v1/time', (route) => json(route, { now: '2026-10-25T00:00:00Z' }));
+  await page.route('**/api/v1/time', (route) =>
+    json(route, { now: '2026-10-25T00:00:00Z' }),
+  );
   await page.route('**/api/v1/me', (route) =>
     json(route, {
-      user: { id: 7, username: 'kenny', name: 'Kenny Lewi', avatar_url: null, email: 'kenny@example.org' },
-      roles: [{ names: { org: 'acme', contest: 'spring', task: null }, role: 'manager' }],
+      user: {
+        id: 7,
+        username: 'kenny',
+        name: 'Kenny Lewi',
+        avatar_url: null,
+        email: 'kenny@example.org',
+      },
+      roles: [
+        { names: { org: 'acme', contest: 'spring', task: null }, role: 'manager' },
+      ],
       degraded: false,
     }),
   );
@@ -137,14 +150,20 @@ async function stub(page: Page) {
     }),
   );
   await page.route('**/api/v1/orgs/acme/contests/spring/tasks/sum', (route) => {
-    if (!new URL(route.request().url()).pathname.endsWith('/tasks/sum')) return route.fallback();
+    if (!new URL(route.request().url()).pathname.endsWith('/tasks/sum'))
+      return route.fallback();
     return json(route, {
       ...TASK,
       results: state.released
         ? {
             released: true,
             history: [
-              { action: 'released', at: '2026-10-25T01:00:00Z', by: 7, by_name: 'kenny' },
+              {
+                action: 'released',
+                at: '2026-10-25T01:00:00Z',
+                by: 7,
+                by_name: 'kenny',
+              },
             ],
           }
         : TASK.results,
@@ -167,7 +186,12 @@ async function stub(page: Page) {
   );
   await page.route('**/entries?*', (route) => {
     state.marked = true;
-    return json(route, { value: 'score', mark: '7.5', by: 7, at: '2026-10-25T01:00:00Z' });
+    return json(route, {
+      value: 'score',
+      mark: '7.5',
+      by: 7,
+      at: '2026-10-25T01:00:00Z',
+    });
   });
   await page.route('**/leaderboards', (route) =>
     json(route, [
@@ -175,7 +199,15 @@ async function stub(page: Page) {
         key: 'gradebook',
         title: 'Gradebook',
         audience: { who: 'staff', rows: 'all' },
-        headers: [{ name: 'points', places: null, at_least: '0', at_most: '10', self_reported: [] }],
+        headers: [
+          {
+            name: 'points',
+            places: null,
+            at_least: '0',
+            at_most: '10',
+            self_reported: [],
+          },
+        ],
         sort: [{ column: 'points', way: 'desc' }],
         dropped: [],
         held_from: null,
@@ -217,7 +249,9 @@ async function stub(page: Page) {
     state.released = true;
     return json(route, {
       released: true,
-      history: [{ action: 'released', at: '2026-10-25T01:00:00Z', by: 7, by_name: 'kenny' }],
+      history: [
+        { action: 'released', at: '2026-10-25T01:00:00Z', by: 7, by_name: 'kenny' },
+      ],
     });
   });
   await page.route('**/hold', (route) => {
@@ -270,5 +304,7 @@ test('a manager marks, releases, ends a hold and reads a regrade', async ({ page
   await expect(page.getByRole('table', { name: 'Gradebook' })).toContainText('7.5');
 
   await page.goto('/orgs/acme/contests/spring/tasks/sum/regrades/r1');
-  await expect(page.getByRole('table', { name: 'Gradebook' })).toContainText('moved from 3 to 1');
+  await expect(page.getByRole('table', { name: 'Gradebook' })).toContainText(
+    'moved from 3 to 1',
+  );
 });

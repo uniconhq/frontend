@@ -35,8 +35,7 @@ const STALE: Record<string, (path: string) => boolean> = {
     path.endsWith('/questions') || path.includes('/clarifications'),
   // A save's checks ended. The id on the event is the publication; the page
   // reads the task again, which carries the publication and its checks.
-  checks: (path) =>
-    /\/tasks\/\{task\}$/.test(path) || path.endsWith('/publications'),
+  checks: (path) => /\/tasks\/\{task\}$/.test(path) || path.endsWith('/publications'),
   // A release or a take-back. What a submission shows changes with no
   // grading moving, so the open result is read again.
   results: (path) =>

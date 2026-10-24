@@ -33,13 +33,7 @@ export function ResultsControls({ path, manager }: { path: Path; manager: boolea
         {shown.released ? 'Results are released.' : 'Results are not released.'}
       </BodyText>
       <History history={shown.history} />
-      {manager && (
-        <Ask
-          path={path}
-          released={shown.released}
-          onDone={setResults}
-        />
-      )}
+      {manager && <Ask path={path} released={shown.released} onDone={setResults} />}
     </div>
   );
 }
@@ -101,7 +95,11 @@ function Ask({
         </Button>
       </div>
       {failed !== null && <ErrorBlock error={failed} />}
-      <Modal opened={asking !== null} onClose={() => setAsking(null)} title={released ? 'Take back' : 'Release results'}>
+      <Modal
+        opened={asking !== null}
+        onClose={() => setAsking(null)}
+        title={released ? 'Take back' : 'Release results'}
+      >
         <div className={classes.stack}>
           <BodyText>{asking}</BodyText>
           <div className={classes.actions}>

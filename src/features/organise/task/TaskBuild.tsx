@@ -23,7 +23,13 @@ import {
   type InputValues,
   type TaskValues,
 } from '../forms/task-values';
-import { exactJS, numberProblem, parseYaml, writeOver, type Doc } from '../forms/yaml-doc';
+import {
+  exactJS,
+  numberProblem,
+  parseYaml,
+  writeOver,
+  type Doc,
+} from '../forms/yaml-doc';
 import {
   declaredOf,
   inputTitle,

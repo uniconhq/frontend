@@ -198,22 +198,22 @@ function dropUses(doc: Document, kind: Ref['kind'], name: string): void {
     );
   }
   for (const key of ['outputs', 'report']) {
-  const report: unknown = (doc.contents as YAMLMap).get(key, true);
-  if (!isMap(report)) continue;
-  report.items = report.items.filter((pair) => {
-    const value = pair.value;
-    if (isScalar(value) && typeof value.value === 'string')
-      return !reads(value.value, kind, name);
-    if (isMap(value)) {
-      const from: unknown = value.get('from');
-      const better: unknown = value.get('better');
-      return !(
-        (typeof from === 'string' && reads(from, kind, name)) ||
-        (typeof better === 'string' && reads(better, kind, name))
-      );
-    }
-    return true;
-  });
+    const report: unknown = (doc.contents as YAMLMap).get(key, true);
+    if (!isMap(report)) continue;
+    report.items = report.items.filter((pair) => {
+      const value = pair.value;
+      if (isScalar(value) && typeof value.value === 'string')
+        return !reads(value.value, kind, name);
+      if (isMap(value)) {
+        const from: unknown = value.get('from');
+        const better: unknown = value.get('better');
+        return !(
+          (typeof from === 'string' && reads(from, kind, name)) ||
+          (typeof better === 'string' && reads(better, kind, name))
+        );
+      }
+      return true;
+    });
   }
 }
 

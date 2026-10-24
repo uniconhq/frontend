@@ -38,7 +38,11 @@ const ENTER =
  */
 export function TaskQueuePage() {
   const { org, contest, task } = useTaskParams();
-  const manager = holdsAt(useMe().roles, { kind: 'task', org, contest, task }, 'manager');
+  const manager = holdsAt(
+    useMe().roles,
+    { kind: 'task', org, contest, task },
+    'manager',
+  );
   return (
     <SectionPage section={sectionOf(TASK_SECTIONS, 'queue')}>
       <Queue org={org} contest={contest} task={task} manager={manager} />
@@ -63,7 +67,8 @@ function Queue({
   const [unmarked, setUnmarked] = useState(false);
   const [board, setBoard] = useState('');
   if (view.state === 'loading') return <PageSkeleton />;
-  if (view.state === 'error') return <ErrorBlock error={view.error} onRetry={view.retry} />;
+  if (view.state === 'error')
+    return <ErrorBlock error={view.error} onRetry={view.retry} />;
   const boards = leaderboardsOf(view.data);
   const rows = view.data
     .map((row) => ({
@@ -89,7 +94,9 @@ function Queue({
         rows.map((row) => (
           <Card key={row.row.entrant}>
             <div className={classes.stack}>
-              <SectionTitle>{row.row.name === '' ? MISSING : row.row.name}</SectionTitle>
+              <SectionTitle>
+                {row.row.name === '' ? MISSING : row.row.name}
+              </SectionTitle>
               <BodyText tone="secondary">
                 Closed {formatDateTime(new Date(row.closed_at))}
               </BodyText>
@@ -152,7 +159,13 @@ function Submission({
         {open ? 'Hide the submission' : 'Open the submission'}
       </Button>
       {open && (
-        <StaffSubmission org={org} contest={contest} task={task} entrant={entrant} number={submission.number} />
+        <StaffSubmission
+          org={org}
+          contest={contest}
+          task={task}
+          entrant={entrant}
+          number={submission.number}
+        />
       )}
     </div>
   );
@@ -218,7 +231,11 @@ function MarkBox({
             },
             onError: (caught) => {
               setSaved(null);
-              setError(isApiError(caught) ? (caught.detail ?? 'The mark was refused.') : 'The mark was refused.');
+              setError(
+                isApiError(caught)
+                  ? (caught.detail ?? 'The mark was refused.')
+                  : 'The mark was refused.',
+              );
             },
           },
         );
@@ -229,7 +246,8 @@ function MarkBox({
 
 function shows(item: Queued, unmarked: boolean, board: string): boolean {
   if (unmarked && item.marks.every((mark) => mark.mark !== null)) return false;
-  if (board !== '' && !item.counted_by.some((cell) => cell.leaderboard === board)) return false;
+  if (board !== '' && !item.counted_by.some((cell) => cell.leaderboard === board))
+    return false;
   return true;
 }
 
@@ -271,12 +289,15 @@ function StaffSubmission({
     ),
   );
   if (view.state === 'loading') return <PageSkeleton rows={2} />;
-  if (view.state === 'error') return <ErrorBlock error={view.error} onRetry={view.retry} />;
+  if (view.state === 'error')
+    return <ErrorBlock error={view.error} onRetry={view.retry} />;
   const where = { org, contest, task, number };
   const grading = view.data.grading;
   return (
     <div className={classes.stack}>
-      {files.state === 'error' && <ErrorBlock error={files.error} onRetry={files.retry} />}
+      {files.state === 'error' && (
+        <ErrorBlock error={files.error} onRetry={files.retry} />
+      )}
       {files.state === 'ready' && (
         <StaffFiles where={where} entrant={entrant} files={files.data} />
       )}
@@ -285,7 +306,10 @@ function StaffSubmission({
       ) : (
         <>
           <BodyText tone="secondary">{STATUS[grading.status]}</BodyText>
-          <ScoredResult grading={grading} readText={(ask) => staffText(where, entrant, ask)} />
+          <ScoredResult
+            grading={grading}
+            readText={(ask) => staffText(where, entrant, ask)}
+          />
         </>
       )}
     </div>

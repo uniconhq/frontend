@@ -618,12 +618,12 @@ function InputRow({
         />
       )}
       {(input.optional || mayBeOptional(workflow, primitives, input.id)) && (
-          <Checkbox
-            label="A task may leave it out"
-            checked={input.optional}
-            onChange={(optional) => update({ optional })}
-          />
-        )}
+        <Checkbox
+          label="A task may leave it out"
+          checked={input.optional}
+          onChange={(optional) => update({ optional })}
+        />
+      )}
       <div className={classes.formText}>
         <CommitField
           label="Title on the task’s form"

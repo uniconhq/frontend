@@ -4,13 +4,7 @@ import { type ApiError, toApiError } from '@/api/problem';
 import { arrival, hashOf, mustBeVerified, sendAndComplete } from '@/api/upload/door';
 import { wasCut } from '@/api/upload/transfer';
 import type { InputField, Submission, Upload } from '@/api/types';
-import {
-  checkDraft,
-  pathOf,
-  submittedInputs,
-  uploadsOf,
-  type Draft,
-} from './draft';
+import { checkDraft, pathOf, submittedInputs, uploadsOf, type Draft } from './draft';
 
 /**
  * A fresh idempotency key. `randomUUID` is there only on a secure origin, and

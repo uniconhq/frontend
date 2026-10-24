@@ -21,14 +21,21 @@ export function HoldLine({ path }: { path: Path }) {
   const view = queryView($api.useQuery('get', HOLD, { params: { path } }));
   const manager = holdsAt(useMe().roles, { kind: 'contest', ...path }, 'manager');
   if (view.state === 'loading') return null;
-  if (view.state === 'error') return <ErrorBlock error={view.error} onRetry={view.retry} compact />;
+  if (view.state === 'error')
+    return <ErrorBlock error={view.error} onRetry={view.retry} compact />;
   const hold = view.data;
   if (hold.from === null) return <BodyText>No hold.</BodyText>;
-  const until = hold.until === 'staff' ? 'until staff end it' : hold.until === null ? '' : `until ${formatDateTime(new Date(hold.until))}`;
+  const until =
+    hold.until === 'staff'
+      ? 'until staff end it'
+      : hold.until === null
+        ? ''
+        : `until ${formatDateTime(new Date(hold.until))}`;
   return (
     <div className={classes.stack}>
       <BodyText>
-        {hold.holding ? 'Holding' : 'Not holding'} from {formatDateTime(new Date(hold.from))} {until}
+        {hold.holding ? 'Holding' : 'Not holding'} from{' '}
+        {formatDateTime(new Date(hold.from))} {until}
       </BodyText>
       {hold.ended_at !== null && (
         <BodyText tone="secondary">
@@ -73,7 +80,11 @@ function EndHold({ path }: { path: Path }) {
         End the hold now
       </Button>
       {failed !== null && <ErrorBlock error={failed} compact />}
-      <Modal opened={asking !== null} onClose={() => setAsking(null)} title="End the hold now">
+      <Modal
+        opened={asking !== null}
+        onClose={() => setAsking(null)}
+        title="End the hold now"
+      >
         <div className={classes.stack}>
           <BodyText>{asking}</BodyText>
           <div className={classes.actions}>

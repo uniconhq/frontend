@@ -785,8 +785,7 @@ export function Editor({
                 if (frames !== null && frames.length > 0) {
                   select(null);
                   setStack(frames);
-                }
-                else if (item.opens !== null) select(item.opens);
+                } else if (item.opens !== null) select(item.opens);
               });
               return;
             }
@@ -813,7 +812,8 @@ export function Editor({
           onOpenBox={(index) => {
             const step = workflow.steps[index];
             const use = step === undefined ? null : parseUse(step.use);
-            if (step === undefined || use === null || primitiveMap.has(step.use)) return;
+            if (step === undefined || use === null || primitiveMap.has(step.use))
+              return;
             select(null);
             setStack([{ use, title: step.id, rest: [] }]);
           }}

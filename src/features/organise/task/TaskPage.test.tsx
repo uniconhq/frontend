@@ -525,9 +525,9 @@ describe('releasing results', () => {
     expect(await screen.findByText('Score becomes visible to entrants.')).toBeVisible();
     const dialog = screen.getByRole('dialog');
     await user.click(within(dialog).getByRole('button', { name: 'Release results' }));
-    expect(await screen.findByRole('list', { name: 'Results history' })).toHaveTextContent(
-      'Released by kenny',
-    );
+    expect(
+      await screen.findByRole('list', { name: 'Results history' }),
+    ).toHaveTextContent('Released by kenny');
   });
 });
 

@@ -1,12 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { inputField, languageField } from '@/test/contestant';
-import {
-  checkDraft,
-  emptyDraft,
-  pathOf,
-  submittedInputs,
-  type Draft,
-} from './draft';
+import { checkDraft, emptyDraft, pathOf, submittedInputs, type Draft } from './draft';
 
 const MB = 1024 * 1024;
 
@@ -174,9 +168,9 @@ describe('the checks before anything is sent', () => {
     expect(
       checkDraft([route], { route: { kind: 'parts', files: [small, null] } }),
     ).toBeNull();
-    expect(
-      checkDraft([route], emptyDraft([route]))?.extensions['errors'],
-    ).toEqual([{ input: 'route', message: 'This input needs a file.' }]);
+    expect(checkDraft([route], emptyDraft([route]))?.extensions['errors']).toEqual([
+      { input: 'route', message: 'This input needs a file.' },
+    ]);
     expect(
       checkDraft([route], {
         route: { kind: 'parts', files: [small, file('b.txt', 50 * MB + 1)] },

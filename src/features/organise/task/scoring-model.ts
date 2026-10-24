@@ -8,7 +8,14 @@ import {
 } from '../formula/parse';
 import { printFormula } from '../formula/print';
 import { nameProblem, type Tree } from '../formula/tree';
-import { NumberText, isRecord, numberText, textOf, writeAt, type Doc } from '../forms/yaml-doc';
+import {
+  NumberText,
+  isRecord,
+  numberText,
+  textOf,
+  writeAt,
+  type Doc,
+} from '../forms/yaml-doc';
 import type { AxisValues, InputValues } from '../forms/task-values';
 
 /** When entrants see a part of the result. Unlisted means never. */
@@ -307,7 +314,9 @@ export function writeScoring(
     JSON.stringify(checksOf(before.checks)) !== JSON.stringify(checksOf(after.checks))
   ) {
     const written = checksOf(after.checks);
-    writeAt(doc, ['checks'], written.length === 0 ? undefined : written, { prune: true });
+    writeAt(doc, ['checks'], written.length === 0 ? undefined : written, {
+      prune: true,
+    });
   }
 }
 
@@ -343,7 +352,9 @@ function checksOf(checks: CheckDraft[]): unknown[] {
 
 /** The runs the axes make, first axis outermost, organiser cells only. */
 export function runsOf(axes: AxisValues[]): RunRow[] {
-  const filled = axes.filter((axis) => axis.inputs.length > 0 && axis.tuples.length > 0);
+  const filled = axes.filter(
+    (axis) => axis.inputs.length > 0 && axis.tuples.length > 0,
+  );
   if (filled.length === 0) return [];
   let rows: { titles: string[]; cells: Record<string, string> }[] = [
     { titles: [], cells: {} },
@@ -385,7 +396,10 @@ export function inGroup(row: RunRow, group: ScoreGroup): boolean {
  * group's inputs are crossed, so a set of runs that is not a rectangle has
  * no pick.
  */
-export function pickFor(rows: RunRow[], selected: ReadonlySet<string>): Record<string, string[]> | null {
+export function pickFor(
+  rows: RunRow[],
+  selected: ReadonlySet<string>,
+): Record<string, string[]> | null {
   const chosen = rows.filter((row) => selected.has(row.id));
   if (chosen.length === 0) return {};
   const inputs = [...new Set(rows.flatMap((row) => Object.keys(row.cells)))];
@@ -393,12 +407,17 @@ export function pickFor(rows: RunRow[], selected: ReadonlySet<string>): Record<s
   for (const input of inputs) {
     const values = [...new Set(chosen.map((row) => row.cells[input] ?? ''))];
     const every = [...new Set(rows.map((row) => row.cells[input] ?? ''))];
-    if (values.length === every.length && values.every((value) => every.includes(value)))
+    if (
+      values.length === every.length &&
+      values.every((value) => every.includes(value))
+    )
       continue;
     picks[input] = values;
   }
   const matched = rows.filter((row) =>
-    Object.entries(picks).every(([input, values]) => values.includes(row.cells[input] ?? '')),
+    Object.entries(picks).every(([input, values]) =>
+      values.includes(row.cells[input] ?? ''),
+    ),
   );
   return matched.length === chosen.length ? picks : null;
 }
@@ -489,7 +508,8 @@ export function troublesOf(
   }
   for (const value of values) {
     if (troubles.has(value.key)) continue;
-    const problem = value.name.trim() === '' ? 'A value needs a name.' : nameProblem(value.name);
+    const problem =
+      value.name.trim() === '' ? 'A value needs a name.' : nameProblem(value.name);
     if (problem !== null) {
       troubles.set(value.key, problem);
       continue;
@@ -509,7 +529,10 @@ export function troublesOf(
     }
     const loop = loopOf(value.name, reads);
     if (loop !== null)
-      troubles.set(value.key, `reads itself, round ${loop.join(' → ')}: break the loop`);
+      troubles.set(
+        value.key,
+        `reads itself, round ${loop.join(' → ')}: break the loop`,
+      );
   }
   return troubles;
 }
@@ -525,7 +548,10 @@ export function renamed(
   if (nameProblem(to) !== null) return null;
   // The caller has already given this value its new name, so one `to` is itself.
   if (values.filter((value) => value.name === to).length > 1) return null;
-  const pattern = new RegExp(`\\b${from.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'g');
+  const pattern = new RegExp(
+    `\\b${from.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`,
+    'g',
+  );
   return values.map((value) => {
     if (value.name === to) return value;
     const text = printed(value, catalogue);
@@ -541,12 +567,18 @@ export function scopeOf(
   columns: Column[],
   catalogue: Catalogue,
 ): FormulaScope {
-  const sets = [...groups.map((group) => group.name).filter((name) => name !== ''), 'all'];
+  const sets = [
+    ...groups.map((group) => group.name).filter((name) => name !== ''),
+    'all',
+  ];
   let known: string[] = [];
   for (let round = 0; round <= values.length; round += 1) {
     const scope = baseScope(sets, values, columns, known);
     const next = values
-      .filter((value) => readLine(printed(value, catalogue), scope, catalogue).kind === 'text')
+      .filter(
+        (value) =>
+          readLine(printed(value, catalogue), scope, catalogue).kind === 'text',
+      )
       .map((value) => value.name);
     if (next.join() === known.join()) break;
     known = next;
@@ -571,11 +603,16 @@ function baseScope(
     ],
     sets,
     each: sets.flatMap((set) => columns.map((column) => `${set}.${column.name}`)),
-    texts: [...sets.flatMap((set) => columnTexts.map((column) => `${set}.${column}`)), ...textValues],
+    texts: [
+      ...sets.flatMap((set) => columnTexts.map((column) => `${set}.${column}`)),
+      ...textValues,
+    ],
     fields: Object.fromEntries(columns.map((column) => [column.name, column.kind])),
     about: {
       ...Object.fromEntries(FACTS.map((fact) => [fact.name, `A fact: ${fact.line}`])),
-      ...Object.fromEntries(sets.map((set) => [set, set === 'all' ? 'Every run' : 'A group'])),
+      ...Object.fromEntries(
+        sets.map((set) => [set, set === 'all' ? 'Every run' : 'A group']),
+      ),
       ...Object.fromEntries(
         sets.flatMap((set) =>
           columns.map((column) => [
@@ -592,10 +629,17 @@ function baseScope(
 export function perRunEntrant(inputs: InputValues[], axes: AxisValues[]): string[] {
   const repeated = new Set(axes.flatMap((axis) => axis.inputs));
   return inputs
-    .filter((input) => input.give === 'per-run' && input.kind === 'details' && repeated.has(input.id))
+    .filter(
+      (input) =>
+        input.give === 'per-run' && input.kind === 'details' && repeated.has(input.id),
+    )
     .map((input) => input.id);
 }
 
 export function entrantInputs(inputs: InputValues[]): InputValues[] {
-  return inputs.filter((input) => input.give === 'entrant' || (input.give === undefined && input.kind === 'details'));
+  return inputs.filter(
+    (input) =>
+      input.give === 'entrant' ||
+      (input.give === undefined && input.kind === 'details'),
+  );
 }

@@ -545,7 +545,9 @@ describe('the contest page for a visitor', () => {
     );
     renderApp(PAGE);
 
-    expect(await screen.findByRole('link', { name: 'See the leaderboards' })).toBeVisible();
+    expect(
+      await screen.findByRole('link', { name: 'See the leaderboards' }),
+    ).toBeVisible();
     expect(
       screen.getByRole('heading', { name: 'Spring 2026', level: 1 }),
     ).toBeVisible();

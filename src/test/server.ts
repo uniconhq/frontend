@@ -252,7 +252,9 @@ const noBoards = [
   http.get('/api/v1/public/contests/:org/:contest/leaderboards', () =>
     HttpResponse.json([]),
   ),
-  http.get('/api/v1/orgs/:org/contests/:contest/leaderboards', () => HttpResponse.json([])),
+  http.get('/api/v1/orgs/:org/contests/:contest/leaderboards', () =>
+    HttpResponse.json([]),
+  ),
   http.get('/api/v1/orgs/:org/contests/:contest/tasks/:task/marks', () =>
     problem(409, 'marks_off'),
   ),

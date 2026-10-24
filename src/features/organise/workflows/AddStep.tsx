@@ -42,15 +42,13 @@ export function AddStep({
   onAddWorkflow: (workflow: PaletteWorkflow) => void;
 }) {
   const entries: MenuEntry[] = [
-    ...newest(primitives).map(
-      (primitive): MenuEntry => ({
-        kind: 'item',
-        text: primitiveTitle(primitive),
-        detail: primitive.description,
-        note: primitive.ref,
-        onSelect: () => onAdd(primitive),
-      }),
-    ),
+    ...newest(primitives).map((primitive): MenuEntry => ({
+      kind: 'item',
+      text: primitiveTitle(primitive),
+      detail: primitive.description,
+      note: primitive.ref,
+      onSelect: () => onAdd(primitive),
+    })),
   ];
   if (workflows.length > 0) {
     entries.push({ kind: 'divider' });

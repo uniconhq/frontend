@@ -606,9 +606,7 @@ describe('the workflow editor', () => {
     const user = userEvent.setup();
     renderApp(EDITOR_PAGE);
     const readFrom = async (output: string) => {
-      await user.click(
-        await screen.findByRole('button', { name: 'The output peak' }),
-      );
+      await user.click(await screen.findByRole('button', { name: 'The output peak' }));
       await user.click(
         within(await openMenu('The output peak')).getByRole('menuitem', {
           name: output,
@@ -668,7 +666,10 @@ describe('the workflow editor', () => {
     const row = within(drawer('Inputs')).getByLabelText('The input time_limit', {
       selector: 'li',
     });
-    await user.selectOptions(within(row).getByRole('combobox', { name: 'Type' }), 'text');
+    await user.selectOptions(
+      within(row).getByRole('combobox', { name: 'Type' }),
+      'text',
+    );
 
     expect(within(row).getByRole('alert')).toHaveTextContent(
       'run.time_limit: This takes a number, not text.',
@@ -819,7 +820,9 @@ describe('the workflow editor', () => {
 
     expect(await stepBox('build')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Open build' }));
-    expect(await screen.findByRole('group', { name: 'Step compile' })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('group', { name: 'Step compile' }),
+    ).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Open compile' }));
     expect(await screen.findByRole('group', { name: 'Step link' })).toBeInTheDocument();
     await user.click(
@@ -828,6 +831,8 @@ describe('the workflow editor', () => {
         { name: 'build' },
       ),
     );
-    expect(await screen.findByRole('group', { name: 'Step compile' })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('group', { name: 'Step compile' }),
+    ).toBeInTheDocument();
   });
 });

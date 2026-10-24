@@ -263,7 +263,8 @@ async function stubApi(page: Page, overrides: Partial<State> = {}): Promise<Stat
     const one = /^\/submissions\/(\d+)$/.exec(path);
     if (one !== null) {
       const found = state.submissions.find((entry) => entry.number === Number(one[1]));
-      if (found === undefined) return route.fulfill({ status: 404, body: 'not stubbed' });
+      if (found === undefined)
+        return route.fulfill({ status: 404, body: 'not stubbed' });
       state.detailReads += 1;
       const grading =
         state.later !== null && state.detailReads > 2 ? state.later : found.grading;

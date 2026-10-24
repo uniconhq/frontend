@@ -178,7 +178,12 @@ function LeaderboardCard({
           <BodyText tone="secondary">Nothing is on a leaderboard yet.</BodyText>
         ) : (
           standing.map((board) => (
-            <LeaderboardTable key={board.key} board={board} submissionTo={open} staff={staff} />
+            <LeaderboardTable
+              key={board.key}
+              board={board}
+              submissionTo={open}
+              staff={staff}
+            />
           ))
         )}
       </div>

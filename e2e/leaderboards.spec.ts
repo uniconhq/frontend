@@ -54,7 +54,9 @@ async function stub(page: Page) {
         avatar_url: null,
         email: 'kenny@example.org',
       },
-      roles: [{ names: { org: 'acme', contest: 'spring', task: null }, role: 'manager' }],
+      roles: [
+        { names: { org: 'acme', contest: 'spring', task: null }, role: 'manager' },
+      ],
       degraded: false,
     }),
   );
@@ -170,8 +172,10 @@ test('writes the three leaderboards and a hold, and marks a refused column', asy
 
   await page.getByRole('button', { name: 'Save' }).click();
   await expect(
-    page.getByRole('region', { name: 'Leaderboard icpc' }).getByText('This column is refused.', {
-      exact: true,
-    }),
+    page
+      .getByRole('region', { name: 'Leaderboard icpc' })
+      .getByText('This column is refused.', {
+        exact: true,
+      }),
   ).toBeVisible();
 });

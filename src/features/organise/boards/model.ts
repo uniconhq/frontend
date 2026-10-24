@@ -130,7 +130,9 @@ export function blankBoard(taken: readonly string[]): BoardDraft {
 }
 
 function readWho(value: unknown): Who {
-  return value === 'entrants' || value === 'everyone' || value === 'staff' ? value : 'staff';
+  return value === 'entrants' || value === 'everyone' || value === 'staff'
+    ? value
+    : 'staff';
 }
 
 function readRows(value: unknown): { rows: RowsKind; top: string } {
@@ -276,12 +278,9 @@ export function hourBefore(end: unknown): string {
  * A top count keeps the rows tied with the last of them, then their own row
  * when it was past the cut. The staff read has every row, so the cut is applied here.
  */
-export function previewRows<T extends { place: number | null; row: { entrant: string } }>(
-  rows: readonly T[],
-  entrant: string,
-  kind: RowsKind,
-  top: number,
-): T[] {
+export function previewRows<
+  T extends { place: number | null; row: { entrant: string } },
+>(rows: readonly T[], entrant: string, kind: RowsKind, top: number): T[] {
   if (kind === 'own') {
     return rows
       .filter((row) => row.row.entrant === entrant)
@@ -316,14 +315,19 @@ export function boardScope(
   outputs: readonly string[],
   texts: readonly string[],
 ): FormulaScope {
-  const fields: Record<string, 'number' | 'text'> = { verdict: 'text', passed: 'number' };
+  const fields: Record<string, 'number' | 'text'> = {
+    verdict: 'text',
+    passed: 'number',
+  };
   for (const name of outputs) if (!(name in fields)) fields[name] = 'number';
   return {
     where: 'leaderboard',
     names: board.columns.map((column) => column.name).filter((name) => name !== ''),
     each: ['verdict', 'passed', ...outputs],
     sets: tasks,
-    boards: boards.map((item) => item.key).filter((key) => key !== '' && key !== board.key),
+    boards: boards
+      .map((item) => item.key)
+      .filter((key) => key !== '' && key !== board.key),
     texts,
     fields,
   };
@@ -348,7 +352,9 @@ export function boardReadings(
   const texts = board.columns
     .filter((column) => pass[column.key]?.kind === 'text')
     .map((column) => column.name);
-  return texts.length === 0 ? pass : read(boardScope(board, boards, tasks, outputs, texts));
+  return texts.length === 0
+    ? pass
+    : read(boardScope(board, boards, tasks, outputs, texts));
 }
 
 /** The trees a save writes: a line left as printed keeps the tree it was read from. */
@@ -366,7 +372,9 @@ export function commit(
         ...board,
         columns: board.columns.map((column) => {
           const printed =
-            column.tree === null ? '' : printFormula(column.tree, catalogue, 'leaderboard');
+            column.tree === null
+              ? ''
+              : printFormula(column.tree, catalogue, 'leaderboard');
           if (lineOf(column, catalogue) === printed) return { ...column, line: null };
           return { ...column, line: null, tree: read[column.key]?.tree ?? null };
         }),
@@ -383,7 +391,10 @@ function snapshot(draft: LeaderboardsDraft) {
       who: board.who,
       rows: board.rows,
       top: board.top,
-      columns: board.columns.map((column) => ({ name: column.name, tree: column.tree })),
+      columns: board.columns.map((column) => ({
+        name: column.name,
+        tree: column.tree,
+      })),
       sort: board.sort,
       display: board.display,
     })),
@@ -397,7 +408,9 @@ function snapshot(draft: LeaderboardsDraft) {
 }
 
 function sameBoards(before: LeaderboardsDraft, after: LeaderboardsDraft): boolean {
-  return JSON.stringify(snapshot(before).boards) === JSON.stringify(snapshot(after).boards);
+  return (
+    JSON.stringify(snapshot(before).boards) === JSON.stringify(snapshot(after).boards)
+  );
 }
 
 function sameHold(before: LeaderboardsDraft, after: LeaderboardsDraft): boolean {
@@ -426,7 +439,9 @@ function boardValue(board: BoardDraft): Record<string, unknown> {
   }
   if (board.display.length > 0) {
     value['display'] = board.display.map((item) =>
-      item.places === '' ? item.name : { [item.name]: { places: numberText(item.places) } },
+      item.places === ''
+        ? item.name
+        : { [item.name]: { places: numberText(item.places) } },
     );
   }
   return value;
@@ -455,7 +470,11 @@ export function writeLeaderboards(
 }
 
 /** Write the hold when it changed. A hold that could not be read stays until it is set again. */
-export function writeHold(doc: Doc, before: LeaderboardsDraft, after: LeaderboardsDraft): void {
+export function writeHold(
+  doc: Doc,
+  before: LeaderboardsDraft,
+  after: LeaderboardsDraft,
+): void {
   if ((before.hold.locked && !after.hold.on) || sameHold(before, after)) return;
   const value = holdValue(after.hold);
   if (value === undefined) {
@@ -470,7 +489,11 @@ export function writeHold(doc: Doc, before: LeaderboardsDraft, after: Leaderboar
   writeAt(doc, ['hold', 'until'], value.until);
 }
 
-function keyProblem(key: string, keys: readonly string[], tasks: readonly string[]): string | null {
+function keyProblem(
+  key: string,
+  keys: readonly string[],
+  tasks: readonly string[],
+): string | null {
   if (key === '') return 'Give the leaderboard a key.';
   if (!KEY.test(key)) {
     return (
@@ -481,7 +504,8 @@ function keyProblem(key: string, keys: readonly string[], tasks: readonly string
   if (key.length > KEY_MAX) {
     return `'${key}' is longer than ${String(KEY_MAX)} characters. Choose a shorter name.`;
   }
-  if (keys.filter((item) => item === key).length > 1) return 'Another leaderboard has this key.';
+  if (keys.filter((item) => item === key).length > 1)
+    return 'Another leaderboard has this key.';
   if (tasks.includes(key)) {
     return (
       `${key} is a task of the contest, and tasks and leaderboards share one set of names, ` +
@@ -501,7 +525,8 @@ function columnNameProblem(name: string, names: readonly string[]): string | nul
       'letters, digits and underscores (_), starting with a letter.'
     );
   }
-  if (names.filter((item) => item === name).length > 1) return 'Another column has this name.';
+  if (names.filter((item) => item === name).length > 1)
+    return 'Another column has this name.';
   return null;
 }
 
@@ -542,7 +567,10 @@ export function problems(
       });
     }
     if (board.columns.length === 0) {
-      found.push({ field: `${board.key}.columns`, message: 'Give the leaderboard a column.' });
+      found.push({
+        field: `${board.key}.columns`,
+        message: 'Give the leaderboard a column.',
+      });
     }
     const names = board.columns.map((column) => column.name);
     const readings =
@@ -561,8 +589,10 @@ export function problems(
       if (catalogue !== null && line.trim() === '') {
         found.push({ field, message: 'Give a formula.' });
       } else if (reading !== undefined) {
-        if (reading.unread !== null) found.push({ field, message: reading.unread.message });
-        for (const problem of reading.problems) found.push({ field, message: problem.message });
+        if (reading.unread !== null)
+          found.push({ field, message: reading.unread.message });
+        for (const problem of reading.problems)
+          found.push({ field, message: problem.message });
         if (reading.kind !== null) kindOf.set(column.name, reading.kind);
       }
     }
@@ -583,7 +613,10 @@ export function problems(
         });
       }
       if (kind === 'pick') {
-        found.push({ field: `${board.key}.sort`, message: 'A pick is not used to order the rows.' });
+        found.push({
+          field: `${board.key}.sort`,
+          message: 'A pick is not used to order the rows.',
+        });
       }
       if (!shown.has(item.name)) {
         found.push({
@@ -603,15 +636,22 @@ export function problems(
           message: 'A text column is shown as given.',
         });
       }
-      const places = kind === 'number' || kind === undefined ? placesProblem(item.places) : null;
-      if (places !== null) found.push({ field: `${board.key}.display`, message: places });
+      const places =
+        kind === 'number' || kind === undefined ? placesProblem(item.places) : null;
+      if (places !== null)
+        found.push({ field: `${board.key}.display`, message: places });
     }
   }
   found.push(...holdProblems(draft.hold, now, start, end));
   return found;
 }
 
-function holdProblems(hold: HoldDraft, now: number, start: unknown, end: unknown): FieldProblem[] {
+function holdProblems(
+  hold: HoldDraft,
+  now: number,
+  start: unknown,
+  end: unknown,
+): FieldProblem[] {
   if (!hold.on) return [];
   const found: FieldProblem[] = [];
   const from = isoOf(hold.from);
@@ -628,11 +668,7 @@ function holdProblems(hold: HoldDraft, now: number, start: unknown, end: unknown
   }
   const opened = instantOf(start);
   const closed = instantOf(end);
-  if (
-    opened !== null &&
-    closed !== null &&
-    (fromAt <= opened || fromAt >= closed)
-  ) {
+  if (opened !== null && closed !== null && (fromAt <= opened || fromAt >= closed)) {
     found.push({
       field: 'hold.from',
       message: 'The hold starts after the contest opens and before it ends.',

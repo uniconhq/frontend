@@ -34,11 +34,17 @@ describe("a contest's leaderboards for its organisers", () => {
       }),
     );
     renderApp(PAGE);
-    await userEvent.click(await screen.findByRole('button', { name: 'Add a leaderboard' }));
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Add a leaderboard' }),
+    );
     const card = screen.getByRole('region', { name: 'Leaderboard board' });
     await userEvent.click(within(card).getByRole('radio', { name: 'Entrants' }));
-    await userEvent.click(within(card).getByRole('radio', { name: "Each entrant's own row" }));
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled());
+    await userEvent.click(
+      within(card).getByRole('radio', { name: "Each entrant's own row" }),
+    );
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled(),
+    );
     await userEvent.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(sent).toContain('rows: own'));
     expect(sent).toContain('who: entrants');
@@ -59,11 +65,15 @@ describe("a contest's leaderboards for its organisers", () => {
       ),
     );
     renderApp(PAGE);
-    await userEvent.click(await screen.findByRole('button', { name: 'Add a leaderboard' }));
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Add a leaderboard' }),
+    );
     const key = screen.getByRole('textbox', { name: 'Key' });
     await userEvent.clear(key);
     await userEvent.type(key, 'gradebook');
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled());
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled(),
+    );
     await userEvent.click(screen.getByRole('button', { name: 'Save' }));
     expect(await screen.findByText('This column is refused.')).toBeVisible();
   });

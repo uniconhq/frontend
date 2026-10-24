@@ -11,8 +11,7 @@ import { useContestParams } from '@/lib/route-params';
 type Diff = components['schemas']['LeaderboardDiff'];
 type Change = components['schemas']['SubmissionChange'];
 
-const READ =
-  '/api/v1/orgs/{org}/contests/{contest}/tasks/{task}/regrades/{regrade}';
+const READ = '/api/v1/orgs/{org}/contests/{contest}/tasks/{task}/regrades/{regrade}';
 
 /** One regrade: each leaderboard after it, and how far each row moved. */
 export function RegradePage() {
@@ -37,7 +36,8 @@ function Regrade({
     $api.useQuery('get', READ, { params: { path: { org, contest, task, regrade } } }),
   );
   if (view.state === 'loading') return <PageSkeleton />;
-  if (view.state === 'error') return <ErrorBlock error={view.error} onRetry={view.retry} />;
+  if (view.state === 'error')
+    return <ErrorBlock error={view.error} onRetry={view.retry} />;
   const boards = view.data.leaderboards;
   return (
     <Page>
@@ -110,7 +110,10 @@ function Changes({
   values: boolean;
 }) {
   const rows = changed.filter(
-    (item) => (values && item.values.length > 0) || item.verdicts.length > 0 || item.more_verdicts > 0,
+    (item) =>
+      (values && item.values.length > 0) ||
+      item.verdicts.length > 0 ||
+      item.more_verdicts > 0,
   );
   if (rows.length === 0 && more === 0) return null;
   return (

@@ -170,11 +170,15 @@ function withValue(raw: unknown): WithValue {
     return { kind: 'literal', value: new NumberText(String(raw)) };
   if (raw instanceof NumberText || typeof raw === 'boolean')
     return { kind: 'literal', value: raw };
-  if (Array.isArray(raw)) return { kind: 'list', items: raw.map((item) => withValue(item)) };
+  if (Array.isArray(raw))
+    return { kind: 'list', items: raw.map((item) => withValue(item)) };
   if (isRecord(raw))
     return {
       kind: 'mapping',
-      entries: Object.entries(raw).map(([name, value]) => ({ name, value: withValue(value) })),
+      entries: Object.entries(raw).map(([name, value]) => ({
+        name,
+        value: withValue(value),
+      })),
     };
   if (typeof raw !== 'string') return { kind: 'invalid', raw };
   const whole = wholeRef(raw);
@@ -189,7 +193,8 @@ function withValue(raw: unknown): WithValue {
 export function refsOf(value: WithValue): Ref[] {
   if (value.kind === 'wire') return [value.ref];
   if (value.kind === 'text') return value.refs;
-  if (value.kind === 'mapping') return value.entries.flatMap((entry) => refsOf(entry.value));
+  if (value.kind === 'mapping')
+    return value.entries.flatMap((entry) => refsOf(entry.value));
   if (value.kind === 'list') return value.items.flatMap((item) => refsOf(item));
   return [];
 }
@@ -197,7 +202,8 @@ export function refsOf(value: WithValue): Ref[] {
 /** The references drawn as wires: a whole reference, including inside a mapping or a list. */
 export function wireRefs(value: WithValue): Ref[] {
   if (value.kind === 'wire') return [value.ref];
-  if (value.kind === 'mapping') return value.entries.flatMap((entry) => wireRefs(entry.value));
+  if (value.kind === 'mapping')
+    return value.entries.flatMap((entry) => wireRefs(entry.value));
   if (value.kind === 'list') return value.items.flatMap((item) => wireRefs(item));
   return [];
 }
@@ -306,7 +312,11 @@ export function readWorkflow(file: unknown): Workflow {
   const top = isRecord(file) ? file : {};
   const inputs = isRecord(top.inputs) ? top.inputs : {};
   const test = isRecord(top.test) ? top.test : {};
-  const listed = isRecord(top.outputs) ? top.outputs : isRecord(top.report) ? top.report : {};
+  const listed = isRecord(top.outputs)
+    ? top.outputs
+    : isRecord(top.report)
+      ? top.report
+      : {};
   return {
     inputs: Object.entries(inputs).map(([id, raw]) => inputOf(id, raw)),
     test: Object.entries(test).map(([name, raw]) => fieldOf(name, raw)),

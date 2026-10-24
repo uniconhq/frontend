@@ -79,7 +79,9 @@ export function ScoredView({
                 </BodyText>
               )}
             </div>
-            {files.state === 'error' && <ErrorBlock error={files.error} onRetry={files.retry} />}
+            {files.state === 'error' && (
+              <ErrorBlock error={files.error} onRetry={files.retry} />
+            )}
             {files.state === 'ready' && (
               <StaffFiles where={where} entrant={entry.by.entrant} files={files.data} />
             )}
@@ -94,4 +96,3 @@ export function ScoredView({
     </section>
   );
 }
-

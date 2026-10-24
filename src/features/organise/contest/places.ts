@@ -175,7 +175,8 @@ export function contestPlace(path: string): ContestPlace {
     const named = second === 'from' ? 'From' : second === 'until' ? 'Until' : undefined;
     return {
       part: 'boards',
-      label: named === undefined ? 'Leaderboards, Hold' : `Leaderboards, Hold: ${named}`,
+      label:
+        named === undefined ? 'Leaderboards, Hold' : `Leaderboards, Hold: ${named}`,
       field: typeof second === 'string' ? `hold.${second}` : 'hold.from',
       item: null,
     };
@@ -224,7 +225,8 @@ function leaderboardPlace(
     };
   }
   if (third === 'audience' && typeof fourth === 'string') {
-    const named = fourth === 'who' ? 'Who sees it' : fourth === 'rows' ? 'Rows' : fourth;
+    const named =
+      fourth === 'who' ? 'Who sees it' : fourth === 'rows' ? 'Rows' : fourth;
     return {
       part: 'boards',
       label: `${board}: ${named}`,

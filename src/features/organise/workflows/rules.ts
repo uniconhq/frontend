@@ -1,11 +1,5 @@
 import { NumberText } from '../forms/yaml-doc';
-import {
-  refText,
-  refsOf,
-  sameRef,
-  type Ref,
-  type Workflow,
-} from './model';
+import { refText, refsOf, sameRef, type Ref, type Workflow } from './model';
 import type { BoxDecl } from './boxes';
 import { declared, raisingPorts, type PrimitiveInfo } from './primitives';
 
@@ -208,7 +202,9 @@ export function wireRefusal(
   const boxed = boxes.get(step.use);
   const target =
     primitive?.inputs[port] ??
-    (boxed?.run === true ? boxed.inputs.find((input) => input.name === port) : undefined);
+    (boxed?.run === true
+      ? boxed.inputs.find((input) => input.name === port)
+      : undefined);
   if (primitive === null && (boxed === undefined || !boxed.run))
     return `${step.use} is not a primitive Unicon knows. Check its owner, name and version.`;
   if (target === undefined) return `${step.use} has no input called ${port}.`;

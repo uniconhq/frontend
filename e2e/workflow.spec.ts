@@ -382,10 +382,14 @@ test('every port of a step opens its menu with the mouse', async ({ page }) => {
     await page.keyboard.press('Escape');
   }
   await page.getByRole('button', { name: 'The output time_ms of run' }).click();
-  await expect(page.getByRole('menuitem', { name: 'Name it as an output' })).toBeVisible();
+  await expect(
+    page.getByRole('menuitem', { name: 'Name it as an output' }),
+  ).toBeVisible();
 });
 
-test('a box opens two levels in, and a problem opens the step inside', async ({ page }) => {
+test('a box opens two levels in, and a problem opens the step inside', async ({
+  page,
+}) => {
   const json = (route: Route, body: unknown) =>
     route.fulfill({
       status: 200,
@@ -451,7 +455,9 @@ test('a box opens two levels in, and a problem opens the step inside', async ({ 
   );
   await page.route('**/api/v1/workflows/check', (route) =>
     json(route, {
-      problems: [{ path: 'steps[0]', message: 'The link failed.', step: 'build/compile/link' }],
+      problems: [
+        { path: 'steps[0]', message: 'The link failed.', step: 'build/compile/link' },
+      ],
     }),
   );
   await page.route('**/api/v1/workflows/kenny/tuned', (route) =>

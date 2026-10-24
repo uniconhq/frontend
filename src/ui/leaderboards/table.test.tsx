@@ -11,10 +11,18 @@ type Header = components['schemas']['Header'];
 type Cell = components['schemas']['LeaderboardCell'];
 type Row = components['schemas']['LeaderboardRow'];
 
-const open = (task: string, number: number) => `/tasks/${task}?submission=${String(number)}`;
+const open = (task: string, number: number) =>
+  `/tasks/${task}?submission=${String(number)}`;
 
 function header(name: string, over: Partial<Header> = {}): Header {
-  return { name, places: null, at_least: null, at_most: null, self_reported: [], ...over };
+  return {
+    name,
+    places: null,
+    at_least: null,
+    at_most: null,
+    self_reported: [],
+    ...over,
+  };
 }
 
 function cell(column: string, over: Partial<Cell> = {}): Cell {
@@ -91,7 +99,9 @@ describe('a leaderboard table', () => {
       <LeaderboardTable
         board={board({
           held_from: '2030-10-01T13:00:00Z',
-          rows: [row('ada', { place: 1, held: 3, cells: [cell('points', { number: '1' })] })],
+          rows: [
+            row('ada', { place: 1, held: 3, cells: [cell('points', { number: '1' })] }),
+          ],
         })}
       />,
     );
@@ -111,7 +121,12 @@ describe('a leaderboard table', () => {
               self_reported: [{ task: 'islands', value: 'score' }],
             }),
           ],
-          rows: [row('ada', { place: 1, cells: [cell('score', { number: '5', hidden: true })] })],
+          rows: [
+            row('ada', {
+              place: 1,
+              cells: [cell('score', { number: '5', hidden: true })],
+            }),
+          ],
         })}
       />,
     );
@@ -147,28 +162,28 @@ describe('a leaderboard table', () => {
   it('opens counted submissions and what is still grading only on a row that has them', () => {
     renderWithProviders(
       <MemoryRouter>
-      <LeaderboardTable
-        submissionTo={open}
-        board={board({
-          audience: { who: 'entrants', rows: 'own' },
-          rows: [
-            row('ada', {
-              cells: [
-                cell('points', {
-                  number: '62',
-                  counted: [{ task: 'sum', number: 4 }],
-                  waiting: [{ task: 'sum', number: 5 }],
-                }),
-              ],
-              grading: 2,
-            }),
-            row('bo', {
-              place: 2,
-              cells: [cell('points', { number: '10', counted: null, waiting: null })],
-            }),
-          ],
-        })}
-      />
+        <LeaderboardTable
+          submissionTo={open}
+          board={board({
+            audience: { who: 'entrants', rows: 'own' },
+            rows: [
+              row('ada', {
+                cells: [
+                  cell('points', {
+                    number: '62',
+                    counted: [{ task: 'sum', number: 4 }],
+                    waiting: [{ task: 'sum', number: 5 }],
+                  }),
+                ],
+                grading: 2,
+              }),
+              row('bo', {
+                place: 2,
+                cells: [cell('points', { number: '10', counted: null, waiting: null })],
+              }),
+            ],
+          })}
+        />
       </MemoryRouter>,
     );
     expect(placeOf('ada')).toHaveTextContent('–');
@@ -181,7 +196,9 @@ describe('a leaderboard table', () => {
       within(ada).getByRole('link', { name: 'Submission 5, being checked' }),
     ).toBeVisible();
     expect(ada).toHaveTextContent('2 grading');
-    expect(within(screen.getByRole('row', { name: /bo/ })).queryByRole('link')).toBeNull();
+    expect(
+      within(screen.getByRole('row', { name: /bo/ })).queryByRole('link'),
+    ).toBeNull();
   });
 
   it('shows every row it is given, including one with no place after the placed rows', () => {
@@ -208,18 +225,24 @@ describe('a task’s points', () => {
         headers: [header('points', { at_most: '100' })],
         rows: [
           row('ada', {
-            cells: [cell('points', { number: '62', counted: [{ task: 'sum', number: 1 }] })],
+            cells: [
+              cell('points', { number: '62', counted: [{ task: 'sum', number: 1 }] }),
+            ],
           }),
         ],
       }),
     ];
-    expect(taskPoints('sum', standing)).toEqual([{ board: 'gradebook', text: '62 / 100' }]);
+    expect(taskPoints('sum', standing)).toEqual([
+      { board: 'gradebook', text: '62 / 100' },
+    ]);
     expect(taskPoints('other', standing)).toEqual([]);
   });
 });
 
 function placeOf(name: string) {
-  const cells = within(screen.getByRole('row', { name: new RegExp(name) })).getAllByRole('cell');
+  const cells = within(
+    screen.getByRole('row', { name: new RegExp(name) }),
+  ).getAllByRole('cell');
   const place = cells[0];
   if (place === undefined) throw new Error('no place');
   return place;

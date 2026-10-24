@@ -336,7 +336,12 @@ function RunRow({
       {run.label !== null && (
         <OpenText
           title="Label"
-          ask={{ ...ask, field: 'label', name: run.label.name, output: run.label.output }}
+          ask={{
+            ...ask,
+            field: 'label',
+            name: run.label.name,
+            output: run.label.output,
+          }}
           readText={readText}
         />
       )}
@@ -481,7 +486,8 @@ function Facts({
   compiled: number | null | undefined;
 }) {
   const rows = Object.entries(facts ?? {});
-  if (compiled != null && facts?.compiled === undefined) rows.push(['compiled', String(compiled)]);
+  if (compiled != null && facts?.compiled === undefined)
+    rows.push(['compiled', String(compiled)]);
   if (rows.length === 0) return null;
   return (
     <dl className={classes.metrics} aria-label="Facts">

@@ -21,7 +21,10 @@ export function taskPoints(
       const most = board.headers.find((header) => header.name === cell.column)?.at_most;
       found.push({
         board: board.key,
-        text: most === null || most === undefined ? cell.number : `${cell.number} / ${most}`,
+        text:
+          most === null || most === undefined
+            ? cell.number
+            : `${cell.number} / ${most}`,
       });
       break;
     }

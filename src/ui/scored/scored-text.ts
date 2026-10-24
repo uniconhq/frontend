@@ -26,10 +26,7 @@ export function submissionsWords(count: number): string {
  * " · ", and a tuple with none by its key. A number is "seed 2"; a file is
  * its name.
  */
-export function tupleLine(
-  titles: RunShown['titles'],
-  key: RunShown['key'],
-): string {
+export function tupleLine(titles: RunShown['titles'], key: RunShown['key']): string {
   const named = titles ?? [];
   const entries = Object.entries(key);
   const count = Math.max(named.length, entries.length);

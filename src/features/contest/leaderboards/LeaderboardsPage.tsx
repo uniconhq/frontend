@@ -33,16 +33,24 @@ function SignedInBoards({ org, contest }: { org: string; contest: string }) {
   const session = useSession();
   const staff =
     session.status === 'signed-in' && contestStaff(org, contest, session.me.roles);
-  const query = $api.useQuery('get', '/api/v1/orgs/{org}/contests/{contest}/leaderboards', {
-    params: { path: { org, contest } },
-  });
+  const query = $api.useQuery(
+    'get',
+    '/api/v1/orgs/{org}/contests/{contest}/leaderboards',
+    {
+      params: { path: { org, contest } },
+    },
+  );
   return <Boards view={queryView(query)} org={org} contest={contest} staff={staff} />;
 }
 
 function PublicBoards({ org, contest }: { org: string; contest: string }) {
-  const query = $api.useQuery('get', '/api/v1/public/contests/{org}/{contest}/leaderboards', {
-    params: { path: { org, contest } },
-  });
+  const query = $api.useQuery(
+    'get',
+    '/api/v1/public/contests/{org}/{contest}/leaderboards',
+    {
+      params: { path: { org, contest } },
+    },
+  );
   return <Boards view={queryView(query)} org={org} contest={contest} staff={false} />;
 }
 
@@ -58,7 +66,8 @@ function Boards({
   staff: boolean;
 }) {
   if (view.state === 'loading') return <PageSkeleton />;
-  if (view.state === 'error') return <ErrorBlock error={view.error} onRetry={view.retry} />;
+  if (view.state === 'error')
+    return <ErrorBlock error={view.error} onRetry={view.retry} />;
   const open = (task: string, number: number) =>
     `${taskPagePath(org, contest, task)}${submissionHref(number)}`;
   return (
@@ -68,7 +77,12 @@ function Boards({
         <BodyText tone="secondary">Nothing is on a leaderboard yet.</BodyText>
       ) : (
         view.data.map((board) => (
-          <LeaderboardTable key={board.key} board={board} submissionTo={open} staff={staff} />
+          <LeaderboardTable
+            key={board.key}
+            board={board}
+            submissionTo={open}
+            staff={staff}
+          />
         ))
       )}
     </Page>

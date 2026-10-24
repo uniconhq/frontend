@@ -89,18 +89,25 @@ function useOutputs(org: string, contest: string, tasks: readonly string[]): str
   }, [fileStamp]);
   const versions = useQueries({
     queries: refs.map((ref) => ({
-      ...$api.queryOptions('get', '/api/v1/workflows/{owner}/{name}/versions/{version}', {
-        params: { path: ref },
-      }),
+      ...$api.queryOptions(
+        'get',
+        '/api/v1/workflows/{owner}/{name}/versions/{version}',
+        {
+          params: { path: ref },
+        },
+      ),
       retry: false,
     })),
   });
-  const versionStamp = versions.map((version) => version.data?.content ?? '').join('\0');
+  const versionStamp = versions
+    .map((version) => version.data?.content ?? '')
+    .join('\0');
   return useMemo(() => {
     const names = new Set<string>();
     for (const version of versions) {
       const content = version.data?.content;
-      if (content !== undefined) for (const name of outputNames(content)) names.add(name);
+      if (content !== undefined)
+        for (const name of outputNames(content)) names.add(name);
     }
     return [...names];
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -123,8 +130,12 @@ function messagesFor(
   refused: readonly DefinitionError[],
 ): string[] {
   return [
-    ...local.filter((problem) => problem.field === field).map((problem) => problem.message),
-    ...refused.filter((error) => matches(field, error.path)).map((error) => error.message),
+    ...local
+      .filter((problem) => problem.field === field)
+      .map((problem) => problem.message),
+    ...refused
+      .filter((error) => matches(field, error.path))
+      .map((error) => error.message),
   ];
 }
 
@@ -175,7 +186,8 @@ function dropColumn(board: BoardDraft, columnKey: string): BoardDraft {
     ...board,
     columns: board.columns.filter((column) => column.key !== columnKey),
     sort: name === '' ? board.sort : board.sort.filter((item) => item.name !== name),
-    display: name === '' ? board.display : board.display.filter((item) => item.name !== name),
+    display:
+      name === '' ? board.display : board.display.filter((item) => item.name !== name),
   };
 }
 
@@ -233,7 +245,9 @@ export function LeaderboardsForm({
   if (loaded.legacy) {
     return (
       <div role="alert">
-        <BodyText>These leaderboards cannot be read, so they cannot be changed here.</BodyText>
+        <BodyText>
+          These leaderboards cannot be read, so they cannot be changed here.
+        </BodyText>
         <BodyText tone="secondary">
           An admin can fix them as text in{' '}
           <PageLink to={viewFilePath(org, contest)}>the stored settings</PageLink>.
@@ -256,7 +270,9 @@ export function LeaderboardsForm({
       }}
     >
       {!manager && (
-        <BodyText tone="secondary">Only a manager of the contest can change these.</BodyText>
+        <BodyText tone="secondary">
+          Only a manager of the contest can change these.
+        </BodyText>
       )}
       {draft.boards.map((board) => (
         <BoardCard
@@ -291,7 +307,10 @@ export function LeaderboardsForm({
         onClick={() =>
           setDraft((current) => ({
             ...current,
-            boards: [...current.boards, blankBoard(current.boards.map((board) => board.key))],
+            boards: [
+              ...current.boards,
+              blankBoard(current.boards.map((board) => board.key)),
+            ],
           }))
         }
       >
@@ -345,7 +364,10 @@ function BoardCard({
   disabled: boolean;
   focused: string | null;
   tileTarget: string | null;
-  onFocus: (name: string, insert: (piece: { text: string; caret?: number }) => void) => void;
+  onFocus: (
+    name: string,
+    insert: (piece: { text: string; caret?: number }) => void,
+  ) => void;
   onInsert: (piece: { text: string; caret?: number }) => void;
   onChange: (change: (board: BoardDraft) => BoardDraft) => void;
   onRemove: () => void;
@@ -362,7 +384,10 @@ function BoardCard({
     .map((column) => ({ value: column.name, label: column.name }));
   const at = (field: string) => messagesFor(field, local, refused);
   return (
-    <section aria-label={`Leaderboard ${board.key === '' ? 'new' : board.key}`} className={shared.stack}>
+    <section
+      aria-label={`Leaderboard ${board.key === '' ? 'new' : board.key}`}
+      className={shared.stack}
+    >
       <FieldBox name={`${board.key}.key`}>
         <TextInput
           label="Key"
@@ -412,7 +437,9 @@ function BoardCard({
             },
             { value: 'top', label: 'The top rows' },
           ]}
-          onChange={(rows) => onChange((current) => ({ ...current, rows: rows as RowsKind }))}
+          onChange={(rows) =>
+            onChange((current) => ({ ...current, rows: rows as RowsKind }))
+          }
         />
         {board.rows === 'top' && (
           <TextInput
@@ -439,7 +466,9 @@ function BoardCard({
           tileTarget={tileTarget}
           onFocus={onFocus}
           onInsert={onInsert}
-          onName={(name) => onChange((current) => renameColumn(current, column.key, name))}
+          onName={(name) =>
+            onChange((current) => renameColumn(current, column.key, name))
+          }
           onLine={(line) =>
             onChange((current) => ({
               ...current,
@@ -455,7 +484,10 @@ function BoardCard({
         variant="secondary"
         disabled={disabled}
         onClick={() =>
-          onChange((current) => ({ ...current, columns: [...current.columns, blankColumn()] }))
+          onChange((current) => ({
+            ...current,
+            columns: [...current.columns, blankColumn()],
+          }))
         }
       >
         Add a column
@@ -475,7 +507,9 @@ function BoardCard({
             onChange={(sort) =>
               onChange((current) => ({
                 ...current,
-                sort: current.sort.map((entry, atIndex) => (atIndex === index ? sort : entry)),
+                sort: current.sort.map((entry, atIndex) =>
+                  atIndex === index ? sort : entry,
+                ),
               }))
             }
             onRemove={() =>
@@ -496,7 +530,10 @@ function BoardCard({
                 (column) => !current.sort.some((item) => item.name === column.name),
               );
               if (next === undefined || next.name === '') return current;
-              return { ...current, sort: [...current.sort, { name: next.name, way: 'desc' }] };
+              return {
+                ...current,
+                sort: [...current.sort, { name: next.name, way: 'desc' }],
+              };
             })
           }
         >
@@ -511,7 +548,11 @@ function BoardCard({
             key={`${item.name}:${String(index)}`}
             item={item}
             names={names}
-            kind={readings[board.columns.find((column) => column.name === item.name)?.key ?? '']?.kind}
+            kind={
+              readings[
+                board.columns.find((column) => column.name === item.name)?.key ?? ''
+              ]?.kind
+            }
             disabled={disabled}
             onChange={(display) =>
               onChange((current) => ({
@@ -596,7 +637,10 @@ function ColumnFields({
   disabled: boolean;
   focused: boolean;
   tileTarget: string | null;
-  onFocus: (name: string, insert: (piece: { text: string; caret?: number }) => void) => void;
+  onFocus: (
+    name: string,
+    insert: (piece: { text: string; caret?: number }) => void,
+  ) => void;
   onInsert: (piece: { text: string; caret?: number }) => void;
   onName: (name: string) => void;
   onLine: (line: string) => void;
@@ -744,7 +788,10 @@ function Preview({
     'get',
     '/api/v1/orgs/{org}/contests/{contest}/leaderboards/{leaderboard}',
     { params: { path: { org, contest, leaderboard: board.key } } },
-    { enabled: entrant !== '' && board.who !== 'staff' && board.key !== '', retry: false },
+    {
+      enabled: entrant !== '' && board.who !== 'staff' && board.key !== '',
+      retry: false,
+    },
   );
   const options = entrants.map((item) => ({
     value: item.id,
@@ -764,7 +811,9 @@ function Preview({
         placeholder="An entrant"
         disabled={disabled || options.length === 0}
         description={
-          options.length === 0 ? 'Nobody has registered, so there is no row to preview.' : undefined
+          options.length === 0
+            ? 'Nobody has registered, so there is no row to preview.'
+            : undefined
         }
         onChange={setEntrant}
       />
@@ -779,7 +828,11 @@ function Preview({
           </BodyText>
           <ul aria-label="Preview">
             {rows.map((row) => (
-              <PreviewRow key={row.row.entrant} row={row} own={row.row.entrant === entrant} />
+              <PreviewRow
+                key={row.row.entrant}
+                row={row}
+                own={row.row.entrant === entrant}
+              />
             ))}
           </ul>
         </>

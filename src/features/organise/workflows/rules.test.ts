@@ -380,7 +380,9 @@ steps:
   it('names a text output and a number output', () => {
     const workflow = readWorkflow(parse(CLASSIC_V2));
 
-    expect(reportRefusal(workflow, primitives, output('compile', 'compile_log'))).toBeNull();
+    expect(
+      reportRefusal(workflow, primitives, output('compile', 'compile_log')),
+    ).toBeNull();
     expect(reportRefusal(workflow, primitives, output('run', 'memory_kb'))).toBeNull();
   });
 
@@ -401,9 +403,7 @@ report:
   it('names what a change of a declaration newly breaks', () => {
     const before = readWorkflow(parse(CLASSIC_V2));
     const after = readWorkflow(
-      parse(
-        CLASSIC_V2.replace('time_limit: number', 'time_limit: text'),
-      ),
+      parse(CLASSIC_V2.replace('time_limit: number', 'time_limit: text')),
     );
 
     expect(newProblem(before, before, primitives)).toBeNull();

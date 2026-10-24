@@ -1246,13 +1246,23 @@ describe("the contest's sections", () => {
     );
     renderApp(CONTEST);
     const boards = await screen.findByRole('region', { name: 'Leaderboards' });
-    await user.click(await within(boards).findByRole('button', { name: 'End the hold now' }));
+    await user.click(
+      await within(boards).findByRole('button', { name: 'End the hold now' }),
+    );
     expect(
-      await screen.findByText('Every row becomes visible, and this hold cannot be put back.'),
+      await screen.findByText(
+        'Every row becomes visible, and this hold cannot be put back.',
+      ),
     ).toBeVisible();
-    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'End the hold now' }));
+    await user.click(
+      within(screen.getByRole('dialog')).getByRole('button', {
+        name: 'End the hold now',
+      }),
+    );
     expect(await within(boards).findByText(/Ended by kenny/)).toBeVisible();
-    expect(within(boards).queryByRole('button', { name: 'End the hold now' })).toBeNull();
+    expect(
+      within(boards).queryByRole('button', { name: 'End the hold now' }),
+    ).toBeNull();
   });
 });
 

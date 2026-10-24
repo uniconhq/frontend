@@ -317,15 +317,16 @@ function boxData(seen: Seen, box: Box): BoxData {
             description: primitive?.description,
             problems: box.step !== null ? (seen.pinned.steps.get(box.step) ?? []) : [],
             openable: primitive === null && boxedRun(seen, step?.use),
-            newer: step === undefined ? null : (seen.workflowBoxes.get(step.use)?.newer ?? null),
+            newer:
+              step === undefined
+                ? null
+                : (seen.workflowBoxes.get(step.use)?.newer ?? null),
           }
         : {
             kind: 'group',
             name,
             detail:
-              box.kind === 'report'
-                ? 'What each run gives'
-                : readersWords(box.readers),
+              box.kind === 'report' ? 'What each run gives' : readersWords(box.readers),
           },
     rows: [
       ...left.map((port, row) => rowView(seen, box, primitive, port, row, 'left')),

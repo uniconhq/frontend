@@ -78,7 +78,11 @@ describe('the breadcrumb', () => {
       { label: 'Browse contests', to: '/', current: false },
       { label: 'acme', to: null, current: false },
       { label: 'spring', to: '/contests/acme/spring', current: false },
-      { label: 'Leaderboards', to: '/contests/acme/spring/leaderboards', current: true },
+      {
+        label: 'Leaderboards',
+        to: '/contests/acme/spring/leaderboards',
+        current: true,
+      },
     ]);
   });
 

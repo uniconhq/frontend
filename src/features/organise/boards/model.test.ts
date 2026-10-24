@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { specCatalogue } from '../formula/catalogue';
-import { exactJS, isRecord, parseYaml, textOf, writeOver, type Doc } from '../forms/yaml-doc';
+import {
+  exactJS,
+  isRecord,
+  parseYaml,
+  textOf,
+  writeOver,
+  type Doc,
+} from '../forms/yaml-doc';
 import {
   commit,
   hourBefore,
@@ -44,7 +51,11 @@ function board(over: Partial<BoardDraft> & Pick<BoardDraft, 'key'>): BoardDraft 
   };
 }
 
-function draft(doc: Doc, boards: BoardDraft[], hold: LeaderboardsDraft['hold']): LeaderboardsDraft {
+function draft(
+  doc: Doc,
+  boards: BoardDraft[],
+  hold: LeaderboardsDraft['hold'],
+): LeaderboardsDraft {
   return { ...readLeaderboards(doc), boards, hold };
 }
 
@@ -95,7 +106,11 @@ describe('leaderboards written into contest.yaml', () => {
     writeLeaderboards(doc, before, next);
     writeHold(doc, before, next);
     const saved = exactJS(doc);
-    if (!isRecord(saved) || !isRecord(saved['leaderboards']) || !isRecord(saved['hold'])) {
+    if (
+      !isRecord(saved) ||
+      !isRecord(saved['leaderboards']) ||
+      !isRecord(saved['hold'])
+    ) {
       throw new Error('leaderboards were not written');
     }
     const gradebook = saved['leaderboards']['gradebook'];
@@ -116,7 +131,9 @@ describe('leaderboards written into contest.yaml', () => {
     ]);
     expect(textOf(icpc['columns']['solved'])).toBe('1');
     expect(saved['hold']['until']).toBe('staff');
-    expect(new Date(textOf(saved['hold']['from'])).getTime()).toBe(end - 60 * 60 * 1000);
+    expect(new Date(textOf(saved['hold']['from'])).getTime()).toBe(
+      end - 60 * 60 * 1000,
+    );
     expect(writeOver(FILE, doc)).toContain('gradebook:');
   });
 
@@ -134,7 +151,10 @@ describe('leaderboards written into contest.yaml', () => {
 describe('what the editor refuses', () => {
   const now = new Date('2026-10-25T00:00:00Z').getTime();
 
-  function found(over: Partial<BoardDraft> & Pick<BoardDraft, 'key'>, tasks = ['islands']) {
+  function found(
+    over: Partial<BoardDraft> & Pick<BoardDraft, 'key'>,
+    tasks = ['islands'],
+  ) {
     const doc = open(FILE);
     const one = draft(doc, [board(over)], {
       locked: false,
@@ -143,14 +163,28 @@ describe('what the editor refuses', () => {
       untilStaff: true,
       until: '',
     });
-    return problems(one, catalogue, tasks, [], now, '2030-10-01T09:00:00Z', '2030-10-01T14:00:00Z');
+    return problems(
+      one,
+      catalogue,
+      tasks,
+      [],
+      now,
+      '2030-10-01T09:00:00Z',
+      '2030-10-01T14:00:00Z',
+    );
   }
 
   it('refuses a key the save would refuse', () => {
-    expect(found({ key: 'a'.repeat(25) }).map((item) => item.message).join(' ')).toMatch(/24/);
-    expect(found({ key: 'islands' }).map((item) => item.message).join(' ')).toMatch(
-      /tasks and leaderboards share one set of names/,
-    );
+    expect(
+      found({ key: 'a'.repeat(25) })
+        .map((item) => item.message)
+        .join(' '),
+    ).toMatch(/24/);
+    expect(
+      found({ key: 'islands' })
+        .map((item) => item.message)
+        .join(' '),
+    ).toMatch(/tasks and leaderboards share one set of names/);
   });
 
   it('refuses own rows for everyone, a sorted text column and a shown pick', () => {
@@ -172,12 +206,16 @@ describe('what the editor refuses', () => {
       sort: [{ name: 'last', way: 'desc' }],
       display: [{ name: 'last', places: '' }],
     });
-    expect(pick.some((item) => item.field === 'latest.display' && item.message.includes('pick'))).toBe(
-      true,
-    );
-    expect(pick.some((item) => item.field === 'latest.sort' && item.message.includes('pick'))).toBe(
-      true,
-    );
+    expect(
+      pick.some(
+        (item) => item.field === 'latest.display' && item.message.includes('pick'),
+      ),
+    ).toBe(true);
+    expect(
+      pick.some(
+        (item) => item.field === 'latest.sort' && item.message.includes('pick'),
+      ),
+    ).toBe(true);
   });
 
   it('does not call a saved formula empty before the catalogue loads', () => {
@@ -212,9 +250,15 @@ describe('what the editor refuses', () => {
       until: '',
     });
     expect(
-      problems(one, catalogue, [], [], now, '2030-10-01T09:00:00Z', '2030-10-01T14:00:00Z').some(
-        (item) => item.field === 'hold.from',
-      ),
+      problems(
+        one,
+        catalogue,
+        [],
+        [],
+        now,
+        '2030-10-01T09:00:00Z',
+        '2030-10-01T14:00:00Z',
+      ).some((item) => item.field === 'hold.from'),
     ).toBe(true);
   });
 });
@@ -236,6 +280,8 @@ describe('a preview cut', () => {
       'd',
       'e',
     ]);
-    expect(previewRows(rows, 'c', 'own', 3)).toEqual([{ place: null, row: { entrant: 'c' } }]);
+    expect(previewRows(rows, 'c', 'own', 3)).toEqual([
+      { place: null, row: { entrant: 'c' } },
+    ]);
   });
 });

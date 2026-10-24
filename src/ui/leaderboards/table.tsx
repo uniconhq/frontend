@@ -52,7 +52,9 @@ export function LeaderboardTable({
               <td>
                 {row.row.name === '' ? MISSING : row.row.name}
                 {row.held > 0 ? ` ${heldCount(row.held)}` : ''}
-                {row.grading !== null && row.grading > 0 ? ` ${gradingCount(row.grading)}` : ''}
+                {row.grading !== null && row.grading > 0
+                  ? ` ${gradingCount(row.grading)}`
+                  : ''}
               </td>
               {board.headers.map((header) => {
                 const cell = row.cells.find((item) => item.column === header.name);
@@ -64,7 +66,10 @@ export function LeaderboardTable({
                       hidden={cell?.hidden ?? false}
                       places={header.places ?? undefined}
                     />
-                    <CountedLinks counted={cell?.counted ?? null} submissionTo={submissionTo} />
+                    <CountedLinks
+                      counted={cell?.counted ?? null}
+                      submissionTo={submissionTo}
+                    />
                     <CountedLinks
                       counted={cell?.waiting ?? null}
                       submissionTo={submissionTo}
@@ -96,7 +101,9 @@ function HeaderNotes({ header, staff }: { header: Header; staff: boolean }) {
   return (
     <>
       {bounds.length > 0 && <span className={classes.note}>{bounds.join(', ')}</span>}
-      {header.self_reported.length > 0 && <span className={classes.note}>Self-reported</span>}
+      {header.self_reported.length > 0 && (
+        <span className={classes.note}>Self-reported</span>
+      )}
     </>
   );
 }
@@ -110,7 +117,8 @@ function CountedLinks({
   submissionTo?: (task: string, number: number) => string;
   waiting?: boolean;
 }) {
-  if (counted === null || counted.length === 0 || submissionTo === undefined) return null;
+  if (counted === null || counted.length === 0 || submissionTo === undefined)
+    return null;
   return (
     <span className={classes.links}>
       {counted.map((item) => (
@@ -126,4 +134,3 @@ function CountedLinks({
     </span>
   );
 }
-

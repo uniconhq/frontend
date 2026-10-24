@@ -82,7 +82,8 @@ function Refusal({ error, inputs }: { error: ApiError; inputs: InputField[] }) {
       )}
       {error.code === 'too_large' && typeof input === 'string' && (
         <BodyText tone="secondary">
-          Too large: {namedPart(inputs, input, error.extensions['part']) ?? labelOf(input)}
+          Too large:{' '}
+          {namedPart(inputs, input, error.extensions['part']) ?? labelOf(input)}
         </BodyText>
       )}
     </Said>
