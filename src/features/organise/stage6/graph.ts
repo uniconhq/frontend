@@ -98,7 +98,7 @@ export type GraphWire = {
  * it never runs behind a box. Wires from one port share their slots, and
  * the first slot says what the wire carries.
  */
-export type Slot = {
+type Slot = {
   key: string;
   x: number;
   y: number;

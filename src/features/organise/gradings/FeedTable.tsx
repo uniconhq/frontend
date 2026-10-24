@@ -8,12 +8,7 @@ import { formatDateTime } from '@/lib/time';
 import { taskPath } from '@/lib/organiser-paths';
 import { STATUS, bySubmission, logHref, nameOf, resultOf, submitterOf } from './feed';
 import { overLimitSentence } from '@/ui/scored/scored-text';
-import {
-  changeOf,
-  decidingValues,
-  sideWords,
-  usePublicationMeanings,
-} from './regrades';
+import { changeOf, sideWords } from './regrades';
 import { ScoredView } from './ScoredView';
 import classes from './feed.module.css';
 
@@ -107,21 +102,13 @@ function StatusCell({
  * result it replaced and its own, side by side, the kind of change under
  * the new one, and the values that decided it where nothing else did.
  */
-function ChangeCells({ path, entry }: { path: ContestPath; entry: FeedEntry }) {
+function ChangeCells({ entry }: { entry: FeedEntry }) {
   const change = entry.grading.change;
-  const names = change === null ? [] : decidingValues(change);
-  const meanings = usePublicationMeanings(
-    path,
-    entry.task,
-    entry.grading.publication,
-    names.length > 0,
-  );
-  const values = names.length > 0 ? { names, meanings } : null;
   return (
     <>
-      <td>{change === null ? '—' : sideWords(change.earlier, values)}</td>
+      <td>{change === null ? '—' : sideWords(change.earlier)}</td>
       <td>
-        {change === null ? '—' : sideWords(change.now, values)}
+        {change === null ? '—' : sideWords(change.now)}
         <BodyText tone="meta">{changeOf(entry)}</BodyText>
       </td>
     </>
@@ -223,7 +210,7 @@ function AttemptRow({
           </span>
         )}
       </th>
-      {compared && <ChangeCells path={path} entry={entry} />}
+      {compared && <ChangeCells entry={entry} />}
       <td>
         {grading.attempt}
         <BodyText tone="meta">publication {grading.publication}</BodyText>

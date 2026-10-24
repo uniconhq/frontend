@@ -46,6 +46,8 @@ const stuck: Grading = {
   deadline_at: null,
   cancel_reason: null,
   automatic: false,
+  early: null,
+  pipeline: 'early',
   limit: null,
   retry_limit: null,
   regrade: null,
@@ -581,7 +583,6 @@ describe("the organisers' scored view of a submission", () => {
   const filledIn: OrganisedSubmission = {
     number: 3,
     submitted_at: '2026-09-26T10:00:00Z',
-    late_days: 0,
     grading: {
       id: done.id,
       attempt: 1,
@@ -589,22 +590,22 @@ describe("the organisers' scored view of a submission", () => {
       stopped: null,
       outcome: 'accepted',
       values: reported(),
-      folded: {},
       reason: null,
       limit: null,
-      points: { shown: '100', pending: '0', pending_until: null },
-      factor: '1',
+      compiled: null,
+      facts: {},
+      once: { reports: {}, texts: {} },
+      run_values: [],
+      runs: [],
       meanings: [],
       groups: [
         {
           group: 'main',
           show: 'after_close',
           outcome: 'accepted',
-          tests: [graded('main/1', 'accepted', reported({ time_ms: '12' }), '1')],
+          tests: [graded('main/1', 'accepted', reported({ time_ms: '12' }))],
           shown_at: '2026-09-26T15:00:00Z',
           ran: true,
-          points: '100',
-          max: '100',
         },
       ],
     },
@@ -635,13 +636,13 @@ describe("the organisers' scored view of a submission", () => {
     const view = await screen.findByRole('region', { name: 'Submission 3, scored' });
     expect(asked[0]?.get('entrant')).toBe('e-ada');
     const main = within(view).getByRole('region', { name: 'Group main' });
-    expect(main).toHaveTextContent('100 / 100 points');
+    expect(main).not.toHaveTextContent(/points/);
     expect(main).toHaveTextContent(/Its entrant sees this at/);
     expect(main).not.toHaveTextContent(/Its entrant sees its tests at/);
     expect(within(main).getByRole('table', { name: 'Tests main' })).toHaveTextContent(
       'main/1',
     );
-    expect(view).toHaveTextContent('100 points');
+    expect(view).not.toHaveTextContent(/points/);
     expect(view).toHaveTextContent('Done');
   });
 

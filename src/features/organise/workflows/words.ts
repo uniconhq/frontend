@@ -259,7 +259,8 @@ export function limitsWords(
   const raised = new Map<string, string>();
   for (const [limit, source] of Object.entries(primitive.limits_from)) {
     const word = LIMIT_WORDS[limit] ?? limit;
-    if (!raised.has(word)) raised.set(word, sourceWords(step, workflow, source.input));
+    if (source.input === null || raised.has(word)) continue;
+    raised.set(word, sourceWords(step, workflow, source.input));
   }
   const grows = [...raised].map(([word, from], at) =>
     at === 0 ? `its ${word} grows with ${from}` : `its ${word} with ${from}`,

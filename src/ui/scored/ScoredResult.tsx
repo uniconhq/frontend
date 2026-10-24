@@ -1,18 +1,17 @@
-import type { GroupShown, Reported, ScoredGrading, ValueMeaning } from '@/api/types';
+import type { GroupShown, Reported, ValueMeaning } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { VerdictBadge } from '@/ui/VerdictBadge';
-import { formatExact, formatPoints, withPointsWord } from '@/lib/exact';
 import { formatDateTime } from '@/lib/time';
-import {
-  foldWords,
-  inReportOrder,
-  meaningOf,
-  titleInSentence,
-  valueTitle,
-  withUnit,
-} from '@/lib/values';
-import { pointsText, valueText } from './scored-text';
+import { inReportOrder, meaningOf, valueTitle, withUnit } from '@/lib/values';
+import { valueText } from './scored-text';
 import classes from './scored.module.css';
+
+/** What a result view reads: groups, the values reported once, and how each is named. */
+type ShownResult = {
+  groups: GroupShown[];
+  meanings: ValueMeaning[];
+  values: Reported;
+};
 
 /**
  * The values a run reported once, such as a compile log, in the workflow's
@@ -65,85 +64,11 @@ function OnceValues({
   );
 }
 
-/** Titles joined as a sentence lists them: "Run time and Memory used". */
-function joined(items: string[]): string {
-  if (items.length <= 1) return items.join('');
-  return `${items.slice(0, -1).join(', ')} and ${items[items.length - 1] ?? ''}`;
-}
-
-/**
- * The task's folds over what the reader is shown of the run, labelled and in
- * the values' own words (M63): "Over the tests shown: Run time 28 ms (the
- * longest), Memory used 10,420 KB (the most)", in the workflow's report order,
- * each name on its number's baseline. The forge folds over the tests shown,
- * a test not accepted counting as the value's worst bound; a fold the run has
- * no value for because such a test leaves it none (#441, TASK-FORMAT 3.4) is
- * said plainly under it. Nothing
- * when the task folds nothing or none is shown yet.
- */
-function FoldedValues({
-  folded,
-  meanings,
-  unaccepted,
-}: {
-  folded: Record<string, string>;
-  meanings: ValueMeaning[];
-  /** Whether a test the reader is shown was not accepted, so a fold may have no value. */
-  unaccepted: boolean;
-}) {
-  const names = inReportOrder(Object.keys(folded), meanings);
-  const missing = unaccepted
-    ? meanings
-        .filter(
-          (meaning) => meaning.fold !== null && folded[meaning.name] === undefined,
-        )
-        .map((meaning) => titleInSentence(meaning.name, meaning))
-    : [];
-  const said = joined(missing);
-  if (names.length === 0 && missing.length === 0) return null;
-  return (
-    <div className={classes.folded}>
-      {names.length > 0 && (
-        <div className={classes.overAll} role="group" aria-label="Over the tests shown">
-          <span>Over the tests shown:</span>
-          <dl className={classes.metrics}>
-            {names.map((name, at) => {
-              const meaning = meaningOf(meanings, name);
-              const words = meaning === undefined ? null : foldWords(meaning);
-              return (
-                <div key={name} className={classes.metric}>
-                  <dt>{valueTitle(name, meaning)}</dt>
-                  <dd>
-                    <span className={classes.number}>
-                      {withUnit(formatExact(folded[name] ?? '0'), meaning)}
-                    </span>
-                    {words !== null && ` (${words})`}
-                    {at < names.length - 1 && ','}
-                  </dd>
-                </div>
-              );
-            })}
-          </dl>
-        </div>
-      )}
-      {missing.length > 0 && (
-        <BodyText tone="secondary">
-          {`${said.charAt(0).toUpperCase()}${said.slice(1)}`}{' '}
-          {missing.length === 1 ? 'has' : 'have'} no value while a test shown is not
-          accepted.
-        </BodyText>
-      )}
-    </div>
-  );
-}
-
 /**
  * One row per test of a group, with its own outcome and each value its steps
  * reported for it, such as its time and memory, a column per value by its
- * title, in the workflow's report order, each number with its unit; then the
- * credit it earned and, where it is scored against the best, that best `B`,
- * so the one can be checked against the other (section 3.2). A column none of
- * the rows has is left out.
+ * title, in the workflow's report order, each number with its unit. A column
+ * none of the rows has is left out.
  */
 function Tests({ group, meanings }: { group: GroupShown; meanings: ValueMeaning[] }) {
   const rows = group.tests ?? [];
@@ -159,8 +84,6 @@ function Tests({ group, meanings }: { group: GroupShown; meanings: ValueMeaning[
     ],
     meanings,
   );
-  const credited = rows.some((row) => row.credit !== null);
-  const bested = rows.some((row) => row.best !== null);
   return (
     <table className={classes.table} aria-label={`Tests ${group.group}`}>
       <thead>
@@ -172,8 +95,6 @@ function Tests({ group, meanings }: { group: GroupShown; meanings: ValueMeaning[
               {valueTitle(name, meaningOf(meanings, name))}
             </th>
           ))}
-          {credited && <th scope="col">Credit</th>}
-          {bested && <th scope="col">Best</th>}
         </tr>
       </thead>
       <tbody>
@@ -197,8 +118,6 @@ function Tests({ group, meanings }: { group: GroupShown; meanings: ValueMeaning[
                 </td>
               );
             })}
-            {credited && <td>{row.credit === null ? '—' : formatExact(row.credit)}</td>}
-            {bested && <td>{row.best === null ? '—' : formatExact(row.best)}</td>}
           </tr>
         ))}
       </tbody>
@@ -225,7 +144,6 @@ function Group({
   testsShownAt: string;
   meanings: ValueMeaning[];
 }) {
-  const points = pointsText(group);
   return (
     <section className={classes.stack} aria-label={`Group ${group.group}`}>
       <div className={classes.verdict}>
@@ -234,11 +152,6 @@ function Group({
           <BodyText tone="secondary">Not run on this grading</BodyText>
         ) : (
           group.outcome !== null && <VerdictBadge verdict={group.outcome} />
-        )}
-        {points !== null && (
-          <BodyText tone="secondary" mono>
-            {points} points
-          </BodyText>
         )}
       </div>
       {group.shown_at !== null && (
@@ -253,11 +166,10 @@ function Group({
 }
 
 /**
- * What a grading's result holds beside where it stands: its points with the
- * late factor they include, what the run reported once, the folds over its
- * tests, and each test group. A contestant reads it as the task shows it now;
- * organisers read the same payload with everything filled in, where each
- * group's time says when its contestant sees it (`shownAt`, and
+ * What a grading's result holds beside where it stands: what the run
+ * reported once, and each test group. A contestant reads it as the task shows
+ * it now; organisers read the same groups, tests and reported values, where
+ * each group's time says when its contestant sees it (`shownAt`, and
  * `testsShownAt` for a group whose tests alone wait).
  */
 export function ScoredResult({
@@ -265,34 +177,13 @@ export function ScoredResult({
   shownAt = 'Shown at',
   testsShownAt = 'Tests shown at',
 }: {
-  grading: ScoredGrading;
+  grading: ShownResult;
   shownAt?: string;
   testsShownAt?: string;
 }) {
   return (
     <>
-      {grading.points !== null && (
-        <BodyText>
-          {grading.points.shown === null
-            ? 'No points shown yet'
-            : withPointsWord(formatPoints(grading.points.shown))}
-          {grading.points.pending_until !== null &&
-            (grading.points.shown === null
-              ? `: up to ${formatPoints(grading.points.pending)}, shown at ${formatDateTime(new Date(grading.points.pending_until))}`
-              : `, and up to ${formatPoints(grading.points.pending)} more shown at ${formatDateTime(new Date(grading.points.pending_until))}`)}
-          {grading.factor !== null &&
-            grading.factor !== '1' &&
-            `, at ${formatExact(grading.factor, 4)} for lateness`}
-        </BodyText>
-      )}
       <OnceValues values={grading.values} meanings={grading.meanings} />
-      <FoldedValues
-        folded={grading.folded}
-        meanings={grading.meanings}
-        unaccepted={grading.groups.some((group) =>
-          (group.tests ?? []).some((test) => test.outcome !== 'accepted'),
-        )}
-      />
       {grading.groups.map((group) => (
         <Group
           key={group.group}

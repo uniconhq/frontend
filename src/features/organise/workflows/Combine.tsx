@@ -1,7 +1,4 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router';
-import { $api } from '@/api/query';
-import { toApiError, type ApiError } from '@/api/problem';
 import type { WorkflowItem } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
@@ -9,9 +6,7 @@ import { Checkbox } from '@/ui/Checkbox';
 import { SectionTitle } from '@/ui/SectionTitle';
 import { Select } from '@/ui/Select';
 import { TextInput } from '@/ui/TextInput';
-import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { useMe } from '@/session';
-import { workflowPath } from '@/lib/organiser-paths';
 import { workflowOwners } from '../roles';
 import shared from '../organise.module.css';
 import classes from './workflows.module.css';
@@ -61,9 +56,6 @@ export function Combine({
   const [chosen, setChosen] = useState<string[]>(first);
   const [owner, setOwner] = useState(workflowOwners(useMe())[0] ?? '');
   const [name, setName] = useState('');
-  const [error, setError] = useState<ApiError | null>(null);
-  const navigate = useNavigate();
-  const combine = $api.useMutation('post', '/api/v1/workflow-combinations');
   if (versions.length < 2) return null;
   return (
     <form
@@ -71,11 +63,6 @@ export function Combine({
       aria-label="Combine workflows"
       onSubmit={(event) => {
         event.preventDefault();
-        setError(null);
-        combine
-          .mutateAsync({ body: { sources: chosen, owner, name: name.trim() } })
-          .then((made) => navigate(workflowPath(made.owner, made.name)))
-          .catch((caught: unknown) => setError(toApiError(caught)));
       }}
     >
       <SectionTitle order={3}>Combine workflows</SectionTitle>
@@ -103,15 +90,10 @@ export function Combine({
       </fieldset>
       <OwnerAndName owner={owner} name={name} setOwner={setOwner} setName={setName} />
       <div>
-        <Button
-          type="submit"
-          loading={combine.isPending}
-          disabled={chosen.length < 2 || name.trim() === ''}
-        >
+        <Button type="submit" disabled={chosen.length < 2 || name.trim() === ''}>
           Combine
         </Button>
       </div>
-      {error !== null && <ErrorBlock error={error} compact />}
     </form>
   );
 }

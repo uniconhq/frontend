@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { screen, waitFor, within } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { createMemoryRouter, RouterProvider } from 'react-router';
 import userEvent from '@/test/user-event';
@@ -49,11 +49,11 @@ function renderCombine() {
 }
 
 describe('combining workflows', () => {
-  it('combines two versions or more into a new workflow', async () => {
-    let asked: unknown = null;
+  it('keeps the form and does not send a combination', async () => {
+    let asked = false;
     server.use(
-      http.post('/api/v1/workflow-combinations', async ({ request }) => {
-        asked = await request.json();
+      http.post('/api/v1/workflow-combinations', () => {
+        asked = true;
         return HttpResponse.json({ owner: 'kenny', name: 'both' }, { status: 201 });
       }),
     );
@@ -68,13 +68,7 @@ describe('combining workflows', () => {
     await user.click(within(form).getByRole('checkbox', { name: 'unicon/classic@v2' }));
     await user.click(combine);
 
-    await waitFor(() =>
-      expect(router.state.location.pathname).toBe('/workflows/kenny/both'),
-    );
-    expect(asked).toEqual({
-      sources: ['acme/graders@v1', 'unicon/classic@v2'],
-      owner: 'kenny',
-      name: 'both',
-    });
+    expect(router.state.location.pathname).toBe('/');
+    expect(asked).toBe(false);
   });
 });

@@ -87,9 +87,7 @@ function TaskScoring({
     <section className={shared.stack} aria-label={label}>
       <SectionTitle order={3}>
         <PageLink to={taskCardPath(org, contest, task, 'tests')}>{label}</PageLink>
-        <span className={classes.titleRest}>
-          : {timeline.worth}, {timeline.when}
-        </span>
+        <span className={classes.titleRest}>: {timeline.when}</span>
       </SectionTitle>
       {latest === null ? (
         <BodyText tone="secondary">

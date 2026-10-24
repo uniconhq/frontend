@@ -3,7 +3,6 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@/test/user-event';
 import { http, HttpResponse } from 'msw';
 import type { FeedEntry, Grading, RegradeSummary } from '@/api/types';
-import { formatExact } from '@/lib/exact';
 import { renderApp } from '@/test/render';
 import { problem, server, signedIn, someone } from '@/test/server';
 import { organisedEntrant } from '@/test/contestant';
@@ -28,8 +27,6 @@ const grading: Grading = {
         test: 'main/1',
         outcome: 'wrong_answer',
         values: { numbers: {}, texts: {} },
-        credit: null,
-        best: null,
       },
     ],
     values: { numbers: {}, texts: {} },
@@ -44,6 +41,8 @@ const grading: Grading = {
   deadline_at: null,
   cancel_reason: null,
   automatic: false,
+  early: null,
+  pipeline: 'early',
   limit: null,
   retry_limit: null,
   regrade: null,
@@ -159,19 +158,15 @@ const nowStopped: FeedEntry = {
       change: 'stopped',
       earlier: {
         attempt: 1,
-        points: '62.5',
         accepted: 5,
         tests: 8,
         stopped: null,
-        values: {},
       },
       now: {
         attempt: 2,
-        points: '0',
         accepted: 0,
         tests: 8,
         stopped: 'compile_error',
-        values: {},
       },
     },
   },
@@ -966,8 +961,8 @@ describe('what a regrade changed', () => {
         .map((header) => header.textContent),
     ).toEqual(expect.arrayContaining(['Before the regrade', 'After the regrade']));
     const row = within(table).getByRole('rowgroup', { name: 'B submission 3 by ada' });
-    expect(row).toHaveTextContent(`${formatExact('62.5', 2)} points`);
-    expect(row).toHaveTextContent('Failed to compile, 0 points');
+    expect(row).not.toHaveTextContent(/points/);
+    expect(row).toHaveTextContent('Failed to compile, 0 of 8 tests passed');
     expect(row).toHaveTextContent('Now fails to compile');
     expect(asked).toContain(`regrade=${REGRADE.id}&change=stopped`);
     expect(screen.queryByRole('combobox', { name: 'Status' })).toBeNull();
@@ -978,15 +973,15 @@ describe('what a regrade changed', () => {
   });
 
   it('says what went down on a task with no points, by the values that decided it (#448)', async () => {
-    const side = { points: null, accepted: 5, tests: 5, stopped: null };
+    const side = { accepted: 5, tests: 5, stopped: null };
     const slower: FeedEntry = {
       ...nowStopped,
       grading: {
         ...nowStopped.grading,
         change: {
           change: 'down',
-          earlier: { ...side, attempt: 1, values: { time_ms: '28', memory_kb: '900' } },
-          now: { ...side, attempt: 2, values: { time_ms: '40', memory_kb: '900' } },
+          earlier: { ...side, attempt: 1 },
+          now: { ...side, attempt: 2 },
         },
       },
     };
@@ -1020,10 +1015,8 @@ describe('what a regrade changed', () => {
 
     const table = await screen.findByRole('table', { name: 'Gradings' });
     const row = within(table).getByRole('rowgroup', { name: 'B submission 3 by ada' });
-    await waitFor(() =>
-      expect(row).toHaveTextContent('5 of 5 tests passed, run time 28 ms'),
-    );
-    expect(row).toHaveTextContent('5 of 5 tests passed, run time 40 msWent down');
+    await waitFor(() => expect(row).toHaveTextContent('5 of 5 tests passed'));
+    expect(row).toHaveTextContent('Went down');
     expect(row).not.toHaveTextContent(/memory/);
   });
 

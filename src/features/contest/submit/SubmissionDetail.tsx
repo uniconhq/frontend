@@ -12,13 +12,7 @@ import { formatDateTime } from '@/lib/time';
 import { downloadHref, nameOf } from './download';
 import { useLiveConnected, useLiveRefused } from '@/live';
 import { serverNow } from '@/lib/time';
-import {
-  DELAYED_SENTENCE,
-  cancelReason,
-  lateness,
-  pollEvery,
-  verdictOf,
-} from './grading';
+import { DELAYED_SENTENCE, cancelReason, pollEvery, verdictOf } from './grading';
 import { overLimitSentence } from '@/ui/scored/scored-text';
 import shared from '../contest.module.css';
 import classes from './submit.module.css';
@@ -184,7 +178,6 @@ export function SubmissionDetail({
         <>
           <BodyText tone="secondary">
             Submitted {formatDateTime(new Date(view.data.submitted_at))}
-            {view.data.late_days > 0 && `, ${lateness(view.data.late_days)}`}
           </BodyText>
           <Files where={where} inputs={inputs} />
           {view.data.grading === null ? (

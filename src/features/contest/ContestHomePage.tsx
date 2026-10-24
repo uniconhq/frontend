@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { $api, queryView } from '@/api/query';
 import { useServerClock } from '@/api/use-server-time';
-import type { Board, ContestHome, PublicTask, TaskEntry } from '@/api/types';
+import type { ContestHome, PublicTask, TaskEntry } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { Card } from '@/ui/Card';
 import { PageLink } from '@/ui/PageLink';
@@ -11,14 +11,12 @@ import { SectionTitle } from '@/ui/SectionTitle';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
 import { taskPagePath } from '@/lib/contest-paths';
-import { inTeams } from '@/lib/entrants';
 import { contestPath } from '@/lib/organiser-paths';
 import { useContestParams } from '@/lib/route-params';
 import { contestViewSectionPath } from '@/lib/sections';
-import { formatDateTime, formatWhen } from '@/lib/time';
+import { formatDateTime } from '@/lib/time';
 import { ContestAnnouncements } from './threads/AnnouncementList';
 import { useMyQuestions } from './threads/questions';
-import { BOARDS_EVERY_MS, BoardList } from './boards/BoardList';
 import { BySession } from './BySession';
 import { useAnchor } from '@/ui/anchor';
 import { Countdown } from '@/ui/Countdown';
@@ -27,7 +25,6 @@ import { YourEntry } from './entry/YourEntry';
 import { notIn, TASK_STANDING } from './entry/not-in';
 import { SignInButtons, SignInPrompt } from './SignInPrompt';
 import { labelOf } from './task-names';
-import { boardPointsText, taskPointsText, type PointsText } from './task-points';
 import { taskTimeLines } from './time-left';
 import classes from './contest.module.css';
 
@@ -83,155 +80,26 @@ function Standing({
   );
 }
 
-/** Points as a line reads them, and when held-back points are shown. */
-function Points({ text }: { text: PointsText | null }) {
-  return (
-    <span className={classes.points}>
-      {text !== null && <span>{text.score}</span>}
-      {text?.pending != null && <span className={classes.pending}>{text.pending}</span>}
-    </span>
-  );
-}
-
-/**
- * Calls `onReveal` as the server's clock passes a time a task's held-back
- * points are shown on any leaderboard, so the page reads them then, not at
- * its next read.
- */
-function useReveals(tasks: TaskEntry[], at: number, onReveal: () => void) {
-  const passed = tasks
-    .flatMap((task) => task.points)
-    .filter((cell) => {
-      const until = cell.points?.pending_until;
-      return until != null && Date.parse(until) <= at;
-    }).length;
-  const last = useRef(passed);
-  useEffect(() => {
-    if (passed > last.current) onReveal();
-    last.current = passed;
-  }, [passed, onReveal]);
-}
-
-/**
- * The tasks with a column of points for each leaderboard the entrant sees
- * (#447), headed by its name, each cell the points as that board counts
- * them; each task's row headed by its letter and name, with where it stands
- * under it. The columns scroll sideways inside the card when there are more
- * than fit, the tasks' names staying in view.
- */
-function BoardColumns({
-  org,
-  contest,
-  tasks,
-  boards,
-  at,
-  counting,
-  notApproved,
-}: {
-  org: string;
-  contest: string;
-  tasks: TaskEntry[];
-  boards: string[];
-  at: number;
-  counting: boolean;
-  notApproved: string;
-}) {
-  const now = new Date(at);
-  return (
-    <div className={classes.columns}>
-      <table className={classes.taskTable} aria-label="Tasks">
-        <thead>
-          <tr>
-            <th scope="col">Task</th>
-            {boards.map((board) => (
-              <th key={board} scope="col">
-                {board}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {tasks.map((task) => (
-            <tr key={task.name}>
-              <th scope="row">
-                <div className={classes.taskCell}>
-                  <span className={classes.taskName}>
-                    <span className={classes.label}>{labelOf(task)}</span>
-                    <PageLink to={taskPagePath(org, contest, task.name)}>
-                      {task.title}
-                    </PageLink>
-                  </span>
-                  <Standing
-                    task={task}
-                    at={at}
-                    counting={counting}
-                    notApproved={notApproved}
-                  />
-                </div>
-              </th>
-              {boards.map((board, index) => {
-                const cell = task.points[index];
-                return (
-                  <td key={board}>
-                    <Points
-                      text={
-                        cell === undefined
-                          ? null
-                          : boardPointsText(cell, task.worth, now)
-                      }
-                    />
-                  </td>
-                );
-              })}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
 /**
  * A contest's released tasks as a signed-in person works from them, in the
- * contest's order: each a link to its page, with their points on it once
- * they are in an approved entrant, read again as held-back points are
- * shown, its worth alone before then, and where it stands for them, the
- * time left on it counted down by the server's clock. With one leaderboard
- * the points are one number, that board's; with several, a column each.
+ * contest's order: each a link to its page, and where it stands for them,
+ * the time left on it counted down by the server's clock.
  */
 function TaskList({
   org,
   contest,
   tasks,
-  boards,
-  onReveal,
   notApproved,
 }: {
   org: string;
   contest: string;
   tasks: TaskEntry[];
-  boards: string[];
-  onReveal: () => void;
   /** Where a task stands for a reader who is not an approved entrant. */
   notApproved: string;
 }) {
   const { at, measured } = useServerClock();
-  useReveals(tasks, at, onReveal);
   if (tasks.length === 0) {
     return <BodyText tone="secondary">No tasks are released yet.</BodyText>;
-  }
-  if (boards.length > 1) {
-    return (
-      <BoardColumns
-        org={org}
-        contest={contest}
-        tasks={tasks}
-        boards={boards}
-        at={at}
-        counting={measured}
-        notApproved={notApproved}
-      />
-    );
   }
   return (
     <ul className={classes.tasks} aria-label="Tasks">
@@ -239,7 +107,6 @@ function TaskList({
         <li key={task.name} className={classes.task}>
           <span className={classes.label}>{labelOf(task)}</span>
           <PageLink to={taskPagePath(org, contest, task.name)}>{task.title}</PageLink>
-          <Points text={taskPointsText(task, new Date(at))} />
           <Standing task={task} at={at} counting={measured} notApproved={notApproved} />
         </li>
       ))}
@@ -281,99 +148,11 @@ function Dates({ start, end }: { start: string; end: string }) {
   );
 }
 
-/** 1st, 2nd, 3rd, 4th, 11th, 21st: a place in a ranking. */
-function ordinal(place: number): string {
-  const tens = place % 100;
-  const last = place % 10;
-  const suffix =
-    tens >= 11 && tens <= 13
-      ? 'th'
-      : last === 1
-        ? 'st'
-        : last === 2
-          ? 'nd'
-          : last === 3
-            ? 'rd'
-            : 'th';
-  return `${String(place)}${suffix}`;
-}
-
-/**
- * Where the reader's entrant stands on one leaderboard, in a line, `team`
- * saying so of a team; how many it shows for a reader with no entrant. The
- * place is said alone: a board may show only the top rows or the reader's
- * own, so the rows served are not everyone on it.
- */
-function placeOn(board: Board, entrant: string | null, team: boolean): string {
-  if (board.nothing_shown) {
-    return board.shown_at === null
-      ? 'Shown once its tasks are released.'
-      : `Shown from ${formatWhen(new Date(board.shown_at))}.`;
-  }
-  const count = board.rows.length;
-  const row =
-    entrant === null
-      ? undefined
-      : board.rows.find((found) => found.row.entrant === entrant);
-  const who = team ? 'Your team is' : 'You are';
-  if (row === undefined) {
-    return entrant === null
-      ? `It shows ${String(count)} ${count === 1 ? 'entrant' : 'entrants'}.`
-      : `${who} not on it yet.`;
-  }
-  return `${who} ${ordinal(row.rank)}.`;
-}
-
-/**
- * The leaderboards the reader may see, as where they stand on each, with the
- * way to the boards themselves; nothing at all when the contest shows them
- * none. Read again now and then, as the leaderboards page reads them.
- */
-function LeaderboardCard({
-  org,
-  contest,
-  entrant,
-  team,
-}: {
-  org: string;
-  contest: string;
-  entrant: string | null;
-  team: boolean;
-}) {
-  const view = queryView(
-    $api.useQuery(
-      'get',
-      '/api/v1/orgs/{org}/contests/{contest}/boards',
-      { params: { path: { org, contest } } },
-      { refetchInterval: BOARDS_EVERY_MS },
-    ),
-  );
-  if (view.state === 'ready' && view.data.length === 0) return null;
-  const several = view.state === 'ready' && view.data.length > 1;
+/** The contest's leaderboards, rebuilt in a later phase. */
+function LeaderboardCard() {
   return (
     <Card>
-      <section className={classes.stack} aria-label="Leaderboard">
-        <SectionTitle>{several ? 'Leaderboards' : 'Leaderboard'}</SectionTitle>
-        {view.state === 'loading' && <PageSkeleton rows={1} />}
-        {view.state === 'error' && (
-          <ErrorBlock error={view.error} onRetry={view.retry} compact />
-        )}
-        {view.state === 'ready' && (
-          <ul className={classes.places} aria-label="Where you stand">
-            {view.data.map((board) => (
-              <li key={board.board}>
-                {several && <strong>{board.board}: </strong>}
-                {placeOn(board, entrant, team)}
-              </li>
-            ))}
-          </ul>
-        )}
-        <div className={classes.links}>
-          <PageLink to={contestViewSectionPath(org, contest, 'boards')}>
-            {several ? 'See the leaderboards' : 'See the leaderboard'}
-          </PageLink>
-        </div>
-      </section>
+      <BodyText>This page is being rebuilt.</BodyText>
     </Card>
   );
 }
@@ -440,10 +219,10 @@ function SignedInHome({ org, contest }: { org: string; contest: string }) {
 
 /**
  * A contest's page in the order a running contest is worked from: how long is
- * left, then the tasks with their points and where each stands, the
- * leaderboard, the announcements and the way to ask a question. The
- * person's entry comes first while it is still to settle (to register, to
- * wait on, or refused), and last once they are in, or organise the contest.
+ * left, then the tasks and where each stands, the leaderboard, the
+ * announcements and the way to ask a question. The person's entry comes
+ * first while it is still to settle (to register, to wait on, or refused),
+ * and last once they are in, or organise the contest.
  */
 function Home({
   org,
@@ -507,18 +286,11 @@ function Home({
             org={org}
             contest={contest}
             tasks={home.tasks}
-            boards={home.boards}
-            onReveal={onBoundary}
             notApproved={TASK_STANDING[notIn(home)]}
           />
         </div>
       </Card>
-      <LeaderboardCard
-        org={org}
-        contest={contest}
-        entrant={entrant?.id ?? null}
-        team={inTeams(home.registration)}
-      />
+      <LeaderboardCard />
       <Card>
         <ContestAnnouncements org={org} contest={contest} />
       </Card>
@@ -530,9 +302,9 @@ function Home({
 
 /**
  * The contest as a visitor sees it: only a public contest, its released
- * tasks and its leaderboards shown to everyone, with a way to sign in to
- * register. A contest that is not public asks them to sign in first, since
- * it may be one they can see with a session.
+ * tasks and its leaderboards, with a way to sign in to register. A contest
+ * that is not public asks them to sign in first, since it may be one they
+ * can see with a session.
  */
 function PublicHome({ org, contest }: { org: string; contest: string }) {
   const view = queryView(
@@ -569,26 +341,9 @@ function PublicHome({ org, contest }: { org: string; contest: string }) {
           <PublicTaskList org={org} contest={contest} tasks={found.tasks} />
         </div>
       </Card>
-      <LandingBoards org={org} contest={contest} />
+      <LeaderboardCard />
     </Page>
   );
-}
-
-/**
- * The contest's leaderboards shown to everyone, read without a session,
- * under its tasks; nothing at all when it shows none.
- */
-function LandingBoards({ org, contest }: { org: string; contest: string }) {
-  const view = queryView(
-    $api.useQuery(
-      'get',
-      '/api/v1/public/contests/{org}/{contest}/boards',
-      { params: { path: { org, contest } } },
-      { refetchInterval: BOARDS_EVERY_MS },
-    ),
-  );
-  if (view.state === 'ready' && view.data.length === 0) return null;
-  return <BoardList view={view} empty="" />;
 }
 
 /**

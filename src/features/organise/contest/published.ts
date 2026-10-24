@@ -1,12 +1,9 @@
-import { useQueries } from '@tanstack/react-query';
 import { $api } from '@/api/query';
-import type { FileContent, TaskStanding, ValueMeaning } from '@/api/types';
+import type { FileContent, TaskStanding } from '@/api/types';
 import type { HeldGroup } from '../forms/board-words';
 import { readTask, type GroupValues, type TaskValues } from '../forms/task-values';
 import { readSettings } from '../task/build-data';
 import { closesWithContest } from './timeline';
-
-const STANDINGS = '/api/v1/orgs/{org}/contests/{contest}/organise/tasks';
 
 /**
  * What entrants are told of a task: its settings as its latest publication
@@ -66,72 +63,4 @@ export function heldOf(
       group: group.name,
       closes,
     }));
-}
-
-/** The values one published task's latest publication reports, by its name (M58). */
-export type TaskValuesReported = { task: string; meanings: ValueMeaning[] };
-
-/**
- * What each published task of the contest reports, as its latest
- * publication names the values, for a leaderboard's ways to rank and its
- * sentence; a withdrawn task is left out, since no leaderboard counts it.
- * Null until the tasks are read, or when they cannot be.
- */
-export function useReportedValues(
-  org: string,
-  contest: string,
-): TaskValuesReported[] | null {
-  const standings = $api.useQuery(
-    'get',
-    STANDINGS,
-    { params: { path: { org, contest } } },
-    { retry: false },
-  );
-  if (standings.data === undefined) return null;
-  return standings.data.flatMap((standing) =>
-    standing.withdrawn || standing.state.latest === null
-      ? []
-      : [{ task: standing.task.name, meanings: standing.state.latest.meanings }],
-  );
-}
-
-/**
- * Every published task's held test groups, for the sentences of the boards
- * that cover them; null until every one is read, or when one cannot be, so a
- * sentence then says what its board counts in general.
- */
-export function useHeldGroups(
-  org: string,
-  contest: string,
-  times: { start: string; end: string } | null,
-): HeldGroup[] | null {
-  const standings = $api.useQuery(
-    'get',
-    STANDINGS,
-    { params: { path: { org, contest } } },
-    { retry: false },
-  );
-  const published = (standings.data ?? []).filter(
-    (standing) => standing.state.latest !== null,
-  );
-  const reads = useQueries({
-    queries: published.map((standing) =>
-      publishedQuery(
-        org,
-        contest,
-        standing.task.name,
-        standing.state.latest?.version ?? '',
-      ),
-    ),
-  });
-  if (standings.data === undefined) return null;
-  const held: HeldGroup[] = [];
-  for (const [at, standing] of published.entries()) {
-    const file = reads[at]?.data;
-    if (file === undefined) return null;
-    const read = readPublished(file);
-    if ('unreadable' in read) return null;
-    held.push(...heldOf(standing, read.groups, times));
-  }
-  return held;
 }

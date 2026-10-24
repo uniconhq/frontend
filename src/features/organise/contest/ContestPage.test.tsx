@@ -204,11 +204,11 @@ describe("the contest's tasks", () => {
     expect(sort).toHaveTextContent(`Publication 1, ${at('2026-09-20T10:00:00Z')}`);
     expect(sort).not.toHaveTextContent(/grades|grading/);
     expect(sort).toHaveTextContent(
-      `100 points, open for the whole contest; due ${at('2026-10-08T09:00:00Z')}, then 10% less per started day late`,
+      `open for the whole contest; due ${at('2026-10-08T09:00:00Z')}`,
     );
 
     const sum = screen.getByRole('listitem', { name: 'B · sum' });
-    expect(sum).toHaveTextContent('no points, open for the whole contest');
+    expect(sum).toHaveTextContent('open for the whole contest');
   });
 
   it('names a time of its own, and the marks a marked board lets each entrant make', async () => {
@@ -223,7 +223,6 @@ describe("the contest's tasks", () => {
             timeline: {
               ...sort.timeline,
               release_at: '2026-10-02T09:00:00Z',
-              late_per_day: '1',
             },
           },
         ]),
@@ -248,7 +247,7 @@ describe("the contest's tasks", () => {
     renderApp(CONTEST);
 
     expect(await screen.findByRole('listitem', { name: 'A · sort' })).toHaveTextContent(
-      `100 points, opens ${at('2026-10-02T09:00:00Z')}; due ${at('2026-10-08T09:00:00Z')}, nothing once late; closes with the contest; an entrant may mark up to 2 submissions`,
+      `opens ${at('2026-10-02T09:00:00Z')}; due ${at('2026-10-08T09:00:00Z')}; closes with the contest; an entrant may mark up to 2 submissions`,
     );
   });
 
@@ -257,7 +256,7 @@ describe("the contest's tasks", () => {
     if (sort === undefined) throw new Error('standings has sort');
     const rated = (late: string): TaskStanding => ({
       ...sort,
-      timeline: { ...sort.timeline, late_per_day: late },
+      timeline: { ...sort.timeline, due: late === '' ? null : sort.timeline.due },
     });
     server.use(
       signedIn,
@@ -269,8 +268,9 @@ describe("the contest's tasks", () => {
     renderApp(CONTEST);
 
     const items = await screen.findAllByRole('listitem', { name: /sort$/ });
-    expect(items[0]).toHaveTextContent('then 0.01% less per started day late');
-    expect(items[1]).toHaveTextContent('then 0.05% less per started day late');
+    expect(items[0]).toHaveTextContent(`due ${at('2026-10-08T09:00:00Z')}`);
+    expect(items[0]).not.toHaveTextContent(/%/);
+    expect(items[1]).not.toHaveTextContent(/%/);
   });
 
   it("says how many problems hold back a task's last save, which its own page lists", async () => {
@@ -298,13 +298,12 @@ describe("the contest's tasks", () => {
         errors: [{ path: '', message: 'task.yaml is missing.' }],
         statement_written: false,
         head_statement_written: false,
+        results: { history: [], released: false },
       },
       timeline: {
         release_at: '2026-10-01T09:00:00Z',
         due: null,
-        late_per_day: null,
         closes: '2026-10-15T09:00:00Z',
-        worth: null,
       },
     };
     server.use(
@@ -327,7 +326,7 @@ describe("the contest's tasks", () => {
     const max = await screen.findByRole('listitem', { name: 'C · max' });
     expect(max).toHaveTextContent('Never published');
     expect(max).toHaveTextContent('1 problem in its last save');
-    expect(max).toHaveTextContent('points known once the task is published');
+    expect(max).toHaveTextContent('open for the whole contest');
 
     const min = screen.getByRole('listitem', { name: 'D · min' });
     expect(min).toHaveTextContent('Never published');
@@ -560,8 +559,8 @@ describe('how the contest is scored (M52)', () => {
       signedIn,
       http.get(`${CONTEST_API}/organise/tasks`, () =>
         HttpResponse.json([
-          { ...sort, timeline: { ...sort.timeline, worth: '50' } },
-          { ...sum, timeline: { ...sum.timeline, worth: '100' } },
+          { ...sort, timeline: { ...sort.timeline } },
+          { ...sum, timeline: { ...sum.timeline } },
         ]),
       ),
       contestFile([
@@ -595,7 +594,7 @@ describe('how the contest is scored (M52)', () => {
     );
     const sortPart = await within(card).findByRole('region', { name: 'A · Sort' });
     expect(within(sortPart).getByRole('heading', { level: 3 })).toHaveTextContent(
-      `A · Sort: 50 points, open for the whole contest; due ${at('2026-10-08T09:00:00Z')}, then 10% less per started day late`,
+      `A · Sort: open for the whole contest; due ${at('2026-10-08T09:00:00Z')}`,
     );
     await line(
       sortPart,
@@ -626,7 +625,7 @@ describe('how the contest is scored (M52)', () => {
 
     const sumPart = within(card).getByRole('region', { name: 'B · Sum' });
     expect(within(sumPart).getByRole('heading', { level: 3 })).toHaveTextContent(
-      'B · Sum: 100 points, open for the whole contest',
+      'B · Sum: open for the whole contest',
     );
     // Where the worth comes from is said only where the contest sets it.
     expect(sumPart).not.toHaveTextContent('scaled');
@@ -649,7 +648,7 @@ describe('how the contest is scored (M52)', () => {
             ...sum,
             label: 'A',
             state: { ...sum.state, draft: false, errors: [] },
-            timeline: { ...sum.timeline, worth: null },
+            timeline: { ...sum.timeline },
           },
         ]),
       ),
@@ -693,7 +692,7 @@ describe('how the contest is scored (M52)', () => {
             submissions: 3,
             take_out: null,
             state: { ...sum.state, draft: false, errors: [] },
-            timeline: { ...sum.timeline, worth: '100' },
+            timeline: { ...sum.timeline },
           },
         ]),
       ),
@@ -736,7 +735,7 @@ describe('how the contest is scored (M52)', () => {
             ...sum,
             label: 'A',
             state: { ...sum.state, draft: false, errors: [] },
-            timeline: { ...sum.timeline, worth: '100' },
+            timeline: { ...sum.timeline },
           },
         ]),
       ),
@@ -802,9 +801,9 @@ describe('how the contest is scored, as published', () => {
         errors: [],
         statement_written: false,
         head_statement_written: false,
+        results: { history: [], released: false },
       },
-      // A task never published has no worth yet.
-      timeline: { ...standings[0]!.timeline, worth: null },
+      timeline: { ...standings[0]!.timeline },
     };
     server.use(
       signedIn,
@@ -853,7 +852,7 @@ describe('how the contest is scored, as published', () => {
       within(fresh).getByText('Not published yet, so entrants are told nothing of it.'),
     ).toBeVisible();
     expect(within(fresh).getByRole('heading', { level: 3 })).toHaveTextContent(
-      'C · new: points known once the task is published',
+      `C · new: open for the whole contest; due ${at('2026-10-08T09:00:00Z')}`,
     );
   });
 });
@@ -891,7 +890,7 @@ describe("a task's place in the contest, changed from its row", () => {
       name: 'A · sort in this contest',
     });
     const worth = await within(dialog).findByRole('textbox', { name: 'Worth' });
-    expect(worth).toHaveAttribute('placeholder', '100, its test groups’ total');
+    expect(worth).toHaveAttribute('placeholder', 'Its test groups’ total');
     await user.type(worth, '120');
     const due = within(dialog).getByRole('radiogroup', { name: 'Due' });
     await user.click(within(due).getByRole('radio', { name: 'At a time' }));
@@ -912,7 +911,7 @@ describe("a task's place in the contest, changed from its row", () => {
     });
   });
 
-  it('offers a task that gives no points neither a worth nor a due time, saying why', async () => {
+  it('offers a worth and a due time', async () => {
     server.use(signedIn, standingList, ...repoFiles);
     settingsSaved();
     const user = userEvent.setup();
@@ -925,10 +924,7 @@ describe("a task's place in the contest, changed from its row", () => {
       name: 'B · sum in this contest',
     });
     const worth = await within(dialog).findByRole('textbox', { name: 'Worth' });
-    expect(worth).toBeDisabled();
-    expect(worth).toHaveAccessibleDescription(
-      'This task gives no points, so it has no worth.',
-    );
+    expect(worth).toBeEnabled();
     expect(
       within(within(dialog).getByRole('radiogroup', { name: 'Due' })).getByRole(
         'radio',
@@ -936,7 +932,7 @@ describe("a task's place in the contest, changed from its row", () => {
           name: 'At a time',
         },
       ),
-    ).toBeDisabled();
+    ).toBeEnabled();
   });
 
   it('moves a task down the list from its row, which saves at once', async () => {
@@ -1012,7 +1008,7 @@ describe("a task's place in the contest, changed from its row", () => {
     const line = within(row).getByRole('button', {
       name: 'Change A · sort in this contest',
     });
-    expect(line).toHaveTextContent(/^100 points, .*·Change$/);
+    expect(line).toHaveTextContent(/open for the whole contest.*·Change$/);
     expect(within(row).queryByRole('button', { name: /^Edit/ })).toBeNull();
   });
 
@@ -1096,7 +1092,7 @@ describe("a task's place in the contest, changed from its row", () => {
     renderApp(CONTEST);
 
     const row = await screen.findByRole('listitem', { name: 'A · sort' });
-    expect(within(row).getByText(/^100 points, /)).toBeVisible();
+    expect(within(row).getByText(/open for the whole contest/)).toBeVisible();
     expect(within(row).queryByRole('button')).toBeNull();
   });
 });
@@ -1192,7 +1188,7 @@ describe("the contest's sections", () => {
     await says('Gradings', '3 waiting to be graded, 1 being graded.');
     await says('Announcements', '2 posted; the latest is “Task B fixed”.');
     await says('Questions', 'Nobody has asked anything yet.');
-    await says('Leaderboards', 'No leaderboard yet.');
+    await says('Leaderboards', 'This page is being rebuilt.');
     await says('Contest organisers', '0 organisers');
     // A contest holds no file but its settings, so it has no Files card (M43).
     expect(screen.queryByRole('region', { name: 'Files' })).toBeNull();
@@ -1232,13 +1228,12 @@ describe('creating a task', () => {
             errors: [],
             statement_written: false,
             head_statement_written: false,
+            results: { history: [], released: false },
           },
           timeline: {
             release_at: '2026-10-01T09:00:00Z',
             due: null,
-            late_per_day: null,
             closes: '2026-10-15T09:00:00Z',
-            worth: null,
           },
         });
         return HttpResponse.json({ name: body.name }, { status: 201 });

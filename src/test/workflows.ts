@@ -99,6 +99,12 @@ function port(type: string, more: Partial<PortDecl> = {}): PortDecl {
     secret: false,
     description: null,
     outcomes: null,
+    at_least: null,
+    at_most: null,
+    better: null,
+    inputs: null,
+    names: null,
+    outputs: null,
     ...more,
   };
 }
@@ -121,6 +127,7 @@ function retired(name: string): PrimitiveInfo {
     version: 'v1',
     batch: false,
     network: false,
+    forms: {},
     limits: {},
     limits_from: {},
     inputs: {},
@@ -139,6 +146,7 @@ export const PRIMITIVES: PrimitiveInfo[] = [
     version: 'v2',
     batch: false,
     network: false,
+    forms: {},
     limits: { ...LIMITS, time_ms: 60000, cpu_ms: 60000, memory_mb: 1024 },
     limits_from: {},
     inputs: {
@@ -178,6 +186,7 @@ export const PRIMITIVES: PrimitiveInfo[] = [
     version: 'v2',
     batch: true,
     network: false,
+    forms: {},
     limits: { ...LIMITS, pids: 32, output_mb: 1 },
     limits_from: {},
     inputs: {
@@ -208,11 +217,24 @@ export const PRIMITIVES: PrimitiveInfo[] = [
     version: 'v2',
     batch: true,
     network: false,
+    forms: {},
     limits: LIMITS,
     limits_from: {
-      time_ms: { input: 'time_limit', scale: '2000', add: '3000' },
-      cpu_ms: { input: 'time_limit', scale: '2000', add: '3000' },
-      memory_mb: { input: 'memory_limit', scale: '1', add: '256' },
+      time_ms: {
+        input: 'time_limit',
+        scale: '2000',
+        add: '3000',
+        max: null,
+        sum: null,
+      },
+      cpu_ms: { input: 'time_limit', scale: '2000', add: '3000', max: null, sum: null },
+      memory_mb: {
+        input: 'memory_limit',
+        scale: '1',
+        add: '256',
+        max: null,
+        sum: null,
+      },
     },
     inputs: {
       binary: port('file', { runs: true, description: 'The program to run.' }),

@@ -7,7 +7,7 @@ import type { GraphBox, GraphWire } from './graph';
  * own inputs.
  */
 
-export type StepKind = 'input' | 'primitive' | 'workflow';
+type StepKind = 'input' | 'primitive' | 'workflow';
 
 export type Step = {
   id: string;
@@ -26,12 +26,12 @@ export type Step = {
   newer?: string;
 };
 
-export type Wire = { from: string; fromPort: string; to: string; toPort: string };
+type Wire = { from: string; fromPort: string; to: string; toPort: string };
 
 /** A name the level gives, and the step output it comes from. */
 export type Report = { name: string; box: string; port: string; unit?: string };
 
-export type WorkflowInput = {
+type WorkflowInput = {
   name: string;
   type: string;
   said: string;
@@ -748,19 +748,4 @@ export function viewOf(level: Level): { boxes: GraphBox[]; wires: GraphWire[] } 
       toPort: output.name,
     });
   return { boxes, wires };
-}
-
-export function isCatalogueItem(value: unknown): value is CatalogueItem {
-  if (typeof value !== 'object' || value === null) return false;
-  const item = value as Partial<CatalogueItem>;
-  return (
-    (item.group === 'input' ||
-      item.group === 'primitive' ||
-      item.group === 'workflow') &&
-    typeof item.title === 'string' &&
-    typeof item.line === 'string' &&
-    typeof item.ref === 'string' &&
-    Array.isArray(item.inputs) &&
-    Array.isArray(item.outputs)
-  );
 }

@@ -97,14 +97,12 @@ export function home(overrides: Partial<ContestHome> = {}): ContestHome {
     registration: entry(),
     organises: false,
     now: '2026-09-12T10:00:00Z',
-    boards: [],
+    standing: [],
     tasks: [
       {
         name: 'sum',
         label: 'A',
         title: 'Sum of Two',
-        worth: '100',
-        points: [],
         release: OPEN,
         due: null,
         closes: '2026-09-12T10:30:00Z',
@@ -126,6 +124,7 @@ export function inputField(overrides: Partial<InputField> = {}): InputField {
     min: null,
     max: null,
     max_size: 10 * 1024 * 1024,
+    parts: null,
     ...overrides,
   };
 }
@@ -142,7 +141,6 @@ export const taskPage: TaskPage = {
   name: 'sum',
   label: 'A',
   title: 'Sum of Two',
-  worth: '100',
   statement: '# Sum\n\nRead two numbers and print their **sum**.\n',
   submissions: { max: 50, rate: { count: 1, per: 30 } },
   inputs: [inputField(), languageField],
@@ -219,9 +217,11 @@ export function grading(overrides: Partial<GradingResult> = {}): GradingResult {
     values: reported(),
     reason: null,
     limit: null,
-    points: null,
-    factor: null,
-    folded: {},
+    compiled: null,
+    once: { reports: {}, texts: {} },
+    reveal_at: null,
+    run_values: [],
+    runs: [],
     meanings: [],
     ...overrides,
   };
@@ -235,14 +235,13 @@ export function reported(
   return { numbers, texts };
 }
 
-/** A test's row of a result, unscored unless its credit is given. */
+/** A test's row of a result. */
 export function graded(
   test: string,
   outcome: Outcome,
   values: Reported = reported(),
-  credit: string | null = null,
 ): GradedTest {
-  return { test, outcome, values, credit, best: null };
+  return { test, outcome, values };
 }
 
 /**
@@ -254,26 +253,17 @@ export const accepted = grading({
   status: 'graded',
   outcome: 'accepted',
   values: reported({}, { log: 'Compiled cleanly.' }),
-  points: { shown: '100', pending: '0', pending_until: null },
-  factor: '1',
   groups: [
     {
       group: 'samples',
       show: 'always',
       outcome: 'accepted',
       tests: [
-        graded(
-          'samples/1',
-          'accepted',
-          reported({ time_ms: '12', memory_kb: '2048' }),
-          '1',
-        ),
-        graded('samples/2', 'accepted', reported(), '1'),
+        graded('samples/1', 'accepted', reported({ time_ms: '12', memory_kb: '2048' })),
+        graded('samples/2', 'accepted', reported()),
       ],
       shown_at: null,
       ran: true,
-      points: '0',
-      max: '0',
     },
     {
       group: 'main',
@@ -282,8 +272,6 @@ export const accepted = grading({
       tests: null,
       shown_at: '2026-09-12T11:00:00Z',
       ran: true,
-      points: '100',
-      max: '100',
     },
   ],
 });
@@ -296,7 +284,6 @@ export function submission(
   return {
     number,
     submitted_at: `2026-09-12T09:${String(number).padStart(2, '0')}:00Z`,
-    late_days: 0,
     grading: graded,
     ...overrides,
   };

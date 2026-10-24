@@ -172,7 +172,6 @@ export function TaskSubmissions({
             contest={contest}
             task={task}
             marked={page.marks !== null}
-            points={page.worth !== null}
           />
         </div>
       </Card>

@@ -68,52 +68,12 @@ export const WHO = [
   },
 ];
 
-export const KINDS = [
-  {
-    value: 'points',
-    label: 'Points, most first',
-    description: 'More points ranks higher.',
-  },
-  {
-    value: 'penalty',
-    label: 'Penalty minutes, fewest first',
-    description:
-      'The minutes from the start to each counted submission, and a set number more for each earlier attempt. Fewer ranks higher.',
-  },
-  {
-    value: 'value',
-    label: 'A value the tasks report',
-    description:
-      'A number the tasks’ workflow reports, such as run time. The workflow says whether higher or lower is better.',
-  },
-];
-
-/** Why the save would refuse penalty minutes as the first key (C3), or null. */
-export function penaltyRefusal(first: boolean): string | null {
-  return first
-    ? 'Penalty minutes only break ties, so they are never the first way to rank.'
-    : null;
-}
-
-/**
- * Why the save would refuse the best submission on each test group for a
- * board ranked by `order` (C3), or null: it needs points first and no value.
- */
-export function perGroupRefusal(order: OrderKeyValues[]): string | null {
-  const pointsFirst = order.length === 0 || order[0]?.kind === 'points';
-  return pointsFirst && !order.some((key) => key.kind === 'value')
-    ? null
-    : 'The best submission on each test group needs points ranked first and no value to rank by.';
-}
-
 /**
  * One key of a board's order in words, saying a total of what: "their total
  * points over every task, most first". `over` is the tasks the total runs
  * over, said with the first key only. A value is named by its title where
  * `values` give one, "their total run time", by its key until then (M58),
- * and ranks lowest or highest first as its workflow says is better. Points
- * and penalty minutes read as the ways to rank say them in the board's form
- * (`orderSummary`).
+ * and ranks lowest or highest first as its workflow says is better.
  */
 function keyWords(
   key: OrderKeyValues,

@@ -121,6 +121,7 @@ const UNREAD: WorkflowForm = {
   problem: 'The workflow unicon/checked@v1 cannot be read.',
   graded: false,
   newer: null,
+  runs: false,
 };
 
 function declared(
@@ -148,6 +149,7 @@ const CHECKED: WorkflowForm = {
   problem: null,
   graded: false,
   newer: null,
+  runs: false,
   inputs: [
     declared('submission', 'file', { contestant: true }),
     declared('language', 'enum', {

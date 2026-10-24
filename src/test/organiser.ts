@@ -95,6 +95,8 @@ export const publications: Publication[] = [
     grading_changed: true,
     changes: ['plans/default.json added'],
     at: '2026-09-20T10:00:00Z',
+    check: null,
+    failed_checks: [],
     meanings: classicMeanings,
   },
   {
@@ -103,6 +105,8 @@ export const publications: Publication[] = [
     grading_changed: false,
     changes: [],
     at: '2026-09-21T10:00:00Z',
+    check: null,
+    failed_checks: [],
     meanings: classicMeanings,
   },
 ];
@@ -114,6 +118,7 @@ export const publishedTask: TaskState = {
   errors: [],
   statement_written: true,
   head_statement_written: true,
+  results: { history: [], released: false },
 };
 
 export const draftTask: TaskState = {
@@ -128,6 +133,7 @@ export const draftTask: TaskState = {
   ],
   statement_written: true,
   head_statement_written: true,
+  results: { history: [], released: false },
 };
 
 export const taskState = http.get(TASK_API, () => HttpResponse.json(publishedTask));
@@ -154,9 +160,7 @@ export const standings: TaskStanding[] = [
     timeline: {
       release_at: '2026-10-01T09:00:00Z',
       due: '2026-10-08T09:00:00Z',
-      late_per_day: '0.1',
       closes: '2026-10-15T09:00:00Z',
-      worth: '100',
     },
   },
   {
@@ -169,9 +173,7 @@ export const standings: TaskStanding[] = [
     timeline: {
       release_at: '2026-10-01T09:00:00Z',
       due: null,
-      late_per_day: null,
       closes: '2026-10-15T09:00:00Z',
-      worth: null,
     },
   },
 ];

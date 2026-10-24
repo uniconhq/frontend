@@ -8,7 +8,7 @@
  */
 
 /** Where a node sits in the line, as string offsets. */
-export type Span = { from: number; to: number };
+type Span = { from: number; to: number };
 
 export type FormulaNode = (
   | { kind: 'name'; name: string }
@@ -53,7 +53,7 @@ export type Tray = 'fold' | 'pick' | 'maths' | 'test';
  * leaderboard), or a value read for each run (each submission), where a
  * group's columns stand for the run being looked at.
  */
-export type Take = 'number' | 'any' | 'set' | 'each';
+type Take = 'number' | 'any' | 'set' | 'each';
 
 /** What a part of a formula is. */
 export type Kind = 'number' | 'text' | 'pick' | 'set' | 'unknown';
@@ -127,7 +127,7 @@ const pick = (
   ...(optional === undefined ? {} : { optional }),
 });
 
-export const OPERATIONS: Operation[] = [
+const OPERATIONS: Operation[] = [
   fold(
     'sum-runs',
     'sum',
@@ -371,7 +371,7 @@ function fits(operation: Operation, count: number): boolean {
 }
 
 /** The catalogue entry a node is, by its name, its inputs and the scope. */
-export function operationOf(op: string, count: number, where: Where): Operation | null {
+function operationOf(op: string, count: number, where: Where): Operation | null {
   const here = OPERATIONS.filter(
     (operation) =>
       operation.op === op &&

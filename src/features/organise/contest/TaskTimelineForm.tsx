@@ -3,7 +3,7 @@ import type { TaskStanding } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
 import { RadioGroup } from '@/ui/RadioGroup';
-import { formatWorth } from '@/lib/exact';
+import { NumberField, TimeField } from '../forms/fields';
 import {
   readContest,
   writeContest,
@@ -11,7 +11,6 @@ import {
   type TaskEntryValues,
 } from '../forms/contest-values';
 import type { FormProps } from '../forms/DefinitionFile';
-import { NumberField, TimeField } from '../forms/fields';
 import { numberProblem } from '../forms/yaml-doc';
 import { ContestFile, FieldBox } from './ContestFile';
 import { useOpenedField } from './opened';
@@ -24,9 +23,7 @@ import forms from '../forms/forms.module.css';
  * One task's place in the contest, changed from its row on the contest's
  * page or from its own page: what it is worth, when it opens, falls due and
  * closes, what a late day costs, and how many submissions may be marked
- * when a board counts marked ones. A setting the
- * save would refuse is not offered, with the reason beside it: a task that
- * gives no points has no worth and no due time.
+ * when a leaderboard counts marked ones.
  */
 export function TaskTimelineForm({
   org,
@@ -75,11 +72,7 @@ function EntryForm({
   const set = (change: Partial<TaskEntryValues>) =>
     setEntry((before) => (before === undefined ? before : { ...before, ...change }));
   const raw = (key: string) => read.rawTimes[`tasks.${String(entry.at)}.${key}`];
-  const noPoints = standing.timeline.worth === null && standing.state.latest !== null;
-  const total =
-    entry.worth === '' && standing.timeline.worth !== null
-      ? `${formatWorth(standing.timeline.worth)}, its test groups’ total`
-      : 'Its test groups’ total';
+  const total = 'Its test groups’ total';
   const marks = markedBoardCovers(read.values, entry.id);
   const after: ContestValues = {
     ...read.values,
@@ -116,12 +109,7 @@ function EntryForm({
           value={entry.worth}
           onChange={(worth) => set({ worth })}
           placeholder={total}
-          hint={
-            noPoints
-              ? 'This task gives no points, so it has no worth.'
-              : 'The most points this task gives in the contest. Left empty, it is the total of its test groups’ points.'
-          }
-          disabled={noPoints}
+          hint="The most points this task gives in the contest. Left empty, it is the total of its test groups’ points."
         />
       </FieldBox>
       <FieldBox name="release_at">
@@ -149,9 +137,6 @@ function EntryForm({
       <FieldBox name="due">
         <RadioGroup
           label="Due"
-          description={
-            noPoints ? 'A task that gives no points is never late.' : undefined
-          }
           value={entry.due === '' ? 'none' : 'at'}
           options={[
             { value: 'none', label: 'No due time' },
@@ -161,7 +146,6 @@ function EntryForm({
             set({ due: choice === 'at' ? read.values.end : '' });
             if (choice !== 'at') setLate('');
           }}
-          disabled={noPoints}
         />
         {entry.due !== '' && (
           <TimeField

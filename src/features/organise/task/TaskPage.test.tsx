@@ -46,14 +46,12 @@ describe('the task page', () => {
       name: 'Change B · sum in this contest',
     });
     expect(within(status).getByText('In Spring:')).toBeVisible();
-    expect(line).toHaveTextContent('no points, open for the whole contest·Change');
+    expect(line).toHaveTextContent('open for the whole contest·Change');
     await user.click(line);
     const dialog = await screen.findByRole('dialog', {
       name: 'B · sum in this contest',
     });
-    expect(
-      await within(dialog).findByRole('textbox', { name: 'Worth' }),
-    ).toBeDisabled();
+    expect(await within(dialog).findByRole('textbox', { name: 'Worth' })).toBeEnabled();
   });
 
   it('reads where the task stands in its contest again after a save, as its points can move with it', async () => {
@@ -161,9 +159,7 @@ describe('the task page', () => {
     renderApp(TASK);
 
     const status = await screen.findByLabelText('Where the task stands');
-    expect(
-      await within(status).findByText('no points, open for the whole contest'),
-    ).toBeVisible();
+    expect(await within(status).findByText('open for the whole contest')).toBeVisible();
     expect(
       within(status).queryByRole('button', { name: /in this contest$/ }),
     ).toBeNull();

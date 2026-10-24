@@ -44,8 +44,7 @@ describe('a task page for a signed-in person', () => {
     ).toBeVisible();
     expect(within(list).getByText('Due')).toBeVisible();
     expect(within(list).getByText('Closes')).toBeVisible();
-    expect(within(list).getByText('Worth')).toBeVisible();
-    expect(within(list).getByText('100 points')).toBeVisible();
+    expect(within(list).queryByText('Worth')).toBeNull();
     expect(screen.getByRole('link', { name: 'Back to the contest' })).toHaveAttribute(
       'href',
       '/contests/acme/spring',
@@ -72,9 +71,7 @@ describe('a task page for a signed-in person', () => {
     server.use(
       signedIn,
       noSubmissions,
-      http.get(`${TASK_API}/page`, () =>
-        HttpResponse.json({ ...taskPage, worth: null }),
-      ),
+      http.get(`${TASK_API}/page`, () => HttpResponse.json(taskPage)),
     );
     renderApp(PAGE);
 
