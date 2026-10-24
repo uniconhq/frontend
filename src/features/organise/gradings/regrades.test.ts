@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { RegradeSummary } from '@/api/types';
 import { formatDateTime } from '@/lib/time';
-import { causeWords, runningWords, summaryParts } from './regrades';
+import { causeWords, changeOf, runningWords, summaryParts } from './regrades';
 
 const counts = {
-  unchanged: 0,
+  regraded: 0,
   new: 0,
   running: 0,
   failed: 0,
@@ -24,7 +24,7 @@ function summary(more: Partial<RegradeSummary> = {}): RegradeSummary {
     total: 120,
     graded: 120,
     running: false,
-    counts: { ...counts, unchanged: 117, failed: 3 },
+    counts: { ...counts, regraded: 117, failed: 3 },
     ...more,
   };
 }
@@ -38,7 +38,7 @@ describe("a regrade's summary", () => {
       '3 failed on Unicon’s side',
     ]);
     expect(
-      words(summaryParts(summary({ counts: { ...counts, unchanged: 120 } }))),
+      words(summaryParts(summary({ counts: { ...counts, regraded: 120 } }))),
     ).toEqual(['120 graded']);
   });
 
@@ -70,7 +70,7 @@ describe("a regrade's summary", () => {
       summary({
         total: 125,
         running: true,
-        counts: { ...counts, unchanged: 120, running: 5 },
+        counts: { ...counts, regraded: 120, running: 5 },
       }),
     );
     expect(parts.map((part) => [part.words, part.linked])).toEqual([
@@ -93,5 +93,23 @@ describe("a regrade's summary", () => {
     expect(
       runningWords(summary({ running: true, counts: { ...counts, running: 8 } })),
     ).toBe('Still running: 8 submissions are being graded.');
+  });
+});
+
+describe('what a regrade did to one submission', () => {
+  it('says it in words, with the attempts by number', () => {
+    expect(changeOf({ change: 'regraded', earlier: 1, now: 2 })).toBe(
+      'Graded again, over an earlier result (attempt 1 → attempt 2)',
+    );
+    expect(changeOf({ change: 'new', earlier: null, now: 2 })).toBe(
+      'Graded for the first time (attempt 2)',
+    );
+    expect(changeOf({ change: 'failed', earlier: 1, now: null })).toBe(
+      'Failed on Unicon’s side (attempt 1 counted before)',
+    );
+    expect(changeOf({ change: 'over_limit', earlier: null, now: null })).toBe(
+      'Not graded, over the limit',
+    );
+    expect(changeOf(null)).toBeNull();
   });
 });

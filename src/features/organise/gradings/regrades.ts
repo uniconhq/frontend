@@ -45,7 +45,7 @@ function counted(count: number, one: string, many: string): string {
  * A regrade's summary as its counts, in the order an organiser reads them
  * (#448): how many it graded, then what failed or was not graded, and what
  * was graded for the first time; a count of 0 is left out, and so are the
- * unchanged, which "graded" holds. "120 graded · 2 failed on Unicon's side".
+ * regraded, which "graded" holds. "120 graded · 2 failed on Unicon's side".
  * Those still being graded are said apart, by `runningWords`. "Graded" links
  * every submission the regrade took only while that is all it graded.
  */
@@ -103,15 +103,25 @@ export function runningWords(summary: RegradeSummary): string | null {
 
 /** What each kind of change is called where Gradings lists those submissions. */
 export const CHANGE_WORDS: Record<RegradeChangeKind, string> = {
-  unchanged: 'Unchanged',
+  regraded: 'Graded again, over an earlier result',
   new: 'Graded for the first time',
   running: 'Still being graded',
   failed: 'Failed on Unicon’s side',
   over_limit: 'Not graded, over the limit',
 };
 
-/** The kind of a submission's change on the feed read by regrade, in words. */
-export function changeOf(entry: FeedEntry): string | null {
-  const change = entry.grading.change;
-  return change === null ? null : CHANGE_WORDS[change.change];
+/**
+ * The kind of a submission's change on the feed read by regrade, in words,
+ * with the attempt that counted when the regrade began and its own attempt,
+ * by number: "Graded again, over an earlier result (attempt 1 → attempt 2)".
+ */
+export function changeOf(change: FeedEntry['grading']['change']): string | null {
+  if (change === null) return null;
+  const words = CHANGE_WORDS[change.change];
+  const { earlier, now } = change;
+  if (earlier !== null && now !== null)
+    return `${words} (attempt ${String(earlier)} → attempt ${String(now)})`;
+  if (now !== null) return `${words} (attempt ${String(now)})`;
+  if (earlier !== null) return `${words} (attempt ${String(earlier)} counted before)`;
+  return words;
 }

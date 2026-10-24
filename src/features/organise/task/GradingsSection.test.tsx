@@ -42,8 +42,6 @@ const stuck: Grading = {
   status: 'system_error',
   error: 'The grading machine lost its run before it began.',
   result: null,
-  log: false,
-  progress: null,
   queued_at: '2026-09-26T10:00:00Z',
   dispatched_at: '2026-09-26T10:00:01Z',
   started_at: null,
@@ -120,38 +118,6 @@ describe("the task's gradings", () => {
     expect(passed).toHaveTextContent('ACCEPTED');
     expect(failed).toHaveTextContent('TIME LIMIT');
     expect(within(table).queryByRole('columnheader', { name: 'Stage' })).toBeNull();
-  });
-
-  it('links each grading whose run wrote a log to it, in a tab of its own', async () => {
-    const logged: Grading = {
-      ...stuck,
-      id: '0199a2c1-6b7e-7c3a-9f10-5d2e4b8a6c33',
-      submission_number: 5,
-      status: 'done',
-      error: null,
-      log: true,
-    };
-    server.use(
-      signedIn,
-      taskState,
-      publicationList,
-      ...repoFiles,
-      http.get(`${TASK_API}/gradings`, () => asEntries([logged, waiting])),
-    );
-    renderApp(TASK);
-
-    const link = await screen.findByRole('link', {
-      name: 'Log of B submission 5 by ada, attempt 1',
-    });
-    expect(link).toHaveAttribute(
-      'href',
-      `/api/v1/orgs/acme/contests/spring/tasks/sum/gradings/${logged.id}/log`,
-    );
-    expect(link).toHaveAttribute('target', '_blank');
-    expect(link).toHaveAttribute('rel', 'noopener noreferrer');
-    expect(
-      screen.queryByRole('link', { name: 'Log of B submission 4 by ada, attempt 1' }),
-    ).toBeNull();
   });
 
   it('retries a stuck grading after asking, and reads the list again', async () => {

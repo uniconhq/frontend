@@ -95,7 +95,7 @@ export type RunsResult = Schemas['RunsResult'];
 export type Rejudged = Schemas['Rejudged'];
 /** A task's latest regrade of many, summed up by what it did to each submission. */
 export type RegradeSummary = Schemas['RegradeSummary'];
-/** What a regrade did to one submission: unchanged, new, failed, and so on. */
+/** What a regrade did to one submission: regraded, new, failed, and so on. */
 export type RegradeChangeKind = Schemas['ChangeKind'];
 /** One attempt in a contest's gradings feed, with its task and who submitted. */
 export type FeedEntry = Schemas['FeedEntry'];

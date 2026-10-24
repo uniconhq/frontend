@@ -892,8 +892,8 @@ export interface paths {
          *     With `regrade`, the regrade of many a summary of `/gradings/regrades`
          *     names, it lists that regrade's gradings, one per submission, its latest
          *     attempt of the regrade, newest first, each with `change`, what it did
-         *     to the submission beside the result it replaced, the earlier and new
-         *     tests accepted side by side; `change` narrows them to one kind, and `user` and
+         *     to the submission beside the result it replaced, the earlier attempt
+         *     and its own by number; `change` narrows them to one kind, and `user` and
          *     `entrant` narrow as ever, while `task`, `status` and `latest` are not
          *     read with it. A regrade the caller cannot see gives no rows, and so
          *     does `change` without `regrade`.
@@ -1710,28 +1710,6 @@ export interface paths {
          *     latest is the one to cancel.
          */
         post: operations["cancelGrading"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/orgs/{org}/contests/{contest}/tasks/{task}/gradings/{grading}/log": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * The run log of one of the task's gradings
-         * @description The log of the grading's run. A grading with no log is `not_found`,
-         *     the same as one that is not there, and a log larger than the platform
-         *     reads back is `log_too_large` with the `limit` in bytes.
-         */
-        get: operations["readGradingLog"];
-        put?: never;
-        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -3398,7 +3376,7 @@ export interface components {
          * @description What a regrade did to one submission, as the module says.
          * @enum {string}
          */
-        ChangeKind: "unchanged" | "new" | "running" | "failed" | "over_limit";
+        ChangeKind: "regraded" | "new" | "running" | "failed" | "over_limit";
         /**
          * CheckDefinition
          * @description A `workflow.yaml` to check as a version would be, writing nothing.
@@ -3965,15 +3943,14 @@ export interface components {
         };
         /**
          * Grading
-         * @description One grading as an organiser managing its task reads it: the
-         *     submission by its number, the publication it grades against, its
-         *     attempt and whether that is the submission's `latest`, the one staff
-         *     cancel or retry, the member who submitted it, `submitted_by`, null when
-         *     a reconcile found it at the forge, where it stands, the reason it failed, the sentence
-         *     staff cancelled it with, its result, whether its log was written, the
-         *     last progress its run reported, its times, and whether the platform made
-         *     it by itself, `automatic`, retrying the attempt before it once that
-         *     failed.
+         * @description One grading as an organiser managing its task reads it: the submission
+         *     by its number, the publication it grades against, its attempt and
+         *     whether that is the submission's `latest`, the one staff cancel or
+         *     retry, the member who submitted it, `submitted_by`, null when a
+         *     reconcile found it at the forge, where it stands, the reason it failed,
+         *     the sentence staff cancelled it with, its result, its times, and whether
+         *     the platform made it by itself, `automatic`, retrying the attempt before
+         *     it once that failed.
          *
          *     On a latest attempt that has not finished with a result, still being
          *     graded, a system error or staff cancelled, `last_good` is the latest
@@ -4028,14 +4005,11 @@ export interface components {
             latest: boolean;
             /** Limit */
             limit: number | null;
-            /** Log */
-            log: boolean;
             /**
              * Pipeline
              * @enum {string}
              */
             pipeline: "early" | "late";
-            progress: components["schemas"]["GradingProgress"] | null;
             /** Publication */
             publication: number;
             /**
@@ -4060,20 +4034,6 @@ export interface components {
             submitted_at: string;
             /** Submitted By */
             submitted_by: number | null;
-        };
-        /**
-         * GradingProgress
-         * @description The last progress a run of the grading format before pipelines
-         *     reported: the step it was at and how many of that step's containers
-         *     were done of how many. No new grading has one.
-         */
-        GradingProgress: {
-            /** Done */
-            done: number;
-            /** Step */
-            step: string;
-            /** Total */
-            total: number;
         };
         /**
          * GradingStatus
@@ -5309,20 +5269,22 @@ export interface components {
         RegradeCause: "rejudge" | "save";
         /**
          * RegradeChange
-         * @description What a regrade did to one submission: `change`, and the result it
-         *     replaced, `earlier`, the one that counted when the regrade began, null
-         *     when there was none, beside its own, `now`, null while it has none.
+         * @description What a regrade did to one submission: `change`, and the attempt
+         *     whose result it replaced, `earlier`, the one that counted when the
+         *     regrade began, null when there was none, beside its own attempt, `now`,
+         *     null while it has no result.
          *
-         *     `unchanged`, graded with an earlier result; `new`, graded with no
-         *     earlier result;
-         *     `running`, still being graded; `failed`, no result yet, its latest
-         *     attempt a system error or cancelled; `over_limit`, not graded, its
-         *     entrant at the task's most submissions.
+         *     `regraded`, graded with an earlier result; `new`, graded with no earlier
+         *     result; `running`, still being graded; `failed`, no result yet, its
+         *     latest attempt a system error or cancelled; `over_limit`, not graded,
+         *     its entrant at the task's most submissions.
          */
         RegradeChange: {
             change: components["schemas"]["ChangeKind"];
-            earlier: components["schemas"]["RegradeSide"] | null;
-            now: components["schemas"]["RegradeSide"] | null;
+            /** Earlier */
+            earlier: number | null;
+            /** Now */
+            now: number | null;
         };
         /**
          * RegradeCounts
@@ -5335,18 +5297,10 @@ export interface components {
             new: number;
             /** Over Limit */
             over_limit: number;
+            /** Regraded */
+            regraded: number;
             /** Running */
             running: number;
-            /** Unchanged */
-            unchanged: number;
-        };
-        /**
-         * RegradeSide
-         * @description One result a regrade sets beside another: its attempt.
-         */
-        RegradeSide: {
-            /** Attempt */
-            attempt: number;
         };
         /**
          * RegradeSummary
@@ -5358,7 +5312,7 @@ export interface components {
          *     its attempts grade against; when and by whom, by user id and
          *     `started_by_name`, their username, null when the forge does not say; how
          *     many submissions it took, `total`; how many it `graded`, finishing with
-         *     a result (`unchanged` and `new` together); whether any is still
+         *     a result (`regraded` and `new` together); whether any is still
          *     `running`; and `counts`, by change. It stays until a newer regrade of
          *     the task replaces it or a manager of the task dismisses it.
          */
@@ -9787,40 +9741,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Grading"];
-                };
-            };
-            /** @description An error, as an RFC 9457 problem document. `code` names it. */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-        };
-    };
-    readGradingLog: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                contest: string;
-                grading: string;
-                org: string;
-                task: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description The log, as the run wrote it. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "text/plain; charset=utf-8": string;
                 };
             };
             /** @description An error, as an RFC 9457 problem document. `code` names it. */

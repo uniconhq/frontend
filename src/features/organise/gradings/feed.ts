@@ -42,7 +42,7 @@ function isStatus(value: string): value is GradingStatus {
 
 /** Each kind of change a regrade made, as the feed reads it by regrade. */
 const CHANGES: readonly RegradeChangeKind[] = [
-  'unchanged',
+  'regraded',
   'new',
   'running',
   'failed',
@@ -190,17 +190,4 @@ export function resultOf(result: RunsResult): string {
   if (stopped !== undefined) return stopped;
   const failed = result.runs.find((run) => run.verdict !== 'accepted');
   return failed === undefined ? 'accepted' : failed.verdict;
-}
-
-/**
- * Where a grading's run log is read: the API route itself, on this origin,
- * which answers plain text the browser shows as it is and runs nothing in.
- */
-export function logHref(
-  path: { org: string; contest: string; task: string },
-  grading: string,
-): string {
-  const part = encodeURIComponent;
-  const task = `/api/v1/orgs/${part(path.org)}/contests/${part(path.contest)}/tasks/${part(path.task)}`;
-  return `${task}/gradings/${part(grading)}/log`;
 }

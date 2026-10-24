@@ -106,7 +106,7 @@ describe("the contest's regrades (#448)", () => {
       graded: 12,
       running: false,
       counts: {
-        unchanged: 9,
+        regraded: 9,
         new: 3,
         running: 0,
         failed: 0,

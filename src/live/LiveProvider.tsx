@@ -16,9 +16,8 @@ const REOPEN_MS = [5_000, 10_000, 20_000, 40_000, 60_000];
  * made at: a grading moves a contestant's submissions, an organiser's
  * gradings, a contest's queue and the contest home, whose standing it
  * moves, and the summaries of regrades under way, but not a
- * submission's files, which a
- * grading never changes, nor a grading's log, kept once it is written
- * (`.../gradings/{grading}/log`); an announcement the announcement lists; and a
+ * submission's files, which a grading never changes; an announcement the
+ * announcement lists; and a
  * clarification the asker's questions and the organisers' inbox; a save's
  * checks the task and its publications; a release or a take-back the
  * submissions, whose shown values change with no grading moving.

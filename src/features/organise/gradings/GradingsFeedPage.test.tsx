@@ -21,8 +21,6 @@ const grading: Grading = {
   status: 'done',
   error: null,
   result: runsResult(['wrong_answer']),
-  log: true,
-  progress: null,
   queued_at: '2026-10-05T10:00:00Z',
   dispatched_at: '2026-10-05T10:00:01Z',
   started_at: '2026-10-05T10:00:05Z',
@@ -59,7 +57,6 @@ const stuckFirst: FeedEntry = {
     status: 'system_error',
     error: 'The grading machine lost its run before it began.',
     result: null,
-    log: false,
     started_at: null,
     finished_at: '2026-10-05T10:05:00Z',
   },
@@ -96,7 +93,6 @@ const cancelled: FeedEntry = {
     error: 'The run did not report by its deadline.',
     cancel_reason: 'Our grader broke; this one does not count against you.',
     result: null,
-    log: false,
   },
 };
 
@@ -122,7 +118,7 @@ const REGRADE: RegradeSummary = {
   graded: 120,
   running: false,
   counts: {
-    unchanged: 115,
+    regraded: 115,
     new: 5,
     running: 0,
     failed: 0,
@@ -140,7 +136,7 @@ const nowGraded: FeedEntry = {
     id: 'g-sum-regraded',
     attempt: 2,
     regrade: REGRADE.id,
-    change: { change: 'new', earlier: null, now: { attempt: 2 } },
+    change: { change: 'new', earlier: null, now: 2 },
   },
 };
 
@@ -193,14 +189,7 @@ describe("the contest's gradings feed", () => {
     expect(team).toHaveTextContent('Lovelaces (grace)');
     expect(team).toHaveTextContent('WRONG ANSWER');
     expect(team).not.toHaveTextContent('wrong_answer');
-    expect(
-      within(team).getByRole('link', {
-        name: 'Log of A submission 1 by Lovelaces (grace), attempt 1',
-      }),
-    ).toHaveAttribute(
-      'href',
-      '/api/v1/orgs/acme/contests/spring/tasks/sort/gradings/g-sort-1/log',
-    );
+    expect(within(team).queryByRole('link', { name: /^Log of/ })).toBeNull();
 
     expect(standingsRead).toBe(false);
     expect(sortAda).toHaveTextContent('Cancelled');
@@ -927,7 +916,7 @@ describe('what a regrade changed', () => {
     ).toEqual(expect.arrayContaining(['What the regrade did']));
     const row = within(table).getByRole('rowgroup', { name: 'B submission 3 by ada' });
     expect(row).not.toHaveTextContent(/points/);
-    expect(row).toHaveTextContent('Graded for the first time');
+    expect(row).toHaveTextContent('Graded for the first time (attempt 2)');
     expect(asked).toContain(`regrade=${REGRADE.id}&change=new`);
     expect(screen.queryByRole('combobox', { name: 'Status' })).toBeNull();
     expect(screen.getByRole('combobox', { name: 'What the regrade did' })).toHaveValue(
@@ -967,7 +956,7 @@ describe('what a regrade changed', () => {
         cause: 'save',
         running: true,
         graded: 100,
-        counts: { ...REGRADE.counts, unchanged: 93, running: 20 },
+        counts: { ...REGRADE.counts, regraded: 93, running: 20 },
       },
     ]);
     feedAnswering(() => feed);

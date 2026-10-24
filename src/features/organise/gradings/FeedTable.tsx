@@ -2,11 +2,10 @@ import { useState, type ReactNode } from 'react';
 import type { FeedEntry, Grading } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { PageLink } from '@/ui/PageLink';
-import { OutLink } from '@/ui/OutLink';
 import { verdictLabel } from '@/ui/verdicts';
 import { formatDateTime } from '@/lib/time';
 import { taskPath } from '@/lib/organiser-paths';
-import { STATUS, bySubmission, logHref, nameOf, resultOf, submitterOf } from './feed';
+import { STATUS, bySubmission, nameOf, resultOf, submitterOf } from './feed';
 import { overLimitSentence } from '@/ui/scored/scored-text';
 import { changeOf } from './regrades';
 import { ScoredView } from './ScoredView';
@@ -52,18 +51,9 @@ function standsLine(grading: Grading): string | null {
 /**
  * Where an attempt stands: its status, why one over the limit was not
  * graded, the reason a system error gave the organisers, the sentence a cancel told the entrant, the earlier result
- * that stands while it has none, what a finished run came to, and its log
- * where its run wrote one.
+ * that stands while it has none, and what a finished run came to.
  */
-function StatusCell({
-  path,
-  entry,
-  name,
-}: {
-  path: ContestPath;
-  entry: FeedEntry;
-  name: string;
-}) {
+function StatusCell({ entry }: { entry: FeedEntry }) {
   const { grading } = entry;
   const stands = standsLine(grading);
   return (
@@ -84,22 +74,13 @@ function StatusCell({
       {grading.status === 'done' && grading.result !== null && (
         <BodyText tone="secondary">{verdictLabel(resultOf(grading.result))}</BodyText>
       )}
-      {grading.log && entry.task !== null && (
-        <OutLink
-          href={logHref({ ...path, task: entry.task }, grading.id)}
-          label={`Log of ${name}`}
-          newTab
-        >
-          Log
-        </OutLink>
-      )}
     </>
   );
 }
 
 /** What a regrade did to the submission, on Gradings read by regrade. */
 function ChangeCell({ entry }: { entry: FeedEntry }) {
-  return <td>{changeOf(entry) ?? '—'}</td>;
+  return <td>{changeOf(entry.grading.change) ?? '—'}</td>;
 }
 
 function TimesCell({ entry }: { entry: FeedEntry }) {
@@ -208,7 +189,7 @@ function AttemptRow({
         )}
       </td>
       <td>
-        <StatusCell path={path} entry={entry} name={name} />
+        <StatusCell entry={entry} />
       </td>
       <td>
         <TimesCell entry={entry} />

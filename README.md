@@ -517,8 +517,8 @@ attempts opening below it: the attempt, the publication it graded against,
 whether Unicon made it by itself after the attempt before it failed, the
 status with the reason a system error gave and the sentence a cancel told
 the contestant, which earlier attempt's result stands while it has none
-(`last_good`), what a finished run came to, its log, and when it was queued,
-started and finished.
+(`last_good`), what a finished run came to, and when it was queued, started
+and finished.
 A submission's Scored view opens under it the submission as its row reads it
 with everything filled in (`GET <task>/organise/submissions/{number}`, the
 row by its `entrant`): the files it was made with, each a download
@@ -892,10 +892,7 @@ button opens it; then what the steps done once reported, such as a compile
 log. The route leaves out what the task withholds, and the page puts nothing
 in its place. A submission whose results come after the contest reads
 "Submitted, results after the contest" and "Results at 14:00", and is read
-again at that time and on a release. A run's log names every run, hidden
-ones too, so no contestant reads it; on a task's Gradings page, each grading
-whose run wrote one has a Log link that opens it as plain text in a tab of
-its own.
+again at that time and on a release.
 
 An open submission lists the files it was made with, each a download
 through the proxy's download door, `/-/downloads/...`, which streams the
