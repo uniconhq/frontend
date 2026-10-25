@@ -104,7 +104,7 @@ function Summary({ path, summary }: { path: ContestPath; summary: RegradeSummary
 
 /**
  * What the latest regrade of each task changed, on the contest's page and on
- * Gradings, so a broken checker or compiler is seen at once: one line per
+ * Gradings, so a regrade that failed on Unicon's side is seen at once: one line per
  * task, newest first, until a newer regrade replaces it or a manager
  * dismisses it. Nothing while there is none, or while they cannot be read.
  */

@@ -84,6 +84,8 @@ export type Submission = Schemas['Submission'];
 export type GradingResult = Schemas['Result'];
 /** A row's submission as organisers read it, with everything filled in. */
 export type OrganisedSubmission = Schemas['OrganisedSubmission'];
+/** A submission's grading as organisers read it, every value and run filled in. */
+export type OrganisedResult = Schemas['OrganisedResult'];
 export type RunShown = Schemas['RunShown'];
 export type RunValue = Schemas['RunValue'];
 export type OnceShown = Schemas['OnceShown'];
@@ -93,8 +95,6 @@ export type RunsResult = Schemas['RunsResult'];
 export type Rejudged = Schemas['Rejudged'];
 /** A task's latest regrade of many, summed up by what it did to each submission. */
 export type RegradeSummary = Schemas['RegradeSummary'];
-/** One result a regrade compares: the one it replaced, or its own. */
-export type RegradeSide = Schemas['RegradeSide'];
 /** What a regrade did to one submission: unchanged, new, failed, and so on. */
 export type RegradeChangeKind = Schemas['ChangeKind'];
 /** One attempt in a contest's gradings feed, with its task and who submitted. */

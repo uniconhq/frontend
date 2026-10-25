@@ -1231,8 +1231,8 @@ describe('taking a task out of the contest', () => {
     takeOuts(() =>
       problem(409, 'take_out_refused', {
         detail:
-          'The leaderboard Practice counts sort by name. Take sort out of that leaderboard first, then remove the task.',
-        boards: ['Practice'],
+          "The leaderboard Practice reads the results of sort. Take sort out of that leaderboard's columns first, then remove the task.",
+        leaderboards: ['Practice'],
       }),
     );
     const user = userEvent.setup();
@@ -1249,7 +1249,7 @@ describe('taking a task out of the contest', () => {
 
     const alert = await within(asked).findByRole('alert');
     expect(alert).toHaveTextContent(
-      'The leaderboard Practice counts sort by name. Take sort out of that leaderboard first, then remove the task.',
+      "The leaderboard Practice reads the results of sort. Take sort out of that leaderboard's columns first, then remove the task.",
     );
     expect(
       within(alert).getByRole('link', { name: 'Open Leaderboards' }),

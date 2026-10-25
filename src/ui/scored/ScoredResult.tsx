@@ -1,5 +1,11 @@
 import { useRef, useState } from 'react';
-import type { OnceShown, RunShown, RunValue } from '@/api/types';
+import type {
+  GradingResult,
+  OnceShown,
+  OrganisedResult,
+  RunShown,
+  RunValue,
+} from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
 import { ShownValue } from '@/ui/number/ShownValue';
@@ -22,16 +28,8 @@ export type TextAsk = {
   output?: string | null;
 };
 
-/** What a result view reads: the values shown, the runs, and what was reported once. */
-type ShownResult = {
-  status?: string;
-  runs?: RunShown[];
-  run_values?: RunValue[];
-  once?: OnceShown;
-  reveal_at?: string | null;
-  facts?: Record<string, string>;
-  compiled?: number | null;
-};
+/** What a result view reads: an entrant's result, or the one staff read with everything filled in. */
+type ShownResult = GradingResult | OrganisedResult;
 
 const SHOWN_AT: Record<NonNullable<RunValue['show']>, string> = {
   now: 'Now',
@@ -39,8 +37,12 @@ const SHOWN_AT: Record<NonNullable<RunValue['show']>, string> = {
   on_release: 'On release',
 };
 
+function factsOf(grading: ShownResult): Record<string, string> {
+  return 'facts' in grading ? grading.facts : {};
+}
+
 function hasFacts(grading: ShownResult): boolean {
-  return Object.keys(grading.facts ?? {}).length > 0 || grading.compiled != null;
+  return Object.keys(factsOf(grading)).length > 0 || grading.compiled !== null;
 }
 
 function groupsOf(runs: RunShown[]): { name: string; runs: RunShown[] }[] {
@@ -204,16 +206,22 @@ function OnceReports({
   );
 }
 
-function RunResult({
+/**
+ * What a grading's result holds beside where it stands: the values its
+ * entrant is shown, each run, and what its steps done once reported, each
+ * value by its name. Staff read the same, with every value and run there
+ * and the facts the values read.
+ */
+export function ScoredResult({
   grading,
   readText,
 }: {
   grading: ShownResult;
   readText?: (ask: TextAsk) => Promise<string>;
 }) {
-  const runs = grading.runs ?? [];
-  const values = grading.run_values ?? [];
-  const once = grading.once ?? { reports: {}, texts: {} };
+  const runs = grading.runs;
+  const values = grading.run_values;
+  const once = grading.once;
   const shown =
     runs.length > 0 ||
     values.length > 0 ||
@@ -223,11 +231,11 @@ function RunResult({
   // Nothing shown yet: said only of a submission whose results come after
   // the contest; one still queued or grading says so where it stands.
   if (!shown) {
-    if (grading.status !== 'submitted') return null;
+    if (grading.status !== 'submitted' || !('reveal_at' in grading)) return null;
     return (
       <>
         <BodyText>{RESULTS_AFTER}</BodyText>
-        {grading.reveal_at != null && grading.reveal_at !== '' && (
+        {grading.reveal_at !== null && grading.reveal_at !== '' && (
           <BodyText tone="secondary">
             {`Results at ${formatDateTime(new Date(grading.reveal_at))}`}
           </BodyText>
@@ -271,7 +279,7 @@ function RunResult({
         </section>
       ))}
       <OnceReports once={once} readText={readText} />
-      <Facts facts={grading.facts} compiled={grading.compiled} />
+      <Facts facts={factsOf(grading)} compiled={grading.compiled} />
     </div>
   );
 }
@@ -280,11 +288,11 @@ function Facts({
   facts,
   compiled,
 }: {
-  facts: Record<string, string> | undefined;
-  compiled: number | null | undefined;
+  facts: Record<string, string>;
+  compiled: number | null;
 }) {
-  const rows = Object.entries(facts ?? {});
-  if (compiled != null && facts?.compiled === undefined)
+  const rows = Object.entries(facts);
+  if (compiled !== null && facts['compiled'] === undefined)
     rows.push(['compiled', String(compiled)]);
   if (rows.length === 0) return null;
   return (
@@ -304,20 +312,4 @@ function factTitle(name: string): string {
   if (name === 'seconds') return 'Seconds';
   if (name === 'compiled') return 'Compiled';
   return name;
-}
-
-/**
- * What a grading's result holds beside where it stands: the values its
- * entrant is shown, each run, and what its steps done once reported, each
- * value by its name. Staff read the same, with every value and run there
- * and the facts the values read.
- */
-export function ScoredResult({
-  grading,
-  readText,
-}: {
-  grading: ShownResult;
-  readText?: (ask: TextAsk) => Promise<string>;
-}) {
-  return <RunResult grading={grading} readText={readText} />;
 }

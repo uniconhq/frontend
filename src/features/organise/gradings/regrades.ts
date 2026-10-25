@@ -1,10 +1,5 @@
 import { $api } from '@/api/query';
-import type {
-  FeedEntry,
-  RegradeChangeKind,
-  RegradeSide,
-  RegradeSummary,
-} from '@/api/types';
+import type { FeedEntry, RegradeChangeKind, RegradeSummary } from '@/api/types';
 import { useFallbackPoll } from '@/live';
 import { formatDateTime } from '@/lib/time';
 
@@ -114,11 +109,6 @@ export const CHANGE_WORDS: Record<RegradeChangeKind, string> = {
   failed: 'Failed on Unicon’s side',
   over_limit: 'Not graded, over the limit',
 };
-
-/** One result a regrade compares, in a cell: the attempt it is. */
-export function sideWords(side: RegradeSide | null): string {
-  return side === null ? '—' : `Attempt ${String(side.attempt)}`;
-}
 
 /** The kind of a submission's change on the feed read by regrade, in words. */
 export function changeOf(entry: FeedEntry): string | null {

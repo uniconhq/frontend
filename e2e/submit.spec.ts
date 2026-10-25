@@ -669,6 +669,6 @@ test('samples show now, and the rest appears when the task reveals', async ({
   await expect(detail.getByText('score')).toBeVisible();
   await expect(detail.getByText('Big grid · seed 2')).toHaveCount(0);
   await expect(detail.getByText('Big grid · seed 2')).toBeVisible({ timeout: 15_000 });
-  await expect(detail.getByText('SKIPPED')).toBeVisible();
+  await expect(detail.getByText('NOT GIVEN')).toBeVisible();
   await expect(detail.getByText('full')).toBeVisible();
 });

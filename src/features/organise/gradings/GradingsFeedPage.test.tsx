@@ -908,7 +908,7 @@ describe('what a regrade changed', () => {
     );
   });
 
-  it('lists a regrade’s submissions with their results before and after it', async () => {
+  it('lists a regrade’s submissions with what it did to each', async () => {
     server.use(signedIn, taskList);
     regrades([REGRADE]);
     const asked = feedAnswering((query) =>
@@ -924,10 +924,9 @@ describe('what a regrade changed', () => {
       within(table)
         .getAllByRole('columnheader')
         .map((header) => header.textContent),
-    ).toEqual(expect.arrayContaining(['Before the regrade', 'After the regrade']));
+    ).toEqual(expect.arrayContaining(['What the regrade did']));
     const row = within(table).getByRole('rowgroup', { name: 'B submission 3 by ada' });
     expect(row).not.toHaveTextContent(/points/);
-    expect(row).toHaveTextContent('Attempt 2');
     expect(row).toHaveTextContent('Graded for the first time');
     expect(asked).toContain(`regrade=${REGRADE.id}&change=new`);
     expect(screen.queryByRole('combobox', { name: 'Status' })).toBeNull();

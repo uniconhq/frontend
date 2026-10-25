@@ -95,7 +95,7 @@ describe('a run task’s result', () => {
       'Test 1',
     );
     expect(screen.getByText('Big grid · seed 2')).toBeVisible();
-    expect(screen.getByText('SKIPPED')).toBeVisible();
+    expect(screen.getByText('NOT GIVEN')).toBeVisible();
     expect(screen.getByText('score').closest('div')).toHaveTextContent('10');
     expect(screen.queryByText(/penal/)).toBeNull();
     expect(screen.queryByText(/self-reported/)).toBeNull();
@@ -158,7 +158,12 @@ describe('a run task’s result', () => {
     renderWithProviders(
       <ScoredResult
         grading={{
+          id: 'g',
+          attempt: 1,
           status: 'done',
+          reason: null,
+          limit: null,
+          once: { reports: {}, texts: {} },
           runs: [
             {
               group: 'all',

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { RegradeSummary } from '@/api/types';
 import { formatDateTime } from '@/lib/time';
-import { causeWords, runningWords, sideWords, summaryParts } from './regrades';
+import { causeWords, runningWords, summaryParts } from './regrades';
 
 const counts = {
   unchanged: 0,
@@ -93,12 +93,5 @@ describe("a regrade's summary", () => {
     expect(
       runningWords(summary({ running: true, counts: { ...counts, running: 8 } })),
     ).toBe('Still running: 8 submissions are being graded.');
-  });
-});
-
-describe('a result a regrade compares', () => {
-  it('reads as the attempt it is, or a dash where there is none', () => {
-    expect(sideWords({ attempt: 2 })).toBe('Attempt 2');
-    expect(sideWords(null)).toBe('—');
   });
 });
