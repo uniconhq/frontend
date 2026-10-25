@@ -4,50 +4,11 @@
   gap: 12px;
 }
 
-.table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 13px;
-  color: var(--unicon-text-body);
-}
-
-.table th {
-  text-align: left;
-  font-weight: 600;
-  color: var(--unicon-text-secondary);
-  padding: 6px 10px 8px 0;
-  border-bottom: 1px solid var(--unicon-border);
-}
-
-.table td,
-.table tbody th {
-  vertical-align: top;
-  padding: 8px 10px 8px 0;
-  border-bottom: 1px solid var(--unicon-border);
-}
-
-/* Each row is named by its test, as a header that reads like a cell. */
-.table tbody th {
-  font-weight: 400;
-  color: var(--unicon-text-body);
-}
-
-.mono {
-  font-family: var(--mantine-font-family-monospace);
-  font-size: 12px;
-}
-
-.verdict {
+.run {
   display: flex;
-  gap: 8px;
-  align-items: center;
+  gap: 8px 14px;
+  align-items: baseline;
   flex-wrap: wrap;
-}
-
-.group {
-  font-family: var(--mantine-font-family-monospace);
-  font-size: 12px;
-  color: var(--unicon-text-secondary);
 }
 
 .metrics {
@@ -71,36 +32,6 @@
 
 .metric dd {
   margin: 0;
-}
-
-.number {
-  font-family: var(--mantine-font-family-monospace);
-  font-size: 12px;
-}
-
-/* "On the leaderboards" and a line per board under it. */
-.boards {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.boardLines {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  font-size: 14px;
-  color: var(--unicon-text-body);
-}
-
-/* A text the run reported once, under its name. */
-.once {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
 }
 
 /* A text the run reported, such as a log, as it wrote it: kept as it is, and scrolled inside itself. */

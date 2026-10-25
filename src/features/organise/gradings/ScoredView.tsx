@@ -1,21 +1,22 @@
 import { $api, queryView } from '@/api/query';
 import type { FeedEntry } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
-import { VerdictBadge } from '@/ui/VerdictBadge';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
 import { ScoredResult } from '@/ui/scored/ScoredResult';
 import { overLimitSentence } from '@/ui/scored/scored-text';
+import { StaffFiles } from '../staff-read';
+import { staffText } from '../staff-text';
 import { STATUS } from './feed';
 import classes from './feed.module.css';
 
 type ContestPath = { org: string; contest: string };
 
 /**
- * A submission as its row reads it, with everything filled in (TASK-FORMAT.md
- * section 1.7), opened under the submission in the feed: the same payload its
- * contestant reads, scored by the same code, with every group's outcome,
- * tests and points shown and each group saying when its row sees it. The row
+ * A submission as its row reads it, with everything filled in, opened under
+ * the submission in the feed: the same payload its entrant reads, scored by
+ * the same code, with every value and run shown and each value saying when
+ * its row sees it. The row
  * is the entrant that made it, as the feed names it. It is the attempt that
  * counts (#442), an earlier one than the feed's head while a later attempt
  * has no result; the view then says which attempt it shows.
@@ -31,6 +32,14 @@ export function ScoredView({
 }) {
   const number = entry.grading.submission_number;
   const query = { entrant: entry.by.entrant };
+  const where = { ...path, task, number };
+  const files = queryView(
+    $api.useQuery(
+      'get',
+      '/api/v1/orgs/{org}/contests/{contest}/tasks/{task}/organise/submissions/{number}/files',
+      { params: { path: where, query } },
+    ),
+  );
   const view = queryView(
     $api.useQuery(
       'get',
@@ -44,8 +53,8 @@ export function ScoredView({
       aria-label={`Submission ${String(number)}, scored`}
     >
       <BodyText tone="secondary">
-        The full result, as its entrant will see it once everything is shown. Each test
-        group says when its entrant sees it.
+        The full result, as its entrant will see it once everything is shown. Each value
+        says when its entrant sees it.
       </BodyText>
       {view.state === 'loading' && <PageSkeleton rows={3} />}
       {view.state === 'error' && <ErrorBlock error={view.error} onRetry={view.retry} />}
@@ -55,9 +64,6 @@ export function ScoredView({
         ) : (
           <>
             <div className={classes.scoredHead}>
-              {view.data.grading.outcome !== null && (
-                <VerdictBadge verdict={view.data.grading.outcome} />
-              )}
               <BodyText tone="secondary">
                 {view.data.grading.status === 'over_limit'
                   ? overLimitSentence('the entrant', view.data.grading.limit)
@@ -69,10 +75,13 @@ export function ScoredView({
                 </BodyText>
               )}
             </div>
+            {files.state === 'error' && (
+              <ErrorBlock error={files.error} onRetry={files.retry} />
+            )}
+            {files.state === 'ready' && <StaffFiles where={where} files={files.data} />}
             <ScoredResult
               grading={view.data.grading}
-              shownAt="Its entrant sees this at"
-              testsShownAt="Its entrant sees its tests at"
+              readText={(ask) => staffText(where, entry.by.entrant, ask)}
             />
           </>
         ))}

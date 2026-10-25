@@ -22,10 +22,15 @@ import { AddPicture } from './AddPicture';
 import { StatementPictures } from './StatementPictures';
 import shared from '../organise.module.css';
 import { useFileWrite, useOwnFile } from './file-hooks';
-import { picturesNamed, type StagedPicture } from './statement-pictures';
+import {
+  picturesNamed,
+  showingPictures,
+  type StagedPicture,
+} from './statement-pictures';
 import classes from './forms.module.css';
 
 const PATH = 'statement.md';
+const SETTINGS = 'task.yaml';
 
 type TaskPlace = Extract<Place, { kind: 'task' }>;
 type AddedPicture = Extract<StagedPicture, { kind: 'add' }>;
@@ -46,10 +51,36 @@ function usePublicFiles(place: Place): TreeEntry[] | null {
 }
 
 /**
+ * The task's settings with `show` listing each new picture now, read past
+ * the query cache, as one change of the save; none when `show` lists them
+ * already, or the settings are an upload or cannot be read.
+ */
+async function settingsShowing(
+  task: TaskPlace,
+  names: string[],
+): Promise<PlannedChange[]> {
+  if (names.length === 0) return [];
+  const { data } = await apiClient.GET(
+    '/api/v1/orgs/{org}/contests/{contest}/tasks/{task}/files/{path}',
+    {
+      params: {
+        path: { org: task.org, contest: task.contest, task: task.task, path: SETTINGS },
+      },
+    },
+  );
+  if (data === undefined || data.upload !== null || data.encoding !== 'utf-8')
+    return [];
+  const text = showingPictures(data.content, names);
+  return text === null ? [] : [{ path: SETTINGS, token: data.token, text }];
+}
+
+/**
  * The statement and every picture staged with it as one save of the task
  * (`POST <task>/save`), a larger picture through the upload door, answered
- * as any save of the task is. A picture already sent for the same path is
- * not sent again, so a save sent again after its question uploads nothing new.
+ * as any save of the task is. A new picture the task's `show` does not list
+ * now is listed in the same save, so entrants see it once it publishes. A
+ * picture already sent for the same path is not sent again, so a save sent
+ * again after its question uploads nothing new.
  */
 async function saveWithPictures(
   task: TaskPlace,
@@ -57,6 +88,9 @@ async function saveWithPictures(
   pictures: StagedPicture[],
   uploads: Map<string, { file: File; id: string }>,
 ): Promise<Outcome> {
+  const added = pictures.flatMap((picture) =>
+    picture.kind === 'add' ? [picture.name] : [],
+  );
   const planned: PlannedChange[] = [
     { path: PATH, token: body.token, text: body.content ?? '' },
     ...pictures.map((picture): PlannedChange => {
@@ -77,6 +111,7 @@ async function saveWithPictures(
         picture.kind === 'add' && `public/${picture.name}` === path,
     )?.file;
   try {
+    planned.push(...(await settingsShowing(task, added)));
     const changes = await fileChanges(planned, (path) => {
       const file = fileAt(path);
       if (file === undefined) throw new Error(`Nothing was chosen for ${path}.`);

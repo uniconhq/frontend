@@ -22,7 +22,7 @@ function teamsOn(values: ContestValues): boolean {
 
 /**
  * The contest's settings that are neither how people enter, its state, its
- * tasks nor its boards, in sections: its name and description, when it
+ * tasks nor its leaderboards, in sections: its name and description, when it
  * runs, and whether people enter in teams. Each section has a heading and
  * a line saying what it is for. A manager sees the admin's settings and
  * cannot change them.

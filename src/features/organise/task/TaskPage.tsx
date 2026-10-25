@@ -26,8 +26,10 @@ import {
   AnnouncementsCard,
   GradingsCard,
   PublicationsCard,
+  QueueCard,
   SettingsCard,
 } from './TaskCards';
+import { ResultsControls } from './ResultsControls';
 
 type TaskPath = { org: string; contest: string; task: string };
 type CardLine = (props: { path: TaskPath }) => ReactNode;
@@ -37,6 +39,7 @@ const TASK = '/api/v1/orgs/{org}/contests/{contest}/tasks/{task}';
 /** The line of each section's card in the grid, by its key in the list. */
 const GRID_CARDS: Record<TaskSectionKey, CardLine> = {
   gradings: GradingsCard,
+  queue: QueueCard,
   publications: PublicationsCard,
   announcements: AnnouncementsCard,
   organisers: ({ path }) => <OrganisersLine place={{ kind: 'task', ...path }} />,
@@ -76,7 +79,7 @@ function useOpenedCard() {
 /**
  * A task's page for its organisers: its name and where it stands; then the
  * cards that build it, in the order one decides the next (its workflow, its
- * inputs, its tests and scoring, which share one save bar, and its
+ * inputs, its runs, scoring and checks, which share one save bar, and its
  * statement, which saves on its own); then a card for each section that runs
  * it. Saving is publishing: a save without problems publishes the task.
  */
@@ -113,6 +116,7 @@ export function TaskPage() {
         }
       >
         <TaskStanding place={place} saving={saving} manager={manager} />
+        <ResultsControls path={path} manager={manager} />
       </PageHeader>
       <TaskBuild place={place} saving={saving} admin={admin} manager={manager} />
       <BuildCard

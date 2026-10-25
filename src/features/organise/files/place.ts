@@ -10,6 +10,9 @@ export type Place =
   | { kind: 'contest'; org: string; contest: string }
   | { kind: 'task'; org: string; contest: string; task: string };
 
+export type WorkflowPlace = { kind: 'workflow'; owner: string; name: string };
+export type FilePlace = Place | WorkflowPlace;
+
 const CONTEST_TREE = '/api/v1/orgs/{org}/contests/{contest}/tree';
 const TASK_TREE = '/api/v1/orgs/{org}/contests/{contest}/tasks/{task}/tree';
 
@@ -35,7 +38,16 @@ export function taskDownloadHref(
   return `/-/downloads/${[...parts, ...path.split('/')].map(encodeURIComponent).join('/')}`;
 }
 
-export function treeQuery(place: Place, folder: string) {
+export function treeQuery(place: FilePlace, folder: string) {
+  if (place.kind === 'workflow')
+    return widenQuery(
+      $api.queryOptions('get', '/api/v1/workflows/{owner}/{name}/tree', {
+        params: {
+          path: { owner: place.owner, name: place.name },
+          query: { path: folder },
+        },
+      }),
+    );
   const query = { path: folder };
   return place.kind === 'task'
     ? widenQuery(
@@ -53,7 +65,13 @@ export function treeQuery(place: Place, folder: string) {
       );
 }
 
-export function fileQuery(place: Place, path: string) {
+export function fileQuery(place: FilePlace, path: string) {
+  if (place.kind === 'workflow')
+    return widenQuery(
+      $api.queryOptions('get', '/api/v1/workflows/{owner}/{name}/files/{path}', {
+        params: { path: { owner: place.owner, name: place.name, path } },
+      }),
+    );
   return place.kind === 'task'
     ? widenQuery(
         $api.queryOptions(

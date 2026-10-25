@@ -58,7 +58,7 @@ function Steps({ workflow }: { workflow: string }) {
  * page; a newer version when there is one, to take with one click; the
  * picker of workflows and versions; and the chosen version's steps, drawn.
  * Choosing here changes the task's other cards to the chosen workflow's
- * inputs and tests at once, and is saved with them, by the one save bar.
+ * inputs at once, and is saved with them, by the one save bar.
  */
 export function WorkflowCard({
   saved,

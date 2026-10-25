@@ -1,5 +1,5 @@
 /**
- * The API serves every score, key and reported number exactly, as a string of
+ * The API serves every value and reported number exactly, as a string of
  * plain decimal digits, so nothing is lost to a float on the way. They are
  * rounded only here, for display, and compared as the digits they are.
  */
@@ -48,55 +48,8 @@ export function compareDecimal(a: string, b: string): number {
   return x < y ? -1 : x > y ? 1 : 0;
 }
 
-/**
- * An exact fraction of two whole numbers, its denominator above zero, for
- * working out points from decimals as the scoring model does (TASK-FORMAT
- * section 3): a group's share of a task's worth is a fraction no float holds,
- * such as 100 times 1/3.
- */
+/** An exact fraction of two whole numbers, its denominator above zero. */
 export type Ratio = { num: bigint; den: bigint };
-
-export const ZERO: Ratio = { num: 0n, den: 1n };
-
-function gcd(a: bigint, b: bigint): bigint {
-  let [x, y] = [a < 0n ? -a : a, b < 0n ? -b : b];
-  while (y !== 0n) [x, y] = [y, x % y];
-  return x === 0n ? 1n : x;
-}
-
-function reduced(num: bigint, den: bigint): Ratio {
-  const sign = den < 0n ? -1n : 1n;
-  const divisor = gcd(num, den);
-  return { num: (sign * num) / divisor, den: (sign * den) / divisor };
-}
-
-/** A decimal written as text as the fraction it is, or null when it is no decimal. */
-export function ratioOf(text: string): Ratio | null {
-  const found = scaled(text);
-  if (found === null) return null;
-  return found.power >= 0
-    ? reduced(found.units * 10n ** BigInt(found.power), 1n)
-    : reduced(found.units, 10n ** BigInt(-found.power));
-}
-
-export function addRatio(a: Ratio, b: Ratio): Ratio {
-  return reduced(a.num * b.den + b.num * a.den, a.den * b.den);
-}
-
-export function mulRatio(a: Ratio, b: Ratio): Ratio {
-  return reduced(a.num * b.num, a.den * b.den);
-}
-
-/** `a` over `b`; `b` must not be zero. */
-export function divRatio(a: Ratio, b: Ratio): Ratio {
-  return reduced(a.num * b.den, a.den * b.num);
-}
-
-export function compareRatio(a: Ratio, b: Ratio): number {
-  const left = a.num * b.den;
-  const right = b.num * a.den;
-  return left < right ? -1 : left > right ? 1 : 0;
-}
 
 /**
  * A fraction as plain decimal digits, rounded half away from zero, or cut
@@ -123,27 +76,6 @@ export function ratioDigits(
     digits: negative && units !== 0n ? `-${kept}` : kept,
     exact: left === 0n,
   };
-}
-
-/**
- * A fraction of points earned for reading, cut as `formatPoints` cuts them,
- * with "about" before it when the digits shown are not the fraction exactly.
- */
-export function formatPointsRatio(value: Ratio): string {
-  const { digits, exact } = ratioDigits(value, POINTS_PLACES, 'cut');
-  const shown = formatExact(digits, POINTS_PLACES);
-  return exact ? shown : `about ${shown}`;
-}
-
-/**
- * A fraction of points something is worth for reading, rounded as
- * `formatWorth` rounds a worth, with "about" before it when the digits shown
- * are not the fraction exactly.
- */
-export function formatWorthRatio(value: Ratio): string {
-  const { digits, exact } = ratioDigits(value, POINTS_PLACES);
-  const shown = formatExact(digits, POINTS_PLACES);
-  return exact ? shown : `about ${shown}`;
 }
 
 /** The digits of an exact number split at its point, its sign apart. */
@@ -174,17 +106,6 @@ export function rounded(exact: string, places: number): string {
   return rounded(negative ? `-${cut}` : cut, places);
 }
 
-/**
- * `exact` cut to at most `places` decimals, toward zero, with trailing zeros
- * dropped: `"99.996"` to 2 is `"99.99"`. For a number that must never read
- * as more than it is, such as points short of a task's worth.
- */
-export function cut(exact: string, places: number): string {
-  const { fraction } = partsOf(exact);
-  if (fraction.length <= places) return rounded(exact, places);
-  return rounded(exact.slice(0, exact.indexOf('.') + 1 + places), places);
-}
-
 const locale = new Intl.NumberFormat();
 const decimalSign =
   locale.formatToParts(0.5).find((part) => part.type === 'decimal')?.value ?? '.';
@@ -200,72 +121,4 @@ export function formatExact(exact: string, places = 4): string {
   const grouped = locale.format(BigInt(whole));
   const digits = fraction === '' ? grouped : `${grouped}${decimalSign}${fraction}`;
   return negative ? `-${digits}` : digits;
-}
-
-/** How many decimals points are shown to. */
-export const POINTS_PLACES = 2;
-
-/**
- * Points earned for reading, the one way every page shows them (R17): cut,
- * never rounded up, to `places` decimals, so a result short of full marks
- * never reads as them and the same points read the same everywhere:
- * `36.666…` is `36.66`. Points that are `most`, where it is known, read as
- * `formatWorth` writes it, so full marks read as the worth beside them.
- * Written as `formatExact` writes a number.
- */
-export function formatPoints(
-  exact: string,
-  most: string | null = null,
-  places = POINTS_PLACES,
-): string {
-  if (most !== null && compareDecimal(exact, most) === 0) return formatWorth(most);
-  return formatExact(cut(exact, places), places);
-}
-
-/**
- * Points as shown with their word after them, "1 point", "36.66 points":
- * the word agrees with the digits read, so a worth sent as `"1.00"` or
- * points cut to `1` read "1 point", and "about 1 point" where it is near.
- */
-export function withPointsWord(shown: string): string {
-  const one = shown.replace(/^about /, '') === formatExact('1');
-  return `${shown} ${one ? 'point' : 'points'}`;
-}
-
-/**
- * The most points something gives, a task's worth or a group's, for reading,
- * the one way every page shows it: rounded to two decimals, so points short
- * of it, cut, read below it.
- */
-export function formatWorth(exact: string): string {
-  return formatExact(exact, POINTS_PLACES);
-}
-
-/**
- * The fewest decimals, from `places` up, at which no two neighbours in
- * `column` that differ show alike, rounded or, for points, cut as they are
- * shown, so a ranking never hides why one row is above the next. Null
- * entries, a row with no number, are passed over.
- */
-export function placesToTell(
-  column: (string | null)[],
-  places = 2,
-  how: 'round' | 'cut' = 'round',
-): number {
-  const shown = how === 'cut' ? cut : rounded;
-  const present = column.filter((value): value is string => value !== null);
-  const longest = Math.max(
-    places,
-    ...present.map((value) => partsOf(value).fraction.length),
-  );
-  for (let tried = places; tried < longest; tried += 1) {
-    const alike = present.some(
-      (value, index) =>
-        index > 0 &&
-        value !== present[index - 1] &&
-        shown(value, tried) === shown(present[index - 1] ?? value, tried),
-    );
-    if (!alike) return tried;
-  }
-  return longest;
 }

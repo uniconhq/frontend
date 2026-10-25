@@ -1,17 +1,17 @@
 import { expect, test, type Page, type Route } from '@playwright/test';
+import type { components } from '../src/api/schema';
+
+type Schemas = components['schemas'];
 
 /** The version the uploaded part of test 1 was last changed at. */
 const UPLOADED_AT = 'a1b2c3d4e5f6a7b8c9d0a1b2c3d4e5f6a7b8c9d0';
 
-/** unicon/classic@v2 as deploy seeds it, its inputs titled for the task's form (#434). */
+/** unicon/classic@v3 as deploy seeds it, its inputs titled for the task's form (#434). */
 const CLASSIC = `inputs:
-  submission: {type: file, contestant: true, title: Solution}
-  language: {type: enum, options: [c, cpp, java, python], contestant: true, title: Language}
-  time_limit: {type: number, title: Time limit, unit: seconds, help: The CPU time the program may use on each test.}
+  submission: {type: file, title: Solution}
+  language: {type: enum, options: [c, cpp, java, python], title: Language}
+  time_limit: {type: number, title: Time limit, unit: seconds, help: The CPU time the program may use on each run.}
   memory_limit: {type: number, title: Memory limit, unit: MB}
-test:
-  input: file
-  answer: file
 steps: []
 `;
 
@@ -31,7 +31,7 @@ async function stubOrganiserApi(page: Page) {
       'name: Spring 2026\nstart: 2030-10-01T09:00:00Z\nend: 2030-10-01T14:00:00Z\nstate: draft\nvisibility: signed-in\ntasks:\n  - id: sum\n',
     contestSaves: 0,
     taskYaml:
-      'name: Sum\nworkflow: unicon/classic@v2\ninputs:\n  submission: {label: Your solution}\n  language: {options: [python]}\n  time_limit: 2\n  memory_limit: 256\ntest_groups:\n  main: {each: 100}\n',
+      'name: Sum\nworkflow: unicon/classic@v3\ninputs:\n  submission: {entrant: {label: Your solution}}\n  language: {entrant: {options: [python]}}\n  time_limit: 2\n  memory_limit: 256\n',
     taskSaves: [] as unknown[],
     /** How many gradings failed and wait, as the queue counts them. */
     failed: 0,
@@ -39,21 +39,22 @@ async function stubOrganiserApi(page: Page) {
     feedAsked: [] as string[],
   };
 
-  const taskState = () => ({
+  const taskState = (): Schemas['TaskState'] => ({
     head: `head-${String(state.published)}`,
     latest: {
-      id: `pub-${String(state.published)}`,
       number: state.published,
       version: `head-${String(state.published)}`,
       grading_changed: state.published === 1,
       changes: [],
       at: '2026-09-29T09:00:00Z',
-      meanings: [],
+      check: null,
+      failed_checks: [],
     },
     draft: false,
     errors: [],
     statement_written: true,
     head_statement_written: true,
+    results: { released: false, history: [] },
   });
 
   const json = (route: Route, body: unknown, status = 200) =>
@@ -64,20 +65,20 @@ async function stubOrganiserApi(page: Page) {
     });
 
   await page.route('**/api/v1/time', (route) =>
-    json(route, { now: '2026-09-29T10:00:00Z' }),
+    json(route, { now: '2026-09-29T10:00:00Z' } satisfies Schemas['ServerTime']),
   );
   await page.route('**/api/v1/workflows', (route) =>
     json(route, [
       {
         owner: 'unicon',
         name: 'classic',
-        versions: ['v2'],
+        versions: ['v3'],
         editable: false,
         visibility: 'public',
       },
-    ]),
+    ] satisfies Schemas['WorkflowItem'][]),
   );
-  await page.route('**/api/v1/workflows/unicon/classic/versions/v2', (route) =>
+  await page.route('**/api/v1/workflows/unicon/classic/versions/v3', (route) =>
     json(route, { content: CLASSIC }),
   );
   await page.route('**/api/v1/primitives', (route) => json(route, []));
@@ -99,7 +100,7 @@ async function stubOrganiserApi(page: Page) {
           ]
         : [],
       degraded: false,
-    }),
+    } satisfies Schemas['Me']),
   );
 
   await page.route(/\/api\/v1\/orgs/, async (route) => {
@@ -159,7 +160,6 @@ async function stubOrganiserApi(page: Page) {
     if (
       [
         `${contest}/organise/entrants`,
-        `${contest}/organise/boards`,
         `${contest}/announcements`,
         `${contest}/clarifications`,
         `${task}/announcements`,
@@ -176,12 +176,14 @@ async function stubOrganiserApi(page: Page) {
       return json(route, []);
     }
     if (path === `${task}/workflow-form`) {
-      const input = (id: string, type: string, more: object) => ({
+      const input = (
+        id: string,
+        type: string,
+        more: Partial<Schemas['DeclaredInput']>,
+      ): Schemas['DeclaredInput'] => ({
         id,
         type,
-        contestant: false,
         options: null,
-        per_test: false,
         optional: false,
         title: null,
         help: null,
@@ -189,29 +191,25 @@ async function stubOrganiserApi(page: Page) {
         ...more,
       });
       return json(route, {
-        workflow: 'unicon/classic@v2',
+        workflow: 'unicon/classic@v3',
         newer: null,
         problem: null,
         inputs: [
-          input('submission', 'file', { contestant: true, title: 'Solution' }),
+          input('submission', 'file', { title: 'Solution' }),
           input('language', 'enum', {
-            contestant: true,
             title: 'Language',
             options: ['c', 'cpp', 'java', 'python'],
           }),
           input('time_limit', 'number', {
             title: 'Time limit',
             unit: 'seconds',
-            help: 'The CPU time the program may use on each test.',
+            help: 'The CPU time the program may use on each run.',
           }),
           input('memory_limit', 'number', { title: 'Memory limit', unit: 'MB' }),
         ],
-        test: [
-          { name: 'input', type: 'file', options: null },
-          { name: 'answer', type: 'file', options: null },
-        ],
         graded: false,
-      });
+        text_values: null,
+      } satisfies Schemas['WorkflowForm']);
     }
     if (path === '/api/v1/orgs/acme/contests') {
       return json(route, [
@@ -235,12 +233,13 @@ async function stubOrganiserApi(page: Page) {
           timeline: {
             release_at: '2026-10-01T09:00:00Z',
             due: null,
-            late_per_day: null,
             closes: '2026-10-01T14:00:00Z',
-            worth: '100',
           },
+          submissions: 0,
+          take_out: null,
+          withdrawn: false,
         },
-      ]);
+      ] satisfies Schemas['TaskStanding'][]);
     }
     if (path === '/api/v1/orgs/acme/contests/spring/tree') {
       return json(route, [
@@ -254,9 +253,10 @@ async function stubOrganiserApi(page: Page) {
       state.taskSaves.push(request.postDataJSON());
       state.published += 1;
       return json(route, {
-        publication: `pub-${String(state.published)}`,
         number: state.published,
         grading_changed: true,
+        check: null,
+        regrade: null,
         changes: ['The time limit changes.'],
         notes: [],
         regraded: 0,
@@ -270,7 +270,7 @@ async function stubOrganiserApi(page: Page) {
           scores: ['No score changes.'],
           reading: ['Nothing entrants read changes.'],
         },
-      });
+      } satisfies Schemas['Published']);
     }
     if (path === `${task}/tree`) {
       const folder = new URL(request.url()).searchParams.get('path') ?? '';
@@ -492,9 +492,8 @@ test('an organiser sets a task up on its cards and saves them in one save', asyn
     .getByRole('textbox', { name: /^Time limit/ });
   await expect(limit).toHaveValue('2');
   await limit.fill('3');
-  const scoring = page.getByRole('region', { name: 'Tests and scoring' });
-  await expect(scoring.getByRole('group', { name: 'main' })).toContainText(
-    'Its one test earns 100 points when it passes.',
+  await expect(page.getByRole('region', { name: 'Runs' })).toContainText(
+    'This makes 1 run.',
   );
 
   const bar = page.getByRole('region', { name: 'Save the task' });
@@ -535,51 +534,15 @@ test('an organiser follows the failed gradings from the contest page', async ({
   expect(state.feedAsked).toContain('status=system_error&latest=true');
 });
 
-test('an organiser reads a test in place, its parts side by side, and is told how to name test files', async ({
-  page,
-}) => {
+test('an organiser reads how many submissions a task takes', async ({ page }) => {
   const state = await stubOrganiserApi(page);
   state.orgMade = true;
   await page.goto('/orgs/acme/contests/spring/tasks/sum');
 
-  const scoring = page.getByRole('region', { name: 'Tests and scoring' });
-  const row = scoring.getByRole('listitem', { name: 'Test 1' });
-  await expect(row).toContainText('Test 1 · 1 2 → 3, expected 10 MB');
-  await row.getByRole('button', { name: /Test 1/ }).click();
-  const view = row.getByRole('region', { name: 'What test 1 holds' });
-  await expect(view.getByLabel('What input holds')).toHaveText('1 2');
-  await expect(view.getByLabel('What answer holds')).toHaveText('3');
-  const input = await view.getByRole('region', { name: 'input' }).boundingBox();
-  const answer = await view.getByRole('region', { name: 'answer' }).boundingBox();
-  expect(answer?.x ?? 0).toBeGreaterThan((input?.x ?? 0) + (input?.width ?? 0) - 1);
-  expect(Math.abs((answer?.y ?? 0) - (input?.y ?? 0))).toBeLessThan(2);
-
-  // An uploaded part downloads whole through the download door (#444).
-  await page.route('**/-/downloads/**', (route) =>
-    route.fulfill({
-      status: 200,
-      headers: { 'Content-Disposition': 'attachment; filename="expected"' },
-      body: '3\n',
-    }),
-  );
-  const expected = view.getByRole('region', { name: 'expected' });
-  await expect(expected).toContainText(
-    'It was uploaded, so it is shown by its size rather than as text.',
-  );
-  const download = expected.getByRole('link', { name: 'Download expected' });
-  await expect(download).toHaveAttribute(
-    'href',
-    `/-/downloads/acme/spring/sum/versions/${UPLOADED_AT}/tests/main/1/expected`,
-  );
-  const [saved] = await Promise.all([page.waitForEvent('download'), download.click()]);
-  expect(saved.suggestedFilename()).toBe('expected');
-
-  await scoring.getByRole('button', { name: 'Add tests', exact: true }).click();
-  const dialog = page.getByRole('dialog', { name: 'Add tests' });
-  await dialog.getByRole('radio', { name: 'Many files at once' }).check();
-  await expect(dialog.getByLabel('How to name the files')).toContainText(
-    "Name them like 1.in (test 1's input) and 1.out (test 1's answer).",
-  );
-  await expect(dialog.getByRole('button', { name: 'Add tests' })).toBeDisabled();
-  await expect(dialog).toContainText('Drop files above to see the tests they make.');
+  const submissions = page.getByRole('region', { name: 'Submissions' });
+  await expect(
+    submissions.getByRole('textbox', { name: 'Most submissions' }),
+  ).toHaveValue('');
+  await expect(submissions).toContainText('at most 50 submissions');
+  await expect(submissions).toContainText('at most 1 in any 30 seconds');
 });

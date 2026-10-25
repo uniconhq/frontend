@@ -1,17 +1,34 @@
 import { ApiError } from '@/api/problem';
 import type { InputField, SubmittedInput } from '@/api/types';
 import { compareDecimal } from '@/lib/exact';
+import { partTitle, partsOf } from '@/lib/submitted';
 
 /**
- * What the panel holds for one input before it is sent: the files of a file
- * or folder input; the text of a text or number input as typed; whether a
- * true-or-false input is ticked; or the option chosen of an enum input.
+ * What the panel holds for one field: the files of a file or folder input;
+ * the text of a text or number input as typed; whether a true-or-false
+ * input is ticked; or the option chosen of an enum input.
  */
-export type Entry =
+export type OneEntry =
   | { kind: 'files'; files: File[] }
   | { kind: 'text'; text: string }
   | { kind: 'flag'; checked: boolean }
   | { kind: 'choice'; option: string };
+
+/**
+ * What the panel holds for one input: one field, or, for an input given
+ * once per row, one field of the input's own kind for each part.
+ */
+export type Entry = OneEntry | { kind: 'parts'; parts: OneEntry[] };
+
+/**
+ * One file about to be uploaded, and the part it belongs to when the input
+ * is given once per row. Parts are numbered from 1, as the slot asks.
+ */
+export type UploadFile = {
+  input: InputField;
+  file: File;
+  part: number | null;
+};
 
 /** Everything in the panel, by input id. Replaced whole on every change. */
 export type Draft = Readonly<Record<string, Entry>>;
@@ -22,23 +39,19 @@ const TEXT_MAX = 64 * 1024;
 /** A number as a contestant gives it: plain decimal digits, as the forge takes one. */
 const PLAIN_DECIMAL = /^-?[0-9]+(\.[0-9]+)?$/;
 
-export function takesFiles(input: InputField): boolean {
+function takesFiles(input: InputField): boolean {
   return input.type === 'file' || input.type === 'folder';
 }
 
-/**
- * Whether the input takes several files that keep where they sit: a
- * folder, or a file per test, which is named `<group>/<test>`.
- */
+/** Whether the input takes several files that keep where they sit: a folder. */
 export function takesPaths(input: InputField): boolean {
-  return input.type === 'folder' || (input.type === 'file' && input.per_test);
+  return input.type === 'folder';
 }
 
 /**
- * Where a file goes under its input. A file of a folder input, or of one
- * that takes a file per test, keeps its path inside the folder it was chosen
- * from, the folder's own name left off; a file chosen alone, and the one
- * file of a file input, goes by its name.
+ * Where a file goes under its input. A file of a folder input keeps its path
+ * inside the folder it was chosen from, the folder's own name left off; a
+ * file chosen alone, and the one file of a file input, goes by its name.
  */
 export function pathOf(input: InputField, file: File): string {
   // A browser without folder picking gives no path at all.
@@ -59,8 +72,15 @@ function firstOption(input: InputField): string {
   return options.length === 1 ? (options[0] ?? '') : '';
 }
 
-/** An input as the panel starts it: no files, or the input's default. */
+/** An input as the panel starts it: no files, or the input's default, in each part it has. */
 function emptyEntry(input: InputField): Entry {
+  const parts = partsOf(input);
+  return parts === null
+    ? emptyOne(input)
+    : { kind: 'parts', parts: parts.map(() => emptyOne(input)) };
+}
+
+function emptyOne(input: InputField): OneEntry {
   switch (input.type) {
     case 'file':
     case 'folder':
@@ -86,18 +106,74 @@ export function emptyDraft(inputs: InputField[]): Draft {
 export function entryOf(draft: Draft, input: InputField): Entry {
   const entry = draft[input.id];
   const empty = emptyEntry(input);
-  return entry !== undefined && entry.kind === empty.kind ? entry : empty;
+  if (entry === undefined || entry.kind !== empty.kind) return empty;
+  if (entry.kind === 'parts' && empty.kind === 'parts') {
+    return {
+      kind: 'parts',
+      parts: empty.parts.map((slot, index) => {
+        const kept = entry.parts[index];
+        return kept !== undefined && kept.kind === slot.kind ? kept : slot;
+      }),
+    };
+  }
+  return entry;
 }
 
-export function filesOf(draft: Draft, input: InputField): File[] {
-  const entry = entryOf(draft, input);
-  return entry.kind === 'files' ? entry.files : [];
+/**
+ * Whether a part is given: a file chosen, a text or a number typed, an
+ * option chosen; a true-or-false part always is. A part not given is left
+ * out of the submit, and the runs of its row are skipped.
+ */
+function partGiven(input: InputField, entry: OneEntry): boolean {
+  switch (entry.kind) {
+    case 'files':
+      return entry.files.length > 0;
+    case 'flag':
+      return true;
+    case 'choice':
+      return entry.option !== '';
+    case 'text':
+      return input.type === 'number' ? entry.text.trim() !== '' : entry.text !== '';
+  }
+}
+
+/** Every file the draft will upload, with the part a per-row input names. */
+export function uploadsOf(inputs: InputField[], draft: Draft): UploadFile[] {
+  const found: UploadFile[] = [];
+  for (const input of inputs) {
+    if (!takesFiles(input)) continue;
+    const entry = entryOf(draft, input);
+    if (entry.kind === 'parts') {
+      entry.parts.forEach((part, index) => {
+        if (part.kind !== 'files') return;
+        for (const file of part.files) found.push({ input, file, part: index + 1 });
+      });
+    } else if (entry.kind === 'files') {
+      for (const file of entry.files) found.push({ input, file, part: null });
+    }
+  }
+  return found;
 }
 
 type Problem = { input: string; message: string };
 
 /** What is wrong with one input's entry, as forge would word it, if anything. */
 function problemOf(input: InputField, entry: Entry): string | null {
+  if (entry.kind !== 'parts') return oneProblem(input, entry);
+  const titles = partsOf(input) ?? [];
+  let given = false;
+  for (const [index, part] of entry.parts.entries()) {
+    if (!partGiven(input, part)) continue;
+    given = true;
+    const problem = oneProblem(input, part);
+    if (problem !== null) {
+      return `${partTitle(titles[index]?.title, index)}: ${problem}`;
+    }
+  }
+  return given ? null : 'Give at least one part of this input.';
+}
+
+function oneProblem(input: InputField, entry: OneEntry): string | null {
   switch (entry.kind) {
     case 'files':
       if (entry.files.length > 0) return null;
@@ -155,7 +231,27 @@ export function checkDraft(inputs: InputField[], draft: Draft): ApiError | null 
   }
 
   for (const input of inputs) {
-    const total = filesOf(draft, input).reduce((sum, file) => sum + file.size, 0);
+    const entry = entryOf(draft, input);
+    if (entry.kind === 'parts') {
+      const parts = partsOf(input) ?? [];
+      for (let index = 0; index < parts.length; index += 1) {
+        const given = entry.parts[index];
+        const part = parts[index];
+        if (given?.kind !== 'files' || part === undefined) continue;
+        const total = given.files.reduce((sum, file) => sum + file.size, 0);
+        if (total > part.max_size) {
+          return new ApiError({
+            code: 'too_large',
+            status: 0,
+            title: 'Too large for this input',
+            extensions: { limit: part.max_size, input: input.id, part: index + 1 },
+          });
+        }
+      }
+      continue;
+    }
+    if (entry.kind !== 'files') continue;
+    const total = entry.files.reduce((sum, file) => sum + file.size, 0);
     if (total > input.max_size) {
       return new ApiError({
         code: 'too_large',
@@ -179,28 +275,37 @@ export function submittedInputs(
   draft: Draft,
   uploadOf: (input: string, file: File) => string,
 ): Record<string, SubmittedInput> {
+  const one = (input: InputField, entry: OneEntry): SubmittedInput => {
+    switch (entry.kind) {
+      case 'files':
+        return { uploads: entry.files.map((file) => uploadOf(input.id, file)) };
+      case 'flag':
+        return { uploads: [], value: entry.checked };
+      case 'choice':
+        return { uploads: [], value: entry.option };
+      case 'text':
+        return {
+          uploads: [],
+          value: input.type === 'number' ? entry.text.trim() : entry.text,
+        };
+    }
+  };
   return Object.fromEntries(
     inputs.map((input): [string, SubmittedInput] => {
       const entry = entryOf(draft, input);
-      switch (entry.kind) {
-        case 'files':
-          return [
-            input.id,
-            { uploads: entry.files.map((file) => uploadOf(input.id, file)) },
-          ];
-        case 'flag':
-          return [input.id, { uploads: [], value: entry.checked }];
-        case 'choice':
-          return [input.id, { uploads: [], value: entry.option }];
-        case 'text':
-          return [
-            input.id,
-            {
-              uploads: [],
-              value: input.type === 'number' ? entry.text.trim() : entry.text,
-            },
-          ];
-      }
+      if (entry.kind !== 'parts') return [input.id, one(input, entry)];
+      return [
+        input.id,
+        {
+          uploads: [],
+          // A part not given is left out, as the forge reads it.
+          parts: Object.fromEntries(
+            entry.parts.flatMap((part, index) =>
+              partGiven(input, part) ? [[String(index + 1), one(input, part)]] : [],
+            ),
+          ),
+        },
+      ];
     }),
   );
 }

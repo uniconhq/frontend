@@ -1,6 +1,9 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { expect, test, type Page, type Route } from '@playwright/test';
+import type { components } from '../src/api/schema';
+
+type Schemas = components['schemas'];
 
 /**
  * The contestant submitting from a task page against the dev server with the
@@ -15,16 +18,16 @@ import { expect, test, type Page, type Route } from '@playwright/test';
 const TASK = '/api/v1/orgs/acme/contests/spring/tasks/sum';
 const OPEN = { released: true, visible: true, open: true, closed: null };
 
-const input = (overrides: Record<string, unknown>) => ({
+const input = (overrides: Partial<Schemas['InputField']>): Schemas['InputField'] => ({
   id: 'submission',
   type: 'file',
   label: 'Your solution',
   options: null,
-  per_test: false,
   default: null,
   min: null,
   max: null,
   max_size: 10485760,
+  parts: null,
   ...overrides,
 });
 
@@ -45,73 +48,62 @@ const queued = {
   id: '5d2f0c1e-0000-4000-8000-000000000001',
   attempt: 1,
   status: 'queued',
-  stopped: null,
-  outcome: null,
-  groups: [],
-  values: { numbers: {}, texts: {} },
-  meanings: [],
   reason: null,
-  points: null,
-  factor: null,
-  boards: [],
-};
+  limit: null,
+  compiled: null,
+  once: { reports: {}, texts: {} },
+  reveal_at: null,
+  run_values: [],
+  runs: [],
+} satisfies Schemas['Result'];
 
-const ranTest = (name: string, outcome: string, timeMs: string, credit: string) => ({
-  test: name,
-  outcome,
-  values: { numbers: { time_ms: timeMs }, texts: {} },
-  credit,
-  best: null,
+const runOf = (overrides: Partial<Schemas['RunShown']>): Schemas['RunShown'] => ({
+  group: 'samples',
+  place: 1,
+  id: null,
+  dropped: false,
+  tuples: [{ title: 'Small grid', key: {} }],
+  verdict: 'accepted',
+  passed: 1,
+  reports: [],
+  texts: {},
+  label: null,
+  message: null,
+  ...overrides,
 });
+
+/** A text written once, such as a compile log, read when it is opened. */
+const LOG = { log: { name: null, output: null } } satisfies Record<
+  string,
+  Schemas['TextRef']
+>;
 
 const graded = {
   ...queued,
   status: 'graded',
-  outcome: 'wrong_answer',
-  values: { numbers: {}, texts: { log: 'Compiled cleanly.' } },
-  points: { shown: '0', pending: '100', pending_until: '2026-09-29T12:00:00Z' },
-  factor: '1',
-  groups: [
-    {
-      group: 'samples',
-      show: 'always',
-      outcome: 'wrong_answer',
-      tests: [
-        ranTest('samples/1', 'accepted', '12', '1'),
-        ranTest('samples/2', 'wrong_answer', '30', '0'),
-      ],
-      shown_at: null,
-      ran: true,
-      points: '0',
-      max: '0',
-    },
-    {
-      group: 'main',
-      show: 'after_close',
-      outcome: null,
-      tests: null,
-      shown_at: '2026-09-29T12:00:00Z',
-      ran: true,
-      points: null,
-      max: '100',
-    },
+  compiled: 1,
+  once: { reports: {}, texts: LOG },
+  runs: [
+    runOf({ reports: [{ title: 'Run time', unit: 'ms', number: '12' }] }),
+    runOf({
+      place: 2,
+      tuples: [{ title: 'Big grid', key: {} }],
+      verdict: 'wrong_answer',
+      passed: 0,
+      reports: [{ title: 'Run time', unit: 'ms', number: '30' }],
+    }),
   ],
-};
+} satisfies Schemas['Result'];
 
-type Submission = {
-  number: number;
-  submitted_at: string;
-  late_days: number;
-  grading: unknown;
-};
+type Submission = Schemas['Submission'];
 
 type State = {
-  inputs: unknown[];
+  inputs: Schemas['InputField'][];
   submissions: Submission[];
   /** How often each submission has been read, so its grading can move on. */
   reads: number;
   /** Each slot asked for, as the browser described its file. */
-  slots: { input: string; filename: string }[];
+  slots: { input: string; filename: string; part?: number }[];
   /** Each file put through the upload door, as its bytes arrived. */
   sent: string[];
   completed: unknown[];
@@ -119,6 +111,11 @@ type State = {
   refusal: { status: number; code: string; extra: Record<string, unknown> } | null;
   /** The forge already holds the file, so the slot has nothing to send. */
   alreadyHeld: boolean;
+  /** Replaces an opened submission's grading from the second read of it. */
+  later: Schemas['Result'] | null;
+  detailReads: number;
+  /** What an opened submission's log holds, read when it is shown. */
+  log: string;
 };
 
 async function stubApi(page: Page, overrides: Partial<State> = {}): Promise<State> {
@@ -132,6 +129,9 @@ async function stubApi(page: Page, overrides: Partial<State> = {}): Promise<Stat
     submits: [],
     refusal: null,
     alreadyHeld: false,
+    later: null,
+    detailReads: 0,
+    log: 'Compiled cleanly.',
     ...overrides,
   };
   const json = (route: Route, body: unknown, status = 200) =>
@@ -142,13 +142,13 @@ async function stubApi(page: Page, overrides: Partial<State> = {}): Promise<Stat
     });
 
   await page.route('**/api/v1/time', (route) =>
-    json(route, { now: '2026-09-29T10:00:00Z' }),
+    json(route, { now: '2026-09-29T10:00:00Z' } satisfies Schemas['ServerTime']),
   );
   await page.route('**/api/v1/auth/register-url', (route) =>
-    json(route, { url: null }),
+    json(route, { url: null } satisfies Schemas['RegisterUrl']),
   );
   await page.route('**/api/v1/auth/forge-url', (route) =>
-    json(route, { url: 'http://forge.localhost:8080' }),
+    json(route, { url: 'http://forge.localhost:8080' } satisfies Schemas['ForgeUrl']),
   );
   await page.route('**/api/v1/me', (route) =>
     json(route, {
@@ -161,7 +161,7 @@ async function stubApi(page: Page, overrides: Partial<State> = {}): Promise<Stat
       },
       roles: [],
       degraded: false,
-    }),
+    } satisfies Schemas['Me']),
   );
 
   await page.route('**/-/uploads/*', async (route) => {
@@ -182,7 +182,6 @@ async function stubApi(page: Page, overrides: Partial<State> = {}): Promise<Stat
         name: 'sum',
         label: 'A',
         title: 'Sum of Two',
-        worth: '100',
         statement: '# Sum\n\nPrint the sum of two numbers.\n',
         submissions: { max: 50, rate: { count: 1, per: 30 } },
         inputs: state.inputs,
@@ -190,7 +189,7 @@ async function stubApi(page: Page, overrides: Partial<State> = {}): Promise<Stat
         due: null,
         closes: '2026-09-29T12:00:00Z',
         marks: null,
-      });
+      } satisfies Schemas['TaskPage']);
     }
     if (path === '/uploads') {
       state.slots.push(request.postDataJSON() as State['slots'][number]);
@@ -203,7 +202,7 @@ async function stubApi(page: Page, overrides: Partial<State> = {}): Promise<Stat
           url: state.alreadyHeld ? null : `/-/uploads/${id}`,
           ready: state.alreadyHeld,
           expires_at: '2026-09-29T10:15:00Z',
-        },
+        } satisfies Schemas['Slot'],
         201,
       );
     }
@@ -211,15 +210,14 @@ async function stubApi(page: Page, overrides: Partial<State> = {}): Promise<Stat
     if (completing !== null) {
       state.completed.push(request.postDataJSON());
       return json(route, {
-        id: completing[1],
+        id: completing[1] ?? '',
         input: 'submission',
         filename: 'main.py',
         content_type: null,
-        declared_size: 1,
         size: 1,
         sha256: 'ab',
         status: 'verified',
-      });
+      } satisfies Schemas['Upload']);
     }
     if (path === '/submissions' && request.method() === 'POST') {
       const body = request.postDataJSON() as State['submits'][number];
@@ -241,10 +239,9 @@ async function stubApi(page: Page, overrides: Partial<State> = {}): Promise<Stat
       }
       // Made now, as the backend would: the page asks for a verdict more
       // often the newer the submission waiting on one is.
-      const made = {
+      const made: Submission = {
         number: state.submissions.length + 1,
         submitted_at: new Date().toISOString(),
-        late_days: 0,
         grading: queued,
       };
       state.submissions.push(made);
@@ -258,18 +255,28 @@ async function stubApi(page: Page, overrides: Partial<State> = {}): Promise<Stat
     const one = /^\/submissions\/(\d+)$/.exec(path);
     if (one !== null) {
       const found = state.submissions.find((entry) => entry.number === Number(one[1]));
-      return found === undefined
-        ? route.fulfill({ status: 404, body: 'not stubbed' })
-        : json(route, found);
+      if (found === undefined)
+        return route.fulfill({ status: 404, body: 'not stubbed' });
+      state.detailReads += 1;
+      const grading =
+        state.later !== null && state.detailReads > 2 ? state.later : found.grading;
+      return json(route, { ...found, grading });
+    }
+    if (/^\/submissions\/\d+\/text$/.test(path)) {
+      return route.fulfill({ status: 200, contentType: 'text/plain', body: state.log });
     }
     if (/^\/submissions\/\d+\/files$/.test(path)) {
       return json(route, {
         number: 1,
         inputs: {
-          submission: { files: ['files/submission/main.cpp'], value: null },
-          language: { files: [], value: 'cpp' },
+          submission: {
+            files: ['files/submission/main.cpp'],
+            value: null,
+            parts: null,
+          },
+          language: { files: [], value: 'cpp', parts: null },
         },
-      });
+      } satisfies Schemas['SubmittedFiles']);
     }
     return route.fulfill({ status: 404, body: 'not stubbed' });
   });
@@ -363,7 +370,7 @@ test('a full pass sends the files as the slot says and makes one submission', as
 
   const list = page.getByRole('table', { name: 'Your submissions' });
   await expect(list.getByText('QUEUED')).toBeVisible();
-  await expect(list.getByText('WRONG ANSWER')).toBeVisible({ timeout: 15_000 });
+  await expect(list.getByText('GRADED')).toBeVisible({ timeout: 15_000 });
 });
 
 test('a file the forge already holds is submitted without being sent', async ({
@@ -387,7 +394,7 @@ test('a file the forge already holds is submitted without being sent', async ({
   expect(state.completed).toHaveLength(1);
 });
 
-test('a submission opens with its log, its groups and their tests', async ({
+test('a submission opens with its runs and its log, read when it is shown', async ({
   page,
 }) => {
   await stubApi(page, {
@@ -395,7 +402,6 @@ test('a submission opens with its log, its groups and their tests', async ({
       {
         number: 1,
         submitted_at: '2026-09-29T09:30:00Z',
-        late_days: 0,
         grading: graded,
       },
     ],
@@ -405,31 +411,32 @@ test('a submission opens with its log, its groups and their tests', async ({
   await page.getByRole('link', { name: '#1' }).click();
   await expect(page).toHaveURL(/\?submission=1$/);
   const detail = page.getByRole('region', { name: 'Submission 1' });
+  const samples = detail.getByRole('region', { name: 'Group samples' });
+  await expect(samples.getByText('Small grid')).toBeVisible();
+  await expect(samples.getByText('WRONG ANSWER')).toBeVisible();
+  await expect(samples).toContainText('Run time (ms) 30');
+  await detail.getByRole('button', { name: 'Show log' }).click();
   await expect(detail.getByLabel('log', { exact: true })).toHaveText(
     'Compiled cleanly.',
   );
-  const rows = detail.getByRole('table', { name: 'Tests samples' }).getByRole('row');
-  await expect(rows).toHaveCount(3);
-  await expect(rows.nth(2)).toContainText('WRONG ANSWER');
-  const main = detail.getByRole('region', { name: 'Group main' });
-  await expect(main.getByText(/^Shown at /)).toBeVisible();
-  await expect(main.getByRole('table')).toHaveCount(0);
 });
 
-test('a submission that did not compile shows that as its verdict', async ({
+test('a submission that did not compile shows that on its runs, with its log', async ({
   page,
 }) => {
   await stubApi(page, {
+    log: 'main.cpp:1: error',
     submissions: [
       {
         number: 1,
         submitted_at: '2026-09-29T09:30:00Z',
-        late_days: 0,
         grading: {
           ...queued,
           status: 'graded',
-          stopped: 'compile_error',
-          values: { numbers: {}, texts: { log: 'main.cpp:1: error' } },
+          // A compile that stopped it, as the forge says once a run is shown.
+          compiled: 0,
+          once: { reports: {}, texts: LOG },
+          runs: [runOf({ verdict: 'compile_error', passed: 0 })],
         },
       },
     ],
@@ -437,13 +444,17 @@ test('a submission that did not compile shows that as its verdict', async ({
   await page.goto(`${PAGE}?submission=1`);
 
   await expect(
-    page.getByRole('table', { name: 'Your submissions' }).getByText('COMPILE ERROR'),
+    page.getByRole('table', { name: 'Your submissions' }).getByText('GRADED'),
   ).toBeVisible();
   const detail = page.getByRole('region', { name: 'Submission 1' });
-  await expect(detail.getByText('COMPILE ERROR')).toBeVisible();
+  await expect(
+    detail.getByRole('region', { name: 'Group samples' }).getByText('COMPILE ERROR'),
+  ).toBeVisible();
+  await detail.getByRole('button', { name: 'Show log' }).click();
   await expect(detail.getByLabel('log', { exact: true })).toHaveText(
     'main.cpp:1: error',
   );
+  await expect(detail.getByLabel('Facts', { exact: true })).toHaveText(/Compiled\s*0/);
   await expect(detail.getByRole('table')).toHaveCount(0);
 });
 
@@ -455,7 +466,6 @@ test('a submission whose grading failed on Unicon’s side reads as delayed', as
       {
         number: 1,
         submitted_at: '2026-09-29T09:30:00Z',
-        late_days: 0,
         grading: { ...queued, status: 'delayed' },
       },
     ],
@@ -482,7 +492,6 @@ test('an earlier submission lists its files, each a download through the door', 
       {
         number: 1,
         submitted_at: '2026-09-29T09:30:00Z',
-        late_days: 0,
         grading: graded,
       },
     ],
@@ -547,4 +556,129 @@ test('each refusal is said in words, and the files stay to send again', async ({
     );
   }
   expect(state.submissions).toHaveLength(0);
+});
+
+const MB = 1024 * 1024;
+
+const valueOf = (
+  name: string,
+  number: string,
+  show: Schemas['RunValue']['show'],
+): Schemas['RunValue'] => ({
+  name,
+  number,
+  text: null,
+  waiting: false,
+  self_reported: false,
+  show,
+  facts: null,
+  runs: null,
+  values: null,
+});
+
+test('a row given in parts is one upload each, held to that part’s size', async ({
+  page,
+}, testInfo) => {
+  const state = await stubApi(page, {
+    inputs: [
+      input({
+        id: 'route',
+        label: 'Route',
+        max_size: 50 * MB,
+        parts: [
+          { title: 'Small grid', max_size: 10 * MB },
+          { title: 'Big grid', max_size: 50 * MB },
+        ],
+      }),
+    ],
+  });
+  await page.goto(PAGE);
+
+  const form = page.getByRole('form', { name: 'Submit' });
+  await expect(form.getByLabel('Small grid', { exact: true })).toBeAttached();
+  await expect(form.getByLabel('Big grid', { exact: true })).toBeAttached();
+  await expect(form.getByText('At most 50 MB.')).toBeVisible();
+
+  const big = testInfo.outputPath('big.bin');
+  await writeFile(big, Buffer.alloc(50 * MB + 1));
+  await form.getByLabel('Big grid', { exact: true }).setInputFiles(big);
+  await form.getByRole('button', { name: 'Submit' }).click();
+  await expect(page.getByRole('alert')).toContainText('Too large: Route, Big grid');
+  expect(state.slots).toHaveLength(0);
+
+  await form.getByRole('button', { name: 'Remove big.bin' }).click();
+  await form.getByLabel('Small grid', { exact: true }).setInputFiles({
+    name: 'small.txt',
+    mimeType: 'text/plain',
+    buffer: Buffer.from('1\n'),
+  });
+  await form.getByRole('button', { name: 'Submit' }).click();
+  await expect(page.getByText('Submitted as #1.')).toBeVisible();
+  expect(
+    state.slots.map((slot) => ({
+      input: slot.input,
+      filename: slot.filename,
+      part: slot.part,
+    })),
+  ).toEqual([{ input: 'route', filename: 'small.txt', part: 1 }]);
+  expect(state.submits[0]?.inputs).toEqual({
+    route: {
+      uploads: [],
+      parts: {
+        '1': { uploads: ['00000000-0000-4000-8000-000000000001'] },
+      },
+    },
+  });
+});
+
+test('samples show now, and the rest appears when the task reveals', async ({
+  page,
+}) => {
+  const samples: Schemas['Result'] = {
+    ...queued,
+    status: 'graded',
+    compiled: 1,
+    reveal_at: '2026-09-29T10:00:03Z',
+    runs: [runOf({})],
+    run_values: [valueOf('score', '10', 'now')],
+    once: { reports: {}, texts: {} },
+  };
+  const revealed: Schemas['Result'] = {
+    ...samples,
+    reveal_at: null,
+    runs: [
+      runOf({}),
+      runOf({
+        group: 'hidden',
+        tuples: [
+          { title: 'Big grid', key: { grid: 'big.txt' } },
+          { title: null, key: { seed: 2 } },
+        ],
+        verdict: 'skipped',
+        passed: 0,
+      }),
+    ],
+    run_values: [valueOf('score', '10', 'now'), valueOf('full', '7', 'on_release')],
+  };
+  await stubApi(page, {
+    later: revealed,
+    submissions: [
+      {
+        number: 1,
+        submitted_at: '2026-09-29T09:30:00Z',
+        grading: samples,
+      },
+    ],
+  });
+  await page.goto(`${PAGE}?submission=1`);
+
+  const detail = page.getByRole('region', { name: 'Submission 1' });
+  await expect(detail.getByText('Small grid')).toBeVisible();
+  await expect(detail.getByText('score')).toBeVisible();
+  await expect(detail.getByText('Big grid · seed 2')).toHaveCount(0);
+  await expect(detail.getByText('Big grid · seed 2')).toBeVisible({
+    timeout: 15_000,
+  });
+  await expect(detail.getByText('NOT GIVEN')).toBeVisible();
+  await expect(detail.getByText('full')).toBeVisible();
 });

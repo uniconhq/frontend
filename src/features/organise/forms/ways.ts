@@ -164,7 +164,7 @@ export function approvesAtOnce(way: WayValues): boolean {
 }
 
 /** Who a way lets in, in a few words: "anyone with an @u.nus.edu email and the code". */
-export function whoWords(way: WayValues): string {
+function whoWords(way: WayValues): string {
   if (way.kind === 'invite') return 'anyone you invite';
   const domains = domainsOf(way.domains);
   const pattern = way.emailPattern.trim() !== '';

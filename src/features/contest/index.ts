@@ -1,4 +1,4 @@
 export { ContestHomePage } from './ContestHomePage';
 export { TaskStatementPage } from './TaskStatementPage';
-export { BoardsPage } from './boards/BoardsPage';
+export { LeaderboardsPage } from './leaderboards/LeaderboardsPage';
 export { QuestionsPage } from './threads/QuestionsPage';

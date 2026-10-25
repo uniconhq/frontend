@@ -34,8 +34,9 @@ const TASK_KEYS = [
   'name',
   'workflow',
   'inputs',
-  'credit',
-  'test_groups',
+  'repeat',
+  'scoring',
+  'checks',
   'submissions',
 ];
 
@@ -72,7 +73,7 @@ function useUnread(
   }
   const unreadable =
     place.kind === 'task'
-      ? readTask(parsed.doc, []).unreadable
+      ? readTask(parsed.doc).unreadable
       : readContest(parsed.doc).unreadable;
   const reason =
     unreadable.length === 0 ? null : `The pages cannot read ${unreadable.join(', ')}.`;
@@ -212,10 +213,9 @@ function WhereChanged({ place }: { place: Place }) {
         The task’s settings as they are stored, for reading only. They are changed on
         the task’s page: its{' '}
         <PageLink to={taskCardPath(org, contest, task, 'workflow')}>Workflow</PageLink>,{' '}
-        <PageLink to={taskCardPath(org, contest, task, 'inputs')}>Inputs</PageLink> and{' '}
-        <PageLink to={taskCardPath(org, contest, task, 'tests')}>
-          Tests and scoring
-        </PageLink>{' '}
+        <PageLink to={taskCardPath(org, contest, task, 'inputs')}>Inputs</PageLink>,{' '}
+        <PageLink to={taskCardPath(org, contest, task, 'runs')}>Runs</PageLink> and{' '}
+        <PageLink to={taskCardPath(org, contest, task, 'tests')}>Submissions</PageLink>{' '}
         cards, and its title in{' '}
         <PageLink to={taskSectionPath(org, contest, task, 'settings')}>
           Settings

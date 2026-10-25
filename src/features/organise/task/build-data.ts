@@ -1,18 +1,10 @@
-import { useQueries, useQuery } from '@tanstack/react-query';
-import { $api, queryView, type QueryView } from '@/api/query';
-import type {
-  DeclaredField,
-  DeclaredInput,
-  FileContent,
-  TreeEntry,
-  WorkflowForm,
-} from '@/api/types';
-import { ratioOf, type Ratio } from '@/lib/exact';
+import { useQuery } from '@tanstack/react-query';
+import { $api } from '@/api/query';
+import type { DeclaredInput, FileContent, WorkflowForm } from '@/api/types';
 import { EDITED } from '@/live';
-import { useContestSettings } from '../contest/settings';
-import { treeQuery, type Place } from '../files/place';
+import type { Place } from '../files/place';
 import { exactJS, isRecord, parseYaml, topMap, type Doc } from '../forms/yaml-doc';
-import { readWorkflow, type ReportEntry } from '../workflows/model';
+import { readWorkflow } from '../workflows/model';
 
 export type TaskPlace = Extract<Place, { kind: 'task' }>;
 
@@ -23,22 +15,8 @@ export function taskPath(place: TaskPlace) {
   return { org: place.org, contest: place.contest, task: place.task };
 }
 
-/**
- * What the task's workflow says the task's form is made of: its inputs, the
- * fields each test has, and what a run reports, which says what a test may
- * earn by.
- */
-export type Declared = {
-  inputs: DeclaredInput[];
-  test: DeclaredField[];
-  report: ReportedValue[];
-};
-
-/**
- * A value a run reports, with whether it is reported for each test: read
- * from a step that runs for each test, as the forge has it.
- */
-export type ReportedValue = ReportEntry & { perTest: boolean };
+/** What the task's workflow says the task's form is made of: its inputs. */
+export type Declared = { inputs: DeclaredInput[] };
 
 /**
  * An input as the organiser's form names it: its title, or its id (#434),
@@ -85,30 +63,17 @@ export function declaredOf(text: string): Declared | null {
     inputs: workflow.inputs.map((input) => ({
       id: input.id,
       type: input.type,
-      contestant: input.contestant,
       options: input.options,
-      per_test: input.perTest,
       optional: input.optional,
       title: input.title,
       help: input.help,
       unit: input.unit,
     })),
-    test: workflow.test.map((field) => ({
-      name: field.name,
-      type: field.type,
-      options: field.options,
-    })),
-    report: workflow.report.map((entry) => ({
-      ...entry,
-      perTest:
-        entry.from?.kind === 'steps' &&
-        workflow.steps.some((step) => step.id === entry.from?.name && step.perTest),
-    })),
   };
 }
 
 /**
- * The inputs and test fields the task's saved workflow declares, as the
+ * The inputs the task's saved workflow declares, as the
  * backend reads them, with whether the task has graded submissions and
  * whether a newer version is out. Read afresh each time the page opens and
  * after each save, never while the organiser types. `built` reads it for the
@@ -177,90 +142,14 @@ export function newestOf(versions: readonly string[]): string | null {
   return best;
 }
 
-/** Folder names in natural order, `2` before `10`, as the format orders tests. */
+/** Names in natural order, `2` before `10`. */
 export function naturally(a: string, b: string): number {
   return a.localeCompare(b, undefined, { numeric: true });
 }
 
-/** The last part of a path: `tests/small/3` is `3`. */
+/** The last part of a path: `parts/small/3.in` is `3.in`. */
 export function lastPart(path: string): string {
   return path.slice(path.lastIndexOf('/') + 1);
-}
-
-/** One test group's folder: its tests by name, and files that are in no test. */
-export type GroupFolder = { name: string; tests: string[]; strays: string[] };
-
-/**
- * The test groups the task's `tests/` folder holds, each with its tests, in
- * the order the format reads them. One read for `tests/` and one per group,
- * since a folder's listing is one level deep. `built` reads them for the
- * build cards (`builtFrom`).
- */
-export function useTestFolders(
-  place: TaskPlace,
-  built = false,
-): QueryView<GroupFolder[]> {
-  const read = <T extends { queryKey: readonly unknown[] }>(options: T) =>
-    built ? builtFrom(options) : options;
-  const top = useQuery({ ...read(treeQuery(place, 'tests')), retry: false });
-  const folders = (top.data ?? [])
-    .filter((entry) => entry.kind === 'directory')
-    .map((entry) => lastPart(entry.path));
-  const groups = useQueries({
-    queries: folders.map((group) => ({
-      ...read(treeQuery(place, `tests/${group}`)),
-      retry: false,
-    })),
-  });
-  if (top.isPending) return { state: 'loading' };
-  // A task with no tests/ folder yet has no groups: the read finds no folder.
-  if (top.isError) {
-    const view = queryView(top);
-    if (view.state === 'error' && view.error.code === 'not_found') {
-      return { state: 'ready', data: [] };
-    }
-    return view.state === 'error' ? view : { state: 'loading' };
-  }
-  const failed = groups.find((group) => group.isError);
-  if (failed !== undefined) {
-    const view = queryView(failed);
-    if (view.state === 'error') return view;
-  }
-  if (groups.some((group) => group.isPending)) return { state: 'loading' };
-  return {
-    state: 'ready',
-    data: folders.map((name, at) => {
-      const entries: TreeEntry[] = groups[at]?.data ?? [];
-      return {
-        name,
-        tests: entries
-          .filter((entry) => entry.kind === 'directory')
-          .map((entry) => lastPart(entry.path))
-          .sort(naturally),
-        strays: entries
-          .filter((entry) => entry.kind !== 'directory')
-          .map((entry) => lastPart(entry.path)),
-      };
-    }),
-  };
-}
-
-/**
- * What the task's contest makes it worth: the `worth` of its entry, or null
- * when the entry gives none and the task is worth its groups' total (#435).
- * `known` is false when the contest's settings cannot be read, as by an
- * organiser of the task alone.
- */
-export function useTaskWorth(place: TaskPlace): {
-  known: boolean;
-  worth: Ratio | null;
-} {
-  const view = useContestSettings(place.org, place.contest);
-  if (view.state !== 'ready' || view.data === null)
-    return { known: false, worth: null };
-  const entry = view.data.tasks.find((task) => task.id === place.task);
-  const text = entry?.worth.trim() ?? '';
-  return { known: entry !== undefined, worth: text === '' ? null : ratioOf(text) };
 }
 
 /** What the workflow form says, or null when the backend could not say it. */

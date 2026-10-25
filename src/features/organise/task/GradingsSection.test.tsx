@@ -5,8 +5,13 @@ import { http, HttpResponse } from 'msw';
 import type { FeedEntry, Grading, OrganisedSubmission, Submitter } from '@/api/types';
 import { renderApp } from '@/test/render';
 import { problem, server, signedIn, someone } from '@/test/server';
-import { graded, reported } from '@/test/contestant';
-import { TASK_API, publicationList, repoFiles, taskState } from '@/test/organiser';
+import {
+  TASK_API,
+  publicationList,
+  repoFiles,
+  runsResult,
+  taskState,
+} from '@/test/organiser';
 
 const TASK = '/orgs/acme/contests/spring/tasks/sum/gradings';
 
@@ -37,8 +42,6 @@ const stuck: Grading = {
   status: 'system_error',
   error: 'The grading machine lost its run before it began.',
   result: null,
-  log: false,
-  progress: null,
   queued_at: '2026-09-26T10:00:00Z',
   dispatched_at: '2026-09-26T10:00:01Z',
   started_at: null,
@@ -46,6 +49,8 @@ const stuck: Grading = {
   deadline_at: null,
   cancel_reason: null,
   automatic: false,
+  early: null,
+  pipeline: 'early',
   limit: null,
   retry_limit: null,
   regrade: null,
@@ -84,18 +89,6 @@ describe("the task's gradings", () => {
   });
 
   it('shows what a finished grading came to', async () => {
-    const result = (
-      overrides: Partial<NonNullable<Grading['result']>>,
-    ): NonNullable<Grading['result']> => ({
-      stopped: null,
-      tests: [
-        graded('main/1', 'accepted', reported({ time_ms: '12' })),
-        graded('main/2', 'accepted', reported({ time_ms: '30' })),
-      ],
-      values: reported(),
-      error: null,
-      ...overrides,
-    });
     const done = (number: number, made: NonNullable<Grading['result']>): Grading => ({
       ...stuck,
       id: `0199a2c1-6b7e-7c3a-9f10-5d2e4b8a6c4${String(number)}`,
@@ -111,18 +104,9 @@ describe("the task's gradings", () => {
       ...repoFiles,
       http.get(`${TASK_API}/gradings`, () =>
         asEntries([
-          done(7, result({ stopped: 'compile_error', tests: [] })),
-          done(6, result({})),
-          done(
-            5,
-            result({
-              tests: [
-                graded('main/1', 'accepted'),
-                graded('main/2', 'time_limit'),
-                graded('main/3', 'wrong_answer'),
-              ],
-            }),
-          ),
+          done(7, runsResult(['skipped', 'skipped'], { compile: 'compile_error' })),
+          done(6, runsResult(['accepted', 'accepted'], { compile: 'accepted' })),
+          done(5, runsResult(['accepted', 'time_limit', 'wrong_answer'])),
         ]),
       ),
     );
@@ -134,38 +118,6 @@ describe("the task's gradings", () => {
     expect(passed).toHaveTextContent('ACCEPTED');
     expect(failed).toHaveTextContent('TIME LIMIT');
     expect(within(table).queryByRole('columnheader', { name: 'Stage' })).toBeNull();
-  });
-
-  it('links each grading whose run wrote a log to it, in a tab of its own', async () => {
-    const logged: Grading = {
-      ...stuck,
-      id: '0199a2c1-6b7e-7c3a-9f10-5d2e4b8a6c33',
-      submission_number: 5,
-      status: 'done',
-      error: null,
-      log: true,
-    };
-    server.use(
-      signedIn,
-      taskState,
-      publicationList,
-      ...repoFiles,
-      http.get(`${TASK_API}/gradings`, () => asEntries([logged, waiting])),
-    );
-    renderApp(TASK);
-
-    const link = await screen.findByRole('link', {
-      name: 'Log of B submission 5 by ada, attempt 1',
-    });
-    expect(link).toHaveAttribute(
-      'href',
-      `/api/v1/orgs/acme/contests/spring/tasks/sum/gradings/${logged.id}/log`,
-    );
-    expect(link).toHaveAttribute('target', '_blank');
-    expect(link).toHaveAttribute('rel', 'noopener noreferrer');
-    expect(
-      screen.queryByRole('link', { name: 'Log of B submission 4 by ada, attempt 1' }),
-    ).toBeNull();
   });
 
   it('retries a stuck grading after asking, and reads the list again', async () => {
@@ -371,7 +323,7 @@ describe("the task's gradings", () => {
       publication: 3,
       status: 'done',
       error: null,
-      result: { stopped: 'compile_error', tests: [], values: reported(), error: null },
+      result: runsResult([], { compile: 'compile_error' }),
     };
     server.use(
       signedIn,
@@ -570,41 +522,47 @@ describe("the organisers' scored view of a submission", () => {
     ...stuck,
     status: 'done',
     error: null,
-    result: {
-      stopped: null,
-      tests: [graded('main/1', 'accepted')],
-      values: reported(),
-      error: null,
-    },
+    result: runsResult(['accepted']),
     finished_at: '2026-09-26T10:01:00Z',
   };
   const filledIn: OrganisedSubmission = {
     number: 3,
     submitted_at: '2026-09-26T10:00:00Z',
-    late_days: 0,
     grading: {
       id: done.id,
       attempt: 1,
       status: 'done',
-      stopped: null,
-      outcome: 'accepted',
-      values: reported(),
-      boards: [],
       reason: null,
       limit: null,
-      points: { shown: '100', pending: '0', pending_until: null },
-      factor: '1',
-      meanings: [],
-      groups: [
+      compiled: null,
+      facts: {},
+      once: { reports: {}, texts: {} },
+      run_values: [
+        {
+          name: 'score',
+          number: '100',
+          text: null,
+          waiting: false,
+          self_reported: false,
+          show: 'after_close',
+          runs: ['run-1'],
+          values: [],
+          facts: [],
+        },
+      ],
+      runs: [
         {
           group: 'main',
-          show: 'after_close',
-          outcome: 'accepted',
-          tests: [graded('main/1', 'accepted', reported({ time_ms: '12' }), '1')],
-          shown_at: '2026-09-26T15:00:00Z',
-          ran: true,
-          points: '100',
-          max: '100',
+          place: 1,
+          id: 'run-1',
+          dropped: false,
+          tuples: [{ title: 'Small grid', key: {} }],
+          verdict: 'accepted',
+          passed: 1,
+          reports: [{ title: 'Run time', unit: 'ms', number: '12' }],
+          texts: {},
+          label: null,
+          message: null,
         },
       ],
     },
@@ -635,13 +593,12 @@ describe("the organisers' scored view of a submission", () => {
     const view = await screen.findByRole('region', { name: 'Submission 3, scored' });
     expect(asked[0]?.get('entrant')).toBe('e-ada');
     const main = within(view).getByRole('region', { name: 'Group main' });
-    expect(main).toHaveTextContent('100 / 100 points');
-    expect(main).toHaveTextContent(/Its entrant sees this at/);
-    expect(main).not.toHaveTextContent(/Its entrant sees its tests at/);
-    expect(within(main).getByRole('table', { name: 'Tests main' })).toHaveTextContent(
-      'main/1',
+    expect(main).toHaveTextContent('Test 1');
+    expect(main).toHaveTextContent('Run time (ms) 12');
+    expect(within(view).getByLabelText('Values')).toHaveTextContent(
+      'score100 After the close',
     );
-    expect(view).toHaveTextContent('100 points');
+    expect(view).not.toHaveTextContent(/points/);
     expect(view).toHaveTextContent('Done');
   });
 

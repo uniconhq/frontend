@@ -68,4 +68,12 @@ describe('an edit laid over the file', () => {
     if ('error' in parsed) throw new Error(parsed.error);
     expect(parsed.doc.toJS()).toEqual({ a: { b: 1, c: 2, e: 4 }, d: 3 });
   });
+
+  it('takes out the last key between blank lines, and keeps the blank line the file ends with', () => {
+    const spaced = 'a:  # c\n  y0: 1\n\n  x1: 1  # k\n\n';
+
+    const text = over(spaced, (doc) => doc.deleteIn(['a', 'x1']));
+
+    expect(text).toBe('a:  # c\n  y0: 1\n\n');
+  });
 });

@@ -232,7 +232,7 @@
   font-size: 13px;
 }
 
-/* One input, test file or report entry in its drawer. */
+/* One input or output in its drawer. */
 .declaration {
   display: flex;
   flex-direction: column;
@@ -256,22 +256,6 @@
   border-top: 1px solid var(--unicon-border);
 }
 
-/* A primitive in the "Add step" menu: its title, what it does, its reference. */
-.addTitle,
-.addDescription {
-  display: block;
-}
-
-.addTitle {
-  font-weight: 700;
-}
-
-.addDescription {
-  color: var(--unicon-text-secondary);
-  font-size: 12px;
-  white-space: normal;
-}
-
 /* The graph's frame: the page's whole width, the graph at its actual size
  * inside it, sliding sideways when it is wider. */
 .frame {
@@ -285,23 +269,6 @@
 
 .canvas {
   min-width: 100%;
-}
-
-.band {
-  width: 100%;
-  height: 100%;
-  border-radius: var(--mantine-radius-sm);
-  background: var(--unicon-hover);
-}
-
-/* What the band is, at its top, in the space above its first box. */
-.bandLabel {
-  display: block;
-  padding: 4px 10px;
-  font-size: 12px;
-  font-weight: 600;
-  line-height: 16px;
-  color: var(--unicon-text-secondary);
 }
 
 .box {
@@ -368,16 +335,6 @@
   font-size: 13px;
   font-weight: 700;
   color: var(--unicon-text-primary);
-}
-
-.runs {
-  margin-left: auto;
-  padding: 0 6px;
-  border-radius: 999px;
-  background: var(--unicon-hover);
-  color: var(--unicon-text-secondary);
-  font-size: 11px;
-  font-weight: 600;
 }
 
 .primitiveTitle {

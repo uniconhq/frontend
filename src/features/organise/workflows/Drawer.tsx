@@ -6,7 +6,7 @@ export const DRAWER_WIDTH = 440;
 
 /**
  * The selected box's drawer, from the right, over the graph (M37): what a
- * step, the inputs, a test's files or the report hold, to change. It is not
+ * step, the inputs or the outputs hold, to change. It is not
  * modal: the graph stays live beside it, so choosing another box shows that
  * one instead. It closes with its × or with Escape, unless Escape is for a
  * menu or a dialog open over it. Opening moves the focus to its title, and

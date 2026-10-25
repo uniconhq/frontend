@@ -39,7 +39,9 @@ function tooLarge(error: ApiError): ErrorDescription {
     message:
       limit === null
         ? 'The files for this input are larger than it takes.'
-        : `The files for this input may be at most ${formatLimit(limit)} in all.`,
+        : typeof error.extensions['part'] === 'number'
+          ? `This part may be at most ${formatLimit(limit)}.`
+          : `The files for this input may be at most ${formatLimit(limit)} in all.`,
   };
 }
 
@@ -334,7 +336,9 @@ export function describeError(error: ApiError): ErrorDescription {
         message:
           limit === null
             ? 'You have made every submission this task takes.'
-            : `This task takes ${limit} submissions in all, and you have made them.`,
+            : limit === 1
+              ? 'This task takes 1 submission in all, and you have made it.'
+              : `This task takes ${limit} submissions in all, and you have made them.`,
       };
     }
     case 'rate_limited':

@@ -1,218 +1,210 @@
 import { describe, expect, it } from 'vitest';
 import { screen, within } from '@testing-library/react';
-import type { OnBoard } from '@/api/types';
+import userEvent from '@/test/user-event';
 import { formatExact } from '@/lib/exact';
-import { formatDateTime } from '@/lib/time';
-import { classicMeanings } from '@/test/organiser';
 import { renderWithProviders } from '@/test/render';
-import { graded, grading, reported } from '@/test/contestant';
+import { grading } from '@/test/contestant';
+import { RESULTS_AFTER } from '@/ui/number/words';
 import { ScoredResult } from './ScoredResult';
 
-/** Classic's values as its workflow names them, in its report order (M58). */
-const MEANINGS = classicMeanings;
-
-const REVEAL = '2026-09-26T15:00:00Z';
-
-/**
- * A wrong answer on classic: a test that was not accepted, while each
- * test's row keeps the time it reported (#441).
- */
-const wrong = grading({
-  status: 'graded',
-  outcome: 'wrong_answer',
-  points: { shown: '50', pending: '0', pending_until: null },
-  factor: '1',
-  groups: [
-    {
-      group: 'main',
-      show: 'always',
-      outcome: 'wrong_answer',
-      tests: [
-        graded('main/1', 'accepted', reported({ time_ms: '12' }), '1'),
-        graded('main/2', 'wrong_answer', reported({ time_ms: '3' }), '0'),
-      ],
-      shown_at: null,
-      ran: true,
-      points: '50',
-      max: '100',
-    },
-  ],
-});
-
-/** An accepted run on classic: its tests' values and its compile log. */
-const right = grading({
-  status: 'graded',
-  outcome: 'accepted',
-  points: { shown: '100', pending: '0', pending_until: null },
-  factor: '1',
-  values: reported({}, { log: 'Compiled cleanly.' }),
-  meanings: MEANINGS,
-  groups: [
-    {
-      group: 'main',
-      show: 'always',
-      outcome: 'accepted',
-      tests: [
-        graded('main/1', 'accepted', reported({ memory_kb: '10420', time_ms: '28' })),
-      ],
-      shown_at: null,
-      ran: true,
-      points: '100',
-      max: '100',
-    },
-  ],
-});
-
-const POINTS = { by: 'points', fold: null, title: null, unit: null };
-const SLOWEST = { by: 'time_ms', fold: 'max' as const, title: 'Run time', unit: 'ms' };
-
-function line(overrides: Partial<OnBoard>): OnBoard {
+/** One run of classic, accepted, with the outputs it reported. */
+function run(reports: { title: string; unit: string | null; number: string }[]) {
   return {
-    board: 'Standings',
-    over: 'all',
-    numbers: [{ ...POINTS, value: '24' }],
-    pending: '0',
-    shown_at: null,
-    counted: false,
-    ...overrides,
+    group: 'main',
+    place: 1,
+    id: null,
+    dropped: false,
+    tuples: [{ title: 'Small grid', key: {} }],
+    verdict: 'accepted' as const,
+    passed: 1,
+    reports,
+    texts: {},
+    label: null,
+    message: null,
   };
 }
 
-describe("a result's points", () => {
-  it('are cut to two decimals, as every page shows them, the run’s and each group’s (R17)', () => {
-    const third = grading({
-      status: 'graded',
-      outcome: 'wrong_answer',
-      points: { shown: '36.666666', pending: '0', pending_until: null },
-      factor: '1',
-      groups: [
-        {
-          group: 'main',
-          show: 'always',
-          outcome: 'wrong_answer',
-          tests: [graded('main/1', 'accepted', reported({}), '1')],
-          shown_at: null,
-          ran: true,
-          points: '36.666666',
-          max: '110',
-        },
-      ],
-    });
-    renderWithProviders(<ScoredResult grading={third} />);
-    expect(screen.getByText(`${formatExact('36.66', 2)} points`)).toBeVisible();
-    expect(
-      screen.getByText(`${formatExact('36.66', 2)} / 110 points`, { exact: false }),
-    ).toBeVisible();
-    expect(screen.queryByText(/36[.,]67/)).toBeNull();
+describe('a run’s values', () => {
+  it('names each by its title and unit, its number exact', () => {
+    renderWithProviders(
+      <ScoredResult
+        grading={grading({
+          status: 'graded',
+          runs: [
+            run([
+              { title: 'Run time', unit: 'ms', number: '28' },
+              { title: 'Memory used', unit: 'KB', number: '10420' },
+            ]),
+          ],
+          once: { reports: { time_ms: '3' }, texts: {} },
+        })}
+      />,
+    );
+
+    const group = screen.getByRole('region', { name: 'Group main' });
+    expect(within(group).getByText(/Run time/)).toHaveTextContent('Run time (ms) 28');
+    expect(within(group).getByText(/Memory used/)).toHaveTextContent(
+      `Memory used (KB) ${formatExact('10420')}`,
+    );
+    expect(screen.getByLabelText('Once')).toHaveTextContent('time_ms3');
   });
 
-  it('read "1 point" for one, and for points that are cut to one', () => {
-    const one = (shown: string) =>
-      grading({
-        status: 'graded',
-        outcome: 'accepted',
-        points: { shown, pending: '0', pending_until: null },
-        factor: '1',
-        groups: [],
-      });
-    const { unmount } = renderWithProviders(<ScoredResult grading={one('1')} />);
-    expect(screen.getByText('1 point')).toBeVisible();
-    unmount();
-    renderWithProviders(<ScoredResult grading={one('1.0004')} />);
-    expect(screen.getByText('1 point')).toBeVisible();
+  it('says nothing while a submission still waits for its grading', () => {
+    renderWithProviders(<ScoredResult grading={grading({ status: 'queued' })} />);
+    expect(screen.queryByText(RESULTS_AFTER)).toBeNull();
+    expect(screen.queryByLabelText('Values')).toBeNull();
   });
 });
 
-describe("a result's values", () => {
-  it('keeps each test’s own values, in the values’ words and the table’s order', () => {
-    renderWithProviders(<ScoredResult grading={right} />);
-
-    const tests = screen.getByRole('table', { name: 'Tests main' });
-    expect(
-      within(tests)
-        .getAllByRole('columnheader')
-        .map((header) => header.textContent),
-    ).toEqual(['Test', 'Outcome', 'Run time', 'Memory used']);
-    expect(within(tests).getAllByRole('row')[1]).toHaveTextContent(
-      `28 ms${formatExact('10420')} KB`,
-    );
-    expect(screen.getByLabelText('Compile log')).toHaveTextContent('Compiled cleanly.');
-    expect(screen.queryByText(/time_ms|memory_kb/)).toBeNull();
-    expect(screen.queryByText(/Over the tests shown/)).toBeNull();
-  });
-});
-
-describe('a result on the leaderboards', () => {
-  it('reads one line per board, its points, what may still come and whether it counts', () => {
+describe('a run task’s result', () => {
+  it('shows values and each run by its titles, with no penalty', () => {
     renderWithProviders(
       <ScoredResult
-        grading={{
-          ...right,
-          boards: [
-            line({ pending: '56', counted: true }),
-            line({ board: 'Public', over: 'live' }),
+        grading={grading({
+          status: 'graded',
+          run_values: [
+            {
+              name: 'score',
+              number: '10',
+              text: null,
+              waiting: false,
+              self_reported: true,
+              show: 'now',
+              facts: null,
+              runs: null,
+              values: null,
+            },
           ],
-        }}
+          runs: [
+            {
+              group: 'samples',
+              place: 1,
+              id: null,
+              dropped: false,
+              tuples: [
+                { title: 'Big grid', key: { grid: 'big.txt' } },
+                { title: null, key: { seed: 2 } },
+              ],
+              verdict: 'skipped',
+              passed: 0,
+              reports: [],
+              texts: {},
+              label: null,
+              message: null,
+            },
+          ],
+        })}
       />,
     );
 
-    const boards = screen.getByRole('region', { name: 'On the leaderboards' });
-    expect(
-      within(boards)
-        .getAllByRole('listitem')
-        .map((item) => item.textContent),
-    ).toEqual([
-      'Standings: 24 points · up to 56 more at the reveal · counts here',
-      'Public: 24 points',
-    ]);
+    expect(screen.getByRole('region', { name: 'Group samples' })).toHaveTextContent(
+      'Test 1',
+    );
+    expect(screen.getByText('Big grid · seed 2')).toBeVisible();
+    expect(screen.getByText('NOT GIVEN')).toBeVisible();
+    expect(screen.getByText('score').closest('div')).toHaveTextContent('10');
+    expect(screen.queryByText(/penal/)).toBeNull();
+    expect(screen.queryByText(/self-reported/)).toBeNull();
   });
 
-  it('labels a value by its title and how the board combines its tests, or says it has none', () => {
+  it('says nothing is shown yet, and when it will be', () => {
     renderWithProviders(
       <ScoredResult
-        grading={{
-          ...wrong,
-          boards: [
-            line({ board: 'Fastest', numbers: [{ ...SLOWEST, value: '15' }] }),
-            line({
-              board: 'Total',
-              numbers: [{ ...SLOWEST, fold: 'sum', value: null }],
-            }),
+        grading={grading({
+          status: 'submitted',
+          reveal_at: '2026-09-29T12:00:00Z',
+        })}
+      />,
+    );
+    expect(screen.getByText(RESULTS_AFTER)).toBeVisible();
+    expect(screen.getByText(/Results at /)).toBeVisible();
+  });
+
+  it('reads a text when it is opened', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(
+      <ScoredResult
+        grading={grading({
+          status: 'graded',
+          once: { reports: {}, texts: { log: { name: null, output: null } } },
+          runs: [
+            {
+              group: 'samples',
+              place: 1,
+              id: null,
+              dropped: false,
+              tuples: [{ title: 'Small grid', key: {} }],
+              verdict: 'accepted',
+              passed: 1,
+              reports: [],
+              texts: {},
+              label: null,
+              message: null,
+            },
           ],
+        })}
+        readText={(ask) => {
+          expect(ask).toEqual({
+            group: null,
+            place: null,
+            field: 'texts',
+            name: 'log',
+            output: null,
+          });
+          return Promise.resolve('Compiled cleanly.');
         }}
       />,
     );
-
-    const boards = screen.getByRole('region', { name: 'On the leaderboards' });
-    expect(boards).toHaveTextContent('Fastest: Run time, highest: 15 ms');
-    expect(boards).toHaveTextContent('Total: Run time, total: no value');
+    await user.click(screen.getByRole('button', { name: 'Show log' }));
+    expect(screen.getByLabelText('log')).toHaveTextContent('Compiled cleanly.');
   });
 
-  it('shares a line between boards that read alike, and says when a board shows nothing yet', () => {
+  it('shows when a value is shown, a dropped run and the facts', () => {
     renderWithProviders(
       <ScoredResult
         grading={{
-          ...right,
-          boards: [
-            line({ counted: true }),
-            line({ board: 'Mirror', counted: true }),
-            line({ board: 'Final', over: 'after_close', shown_at: REVEAL }),
+          id: 'g',
+          attempt: 1,
+          status: 'done',
+          reason: null,
+          limit: null,
+          once: { reports: {}, texts: {} },
+          runs: [
+            {
+              group: 'all',
+              place: 1,
+              dropped: true,
+              id: 'r',
+              tuples: [{ title: 'Small grid', key: {} }],
+              verdict: 'accepted',
+              passed: 1,
+              reports: [],
+              texts: {},
+              label: null,
+              message: null,
+            },
           ],
+          run_values: [
+            {
+              name: 'score',
+              number: '7.5',
+              text: null,
+              waiting: false,
+              self_reported: false,
+              show: 'on_release',
+              facts: null,
+              runs: null,
+              values: null,
+            },
+          ],
+          facts: { seconds_late: '0', seconds: '1.2' },
+          compiled: 1,
         }}
       />,
     );
-
-    const items = within(
-      screen.getByRole('region', { name: 'On the leaderboards' }),
-    ).getAllByRole('listitem');
-    expect(items.map((item) => item.textContent)).toEqual([
-      'Standings, Mirror: 24 points · counts here',
-      `Final: shown at ${formatDateTime(new Date(REVEAL))}`,
-    ]);
-  });
-
-  it('says nothing where no board covers the task', () => {
-    renderWithProviders(<ScoredResult grading={right} />);
-    expect(screen.queryByRole('region', { name: 'On the leaderboards' })).toBeNull();
+    expect(screen.getByText(/On release/)).toBeVisible();
+    expect(screen.getByText('Dropped')).toBeVisible();
+    expect(screen.getByText('Seconds late').closest('div')).toHaveTextContent('0');
+    expect(screen.getByText('Compiled').closest('div')).toHaveTextContent('1');
   });
 });

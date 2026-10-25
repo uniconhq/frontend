@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { inputField, languageField } from '@/test/contestant';
-import { checkDraft, emptyDraft, pathOf, submittedInputs, type Draft } from './draft';
+import {
+  checkDraft,
+  emptyDraft,
+  pathOf,
+  submittedInputs,
+  uploadsOf,
+  type Draft,
+} from './draft';
 
 const MB = 1024 * 1024;
 
@@ -21,12 +28,6 @@ const program = inputField({
   type: 'folder',
   label: 'Your program',
   max_size: 20,
-});
-const answers = inputField({
-  id: 'answers',
-  type: 'file',
-  label: 'Your answers',
-  per_test: true,
 });
 /** A number of 30 significant digits, past what a float holds. */
 const THIRTY = '0.123456789012345678901234567891';
@@ -72,11 +73,6 @@ describe('where each file goes under its input', () => {
   it('keeps a folder’s layout, the chosen folder’s own name left off', () => {
     expect(pathOf(program, inFolder('mine/src/Main.java'))).toBe('src/Main.java');
     expect(pathOf(program, file('Main.java', 1))).toBe('Main.java');
-  });
-
-  it('names a file per test by where it sits, or by its name as given', () => {
-    expect(pathOf(answers, inFolder('out/main/1.txt'))).toBe('main/1.txt');
-    expect(pathOf(answers, file('1.txt', 1))).toBe('1.txt');
   });
 
   it('names the one file of a file input by its name', () => {
@@ -156,6 +152,42 @@ describe('the checks before anything is sent', () => {
     expect(refused?.extensions).toEqual({ limit: 20, input: 'program' });
   });
 
+  it('holds each part to its own size, and lets one part stay empty', () => {
+    const route = inputField({
+      id: 'route',
+      parts: [
+        { title: 'Small grid', max_size: 10 * MB },
+        { title: null, max_size: 50 * MB },
+      ],
+    });
+    const small = file('a.txt', 1);
+    expect(
+      checkDraft([route], {
+        route: {
+          kind: 'parts',
+          parts: [
+            { kind: 'files', files: [small] },
+            { kind: 'files', files: [] },
+          ],
+        },
+      }),
+    ).toBeNull();
+    expect(checkDraft([route], emptyDraft([route]))?.extensions['errors']).toEqual([
+      { input: 'route', message: 'Give at least one part of this input.' },
+    ]);
+    expect(
+      checkDraft([route], {
+        route: {
+          kind: 'parts',
+          parts: [
+            { kind: 'files', files: [small] },
+            { kind: 'files', files: [file('b.txt', 50 * MB + 1)] },
+          ],
+        },
+      })?.extensions,
+    ).toEqual({ limit: 50 * MB, input: 'route', part: 2 });
+  });
+
   it('holds one file to its input’s size', () => {
     const refused = checkDraft([inputField({ max_size: MB })], {
       submission: { kind: 'files', files: [file('big.py', MB + 1)] },
@@ -204,6 +236,167 @@ describe('what a submit sends', () => {
       language: { uploads: [], value: 'python' },
       fast: { uploads: [], value: false },
       notes: { uploads: [], value: 'hello' },
+    });
+  });
+
+  it('sends a per-row input as one part from 1, leaving out a part not given', () => {
+    const route = inputField({
+      id: 'route',
+      parts: [
+        { title: 'Small grid', max_size: MB },
+        { title: 'Big grid', max_size: MB },
+      ],
+    });
+    const small = file('a.txt', 1);
+    expect(
+      submittedInputs(
+        [route],
+        {
+          route: {
+            kind: 'parts',
+            parts: [
+              { kind: 'files', files: [small] },
+              { kind: 'files', files: [] },
+            ],
+          },
+        },
+        () => 'up',
+      ),
+    ).toEqual({
+      route: { uploads: [], parts: { '1': { uploads: ['up'] } } },
+    });
+  });
+
+  it('gives each part of a number input its own value, checked as the input is', () => {
+    const seed = inputField({
+      id: 'seed',
+      type: 'number',
+      min: '0',
+      max: '9',
+      parts: [
+        { title: 'Small grid', max_size: MB },
+        { title: null, max_size: MB },
+      ],
+    });
+    const draft = emptyDraft([seed]);
+    expect(draft).toEqual({
+      seed: {
+        kind: 'parts',
+        parts: [
+          { kind: 'text', text: '' },
+          { kind: 'text', text: '' },
+        ],
+      },
+    });
+    const typed: Draft = {
+      seed: {
+        kind: 'parts',
+        parts: [
+          { kind: 'text', text: ' 4 ' },
+          { kind: 'text', text: '12' },
+        ],
+      },
+    };
+    expect(checkDraft([seed], typed)?.extensions['errors']).toEqual([
+      { input: 'seed', message: 'Part 2: This must be at most 9.' },
+    ]);
+    const fixed: Draft = {
+      seed: {
+        kind: 'parts',
+        parts: [
+          { kind: 'text', text: ' 4 ' },
+          { kind: 'text', text: '' },
+        ],
+      },
+    };
+    expect(checkDraft([seed], fixed)).toBeNull();
+    expect(submittedInputs([seed], fixed, () => '')).toEqual({
+      seed: { uploads: [], parts: { '1': { uploads: [], value: '4' } } },
+    });
+  });
+
+  it('sends every file of a folder part, each at its path in the folder', () => {
+    const tree = inputField({
+      id: 'tree',
+      type: 'folder',
+      parts: [{ title: null, max_size: MB }],
+    });
+    const files = [inFolder('p/a.c'), inFolder('p/lib/b.h')];
+    const draft: Draft = { tree: { kind: 'parts', parts: [{ kind: 'files', files }] } };
+    const found = uploadsOf([tree], draft);
+    expect(found.map((each) => [pathOf(each.input, each.file), each.part])).toEqual([
+      ['a.c', 1],
+      ['lib/b.h', 1],
+    ]);
+    expect(submittedInputs([tree], draft, (_, chosen) => chosen.name)).toEqual({
+      tree: { uploads: [], parts: { '1': { uploads: ['a.c', 'b.h'] } } },
+    });
+  });
+
+  it('counts a true-or-false part always, and a text, number, file or choice when it is given', () => {
+    const parts = [
+      { title: 'Small grid', max_size: MB },
+      { title: 'Big grid', max_size: MB },
+    ];
+    const sent = submittedInputs(
+      [
+        inputField({ id: 'flag', type: 'boolean', parts }),
+        inputField({ id: 'note', type: 'text', parts }),
+        inputField({ id: 'seed', type: 'number', parts }),
+        inputField({ id: 'file', type: 'file', parts }),
+        inputField({ id: 'choice', type: 'enum', options: ['python'], parts }),
+      ],
+      {
+        flag: {
+          kind: 'parts',
+          parts: [
+            { kind: 'flag', checked: false },
+            { kind: 'flag', checked: true },
+          ],
+        },
+        note: {
+          kind: 'parts',
+          parts: [
+            { kind: 'text', text: ' ' },
+            { kind: 'text', text: '' },
+          ],
+        },
+        seed: {
+          kind: 'parts',
+          parts: [
+            { kind: 'text', text: ' 1 ' },
+            { kind: 'text', text: '  ' },
+          ],
+        },
+        file: {
+          kind: 'parts',
+          parts: [
+            { kind: 'files', files: [file('a.txt', 1)] },
+            { kind: 'files', files: [] },
+          ],
+        },
+        choice: {
+          kind: 'parts',
+          parts: [
+            { kind: 'choice', option: 'python' },
+            { kind: 'choice', option: '' },
+          ],
+        },
+      },
+      () => 'up',
+    );
+    expect(sent).toEqual({
+      flag: {
+        uploads: [],
+        parts: {
+          '1': { uploads: [], value: false },
+          '2': { uploads: [], value: true },
+        },
+      },
+      note: { uploads: [], parts: { '1': { uploads: [], value: ' ' } } },
+      seed: { uploads: [], parts: { '1': { uploads: [], value: '1' } } },
+      file: { uploads: [], parts: { '1': { uploads: ['up'] } } },
+      choice: { uploads: [], parts: { '1': { uploads: [], value: 'python' } } },
     });
   });
 });

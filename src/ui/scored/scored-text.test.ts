@@ -1,5 +1,31 @@
 import { describe, expect, it } from 'vitest';
-import { overLimitSentence, submissionsWords } from './scored-text';
+import {
+  overLimitSentence,
+  reportLabel,
+  submissionsWords,
+  tupleLine,
+} from './scored-text';
+
+describe('a run’s rows', () => {
+  it('shows a titled tuple by its title and an untitled one by its columns', () => {
+    expect(
+      tupleLine([
+        { title: 'Big grid', key: { grid: 'big.txt', answer: 'big.ans' } },
+        { title: null, key: { seed: 2 } },
+      ]),
+    ).toBe('Big grid · seed 2');
+    expect(
+      tupleLine([{ title: null, key: { route: 'hidden/route.txt', seed: 2 } }]),
+    ).toBe('route.txt · seed 2');
+  });
+});
+
+describe('a shown output', () => {
+  it('names it by its title, with its unit when it has one', () => {
+    expect(reportLabel('Run time', 'ms')).toBe('Run time (ms)');
+    expect(reportLabel('score', null)).toBe('score');
+  });
+});
 
 describe('a submission over the task’s limit (#445)', () => {
   it('counts the limit in submissions, one or many', () => {

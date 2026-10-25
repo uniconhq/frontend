@@ -1,5 +1,4 @@
 import { BodyText } from '@/ui/BodyText';
-import type { Selected } from './lines';
 import type { Placed } from './pins';
 import classes from './workflows.module.css';
 
@@ -22,7 +21,7 @@ export function Problems({
   /** Why the check did not run, when it did not. */
   failure: string | null;
   placed: Placed[];
-  onOpen: (selected: Selected) => void;
+  onOpen: (placed: Placed) => void;
 }) {
   if (status === 'pending') return null;
   // Always one line, so the banner keeps its height and the graph under it
@@ -67,7 +66,7 @@ export function Problems({
               <button
                 type="button"
                 className={classes.problemLink}
-                onClick={() => onOpen(opens)}
+                onClick={() => onOpen({ problem, where, opens })}
               >
                 {where}
               </button>

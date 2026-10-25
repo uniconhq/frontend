@@ -9,11 +9,11 @@ import { lookOf, type Verdict } from './verdicts';
  * label, and the colour pair read from theme.other.verdict. The label always
  * ships with the colour: a verdict must never be carried by colour alone.
  *
- * A verdict is an outcome the run gave, or where a grading stands while it has
- * none to show. The six colour pairs are the handoff's, so every outcome and
+ * A verdict is the outcome a run gave, or where a grading or a submission
+ * stands. The six colour pairs are the handoff's, so every outcome and
  * status takes one of them: passing, failing, a limit, a build or platform
- * error, under way, and waiting or neutral. `done` is neutral, because a grading whose outcome the
- * task keeps hidden says nothing about whether it passed.
+ * error, under way, and waiting or neutral. `done` and `graded` are neutral,
+ * since a grading as a whole neither passes nor fails; its runs do.
  */
 
 /**

@@ -4,12 +4,7 @@ import userEvent from '@/test/user-event';
 import { http, HttpResponse } from 'msw';
 import { renderApp } from '@/test/render';
 import { problem, server, signedIn } from '@/test/server';
-import {
-  CLASSIC_V2,
-  PRIMITIVES,
-  WORKFLOW_API,
-  workflowBackend,
-} from '@/test/workflows';
+import { CLASSIC, PRIMITIVES, WORKFLOW_API, workflowBackend } from '@/test/workflows';
 
 const LISTED = [
   {
@@ -60,7 +55,7 @@ describe('the workflows page', () => {
         made = await request.json();
         return HttpResponse.json({ owner: 'acme', name: 'fresh' }, { status: 201 });
       }),
-      ...workflowBackend(CLASSIC_V2).handlers,
+      ...workflowBackend(CLASSIC).handlers,
     );
     const user = userEvent.setup();
     const { router } = renderApp('/workflows');
@@ -141,7 +136,7 @@ describe('the workflows page', () => {
         asked = await request.json();
         return HttpResponse.json({ owner: 'kenny', name: 'tuned' }, { status: 201 });
       }),
-      ...workflowBackend(CLASSIC_V2).handlers,
+      ...workflowBackend(CLASSIC).handlers,
     );
     const user = userEvent.setup();
     const { router } = renderApp('/workflows');
@@ -222,7 +217,7 @@ describe('a workflow one may only read', () => {
   ].join('\n');
 
   it('draws its latest version, read-only, with its file behind View file', async () => {
-    server.use(signedIn, page(['v1', 'v2']), primitives, version(CLASSIC_V2), check());
+    server.use(signedIn, page(['v1', 'v2']), primitives, version(CLASSIC), check());
     const user = userEvent.setup();
     renderApp('/workflows/unicon/classic');
 
@@ -244,7 +239,7 @@ describe('a workflow one may only read', () => {
     const dialog = await screen.findByRole('dialog', { name: 'The file of v2' });
     expect(
       within(dialog).getByLabelText<HTMLTextAreaElement>('The file of v2').value,
-    ).toBe(CLASSIC_V2);
+    ).toBe(CLASSIC);
   });
 
   it('opens a version in the old format in the state of one that cannot be opened, with the forge’s reason', async () => {
@@ -311,13 +306,13 @@ describe('a workflow one may only read', () => {
       signedIn,
       page(['v2']),
       primitives,
-      version(CLASSIC_V2),
+      version(CLASSIC),
       check(),
       http.post('/api/v1/workflow-copies', async ({ request }) => {
         asked = await request.json();
         return HttpResponse.json({ owner: 'kenny', name: 'tuned' }, { status: 201 });
       }),
-      ...workflowBackend(CLASSIC_V2).handlers,
+      ...workflowBackend(CLASSIC).handlers,
     );
     const user = userEvent.setup();
     const { router } = renderApp('/workflows/unicon/classic');
@@ -348,7 +343,7 @@ describe('a workflow one may only read', () => {
 
 describe('a workflow one may edit', () => {
   it('offers no way to combine it with others for now', async () => {
-    server.use(signedIn, ...workflowBackend(CLASSIC_V2).handlers);
+    server.use(signedIn, ...workflowBackend(CLASSIC).handlers);
     renderApp('/workflows/kenny/tuned');
 
     await screen.findByRole('group', { name: 'Step run' });
@@ -358,7 +353,7 @@ describe('a workflow one may edit', () => {
 
 describe('who reads a workflow', () => {
   it('applies who reads it as it is chosen, asking before it takes it from people', async () => {
-    const backend = workflowBackend(CLASSIC_V2);
+    const backend = workflowBackend(CLASSIC);
     server.use(signedIn, ...backend.handlers);
     const user = userEvent.setup();
     renderApp('/workflows/kenny/tuned');

@@ -31,7 +31,6 @@ import { keepEqual } from '@/lib/keep-equal';
 import { ActionMenu, type MenuEntry } from '@/ui/ActionMenu';
 import {
   GEOMETRY,
-  columnX,
   headerOf,
   rowOf,
   wirePath,
@@ -39,6 +38,7 @@ import {
   type Layout,
   type Point,
 } from './layout';
+import type { BoxDecl } from './boxes';
 import { sourceAt, targetAt, type Notice, type Target } from './ends';
 import { NOTICE_MS } from './notice';
 import { NumberText } from '../forms/yaml-doc';
@@ -48,14 +48,10 @@ import { declared, type PrimitiveInfo } from './primitives';
 import {
   boxName,
   entryMarks,
-  fieldMarks,
-  inputMarks,
   portMarks,
   primitiveTitle,
   readersWords,
   refWords,
-  BAND_LABEL,
-  runsWords,
 } from './words';
 import classes from './workflows.module.css';
 
@@ -82,7 +78,7 @@ type Side = 'left' | 'right';
 /** What a port's row shows. */
 type RowView = {
   port: string;
-  /** What the row reads as: a report entry by its title, its key only where it has none (M58). */
+  /** What the row reads as: an output by its title, its key only where it has none (M58). */
   name: string;
   side: Side;
   /** How far down its box the row stands. */
@@ -94,7 +90,7 @@ type RowView = {
   offered: boolean;
   refused: string | null;
   title: string | undefined;
-  /** The report's row for an entry not made yet, which a wire is dropped on. */
+  /** The outputs' row for one not made yet, which a wire is dropped on. */
   isNew: boolean;
   /** What the port's menu is called, or null for a port with none. */
   label: string | null;
@@ -111,11 +107,16 @@ type HeadView =
   | {
       kind: 'step';
       name: string;
-      runs: string;
+      /** The step's place in `steps:`, so Open can name it. */
+      step: number | null;
       primitive: string | null;
       use: string;
       description: string | null | undefined;
       problems: DefinitionProblem[];
+      /** A run workflow, which Open shows. */
+      openable: boolean;
+      /** A later version of that workflow, when there is one. */
+      newer: string | null;
     }
   | { kind: 'group'; name: string; detail: string };
 
@@ -136,7 +137,6 @@ type BoxData = {
 
 type BoxNode = Node<BoxData, 'box'>;
 type SlotNode = Node<{ label: string | null; colour: string | undefined }, 'slot'>;
-type BandNode = Node<Record<string, never>, 'band'>;
 type WireEdge = Edge<
   { points: Point[]; colour: string | undefined; marked: boolean; dimmed: boolean },
   'wire'
@@ -149,6 +149,8 @@ type Actions = {
   menus: boolean;
   select: (key: string) => void;
   entries: (box: string, port: string, side: Side) => MenuEntry[];
+  /** Open the run workflow a step uses. */
+  openBox: (index: number) => void;
 };
 
 const ActionsContext = createContext<Actions | null>(null);
@@ -172,12 +174,14 @@ type Seen = {
   label: ((box: Box, port: string, side: Side) => string | null) | null;
   /** The ports a drawn wire feeds, `port:<step>.<port>`. */
   drawn: Set<string>;
+  /** Run workflows the steps use, by `owner/name@version`. */
+  workflowBoxes: ReadonlyMap<string, BoxDecl>;
 };
 
 /**
  * What a port without a drawn wire is given, as the port shows it: a value,
  * text with values written in, or a wire the layout cannot draw, such as a
- * once step reading a per-test one, which the file holds all the same.
+ * step reading one written after it, which the file holds all the same.
  */
 function shownValue(
   workflow: Workflow,
@@ -197,6 +201,7 @@ function shownValue(
       ? `= ${value.value.text}`
       : `= ${JSON.stringify(value.value)}`;
   if (value.kind === 'text') return `= ${JSON.stringify(value.text)}`;
+  if (value.kind === 'mapping' || value.kind === 'list') return null;
   return 'a value no port takes';
 }
 
@@ -224,11 +229,9 @@ function rowView(
       ? (pinned.ports.get(`${String(box.step)}.${port}`) ?? [])
       : box.kind === 'inputs'
         ? (pinned.inputs.get(port) ?? [])
-        : box.kind === 'test'
-          ? (pinned.fields.get(port) ?? [])
-          : box.kind === 'report'
-            ? (pinned.entries.get(port) ?? [])
-            : [];
+        : box.kind === 'outputs'
+          ? (pinned.entries.get(port) ?? [])
+          : [];
   const noticed =
     seen.notice !== null && seen.notice.box === box.key && seen.notice.port === port;
   const value = side === 'left' ? shownValue(workflow, box, port, seen.drawn) : null;
@@ -236,23 +239,23 @@ function rowView(
     box.kind === 'inputs'
       ? workflow.inputs.find((found) => found.id === port)
       : undefined;
-  const field =
-    box.kind === 'test'
-      ? workflow.test.find((found) => found.name === port)
-      : undefined;
   const entry =
-    box.kind === 'report'
-      ? workflow.report.find((found) => found.name === port)
+    box.kind === 'outputs'
+      ? workflow.outputs.find((found) => found.name === port)
       : undefined;
-  const type = decl?.type ?? input?.type ?? field?.type ?? null;
+  const step = box.step !== null ? workflow.steps[box.step] : undefined;
+  const boxed = step !== undefined ? seen.workflowBoxes.get(step.use) : undefined;
+  const boxType =
+    side === 'left'
+      ? boxed?.inputs.find((input) => input.name === port)?.type
+      : boxed?.outputs.find((output) => output.name === port)?.type;
+  const type = decl?.type ?? boxType ?? input?.type ?? null;
   const marks = [
     ...(side === 'left' && primitive !== null ? portMarks(primitive, port) : []),
-    ...(input !== undefined ? inputMarks(input) : []),
-    ...(field !== undefined ? fieldMarks(field) : []),
     ...(entry !== undefined ? entryMarks(entry) : []),
   ];
   const said = [type, ...marks, value].filter((part) => part !== null).join(' · ');
-  const isNew = box.kind === 'report' && port === '+';
+  const isNew = box.kind === 'outputs' && port === '+';
   const output = box.kind === 'step' && side === 'right';
   return {
     port,
@@ -273,12 +276,16 @@ function rowView(
   };
 }
 
+function boxedRun(seen: Seen, use: string | undefined): boolean {
+  return use !== undefined && seen.workflowBoxes.get(use)?.run === true;
+}
+
 function boxData(seen: Seen, box: Box): BoxData {
   const { workflow } = seen;
   const step = box.step !== null ? workflow.steps[box.step] : undefined;
   const primitive = step !== undefined ? declared(seen.primitives, step.use) : null;
   const name = boxName(box, workflow);
-  const left = box.kind === 'report' ? [...box.left, '+'] : box.left;
+  const left = box.kind === 'outputs' ? [...box.left, '+'] : box.left;
   return {
     key: box.key,
     kind: box.kind,
@@ -292,18 +299,23 @@ function boxData(seen: Seen, box: Box): BoxData {
         ? {
             kind: 'step',
             name: step?.id || '(no name)',
-            runs: runsWords(step?.perTest === true),
+            step: box.step,
             primitive: primitive !== null ? primitiveTitle(primitive) : null,
             use: step?.use ?? '',
             description: primitive?.description,
             problems: box.step !== null ? (seen.pinned.steps.get(box.step) ?? []) : [],
+            openable: primitive === null && boxedRun(seen, step?.use),
+            newer:
+              step === undefined
+                ? null
+                : (seen.workflowBoxes.get(step.use)?.newer ?? null),
           }
         : {
             kind: 'group',
             name,
             detail:
-              box.kind === 'report'
-                ? 'What each grading reports'
+              box.kind === 'outputs'
+                ? 'What each run gives'
                 : readersWords(box.readers),
           },
     rows: [
@@ -379,7 +391,7 @@ const PortRow = memo(function PortRow({ box, row }: { box: string; row: RowView 
       />
       {row.isNew ? (
         <span className={classes.drop}>
-          {actions.readOnly ? '' : 'Drop an output here to report it'}
+          {actions.readOnly ? '' : 'Drop a step’s output here to make it an output'}
         </span>
       ) : (
         <>
@@ -414,7 +426,7 @@ const PortRow = memo(function PortRow({ box, row }: { box: string; row: RowView 
   );
 });
 
-/** The head of a step's box: its name and how often it runs, its primitive, what that does. */
+/** The head of a step's box: its name, its primitive, what that does. */
 const StepHead = memo(function StepHead({
   box,
   head,
@@ -432,7 +444,6 @@ const StepHead = memo(function StepHead({
       >
         <span className={classes.titleLine}>
           <span className={classes.title}>{head.name}</span>
-          <span className={classes.runs}>{head.runs}</span>
         </span>
         <span className={classes.primitiveLine}>
           {head.primitive !== null && (
@@ -441,6 +452,21 @@ const StepHead = memo(function StepHead({
           <span className={classes.ref}>{head.use}</span>
         </span>
       </button>
+      {head.openable && (
+        <button
+          type="button"
+          className={`${classes.headButton} nodrag nopan`}
+          aria-label={`Open ${head.name}`}
+          onClick={() => {
+            if (head.step !== null) actions.openBox(head.step);
+          }}
+        >
+          Open
+        </button>
+      )}
+      {head.newer !== null && (
+        <p className={classes.description}>A newer version is {head.newer}</p>
+      )}
       {head.problems.length > 0 ? (
         <p className={classes.headProblem}>
           {head.problems.map((problem) => (
@@ -531,18 +557,6 @@ const SlotView = memo(function SlotView({ data }: NodeProps<SlotNode>) {
   );
 });
 
-/**
- * The shaded band behind the steps that run for each test and the test's
- * files, labelled at its top so it says what it is (M55).
- */
-function BandView() {
-  return (
-    <div className={classes.band}>
-      <span className={classes.bandLabel}>{BAND_LABEL}</span>
-    </div>
-  );
-}
-
 const WireView = memo(function WireView({ data }: EdgeProps<WireEdge>) {
   if (data === undefined) return null;
   return (
@@ -557,10 +571,10 @@ const WireView = memo(function WireView({ data }: EdgeProps<WireEdge>) {
   );
 });
 
-const NODE_TYPES = { box: BoxView, slot: SlotView, band: BandView };
+const NODE_TYPES = { box: BoxView, slot: SlotView };
 const EDGE_TYPES = { wire: WireView };
 
-/** Space around the graph inside its frame, room for the band and the handles. */
+/** Space around the graph inside its frame, room for the handles. */
 const PAD = 32;
 
 const VIEWPORT = { x: PAD, y: PAD, zoom: 1 };
@@ -629,6 +643,8 @@ function useReveal(
  * Each port is a menu when `label` and `entries` are given, built only when
  * it opens; without them, each port is only its name.
  */
+const NO_WORKFLOW_BOXES = new Map<string, BoxDecl>();
+
 export function Graph({
   layout,
   workflow,
@@ -647,6 +663,8 @@ export function Graph({
   onDrop,
   reveal = null,
   cover = 0,
+  workflowBoxes = NO_WORKFLOW_BOXES,
+  onOpenBox,
 }: {
   layout: Layout;
   workflow: Workflow;
@@ -665,6 +683,8 @@ export function Graph({
   onDrop: (source: Ref, target: Target, box: string, port: string) => void;
   reveal?: Reveal | null;
   cover?: number;
+  workflowBoxes?: ReadonlyMap<string, BoxDecl>;
+  onOpenBox?: (index: number) => void;
 }) {
   const frame = useRef<HTMLDivElement>(null);
   useReveal(frame, layout, reveal, cover);
@@ -691,24 +711,9 @@ export function Graph({
     notice,
     label: menus ? label : null,
     drawn,
+    workflowBoxes,
   };
-  const found: (BoxNode | SlotNode | BandNode)[] = [];
-  if (layout.band !== null) {
-    const left = columnX(layout.band.first) - GEOMETRY.gap / 2;
-    const right = columnX(layout.band.last) + GEOMETRY.width + GEOMETRY.gap / 2;
-    found.push({
-      id: 'band',
-      type: 'band',
-      position: { x: left, y: -GEOMETRY.space },
-      width: right - left,
-      height: layout.height + 2 * GEOMETRY.space,
-      data: {},
-      selectable: false,
-      draggable: false,
-      connectable: false,
-      zIndex: -1,
-    });
-  }
+  const found: (BoxNode | SlotNode)[] = [];
   for (const box of layout.boxes)
     found.push({
       id: box.key,
@@ -767,6 +772,7 @@ export function Graph({
     onSelect,
     onDragStart,
     onDrop,
+    onOpenBox,
   });
   useLayoutEffect(() => {
     latest.current = {
@@ -777,6 +783,7 @@ export function Graph({
       onSelect,
       onDragStart,
       onDrop,
+      onOpenBox,
     };
   });
   const select = useCallback((key: string) => {
@@ -793,6 +800,7 @@ export function Graph({
         const box = now.get(key);
         return box !== undefined && build !== undefined ? build(box, port, side) : [];
       },
+      openBox: (index) => latest.current.onOpenBox?.(index),
     }),
     [readOnly, menus, select],
   );

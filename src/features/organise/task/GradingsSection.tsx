@@ -9,8 +9,8 @@ type TaskPath = { org: string; contest: string; task: string };
 /**
  * The task's gradings, newest first, as the contest's feed shows them
  * narrowed to the task, read from the task's own route: who made each
- * submission, where its attempts stand, what they came to, why one failed
- * and its log. A manager of the task gets the same actions as on the feed,
+ * submission, where its attempts stand, what they came to and why one
+ * failed. A manager of the task gets the same actions as on the feed,
  * and Rejudge for the whole task.
  */
 export function GradingsSection({ path }: { path: TaskPath }) {

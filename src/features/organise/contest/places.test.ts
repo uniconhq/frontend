@@ -10,12 +10,11 @@ describe('where a refused setting of the contest is changed', () => {
       'signup',
       'code',
     ]);
-    expect(stepsOf('leaderboards[0].order[2].per_attempt')).toEqual([
+    expect(stepsOf('leaderboards.final.sort[2]')).toEqual([
       'leaderboards',
-      0,
-      'order',
+      'final',
+      'sort',
       2,
-      'per_attempt',
     ]);
     expect(stepsOf('')).toEqual([]);
   });
@@ -69,15 +68,35 @@ describe('where a refused setting of the contest is changed', () => {
       '/orgs/acme/contests/spring/entry?field=way&item=0',
     ],
     [
-      'tasks[1].late_per_day',
-      'Tasks, B: Taken off per late day',
-      '/orgs/acme/contests/spring?part=tasks&field=late_per_day&item=1',
+      'tasks[1].closes',
+      'Tasks, B: Closes',
+      '/orgs/acme/contests/spring?part=tasks&field=closes&item=1',
     ],
     ['tasks', 'Tasks', '/orgs/acme/contests/spring?part=tasks'],
     [
-      'leaderboards[0].rows',
-      'Leaderboards, leaderboard 1: Rows shown',
-      '/orgs/acme/contests/spring/boards?field=rows&item=0',
+      'leaderboards.gradebook.title',
+      'Leaderboards, gradebook: Title',
+      '/orgs/acme/contests/spring/leaderboards?field=gradebook.title',
+    ],
+    [
+      'leaderboards.gradebook.columns.solved',
+      'Leaderboards, gradebook: solved',
+      '/orgs/acme/contests/spring/leaderboards?field=gradebook.columns.solved',
+    ],
+    [
+      'leaderboards.gradebook.audience.rows',
+      'Leaderboards, gradebook: Rows',
+      '/orgs/acme/contests/spring/leaderboards?field=gradebook.audience.rows',
+    ],
+    [
+      'hold.from',
+      'Leaderboards, Hold: From',
+      '/orgs/acme/contests/spring/leaderboards?field=hold.from',
+    ],
+    [
+      'hold.until',
+      'Leaderboards, Hold: Until',
+      '/orgs/acme/contests/spring/leaderboards?field=hold.until',
     ],
     ['', 'Settings', '/orgs/acme/contests/spring/settings'],
     ['team_size', 'Settings', '/orgs/acme/contests/spring/settings'],

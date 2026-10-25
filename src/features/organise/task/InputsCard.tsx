@@ -3,12 +3,13 @@ import type { DeclaredInput } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
 import { Checkbox } from '@/ui/Checkbox';
+import { Chip } from '@/ui/Chip';
 import { InfoTip } from '@/ui/InfoTip';
 import { Select } from '@/ui/Select';
 import { TextInput } from '@/ui/TextInput';
 import { FieldBox } from '../contest/ContestFile';
 import { NumberField } from '../forms/fields';
-import { heldTheOtherWay, type InputValues } from '../forms/task-values';
+import type { Give, InputValues } from '../forms/task-values';
 import { BuildCard, CardPart } from './BuildCard';
 import { inputTitle, type TaskPlace } from './build-data';
 import { FileSetting } from './FileSetting';
@@ -239,7 +240,7 @@ function EntrantFields({
         )}
         {(type === 'file' || type === 'folder') && (
           <TextInput
-            label={declared.per_test ? 'Maximum size of all its files' : 'Maximum size'}
+            label="Maximum size"
             value={input.maxSize}
             onChange={(maxSize) => onChange({ maxSize })}
             placeholder="10MB"
@@ -285,41 +286,72 @@ function EntrantFields({
 function DeclaredItem({
   declared,
   input,
+  axisCount,
+  axis,
   onChange,
+  onGive,
+  onAxis,
   files,
   disabled,
 }: {
   declared: DeclaredInput;
   input: InputValues;
+  axisCount: number;
+  axis: number;
   onChange: Change;
+  onGive: (give: Give) => void;
+  onAxis: (axis: number) => void;
   files: InputFiles | undefined;
   disabled: boolean;
 }) {
-  const other = heldTheOtherWay(input);
+  const give = input.give ?? (input.kind === 'details' ? 'entrant' : 'setting');
+  const entrant = give === 'entrant';
+  const perRun = give === 'per-run';
   return (
     <FieldBox name={declared.id}>
       <div className={classes.item} role="group" aria-label={inputTitle(declared)}>
-        {declared.contestant && (
-          <div className={classes.itemHead}>
-            <div className={classes.titleRow}>
-              <h4 className={classes.itemTitle}>{declared.title ?? declared.id}</h4>
-              {declared.help !== null && (
-                <InfoTip about={declared.title ?? declared.id}>{declared.help}</InfoTip>
-              )}
-            </div>
-            {declared.per_test && (
-              <BodyText tone="secondary">One file for each test</BodyText>
+        <div className={classes.itemHead}>
+          <div className={classes.titleRow}>
+            <h4 className={classes.itemTitle}>{declared.title ?? declared.id}</h4>
+            {/* A value's field carries its help; the others have it here. */}
+            {(entrant || perRun) && declared.help !== null && (
+              <InfoTip about={declared.title ?? declared.id}>{declared.help}</InfoTip>
             )}
           </div>
+          <Chip tone="quiet">{declared.type}</Chip>
+        </div>
+        <div className={classes.narrow}>
+          <Select
+            label="Who gives it"
+            value={give}
+            options={[
+              { value: 'setting', label: 'You set it' },
+              { value: 'entrant', label: 'The entrant gives it' },
+              { value: 'per-run', label: 'One for each run' },
+            ]}
+            onChange={(next) => onGive(next as Give)}
+            disabled={disabled}
+          />
+        </div>
+        {perRun && axisCount > 1 && (
+          <div className={classes.narrow}>
+            <Select
+              label="Axis"
+              value={String(axis)}
+              options={Array.from({ length: axisCount }, (_, index) => ({
+                value: String(index),
+                label: `Axis ${String(index + 1)}`,
+              }))}
+              onChange={(next) => onAxis(Number(next))}
+              disabled={disabled}
+            />
+          </div>
         )}
-        {other && (
-          <BodyText tone="secondary">
-            {declared.contestant
-              ? 'The task sets a value for this, but under this workflow entrants give it. Saving replaces the task’s value with what is set here.'
-              : 'Entrants give this now, but under this workflow the task sets it. Saving replaces that with the value set here.'}
+        {perRun ? (
+          <BodyText size="sm" tone="secondary">
+            A column in Runs.
           </BodyText>
-        )}
-        {declared.contestant ? (
+        ) : entrant ? (
           <EntrantFields
             declared={declared}
             input={input}
@@ -327,15 +359,13 @@ function DeclaredItem({
             disabled={disabled}
           />
         ) : (
-          <div className={classes.single}>
-            <ValueField
-              declared={declared}
-              input={input}
-              files={files}
-              onChange={onChange}
-              disabled={disabled}
-            />
-          </div>
+          <ValueField
+            declared={declared}
+            input={input}
+            onChange={onChange}
+            files={files}
+            disabled={disabled}
+          />
         )}
       </div>
     </FieldBox>
@@ -507,21 +537,25 @@ function AddUnknown({
 }
 
 /**
- * The Inputs card: the form the workflow's inputs make, in the order an
- * organiser thinks of them. First what entrants submit (the inputs they
- * give: what they see of each, the choices they have and how much they may
- * send), then the limits and settings the task gives a value. Each input is
- * named by its title from the workflow, a number's unit after it, its help
- * behind an ⓘ; a setting that is a file or a folder has its own box to
- * view, upload and replace it (`FileSetting`). When the workflow cannot be
- * read, the inputs the settings have are shown as they are, to keep or
- * remove.
+ * The Inputs card: the form the workflow's inputs make, in the order the
+ * workflow declares them, each saying who gives it: the task, the entrant
+ * (what they see of it, the choices they have and how much they may send),
+ * or each run, as a column in Runs. Each input is named by its title from
+ * the workflow, a number's unit after it, its help behind an ⓘ; a setting
+ * that is a file or a folder has its own box to view, upload and replace it
+ * (`FileSetting`). Inputs the task has that the workflow does not are listed
+ * to remove. When the workflow cannot be read, the inputs the settings have
+ * are shown as they are, to keep or remove.
  */
 export function InputsCard({
   declared,
   workflowProblem,
   inputs,
+  axisCount = 1,
+  axisOf = () => 0,
   onChange,
+  onGive = () => undefined,
+  onAxis = () => undefined,
   onRemove,
   onAdd,
   files,
@@ -534,13 +568,19 @@ export function InputsCard({
   /** Why the workflow cannot be read, when it cannot. */
   workflowProblem: string | null;
   inputs: InputValues[];
+  /** How many axes the runs card has, so a per-run input can move. */
+  axisCount?: number;
+  /** Which axis a per-run input is a column of. */
+  axisOf?: (id: string) => number;
   onChange: (id: string, change: Partial<InputValues>) => void;
+  onGive?: (id: string, give: Give) => void;
+  onAxis?: (id: string, axis: number) => void;
   onRemove: (id: string) => void;
   onAdd: (id: string, kind: InputValues['kind']) => void;
   disabled: boolean;
 }) {
   const line =
-    'What entrants submit, and the limits and settings the workflow asks the task for.';
+    'What the workflow needs, and who gives each: you, the entrant, or one for each run.';
   if (declared === null) {
     return (
       <BuildCard id="inputs" title="Inputs" line={line}>
@@ -568,8 +608,6 @@ export function InputsCard({
     );
   }
 
-  const entrants = declared.filter((input) => input.contestant);
-  const task = declared.filter((input) => !input.contestant);
   const undeclared = inputs.filter(
     (input) => !declared.some((found) => found.id === input.id),
   );
@@ -580,7 +618,11 @@ export function InputsCard({
         key={each.id}
         declared={each}
         input={input}
+        axisCount={axisCount}
+        axis={axisOf(each.id)}
         onChange={(change) => onChange(each.id, change)}
+        onGive={(give) => onGive(each.id, give)}
+        onAxis={(axis) => onAxis(each.id, axis)}
         files={files}
         disabled={disabled}
       />
@@ -589,26 +631,7 @@ export function InputsCard({
 
   return (
     <BuildCard id="inputs" title="Inputs" line={line}>
-      <CardPart
-        title="What entrants submit"
-        line="What they see of each part of a submission, and how much they may send."
-      >
-        {entrants.length === 0 ? (
-          <BodyText tone="secondary">The workflow asks entrants for nothing.</BodyText>
-        ) : (
-          entrants.map(item)
-        )}
-      </CardPart>
-      <CardPart
-        title="Limits and settings"
-        line="What the task sets for every submission, such as its time and memory limits."
-      >
-        {task.length === 0 ? (
-          <BodyText tone="secondary">The workflow asks the task for nothing.</BodyText>
-        ) : (
-          task.map(item)
-        )}
-      </CardPart>
+      {declared.map(item)}
       {undeclared.length > 0 && (
         <CardPart
           title="Not used by this workflow"

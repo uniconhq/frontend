@@ -19,7 +19,7 @@ import {
   readWorkflow,
   refText,
   type Ref,
-  type ReportEntry,
+  type OutputEntry,
   type Workflow,
 } from './model';
 import type { PrimitiveInfo } from './primitives';
@@ -33,7 +33,7 @@ import { orderAfterWire } from './rules';
  * given back as it is.
  */
 
-const TOP_ORDER = ['inputs', 'test', 'steps', 'report'];
+const TOP_ORDER = ['inputs', 'steps', 'outputs'];
 
 type Edit = (doc: Document) => void;
 
@@ -123,7 +123,7 @@ function declarationNode(declaration: Record<string, unknown>): unknown {
     : kept;
 }
 
-/** A free id for a new step, input, field or entry: `base`, then `base-2`, `base-3`. */
+/** A free id for a new step, input or output: `base`, then `base-2`, `base-3`. */
 export function freeName(base: string, taken: string[], separator = '-'): string {
   if (!taken.includes(base)) return base;
   for (let number = 2; ; number += 1) {
@@ -139,7 +139,7 @@ function reorder(doc: Document, order: number[]): void {
   steps.items = order.map((at) => old[at]).filter((item) => item !== undefined);
 }
 
-/** Every string in the steps' ports and the report, rewritten by `change`. */
+/** Every string in the steps' ports and the outputs, rewritten by `change`. */
 function rewriteStrings(doc: Document, change: (text: string) => string): void {
   const visit = (node: unknown) => {
     if (isMap(node)) {
@@ -151,13 +151,12 @@ function rewriteStrings(doc: Document, change: (text: string) => string): void {
     }
   };
   for (const step of stepsOf(doc).items) if (isMap(step)) visit(step.get('with', true));
-  const report: unknown = (doc.contents as YAMLMap).get('report', true);
-  if (isMap(report)) {
-    for (const pair of report.items) {
-      if (isScalar(pair.value) && typeof pair.value.value === 'string') {
-        pair.value.value = change(pair.value.value);
-      } else visit(pair.value);
-    }
+  const listed: unknown = (doc.contents as YAMLMap).get('outputs', true);
+  if (!isMap(listed)) return;
+  for (const pair of listed.items) {
+    if (isScalar(pair.value) && typeof pair.value.value === 'string') {
+      pair.value.value = change(pair.value.value);
+    } else visit(pair.value);
   }
 }
 
@@ -181,7 +180,7 @@ function reads(text: string, kind: Ref['kind'], name: string): boolean {
   return false;
 }
 
-/** Remove every port value and report entry that reads `name` of `kind`. */
+/** Remove every port value and output that reads `name` of `kind`. */
 function dropUses(doc: Document, kind: Ref['kind'], name: string): void {
   for (const step of stepsOf(doc).items) {
     if (!isMap(step)) continue;
@@ -196,19 +195,15 @@ function dropUses(doc: Document, kind: Ref['kind'], name: string): void {
         ),
     );
   }
-  const report: unknown = (doc.contents as YAMLMap).get('report', true);
-  if (!isMap(report)) return;
-  report.items = report.items.filter((pair) => {
+  const outputs: unknown = (doc.contents as YAMLMap).get('outputs', true);
+  if (!isMap(outputs)) return;
+  outputs.items = outputs.items.filter((pair) => {
     const value = pair.value;
     if (isScalar(value) && typeof value.value === 'string')
       return !reads(value.value, kind, name);
     if (isMap(value)) {
       const from: unknown = value.get('from');
-      const better: unknown = value.get('better');
-      return !(
-        (typeof from === 'string' && reads(from, kind, name)) ||
-        (typeof better === 'string' && reads(better, kind, name))
-      );
+      return !(typeof from === 'string' && reads(from, kind, name));
     }
     return true;
   });
@@ -216,32 +211,31 @@ function dropUses(doc: Document, kind: Ref['kind'], name: string): void {
 
 // Steps
 
-/** A step of `primitive` added, once before every per-test step, per test at the end. */
-export function addStep(
-  text: string,
-  primitive: PrimitiveInfo,
-  perTest = false,
-): string {
+/** A step that uses a run workflow, added at the end. */
+export function addUse(text: string, ref: string, name: string): string {
+  const workflow = workflowOf(text);
+  const id = freeName(
+    name,
+    workflow.steps.map((step) => step.id),
+  );
+  return edited(text, (doc) => {
+    stepsOf(doc).items.push(nodeFor(doc, { id, use: ref, with: {} }));
+  });
+}
+
+/** A step of `primitive`, added at the end. */
+export function addStep(text: string, primitive: PrimitiveInfo): string {
   const workflow = workflowOf(text);
   const id = freeName(
     primitive.name,
     workflow.steps.map((step) => step.id),
   );
   return edited(text, (doc) => {
-    const node = nodeFor(
-      doc,
-      perTest
-        ? { id, use: primitive.ref, per_test: true, with: {} }
-        : { id, use: primitive.ref, with: {} },
-    );
-    const steps = stepsOf(doc);
-    const firstPerTest = workflow.steps.findIndex((step) => step.perTest);
-    if (perTest || firstPerTest < 0) steps.items.push(node);
-    else steps.items.splice(firstPerTest, 0, node);
+    stepsOf(doc).items.push(nodeFor(doc, { id, use: primitive.ref, with: {} }));
   });
 }
 
-/** The step removed, with every wire from it and every report entry reading it. */
+/** The step removed, with every wire from it and every output reading it. */
 export function removeStep(text: string, index: number): string {
   const workflow = workflowOf(text);
   const step = workflow.steps[index];
@@ -266,41 +260,6 @@ export function renameStep(text: string, index: number, id: string): string {
 /** The step's primitive at another version. */
 export function setUse(text: string, index: number, use: string): string {
   return edited(text, (doc) => writeAt(doc, ['steps', index, 'use'], use));
-}
-
-/**
- * The step switched between once and per test, moved the fewest places to
- * keep every once step before every per-test step.
- */
-export function setPerTest(text: string, index: number, perTest: boolean): string {
-  const workflow = workflowOf(text);
-  return edited(text, (doc) => {
-    const node = stepNode(doc, index);
-    if (node === null) return;
-    if (!perTest) node.delete('per_test');
-    else if (!node.has('per_test')) {
-      // Where the format writes it: after `use`, before `with`.
-      const at = node.items.findIndex(
-        (pair) => isScalar(pair.key) && pair.key.value === 'with',
-      );
-      if (at < 0) node.set('per_test', true);
-      else node.items.splice(at, 0, doc.createPair('per_test', true));
-    } else node.set('per_test', true);
-    const others = workflow.steps.map((_, at) => at).filter((at) => at !== index);
-    const where = others.findIndex((at) => at > index);
-    let place = where < 0 ? others.length : where;
-    if (perTest) {
-      const lastOnce = others.filter((at) => !workflow.steps[at]?.perTest).at(-1);
-      if (lastOnce !== undefined && lastOnce > index)
-        place = others.indexOf(lastOnce) + 1;
-    } else {
-      const firstPerTest = others.find((at) => workflow.steps[at]?.perTest);
-      if (firstPerTest !== undefined && firstPerTest < index)
-        place = others.indexOf(firstPerTest);
-    }
-    others.splice(place, 0, index);
-    reorder(doc, others);
-  });
 }
 
 // Ports
@@ -347,7 +306,7 @@ export function clearPort(text: string, index: number, port: string): string {
   });
 }
 
-// Inputs and test fields
+// Inputs
 
 /**
  * An input's declaration: its type and what the format allows with it, and
@@ -356,30 +315,18 @@ export function clearPort(text: string, index: number, port: string): string {
  */
 export type InputFields = {
   type: string;
-  contestant?: boolean;
   options?: string[] | null;
-  per_test?: boolean;
   optional?: boolean;
   title?: string | null;
   help?: string | null;
   unit?: string | null;
 };
 
-export type FieldFields = { type: string; options?: string[] | null; public?: boolean };
-
 /** An input declared, or its declaration changed. */
 export function setInput(text: string, id: string, fields: InputFields): string {
   return edited(text, (doc) => {
     top<YAMLMap>(doc, 'inputs');
     writeAt(doc, ['inputs', id], declarationNode(fields));
-  });
-}
-
-/** A test field declared, or its declaration changed. */
-export function setField(text: string, name: string, fields: FieldFields): string {
-  return edited(text, (doc) => {
-    top<YAMLMap>(doc, 'test');
-    writeAt(doc, ['test', name], declarationNode(fields));
   });
 }
 
@@ -398,15 +345,7 @@ export function renameInput(text: string, from: string, to: string): string {
   });
 }
 
-/** A test field renamed, every reference to it following. */
-export function renameField(text: string, from: string, to: string): string {
-  return edited(text, (doc) => {
-    renameKey(doc, 'test', from, to);
-    rewriteStrings(doc, (value) => renamed(value, 'test', from, to));
-  });
-}
-
-/** An input removed, with every port value and report entry reading it. */
+/** An input removed, with every port value and output reading it. */
 export function removeInput(text: string, id: string): string {
   return edited(text, (doc) => {
     writeAt(doc, ['inputs', id], undefined);
@@ -414,24 +353,13 @@ export function removeInput(text: string, id: string): string {
   });
 }
 
-/** A test field removed, with every port value reading it. */
-export function removeField(text: string, name: string): string {
-  return edited(text, (doc) => {
-    writeAt(doc, ['test', name], undefined);
-    dropUses(doc, 'test', name);
-  });
-}
-
-// The report
+// The outputs
 
 export type EntryFields = {
   from: Ref;
-  /** What pages call the value, "Run time", and what it is counted in, "ms" (M58). */
+  /** What pages call the value, "Run time", and what it is counted in, "ms". */
   title?: string | null;
   unit?: string | null;
-  better?: string | null;
-  at_least?: NumberText | null;
-  at_most?: NumberText | null;
 };
 
 /**
@@ -441,26 +369,23 @@ export type EntryFields = {
  * the primitive's declaration is not known.
  */
 export function entryFields(
-  entry: ReportEntry,
+  entry: OutputEntry,
   type: string | null,
   changed: Partial<EntryFields> & { from: Ref },
 ): EntryFields {
   const fields: EntryFields = {
     title: entry.title,
     unit: entry.unit,
-    better: entry.better,
-    at_least: entry.atLeast,
-    at_most: entry.atMost,
     ...changed,
   };
   if (type !== null && type !== 'number') fields.unit = null;
   return fields;
 }
 
-/** A report entry written, in the short form when it only reads an output. */
+/** An output written, in the short form when it only reads a step's output. */
 export function setEntry(text: string, name: string, fields: EntryFields): string {
   return edited(text, (doc) => {
-    top<YAMLMap>(doc, 'report');
+    top<YAMLMap>(doc, 'outputs');
     const { from, ...meaning } = fields;
     const kept = Object.fromEntries(
       Object.entries(meaning).filter(
@@ -469,14 +394,14 @@ export function setEntry(text: string, name: string, fields: EntryFields): strin
     );
     const value =
       Object.keys(kept).length === 0 ? refText(from) : { from: refText(from), ...kept };
-    writeAt(doc, ['report', name], value);
+    writeAt(doc, ['outputs', name], value);
   });
 }
 
 export function renameEntry(text: string, from: string, to: string): string {
-  return edited(text, (doc) => renameKey(doc, 'report', from, to));
+  return edited(text, (doc) => renameKey(doc, 'outputs', from, to));
 }
 
 export function removeEntry(text: string, name: string): string {
-  return edited(text, (doc) => writeAt(doc, ['report', name], undefined));
+  return edited(text, (doc) => writeAt(doc, ['outputs', name], undefined));
 }

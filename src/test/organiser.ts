@@ -3,12 +3,13 @@ import type {
   FileContent,
   ListedContest,
   Named,
+  Outcome,
   Publication,
+  RunsResult,
   SaveEffect,
   TaskStanding,
   TaskState,
   TreeEntry,
-  ValueMeaning,
 } from '@/api/types';
 import { problem } from './server';
 
@@ -81,12 +82,31 @@ export const unchanged: SaveEffect = {
   reading: ['Nothing entrants read changes.'],
 };
 
-/** What classic reports, as a publication names its values (M58), in its report order. */
-export const classicMeanings: ValueMeaning[] = [
-  { name: 'time_ms', title: 'Run time', unit: 'ms', better: 'lower' },
-  { name: 'memory_kb', title: 'Memory used', unit: 'KB', better: 'lower' },
-  { name: 'log', title: 'Compile log', unit: null, better: null },
-];
+/**
+ * A finished grading's result: a run for each verdict, in order, and the
+ * outcome of each step done once, by its id.
+ */
+export function runsResult(
+  verdicts: Outcome[],
+  once: Record<string, Outcome> = {},
+): RunsResult {
+  return {
+    schema_version: 6,
+    error: null,
+    once: { outcomes: once, reports: {}, texts: {} },
+    runs: verdicts.map((verdict, at) => ({
+      id: `run-${String(at + 1)}`,
+      key: {},
+      label: null,
+      message: null,
+      passed: verdict === 'accepted' ? 1 : 0,
+      reports: {},
+      texts: {},
+      verdict,
+    })),
+    staff: [],
+  };
+}
 
 export const publications: Publication[] = [
   {
@@ -95,7 +115,8 @@ export const publications: Publication[] = [
     grading_changed: true,
     changes: ['plans/default.json added'],
     at: '2026-09-20T10:00:00Z',
-    meanings: classicMeanings,
+    check: null,
+    failed_checks: [],
   },
   {
     number: 2,
@@ -103,7 +124,8 @@ export const publications: Publication[] = [
     grading_changed: false,
     changes: [],
     at: '2026-09-21T10:00:00Z',
-    meanings: classicMeanings,
+    check: null,
+    failed_checks: [],
   },
 ];
 
@@ -114,6 +136,7 @@ export const publishedTask: TaskState = {
   errors: [],
   statement_written: true,
   head_statement_written: true,
+  results: { history: [], released: false },
 };
 
 export const draftTask: TaskState = {
@@ -128,6 +151,7 @@ export const draftTask: TaskState = {
   ],
   statement_written: true,
   head_statement_written: true,
+  results: { history: [], released: false },
 };
 
 export const taskState = http.get(TASK_API, () => HttpResponse.json(publishedTask));
@@ -139,8 +163,7 @@ export const publicationList = http.get(`${TASK_API}/publications`, () =>
 
 /**
  * The spring contest's tasks in its order: sort, on its first publication,
- * due a week after its release with a tenth off per late day and worth 100,
- * and sum, with no due, whose last save left a draft with errors on its
+ * due a week after its release, and sum, with no due, whose last save left a draft with errors on its
  * second publication.
  */
 export const standings: TaskStanding[] = [
@@ -154,9 +177,7 @@ export const standings: TaskStanding[] = [
     timeline: {
       release_at: '2026-10-01T09:00:00Z',
       due: '2026-10-08T09:00:00Z',
-      late_per_day: '0.1',
       closes: '2026-10-15T09:00:00Z',
-      worth: '100',
     },
   },
   {
@@ -169,9 +190,7 @@ export const standings: TaskStanding[] = [
     timeline: {
       release_at: '2026-10-01T09:00:00Z',
       due: null,
-      late_per_day: null,
       closes: '2026-10-15T09:00:00Z',
-      worth: null,
     },
   },
 ];

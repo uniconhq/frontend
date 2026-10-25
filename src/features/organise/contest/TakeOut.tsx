@@ -137,7 +137,7 @@ function Refusal({
 }) {
   const refused = toApiError(error);
   if (refused.code === 'take_out_refused') {
-    const boards = refused.extensions['boards'];
+    const boards = refused.extensions['leaderboards'];
     return (
       <div className={shared.panel} role="alert">
         <BodyText>

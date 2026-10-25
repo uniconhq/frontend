@@ -36,7 +36,7 @@ export const CONTEST_SECTIONS = [
   { key: 'entry', label: 'How people enter', segment: 'entry', card: 'grid' },
   { key: 'entrants', label: 'Entrants', segment: 'entrants', card: 'grid' },
   { key: 'gradings', label: 'Gradings', segment: 'gradings', card: 'grid' },
-  { key: 'boards', label: 'Leaderboards', segment: 'boards', card: 'grid' },
+  { key: 'boards', label: 'Leaderboards', segment: 'leaderboards', card: 'grid' },
   {
     key: 'announcements',
     label: 'Announcements',
@@ -54,13 +54,14 @@ export const CONTEST_SECTIONS = [
 
 /**
  * A task's sections for running it, each a page of its own. What builds the
- * task (its workflow, inputs, tests and scoring, and statement) is on the
+ * task (its workflow, inputs, runs, scoring and checks, and statement) is on the
  * task's own page, as the cards `TASK_BUILD_CARDS` lists, each file it holds
  * changed on the card it belongs to; its Settings page holds its title, its
  * settings as they are stored and, for its admins, every file to read (M51).
  */
 export const TASK_SECTIONS = [
   { key: 'gradings', label: 'Gradings', segment: 'gradings', card: 'grid' },
+  { key: 'queue', label: 'Queue', segment: 'queue', card: 'grid' },
   {
     key: 'publications',
     label: 'Publications',
@@ -79,14 +80,18 @@ export const TASK_SECTIONS = [
 
 /**
  * The cards that build a task, on its own page, in the order one decides the
- * next: the workflow, its inputs, the tests and their scoring, which share
- * one save, and the statement, which saves on its own. Each key is the card's
- * anchor, which the sidebar and a link to one of its fields open it by.
+ * next: the workflow, its inputs, its runs, its scoring and checks, how many
+ * submissions it takes, which share one save, and the statement, which saves
+ * on its own. Each key is the card's anchor, which the sidebar and a link to
+ * one of its fields open it by. `tests` stays the submissions card's anchor.
  */
 export const TASK_BUILD_CARDS = [
   { key: 'workflow', label: 'Workflow' },
   { key: 'inputs', label: 'Inputs' },
-  { key: 'tests', label: 'Tests and scoring' },
+  { key: 'runs', label: 'Runs' },
+  { key: 'scoring', label: 'Scoring' },
+  { key: 'checks', label: 'Checks' },
+  { key: 'tests', label: 'Submissions' },
   { key: 'statement', label: 'Statement' },
 ] as const;
 
@@ -107,7 +112,7 @@ export function taskCardPath(
  */
 export const CONTEST_VIEW_SECTIONS = [
   { key: 'tasks', label: 'Tasks', segment: '', card: 'grid' },
-  { key: 'boards', label: 'Leaderboards', segment: 'boards', card: 'grid' },
+  { key: 'boards', label: 'Leaderboards', segment: 'leaderboards', card: 'grid' },
   { key: 'questions', label: 'Questions', segment: 'questions', card: 'grid' },
 ] as const satisfies readonly Section[];
 
@@ -122,6 +127,20 @@ function under(base: string, segment: string): string {
 
 export function orgSectionPath(org: string, key: OrgSectionKey): string {
   return under(orgPath(org), sectionOf(ORG_SECTIONS, key).segment);
+}
+
+/**
+ * Where staff read one entrant's submissions to a task: the contest's
+ * gradings, kept to that task and entrant.
+ */
+export function entrantGradingsPath(
+  org: string,
+  contest: string,
+  task: string,
+  entrant: string,
+): string {
+  const search = new URLSearchParams({ task, entrant });
+  return `${contestSectionPath(org, contest, 'gradings')}?${search.toString()}`;
 }
 
 export function contestSectionPath(

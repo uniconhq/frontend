@@ -1,4 +1,4 @@
-import { refsOf, type Ref, type Workflow } from './model';
+import { refsOf, wireRefs, type Ref, type Workflow } from './model';
 import type { PrimitiveInfo } from './primitives';
 import { refWords } from './words';
 
@@ -7,15 +7,12 @@ import { refWords } from './words';
  * `workflow.yaml` alone (PROPOSAL.md section 12, #377). Nothing of it is
  * stored, so one file always draws one picture. The rules:
  *
- * - Columns. A once step stands one column right of the furthest once step
- *   it reads, the first in column 1; a per-test step the same among the
- *   per-test steps, in a band after every once column. The report stands in
- *   the last column.
+ * - Columns. A step stands one column right of the furthest step it reads,
+ *   the first in column 1. The outputs stand in the last column.
  * - Groups. Inputs read by exactly the same steps share a box, named for
  *   them, in the column just before the first of them, their rows in the
- *   order of the ports they feed; test fields likewise, never left of the
- *   band's first column. One that nothing reads stands in the first column,
- *   or the band's first. Text with an input written in counts as reading it.
+ *   order of the ports they feed. One that nothing reads stands in the first
+ *   column. Text with an input written in counts as reading it.
  * - Slots. A wire that skips columns runs through a slot of its own in each
  *   column it crosses, labelled in words with its source where it starts
  *   ("time_ms from run"), and wires
@@ -39,7 +36,7 @@ export const GEOMETRY = {
   gap: 104,
   /** A step's title rows: its name, its primitive and what the primitive does. */
   header: 84,
-  /** The title rows of the inputs, a test's files and the report. */
+  /** The title rows of the inputs and the outputs. */
   groupHeader: 50,
   /** One port's row. */
   row: 28,
@@ -52,7 +49,7 @@ export const GEOMETRY = {
 const SWEEPS = 4;
 const PINGPONG = [0, 1, 2, 3, 4, 3, 2, 1];
 
-type BoxKind = 'step' | 'inputs' | 'test' | 'report';
+type BoxKind = 'step' | 'inputs' | 'outputs';
 
 export type Box = {
   key: string;
@@ -66,9 +63,9 @@ export type Box = {
   step: number | null;
   /** For a group, the steps it is read by, in the order of `steps:`. */
   readers: string[];
-  /** Ports down the left: a step's inputs, the report's entries. */
+  /** Ports down the left: a step's inputs, the outputs' entries. */
   left: string[];
-  /** Ports down the right: a step's outputs, a group's inputs or fields. */
+  /** Ports down the right: a step's outputs, a group's inputs. */
   right: string[];
   colour: number;
 };
@@ -90,9 +87,9 @@ export type Point = { x: number; y: number };
 
 type Wire = {
   key: string;
-  /** `inputs:<id>`, `test:<field>` or `steps:<index>.<output>`. */
+  /** `inputs:<id>` or `steps:<index>.<output>`. */
   source: string;
-  /** `port:<index>.<port>` or `report:<name>`. */
+  /** `port:<index>.<port>` or `outputs:<name>`. */
   target: string;
   from: { box: string; port: string };
   to: { box: string; port: string };
@@ -103,8 +100,6 @@ type Wire = {
 
 export type Layout = {
   columns: number;
-  /** The columns of the per-test band, first to last. */
-  band: { first: number; last: number } | null;
   boxes: Box[];
   slots: Slot[];
   wires: Wire[];
@@ -114,11 +109,11 @@ export type Layout = {
 };
 
 /** The colour a column takes, 0 to 4: 1 to 5 and back down, again and again. */
-export function colourOf(column: number): number {
+function colourOf(column: number): number {
   return PINGPONG[column % PINGPONG.length] ?? 0;
 }
 
-export function columnX(column: number): number {
+function columnX(column: number): number {
   return column * (GEOMETRY.width + GEOMETRY.gap);
 }
 
@@ -142,7 +137,7 @@ export function rowOf(
     : box.left.length + Math.max(box.right.indexOf(port), 0);
 }
 
-const REPORT_BOX = 'report';
+const OUTPUTS_BOX = 'outputs';
 
 function stepBox(index: number): string {
   return `step:${index}`;
@@ -181,15 +176,25 @@ type Connection = {
   targetPort: string;
 };
 
-/** The ports of each step: the primitive's own, in its order, then the rest the file uses. */
-function stepPorts(workflow: Workflow, primitives: Map<string, PrimitiveInfo>) {
+/** The ports of a run workflow drawn as a box, when the step is not a primitive. */
+export type StepPorts = { inputs: string[]; outputs: string[] };
+
+/** The ports of each step: the primitive's own, or a box's, then the rest the file uses. */
+function stepPorts(
+  workflow: Workflow,
+  primitives: Map<string, PrimitiveInfo>,
+  boxes: ReadonlyMap<string, StepPorts>,
+) {
   const indexes = stepIndexes(workflow);
   const left: string[][] = [];
   const right: string[][] = [];
   workflow.steps.forEach((step) => {
     const declared = primitives.get(step.use);
+    const box = boxes.get(step.use);
     const inputs =
-      declared && declared.problem === null ? Object.keys(declared.inputs) : [];
+      declared && declared.problem === null
+        ? Object.keys(declared.inputs)
+        : (box?.inputs ?? []);
     left.push([
       ...inputs,
       ...Object.keys(step.with).filter((port) => !inputs.includes(port)),
@@ -197,7 +202,7 @@ function stepPorts(workflow: Workflow, primitives: Map<string, PrimitiveInfo>) {
     const outputs =
       declared && declared.problem === null
         ? Object.keys(declared.outputs).filter((output) => output !== 'outcome')
-        : [];
+        : [...(box?.outputs ?? [])];
     right.push(outputs);
   });
   const reads = (ref: Ref, before: number) => {
@@ -216,7 +221,7 @@ function stepPorts(workflow: Workflow, primitives: Map<string, PrimitiveInfo>) {
     for (const value of Object.values(step.with))
       for (const ref of refsOf(value)) reads(ref, index);
   });
-  for (const entry of workflow.report)
+  for (const entry of workflow.outputs)
     if (entry.from !== null) reads(entry.from, Infinity);
   return { left, right };
 }
@@ -238,28 +243,21 @@ function compare(a: (number | string)[], b: (number | string)[]): number {
 export function layoutWorkflow(
   workflow: Workflow,
   primitives: Map<string, PrimitiveInfo>,
+  given: ReadonlyMap<string, StepPorts> = new Map(),
 ): Layout {
   const { steps } = workflow;
   const indexes = stepIndexes(workflow);
-  const ports = stepPorts(workflow, primitives);
+  const ports = stepPorts(workflow, primitives, given);
   const declaredInputs = new Set(workflow.inputs.map((input) => input.id));
-  const declaredFields = new Set(workflow.test.map((field) => field.name));
 
-  // What each step reads, and who reads each input and field.
+  // What each step reads, and who reads each input.
   const reads = steps.map(() => new Set<number>());
   const inputReaders = new Map<string, Set<number>>();
-  const fieldReaders = new Map<string, Set<number>>();
   const firstUse = new Map<string, [number, number]>();
-  const REPORT = steps.length;
-  const note = (
-    readers: Map<string, Set<number>>,
-    key: string,
-    by: number,
-    port: number,
-  ) => {
-    const held = readers.get(key) ?? new Set<number>();
+  const note = (key: string, by: number, port: number) => {
+    const held = inputReaders.get(key) ?? new Set<number>();
     held.add(by);
-    readers.set(key, held);
+    inputReaders.set(key, held);
     const use = firstUse.get(key);
     if (use === undefined || compare([by, port], use) < 0)
       firstUse.set(key, [by, port]);
@@ -270,9 +268,7 @@ export function layoutWorkflow(
       const portIndex = left.indexOf(port);
       for (const ref of refsOf(value)) {
         if (ref.kind === 'inputs' && declaredInputs.has(ref.name))
-          note(inputReaders, `inputs:${ref.name}`, index, portIndex);
-        else if (ref.kind === 'test' && declaredFields.has(ref.name))
-          note(fieldReaders, `test:${ref.name}`, index, portIndex);
+          note(`inputs:${ref.name}`, index, portIndex);
         else if (ref.kind === 'steps') {
           const read = indexes.get(ref.name);
           if (read !== undefined && read < index) reads[index]?.add(read);
@@ -280,37 +276,17 @@ export function layoutWorkflow(
       }
     }
   });
-  workflow.report.forEach((entry, at) => {
-    if (entry.betterRef?.kind === 'inputs' && declaredInputs.has(entry.betterRef.name))
-      note(inputReaders, `inputs:${entry.betterRef.name}`, REPORT, at);
-  });
 
   // Columns.
   const column: number[] = steps.map(() => 0);
-  steps.forEach((step, index) => {
-    if (step.perTest) return;
+  steps.forEach((_, index) => {
     let at = 1;
-    for (const read of reads[index] ?? [])
-      if (!steps[read]?.perTest) at = Math.max(at, (column[read] ?? 0) + 1);
+    for (const read of reads[index] ?? []) at = Math.max(at, (column[read] ?? 0) + 1);
     column[index] = at;
   });
-  const lastOnce = Math.max(
-    0,
-    ...steps.map((step, index) => (step.perTest ? 0 : (column[index] ?? 0))),
-  );
-  const bandFirst = lastOnce + 1;
-  steps.forEach((step, index) => {
-    if (!step.perTest) return;
-    let at = bandFirst + 1;
-    for (const read of reads[index] ?? [])
-      if (steps[read]?.perTest) at = Math.max(at, (column[read] ?? 0) + 1);
-    column[index] = at;
-  });
-  const reportColumn = Math.max(bandFirst, ...column) + 1;
-  const readerColumn = (reader: number) =>
-    reader === REPORT ? reportColumn : (column[reader] ?? 0);
-  const readerName = (reader: number) =>
-    reader === REPORT ? 'report' : (steps[reader]?.id ?? '');
+  const reportColumn = Math.max(0, ...column) + 1;
+  const readerColumn = (reader: number) => column[reader] ?? 0;
+  const readerName = (reader: number) => steps[reader]?.id ?? '';
 
   // Boxes.
   type Draft = Omit<Box, 'x' | 'y' | 'height' | 'width' | 'colour'> & {
@@ -329,64 +305,40 @@ export function layoutWorkflow(
       base: [index, 1],
     });
   });
-  const grouped = (
-    kind: 'inputs' | 'test',
-    names: string[],
-    readers: Map<string, Set<number>>,
-    unreadColumn: number,
-    floor: number,
-  ) => {
-    const groups = new Map<string, string[]>();
-    for (const name of names) {
-      const by = [...(readers.get(`${kind}:${name}`) ?? [])].sort((a, b) => a - b);
-      const key = by.join(',');
-      groups.set(key, [...(groups.get(key) ?? []), name]);
-    }
-    for (const [key, members] of groups) {
-      const by = key === '' ? [] : key.split(',').map(Number);
-      const at =
-        by.length === 0
-          ? unreadColumn
-          : Math.max(floor, Math.min(...by.map(readerColumn)) - 1);
-      const ordered = [...members].sort((a, b) => {
-        const first = firstUse.get(`${kind}:${a}`) ?? [Infinity, names.indexOf(a)];
-        const second = firstUse.get(`${kind}:${b}`) ?? [Infinity, names.indexOf(b)];
-        return compare(first, second) || names.indexOf(a) - names.indexOf(b);
-      });
-      const firstOf = firstUse.get(`${kind}:${ordered[0] ?? ''}`) ?? [-1, 0];
-      drafts.push({
-        key: `${kind}:${key}`,
-        kind,
-        column: at,
-        step: null,
-        readers: by.map(readerName),
-        left: [],
-        right: ordered,
-        base: [firstOf[0], 0, kind === 'inputs' ? 0 : 1, firstOf[1]],
-      });
-    }
-  };
-  grouped(
-    'inputs',
-    workflow.inputs.map((input) => input.id),
-    inputReaders,
-    0,
-    0,
-  );
-  grouped(
-    'test',
-    workflow.test.map((field) => field.name),
-    fieldReaders,
-    bandFirst,
-    bandFirst,
-  );
+  const names = workflow.inputs.map((input) => input.id);
+  const groups = new Map<string, string[]>();
+  for (const name of names) {
+    const by = [...(inputReaders.get(`inputs:${name}`) ?? [])].sort((a, b) => a - b);
+    const key = by.join(',');
+    groups.set(key, [...(groups.get(key) ?? []), name]);
+  }
+  for (const [key, members] of groups) {
+    const by = key === '' ? [] : key.split(',').map(Number);
+    const at = by.length === 0 ? 0 : Math.max(0, Math.min(...by.map(readerColumn)) - 1);
+    const ordered = [...members].sort((a, b) => {
+      const first = firstUse.get(`inputs:${a}`) ?? [Infinity, names.indexOf(a)];
+      const second = firstUse.get(`inputs:${b}`) ?? [Infinity, names.indexOf(b)];
+      return compare(first, second) || names.indexOf(a) - names.indexOf(b);
+    });
+    const firstOf = firstUse.get(`inputs:${ordered[0] ?? ''}`) ?? [-1, 0];
+    drafts.push({
+      key: `inputs:${key}`,
+      kind: 'inputs',
+      column: at,
+      step: null,
+      readers: by.map(readerName),
+      left: [],
+      right: ordered,
+      base: [firstOf[0], 0, 0, firstOf[1]],
+    });
+  }
   drafts.push({
-    key: REPORT_BOX,
-    kind: 'report',
+    key: OUTPUTS_BOX,
+    kind: 'outputs',
     column: reportColumn,
     step: null,
     readers: [],
-    left: workflow.report.map((entry) => entry.name),
+    left: workflow.outputs.map((entry) => entry.name),
     right: [],
     base: [Infinity, 2],
   });
@@ -395,14 +347,7 @@ export function layoutWorkflow(
   const used = [...new Set(drafts.map((draft) => draft.column))].sort((a, b) => a - b);
   const dense = new Map(used.map((value, at) => [value, at]));
   for (const draft of drafts) draft.column = dense.get(draft.column) ?? 0;
-  const firstBand = used.findIndex((value) => value >= bandFirst);
   const lastColumn = used.length - 1;
-  const band =
-    firstBand >= 0 &&
-    firstBand < lastColumn &&
-    (workflow.test.length > 0 || steps.some((step) => step.perTest))
-      ? { first: firstBand, last: lastColumn - 1 }
-      : null;
   const boxOf = new Map(drafts.map((draft) => [draft.key, draft]));
 
   // Connections: each wire from its source port to the port it feeds.
@@ -410,8 +355,6 @@ export function layoutWorkflow(
   for (const draft of drafts) {
     if (draft.kind === 'inputs')
       for (const id of draft.right) sourceBox.set(`inputs:${id}`, draft.key);
-    if (draft.kind === 'test')
-      for (const name of draft.right) sourceBox.set(`test:${name}`, draft.key);
   }
   const connections: Connection[] = [];
   const connect = (
@@ -446,12 +389,12 @@ export function layoutWorkflow(
   };
   steps.forEach((step, index) => {
     for (const [port, value] of Object.entries(step.with))
-      if (value.kind === 'wire')
-        connect(value.ref, index, stepBox(index), port, `port:${index}.${port}`);
+      for (const ref of wireRefs(value))
+        connect(ref, index, stepBox(index), port, `port:${index}.${port}`);
   });
-  for (const entry of workflow.report)
+  for (const entry of workflow.outputs)
     if (entry.from !== null)
-      connect(entry.from, Infinity, REPORT_BOX, entry.name, `report:${entry.name}`);
+      connect(entry.from, Infinity, OUTPUTS_BOX, entry.name, `outputs:${entry.name}`);
   const columnOfBox = (key: string) => boxOf.get(key)?.column ?? 0;
   const live = connections.filter(
     (connection) =>
@@ -469,8 +412,10 @@ export function layoutWorkflow(
         output: connection.sourcePort,
       });
     }
-    const [kind, name] = connection.source.split(':') as ['inputs' | 'test', string];
-    return refWords({ kind, name });
+    return refWords({
+      kind: 'inputs',
+      name: connection.source.slice('inputs:'.length),
+    });
   };
   const chains = live.map((connection) => {
     const from = columnOfBox(connection.sourceBox);
@@ -505,7 +450,7 @@ export function layoutWorkflow(
       key: draft.key,
       column: draft.column,
       rows:
-        draft.kind === 'report'
+        draft.kind === 'outputs'
           ? draft.left.length + 1
           : Math.max(draft.left.length + draft.right.length, 1),
       base: draft.base,
@@ -716,7 +661,6 @@ export function layoutWorkflow(
   });
   return {
     columns,
-    band,
     boxes,
     slots: slotList,
     wires,

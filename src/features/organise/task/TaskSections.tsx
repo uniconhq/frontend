@@ -32,7 +32,7 @@ function useTaskPlace() {
 
 /**
  * The task's title, the one setting not on its page. Its workflow, inputs,
- * tests and scoring are set on the task's own page.
+ * runs, scoring and checks are set on the task's own page.
  */
 export function TaskSettingsPage() {
   const { place, admin } = useTaskPlace();
@@ -42,7 +42,7 @@ export function TaskSettingsPage() {
       section={sectionOf(TASK_SECTIONS, 'settings')}
       intro={
         <BodyText tone="secondary">
-          The workflow, inputs, tests and scoring are set on{' '}
+          The workflow, inputs, runs, scoring and checks are set on{' '}
           <PageLink to={taskPath(org, contest, task)}>the task’s page</PageLink>.
         </BodyText>
       }
@@ -73,8 +73,8 @@ function AllFiles({ place }: { place: Extract<Place, { kind: 'task' }> }) {
         <SectionTitle>All files</SectionTitle>
         <BodyText tone="secondary">
           Every file the task holds, to read but not change. They are changed on the
-          task&apos;s page: tests in Tests and scoring, pictures from the Statement
-          card, and a setting&apos;s file in its box on the Inputs card.
+          task&apos;s page: a run&apos;s file on the Runs card, pictures from the
+          Statement card, and a setting&apos;s file in its box on the Inputs card.
         </BodyText>
         <div className={classes.actions}>
           <Button
