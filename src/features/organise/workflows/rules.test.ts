@@ -7,7 +7,7 @@ import {
   mayBeOptional,
   newProblem,
   orderAfterWire,
-  reportRefusal,
+  outputRefusal,
   valueRefusal,
   wireRefusal,
 } from './rules';
@@ -242,11 +242,11 @@ steps:
   });
 
   it('reports only text and numbers', () => {
-    expect(reportRefusal(WORKFLOW, primitives, output('run', 'time_ms'))).toBeNull();
-    expect(reportRefusal(WORKFLOW, primitives, output('run', 'output'))).toBe(
+    expect(outputRefusal(WORKFLOW, primitives, output('run', 'time_ms'))).toBeNull();
+    expect(outputRefusal(WORKFLOW, primitives, output('run', 'output'))).toBe(
       'steps.run.output is a file, and only text or a number can be reported.',
     );
-    expect(reportRefusal(WORKFLOW, primitives, input('limit'))).toBe(
+    expect(outputRefusal(WORKFLOW, primitives, input('limit'))).toBe(
       "Only a step's output can be reported, not an input or a file of the workflow.",
     );
   });
@@ -328,8 +328,8 @@ steps:
   it('names a text output and a number output', () => {
     const workflow = readWorkflow(parse(CLASSIC));
 
-    expect(reportRefusal(workflow, primitives, output('compile', 'log'))).toBeNull();
-    expect(reportRefusal(workflow, primitives, output('run', 'memory_kb'))).toBeNull();
+    expect(outputRefusal(workflow, primitives, output('compile', 'log'))).toBeNull();
+    expect(outputRefusal(workflow, primitives, output('run', 'memory_kb'))).toBeNull();
   });
 
   it('names what a change of a declaration newly breaks', () => {

@@ -49,7 +49,7 @@ export const GEOMETRY = {
 const SWEEPS = 4;
 const PINGPONG = [0, 1, 2, 3, 4, 3, 2, 1];
 
-type BoxKind = 'step' | 'inputs' | 'report';
+type BoxKind = 'step' | 'inputs' | 'outputs';
 
 export type Box = {
   key: string;
@@ -89,7 +89,7 @@ type Wire = {
   key: string;
   /** `inputs:<id>` or `steps:<index>.<output>`. */
   source: string;
-  /** `port:<index>.<port>` or `report:<name>`. */
+  /** `port:<index>.<port>` or `outputs:<name>`. */
   target: string;
   from: { box: string; port: string };
   to: { box: string; port: string };
@@ -109,7 +109,7 @@ export type Layout = {
 };
 
 /** The colour a column takes, 0 to 4: 1 to 5 and back down, again and again. */
-export function colourOf(column: number): number {
+function colourOf(column: number): number {
   return PINGPONG[column % PINGPONG.length] ?? 0;
 }
 
@@ -137,7 +137,7 @@ export function rowOf(
     : box.left.length + Math.max(box.right.indexOf(port), 0);
 }
 
-const REPORT_BOX = 'report';
+const OUTPUTS_BOX = 'outputs';
 
 function stepBox(index: number): string {
   return `step:${index}`;
@@ -221,7 +221,7 @@ function stepPorts(
     for (const value of Object.values(step.with))
       for (const ref of refsOf(value)) reads(ref, index);
   });
-  for (const entry of workflow.report)
+  for (const entry of workflow.outputs)
     if (entry.from !== null) reads(entry.from, Infinity);
   return { left, right };
 }
@@ -333,12 +333,12 @@ export function layoutWorkflow(
     });
   }
   drafts.push({
-    key: REPORT_BOX,
-    kind: 'report',
+    key: OUTPUTS_BOX,
+    kind: 'outputs',
     column: reportColumn,
     step: null,
     readers: [],
-    left: workflow.report.map((entry) => entry.name),
+    left: workflow.outputs.map((entry) => entry.name),
     right: [],
     base: [Infinity, 2],
   });
@@ -392,9 +392,9 @@ export function layoutWorkflow(
       for (const ref of wireRefs(value))
         connect(ref, index, stepBox(index), port, `port:${index}.${port}`);
   });
-  for (const entry of workflow.report)
+  for (const entry of workflow.outputs)
     if (entry.from !== null)
-      connect(entry.from, Infinity, REPORT_BOX, entry.name, `report:${entry.name}`);
+      connect(entry.from, Infinity, OUTPUTS_BOX, entry.name, `outputs:${entry.name}`);
   const columnOfBox = (key: string) => boxOf.get(key)?.column ?? 0;
   const live = connections.filter(
     (connection) =>
@@ -450,7 +450,7 @@ export function layoutWorkflow(
       key: draft.key,
       column: draft.column,
       rows:
-        draft.kind === 'report'
+        draft.kind === 'outputs'
           ? draft.left.length + 1
           : Math.max(draft.left.length + draft.right.length, 1),
       base: draft.base,

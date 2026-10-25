@@ -232,7 +232,7 @@
   font-size: 13px;
 }
 
-/* One input, test file or report entry in its drawer. */
+/* One input or output in its drawer. */
 .declaration {
   display: flex;
   flex-direction: column;

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@/test/user-event';
 import { delay, http, HttpResponse } from 'msw';
+import type { WorkflowForm } from '@/api/types';
 import { TASK_BUILD_CARDS, TASK_SECTIONS } from '@/lib/sections';
 import { formatDateTime } from '@/lib/time';
 import { renderApp } from '@/test/render';
@@ -245,7 +246,22 @@ describe('the task page', () => {
   });
 
   it('builds the task in order with cards, each leading to where its part is done', async () => {
-    server.use(signedIn, taskState, publicationList, ...repoFiles);
+    server.use(
+      signedIn,
+      taskState,
+      publicationList,
+      ...repoFiles,
+      // A saved workflow that reads, so the Scoring and Checks cards are there.
+      http.get(`${TASK_API}/workflow-form`, () =>
+        HttpResponse.json({
+          workflow: 'unicon/classic@v3',
+          newer: null,
+          problem: null,
+          graded: false,
+          inputs: [],
+        } satisfies WorkflowForm),
+      ),
+    );
     renderApp(TASK);
 
     await screen.findByRole('region', { name: 'Workflow' });

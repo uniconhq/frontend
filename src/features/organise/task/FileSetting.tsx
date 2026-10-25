@@ -105,7 +105,7 @@ export function FileSetting({
       {staged !== undefined ? (
         <div className={shared.actions}>
           <BodyText>{staged.summary}</BodyText>
-          {/* Waiting for the task's save, marked as a test's row marks one. */}
+          {/* Waiting for the task's save, marked as a picture waiting for it is. */}
           {staged.was === '' ? (
             <Chip tone="live">New</Chip>
           ) : (

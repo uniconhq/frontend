@@ -32,7 +32,7 @@ function useTaskPlace() {
 
 /**
  * The task's title, the one setting not on its page. Its workflow, inputs,
- * tests and scoring are set on the task's own page.
+ * runs, scoring and checks are set on the task's own page.
  */
 export function TaskSettingsPage() {
   const { place, admin } = useTaskPlace();
@@ -42,7 +42,7 @@ export function TaskSettingsPage() {
       section={sectionOf(TASK_SECTIONS, 'settings')}
       intro={
         <BodyText tone="secondary">
-          The workflow, inputs, tests and scoring are set on{' '}
+          The workflow, inputs, runs, scoring and checks are set on{' '}
           <PageLink to={taskPath(org, contest, task)}>the task’s page</PageLink>.
         </BodyText>
       }

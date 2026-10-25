@@ -58,7 +58,7 @@ type Step = {
   with: Record<string, WithValue>;
 };
 
-export type ReportEntry = {
+export type OutputEntry = {
   name: string;
   /** The output it reads, or null when `from` is not one reference. */
   from: Ref | null;
@@ -75,7 +75,7 @@ export type ReportEntry = {
 export type Workflow = {
   inputs: InputDecl[];
   steps: Step[];
-  report: ReportEntry[];
+  outputs: OutputEntry[];
 };
 
 const WHOLE = /^\s*\$\{\{\s*([^{}]*?)\s*\}\}\s*$/;
@@ -218,7 +218,7 @@ function inputOf(id: string, raw: unknown): InputDecl {
   };
 }
 
-function entryOf(name: string, raw: unknown): ReportEntry {
+function entryOf(name: string, raw: unknown): OutputEntry {
   if (typeof raw === 'string') {
     return {
       name,
@@ -265,6 +265,6 @@ export function readWorkflow(file: unknown): Workflow {
   return {
     inputs: Object.entries(inputs).map(([id, raw]) => inputOf(id, raw)),
     steps: (Array.isArray(top.steps) ? top.steps : []).map(stepOf),
-    report: Object.entries(listed).map(([name, raw]) => entryOf(name, raw)),
+    outputs: Object.entries(listed).map(([name, raw]) => entryOf(name, raw)),
   };
 }

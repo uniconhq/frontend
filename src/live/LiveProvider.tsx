@@ -14,8 +14,8 @@ const REOPEN_MS = [5_000, 10_000, 20_000, 40_000, 60_000];
 /**
  * Which reads each kind of nudge makes stale, by the route the read was
  * made at: a grading moves a contestant's submissions, an organiser's
- * gradings, a contest's queue and the contest home, whose tasks carry the
- * entrant's points, and the summaries of regrades under way, but not a
+ * gradings, a contest's queue and the contest home, whose standing it
+ * moves, and the summaries of regrades under way, but not a
  * submission's files, which a
  * grading never changes, nor a grading's log, kept once it is written
  * (`.../gradings/{grading}/log`); an announcement the announcement lists; and a

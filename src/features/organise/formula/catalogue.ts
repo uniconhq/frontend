@@ -2,8 +2,7 @@ import type { components } from '@/api/schema';
 
 /**
  * The catalogue `GET /blocks` serves, narrowed to the forms the formula
- * editor reads. A test and the dev page's stub build this; the page itself
- * reads the endpoint.
+ * editor reads. A test builds this; the page itself reads the endpoint.
  */
 export type Catalogue = components['schemas']['Catalogue'];
 

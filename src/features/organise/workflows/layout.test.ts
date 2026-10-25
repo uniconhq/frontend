@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import { parseYaml } from '../forms/yaml-doc';
 import { CLASSIC, FOLDER, PRIMITIVES } from '@/test/workflows';
 import {
-  colourOf,
   layoutWorkflow,
   rowOf,
   wirePath,
@@ -177,7 +176,7 @@ describe('the layout', () => {
     expect(columnOf(layout, 'step:1')).toBe(2);
     expect(columnOf(layout, 'inputs:2')).toBe(2);
     expect(columnOf(layout, 'step:2')).toBe(3);
-    expect(columnOf(layout, 'report')).toBe(4);
+    expect(columnOf(layout, 'outputs')).toBe(4);
     const reads = layout.boxes.find((box) => box.key === 'inputs:0');
     expect(reads?.right).toEqual(['submission', 'language']);
     expect(reads?.readers).toEqual(['compile']);
@@ -192,7 +191,7 @@ describe('the layout', () => {
     const log = layout.slots.filter((slot) => slot.source === 'steps:0.log');
     expect(log.map((slot) => slot.column)).toEqual([2, 3]);
     expect(log.map((slot) => slot.label)).toEqual(['log from compile', null]);
-    const wire = layout.wires.find((found) => found.target === 'report:log');
+    const wire = layout.wires.find((found) => found.target === 'outputs:log');
     expect(wire?.points).toHaveLength(2 + 2 * 2);
   });
 
@@ -296,13 +295,14 @@ steps:
   });
 
   it('colours the columns 1 to 5 and back, and a wire by the column it leaves', () => {
-    expect(Array.from({ length: 12 }, (_, column) => colourOf(column))).toEqual([
-      0, 1, 2, 3, 4, 3, 2, 1, 0, 1, 2, 3,
-    ]);
+    const pingpong = [0, 1, 2, 3, 4, 3, 2, 1];
     const layout = laid(CLASSIC);
+    for (const box of layout.boxes) {
+      expect(box.colour).toBe(pingpong[box.column % pingpong.length]);
+    }
     for (const wire of layout.wires) {
       const source = layout.boxes.find((box) => box.key === wire.from.box);
-      expect(wire.colour).toBe(colourOf(source?.column ?? -1));
+      expect(wire.colour).toBe(source?.colour);
     }
   });
 

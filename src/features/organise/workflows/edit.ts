@@ -19,7 +19,7 @@ import {
   readWorkflow,
   refText,
   type Ref,
-  type ReportEntry,
+  type OutputEntry,
   type Workflow,
 } from './model';
 import type { PrimitiveInfo } from './primitives';
@@ -369,7 +369,7 @@ export type EntryFields = {
  * the primitive's declaration is not known.
  */
 export function entryFields(
-  entry: ReportEntry,
+  entry: OutputEntry,
   type: string | null,
   changed: Partial<EntryFields> & { from: Ref },
 ): EntryFields {

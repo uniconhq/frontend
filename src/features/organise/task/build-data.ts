@@ -142,12 +142,12 @@ export function newestOf(versions: readonly string[]): string | null {
   return best;
 }
 
-/** Folder names in natural order, `2` before `10`, as the format orders tests. */
+/** Names in natural order, `2` before `10`. */
 export function naturally(a: string, b: string): number {
   return a.localeCompare(b, undefined, { numeric: true });
 }
 
-/** The last part of a path: `tests/small/3` is `3`. */
+/** The last part of a path: `parts/small/3.in` is `3.in`. */
 export function lastPart(path: string): string {
   return path.slice(path.lastIndexOf('/') + 1);
 }

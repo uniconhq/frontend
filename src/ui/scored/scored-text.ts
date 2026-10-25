@@ -6,12 +6,6 @@ export function submissionsWords(count: number): string {
 }
 
 /**
- * Why a submission past the task's limit was not graded (#445), said to the
- * entrant ("you") or of them ("the entrant"): it was graded again after a
- * delay, when they already had as many submissions with a result as the
- * task takes.
- */
-/**
  * How a run names the rows it came from: each tuple's title, joined with
  * " · ", and a tuple with none by its key. A number is "seed 2"; a file is
  * its name.
@@ -50,6 +44,12 @@ function keyText(name: string, value: unknown): string {
   return name;
 }
 
+/**
+ * Why a submission past the task's limit was not graded (#445), said to the
+ * entrant ("you") or of them ("the entrant"): it was graded again after a
+ * delay, when they already had as many submissions with a result as the
+ * task takes.
+ */
 export function overLimitSentence(who: string, limit: number | null): string {
   const most = limit === null ? 'submissions' : submissionsWords(limit);
   return `Not graded: ${who} had reached the limit of ${most} for this task.`;

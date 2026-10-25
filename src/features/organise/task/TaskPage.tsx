@@ -79,7 +79,7 @@ function useOpenedCard() {
 /**
  * A task's page for its organisers: its name and where it stands; then the
  * cards that build it, in the order one decides the next (its workflow, its
- * inputs, its tests and scoring, which share one save bar, and its
+ * inputs, its runs, scoring and checks, which share one save bar, and its
  * statement, which saves on its own); then a card for each section that runs
  * it. Saving is publishing: a save without problems publishes the task.
  */

@@ -246,7 +246,7 @@ const noThreads = [
   http.get('/api/v1/orgs/:org/clarifications', () => HttpResponse.json([])),
 ];
 
-/** A contest with no boards, so no task takes marks, until a test gives some. */
+/** A contest with no leaderboards, so no task takes marks, until a test gives some. */
 const noBoards = [
   http.get('/api/v1/public/contests/:org/:contest/leaderboards', () =>
     HttpResponse.json([]),

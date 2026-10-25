@@ -602,7 +602,8 @@ function Unread({
 
 /**
  * The task's build cards, once its settings and its workflow's form are
- * read: Workflow, Inputs, Runs and Submissions, and their one save bar.
+ * read: Workflow, Inputs, Runs, Scoring, Checks and Submissions, and their
+ * one save bar; Scoring and Checks only once a saved workflow reads.
  * Settings that are an upload show as one; settings that do not read say why.
  */
 export function TaskBuild({

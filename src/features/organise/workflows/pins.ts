@@ -76,9 +76,9 @@ export function placed(problems: DefinitionProblem[], workflow: Workflow): Place
       };
     if (
       pin.kind === 'entry' &&
-      workflow.report.some((entry) => entry.name === pin.name)
+      workflow.outputs.some((entry) => entry.name === pin.name)
     )
-      return { problem, where: `Outputs, ${pin.name}`, opens: { kind: 'report' } };
+      return { problem, where: `Outputs, ${pin.name}`, opens: { kind: 'outputs' } };
     const head = /^[^.[]*/.exec(problem.path)?.[0] ?? '';
     return { problem, where: WHOLE[head] ?? problem.path, opens: null };
   });

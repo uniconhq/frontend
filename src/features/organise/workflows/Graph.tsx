@@ -78,7 +78,7 @@ type Side = 'left' | 'right';
 /** What a port's row shows. */
 type RowView = {
   port: string;
-  /** What the row reads as: a report entry by its title, its key only where it has none (M58). */
+  /** What the row reads as: an output by its title, its key only where it has none (M58). */
   name: string;
   side: Side;
   /** How far down its box the row stands. */
@@ -90,7 +90,7 @@ type RowView = {
   offered: boolean;
   refused: string | null;
   title: string | undefined;
-  /** The report's row for an entry not made yet, which a wire is dropped on. */
+  /** The outputs' row for one not made yet, which a wire is dropped on. */
   isNew: boolean;
   /** What the port's menu is called, or null for a port with none. */
   label: string | null;
@@ -229,7 +229,7 @@ function rowView(
       ? (pinned.ports.get(`${String(box.step)}.${port}`) ?? [])
       : box.kind === 'inputs'
         ? (pinned.inputs.get(port) ?? [])
-        : box.kind === 'report'
+        : box.kind === 'outputs'
           ? (pinned.entries.get(port) ?? [])
           : [];
   const noticed =
@@ -240,8 +240,8 @@ function rowView(
       ? workflow.inputs.find((found) => found.id === port)
       : undefined;
   const entry =
-    box.kind === 'report'
-      ? workflow.report.find((found) => found.name === port)
+    box.kind === 'outputs'
+      ? workflow.outputs.find((found) => found.name === port)
       : undefined;
   const step = box.step !== null ? workflow.steps[box.step] : undefined;
   const boxed = step !== undefined ? seen.workflowBoxes.get(step.use) : undefined;
@@ -255,7 +255,7 @@ function rowView(
     ...(entry !== undefined ? entryMarks(entry) : []),
   ];
   const said = [type, ...marks, value].filter((part) => part !== null).join(' · ');
-  const isNew = box.kind === 'report' && port === '+';
+  const isNew = box.kind === 'outputs' && port === '+';
   const output = box.kind === 'step' && side === 'right';
   return {
     port,
@@ -285,7 +285,7 @@ function boxData(seen: Seen, box: Box): BoxData {
   const step = box.step !== null ? workflow.steps[box.step] : undefined;
   const primitive = step !== undefined ? declared(seen.primitives, step.use) : null;
   const name = boxName(box, workflow);
-  const left = box.kind === 'report' ? [...box.left, '+'] : box.left;
+  const left = box.kind === 'outputs' ? [...box.left, '+'] : box.left;
   return {
     key: box.key,
     kind: box.kind,
@@ -314,7 +314,9 @@ function boxData(seen: Seen, box: Box): BoxData {
             kind: 'group',
             name,
             detail:
-              box.kind === 'report' ? 'What each run gives' : readersWords(box.readers),
+              box.kind === 'outputs'
+                ? 'What each run gives'
+                : readersWords(box.readers),
           },
     rows: [
       ...left.map((port, row) => rowView(seen, box, primitive, port, row, 'left')),
@@ -389,7 +391,7 @@ const PortRow = memo(function PortRow({ box, row }: { box: string; row: RowView 
       />
       {row.isNew ? (
         <span className={classes.drop}>
-          {actions.readOnly ? '' : 'Drop an output here to report it'}
+          {actions.readOnly ? '' : 'Drop a step’s output here to make it an output'}
         </span>
       ) : (
         <>

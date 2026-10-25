@@ -33,7 +33,7 @@ import {
   wholeRef,
   refText,
   type InputDecl,
-  type ReportEntry,
+  type OutputEntry,
   type Workflow,
 } from './model';
 import type { Pinned } from './pins';
@@ -42,8 +42,8 @@ import {
   mayBeOptional,
   newProblem,
   outputType,
-  reportable,
-  reportRefusal,
+  outputSources,
+  outputRefusal,
   valueRefusal,
   wireRefusal,
 } from './rules';
@@ -69,8 +69,12 @@ import classes from './workflows.module.css';
 type Change = (next: string) => void;
 
 const HANDLE = /^[a-z0-9][a-z0-9_-]{0,39}$/;
-const REPORT_NAME = /^[a-z][a-z0-9_]*$/;
-const RESERVED = ['outcome', 'points', 'penalty'];
+const OUTPUT_NAME = /^[a-z][a-z0-9_]*$/;
+/**
+ * Names Unicon uses itself, as the forge refuses them: what it gives every
+ * run, its verdict and `passed`, and the older names it still keeps.
+ */
+const RESERVED = ['verdict', 'passed', 'outcome', 'points', 'penalty'];
 const SCALARS = ['text', 'number', 'boolean', 'enum'];
 
 /** Why `name` cannot be an id among `taken`, or null when it can. */
@@ -300,7 +304,7 @@ function PortValue({
 
 /**
  * What the author never acts on, said once in plain words for whoever wants
- * it: the primitive, how it runs many runs, what result it reports, what it
+ * it: the primitive, how it runs many runs, the verdicts it gives, what it
  * keeps secret, and what it gets each time it runs and whose limits those
  * are (M56).
  */
@@ -330,11 +334,11 @@ function Details({
           </li>
         )}
         {primitive.network && <li>It can reach the network.</li>}
-        {typeof outcome === 'string' && <li>Result it reports: {outcome}</li>}
+        {typeof outcome === 'string' && <li>Verdict it gives: {outcome}</li>}
         {Array.isArray(outcome) && (
           <li>
-            Result it reports, one of:
-            <ul className={classes.detailList} aria-label="Results it reports">
+            Verdict it gives, one of:
+            <ul className={classes.detailList} aria-label="Verdicts it gives">
               {outcome.map((line) => (
                 <li key={line}>{line}</li>
               ))}
@@ -782,7 +786,7 @@ function EntryRow({
   text: string;
   workflow: Workflow;
   primitives: Map<string, PrimitiveInfo>;
-  entry: ReportEntry;
+  entry: OutputEntry;
   pinned: Pinned;
   change: Change;
 }) {
@@ -790,7 +794,7 @@ function EntryRow({
   const from = entry.from;
   const type = outputType(workflow, primitives, from);
   const isNumber = type === 'number';
-  const sources = reportable(workflow, primitives);
+  const sources = outputSources(workflow, primitives);
   const write = (next: Partial<EntryFields>) => {
     const reads = next.from ?? from;
     if (reads === null) return;
@@ -810,14 +814,14 @@ function EntryRow({
       <CommitField
         label="Name"
         value={entry.name}
-        description="Tasks and leaderboards pick it by this name."
+        description="A task reads it by this name, as a column of its runs."
         apply={(name) => {
-          if (!REPORT_NAME.test(name))
-            return "A reported value's name may use only lower case letters, digits and underscores (_), starting with a letter.";
+          if (!OUTPUT_NAME.test(name))
+            return "An output's name may use only lower case letters, digits and underscores (_), starting with a letter.";
           if (RESERVED.includes(name))
-            return `${name} is a name Unicon uses itself, for what a leaderboard ranks. Report this value under another name.`;
+            return `${name} is a name Unicon uses itself, for what it gives every run. Give this output another name.`;
           if (
-            workflow.report.some(
+            workflow.outputs.some(
               (other) => other.name === name && other.name !== entry.name,
             )
           )
@@ -835,7 +839,7 @@ function EntryRow({
         onChange={(chosen) => {
           const ref = sources.find((found) => refLabel(found) === chosen);
           if (ref === undefined) return;
-          const refused = reportRefusal(workflow, primitives, ref);
+          const refused = outputRefusal(workflow, primitives, ref);
           setRefused(refused);
           if (refused === null) write({ from: ref });
         }}
@@ -887,7 +891,7 @@ function EntryRow({
   );
 }
 
-export function ReportPanel({
+export function OutputsPanel({
   text,
   workflow,
   primitives,
@@ -900,16 +904,16 @@ export function ReportPanel({
   pinned: Pinned;
   change: Change;
 }) {
-  const sources = reportable(workflow, primitives);
+  const sources = outputSources(workflow, primitives);
   const [chosen, setChosen] = useState('');
   return (
     <section className={classes.panel} aria-label="Outputs">
       <BodyText size="sm" tone="secondary">
-        What each grading reports, such as the time a program took. Organisers see it
-        with every grading, and a leaderboard can rank by a number here.
+        What each run gives, such as the time a program took. A task reads each as a
+        column of its runs, and a workflow that uses this one as a box wires them on.
       </BodyText>
       <ul className={classes.list}>
-        {workflow.report.map((entry) => (
+        {workflow.outputs.map((entry) => (
           <EntryRow
             key={entry.name}
             text={text}
@@ -924,7 +928,7 @@ export function ReportPanel({
       {sources.length > 0 && (
         <div className={classes.add}>
           <Select
-            label="Report an output"
+            label="A step’s output to add"
             value={chosen}
             placeholder="Choose an output"
             options={sources.map((ref) => ({
@@ -942,7 +946,7 @@ export function ReportPanel({
                 if (ref === undefined) return;
                 const name = freeName(
                   ref.output,
-                  workflow.report.map((entry) => entry.name),
+                  workflow.outputs.map((entry) => entry.name),
                   '_',
                 );
                 change(setEntry(text, name, { from: ref }));
