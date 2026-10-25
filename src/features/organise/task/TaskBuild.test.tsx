@@ -1516,6 +1516,27 @@ describe('scoring, checks and what a save answers', { timeout: 60_000 }, () => {
     expect(JSON.stringify(file)).not.toMatch(/extra|big|gone|samples/);
   });
 
+  it('lists a shown folder that holds nothing yet as a folder, not as a part to take out', async () => {
+    taskBackend({
+      content: `${ISLANDS}scoring:
+  values:
+    total: {block: sum, over: {runs: all}, of: {run: [all, passed]}}
+  show:
+    now: [total, public/]
+`,
+      form: runForm('unicon/classic@v3', [
+        declared('code', 'file'),
+        declared('input', 'file'),
+      ]),
+    });
+    await openTask();
+    const scoring = await screen.findByRole('region', { name: 'Scoring' });
+    const folder = await within(scoring).findByRole('row', { name: /public\// });
+    expect(folder).not.toHaveTextContent('Not a part of this task');
+    expect(folder).toHaveTextContent('A folder, empty for now');
+    expect(within(scoring).queryByText(/Not a part of this task/)).toBeNull();
+  });
+
   it('moves a renamed group\u2019s when once its name is done, past a value\u2019s name typed on the way', async () => {
     const { sent } = taskBackend({
       content: `${ISLANDS}scoring:

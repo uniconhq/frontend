@@ -805,6 +805,16 @@ function ResultParts({
       what: 'A file, to download',
       saved: savedShow[file] ?? 'never',
     })),
+    // A listed folder may be empty (open 73), as the starter's `public/` is
+    // before it holds a picture; the tree has no entry for it, and the forge
+    // takes it.
+    ...Object.keys(values.show)
+      .filter((name) => name.endsWith('/') && !files.includes(name))
+      .map((name) => ({
+        name,
+        what: 'A folder, empty for now',
+        saved: savedShow[name] ?? 'never',
+      })),
   ];
   // A name the file shows that is no part of the task, such as a value since
   // removed: the forge refuses it, so it is listed to take out.
