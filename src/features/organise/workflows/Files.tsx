@@ -55,7 +55,11 @@ export function WorkflowFiles({
             .join('/');
         const before = staged.find((change) => change.path === path);
         const token =
-          before?.token ?? replacing?.token ?? (await tokenNow(place, path));
+          before !== undefined
+            ? before.token
+            : replacing !== undefined
+              ? replacing.token
+              : await tokenNow(place, path);
         const id = await sendToTask(place, file, path, setState);
         const at = staged.findIndex((change) => change.path === path);
         const change: SaveChange = {

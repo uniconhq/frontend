@@ -220,4 +220,60 @@ describe('the workflow files', () => {
     ).toBeInTheDocument();
     expect(barButton('Save')).toBeEnabled();
   });
+  it('keeps a new file token when replacing its pending upload', async () => {
+    const backend = workflowBackend(CLASSIC);
+    let reads = 0;
+    server.use(signedIn, ...backend.handlers);
+    server.use(
+      http.get(`${WORKFLOW_API}/files/new.py`, () => {
+        reads += 1;
+        return reads === 1
+          ? problem(404, 'not_found')
+          : HttpResponse.json({ token: 'someone-elses-file' });
+      }),
+      http.post(`${WORKFLOW_API}/uploads`, () =>
+        HttpResponse.json({
+          id: 'new-upload',
+          url: null,
+          ready: true,
+          expires_at: '2026-10-27T12:00:00Z',
+        }),
+      ),
+      http.post(`${WORKFLOW_API}/uploads/new-upload/complete`, () =>
+        HttpResponse.json({ status: 'verified' }),
+      ),
+    );
+    const user = userEvent.setup();
+    renderApp(EDITOR_PAGE);
+    const files = await screen.findByRole('region', { name: 'Files' });
+    for (const content of ['first', 'second']) {
+      await user.upload(
+        within(files).getByLabelText('Add files'),
+        new File([content], 'new.py'),
+      );
+      await user.click(within(files).getByRole('button', { name: 'Upload files' }));
+      await waitFor(() =>
+        expect(
+          within(files).getByRole('button', { name: 'Upload files' }),
+        ).toBeDisabled(),
+      );
+      await within(files).findByText('new.py: uploaded, waiting for Save');
+    }
+    await user.click(barButton('Save'));
+    await waitFor(() => expect(backend.state.saves).toHaveLength(1));
+    expect(reads).toBe(1);
+    expect(backend.state.saves[0]).toEqual({
+      content: CLASSIC,
+      token: 'token-1',
+      changes: [
+        {
+          path: 'new.py',
+          token: null,
+          encoding: 'utf-8',
+          remove: false,
+          upload: 'new-upload',
+        },
+      ],
+    });
+  });
 });
