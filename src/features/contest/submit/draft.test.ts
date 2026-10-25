@@ -332,4 +332,71 @@ describe('what a submit sends', () => {
       tree: { uploads: [], parts: { '1': { uploads: ['a.c', 'b.h'] } } },
     });
   });
+
+  it('counts a true-or-false part always, and a text, number, file or choice when it is given', () => {
+    const parts = [
+      { title: 'Small grid', max_size: MB },
+      { title: 'Big grid', max_size: MB },
+    ];
+    const sent = submittedInputs(
+      [
+        inputField({ id: 'flag', type: 'boolean', parts }),
+        inputField({ id: 'note', type: 'text', parts }),
+        inputField({ id: 'seed', type: 'number', parts }),
+        inputField({ id: 'file', type: 'file', parts }),
+        inputField({ id: 'choice', type: 'enum', options: ['python'], parts }),
+      ],
+      {
+        flag: {
+          kind: 'parts',
+          parts: [
+            { kind: 'flag', checked: false },
+            { kind: 'flag', checked: true },
+          ],
+        },
+        note: {
+          kind: 'parts',
+          parts: [
+            { kind: 'text', text: ' ' },
+            { kind: 'text', text: '' },
+          ],
+        },
+        seed: {
+          kind: 'parts',
+          parts: [
+            { kind: 'text', text: ' 1 ' },
+            { kind: 'text', text: '  ' },
+          ],
+        },
+        file: {
+          kind: 'parts',
+          parts: [
+            { kind: 'files', files: [file('a.txt', 1)] },
+            { kind: 'files', files: [] },
+          ],
+        },
+        choice: {
+          kind: 'parts',
+          parts: [
+            { kind: 'choice', option: 'python' },
+            { kind: 'choice', option: '' },
+          ],
+        },
+      },
+      () => 'up',
+    );
+    expect(sent).toEqual({
+      flag: {
+        uploads: [],
+        parts: {
+          '1': { uploads: [], value: false },
+          '2': { uploads: [], value: true },
+        },
+      },
+      note: { uploads: [], parts: { '1': { uploads: [], value: ' ' } } },
+      seed: { uploads: [], parts: { '1': { uploads: [], value: '1' } } },
+      file: { uploads: [], parts: { '1': { uploads: ['up'] } } },
+      choice: { uploads: [], parts: { '1': { uploads: [], value: 'python' } } },
+    });
+  });
 });
