@@ -1,4 +1,5 @@
 import type { components } from '@/api/schema';
+import { formatExact } from '@/lib/exact';
 import { formatDateTime } from '@/lib/time';
 import { BodyText } from '@/ui/BodyText';
 import { PageLink } from '@/ui/PageLink';
@@ -23,8 +24,8 @@ export function LeaderboardTable({
   staff = false,
 }: {
   board: Leaderboard;
-  /** The address of one counted submission, when the caller can open it. */
-  submissionTo?: (task: string, number: number) => string;
+  /** The address of one counted submission of a row's entrant, when the caller can open it. */
+  submissionTo?: (task: string, number: number, entrant: string) => string;
   /** Bounds are staff only. A self-reported mark is on the header for everyone. */
   staff?: boolean;
 }) {
@@ -68,10 +69,12 @@ export function LeaderboardTable({
                     />
                     <CountedLinks
                       counted={cell?.counted ?? null}
+                      entrant={row.row.entrant}
                       submissionTo={submissionTo}
                     />
                     <CountedLinks
                       counted={cell?.waiting ?? null}
+                      entrant={row.row.entrant}
                       submissionTo={submissionTo}
                       waiting
                     />
@@ -94,8 +97,8 @@ export function LeaderboardTable({
 function HeaderNotes({ header, staff }: { header: Header; staff: boolean }) {
   const bounds = staff
     ? [
-        header.at_least === null ? null : `at least ${header.at_least}`,
-        header.at_most === null ? null : `at most ${header.at_most}`,
+        header.at_least === null ? null : `at least ${formatExact(header.at_least)}`,
+        header.at_most === null ? null : `at most ${formatExact(header.at_most)}`,
       ].filter((item) => item !== null)
     : [];
   return (
@@ -110,11 +113,13 @@ function HeaderNotes({ header, staff }: { header: Header; staff: boolean }) {
 
 function CountedLinks({
   counted,
+  entrant,
   submissionTo,
   waiting = false,
 }: {
   counted: Counted[] | null;
-  submissionTo?: (task: string, number: number) => string;
+  entrant: string;
+  submissionTo?: (task: string, number: number, entrant: string) => string;
   waiting?: boolean;
 }) {
   if (counted === null || counted.length === 0 || submissionTo === undefined)
@@ -124,7 +129,7 @@ function CountedLinks({
       {counted.map((item) => (
         <PageLink
           key={`${item.task}:${String(item.number)}`}
-          to={submissionTo(item.task, item.number)}
+          to={submissionTo(item.task, item.number, entrant)}
         >
           {waiting
             ? `Submission ${String(item.number)}, being checked`

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { blankBoard, boardScope, givenValues } from '../leaderboards/model';
 import { specCatalogue } from './catalogue';
 import {
   checkFormula,
@@ -38,14 +39,31 @@ const task: FormulaScope = {
   fields: { passed: 'number', time_ms: 'number', verdict: 'text' },
 };
 
-const leaderboard: FormulaScope = {
-  where: 'leaderboard',
-  names: ['islands_last', 'islands_last.total', 'gradebook.total'],
-  each: ['islands.total'],
-  sets: ['islands'],
-  boards: ['gradebook'],
-  fields: { total: 'number', first_failed: 'text', attempt: 'number' },
-};
+/**
+ * A leaderboard's scope as the leaderboards page builds it: its column
+ * islands_last beside the gradebook, over the task islands, whose settings
+ * give total and the text first_failed.
+ */
+const ISLANDS = `name: Islands
+scoring:
+  values:
+    total: {block: sum, over: {runs: all}, of: {run: [all, passed]}}
+    first_failed:
+      block: otherwise
+      of: [{run: [{block: first, from: {runs: all}}, verdict]}, {text: none}]
+`;
+const leaderboard: FormulaScope = boardScope(
+  {
+    ...blankBoard([]),
+    key: 'board',
+    columns: [{ key: 'c1', name: 'islands_last', line: null, tree: '1' }],
+  },
+  [{ ...blankBoard([]), key: 'gradebook' }],
+  ['islands'],
+  { islands: givenValues(ISLANDS) },
+  catalogue.leaderboard_facts,
+  [],
+);
 
 function parsed(text: string): Ast {
   const result = parseFormula(text);
@@ -74,7 +92,9 @@ describe('parseFormula', () => {
     'otherwise(first(all, all.passed == 0).verdict, "none")',
     'highest(sample_tests, sample_tests.time_ms).time_ms + 1',
     'entered(at_least: 0, at_most: 1)',
-    'sum(sample_tests.passed, weights: {passed: 2})',
+    'sum(sample_tests.passed, weights: {input: {"tests/7.in": 3}})',
+    'count(all, weights: {seed: {1: 2}})',
+    'exec("programs/mean/", python, all)',
     'best_each(islands, total, {st1: desc, st2: desc})',
   ])('round-trips %s to the same tree', (text) => {
     const scope = text.startsWith('best_each') ? leaderboard : task;
@@ -95,11 +115,41 @@ describe('parseFormula', () => {
     ).toBe('sum(sample_tests.passed, missing: skip)');
     expect(
       printFormula(
-        tree('sum(sample_tests.passed, weights: {passed: 2})'),
+        tree('sum(sample_tests.passed, weights: {input: {"tests/7.in": 3}})'),
         catalogue,
         'task',
       ),
-    ).toBe('sum(sample_tests.passed, weights: {passed: 2})');
+    ).toBe('sum(sample_tests.passed, weights: {input: {"tests/7.in": 3}})');
+  });
+
+  it('reads an exec block’s program and language as plain text', () => {
+    expect(tree('exec("programs/mean/", python, all)')).toEqual({
+      block: 'exec',
+      program: 'programs/mean/',
+      language: 'python',
+      over: { runs: 'all' },
+    });
+    expect(messages('exec("programs/mean.py", cobol, all)', task)).toEqual([
+      'Give the folder of the task that holds the program and its program.yaml, such as programs/mean/.',
+      "Give the program's language, one of c, cpp, java, python, ipynb.",
+    ]);
+  });
+
+  it('prints no needless brackets, a minus as written, and a bound by name', () => {
+    const lines = [
+      'st1 - st2 - 1',
+      'st1 - (st2 - 1)',
+      'st1 / st2 * 2',
+      'st1 * -st2',
+      '-(st1 + st2)',
+      '(st1 < st2) == 1',
+      'entered(at_least: 0, at_most: 1)',
+      'sum_best(k: 2, islands, gradebook.points)',
+    ];
+    for (const line of lines) {
+      const scope = line.startsWith('sum_best') ? leaderboard : task;
+      expect(printFormula(tree(line, scope), catalogue, scope.where)).toBe(line);
+    }
   });
 
   it('keeps a parenthesised sum nested, and a bare chain flat', () => {
@@ -141,13 +191,26 @@ describe('checkFormula', () => {
     expect(
       messages('otherwise(first(all, all.passed == 0).verdict, "none")', task),
     ).toEqual([]);
+    expect(messages('count(islands, islands.total == 0)', leaderboard)).toEqual([]);
+  });
+
+  it('reads max and min over a group or a task, not as max of numbers', () => {
+    expect(messages('max(sample_tests, sample_tests.time_ms)', task)).toEqual([]);
+    expect(messages('min(islands, islands.total)', leaderboard)).toEqual([]);
+    expect(messages('max(st1, sample_tests)', task)).toEqual([
+      'a group, not a number: count its runs, or fold one of its columns',
+    ]);
+  });
+
+  it('reads on a leaderboard the values a task gives and the leaderboard facts, not its runs', () => {
+    expect(messages('sum(islands, islands.total)', leaderboard)).toEqual([]);
+    expect(messages('max(islands, islands.seconds_late)', leaderboard)).toEqual([]);
+    expect(messages('sum(islands, islands.verdict)', leaderboard)).toEqual([
+      'not a value of a submission',
+    ]);
     expect(
-      messages('count(islands, islands.total == 0)', {
-        ...leaderboard,
-        each: ['islands.total'],
-        fields: { total: 'number' },
-      }),
-    ).toEqual([]);
+      checkFormula(parsed('latest(islands).first_failed'), leaderboard, catalogue).kind,
+    ).toBe('text');
   });
 
   it('names an unknown name and a per-run name outside a fold', () => {

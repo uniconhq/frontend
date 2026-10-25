@@ -94,7 +94,7 @@ describe('a run task’s result', () => {
     expect(screen.getByRole('region', { name: 'Group samples' })).toHaveTextContent(
       'Test 1',
     );
-    expect(screen.getByText('Big grid · seed 2')).toBeVisible();
+    expect(screen.getByText('big.txt · seed 2 · Big grid')).toBeVisible();
     expect(screen.getByText('NOT GIVEN')).toBeVisible();
     expect(screen.getByText('score').closest('div')).toHaveTextContent('10');
     expect(screen.queryByText(/penal/)).toBeNull();

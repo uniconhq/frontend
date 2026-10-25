@@ -18,6 +18,7 @@ import {
   takesPaths,
   type Draft,
   type Entry,
+  type OneEntry,
 } from './draft';
 import type { Phase } from './use-submit';
 import shared from '../contest.module.css';
@@ -114,8 +115,8 @@ function numberHint(input: InputField): string | undefined {
 }
 
 /**
- * One input's field: a drop zone, a choice, or a value. An enum with only
- * one option has nothing to choose, so it is a line saying which.
+ * One input's field: a drop zone, a choice, or a value; for an input given
+ * once per row, one such field for each part, each by its row's title.
  */
 function Field({
   input,
@@ -130,39 +131,76 @@ function Field({
   busy: boolean;
   sentOf: (file: File) => number | null;
 }) {
-  const { label } = input;
+  if (entry.kind !== 'parts') {
+    return (
+      <OneField
+        input={input}
+        label={input.label}
+        sizeHint={fileHint(input)}
+        entry={entry}
+        onChange={onChange}
+        busy={busy}
+        sentOf={sentOf}
+      />
+    );
+  }
+  const parts = partsOf(input) ?? [];
+  return (
+    <>
+      {parts.map((part, index) => {
+        const one = entry.parts[index];
+        if (one === undefined) return null;
+        const title = partTitle(part.title, index);
+        return (
+          <OneField
+            key={`${String(index)}:${title}`}
+            input={input}
+            label={title}
+            sizeHint={`At most ${formatLimit(part.max_size)}.`}
+            entry={one}
+            onChange={(next) =>
+              onChange({
+                kind: 'parts',
+                parts: entry.parts.map((was, at) => (at === index ? next : was)),
+              })
+            }
+            busy={busy}
+            sentOf={sentOf}
+          />
+        );
+      })}
+    </>
+  );
+}
+
+/**
+ * One field, by `label`: a drop zone, a choice, or a value. An enum with
+ * only one option has nothing to choose, so it is a line saying which.
+ */
+function OneField({
+  input,
+  label,
+  sizeHint,
+  entry,
+  onChange,
+  busy,
+  sentOf,
+}: {
+  input: InputField;
+  label: string;
+  /** How large its files may be, for a drop zone. */
+  sizeHint: string;
+  entry: OneEntry;
+  onChange: (entry: OneEntry) => void;
+  busy: boolean;
+  sentOf: (file: File) => number | null;
+}) {
   switch (entry.kind) {
-    case 'parts': {
-      const parts = partsOf(input) ?? [];
-      return (
-        <>
-          {parts.map((part, index) => {
-            const file = entry.files[index] ?? null;
-            const title = partTitle(part.title, index);
-            return (
-              <FileDrop
-                key={`${String(index)}:${title}`}
-                label={title}
-                description={`At most ${formatLimit(part.max_size)}.`}
-                files={file === null ? [] : [file]}
-                onChange={(files) => {
-                  const next = parts.map((_, at) => entry.files[at] ?? null);
-                  next[index] = files[0] ?? null;
-                  onChange({ kind: 'parts', files: next });
-                }}
-                progressOf={sentOf}
-                disabled={busy}
-              />
-            );
-          })}
-        </>
-      );
-    }
     case 'files':
       return (
         <FileDrop
           label={label}
-          description={fileHint(input)}
+          description={sizeHint}
           folder={takesPaths(input)}
           pathOf={(file) => pathOf(input, file)}
           files={entry.files}

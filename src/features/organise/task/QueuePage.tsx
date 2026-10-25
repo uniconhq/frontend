@@ -171,6 +171,9 @@ function Submission({
   );
 }
 
+/** A mark as the forge takes one: a plain decimal, such as `7.5`. Its bounds the forge checks. */
+const DECIMAL = /^-?\d+(\.\d+)?$/;
+
 function MarkBox({
   org,
   contest,
@@ -192,6 +195,8 @@ function MarkBox({
 }) {
   const queryClient = useQueryClient();
   const [draft, setDraft] = useState(mark ?? '');
+  // The mark as last kept, so a blur that changed nothing posts nothing.
+  const [kept, setKept] = useState(mark ?? '');
   const [saved, setSaved] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const enter = $api.useMutation('post', ENTER);
@@ -208,21 +213,28 @@ function MarkBox({
       value={draft}
       inputMode="decimal"
       error={error ?? undefined}
-      description={saved === null ? undefined : `Saved ${saved}`}
+      description={saved === null ? undefined : `Saved by you ${saved}`}
       onChange={(next) => {
         setDraft(next);
         setError(null);
       }}
       onCommit={() => {
+        const written = draft.trim();
+        if (written === kept) return;
+        if (written !== '' && !DECIMAL.test(written)) {
+          setError('Write the mark as a plain decimal, such as 7.5.');
+          return;
+        }
         enter.mutate(
           {
             params: { path: { org, contest, task, number }, query: { entrant } },
-            body: { value, mark: draft },
+            body: { value, mark: written },
           },
           {
-            onSuccess: (kept) => {
-              setSaved(formatDateTime(new Date(kept.at)));
-              setDraft(kept.mark ?? '');
+            onSuccess: (entered) => {
+              setSaved(formatDateTime(new Date(entered.at)));
+              setDraft(entered.mark ?? '');
+              setKept(entered.mark ?? '');
               void queryClient.invalidateQueries({
                 queryKey: $api.queryOptions('get', QUEUE, {
                   params: { path: { org, contest, task } },

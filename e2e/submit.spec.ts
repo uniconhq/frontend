@@ -623,7 +623,6 @@ test('a row given in parts is one upload each, held to that part’s size', asyn
       uploads: [],
       parts: {
         '1': { uploads: ['00000000-0000-4000-8000-000000000001'] },
-        '2': { uploads: [] },
       },
     },
   });
@@ -671,8 +670,10 @@ test('samples show now, and the rest appears when the task reveals', async ({
   const detail = page.getByRole('region', { name: 'Submission 1' });
   await expect(detail.getByText('Small grid')).toBeVisible();
   await expect(detail.getByText('score')).toBeVisible();
-  await expect(detail.getByText('Big grid · seed 2')).toHaveCount(0);
-  await expect(detail.getByText('Big grid · seed 2')).toBeVisible({ timeout: 15_000 });
+  await expect(detail.getByText('big.txt · seed 2 · Big grid')).toHaveCount(0);
+  await expect(detail.getByText('big.txt · seed 2 · Big grid')).toBeVisible({
+    timeout: 15_000,
+  });
   await expect(detail.getByText('NOT GIVEN')).toBeVisible();
   await expect(detail.getByText('full')).toBeVisible();
 });

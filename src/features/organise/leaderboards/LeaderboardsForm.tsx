@@ -34,12 +34,11 @@ import {
   commit,
   hourBefore,
   lineOf,
-  outputNames,
+  givenValues,
   previewRows,
   problems,
   readLeaderboards,
   taskIds,
-  workflowRef,
   writeHold,
   writeLeaderboards,
   type BoardDraft,
@@ -48,6 +47,7 @@ import {
   type HoldDraft,
   type RowsKind,
   type ShowDraft,
+  type TaskGives,
   type SortDraft,
   type Who,
 } from './model';
@@ -62,7 +62,17 @@ const WAYS = [
   { value: 'asc', label: 'Lowest first' },
 ];
 
-function useOutputs(org: string, contest: string, tasks: readonly string[]): string[] {
+/**
+ * What each task gives a leaderboard, the values its settings name, read
+ * from each task's `task.yaml`; null until every one has been read, so no
+ * formula is called unknown meanwhile. A task whose settings cannot be read
+ * gives nothing here, and the forge says so at the save.
+ */
+function useTaskGives(
+  org: string,
+  contest: string,
+  tasks: readonly string[],
+): TaskGives | null {
   const files = useQueries({
     queries: tasks.map((task) => ({
       ...$api.queryOptions(
@@ -73,45 +83,19 @@ function useOutputs(org: string, contest: string, tasks: readonly string[]): str
       retry: false,
     })),
   });
-  const fileStamp = files.map((file) => file.data?.content ?? '').join('\0');
-  const refs = useMemo(() => {
-    const found = new Map<string, { owner: string; name: string; version: string }>();
-    for (const file of files) {
-      const content = file.data?.content;
-      if (content === undefined) continue;
-      const ref = workflowRef(content);
-      if (ref === null) continue;
-      found.set(`${ref.owner}/${ref.name}@${ref.version}`, ref);
-    }
-    return [...found.values()];
-    // `fileStamp` is the files. `files` is a new array every render.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fileStamp]);
-  const versions = useQueries({
-    queries: refs.map((ref) => ({
-      ...$api.queryOptions(
-        'get',
-        '/api/v1/workflows/{owner}/{name}/versions/{version}',
-        {
-          params: { path: ref },
-        },
-      ),
-      retry: false,
-    })),
-  });
-  const versionStamp = versions
-    .map((version) => version.data?.content ?? '')
-    .join('\0');
+  const pending = files.some((file) => file.isPending);
+  const stamp = files.map((file) => file.data?.content ?? '').join('\0');
   return useMemo(() => {
-    const names = new Set<string>();
-    for (const version of versions) {
-      const content = version.data?.content;
-      if (content !== undefined)
-        for (const name of outputNames(content)) names.add(name);
-    }
-    return [...names];
+    if (pending) return null;
+    return Object.fromEntries(
+      tasks.map((task, index) => {
+        const content = files[index]?.data?.content;
+        return [task, content === undefined ? [] : givenValues(content)];
+      }),
+    );
+    // `stamp` is the files. `files` is a new array every render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [versionStamp]);
+  }, [pending, stamp, tasks]);
 }
 
 function matches(field: string, path: string): boolean {
@@ -213,9 +197,10 @@ export function LeaderboardsForm({
   const [draft, setDraft] = useState(loaded);
   const [now, setNow] = useState(() => Date.now());
   const [tasks] = useState(() => taskIds(doc));
-  const outputs = useOutputs(org, contest, tasks);
+  const gives = useTaskGives(org, contest, tasks);
   const blocks = $api.useQuery('get', '/api/v1/blocks');
-  const catalogue = blocks.data ?? null;
+  // Formulas are read once the blocks and what every task gives are in.
+  const catalogue = gives === null ? null : (blocks.data ?? null);
   const entrants = $api.useQuery(
     'get',
     '/api/v1/orgs/{org}/contests/{contest}/organise/entrants',
@@ -225,18 +210,21 @@ export function LeaderboardsForm({
   const start = isRecord(root) ? root['start'] : undefined;
   const end = isRecord(root) ? root['end'] : undefined;
   const local = useMemo(
-    () => problems(draft, catalogue, tasks, outputs, now, start, end),
-    [catalogue, draft, end, now, outputs, start, tasks],
+    () => problems(draft, catalogue, tasks, gives ?? {}, now, start, end, loaded.hold),
+    [catalogue, draft, end, now, gives, start, tasks, loaded.hold],
   );
   const target = useFormulaTarget();
   useOpenedField(!loaded.legacy);
   const disabled = !manager || busy || asking;
   const save = () => {
-    if (catalogue === null) return;
+    if (catalogue === null || gives === null) return;
     const at = Date.now();
     if (at !== now) setNow(at);
-    if (problems(draft, catalogue, tasks, outputs, at, start, end).length > 0) return;
-    const next = commit(draft, catalogue, tasks, outputs);
+    if (
+      problems(draft, catalogue, tasks, gives, at, start, end, loaded.hold).length > 0
+    )
+      return;
+    const next = commit(draft, catalogue, tasks, gives);
     onSave((file) => {
       writeLeaderboards(file, loaded, next);
       writeHold(file, loaded, next);
@@ -283,7 +271,7 @@ export function LeaderboardsForm({
           board={board}
           boards={draft.boards}
           tasks={tasks}
-          outputs={outputs}
+          gives={gives ?? {}}
           catalogue={catalogue}
           entrants={entrants.data ?? []}
           local={local}
@@ -339,7 +327,7 @@ function BoardCard({
   board,
   boards,
   tasks,
-  outputs,
+  gives,
   catalogue,
   entrants,
   local,
@@ -357,7 +345,7 @@ function BoardCard({
   board: BoardDraft;
   boards: readonly BoardDraft[];
   tasks: readonly string[];
-  outputs: readonly string[];
+  gives: TaskGives;
   catalogue: Catalogue | null;
   entrants: { id: string; display_name: string }[];
   local: readonly FieldProblem[];
@@ -374,12 +362,14 @@ function BoardCard({
   onRemove: () => void;
 }) {
   const readings =
-    catalogue === null ? {} : boardReadings(board, boards, tasks, outputs, catalogue);
+    catalogue === null ? {} : boardReadings(board, boards, tasks, gives, catalogue);
   const texts = board.columns
     .filter((column) => readings[column.key]?.kind === 'text')
     .map((column) => column.name);
   const scope =
-    catalogue === null ? null : boardScope(board, boards, tasks, outputs, texts);
+    catalogue === null
+      ? null
+      : boardScope(board, boards, tasks, gives, catalogue.leaderboard_facts, texts);
   const names = board.columns
     .filter((column) => column.name !== '')
     .map((column) => ({ value: column.name, label: column.name }));

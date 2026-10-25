@@ -1,3 +1,4 @@
+import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { $api, queryView } from '@/api/query';
 import { isApiError } from '@/api/problem';
@@ -18,22 +19,27 @@ const HIDE = '/api/v1/orgs/{org}/contests/{contest}/tasks/{task}/results/hide';
 
 /**
  * Whether a run task's results are released, who released or took them
- * back, and the buttons that ask first.
+ * back, and the buttons that ask first. A release or a take-back reads the
+ * task again, so what is shown is always the task's own.
  */
 export function ResultsControls({ path, manager }: { path: Path; manager: boolean }) {
+  const queryClient = useQueryClient();
   const view = queryView($api.useQuery('get', TASK, { params: { path } }));
-  const [results, setResults] = useState<Results | null>(null);
   if (view.state === 'loading' || view.state === 'error') return null;
-  const found = view.data.results;
-  if (found === undefined) return null;
-  const shown = results ?? found;
+  const shown = view.data.results;
+  if (shown === undefined) return null;
+  const done = () => {
+    void queryClient.invalidateQueries({
+      queryKey: $api.queryOptions('get', TASK, { params: { path } }).queryKey,
+    });
+  };
   return (
     <div className={classes.stack}>
       <BodyText>
         {shown.released ? 'Results are released.' : 'Results are not released.'}
       </BodyText>
       <History history={shown.history} />
-      {manager && <Ask path={path} released={shown.released} onDone={setResults} />}
+      {manager && <Ask path={path} released={shown.released} onDone={done} />}
     </div>
   );
 }
@@ -60,7 +66,7 @@ function Ask({
 }: {
   path: Path;
   released: boolean;
-  onDone: (results: Results) => void;
+  onDone: () => void;
 }) {
   const release = $api.useMutation('post', RELEASE);
   const hide = $api.useMutation('post', HIDE);
@@ -73,9 +79,9 @@ function Ask({
     send.mutate(
       { params: { path }, body: { confirm } },
       {
-        onSuccess: (data) => {
+        onSuccess: () => {
           setAsking(null);
-          onDone(data);
+          onDone();
         },
         onError: (error) => {
           if (!confirm && isApiError(error) && error.code === 'confirmation_required') {

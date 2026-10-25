@@ -513,6 +513,8 @@ export function writeTask(
         unreadable,
       },
       (value) => value.tree,
+      (input, text) =>
+        typedValue(after.inputs.find((item) => item.id === input)?.type ?? null, text),
     );
   }
 }

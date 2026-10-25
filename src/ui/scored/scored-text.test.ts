@@ -2,10 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { overLimitSentence, submissionsWords, tupleLine } from './scored-text';
 
 describe('a run’s rows', () => {
-  it('joins titles, and names a row with none from its key', () => {
-    expect(tupleLine(['Big grid', null], { grid: 'big.txt', seed: 2 })).toBe(
-      'Big grid · seed 2',
-    );
+  it('shows the whole key, then the titles there are, never pairing them by place', () => {
+    // Two axes: the grid's title, and seeds with none. The key's columns
+    // come in name order, so its first is not the first axis's.
+    expect(
+      tupleLine(['Big grid', null], { answer: 'big.ans', grid: 'big.txt', seed: 2 }),
+    ).toBe('big.ans · big.txt · seed 2 · Big grid');
     expect(tupleLine(null, { route: 'hidden/route.txt', seed: 2 })).toBe(
       'route.txt · seed 2',
     );

@@ -48,8 +48,9 @@ function readText(where: Where, ask: TextAsk): Promise<string> {
  * and says the submission no longer counts against the task's limit: a cancel
  * with a sentence is the one the forge leaves out of the limit, so one
  * without (made before cancels carried one) says nothing about the limit. A
- * delayed one says its grading failed on Unicon's side, and nothing else;
- * one over the limit, that it was not graded and why (#445).
+ * delayed one says its grading failed on Unicon's side, then shows the runs
+ * it did give and its values, one reading a failed run "being checked"; one
+ * over the limit, that it was not graded and why (#445).
  */
 function Grading({
   grading,
@@ -65,6 +66,7 @@ function Grading({
           <VerdictBadge verdict="delayed" />
         </div>
         <BodyText>{DELAYED_SENTENCE}</BodyText>
+        <ScoredResult grading={grading} readText={readText} />
       </>
     );
   }

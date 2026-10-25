@@ -26,6 +26,7 @@ import { TASK_PALETTE, type GraphBox, type GraphWire, type Shape } from './graph
 import {
   FACTS,
   WHEN,
+  axisColumns,
   columnsOf,
   freshKey,
   inGroup,
@@ -38,6 +39,7 @@ import {
   sourcesOf,
   troublesOf,
   valueTree,
+  withLine,
   type Column,
   type RunRow,
   type ScoreGroup,
@@ -87,9 +89,16 @@ export function ScoringCard({
   const catalogue = blocks.data ?? null;
   const tree = useQuery({ ...treeQuery(place, ''), retry: false });
   const files = (tree.data ?? [])
-    .filter((entry) => entry.path !== 'task.yaml')
+    // The forge never serves task.yaml, nor the plans it writes itself.
+    .filter((entry) => entry.path !== 'task.yaml' && entry.path !== 'plans')
     .map((entry) => (entry.kind === 'directory' ? `${entry.path}/` : entry.path));
-  const columns = columnsOf(outputColumns(workflowText));
+  const outputs = useMemo(() => outputColumns(workflowText), [workflowText]);
+  const columns = useMemo(() => columnsOf(outputs), [outputs]);
+  // A formula also reads each input an axis fills, as a column of its run.
+  const readable = useMemo(
+    () => [...columns, ...axisColumns(values.axes, values.inputs)],
+    [columns, values.axes, values.inputs],
+  );
   const rows = runsOf(values.axes);
   const [chosen, setChosen] = useState<string | null>(null);
   // The when as read. A part shown now stays shown, even after the select moves.
@@ -102,8 +111,8 @@ export function ScoringCard({
     () =>
       catalogue === null || workflowRead !== 'ready'
         ? null
-        : scopeOf(values.scoreGroups, values.scoreValues, columns, catalogue),
-    [catalogue, columns, values.scoreGroups, values.scoreValues, workflowRead],
+        : scopeOf(values.scoreGroups, values.scoreValues, readable, catalogue),
+    [catalogue, readable, values.scoreGroups, values.scoreValues, workflowRead],
   );
   const readings = useMemo(() => {
     if (catalogue === null || scope === null) return {};
@@ -181,7 +190,7 @@ export function ScoringCard({
         )}
         {more > 0 && <BodyText>and {String(more)} more runs</BodyText>}
         <BodyText size="sm">
-          Every run also gives {columns.map((column) => column.name).join(', ')}. A
+          Every run also gives {readable.map((column) => column.name).join(', ')}. A
           value reads {FACTS.map((fact) => fact.name).join(', ')} too.
         </BodyText>
       </CardPart>
@@ -195,6 +204,22 @@ export function ScoringCard({
           troubles={troubles}
           disabled={disabled}
           onChange={setGroups}
+          onRename={(key, name) => {
+            const old = values.scoreGroups.find((group) => group.key === key)?.name;
+            onChange({
+              scoreGroups: values.scoreGroups.map((group) =>
+                group.key === key ? { ...group, name } : group,
+              ),
+              show: old === undefined ? values.show : movedShow(values.show, old, name),
+            });
+          }}
+          onRemove={(key) => {
+            const old = values.scoreGroups.find((group) => group.key === key)?.name;
+            onChange({
+              scoreGroups: values.scoreGroups.filter((group) => group.key !== key),
+              show: old === undefined ? values.show : withoutShow(values.show, old),
+            });
+          }}
           onAdd={() =>
             setGroups([
               ...values.scoreGroups,
@@ -257,6 +282,7 @@ export function ScoringCard({
         <ResultParts
           values={values}
           savedShow={savedShow}
+          outputs={outputs}
           files={files}
           graded={graded}
           disabled={disabled}
@@ -348,9 +374,12 @@ export function ScoringCard({
                   variant="secondary"
                   disabled={disabled}
                   onClick={() =>
-                    setValues(
-                      values.scoreValues.filter((item) => item.key !== value.key),
-                    )
+                    onChange({
+                      scoreValues: values.scoreValues.filter(
+                        (item) => item.key !== value.key,
+                      ),
+                      show: withoutShow(values.show, value.name),
+                    })
                   }
                 >
                   Remove
@@ -421,9 +450,7 @@ function editText(
   scope: FormulaScope,
 ): ScoreValue[] {
   return values.map((item) =>
-    item.key === key
-      ? { ...item, text, tree: valueTree({ ...item, text }, scope, catalogue) }
-      : item,
+    item.key === key ? withLine(item, text, scope, catalogue) : item,
   );
 }
 
@@ -452,6 +479,8 @@ function Groups({
   troubles,
   disabled,
   onChange,
+  onRename,
+  onRemove,
   onAdd,
 }: {
   rows: RunRow[];
@@ -459,6 +488,8 @@ function Groups({
   troubles: Map<string, string>;
   disabled: boolean;
   onChange: (groups: ScoreGroup[]) => void;
+  onRename: (key: string, name: string) => void;
+  onRemove: (key: string) => void;
   onAdd: () => void;
 }) {
   const [unpicked, setUnpicked] = useState<string | null>(null);
@@ -479,13 +510,7 @@ function Groups({
                       labelHidden
                       value={group.name}
                       disabled={disabled}
-                      onChange={(name) =>
-                        onChange(
-                          groups.map((item) =>
-                            item.key === group.key ? { ...item, name } : item,
-                          ),
-                        )
-                      }
+                      onChange={(name) => onRename(group.key, name)}
                     />
                   </FieldBox>
                 </th>
@@ -557,6 +582,21 @@ function Groups({
               : troubles.get(group.key)}
           </BodyText>
         ),
+      )}
+      {groups.length > 0 && (
+        <div className={classes.valueHead}>
+          {groups.map((group) => (
+            <Button
+              key={group.key}
+              size="xs"
+              variant="secondary"
+              disabled={disabled}
+              onClick={() => onRemove(group.key)}
+            >
+              {group.name === '' ? 'Remove this group' : `Remove ${group.name}`}
+            </Button>
+          ))}
+        </div>
       )}
       <Button variant="secondary" disabled={disabled} onClick={onAdd}>
         Add a group
@@ -694,6 +734,7 @@ function flowWires(
 function ResultParts({
   values,
   savedShow,
+  outputs,
   files,
   graded,
   disabled,
@@ -702,6 +743,8 @@ function ResultParts({
   values: TaskValues;
   /** The when each part had when the card was read, so a shown part stays shown. */
   savedShow: Record<string, When>;
+  /** The workflow's outputs, each shown with its run. */
+  outputs: Column[];
   files: string[];
   graded: boolean;
   disabled: boolean;
@@ -719,13 +762,28 @@ function ResultParts({
       saved: group.saved,
     })),
     { name: 'all', what: 'Every run', saved: savedShow.all ?? 'never' },
-    { name: 'log', what: 'The compile log', saved: savedShow.log ?? 'never' },
+    {
+      name: 'compiled',
+      what: 'Whether it compiled',
+      saved: savedShow.compiled ?? 'never',
+    },
+    ...outputs.map((output) => ({
+      name: output.name,
+      what: output.title ?? 'An output of each run',
+      saved: savedShow[output.name] ?? 'never',
+    })),
     ...files.map((file) => ({
       name: file,
       what: 'A file, to download',
       saved: savedShow[file] ?? 'never',
     })),
   ];
+  // A name the file shows that is no part of the task, such as a value since
+  // removed: the forge refuses it, so it is listed to take out.
+  const known = new Set(parts.map((part) => part.name));
+  const unknown = Object.entries(values.show)
+    .filter(([name, when]) => when !== 'never' && name !== '' && !known.has(name))
+    .map(([name]) => name);
   return (
     <table className={classes.runs}>
       <thead>
@@ -754,9 +812,45 @@ function ResultParts({
               </td>
             </tr>
           ))}
+        {unknown.map((name) => (
+          <tr key={`unknown:${name}`}>
+            <th>{name}</th>
+            <td>Not a part of this task, so the save is refused</td>
+            <td>
+              <Button
+                size="xs"
+                variant="secondary"
+                disabled={disabled}
+                onClick={() => onShow(name, 'never')}
+              >
+                {`Stop showing ${name}`}
+              </Button>
+            </td>
+          </tr>
+        ))}
       </tbody>
     </table>
   );
+}
+
+/** `show` without `name`, as when the part it names is removed. */
+function withoutShow(show: Record<string, When>, name: string): Record<string, When> {
+  const rest = { ...show };
+  delete rest[name];
+  return rest;
+}
+
+/** `show` with `from`'s when moved to `to`, as when the part is renamed. */
+function movedShow(
+  show: Record<string, When>,
+  from: string,
+  to: string,
+): Record<string, When> {
+  const when = show[from];
+  if (when === undefined || from === to) return show;
+  const rest = withoutShow(show, from);
+  rest[to] = when;
+  return rest;
 }
 
 function WhenField({

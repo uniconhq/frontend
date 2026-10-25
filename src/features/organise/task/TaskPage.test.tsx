@@ -499,6 +499,49 @@ describe('releasing results', () => {
       await screen.findByRole('list', { name: 'Results history' }),
     ).toHaveTextContent('Released by kenny');
   });
+
+  it('reads the task again after a release, rather than keeping what the release answered', async () => {
+    let released = false;
+    const history = [
+      { action: 'released', at: '2026-10-25T01:00:00Z', by: 7, by_name: 'kenny' },
+    ];
+    server.use(
+      signedIn,
+      publicationList,
+      ...repoFiles,
+      http.get(TASK_API, () =>
+        HttpResponse.json({
+          ...publishedTask,
+          // By the time the task is read again, ana has taken them back.
+          results: released
+            ? {
+                released: false,
+                history: [
+                  ...history,
+                  {
+                    action: 'hidden_again',
+                    at: '2026-10-25T01:05:00Z',
+                    by: 8,
+                    by_name: 'ana',
+                  },
+                ],
+              }
+            : { released: false, history: [] },
+        }),
+      ),
+      http.post(`${TASK_API}/results/release`, () => {
+        released = true;
+        return HttpResponse.json({ released: true, history });
+      }),
+    );
+    const user = userEvent.setup();
+    renderApp(TASK);
+    await user.click(await screen.findByRole('button', { name: 'Release results' }));
+    expect(
+      await screen.findByRole('list', { name: 'Results history' }),
+    ).toHaveTextContent('Taken back by ana');
+    expect(screen.getByText('Results are not released.')).toBeVisible();
+  });
 });
 
 describe("the task's publications", () => {

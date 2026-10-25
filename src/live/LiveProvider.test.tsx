@@ -189,6 +189,7 @@ describe('where the live stream stands', () => {
         `${contest}/gradings/queue`,
         `${contest}/gradings/regrades`,
         `${contest}/home`,
+        `${contest}/leaderboards`,
       ];
       const announced = [
         `${contest}/announcements`,
@@ -204,7 +205,6 @@ describe('where the live stream stands', () => {
       const checked = [`${task}`, `${task}/publications`];
       const untouched = [
         `${task}/submissions/{number}/files`,
-        `${task}/gradings/{grading}/log`,
         `${task}/page`,
         '/api/v1/me',
       ];
@@ -259,6 +259,7 @@ describe('where the live stream stands', () => {
         `${task}/submissions/{number}`,
         `${task}/organise/submissions/{number}`,
         `${contest}/home`,
+        `${contest}/leaderboards`,
       ];
       const left = [
         `${task}/submissions/{number}/files`,

@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { inputField, languageField } from '@/test/contestant';
-import { checkDraft, emptyDraft, pathOf, submittedInputs, type Draft } from './draft';
+import {
+  checkDraft,
+  emptyDraft,
+  pathOf,
+  submittedInputs,
+  uploadsOf,
+  type Draft,
+} from './draft';
 
 const MB = 1024 * 1024;
 
@@ -155,14 +162,28 @@ describe('the checks before anything is sent', () => {
     });
     const small = file('a.txt', 1);
     expect(
-      checkDraft([route], { route: { kind: 'parts', files: [small, null] } }),
+      checkDraft([route], {
+        route: {
+          kind: 'parts',
+          parts: [
+            { kind: 'files', files: [small] },
+            { kind: 'files', files: [] },
+          ],
+        },
+      }),
     ).toBeNull();
     expect(checkDraft([route], emptyDraft([route]))?.extensions['errors']).toEqual([
-      { input: 'route', message: 'This input needs a file.' },
+      { input: 'route', message: 'Give at least one part of this input.' },
     ]);
     expect(
       checkDraft([route], {
-        route: { kind: 'parts', files: [small, file('b.txt', 50 * MB + 1)] },
+        route: {
+          kind: 'parts',
+          parts: [
+            { kind: 'files', files: [small] },
+            { kind: 'files', files: [file('b.txt', 50 * MB + 1)] },
+          ],
+        },
       })?.extensions,
     ).toEqual({ limit: 50 * MB, input: 'route', part: 2 });
   });
@@ -218,7 +239,7 @@ describe('what a submit sends', () => {
     });
   });
 
-  it('sends a per-row input as one part from 1, an empty part with no upload', () => {
+  it('sends a per-row input as one part from 1, leaving out a part not given', () => {
     const route = inputField({
       id: 'route',
       parts: [
@@ -230,14 +251,85 @@ describe('what a submit sends', () => {
     expect(
       submittedInputs(
         [route],
-        { route: { kind: 'parts', files: [small, null] } },
+        {
+          route: {
+            kind: 'parts',
+            parts: [
+              { kind: 'files', files: [small] },
+              { kind: 'files', files: [] },
+            ],
+          },
+        },
         () => 'up',
       ),
     ).toEqual({
-      route: {
-        uploads: [],
-        parts: { '1': { uploads: ['up'] }, '2': { uploads: [] } },
+      route: { uploads: [], parts: { '1': { uploads: ['up'] } } },
+    });
+  });
+
+  it('gives each part of a number input its own value, checked as the input is', () => {
+    const seed = inputField({
+      id: 'seed',
+      type: 'number',
+      min: '0',
+      max: '9',
+      parts: [
+        { title: 'Small grid', max_size: MB },
+        { title: null, max_size: MB },
+      ],
+    });
+    const draft = emptyDraft([seed]);
+    expect(draft).toEqual({
+      seed: {
+        kind: 'parts',
+        parts: [
+          { kind: 'text', text: '' },
+          { kind: 'text', text: '' },
+        ],
       },
+    });
+    const typed: Draft = {
+      seed: {
+        kind: 'parts',
+        parts: [
+          { kind: 'text', text: ' 4 ' },
+          { kind: 'text', text: '12' },
+        ],
+      },
+    };
+    expect(checkDraft([seed], typed)?.extensions['errors']).toEqual([
+      { input: 'seed', message: 'Part 2: This must be at most 9.' },
+    ]);
+    const fixed: Draft = {
+      seed: {
+        kind: 'parts',
+        parts: [
+          { kind: 'text', text: ' 4 ' },
+          { kind: 'text', text: '' },
+        ],
+      },
+    };
+    expect(checkDraft([seed], fixed)).toBeNull();
+    expect(submittedInputs([seed], fixed, () => '')).toEqual({
+      seed: { uploads: [], parts: { '1': { uploads: [], value: '4' } } },
+    });
+  });
+
+  it('sends every file of a folder part, each at its path in the folder', () => {
+    const tree = inputField({
+      id: 'tree',
+      type: 'folder',
+      parts: [{ title: null, max_size: MB }],
+    });
+    const files = [inFolder('p/a.c'), inFolder('p/lib/b.h')];
+    const draft: Draft = { tree: { kind: 'parts', parts: [{ kind: 'files', files }] } };
+    const found = uploadsOf([tree], draft);
+    expect(found.map((each) => [pathOf(each.input, each.file), each.part])).toEqual([
+      ['a.c', 1],
+      ['lib/b.h', 1],
+    ]);
+    expect(submittedInputs([tree], draft, (_, chosen) => chosen.name)).toEqual({
+      tree: { uploads: [], parts: { '1': { uploads: ['a.c', 'b.h'] } } },
     });
   });
 });

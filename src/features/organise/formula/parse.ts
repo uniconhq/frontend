@@ -35,6 +35,11 @@ export type FormulaScope = {
   fields?: Readonly<Record<string, 'number' | 'text'>>;
   /** What each name is, in words. */
   about?: Readonly<Record<string, string>>;
+  /**
+   * The real name of each name above that a formula writes otherwise, each
+   * `-` as `_`, so the tree stores the real one. A pair `a.b` is keyed whole.
+   */
+  real?: Readonly<Record<string, string>>;
 };
 
 export type FormulaProblem = { span?: Span; message: string };
@@ -292,8 +297,10 @@ export function parseFormula(source: string): ParseResult {
     const entries: { key: string; value: Ast }[] = [];
     if (peek().kind !== 'rbrace') {
       for (;;) {
+        // A key is a name, a number, or quoted text such as a path:
+        // `{input: {"tests/7.in": 3}}`, `{seed: {1: 2}}`.
         const key = peek();
-        if (key.kind !== 'id')
+        if (key.kind !== 'id' && key.kind !== 'num' && key.kind !== 'str')
           return fail('This line cannot be read: a mapping needs a name.');
         eat();
         if (peek().kind !== 'colon')
@@ -467,6 +474,10 @@ function compile(node: Ast, place: Place, each: boolean, pickOk: boolean): Built
     node.args.forEach((arg) => compile(arg.value, place, each, false));
     return { tree: { block }, kind: 'unknown' };
   }
+  // The first form that reads the inputs cleanly wins, so max over a group
+  // or a task's results is not taken for max of numbers; with none clean,
+  // the first that reads them at all says what is wrong.
+  let fallback: { problems: FormulaProblem[]; built: Built } | null = null;
   for (const form of forms) {
     const scratch: FormulaProblem[] = [];
     const trial: Place = { ...place, problems: scratch };
@@ -475,8 +486,13 @@ function compile(node: Ast, place: Place, each: boolean, pickOk: boolean): Built
     const kind = gives(form, filled.kinds, node, trial);
     if (kind === 'pick' && !pickOk)
       scratch.push({ span: node.span, message: say.pick });
-    place.problems.push(...scratch);
-    return { tree: { block, ...filled.inputs }, kind };
+    const built: Built = { tree: { block, ...filled.inputs }, kind };
+    if (scratch.length === 0) return built;
+    fallback ??= { problems: scratch, built };
+  }
+  if (fallback !== null) {
+    place.problems.push(...fallback.problems);
+    return fallback.built;
   }
   const before = place.problems.length;
   node.args.forEach((arg) => compile(arg.value, place, each, false));
@@ -522,7 +538,7 @@ function compileName(
   ) {
     const kind =
       texts.has(name) || scope.fields?.[dot.column] === 'text' ? 'text' : 'number';
-    return { tree: { value: [dot.group, dot.column] }, kind };
+    return { tree: { value: [{ column: dot.group }, dot.column] }, kind };
   }
   if (dot !== null && (scope.boards ?? []).includes(dot.group)) {
     return { tree: { column: [dot.group, dot.column] }, kind: 'number' };
@@ -579,6 +595,8 @@ function fill(
         });
       return { tree: { name: called }, kind: 'number' };
     }
+    if (input.kind === 'path' || input.kind === 'language')
+      return plainText(arg.value, input.kind, place);
     if (input.plain && arg.value.kind !== 'number') return null;
     return compile(arg.value, place, inside, input.kind === 'either');
   };
@@ -684,6 +702,42 @@ function accept(
   return true;
 }
 
+/**
+ * An `exec` block's program or language, written as quoted text or a bare
+ * name, as the plain text the file holds: a program is a folder of the task,
+ * such as `"programs/mean/"`, and a language one the catalogue lists.
+ */
+function plainText(node: Ast, kind: 'path' | 'language', place: Place): Built | null {
+  const text =
+    node.kind === 'text' ? node.text : node.kind === 'name' ? node.name : null;
+  if (text === null) return null;
+  if (kind === 'language') {
+    const languages = place.catalogue.languages;
+    if (!languages.includes(text))
+      place.problems.push({
+        span: node.span,
+        message: `Give the program's language, one of ${languages.join(', ')}.`,
+      });
+  } else if (!folder(text)) {
+    place.problems.push({
+      span: node.span,
+      message:
+        'Give the folder of the task that holds the program and its program.yaml, ' +
+        'such as programs/mean/.',
+    });
+  }
+  return { tree: text, kind: 'unknown' };
+}
+
+/** Whether `text` names a folder of the task: relative, ending in `/`, no part empty, `.` or `..`. */
+function folder(text: string): boolean {
+  if (!text.endsWith('/') || text.startsWith('/')) return false;
+  return text
+    .slice(0, -1)
+    .split('/')
+    .every((part) => part !== '' && part !== '.' && part !== '..');
+}
+
 function directions(node: Extract<Ast, { kind: 'map' }>, place: Place): Built | null {
   const map: Record<string, Tree> = {};
   for (const entry of node.entries) {
@@ -746,7 +800,45 @@ export function checkFormula(
   const problems = [...place.problems].sort(
     (a, b) => (a.span?.from ?? 0) - (b.span?.from ?? 0),
   );
-  return { problems, kind: built.kind, tree: built.tree };
+  const tree =
+    scope.real === undefined ? built.tree : realNames(built.tree, scope.real);
+  return { problems, kind: built.kind, tree };
+}
+
+const NAMED = new Set(['results', 'runs', 'column', 'value', 'run']);
+
+/** `tree` with each name a formula wrote as `_` given back its real `-`. */
+function realNames(tree: Tree, real: Readonly<Record<string, string>>): Tree {
+  if (tree === null || typeof tree === 'string') return tree;
+  const one = (name: Tree): Tree =>
+    typeof name === 'string' ? (real[name] ?? name) : realNames(name, real);
+  const out: { [key: string]: Tree | Tree[] | undefined } = {};
+  for (const [key, child] of Object.entries(tree)) {
+    if (child === undefined || key === 'text') {
+      out[key] = child;
+    } else if (!NAMED.has(key)) {
+      out[key] = Array.isArray(child)
+        ? child.map((item) => realNames(item, real))
+        : realNames(child, real);
+    } else if (typeof child === 'string') {
+      out[key] = real[child] ?? child;
+    } else if (Array.isArray(child)) {
+      const [record, column] = child;
+      const pair =
+        typeof record === 'string' && typeof column === 'string'
+          ? real[`${record}.${column}`]
+          : undefined;
+      // A column of another leaderboard is keyed with its leaderboard; a
+      // value or a fact read off a task or a pick has no `-`.
+      out[key] =
+        pair === undefined
+          ? [one(record ?? null), ...child.slice(1)]
+          : [pair.slice(0, pair.indexOf('.')), pair.slice(pair.indexOf('.') + 1)];
+    } else {
+      out[key] = realNames(child, real);
+    }
+  }
+  return out;
 }
 
 /**

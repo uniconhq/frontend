@@ -1,12 +1,14 @@
 import type { Catalogue } from '../formula/catalogue';
 import { readLine, type FormulaScope, type Kind, type Reading } from '../formula/parse';
 import { printFormula } from '../formula/print';
-import { nameProblem, type Tree } from '../formula/tree';
+import { unreadableProblem, written, type Tree } from '../formula/tree';
 import {
+  exactAt,
   exactJS,
   isRecord,
   numberText,
   parseYaml,
+  renameKeys,
   textOf,
   Time,
   writeAt,
@@ -72,6 +74,7 @@ export type FieldProblem = { field: string; message: string };
 export const KEY_MAX = 24;
 const KEY = /^[a-z0-9][a-z0-9_-]*$/;
 const COLUMN_MAX = 40;
+const COLUMN = /^[a-z][a-z0-9_-]*$/;
 
 export const OWN_EVERYONE =
   'A leaderboard shown to everyone cannot show each entrant only their own row, ' +
@@ -234,31 +237,39 @@ export function taskIds(doc: Doc): string[] {
   });
 }
 
-/** `owner/name@version` as the workflow a task file names, or null. */
-export function workflowRef(
-  content: string,
-): { owner: string; name: string; version: string } | null {
-  const parsed = parseYaml(content);
-  if ('error' in parsed) return null;
-  const top = exactJS(parsed.doc);
-  if (!isRecord(top)) return null;
-  const text = textOf(top['workflow']);
-  const at = text.lastIndexOf('@');
-  if (at <= 0) return null;
-  const head = text.slice(0, at);
-  const slash = head.indexOf('/');
-  const version = text.slice(at + 1);
-  if (slash <= 0 || slash === head.length - 1 || version === '') return null;
-  return { owner: head.slice(0, slash), name: head.slice(slash + 1), version };
-}
+/** A value a task gives, as a leaderboard reads it: by name, and whether it is text. */
+export type GivenValue = { name: string; text: boolean };
 
-/** The output names a workflow file declares under `outputs`. */
-export function outputNames(content: string): string[] {
+/** What each task the contest lists gives a leaderboard, by task id. */
+export type TaskGives = Readonly<Record<string, readonly GivenValue[]>>;
+
+/**
+ * The values a task's settings give, the names under `scoring.values`, as
+ * `t.v` on a leaderboard reads them. A value is text when its formula is a
+ * text, a run's verdict, or an `if` or `otherwise` choosing between texts.
+ */
+export function givenValues(content: string): GivenValue[] {
   const parsed = parseYaml(content);
   if ('error' in parsed) return [];
   const top = exactJS(parsed.doc);
-  if (!isRecord(top) || !isRecord(top['outputs'])) return [];
-  return Object.keys(top['outputs']);
+  if (!isRecord(top) || !isRecord(top['scoring'])) return [];
+  const values = top['scoring']['values'];
+  if (!isRecord(values)) return [];
+  return Object.entries(values).map(([name, tree]) => ({ name, text: textTree(tree) }));
+}
+
+function textTree(tree: unknown): boolean {
+  if (!isRecord(tree)) return false;
+  if ('text' in tree) return true;
+  const run = tree['run'];
+  if (Array.isArray(run)) return run[run.length - 1] === 'verdict';
+  const block = tree['block'];
+  if (block === 'if' || block === 'otherwise') {
+    const of = tree['of'];
+    const branches = Array.isArray(of) ? of.slice(block === 'if' ? 1 : 0) : [];
+    return branches.length > 0 && branches.every(textTree);
+  }
+  return false;
 }
 
 /** The contest's end, an hour earlier, as the time field holds it. Empty when the end is not a time. */
@@ -302,29 +313,61 @@ export function previewRows<
   return kept;
 }
 
-/** What a leaderboard's formulas may name. */
+/**
+ * What a leaderboard's formulas may name: its columns; each task's results,
+ * and on each of them, `t.v`, the values the task gives and the facts a
+ * leaderboard reads (`leaderboard_facts`), as the forge resolves them; and
+ * the other leaderboards' columns.
+ */
 export function boardScope(
   board: BoardDraft,
   boards: readonly BoardDraft[],
   tasks: readonly string[],
-  outputs: readonly string[],
+  gives: TaskGives,
+  facts: readonly string[],
   texts: readonly string[],
 ): FormulaScope {
-  const fields: Record<string, 'number' | 'text'> = {
-    verdict: 'text',
-    passed: 'number',
+  const fields: Record<string, 'number' | 'text'> = {};
+  for (const fact of facts) fields[fact] = 'number';
+  // A formula writes each `-` of a task, a leaderboard or a column as `_`;
+  // the scope holds the written names and the real ones they stand for.
+  const real: Record<string, string> = {};
+  const write = (name: string): string => {
+    const text = written(name);
+    if (text !== name) real[text] ??= name;
+    return text;
   };
-  for (const name of outputs) if (!(name in fields)) fields[name] = 'number';
+  const each: string[] = [];
+  const textValues: string[] = [];
+  const sets = tasks.map(write);
+  for (const task of sets) {
+    for (const value of gives[real[task] ?? task] ?? []) {
+      fields[value.name] ??= value.text ? 'text' : 'number';
+      each.push(`${task}.${value.name}`);
+      if (value.text) textValues.push(`${task}.${value.name}`);
+    }
+    for (const fact of facts) each.push(`${task}.${fact}`);
+  }
+  const others = boards.filter((item) => item.key !== '' && item.key !== board.key);
+  for (const other of others) {
+    for (const column of other.columns) {
+      const pair = `${written(other.key)}.${written(column.name)}`;
+      if (column.name !== '' && pair !== `${other.key}.${column.name}`)
+        real[pair] ??= `${other.key}.${column.name}`;
+    }
+  }
   return {
     where: 'leaderboard',
-    names: board.columns.map((column) => column.name).filter((name) => name !== ''),
-    each: ['verdict', 'passed', ...outputs],
-    sets: tasks,
-    boards: boards
-      .map((item) => item.key)
-      .filter((key) => key !== '' && key !== board.key),
-    texts,
+    names: board.columns
+      .map((column) => column.name)
+      .filter((name) => name !== '')
+      .map(write),
+    each,
+    sets,
+    boards: others.map((item) => write(item.key)),
+    texts: [...texts.map(written), ...textValues],
     fields,
+    real,
   };
 }
 
@@ -332,10 +375,11 @@ export function boardReadings(
   board: BoardDraft,
   boards: readonly BoardDraft[],
   tasks: readonly string[],
-  outputs: readonly string[],
+  gives: TaskGives,
   catalogue: Catalogue,
 ): Record<string, Reading> {
-  const first = boardScope(board, boards, tasks, outputs, []);
+  const facts = catalogue.leaderboard_facts;
+  const first = boardScope(board, boards, tasks, gives, facts, []);
   const read = (scope: FormulaScope) =>
     Object.fromEntries(
       board.columns.map((column) => [
@@ -349,7 +393,7 @@ export function boardReadings(
     .map((column) => column.name);
   return texts.length === 0
     ? pass
-    : read(boardScope(board, boards, tasks, outputs, texts));
+    : read(boardScope(board, boards, tasks, gives, facts, texts));
 }
 
 /** The trees a save writes: a line left as printed keeps the tree it was read from. */
@@ -357,12 +401,12 @@ export function commit(
   draft: LeaderboardsDraft,
   catalogue: Catalogue,
   tasks: readonly string[],
-  outputs: readonly string[],
+  gives: TaskGives,
 ): LeaderboardsDraft {
   return {
     ...draft,
     boards: draft.boards.map((board) => {
-      const read = boardReadings(board, draft.boards, tasks, outputs, catalogue);
+      const read = boardReadings(board, draft.boards, tasks, gives, catalogue);
       return {
         ...board,
         columns: board.columns.map((column) => {
@@ -423,11 +467,13 @@ function boardValue(board: BoardDraft): Record<string, unknown> {
     ),
   };
   if (board.title !== '') value['title'] = board.title;
+  // Only what differs from the defaults, staff and every row, is written.
   if (board.who !== 'staff' || board.rows !== 'all') {
-    value['audience'] = {
-      who: board.who,
-      rows: board.rows === 'top' ? numberText(board.top) : board.rows,
-    };
+    const audience: Record<string, unknown> = {};
+    if (board.who !== 'staff') audience['who'] = board.who;
+    if (board.rows !== 'all')
+      audience['rows'] = board.rows === 'top' ? numberText(board.top) : board.rows;
+    value['audience'] = audience;
   }
   if (board.sort.length > 0) {
     value['sort'] = board.sort.map((item) => ({ [item.name]: item.way }));
@@ -457,11 +503,68 @@ export function writeLeaderboards(
   after: LeaderboardsDraft,
 ): void {
   if (before.legacy || after.legacy || sameBoards(before, after)) return;
-  if (doc.hasIn(['leaderboards'])) doc.deleteIn(['leaderboards']);
-  if (after.boards.length === 0) return;
-  const written: Record<string, unknown> = {};
-  for (const board of after.boards) written[board.key] = boardValue(board);
-  writeAt(doc, ['leaderboards'], written);
+  if (after.boards.length === 0) {
+    writeAt(doc, ['leaderboards'], undefined);
+    return;
+  }
+  // Each leaderboard is written over its own entry, key by key, so a board
+  // or a column left as it was keeps its place, its style and its comments,
+  // and a renamed one is renamed where it stands.
+  const kept = new Set(after.boards.map((board) => board.id));
+  for (const old of before.boards) {
+    if (!kept.has(old.id)) writeAt(doc, ['leaderboards', old.key], undefined);
+  }
+  // Every rename lands at once, so a chain or a swap of keys is kept.
+  const was = new Map(before.boards.map((board) => [board.id, board]));
+  renameKeys(
+    doc,
+    ['leaderboards'],
+    new Map(
+      after.boards.flatMap((board) => {
+        const old = was.get(board.id);
+        return old === undefined ? [] : [[old.key, board.key] as const];
+      }),
+    ),
+  );
+  for (const board of after.boards) {
+    const old = was.get(board.id);
+    if (old !== undefined) {
+      const named = new Map(
+        board.columns.map((column) => [column.key, column.name] as const),
+      );
+      renameKeys(
+        doc,
+        ['leaderboards', board.key, 'columns'],
+        new Map(
+          old.columns.flatMap((column) => {
+            const name = named.get(column.key);
+            return column.name !== '' && name !== undefined && name !== ''
+              ? [[column.name, name] as const]
+              : [];
+          }),
+        ),
+        new Set(
+          old.columns
+            .filter((column) => !named.get(column.key))
+            .map((column) => column.name),
+        ),
+      );
+      if (JSON.stringify(boardValue(old)) === JSON.stringify(boardValue(board)))
+        continue;
+    }
+    const value = boardValue(board);
+    // An audience written as it stands, such as `{who: staff}`, stays so.
+    const stored = exactAt(doc, ['leaderboards', board.key, 'audience']);
+    if (
+      old !== undefined &&
+      stored !== undefined &&
+      old.who === board.who &&
+      old.rows === board.rows &&
+      (board.rows !== 'top' || old.top === board.top)
+    )
+      value['audience'] = stored;
+    writeAt(doc, ['leaderboards', board.key], value);
+  }
 }
 
 /** Write the hold when it changed. A hold that could not be read stays until it is set again. */
@@ -507,22 +610,58 @@ function keyProblem(
       'so a column can read either. Name the leaderboard otherwise.'
     );
   }
+  const unreadable = unreadableProblem(key);
+  if (unreadable !== null) return unreadable;
+  // A key reads as a task, or as a key before it, once each `-` is `_`.
+  const before = keys.slice(0, keys.indexOf(key));
+  const other = [...tasks, ...before].find(
+    (item) => item !== key && written(item) === written(key),
+  );
+  if (other !== undefined) {
+    return (
+      `${key} reads as ${other} in a formula, where each - is written _. ` +
+      'Name the leaderboard otherwise.'
+    );
+  }
   return null;
 }
 
-function columnNameProblem(name: string, names: readonly string[]): string | null {
+function columnNameProblem(
+  name: string,
+  names: readonly string[],
+  tasks: readonly string[],
+  keys: readonly string[],
+): string | null {
   if (name === '') return 'Give the column a name.';
-  const problem = nameProblem(name);
-  if (problem !== null) return problem;
-  if (name.length > COLUMN_MAX) {
+  if (!COLUMN.test(name) || name.length > COLUMN_MAX) {
     return (
       `'${name}' cannot be a column's name. Use at most ${String(COLUMN_MAX)} lower case ` +
-      'letters, digits and underscores (_), starting with a letter.'
+      'letters, digits, hyphens (-) and underscores (_), starting with a letter.'
     );
   }
   if (names.filter((item) => item === name).length > 1)
     return 'Another column has this name.';
-  return null;
+  if (tasks.includes(name) || keys.includes(name)) {
+    const what = tasks.includes(name) ? 'a task' : 'a leaderboard';
+    return (
+      `${name} is ${what} of the contest, and tasks, leaderboards and a leaderboard's ` +
+      'columns share one set of names, so a.b always reads one thing. Name the column ' +
+      'otherwise.'
+    );
+  }
+  // A name reads as a task, a leaderboard or a column before it, once each
+  // `-` is `_`.
+  const before = names.slice(0, names.indexOf(name));
+  const other = [...tasks, ...keys, ...before].find(
+    (item) => item !== name && written(item) === written(name),
+  );
+  if (other !== undefined) {
+    return (
+      `${name} reads as ${other} in a formula, where each - is written _. ` +
+      'Name the column otherwise.'
+    );
+  }
+  return unreadableProblem(name);
 }
 
 function placesProblem(places: string): string | null {
@@ -541,10 +680,11 @@ export function problems(
   draft: LeaderboardsDraft,
   catalogue: Catalogue | null,
   tasks: readonly string[],
-  outputs: readonly string[],
+  gives: TaskGives,
   now: number,
   start: unknown,
   end: unknown,
+  saved: HoldDraft | null = null,
 ): FieldProblem[] {
   if (draft.legacy) return [];
   const found: FieldProblem[] = [];
@@ -571,11 +711,11 @@ export function problems(
     const readings =
       catalogue === null
         ? {}
-        : boardReadings(board, draft.boards, tasks, outputs, catalogue);
+        : boardReadings(board, draft.boards, tasks, gives, catalogue);
     const kindOf = new Map<string, Kind>();
     for (const column of board.columns) {
       const field = columnField(board.key, column);
-      const name = columnNameProblem(column.name, names);
+      const name = columnNameProblem(column.name, names, tasks, keys);
       if (name !== null) found.push({ field, message: name });
       const line = lineOf(column, catalogue);
       const reading = readings[column.key];
@@ -637,12 +777,18 @@ export function problems(
         found.push({ field: `${board.key}.display`, message: places });
     }
   }
-  found.push(...holdProblems(draft.hold, now, start, end));
+  found.push(...holdProblems(draft.hold, saved, now, start, end));
   return found;
 }
 
+/**
+ * The hold's problems. As the forge checks it, a start already passed or
+ * outside the contest is refused only when the save sets or moves the
+ * hold: one stored that has since started is kept as it is.
+ */
 function holdProblems(
   hold: HoldDraft,
+  saved: HoldDraft | null,
   now: number,
   start: unknown,
   end: unknown,
@@ -655,7 +801,9 @@ function holdProblems(
     return found;
   }
   const fromAt = new Date(from).getTime();
-  if (fromAt <= now) {
+  const was = saved?.on === true ? isoOf(saved.from) : undefined;
+  const moved = was === undefined || new Date(was).getTime() !== fromAt;
+  if (moved && fromAt <= now) {
     found.push({
       field: 'hold.from',
       message: 'That time has passed. Give a time still to come.',
@@ -663,7 +811,12 @@ function holdProblems(
   }
   const opened = instantOf(start);
   const closed = instantOf(end);
-  if (opened !== null && closed !== null && (fromAt <= opened || fromAt >= closed)) {
+  if (
+    moved &&
+    opened !== null &&
+    closed !== null &&
+    (fromAt <= opened || fromAt >= closed)
+  ) {
     found.push({
       field: 'hold.from',
       message: 'The hold starts after the contest opens and before it ends.',

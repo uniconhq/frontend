@@ -2,7 +2,9 @@ import { $api, queryView, type QueryView } from '@/api/query';
 import type { components } from '@/api/schema';
 import { taskPagePath } from '@/lib/contest-paths';
 import { useContestParams } from '@/lib/route-params';
+import { entrantGradingsPath } from '@/lib/sections';
 import { contestStaff } from '@/lib/viewer';
+import { useFallbackPoll } from '@/live';
 import { useSession } from '@/session';
 import { BodyText } from '@/ui/BodyText';
 import { Page, PageHeader } from '@/ui/Page';
@@ -14,10 +16,14 @@ import { submissionHref } from '../submit/submission-param';
 
 type Leaderboard = components['schemas']['Leaderboard'];
 
+const POLL_MS = 30_000;
+
 /**
  * The contest's leaderboards as this caller is shown them. A visitor reads
  * the public list; a signed-in person reads their own, which already
- * follows the audience, the hold and a dropped sort key.
+ * follows the audience, the hold and a dropped sort key. A grading or a
+ * release reads them again through the live stream; with no stream, as for
+ * a visitor, they are read again every thirty seconds.
  */
 export function LeaderboardsPage() {
   const { org, contest } = useContestParams();
@@ -39,6 +45,7 @@ function SignedInBoards({ org, contest }: { org: string; contest: string }) {
     {
       params: { path: { org, contest } },
     },
+    { refetchInterval: useFallbackPoll(POLL_MS) },
   );
   return <Boards view={queryView(query)} org={org} contest={contest} staff={staff} />;
 }
@@ -50,6 +57,7 @@ function PublicBoards({ org, contest }: { org: string; contest: string }) {
     {
       params: { path: { org, contest } },
     },
+    { refetchInterval: useFallbackPoll(POLL_MS) },
   );
   return <Boards view={queryView(query)} org={org} contest={contest} staff={false} />;
 }
@@ -68,8 +76,12 @@ function Boards({
   if (view.state === 'loading') return <PageSkeleton />;
   if (view.state === 'error')
     return <ErrorBlock error={view.error} onRetry={view.retry} />;
-  const open = (task: string, number: number) =>
-    `${taskPagePath(org, contest, task)}${submissionHref(number)}`;
+  // Staff open the entrant's submissions to the task; anyone else, who
+  // reads only their own row, their own submission.
+  const open = (task: string, number: number, entrant: string) =>
+    staff
+      ? entrantGradingsPath(org, contest, task, entrant)
+      : `${taskPagePath(org, contest, task)}${submissionHref(number)}`;
   return (
     <Page>
       <PageHeader title="Leaderboards" />

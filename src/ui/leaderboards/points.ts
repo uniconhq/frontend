@@ -3,28 +3,37 @@ import type { components } from '@/api/schema';
 type Leaderboard = components['schemas']['Leaderboard'];
 type Cell = components['schemas']['LeaderboardCell'];
 
+/** A task's points on one leaderboard of the viewer's standing. */
+export type TaskPoints = {
+  board: string;
+  /** The cell's number, its exact digits. */
+  number: string;
+  /** Decimals its column shows. */
+  places: number | undefined;
+  /** The most the column can show, which only staff are told. */
+  most: string | null;
+};
+
 /**
- * A task's points on the viewer's standing: one line per leaderboard, the
- * cell that counted the task over the most that column can show.
+ * A task's points on the viewer's standing: one per leaderboard, from the
+ * cell that counted this task alone. A total over several tasks counts each
+ * of them, so it is no one task's points.
  */
 export function taskPoints(
   task: string,
   standing: readonly Leaderboard[],
-): { board: string; text: string }[] {
-  const found: { board: string; text: string }[] = [];
+): TaskPoints[] {
+  const found: TaskPoints[] = [];
   for (const board of standing) {
     for (const row of board.rows) {
-      const cell = row.cells.find(
-        (item) => !item.hidden && item.number !== null && counts(item, task),
-      );
+      const cell = row.cells.find((item) => !item.hidden && alone(item, task));
       if (cell === undefined || cell.number === null) continue;
-      const most = board.headers.find((header) => header.name === cell.column)?.at_most;
+      const header = board.headers.find((item) => item.name === cell.column);
       found.push({
         board: board.key,
-        text:
-          most === null || most === undefined
-            ? cell.number
-            : `${cell.number} / ${most}`,
+        number: cell.number,
+        places: header?.places ?? undefined,
+        most: header?.at_most ?? null,
       });
       break;
     }
@@ -32,6 +41,11 @@ export function taskPoints(
   return found;
 }
 
-function counts(cell: Cell, task: string): boolean {
-  return (cell.counted ?? []).some((item) => item.task === task);
+function alone(cell: Cell, task: string): boolean {
+  const counted = cell.counted ?? [];
+  return (
+    cell.number !== null &&
+    counted.length > 0 &&
+    counted.every((item) => item.task === task)
+  );
 }

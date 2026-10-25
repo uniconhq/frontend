@@ -289,7 +289,9 @@ test('a contestant registers, waits, is let in and reads the task', async ({
   // In race order: the time left, then the tasks, the leaderboard and the way to ask.
   const tasks = page.getByRole('list', { name: 'Tasks' });
   await expect(tasks).toContainText('Closes in');
-  await expect(tasks).toContainText('62 / 100');
+  // An entrant reads the points, not the most the column can show.
+  await expect(tasks).toContainText('62');
+  await expect(tasks).not.toContainText('/ 100');
   await expect(page.getByRole('table', { name: 'Gradebook' })).toBeVisible();
   await expect(
     page

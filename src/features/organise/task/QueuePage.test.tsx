@@ -122,4 +122,43 @@ describe('the grading queue', () => {
     await user.type(box, '{Enter}');
     expect(body).toEqual({ value: 'score', mark: '' });
   });
+
+  it('posts nothing when the box did not change, and refuses a mark that is no decimal', async () => {
+    const user = userEvent.setup();
+    let posts = 0;
+    server.use(
+      signedIn,
+      http.get(QUEUE, () =>
+        HttpResponse.json([
+          {
+            ...ROW,
+            submissions: [
+              { ...ROW.submissions[0], marks: [{ value: 'score', mark: '7.5' }] },
+            ],
+          },
+        ]),
+      ),
+      http.post(ENTER, () => {
+        posts += 1;
+        return HttpResponse.json({
+          value: 'score',
+          mark: '7.5',
+          by: 7,
+          at: '2026-10-25T01:00:00Z',
+        });
+      }),
+    );
+    renderApp(PAGE);
+    const box = await screen.findByRole('textbox', { name: 'score' });
+    await user.click(box);
+    await user.tab();
+    await user.type(box, '{Enter}');
+    expect(posts).toBe(0);
+    await user.clear(box);
+    await user.type(box, 'seven{Enter}');
+    expect(
+      await screen.findByText('Write the mark as a plain decimal, such as 7.5.'),
+    ).toBeVisible();
+    expect(posts).toBe(0);
+  });
 });

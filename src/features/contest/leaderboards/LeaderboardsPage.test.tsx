@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { http, HttpResponse } from 'msw';
 import { screen } from '@testing-library/react';
 import { renderApp } from '@/test/render';
-import { server, signedIn } from '@/test/server';
+import { server, signedIn, someone } from '@/test/server';
+import { passTime, withFakeTimers } from '@/test/timers';
 
 const PAGE = '/contests/acme/spring/leaderboards';
 
@@ -37,9 +38,9 @@ const GRADEBOOK = {
 };
 
 describe("a contest's leaderboards", () => {
-  it('reads the signed-in list and opens a counted submission', async () => {
+  it('reads the signed-in list and opens a counted submission of the entrant’s own', async () => {
     server.use(
-      signedIn,
+      http.get('/api/v1/me', () => HttpResponse.json({ ...someone, roles: [] })),
       http.get('/api/v1/orgs/:org/contests/:contest/leaderboards', () =>
         HttpResponse.json([GRADEBOOK]),
       ),
@@ -49,6 +50,20 @@ describe("a contest's leaderboards", () => {
     expect(screen.getByRole('link', { name: 'Submission 4' })).toHaveAttribute(
       'href',
       '/contests/acme/spring/tasks/sum?submission=4',
+    );
+  });
+
+  it('opens, for staff, the row’s entrant’s submissions to the task', async () => {
+    server.use(
+      signedIn,
+      http.get('/api/v1/orgs/:org/contests/:contest/leaderboards', () =>
+        HttpResponse.json([GRADEBOOK]),
+      ),
+    );
+    renderApp(PAGE);
+    expect(await screen.findByRole('link', { name: 'Submission 4' })).toHaveAttribute(
+      'href',
+      expect.stringMatching(/\/gradings\?task=sum&entrant=ada$/),
     );
   });
 
@@ -66,5 +81,24 @@ describe("a contest's leaderboards", () => {
     server.use(signedIn);
     renderApp(PAGE);
     expect(await screen.findByText('Nothing is on a leaderboard yet.')).toBeVisible();
+  });
+});
+
+describe('the leaderboards with no stream', () => {
+  withFakeTimers();
+
+  it('reads the public list again every thirty seconds', async () => {
+    let reads = 0;
+    server.use(
+      http.get('/api/v1/public/contests/:org/:contest/leaderboards', () => {
+        reads += 1;
+        return HttpResponse.json([GRADEBOOK]);
+      }),
+    );
+    renderApp(PAGE);
+    expect(await screen.findByRole('table', { name: 'Gradebook' })).toBeVisible();
+    expect(reads).toBe(1);
+    await passTime(30_000);
+    expect(reads).toBe(2);
   });
 });

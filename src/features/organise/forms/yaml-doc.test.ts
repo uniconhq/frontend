@@ -4,6 +4,7 @@ import {
   numberProblem,
   numberText,
   parseYaml,
+  renameKeys,
   textAt,
   writeAt,
   writeOver,
@@ -297,5 +298,17 @@ describe('a number typed into a field', () => {
     expect(numberProblem('1e9999999')).toBe('Enter a smaller number.');
     expect(numberProblem('-1e400')).toBe('Enter a smaller number.');
     expect(numberProblem('1e300')).toBeUndefined();
+  });
+});
+
+describe('renaming keys', () => {
+  it('refuses a name another entry keeps, rather than doing nothing', () => {
+    const parsed = parseYaml('a: 1\nb: 2\n');
+    if ('error' in parsed) throw new Error(parsed.error);
+    expect(() => {
+      renameKeys(parsed.doc, [], new Map([['a', 'b']]));
+    }).toThrow('already has b');
+    renameKeys(parsed.doc, [], new Map([['a', 'b']]), new Set(['b']));
+    expect(writeYaml(parsed.doc)).toBe('b: 1\n');
   });
 });

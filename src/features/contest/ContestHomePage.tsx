@@ -11,11 +11,15 @@ import { SectionTitle } from '@/ui/SectionTitle';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
 import { taskPoints } from '@/ui/leaderboards/points';
+import { ShownValue } from '@/ui/number/ShownValue';
+import { formatExact } from '@/lib/exact';
 import { LeaderboardTable } from '@/ui/leaderboards/table';
 import { taskPagePath } from '@/lib/contest-paths';
 import { contestPath } from '@/lib/organiser-paths';
+import { contestStaff } from '@/lib/viewer';
+import { useSession } from '@/session';
 import { useContestParams } from '@/lib/route-params';
-import { contestViewSectionPath } from '@/lib/sections';
+import { contestViewSectionPath, entrantGradingsPath } from '@/lib/sections';
 import { formatDateTime } from '@/lib/time';
 import { ContestAnnouncements } from './threads/AnnouncementList';
 import { useMyQuestions } from './threads/questions';
@@ -94,6 +98,7 @@ function TaskList({
   tasks,
   notApproved,
   standing,
+  staff,
 }: {
   org: string;
   contest: string;
@@ -101,6 +106,8 @@ function TaskList({
   /** Where a task stands for a reader who is not an approved entrant. */
   notApproved: string;
   standing: ContestHome['standing'];
+  /** The most a column can show is told to staff only. */
+  staff: boolean;
 }) {
   const { at, measured } = useServerClock();
   if (tasks.length === 0) {
@@ -113,7 +120,10 @@ function TaskList({
           <span className={classes.label}>{labelOf(task)}</span>
           <PageLink to={taskPagePath(org, contest, task.name)}>{task.title}</PageLink>
           {taskPoints(task.name, standing).map((points) => (
-            <span key={points.board}>{points.text}</span>
+            <span key={points.board}>
+              <ShownValue number={points.number} places={points.places} />
+              {staff && points.most !== null && ` / ${formatExact(points.most)}`}
+            </span>
           ))}
           <Standing task={task} at={at} counting={measured} notApproved={notApproved} />
         </li>
@@ -168,8 +178,12 @@ function LeaderboardCard({
   standing: ContestHome['standing'];
   staff: boolean;
 }) {
-  const open = (task: string, number: number) =>
-    `${taskPagePath(org, contest, task)}${submissionHref(number)}`;
+  // Staff open the entrant's submissions to the task; anyone else, who
+  // reads only their own row, their own submission.
+  const open = (task: string, number: number, entrant: string) =>
+    staff
+      ? entrantGradingsPath(org, contest, task, entrant)
+      : `${taskPagePath(org, contest, task)}${submissionHref(number)}`;
   return (
     <Card>
       <div className={classes.stack}>
@@ -283,6 +297,11 @@ function Home({
   home: ContestHome;
   onBoundary: () => void;
 }) {
+  const session = useSession();
+  // Leaderboard staff as the forge reads it: a role at the contest or the
+  // org, not one at a task alone, which `organises` counts.
+  const staff =
+    session.status === 'signed-in' && contestStaff(org, contest, session.me.roles);
   const entrant = home.registration.entrant;
   const approved = entrant?.status === 'approved';
   const settled = approved || home.organises;
@@ -336,6 +355,7 @@ function Home({
             tasks={home.tasks}
             notApproved={TASK_STANDING[notIn(home)]}
             standing={home.standing}
+            staff={staff}
           />
         </div>
       </Card>
@@ -343,7 +363,7 @@ function Home({
         org={org}
         contest={contest}
         standing={home.standing}
-        staff={home.organises}
+        staff={staff}
       />
       <Card>
         <ContestAnnouncements org={org} contest={contest} />

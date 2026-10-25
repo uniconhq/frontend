@@ -25,19 +25,31 @@ const UNREADABLE = new Set([
 
 const VALUE_NAME = /^[a-z][a-z0-9_]*$/;
 
+/** A name as a formula writes it: each `-` as `_`. */
+export function written(name: string): string {
+  return name.replaceAll('-', '_');
+}
+
 /**
- * Why `name` cannot name a value, a group or a column, in the forge's
- * sentence, or none when a formula would read it as a name. A `-` is read
- * as `_`.
+ * Why a formula would read `name`, once each `-` is written `_`, as an
+ * operator rather than a name, in the forge's sentence, or none.
+ */
+export function unreadableProblem(name: string): string | null {
+  const read = written(name);
+  if (!UNREADABLE.has(read)) return null;
+  return (
+    `${read} is a word a formula reads as an operator, so it can't name a value. ` +
+    'Choose another name.'
+  );
+}
+
+/**
+ * Why `name` cannot name a value or a group, in the forge's sentence, or
+ * none when a formula would read it as a name.
  */
 export function nameProblem(name: string): string | null {
-  const read = name.replaceAll('-', '_');
-  if (UNREADABLE.has(read)) {
-    return (
-      `${read} is a word a formula reads as an operator, so it can't name a value. ` +
-      'Choose another name.'
-    );
-  }
+  const unreadable = unreadableProblem(name);
+  if (unreadable !== null) return unreadable;
   if (!VALUE_NAME.test(name)) {
     return (
       'A name may use only lower case letters, digits and underscores (_), ' +
