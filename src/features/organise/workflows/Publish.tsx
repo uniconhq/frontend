@@ -21,6 +21,7 @@ export function PublishVersion({
   name,
   versions,
   token,
+  revision,
   dirty,
   problems,
   checking = false,
@@ -31,6 +32,7 @@ export function PublishVersion({
   versions: string[];
   /** The token the draft was last saved with. */
   token: string | null;
+  revision?: string | null;
   dirty: boolean;
   /** How many problems the check found, which a version would be refused for. */
   problems: number;
@@ -59,7 +61,7 @@ export function PublishVersion({
     try {
       const made = await make.mutateAsync({
         params: { path: { owner, name } },
-        body: { version: asked, token },
+        body: { version: asked, token, ...(revision == null ? {} : { revision }) },
       });
       await queryClient.invalidateQueries({ queryKey: page });
       setOpen(false);
