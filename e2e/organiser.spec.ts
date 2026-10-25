@@ -208,6 +208,7 @@ async function stubOrganiserApi(page: Page) {
           input('memory_limit', 'number', { title: 'Memory limit', unit: 'MB' }),
         ],
         graded: false,
+        text_values: null,
       } satisfies Schemas['WorkflowForm']);
     }
     if (path === '/api/v1/orgs/acme/contests') {

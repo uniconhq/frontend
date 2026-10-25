@@ -62,11 +62,10 @@ const runOf = (overrides: Partial<Schemas['RunShown']>): Schemas['RunShown'] => 
   place: 1,
   id: null,
   dropped: false,
-  key: {},
-  titles: ['Small grid'],
+  tuples: [{ title: 'Small grid', key: {} }],
   verdict: 'accepted',
   passed: 1,
-  reports: {},
+  reports: [],
   texts: {},
   label: null,
   message: null,
@@ -85,13 +84,13 @@ const graded = {
   compiled: 1,
   once: { reports: {}, texts: LOG },
   runs: [
-    runOf({ reports: { time_ms: '12' } }),
+    runOf({ reports: [{ title: 'Run time', unit: 'ms', number: '12' }] }),
     runOf({
       place: 2,
-      titles: ['Big grid'],
+      tuples: [{ title: 'Big grid', key: {} }],
       verdict: 'wrong_answer',
       passed: 0,
-      reports: { time_ms: '30' },
+      reports: [{ title: 'Run time', unit: 'ms', number: '30' }],
     }),
   ],
 } satisfies Schemas['Result'];
@@ -415,7 +414,7 @@ test('a submission opens with its runs and its log, read when it is shown', asyn
   const samples = detail.getByRole('region', { name: 'Group samples' });
   await expect(samples.getByText('Small grid')).toBeVisible();
   await expect(samples.getByText('WRONG ANSWER')).toBeVisible();
-  await expect(samples).toContainText('time_ms 30');
+  await expect(samples).toContainText('Run time (ms) 30');
   await detail.getByRole('button', { name: 'Show log' }).click();
   await expect(detail.getByLabel('log', { exact: true })).toHaveText(
     'Compiled cleanly.',
@@ -651,8 +650,10 @@ test('samples show now, and the rest appears when the task reveals', async ({
       runOf({}),
       runOf({
         group: 'hidden',
-        titles: ['Big grid', null],
-        key: { grid: 'big.txt', seed: 2 },
+        tuples: [
+          { title: 'Big grid', key: { grid: 'big.txt' } },
+          { title: null, key: { seed: 2 } },
+        ],
         verdict: 'skipped',
         passed: 0,
       }),
@@ -674,8 +675,8 @@ test('samples show now, and the rest appears when the task reveals', async ({
   const detail = page.getByRole('region', { name: 'Submission 1' });
   await expect(detail.getByText('Small grid')).toBeVisible();
   await expect(detail.getByText('score')).toBeVisible();
-  await expect(detail.getByText('big.txt · seed 2 · Big grid')).toHaveCount(0);
-  await expect(detail.getByText('big.txt · seed 2 · Big grid')).toBeVisible({
+  await expect(detail.getByText('Big grid · seed 2')).toHaveCount(0);
+  await expect(detail.getByText('Big grid · seed 2')).toBeVisible({
     timeout: 15_000,
   });
   await expect(detail.getByText('NOT GIVEN')).toBeVisible();

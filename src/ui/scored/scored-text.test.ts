@@ -1,16 +1,24 @@
 import { describe, expect, it } from 'vitest';
-import { overLimitSentence, submissionsWords, tupleLine } from './scored-text';
+import { overLimitSentence, reportLabel, submissionsWords, tupleLine } from './scored-text';
 
 describe('a run’s rows', () => {
-  it('shows the whole key, then the titles there are, never pairing them by place', () => {
-    // Two axes: the grid's title, and seeds with none. The key's columns
-    // come in name order, so its first is not the first axis's.
+  it('shows a titled tuple by its title and an untitled one by its columns', () => {
     expect(
-      tupleLine(['Big grid', null], { answer: 'big.ans', grid: 'big.txt', seed: 2 }),
-    ).toBe('big.ans · big.txt · seed 2 · Big grid');
-    expect(tupleLine(null, { route: 'hidden/route.txt', seed: 2 })).toBe(
+      tupleLine([
+        { title: 'Big grid', key: { grid: 'big.txt', answer: 'big.ans' } },
+        { title: null, key: { seed: 2 } },
+      ]),
+    ).toBe('Big grid · seed 2');
+    expect(tupleLine([{ title: null, key: { route: 'hidden/route.txt', seed: 2 } }])).toBe(
       'route.txt · seed 2',
     );
+  });
+});
+
+describe('a shown output', () => {
+  it('names it by its title, with its unit when it has one', () => {
+    expect(reportLabel('Run time', 'ms')).toBe('Run time (ms)');
+    expect(reportLabel('score', null)).toBe('score');
   });
 });
 

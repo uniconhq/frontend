@@ -40,6 +40,7 @@ async function stub(page: Page) {
         newer: null,
         problem: null,
         workflow: null,
+        text_values: null,
       } satisfies Schemas['WorkflowForm']);
     }
     if (path.includes('/regrades/')) {

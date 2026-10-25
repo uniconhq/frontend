@@ -259,6 +259,7 @@ describe('the task page', () => {
           problem: null,
           graded: false,
           inputs: [],
+          text_values: null,
         } satisfies WorkflowForm),
       ),
     );

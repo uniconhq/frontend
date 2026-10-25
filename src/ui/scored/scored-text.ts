@@ -6,20 +6,28 @@ export function submissionsWords(count: number): string {
 }
 
 /**
- * How a run names the rows it came from: its whole key, every column of
- * every axis as the run was given it, then each title its tuples have,
- * joined with " · ". A key is not paired with a title by place: the key
- * holds every axis's columns in name order, the titles one per axis. A
- * number is "seed 2"; a file is its name.
+ * How a run names the rows it came from: one piece per axis, joined with
+ * " · ". A tuple with a title shows that title; one without shows that
+ * axis's columns, a number as "seed 2" and a file by its name.
  */
-export function tupleLine(titles: RunShown['titles'], key: RunShown['key']): string {
-  const parts = Object.entries(key)
-    .map(([name, value]) => keyText(name, value))
-    .filter((shown) => shown !== '');
-  for (const title of titles ?? []) {
-    if (typeof title === 'string' && title !== '') parts.push(title);
+export function tupleLine(tuples: RunShown['tuples']): string {
+  const parts: string[] = [];
+  for (const tuple of tuples) {
+    if (typeof tuple.title === 'string' && tuple.title !== '') {
+      parts.push(tuple.title);
+      continue;
+    }
+    for (const [name, value] of Object.entries(tuple.key)) {
+      const shown = keyText(name, value);
+      if (shown !== '') parts.push(shown);
+    }
   }
   return parts.join(' · ');
+}
+
+/** How a shown output is named: its title, and its unit in parentheses. */
+export function reportLabel(title: string, unit: string | null): string {
+  return unit !== null && unit !== '' ? `${title} (${unit})` : title;
 }
 
 function keyText(name: string, value: unknown): string {

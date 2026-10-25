@@ -7,15 +7,16 @@ import { grading } from '@/test/contestant';
 import { RESULTS_AFTER } from '@/ui/number/words';
 import { ScoredResult } from './ScoredResult';
 
-/** One run of classic, accepted, with the time and memory it reported. */
-function run(reports: Record<string, string>) {
+/** One run of classic, accepted, with the outputs it reported. */
+function run(
+  reports: { title: string; unit: string | null; number: string }[],
+) {
   return {
     group: 'main',
     place: 1,
     id: null,
     dropped: false,
-    key: {},
-    titles: ['Small grid'],
+    tuples: [{ title: 'Small grid', key: {} }],
     verdict: 'accepted' as const,
     passed: 1,
     reports,
@@ -26,21 +27,26 @@ function run(reports: Record<string, string>) {
 }
 
 describe('a run’s values', () => {
-  it('names each by its key, its number exact', () => {
+  it('names each by its title and unit, its number exact', () => {
     renderWithProviders(
       <ScoredResult
         grading={grading({
           status: 'graded',
-          runs: [run({ time_ms: '28', memory_kb: '10420' })],
+          runs: [
+            run([
+              { title: 'Run time', unit: 'ms', number: '28' },
+              { title: 'Memory used', unit: 'KB', number: '10420' },
+            ]),
+          ],
           once: { reports: { time_ms: '3' }, texts: {} },
         })}
       />,
     );
 
     const group = screen.getByRole('region', { name: 'Group main' });
-    expect(within(group).getByText(/time_ms/)).toHaveTextContent('time_ms 28');
-    expect(within(group).getByText(/memory_kb/)).toHaveTextContent(
-      `memory_kb ${formatExact('10420')}`,
+    expect(within(group).getByText(/Run time/)).toHaveTextContent('Run time (ms) 28');
+    expect(within(group).getByText(/Memory used/)).toHaveTextContent(
+      `Memory used (KB) ${formatExact('10420')}`,
     );
     expect(screen.getByLabelText('Once')).toHaveTextContent('time_ms3');
   });
@@ -77,11 +83,13 @@ describe('a run task’s result', () => {
               place: 1,
               id: null,
               dropped: false,
-              key: { grid: 'big.txt', seed: 2 },
-              titles: ['Big grid', null],
+              tuples: [
+                { title: 'Big grid', key: { grid: 'big.txt' } },
+                { title: null, key: { seed: 2 } },
+              ],
               verdict: 'skipped',
               passed: 0,
-              reports: {},
+              reports: [],
               texts: {},
               label: null,
               message: null,
@@ -94,7 +102,7 @@ describe('a run task’s result', () => {
     expect(screen.getByRole('region', { name: 'Group samples' })).toHaveTextContent(
       'Test 1',
     );
-    expect(screen.getByText('big.txt · seed 2 · Big grid')).toBeVisible();
+    expect(screen.getByText('Big grid · seed 2')).toBeVisible();
     expect(screen.getByText('NOT GIVEN')).toBeVisible();
     expect(screen.getByText('score').closest('div')).toHaveTextContent('10');
     expect(screen.queryByText(/penal/)).toBeNull();
@@ -127,11 +135,10 @@ describe('a run task’s result', () => {
               place: 1,
               id: null,
               dropped: false,
-              key: {},
-              titles: ['Small grid'],
+              tuples: [{ title: 'Small grid', key: {} }],
               verdict: 'accepted',
               passed: 1,
-              reports: {},
+              reports: [],
               texts: {},
               label: null,
               message: null,
@@ -170,11 +177,10 @@ describe('a run task’s result', () => {
               place: 1,
               dropped: true,
               id: 'r',
-              key: {},
-              titles: ['Small grid'],
+              tuples: [{ title: 'Small grid', key: {} }],
               verdict: 'accepted',
               passed: 1,
-              reports: {},
+              reports: [],
               texts: {},
               label: null,
               message: null,

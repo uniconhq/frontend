@@ -76,6 +76,7 @@ const UNREAD: WorkflowForm = {
   problem: 'The workflow unicon/checked@v1 cannot be read.',
   graded: false,
   newer: null,
+  text_values: null,
 };
 
 function declared(
@@ -115,6 +116,7 @@ const CHECKED: WorkflowForm = {
     declared('greeting', 'text', { optional: true }),
     declared('token', 'text'),
   ],
+  text_values: null,
 };
 
 /** unicon/checked's file, which reports the fraction its checker gives a run. */
@@ -1044,6 +1046,7 @@ function runForm(workflow: string, inputs: DeclaredInput[]): WorkflowForm {
     graded: false,
     newer: null,
     inputs,
+    text_values: null,
   };
 }
 

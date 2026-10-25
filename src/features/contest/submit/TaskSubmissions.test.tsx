@@ -895,8 +895,8 @@ describe('a submission opened from the list', () => {
       name: 'Group samples',
     });
     expect(within(samples).getAllByText('ACCEPTED')).toHaveLength(2);
-    expect(samples).toHaveTextContent('time_ms 12');
-    expect(samples).toHaveTextContent(`memory_kb ${formatExact('2048')}`);
+    expect(samples).toHaveTextContent('Run time (ms) 12');
+    expect(samples).toHaveTextContent(`Memory used (KB) ${formatExact('2048')}`);
     expect(detail).not.toHaveTextContent(/points/);
 
     await user.click(within(detail).getByRole('button', { name: 'Show log' }));

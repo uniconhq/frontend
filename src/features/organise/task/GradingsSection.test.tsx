@@ -556,11 +556,10 @@ describe("the organisers' scored view of a submission", () => {
           place: 1,
           id: 'run-1',
           dropped: false,
-          key: {},
-          titles: ['Small grid'],
+          tuples: [{ title: 'Small grid', key: {} }],
           verdict: 'accepted',
           passed: 1,
-          reports: { time_ms: '12' },
+          reports: [{ title: 'Run time', unit: 'ms', number: '12' }],
           texts: {},
           label: null,
           message: null,
@@ -595,7 +594,7 @@ describe("the organisers' scored view of a submission", () => {
     expect(asked[0]?.get('entrant')).toBe('e-ada');
     const main = within(view).getByRole('region', { name: 'Group main' });
     expect(main).toHaveTextContent('Test 1');
-    expect(main).toHaveTextContent('time_ms 12');
+    expect(main).toHaveTextContent('Run time (ms) 12');
     expect(within(view).getByLabelText('Values')).toHaveTextContent(
       'score100 After the close',
     );
