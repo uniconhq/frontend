@@ -18,7 +18,7 @@ function pinOf(path: string): Pin {
   const step = /^steps\[(\d+)\](?:\.with\.([^.[]+))?/.exec(path);
   if (step?.[1] !== undefined)
     return { kind: 'step', index: Number(step[1]), port: step[2] ?? null };
-  const keyed = /^(inputs|test|report)\.([^.[]+)/.exec(path);
+  const keyed = /^(inputs|test|report|outputs)\.([^.[]+)/.exec(path);
   if (keyed?.[2] !== undefined) {
     if (keyed[1] === 'inputs') return { kind: 'input', id: keyed[2] };
     if (keyed[1] === 'test') return { kind: 'field', name: keyed[2] };
@@ -56,7 +56,8 @@ const WHOLE: Record<string, string> = {
   inputs: 'Inputs',
   test: 'Each test’s files',
   steps: 'Steps',
-  report: 'Report',
+  report: 'Outputs',
+  outputs: 'Outputs',
 };
 
 /** Every problem, in the file's order, said where it is and what fixes it opens. */

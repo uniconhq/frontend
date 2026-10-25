@@ -289,7 +289,9 @@ export const WORKFLOW_API = '/api/v1/workflows/kenny/tuned';
 export function workflowBackend(
   draft: string,
   options: {
-    problems?: (content: string) => { path: string; message: string }[];
+    problems?: (
+      content: string,
+    ) => { path: string; message: string; step?: string | null }[];
     versions?: string[];
   } = {},
 ) {
@@ -341,6 +343,14 @@ export function workflowBackend(
       ]),
     ),
     http.get('/api/v1/primitives', () => HttpResponse.json(PRIMITIVES)),
+    http.get('/api/v1/workflows/:owner/:name/versions/:version/box', () =>
+      HttpResponse.json({
+        inputs: [],
+        outputs: [],
+        newer_version: null,
+        run: false,
+      }),
+    ),
     http.post('/api/v1/workflows/check', async ({ request }) => {
       const { content } = (await request.json()) as { content: string };
       state.checks += 1;

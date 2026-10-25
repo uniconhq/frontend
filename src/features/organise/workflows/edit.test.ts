@@ -149,22 +149,18 @@ describe('editing the file in place', () => {
     });
   });
 
-  it('keeps a bound of thirty digits as written through an edit of the entry', () => {
-    const digits = '-12345678901234.5678901234567891';
-    const bounded = setEntry(COMMENTED, 'time', {
+  it('keeps a title when the unit is set', () => {
+    const titled = setEntry(COMMENTED, 'time', {
       from: { kind: 'steps', name: 'run', output: 'time_ms' },
-      at_least: new NumberText(digits),
+      title: 'Run time',
     });
-    const entry = workflowOf(bounded).report.find((found) => found.name === 'time');
-
-    expect(bounded).toContain(`at_least: ${digits}`);
-    expect(entry?.atLeast?.text).toBe(digits);
-    const folded = setEntry(bounded, 'time', {
+    const withUnit = setEntry(titled, 'time', {
       from: { kind: 'steps', name: 'run', output: 'time_ms' },
-      fold: 'max',
-      at_least: entry?.atLeast ?? null,
+      title: 'Run time',
+      unit: 'ms',
     });
-    expect(folded).toContain(`at_least: ${digits}, fold: max`);
+    expect(withUnit).toContain('title: Run time');
+    expect(withUnit).toContain('unit: ms');
   });
 
   it('writes the first port of a new step as a block', () => {
@@ -345,14 +341,13 @@ describe('editing the file in place', () => {
     });
     const meant = setEntry(COMMENTED, 'time', {
       from: { kind: 'steps', name: 'run', output: 'time_ms' },
-      fold: 'max',
-      better: 'lower',
-      at_least: new NumberText('0'),
+      title: 'Run time',
+      unit: 'ms',
     });
 
     expect(short).toContain('time: ${{ steps.run.time_ms }}');
     expect(meant).toContain(
-      'time: {from: "${{ steps.run.time_ms }}", fold: max, better: lower, at_least: 0}',
+      'time: {from: "${{ steps.run.time_ms }}", title: Run time, unit: ms}',
     );
     expect(
       workflowOf(removeEntry(meant, 'time')).report.map((entry) => entry.name),
@@ -416,5 +411,39 @@ describe('editing the file in place', () => {
     expect(text.indexOf('test:')).toBeLessThan(text.indexOf('steps:'));
     expect(ids(text)).toEqual(['compile', 'sandbox-run']);
     expect(CLASSIC_V2.length).toBeGreaterThan(0);
+  });
+
+  it('reads a named set of files and a step output with a dotted name', () => {
+    const text = [
+      'steps:',
+      '  - id: compare',
+      '    use: unicon/exec@v1',
+      '    with:',
+      '      program: ${{ workflow.diff/program.yaml }}',
+      '      files:',
+      '        output: ${{ steps.solution.output }}',
+      '        answer: ${{ inputs.answer }}',
+      'outputs:',
+      '  time_ms: {from: "${{ steps.game.entrant.time_ms }}", title: Run time, unit: ms}',
+      '',
+    ].join('\n');
+    const workflow = workflowOf(text);
+    const files = workflow.steps[0]?.with.files;
+    expect(files?.kind).toBe('mapping');
+    expect(workflow.steps[0]?.with.program).toMatchObject({
+      kind: 'wire',
+      ref: { kind: 'workflow', name: 'diff/program.yaml' },
+    });
+    expect(workflow.report[0]).toMatchObject({
+      name: 'time_ms',
+      title: 'Run time',
+      unit: 'ms',
+      from: { kind: 'steps', name: 'game', output: 'entrant.time_ms' },
+    });
+    const from = workflow.report[0]?.from ?? null;
+    if (from === null) throw new Error('the output has no source');
+    const edited = setEntry(text, 'time_ms', { from, title: 'Run time', unit: 'ms' });
+    expect(edited).toContain('output: ${{ steps.solution.output }}');
+    expect(edited).toContain('program: ${{ workflow.diff/program.yaml }}');
   });
 });

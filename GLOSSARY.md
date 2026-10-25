@@ -8,8 +8,8 @@ Nothing on screen names a file, a format key or how something is stored
 (`task.yaml`, "the id", "declares", "pins", "form details", "mapping"): say what
 the person is doing and what happens. Two places are the exception. "View
 file" shows a contest's or a task's stored settings, read-only, for checking.
-The workflow editor shows what a workflow's author must type: a port's name, a
-reference such as `${{ inputs.language }}`, and `fold` and `better`. And where
+The workflow editor shows what a workflow's author must type: a port's name and a
+reference such as `${{ inputs.language }}`. And where
 files are added to a task, the folders and files people make for it are named
 as they make them: `public/` for a statement's pictures, and a test's own
 `test.yaml` in a zip of tests.
@@ -40,6 +40,8 @@ as they make them: `public/` for a statement's pictures, and a test's own
 | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
 | **workflow**                                | the steps that grade a submission, which a task chooses                                                                                                                                                                                                 | pipeline, grader, checker (for the whole)                      |
 | **step**                                    | one stage of a workflow, which runs a primitive                                                                                                                                                                                                         | node, job                                                      |
+| **output**                                  | what one run of a workflow gives, named on the workflow                                                                                                                                                                                                 | report (on screen)                                             |
+| **box**                                     | a step that is itself a workflow, opened from the graph                                                                                                                                                                                                | subgraph                                                       |
 | **primitive**                               | a ready-made program a step runs, such as Compile or Run program                                                                                                                                                                                        | component, action                                              |
 | **runs once for each test**                 | a step that runs for every test, given its files, standing in the graph’s shaded band; any other step runs once, for the whole submission                                                                                                               | per test, per-test band                                        |
 | **input**                                   | a setting a workflow asks of the task, or of the entrant                                                                                                                                                                                                | parameter, option, field (for these)                           |

@@ -11,7 +11,7 @@ import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { useMe } from '@/session';
 import { workflowPath } from '@/lib/organiser-paths';
 import { workflowOwners } from '../roles';
-import { OwnerAndName } from './Combine';
+import { OwnerAndName } from './OwnerAndName';
 import classes from './workflows.module.css';
 
 const STARTS = [

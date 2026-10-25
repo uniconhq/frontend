@@ -33,7 +33,7 @@ import { orderAfterWire } from './rules';
  * given back as it is.
  */
 
-const TOP_ORDER = ['inputs', 'test', 'steps', 'report'];
+const TOP_ORDER = ['inputs', 'test', 'steps', 'outputs', 'report'];
 
 type Edit = (doc: Document) => void;
 
@@ -151,9 +151,10 @@ function rewriteStrings(doc: Document, change: (text: string) => string): void {
     }
   };
   for (const step of stepsOf(doc).items) if (isMap(step)) visit(step.get('with', true));
-  const report: unknown = (doc.contents as YAMLMap).get('report', true);
-  if (isMap(report)) {
-    for (const pair of report.items) {
+  for (const key of ['outputs', 'report']) {
+    const listed: unknown = (doc.contents as YAMLMap).get(key, true);
+    if (!isMap(listed)) continue;
+    for (const pair of listed.items) {
       if (isScalar(pair.value) && typeof pair.value.value === 'string') {
         pair.value.value = change(pair.value.value);
       } else visit(pair.value);
@@ -196,8 +197,9 @@ function dropUses(doc: Document, kind: Ref['kind'], name: string): void {
         ),
     );
   }
-  const report: unknown = (doc.contents as YAMLMap).get('report', true);
-  if (!isMap(report)) return;
+  for (const key of ['outputs', 'report']) {
+  const report: unknown = (doc.contents as YAMLMap).get(key, true);
+  if (!isMap(report)) continue;
   report.items = report.items.filter((pair) => {
     const value = pair.value;
     if (isScalar(value) && typeof value.value === 'string')
@@ -212,9 +214,22 @@ function dropUses(doc: Document, kind: Ref['kind'], name: string): void {
     }
     return true;
   });
+  }
 }
 
 // Steps
+
+/** A step that uses a run workflow, added at the end. */
+export function addUse(text: string, ref: string, name: string): string {
+  const workflow = workflowOf(text);
+  const id = freeName(
+    name,
+    workflow.steps.map((step) => step.id),
+  );
+  return edited(text, (doc) => {
+    stepsOf(doc).items.push(nodeFor(doc, { id, use: ref, with: {} }));
+  });
+}
 
 /** A step of `primitive` added, once before every per-test step, per test at the end. */
 export function addStep(
@@ -426,13 +441,9 @@ export function removeField(text: string, name: string): string {
 
 export type EntryFields = {
   from: Ref;
-  /** What pages call the value, "Run time", and what it is counted in, "ms" (M58). */
+  /** What pages call the value, "Run time", and what it is counted in, "ms". */
   title?: string | null;
   unit?: string | null;
-  fold?: string | null;
-  better?: string | null;
-  at_least?: NumberText | null;
-  at_most?: NumberText | null;
 };
 
 /**
@@ -449,20 +460,25 @@ export function entryFields(
   const fields: EntryFields = {
     title: entry.title,
     unit: entry.unit,
-    fold: entry.fold,
-    better: entry.better,
-    at_least: entry.atLeast,
-    at_most: entry.atMost,
     ...changed,
   };
   if (type !== null && type !== 'number') fields.unit = null;
   return fields;
 }
 
+/** The list a file already uses, `outputs` for a run workflow and `report` for an older one. */
+function outputKey(doc: Document): 'outputs' | 'report' {
+  const root = doc.contents as YAMLMap;
+  if (isMap(root.get('outputs', true))) return 'outputs';
+  if (isMap(root.get('report', true))) return 'report';
+  return 'outputs';
+}
+
 /** A report entry written, in the short form when it only reads an output. */
 export function setEntry(text: string, name: string, fields: EntryFields): string {
   return edited(text, (doc) => {
-    top<YAMLMap>(doc, 'report');
+    const key = outputKey(doc);
+    top<YAMLMap>(doc, key);
     const { from, ...meaning } = fields;
     const kept = Object.fromEntries(
       Object.entries(meaning).filter(
@@ -471,14 +487,14 @@ export function setEntry(text: string, name: string, fields: EntryFields): strin
     );
     const value =
       Object.keys(kept).length === 0 ? refText(from) : { from: refText(from), ...kept };
-    writeAt(doc, ['report', name], value);
+    writeAt(doc, [key, name], value);
   });
 }
 
 export function renameEntry(text: string, from: string, to: string): string {
-  return edited(text, (doc) => renameKey(doc, 'report', from, to));
+  return edited(text, (doc) => renameKey(doc, outputKey(doc), from, to));
 }
 
 export function removeEntry(text: string, name: string): string {
-  return edited(text, (doc) => writeAt(doc, ['report', name], undefined));
+  return edited(text, (doc) => writeAt(doc, [outputKey(doc), name], undefined));
 }

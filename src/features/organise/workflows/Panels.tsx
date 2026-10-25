@@ -3,10 +3,8 @@ import { ActionMenu } from '@/ui/ActionMenu';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
 import { Checkbox } from '@/ui/Checkbox';
-import { RadioGroup } from '@/ui/RadioGroup';
 import { Select } from '@/ui/Select';
 import { TextInput } from '@/ui/TextInput';
-import { compareDecimal } from '@/lib/exact';
 import { NumberText, numberText } from '../forms/yaml-doc';
 import {
   clearPort,
@@ -23,7 +21,6 @@ import {
   setEntry,
   setField,
   setInput,
-  setPerTest,
   setUse,
   setValue,
   wire,
@@ -47,13 +44,11 @@ import {
 import type { Pinned } from './pins';
 import { declared, type PrimitiveInfo } from './primitives';
 import {
-  BOUNDS,
   mayBeOptional,
   newProblem,
   outputType,
   reportable,
   reportRefusal,
-  switchRefusal,
   valueRefusal,
   wireRefusal,
 } from './rules';
@@ -63,7 +58,6 @@ import {
   portMarks,
   primitiveTitle,
   refWords,
-  runsSentence,
 } from './words';
 import classes from './workflows.module.css';
 
@@ -206,7 +200,9 @@ function PortValue({
           : String(value.value)
         : value.kind === 'text'
           ? value.text
-          : JSON.stringify(value.raw);
+          : value.kind === 'mapping' || value.kind === 'list'
+            ? ''
+            : JSON.stringify(value.raw);
   const apply = (raw: string | NumberText | boolean | undefined): string | null => {
     if (raw === undefined || raw === '') {
       change(clearPort(text, index, port));
@@ -259,8 +255,8 @@ function PortValue({
     return (
       <div className={classes.portValue}>
         <BodyText size="sm">
-          <strong>{label}</strong> takes a {decl.type}. Wire it from an input, a test’s
-          file or another step’s output, with its port on the graph.
+          <strong>{label}</strong> takes a {decl.type}. Wire it from an input or another
+          step’s output, with its port on the graph.
         </BodyText>
         {line !== undefined && (
           <BodyText size="sm" tone="secondary">
@@ -273,11 +269,6 @@ function PortValue({
     ...workflow.inputs
       .filter((input) => SCALARS.includes(input.type) && !input.optional)
       .map((input) => ({ kind: 'inputs' as const, name: input.id })),
-    ...(step.perTest
-      ? workflow.test
-          .filter((field) => SCALARS.includes(field.type))
-          .map((field) => ({ kind: 'test' as const, name: field.name }))
-      : []),
   ];
   return (
     <div className={classes.stack}>
@@ -371,20 +362,6 @@ function Details({
   );
 }
 
-const RUNS = [
-  {
-    value: 'once',
-    label: 'Once per submission',
-    description: 'Before the tests, such as compiling the program.',
-  },
-  {
-    value: 'each',
-    label: 'Once for each test',
-    description:
-      'Given each test’s files, such as running the program on the test’s input.',
-  },
-];
-
 export function StepPanel({
   text,
   workflow,
@@ -410,7 +387,6 @@ export function StepPanel({
     (found) =>
       found.problem === null && primitive !== null && found.name === primitive.name,
   );
-  const switching = switchRefusal(workflow, index);
   const problems = [
     ...(pinned.steps.get(index) ?? []),
     ...Object.keys(step.with).flatMap(
@@ -450,16 +426,6 @@ export function StepPanel({
           ))}
         </ul>
       )}
-      <RadioGroup
-        label="Run it"
-        value={step.perTest ? 'each' : 'once'}
-        options={RUNS}
-        disabled={switching !== null}
-        description={[runsSentence(step.perTest), switching]
-          .filter((line) => line !== null)
-          .join(' ')}
-        onChange={(chosen) => change(setPerTest(text, index, chosen === 'each'))}
-      />
       <CommitField
         label="Name"
         value={step.id}
@@ -636,16 +602,6 @@ function InputRow({
         options={TYPE_OPTIONS}
         onChange={(type) => update({ type })}
       />
-      <Checkbox
-        label="The entrant gives it"
-        description={
-          input.contestant
-            ? 'Each submission gives it, such as the program and its language.'
-            : 'The task gives it, such as a time limit.'
-        }
-        checked={input.contestant}
-        onChange={(contestant) => update({ contestant })}
-      />
       {input.type === 'enum' && (
         <CommitField
           label="Options"
@@ -661,15 +617,7 @@ function InputRow({
           }}
         />
       )}
-      {input.contestant && input.type === 'file' && (
-        <Checkbox
-          label="One file for each test"
-          checked={input.perTest}
-          onChange={(perTest) => update({ per_test: perTest })}
-        />
-      )}
-      {!input.contestant &&
-        (input.optional || mayBeOptional(workflow, primitives, input.id)) && (
+      {(input.optional || mayBeOptional(workflow, primitives, input.id)) && (
           <Checkbox
             label="A task may leave it out"
             checked={input.optional}
@@ -804,14 +752,6 @@ function FieldRow({
             update({ options });
             return null;
           }}
-        />
-      )}
-      {(field.type === 'file' || field.type === 'folder') && (
-        <Checkbox
-          label="Shown to entrants"
-          description="Entrants can download it from the task, for a task they work on offline."
-          checked={field.public}
-          onChange={(shown) => update({ public: shown })}
         />
       )}
       {problems.map((problem) => (
@@ -992,12 +932,6 @@ export function FieldsPanel({
   );
 }
 
-const FOLDS = [
-  { value: 'sum', label: 'Their total' },
-  { value: 'mean', label: 'Their average' },
-  { value: 'max', label: 'The largest' },
-];
-
 function EntryRow({
   text,
   workflow,
@@ -1015,13 +949,8 @@ function EntryRow({
 }) {
   const [refused, setRefused] = useState<string | null>(null);
   const from = entry.from;
-  const step =
-    from?.kind === 'steps'
-      ? workflow.steps.find((found) => found.id === from.name)
-      : undefined;
   const type = outputType(workflow, primitives, from);
   const isNumber = type === 'number';
-  const perTest = step?.perTest === true;
   const sources = reportable(workflow, primitives);
   const write = (next: Partial<EntryFields>) => {
     const reads = next.from ?? from;
@@ -1037,46 +966,8 @@ function EntryRow({
       ),
     );
   };
-  const betterInputs = workflow.inputs.filter(
-    (input) =>
-      !input.contestant &&
-      !input.optional &&
-      input.type === 'enum' &&
-      (input.options ?? []).every(
-        (option) => option === 'higher' || option === 'lower',
-      ),
-  );
-  const bound = (
-    key: 'at_least' | 'at_most',
-    label: string,
-    current: NumberText | null,
-  ) => (
-    <CommitField
-      label={label}
-      value={current === null ? '' : current.text}
-      placeholder="None"
-      apply={(written) => {
-        if (written.trim() === '') {
-          write({ [key]: null });
-          return null;
-        }
-        const value = numberText(written);
-        if (!(value instanceof NumberText)) return 'Give a number.';
-        const least = key === 'at_least' ? value : entry.atLeast;
-        const most = key === 'at_most' ? value : entry.atMost;
-        if (
-          least !== null &&
-          most !== null &&
-          compareDecimal(least.text, most.text) > 0
-        )
-          return BOUNDS;
-        write({ [key]: value });
-        return null;
-      }}
-    />
-  );
   return (
-    <li className={classes.declaration} aria-label={`The report entry ${entry.name}`}>
+    <li className={classes.declaration} aria-label={`The output ${entry.name}`}>
       <CommitField
         label="Name"
         value={entry.name}
@@ -1105,7 +996,7 @@ function EntryRow({
         onChange={(chosen) => {
           const ref = sources.find((found) => refLabel(found) === chosen);
           if (ref === undefined) return;
-          const refused = reportRefusal(workflow, primitives, ref, entry);
+          const refused = reportRefusal(workflow, primitives, ref);
           setRefused(refused);
           if (refused === null) write({ from: ref });
         }}
@@ -1139,37 +1030,6 @@ function EntryRow({
           />
         )}
       </div>
-      {isNumber && perTest && (
-        <Select
-          label="Over the tests, report"
-          value={entry.fold ?? ''}
-          placeholder="Each test’s value"
-          options={FOLDS}
-          onChange={(fold) => write({ fold: fold === '' ? null : fold })}
-        />
-      )}
-      {isNumber && perTest && (
-        <Select
-          label="Better is"
-          value={entry.better ?? ''}
-          placeholder="Not ranked"
-          options={[
-            { value: 'higher', label: 'Higher' },
-            { value: 'lower', label: 'Lower' },
-            ...betterInputs.map((input) => ({
-              value: refText({ kind: 'inputs', name: input.id }),
-              label: `As the task’s ${input.id} says`,
-            })),
-          ]}
-          onChange={(better) => write({ better: better === '' ? null : better })}
-        />
-      )}
-      {isNumber && (
-        <div className={classes.formText}>
-          {bound('at_least', 'Lowest it can be', entry.atLeast)}
-          {bound('at_most', 'Highest it can be', entry.atMost)}
-        </div>
-      )}
       {(pinned.entries.get(entry.name) ?? []).map((problem) => (
         <p key={problem.message} className={classes.problemText}>
           {problem.message}
@@ -1181,7 +1041,7 @@ function EntryRow({
           variant="secondary"
           onClick={() => change(removeEntry(text, entry.name))}
         >
-          Remove {entry.name} from the report
+          Remove {entry.name} from the outputs
         </Button>
       </div>
     </li>
@@ -1204,7 +1064,7 @@ export function ReportPanel({
   const sources = reportable(workflow, primitives);
   const [chosen, setChosen] = useState('');
   return (
-    <section className={classes.panel} aria-label="The report">
+    <section className={classes.panel} aria-label="Outputs">
       <BodyText size="sm" tone="secondary">
         What each grading reports, such as the time a program took. Organisers see it
         with every grading, and a leaderboard can rank by a number here.
@@ -1250,7 +1110,7 @@ export function ReportPanel({
                 setChosen('');
               }}
             >
-              Add to the report
+              Add an output
             </Button>
           </div>
         </div>

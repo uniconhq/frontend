@@ -97,7 +97,7 @@ describe('saving and publishing a workflow', () => {
     await user.click(await outputButton('run', 'time_ms'));
     await user.click(
       within(await openMenu('The output time_ms of run')).getByRole('menuitem', {
-        name: 'Report it',
+        name: 'Name it as an output',
       }),
     );
     await user.click(barButton('Save'));

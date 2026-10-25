@@ -31,7 +31,7 @@ describe('a workflow drawn', () => {
     const run = await screen.findByRole('group', { name: 'Step run' });
     expect(within(run).getByText('Run program')).toBeInTheDocument();
     expect(within(run).getByText('unicon/sandbox-run@v2')).toBeInTheDocument();
-    expect(within(run).getByText('For each test')).toBeInTheDocument();
+    expect(within(run).queryByText('For each test')).not.toBeInTheDocument();
     expect(
       within(run).getByText(
         "Runs a program on each test's input and records its output, time and memory.",
@@ -75,10 +75,10 @@ describe('a workflow drawn', () => {
     const inputs = screen
       .getAllByRole('group', { name: 'Inputs' })
       .find((box) => within(box).queryByText('submission') !== null);
-    expect(inputs).toHaveTextContent('the entrant gives it');
+    expect(inputs).not.toHaveTextContent('the entrant gives it');
     expect(inputs).toHaveTextContent('Used by compile');
-    const report = screen.getByRole('group', { name: 'Report' });
-    expect(report).toHaveTextContent('largest over the tests · lower is better');
+    const report = screen.getByRole('group', { name: 'Outputs' });
+    expect(report).not.toHaveTextContent('largest over the tests');
     expect(screen.getAllByRole('group', { name: 'Each test’s files' }).length).toBe(2);
   });
 
@@ -89,7 +89,7 @@ describe('a workflow drawn', () => {
     );
     renderWithProviders(<DrawnGraph text={titled} primitives={PRIMITIVES} />);
 
-    const report = await screen.findByRole('group', { name: 'Report' });
+    const report = await screen.findByRole('group', { name: 'Outputs' });
     const rows = [...report.querySelectorAll<HTMLElement>('[data-side="left"]')];
     const names = rows.map(
       (row) => row.firstElementChild?.nextElementSibling?.textContent,

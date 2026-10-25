@@ -128,6 +128,8 @@ export type Primitive = Schemas['Primitive'];
 export type PrimitivePort = Schemas['PrimitivePort'];
 /** A workflow a person may read, and whether they may edit it. */
 export type WorkflowItem = Schemas['WorkflowItem'];
+/** A version's inputs and outputs, for drawing it as a box. */
+export type WorkflowBox = Schemas['WorkflowBox'];
 /** A workflow as its page shows it, with the draft for one who may edit it. */
 export type WorkflowPage = Schemas['WorkflowPage'];
 /** One problem a version would be refused for, at its YAML path. */

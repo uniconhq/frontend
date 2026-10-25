@@ -1,4 +1,4 @@
-import { refsOf, type Ref, type Workflow } from './model';
+import { refsOf, wireRefs, type Ref, type Workflow } from './model';
 import type { PrimitiveInfo } from './primitives';
 import { refWords } from './words';
 
@@ -181,15 +181,25 @@ type Connection = {
   targetPort: string;
 };
 
-/** The ports of each step: the primitive's own, in its order, then the rest the file uses. */
-function stepPorts(workflow: Workflow, primitives: Map<string, PrimitiveInfo>) {
+/** The ports of a run workflow drawn as a box, when the step is not a primitive. */
+export type StepPorts = { inputs: string[]; outputs: string[] };
+
+/** The ports of each step: the primitive's own, or a box's, then the rest the file uses. */
+function stepPorts(
+  workflow: Workflow,
+  primitives: Map<string, PrimitiveInfo>,
+  boxes: ReadonlyMap<string, StepPorts>,
+) {
   const indexes = stepIndexes(workflow);
   const left: string[][] = [];
   const right: string[][] = [];
   workflow.steps.forEach((step) => {
     const declared = primitives.get(step.use);
+    const box = boxes.get(step.use);
     const inputs =
-      declared && declared.problem === null ? Object.keys(declared.inputs) : [];
+      declared && declared.problem === null
+        ? Object.keys(declared.inputs)
+        : (box?.inputs ?? []);
     left.push([
       ...inputs,
       ...Object.keys(step.with).filter((port) => !inputs.includes(port)),
@@ -197,7 +207,7 @@ function stepPorts(workflow: Workflow, primitives: Map<string, PrimitiveInfo>) {
     const outputs =
       declared && declared.problem === null
         ? Object.keys(declared.outputs).filter((output) => output !== 'outcome')
-        : [];
+        : [...(box?.outputs ?? [])];
     right.push(outputs);
   });
   const reads = (ref: Ref, before: number) => {
@@ -238,10 +248,11 @@ function compare(a: (number | string)[], b: (number | string)[]): number {
 export function layoutWorkflow(
   workflow: Workflow,
   primitives: Map<string, PrimitiveInfo>,
+  given: ReadonlyMap<string, StepPorts> = new Map(),
 ): Layout {
   const { steps } = workflow;
   const indexes = stepIndexes(workflow);
-  const ports = stepPorts(workflow, primitives);
+  const ports = stepPorts(workflow, primitives, given);
   const declaredInputs = new Set(workflow.inputs.map((input) => input.id));
   const declaredFields = new Set(workflow.test.map((field) => field.name));
 
@@ -446,8 +457,8 @@ export function layoutWorkflow(
   };
   steps.forEach((step, index) => {
     for (const [port, value] of Object.entries(step.with))
-      if (value.kind === 'wire')
-        connect(value.ref, index, stepBox(index), port, `port:${index}.${port}`);
+      for (const ref of wireRefs(value))
+        connect(ref, index, stepBox(index), port, `port:${index}.${port}`);
   });
   for (const entry of workflow.report)
     if (entry.from !== null)

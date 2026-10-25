@@ -39,6 +39,7 @@ import {
   type Layout,
   type Point,
 } from './layout';
+import type { BoxDecl } from './boxes';
 import { sourceAt, targetAt, type Notice, type Target } from './ends';
 import { NOTICE_MS } from './notice';
 import { NumberText } from '../forms/yaml-doc';
@@ -48,8 +49,6 @@ import { declared, type PrimitiveInfo } from './primitives';
 import {
   boxName,
   entryMarks,
-  fieldMarks,
-  inputMarks,
   portMarks,
   primitiveTitle,
   readersWords,
@@ -111,11 +110,17 @@ type HeadView =
   | {
       kind: 'step';
       name: string;
+      /** The step's place in `steps:`, so Open can name it. */
+      step: number | null;
       runs: string;
       primitive: string | null;
       use: string;
       description: string | null | undefined;
       problems: DefinitionProblem[];
+      /** A run workflow, which Open shows. */
+      openable: boolean;
+      /** A later version of that workflow, when there is one. */
+      newer: string | null;
     }
   | { kind: 'group'; name: string; detail: string };
 
@@ -149,6 +154,8 @@ type Actions = {
   menus: boolean;
   select: (key: string) => void;
   entries: (box: string, port: string, side: Side) => MenuEntry[];
+  /** Open the run workflow a step uses. */
+  openBox: (index: number) => void;
 };
 
 const ActionsContext = createContext<Actions | null>(null);
@@ -172,6 +179,8 @@ type Seen = {
   label: ((box: Box, port: string, side: Side) => string | null) | null;
   /** The ports a drawn wire feeds, `port:<step>.<port>`. */
   drawn: Set<string>;
+  /** Run workflows the steps use, by `owner/name@version`. */
+  workflowBoxes: ReadonlyMap<string, BoxDecl>;
 };
 
 /**
@@ -197,6 +206,7 @@ function shownValue(
       ? `= ${value.value.text}`
       : `= ${JSON.stringify(value.value)}`;
   if (value.kind === 'text') return `= ${JSON.stringify(value.text)}`;
+  if (value.kind === 'mapping' || value.kind === 'list') return null;
   return 'a value no port takes';
 }
 
@@ -244,11 +254,15 @@ function rowView(
     box.kind === 'report'
       ? workflow.report.find((found) => found.name === port)
       : undefined;
-  const type = decl?.type ?? input?.type ?? field?.type ?? null;
+  const step = box.step !== null ? workflow.steps[box.step] : undefined;
+  const boxed = step !== undefined ? seen.workflowBoxes.get(step.use) : undefined;
+  const boxType =
+    side === 'left'
+      ? boxed?.inputs.find((input) => input.name === port)?.type
+      : boxed?.outputs.find((output) => output.name === port)?.type;
+  const type = decl?.type ?? boxType ?? input?.type ?? field?.type ?? null;
   const marks = [
     ...(side === 'left' && primitive !== null ? portMarks(primitive, port) : []),
-    ...(input !== undefined ? inputMarks(input) : []),
-    ...(field !== undefined ? fieldMarks(field) : []),
     ...(entry !== undefined ? entryMarks(entry) : []),
   ];
   const said = [type, ...marks, value].filter((part) => part !== null).join(' · ');
@@ -273,6 +287,10 @@ function rowView(
   };
 }
 
+function boxedRun(seen: Seen, use: string | undefined): boolean {
+  return use !== undefined && seen.workflowBoxes.get(use)?.run === true;
+}
+
 function boxData(seen: Seen, box: Box): BoxData {
   const { workflow } = seen;
   const step = box.step !== null ? workflow.steps[box.step] : undefined;
@@ -292,18 +310,21 @@ function boxData(seen: Seen, box: Box): BoxData {
         ? {
             kind: 'step',
             name: step?.id || '(no name)',
-            runs: runsWords(step?.perTest === true),
+            step: box.step,
+            runs: runsWords(false),
             primitive: primitive !== null ? primitiveTitle(primitive) : null,
             use: step?.use ?? '',
             description: primitive?.description,
             problems: box.step !== null ? (seen.pinned.steps.get(box.step) ?? []) : [],
+            openable: primitive === null && boxedRun(seen, step?.use),
+            newer: step === undefined ? null : (seen.workflowBoxes.get(step.use)?.newer ?? null),
           }
         : {
             kind: 'group',
             name,
             detail:
               box.kind === 'report'
-                ? 'What each grading reports'
+                ? 'What each run gives'
                 : readersWords(box.readers),
           },
     rows: [
@@ -441,6 +462,21 @@ const StepHead = memo(function StepHead({
           <span className={classes.ref}>{head.use}</span>
         </span>
       </button>
+      {head.openable && (
+        <button
+          type="button"
+          className={`${classes.headButton} nodrag nopan`}
+          aria-label={`Open ${head.name}`}
+          onClick={() => {
+            if (head.step !== null) actions.openBox(head.step);
+          }}
+        >
+          Open
+        </button>
+      )}
+      {head.newer !== null && (
+        <p className={classes.description}>A newer version is {head.newer}</p>
+      )}
       {head.problems.length > 0 ? (
         <p className={classes.headProblem}>
           {head.problems.map((problem) => (
@@ -629,6 +665,8 @@ function useReveal(
  * Each port is a menu when `label` and `entries` are given, built only when
  * it opens; without them, each port is only its name.
  */
+const NO_WORKFLOW_BOXES = new Map<string, BoxDecl>();
+
 export function Graph({
   layout,
   workflow,
@@ -647,6 +685,8 @@ export function Graph({
   onDrop,
   reveal = null,
   cover = 0,
+  workflowBoxes = NO_WORKFLOW_BOXES,
+  onOpenBox,
 }: {
   layout: Layout;
   workflow: Workflow;
@@ -665,6 +705,8 @@ export function Graph({
   onDrop: (source: Ref, target: Target, box: string, port: string) => void;
   reveal?: Reveal | null;
   cover?: number;
+  workflowBoxes?: ReadonlyMap<string, BoxDecl>;
+  onOpenBox?: (index: number) => void;
 }) {
   const frame = useRef<HTMLDivElement>(null);
   useReveal(frame, layout, reveal, cover);
@@ -691,6 +733,7 @@ export function Graph({
     notice,
     label: menus ? label : null,
     drawn,
+    workflowBoxes,
   };
   const found: (BoxNode | SlotNode | BandNode)[] = [];
   if (layout.band !== null) {
@@ -767,6 +810,7 @@ export function Graph({
     onSelect,
     onDragStart,
     onDrop,
+    onOpenBox,
   });
   useLayoutEffect(() => {
     latest.current = {
@@ -777,6 +821,7 @@ export function Graph({
       onSelect,
       onDragStart,
       onDrop,
+      onOpenBox,
     };
   });
   const select = useCallback((key: string) => {
@@ -793,6 +838,7 @@ export function Graph({
         const box = now.get(key);
         return box !== undefined && build !== undefined ? build(box, port, side) : [];
       },
+      openBox: (index) => latest.current.onOpenBox?.(index),
     }),
     [readOnly, menus, select],
   );

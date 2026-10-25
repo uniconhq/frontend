@@ -1,4 +1,5 @@
-import { ActionMenu } from '@/ui/ActionMenu';
+import { ActionMenu, type MenuEntry } from '@/ui/ActionMenu';
+import type { PaletteWorkflow } from './boxes';
 import type { PrimitiveInfo } from './primitives';
 import { versionNumber } from './versions';
 import { primitiveTitle } from './words';
@@ -29,13 +30,38 @@ function newest(primitives: PrimitiveInfo[]): PrimitiveInfo[] {
  */
 export function AddStep({
   primitives,
+  workflows,
   disabled,
   onAdd,
+  onAddWorkflow,
 }: {
   primitives: PrimitiveInfo[];
+  workflows: PaletteWorkflow[];
   disabled: boolean;
   onAdd: (primitive: PrimitiveInfo) => void;
+  onAddWorkflow: (workflow: PaletteWorkflow) => void;
 }) {
+  const entries: MenuEntry[] = [
+    ...newest(primitives).map(
+      (primitive): MenuEntry => ({
+        kind: 'item',
+        text: primitiveTitle(primitive),
+        detail: primitive.description,
+        note: primitive.ref,
+        onSelect: () => onAdd(primitive),
+      }),
+    ),
+  ];
+  if (workflows.length > 0) {
+    entries.push({ kind: 'divider' });
+    for (const workflow of workflows)
+      entries.push({
+        kind: 'item',
+        text: `${workflow.owner}/${workflow.name}`,
+        note: workflow.version,
+        onSelect: () => onAddWorkflow(workflow),
+      });
+  }
   return (
     <ActionMenu
       button
@@ -43,13 +69,7 @@ export function AddStep({
       label="Add step"
       disabled={disabled}
       empty="Unicon has no primitive this page can use."
-      entries={newest(primitives).map((primitive) => ({
-        kind: 'item' as const,
-        text: primitiveTitle(primitive),
-        detail: primitive.description,
-        note: primitive.ref,
-        onSelect: () => onAdd(primitive),
-      }))}
+      entries={entries}
     />
   );
 }

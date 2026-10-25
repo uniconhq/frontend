@@ -20,22 +20,26 @@ export const VALUE_TYPES: ValueType[] = [
   'folder',
 ];
 
-/** One `${{ ... }}`: an input, a field of the current test, or a step's output. */
+/** One `${{ ... }}`: an input, a file of the workflow, or a step's output. */
 export type Ref =
   | { kind: 'inputs'; name: string }
   | { kind: 'test'; name: string }
+  | { kind: 'workflow'; name: string }
   | { kind: 'steps'; name: string; output: string };
 
 /**
  * What a port is given. `wire` is a whole reference, drawn as a wire; `text`
  * a string with references written into it, which draws none; `literal` a
- * number, a boolean or a plain string; `invalid` anything else, such as a
- * list or a `${{ }}` that is not a reference.
+ * number, a boolean or a plain string; `mapping` a set of named values, such
+ * as `named_files`; `list` an ordered set of values; `invalid` a `${{ }}`
+ * that is not a reference.
  */
 export type WithValue =
   | { kind: 'wire'; ref: Ref }
   | { kind: 'text'; text: string; refs: Ref[] }
   | { kind: 'literal'; value: string | NumberText | boolean }
+  | { kind: 'mapping'; entries: { name: string; value: WithValue }[] }
+  | { kind: 'list'; items: WithValue[] }
   | { kind: 'invalid'; raw: unknown };
 
 export type InputDecl = {
@@ -101,29 +105,29 @@ function parseRef(expression: string): Ref | null {
   const [head, name, output] = parts;
   if (head === 'inputs' && name && parts.length === 2) return { kind: 'inputs', name };
   if (head === 'test' && name && parts.length === 2) return { kind: 'test', name };
-  if (head === 'steps' && name && output && parts.length === 3)
-    return { kind: 'steps', name, output };
+  if (head === 'workflow' && parts.length >= 2)
+    return { kind: 'workflow', name: parts.slice(1).join('.') };
+  if (head === 'steps' && name && output)
+    return { kind: 'steps', name, output: parts.slice(2).join('.') };
   return null;
 }
 
 /** A reference as the file writes it. */
 export function refText(ref: Ref): string {
   if (ref.kind === 'steps') return `\${{ steps.${ref.name}.${ref.output} }}`;
+  if (ref.kind === 'workflow') return `\${{ workflow.${ref.name} }}`;
   return `\${{ ${ref.kind}.${ref.name} }}`;
 }
 
 /** A reference as the page names it, without the braces. */
 export function refLabel(ref: Ref): string {
   if (ref.kind === 'steps') return `${ref.name}.${ref.output}`;
+  if (ref.kind === 'workflow') return ref.name;
   return `${ref.kind}.${ref.name}`;
 }
 
 export function sameRef(a: Ref, b: Ref): boolean {
-  return (
-    a.kind === b.kind &&
-    a.name === b.name &&
-    (a.kind !== 'steps' || (b.kind === 'steps' && a.output === b.output))
-  );
+  return refText(a) === refText(b);
 }
 
 /** The one reference `text` is exactly, or null when it is anything else. */
@@ -153,7 +157,7 @@ export function refProblem(text: string): string | null {
   for (const match of found) {
     const expression = match[1] ?? '';
     if (parseRef(expression) === null)
-      return `Unicon cannot read \${{ ${expression} }}. Write \${{ inputs.<id> }}, \${{ test.<field> }} or \${{ steps.<id>.<output> }}.`;
+      return `Unicon cannot read \${{ ${expression} }}. Write \${{ inputs.<id> }}, \${{ workflow.<path> }} or \${{ steps.<id>.<output> }}.`;
   }
   if (text.split('${{').length - 1 !== found.length)
     return 'A ${{ is not closed with }}, or has a brace inside it. Close each one, and remove any brace inside.';
@@ -166,6 +170,12 @@ function withValue(raw: unknown): WithValue {
     return { kind: 'literal', value: new NumberText(String(raw)) };
   if (raw instanceof NumberText || typeof raw === 'boolean')
     return { kind: 'literal', value: raw };
+  if (Array.isArray(raw)) return { kind: 'list', items: raw.map((item) => withValue(item)) };
+  if (isRecord(raw))
+    return {
+      kind: 'mapping',
+      entries: Object.entries(raw).map(([name, value]) => ({ name, value: withValue(value) })),
+    };
   if (typeof raw !== 'string') return { kind: 'invalid', raw };
   const whole = wholeRef(raw);
   if (whole !== null) return { kind: 'wire', ref: whole };
@@ -175,10 +185,20 @@ function withValue(raw: unknown): WithValue {
   return { kind: 'text', text: raw, refs };
 }
 
-/** The references a port's value reads: the wire's, or those written in. */
+/** The references a port's value reads, including those inside a mapping or a list. */
 export function refsOf(value: WithValue): Ref[] {
   if (value.kind === 'wire') return [value.ref];
   if (value.kind === 'text') return value.refs;
+  if (value.kind === 'mapping') return value.entries.flatMap((entry) => refsOf(entry.value));
+  if (value.kind === 'list') return value.items.flatMap((item) => refsOf(item));
+  return [];
+}
+
+/** The references drawn as wires: a whole reference, including inside a mapping or a list. */
+export function wireRefs(value: WithValue): Ref[] {
+  if (value.kind === 'wire') return [value.ref];
+  if (value.kind === 'mapping') return value.entries.flatMap((entry) => wireRefs(entry.value));
+  if (value.kind === 'list') return value.items.flatMap((item) => wireRefs(item));
   return [];
 }
 
@@ -286,11 +306,11 @@ export function readWorkflow(file: unknown): Workflow {
   const top = isRecord(file) ? file : {};
   const inputs = isRecord(top.inputs) ? top.inputs : {};
   const test = isRecord(top.test) ? top.test : {};
-  const report = isRecord(top.report) ? top.report : {};
+  const listed = isRecord(top.outputs) ? top.outputs : isRecord(top.report) ? top.report : {};
   return {
     inputs: Object.entries(inputs).map(([id, raw]) => inputOf(id, raw)),
     test: Object.entries(test).map(([name, raw]) => fieldOf(name, raw)),
     steps: (Array.isArray(top.steps) ? top.steps : []).map(stepOf),
-    report: Object.entries(report).map(([name, raw]) => entryOf(name, raw)),
+    report: Object.entries(listed).map(([name, raw]) => entryOf(name, raw)),
   };
 }
