@@ -15,7 +15,7 @@ import {
 } from '@/lib/exact';
 import { listed } from '@/lib/listed';
 import { percentOf } from '../contest/percent';
-import type { GroupValues, TaskValues } from '../forms/task-values';
+import type { GroupValues } from '../forms/task-values';
 
 /**
  * How a task scores, in the words its organisers and entrants read
@@ -33,7 +33,7 @@ import type { GroupValues, TaskValues } from '../forms/task-values';
 export type Rule = 'none' | 'all' | 'share' | 'each' | 'bonus' | 'worst' | 'advanced';
 
 /** A test's credit: 1 when accepted, a reported value, or a value over the best. */
-export type CreditKind = TaskValues['credit']['kind'];
+export type CreditKind = 'none' | 'value' | 'relative';
 
 const set = (text: string) => text.trim() !== '';
 
@@ -43,19 +43,6 @@ const ONE: Ratio = { num: 1n, den: 1n };
 function everyTest(passAt: string): boolean {
   const share = ratioOf(passAt);
   return !set(passAt) || (share !== null && compareRatio(share, ONE) === 0);
-}
-
-/**
- * Why a share of tests cannot be saved, or undefined when it can: the format
- * takes a share above none and at most every test.
- */
-export function shareProblem(passAt: string): string | undefined {
-  if (!set(passAt)) return undefined;
-  const share = ratioOf(passAt);
-  if (share === null) return undefined;
-  return compareRatio(share, ZERO) <= 0 || compareRatio(share, { num: 1n, den: 1n }) > 0
-    ? 'Give a share above 0% and at most 100%.'
-    : undefined;
 }
 
 /** The rule a group's weights say, as the form offers rules. */
@@ -69,19 +56,6 @@ export function ruleOf(group: GroupValues): Rule {
   if (each) return set(group.passAt) ? 'advanced' : 'each';
   return everyTest(group.passAt) ? 'all' : 'share';
 }
-
-/** The rules in the order the form offers them, with what each says. */
-export const RULES: { value: Exclude<Rule, 'advanced'>; label: string }[] = [
-  { value: 'all', label: 'Every test must pass' },
-  { value: 'share', label: 'At least a share of its tests must pass' },
-  { value: 'each', label: 'Points for each test passed' },
-  {
-    value: 'bonus',
-    label: 'Points for each test passed, and a bonus for passing every one',
-  },
-  { value: 'worst', label: 'The lowest test score counts' },
-  { value: 'none', label: 'No points: for practice' },
-];
 
 /**
  * Why the save would refuse a rule here, or null when it would not: the
@@ -131,24 +105,6 @@ export function withRule(group: GroupValues, rule: Rule): GroupValues {
               ? { ...cleared, each: points, pass: bonus }
               : { ...cleared, worst: points };
   return readsWeights(next) ? next : { ...next, weights: [] };
-}
-
-/** The group with its points box, under its rule, set to `points`. */
-export function withPoints(
-  group: GroupValues,
-  points: string,
-  rule: Rule,
-): GroupValues {
-  if (rule === 'all' || rule === 'share') return { ...group, pass: points };
-  if (rule === 'worst') return { ...group, worst: points };
-  return { ...group, each: points };
-}
-
-/** The points box of a group under the rule it is shown with. */
-export function pointsOf(group: GroupValues, rule: Rule): string {
-  if (rule === 'all' || rule === 'share') return group.pass;
-  if (rule === 'worst') return group.worst;
-  return group.each;
 }
 
 /**
@@ -403,7 +359,7 @@ export function groupWords(
  * points shared among the tests passed", "[10] points times the lowest test
  * score", "[100] points when at least [80]% of the tests pass".
  */
-export function mixWords(
+function mixWords(
   credit: CreditKind,
   weighted: boolean,
 ): { each: string; worst: string; passBefore: string; passAfter: string } {
@@ -530,20 +486,7 @@ export function showRefusal(
 }
 
 /**
- * Why showing a group's pass or fail alone is greyed, in a few words for its
- * option's own label: "(needs a group that earns all or nothing)". Null
- * where the save would take it.
- */
-export function showGreyedWords(group: GroupValues, credit: CreditKind): string | null {
-  if (showRefusal('verdict', group, credit) === null) return null;
-  return credit === 'relative'
-    ? '(not while a test earns against the best)'
-    : '(needs a group that earns all or nothing)';
-}
-
-/**
- * A task none of whose groups earns, in the words the Tests card and how the
- * contest is scored both use.
+ * A task none of whose groups earns, in the words how the contest is scored uses.
  */
 export const NO_POINTS =
   'The task gives no points: no group earns any. It is ranked on what its workflow reports, if a leaderboard says so.';

@@ -423,3 +423,17 @@
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: 10px;
 }
+
+.runs {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.runs th,
+.runs td {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--unicon-border);
+  vertical-align: top;
+  text-align: left;
+}

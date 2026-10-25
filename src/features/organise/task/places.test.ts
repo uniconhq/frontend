@@ -48,12 +48,12 @@ describe('where a refused setting or file of the task is changed', () => {
     ],
     [
       'submissions.rate.per',
-      'Tests and scoring, Submission rules: Length of the window',
+      'Submissions: Length of the window',
       `${PAGE}?card=tests&field=per`,
     ],
     [
       'submissions.max',
-      'Tests and scoring, Submission rules: Most submissions',
+      'Submissions: Most submissions',
       `${PAGE}?card=tests&field=max`,
     ],
     ['tests/', 'Tests', `${PAGE}?card=tests`],
@@ -62,6 +62,21 @@ describe('where a refused setting or file of the task is changed', () => {
       'tests/large/3/answer.txt',
       'Tests, large, test 3',
       `${PAGE}?card=tests&field=test%3A3&item=large`,
+    ],
+    [
+      'repeat[0].tuples[1].title',
+      'Runs, axis 1, row 2: title',
+      `${PAGE}?card=runs&field=axis-0-tuple-1-title`,
+    ],
+    [
+      'repeat[0].tuples[1].max_size',
+      'Runs, axis 1, row 2: max_size',
+      `${PAGE}?card=runs&field=axis-0-tuple-1-max_size`,
+    ],
+    [
+      'repeat[1].tuples[0].seed',
+      'Runs, axis 2, row 1: seed',
+      `${PAGE}?card=runs&field=axis-1-tuple-0-seed`,
     ],
     ['statement.md', 'Statement', `${PAGE}?card=statement`],
     // A setting's own files, under its folder (M51), or under inputs/ for an

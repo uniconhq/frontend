@@ -12,7 +12,7 @@ import { formatDateTime } from '@/lib/time';
 import { DefinitionErrors } from '../DefinitionErrors';
 import { TaskInContest } from '../contest/TaskEntry';
 import { fileQuery } from '../files/place';
-import { readTask } from '../forms/task-values';
+import { readTask, runCount } from '../forms/task-values';
 import {
   inputTitle,
   readSettings,
@@ -41,7 +41,7 @@ function StateChip({ state }: { state: TaskState }) {
   return <Chip tone="live">Published</Chip>;
 }
 
-type Card = 'workflow' | 'inputs' | 'tests' | 'statement';
+type Card = 'workflow' | 'inputs' | 'runs' | 'tests' | 'statement';
 
 type Item = { card: Card; ok: boolean; text: string };
 
@@ -99,6 +99,8 @@ function readiness(
   const tests = folders.reduce((total, folder) => total + folder.tests.length, 0);
   const empty = folders.find((folder) => folder.tests.length === 0);
   const total = values === null ? null : taskWeight(values.groups);
+  const axes = (values?.axes ?? []).filter((axis) => axis.inputs.length > 0);
+  const gradedByTests = axes.length === 0;
   return [
     {
       card: 'statement',
@@ -125,26 +127,38 @@ function readiness(
             ? 'Inputs: see the problems below'
             : 'Inputs',
     },
-    {
-      card: 'tests',
-      ok: tests > 0 && empty === undefined && !under(state, 'tests'),
-      text:
-        tests === 0
-          ? 'Tests: none yet'
-          : `Tests: ${String(tests)} in ${folders.length === 1 ? '1 group' : `${String(folders.length)} groups`}${empty !== undefined ? `, ${empty.name} has none` : ''}`,
-    },
-    {
-      card: 'tests',
-      ok: total !== null && !under(state, 'test_groups', 'credit'),
-      text:
-        total === null
-          ? 'Scoring: cannot be read'
-          : under(state, 'test_groups', 'credit')
-            ? 'Scoring: see the problems below'
-            : total.num === 0n
-              ? 'Scoring: no points, ranked on reported values'
-              : `Scoring: ${pointsWords(total)}${worth !== null && compareRatio(worth, total) !== 0 ? ' here' : ''}`,
-    },
+    ...(gradedByTests
+      ? [
+          {
+            card: 'tests' as const,
+            ok: tests > 0 && empty === undefined && !under(state, 'tests'),
+            text:
+              tests === 0
+                ? 'Tests: none yet'
+                : `Tests: ${String(tests)} in ${folders.length === 1 ? '1 group' : `${String(folders.length)} groups`}${empty !== undefined ? `, ${empty.name} has none` : ''}`,
+          },
+          {
+            card: 'tests' as const,
+            ok: total !== null && !under(state, 'test_groups', 'credit'),
+            text:
+              total === null
+                ? 'Scoring: cannot be read'
+                : under(state, 'test_groups', 'credit')
+                  ? 'Scoring: see the problems below'
+                  : total.num === 0n
+                    ? 'Scoring: no points, ranked on reported values'
+                    : `Scoring: ${pointsWords(total)}${worth !== null && compareRatio(worth, total) !== 0 ? ' here' : ''}`,
+          },
+        ]
+      : [
+          {
+            card: 'runs' as const,
+            ok: !under(state, 'repeat'),
+            text: under(state, 'repeat')
+              ? 'Runs: see the problems below'
+              : `Runs: ${String(runCount(axes))}`,
+          },
+        ]),
   ];
 }
 

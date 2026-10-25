@@ -73,8 +73,8 @@ function AllFiles({ place }: { place: Extract<Place, { kind: 'task' }> }) {
         <SectionTitle>All files</SectionTitle>
         <BodyText tone="secondary">
           Every file the task holds, to read but not change. They are changed on the
-          task&apos;s page: tests in Tests and scoring, pictures from the Statement
-          card, and a setting&apos;s file in its box on the Inputs card.
+          task&apos;s page: a run&apos;s file on the Runs card, pictures from the
+          Statement card, and a setting&apos;s file in its box on the Inputs card.
         </BodyText>
         <div className={classes.actions}>
           <Button

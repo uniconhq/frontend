@@ -23,7 +23,7 @@ function task(groups: GroupValues[]): TaskValues {
     name: 'Sum',
     workflow: 'unicon/classic@v1',
     inputs: [],
-    credit: { kind: 'none', name: '' },
+    axes: [],
     groups,
     max: '',
     rateCount: '',

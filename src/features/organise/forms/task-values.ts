@@ -27,11 +27,30 @@ export type TaskValues = {
   name: string;
   workflow: string;
   inputs: InputValues[];
-  credit: { kind: 'none' | 'value' | 'relative'; name: string };
+  /**
+   * One axis of `repeat`: the inputs that move together, and one tuple per
+   * row. A second axis is crossed with the first, so 2 and 3 tuples make 6
+   * runs.
+   */
+  axes: AxisValues[];
   groups: GroupValues[];
   max: string;
   rateCount: string;
   ratePer: string;
+};
+
+/** Who fills an input: the organiser, the entrant, or one value per run. */
+export type Give = 'setting' | 'entrant' | 'per-run';
+
+export type AxisValues = {
+  inputs: string[];
+  tuples: TupleValues[];
+};
+
+export type TupleValues = {
+  title: string;
+  maxSize: string;
+  cells: Record<string, { entrant: boolean; value: string }>;
 };
 
 export type InputValues = {
@@ -57,6 +76,12 @@ export type InputValues = {
   value: string;
   /** The value names a secret of the org rather than being the value. */
   secret: boolean;
+  /**
+   * Who fills it, once the task is in the run format. Absent on a value read
+   * from an older file, which the form still edits as a setting or as the
+   * entrant's details.
+   */
+  give?: Give;
 };
 
 export type GroupValues = {
@@ -101,6 +126,22 @@ export function emptyInput(
   };
 }
 
+/** One empty tuple of an axis, every cell a value the organiser has not set. */
+export function emptyTuple(inputs: readonly string[]): TupleValues {
+  return {
+    title: '',
+    maxSize: '',
+    cells: Object.fromEntries(inputs.map((id) => [id, { entrant: false, value: '' }])),
+  };
+}
+
+/** How many runs the axes make: the product of their tuples, or 1 with none. */
+export function runCount(axes: readonly AxisValues[]): number {
+  const counted = axes.filter((axis) => axis.inputs.length > 0);
+  if (counted.length === 0) return 1;
+  return counted.reduce((total, axis) => total * Math.max(axis.tuples.length, 1), 1);
+}
+
 /** Whether the file holds an input the other way from how the workflow declares it. */
 export function heldTheOtherWay(input: InputValues): boolean {
   return input.read && input.shape !== input.kind;
@@ -114,6 +155,7 @@ export function heldTheOtherWay(input: InputValues): boolean {
 function readInput(id: string, entry: unknown, declared?: DeclaredInput): InputValues {
   const read = readEntry(id, entry);
   if (declared === undefined) return read;
+  if (read.give === 'entrant') return { ...read, type: declared.type };
   const kind = declared.contestant ? 'details' : 'value';
   const typed = { ...read, type: declared.type };
   return kind === read.shape
@@ -123,6 +165,13 @@ function readInput(id: string, entry: unknown, declared?: DeclaredInput): InputV
 
 function readEntry(id: string, entry: unknown): InputValues {
   const input = { ...emptyInput(id, 'value'), read: true };
+  if (entry === 'entrant')
+    return { ...input, kind: 'details', shape: 'details', give: 'entrant' };
+  if (isRecord(entry) && Object.hasOwn(entry, 'entrant')) {
+    const details = entry['entrant'];
+    const from = isRecord(details) ? readEntry(id, details) : input;
+    return { ...from, kind: 'details', shape: 'details', give: 'entrant', read: true };
+  }
   if (isRecord(entry) && !Object.hasOwn(entry, 'secret')) {
     const options = entry['options'];
     return {
@@ -142,6 +191,59 @@ function readEntry(id: string, entry: unknown): InputValues {
   if (isRecord(entry))
     return { ...input, secret: true, value: textOf(entry['secret']) };
   return { ...input, value: textOf(entry) };
+}
+
+function readCell(entry: unknown): { entrant: boolean; value: string } {
+  if (entry === 'entrant') return { entrant: true, value: '' };
+  return { entrant: false, value: textOf(entry) };
+}
+
+function readTuple(inputs: string[], entry: unknown): TupleValues | null {
+  if (Array.isArray(entry)) {
+    return {
+      title: '',
+      maxSize: '',
+      cells: Object.fromEntries(
+        inputs.map((id, index) => [id, readCell(entry[index])]),
+      ),
+    };
+  }
+  if (!isRecord(entry) && inputs.length === 1) {
+    const id = inputs[0];
+    return id === undefined
+      ? null
+      : { title: '', maxSize: '', cells: { [id]: readCell(entry) } };
+  }
+  if (!isRecord(entry)) return null;
+  return {
+    title: textOf(entry['title']),
+    maxSize: textOf(entry['max_size']),
+    cells: Object.fromEntries(inputs.map((id) => [id, readCell(entry[id])])),
+  };
+}
+
+/** `repeat` as axes, or null when it is not a list of axes. */
+function readAxes(node: unknown): AxisValues[] | null {
+  if (node === undefined) return [];
+  if (!Array.isArray(node)) return null;
+  const axes: AxisValues[] = [];
+  for (const item of node) {
+    if (
+      !isRecord(item) ||
+      !Array.isArray(item['inputs']) ||
+      !Array.isArray(item['tuples'])
+    )
+      return null;
+    const inputs = item['inputs'].map(textOf).filter((id) => id !== '');
+    const tuples: TupleValues[] = [];
+    for (const tuple of item['tuples']) {
+      const read = readTuple(inputs, tuple);
+      if (read === null) return null;
+      tuples.push(read);
+    }
+    axes.push({ inputs, tuples });
+  }
+  return axes;
 }
 
 function readGroup(name: string, entry: unknown, folder: boolean): GroupValues {
@@ -177,15 +279,11 @@ export function readTask(
   const unreadable: string[] = [];
   const at = (...path: string[]) => textAt(doc, path);
 
+  const axes = readAxes(exactAt(doc, ['repeat']));
+  if (axes === null) unreadable.push('repeat');
+  const axisInputs = new Set((axes ?? []).flatMap((axis) => axis.inputs));
   const inputs = exactAt(doc, ['inputs']);
   if (inputs !== undefined && !isRecord(inputs)) unreadable.push('inputs');
-
-  const credit = valueAt(doc, ['credit']);
-  let creditValues: TaskValues['credit'] = { kind: 'none', name: '' };
-  if (typeof credit === 'string') creditValues = { kind: 'value', name: credit };
-  else if (isRecord(credit) && typeof credit['relative'] === 'string') {
-    creditValues = { kind: 'relative', name: credit['relative'] };
-  } else if (credit !== undefined) unreadable.push('credit');
 
   const groups = exactAt(doc, ['test_groups']);
   const groupsOk =
@@ -238,14 +336,17 @@ export function readTask(
             emptyInput(input.id, input.contestant ? 'details' : 'value', input.type),
           )
       : [];
+  const withGive = [...given, ...missing].map((input) =>
+    axisInputs.has(input.id) ? { ...input, give: 'per-run' as const } : input,
+  );
 
   return {
     unreadable,
     values: {
       name: at('name'),
       workflow: at('workflow'),
-      inputs: [...given, ...missing],
-      credit: creditValues,
+      inputs: withGive,
+      axes: axes ?? [],
       groups: groupValues,
       max: isRecord(submissions) ? at('submissions', 'max') : '',
       rateCount: isRecord(rate) ? at('submissions', 'rate', 'count') : '',
@@ -309,6 +410,13 @@ function inputEntry(input: InputValues): unknown {
   return details;
 }
 
+/** An entrant's input: `entrant` alone, or `{entrant: {label, ...}}` with its form. */
+function entrantEntry(input: InputValues): unknown {
+  const details = inputEntry({ ...input, kind: 'details' });
+  if (!isRecord(details) || Object.keys(details).length === 0) return 'entrant';
+  return { entrant: details };
+}
+
 /** Whether an entry holds nothing to write: no value, or no form detail. */
 function emptyEntry(input: InputValues): boolean {
   const entry = inputEntry(input);
@@ -338,6 +446,28 @@ function groupEntry(group: GroupValues): Record<string, unknown> {
   add('test_weights', weightsOf(group.weights));
   add('show', text(group.show));
   return entry;
+}
+
+/** `repeat` as the file holds it: every tuple a map, so a title cannot swap two values. */
+function repeatOf(axes: AxisValues[], inputs: InputValues[]): unknown[] {
+  return axes
+    .filter((axis) => axis.inputs.length > 0)
+    .map((axis) => ({
+      inputs: axis.inputs,
+      tuples: axis.tuples.map((tuple) => {
+        const row: Record<string, unknown> = {};
+        const entrant = axis.inputs.some((id) => tuple.cells[id]?.entrant === true);
+        for (const id of axis.inputs) {
+          const cell = tuple.cells[id];
+          const type = inputs.find((input) => input.id === id)?.type ?? null;
+          row[id] =
+            cell?.entrant === true ? 'entrant' : typedValue(type, cell?.value ?? '');
+        }
+        if (tuple.title.trim() !== '') row.title = tuple.title.trim();
+        if (entrant && tuple.maxSize.trim() !== '') row.max_size = tuple.maxSize.trim();
+        return row;
+      }),
+    }));
 }
 
 /**
@@ -382,23 +512,6 @@ export function writeTask(
   }
   put(['workflow'], before.workflow, after.workflow, text);
 
-  if (!unreadable.includes('credit')) {
-    const was = before.credit;
-    const now = after.credit;
-    if (was.kind !== now.kind || was.name !== now.name) {
-      const name = now.name.trim();
-      writeAt(
-        doc,
-        ['credit'],
-        now.kind === 'none' || name === ''
-          ? undefined
-          : now.kind === 'value'
-            ? name
-            : { relative: name },
-      );
-    }
-  }
-
   if (!unreadable.includes('inputs')) {
     for (const input of before.inputs) {
       if (!after.inputs.some((kept) => kept.id === input.id)) {
@@ -409,6 +522,20 @@ export function writeTask(
       const was = before.inputs.find((old) => old.id === input.id);
       const path = (key?: string) =>
         key === undefined ? ['inputs', input.id] : ['inputs', input.id, key];
+      if (input.give === 'per-run') {
+        writeAt(doc, path(), undefined, { prune: true });
+        continue;
+      }
+      if (input.give === 'entrant') {
+        if (
+          was === undefined ||
+          was.give !== 'entrant' ||
+          JSON.stringify(entrantEntry(was)) !== JSON.stringify(entrantEntry(input))
+        ) {
+          writeAt(doc, path(), entrantEntry(input), { prune: true });
+        }
+        continue;
+      }
       if (was === undefined && emptyEntry(input)) continue;
       if (was === undefined || was.shape !== input.kind) {
         writeAt(doc, path(), inputEntry(input), { prune: true });
@@ -433,6 +560,16 @@ export function writeTask(
         put(path('max_size'), was.maxSize, input.maxSize, text, true);
       }
     }
+  }
+
+  if (
+    !unreadable.includes('repeat') &&
+    JSON.stringify(before.axes) !== JSON.stringify(after.axes)
+  ) {
+    const written = repeatOf(after.axes, after.inputs);
+    writeAt(doc, ['repeat'], written.length === 0 ? undefined : written, {
+      prune: true,
+    });
   }
 
   if (!unreadable.includes('test_groups')) {

@@ -24,6 +24,7 @@ function held(input: InputValues): string {
     maxSize,
     value,
     secret,
+    give,
   } = input;
   return JSON.stringify([
     id,
@@ -36,6 +37,7 @@ function held(input: InputValues): string {
     maxSize,
     value,
     secret,
+    give,
   ]);
 }
 
@@ -130,8 +132,8 @@ export function changeLines(
       lines.push(`Inputs: ${name}`);
     }
   }
-  if (JSON.stringify(before.credit) !== JSON.stringify(after.credit)) {
-    lines.push('How a test earns');
+  if (JSON.stringify(before.axes) !== JSON.stringify(after.axes)) {
+    lines.push('Runs');
   }
   const groups = [
     ...new Set([...before.groups, ...after.groups].map((group) => group.name)),

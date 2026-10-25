@@ -19,7 +19,7 @@ import type { Place } from '../files/place';
  * page, which holds its title. `tests` is the Tests and scoring card, which
  * also holds the submission rules.
  */
-type TaskCard = 'workflow' | 'inputs' | 'tests' | 'statement' | 'settings';
+type TaskCard = 'workflow' | 'inputs' | 'runs' | 'tests' | 'statement' | 'settings';
 
 export type TaskPlace = {
   card: TaskCard;
@@ -35,6 +35,7 @@ export type TaskPlace = {
 const CARD_LABELS: Record<TaskCard, string> = {
   workflow: 'Workflow',
   inputs: 'Inputs',
+  runs: 'Runs',
   tests: 'Tests and scoring',
   statement: 'Statement',
   settings: 'Settings',
@@ -57,7 +58,7 @@ const SUBMISSION_FIELDS: Record<string, [string, string]> = {
 };
 
 /** A test's place in the card: its row, by its name, in its group. */
-export function testField(test: string): string {
+function testField(test: string): string {
   return `test:${test}`;
 }
 
@@ -131,7 +132,7 @@ export function taskPlace(
       item: null,
     };
   }
-  const [top, second, third, fourth] = stepsOf(path);
+  const [top, second, third, fourth, fifth] = stepsOf(path);
   switch (top) {
     case 'name':
       return { card: 'settings', label: 'Settings: Title', field: 'name', item: null };
@@ -191,11 +192,23 @@ export function taskPlace(
       const named = typeof key === 'string' ? SUBMISSION_FIELDS[key] : undefined;
       return {
         card: 'tests',
-        label:
-          named === undefined
-            ? 'Tests and scoring: Submission rules'
-            : `Tests and scoring, Submission rules: ${named[1]}`,
+        label: named === undefined ? 'Submissions' : `Submissions: ${named[1]}`,
         field: named?.[0] ?? 'max',
+        item: null,
+      };
+    }
+    case 'repeat': {
+      const axis = typeof second === 'number' ? second : 0;
+      const row = typeof fourth === 'number' ? fourth : 0;
+      const name = typeof fifth === 'string' ? fifth : null;
+      return {
+        card: 'runs',
+        label:
+          name === null
+            ? 'Runs'
+            : `Runs, axis ${String(axis + 1)}, row ${String(row + 1)}: ${name}`,
+        field:
+          name === null ? null : `axis-${String(axis)}-tuple-${String(row)}-${name}`,
         item: null,
       };
     }

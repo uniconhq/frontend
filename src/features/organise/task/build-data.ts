@@ -39,7 +39,7 @@ export type Declared = {
  * from a step that runs for each test, as the forge has it, or folded over
  * the tests.
  */
-export type ReportedValue = ReportEntry & { perTest: boolean };
+type ReportedValue = ReportEntry & { perTest: boolean };
 
 /**
  * An input as the organiser's form names it: its title, or its id (#434),

@@ -3,12 +3,13 @@ import type { DeclaredInput } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
 import { Checkbox } from '@/ui/Checkbox';
+import { Chip } from '@/ui/Chip';
 import { InfoTip } from '@/ui/InfoTip';
 import { Select } from '@/ui/Select';
 import { TextInput } from '@/ui/TextInput';
 import { FieldBox } from '../contest/ContestFile';
 import { NumberField } from '../forms/fields';
-import { heldTheOtherWay, type InputValues } from '../forms/task-values';
+import { heldTheOtherWay, type Give, type InputValues } from '../forms/task-values';
 import { BuildCard, CardPart } from './BuildCard';
 import { inputTitle, type TaskPlace } from './build-data';
 import { FileSetting } from './FileSetting';
@@ -285,21 +286,34 @@ function EntrantFields({
 function DeclaredItem({
   declared,
   input,
+  runs,
+  axisCount,
+  axis,
   onChange,
+  onGive,
+  onAxis,
   files,
   disabled,
 }: {
   declared: DeclaredInput;
   input: InputValues;
+  runs: boolean;
+  axisCount: number;
+  axis: number;
   onChange: Change;
+  onGive: (give: Give) => void;
+  onAxis: (axis: number) => void;
   files: InputFiles | undefined;
   disabled: boolean;
 }) {
   const other = heldTheOtherWay(input);
+  const give = input.give ?? (input.kind === 'details' ? 'entrant' : 'setting');
+  const entrant = runs ? give === 'entrant' : declared.contestant;
+  const perRun = runs && give === 'per-run';
   return (
     <FieldBox name={declared.id}>
       <div className={classes.item} role="group" aria-label={inputTitle(declared)}>
-        {declared.contestant && (
+        {!runs && declared.contestant && (
           <div className={classes.itemHead}>
             <div className={classes.titleRow}>
               <h4 className={classes.itemTitle}>{declared.title ?? declared.id}</h4>
@@ -312,14 +326,53 @@ function DeclaredItem({
             )}
           </div>
         )}
-        {other && (
+        {runs && (
+          <>
+            <div className={classes.itemHead}>
+              <h4 className={classes.itemTitle}>{declared.title ?? declared.id}</h4>
+              <Chip tone="quiet">{declared.type}</Chip>
+            </div>
+            <div className={classes.narrow}>
+              <Select
+                label="Who gives it"
+                value={give}
+                options={[
+                  { value: 'setting', label: 'You set it' },
+                  { value: 'entrant', label: 'The entrant gives it' },
+                  { value: 'per-run', label: 'One for each run' },
+                ]}
+                onChange={(next) => onGive(next as Give)}
+                disabled={disabled}
+              />
+            </div>
+            {perRun && axisCount > 1 && (
+              <div className={classes.narrow}>
+                <Select
+                  label="Axis"
+                  value={String(axis)}
+                  options={Array.from({ length: axisCount }, (_, index) => ({
+                    value: String(index),
+                    label: `Axis ${String(index + 1)}`,
+                  }))}
+                  onChange={(next) => onAxis(Number(next))}
+                  disabled={disabled}
+                />
+              </div>
+            )}
+          </>
+        )}
+        {other && !runs && (
           <BodyText tone="secondary">
             {declared.contestant
               ? 'The task sets a value for this, but under this workflow entrants give it. Saving replaces the task’s value with what is set here.'
               : 'Entrants give this now, but under this workflow the task sets it. Saving replaces that with the value set here.'}
           </BodyText>
         )}
-        {declared.contestant ? (
+        {perRun ? (
+          <BodyText size="sm" tone="secondary">
+            A column in Runs.
+          </BodyText>
+        ) : entrant ? (
           <EntrantFields
             declared={declared}
             input={input}
@@ -327,15 +380,13 @@ function DeclaredItem({
             disabled={disabled}
           />
         ) : (
-          <div className={classes.single}>
-            <ValueField
-              declared={declared}
-              input={input}
-              files={files}
-              onChange={onChange}
-              disabled={disabled}
-            />
-          </div>
+          <ValueField
+            declared={declared}
+            input={input}
+            onChange={onChange}
+            files={files}
+            disabled={disabled}
+          />
         )}
       </div>
     </FieldBox>
@@ -521,7 +572,12 @@ export function InputsCard({
   declared,
   workflowProblem,
   inputs,
+  runs = false,
+  axisCount = 1,
+  axisOf = () => 0,
   onChange,
+  onGive = () => undefined,
+  onAxis = () => undefined,
   onRemove,
   onAdd,
   files,
@@ -534,13 +590,22 @@ export function InputsCard({
   /** Why the workflow cannot be read, when it cannot. */
   workflowProblem: string | null;
   inputs: InputValues[];
+  /** The workflow describes one run, so the task says who gives each input. */
+  runs?: boolean;
+  /** How many axes the runs card has, so a per-run input can move. */
+  axisCount?: number;
+  /** Which axis a per-run input is a column of. */
+  axisOf?: (id: string) => number;
   onChange: (id: string, change: Partial<InputValues>) => void;
+  onGive?: (id: string, give: Give) => void;
+  onAxis?: (id: string, axis: number) => void;
   onRemove: (id: string) => void;
   onAdd: (id: string, kind: InputValues['kind']) => void;
   disabled: boolean;
 }) {
-  const line =
-    'What entrants submit, and the limits and settings the workflow asks the task for.';
+  const line = runs
+    ? 'What the workflow needs, and who gives each: you, the entrant, or one for each run.'
+    : 'What entrants submit, and the limits and settings the workflow asks the task for.';
   if (declared === null) {
     return (
       <BuildCard id="inputs" title="Inputs" line={line}>
@@ -580,12 +645,30 @@ export function InputsCard({
         key={each.id}
         declared={each}
         input={input}
+        runs={runs}
+        axisCount={axisCount}
+        axis={axisOf(each.id)}
         onChange={(change) => onChange(each.id, change)}
+        onGive={(give) => onGive(each.id, give)}
+        onAxis={(axis) => onAxis(each.id, axis)}
         files={files}
         disabled={disabled}
       />
     );
   };
+
+  if (runs) {
+    return (
+      <BuildCard id="inputs" title="Inputs" line={line}>
+        {declared.map(item)}
+        {undeclared.length > 0 && (
+          <BodyText tone="secondary">
+            Not used by this workflow: {undeclared.map((input) => input.id).join(', ')}.
+          </BodyText>
+        )}
+      </BuildCard>
+    );
+  }
 
   return (
     <BuildCard id="inputs" title="Inputs" line={line}>

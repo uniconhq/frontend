@@ -1335,8 +1335,9 @@ describe('creating a task', () => {
     await user.click(await screen.findByRole('button', { name: 'New task' }));
     const form = screen.getByRole('form', { name: 'New task' });
     await user.type(within(form).getByRole('textbox', { name: /^Name/ }), 'max');
-    await user.click(
-      await within(form).findByRole('radio', { name: 'A program of several files' }),
+    await user.selectOptions(
+      await within(form).findByRole('combobox', { name: 'Workflow' }),
+      'unicon/classic-folder',
     );
     await user.click(within(form).getByRole('button', { name: 'Create task' }));
 
@@ -1356,7 +1357,7 @@ describe('creating a task', () => {
     });
   });
 
-  it('says under each kind of task what it is, and under a greyed one why', async () => {
+  it('offers the workflows the organiser may read, and no other', async () => {
     server.use(signedIn, ...repoFiles);
     standingsAndCreate();
     server.use(
@@ -1377,21 +1378,13 @@ describe('creating a task', () => {
     const user = userEvent.setup();
     await user.click(await screen.findByRole('button', { name: 'New task' }));
     const form = screen.getByRole('form', { name: 'New task' });
-    const classic = await within(form).findByRole('radio', {
-      name: 'Compare output with an answer',
-    });
-    expect(classic).toBeChecked();
-    expect(classic).toHaveAccessibleDescription(
-      'Entrants submit one source file. Each test runs it on an input and compares what it prints with the answer.',
-    );
-    const folder = within(form).getByRole('radio', {
-      name: 'A program of several files',
-    });
-    expect(folder).toBeDisabled();
-    expect(folder).toHaveAccessibleDescription(/Its workflow is not available here\.$/);
+    const workflow = await within(form).findByRole('combobox', { name: 'Workflow' });
     expect(
-      within(form).getByRole('radiogroup', { name: 'What kind of task' }),
-    ).not.toHaveAccessibleDescription(/not available/);
+      within(workflow).getByRole('option', { name: 'unicon/classic' }),
+    ).toBeVisible();
+    expect(
+      within(workflow).queryByRole('option', { name: 'unicon/classic-folder' }),
+    ).toBeNull();
   });
 
   it('sends no title when none was given', async () => {

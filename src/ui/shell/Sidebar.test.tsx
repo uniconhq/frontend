@@ -81,7 +81,7 @@ describe('the sidebar', () => {
       .getAllByRole('link')
       .filter((link) => /active/.test(link.className))
       .map((link) => link.textContent);
-    expect(marked).toEqual(['Tests and scoring']);
+    expect(marked).toEqual(['Submissions']);
   });
 
   it("lists a contest's tasks, leaderboards and questions to its contestants, the tasks marked on a task's page", async () => {

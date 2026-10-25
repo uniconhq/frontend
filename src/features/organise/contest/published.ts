@@ -1,7 +1,8 @@
 import { $api } from '@/api/query';
 import type { FileContent, TaskStanding } from '@/api/types';
 import type { HeldGroup } from '../forms/board-words';
-import { readTask, type GroupValues, type TaskValues } from '../forms/task-values';
+import { isRecord, valueAt } from '../forms/yaml-doc';
+import { readTask, type GroupValues } from '../forms/task-values';
 import { readSettings } from '../task/build-data';
 import { closesWithContest } from './timeline';
 
@@ -32,17 +33,29 @@ export function publishedQuery(
   };
 }
 
+/** How a test earns, read from a published task that still says so. */
+type PublishedCredit = { kind: 'none' | 'value' | 'relative'; name: string };
+
 /** A published task's test groups and how a test earns, or why they cannot be read. */
 export type Published =
-  | { groups: GroupValues[]; credit: TaskValues['credit'] }
+  | { groups: GroupValues[]; credit: PublishedCredit }
   | { unreadable: 'settings' | 'groups' };
+
+function readCredit(doc: Parameters<typeof valueAt>[0]): PublishedCredit {
+  const credit = valueAt(doc, ['credit']);
+  if (typeof credit === 'string') return { kind: 'value', name: credit };
+  if (isRecord(credit) && typeof credit['relative'] === 'string') {
+    return { kind: 'relative', name: credit['relative'] };
+  }
+  return { kind: 'none', name: '' };
+}
 
 export function readPublished(file: FileContent): Published {
   const settings = readSettings(file);
   if ('error' in settings) return { unreadable: 'settings' };
   const { values, unreadable } = readTask(settings.doc, []);
   if (unreadable.includes('test_groups')) return { unreadable: 'groups' };
-  return { groups: values.groups, credit: values.credit };
+  return { groups: values.groups, credit: readCredit(settings.doc) };
 }
 
 /**
