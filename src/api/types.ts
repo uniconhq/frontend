@@ -70,11 +70,14 @@ export type ListedContest = Schemas['ListedContest'];
 export type ContestHome = Schemas['ContestHome'];
 export type PublicTask = Schemas['PublicTask'];
 export type TaskPage = Schemas['TaskPage'];
-export type InputField = Schemas['InputField'];
-/** What the task form is built from: the inputs and test fields its workflow declares. */
-export type WorkflowForm = Schemas['WorkflowForm'];
-export type DeclaredInput = Schemas['DeclaredInput'];
-export type DeclaredField = Schemas['DeclaredField'];
+/** One input a task's submit form takes, with a file per input or per part. */
+export type InputField = Omit<Schemas['InputField'], 'per_test'>;
+/** What the task form is built from: the inputs its workflow declares. */
+export type WorkflowForm = Omit<Schemas['WorkflowForm'], 'runs' | 'test' | 'inputs'> & {
+  inputs: DeclaredInput[];
+};
+/** One input a workflow declares. Who gives it, and whether it repeats, are the task's. */
+export type DeclaredInput = Omit<Schemas['DeclaredInput'], 'contestant' | 'per_test'>;
 export type TaskEntry = Schemas['TaskEntry'];
 
 export type Upload = Schemas['Upload'];
@@ -83,20 +86,14 @@ export type Submission = Schemas['Submission'];
 export type GradingResult = Schemas['Result'];
 /** A row's submission as organisers read it, with everything filled in. */
 export type OrganisedSubmission = Schemas['OrganisedSubmission'];
-export type GroupShown = Schemas['GroupShown'];
 export type RunShown = Schemas['RunShown'];
 export type RunValue = Schemas['RunValue'];
 export type OnceShown = Schemas['OnceShown'];
-/** A run's reported values by name, its numbers exact and its texts apart. */
-export type Reported = Schemas['Reported'];
-/**
- * One value a task's workflow reports, as pages name it: its key, its title
- * and unit, and how it folds over the tests and which way is better.
- */
+/** One value a task's workflow reports, as pages name it: its key, its title and unit. */
 export type ValueMeaning = Schemas['ValueMeaning'];
-/** One test's row of a result: its id, its outcome, and the values its steps reported. */
-export type GradedTest = Schemas['GradedTest'];
 export type Grading = Schemas['Grading'];
+/** A finished grading's runs, and what its steps done once returned. */
+export type RunsResult = Schemas['RunsResult'];
 export type Rejudged = Schemas['Rejudged'];
 /** A task's latest regrade of many, summed up by what it did to each submission. */
 export type RegradeSummary = Schemas['RegradeSummary'];
@@ -123,8 +120,8 @@ export type SubmissionState = GradingResult['status'];
 /** The marks a row holds on a task, the most it may hold, and its close. */
 export type Marks = Schemas['Marks'];
 
-/** The runner's list of outcomes, which each test and what stopped a run take one of. */
-export type Outcome = Schemas['GradedTest']['outcome'];
+/** The runner's list of outcomes, which each run and what stopped a grading take one of. */
+export type Outcome = Schemas['RunVerdict']['verdict'];
 
 /** A primitive at one version, with its declared ports. */
 export type Primitive = Schemas['Primitive'];

@@ -21,7 +21,6 @@ export type Notice = { box: string; port: string; reason: string; count: number 
 
 export function sourceAt(box: Box, port: string, workflow: Workflow): Ref | null {
   if (box.kind === 'inputs') return { kind: 'inputs', name: port };
-  if (box.kind === 'test') return { kind: 'test', name: port };
   if (box.kind === 'step' && box.step !== null) {
     const step = workflow.steps[box.step];
     return step !== undefined ? { kind: 'steps', name: step.id, output: port } : null;

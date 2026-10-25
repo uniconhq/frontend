@@ -19,7 +19,7 @@ const STARTS = [
     value: 'starter',
     label: 'The starter',
     description:
-      'Compiles the submission, runs it on each test and compares its output with the test’s answer. Change it from there.',
+      'Compiles the submission, runs it on the run’s input and compares its output with the run’s answer. Change it from there.',
   },
   {
     value: 'copy',

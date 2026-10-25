@@ -11,9 +11,7 @@ function declared(id: string, type: string): DeclaredInput {
   return {
     id,
     type,
-    contestant: false,
     options: null,
-    per_test: false,
     optional: false,
     title: null,
     help: null,

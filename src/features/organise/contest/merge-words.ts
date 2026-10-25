@@ -1,4 +1,3 @@
-import { OVER, SELECT, WHO } from '../forms/board-words';
 import type { MergePath } from '../forms/merge';
 import { NumberText } from '../forms/yaml-doc';
 import { BOARD_FIELDS, TASK_FIELDS } from './places';
@@ -36,11 +35,6 @@ const UNDER: Record<string, Record<string, string>> = {
   },
 };
 
-/** A form's choices as a lookup from each value to its words. */
-function wordsOf(options: { value: string; label: string }[]): Record<string, string> {
-  return Object.fromEntries(options.map((option) => [option.value, option.label]));
-}
-
 const VALUES: Record<string, Record<string, string>> = {
   state: { draft: 'Draft', published: 'Open', archived: 'Archived' },
   visibility: {
@@ -52,9 +46,7 @@ const VALUES: Record<string, Record<string, string>> = {
     start: 'When the contest starts',
     first_submission: 'At its first submission',
   },
-  who: wordsOf(WHO),
-  over: wordsOf(OVER),
-  select: wordsOf(SELECT),
+  who: { staff: 'Staff', entrants: 'Entrants', everyone: 'Everyone' },
   approval: { auto: 'Approved straight away', manual: 'An organiser approves' },
 };
 

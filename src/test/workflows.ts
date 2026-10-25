@@ -3,91 +3,88 @@ import type { PrimitiveInfo, PortDecl } from '@/features/organise/workflows/prim
 import { problem } from './server';
 
 /**
- * The seeded workflows as deploy's bootstrap writes them, and the platform's
+ * Run workflows as the editor's tests draw them, and the platform's
  * primitives as the backend lists them: each primitive's v1 in the format
- * before 2026-10-07, which the platform no longer reads, and its v2 with its
- * ports, its title and what it and each port do (#436), as each primitive's
- * own `primitive.yaml` says them.
+ * before 2026-10-07, which the platform no longer reads, and its current
+ * version with its ports, its title and what it and each port do (#436), as
+ * each primitive's own `primitive.yaml` says them.
+ *
+ * `CLASSIC` is one run of a task judged by comparing output with an answer,
+ * as deploy's unicon/classic@v3 is (SIMPLER-CORE.md section 7): compile the
+ * submission, run the program on the run's input under the task's limits,
+ * and compare its output with the run's answer. Deploy's compares with a diff
+ * script given a manifest, whose outputs no primitive here declares, so this
+ * one compares with diff-check.
  */
-export const CLASSIC_V2 = `# unicon/classic@v2, the built-in workflow for a task judged by comparing
-# output with an answer: compile the submission once, run the program on
-# every test under the task's limits, and compare each run's output with
-# that test's answer. Seeded by \`uv run bootstrap\` into the repository
-# unicon/classic.workflow at the forge, at the tag v2. The format is
-# TASK-FORMAT.md section 1.3.
+export const CLASSIC = `# unicon/classic@v3, one run of a task judged by comparing output with an
+# answer: compile the submission, run the program on the run's input under
+# the task's limits, and compare its output with the run's answer. The
+# format is SIMPLER-CORE.md section 7.
 inputs:
-  submission: {type: file, contestant: true}
-  language: {type: enum, options: [c, cpp, java, python], contestant: true}
+  submission: file
+  language: {type: enum, options: [c, cpp, java, python]}
   time_limit: number
   memory_limit: number
-test:
   input: file
   answer: file
 steps:
   - id: compile
-    use: unicon/compile@v2
+    use: unicon/compile@v3
     with:
       source: \${{ inputs.submission }}
       language: \${{ inputs.language }}
   - id: run
-    use: unicon/sandbox-run@v2
-    per_test: true
+    use: unicon/exec@v1
     with:
-      binary: \${{ steps.compile.binary }}
-      input: \${{ test.input }}
+      program: \${{ steps.compile.program }}
+      stdin: \${{ inputs.input }}
       time_limit: \${{ inputs.time_limit }}
       memory_limit: \${{ inputs.memory_limit }}
   - id: check
     use: unicon/diff-check@v2
-    per_test: true
     with:
       actual: \${{ steps.run.output }}
-      expected: \${{ test.answer }}
-report:
-  time_ms: {from: "\${{ steps.run.time_ms }}", fold: max, better: lower, at_least: 0}
-  memory_kb: {from: "\${{ steps.run.memory_kb }}", fold: max, better: lower, at_least: 0}
-  log: \${{ steps.compile.compile_log }}
+      expected: \${{ inputs.answer }}
+outputs:
+  time_ms: {from: "\${{ steps.run.time_ms }}", unit: ms}
+  memory_kb: {from: "\${{ steps.run.memory_kb }}", unit: KB}
+  log: \${{ steps.compile.log }}
 `;
 
-export const CLASSIC_FOLDER = `# unicon/classic-folder@v1, the built-in workflow for a program of several
-# files: compile the contestant's folder of sources once, starting from the
-# entry point they name, run the program on every test under the task's
-# limits, and compare each run's output with that test's answer. Seeded by
-# \`uv run bootstrap\` into the repository unicon/classic-folder.workflow at
-# the forge, at the tag v1. The format is TASK-FORMAT.md section 1.3, and
-# the workflow is section 4.7's.
+/** One run of a program of several files, started from the entry point the entrant names. */
+export const FOLDER = `# A program of several files: compile the entrant's folder of sources,
+# starting from the entry point they name, run the program on the run's
+# input under the task's limits, and compare its output with the run's
+# answer.
 inputs:
-  program: {type: folder, contestant: true}
-  language: {type: enum, options: [c, cpp, java, python], contestant: true}
-  entry: {type: text, contestant: true}
+  program: folder
+  language: {type: enum, options: [c, cpp, java, python]}
+  entry: text
   time_limit: number
   memory_limit: number
-test:
   input: file
   answer: file
 steps:
   - id: compile
-    use: unicon/compile@v2
+    use: unicon/compile@v3
     with:
       source: \${{ inputs.program }}
       entry: \${{ inputs.entry }}
       language: \${{ inputs.language }}
   - id: run
-    use: unicon/sandbox-run@v2
-    per_test: true
+    use: unicon/exec@v1
     with:
-      binary: \${{ steps.compile.binary }}
-      input: \${{ test.input }}
+      program: \${{ steps.compile.program }}
+      stdin: \${{ inputs.input }}
       time_limit: \${{ inputs.time_limit }}
       memory_limit: \${{ inputs.memory_limit }}
   - id: check
     use: unicon/diff-check@v2
-    per_test: true
-    with: {actual: "\${{ steps.run.output }}", expected: "\${{ test.answer }}"}
-report:
-  time_ms: {from: "\${{ steps.run.time_ms }}", fold: max, better: lower, at_least: 0}
-  memory_kb: {from: "\${{ steps.run.memory_kb }}", fold: max, better: lower, at_least: 0}
-  log: \${{ steps.compile.compile_log }}
+    with: {actual: "\${{ steps.run.output }}", expected: "\${{ inputs.answer }}"}
+outputs:
+  time_ms: {from: "\${{ steps.run.time_ms }}", unit: ms}
+  memory_kb: {from: "\${{ steps.run.memory_kb }}", unit: KB}
+  log: \${{ steps.compile.log }}
 `;
 
 function port(type: string, more: Partial<PortDecl> = {}): PortDecl {
@@ -139,11 +136,11 @@ function retired(name: string): PrimitiveInfo {
 export const PRIMITIVES: PrimitiveInfo[] = [
   retired('compile'),
   {
-    ref: 'unicon/compile@v2',
+    ref: 'unicon/compile@v3',
     name: 'compile',
     title: 'Compile',
-    description: "Compiles the contestant's source files into one program.",
-    version: 'v2',
+    description: 'Compiles source files into one program.',
+    version: 'v3',
     batch: false,
     network: false,
     forms: {},
@@ -164,8 +161,8 @@ export const PRIMITIVES: PrimitiveInfo[] = [
       }),
     },
     outputs: {
-      binary: port('file', { description: 'The compiled program, ready to run.' }),
-      compile_log: port('text', { description: 'Everything the compiler printed.' }),
+      program: port('file', { description: 'The compiled program, ready to run.' }),
+      log: port('text', { description: 'Everything the compiler printed.' }),
       outcome: port('outcome', {
         description: 'Whether the source compiled.',
         outcomes: {
@@ -207,14 +204,13 @@ export const PRIMITIVES: PrimitiveInfo[] = [
     },
     problem: null,
   },
-  retired('sandbox-run'),
   {
-    ref: 'unicon/sandbox-run@v2',
-    name: 'sandbox-run',
+    ref: 'unicon/exec@v1',
+    name: 'exec',
     title: 'Run program',
     description:
-      "Runs a program on each test's input and records its output, time and memory.",
-    version: 'v2',
+      'Runs a program once under limits and records its output, time and memory.',
+    version: 'v1',
     batch: true,
     network: false,
     forms: {},
@@ -237,8 +233,8 @@ export const PRIMITIVES: PrimitiveInfo[] = [
       },
     },
     inputs: {
-      binary: port('file', { runs: true, description: 'The program to run.' }),
-      input: port('file', {
+      program: port('file', { runs: true, description: 'The program to run.' }),
+      stdin: port('file', {
         runs: false,
         description: 'What the program reads on standard input.',
       }),
@@ -247,10 +243,10 @@ export const PRIMITIVES: PrimitiveInfo[] = [
         description: "Arguments added to the program's command line, split on spaces.",
       }),
       time_limit: port('number', {
-        description: 'Seconds of CPU time the program may use on each test.',
+        description: 'Seconds of CPU time the program may use.',
       }),
       memory_limit: port('number', {
-        description: 'Megabytes of memory the program may use on each test.',
+        description: 'Megabytes of memory the program may use.',
       }),
     },
     outputs: {
@@ -337,7 +333,7 @@ export function workflowBackend(
           owner: 'unicon',
           name: 'classic',
           visibility: 'public',
-          versions: ['v2'],
+          versions: ['v3'],
           editable: false,
         },
       ]),

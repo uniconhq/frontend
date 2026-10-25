@@ -62,10 +62,10 @@ tasks:
   });
 
   it('gives a key written with nothing after it a mapping for a field under it', () => {
-    const text = edit('test_groups:\n  samples:\n', (doc) => {
-      writeAt(doc, ['test_groups', 'samples', 'each'], 10);
+    const text = edit('inputs:\n  code:\n', (doc) => {
+      writeAt(doc, ['inputs', 'code', 'max'], 10);
     });
-    expect(parse(text)).toEqual({ test_groups: { samples: { each: 10 } } });
+    expect(parse(text)).toEqual({ inputs: { code: { max: 10 } } });
   });
 
   it('refuses text that is not YAML with the reason', () => {
@@ -89,14 +89,10 @@ describe('times', () => {
 });
 
 describe('merging a number past what a float holds', () => {
-  const TASK = 'name: Sum\ntest_groups:\n  main: {pass: 0.123456789012345678901}\n';
+  const TASK = 'name: Sum\ninputs:\n  tolerance: 0.123456789012345678901\n';
   const exact = (text: string) => exactJS(docOf(text));
   const mine = edit(TASK, (doc) => {
-    writeAt(
-      doc,
-      ['test_groups', 'main', 'pass'],
-      new NumberText('0.123456789012345678902'),
-    );
+    writeAt(doc, ['inputs', 'tolerance'], new NumberText('0.123456789012345678902'));
   });
   const theirs = edit(TASK, (doc) => {
     writeAt(doc, ['name'], 'Sums');
@@ -107,16 +103,16 @@ describe('merging a number past what a float holds', () => {
 
     expect(diffs.map((diff) => pathText(diff.path))).toEqual([
       'name',
-      'test_groups.main.pass',
+      'inputs.tolerance',
     ]);
     expect(mergeText(theirs, diffs, ['theirs', 'mine'])).toBe(
-      'name: Sums\ntest_groups:\n  main: {pass: 0.123456789012345678902}\n',
+      'name: Sums\ninputs:\n  tolerance: 0.123456789012345678902\n',
     );
   });
 
   it('takes a number spelled another way for the same number', () => {
     const spelled = TASK.replace('0.123456789012345678901', '0.1234567890123456789010');
-    const hex = 'name: Sum\ntest_groups:\n  main: {each: 0x10}\n';
+    const hex = 'name: Sum\ninputs:\n  seed: 0x10\n';
 
     expect(differences(exact(hex), exact(hex), exact(hex), 'task.yaml')).toEqual([]);
     expect(

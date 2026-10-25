@@ -36,11 +36,9 @@ import {
   readSettings,
   formOf,
   refParts,
-  useTestFolders,
   useWorkflowForm,
   useWorkflowVersion,
   type Declared,
-  type GroupFolder,
   type TaskPlace,
 } from './build-data';
 import type { TaskSave } from './build-save';
@@ -50,7 +48,6 @@ import { InputsCard, type InputFiles } from './InputsCard';
 import { taskMergeWords } from './merge-words';
 import { taskPlace, taskPlaceOf } from './places';
 import { SaveBar } from './SaveBar';
-import { NOTHING_STAGED } from './staged';
 import { RunsCard } from './RunsCard';
 import { ChecksCard } from './ChecksCard';
 import { ScoringCard } from './ScoringCard';
@@ -67,11 +64,10 @@ const PATH = 'task.yaml';
 /** The workflow's inputs as the cards type them, for the workflow chosen. */
 function inputsFor(
   doc: Doc,
-  folders: string[],
   declared: Declared,
   keepUndeclared: boolean,
 ): InputValues[] {
-  const inputs = readTask(doc, folders, declared.inputs).values.inputs;
+  const inputs = readTask(doc, declared.inputs).values.inputs;
   return keepUndeclared
     ? inputs
     : inputs.filter((input) => declared.inputs.some((found) => found.id === input.id));
@@ -87,16 +83,15 @@ function movedLabel(path: string, titles: ReadonlyMap<string, string>): string {
 }
 
 /**
- * The cards that build the task, from its settings, its workflow and its
- * tests, with the one save bar they share. Built afresh from the settings
- * each time they are saved, so a save never runs on what was read before.
+ * The cards that build the task, from its settings and its workflow, with
+ * the one save bar they share. Built afresh from the settings each time
+ * they are saved, so a save never runs on what was read before.
  */
 function BuildForm({
   place,
   file,
   doc,
   form,
-  folders,
   saving,
   admin,
   manager,
@@ -105,17 +100,13 @@ function BuildForm({
   file: FileContent;
   doc: Doc;
   form: WorkflowForm | null;
-  folders: GroupFolder[];
   saving: TaskSave;
   admin: boolean;
   manager: boolean;
 }) {
   const saved = form?.workflow ?? null;
   const savedReadable = form !== null && form.problem === null && saved !== null;
-  const names = folders.map((folder) => folder.name);
-  const [read] = useState(() =>
-    readTask(doc, names, savedReadable ? form.inputs : null),
-  );
+  const [read] = useState(() => readTask(doc, savedReadable ? form.inputs : null));
   const [values, setValues] = useState<TaskValues>(read.values);
   const queryClient = useQueryClient();
   const [inputFiles, setInputFiles] = useState<StagedInput[]>([]);
@@ -136,9 +127,7 @@ function BuildForm({
   const fromVersion = useMemo(() => (text === null ? null : declaredOf(text)), [text]);
   const declared = useMemo((): Declared | null => {
     if (picked !== saved) return fromVersion;
-    return savedReadable
-      ? { inputs: form.inputs, test: form.test, report: fromVersion?.report ?? [] }
-      : null;
+    return savedReadable ? { inputs: form.inputs } : null;
   }, [fromVersion, picked, saved, savedReadable, form]);
   const titles = useMemo(
     () =>
@@ -159,12 +148,12 @@ function BuildForm({
     const kept = inputFiles.filter((change) => {
       const input = declared.inputs.find((found) => found.id === change.id);
       const kind = change.value.endsWith('/') ? 'folder' : 'file';
-      return input !== undefined && !input.contestant && input.type === kind;
+      return input !== undefined && input.type === kind;
     });
     if (kept.length !== inputFiles.length) setInputFiles(kept);
     setValues((before) => ({
       ...before,
-      inputs: inputsFor(doc, names, declared, picked === saved).map((input) => {
+      inputs: inputsFor(doc, declared, picked === saved).map((input) => {
         const change = kept.find((each) => each.id === input.id);
         return change === undefined ? input : { ...input, value: change.value };
       }),
@@ -275,7 +264,6 @@ function BuildForm({
   const lines = changeLines(
     read.values,
     values,
-    NOTHING_STAGED,
     titles,
     inputFiles.map((change) => change.id),
   );
@@ -319,7 +307,7 @@ function BuildForm({
         ? numberProblem(input.kind === 'value' ? input.value : input.default)
         : undefined,
     ]),
-    ...(form?.runs === true ? scoreProblems : []),
+    ...(savedReadable ? scoreProblems : []),
   ].filter((problem): problem is string => problem !== undefined);
   const workflowRaw = useMemo(() => {
     if (text === null) return null;
@@ -378,7 +366,6 @@ function BuildForm({
                 : 'The workflow chosen cannot be read.'
         }
         inputs={values.inputs}
-        runs={form?.runs === true}
         axisCount={Math.max(values.axes.length, 1)}
         axisOf={(id) => {
           const index = values.axes.findIndex((axis) => axis.inputs.includes(id));
@@ -395,7 +382,7 @@ function BuildForm({
         disabled={disabled}
       />
       <RunsCard
-        active={form?.runs === true && declared !== null}
+        active={declared !== null}
         declared={declared?.inputs ?? []}
         axes={values.axes}
         disabled={disabled}
@@ -441,7 +428,7 @@ function BuildForm({
             .catch((error: unknown) => setReading(error));
         }}
       />
-      {form?.runs === true && (
+      {savedReadable && (
         <>
           <ScoringCard
             place={place}
@@ -631,17 +618,13 @@ export function TaskBuild({
 }) {
   const file = useOwnFile(place, PATH);
   const workflowForm = useWorkflowForm(place, true);
-  const folders = useTestFolders(place, true);
-  if (file.isPending || workflowForm.isPending || folders.state === 'loading') {
+  if (file.isPending || workflowForm.isPending) {
     return <PageSkeleton rows={8} />;
   }
   if (file.data === undefined) {
     return (
       <ErrorBlock error={toApiError(file.error)} onRetry={() => void file.refetch()} />
     );
-  }
-  if (folders.state === 'error') {
-    return <ErrorBlock error={folders.error} onRetry={folders.retry} />;
   }
   if (file.data.upload) {
     return (
@@ -672,7 +655,6 @@ export function TaskBuild({
       file={file.data}
       doc={read.doc}
       form={form}
-      folders={folders.data}
       saving={saving}
       admin={admin}
       manager={manager}

@@ -11,21 +11,17 @@ import {
   entryFields,
   freeName,
   removeEntry,
-  removeField,
   removeInput,
   removeStep,
   renameEntry,
-  renameField,
   renameInput,
   renameStep,
   setEntry,
-  setField,
   setInput,
   setUse,
   setValue,
   wire,
   type EntryFields,
-  type FieldFields,
   type InputFields,
   workflowOf,
 } from './edit';
@@ -36,7 +32,6 @@ import {
   refsIn,
   wholeRef,
   refText,
-  type FieldDecl,
   type InputDecl,
   type ReportEntry,
   type Workflow,
@@ -66,8 +61,8 @@ import classes from './workflows.module.css';
  * it runs, its name, its primitive's version, a value for each port without
  * a wire and what each port is for (#436), what the author never acts on
  * under Details; the inputs, each offering exactly what the format allows it
- * and what the task's form names it (#434); a test's files; and the report's
- * entries with what each number means. Every change is an edit of the file
+ * and what the task's form names it (#434); and the outputs, each with what
+ * pages call it and its unit. Every change is an edit of the file
  * in place, handed up as its new text.
  */
 
@@ -77,7 +72,6 @@ const HANDLE = /^[a-z0-9][a-z0-9_-]{0,39}$/;
 const REPORT_NAME = /^[a-z][a-z0-9_]*$/;
 const RESERVED = ['outcome', 'points', 'penalty'];
 const SCALARS = ['text', 'number', 'boolean', 'enum'];
-const NOT_TEST = 'A test field cannot be called test. Choose another name.';
 
 /** Why `name` cannot be an id among `taken`, or null when it can. */
 function handleProblem(name: string, taken: string[]): string | null {
@@ -306,7 +300,7 @@ function PortValue({
 
 /**
  * What the author never acts on, said once in plain words for whoever wants
- * it: the primitive, how it runs the tests, what result it reports, what it
+ * it: the primitive, how it runs many runs, what result it reports, what it
  * keeps secret, and what it gets each time it runs and whose limits those
  * are (M56).
  */
@@ -331,8 +325,8 @@ function Details({
         </li>
         {primitive.batch && (
           <li>
-            When it runs for each test, one start serves all the tests rather than one
-            start each, and each test keeps its own limits.
+            When a grading has many runs of it, one start serves them all rather than
+            one start each, and each run keeps its own limits.
           </li>
         )}
         {primitive.network && <li>It can reach the network.</li>}
@@ -556,9 +550,7 @@ function InputRow({
   const [refused, setRefused] = useState<string | null>(null);
   const fields: InputFields = {
     type: input.type,
-    contestant: input.contestant,
     options: input.options,
-    per_test: input.perTest,
     optional: input.optional,
     title: input.title,
     help: input.help,
@@ -571,8 +563,6 @@ function InputRow({
       merged.options = ['a', 'b'];
     // A unit goes after a number's title on the task's form, and only there (M54).
     if (merged.type !== 'number') merged.unit = null;
-    if (!(merged.contestant && merged.type === 'file')) merged.per_test = false;
-    if (merged.contestant) merged.optional = false;
     const written = setInput(text, input.id, merged);
     const broken = newProblem(workflow, workflowOf(written), primitives);
     setRefused(broken);
@@ -684,111 +674,16 @@ function InputRow({
   );
 }
 
-function FieldRow({
-  text,
-  workflow,
-  primitives,
-  field,
-  pinned,
-  change,
-}: {
-  text: string;
-  workflow: Workflow;
-  primitives: Map<string, PrimitiveInfo>;
-  field: FieldDecl;
-  pinned: Pinned;
-  change: Change;
-}) {
-  const [refused, setRefused] = useState<string | null>(null);
-  const fields: FieldFields = {
-    type: field.type,
-    options: field.options,
-    public: field.public,
-  };
-  const update = (next: Partial<FieldFields>) => {
-    const merged = { ...fields, ...next };
-    if (merged.type !== 'enum') merged.options = null;
-    else if (merged.options === null || merged.options?.length === 0)
-      merged.options = ['a', 'b'];
-    if (merged.type !== 'file' && merged.type !== 'folder') merged.public = false;
-    const written = setField(text, field.name, merged);
-    const broken = newProblem(workflow, workflowOf(written), primitives);
-    setRefused(broken);
-    if (broken === null) change(written);
-  };
-  const problems = pinned.fields.get(field.name) ?? [];
-  return (
-    <li className={classes.declaration} aria-label={`The test’s ${field.name}`}>
-      <CommitField
-        label="Name"
-        value={field.name}
-        description="Steps read it by this name. Renaming it changes them too."
-        apply={(name) => {
-          if (name === 'test') return NOT_TEST;
-          const problem = handleProblem(
-            name,
-            workflow.test
-              .filter((other) => other.name !== field.name)
-              .map((other) => other.name),
-          );
-          if (problem === null) change(renameField(text, field.name, name));
-          return problem;
-        }}
-      />
-      <Select
-        label="Type"
-        value={field.type}
-        options={TYPE_OPTIONS}
-        onChange={(type) => update({ type })}
-      />
-      {field.type === 'enum' && (
-        <CommitField
-          label="Options"
-          description="Separated by commas."
-          value={optionsText(field.options)}
-          apply={(written) => {
-            const options = optionsOf(written);
-            if (options.length === 0) return 'List the options to choose from.';
-            update({ options });
-            return null;
-          }}
-        />
-      )}
-      {problems.map((problem) => (
-        <p key={problem.message} className={classes.problemText}>
-          {problem.message}
-        </p>
-      ))}
-      {refused !== null && (
-        <p className={classes.problemText} role="alert">
-          {refused}
-        </p>
-      )}
-      <div>
-        <Button
-          size="xs"
-          variant="secondary"
-          onClick={() => change(removeField(text, field.name))}
-        >
-          Remove {field.name} from each test
-        </Button>
-      </div>
-    </li>
-  );
-}
-
-/** A new input's or test's name and type, added in place. */
+/** A new input's name and type, added in place. */
 function AddDeclaration({
   label,
   button,
   taken,
-  test = false,
   onAdd,
 }: {
   label: string;
   button: string;
   taken: string[];
-  test?: boolean;
   onAdd: (id: string, type: string) => void;
 }) {
   const [id, setId] = useState('');
@@ -800,8 +695,7 @@ function AddDeclaration({
       aria-label={button}
       onSubmit={(event) => {
         event.preventDefault();
-        const found =
-          handleProblem(id, taken) ?? (test && id === 'test' ? NOT_TEST : null);
+        const found = handleProblem(id, taken);
         setProblem(found);
         if (found !== null) return;
         onAdd(id, type);
@@ -870,61 +764,6 @@ export function InputsPanel({
         onAdd={(id, type) =>
           change(
             setInput(text, id, { type, options: type === 'enum' ? ['a', 'b'] : null }),
-          )
-        }
-      />
-    </section>
-  );
-}
-
-export function FieldsPanel({
-  text,
-  workflow,
-  primitives,
-  pinned,
-  names,
-  change,
-}: {
-  text: string;
-  workflow: Workflow;
-  primitives: Map<string, PrimitiveInfo>;
-  pinned: Pinned;
-  names: string[] | null;
-  change: Change;
-}) {
-  const shown = workflow.test.filter(
-    (field) => names === null || names.includes(field.name),
-  );
-  return (
-    <section className={classes.panel} aria-label="Each test’s files">
-      <BodyText size="sm" tone="secondary">
-        What every test holds, such as its input and its answer. Each task’s tests give
-        these, and only a step that runs for each test reads them.
-      </BodyText>
-      <ul className={classes.list}>
-        {shown.map((field) => (
-          <FieldRow
-            key={field.name}
-            text={text}
-            workflow={workflow}
-            primitives={primitives}
-            field={field}
-            pinned={pinned}
-            change={change}
-          />
-        ))}
-      </ul>
-      <AddDeclaration
-        label="New file or value"
-        button="Add to each test"
-        test
-        taken={workflow.test.map((field) => field.name)}
-        onAdd={(name, type) =>
-          change(
-            setField(text, name, {
-              type,
-              options: type === 'enum' ? ['a', 'b'] : null,
-            }),
           )
         }
       />

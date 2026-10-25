@@ -50,19 +50,15 @@ function takesFiles(input: InputField): boolean {
   return input.type === 'file' || input.type === 'folder';
 }
 
-/**
- * Whether the input takes several files that keep where they sit: a
- * folder, or a file per test, which is named `<group>/<test>`.
- */
+/** Whether the input takes several files that keep where they sit: a folder. */
 export function takesPaths(input: InputField): boolean {
-  return input.type === 'folder' || (input.type === 'file' && input.per_test);
+  return input.type === 'folder';
 }
 
 /**
- * Where a file goes under its input. A file of a folder input, or of one
- * that takes a file per test, keeps its path inside the folder it was chosen
- * from, the folder's own name left off; a file chosen alone, and the one
- * file of a file input, goes by its name.
+ * Where a file goes under its input. A file of a folder input keeps its path
+ * inside the folder it was chosen from, the folder's own name left off; a
+ * file chosen alone, and the one file of a file input, goes by its name.
  */
 export function pathOf(input: InputField, file: File): string {
   // A browser without folder picking gives no path at all.

@@ -7,7 +7,6 @@ import { Chip } from '@/ui/Chip';
 import { PageLink } from '@/ui/PageLink';
 import { Loaded } from '@/ui/feedback/Loaded';
 import { taskCardPath } from '@/lib/sections';
-import { compareRatio, type Ratio } from '@/lib/exact';
 import { formatDateTime } from '@/lib/time';
 import { DefinitionErrors } from '../DefinitionErrors';
 import { TaskInContest } from '../contest/TaskEntry';
@@ -17,16 +16,12 @@ import {
   inputTitle,
   readSettings,
   taskPath,
-  useTaskWorth,
-  useTestFolders,
   useWorkflowForm,
-  type GroupFolder,
   type TaskPlace,
 } from './build-data';
 import type { TaskSave } from './build-save';
 import { taskPlaceOf } from './places';
 import { publishedLine, savedBy } from './published';
-import { pointsWords, taskWeight } from './scoring';
 import classes from './task.module.css';
 
 const TASK = '/api/v1/orgs/{org}/contests/{contest}/tasks/{task}';
@@ -44,7 +39,7 @@ function StateChip({ state }: { state: TaskState }) {
   return <Chip tone="live">Published</Chip>;
 }
 
-type Card = 'workflow' | 'inputs' | 'runs' | 'tests' | 'statement';
+type Card = 'workflow' | 'inputs' | 'runs' | 'statement';
 
 type Item = { card: Card; ok: boolean; text: string };
 
@@ -61,14 +56,12 @@ const under = (state: TaskState, ...tops: string[]) =>
 /**
  * Each part of the task, ticked when it is done or saying what it is
  * missing, in the order its cards build it: its statement, its workflow, its
- * inputs, its tests and its scoring (M11).
+ * inputs and its runs (M11).
  */
 function readiness(
   state: TaskState,
   form: WorkflowForm | null,
   settings: string | null,
-  folders: GroupFolder[],
-  worth: Ratio | null,
 ): Item[] {
   // The forge says whether the statement saved is written: not blank, and not
   // the one a new task starts with (M57).
@@ -84,26 +77,17 @@ function readiness(
           upload: null,
           version: null,
         });
-  const values =
-    read === null || 'error' in read
-      ? null
-      : readTask(
-          read.doc,
-          folders.map((folder) => folder.name),
-        ).values;
+  const values = read === null || 'error' in read ? null : readTask(read.doc).values;
   const needed = (form?.problem === null ? form.inputs : []).filter(
-    (input) => !input.contestant && !input.optional,
+    (input) => !input.optional,
   );
-  const missing = needed.find(
-    (input) =>
-      (values?.inputs.find((given) => given.id === input.id)?.value.trim() ?? '') ===
-      '',
-  );
-  const tests = folders.reduce((total, folder) => total + folder.tests.length, 0);
-  const empty = folders.find((folder) => folder.tests.length === 0);
-  const total = values === null ? null : taskWeight(values.groups);
+  // An input the entrant gives, or one each run gives, needs no value here.
+  const missing = needed.find((input) => {
+    const given = values?.inputs.find((found) => found.id === input.id);
+    if (given?.give === 'entrant' || given?.give === 'per-run') return false;
+    return (given?.value.trim() ?? '') === '';
+  });
   const axes = (values?.axes ?? []).filter((axis) => axis.inputs.length > 0);
-  const gradedByTests = axes.length === 0;
   return [
     {
       card: 'statement',
@@ -130,38 +114,13 @@ function readiness(
             ? 'Inputs: see the problems below'
             : 'Inputs',
     },
-    ...(gradedByTests
-      ? [
-          {
-            card: 'tests' as const,
-            ok: tests > 0 && empty === undefined && !under(state, 'tests'),
-            text:
-              tests === 0
-                ? 'Tests: none yet'
-                : `Tests: ${String(tests)} in ${folders.length === 1 ? '1 group' : `${String(folders.length)} groups`}${empty !== undefined ? `, ${empty.name} has none` : ''}`,
-          },
-          {
-            card: 'tests' as const,
-            ok: total !== null && !under(state, 'test_groups', 'credit'),
-            text:
-              total === null
-                ? 'Scoring: cannot be read'
-                : under(state, 'test_groups', 'credit')
-                  ? 'Scoring: see the problems below'
-                  : total.num === 0n
-                    ? 'Scoring: no points, ranked on reported values'
-                    : `Scoring: ${pointsWords(total)}${worth !== null && compareRatio(worth, total) !== 0 ? ' here' : ''}`,
-          },
-        ]
-      : [
-          {
-            card: 'runs' as const,
-            ok: !under(state, 'repeat'),
-            text: under(state, 'repeat')
-              ? 'Runs: see the problems below'
-              : `Runs: ${String(runCount(axes))}`,
-          },
-        ]),
+    {
+      card: 'runs',
+      ok: !under(state, 'repeat'),
+      text: under(state, 'repeat')
+        ? 'Runs: see the problems below'
+        : `Runs: ${String(runCount(axes))}`,
+    },
   ];
 }
 
@@ -261,8 +220,6 @@ export function TaskStanding({
   const history = $api.useQuery('get', `${TASK}/history`, { params: { path } });
   const form = useWorkflowForm(place);
   const settings = useQuery({ ...fileQuery(place, 'task.yaml'), retry: false });
-  const folders = useTestFolders(place);
-  const { worth } = useTaskWorth(place);
   const changes: FileChange[] | undefined = history.data;
   const last = changes?.[0];
 
@@ -280,18 +237,14 @@ export function TaskStanding({
               </BodyText>
             )}
           </div>
-          {folders.state === 'ready' && (
-            <Ready
-              place={place}
-              items={readiness(
-                task,
-                form.isError ? null : (form.data ?? null),
-                settings.data?.encoding === 'utf-8' ? settings.data.content : null,
-                folders.data,
-                worth,
-              )}
-            />
-          )}
+          <Ready
+            place={place}
+            items={readiness(
+              task,
+              form.isError ? null : (form.data ?? null),
+              settings.data?.encoding === 'utf-8' ? settings.data.content : null,
+            )}
+          />
           <BodyText>
             {publishedLine(
               task.latest,

@@ -303,23 +303,8 @@ describe('the task page', () => {
 });
 
 describe('what the task has, under its name', { timeout: 20_000 }, () => {
-  /** The sum task with a statement, two groups of tests, and the classic workflow. */
+  /** The sum task with a statement, on the classic workflow. */
   function readyBackend(state = publishedTask) {
-    const tree: Record<string, unknown[]> = {
-      tests: ['small', 'large'].map((group) => ({
-        path: `tests/${group}`,
-        kind: 'directory',
-        size: null,
-        upload: null,
-      })),
-      'tests/small': ['1', '2'].map((test) => ({
-        path: `tests/small/${test}`,
-        kind: 'directory',
-        size: null,
-        upload: null,
-      })),
-      'tests/large': [],
-    };
     const saves: unknown[] = [];
     server.use(
       signedIn,
@@ -336,26 +321,17 @@ describe('what the task has, under its name', { timeout: 20_000 }, () => {
           },
         ]),
       ),
-      http.get(`${TASK_API}/tree`, ({ request }) => {
-        const path = new URL(request.url).searchParams.get('path') ?? '';
-        return path.startsWith('tests')
-          ? HttpResponse.json(tree[path] ?? [])
-          : undefined;
-      }),
       http.get(`${TASK_API}/workflow-form`, () =>
         HttpResponse.json({
-          workflow: 'unicon/classic@v2',
+          workflow: 'unicon/classic@v3',
           newer: null,
           problem: null,
           graded: false,
-          test: [],
           inputs: [
             {
               id: 'time_limit',
               type: 'number',
-              contestant: false,
               options: null,
-              per_test: false,
               optional: false,
               title: 'Time limit',
               help: null,
@@ -395,46 +371,12 @@ describe('what the task has, under its name', { timeout: 20_000 }, () => {
       ['Done', 'Statement'],
       ['Done', 'Workflow'],
       ['Not done', 'Inputs: Time limit (seconds) needs a value'],
-      ['Not done', 'Tests: 2 in 2 groups, large has none'],
-      ['Done', 'Scoring: no points, ranked on reported values'],
+      ['Done', 'Runs: 1'],
     ]);
     expect(within(row).getByRole('link', { name: /^Inputs/ })).toHaveAttribute(
       'href',
       `${TASK}?card=inputs`,
     );
-  });
-
-  it('says the scoring’s points are here where the contest scales the task to a worth of its own', async () => {
-    readyBackend();
-    const file = (path: string, content: string) =>
-      HttpResponse.json({
-        path,
-        encoding: 'utf-8',
-        content,
-        token: `token-${path}`,
-        upload: null,
-        version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
-      });
-    server.use(
-      http.get(`${TASK_API}/files/task.yaml`, () =>
-        file(
-          'task.yaml',
-          'name: sum\nworkflow: unicon/classic@v2\ntest_groups:\n  small:\n    pass: 100\n',
-        ),
-      ),
-      http.get(`${CONTEST_API}/files/contest.yaml`, () =>
-        file(
-          'contest.yaml',
-          'name: Spring\ntasks:\n  - id: sort\n  - id: sum\n    worth: 70\n',
-        ),
-      ),
-    );
-    renderApp(TASK);
-
-    const row = await screen.findByRole('list', { name: 'What the task has' });
-    expect(
-      await within(row).findByRole('link', { name: 'Scoring: 100 points here' }),
-    ).toBeVisible();
   });
 
   it('does not tick a statement the forge says is not written yet: blank, or the one a new task starts with (M57)', async () => {

@@ -2,13 +2,11 @@ import { http, HttpResponse } from 'msw';
 import type {
   ContestHome,
   Entrant,
-  GradedTest,
   GradingResult,
   InputField,
   MyEntry,
   OrganisedEntrant,
-  Outcome,
-  Reported,
+  RunShown,
   Submission,
   TaskPage,
   TaskRelease,
@@ -112,8 +110,13 @@ export function home(overrides: Partial<ContestHome> = {}): ContestHome {
   };
 }
 
-/** A contestant input, a file input for the solution unless told otherwise. */
-export function inputField(overrides: Partial<InputField> = {}): InputField {
+/**
+ * An entrant input, a file input for the solution unless told otherwise, as
+ * the task's page serves it.
+ */
+export function inputField(
+  overrides: Partial<InputField> = {},
+): components['schemas']['InputField'] {
   return {
     id: 'submission',
     type: 'file',
@@ -214,7 +217,7 @@ export function grading(overrides: Partial<GradingResult> = {}): GradingResult {
     stopped: null,
     outcome: null,
     groups: [],
-    values: reported(),
+    values: { numbers: {}, texts: {} },
     reason: null,
     limit: null,
     compiled: null,
@@ -227,53 +230,33 @@ export function grading(overrides: Partial<GradingResult> = {}): GradingResult {
   };
 }
 
-/** Reported values, its numbers as the exact strings the API serves. */
-export function reported(
-  numbers: Record<string, string> = {},
-  texts: Record<string, string> = {},
-): Reported {
-  return { numbers, texts };
-}
-
-/** A test's row of a result. */
-export function graded(
-  test: string,
-  outcome: Outcome,
-  values: Reported = reported(),
-): GradedTest {
-  return { test, outcome, values };
+/** A run of the samples, accepted, with what it reported. */
+function sampleRun(place: number, reports: Record<string, string>): RunShown {
+  return {
+    group: 'samples',
+    place,
+    id: null,
+    dropped: false,
+    key: {},
+    titles: [],
+    verdict: 'accepted',
+    passed: 1,
+    reports,
+    texts: {},
+    label: null,
+    message: null,
+  };
 }
 
 /**
- * A graded one: accepted, with its compile log, the samples shown with their
- * tests, and a group whose tests are shown at the reveal, scored on a task
- * giving the samples nothing and main 100.
+ * A graded one: accepted, with the compile log written once and the two
+ * runs of the samples, each with what it reported.
  */
 export const accepted = grading({
   status: 'graded',
   outcome: 'accepted',
-  values: reported({}, { log: 'Compiled cleanly.' }),
-  groups: [
-    {
-      group: 'samples',
-      show: 'always',
-      outcome: 'accepted',
-      tests: [
-        graded('samples/1', 'accepted', reported({ time_ms: '12', memory_kb: '2048' })),
-        graded('samples/2', 'accepted', reported()),
-      ],
-      shown_at: null,
-      ran: true,
-    },
-    {
-      group: 'main',
-      show: 'verdict',
-      outcome: 'accepted',
-      tests: null,
-      shown_at: '2026-09-12T11:00:00Z',
-      ran: true,
-    },
-  ],
+  once: { reports: {}, texts: { log: { name: null, output: null } } },
+  runs: [sampleRun(1, { time_ms: '12', memory_kb: '2048' }), sampleRun(2, {})],
 });
 
 export function submission(

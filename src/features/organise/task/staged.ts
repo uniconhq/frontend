@@ -3,37 +3,12 @@ import { toApiError } from '@/api/problem';
 import type { SaveChange } from '@/api/types';
 import { tokenNow } from '../files/use-task-upload';
 import type { TaskPlace } from './build-data';
-import type { Source, TestFile } from './match';
 
-/**
- * Changes to the task's tests that wait for the one save of the task: tests
- * added or replaced, with their files and values, and tests taken out. Each
- * test that is there already carries its files as they were when the change
- * was made, with the token each was read with, so a file someone else changed
- * since is a conflict at the save, not overwritten unseen.
- */
+/** A file to add, from the disk: its name or path, its size, its bytes. */
+export type Source = { path: string; size: number; read: () => Promise<Blob> };
 
-/** A file of a test as it was when a change to the test was made. */
-export type Existing = { path: string; token: string; size: number | null };
-
-type StagedTest = {
-  group: string;
-  test: string;
-  files: TestFile[];
-  /**
-   * The test's values (its `test.yaml`), by field, when this change gives
-   * them; null leaves the values as they are.
-   */
-  values: Record<string, string> | null;
-  /** Its files as they were, none for a new test. */
-  existing: Existing[];
-};
-
-type StagedRemoval = { group: string; test: string; existing: Existing[] };
-
-export type Staged = { tests: StagedTest[]; removals: StagedRemoval[] };
-
-export const NOTHING_STAGED: Staged = { tests: [], removals: [] };
+/** A file of the task as it was when a change to it was made. */
+type Existing = { path: string; token: string; size: number | null };
 
 const TREE = '/api/v1/orgs/{org}/contests/{contest}/tasks/{task}/tree';
 

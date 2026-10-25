@@ -31,7 +31,6 @@ import { keepEqual } from '@/lib/keep-equal';
 import { ActionMenu, type MenuEntry } from '@/ui/ActionMenu';
 import {
   GEOMETRY,
-  columnX,
   headerOf,
   rowOf,
   wirePath,
@@ -53,8 +52,6 @@ import {
   primitiveTitle,
   readersWords,
   refWords,
-  BAND_LABEL,
-  runsWords,
 } from './words';
 import classes from './workflows.module.css';
 
@@ -112,7 +109,6 @@ type HeadView =
       name: string;
       /** The step's place in `steps:`, so Open can name it. */
       step: number | null;
-      runs: string;
       primitive: string | null;
       use: string;
       description: string | null | undefined;
@@ -141,7 +137,6 @@ type BoxData = {
 
 type BoxNode = Node<BoxData, 'box'>;
 type SlotNode = Node<{ label: string | null; colour: string | undefined }, 'slot'>;
-type BandNode = Node<Record<string, never>, 'band'>;
 type WireEdge = Edge<
   { points: Point[]; colour: string | undefined; marked: boolean; dimmed: boolean },
   'wire'
@@ -186,7 +181,7 @@ type Seen = {
 /**
  * What a port without a drawn wire is given, as the port shows it: a value,
  * text with values written in, or a wire the layout cannot draw, such as a
- * once step reading a per-test one, which the file holds all the same.
+ * step reading one written after it, which the file holds all the same.
  */
 function shownValue(
   workflow: Workflow,
@@ -234,21 +229,15 @@ function rowView(
       ? (pinned.ports.get(`${String(box.step)}.${port}`) ?? [])
       : box.kind === 'inputs'
         ? (pinned.inputs.get(port) ?? [])
-        : box.kind === 'test'
-          ? (pinned.fields.get(port) ?? [])
-          : box.kind === 'report'
-            ? (pinned.entries.get(port) ?? [])
-            : [];
+        : box.kind === 'report'
+          ? (pinned.entries.get(port) ?? [])
+          : [];
   const noticed =
     seen.notice !== null && seen.notice.box === box.key && seen.notice.port === port;
   const value = side === 'left' ? shownValue(workflow, box, port, seen.drawn) : null;
   const input =
     box.kind === 'inputs'
       ? workflow.inputs.find((found) => found.id === port)
-      : undefined;
-  const field =
-    box.kind === 'test'
-      ? workflow.test.find((found) => found.name === port)
       : undefined;
   const entry =
     box.kind === 'report'
@@ -260,7 +249,7 @@ function rowView(
     side === 'left'
       ? boxed?.inputs.find((input) => input.name === port)?.type
       : boxed?.outputs.find((output) => output.name === port)?.type;
-  const type = decl?.type ?? boxType ?? input?.type ?? field?.type ?? null;
+  const type = decl?.type ?? boxType ?? input?.type ?? null;
   const marks = [
     ...(side === 'left' && primitive !== null ? portMarks(primitive, port) : []),
     ...(entry !== undefined ? entryMarks(entry) : []),
@@ -311,7 +300,6 @@ function boxData(seen: Seen, box: Box): BoxData {
             kind: 'step',
             name: step?.id || '(no name)',
             step: box.step,
-            runs: runsWords(false),
             primitive: primitive !== null ? primitiveTitle(primitive) : null,
             use: step?.use ?? '',
             description: primitive?.description,
@@ -436,7 +424,7 @@ const PortRow = memo(function PortRow({ box, row }: { box: string; row: RowView 
   );
 });
 
-/** The head of a step's box: its name and how often it runs, its primitive, what that does. */
+/** The head of a step's box: its name, its primitive, what that does. */
 const StepHead = memo(function StepHead({
   box,
   head,
@@ -454,7 +442,6 @@ const StepHead = memo(function StepHead({
       >
         <span className={classes.titleLine}>
           <span className={classes.title}>{head.name}</span>
-          <span className={classes.runs}>{head.runs}</span>
         </span>
         <span className={classes.primitiveLine}>
           {head.primitive !== null && (
@@ -568,18 +555,6 @@ const SlotView = memo(function SlotView({ data }: NodeProps<SlotNode>) {
   );
 });
 
-/**
- * The shaded band behind the steps that run for each test and the test's
- * files, labelled at its top so it says what it is (M55).
- */
-function BandView() {
-  return (
-    <div className={classes.band}>
-      <span className={classes.bandLabel}>{BAND_LABEL}</span>
-    </div>
-  );
-}
-
 const WireView = memo(function WireView({ data }: EdgeProps<WireEdge>) {
   if (data === undefined) return null;
   return (
@@ -594,10 +569,10 @@ const WireView = memo(function WireView({ data }: EdgeProps<WireEdge>) {
   );
 });
 
-const NODE_TYPES = { box: BoxView, slot: SlotView, band: BandView };
+const NODE_TYPES = { box: BoxView, slot: SlotView };
 const EDGE_TYPES = { wire: WireView };
 
-/** Space around the graph inside its frame, room for the band and the handles. */
+/** Space around the graph inside its frame, room for the handles. */
 const PAD = 32;
 
 const VIEWPORT = { x: PAD, y: PAD, zoom: 1 };
@@ -736,23 +711,7 @@ export function Graph({
     drawn,
     workflowBoxes,
   };
-  const found: (BoxNode | SlotNode | BandNode)[] = [];
-  if (layout.band !== null) {
-    const left = columnX(layout.band.first) - GEOMETRY.gap / 2;
-    const right = columnX(layout.band.last) + GEOMETRY.width + GEOMETRY.gap / 2;
-    found.push({
-      id: 'band',
-      type: 'band',
-      position: { x: left, y: -GEOMETRY.space },
-      width: right - left,
-      height: layout.height + 2 * GEOMETRY.space,
-      data: {},
-      selectable: false,
-      draggable: false,
-      connectable: false,
-      zIndex: -1,
-    });
-  }
+  const found: (BoxNode | SlotNode)[] = [];
   for (const box of layout.boxes)
     found.push({
       id: box.key,

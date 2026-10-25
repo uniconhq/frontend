@@ -52,14 +52,6 @@ export function outcomeWords(primitive: PrimitiveInfo): string | string[] | null
   return outcomes.map(([word, when]) => `${outcomeName(word)} if ${when}`);
 }
 
-/** What the shaded band on the graph says it is: the steps in it run once for each test (M55). */
-export const BAND_LABEL = 'Runs once for each test';
-
-/** How often a step runs, as its box says it. */
-export function runsWords(perTest: boolean): string {
-  return perTest ? 'For each test' : 'Once';
-}
-
 const LIMIT_WORDS: Record<string, string> = {
   time_ms: 'time',
   cpu_ms: 'time',
@@ -101,7 +93,7 @@ export function entryMarks(entry: ReportEntry): string[] {
 export function refWords(ref: Ref): string {
   if (ref.kind === 'steps') return `${ref.output} from ${ref.name}`;
   if (ref.kind === 'inputs') return `${ref.name} from the inputs`;
-  return `${ref.name} from each test`;
+  return `${ref.name} from the workflow’s files`;
 }
 
 /** Who reads a workflow, in a few words, as its page's header says it. */
@@ -122,11 +114,10 @@ export function boxName(box: Box, workflow: Workflow): string {
   if (box.kind === 'step' && box.step !== null)
     return `Step ${workflow.steps[box.step]?.id || '(no name)'}`;
   if (box.kind === 'inputs') return 'Inputs';
-  if (box.kind === 'test') return 'Each test’s files';
   return 'Outputs';
 }
 
-/** The steps that read a group of inputs or test files, as its box says it. */
+/** The steps that read a group of inputs, as its box says it. */
 export function readersWords(readers: string[]): string {
   if (readers.length === 0) return 'Nothing uses these yet';
   if (readers.length === 1) return `Used by ${readers[0] ?? ''}`;
@@ -183,9 +174,10 @@ function limitParts(limits: Record<string, number>): string[] {
 }
 
 /**
- * Where a port a limit grows from takes its value: "the task’s Time limit"
- * for a workflow input, named by its title, or the entrant’s when the entrant
- * gives it; "what its time_limit is given" otherwise.
+ * Where a port a limit grows from takes its value: "the Time limit input"
+ * for a workflow input, named by its title; "what its time_limit is given"
+ * otherwise. Whether the task or the entrant fills the input is the task's
+ * to say, so the workflow's words name only the input.
  */
 function sourceWords(
   step: Workflow['steps'][number] | undefined,
@@ -196,7 +188,7 @@ function sourceWords(
   if (value?.kind === 'wire' && value.ref.kind === 'inputs') {
     const name = value.ref.name;
     const input = workflow.inputs.find((found) => found.id === name);
-    return `the ${input?.contestant === true ? 'entrant’s' : 'task’s'} ${input?.title ?? name}`;
+    return `the ${input?.title ?? name} input`;
   }
   return `what its ${port} is given`;
 }
@@ -205,12 +197,11 @@ function sourceWords(
  * What a step's container gets each time it runs, in plain words (M56): "What
  * this step gets each time it runs: up to 60 seconds, 1 GB of memory, 128
  * processes, 64 MB of output", with each limit a task raises said so ("its
- * time grows with the task’s Time limit"), or "for each test" where the step
- * runs for each test as one batch, whose limits are each test's (TASK-FORMAT
- * 1.4); null when the primitive gives no limits. Then whose limits they are. A step runs the entrant's program when
+ * time grows with the Time limit input"); null when the primitive gives no
+ * limits. Then whose limits they are. A step runs the entrant's program when
  * its primitive runs what arrives at a port (`runs`) and raises its limits
  * from what it is given (`limits_from`), as Run program does to fit the
- * task's Time limit: the program then runs inside it within those. Compile
+ * Time limit input: the program then runs inside it within those. Compile
  * runs what arrives too, but takes nothing from the task, so its limits are
  * its own.
  */
@@ -230,9 +221,7 @@ export function limitsWords(
   const grows = [...raised].map(([word, from], at) =>
     at === 0 ? `its ${word} grows with ${from}` : `its ${word} with ${from}`,
   );
-  const each =
-    primitive.batch && step?.perTest === true ? 'for each test' : 'each time it runs';
-  const gets = `What this step gets ${each}: ${parts.join(', ')}${
+  const gets = `What this step gets each time it runs: ${parts.join(', ')}${
     grows.length === 0 ? '' : `; ${listed(grows)}`
   }.`;
   const runsProgram =

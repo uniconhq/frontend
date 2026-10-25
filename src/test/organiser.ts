@@ -3,7 +3,9 @@ import type {
   FileContent,
   ListedContest,
   Named,
+  Outcome,
   Publication,
+  RunsResult,
   SaveEffect,
   TaskStanding,
   TaskState,
@@ -83,10 +85,36 @@ export const unchanged: SaveEffect = {
 
 /** What classic reports, as a publication names its values (M58), in its report order. */
 export const classicMeanings: ValueMeaning[] = [
-  { name: 'time_ms', title: 'Run time', unit: 'ms', fold: 'max', better: 'lower' },
-  { name: 'memory_kb', title: 'Memory used', unit: 'KB', fold: 'max', better: 'lower' },
+  { name: 'time_ms', title: 'Run time', unit: 'ms', fold: null, better: 'lower' },
+  { name: 'memory_kb', title: 'Memory used', unit: 'KB', fold: null, better: 'lower' },
   { name: 'log', title: 'Compile log', unit: null, fold: null, better: null },
 ];
+
+/**
+ * A finished grading's result: a run for each verdict, in order, and the
+ * outcome of each step done once, by its id.
+ */
+export function runsResult(
+  verdicts: Outcome[],
+  once: Record<string, Outcome> = {},
+): RunsResult {
+  return {
+    schema_version: 6,
+    error: null,
+    once: { outcomes: once, reports: {}, texts: {} },
+    runs: verdicts.map((verdict, at) => ({
+      id: `run-${String(at + 1)}`,
+      key: {},
+      label: null,
+      message: null,
+      passed: verdict === 'accepted' ? 1 : 0,
+      reports: {},
+      texts: {},
+      verdict,
+    })),
+    staff: [],
+  };
+}
 
 export const publications: Publication[] = [
   {

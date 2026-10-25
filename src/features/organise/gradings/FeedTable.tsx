@@ -81,9 +81,11 @@ function StatusCell({
         </BodyText>
       )}
       {stands !== null && <BodyText tone="secondary">{stands}</BodyText>}
-      {grading.status === 'done' && grading.result !== null && (
-        <BodyText tone="secondary">{verdictLabel(resultOf(grading.result))}</BodyText>
-      )}
+      {grading.status === 'done' &&
+        grading.result !== null &&
+        'runs' in grading.result && (
+          <BodyText tone="secondary">{verdictLabel(resultOf(grading.result))}</BodyText>
+        )}
       {grading.log && entry.task !== null && (
         <OutLink
           href={logHref({ ...path, task: entry.task }, grading.id)}

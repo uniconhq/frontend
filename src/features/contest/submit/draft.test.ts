@@ -22,12 +22,6 @@ const program = inputField({
   label: 'Your program',
   max_size: 20,
 });
-const answers = inputField({
-  id: 'answers',
-  type: 'file',
-  label: 'Your answers',
-  per_test: true,
-});
 /** A number of 30 significant digits, past what a float holds. */
 const THIRTY = '0.123456789012345678901234567891';
 const alpha = inputField({
@@ -72,11 +66,6 @@ describe('where each file goes under its input', () => {
   it('keeps a folder’s layout, the chosen folder’s own name left off', () => {
     expect(pathOf(program, inFolder('mine/src/Main.java'))).toBe('src/Main.java');
     expect(pathOf(program, file('Main.java', 1))).toBe('Main.java');
-  });
-
-  it('names a file per test by where it sits, or by its name as given', () => {
-    expect(pathOf(answers, inFolder('out/main/1.txt'))).toBe('main/1.txt');
-    expect(pathOf(answers, file('1.txt', 1))).toBe('1.txt');
   });
 
   it('names the one file of a file input by its name', () => {

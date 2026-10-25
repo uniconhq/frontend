@@ -2,8 +2,7 @@ import type { DeclaredInput } from '@/api/types';
 import { formatSize } from '@/lib/size';
 import { tokenNow } from '../files/use-task-upload';
 import type { TaskPlace } from './build-data';
-import type { Source } from './match';
-import { filesUnder, type PlannedChange } from './staged';
+import { filesUnder, type PlannedChange, type Source } from './staged';
 
 /**
  * A file or a folder chosen for a setting of the task on the Inputs card

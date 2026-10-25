@@ -14,10 +14,10 @@ import classes from './feed.module.css';
 type ContestPath = { org: string; contest: string };
 
 /**
- * A submission as its row reads it, with everything filled in (TASK-FORMAT.md
- * section 1.7), opened under the submission in the feed: the same payload its
- * contestant reads, scored by the same code, with every group's outcome,
- * tests and points shown and each group saying when its row sees it. The row
+ * A submission as its row reads it, with everything filled in, opened under
+ * the submission in the feed: the same payload its entrant reads, scored by
+ * the same code, with every value and run shown and each value saying when
+ * its row sees it. The row
  * is the entrant that made it, as the feed names it. It is the attempt that
  * counts (#442), an earlier one than the feed's head while a later attempt
  * has no result; the view then says which attempt it shows.
@@ -54,8 +54,8 @@ export function ScoredView({
       aria-label={`Submission ${String(number)}, scored`}
     >
       <BodyText tone="secondary">
-        The full result, as its entrant will see it once everything is shown. Each test
-        group says when its entrant sees it.
+        The full result, as its entrant will see it once everything is shown. Each value
+        says when its entrant sees it.
       </BodyText>
       {view.state === 'loading' && <PageSkeleton rows={3} />}
       {view.state === 'error' && <ErrorBlock error={view.error} onRetry={view.retry} />}
@@ -87,8 +87,6 @@ export function ScoredView({
             )}
             <ScoredResult
               grading={view.data.grading}
-              shownAt="Its entrant sees this at"
-              testsShownAt="Its entrant sees its tests at"
               readText={(ask) => staffText(where, entry.by.entrant, ask)}
             />
           </>

@@ -4,14 +4,12 @@ import { YAML_OPTIONS } from '../forms/yaml-doc';
 
 /**
  * The lines of `workflow.yaml` a box stands for, so selecting the box marks
- * them in the preview: a step's item, an input's or a field's entry, the
- * report. Read from the document's own node ranges, so the lines are the
+ * them in the preview: a step's item, an input's entry, the outputs. Read from the document's own node ranges, so the lines are the
  * file's as it is written, comments and all.
  */
 export type Selected =
   | { kind: 'step'; index: number }
   | { kind: 'inputs'; ids: string[] }
-  | { kind: 'test'; names: string[] }
   | { kind: 'report' };
 
 export function linesOf(text: string, selected: Selected | null): LineRange[] {
@@ -42,7 +40,6 @@ export function linesOf(text: string, selected: Selected | null): LineRange[] {
     return isSeq(steps) ? ofNode(steps.items[selected.index] as Node | undefined) : [];
   }
   if (selected.kind === 'inputs') return pairsOf('inputs', selected.ids);
-  if (selected.kind === 'test') return pairsOf('test', selected.names);
-  const report: unknown = doc.get('report', true);
-  return isMap(report) ? ofNode(report) : [];
+  const outputs: unknown = doc.get('outputs', true);
+  return isMap(outputs) ? ofNode(outputs) : [];
 }

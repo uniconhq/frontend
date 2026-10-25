@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { parse } from 'yaml';
-import { CLASSIC_V2, PRIMITIVES } from '@/test/workflows';
+import { CLASSIC, PRIMITIVES } from '@/test/workflows';
 import { readWorkflow, type Ref } from './model';
 import { byRef, type PrimitiveInfo } from './primitives';
 import {
@@ -8,7 +8,6 @@ import {
   newProblem,
   orderAfterWire,
   reportRefusal,
-  switchRefusal,
   valueRefusal,
   wireRefusal,
 } from './rules';
@@ -97,28 +96,24 @@ const primitives = byRef([...PRIMITIVES, CHECKER]);
 const WORKFLOW = readWorkflow(
   parse(`
 inputs:
-  submission: {type: file, contestant: true}
-  language: {type: enum, options: [c, cpp], contestant: true}
-  wide: {type: enum, options: [c, rust], contestant: true}
+  submission: file
+  language: {type: enum, options: [c, cpp]}
+  wide: {type: enum, options: [c, rust]}
   mode: {type: enum, options: [exact]}
-  answers: {type: file, contestant: true, per_test: true}
+  input: file
   limit: number
-  guess: {type: number, contestant: true}
+  episodes: number
   key: {type: text, optional: true}
   flag: boolean
-test:
-  input: file
-  episodes: number
 steps:
-  - {id: compile, use: unicon/compile@v2, with: {}}
-  - {id: run, use: unicon/sandbox-run@v2, per_test: true, with: {binary: "\${{ steps.compile.binary }}"}}
-  - {id: check, use: unicon/checker-like@v1, per_test: true, with: {}}
-  - {id: late, use: unicon/compile@v2, with: {}}
+  - {id: compile, use: unicon/compile@v3, with: {}}
+  - {id: run, use: unicon/exec@v1, with: {program: "\${{ steps.compile.program }}"}}
+  - {id: check, use: unicon/checker-like@v1, with: {}}
+  - {id: late, use: unicon/compile@v3, with: {}}
 `),
 );
 
 const input = (name: string): Ref => ({ kind: 'inputs', name });
-const field = (name: string): Ref => ({ kind: 'test', name });
 const output = (name: string, out: string): Ref => ({
   kind: 'steps',
   name,
@@ -131,15 +126,20 @@ describe('the drag rules', () => {
     ['an enum within the port’s options', 0, 'language', input('language')],
     ['a number into a text port', 1, 'args', input('limit')],
     ['a boolean into a text port', 1, 'args', input('flag')],
-    ['a test field into a per-test step', 1, 'input', field('input')],
-    ['a per-test input into a per-test step', 1, 'input', input('answers')],
+    ['a file input into a file port', 1, 'stdin', input('input')],
     ['an optional input into an optional port', 1, 'args', input('key')],
-    ['a task input into a port that raises a limit', 1, 'time_limit', input('limit')],
+    ['an input into a port that raises a limit', 1, 'time_limit', input('limit')],
     [
-      'a test field into a port that raises a limit',
+      'another input into a port that raises a limit',
       1,
-      'time_limit',
-      field('episodes'),
+      'memory_limit',
+      input('episodes'),
+    ],
+    [
+      'a step output into a port that raises no limit',
+      3,
+      'entry',
+      output('check', 'fraction'),
     ],
     ['an enum within an enum port', 2, 'mode', input('mode')],
   ] as const)('lets %s be wired', (_, step, port, source) => {
@@ -157,7 +157,7 @@ describe('the drag rules', () => {
     [
       'a boolean into a file port',
       1,
-      'binary',
+      'program',
       input('flag'),
       'This takes a file, not true or false.',
     ],
@@ -167,34 +167,6 @@ describe('the drag rules', () => {
       'language',
       input('wide'),
       'This takes one of c, cpp, java, python, not rust.',
-    ],
-    [
-      'a once step reading a per-test step',
-      3,
-      'entry',
-      output('check', 'fraction'),
-      'The step check runs for each test, so a step that runs once cannot read it.',
-    ],
-    [
-      'a test field into a once step',
-      0,
-      'source',
-      field('input'),
-      "Only a step that runs for each test can read a test's fields.",
-    ],
-    [
-      'a per-test input into a once step',
-      0,
-      'source',
-      input('answers'),
-      'answers is given once for each test, so only a step that runs for each test can read it.',
-    ],
-    [
-      'a number the entrant gives into a port that raises a limit',
-      1,
-      'time_limit',
-      input('guess'),
-      null,
     ],
     [
       'a step reading its own output',
@@ -213,7 +185,7 @@ describe('the drag rules', () => {
     [
       'an optional input into a required port',
       1,
-      'input',
+      'stdin',
       input('key'),
       'That input is optional, so it can be given only to an optional port.',
     ],
@@ -232,10 +204,9 @@ describe('the drag rules', () => {
     const workflow = readWorkflow(
       parse(`
 inputs: {}
-test: {input: file}
 steps:
-  - {id: first, use: unicon/sandbox-run@v2, with: {}}
-  - {id: second, use: unicon/sandbox-run@v2, with: {}}
+  - {id: first, use: unicon/exec@v1, with: {}}
+  - {id: second, use: unicon/exec@v1, with: {}}
 `),
     );
 
@@ -247,10 +218,9 @@ steps:
   it('refuses an optional output into a required port', () => {
     const workflow = readWorkflow(
       parse(`
-test: {input: file}
 steps:
-  - {id: check, use: unicon/checker-like@v1, per_test: true, with: {}}
-  - {id: run, use: unicon/sandbox-run@v2, per_test: true, with: {}}
+  - {id: check, use: unicon/checker-like@v1, with: {}}
+  - {id: run, use: unicon/exec@v1, with: {}}
 `),
     );
 
@@ -261,13 +231,13 @@ steps:
       wireRefusal(workflow, primitives, 1, 'args', output('check', 'fraction')),
     ).toBeNull();
     expect(
-      wireRefusal(workflow, primitives, 1, 'input', output('check', 'fraction')),
+      wireRefusal(workflow, primitives, 1, 'stdin', output('check', 'fraction')),
     ).toBe('That output may be missing, so it can be given only to an optional port.');
   });
 
   it('lets a step read one listed after it when that makes no loop', () => {
     expect(
-      wireRefusal(WORKFLOW, primitives, 0, 'source', output('late', 'binary')),
+      wireRefusal(WORKFLOW, primitives, 0, 'source', output('late', 'program')),
     ).toBeNull();
   });
 
@@ -277,14 +247,14 @@ steps:
       'steps.run.output is a file, and only text or a number can be reported.',
     );
     expect(reportRefusal(WORKFLOW, primitives, input('limit'))).toBe(
-      "Only a step's output can be reported, not an input or a test's field.",
+      "Only a step's output can be reported, not an input or a file of the workflow.",
     );
   });
 
   it('takes text with values written in only into a text port', () => {
     expect(
-      valueRefusal(WORKFLOW, primitives, 1, 'args', '--n ${{ test.episodes }}', [
-        field('episodes'),
+      valueRefusal(WORKFLOW, primitives, 1, 'args', '--n ${{ inputs.episodes }}', [
+        input('episodes'),
       ]),
     ).toBeNull();
     expect(
@@ -298,10 +268,10 @@ steps:
       ]),
     ).toBe('This takes one of c, cpp, java, python.');
     expect(
-      valueRefusal(WORKFLOW, primitives, 0, 'entry', 'x ${{ test.episodes }}', [
-        field('episodes'),
+      valueRefusal(WORKFLOW, primitives, 0, 'entry', 'x ${{ inputs.missing }}', [
+        input('missing'),
       ]),
-    ).toBe("Only a step that runs for each test can read a test's fields.");
+    ).toBe('The workflow has no input called missing.');
     expect(
       valueRefusal(WORKFLOW, primitives, 1, 'args', 'x ${{ inputs.key }}', [
         input('key'),
@@ -312,11 +282,11 @@ steps:
     expect(valueRefusal(WORKFLOW, primitives, 0, 'language', 'rust', [])).toBe(
       'This takes one of c, cpp, java, python.',
     );
-    expect(valueRefusal(WORKFLOW, primitives, 1, 'binary', true, [])).toBe(
+    expect(valueRefusal(WORKFLOW, primitives, 1, 'program', true, [])).toBe(
       'This takes a file, not true or false.',
     );
     expect(
-      valueRefusal(WORKFLOW, primitives, 1, 'binary', 'x ${{ steps.run.output }}', [
+      valueRefusal(WORKFLOW, primitives, 1, 'program', 'x ${{ steps.run.output }}', [
         output('run', 'output'),
       ]),
     ).toBe("A step's output can be given only whole, not written into text.");
@@ -325,35 +295,14 @@ steps:
     ).toBeNull();
   });
 
-  it('refuses switching a step while a wire forbids it', () => {
-    const workflow = readWorkflow(parse(CLASSIC_V2));
-
-    expect(switchRefusal(workflow, 1)).toBe(
-      "It reads the test's input, which only a step that runs for each test can read.",
-    );
-    expect(switchRefusal(workflow, 0)).toBeNull();
-    const once = readWorkflow(
-      parse(`
-test: {input: file}
-steps:
-  - {id: a, use: unicon/compile@v2}
-  - {id: b, use: unicon/compile@v2, with: {source: "\${{ steps.a.binary }}"}}
-`),
-    );
-    expect(switchRefusal(once, 0)).toBe(
-      'b runs once and reads it, so this step runs once too.',
-    );
-  });
-
   it('moves the fewest steps when a step comes to read a later one', () => {
     const workflow = readWorkflow(
       parse(`
-test: {input: file}
 steps:
-  - {id: a, use: unicon/compile@v2}
-  - {id: b, use: unicon/compile@v2, with: {source: "\${{ steps.a.binary }}"}}
-  - {id: c, use: unicon/compile@v2, with: {source: "\${{ steps.b.binary }}"}}
-  - {id: d, use: unicon/compile@v2}
+  - {id: a, use: unicon/compile@v3}
+  - {id: b, use: unicon/compile@v3, with: {source: "\${{ steps.a.program }}"}}
+  - {id: c, use: unicon/compile@v3, with: {source: "\${{ steps.b.program }}"}}
+  - {id: d, use: unicon/compile@v3}
 `),
     );
 
@@ -361,15 +310,14 @@ steps:
     expect(orderAfterWire(workflow, 2, 3)).toEqual([0, 1, 3, 2]);
   });
 
-  it('offers optional only on a task input every use of which is an optional port, whole', () => {
+  it('offers optional only on an input every use of which is an optional port, whole', () => {
     const workflow = readWorkflow(
       parse(`
 inputs:
   key: text
   other: text
-test: {input: file}
 steps:
-  - {id: run, use: unicon/sandbox-run@v2, per_test: true, with: {args: "\${{ inputs.key }}", input: "\${{ inputs.other }}"}}
+  - {id: run, use: unicon/exec@v1, with: {args: "\${{ inputs.key }}", stdin: "\${{ inputs.other }}"}}
 `),
     );
 
@@ -378,32 +326,16 @@ steps:
   });
 
   it('names a text output and a number output', () => {
-    const workflow = readWorkflow(parse(CLASSIC_V2));
+    const workflow = readWorkflow(parse(CLASSIC));
 
-    expect(
-      reportRefusal(workflow, primitives, output('compile', 'compile_log')),
-    ).toBeNull();
+    expect(reportRefusal(workflow, primitives, output('compile', 'log'))).toBeNull();
     expect(reportRefusal(workflow, primitives, output('run', 'memory_kb'))).toBeNull();
   });
 
-  it('lets a step run once while an output still carries an old fold', () => {
-    const workflow = readWorkflow(
-      parse(`
-test: {input: file}
-steps:
-  - {id: run, use: unicon/sandbox-run@v2, per_test: true, with: {}}
-report:
-  time: {from: "\${{ steps.run.time_ms }}", fold: max}
-`),
-    );
-
-    expect(switchRefusal(workflow, 0)).toBeNull();
-  });
-
   it('names what a change of a declaration newly breaks', () => {
-    const before = readWorkflow(parse(CLASSIC_V2));
+    const before = readWorkflow(parse(CLASSIC));
     const after = readWorkflow(
-      parse(CLASSIC_V2.replace('time_limit: number', 'time_limit: text')),
+      parse(CLASSIC.replace('time_limit: number', 'time_limit: text')),
     );
 
     expect(newProblem(before, before, primitives)).toBeNull();

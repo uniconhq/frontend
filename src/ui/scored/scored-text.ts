@@ -1,14 +1,4 @@
-import type { Reported, RunShown } from '@/api/types';
-import { formatExact } from '@/lib/exact';
-
-/**
- * A test's reported value by name as read: a number to at most four
- * decimals, its text, or nothing when it reported none of that name.
- */
-export function valueText(values: Reported, name: string): string | undefined {
-  const number = values.numbers[name];
-  return number === undefined ? values.texts[name] : formatExact(number);
-}
+import type { RunShown } from '@/api/types';
 
 /** A number of submissions in words: "1 submission", "10 submissions". */
 export function submissionsWords(count: number): string {

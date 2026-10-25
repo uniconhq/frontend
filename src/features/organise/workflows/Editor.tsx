@@ -26,7 +26,6 @@ import {
   entryFields,
   freeName,
   setEntry,
-  setField,
   setInput,
   wire,
   workflowOf,
@@ -39,7 +38,7 @@ import { Inside } from './Inside';
 import { layoutWorkflow, type Box, type StepPorts } from './layout';
 import { linesOf, type Selected } from './lines';
 import { type Ref, type Workflow } from './model';
-import { FieldsPanel, InputsPanel, ReportPanel, StepPanel } from './Panels';
+import { InputsPanel, ReportPanel, StepPanel } from './Panels';
 import { pinned as pinProblems, placed } from './pins';
 import { Problems } from './Problems';
 import { byRef, declared, type PrimitiveInfo } from './primitives';
@@ -55,8 +54,8 @@ import classes from './workflows.module.css';
  * each change is an edit of the YAML document in place, comments and all,
  * kept in the page's history for undo and redo. The bar above says it is the
  * draft and holds Save, "Publish version", Share and "View file" (M32); the
- * toolbar under it holds Undo, Redo, "Add step" and the inputs, a test's
- * files and the report (M37). The box selected opens in a drawer on the
+ * toolbar under it holds Undo, Redo, "Add step", the inputs and the outputs
+ * (M37). The box selected opens in a drawer on the
  * right. A moment after each change the draft is checked as a version would
  * be, and each problem is said in the banner, linked to its box, and beside
  * its mark on the box (M31). A draft with problems saves; a version of one is
@@ -142,11 +141,10 @@ function boxOf(boxes: Box[], selected: Selected | null): string | null {
   if (selected === null) return null;
   if (selected.kind === 'report') return 'report';
   if (selected.kind === 'step') return `step:${String(selected.index)}`;
-  const kind = selected.kind;
-  const names = kind === 'inputs' ? selected.ids : selected.names;
+  const ids = selected.ids;
   return (
     boxes.find(
-      (box) => box.kind === kind && box.right.some((name) => names.includes(name)),
+      (box) => box.kind === 'inputs' && box.right.some((name) => ids.includes(name)),
     )?.key ?? null
   );
 }
@@ -180,7 +178,6 @@ function drawerTitle(selected: Selected | null, workflow: Workflow): string | nu
   if (selected.kind === 'step')
     return `Step ${workflow.steps[selected.index]?.id || '(no name)'}`;
   if (selected.kind === 'inputs') return 'Inputs';
-  if (selected.kind === 'test') return 'Each test’s files';
   return 'Outputs';
 }
 
@@ -314,7 +311,6 @@ export function Editor({
         problems,
         workflow.steps.length,
         workflow.inputs.map((input) => input.id),
-        workflow.test.map((field) => field.name),
         workflow.report.map((entry) => entry.name),
       ),
     [problems, workflow],
@@ -438,7 +434,6 @@ export function Editor({
   /** Every source a port could be wired from, in the order the file declares them. */
   const sources = (): Ref[] => [
     ...workflow.inputs.map((input): Ref => ({ kind: 'inputs', name: input.id })),
-    ...workflow.test.map((field): Ref => ({ kind: 'test', name: field.name })),
     ...workflow.steps.flatMap((step) => {
       const declaredOutputs = declared(primitiveMap, step.use)?.outputs;
       const names =
@@ -466,7 +461,7 @@ export function Editor({
       ? `The output ${source.output} of ${source.name}`
       : source.kind === 'inputs'
         ? `The input ${source.name}`
-        : `Each test’s ${source.name}`;
+        : `The file ${source.name}`;
   };
 
   /**
@@ -518,24 +513,6 @@ export function Editor({
               );
             },
           });
-          if (step?.perTest)
-            entries.push({
-              kind: 'item',
-              text: `A new part of each test, of type ${decl.type}, wired here`,
-              onSelect: () => {
-                const field = freeName(
-                  port.replaceAll('_', '-'),
-                  workflow.test.map((each) => each.name),
-                );
-                const declaredText = setField(text, field, {
-                  type: decl.type,
-                  options: decl.options,
-                });
-                change(
-                  wire(declaredText, target.step, port, { kind: 'test', name: field }),
-                );
-              },
-            });
         }
         if (value !== undefined)
           entries.push({
@@ -625,15 +602,6 @@ export function Editor({
         primitives={primitiveMap}
         pinned={pins}
         ids={selected.ids.length > 0 ? selected.ids : null}
-        change={change}
-      />
-    ) : selected.kind === 'test' ? (
-      <FieldsPanel
-        text={text}
-        workflow={workflow}
-        primitives={primitiveMap}
-        pinned={pins}
-        names={selected.names.length > 0 ? selected.names : null}
         change={change}
       />
     ) : (

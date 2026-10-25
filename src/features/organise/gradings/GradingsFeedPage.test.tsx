@@ -6,7 +6,7 @@ import type { FeedEntry, Grading, RegradeSummary } from '@/api/types';
 import { renderApp } from '@/test/render';
 import { problem, server, signedIn, someone } from '@/test/server';
 import { organisedEntrant } from '@/test/contestant';
-import { CONTEST_API, standingList, taskList } from '@/test/organiser';
+import { CONTEST_API, runsResult, standingList, taskList } from '@/test/organiser';
 import { passTime, withFakeTimers } from '@/test/timers';
 
 const FEED = '/orgs/acme/contests/spring/gradings';
@@ -20,18 +20,7 @@ const grading: Grading = {
   latest: true,
   status: 'done',
   error: null,
-  result: {
-    stopped: null,
-    tests: [
-      {
-        test: 'main/1',
-        outcome: 'wrong_answer',
-        values: { numbers: {}, texts: {} },
-      },
-    ],
-    values: { numbers: {}, texts: {} },
-    error: null,
-  },
+  result: runsResult(['wrong_answer']),
   log: true,
   progress: null,
   queued_at: '2026-10-05T10:00:00Z',

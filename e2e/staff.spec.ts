@@ -193,7 +193,7 @@ async function stub(page: Page) {
       at: '2026-10-25T01:00:00Z',
     });
   });
-  await page.route('**/leaderboards', (route) =>
+  await page.route('**/api/v1/**/leaderboards', (route) =>
     json(route, [
       {
         key: 'gradebook',

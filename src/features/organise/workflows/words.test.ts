@@ -3,7 +3,7 @@ import { PRIMITIVES } from '@/test/workflows';
 import type { PrimitiveInfo } from './primitives';
 import { outcomeWords } from './words';
 
-const COMPILE = PRIMITIVES.find((found) => found.ref === 'unicon/compile@v2');
+const COMPILE = PRIMITIVES.find((found) => found.ref === 'unicon/compile@v3');
 
 /** Compile with its outcome port holding `outcomes`. */
 function withOutcomes(outcomes: Record<string, string> | null): PrimitiveInfo {

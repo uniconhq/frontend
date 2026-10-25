@@ -2,7 +2,8 @@ import { act, waitFor } from '@testing-library/react';
 import { setupServer } from 'msw/node';
 import { expect } from 'vitest';
 import { http, HttpResponse } from 'msw';
-import type { ContestHome, Me, SessionInfo, WorkflowForm } from '@/api/types';
+import type { ContestHome, Me, SessionInfo } from '@/api/types';
+import type { components } from '@/api/schema';
 
 /**
  * A fake backend for the tests, so they exercise the real client, the real
@@ -220,7 +221,7 @@ const emptyOrganising = [
       test: [],
       graded: false,
       runs: false,
-    } satisfies WorkflowForm),
+    } satisfies components['schemas']['WorkflowForm']),
   ),
 ];
 

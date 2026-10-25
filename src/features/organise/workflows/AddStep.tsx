@@ -25,8 +25,7 @@ function newest(primitives: PrimitiveInfo[]): PrimitiveInfo[] {
 /**
  * "Add step" on the editor's toolbar (M37, M31): the platform's primitives
  * as a menu, each with its title, what it does and its reference small, and
- * one way to add each. How often the new step runs is asked in its drawer,
- * which opens as it is added.
+ * one way to add each. The new step's drawer opens as it is added.
  */
 export function AddStep({
   primitives,

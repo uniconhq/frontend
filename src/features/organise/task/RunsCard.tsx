@@ -39,7 +39,7 @@ export function RunsCard({
   onChange,
   onFile,
 }: {
-  /** The workflow describes one run. Otherwise the card says the task is graded by tests. */
+  /** The workflow can be read. Otherwise the card waits for it, as its inputs are not known. */
   active: boolean;
   declared: readonly DeclaredInput[];
   axes: AxisValues[];
@@ -56,7 +56,7 @@ export function RunsCard({
         line="One row is one tuple. Axes are crossed, so two axes make a run for every pair."
       >
         <BodyText>
-          This workflow grades by its tests, so a run is one of those tests.
+          The runs are set here once the workflow can be read, as they give its inputs.
         </BodyText>
       </BuildCard>
     );

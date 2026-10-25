@@ -24,12 +24,12 @@ import {
  * "not set". The form writes only what changed from what it read.
  *
  * The workflow's declarations, when they can be read, say which inputs there
- * are, which the contestant gives (form details) and which the task gives (a
- * value), and each one's type, so a value is written as its type. When they
- * cannot be read, the form edits the `inputs` entries the file has, and adds
- * or removes one by its id; an entry is then the contestant's when it holds
- * form details (a mapping, other than a secret), and a value otherwise. The
- * save checks both against the workflow.
+ * are and each one's type, so a value is written as its type. Who gives each
+ * is the task's: the entrant, by `entrant` and its form details; one value
+ * per run, by an axis of `repeat`; or the task, by a value. When the
+ * declarations cannot be read, the form edits the `inputs` entries the file
+ * has, and adds or removes one by its id. The save checks both against the
+ * workflow.
  */
 export type TaskValues = {
   name: string;
@@ -41,7 +41,6 @@ export type TaskValues = {
    * runs.
    */
   axes: AxisValues[];
-  groups: GroupValues[];
   /** Groups of runs, by the repeated inputs they pick. */
   scoreGroups: ScoreGroup[];
   /** Named results, each a formula. */
@@ -92,25 +91,10 @@ export type InputValues = {
   /** The value names a secret of the org rather than being the value. */
   secret: boolean;
   /**
-   * Who fills it, once the task is in the run format. Absent on a value read
-   * from an older file, which the form still edits as a setting or as the
-   * entrant's details.
+   * Who fills it: the entrant, one value per run, or the organiser. Absent
+   * on a setting, which the organiser fills.
    */
   give?: Give;
-};
-
-export type GroupValues = {
-  name: string;
-  /** Whether `test_groups` has the group as read. */
-  read: boolean;
-  /** Whether `tests/` has a folder for it. */
-  folder: boolean;
-  each: string;
-  worst: string;
-  pass: string;
-  passAt: string;
-  weights: { test: string; weight: string }[];
-  show: string;
 };
 
 export type TaskRead = {
@@ -163,19 +147,16 @@ export function heldTheOtherWay(input: InputValues): boolean {
 }
 
 /**
- * An entry as the form shows it. With its declaration, it is the kind the
- * workflow says, whatever the file holds; a field of the other kind reads
- * as empty, and the save writes the entry afresh.
+ * An entry as the form shows it, typed as its declaration says. An entry
+ * that is not the entrant's is a value the task gives: one held as form
+ * details reads as empty, and the save writes the entry afresh.
  */
 function readInput(id: string, entry: unknown, declared?: DeclaredInput): InputValues {
   const read = readEntry(id, entry);
   if (declared === undefined) return read;
-  if (read.give === 'entrant') return { ...read, type: declared.type };
-  const kind = declared.contestant ? 'details' : 'value';
   const typed = { ...read, type: declared.type };
-  return kind === read.shape
-    ? typed
-    : { ...emptyInput(id, kind, declared.type), read: true, shape: read.shape };
+  if (read.give === 'entrant' || read.shape === 'value') return typed;
+  return { ...emptyInput(id, 'value', declared.type), read: true, shape: read.shape };
 }
 
 function readEntry(id: string, entry: unknown): InputValues {
@@ -261,36 +242,8 @@ function readAxes(node: unknown): AxisValues[] | null {
   return axes;
 }
 
-function readGroup(name: string, entry: unknown, folder: boolean): GroupValues {
-  const group = isRecord(entry) ? entry : {};
-  const weights = group['test_weights'];
-  return {
-    name,
-    read: true,
-    folder,
-    each: textOf(group['each']),
-    worst: textOf(group['worst']),
-    pass: textOf(group['pass']),
-    passAt: textOf(group['pass_at']),
-    weights: isRecord(weights)
-      ? Object.entries(weights).map(([test, weight]) => ({
-          test,
-          weight: textOf(weight),
-        }))
-      : [],
-    show: textOf(group['show']),
-  };
-}
-
-/**
- * `folders` are the names of the folders under `tests/`, each a test group;
- * `declared` the inputs the workflow declares, when they could be read.
- */
-export function readTask(
-  doc: Doc,
-  folders: string[],
-  declared: DeclaredInput[] | null = null,
-): TaskRead {
+/** `declared` are the inputs the workflow declares, when they could be read. */
+export function readTask(doc: Doc, declared: DeclaredInput[] | null = null): TaskRead {
   const unreadable: string[] = [];
   const at = (...path: string[]) => textAt(doc, path);
 
@@ -299,29 +252,6 @@ export function readTask(
   const axisInputs = new Set((axes ?? []).flatMap((axis) => axis.inputs));
   const inputs = exactAt(doc, ['inputs']);
   if (inputs !== undefined && !isRecord(inputs)) unreadable.push('inputs');
-
-  const groups = exactAt(doc, ['test_groups']);
-  const groupsOk =
-    groups === undefined ||
-    (isRecord(groups) &&
-      Object.values(groups).every(
-        (group) =>
-          group === null ||
-          (isRecord(group) &&
-            (group['test_weights'] === undefined || isRecord(group['test_weights']))),
-      ));
-  if (!groupsOk) unreadable.push('test_groups');
-  const named = groupsOk && isRecord(groups) ? groups : {};
-  const groupValues = [
-    ...Object.entries(named).map(([name, entry]) =>
-      readGroup(name, entry, folders.includes(name)),
-    ),
-    ...(groupsOk
-      ? folders
-          .filter((folder) => !Object.hasOwn(named, folder))
-          .map((folder) => ({ ...readGroup(folder, {}, true), read: false }))
-      : []),
-  ];
 
   const submissions = valueAt(doc, ['submissions']);
   const rate = valueAt(doc, ['submissions', 'rate']);
@@ -347,9 +277,7 @@ export function readTask(
     isRecord(inputs) || inputs === undefined
       ? (declared ?? [])
           .filter((input) => !given.some((found) => found.id === input.id))
-          .map((input) =>
-            emptyInput(input.id, input.contestant ? 'details' : 'value', input.type),
-          )
+          .map((input) => emptyInput(input.id, 'value', input.type))
       : [];
   const withGive = [...given, ...missing].map((input) =>
     axisInputs.has(input.id) ? { ...input, give: 'per-run' as const } : input,
@@ -364,7 +292,6 @@ export function readTask(
       workflow: at('workflow'),
       inputs: withGive,
       axes: axes ?? [],
-      groups: groupValues,
       scoreGroups: scoring.scoreGroups,
       scoreValues: scoring.scoreValues,
       show: scoring.show,
@@ -442,31 +369,6 @@ function entrantEntry(input: InputValues): unknown {
 function emptyEntry(input: InputValues): boolean {
   const entry = inputEntry(input);
   return entry === undefined || (isRecord(entry) && Object.keys(entry).length === 0);
-}
-
-function weightsOf(rows: GroupValues['weights']): Record<string, unknown> | undefined {
-  const weights: Record<string, unknown> = {};
-  for (const row of rows) {
-    const weight = numberText(row.weight);
-    if (row.test.trim() !== '' && weight !== undefined)
-      weights[row.test.trim()] = weight;
-  }
-  return Object.keys(weights).length === 0 ? undefined : weights;
-}
-
-/** A group as the file holds it, for one the form adds. */
-function groupEntry(group: GroupValues): Record<string, unknown> {
-  const entry: Record<string, unknown> = {};
-  const add = (key: string, value: unknown) => {
-    if (value !== undefined) entry[key] = value;
-  };
-  add('each', numberText(group.each));
-  add('worst', numberText(group.worst));
-  add('pass', numberText(group.pass));
-  add('pass_at', numberText(group.passAt));
-  add('test_weights', weightsOf(group.weights));
-  add('show', text(group.show));
-  return entry;
 }
 
 /** `repeat` as the file holds it: every tuple a map, so a title cannot swap two values. */
@@ -612,29 +514,5 @@ export function writeTask(
       },
       (value) => value.tree,
     );
-  }
-
-  if (!unreadable.includes('test_groups')) {
-    for (const group of before.groups) {
-      if (group.read && !after.groups.some((kept) => kept.name === group.name)) {
-        writeAt(doc, ['test_groups', group.name], undefined);
-      }
-    }
-    for (const group of after.groups) {
-      const was = before.groups.find((old) => old.name === group.name);
-      const path = (key: string) => ['test_groups', group.name, key];
-      if (was === undefined || !group.read) {
-        writeAt(doc, ['test_groups', group.name], groupEntry(group));
-        continue;
-      }
-      put(path('each'), was.each, group.each, numberText);
-      put(path('worst'), was.worst, group.worst, numberText);
-      put(path('pass'), was.pass, group.pass, numberText);
-      put(path('pass_at'), was.passAt, group.passAt, numberText);
-      put(path('show'), was.show, group.show, text);
-      if (JSON.stringify(was.weights) !== JSON.stringify(group.weights)) {
-        writeAt(doc, path('test_weights'), weightsOf(group.weights));
-      }
-    }
   }
 }

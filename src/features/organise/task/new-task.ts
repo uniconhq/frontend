@@ -3,7 +3,7 @@ import { exactJS, isRecord, parseYaml, writeAt, writeOver } from '../forms/yaml-
 import { declaredOf, refParts } from './build-data';
 
 /** The workflow a new task is created on, until its first save names another. */
-export const STARTER = 'unicon/classic@v2';
+export const STARTER = 'unicon/classic@v3';
 
 /** The workflow a new task should move onto, empty until one is chosen. */
 export type Kind = { workflow: string };
@@ -15,8 +15,8 @@ const TASK = '/api/v1/orgs/{org}/contests/{contest}/tasks/{task}';
 /**
  * A task just made, set to grade with `workflow` in place of the starter's,
  * in its first save: the settings name the workflow, keep the starter's
- * inputs the workflow also has, and drop the others. The starter's test
- * stays, as the first test to replace.
+ * inputs the workflow also has, and drop the others. The starter's runs
+ * stay, as the first to replace.
  */
 export async function startOn(
   where: { org: string; contest: string; task: string },
@@ -45,30 +45,23 @@ export async function startOn(
       writeAt(doc, ['inputs', id], undefined, { prune: true });
       continue;
     }
-    // A choice keeps only the options the new workflow has.
-    const options = given[id];
+    // An entrant's choice keeps only the options the new workflow has.
+    const entry = given[id];
+    const details = isRecord(entry) ? entry['entrant'] : undefined;
     if (
       kept.type === 'enum' &&
-      isRecord(options) &&
-      Array.isArray(options['options'])
+      isRecord(details) &&
+      Array.isArray(details['options'])
     ) {
-      const left = (options['options'] as unknown[]).filter(
+      const left = (details['options'] as unknown[]).filter(
         (option) => typeof option === 'string' && (kept.options ?? []).includes(option),
       );
-      writeAt(doc, ['inputs', id, 'options'], left.length === 0 ? undefined : left, {
-        prune: true,
-      });
-    }
-  }
-  for (const input of declared?.inputs ?? []) {
-    if (
-      input.contestant &&
-      (input.type === 'file' || input.type === 'folder') &&
-      !(input.id in given)
-    ) {
-      writeAt(doc, ['inputs', input.id], {
-        label: `Your ${input.title?.toLowerCase() ?? input.id}`,
-      });
+      writeAt(
+        doc,
+        ['inputs', id, 'entrant', 'options'],
+        left.length === 0 ? undefined : left,
+        { prune: true },
+      );
     }
   }
   await apiClient.POST(`${TASK}/save`, {

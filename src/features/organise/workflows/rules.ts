@@ -7,9 +7,8 @@ import { declared, raisingPorts, type PrimitiveInfo } from './primitives';
  * What a version of a workflow would refuse that the primitives'
  * declarations decide, asked at the drag rather than at the save (PROPOSAL.md
  * section 12): the type under the two widenings, an enum's options, an
- * optional output into a required port, a test field or a per-test input
- * into a once step, a once step reading a per-test step, a contestant input
- * or a step output into a port a limit is raised from, and a loop. Each
+ * optional output into a required port, a step output into a port a limit
+ * is raised from, and a loop. Each
  * answer is the reason in a sentence, or null when the wire may be drawn.
  * The sentences are the forge's (`forge.domain.plans.check_workflow` and
  * `forge.domain.workflow_definition`), so the page and the version say the
@@ -38,7 +37,7 @@ function a(type: string): string {
 type Kind = {
   type: string;
   options: string[] | null;
-  source: 'input' | 'contestant' | 'test' | 'step' | 'workflow';
+  source: 'input' | 'step' | 'workflow';
   optional: boolean;
 };
 
@@ -98,17 +97,13 @@ function kindOf(
   ref: Ref,
   boxes: ReadonlyMap<string, BoxDecl> = new Map(),
 ): Kind | string {
-  const perTest =
-    stepIndex === 'report' ? true : (workflow.steps[stepIndex]?.perTest ?? false);
   if (ref.kind === 'inputs') {
     const input = workflow.inputs.find((found) => found.id === ref.name);
     if (input === undefined) return `The workflow has no input called ${ref.name}.`;
-    if (input.perTest && !perTest)
-      return `${ref.name} is given once for each test, so only a step that runs for each test can read it.`;
     return {
       type: input.type,
       options: input.options,
-      source: input.contestant ? 'contestant' : 'input',
+      source: 'input',
       optional: input.optional,
     };
   }
@@ -117,19 +112,6 @@ function kindOf(
       type: ref.name.endsWith('/') ? 'folder' : 'file',
       options: null,
       source: 'workflow',
-      optional: false,
-    };
-  }
-  if (ref.kind === 'test') {
-    const field = workflow.test.find((found) => found.name === ref.name);
-    if (field === undefined)
-      return `${ref.name} is not one of the workflow's test fields.`;
-    if (!perTest)
-      return "Only a step that runs for each test can read a test's fields.";
-    return {
-      type: field.type,
-      options: field.options,
-      source: 'test',
       optional: false,
     };
   }
@@ -150,8 +132,6 @@ function kindOf(
     ?.outputs.find((output) => output.name === ref.output);
   if (port === undefined && (boxed === undefined || boxed.type === null))
     return `The step ${ref.name} has no output called ${ref.output}.`;
-  if (source.perTest && !perTest)
-    return `The step ${ref.name} runs for each test, so a step that runs once cannot read it.`;
   const type = port?.type ?? boxed?.type ?? '';
   if (type === 'outcome')
     return "A step's outcome is read by Unicon itself, and cannot be given to another step.";
@@ -230,7 +210,7 @@ export function reportRefusal(
   boxes: ReadonlyMap<string, BoxDecl> = new Map(),
 ): string | null {
   if (source.kind !== 'steps')
-    return "Only a step's output can be reported, not an input or a test's field.";
+    return "Only a step's output can be reported, not an input or a file of the workflow.";
   const kind = kindOf(workflow, primitives, 'report', source, boxes);
   if (typeof kind === 'string') return kind;
   if (kind.type !== 'text' && kind.type !== 'number')
@@ -240,8 +220,8 @@ export function reportRefusal(
 
 /**
  * Why `text` may not be the value of a port, or null when it may: a plain
- * literal of the port's type, or text with inputs and, in a per-test step,
- * test fields written in, which fits only a text port.
+ * literal of the port's type, or text with inputs written in, which fits
+ * only a text port.
  */
 export function valueRefusal(
   workflow: Workflow,
@@ -291,37 +271,6 @@ export function valueRefusal(
 }
 
 /**
- * Why the step at `index` may not switch between once and per test while
- * its wires stand, or null when it may.
- */
-export function switchRefusal(workflow: Workflow, index: number): string | null {
-  const step = workflow.steps[index];
-  if (step === undefined) return null;
-  if (step.perTest) {
-    for (const value of Object.values(step.with))
-      for (const ref of refsOf(value)) {
-        if (ref.kind === 'test')
-          return `It reads the test's ${ref.name}, which only a step that runs for each test can read.`;
-        if (
-          ref.kind === 'inputs' &&
-          workflow.inputs.find((input) => input.id === ref.name)?.perTest
-        )
-          return `It reads ${ref.name}, which is given once for each test.`;
-        if (ref.kind === 'steps') {
-          const read = indexOf(workflow).get(ref.name);
-          if (read !== undefined && workflow.steps[read]?.perTest)
-            return `It reads ${ref.name}, which runs for each test.`;
-        }
-      }
-    return null;
-  }
-  for (const [at, other] of workflow.steps.entries())
-    if (!other.perTest && at !== index && stepsRead(workflow, at).has(index))
-      return `${other.id} runs once and reads it, so this step runs once too.`;
-  return null;
-}
-
-/**
  * The order of `steps:` after the step at `reader` comes to read the one at
  * `read`, as indexes into the old order, moving as few steps as it must:
  * either `read` and what it needs after `reader` move up before it, or
@@ -350,7 +299,7 @@ export function orderAfterWire(
   return [...rest.slice(0, place), ...down, ...rest.slice(place)];
 }
 
-/** Every reference to `ref` in the workflow's ports and report. */
+/** Every reference to `ref` in the workflow's ports and outputs. */
 function usesOf(
   workflow: Workflow,
   ref: Ref,
@@ -362,17 +311,14 @@ function usesOf(
         found.push({ step: at, port });
   });
   for (const entry of workflow.report)
-    if (
-      (entry.from && sameRef(entry.from, ref)) ||
-      (entry.betterRef && sameRef(entry.betterRef, ref))
-    )
+    if (entry.from && sameRef(entry.from, ref))
       found.push({ step: 'report', port: entry.name });
   return found;
 }
 
 /**
- * Whether an input may be marked `optional`: a task's input every use of
- * which is a whole wire into a port the primitive marks optional.
+ * Whether an input may be marked `optional`: one every use of which is a
+ * whole wire into a port the primitive marks optional.
  */
 export function mayBeOptional(
   workflow: Workflow,
@@ -380,7 +326,7 @@ export function mayBeOptional(
   id: string,
 ): boolean {
   const input = workflow.inputs.find((found) => found.id === id);
-  if (input === undefined || input.contestant) return false;
+  if (input === undefined) return false;
   const uses = usesOf(workflow, { kind: 'inputs', name: id });
   return uses.every((use) => {
     if (use.step === 'report') return false;

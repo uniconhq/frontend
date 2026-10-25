@@ -3,15 +3,12 @@ import { expect, test, type Page, type Route } from '@playwright/test';
 /** The version the uploaded part of test 1 was last changed at. */
 const UPLOADED_AT = 'a1b2c3d4e5f6a7b8c9d0a1b2c3d4e5f6a7b8c9d0';
 
-/** unicon/classic@v2 as deploy seeds it, its inputs titled for the task's form (#434). */
+/** unicon/classic@v3 as deploy seeds it, its inputs titled for the task's form (#434). */
 const CLASSIC = `inputs:
-  submission: {type: file, contestant: true, title: Solution}
-  language: {type: enum, options: [c, cpp, java, python], contestant: true, title: Language}
-  time_limit: {type: number, title: Time limit, unit: seconds, help: The CPU time the program may use on each test.}
+  submission: {type: file, title: Solution}
+  language: {type: enum, options: [c, cpp, java, python], title: Language}
+  time_limit: {type: number, title: Time limit, unit: seconds, help: The CPU time the program may use on each run.}
   memory_limit: {type: number, title: Memory limit, unit: MB}
-test:
-  input: file
-  answer: file
 steps: []
 `;
 
@@ -31,7 +28,7 @@ async function stubOrganiserApi(page: Page) {
       'name: Spring 2026\nstart: 2030-10-01T09:00:00Z\nend: 2030-10-01T14:00:00Z\nstate: draft\nvisibility: signed-in\ntasks:\n  - id: sum\n',
     contestSaves: 0,
     taskYaml:
-      'name: Sum\nworkflow: unicon/classic@v2\ninputs:\n  submission: {label: Your solution}\n  language: {options: [python]}\n  time_limit: 2\n  memory_limit: 256\ntest_groups:\n  main: {each: 100}\n',
+      'name: Sum\nworkflow: unicon/classic@v3\ninputs:\n  submission: {entrant: {label: Your solution}}\n  language: {entrant: {options: [python]}}\n  time_limit: 2\n  memory_limit: 256\n',
     taskSaves: [] as unknown[],
     /** How many gradings failed and wait, as the queue counts them. */
     failed: 0,
@@ -72,13 +69,13 @@ async function stubOrganiserApi(page: Page) {
       {
         owner: 'unicon',
         name: 'classic',
-        versions: ['v2'],
+        versions: ['v3'],
         editable: false,
         visibility: 'public',
       },
     ]),
   );
-  await page.route('**/api/v1/workflows/unicon/classic/versions/v2', (route) =>
+  await page.route('**/api/v1/workflows/unicon/classic/versions/v3', (route) =>
     json(route, { content: CLASSIC }),
   );
   await page.route('**/api/v1/primitives', (route) => json(route, []));
@@ -179,9 +176,7 @@ async function stubOrganiserApi(page: Page) {
       const input = (id: string, type: string, more: object) => ({
         id,
         type,
-        contestant: false,
         options: null,
-        per_test: false,
         optional: false,
         title: null,
         help: null,
@@ -189,26 +184,21 @@ async function stubOrganiserApi(page: Page) {
         ...more,
       });
       return json(route, {
-        workflow: 'unicon/classic@v2',
+        workflow: 'unicon/classic@v3',
         newer: null,
         problem: null,
         inputs: [
-          input('submission', 'file', { contestant: true, title: 'Solution' }),
+          input('submission', 'file', { title: 'Solution' }),
           input('language', 'enum', {
-            contestant: true,
             title: 'Language',
             options: ['c', 'cpp', 'java', 'python'],
           }),
           input('time_limit', 'number', {
             title: 'Time limit',
             unit: 'seconds',
-            help: 'The CPU time the program may use on each test.',
+            help: 'The CPU time the program may use on each run.',
           }),
           input('memory_limit', 'number', { title: 'Memory limit', unit: 'MB' }),
-        ],
-        test: [
-          { name: 'input', type: 'file', options: null },
-          { name: 'answer', type: 'file', options: null },
         ],
         graded: false,
       });
@@ -493,7 +483,7 @@ test('an organiser sets a task up on its cards and saves them in one save', asyn
   await expect(limit).toHaveValue('2');
   await limit.fill('3');
   await expect(page.getByRole('region', { name: 'Runs' })).toContainText(
-    'This workflow grades by its tests',
+    'This makes 1 run.',
   );
 
   const bar = page.getByRole('region', { name: 'Save the task' });

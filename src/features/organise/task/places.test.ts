@@ -21,32 +21,6 @@ describe('where a refused setting or file of the task is changed', () => {
       `${PAGE}?card=inputs&field=language`,
     ],
     [
-      'credit.relative',
-      'Tests and scoring: How a test earns',
-      `${PAGE}?card=tests&field=credit`,
-    ],
-    ['test_groups', 'Tests and scoring: Test groups', `${PAGE}?card=tests`],
-    [
-      'test_groups.small',
-      'Tests and scoring, small',
-      `${PAGE}?card=tests&field=rule&item=small`,
-    ],
-    [
-      'test_groups.small.show',
-      'Tests and scoring, small: When entrants see results',
-      `${PAGE}?card=tests&field=show&item=small`,
-    ],
-    [
-      'test_groups.main.pass_at',
-      'Tests and scoring, main: Share of tests that must pass',
-      `${PAGE}?card=tests&field=rule&item=main`,
-    ],
-    [
-      'test_groups.main.test_weights.7',
-      'Tests and scoring, main, test 7: Weight',
-      `${PAGE}?card=tests&field=test%3A7&item=main`,
-    ],
-    [
       'submissions.rate.per',
       'Submissions: Length of the window',
       `${PAGE}?card=tests&field=per`,
@@ -55,13 +29,6 @@ describe('where a refused setting or file of the task is changed', () => {
       'submissions.max',
       'Submissions: Most submissions',
       `${PAGE}?card=tests&field=max`,
-    ],
-    ['tests/', 'Tests', `${PAGE}?card=tests`],
-    ['tests/large/', 'Tests, large', `${PAGE}?card=tests&item=large`],
-    [
-      'tests/large/3/answer.txt',
-      'Tests, large, test 3',
-      `${PAGE}?card=tests&field=test%3A3&item=large`,
     ],
     [
       'repeat[0].tuples[1].title',
@@ -112,7 +79,6 @@ describe('where a refused setting or file of the task is changed', () => {
   });
 
   it('places a problem of the whole file by what its sentence is about', () => {
-    expect(taskPlace('', 'The test main/1 has no answer.').card).toBe('tests');
     expect(taskPlace('', 'The workflow cannot be read.').card).toBe('workflow');
     expect(taskPlace('', 'An input is missing.').card).toBe('inputs');
     expect(taskPlace('', 'It is not a mapping.')).toEqual({

@@ -20,15 +20,15 @@ inputs:
   answer: {type: file, title: Answer}
 steps:
   - id: compile
-    use: unicon/compile@v2
+    use: unicon/compile@v3
     with:
       source: \${{ inputs.submission }}
       language: \${{ inputs.language }}
   - id: run
-    use: unicon/sandbox-run@v2
+    use: unicon/exec@v1
     with:
-      binary: \${{ steps.compile.binary }}
-      input: \${{ inputs.input }}
+      program: \${{ steps.compile.program }}
+      stdin: \${{ inputs.input }}
       time_limit: \${{ inputs.time_limit }}
       memory_limit: \${{ inputs.memory_limit }}
   - id: check
@@ -37,7 +37,7 @@ steps:
       actual: \${{ steps.run.output }}
       expected: \${{ inputs.answer }}
 outputs:
-  log: \${{ steps.compile.compile_log }}
+  log: \${{ steps.compile.log }}
 `;
 
 const port = (type: string, more: Record<string, unknown> = {}) => ({
@@ -61,11 +61,11 @@ const LIMITS = {
 
 const PRIMITIVES = [
   {
-    ref: 'unicon/compile@v2',
+    ref: 'unicon/compile@v3',
     name: 'compile',
     title: 'Compile',
-    description: "Compiles the contestant's source files into one program.",
-    version: 'v2',
+    description: 'Compiles source files into one program.',
+    version: 'v3',
     batch: false,
     network: false,
     limits: LIMITS,
@@ -76,8 +76,8 @@ const PRIMITIVES = [
       entry: port('text', { optional: true }),
     },
     outputs: {
-      binary: port('file'),
-      compile_log: port('text'),
+      program: port('file'),
+      log: port('text'),
       outcome: port('outcome'),
     },
     problem: null,
@@ -101,12 +101,12 @@ const PRIMITIVES = [
     problem: null,
   },
   {
-    ref: 'unicon/sandbox-run@v2',
-    name: 'sandbox-run',
+    ref: 'unicon/exec@v1',
+    name: 'exec',
     title: 'Run program',
     description:
-      "Runs a program on each test's input and records its output, time and memory.",
-    version: 'v2',
+      'Runs a program once under limits and records its output, time and memory.',
+    version: 'v1',
     batch: true,
     network: false,
     limits: LIMITS,
@@ -115,8 +115,8 @@ const PRIMITIVES = [
       memory_mb: { input: 'memory_limit', scale: '1', add: '256' },
     },
     inputs: {
-      binary: port('file', { runs: true }),
-      input: port('file', { runs: false }),
+      program: port('file', { runs: true }),
+      stdin: port('file', { runs: false }),
       args: port('text', { optional: true }),
       time_limit: port('number'),
       memory_limit: port('number'),
@@ -328,7 +328,7 @@ test('a step added below the window is scrolled into it', async ({ page }) => {
 
   await page.getByRole('button', { name: 'Add step' }).click();
   await page.getByRole('menuitem', { name: /^Run program/ }).click();
-  const added = page.getByRole('group', { name: 'Step sandbox-run' });
+  const added = page.getByRole('group', { name: 'Step exec' });
   await expect(added).toBeVisible();
   // Up or down the page as well as sideways in the frame, the whole box in the window.
   await expect
@@ -371,8 +371,8 @@ test('every port of a step opens its menu with the mouse', async ({ page }) => {
   for (const [step, port] of [
     ['compile', 'source'],
     ['compile', 'language'],
-    ['run', 'binary'],
-    ['run', 'input'],
+    ['run', 'program'],
+    ['run', 'stdin'],
     ['check', 'actual'],
   ] as const) {
     await page.getByRole('button', { name: `The port ${port} of ${step}` }).click();
@@ -398,7 +398,7 @@ test('a box opens two levels in, and a problem opens the step inside', async ({
     });
   const draft = 'steps:\n  - {id: build, use: kenny/inner@v1}\n';
   const inner = 'steps:\n  - {id: compile, use: kenny/deep@v1}\n';
-  const deep = 'steps:\n  - {id: link, use: unicon/compile@v2}\n';
+  const deep = 'steps:\n  - {id: link, use: unicon/compile@v3}\n';
   const box = {
     inputs: [
       {

@@ -34,8 +34,9 @@ const TASK_KEYS = [
   'name',
   'workflow',
   'inputs',
-  'credit',
-  'test_groups',
+  'repeat',
+  'scoring',
+  'checks',
   'submissions',
 ];
 
@@ -72,7 +73,7 @@ function useUnread(
   }
   const unreadable =
     place.kind === 'task'
-      ? readTask(parsed.doc, []).unreadable
+      ? readTask(parsed.doc).unreadable
       : readContest(parsed.doc).unreadable;
   const reason =
     unreadable.length === 0 ? null : `The pages cannot read ${unreadable.join(', ')}.`;

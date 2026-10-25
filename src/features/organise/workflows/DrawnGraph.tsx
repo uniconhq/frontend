@@ -9,7 +9,7 @@ import { readWorkflow } from './model';
 import { pinned } from './pins';
 import { byRef } from './primitives';
 
-const NO_PROBLEMS = pinned([], 0, [], [], []);
+const NO_PROBLEMS = pinned([], 0, [], []);
 const NO_BOXES = new Map<string, BoxDecl>();
 
 /**

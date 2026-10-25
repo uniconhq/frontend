@@ -44,52 +44,18 @@ vi.mock('@/lib/save-file', () => ({
 const TASK = `name: Shortest Path   # the title
 workflow: unicon/checked@v1
 inputs:
-  submission: {label: Your solution, max_size: 1MB}
-  language: {options: [cpp, python], default: cpp}
+  submission: {entrant: {label: Your solution, max_size: 1MB}}
+  language: {entrant: {options: [cpp, python], default: cpp}}
   checker: checker/checker.cpp
   time_limit: 2
   token: {secret: judge-token}
-credit: fraction
-test_groups:
-  samples: {}
-  small: {pass: 30, show: verdict}
-  old: {each: 5}
 submissions:
   max: 50
   rate: {count: 1, per: 30}
 `;
 
-/** The folders under `tests/`: a group each, a test each under it. */
-const FOLDERS: Record<string, string[]> = {
-  samples: ['1', '2'],
-  small: ['1', '2', '3'],
-  large: ['1'],
-};
-
-function folder(path: string): TreeEntry {
-  return {
-    path,
-    kind: 'directory',
-    size: null,
-    upload: null,
-    start: null,
-    token: null,
-    version: null,
-  };
-}
-
 /** The commit a listed file was last changed at, as the tree names it. */
 const LISTED_AT = '9f8e7d6c5b4a39281706f5e4d3c2b1a098765432';
-
-/**
- * How a test file begins, as the listing gives it of a small text file
- * (M67): an input "1 2", an answer "3", nothing past 1 KB.
- */
-function startFor(path: string, size: number): string | null {
-  if (size === 0) return '';
-  if (size > 1024) return null;
-  return path.endsWith('/input') ? '1 2\n' : '3\n';
-}
 
 function file(path: string, size = 4, version: string | null = LISTED_AT): TreeEntry {
   return {
@@ -97,38 +63,19 @@ function file(path: string, size = 4, version: string | null = LISTED_AT): TreeE
     kind: 'file',
     size,
     upload: null,
-    start: startFor(path, size),
+    start: null,
     token: `token-${path}`,
     version,
   };
-}
-
-/** The tree of the task's tests as `GET <task>/tree?path=` answers it, folder by folder. */
-function testsTree(groups: Record<string, string[]>): Record<string, TreeEntry[]> {
-  const tree: Record<string, TreeEntry[]> = {
-    tests: Object.keys(groups).map((group) => folder(`tests/${group}`)),
-  };
-  for (const [group, tests] of Object.entries(groups)) {
-    tree[`tests/${group}`] = tests.map((test) => folder(`tests/${group}/${test}`));
-    for (const test of tests) {
-      tree[`tests/${group}/${test}`] = [
-        file(`tests/${group}/${test}/input`),
-        file(`tests/${group}/${test}/answer`, 2),
-      ];
-    }
-  }
-  return tree;
 }
 
 /** A workflow form whose workflow cannot be read, so the cards edit the entries there are. */
 const UNREAD: WorkflowForm = {
   workflow: 'unicon/checked@v1',
   inputs: [],
-  test: [],
   problem: 'The workflow unicon/checked@v1 cannot be read.',
   graded: false,
   newer: null,
-  runs: false,
 };
 
 function declared(
@@ -139,9 +86,7 @@ function declared(
   return {
     id,
     type,
-    contestant: false,
     options: null,
-    per_test: false,
     optional: false,
     title: null,
     help: null,
@@ -156,13 +101,9 @@ const CHECKED: WorkflowForm = {
   problem: null,
   graded: false,
   newer: null,
-  runs: false,
   inputs: [
-    declared('submission', 'file', { contestant: true }),
-    declared('language', 'enum', {
-      contestant: true,
-      options: ['cpp', 'python', 'java'],
-    }),
+    declared('submission', 'file'),
+    declared('language', 'enum', { options: ['cpp', 'python', 'java'] }),
     declared('checker', 'file'),
     declared('time_limit', 'number', {
       title: 'Time limit',
@@ -174,35 +115,28 @@ const CHECKED: WorkflowForm = {
     declared('greeting', 'text', { optional: true }),
     declared('token', 'text'),
   ],
-  test: [
-    { name: 'input', type: 'file', options: null },
-    { name: 'answer', type: 'file', options: null },
-  ],
 };
 
-/** unicon/checked's file, which reports a fraction a test may earn. */
+/** unicon/checked's file, which reports the fraction its checker gives a run. */
 const CHECKED_YAML = `inputs:
-  submission: {type: file, contestant: true}
-  language: {type: enum, options: [cpp, python, java], contestant: true}
+  submission: file
+  language: {type: enum, options: [cpp, python, java]}
   checker: file
   time_limit: {type: number, title: Time limit, unit: seconds}
   memory_limit: {type: number, optional: true}
   strict: boolean
   greeting: {type: text, optional: true}
   token: text
-test:
-  input: file
-  answer: file
 steps: []
-report:
-  fraction: {from: "\${{ steps.check.fraction }}", fold: mean, better: higher, at_least: 0, at_most: 1}
-  time_ms: {from: "\${{ steps.run.time_ms }}", fold: max, better: lower, at_least: 0}
+outputs:
+  fraction: {from: "\${{ steps.check.fraction }}"}
+  time_ms: {from: "\${{ steps.run.time_ms }}", unit: ms}
 `;
 
-/** A workflow that takes the time limit from the entrant. */
-const TUNABLE_YAML = CHECKED_YAML.replace(
-  'time_limit: {type: number, title: Time limit, unit: seconds}',
-  'time_limit: {type: number, contestant: true, title: Time limit, unit: seconds}',
+/** A workflow like unicon/checked with no checker and no token. */
+const TUNABLE_YAML = CHECKED_YAML.replace('  checker: file\n', '').replace(
+  '  token: text\n',
+  '',
 );
 
 const WORKFLOWS: WorkflowItem[] = [
@@ -232,8 +166,8 @@ const PUBLISHED = {
 };
 
 /**
- * The sum task with its settings as above, its tests as `groups` says, and
- * its workflow declaring what `form` says. Each save is kept in `sent`; with
+ * The sum task with its settings as above, and its workflow declaring what
+ * `form` says. Each save is kept in `sent`; with
  * `conflictWith`, the first is refused as a conflict and the settings become
  * that text, as if someone else had saved them.
  */
@@ -242,7 +176,6 @@ function taskBackend(
     answer?: () => Response;
     conflictWith?: string;
     form?: WorkflowForm;
-    groups?: Record<string, string[]>;
     contest?: string;
     /** The settings as stored, in place of the ones above. */
     content?: string;
@@ -251,7 +184,6 @@ function taskBackend(
   } = {},
 ) {
   const { answer = () => HttpResponse.json(PUBLISHED), form = UNREAD } = options;
-  let tree = testsTree(options.groups ?? FOLDERS);
   let declaredNow = form;
   let settings: FileContent = {
     path: 'task.yaml',
@@ -266,26 +198,13 @@ function taskBackend(
     signedIn,
     taskState,
     publicationList,
-    http.get(`${TASK_API}/tree`, ({ request }) => {
-      const at = new URL(request.url).searchParams.get('path') ?? '';
-      return HttpResponse.json(at.startsWith('tests') ? (tree[at] ?? []) : []);
-    }),
+    http.get(`${TASK_API}/tree`, () => HttpResponse.json([])),
     http.get('/api/v1/blocks', () => HttpResponse.json(specCatalogue())),
     http.get(`${TASK_API}/files/:path`, async ({ params }) => {
       const path = decodeURIComponent(String(params['path']));
       if (path === 'task.yaml') {
         if (sent.length > 0) await options.readAfterSave;
         return HttpResponse.json(settings);
-      }
-      if (path.startsWith('tests/')) {
-        return HttpResponse.json({
-          path,
-          encoding: 'utf-8',
-          content: '1 2\n',
-          token: `token-${path}`,
-          upload: null,
-          version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
-        });
       }
       return undefined;
     }),
@@ -339,14 +258,9 @@ function taskBackend(
       ),
     );
   }
-  /** Someone else saving the task: its settings, its tests and what its workflow declares. */
-  const elsewhere = (now: {
-    content: string;
-    groups: Record<string, string[]>;
-    form: WorkflowForm;
-  }) => {
+  /** Someone else saving the task: its settings and what its workflow declares. */
+  const elsewhere = (now: { content: string; form: WorkflowForm }) => {
     settings = { ...settings, content: now.content, token: 'token-theirs' };
-    tree = testsTree(now.groups);
     declaredNow = now.form;
   };
   return { sent, elsewhere };
@@ -410,35 +324,30 @@ describe('the cards that build a task', { timeout: 30_000 }, () => {
     const { inputs, tests } = await openTask();
 
     expect(within(tests).getByLabelText('Most submissions')).toBeDisabled();
-    const entrants = within(inputs).getByRole('region', {
-      name: 'What entrants submit',
-    });
-    const limits = within(inputs).getByRole('region', { name: 'Limits and settings' });
-    expect(fieldIn(limits, 'Time limit (seconds)', /^Time limit/)).toHaveValue('2');
+    expect(fieldIn(inputs, 'Time limit (seconds)', /^Time limit/)).toHaveValue('2');
     expect(
-      within(limits).getByRole('button', { name: 'About Time limit (seconds)' }),
+      within(inputs).getByRole('button', { name: 'About Time limit (seconds)' }),
     ).toBeVisible();
-    expect(within(entrants).queryByLabelText(/Time limit/)).toBeNull();
+    expect(fieldIn(inputs, 'submission', 'Who gives it')).toHaveValue('entrant');
+    expect(fieldIn(inputs, 'Time limit (seconds)', 'Who gives it')).toHaveValue(
+      'setting',
+    );
 
-    fill(fieldIn(entrants, 'submission', 'Label shown to entrants'), 'Your program');
+    fill(fieldIn(inputs, 'submission', 'Label shown to entrants'), 'Your program');
     fireEvent.click(
-      within(within(entrants).getByRole('group', { name: 'language' })).getByRole(
+      within(within(inputs).getByRole('group', { name: 'language' })).getByRole(
         'checkbox',
-        {
-          name: 'java',
-        },
+        { name: 'java' },
       ),
     );
-    fill(fieldIn(limits, 'Time limit (seconds)', /^Time limit/), '3');
-    fill(fieldIn(limits, 'memory_limit', 'memory_limit'), '256');
-    fill(fieldIn(limits, 'strict', 'strict'), 'true');
-    fill(fieldIn(limits, 'greeting', 'greeting'), '42');
+    fill(fieldIn(inputs, 'Time limit (seconds)', /^Time limit/), '3');
+    fill(fieldIn(inputs, 'memory_limit', 'memory_limit'), '256');
+    fill(fieldIn(inputs, 'strict', 'strict'), 'true');
+    fill(fieldIn(inputs, 'greeting', 'greeting'), '42');
     expect(
-      within(within(limits).getByRole('group', { name: 'token' })).getByRole(
+      within(within(inputs).getByRole('group', { name: 'token' })).getByRole(
         'checkbox',
-        {
-          name: 'Use one of the org’s secrets',
-        },
+        { name: 'Use one of the org’s secrets' },
       ),
     ).toBeChecked();
 
@@ -456,8 +365,8 @@ describe('the cards that build a task', { timeout: 30_000 }, () => {
       'token-task',
     );
     expect(written(sent[0])['inputs']).toEqual({
-      submission: { label: 'Your program', max_size: '1MB' },
-      language: { options: ['cpp', 'python', 'java'], default: 'cpp' },
+      submission: { entrant: { label: 'Your program', max_size: '1MB' } },
+      language: { entrant: { options: ['cpp', 'python', 'java'], default: 'cpp' } },
       checker: 'checker/checker.cpp',
       time_limit: 3,
       token: { secret: 'judge-token' },
@@ -476,23 +385,20 @@ describe('the cards that build a task', { timeout: 30_000 }, () => {
       form: {
         ...CHECKED,
         inputs: [
-          declared('submission', 'file', { contestant: true, title: 'Solution' }),
+          declared('submission', 'file', { title: 'Solution' }),
           ...CHECKED.inputs.slice(1),
         ],
       },
     });
     const { inputs } = await openTask();
 
-    const entrants = within(inputs).getByRole('region', {
-      name: 'What entrants submit',
-    });
     // An empty label shows entrants the workflow's title, and its key only
     // where it gives none.
-    expect(fieldIn(entrants, 'Solution', 'Label shown to entrants')).toHaveAttribute(
+    expect(fieldIn(inputs, 'Solution', 'Label shown to entrants')).toHaveAttribute(
       'placeholder',
       'Solution',
     );
-    expect(fieldIn(entrants, 'language', 'Label shown to entrants')).toHaveAttribute(
+    expect(fieldIn(inputs, 'language', 'Label shown to entrants')).toHaveAttribute(
       'placeholder',
       'language',
     );
@@ -504,7 +410,6 @@ describe('the cards that build a task', { timeout: 30_000 }, () => {
         ...CHECKED,
         inputs: [
           declared('submission', 'file', {
-            contestant: true,
             title: 'Solution',
             help: 'The source file the contestant submits.',
           }),
@@ -515,22 +420,18 @@ describe('the cards that build a task', { timeout: 30_000 }, () => {
     const user = userEvent.setup();
     const { inputs } = await openTask();
 
-    const entrants = within(inputs).getByRole('region', {
-      name: 'What entrants submit',
-    });
-    const solution = within(entrants).getByRole('group', { name: 'Solution' });
+    const solution = within(inputs).getByRole('group', { name: 'Solution' });
     await user.click(within(solution).getByRole('button', { name: 'About Solution' }));
     expect(
       await screen.findByText('The source file the contestant submits.'),
     ).toBeVisible();
     expect(within(solution).queryByText('submission')).toBeNull();
     // An input the workflow gives no title keeps its key as its title, and no ⓘ.
-    const language = within(entrants).getByRole('group', { name: 'language' });
+    const language = within(inputs).getByRole('group', { name: 'language' });
     expect(within(language).getByRole('heading', { name: 'language' })).toBeVisible();
     expect(within(language).queryByRole('button', { name: /^About/ })).toBeNull();
-    const limits = within(inputs).getByRole('region', { name: 'Limits and settings' });
-    expect(within(limits).queryByText('time_limit')).toBeNull();
-    expect(fieldIn(limits, 'Time limit (seconds)', /^Time limit/)).toBeVisible();
+    expect(within(inputs).queryByText('time_limit')).toBeNull();
+    expect(fieldIn(inputs, 'Time limit (seconds)', /^Time limit/)).toBeVisible();
   });
 
   it('views and replaces a setting’s file in its box, saving the new one with the task and taking out the old (M51)', async () => {
@@ -631,9 +532,9 @@ describe('the cards that build a task', { timeout: 30_000 }, () => {
       }),
     );
     expect(await within(checker).findByText('checker.cpp, 21 B')).toBeVisible();
-    expect(
-      await screen.findByRole('list', { name: 'What changed' }),
-    ).not.toHaveTextContent('checker');
+    await waitFor(() =>
+      expect(screen.queryByRole('list', { name: 'What changed' })).toBeNull(),
+    );
   });
 
   describe('a file chosen for a setting, through a change of workflow', () => {
@@ -768,27 +669,21 @@ describe('the cards that build a task', { timeout: 30_000 }, () => {
     asManager();
     const { inputs, workflow } = await openTask();
 
+    expect(within(inputs).getByRole('group', { name: 'checker' })).toBeVisible();
     fill(await within(workflow).findByLabelText(/^Workflow/), 'my-org/tunable');
-    const entrants = await within(inputs).findByRole('region', {
-      name: 'What entrants submit',
-    });
-    expect(
-      await within(entrants).findByRole('group', { name: 'Time limit (seconds)' }),
-    ).toBeVisible();
-    expect(
-      within(
-        within(entrants).getByRole('group', { name: 'Time limit (seconds)' }),
-      ).getByText(
-        /The task sets a value for this, but under this workflow entrants give it/,
-      ),
-    ).toBeVisible();
-    fill(fieldIn(entrants, 'Time limit (seconds)', 'Largest allowed'), '10');
+    await waitFor(() =>
+      expect(within(inputs).queryByRole('group', { name: 'checker' })).toBeNull(),
+    );
+    expect(within(inputs).queryByRole('group', { name: 'token' })).toBeNull();
+    fill(fieldIn(inputs, 'Time limit (seconds)', /^Time limit/), '4');
     await save();
 
     const saved = written(await waitForSave(sent));
     expect(saved['workflow']).toBe('my-org/tunable@v1');
-    expect((saved['inputs'] as Record<string, unknown>)['time_limit']).toEqual({
-      max: 10,
+    expect(saved['inputs']).toEqual({
+      submission: { entrant: { label: 'Your solution', max_size: '1MB' } },
+      language: { entrant: { options: ['cpp', 'python'], default: 'cpp' } },
+      time_limit: 4,
     });
   });
 
@@ -814,7 +709,12 @@ describe('the cards that build a task', { timeout: 30_000 }, () => {
     const saved = written(await waitForSave(sent)) as {
       inputs: Record<string, unknown>;
     };
-    expect(Object.keys(saved.inputs)).toEqual(['language', 'checker']);
+    // An entrant input with nothing set for entrants is the entrant's alone.
+    expect(saved.inputs).toEqual({
+      submission: 'entrant',
+      language: { entrant: { options: ['cpp', 'python'], default: 'cpp' } },
+      checker: 'checker/checker.cpp',
+    });
   });
 
   it('edits the inputs the settings hold when the workflow cannot be read', async () => {
@@ -925,10 +825,9 @@ describe('the cards while the task is being changed', { timeout: 30_000 }, () =>
     fill(fieldIn(inputs, 'time_limit', 'Value'), '3');
     fill(within(tests).getByLabelText('Most submissions'), '20');
 
-    // Someone else saves the task meanwhile, with a new group and a graded submission.
+    // Someone else saves the task meanwhile, and a submission is graded.
     elsewhere({
       content: TASK.replace('time_limit: 2', 'time_limit: 5'),
-      groups: { ...FOLDERS, extra: ['1'] },
       form: { ...UNREAD, graded: true },
     });
     await afterAnswers(comeBackToTab);
@@ -961,11 +860,7 @@ describe('the cards while the task is being changed', { timeout: 30_000 }, () =>
 describe('discarding at a conflict', { timeout: 30_000 }, () => {
   it('drops my changes and shows the settings as they are now', async () => {
     const theirs = TASK.replace('time_limit: 2', 'time_limit: 5');
-    // A folder for each group the settings hold, so nothing else is to save.
-    taskBackend({
-      conflictWith: theirs,
-      groups: { samples: ['1', '2'], small: ['1', '2', '3'], old: ['1'] },
-    });
+    taskBackend({ conflictWith: theirs });
     const { tests } = await openTask();
 
     fill(within(tests).getByLabelText('Most submissions'), '20');
@@ -1142,24 +1037,13 @@ describe('the save’s answer (M66)', { timeout: 30_000 }, () => {
   });
 });
 
-/** A run workflow's inputs, each contestant flag left false: the task says who gives it. */
-function runInput(
-  id: string,
-  type: string,
-  more: Partial<DeclaredInput> = {},
-): DeclaredInput {
-  return declared(id, type, more);
-}
-
 function runForm(workflow: string, inputs: DeclaredInput[]): WorkflowForm {
   return {
     workflow,
     problem: null,
     graded: false,
     newer: null,
-    runs: true,
     inputs,
-    test: [],
   };
 }
 
@@ -1172,12 +1056,12 @@ describe('islands, cartpole and tour', { timeout: 60_000 }, () => {
     const { sent } = taskBackend({
       content: 'name: Islands\nworkflow: unicon/classic@v3\n',
       form: runForm('unicon/classic@v3', [
-        runInput('code', 'file'),
-        runInput('language', 'enum', { options: ['cpp', 'python'] }),
-        runInput('time_limit', 'number'),
-        runInput('memory_limit', 'number'),
-        runInput('input', 'file'),
-        runInput('answer', 'file'),
+        declared('code', 'file'),
+        declared('language', 'enum', { options: ['cpp', 'python'] }),
+        declared('time_limit', 'number'),
+        declared('memory_limit', 'number'),
+        declared('input', 'file'),
+        declared('answer', 'file'),
       ]),
     });
     const { inputs } = await openTask();
@@ -1264,10 +1148,10 @@ describe('islands, cartpole and tour', { timeout: 60_000 }, () => {
     const { sent } = taskBackend({
       content: 'name: Cartpole\nworkflow: cs2109s/cartpole@v1\n',
       form: runForm('cs2109s/cartpole@v1', [
-        runInput('weights', 'file'),
-        runInput('episodes', 'number'),
-        runInput('env', 'text'),
-        runInput('seed', 'number'),
+        declared('weights', 'file'),
+        declared('episodes', 'number'),
+        declared('env', 'text'),
+        declared('seed', 'number'),
       ]),
     });
     const { inputs } = await openTask();
@@ -1310,7 +1194,7 @@ describe('islands, cartpole and tour', { timeout: 60_000 }, () => {
   it('numbers a run’s field as the file will, when an empty axis would have sat first', async () => {
     const { sent } = taskBackend({
       content: 'name: Rooms\nworkflow: unicon/rooms@v1\n',
-      form: runForm('unicon/rooms@v1', [runInput('env', 'text')]),
+      form: runForm('unicon/rooms@v1', [declared('env', 'text')]),
     });
     const { inputs } = await openTask();
     await who(inputs, 'env', 'One for each run');
@@ -1335,9 +1219,9 @@ describe('islands, cartpole and tour', { timeout: 60_000 }, () => {
     const { sent } = taskBackend({
       content: 'name: Tour\nworkflow: unicon/tour@v1\n',
       form: runForm('unicon/tour@v1', [
-        runInput('best', 'number'),
-        runInput('input', 'file'),
-        runInput('route', 'file'),
+        declared('best', 'number'),
+        declared('input', 'file'),
+        declared('route', 'file'),
       ]),
     });
     const { inputs } = await openTask();
@@ -1401,9 +1285,9 @@ repeat:
       - {input: parts/2.in, route: entrant, title: Big grid, max_size: 50MB}
 `,
       form: runForm('unicon/tour@v1', [
-        runInput('best', 'number'),
-        runInput('input', 'file'),
-        runInput('route', 'file'),
+        declared('best', 'number'),
+        declared('input', 'file'),
+        declared('route', 'file'),
       ]),
       answer: () =>
         HttpResponse.json({
@@ -1472,8 +1356,8 @@ describe('scoring, checks and what a save answers', { timeout: 60_000 }, () => {
     const { sent } = taskBackend({
       content: ISLANDS,
       form: runForm('unicon/classic@v3', [
-        runInput('code', 'file'),
-        runInput('input', 'file'),
+        declared('code', 'file'),
+        declared('input', 'file'),
       ]),
     });
     await openTask();
@@ -1521,8 +1405,8 @@ describe('scoring, checks and what a save answers', { timeout: 60_000 }, () => {
     const { sent } = taskBackend({
       content: ISLANDS,
       form: runForm('unicon/classic@v3', [
-        runInput('code', 'file'),
-        runInput('input', 'file'),
+        declared('code', 'file'),
+        declared('input', 'file'),
       ]),
     });
     await openTask();
@@ -1552,7 +1436,7 @@ describe('scoring, checks and what a save answers', { timeout: 60_000 }, () => {
       content:
         'name: Islands\nworkflow: unicon/classic@v3\nscoring:\n  show:\n    now: [log]\n',
       form: {
-        ...runForm('unicon/classic@v3', [runInput('code', 'file')]),
+        ...runForm('unicon/classic@v3', [declared('code', 'file')]),
         graded: true,
       },
     });
@@ -1571,8 +1455,8 @@ describe('scoring, checks and what a save answers', { timeout: 60_000 }, () => {
     const { sent } = taskBackend({
       content: ISLANDS,
       form: runForm('unicon/classic@v3', [
-        runInput('code', 'file'),
-        runInput('input', 'file'),
+        declared('code', 'file'),
+        declared('input', 'file'),
       ]),
       answer: () =>
         problem(409, 'confirmation_required', {
@@ -1604,8 +1488,8 @@ describe('a publication’s checks', { timeout: 30_000 }, () => {
     const { sent } = taskBackend({
       content: ISLANDS,
       form: runForm('unicon/classic@v3', [
-        runInput('code', 'file'),
-        runInput('input', 'file'),
+        declared('code', 'file'),
+        declared('input', 'file'),
       ]),
     });
     const latest = publications[1];
@@ -1631,8 +1515,8 @@ describe('a publication’s checks', { timeout: 30_000 }, () => {
     taskBackend({
       content: ISLANDS,
       form: runForm('unicon/classic@v3', [
-        runInput('code', 'file'),
-        runInput('input', 'file'),
+        declared('code', 'file'),
+        declared('input', 'file'),
       ]),
     });
     const latest = publications[1];
