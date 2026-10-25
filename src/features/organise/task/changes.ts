@@ -135,6 +135,16 @@ export function changeLines(
   if (JSON.stringify(before.axes) !== JSON.stringify(after.axes)) {
     lines.push('Runs');
   }
+  if (
+    JSON.stringify(before.scoreGroups) !== JSON.stringify(after.scoreGroups) ||
+    JSON.stringify(before.scoreValues) !== JSON.stringify(after.scoreValues) ||
+    JSON.stringify(before.show) !== JSON.stringify(after.show)
+  ) {
+    lines.push('Scoring');
+  }
+  if (JSON.stringify(before.checks) !== JSON.stringify(after.checks)) {
+    lines.push('Checks');
+  }
   const groups = [
     ...new Set([...before.groups, ...after.groups].map((group) => group.name)),
   ];

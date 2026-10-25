@@ -10,6 +10,14 @@ import {
   writeAt,
   type Doc,
 } from './yaml-doc';
+import {
+  readScoring,
+  writeScoring,
+  type CheckDraft,
+  type ScoreGroup,
+  type ScoreValue,
+  type When,
+} from '../task/scoring-model';
 
 /**
  * `task.yaml` as the form's fields. Every field is text, so an empty one is
@@ -34,6 +42,13 @@ export type TaskValues = {
    */
   axes: AxisValues[];
   groups: GroupValues[];
+  /** Groups of runs, by the repeated inputs they pick. */
+  scoreGroups: ScoreGroup[];
+  /** Named results, each a formula. */
+  scoreValues: ScoreValue[];
+  /** When each part of the result is shown. */
+  show: Record<string, When>;
+  checks: CheckDraft[];
   max: string;
   rateCount: string;
   ratePer: string;
@@ -339,6 +354,8 @@ export function readTask(
   const withGive = [...given, ...missing].map((input) =>
     axisInputs.has(input.id) ? { ...input, give: 'per-run' as const } : input,
   );
+  const scoring = readScoring((path) => exactAt(doc, path));
+  unreadable.push(...scoring.unreadable);
 
   return {
     unreadable,
@@ -348,6 +365,10 @@ export function readTask(
       inputs: withGive,
       axes: axes ?? [],
       groups: groupValues,
+      scoreGroups: scoring.scoreGroups,
+      scoreValues: scoring.scoreValues,
+      show: scoring.show,
+      checks: scoring.checks,
       max: isRecord(submissions) ? at('submissions', 'max') : '',
       rateCount: isRecord(rate) ? at('submissions', 'rate', 'count') : '',
       ratePer: isRecord(rate) ? at('submissions', 'rate', 'per') : '',
@@ -570,6 +591,27 @@ export function writeTask(
     writeAt(doc, ['repeat'], written.length === 0 ? undefined : written, {
       prune: true,
     });
+  }
+
+  if (!unreadable.includes('scoring') || !unreadable.includes('checks')) {
+    writeScoring(
+      doc,
+      {
+        scoreGroups: before.scoreGroups,
+        scoreValues: before.scoreValues,
+        show: before.show,
+        checks: before.checks,
+        unreadable,
+      },
+      {
+        scoreGroups: after.scoreGroups,
+        scoreValues: after.scoreValues,
+        show: after.show,
+        checks: after.checks,
+        unreadable,
+      },
+      (value) => value.tree,
+    );
   }
 
   if (!unreadable.includes('test_groups')) {

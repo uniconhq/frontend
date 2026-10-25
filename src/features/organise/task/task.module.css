@@ -437,3 +437,29 @@
   vertical-align: top;
   text-align: left;
 }
+
+.dot {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1px solid var(--unicon-border);
+  background: transparent;
+}
+
+.dot[data-on] {
+  background: var(--unicon-accent, #3d7a5a);
+}
+
+.valueCard {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.valueHead {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: end;
+}

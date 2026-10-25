@@ -37,6 +37,9 @@ function StateChip({ state }: { state: TaskState }) {
     return <Chip tone="warn">Last save has problems</Chip>;
   }
   if (state.latest === null) return <Chip>Not published</Chip>;
+  if (state.latest.check === 'checking') return <Chip>Checking</Chip>;
+  if (state.latest.check === 'refused') return <Chip tone="warn">Refused</Chip>;
+  if (state.latest.check === 'unchecked') return <Chip>Never checked</Chip>;
   if (state.draft) return <Chip>Draft, not published</Chip>;
   return <Chip tone="live">Published</Chip>;
 }
@@ -295,6 +298,25 @@ export function TaskStanding({
               task.latest === null ? null : savedBy(task.latest, changes),
             )}
           </BodyText>
+          {(task.latest?.failed_checks ?? []).length > 0 && (
+            <ul aria-label="Failed checks">
+              {(task.latest?.failed_checks ?? []).map((check) => (
+                <li key={check.index}>
+                  Check {String(check.index)}
+                  <ul>
+                    {check.failing.map((sentence) => (
+                      <li key={sentence}>{sentence}</li>
+                    ))}
+                    {check.runs.map((run) => (
+                      <li key={run.id}>
+                        {run.id}: {run.verdict}
+                      </li>
+                    ))}
+                  </ul>
+                </li>
+              ))}
+            </ul>
+          )}
           <NextStep place={place} state={task} saving={saving} manager={manager} />
         </div>
       )}

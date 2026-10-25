@@ -453,6 +453,10 @@ export function FormulaLine({
   }, []);
 
   useEffect(() => {
+    view.current?.contentDOM.setAttribute('aria-label', label);
+  }, [label]);
+
+  useEffect(() => {
     const current = view.current;
     if (current === null) return;
     const text = current.state.doc.toString();

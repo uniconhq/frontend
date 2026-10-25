@@ -23,7 +23,7 @@ import {
   type InputValues,
   type TaskValues,
 } from '../forms/task-values';
-import { numberProblem, parseYaml, writeOver, type Doc } from '../forms/yaml-doc';
+import { exactJS, numberProblem, parseYaml, writeOver, type Doc } from '../forms/yaml-doc';
 import {
   declaredOf,
   inputTitle,
@@ -46,6 +46,8 @@ import { taskPlace, taskPlaceOf } from './places';
 import { SaveBar } from './SaveBar';
 import { NOTHING_STAGED } from './staged';
 import { RunsCard } from './RunsCard';
+import { ChecksCard } from './ChecksCard';
+import { ScoringCard } from './ScoringCard';
 import { SubmissionsCard } from './SubmissionsCard';
 import { WorkflowCard } from './WorkflowCard';
 import { BodyText } from '@/ui/BodyText';
@@ -299,6 +301,7 @@ function BuildForm({
     sent?.values === values &&
     sent.inputFiles === inputFiles;
   const toSave = changed && !through;
+  const [scoreProblems, setScoreProblems] = useState<string[]>([]);
   const problems = [
     ...[values.max, values.rateCount, values.ratePer].map((text) =>
       numberProblem(text, true),
@@ -310,7 +313,17 @@ function BuildForm({
         ? numberProblem(input.kind === 'value' ? input.value : input.default)
         : undefined,
     ]),
+    ...(form?.runs === true ? scoreProblems : []),
   ].filter((problem): problem is string => problem !== undefined);
+  const workflowRaw = useMemo(() => {
+    if (text === null) return null;
+    const parsed = parseYaml(text);
+    return 'error' in parsed ? null : exactJS(parsed.doc);
+  }, [text]);
+  const draftErrors =
+    saving.outcome?.kind === 'saved' && 'errors' in saving.outcome.result
+      ? saving.outcome.result.errors
+      : [];
 
   const save = () => {
     const fresh = parseYaml(file.content);
@@ -422,6 +435,25 @@ function BuildForm({
             .catch((error: unknown) => setReading(error));
         }}
       />
+      {form?.runs === true && (
+        <>
+          <ScoringCard
+            place={place}
+            values={values}
+            workflowText={workflowRaw}
+            graded={form?.graded === true}
+            disabled={disabled}
+            errors={draftErrors}
+            onChange={set}
+            onProblems={setScoreProblems}
+          />
+          <ChecksCard
+            values={values}
+            disabled={disabled}
+            onChange={(checks) => set({ checks })}
+          />
+        </>
+      )}
       <SubmissionsCard
         values={values}
         admin={admin}

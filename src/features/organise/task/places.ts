@@ -19,7 +19,15 @@ import type { Place } from '../files/place';
  * page, which holds its title. `tests` is the Tests and scoring card, which
  * also holds the submission rules.
  */
-type TaskCard = 'workflow' | 'inputs' | 'runs' | 'tests' | 'statement' | 'settings';
+type TaskCard =
+  | 'workflow'
+  | 'inputs'
+  | 'runs'
+  | 'scoring'
+  | 'checks'
+  | 'tests'
+  | 'statement'
+  | 'settings';
 
 export type TaskPlace = {
   card: TaskCard;
@@ -36,6 +44,8 @@ const CARD_LABELS: Record<TaskCard, string> = {
   workflow: 'Workflow',
   inputs: 'Inputs',
   runs: 'Runs',
+  scoring: 'Scoring',
+  checks: 'Checks',
   tests: 'Tests and scoring',
   statement: 'Statement',
   settings: 'Settings',
@@ -194,6 +204,34 @@ export function taskPlace(
         card: 'tests',
         label: named === undefined ? 'Submissions' : `Submissions: ${named[1]}`,
         field: named?.[0] ?? 'max',
+        item: null,
+      };
+    }
+    case 'scoring': {
+      if (second === 'values' && typeof third === 'string') {
+        return {
+          card: 'scoring',
+          label: `Scoring: ${third}`,
+          field: `value-${third}`,
+          item: null,
+        };
+      }
+      if (second === 'groups' && typeof third === 'string') {
+        return {
+          card: 'scoring',
+          label: `Scoring: ${third}`,
+          field: `group-${third}`,
+          item: null,
+        };
+      }
+      return { card: 'scoring', label: 'Scoring', field: null, item: null };
+    }
+    case 'checks': {
+      const index = typeof second === 'number' ? second : 0;
+      return {
+        card: 'checks',
+        label: `Checks: check ${String(index + 1)}`,
+        field: `check-${String(index)}`,
         item: null,
       };
     }

@@ -18,11 +18,14 @@ import {
   CONTEST_API,
   draftTask,
   publicationList,
+  publications,
+  publishedTask,
   repoFiles,
   taskState,
   unchanged,
 } from '@/test/organiser';
-import { comeBackToTab, fakeLiveStream, openStream, realLiveStream } from '@/test/live';
+import { comeBackToTab, fakeLiveStream, nudge, openStream, realLiveStream } from '@/test/live';
+import { specCatalogue } from '../formula/catalogue';
 
 /** The names of the files handed to the browser to save, in turn. */
 const saved = vi.hoisted((): string[] => []);
@@ -259,8 +262,9 @@ function taskBackend(
     publicationList,
     http.get(`${TASK_API}/tree`, ({ request }) => {
       const at = new URL(request.url).searchParams.get('path') ?? '';
-      return at.startsWith('tests') ? HttpResponse.json(tree[at] ?? []) : undefined;
+      return HttpResponse.json(at.startsWith('tests') ? (tree[at] ?? []) : []);
     }),
+    http.get('/api/v1/blocks', () => HttpResponse.json(specCatalogue())),
     http.get(`${TASK_API}/files/:path`, async ({ params }) => {
       const path = decodeURIComponent(String(params['path']));
       if (path === 'task.yaml') {
@@ -1429,5 +1433,228 @@ repeat:
       document.querySelector('[data-field="axis-0-tuple-1-max_size"]'),
     ).not.toBeNull();
     expect(document.querySelector('[data-field="best"]')).not.toBeNull();
+  });
+});
+
+const ISLANDS = `name: Islands
+workflow: unicon/classic@v3
+inputs:
+  code: {entrant: {label: Solution}}
+repeat:
+  - inputs: [input]
+    tuples:
+      - {input: sample.in, title: Sample}
+`;
+
+async function typeLine(name: string, text: string) {
+  const line = await screen.findByRole('textbox', { name });
+  await userEvent.type(line, text);
+}
+
+describe('scoring, checks and what a save answers', { timeout: 60_000 }, () => {
+  beforeEach(() => {
+    // The formula line measures its text. jsdom's ranges have no client rects.
+    Range.prototype.getClientRects = () => {
+      const rects = [] as unknown as DOMRectList;
+      Object.defineProperty(rects, 'length', { value: 0 });
+      rects.item = () => null;
+      return rects;
+    };
+  });
+
+  it('saves islands with its text value first_failed and a check', async () => {
+    const { sent } = taskBackend({
+      content: ISLANDS,
+      form: runForm('unicon/classic@v3', [
+        runInput('code', 'file'),
+        runInput('input', 'file'),
+      ]),
+    });
+    await openTask();
+    const scoring = await screen.findByRole('region', { name: 'Scoring' });
+    await userEvent.click(within(scoring).getByRole('button', { name: 'Add a value' }));
+    await typeLine('value_1', 'otherwise(first(all, all.passed == 0).verdict, "none")');
+    fill(within(scoring).getByRole('textbox', { name: 'Name' }), 'first_failed');
+    fireEvent.blur(within(scoring).getByRole('textbox', { name: 'Name' }));
+
+    const checks = screen.getByRole('region', { name: 'Checks' });
+    await userEvent.click(within(checks).getByRole('button', { name: 'Add a check' }));
+    fill(within(checks).getByRole('textbox', { name: 'Solution' }), 'print(1)');
+    await userEvent.selectOptions(
+      within(checks).getByRole('combobox', { name: 'Verdict every run gets' }),
+      'accepted',
+    );
+    await save();
+
+    expect(written(sent[0])).toMatchObject({
+      scoring: {
+        values: {
+          first_failed: {
+            block: 'otherwise',
+            of: [
+              {
+                run: [
+                  {
+                    block: 'first',
+                    from: { runs: 'all' },
+                    where: { block: 'eq', of: [{ run: ['all', 'passed'] }, 0] },
+                  },
+                  'verdict',
+                ],
+              },
+              { text: 'none' },
+            ],
+          },
+        },
+      },
+      checks: [{ submit: { code: 'print(1)' }, expect: { verdict: 'accepted' } }],
+    });
+  });
+
+  it('refuses a value named like a group, and a loop, before the save', async () => {
+    const { sent } = taskBackend({
+      content: ISLANDS,
+      form: runForm('unicon/classic@v3', [runInput('code', 'file'), runInput('input', 'file')]),
+    });
+    await openTask();
+    const scoring = await screen.findByRole('region', { name: 'Scoring' });
+    await userEvent.click(within(scoring).getByRole('button', { name: 'Add a group' }));
+    await userEvent.click(within(scoring).getByRole('button', { name: 'Add a value' }));
+    fill(within(scoring).getByRole('textbox', { name: 'Name' }), 'group_1');
+    expect(scoring).toHaveTextContent('a group is called group_1 too: rename one');
+    const bar = screen.getByRole('region', { name: 'Save the task' });
+    expect(within(bar).getByRole('button', { name: 'Save' })).toBeDisabled();
+
+    fill(within(scoring).getByRole('textbox', { name: 'Name' }), 'left');
+    await userEvent.click(within(scoring).getByRole('button', { name: 'Add a value' }));
+    const names = within(scoring).getAllByRole('textbox', { name: 'Name' });
+    fill(names[1]!, 'right');
+    await typeLine('left', 'right');
+    await typeLine('right', 'left');
+    expect(scoring).toHaveTextContent('reads itself, round left → right → left: break the loop');
+    expect(within(bar).getByRole('button', { name: 'Save' })).toBeDisabled();
+    expect(sent).toEqual([]);
+  });
+
+  it('keeps a part shown now from being hidden later, once a submission is graded', async () => {
+    taskBackend({
+      content: 'name: Islands\nworkflow: unicon/classic@v3\nscoring:\n  show:\n    now: [log]\n',
+      form: {
+        ...runForm('unicon/classic@v3', [runInput('code', 'file')]),
+        graded: true,
+      },
+    });
+    await openTask();
+    const scoring = await screen.findByRole('region', { name: 'Scoring' });
+    const when = within(scoring).getByRole('combobox', { name: 'When log is shown' });
+    expect(within(when).getByRole('option', { name: 'Now' })).toBeEnabled();
+    expect(
+      within(when).getByRole('option', { name: 'After the close: no, entrants have seen it' }),
+    ).toBeDisabled();
+  });
+
+  it('shows the summary and sends confirm and asked when a save asks first', async () => {
+    const { sent } = taskBackend({
+      content: ISLANDS,
+      form: runForm('unicon/classic@v3', [runInput('code', 'file'), runInput('input', 'file')]),
+      answer: () =>
+        problem(409, 'confirmation_required', {
+          detail: 'The contest is running. Publish this change now?',
+          changes: [],
+          regrades: 0,
+          ...unchanged,
+          asked: 'b1c2d3e:12',
+        }),
+    });
+    const { inputs } = await openTask();
+    fill(fieldIn(inputs, 'code', 'Label shown to entrants'), 'Your solution');
+    await save();
+    const bar = screen.getByRole('region', { name: 'Save the task' });
+    expect(await within(bar).findByText("Nobody's result changes.")).toBeVisible();
+    await userEvent.click(within(bar).getByRole('button', { name: 'Publish the change' }));
+    await waitFor(() => expect(sent).toHaveLength(2));
+    expect(sent[1]).toMatchObject({ confirm: true, asked: 'b1c2d3e:12' });
+  });
+});
+
+describe('a publication’s checks', { timeout: 30_000 }, () => {
+  beforeEach(fakeLiveStream);
+  afterEach(realLiveStream);
+
+  it('reads never checked, and still saves', async () => {
+    const { sent } = taskBackend({
+      content: ISLANDS,
+      form: runForm('unicon/classic@v3', [runInput('code', 'file'), runInput('input', 'file')]),
+    });
+    const latest = publications[1];
+    server.use(
+      http.get(TASK_API, () =>
+        HttpResponse.json({
+          ...publishedTask,
+          latest: latest === undefined ? null : { ...latest, check: 'unchecked' },
+        }),
+      ),
+    );
+    const { inputs } = await openTask();
+    expect(screen.getAllByText(/was never checked/).length).toBeGreaterThan(0);
+    fill(fieldIn(inputs, 'code', 'Label shown to entrants'), 'Your solution');
+    await save();
+    expect(await screen.findByText('Saved and published as publication 4.')).toBeVisible();
+    expect(sent).toHaveLength(1);
+  });
+
+  it('turns a checking publication refused on the checks nudge, and does not poll', async () => {
+    taskBackend({
+      content: ISLANDS,
+      form: runForm('unicon/classic@v3', [runInput('code', 'file'), runInput('input', 'file')]),
+    });
+    const latest = publications[1];
+    let refused = false;
+    const reads: string[] = [];
+    server.use(
+      http.get(TASK_API, ({ request }) => {
+        reads.push(new URL(request.url).pathname);
+        return HttpResponse.json({
+          ...publishedTask,
+          latest:
+            latest === undefined
+              ? null
+              : {
+                  ...latest,
+                  check: refused ? 'refused' : 'checking',
+                  failed_checks: refused
+                    ? [
+                        {
+                          index: 1,
+                          failing: ['Run sample got wrong_answer, not accepted.'],
+                          runs: [
+                            {
+                              id: 'run-1',
+                              key: { input: 'sample.in' },
+                              reports: { passed: '0' },
+                              verdict: 'wrong_answer',
+                            },
+                          ],
+                          outcomes: {},
+                          values: {},
+                          error: null,
+                        },
+                      ]
+                    : [],
+                },
+        });
+      }),
+    );
+    await openTask();
+    openStream();
+    expect((await screen.findAllByText(/Its checks are still running/)).length).toBeGreaterThan(0);
+    const settled = reads.length;
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    expect(reads).toHaveLength(settled);
+    refused = true;
+    nudge('checks');
+    expect(await screen.findByText('run-1: wrong_answer')).toBeVisible();
+    expect(screen.getAllByText(/was refused/).length).toBeGreaterThan(0);
+    expect(reads.length).toBeGreaterThan(settled);
   });
 });

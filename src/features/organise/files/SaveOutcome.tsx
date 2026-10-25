@@ -146,6 +146,14 @@ export function SaveOutcome<Body = WriteFile>({
       return (
         <Panel role="status">
           <BodyText>Saved and published as publication {result.number}.</BodyText>
+          {result.check === 'checking' && (
+            <BodyText>Its checks are still running.</BodyText>
+          )}
+          {result.check === 'unchecked' && (
+            <BodyText>
+              This publication was never checked. The next save checks it.
+            </BodyText>
+          )}
           <Effect effect={result.effect} />
           <Notes label="About the task as published:" notes={result.notes} />
         </Panel>
