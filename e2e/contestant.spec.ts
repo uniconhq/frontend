@@ -20,6 +20,39 @@ const CONTEST = {
 const OPEN = { released: true, visible: true, open: true, closed: null };
 const ENTRANT = '0e000000-0000-4000-8000-000000000007';
 
+/** The caller's own row, which the home shows and the task list's points follow. */
+function homeStanding() {
+  return {
+    key: 'gradebook',
+    title: 'Gradebook',
+    audience: { who: 'entrants', rows: 'own' },
+    headers: [
+      { name: 'points', places: null, at_least: null, at_most: '100', self_reported: [] },
+    ],
+    sort: [{ column: 'points', way: 'desc' }],
+    dropped: [],
+    held_from: null,
+    rows: [
+      {
+        place: null,
+        grading: null,
+        held: 0,
+        row: { entrant: ENTRANT, name: 'carol' },
+        cells: [
+          {
+            column: 'points',
+            number: '62',
+            text: null,
+            hidden: false,
+            counted: [{ task: 'sum', number: 1 }],
+            waiting: null,
+          },
+        ],
+      },
+    ],
+  };
+}
+
 /** The contest's one leaderboard, the caller's entrant, carol's, first of two, its numbers exact strings. */
 const STANDINGS = {
   board: 'Standings',
@@ -187,6 +220,7 @@ async function stubContestantApi(page: Page, signedIn: boolean) {
         registration: entry,
         organises: false,
         now: '2026-09-29T10:00:00Z',
+        standing: approved ? [homeStanding()] : [],
         // The leaderboards an approved entrant sees, which each task's points follow.
         boards: approved ? [STANDINGS.board] : [],
         tasks: [
@@ -304,7 +338,8 @@ test('a contestant registers, waits, is let in and reads the task', async ({
   // In race order: the time left, then the tasks, the leaderboard and the way to ask.
   const tasks = page.getByRole('list', { name: 'Tasks' });
   await expect(tasks).toContainText('Closes in');
-  await expect(page.getByText('This page is being rebuilt.')).toBeVisible();
+  await expect(tasks).toContainText('62 / 100');
+  await expect(page.getByRole('table', { name: 'Gradebook' })).toBeVisible();
   await expect(
     page
       .getByRole('region', { name: 'Questions to the organisers' })

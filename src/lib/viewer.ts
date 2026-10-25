@@ -48,6 +48,11 @@ export type Viewer = {
   taskManager: boolean;
 };
 
+/** Any role at the org, the contest, or one of its tasks. */
+export function contestStaff(org: string, contest: string, roles: Roles): boolean {
+  return covers(roles, org, contest, null, 'observer');
+}
+
 export function viewerOf(
   org: string,
   contest: string,

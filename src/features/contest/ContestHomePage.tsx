@@ -10,6 +10,8 @@ import { Page, PageHeader } from '@/ui/Page';
 import { SectionTitle } from '@/ui/SectionTitle';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
+import { taskPoints } from '@/ui/leaderboards/points';
+import { LeaderboardTable } from '@/ui/leaderboards/table';
 import { taskPagePath } from '@/lib/contest-paths';
 import { contestPath } from '@/lib/organiser-paths';
 import { useContestParams } from '@/lib/route-params';
@@ -25,6 +27,7 @@ import { YourEntry } from './entry/YourEntry';
 import { notIn, TASK_STANDING } from './entry/not-in';
 import { SignInButtons, SignInPrompt } from './SignInPrompt';
 import { labelOf } from './task-names';
+import { submissionHref } from './submit/submission-param';
 import { taskTimeLines } from './time-left';
 import classes from './contest.module.css';
 
@@ -90,12 +93,14 @@ function TaskList({
   contest,
   tasks,
   notApproved,
+  standing,
 }: {
   org: string;
   contest: string;
   tasks: TaskEntry[];
   /** Where a task stands for a reader who is not an approved entrant. */
   notApproved: string;
+  standing: ContestHome['standing'];
 }) {
   const { at, measured } = useServerClock();
   if (tasks.length === 0) {
@@ -107,6 +112,9 @@ function TaskList({
         <li key={task.name} className={classes.task}>
           <span className={classes.label}>{labelOf(task)}</span>
           <PageLink to={taskPagePath(org, contest, task.name)}>{task.title}</PageLink>
+          {taskPoints(task.name, standing).map((points) => (
+            <span key={points.board}>{points.text}</span>
+          ))}
           <Standing task={task} at={at} counting={measured} notApproved={notApproved} />
         </li>
       ))}
@@ -148,11 +156,46 @@ function Dates({ start, end }: { start: string; end: string }) {
   );
 }
 
-/** The contest's leaderboards, rebuilt in a later phase. */
-function LeaderboardCard() {
+/** The viewer's own row of each leaderboard they can read. */
+function LeaderboardCard({
+  org,
+  contest,
+  standing,
+  staff,
+}: {
+  org: string;
+  contest: string;
+  standing: ContestHome['standing'];
+  staff: boolean;
+}) {
+  const open = (task: string, number: number) =>
+    `${taskPagePath(org, contest, task)}${submissionHref(number)}`;
   return (
     <Card>
-      <BodyText>This page is being rebuilt.</BodyText>
+      <div className={classes.stack}>
+        <SectionTitle>Leaderboards</SectionTitle>
+        {standing.length === 0 ? (
+          <BodyText tone="secondary">Nothing is on a leaderboard yet.</BodyText>
+        ) : (
+          standing.map((board) => (
+            <LeaderboardTable key={board.key} board={board} submissionTo={open} staff={staff} />
+          ))
+        )}
+      </div>
+    </Card>
+  );
+}
+
+/** A visitor has no row. The public leaderboards are the contest's own page. */
+function PublicLeaderboards({ org, contest }: { org: string; contest: string }) {
+  return (
+    <Card>
+      <div className={classes.stack}>
+        <SectionTitle>Leaderboards</SectionTitle>
+        <PageLink to={contestViewSectionPath(org, contest, 'boards')}>
+          See the leaderboards
+        </PageLink>
+      </div>
     </Card>
   );
 }
@@ -287,10 +330,16 @@ function Home({
             contest={contest}
             tasks={home.tasks}
             notApproved={TASK_STANDING[notIn(home)]}
+            standing={home.standing}
           />
         </div>
       </Card>
-      <LeaderboardCard />
+      <LeaderboardCard
+        org={org}
+        contest={contest}
+        standing={home.standing}
+        staff={home.organises}
+      />
       <Card>
         <ContestAnnouncements org={org} contest={contest} />
       </Card>
@@ -341,7 +390,7 @@ function PublicHome({ org, contest }: { org: string; contest: string }) {
           <PublicTaskList org={org} contest={contest} tasks={found.tasks} />
         </div>
       </Card>
-      <LeaderboardCard />
+      <PublicLeaderboards org={org} contest={contest} />
     </Page>
   );
 }

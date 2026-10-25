@@ -59,7 +59,7 @@ describe('the contest page for a signed-in person', () => {
 
     const timer = await screen.findByRole('timer', { name: 'Contest countdown' });
     const tasks = screen.getByRole('heading', { name: 'Tasks' });
-    const board = await screen.findByText('This page is being rebuilt.');
+    const board = await screen.findByRole('heading', { name: 'Leaderboards' });
     const announcements = screen.getByRole('heading', { name: 'Announcements' });
     const questions = screen.getByRole('region', {
       name: 'Questions to the organisers',
@@ -94,7 +94,7 @@ describe('the contest page for a signed-in person', () => {
     ).toBeNull();
   });
 
-  it('says the leaderboard is being rebuilt', async () => {
+  it('says when nothing is on a leaderboard yet', async () => {
     server.use(
       signedIn,
       http.get(`${CONTEST_API}/home`, () =>
@@ -103,7 +103,7 @@ describe('the contest page for a signed-in person', () => {
     );
     renderApp(PAGE);
 
-    expect(await screen.findByText('This page is being rebuilt.')).toBeVisible();
+    expect(await screen.findByText('Nothing is on a leaderboard yet.')).toBeVisible();
   });
 
   it('shows the leaderboard note when the person is in', async () => {
@@ -116,7 +116,7 @@ describe('the contest page for a signed-in person', () => {
     renderApp(PAGE);
 
     await screen.findByRole('heading', { name: 'Tasks' });
-    expect(await screen.findByText('This page is being rebuilt.')).toBeVisible();
+    expect(await screen.findByText('Nothing is on a leaderboard yet.')).toBeVisible();
   });
 
   it('leads an organiser of the contest back to organising it, and nobody else', async () => {
@@ -199,7 +199,7 @@ describe('the contest page for a signed-in person', () => {
     expect(max).toHaveTextContent(/Closes in /);
   });
 
-  it('keeps the task list and says the leaderboard is being rebuilt', async () => {
+  it('keeps the task list when nothing is on a leaderboard yet', async () => {
     const task = (name: string) => ({
       name,
       label: name.toUpperCase(),
@@ -226,7 +226,7 @@ describe('the contest page for a signed-in person', () => {
       'href',
       '/contests/acme/spring/tasks/a',
     );
-    expect(screen.getByText('This page is being rebuilt.')).toBeVisible();
+    expect(screen.getByText('Nothing is on a leaderboard yet.')).toBeVisible();
     expect(screen.queryByRole('columnheader')).toBeNull();
   });
 
@@ -531,18 +531,21 @@ describe('the contest page for a visitor', () => {
       `/api/v1/auth/login?next=${encodeURIComponent(PAGE)}`,
     );
     expect(screen.getByRole('link', { name: 'Sum of Two' })).toBeVisible();
-    expect(screen.getByText('This page is being rebuilt.')).toBeVisible();
+    expect(screen.getByRole('link', { name: 'See the leaderboards' })).toHaveAttribute(
+      'href',
+      '/contests/acme/spring/boards',
+    );
     expect(screen.queryByRole('button', { name: 'Register' })).not.toBeInTheDocument();
     expect(screen.queryByRole('table')).toBeNull();
   });
 
-  it('says the public leaderboard is being rebuilt', async () => {
+  it('links a visitor to the public leaderboards', async () => {
     server.use(
       http.get(`${PUBLIC_API}/:org/:contest`, () => HttpResponse.json(publicContest)),
     );
     renderApp(PAGE);
 
-    expect(await screen.findByText('This page is being rebuilt.')).toBeVisible();
+    expect(await screen.findByRole('link', { name: 'See the leaderboards' })).toBeVisible();
     expect(
       screen.getByRole('heading', { name: 'Spring 2026', level: 1 }),
     ).toBeVisible();
