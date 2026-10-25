@@ -1,11 +1,12 @@
 import { useState } from 'react';
+import { $api } from '@/api/query';
 import { BodyText } from '@/ui/BodyText';
 import { Page, PageHeader } from '@/ui/Page';
 import { Select } from '@/ui/Select';
-import { FormulaLine, FormulaTiles } from './FormulaEditor';
-import type { FormulaScope } from './formula';
+import { FormulaLine, FormulaTiles } from '../formula/Editor';
+import type { FormulaScope } from '../formula/parse';
+import { useFormulaTarget } from '../formula/target';
 import { MockLinks } from './MockLinks';
-import { useFormulaTarget } from './useFormulaTarget';
 import classes from './stage6.module.css';
 
 const TASK_SCOPE: FormulaScope = {
@@ -18,8 +19,11 @@ const TASK_SCOPE: FormulaScope = {
     'total',
     'first_failed',
     'seconds_late',
+    'a_win',
+    'a_win.attempt',
+    'a_minute',
   ],
-  sets: ['sample_tests', 'st1_tests', 'st2_tests', 'all'],
+  sets: ['sample_tests', 'st1_tests', 'st2_tests', 'all', 'a'],
   each: [
     'sample_tests.passed',
     'sample_tests.time_ms',
@@ -28,6 +32,9 @@ const TASK_SCOPE: FormulaScope = {
     'all.passed',
     'all.points',
     'all.verdict',
+    'a.compiled',
+    'a.solved',
+    'a.attempt',
   ],
   texts: ['first_failed', 'all.verdict'],
   fields: { passed: 'number', verdict: 'text', points: 'number', time_ms: 'number' },
@@ -111,6 +118,12 @@ const TASKS = [
     result: 'fastest',
     text: 'lowest(sample_tests, sample_tests.time_ms).time_ms',
   },
+  {
+    id: 'a_tries',
+    label: 'a_tries (ICPC)',
+    result: 'a_tries',
+    text: 'count(a, a.compiled == 1 and a.solved == 0 and otherwise(a.attempt < a_win.attempt, 1))',
+  },
 ];
 
 const COLUMNS = [
@@ -151,6 +164,7 @@ const COLUMNS = [
  * leaderboard's columns. Nothing is saved.
  */
 export function FormulaPage() {
+  const blocks = $api.useQuery('get', '/api/v1/blocks');
   const [where, setWhere] = useState<'task' | 'leaderboard'>('task');
   const examples = where === 'task' ? TASKS : COLUMNS;
   const [pick, setPick] = useState(TASKS[0]?.id ?? 'total');
@@ -159,6 +173,7 @@ export function FormulaPage() {
   const example = examples.find((item) => item.id === pick) ?? examples[0];
   if (example === undefined) return null;
   const scope = where === 'task' ? TASK_SCOPE : LEADERBOARD_SCOPE;
+  const catalogue = blocks.data;
 
   return (
     <Page label="Formula">
@@ -194,17 +209,33 @@ export function FormulaPage() {
           />
         </div>
       </div>
-      <FormulaTiles scope={scope} target={line.target} onInsert={line.insert} />
-      <div className={classes.formulaLine}>
-        <FormulaLine
-          key={example.id}
-          label={example.result}
-          scope={scope}
-          value={texts[example.id] ?? example.text}
-          onChange={(text) => setTexts((curr) => ({ ...curr, [example.id]: text }))}
-          onFocusLine={(insert) => line.focus(example.result, insert)}
-        />
-      </div>
+      {catalogue === undefined ? (
+        <BodyText>
+          {blocks.isError
+            ? 'The blocks could not be loaded, so a formula cannot be checked.'
+            : 'Loading the blocks.'}
+        </BodyText>
+      ) : (
+        <>
+          <FormulaTiles
+            scope={scope}
+            catalogue={catalogue}
+            target={line.target}
+            onInsert={line.insert}
+          />
+          <div className={classes.formulaLine}>
+            <FormulaLine
+              key={example.id}
+              label={example.result}
+              scope={scope}
+              catalogue={catalogue}
+              value={texts[example.id] ?? example.text}
+              onChange={(text) => setTexts((curr) => ({ ...curr, [example.id]: text }))}
+              onFocusLine={(insert) => line.focus(example.result, insert)}
+            />
+          </div>
+        </>
+      )}
     </Page>
   );
 }
