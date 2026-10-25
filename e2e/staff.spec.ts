@@ -1,4 +1,7 @@
 import { expect, test, type Page, type Route } from '@playwright/test';
+import type { components } from '../src/api/schema';
+
+type Schemas = components['schemas'];
 
 /**
  * A task manager marks a counted submission, releases results, ends a hold,
@@ -14,9 +17,9 @@ const TASK = {
   statement_written: true,
   results: {
     released: false,
-    history: [] as { action: string; at: string; by: number; by_name: string | null }[],
+    history: [] as Schemas['Results']['history'],
   },
-};
+} satisfies Schemas['TaskState'];
 
 function json(route: Route, body: unknown, status = 200) {
   return route.fulfill({
@@ -36,15 +39,13 @@ async function stub(page: Page) {
         inputs: [],
         newer: null,
         problem: null,
-        runs: false,
-        test: [],
         workflow: null,
-      });
+      } satisfies Schemas['WorkflowForm']);
     }
     if (path.includes('/regrades/')) {
       return json(route, {
         id: 'r1',
-        cause: { kind: 'save' },
+        cause: 'save',
         publication: 2,
         total: 1,
         running: 0,
@@ -79,7 +80,7 @@ async function stub(page: Page) {
             ],
           },
         ],
-      });
+      } satisfies Schemas['RunRegradeSummary']);
     }
     if (path.endsWith('/organise/queue')) {
       return json(route, [
@@ -94,13 +95,13 @@ async function stub(page: Page) {
             },
           ],
         },
-      ]);
+      ] satisfies Schemas['QueueRow'][]);
     }
     if (route.request().method() === 'GET') return json(route, []);
     return route.fulfill({ status: 404, body: route.request().url() });
   });
   await page.route('**/api/v1/time', (route) =>
-    json(route, { now: '2026-10-25T00:00:00Z' }),
+    json(route, { now: '2026-10-25T00:00:00Z' } satisfies Schemas['ServerTime']),
   );
   await page.route('**/api/v1/me', (route) =>
     json(route, {
@@ -115,9 +116,9 @@ async function stub(page: Page) {
         { names: { org: 'acme', contest: 'spring', task: null }, role: 'manager' },
       ],
       degraded: false,
-    }),
+    } satisfies Schemas['Me']),
   );
-  const file = (path: string, content: string) => ({
+  const file = (path: string, content: string): Schemas['FileContent'] => ({
     path,
     encoding: 'utf-8',
     content,
@@ -182,7 +183,7 @@ async function stub(page: Page) {
           },
         ],
       },
-    ]),
+    ] satisfies Schemas['QueueRow'][]),
   );
   await page.route('**/entries?*', (route) => {
     state.marked = true;
@@ -191,7 +192,7 @@ async function stub(page: Page) {
       mark: '7.5',
       by: 7,
       at: '2026-10-25T01:00:00Z',
-    });
+    } satisfies Schemas['EnteredMark']);
   });
   await page.route('**/api/v1/**/leaderboards', (route) =>
     json(route, [
@@ -230,7 +231,7 @@ async function stub(page: Page) {
           },
         ],
       },
-    ]),
+    ] satisfies Schemas['Leaderboard'][]),
   );
   await page.route('**/results/release', (route) => {
     const body = route.request().postDataJSON() as { confirm?: boolean };
@@ -252,7 +253,7 @@ async function stub(page: Page) {
       history: [
         { action: 'released', at: '2026-10-25T01:00:00Z', by: 7, by_name: 'kenny' },
       ],
-    });
+    } satisfies Schemas['Results']);
   });
   await page.route('**/hold', (route) => {
     if (route.request().method() === 'GET') {
@@ -263,7 +264,7 @@ async function stub(page: Page) {
         ended_at: state.holding ? null : '2026-10-25T01:00:00Z',
         ended_by: state.holding ? null : 7,
         ended_by_name: state.holding ? null : 'kenny',
-      });
+      } satisfies Schemas['HoldState']);
     }
     return route.fallback();
   });
@@ -289,7 +290,7 @@ async function stub(page: Page) {
       ended_at: '2026-10-25T01:00:00Z',
       ended_by: 7,
       ended_by_name: 'kenny',
-    });
+    } satisfies Schemas['HoldState']);
   });
 }
 

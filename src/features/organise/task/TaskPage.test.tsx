@@ -397,6 +397,16 @@ describe('what the task has, under its name', { timeout: 20_000 }, () => {
     );
   });
 
+  it('says nothing of what the task lacks while its workflow is still being read', async () => {
+    readyBackend();
+    server.use(http.get(`${TASK_API}/workflow-form`, () => delay('infinite')));
+    renderApp(TASK);
+
+    await screen.findByLabelText('Where the task stands');
+    expect(screen.queryByRole('list', { name: 'What the task has' })).toBeNull();
+    expect(screen.queryByText('Workflow: none chosen')).toBeNull();
+  });
+
   it('does not tick a statement the forge says is not written yet: blank, or the one a new task starts with (M57)', async () => {
     readyBackend({ ...publishedTask, head_statement_written: false });
     renderApp(TASK);

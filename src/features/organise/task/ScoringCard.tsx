@@ -8,7 +8,7 @@ import { Chip } from '@/ui/Chip';
 import { Select } from '@/ui/Select';
 import { TextInput } from '@/ui/TextInput';
 import { FormulaLine, FormulaTiles } from '../formula/Editor';
-import type { Catalogue } from '../formula/catalogue';
+import { BLOCKS_UNLOADED, type Catalogue } from '../formula/catalogue';
 import {
   describeFormula,
   readLine,
@@ -48,6 +48,12 @@ import classes from './task.module.css';
 
 const SCORING: Shape = { width: 176, gap: 40 };
 
+/** How far the picked workflow file has been read, for its outputs. */
+export type WorkflowRead = 'loading' | 'failed' | 'ready';
+
+const WORKFLOW_UNREAD =
+  'The workflow could not be read, so the outputs its runs give are not known and the formulas cannot be shown or checked.';
+
 /**
  * How a submission is scored: what one run gives, the groups, the result as
  * a flow, and a card per value. Only a run workflow has it.
@@ -56,6 +62,7 @@ export function ScoringCard({
   place,
   values,
   workflowText,
+  workflowRead,
   graded,
   disabled,
   errors,
@@ -66,6 +73,8 @@ export function ScoringCard({
   values: TaskValues;
   /** The workflow file, so the runs' columns are its outputs. */
   workflowText: unknown;
+  /** Until it reads, a formula is not checked, so no output is called unknown. */
+  workflowRead: WorkflowRead;
   /** A graded submission exists, so what is shown now has been seen. */
   graded: boolean;
   disabled: boolean;
@@ -91,10 +100,10 @@ export function ScoringCard({
   const target = useFormulaTarget();
   const scope = useMemo(
     () =>
-      catalogue === null
+      catalogue === null || workflowRead !== 'ready'
         ? null
         : scopeOf(values.scoreGroups, values.scoreValues, columns, catalogue),
-    [catalogue, columns, values.scoreGroups, values.scoreValues],
+    [catalogue, columns, values.scoreGroups, values.scoreValues, workflowRead],
   );
   const readings = useMemo(() => {
     if (catalogue === null || scope === null) return {};
@@ -135,6 +144,8 @@ export function ScoringCard({
       title="Scoring"
       line="What one submission gives, which runs each group holds, and the values that make its result."
     >
+      {blocks.isError && <BodyText>{BLOCKS_UNLOADED}</BodyText>}
+      {workflowRead === 'failed' && <BodyText>{WORKFLOW_UNREAD}</BodyText>}
       <CardPart
         title="What one submission gives"
         line="One submission runs once on each row. The numbers here are made up, to show the shape."
@@ -259,13 +270,16 @@ export function ScoringCard({
         {values.scoreValues.map((value) => {
           const reading = readings[value.key];
           const trouble = troubles.get(value.key);
+          // Unread, while the blocks or the workflow are not in, it says nothing.
           const kind =
-            trouble === undefined &&
-            reading?.unread === null &&
-            reading.problems.length === 0 &&
-            (reading.kind === 'number' || reading.kind === 'text')
-              ? reading.kind
-              : 'to fix';
+            trouble === undefined && reading === undefined
+              ? null
+              : trouble === undefined &&
+                  reading?.unread === null &&
+                  reading.problems.length === 0 &&
+                  (reading.kind === 'number' || reading.kind === 'text')
+                ? reading.kind
+                : 'to fix';
           return (
             <div key={value.key} className={classes.valueCard}>
               <div className={classes.valueHead}>
@@ -326,7 +340,9 @@ export function ScoringCard({
                   labelled
                   onChange={(when) => setShow(value.name, when)}
                 />
-                <Chip tone={kind === 'to fix' ? 'warn' : 'quiet'}>{kind}</Chip>
+                {kind !== null && (
+                  <Chip tone={kind === 'to fix' ? 'warn' : 'quiet'}>{kind}</Chip>
+                )}
                 <Button
                   size="xs"
                   variant="secondary"

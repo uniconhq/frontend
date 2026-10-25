@@ -6,6 +6,10 @@ import type { components } from '@/api/schema';
  */
 export type Catalogue = components['schemas']['Catalogue'];
 
+/** What a page that writes formulas says when `GET /blocks` fails. */
+export const BLOCKS_UNLOADED =
+  'The blocks formulas are made of could not be loaded, so formulas cannot be shown, checked or saved. Reload the page to try again.';
+
 type Block = components['schemas']['Block'];
 type BlockForm = components['schemas']['BlockForm'];
 type BlockInput = components['schemas']['BlockInput'];

@@ -1,4 +1,7 @@
 import { expect, test, type Page, type Route } from '@playwright/test';
+import type { components } from '../src/api/schema';
+
+type Schemas = components['schemas'];
 
 /** The version the uploaded part of test 1 was last changed at. */
 const UPLOADED_AT = 'a1b2c3d4e5f6a7b8c9d0a1b2c3d4e5f6a7b8c9d0';
@@ -36,15 +39,16 @@ async function stubOrganiserApi(page: Page) {
     feedAsked: [] as string[],
   };
 
-  const taskState = () => ({
+  const taskState = (): Schemas['TaskState'] => ({
     head: `head-${String(state.published)}`,
     latest: {
-      id: `pub-${String(state.published)}`,
       number: state.published,
       version: `head-${String(state.published)}`,
       grading_changed: state.published === 1,
       changes: [],
       at: '2026-09-29T09:00:00Z',
+      check: null,
+      failed_checks: [],
     },
     draft: false,
     errors: [],
@@ -61,7 +65,7 @@ async function stubOrganiserApi(page: Page) {
     });
 
   await page.route('**/api/v1/time', (route) =>
-    json(route, { now: '2026-09-29T10:00:00Z' }),
+    json(route, { now: '2026-09-29T10:00:00Z' } satisfies Schemas['ServerTime']),
   );
   await page.route('**/api/v1/workflows', (route) =>
     json(route, [
@@ -72,7 +76,7 @@ async function stubOrganiserApi(page: Page) {
         editable: false,
         visibility: 'public',
       },
-    ]),
+    ] satisfies Schemas['WorkflowItem'][]),
   );
   await page.route('**/api/v1/workflows/unicon/classic/versions/v3', (route) =>
     json(route, { content: CLASSIC }),
@@ -96,7 +100,7 @@ async function stubOrganiserApi(page: Page) {
           ]
         : [],
       degraded: false,
-    }),
+    } satisfies Schemas['Me']),
   );
 
   await page.route(/\/api\/v1\/orgs/, async (route) => {
@@ -172,7 +176,11 @@ async function stubOrganiserApi(page: Page) {
       return json(route, []);
     }
     if (path === `${task}/workflow-form`) {
-      const input = (id: string, type: string, more: object) => ({
+      const input = (
+        id: string,
+        type: string,
+        more: Partial<Schemas['DeclaredInput']>,
+      ): Schemas['DeclaredInput'] => ({
         id,
         type,
         options: null,
@@ -200,7 +208,7 @@ async function stubOrganiserApi(page: Page) {
           input('memory_limit', 'number', { title: 'Memory limit', unit: 'MB' }),
         ],
         graded: false,
-      });
+      } satisfies Schemas['WorkflowForm']);
     }
     if (path === '/api/v1/orgs/acme/contests') {
       return json(route, [
@@ -226,8 +234,11 @@ async function stubOrganiserApi(page: Page) {
             due: null,
             closes: '2026-10-01T14:00:00Z',
           },
+          submissions: 0,
+          take_out: null,
+          withdrawn: false,
         },
-      ]);
+      ] satisfies Schemas['TaskStanding'][]);
     }
     if (path === '/api/v1/orgs/acme/contests/spring/tree') {
       return json(route, [
@@ -241,9 +252,10 @@ async function stubOrganiserApi(page: Page) {
       state.taskSaves.push(request.postDataJSON());
       state.published += 1;
       return json(route, {
-        publication: `pub-${String(state.published)}`,
         number: state.published,
         grading_changed: true,
+        check: null,
+        regrade: null,
         changes: ['The time limit changes.'],
         notes: [],
         regraded: 0,
@@ -257,7 +269,7 @@ async function stubOrganiserApi(page: Page) {
           scores: ['No score changes.'],
           reading: ['Nothing entrants read changes.'],
         },
-      });
+      } satisfies Schemas['Published']);
     }
     if (path === `${task}/tree`) {
       const folder = new URL(request.url()).searchParams.get('path') ?? '';

@@ -1,5 +1,6 @@
 import { publicPathOf } from '@/lib/task-pictures';
 import { formatLimit } from '@/lib/size';
+import { exactJS, isRecord, parseYaml, writeAt, writeOver } from './yaml-doc';
 
 /**
  * The endings of the pictures a statement can show: the ones the backend
@@ -54,4 +55,47 @@ export function picturesNamed(text: string): Set<string> {
     if (parts !== null) named.add(parts.join('/'));
   }
   return named;
+}
+
+const LATER = ['after_close', 'on_release'] as const;
+
+/**
+ * The task's settings, `text`, with `scoring.show.now` showing each new
+ * picture under `public/`, as the forge serves a file only while `show`
+ * lists it or a folder it is in. It lists `public/`, unless a file there is
+ * shown only later, which then stays so and each picture is listed alone.
+ * Null when every picture is shown now already, or the settings cannot be read.
+ */
+export function showingPictures(text: string, names: readonly string[]): string | null {
+  const parsed = parseYaml(text);
+  if ('error' in parsed) return null;
+  const root = exactJS(parsed.doc);
+  if (!isRecord(root)) return null;
+  const scoring = root['scoring'] ?? {};
+  if (!isRecord(scoring)) return null;
+  const show = scoring['show'] ?? {};
+  if (!isRecord(show)) return null;
+  const now = show['now'] ?? [];
+  if (!Array.isArray(now)) return null;
+  const listed = (entries: unknown) =>
+    Array.isArray(entries)
+      ? entries.filter((entry): entry is string => typeof entry === 'string')
+      : [];
+  const shownNow = (path: string) =>
+    listed(now).some(
+      (entry) => entry === path || (entry.endsWith('/') && path.startsWith(entry)),
+    );
+  const missing = names
+    .map((name) => `public/${name}`)
+    .filter((path) => !shownNow(path));
+  if (missing.length === 0) return null;
+  const later = LATER.some((when) =>
+    listed(show[when]).some((entry) => entry.startsWith('public/')),
+  );
+  writeAt(
+    parsed.doc,
+    ['scoring', 'show', 'now'],
+    [...(now as unknown[]), ...(later ? missing : ['public/'])],
+  );
+  return writeOver(text, parsed.doc);
 }

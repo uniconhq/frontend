@@ -1,5 +1,8 @@
 import { expect, test, type Page, type Route } from '@playwright/test';
 import { parse } from 'yaml';
+import type { components } from '../src/api/schema';
+
+type Schemas = components['schemas'];
 
 /** Enough of `GET /blocks` for a formula that is the number 1. */
 const CATALOGUE = {
@@ -10,7 +13,7 @@ const CATALOGUE = {
   leaderboard_leaves: [],
   leaves: [],
   skip: 'SKIPPED',
-};
+} satisfies Schemas['Catalogue'];
 
 /**
  * A contest manager writes the course gradebook, the olympiad leaderboard
@@ -43,7 +46,7 @@ async function stub(page: Page) {
     return route.fulfill({ status: 404, body: route.request().url() });
   });
   await page.route('**/api/v1/time', (route) =>
-    json(route, { now: '2026-10-25T00:00:00Z' }),
+    json(route, { now: '2026-10-25T00:00:00Z' } satisfies Schemas['ServerTime']),
   );
   await page.route('**/api/v1/me', (route) =>
     json(route, {
@@ -58,7 +61,7 @@ async function stub(page: Page) {
         { names: { org: 'acme', contest: 'spring', task: null }, role: 'manager' },
       ],
       degraded: false,
-    }),
+    } satisfies Schemas['Me']),
   );
   await page.route('**/api/v1/blocks', (route) => json(route, CATALOGUE));
   await page.route('**/api/v1/orgs/acme/contests/spring/organise/entrants', (route) =>
@@ -88,7 +91,7 @@ async function stub(page: Page) {
           }),
         });
       }
-      return json(route, { version: 'v1', notes: [] });
+      return json(route, { version: 'v1', notes: [] } satisfies Schemas['Written']);
     }
     return json(route, {
       path: 'contest.yaml',
@@ -97,7 +100,7 @@ async function stub(page: Page) {
       token: `token-${String(state.saves)}`,
       upload: null,
       version: 'v0',
-    });
+    } satisfies Schemas['FileContent']);
   });
   return state;
 }

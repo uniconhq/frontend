@@ -1,4 +1,7 @@
 import { expect, test, type Locator, type Page, type Route } from '@playwright/test';
+import type { components } from '../src/api/schema';
+
+type Schemas = components['schemas'];
 
 /**
  * The workflow editor in a real browser against the dev server with the API
@@ -40,13 +43,23 @@ outputs:
   log: \${{ steps.compile.log }}
 `;
 
-const port = (type: string, more: Record<string, unknown> = {}) => ({
+const port = (
+  type: Schemas['PrimitivePort']['type'],
+  more: Partial<Schemas['PrimitivePort']> = {},
+): Schemas['PrimitivePort'] => ({
   type,
   options: null,
   optional: false,
   runs: null,
   secret: false,
   description: null,
+  at_least: null,
+  at_most: null,
+  better: null,
+  inputs: null,
+  names: null,
+  outcomes: null,
+  outputs: null,
   ...more,
 });
 
@@ -70,6 +83,7 @@ const PRIMITIVES = [
     network: false,
     limits: LIMITS,
     limits_from: {},
+    forms: {},
     inputs: {
       source: port('folder', { runs: true }),
       language: port('enum', { options: ['c', 'cpp', 'java', 'python'] }),
@@ -93,6 +107,7 @@ const PRIMITIVES = [
     network: false,
     limits: LIMITS,
     limits_from: {},
+    forms: {},
     inputs: {
       actual: port('file', { runs: false }),
       expected: port('file', { runs: false }),
@@ -111,9 +126,22 @@ const PRIMITIVES = [
     network: false,
     limits: LIMITS,
     limits_from: {
-      time_ms: { input: 'time_limit', scale: '2000', add: '3000' },
-      memory_mb: { input: 'memory_limit', scale: '1', add: '256' },
+      time_ms: {
+        input: 'time_limit',
+        scale: '2000',
+        add: '3000',
+        max: null,
+        sum: null,
+      },
+      memory_mb: {
+        input: 'memory_limit',
+        scale: '1',
+        add: '256',
+        max: null,
+        sum: null,
+      },
     },
+    forms: {},
     inputs: {
       program: port('file', { runs: true }),
       stdin: port('file', { runs: false }),
@@ -129,7 +157,7 @@ const PRIMITIVES = [
     },
     problem: null,
   },
-];
+] satisfies Schemas['Primitive'][];
 
 async function stubWorkflowApi(page: Page) {
   const json = (route: Route, body: unknown, status = 200) =>
@@ -139,14 +167,14 @@ async function stubWorkflowApi(page: Page) {
       body: JSON.stringify(body),
     });
   await page.route('**/api/v1/time', (route) =>
-    json(route, { now: '2026-10-09T10:00:00Z' }),
+    json(route, { now: '2026-10-09T10:00:00Z' } satisfies Schemas['ServerTime']),
   );
   await page.route('**/api/v1/me', (route) =>
     json(route, {
       user: { id: 7, username: 'kenny', name: null, avatar_url: null, email: null },
       roles: [],
       degraded: false,
-    }),
+    } satisfies Schemas['Me']),
   );
   await page.route('**/api/v1/primitives', (route) => json(route, PRIMITIVES));
   await page.route(/\/api\/v1\/workflows$/, (route) => json(route, []));
@@ -425,14 +453,14 @@ test('a box opens two levels in, and a problem opens the step inside', async ({
     run: true,
   };
   await page.route('**/api/v1/time', (route) =>
-    json(route, { now: '2026-10-09T10:00:00Z' }),
+    json(route, { now: '2026-10-09T10:00:00Z' } satisfies Schemas['ServerTime']),
   );
   await page.route('**/api/v1/me', (route) =>
     json(route, {
       user: { id: 7, username: 'kenny', name: null, avatar_url: null, email: null },
       roles: [],
       degraded: false,
-    }),
+    } satisfies Schemas['Me']),
   );
   await page.route('**/api/v1/primitives', (route) => json(route, PRIMITIVES));
   await page.route(/\/api\/v1\/workflows$/, (route) =>

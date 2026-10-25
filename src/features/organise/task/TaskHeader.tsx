@@ -237,14 +237,17 @@ export function TaskStanding({
               </BodyText>
             )}
           </div>
-          <Ready
-            place={place}
-            items={readiness(
-              task,
-              form.isError ? null : (form.data ?? null),
-              settings.data?.encoding === 'utf-8' ? settings.data.content : null,
-            )}
-          />
+          {/* Only once both are read, so it never says what they lack meanwhile. */}
+          {!form.isPending && !settings.isPending && (
+            <Ready
+              place={place}
+              items={readiness(
+                task,
+                form.isError ? null : (form.data ?? null),
+                settings.data?.encoding === 'utf-8' ? settings.data.content : null,
+              )}
+            />
+          )}
           <BodyText>
             {publishedLine(
               task.latest,

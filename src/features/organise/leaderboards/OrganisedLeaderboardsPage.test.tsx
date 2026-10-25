@@ -77,4 +77,14 @@ describe("a contest's leaderboards for its organisers", () => {
     await userEvent.click(screen.getByRole('button', { name: 'Save' }));
     expect(await screen.findByText('This column is refused.')).toBeVisible();
   });
+
+  it('says the blocks could not be loaded, which is why it cannot save', async () => {
+    server.use(http.get('/api/v1/blocks', () => problem(500, 'internal')));
+    renderApp(PAGE);
+
+    expect(
+      await screen.findByText(/The blocks formulas are made of could not be loaded/),
+    ).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
+  });
 });

@@ -290,7 +290,10 @@ picture added or removed is marked New or To be removed, with Undo, and the
 preview draws an added one from its own bytes. The statement's Save writes
 `statement.md` and every picture with it in one save of the task
 (`POST <task>/save`), answered as any other (`forms/StatementEditor.tsx`,
-`forms/statement-pictures.ts`), so a picture never publishes on its own. A
+`forms/statement-pictures.ts`), so a picture never publishes on its own. As
+the forge serves a file only while the task's `show` lists it, a new picture
+`scoring.show.now` does not cover adds `public/` there in the same save, or
+the picture alone when a file under `public/` is shown only later. A
 setting that is a file or a folder, such as a checker, has
 its own box on the Inputs card (`task/FileSetting.tsx`): what it names, with
 View, Replace and, for an optional one, Use none; a file chosen is marked New

@@ -1,4 +1,7 @@
 import { expect, test, type Page, type Route } from '@playwright/test';
+import type { components } from '../src/api/schema';
+
+type Schemas = components['schemas'];
 
 /**
  * The contestant path against the dev server with the API stubbed, so it
@@ -21,7 +24,7 @@ const OPEN = { released: true, visible: true, open: true, closed: null };
 const ENTRANT = '0e000000-0000-4000-8000-000000000007';
 
 /** The caller's own row, which the home and the leaderboards show and the task list's points follow. */
-function homeStanding() {
+function homeStanding(): Schemas['Leaderboard'] {
   return {
     key: 'gradebook',
     title: 'Gradebook',
@@ -69,13 +72,13 @@ async function stubContestantApi(page: Page, signedIn: boolean) {
     });
 
   await page.route('**/api/v1/time', (route) =>
-    json(route, { now: '2026-09-29T10:00:00Z' }),
+    json(route, { now: '2026-09-29T10:00:00Z' } satisfies Schemas['ServerTime']),
   );
   await page.route('**/api/v1/auth/register-url', (route) =>
-    json(route, { url: null }),
+    json(route, { url: null } satisfies Schemas['RegisterUrl']),
   );
   await page.route('**/api/v1/auth/forge-url', (route) =>
-    json(route, { url: 'http://forge.localhost:8080' }),
+    json(route, { url: 'http://forge.localhost:8080' } satisfies Schemas['ForgeUrl']),
   );
   await page.route('**/api/v1/me', (route) =>
     signedIn
@@ -89,7 +92,7 @@ async function stubContestantApi(page: Page, signedIn: boolean) {
           },
           roles: [],
           degraded: false,
-        })
+        } satisfies Schemas['Me'])
       : json(
           route,
           { code: 'unauthenticated', status: 401, title: 'x', detail: 'x' },
@@ -97,19 +100,19 @@ async function stubContestantApi(page: Page, signedIn: boolean) {
         ),
   );
   await page.route('**/api/v1/public/contests', (route) =>
-    json(route, [{ ...CONTEST, tasks: [] }]),
+    json(route, [{ ...CONTEST, tasks: [] }] satisfies Schemas['PublicContest'][]),
   );
   await page.route('**/api/v1/public/contests/acme/spring', (route) =>
     json(route, {
       ...CONTEST,
       tasks: [{ name: 'sum', label: 'A', title: 'Sum of Two' }],
-    }),
+    } satisfies Schemas['PublicContest']),
   );
   await page.route('**/api/v1/public/contests/acme/spring/tasks/sum', (route) =>
     json(route, {
       task: { name: 'sum', label: 'A', title: 'Sum of Two' },
       statement: '# Sum\n\nPrint the sum of two numbers.\n',
-    }),
+    } satisfies Schemas['PublicStatement']),
   );
   await page.route('**/api/v1/contests', (route) =>
     json(route, [
@@ -118,11 +121,11 @@ async function stubContestantApi(page: Page, signedIn: boolean) {
         visibility: 'everyone',
         status: state.registered ? 'pending' : null,
       },
-    ]),
+    ] satisfies Schemas['ContestSummary'][]),
   );
 
   /** The caller's entrant, carol alone, as the backend answers it. */
-  const entrantOf = (status: 'pending' | 'approved') => ({
+  const entrantOf = (status: 'pending' | 'approved'): Schemas['Entrant'] => ({
     id: ENTRANT,
     name: null,
     display_name: 'carol',
@@ -149,8 +152,8 @@ async function stubContestantApi(page: Page, signedIn: boolean) {
 
   /** The caller's entry: free to register, then registered alone, pending, then approved. */
   const registration = () => {
-    const entry = {
-      entrant: null as unknown,
+    const entry: Schemas['MyEntry'] = {
+      entrant: null,
       invitations: [],
       registration_open: true,
       can_register: true,
@@ -175,8 +178,7 @@ async function stubContestantApi(page: Page, signedIn: boolean) {
     }
     if (path.endsWith('/home')) {
       const entry = registration();
-      const approved =
-        (entry.entrant as { status?: string } | null)?.status === 'approved';
+      const approved = entry.entrant?.status === 'approved';
       return json(route, {
         ...CONTEST,
         state: 'published',
@@ -194,7 +196,7 @@ async function stubContestantApi(page: Page, signedIn: boolean) {
             closes: CONTEST.end,
           },
         ],
-      });
+      } satisfies Schemas['ContestHome']);
     }
     if (path.endsWith('/tasks/sum/page')) {
       return json(route, {
@@ -213,6 +215,7 @@ async function stubContestantApi(page: Page, signedIn: boolean) {
             min: null,
             max: null,
             max_size: 10485760,
+            parts: null,
           },
           {
             id: 'language',
@@ -223,12 +226,14 @@ async function stubContestantApi(page: Page, signedIn: boolean) {
             min: null,
             max: null,
             max_size: 10485760,
+            parts: null,
           },
         ],
         release: OPEN,
         due: null,
         closes: CONTEST.end,
-      });
+        marks: null,
+      } satisfies Schemas['TaskPage']);
     }
     if (path.endsWith('/tasks/sum/submissions')) return json(route, []);
     if (path.endsWith('/leaderboards')) return json(route, [homeStanding()]);

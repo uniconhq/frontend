@@ -12,7 +12,7 @@ import { TextInput } from '@/ui/TextInput';
 import { Checkbox } from '@/ui/Checkbox';
 import { useMe } from '@/session';
 import { FormulaLine, FormulaTiles, type FormulaMark } from '../formula/Editor';
-import type { Catalogue } from '../formula/catalogue';
+import { BLOCKS_UNLOADED, type Catalogue } from '../formula/catalogue';
 import { useFormulaTarget } from '../formula/target';
 import { FieldBox } from '../contest/ContestFile';
 import { useOpenedField } from '../contest/opened';
@@ -274,6 +274,7 @@ export function LeaderboardsForm({
           Only a manager of the contest can change these.
         </BodyText>
       )}
+      {blocks.isError && <BodyText>{BLOCKS_UNLOADED}</BodyText>}
       {draft.boards.map((board) => (
         <BoardCard
           key={board.id}

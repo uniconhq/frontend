@@ -50,7 +50,7 @@ import { taskPlace, taskPlaceOf } from './places';
 import { SaveBar } from './SaveBar';
 import { RunsCard } from './RunsCard';
 import { ChecksCard } from './ChecksCard';
-import { ScoringCard } from './ScoringCard';
+import { ScoringCard, type WorkflowRead } from './ScoringCard';
 import { SubmissionsCard } from './SubmissionsCard';
 import { WorkflowCard } from './WorkflowCard';
 import { BodyText } from '@/ui/BodyText';
@@ -314,6 +314,14 @@ function BuildForm({
     const parsed = parseYaml(text);
     return 'error' in parsed ? null : exactJS(parsed.doc);
   }, [text]);
+  const workflowRead: WorkflowRead =
+    refParts(picked) === null ||
+    version.state === 'error' ||
+    (text !== null && workflowRaw === null)
+      ? 'failed'
+      : workflowRaw === null
+        ? 'loading'
+        : 'ready';
   const draftErrors =
     saving.outcome?.kind === 'saved' && 'errors' in saving.outcome.result
       ? saving.outcome.result.errors
@@ -434,6 +442,7 @@ function BuildForm({
             place={place}
             values={values}
             workflowText={workflowRaw}
+            workflowRead={workflowRead}
             graded={form?.graded === true}
             disabled={disabled}
             errors={draftErrors}
