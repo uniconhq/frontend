@@ -3,6 +3,7 @@ import type {
   Grading,
   GradingStatus,
   RegradeChangeKind,
+  RunsResult,
   Submitter,
 } from '@/api/types';
 
@@ -42,10 +43,7 @@ function isStatus(value: string): value is GradingStatus {
 
 /** Each kind of change a regrade made, as the feed reads it by regrade. */
 const CHANGES: readonly RegradeChangeKind[] = [
-  'up',
-  'down',
-  'stopped',
-  'unchanged',
+  'regraded',
   'new',
   'running',
   'failed',
@@ -182,26 +180,32 @@ export function bySubmission(
 }
 
 /**
- * What a finished grading's result comes to: what stopped the run, or the
- * first test that did not pass, or accepted when every one did.
+ * A submission's attempts by pipeline, the early ones first, each line's
+ * highest attempt first. A submission whose runs are not all shown during
+ * the contest is graded twice, early and late, each pipeline with attempts
+ * of its own, so neither replaces the other.
  */
-export function resultOf(result: NonNullable<Grading['result']>): string {
-  return (
-    result.stopped ??
-    result.tests.find((test) => test.outcome !== 'accepted')?.outcome ??
-    'accepted'
-  );
+export function byPipeline(
+  attempts: FeedEntry[],
+): { pipeline: Grading['pipeline']; attempts: FeedEntry[] }[] {
+  return (['early', 'late'] as const)
+    .map((pipeline) => ({
+      pipeline,
+      attempts: attempts.filter((entry) => entry.grading.pipeline === pipeline),
+    }))
+    .filter((line) => line.attempts.length > 0);
 }
 
 /**
- * Where a grading's run log is read: the API route itself, on this origin,
- * which answers plain text the browser shows as it is and runs nothing in.
+ * What a finished grading's result comes to: the first step done once that
+ * did not pass, such as a compile, or the first run that did not, or
+ * accepted when every one did.
  */
-export function logHref(
-  path: { org: string; contest: string; task: string },
-  grading: string,
-): string {
-  const part = encodeURIComponent;
-  const task = `/api/v1/orgs/${part(path.org)}/contests/${part(path.contest)}/tasks/${part(path.task)}`;
-  return `${task}/gradings/${part(grading)}/log`;
+export function resultOf(result: RunsResult): string {
+  const stopped = Object.values(result.once.outcomes).find(
+    (outcome) => outcome !== 'accepted',
+  );
+  if (stopped !== undefined) return stopped;
+  const failed = result.runs.find((run) => run.verdict !== 'accepted');
+  return failed === undefined ? 'accepted' : failed.verdict;
 }

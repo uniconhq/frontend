@@ -1,15 +1,12 @@
 import { queryView } from '@/api/query';
-import { RadioGroup } from '@/ui/RadioGroup';
 import { Loaded } from '@/ui/feedback/Loaded';
 import { useWorkflowList } from './build-data';
-import { KINDS, readable, type Kind } from './new-task';
+import type { Kind } from './new-task';
 import { WorkflowPicker } from './WorkflowPicker';
 
 /**
- * What kind of task to make, so a first task never starts from a blank
- * page: comparing output with an answer, a program of several files, or
- * another workflow chosen from those the organiser may read. A kind whose
- * workflow they may not read is greyed out, saying so.
+ * The workflow a new task starts on. The task is created on the platform's
+ * starter, then its first save moves it onto the workflow chosen here.
  */
 export function TaskKind({
   value,
@@ -21,42 +18,13 @@ export function TaskKind({
   const list = queryView(useWorkflowList());
   return (
     <Loaded view={list} rows={3}>
-      {(items) => {
-        const missing = KINDS.filter(
-          (kind) => kind.workflow !== null && !readable(items, kind.workflow),
-        );
-        return (
-          <>
-            <RadioGroup
-              label="What kind of task"
-              value={value.kind}
-              options={KINDS.map((kind) => ({
-                value: kind.value,
-                label: kind.label,
-                description: kind.line,
-                disabled: missing.some((each) => each.value === kind.value),
-                reason: 'Its workflow is not available here.',
-              }))}
-              onChange={(chosen) => {
-                const kind = KINDS.find((each) => each.value === chosen);
-                if (kind === undefined) return;
-                onChange({
-                  kind: kind.value,
-                  workflow:
-                    kind.workflow ?? (value.kind === 'other' ? value.workflow : ''),
-                });
-              }}
-            />
-            {value.kind === 'other' && (
-              <WorkflowPicker
-                value={value.workflow}
-                items={items}
-                onChange={(workflow) => onChange({ kind: 'other', workflow })}
-              />
-            )}
-          </>
-        );
-      }}
+      {(items) => (
+        <WorkflowPicker
+          value={value.workflow}
+          items={items}
+          onChange={(workflow) => onChange({ workflow })}
+        />
+      )}
     </Loaded>
   );
 }

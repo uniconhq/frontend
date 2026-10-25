@@ -27,7 +27,7 @@
 }
 
 /*
- * A task's worth and timeline in its contest, as one line that opens the
+ * A task's timeline in its contest, as one line that opens the
  * dialog they are changed in, ending in "Change" in a link's look.
  */
 .entryLine {
@@ -157,16 +157,4 @@
   width: 1.2em;
   text-align: center;
   color: var(--unicon-text-secondary);
-}
-
-/* How the contest is scored, a task to a column where there is room. */
-.scoring {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(360px, 100%), 1fr));
-  gap: 16px 24px;
-}
-
-/* What a task's heading says after its name: its worth and when it is open. */
-.titleRest {
-  font-weight: 400;
 }

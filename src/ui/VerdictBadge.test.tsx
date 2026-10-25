@@ -12,7 +12,7 @@ const EVERY: [Verdict, string][] = [
   ['output_limit', 'OUTPUT LIMIT'],
   ['runtime_error', 'RUNTIME ERROR'],
   ['compile_error', 'COMPILE ERROR'],
-  ['skipped', 'SKIPPED'],
+  ['skipped', 'NOT GIVEN'],
   ['system_error', 'SYSTEM ERROR'],
   ['queued', 'QUEUED'],
   ['dispatched', 'STARTING'],

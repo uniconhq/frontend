@@ -8,7 +8,7 @@ import { OutLink } from '@/ui/OutLink';
 import { Loaded } from '@/ui/feedback/Loaded';
 import { formatSize } from '@/lib/size';
 import { saveFile } from '@/lib/save-file';
-import { fileQuery, taskDownloadHref, treeQuery, type Place } from './place';
+import { fileQuery, taskDownloadHref, treeQuery, type FilePlace } from './place';
 import classes from './FilePreview.module.css';
 
 /**
@@ -117,7 +117,7 @@ function DownloadLink({
   path,
   version,
 }: {
-  place: Place;
+  place: FilePlace;
   path: string;
   version: string | null;
 }) {
@@ -150,7 +150,7 @@ export function SavedFile({
   upload,
   listedAt,
 }: {
-  place: Place;
+  place: FilePlace;
   path: string;
   /** What the file is called here, such as the part of a test it is. */
   title?: string;
@@ -198,74 +198,6 @@ export function SavedFile({
   );
 }
 
-/** Bytes as text when they are text, or null. */
-async function textOf(blob: Blob): Promise<string | null> {
-  try {
-    const text = new TextDecoder('utf-8', { fatal: true }).decode(
-      await blob.arrayBuffer(),
-    );
-    return text.includes('\u0000') ? null : text;
-  } catch {
-    return null;
-  }
-}
-
-/** A number for each chosen file's reader, so two alike in name and size are kept apart. */
-const readers = new WeakMap<() => Promise<Blob>, number>();
-let nextReader = 0;
-
-function readerId(read: () => Promise<Blob>): number {
-  let id = readers.get(read);
-  if (id === undefined) {
-    nextReader += 1;
-    id = nextReader;
-    readers.set(read, id);
-  }
-  return id;
-}
-
-/**
- * A file chosen on this computer and not saved yet, shown as a saved one is,
- * from its own bytes.
- */
-export function ChosenFile({
-  title,
-  name,
-  size,
-  read,
-}: {
-  title: string;
-  name: string;
-  size: number;
-  read: () => Promise<Blob>;
-}) {
-  const view = queryView(
-    useQuery({
-      queryKey: ['chosen-file', readerId(read)],
-      queryFn: async () => ({ text: await textOf(await read()) }),
-      enabled: size <= READ_AT_MOST,
-      staleTime: Infinity,
-      gcTime: 0,
-      retry: false,
-    }),
-  );
-  const download = async () => saveFile(name, await read());
-  return (
-    <section className={classes.part} aria-label={title}>
-      <Head name={title} size={size} />
-      {size > READ_AT_MOST ? (
-        <BodyText tone="secondary">It is too big to show here.</BodyText>
-      ) : (
-        <Loaded view={view} compact>
-          {({ text }) => (
-            <Shown name={title} text={text} onDownload={() => void download()} />
-          )}
-        </Loaded>
-      )}
-    </section>
-  );
-}
-
 /** One folder's entries, folders first, a folder opening below itself. */
 function FolderLevel({
   place,
@@ -273,7 +205,7 @@ function FolderLevel({
   chosen,
   onChoose,
 }: {
-  place: Place;
+  place: FilePlace;
   path: string;
   chosen: TreeEntry | null;
   onChoose: (entry: TreeEntry) => void;
@@ -361,17 +293,27 @@ export function SavedFolder({
   path,
   title = nameOf(path),
   heading = `${title}, a folder`,
+  onChoose,
 }: {
-  place: Place;
+  place: FilePlace;
   path: string;
   title?: string;
   heading?: string;
+  onChoose?: (entry: TreeEntry) => void;
 }) {
   const [chosen, setChosen] = useState<TreeEntry | null>(null);
   return (
     <section className={classes.part} aria-label={title}>
       <Head name={heading} size={null} />
-      <FolderLevel place={place} path={path} chosen={chosen} onChoose={setChosen} />
+      <FolderLevel
+        place={place}
+        path={path}
+        chosen={chosen}
+        onChoose={(entry) => {
+          setChosen(entry);
+          onChoose?.(entry);
+        }}
+      />
       {chosen !== null && (
         <SavedFile
           key={chosen.path}

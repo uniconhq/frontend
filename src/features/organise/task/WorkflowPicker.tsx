@@ -50,7 +50,7 @@ export function WorkflowPicker({
           const version = found === undefined ? null : newestOf(found.versions);
           if (version !== null) onChange(`${next}@${version}`);
         }}
-        info="The workflow grades every submission: it says what entrants submit, what the task sets and what each test holds. The task keeps the version chosen here until another is chosen and saved."
+        info="The workflow grades every submission: it says what entrants submit, what the task sets and what each run is given. The task keeps the version chosen here until another is chosen and saved."
         disabled={disabled}
       />
       <Select

@@ -14,12 +14,14 @@ const REOPEN_MS = [5_000, 10_000, 20_000, 40_000, 60_000];
 /**
  * Which reads each kind of nudge makes stale, by the route the read was
  * made at: a grading moves a contestant's submissions, an organiser's
- * gradings, a contest's queue and the contest home, whose tasks carry the
- * entrant's points, and the summaries of regrades under way, but not a
- * submission's files, which a
- * grading never changes, nor a grading's log, kept once it is written
- * (`.../gradings/{grading}/log`); an announcement the announcement lists; and a
- * clarification the asker's questions and the organisers' inbox.
+ * gradings, a contest's queue, the contest home and the leaderboards, whose
+ * rows it moves, and the summaries of regrades under way, but not a
+ * submission's files, which a grading never changes; an announcement the
+ * announcement lists; and a
+ * clarification the asker's questions and the organisers' inbox; a save's
+ * checks the task and its publications; a release or a take-back the
+ * submissions and the leaderboards, whose shown values change with no
+ * grading moving.
  */
 const STALE: Record<string, (path: string) => boolean> = {
   grading: (path) =>
@@ -27,10 +29,20 @@ const STALE: Record<string, (path: string) => boolean> = {
     path.endsWith('/gradings') ||
     path.endsWith('/gradings/queue') ||
     path.endsWith('/gradings/regrades') ||
-    path.endsWith('/home'),
+    path.endsWith('/home') ||
+    path.endsWith('/leaderboards'),
   announcement: (path) => path.includes('/announcements'),
   clarification: (path) =>
     path.endsWith('/questions') || path.includes('/clarifications'),
+  // A save's checks ended. The id on the event is the publication; the page
+  // reads the task again, which carries the publication and its checks.
+  checks: (path) => /\/tasks\/\{task\}$/.test(path) || path.endsWith('/publications'),
+  // A release or a take-back. What a submission shows changes with no
+  // grading moving, so the open result is read again.
+  results: (path) =>
+    (path.includes('/submissions') && !path.endsWith('/files')) ||
+    path.endsWith('/home') ||
+    path.endsWith('/leaderboards'),
 };
 
 function readAt(query: Query): string | null {

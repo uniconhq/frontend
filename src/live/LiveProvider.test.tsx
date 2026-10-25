@@ -189,6 +189,7 @@ describe('where the live stream stands', () => {
         `${contest}/gradings/queue`,
         `${contest}/gradings/regrades`,
         `${contest}/home`,
+        `${contest}/leaderboards`,
       ];
       const announced = [
         `${contest}/announcements`,
@@ -201,13 +202,13 @@ describe('where the live stream stands', () => {
         `${contest}/clarifications`,
         `${org}/clarifications`,
       ];
+      const checked = [`${task}`, `${task}/publications`];
       const untouched = [
         `${task}/submissions/{number}/files`,
-        `${task}/gradings/{grading}/log`,
         `${task}/page`,
         '/api/v1/me',
       ];
-      const reads = [...graded, ...announced, ...asked, ...untouched];
+      const reads = [...graded, ...announced, ...asked, ...checked, ...untouched];
       for (const path of reads) client.setQueryData(['get', path], {});
       const stale = () =>
         reads.filter((path) => client.getQueryState(['get', path])?.isInvalidated);
@@ -234,8 +235,51 @@ describe('where the live stream stands', () => {
       });
       expect(stale()).toEqual([...graded, ...announced, ...asked]);
 
+      act(() => {
+        source?.listeners.get('checks')?.();
+        vi.advanceTimersByTime(300);
+      });
+      expect(stale()).toEqual([...graded, ...announced, ...asked, ...checked]);
+
       act(() => source?.listeners.get('resync')?.());
       expect(stale()).toEqual(reads);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('reads a submission again when results are released or taken back', () => {
+    vi.useFakeTimers();
+    try {
+      const client = new QueryClient();
+      const contest = '/api/v1/orgs/{org}/contests/{contest}';
+      const task = `${contest}/tasks/{task}`;
+      const released = [
+        `${task}/submissions`,
+        `${task}/submissions/{number}`,
+        `${task}/organise/submissions/{number}`,
+        `${contest}/home`,
+        `${contest}/leaderboards`,
+      ];
+      const left = [
+        `${task}/submissions/{number}/files`,
+        `${task}/gradings`,
+        `${contest}/gradings/queue`,
+      ];
+      for (const path of [...released, ...left]) {
+        client.setQueryData(['get', path], {});
+      }
+      renderProvider(client);
+      const source = FakeSource.last;
+      act(() => source?.onopen?.());
+      act(() => {
+        source?.listeners.get('results')?.();
+        vi.advanceTimersByTime(300);
+      });
+      const stale = (paths: string[]) =>
+        paths.filter((path) => client.getQueryState(['get', path])?.isInvalidated);
+      expect(stale(released)).toEqual(released);
+      expect(stale(left)).toEqual([]);
     } finally {
       vi.useRealTimers();
     }
@@ -265,7 +309,13 @@ describe('where the live stream stands', () => {
       act(() => source?.onopen?.());
 
       act(() => {
-        for (const kind of ['grading', 'announcement', 'clarification']) {
+        for (const kind of [
+          'grading',
+          'announcement',
+          'clarification',
+          'checks',
+          'results',
+        ]) {
           source?.listeners.get(kind)?.();
         }
         vi.advanceTimersByTime(300);

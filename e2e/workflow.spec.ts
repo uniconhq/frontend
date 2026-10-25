@@ -1,4 +1,7 @@
 import { expect, test, type Locator, type Page, type Route } from '@playwright/test';
+import type { components } from '../src/api/schema';
+
+type Schemas = components['schemas'];
 
 /**
  * The workflow editor in a real browser against the dev server with the API
@@ -12,44 +15,51 @@ import { expect, test, type Locator, type Page, type Route } from '@playwright/t
 
 const CLASSIC = `# kenny/tuned, a workflow.
 inputs:
-  submission: {type: file, contestant: true}
-  language: {type: enum, options: [c, cpp, java, python], contestant: true}
-  time_limit: number
-  memory_limit: number
-test:
-  input: file
-  answer: file
+  submission: {type: file, title: Solution}
+  language: {type: enum, options: [c, cpp, java, python], title: Language}
+  time_limit: {type: number, title: Time limit}
+  memory_limit: {type: number, title: Memory limit}
+  input: {type: file, title: Input}
+  answer: {type: file, title: Answer}
 steps:
   - id: compile
-    use: unicon/compile@v2
+    use: unicon/compile@v3
     with:
       source: \${{ inputs.submission }}
       language: \${{ inputs.language }}
   - id: run
-    use: unicon/sandbox-run@v2
-    per_test: true
+    use: unicon/exec@v1
     with:
-      binary: \${{ steps.compile.binary }}
-      input: \${{ test.input }}
+      program: \${{ steps.compile.program }}
+      stdin: \${{ inputs.input }}
       time_limit: \${{ inputs.time_limit }}
       memory_limit: \${{ inputs.memory_limit }}
   - id: check
     use: unicon/diff-check@v2
-    per_test: true
     with:
       actual: \${{ steps.run.output }}
-      expected: \${{ test.answer }}
-report:
-  log: \${{ steps.compile.compile_log }}
+      expected: \${{ inputs.answer }}
+outputs:
+  log: \${{ steps.compile.log }}
 `;
 
-const port = (type: string, more: Record<string, unknown> = {}) => ({
+const port = (
+  type: Schemas['PrimitivePort']['type'],
+  more: Partial<Schemas['PrimitivePort']> = {},
+): Schemas['PrimitivePort'] => ({
   type,
   options: null,
   optional: false,
   runs: null,
   secret: false,
   description: null,
+  at_least: null,
+  at_most: null,
+  better: null,
+  inputs: null,
+  names: null,
+  outcomes: null,
+  outputs: null,
   ...more,
 });
 
@@ -64,23 +74,24 @@ const LIMITS = {
 
 const PRIMITIVES = [
   {
-    ref: 'unicon/compile@v2',
+    ref: 'unicon/compile@v3',
     name: 'compile',
     title: 'Compile',
-    description: "Compiles the contestant's source files into one program.",
-    version: 'v2',
+    description: 'Compiles source files into one program.',
+    version: 'v3',
     batch: false,
     network: false,
     limits: LIMITS,
     limits_from: {},
+    forms: {},
     inputs: {
       source: port('folder', { runs: true }),
       language: port('enum', { options: ['c', 'cpp', 'java', 'python'] }),
       entry: port('text', { optional: true }),
     },
     outputs: {
-      binary: port('file'),
-      compile_log: port('text'),
+      program: port('file'),
+      log: port('text'),
       outcome: port('outcome'),
     },
     problem: null,
@@ -96,6 +107,7 @@ const PRIMITIVES = [
     network: false,
     limits: LIMITS,
     limits_from: {},
+    forms: {},
     inputs: {
       actual: port('file', { runs: false }),
       expected: port('file', { runs: false }),
@@ -104,22 +116,35 @@ const PRIMITIVES = [
     problem: null,
   },
   {
-    ref: 'unicon/sandbox-run@v2',
-    name: 'sandbox-run',
+    ref: 'unicon/exec@v1',
+    name: 'exec',
     title: 'Run program',
     description:
-      "Runs a program on each test's input and records its output, time and memory.",
-    version: 'v2',
+      'Runs a program once under limits and records its output, time and memory.',
+    version: 'v1',
     batch: true,
     network: false,
     limits: LIMITS,
     limits_from: {
-      time_ms: { input: 'time_limit', scale: '2000', add: '3000' },
-      memory_mb: { input: 'memory_limit', scale: '1', add: '256' },
+      time_ms: {
+        input: 'time_limit',
+        scale: '2000',
+        add: '3000',
+        max: null,
+        sum: null,
+      },
+      memory_mb: {
+        input: 'memory_limit',
+        scale: '1',
+        add: '256',
+        max: null,
+        sum: null,
+      },
     },
+    forms: {},
     inputs: {
-      binary: port('file', { runs: true }),
-      input: port('file', { runs: false }),
+      program: port('file', { runs: true }),
+      stdin: port('file', { runs: false }),
       args: port('text', { optional: true }),
       time_limit: port('number'),
       memory_limit: port('number'),
@@ -132,7 +157,7 @@ const PRIMITIVES = [
     },
     problem: null,
   },
-];
+] satisfies Schemas['Primitive'][];
 
 async function stubWorkflowApi(page: Page) {
   const json = (route: Route, body: unknown, status = 200) =>
@@ -142,16 +167,17 @@ async function stubWorkflowApi(page: Page) {
       body: JSON.stringify(body),
     });
   await page.route('**/api/v1/time', (route) =>
-    json(route, { now: '2026-10-09T10:00:00Z' }),
+    json(route, { now: '2026-10-09T10:00:00Z' } satisfies Schemas['ServerTime']),
   );
   await page.route('**/api/v1/me', (route) =>
     json(route, {
       user: { id: 7, username: 'kenny', name: null, avatar_url: null, email: null },
       roles: [],
       degraded: false,
-    }),
+    } satisfies Schemas['Me']),
   );
   await page.route('**/api/v1/primitives', (route) => json(route, PRIMITIVES));
+  await page.route(/\/api\/v1\/workflows$/, (route) => json(route, []));
   await page.route('**/api/v1/workflows/check', (route) =>
     json(route, { problems: [] }),
   );
@@ -229,7 +255,7 @@ test('a wire dragged onto a port edits the file, and a refused one says why', as
   );
   await drag(page, submission, handle(page, 'step:1', 'in:memory_limit'));
   const refused = page.getByRole('alert').filter({
-    hasText: 'This value raises a limit, so the task must give it, not the entrant.',
+    hasText: 'This takes a number, not a file.',
   });
   await expect(refused).toBeVisible();
   expect(await file(page)).toContain('memory_limit: ${{ inputs.memory_limit }}');
@@ -248,7 +274,7 @@ test('a refused wire’s message covers no port, and goes on a click, on Escape 
   );
   const target = handle(page, 'step:1', 'in:memory_limit');
   const refused = page.getByRole('alert').filter({
-    hasText: 'This value raises a limit, so the task must give it, not the entrant.',
+    hasText: 'This takes a number, not a file.',
   });
 
   await drag(page, submission, target);
@@ -307,7 +333,6 @@ test('a step added from the toolbar opens in the drawer clear of its box, and is
   const added = page.getByRole('group', { name: 'Step diff-check' });
   await expect(added).toBeVisible();
   const opened = page.getByRole('complementary', { name: 'Step diff-check' });
-  await expect(opened.getByRole('radio', { name: 'Once for each test' })).toBeChecked();
   // The box stands clear of the drawer over the right of the window.
   const box = await added.boundingBox();
   const over = await opened.boundingBox();
@@ -331,7 +356,7 @@ test('a step added below the window is scrolled into it', async ({ page }) => {
 
   await page.getByRole('button', { name: 'Add step' }).click();
   await page.getByRole('menuitem', { name: /^Run program/ }).click();
-  const added = page.getByRole('group', { name: 'Step sandbox-run' });
+  const added = page.getByRole('group', { name: 'Step exec' });
   await expect(added).toBeVisible();
   // Up or down the page as well as sideways in the frame, the whole box in the window.
   await expect
@@ -374,8 +399,8 @@ test('every port of a step opens its menu with the mouse', async ({ page }) => {
   for (const [step, port] of [
     ['compile', 'source'],
     ['compile', 'language'],
-    ['run', 'binary'],
-    ['run', 'input'],
+    ['run', 'program'],
+    ['run', 'stdin'],
     ['check', 'actual'],
   ] as const) {
     await page.getByRole('button', { name: `The port ${port} of ${step}` }).click();
@@ -385,5 +410,122 @@ test('every port of a step opens its menu with the mouse', async ({ page }) => {
     await page.keyboard.press('Escape');
   }
   await page.getByRole('button', { name: 'The output time_ms of run' }).click();
-  await expect(page.getByRole('menuitem', { name: 'Report it' })).toBeVisible();
+  await expect(
+    page.getByRole('menuitem', { name: 'Name it as an output' }),
+  ).toBeVisible();
+});
+
+test('a box opens two levels in, and a problem opens the step inside', async ({
+  page,
+}) => {
+  const json = (route: Route, body: unknown) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(body),
+    });
+  const draft = 'steps:\n  - {id: build, use: kenny/inner@v1}\n';
+  const inner = 'steps:\n  - {id: compile, use: kenny/deep@v1}\n';
+  const deep = 'steps:\n  - {id: link, use: unicon/compile@v3}\n';
+  const box = {
+    inputs: [
+      {
+        name: 'source',
+        type: 'folder',
+        optional: false,
+        options: null,
+        title: null,
+        unit: null,
+      },
+    ],
+    outputs: [
+      {
+        name: 'program',
+        type: 'file',
+        title: null,
+        unit: null,
+        at_least: null,
+        at_most: null,
+        better: null,
+      },
+    ],
+    newer_version: null,
+    run: true,
+  };
+  await page.route('**/api/v1/time', (route) =>
+    json(route, { now: '2026-10-09T10:00:00Z' } satisfies Schemas['ServerTime']),
+  );
+  await page.route('**/api/v1/me', (route) =>
+    json(route, {
+      user: { id: 7, username: 'kenny', name: null, avatar_url: null, email: null },
+      roles: [],
+      degraded: false,
+    } satisfies Schemas['Me']),
+  );
+  await page.route('**/api/v1/primitives', (route) => json(route, PRIMITIVES));
+  await page.route(/\/api\/v1\/workflows$/, (route) =>
+    json(route, [
+      {
+        owner: 'kenny',
+        name: 'inner',
+        visibility: 'private',
+        versions: ['v1'],
+        editable: true,
+      },
+      {
+        owner: 'kenny',
+        name: 'deep',
+        visibility: 'private',
+        versions: ['v1'],
+        editable: true,
+      },
+    ]),
+  );
+  await page.route('**/api/v1/workflows/check', (route) =>
+    json(route, {
+      problems: [
+        { path: 'steps[0]', message: 'The link failed.', step: 'build/compile/link' },
+      ],
+    }),
+  );
+  await page.route('**/api/v1/workflows/kenny/tuned', (route) =>
+    json(route, {
+      owner: 'kenny',
+      name: 'tuned',
+      visibility: 'private',
+      versions: [],
+      editable: true,
+      draft: { content: draft, token: 'token-1' },
+      readers: [],
+    }),
+  );
+  await page.route(/\/versions\/[^/]+\/box$/, (route) => {
+    const newer = route.request().url().includes('/inner/') ? 'v2' : null;
+    return json(route, { ...box, newer_version: newer });
+  });
+  await page.route(/\/versions\/v1$/, (route) =>
+    json(route, {
+      content: route.request().url().includes('/inner/') ? inner : deep,
+    }),
+  );
+
+  await page.setViewportSize({ width: 1600, height: 1000 });
+  await page.goto('/workflows/kenny/tuned');
+  await expect(page.getByRole('group', { name: 'Step build' })).toBeVisible();
+  await expect(page.getByText('A newer version is v2')).toBeVisible();
+  await page
+    .getByRole('region', { name: 'Problems' })
+    .getByRole('button', { name: 'Step build' })
+    .click();
+  await expect(page.getByRole('group', { name: 'Step link' })).toBeVisible();
+  const crumbs = page.getByRole('navigation', { name: 'Where this box sits' });
+  await expect(crumbs.getByRole('button', { name: 'compile' })).toBeVisible();
+  await crumbs.getByRole('button', { name: 'tuned' }).click();
+  await expect(page.getByRole('group', { name: 'Step build' })).toBeVisible();
+  await page.getByRole('button', { name: 'Open build' }).click();
+  await expect(page.getByRole('group', { name: 'Step compile' })).toBeVisible();
+  await page.getByRole('button', { name: 'Open compile' }).click();
+  await expect(page.getByRole('group', { name: 'Step link' })).toBeVisible();
+  await crumbs.getByRole('button', { name: 'build' }).click();
+  await expect(page.getByRole('group', { name: 'Step compile' })).toBeVisible();
 });

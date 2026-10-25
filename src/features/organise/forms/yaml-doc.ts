@@ -313,7 +313,8 @@ export function isRecord(value: unknown): value is Record<string, unknown> {
     value !== null &&
     !Array.isArray(value) &&
     !(value instanceof NumberText) &&
-    !(value instanceof Time)
+    !(value instanceof Time) &&
+    !(value instanceof Map)
   );
 }
 
@@ -398,12 +399,61 @@ export function writeAt(
   const flat = (item: unknown) =>
     !isRecord(item) &&
     (!Array.isArray(item) || item.every((inner) => !isRecord(inner)));
+  // A `Map`, whose keys keep their types, is written whole on one line, and
+  // a collection the file wrote on one line stays on one.
+  const wasFlow =
+    (isMap(old) || isSeq(old)) && old.flow === true && old.items.length > 0;
   const flow = Array.isArray(value)
-    ? value.every(flat)
-    : isRecord(value) && Object.values(value).every(flat);
+    ? wasFlow || value.every(flat)
+    : value instanceof Map ||
+      wasFlow ||
+      (isRecord(value) && Object.values(value).every(flat));
   const node = nodeFor(doc, value, { flow });
   keepComments(old, node);
   doc.setIn(path, node);
+}
+
+/**
+ * Rename keys of the mapping at `path` in place, all at once, so a chain
+ * (a to b, b to c) or a swap (a to b, b to a) lands as asked: each entry
+ * keeps its place, its value and its comments. A key `renames` names that
+ * the mapping does not have is nothing to rename. A target held by an entry
+ * that is neither renamed away nor among `dropped`, the keys the write
+ * takes out, is refused with an error rather than left as it was.
+ */
+export function renameKeys(
+  doc: Doc,
+  path: Path,
+  renames: ReadonlyMap<string, string>,
+  dropped: ReadonlySet<string> = new Set(),
+): void {
+  const moves = new Map([...renames].filter(([from, to]) => from !== to));
+  if (moves.size === 0) return;
+  const map: unknown = path.length === 0 ? doc.contents : doc.getIn(path, true);
+  if (!isMap(map)) return;
+  const keyOf = (pair: (typeof map.items)[number]) =>
+    isScalar(pair.key) ? String(pair.key.value) : null;
+  const present = new Set(map.items.map(keyOf));
+  const targets = [...moves].filter(([from]) => present.has(from)).map(([, to]) => to);
+  const where = path.join('.');
+  if (new Set(targets).size !== targets.length)
+    throw new Error(`Two entries of ${where} cannot both be renamed to one name.`);
+  for (const target of targets) {
+    if (present.has(target) && !moves.has(target) && !dropped.has(target))
+      throw new Error(
+        `${where} already has ${target}, so nothing can be renamed to it.`,
+      );
+  }
+  // The entry a renamed one replaces is one the write takes out anyway.
+  map.items = map.items.filter((pair) => {
+    const key = keyOf(pair);
+    return key === null || moves.has(key) || !targets.includes(key);
+  });
+  for (const pair of map.items) {
+    const key = keyOf(pair);
+    const to = key === null ? undefined : moves.get(key);
+    if (to !== undefined && isScalar(pair.key)) pair.key.value = to;
+  }
 }
 
 /**
@@ -452,7 +502,7 @@ export function textOf(value: unknown): string {
  * A number typed into a field: undefined when empty, NaN when it is not a
  * number, which the form shows as an error and will not save.
  */
-export function numberOf(text: string): number | undefined {
+function numberOf(text: string): number | undefined {
   const trimmed = text.trim();
   if (trimmed === '') return undefined;
   if (!CORE_NUMBER.test(trimmed)) return Number.NaN;

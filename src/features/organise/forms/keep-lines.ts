@@ -6,6 +6,7 @@
  * those lines, with any line the library writes otherwise right beside them,
  * take the library's form; every other line stays as the file wrote it.
  */
+import { diffArrays } from 'diff';
 
 /** A run of lines the file and the library's writing hold alike, or not. */
 type Segment = { same: boolean; u0: number; u1: number; o0: number; o1: number };
@@ -59,39 +60,16 @@ export function overOriginal(
  * common run of lines, or -1.
  */
 function matched(a: string[], b: string[]): number[] {
-  const result = new Array<number>(b.length).fill(-1);
-  let start = 0;
-  while (start < a.length && start < b.length && a[start] === b[start]) {
-    result[start] = start;
-    start += 1;
-  }
-  let endA = a.length;
-  let endB = b.length;
-  while (endA > start && endB > start && a[endA - 1] === b[endB - 1]) {
-    endA -= 1;
-    endB -= 1;
-    result[endB] = endA;
-  }
-  const n = endA - start;
-  const m = endB - start;
-  const width = m + 1;
-  const table = new Uint32Array((n + 1) * width);
-  for (let i = n - 1; i >= 0; i -= 1)
-    for (let j = m - 1; j >= 0; j -= 1)
-      table[i * width + j] =
-        a[start + i] === b[start + j]
-          ? (table[(i + 1) * width + j + 1] ?? 0) + 1
-          : Math.max(table[(i + 1) * width + j] ?? 0, table[i * width + j + 1] ?? 0);
-  let i = 0;
-  let j = 0;
-  while (i < n && j < m) {
-    if (a[start + i] === b[start + j]) {
-      result[start + j] = start + i;
-      i += 1;
-      j += 1;
-    } else if ((table[(i + 1) * width + j] ?? 0) >= (table[i * width + j + 1] ?? 0))
-      i += 1;
-    else j += 1;
+  const result: number[] = [];
+  let at = 0;
+  for (const change of diffArrays(a, b)) {
+    if (change.removed) at += change.count;
+    else if (change.added) result.push(...new Array<number>(change.count).fill(-1));
+    else
+      for (let line = 0; line < change.count; line += 1) {
+        result.push(at);
+        at += 1;
+      }
   }
   return result;
 }

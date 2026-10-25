@@ -2,8 +2,7 @@ import type { DeclaredInput } from '@/api/types';
 import { formatSize } from '@/lib/size';
 import { tokenNow } from '../files/use-task-upload';
 import type { TaskPlace } from './build-data';
-import type { Source } from './match';
-import { filesUnder, type PlannedChange } from './staged';
+import { filesUnder, type PlannedChange, type Source } from './staged';
 
 /**
  * A file or a folder chosen for a setting of the task on the Inputs card
@@ -106,5 +105,30 @@ export async function stageInputFiles(
       files.length === 1 && !folder
         ? `${files[0]?.name ?? ''}, ${formatSize(size)}`
         : `${String(files.length)} ${files.length === 1 ? 'file' : 'files'}, ${formatSize(size)}`,
+  };
+}
+
+/**
+ * A file for one cell of a run. The editor names the path (`runs/0/1/input`),
+ * so the file's own name is never what the task stores.
+ */
+export async function stageRunFile(
+  place: TaskPlace,
+  path: string,
+  file: File,
+  was: string,
+): Promise<StagedInput> {
+  const token = await tokenNow(place, path);
+  const planned: PlannedChange[] = [{ path, token, source: sourceOf(file) }];
+  if (was !== '' && was !== path) {
+    const old = await tokenNow(place, was);
+    if (old !== null) planned.push({ path: was, token: old, remove: true });
+  }
+  return {
+    id: path,
+    value: path,
+    was,
+    planned,
+    summary: `${file.name}, ${formatSize(file.size)}`,
   };
 }

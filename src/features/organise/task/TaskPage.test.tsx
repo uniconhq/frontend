@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@/test/user-event';
 import { delay, http, HttpResponse } from 'msw';
+import type { WorkflowForm } from '@/api/types';
 import { TASK_BUILD_CARDS, TASK_SECTIONS } from '@/lib/sections';
 import { formatDateTime } from '@/lib/time';
 import { renderApp } from '@/test/render';
@@ -46,17 +47,17 @@ describe('the task page', () => {
       name: 'Change B · sum in this contest',
     });
     expect(within(status).getByText('In Spring:')).toBeVisible();
-    expect(line).toHaveTextContent('no points, open for the whole contest·Change');
+    expect(line).toHaveTextContent('open for the whole contest·Change');
     await user.click(line);
     const dialog = await screen.findByRole('dialog', {
       name: 'B · sum in this contest',
     });
     expect(
-      await within(dialog).findByRole('textbox', { name: 'Worth' }),
-    ).toBeDisabled();
+      await within(dialog).findByRole('radiogroup', { name: 'Due' }),
+    ).toBeVisible();
   });
 
-  it('reads where the task stands in its contest again after a save, as its points can move with it', async () => {
+  it('reads where the task stands in its contest again after a save', async () => {
     let reads = 0;
     server.use(
       http.get(`${CONTEST_API}/organise/tasks`, () => {
@@ -71,7 +72,7 @@ describe('the task page', () => {
         HttpResponse.json({
           number: 3,
           grading_changed: true,
-          changes: ['main gives 110 points.'],
+          changes: ['The time limit changes.'],
           notes: [],
           regraded: 0,
           effect: unchanged,
@@ -161,9 +162,7 @@ describe('the task page', () => {
     renderApp(TASK);
 
     const status = await screen.findByLabelText('Where the task stands');
-    expect(
-      await within(status).findByText('no points, open for the whole contest'),
-    ).toBeVisible();
+    expect(await within(status).findByText('open for the whole contest')).toBeVisible();
     expect(
       within(status).queryByRole('button', { name: /in this contest$/ }),
     ).toBeNull();
@@ -247,7 +246,23 @@ describe('the task page', () => {
   });
 
   it('builds the task in order with cards, each leading to where its part is done', async () => {
-    server.use(signedIn, taskState, publicationList, ...repoFiles);
+    server.use(
+      signedIn,
+      taskState,
+      publicationList,
+      ...repoFiles,
+      // A saved workflow that reads, so the Scoring and Checks cards are there.
+      http.get(`${TASK_API}/workflow-form`, () =>
+        HttpResponse.json({
+          workflow: 'unicon/classic@v3',
+          newer: null,
+          problem: null,
+          graded: false,
+          inputs: [],
+          text_values: null,
+        } satisfies WorkflowForm),
+      ),
+    );
     renderApp(TASK);
 
     await screen.findByRole('region', { name: 'Workflow' });
@@ -307,23 +322,8 @@ describe('the task page', () => {
 });
 
 describe('what the task has, under its name', { timeout: 20_000 }, () => {
-  /** The sum task with a statement, two groups of tests, and the classic workflow. */
+  /** The sum task with a statement, on the classic workflow. */
   function readyBackend(state = publishedTask) {
-    const tree: Record<string, unknown[]> = {
-      tests: ['small', 'large'].map((group) => ({
-        path: `tests/${group}`,
-        kind: 'directory',
-        size: null,
-        upload: null,
-      })),
-      'tests/small': ['1', '2'].map((test) => ({
-        path: `tests/small/${test}`,
-        kind: 'directory',
-        size: null,
-        upload: null,
-      })),
-      'tests/large': [],
-    };
     const saves: unknown[] = [];
     server.use(
       signedIn,
@@ -340,26 +340,17 @@ describe('what the task has, under its name', { timeout: 20_000 }, () => {
           },
         ]),
       ),
-      http.get(`${TASK_API}/tree`, ({ request }) => {
-        const path = new URL(request.url).searchParams.get('path') ?? '';
-        return path.startsWith('tests')
-          ? HttpResponse.json(tree[path] ?? [])
-          : undefined;
-      }),
       http.get(`${TASK_API}/workflow-form`, () =>
         HttpResponse.json({
-          workflow: 'unicon/classic@v2',
+          workflow: 'unicon/classic@v3',
           newer: null,
           problem: null,
           graded: false,
-          test: [],
           inputs: [
             {
               id: 'time_limit',
               type: 'number',
-              contestant: false,
               options: null,
-              per_test: false,
               optional: false,
               title: 'Time limit',
               help: null,
@@ -399,8 +390,7 @@ describe('what the task has, under its name', { timeout: 20_000 }, () => {
       ['Done', 'Statement'],
       ['Done', 'Workflow'],
       ['Not done', 'Inputs: Time limit (seconds) needs a value'],
-      ['Not done', 'Tests: 2 in 2 groups, large has none'],
-      ['Done', 'Scoring: no points, ranked on reported values'],
+      ['Done', 'Runs: 1'],
     ]);
     expect(within(row).getByRole('link', { name: /^Inputs/ })).toHaveAttribute(
       'href',
@@ -408,37 +398,14 @@ describe('what the task has, under its name', { timeout: 20_000 }, () => {
     );
   });
 
-  it('says the scoring’s points are here where the contest scales the task to a worth of its own', async () => {
+  it('says nothing of what the task lacks while its workflow is still being read', async () => {
     readyBackend();
-    const file = (path: string, content: string) =>
-      HttpResponse.json({
-        path,
-        encoding: 'utf-8',
-        content,
-        token: `token-${path}`,
-        upload: null,
-        version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
-      });
-    server.use(
-      http.get(`${TASK_API}/files/task.yaml`, () =>
-        file(
-          'task.yaml',
-          'name: sum\nworkflow: unicon/classic@v2\ntest_groups:\n  small:\n    pass: 100\n',
-        ),
-      ),
-      http.get(`${CONTEST_API}/files/contest.yaml`, () =>
-        file(
-          'contest.yaml',
-          'name: Spring\ntasks:\n  - id: sort\n  - id: sum\n    worth: 70\n',
-        ),
-      ),
-    );
+    server.use(http.get(`${TASK_API}/workflow-form`, () => delay('infinite')));
     renderApp(TASK);
 
-    const row = await screen.findByRole('list', { name: 'What the task has' });
-    expect(
-      await within(row).findByRole('link', { name: 'Scoring: 100 points here' }),
-    ).toBeVisible();
+    await screen.findByLabelText('Where the task stands');
+    expect(screen.queryByRole('list', { name: 'What the task has' })).toBeNull();
+    expect(screen.queryByText('Workflow: none chosen')).toBeNull();
   });
 
   it('does not tick a statement the forge says is not written yet: blank, or the one a new task starts with (M57)', async () => {
@@ -479,6 +446,102 @@ describe('what the task has, under its name', { timeout: 20_000 }, () => {
       await screen.findByText('Saved and published as publication 3.'),
     ).toBeVisible();
     expect(saves).toEqual([{ changes: [], confirm: false, keep_as_draft: false }]);
+  });
+});
+
+describe('releasing results', () => {
+  it('asks first and then shows who released them', async () => {
+    const user = userEvent.setup();
+    let confirmed = false;
+    server.use(
+      signedIn,
+      publicationList,
+      ...repoFiles,
+      http.get(TASK_API, () =>
+        HttpResponse.json({
+          ...publishedTask,
+          results: confirmed
+            ? {
+                released: true,
+                history: [
+                  {
+                    action: 'released',
+                    at: '2026-10-25T01:00:00Z',
+                    by: 7,
+                    by_name: 'kenny',
+                  },
+                ],
+              }
+            : { released: false, history: [] },
+        }),
+      ),
+      http.post(`${TASK_API}/results/release`, async ({ request }) => {
+        const body = (await request.json()) as { confirm: boolean };
+        if (!body.confirm) {
+          return problem(409, 'confirmation_required', {
+            detail: 'Score becomes visible to entrants.',
+          });
+        }
+        confirmed = true;
+        return HttpResponse.json({
+          released: true,
+          history: [
+            { action: 'released', at: '2026-10-25T01:00:00Z', by: 7, by_name: 'kenny' },
+          ],
+        });
+      }),
+    );
+    renderApp(TASK);
+    await user.click(await screen.findByRole('button', { name: 'Release results' }));
+    expect(await screen.findByText('Score becomes visible to entrants.')).toBeVisible();
+    const dialog = screen.getByRole('dialog');
+    await user.click(within(dialog).getByRole('button', { name: 'Release results' }));
+    expect(
+      await screen.findByRole('list', { name: 'Results history' }),
+    ).toHaveTextContent('Released by kenny');
+  });
+
+  it('reads the task again after a release, rather than keeping what the release answered', async () => {
+    let released = false;
+    const history = [
+      { action: 'released', at: '2026-10-25T01:00:00Z', by: 7, by_name: 'kenny' },
+    ];
+    server.use(
+      signedIn,
+      publicationList,
+      ...repoFiles,
+      http.get(TASK_API, () =>
+        HttpResponse.json({
+          ...publishedTask,
+          // By the time the task is read again, ana has taken them back.
+          results: released
+            ? {
+                released: false,
+                history: [
+                  ...history,
+                  {
+                    action: 'hidden_again',
+                    at: '2026-10-25T01:05:00Z',
+                    by: 8,
+                    by_name: 'ana',
+                  },
+                ],
+              }
+            : { released: false, history: [] },
+        }),
+      ),
+      http.post(`${TASK_API}/results/release`, () => {
+        released = true;
+        return HttpResponse.json({ released: true, history });
+      }),
+    );
+    const user = userEvent.setup();
+    renderApp(TASK);
+    await user.click(await screen.findByRole('button', { name: 'Release results' }));
+    expect(
+      await screen.findByRole('list', { name: 'Results history' }),
+    ).toHaveTextContent('Taken back by ana');
+    expect(screen.getByText('Results are not released.')).toBeVisible();
   });
 });
 

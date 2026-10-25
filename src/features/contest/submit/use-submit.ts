@@ -4,14 +4,7 @@ import { type ApiError, toApiError } from '@/api/problem';
 import { arrival, hashOf, mustBeVerified, sendAndComplete } from '@/api/upload/door';
 import { wasCut } from '@/api/upload/transfer';
 import type { InputField, Submission, Upload } from '@/api/types';
-import {
-  checkDraft,
-  filesOf,
-  pathOf,
-  submittedInputs,
-  takesFiles,
-  type Draft,
-} from './draft';
+import { checkDraft, pathOf, submittedInputs, uploadsOf, type Draft } from './draft';
 
 /**
  * A fresh idempotency key. `randomUUID` is there only on a secure origin, and
@@ -119,7 +112,11 @@ export function useSubmit({
   const progress = (file: File, share: number) =>
     setSent((current) => new Map(current).set(file, Math.round(share * 100)));
 
-  const newSlot = async (input: InputField, file: File): Promise<Slot> => {
+  const newSlot = async (
+    input: InputField,
+    file: File,
+    part: number | null,
+  ): Promise<Slot> => {
     setPhase('hashing');
     const sha256 = await hashOf(file, (share) => progress(file, share));
     setPhase('uploading');
@@ -132,6 +129,7 @@ export function useSubmit({
         size: file.size,
         sha256,
         content_type: file.type === '' ? null : file.type,
+        ...(part === null ? {} : { part }),
       },
     });
     const slot = { id: made.id, url: made.url };
@@ -168,9 +166,13 @@ export function useSubmit({
     }
   };
 
-  const upload = async (input: InputField, file: File): Promise<string> => {
+  const upload = async (
+    input: InputField,
+    file: File,
+    part: number | null,
+  ): Promise<string> => {
     const kept = pending.current.get(input.id)?.get(file);
-    const slot = kept ?? (await newSlot(input, file));
+    const slot = kept ?? (await newSlot(input, file, part));
     setPhase('uploading');
     let status: Upload['status'];
     try {
@@ -217,9 +219,7 @@ export function useSubmit({
       }
       const { key } = attempt.current;
 
-      const files = inputs
-        .filter(takesFiles)
-        .flatMap((input) => filesOf(draft, input).map((file) => ({ input, file })));
+      const files = uploadsOf(inputs, draft);
       setPhase('uploading');
       setSent(
         new Map(
@@ -229,9 +229,9 @@ export function useSubmit({
           ]),
         ),
       );
-      for (const { input, file } of files) {
+      for (const { input, file, part } of files) {
         if (uploadOf(input.id, file) !== undefined) continue;
-        put(uploaded.current, input.id, file, await upload(input, file));
+        put(uploaded.current, input.id, file, await upload(input, file, part));
       }
 
       setPhase('submitting');

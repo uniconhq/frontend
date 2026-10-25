@@ -108,7 +108,7 @@ function Consequence({ asking }: { asking: Asking }) {
         {asking.task === '' && <BodyText>Choose the task to rejudge.</BodyText>}
         <BodyText>
           Every submission to {task} runs again on the task as it is now, its latest
-          publication. For when its tests, its checker or its scoring changed. To grade
+          publication. For when its runs, its workflow or its scoring changed. To grade
           one submission again on the version it was graded on, retry it instead.
         </BodyText>
         <BodyText tone="secondary">

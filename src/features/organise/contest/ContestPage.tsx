@@ -25,7 +25,6 @@ import {
   QuestionsCard,
 } from './ContestCards';
 import { RegradeSummaries } from '../gradings/RegradeSummaries';
-import { ContestScoring } from './ContestScoring';
 import { ContestSummary } from './ContestSummary';
 import { ContestTasks } from './ContestTasks';
 import { StatusCard } from './StatusCard';
@@ -64,7 +63,7 @@ const CARDS: Record<
  * how many gradings failed, while any wait; what each task's latest regrade
  * changed, until it is dismissed; its status, with what opening
  * it needs and the buttons that open, take back and archive it; its
- * settings at a glance; its tasks; how it is scored; and a card for each of
+ * settings at a glance; its tasks; and a card for each of
  * its sections, each going to its own page. The forms are on the
  * sections' pages, but for a task's timeline, edited on its row, and the
  * status's buttons, each asked in a dialog. Each part loads and fails on its
@@ -103,7 +102,6 @@ export function ContestPage() {
       <StatusCard org={org} contest={contest} />
       <ContestSummary org={org} contest={contest} />
       <ContestTasks org={org} contest={contest} />
-      <ContestScoring org={org} contest={contest} />
       <CardGrid label="The contest's sections">
         {CONTEST_SECTIONS.filter(
           (section): section is Extract<typeof section, { card: 'grid' }> =>

@@ -52,6 +52,11 @@ export function openStream() {
   act(() => FakeSource.last?.onopen?.());
 }
 
+/** One nudge, as the stream sends it. The page gathers it before it reads again. */
+export function nudge(kind: string) {
+  act(() => FakeSource.last?.listeners.get(kind)?.());
+}
+
 /**
  * Switching to another window and back: the tab hidden closes the stream,
  * and the tab in front again opens a new one, which re-reads what may have

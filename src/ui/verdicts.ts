@@ -1,5 +1,6 @@
 import type { GradingStatus, Outcome, SubmissionState } from '@/api/types';
 import type { VerdictName } from '@/theme/theme';
+import { NOT_GIVEN } from './number/words';
 
 /**
  * What each verdict is called and which of the handoff's six colour pairs it
@@ -17,7 +18,8 @@ const LOOK: Record<Verdict, { label: string; colors: VerdictName }> = {
   output_limit: { label: 'OUTPUT LIMIT', colors: 'limit' },
   runtime_error: { label: 'RUNTIME ERROR', colors: 'rejected' },
   compile_error: { label: 'COMPILE ERROR', colors: 'error' },
-  skipped: { label: 'SKIPPED', colors: 'queued' },
+  // A run skipped as a part it reads was not given (6.1).
+  skipped: { label: NOT_GIVEN.toUpperCase(), colors: 'queued' },
   system_error: { label: 'SYSTEM ERROR', colors: 'error' },
   queued: { label: 'QUEUED', colors: 'queued' },
   dispatched: { label: 'STARTING', colors: 'queued' },
@@ -25,6 +27,7 @@ const LOOK: Record<Verdict, { label: string; colors: VerdictName }> = {
   done: { label: 'GRADED', colors: 'queued' },
   grading: { label: 'GRADING', colors: 'running' },
   graded: { label: 'GRADED', colors: 'queued' },
+  submitted: { label: 'SUBMITTED', colors: 'queued' },
   delayed: { label: 'GRADING DELAYED', colors: 'queued' },
   cancelled: { label: 'CANCELLED', colors: 'queued' },
   over_limit: { label: 'OVER THE LIMIT', colors: 'queued' },

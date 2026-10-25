@@ -1,30 +1,48 @@
-import type { GroupShown, Reported } from '@/api/types';
-import { formatExact, formatPoints, formatWorth } from '@/lib/exact';
-
-/**
- * A test's reported value by name as read: a number to at most four
- * decimals, its text, or nothing when it reported none of that name.
- */
-export function valueText(values: Reported, name: string): string | undefined {
-  const number = values.numbers[name];
-  return number === undefined ? values.texts[name] : formatExact(number);
-}
-
-/**
- * A group's points out of the most it gives, as `30 / 70`; only the most
- * while its verdict is not shown; nothing on a task that gives no points.
- */
-export function pointsText(group: GroupShown): string | null {
-  if (group.max === null) return null;
-  const most = formatWorth(group.max);
-  return group.points === null
-    ? `of ${most}`
-    : `${formatPoints(group.points, group.max)} / ${most}`;
-}
+import type { RunShown } from '@/api/types';
 
 /** A number of submissions in words: "1 submission", "10 submissions". */
 export function submissionsWords(count: number): string {
   return `${String(count)} ${count === 1 ? 'submission' : 'submissions'}`;
+}
+
+/**
+ * How a run names the rows it came from: one piece per axis, joined with
+ * " · ". A tuple with a title shows that title; one without shows that
+ * axis's columns, a number as "seed 2" and a file by its name.
+ */
+export function tupleLine(tuples: RunShown['tuples']): string {
+  const parts: string[] = [];
+  for (const tuple of tuples) {
+    if (typeof tuple.title === 'string' && tuple.title !== '') {
+      parts.push(tuple.title);
+      continue;
+    }
+    for (const [name, value] of Object.entries(tuple.key)) {
+      const shown = keyText(name, value);
+      if (shown !== '') parts.push(shown);
+    }
+  }
+  return parts.join(' · ');
+}
+
+/** How a shown output is named: its title, and its unit in parentheses. */
+export function reportLabel(title: string, unit: string | null): string {
+  return unit !== null && unit !== '' ? `${title} (${unit})` : title;
+}
+
+function keyText(name: string, value: unknown): string {
+  if (typeof value === 'string') {
+    const slash = Math.max(value.lastIndexOf('/'), value.lastIndexOf('\\'));
+    return slash === -1 ? value : value.slice(slash + 1);
+  }
+  if (typeof value === 'number' || typeof value === 'boolean') {
+    return `${name} ${String(value)}`;
+  }
+  if (value !== null && typeof value === 'object' && 'part' in value) {
+    const part = value.part;
+    return typeof part === 'number' ? `Part ${String(part)}` : name;
+  }
+  return name;
 }
 
 /**

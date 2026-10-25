@@ -14,8 +14,8 @@ import { HomePage, InviteLink, InvitesPage } from '@/features/home';
 import { LoginPage } from '@/features/auth';
 import { AccountPage } from '@/features/account';
 import {
-  BoardsPage,
   ContestHomePage,
+  LeaderboardsPage,
   QuestionsPage,
   TaskStatementPage,
 } from '@/features/contest';
@@ -27,6 +27,7 @@ import {
   OrgPage,
   OrgsPage,
   TASK_SECTION_PAGES,
+  RegradePage,
   TaskPage,
   viewFilePath,
   WorkflowPage,
@@ -36,6 +37,7 @@ import { RequireSession, SessionExpiredModal, SessionProvider } from '@/session'
 import {
   CONTEST_SECTIONS,
   contestSectionPath,
+  contestViewSectionPath,
   ORG_SECTIONS,
   TASK_SECTIONS,
   taskCardPath,
@@ -76,6 +78,20 @@ function ToEntrants() {
   return (
     <Navigate to={`${contestSectionPath(org, contest, 'entrants')}${search}`} replace />
   );
+}
+
+/**
+ * A contest's Leaderboards page, at `boards` before it took the name
+ * `leaderboards`: an old link, the organiser's or the contest's own, lands
+ * there, what it asked kept.
+ */
+function ToLeaderboards({ organise = false }: { organise?: boolean }) {
+  const { org, contest } = useContestParams();
+  const { search } = useLocation();
+  const to = organise
+    ? contestSectionPath(org, contest, 'boards')
+    : contestViewSectionPath(org, contest, 'boards');
+  return <Navigate to={`${to}${search}`} replace />;
 }
 
 /** A task's Statement page, now the Statement card on the task's own page. */
@@ -122,6 +138,7 @@ const movedRoutes: RouteObject[] = [
   { path: `${CONTEST}/files`, element: <ToContestSettings /> },
   { path: `${TASK}/statement`, element: <ToStatement /> },
   { path: `${TASK}/files`, element: <ToTaskPage /> },
+  { path: `${CONTEST}/boards`, element: <ToLeaderboards organise /> },
 ];
 
 /**
@@ -181,7 +198,11 @@ export const routes: RouteObject[] = [
            * signed-in person, each page reading what the caller may see.
            */
           { path: 'contests/:org/:contest', element: <ContestHomePage /> },
-          { path: 'contests/:org/:contest/boards', element: <BoardsPage /> },
+          {
+            path: 'contests/:org/:contest/leaderboards',
+            element: <LeaderboardsPage />,
+          },
+          { path: 'contests/:org/:contest/boards', element: <ToLeaderboards /> },
           { path: 'contests/:org/:contest/questions', element: <QuestionsPage /> },
           {
             path: 'contests/:org/:contest/tasks/:task',
@@ -224,6 +245,7 @@ export const routes: RouteObject[] = [
                   { path: ORG, element: <OrgPage /> },
                   { path: CONTEST, element: <ContestPage /> },
                   { path: TASK, element: <TaskPage /> },
+                  { path: `${TASK}/regrades/:regrade`, element: <RegradePage /> },
                   ...sectionRoutes,
                   ...movedRoutes,
                 ],

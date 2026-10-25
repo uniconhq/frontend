@@ -79,22 +79,10 @@ const WAY: Record<string, string> = {
 
 export const TASK_FIELDS: Record<string, string> = {
   id: 'Task',
-  worth: 'Worth',
   release_at: 'Opens',
   due: 'Due',
-  late_per_day: 'Taken off per late day',
   closes: 'Closes',
   marks: 'Marks',
-};
-
-export const BOARD_FIELDS: Record<string, string> = {
-  name: 'Name',
-  tasks: 'Tasks',
-  over: 'Results counted',
-  select: 'Which submission counts',
-  order: 'Ranked by',
-  who: 'Shown to',
-  rows: 'Rows shown',
 };
 
 /**
@@ -171,20 +159,68 @@ export function contestPlace(path: string): ContestPlace {
       item: second,
     };
   }
-  if (top === 'leaderboards') {
-    if (typeof second !== 'number') {
-      return { part: 'boards', label: 'Leaderboards', field: null, item: null };
-    }
-    const label = typeof third === 'string' ? BOARD_FIELDS[third] : undefined;
-    const board = `Leaderboards, leaderboard ${String(second + 1)}`;
+  if (top === 'hold') {
+    const named = second === 'from' ? 'From' : second === 'until' ? 'Until' : undefined;
     return {
       part: 'boards',
-      label: label === undefined ? board : `${board}: ${label}`,
-      field: label === undefined ? null : (third as string),
-      item: second,
+      label:
+        named === undefined ? 'Leaderboards, Hold' : `Leaderboards, Hold: ${named}`,
+      field: typeof second === 'string' ? `hold.${second}` : 'hold.from',
+      item: null,
     };
   }
+  if (top === 'leaderboards') {
+    if (typeof second !== 'string') {
+      return { part: 'boards', label: 'Leaderboards', field: null, item: null };
+    }
+    return leaderboardPlace(second, third, fourth);
+  }
   return whole;
+}
+
+export const BOARD_PARTS: Record<string, string> = {
+  title: 'Title',
+  columns: 'Column',
+  sort: 'Sort',
+  display: 'Display',
+  audience: 'Who sees it',
+};
+
+/** A leaderboard stored as a mapping, named by its key. `item` stays empty: the key is in the field. */
+function leaderboardPlace(
+  key: string,
+  third: string | number | undefined,
+  fourth: string | number | undefined,
+): ContestPlace {
+  const board = `Leaderboards, ${key}`;
+  if (third === 'columns' && typeof fourth === 'string') {
+    return {
+      part: 'boards',
+      label: `${board}: ${fourth}`,
+      field: `${key}.columns.${fourth}`,
+      item: null,
+    };
+  }
+  if (third === 'audience' && typeof fourth === 'string') {
+    const named =
+      fourth === 'who' ? 'Who sees it' : fourth === 'rows' ? 'Rows' : fourth;
+    return {
+      part: 'boards',
+      label: `${board}: ${named}`,
+      field: `${key}.audience.${fourth}`,
+      item: null,
+    };
+  }
+  if (typeof third === 'string') {
+    const named = BOARD_PARTS[third];
+    return {
+      part: 'boards',
+      label: named === undefined ? board : `${board}: ${named}`,
+      field: `${key}.${third}`,
+      item: null,
+    };
+  }
+  return { part: 'boards', label: board, field: `${key}.key`, item: null };
 }
 
 /** The parameters of a contest page's address that open a part and focus a field. */

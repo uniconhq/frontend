@@ -1,14 +1,9 @@
-import { compareRatio, divRatio, ratioOf, ZERO, type Ratio } from '@/lib/exact';
-import type { GroupValues, InputValues, TaskValues } from '../forms/task-values';
-import { groupWeight } from './scoring';
-import type { Staged } from './staged';
+import type { InputValues, TaskValues } from '../forms/task-values';
 
 /**
  * What a save of the task's cards would change, a line each in words, for
  * the save bar to list before anything is saved: the workflow, each input by
- * its title, how a test earns, each group's rule, when it is shown and its
- * test weights, the tests added, replaced and taken out of each group, and
- * the submission rules.
+ * its title, the runs, the scoring, the checks and the submission rules.
  */
 
 /** An input's fields that say what it holds, without how it was read. */
@@ -24,6 +19,7 @@ function held(input: InputValues): string {
     maxSize,
     value,
     secret,
+    give,
   } = input;
   return JSON.stringify([
     id,
@@ -36,75 +32,14 @@ function held(input: InputValues): string {
     maxSize,
     value,
     secret,
+    give,
   ]);
-}
-
-function count(n: number, one: string, many: string): string {
-  return `${String(n)} ${n === 1 ? one : many}`;
-}
-
-const PARTS = ['each', 'worst', 'pass'] as const;
-
-function exactly(text: string): Ratio {
-  return text.trim() === '' ? ZERO : (ratioOf(text) ?? ZERO);
-}
-
-/**
- * Whether how a group earns its points moved other than by its total alone,
- * as the forge says it: each part's share of the group's total, and the
- * share of tests that must pass where a part is earned by passing.
- */
-function earningMoved(was: GroupValues, now: GroupValues): boolean {
-  const then = groupWeight(was);
-  const total = groupWeight(now);
-  const shape = (group: GroupValues, of: Ratio) =>
-    PARTS.map((part) => {
-      const weight = exactly(group[part]);
-      return weight.num === 0n || of.num === 0n ? ZERO : divRatio(weight, of);
-    });
-  const before = shape(was, then);
-  const after = shape(now, total);
-  if (before.some((share, at) => compareRatio(share, after[at] ?? ZERO) !== 0)) {
-    return true;
-  }
-  return (
-    exactly(now.pass).num !== 0n &&
-    compareRatio(passAtOf(was.passAt), passAtOf(now.passAt)) !== 0
-  );
-}
-
-/** The share of tests that must pass for the pass part; unset, every one. */
-function passAtOf(text: string): Ratio {
-  return text.trim() === '' ? { num: 1n, den: 1n } : exactly(text);
-}
-
-function groupLines(
-  was: GroupValues | undefined,
-  now: GroupValues | undefined,
-): string[] {
-  if (was === undefined && now !== undefined) return [`New test group ${now.name}`];
-  if (now === undefined && was !== undefined) {
-    return was.read ? [`Test group ${was.name} removed`] : [];
-  }
-  if (was === undefined || now === undefined) return [];
-  const lines: string[] = [];
-  if (compareRatio(groupWeight(was), groupWeight(now)) !== 0) {
-    lines.push(`${now.name}: points`);
-  }
-  if (earningMoved(was, now)) lines.push(`${now.name}: how it earns points`);
-  if (was.show !== now.show) lines.push(`${now.name}: when entrants see results`);
-  if (JSON.stringify(was.weights) !== JSON.stringify(now.weights)) {
-    lines.push(`${now.name}: weights`);
-  }
-  if (!was.read && lines.length === 0) lines.push(`${now.name}: added to scoring`);
-  return lines;
 }
 
 /** The lines of a save; `newFiles` are the settings given a new file, each said once as such. */
 export function changeLines(
   before: TaskValues,
   after: TaskValues,
-  staged: Staged,
   titles: ReadonlyMap<string, string>,
   newFiles: readonly string[] = [],
 ): string[] {
@@ -130,34 +65,18 @@ export function changeLines(
       lines.push(`Inputs: ${name}`);
     }
   }
-  if (JSON.stringify(before.credit) !== JSON.stringify(after.credit)) {
-    lines.push('How a test earns');
+  if (JSON.stringify(before.axes) !== JSON.stringify(after.axes)) {
+    lines.push('Runs');
   }
-  const groups = [
-    ...new Set([...before.groups, ...after.groups].map((group) => group.name)),
-  ];
-  for (const name of groups) {
-    lines.push(
-      ...groupLines(
-        before.groups.find((group) => group.name === name),
-        after.groups.find((group) => group.name === name),
-      ),
-    );
+  if (
+    JSON.stringify(before.scoreGroups) !== JSON.stringify(after.scoreGroups) ||
+    JSON.stringify(before.scoreValues) !== JSON.stringify(after.scoreValues) ||
+    JSON.stringify(before.show) !== JSON.stringify(after.show)
+  ) {
+    lines.push('Scoring');
   }
-  const tested = [
-    ...new Set([...staged.tests, ...staged.removals].map((test) => test.group)),
-  ];
-  for (const group of tested) {
-    const changed = staged.tests.filter((test) => test.group === group);
-    const added = changed.filter((test) => test.existing.length === 0).length;
-    const replaced = changed.length - added;
-    const removed = staged.removals.filter((test) => test.group === group).length;
-    const parts = [
-      added > 0 ? `${count(added, 'test', 'tests')} added` : null,
-      replaced > 0 ? `${count(replaced, 'test', 'tests')} replaced` : null,
-      removed > 0 ? `${count(removed, 'test', 'tests')} removed` : null,
-    ].filter((part): part is string => part !== null);
-    lines.push(`Tests of ${group}: ${parts.join(', ')}`);
+  if (JSON.stringify(before.checks) !== JSON.stringify(after.checks)) {
+    lines.push('Checks');
   }
   if (
     before.max !== after.max ||

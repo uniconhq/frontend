@@ -7,8 +7,7 @@ import type { Outcome } from '../files/SaveOutcome';
 import { fileQuery, staleAfterWrite } from '../files/place';
 import { sendToTask, tokenNow } from '../files/use-task-upload';
 import { taskPath, type TaskPlace } from './build-data';
-import type { Source } from './match';
-import { fileChanges, type PlannedChange } from './staged';
+import { fileChanges, type PlannedChange, type Source } from './staged';
 
 /**
  * One save of the task's cards: the settings as the cards changed them, read

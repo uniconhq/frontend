@@ -45,7 +45,7 @@ const DRAFT = [
   'end: 2030-10-15T09:00:00Z',
   'state: draft',
   'visibility: signed-in',
-  'leaderboards: [{name: Standings, who: contestants}]',
+  'leaderboards: {standings: {title: Standings, audience: {who: entrants}}}',
   'tasks: [{id: sort}, {id: sum}]',
 ];
 

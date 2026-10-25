@@ -177,7 +177,7 @@ function moved(id: string, by: -1 | 1) {
 
 /**
  * A contest's tasks as a list card, in the contest's order, each row its
- * letter and name, where its files stand, and its worth and timeline in the
+ * letter and name, where its files stand, and its timeline in the
  * contest as one line, which a manager presses to change them, or take the
  * task out of the contest, in a dialog; a withdrawn task says so, with Put
  * back on its row;

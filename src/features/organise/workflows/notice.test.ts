@@ -3,7 +3,7 @@ import { act, fireEvent, renderHook } from '@testing-library/react';
 import { NOTICE_MS, useNotice } from './notice';
 
 const REFUSED = {
-  box: 'report',
+  box: 'outputs',
   port: '+',
   reason: 'Only a step’s output can be reported, not an input or a test’s field.',
 };

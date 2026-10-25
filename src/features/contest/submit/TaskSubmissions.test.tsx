@@ -13,7 +13,6 @@ import {
   grading,
   inputField,
   languageField,
-  reported,
   submission,
   TASK_API,
   taskPage,
@@ -83,6 +82,54 @@ const PYTHON_SHA256 =
   'cc42155088fca5730758db72b2a5bca33112a941dfaa2d43098ec422ce4ea213';
 
 describe('the submit panel', () => {
+  it('gives each part of an input given per row a field of the input’s own kind', async () => {
+    server.use(
+      signedIn,
+      listing([]),
+      withPage({
+        inputs: [
+          inputField({
+            id: 'tree',
+            type: 'folder',
+            label: 'Your tree',
+            parts: [
+              { title: 'Small grid', max_size: 1024 },
+              { title: null, max_size: 1024 },
+            ],
+          }),
+          inputField({
+            id: 'seed',
+            type: 'number',
+            label: 'Seed',
+            parts: [
+              { title: null, max_size: 1024 },
+              { title: null, max_size: 1024 },
+            ],
+          }),
+        ],
+      }),
+    );
+    renderApp(PAGE);
+
+    const form = await screen.findByRole('form', { name: 'Submit' });
+    expect(within(form).getByLabelText('Small grid: a folder')).toHaveProperty(
+      'webkitdirectory',
+      true,
+    );
+    expect(within(form).getByLabelText('Part 2: a folder')).toHaveProperty(
+      'webkitdirectory',
+      true,
+    );
+    expect(within(form).getAllByRole('textbox', { name: /^Part [12]$/ })).toHaveLength(
+      2,
+    );
+    // Each input given in parts is a group named by its label, its parts under it.
+    const seed = within(form).getByRole('group', { name: 'Seed' });
+    expect(within(seed).getAllByRole('textbox', { name: /^Part [12]$/ })).toHaveLength(
+      2,
+    );
+  });
+
   it('shows a drop zone per file input, a choice for an enum and a field for each value', async () => {
     server.use(
       signedIn,
@@ -100,7 +147,6 @@ describe('the submit panel', () => {
             id: 'answers',
             type: 'file',
             label: 'Your answers',
-            per_test: true,
             max_size: 1024 * 1024,
           }),
           inputField({
@@ -133,7 +179,7 @@ describe('the submit panel', () => {
     const form = await screen.findByRole('form', { name: 'Submit' });
     const solution = within(form).getByLabelText('Your solution');
     const program = within(form).getByLabelText('Your program');
-    expect(form.querySelectorAll('input[type="file"]')).toHaveLength(5);
+    expect(form.querySelectorAll('input[type="file"]')).toHaveLength(4);
     expect(solution).not.toHaveAttribute('multiple');
     expect(
       within(form).getByText(/Drop a file here or choose one\. At most 10 MB\./),
@@ -144,8 +190,8 @@ describe('the submit panel', () => {
       true,
     );
     expect(within(form).getByText(/At most 5 MB in all\./)).toBeVisible();
-    expect(within(form).getByLabelText('Your answers: a folder')).toBeInTheDocument();
-    expect(within(form).getByText(/One file for each test/)).toBeVisible();
+    expect(within(form).getByLabelText('Your answers')).not.toHaveAttribute('multiple');
+    expect(within(form).getByText(/At most 1 MB\./)).toBeVisible();
     expect(within(form).getByText('language: python')).toBeVisible();
     expect(within(form).queryByRole('combobox', { name: 'language' })).toBeNull();
     expect(within(form).getByRole('combobox', { name: 'Level' })).toHaveValue('');
@@ -318,50 +364,6 @@ describe('the submit panel', () => {
     });
   });
 
-  it('sends a file per test by its name, and says why the server turns one away', async () => {
-    const slots: unknown[] = [];
-    server.use(
-      signedIn,
-      listing([]),
-      withPage({
-        inputs: [
-          inputField({
-            id: 'answers',
-            type: 'file',
-            label: 'Your answers',
-            per_test: true,
-          }),
-        ],
-      }),
-      http.post(`${TASK_API}/uploads`, async ({ request }) => {
-        slots.push(await request.json());
-        return problem(422, 'invalid_inputs', {
-          errors: [
-            {
-              input: 'answers',
-              message:
-                'Name each file of this input after a test, as <group>/<test>, such as main/1.txt.',
-            },
-          ],
-        });
-      }),
-    );
-    const user = userEvent.setup();
-    renderApp(PAGE);
-
-    await user.upload(
-      await screen.findByLabelText('Your answers'),
-      new File(['3'], '1.txt', { type: 'text/plain' }),
-    );
-    await user.click(screen.getByRole('button', { name: 'Submit' }));
-
-    const alert = await screen.findByRole('alert');
-    expect(alert).toHaveTextContent(
-      'Your answers: Name each file of this input after a test, as <group>/<test>, such as main/1.txt.',
-    );
-    expect(slots).toEqual([expect.objectContaining({ filename: '1.txt' })]);
-  });
-
   it('sends a file again from the start when its connection is cut, then submits it', async () => {
     const store = uploadStore();
     const made = submissions();
@@ -496,6 +498,12 @@ describe('the submit panel', () => {
       { limit: 50 },
       'You have used every submission',
       'This task takes 50 submissions in all',
+    ],
+    [
+      'submission_limit',
+      { limit: 1 },
+      'You have used every submission',
+      'This task takes 1 submission in all, and you have made it.',
     ],
     [
       'rate_limited',
@@ -740,11 +748,11 @@ describe('the submissions list', () => {
     await passTime(2_000);
     expect(await within(list).findByText('GRADING')).toBeVisible();
     await passTime(2_000);
-    expect(await within(list).findByText('ACCEPTED')).toBeVisible();
+    expect(await within(list).findByText('GRADED')).toBeVisible();
     expect(
       screen
         .getAllByRole('status')
-        .some((region) => region.textContent === 'Submission #1: ACCEPTED.'),
+        .some((region) => region.textContent === 'Submission #1: GRADED.'),
     ).toBe(true);
 
     const settled = asked;
@@ -792,16 +800,14 @@ describe('the submissions list', () => {
     expect(asked).toBe(settled);
   });
 
-  it('lists the newest first, each with its verdict and how late it was', async () => {
+  it('lists the newest first, each with where it stands', async () => {
     server.use(
       signedIn,
       withPage({}),
       listing([
         submission(1, accepted),
-        submission(2, grading({ status: 'graded', stopped: 'compile_error' })),
-        submission(3, grading({ status: 'graded', outcome: 'wrong_answer' }), {
-          late_days: 2,
-        }),
+        submission(2, grading({ status: 'cancelled' })),
+        submission(3, grading({ status: 'over_limit' })),
         submission(4, grading({ status: 'grading' })),
       ]),
     );
@@ -810,32 +816,21 @@ describe('the submissions list', () => {
     const list = await screen.findByRole('table', { name: 'Your submissions' });
     const rows = within(list).getAllByRole('row').slice(1);
     expect(rows.map((row) => row.textContent)).toEqual([
-      expect.stringMatching(/^#4.*GRADING—$/),
-      expect.stringMatching(/^#3.*2 days lateWRONG ANSWER—$/),
-      expect.stringMatching(/^#2.*COMPILE ERROR—$/),
-      expect.stringMatching(/^#1.*ACCEPTED100$/),
+      expect.stringMatching(/^#4.*GRADING$/),
+      expect.stringMatching(/^#3.*OVER THE LIMIT/),
+      expect.stringMatching(/^#2.*CANCELLED$/),
+      expect.stringMatching(/^#1.*GRADED$/),
     ]);
   });
 
   it('says each submission’s points in its row, or when held-back points are shown', async () => {
-    const held = (shown: string | null) =>
-      grading({
-        ...accepted,
-        points: { shown, pending: '70', pending_until: '2026-09-12T14:00:00Z' },
-      });
     server.use(
       signedIn,
       withPage({}),
       listing([
-        submission(
-          1,
-          grading({
-            ...accepted,
-            points: { shown: '82.5', pending: '0', pending_until: null },
-          }),
-        ),
-        submission(2, held(null)),
-        submission(3, held('30')),
+        submission(1, accepted),
+        submission(2, accepted),
+        submission(3, accepted),
         submission(4, grading({ status: 'queued' })),
       ]),
     );
@@ -847,17 +842,14 @@ describe('the submissions list', () => {
       .getAllByRole('row')
       .slice(1)
       .map((row) => row.lastElementChild?.textContent);
-    expect(cells).toEqual([
-      '—',
-      `30 so far, more shown at ${at}`,
-      `shown at ${at}`,
-      formatExact('82.5', 2),
-    ]);
-    expect(within(list).getByRole('columnheader', { name: 'Points' })).toBeVisible();
+    expect(cells).toEqual(['QUEUED', 'GRADED', 'GRADED', 'GRADED']);
+    expect(list).not.toHaveTextContent(/points/);
+    expect(within(list).queryByRole('columnheader', { name: 'Points' })).toBeNull();
+    expect(at).toBe(formatWhen(new Date('2026-09-12T14:00:00Z')));
   });
 
   it('leaves points out of the list on a task that gives none', async () => {
-    server.use(signedIn, withPage({ worth: null }), listing([submission(1, accepted)]));
+    server.use(signedIn, withPage({}), listing([submission(1, accepted)]));
     renderApp(PAGE);
 
     const list = await screen.findByRole('table', { name: 'Your submissions' });
@@ -867,10 +859,7 @@ describe('the submissions list', () => {
 
 describe('a submission opened from the list, nothing of it shown yet', () => {
   it('says no points are shown yet and when they are, never a shown 0', async () => {
-    const hidden = grading({
-      ...accepted,
-      points: { shown: null, pending: '70', pending_until: '2026-09-12T14:00:00Z' },
-    });
+    const hidden = grading({ ...accepted });
     server.use(
       signedIn,
       withPage({}),
@@ -885,60 +874,21 @@ describe('a submission opened from the list, nothing of it shown yet', () => {
     await user.click(await screen.findByRole('link', { name: '#1' }));
 
     const detail = await screen.findByRole('region', { name: 'Submission 1' });
-    expect(
-      await within(detail).findByText(/^No points shown yet: up to 70, shown at /),
-    ).toBeVisible();
-    expect(within(detail).queryByText(/^0 points/)).toBeNull();
+    expect(detail).not.toHaveTextContent(/points/);
   });
 });
 
 describe('a submission opened from the list', () => {
-  it('shows what the run reported once and each group as the task shows it, or that it did not run', async () => {
-    const graded = grading({
-      ...accepted,
-      groups: [
-        ...accepted.groups,
-        {
-          group: 'large',
-          show: 'after_close',
-          outcome: null,
-          tests: null,
-          shown_at: '2026-09-12T11:00:00Z',
-          ran: true,
-          points: null,
-          max: '70',
-        },
-        {
-          group: 'extra',
-          show: 'always',
-          outcome: null,
-          tests: [],
-          shown_at: null,
-          ran: false,
-          points: null,
-          max: '0',
-        },
-      ],
-      points: { shown: '100', pending: '70', pending_until: '2026-09-12T11:00:00Z' },
-      boards: [
-        {
-          board: 'Fastest',
-          over: 'live',
-          numbers: [
-            { by: 'time_ms', fold: 'max', title: null, unit: null, value: '12.5' },
-          ],
-          pending: '0',
-          shown_at: null,
-          counted: true,
-        },
-      ],
-    });
+  it('shows each run by its group with what it reported, and reads the log written once when opened', async () => {
     server.use(
       signedIn,
       withPage({}),
-      listing([submission(1, graded)]),
+      listing([submission(1, accepted)]),
       http.get(`${TASK_API}/submissions/:number`, () =>
-        HttpResponse.json(submission(1, graded)),
+        HttpResponse.json(submission(1, accepted)),
+      ),
+      http.get(`${TASK_API}/submissions/:number/text`, () =>
+        HttpResponse.text('Compiled cleanly.'),
       ),
     );
     const user = userEvent.setup();
@@ -947,91 +897,18 @@ describe('a submission opened from the list', () => {
     await user.click(await screen.findByRole('link', { name: '#1' }));
 
     const detail = await screen.findByRole('region', { name: 'Submission 1' });
+    const samples = await within(detail).findByRole('region', {
+      name: 'Group samples',
+    });
+    expect(within(samples).getAllByText('ACCEPTED')).toHaveLength(2);
+    expect(samples).toHaveTextContent('Run time (ms) 12');
+    expect(samples).toHaveTextContent(`Memory used (KB) ${formatExact('2048')}`);
+    expect(detail).not.toHaveTextContent(/points/);
+
+    await user.click(within(detail).getByRole('button', { name: 'Show log' }));
     expect(await within(detail).findByLabelText('log')).toHaveTextContent(
       'Compiled cleanly.',
     );
-
-    const samples = within(detail).getByRole('region', { name: 'Group samples' });
-    const tests = within(samples).getByRole('table', { name: 'Tests samples' });
-    expect(within(tests).getByRole('columnheader', { name: 'time_ms' })).toBeVisible();
-    const rows = within(tests).getAllByRole('row');
-    expect(rows).toHaveLength(3);
-    expect(rows[1]).toHaveTextContent(`samples/1ACCEPTED12${formatExact('2048')}`);
-    expect(rows[2]).toHaveTextContent('samples/2ACCEPTED——');
-    expect(
-      within(detail).getByText(/^100 points, and up to 70 more shown at /),
-    ).toBeVisible();
-    expect(
-      within(detail).getByRole('region', { name: 'On the leaderboards' }),
-    ).toHaveTextContent(
-      `Fastest: time_ms, highest: ${formatExact('12.5')} · counts here`,
-    );
-
-    const main = within(detail).getByRole('region', { name: 'Group main' });
-    expect(within(main).getByText('ACCEPTED')).toBeVisible();
-    expect(within(main).getByText('100 / 100 points')).toBeVisible();
-    expect(within(main).getByText(/^Tests shown at /)).toBeVisible();
-    expect(within(main).queryByText(/^Shown at /)).toBeNull();
-    expect(within(main).queryByRole('table')).toBeNull();
-
-    const large = within(detail).getByRole('region', { name: 'Group large' });
-    expect(within(large).getByText(/^Shown at /)).toBeVisible();
-    expect(within(large).getByText('of 70 points')).toBeVisible();
-    expect(within(large).queryByText('ACCEPTED')).toBeNull();
-    expect(within(large).queryByRole('table')).toBeNull();
-    expect(within(large).queryByText('Not run on this grading')).toBeNull();
-
-    const extra = within(detail).getByRole('region', { name: 'Group extra' });
-    expect(within(extra).getByText('Not run on this grading')).toBeVisible();
-    expect(within(extra).queryByRole('table')).toBeNull();
-  });
-
-  it('shows beside each test its credit and, scored against the best, that best', async () => {
-    const relative = grading({
-      ...accepted,
-      groups: [
-        {
-          group: 'main',
-          show: 'always',
-          outcome: 'accepted',
-          tests: [
-            {
-              test: 'main/1',
-              outcome: 'accepted',
-              values: reported({ score: '80' }),
-              credit: '0.8',
-              best: '100',
-            },
-          ],
-          shown_at: null,
-          ran: true,
-          points: '80',
-          max: '100',
-        },
-      ],
-    });
-    server.use(
-      signedIn,
-      withPage({}),
-      listing([submission(1, relative)]),
-      http.get(`${TASK_API}/submissions/:number`, () =>
-        HttpResponse.json(submission(1, relative)),
-      ),
-    );
-    renderApp(`${PAGE}?submission=1`);
-
-    const detail = await screen.findByRole('region', { name: 'Submission 1' });
-    const tests = await within(detail).findByRole('table', { name: 'Tests main' });
-    expect(
-      within(tests)
-        .getAllByRole('columnheader')
-        .map((header) => header.textContent),
-    ).toEqual(['Test', 'Outcome', 'score', 'Credit', 'Best']);
-    expect(
-      within(tests)
-        .getAllByRole('cell')
-        .map((cell) => cell.textContent),
-    ).toEqual(['ACCEPTED', '80', formatExact('0.8'), '100']);
   });
 
   it('shows a cancelled one as cancelled, in the organisers’ words', async () => {
@@ -1062,7 +939,7 @@ describe('a submission opened from the list', () => {
     expect(within(detail).getByText(/does not count against the task/)).toBeVisible();
   });
 
-  it('says a delayed grading is delayed on Unicon’s side, in its row and opened, and nothing more', async () => {
+  it('says a delayed grading is delayed on Unicon’s side, in its row and opened', async () => {
     const delayed = grading({ status: 'delayed' });
     server.use(
       signedIn,
@@ -1088,6 +965,42 @@ describe('a submission opened from the list', () => {
       ),
     ).toBeVisible();
     expect(within(detail).queryByRole('table')).toBeNull();
+  });
+
+  it('shows, opened, what a delayed grading gave beside its delay, a value on a failed run being checked', async () => {
+    const delayed = grading({
+      status: 'delayed',
+      run_values: [
+        {
+          name: 'score',
+          number: null,
+          text: null,
+          waiting: true,
+          self_reported: false,
+          show: 'now',
+          facts: null,
+          runs: null,
+          values: null,
+        },
+      ],
+      runs: accepted.runs,
+    });
+    server.use(
+      signedIn,
+      withPage({}),
+      listing([submission(1, delayed)]),
+      http.get(`${TASK_API}/submissions/:number`, () =>
+        HttpResponse.json(submission(1, delayed)),
+      ),
+    );
+    renderApp(`${PAGE}?submission=1`);
+
+    const detail = await screen.findByRole('region', { name: 'Submission 1' });
+    expect(await within(detail).findByText('GRADING DELAYED')).toBeVisible();
+    expect(within(detail).getByRole('region', { name: 'Group samples' })).toBeVisible();
+    expect(within(detail).getByLabelText('Values')).toHaveTextContent(
+      /score.*being checked/i,
+    );
   });
 
   it('says a submission past the limit was not graded and why, in its row and opened, with no points', async () => {
@@ -1258,6 +1171,68 @@ describe('a submission opened from the list', () => {
     ).toEqual(['Language: python', 'old: 3']);
   });
 
+  it('shows each part of an input given in parts under it, by its row’s title or Part n', async () => {
+    server.use(
+      signedIn,
+      withPage({
+        inputs: [
+          inputField({
+            id: 'out',
+            label: 'Outputs',
+            parts: [
+              { title: 'Small', max_size: 1024 },
+              { title: null, max_size: 1024 },
+            ],
+          }),
+          inputField({
+            id: 'n',
+            type: 'number',
+            label: 'Answers',
+            parts: [
+              { title: 'Small', max_size: 0 },
+              { title: null, max_size: 0 },
+            ],
+          }),
+        ],
+      }),
+      listing([submission(1, accepted)]),
+      http.get(`${TASK_API}/submissions/:number`, () =>
+        HttpResponse.json(submission(1, accepted)),
+      ),
+      http.get(`${TASK_API}/submissions/:number/files`, () =>
+        HttpResponse.json({
+          number: 1,
+          inputs: {
+            out: {
+              files: [],
+              value: null,
+              parts: {
+                '2': { files: ['files/out/2/b.txt'], value: null },
+                '1': { files: ['files/out/1/a.txt'], value: null },
+              },
+            },
+            n: { files: [], value: null, parts: { '1': { files: [], value: '5' } } },
+          },
+        }),
+      ),
+    );
+    renderApp(`${PAGE}?submission=1`);
+
+    const detail = await screen.findByRole('region', { name: 'Submission 1' });
+    const files = await within(detail).findByRole('list', { name: 'Files' });
+    expect(
+      within(files)
+        .getAllByRole('listitem')
+        .map((item) => item.textContent),
+    ).toEqual(['Outputs, Small: 1/a.txt', 'Outputs, Part 2: 2/b.txt']);
+    expect(within(files).getAllByRole('link')[1]).toHaveAttribute(
+      'href',
+      '/-/downloads/acme/spring/sum/1/files/out/2/b.txt',
+    );
+    const given = within(detail).getByRole('list', { name: 'Values given' });
+    expect(within(given).getByRole('listitem')).toHaveTextContent('Answers, Small: 5');
+  });
+
   it('names each file by its path under its input, so files of one name differ', async () => {
     server.use(
       signedIn,
@@ -1294,26 +1269,29 @@ describe('a submission opened from the list', () => {
     ]);
   });
 
-  it('shows what stopped the run as its verdict, and its log as text, never as markup', async () => {
+  it('shows a graded submission’s log as text, never as markup', async () => {
     const stopped = grading({
       status: 'graded',
-      stopped: 'compile_error',
-      values: reported({}, { log: '<img src=x onerror="alert(1)">' }),
+      once: { reports: {}, texts: { log: { name: null, output: null } } },
     });
     server.use(
       signedIn,
       withPage({}),
-      listing([submission(1, stopped, { late_days: 1 })]),
+      listing([submission(1, stopped)]),
       http.get(`${TASK_API}/submissions/:number`, () =>
-        HttpResponse.json(submission(1, stopped, { late_days: 1 })),
+        HttpResponse.json(submission(1, stopped)),
+      ),
+      http.get(`${TASK_API}/submissions/:number/text`, () =>
+        HttpResponse.text('<img src=x onerror="alert(1)">'),
       ),
     );
+    const user = userEvent.setup();
     renderApp(`${PAGE}?submission=1`);
 
     const detail = await screen.findByRole('region', { name: 'Submission 1' });
-    expect(await within(detail).findByText('COMPILE ERROR')).toBeVisible();
-    expect(within(detail).getByText(/, 1 day late$/)).toBeVisible();
-    expect(within(detail).getByLabelText('log')).toHaveTextContent(
+    expect(await within(detail).findByText('GRADED')).toBeVisible();
+    await user.click(within(detail).getByRole('button', { name: 'Show log' }));
+    expect(await within(detail).findByLabelText('log')).toHaveTextContent(
       '<img src=x onerror="alert(1)">',
     );
     expect(document.querySelector('img[src="x"]')).toBeNull();

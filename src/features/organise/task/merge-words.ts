@@ -1,23 +1,13 @@
 import type { MergeWords } from '../forms/MergeView';
 import type { MergePath } from '../forms/merge';
-import { isRecord, NumberText } from '../forms/yaml-doc';
-import { percentOf } from '../contest/percent';
+import { isRecord } from '../forms/yaml-doc';
 import { taskPlace } from './places';
-import { SHOWS } from './scoring';
 
 /**
  * The task's settings in words for the merge of two saves (M27): each
  * setting named as its card names it, and each value as the cards say it,
  * never as the settings file holds it.
  */
-
-const RULE_WEIGHTS: Record<string, string> = {
-  each: 'Points shared among the tests',
-  worst: 'Points times the lowest test score',
-  pass: 'Points when enough tests pass',
-  pass_at: 'Share of tests that must pass',
-  test_weights: 'Weights',
-};
 
 const INPUT_DETAILS: Record<string, string> = {
   label: 'Label shown to entrants',
@@ -28,14 +18,10 @@ const INPUT_DETAILS: Record<string, string> = {
   max_size: 'Maximum size',
 };
 
-/** A setting of the task named in words: "Tests and scoring, small: When entrants see results". */
+/** A setting of the task named in words: "Inputs: Time limit, maximum size". */
 function fieldName(path: MergePath, titles: ReadonlyMap<string, string>): string {
   const keys = path.filter((step): step is string => typeof step === 'string');
   const [top, second, third] = keys;
-  if (top === 'test_groups' && second !== undefined && third !== undefined) {
-    const named = RULE_WEIGHTS[third];
-    if (named !== undefined) return `Tests and scoring, ${second}: ${named}`;
-  }
   if (top === 'inputs' && second !== undefined && third !== undefined) {
     return `Inputs: ${titles.get(second) ?? second}, ${(INPUT_DETAILS[third] ?? third).toLowerCase()}`;
   }
@@ -43,21 +29,7 @@ function fieldName(path: MergePath, titles: ReadonlyMap<string, string>): string
 }
 
 /** A value of a task setting in words, or null where it reads well as it is. */
-function valueWords(path: MergePath, value: unknown): string | null {
-  const key = [...path]
-    .reverse()
-    .find((step): step is string => typeof step === 'string');
-  if (key === 'show' && typeof value === 'string') {
-    return SHOWS.find((show) => show.value === value)?.label ?? null;
-  }
-  if (key === 'pass_at' && value instanceof NumberText)
-    return `${percentOf(value.text)}%`;
-  if (key === 'credit') {
-    if (typeof value === 'string') return `A score the workflow gives it: ${value}`;
-    if (isRecord(value) && typeof value['relative'] === 'string') {
-      return `Its ${value['relative']} against the best any entrant reached`;
-    }
-  }
+function valueWords(_path: MergePath, value: unknown): string | null {
   if (typeof value === 'boolean') return value ? 'Yes' : 'No';
   if (isRecord(value) && typeof value['secret'] === 'string') {
     return `The org’s secret ${value['secret']}`;

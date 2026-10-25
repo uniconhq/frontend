@@ -81,7 +81,7 @@ describe('the sidebar', () => {
       .getAllByRole('link')
       .filter((link) => /active/.test(link.className))
       .map((link) => link.textContent);
-    expect(marked).toEqual(['Tests and scoring']);
+    expect(marked).toEqual(['Submissions']);
   });
 
   it("lists a contest's tasks, leaderboards and questions to its contestants, the tasks marked on a task's page", async () => {
@@ -95,7 +95,7 @@ describe('the sidebar', () => {
 
     expect(await entries('Contest')).toEqual([
       ['Tasks', '/contests/acme/spring'],
-      ['Leaderboards', '/contests/acme/spring/boards'],
+      ['Leaderboards', '/contests/acme/spring/leaderboards'],
       ['Questions', '/contests/acme/spring/questions'],
     ]);
     const nav = screen.getByRole('navigation', { name: 'Sections' });

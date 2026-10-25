@@ -1,3 +1,4 @@
+import { apiClient } from '@/api/client';
 import { $api, queryView } from '@/api/query';
 import type { GradingResult, InputField } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
@@ -7,35 +8,58 @@ import { SectionTitle } from '@/ui/SectionTitle';
 import { VerdictBadge } from '@/ui/VerdictBadge';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
-import { ScoredResult } from '@/ui/scored/ScoredResult';
+import { ScoredResult, type TextAsk } from '@/ui/scored/ScoredResult';
 import { formatDateTime } from '@/lib/time';
-import { downloadHref, nameOf } from './download';
+import { downloadHref } from './download';
+import { nameOf, submittedItems } from '@/lib/submitted';
 import { useLiveConnected, useLiveRefused } from '@/live';
 import { serverNow } from '@/lib/time';
-import {
-  DELAYED_SENTENCE,
-  cancelReason,
-  lateness,
-  pollEvery,
-  verdictOf,
-} from './grading';
+import { DELAYED_SENTENCE, cancelReason, pollEvery } from './grading';
 import { overLimitSentence } from '@/ui/scored/scored-text';
 import shared from '../contest.module.css';
 import classes from './submit.module.css';
 
 type Where = { org: string; contest: string; task: string; number: number };
 
+/** A text the submission shows, read when its row is opened. */
+function readText(where: Where, ask: TextAsk): Promise<string> {
+  return apiClient
+    .GET(
+      '/api/v1/orgs/{org}/contests/{contest}/tasks/{task}/submissions/{number}/text',
+      {
+        params: {
+          path: where,
+          query: {
+            field: ask.field,
+            group: ask.group ?? undefined,
+            place: ask.place ?? undefined,
+            name: ask.name ?? undefined,
+          },
+        },
+        parseAs: 'text',
+      },
+    )
+    .then((found) => found.data ?? '');
+}
+
 /**
- * What the grading holds for the contestant: its verdict, what the run
- * reported once, such as a compile log, and each test group as the task
- * shows it. A grading the organisers cancelled holds their sentence instead,
+ * What the grading holds for the entrant: its verdict, the values and runs
+ * the task shows, and what its steps done once reported, such as a compile
+ * log. A grading the organisers cancelled holds their sentence instead,
  * and says the submission no longer counts against the task's limit: a cancel
  * with a sentence is the one the forge leaves out of the limit, so one
  * without (made before cancels carried one) says nothing about the limit. A
- * delayed one says its grading failed on Unicon's side, and nothing else;
- * one over the limit, that it was not graded and why (#445).
+ * delayed one says its grading failed on Unicon's side, then shows the runs
+ * it did give and its values, one reading a failed run "being checked"; one
+ * over the limit, that it was not graded and why (#445).
  */
-function Grading({ grading }: { grading: GradingResult }) {
+function Grading({
+  grading,
+  readText,
+}: {
+  grading: GradingResult;
+  readText: (ask: TextAsk) => Promise<string>;
+}) {
   if (grading.status === 'delayed') {
     return (
       <>
@@ -43,6 +67,7 @@ function Grading({ grading }: { grading: GradingResult }) {
           <VerdictBadge verdict="delayed" />
         </div>
         <BodyText>{DELAYED_SENTENCE}</BodyText>
+        <ScoredResult grading={grading} readText={readText} />
       </>
     );
   }
@@ -81,11 +106,11 @@ function Grading({ grading }: { grading: GradingResult }) {
   return (
     <>
       <div className={classes.verdict}>
-        <VerdictBadge verdict={verdictOf(grading)} />
+        <VerdictBadge verdict={grading.status} />
         {/* Entrants' pages speak of a submission, not of its gradings' attempts. */}
         {grading.attempt > 1 && <BodyText tone="secondary">Graded again</BodyText>}
       </div>
-      <ScoredResult grading={grading} />
+      <ScoredResult grading={grading} readText={readText} />
     </>
   );
 }
@@ -94,7 +119,8 @@ function Grading({ grading }: { grading: GradingResult }) {
  * What the submission was made with, input by input: each file a download of
  * the file as it was submitted, whatever its size, named with its input as
  * the form names it (its label; its key only for an input the task no longer
- * has), and each value given, as it was given.
+ * has), and each value given, as it was given; an input given in parts
+ * has each part under it.
  */
 function Files({ where, inputs: fields }: { where: Where; inputs: InputField[] }) {
   const view = queryView(
@@ -106,21 +132,14 @@ function Files({ where, inputs: fields }: { where: Where; inputs: InputField[] }
   );
   if (view.state === 'loading') return <PageSkeleton rows={1} />;
   if (view.state === 'error') return <ErrorBlock error={view.error} compact />;
-  const labelOf = (id: string) => fields.find((field) => field.id === id)?.label ?? id;
-  const inputs = Object.entries(view.data.inputs);
-  const files = inputs.flatMap(([id, input]) =>
-    input.files.map((path) => ({ id, path })),
-  );
-  const values = inputs.flatMap(([id, input]) =>
-    input.value === null ? [] : [{ id, value: String(input.value) }],
-  );
+  const { files, values } = submittedItems(view.data.inputs, fields);
   return (
     <>
       {files.length > 0 && (
         <ul className={classes.files} aria-label="Files">
-          {files.map(({ id, path }) => (
-            <li key={path}>
-              {labelOf(id)}:{' '}
+          {files.map(({ key, label, path }) => (
+            <li key={key}>
+              {label}:{' '}
               <OutLink href={downloadHref(where, path)}>{nameOf(path)}</OutLink>
             </li>
           ))}
@@ -128,9 +147,9 @@ function Files({ where, inputs: fields }: { where: Where; inputs: InputField[] }
       )}
       {values.length > 0 && (
         <ul className={classes.files} aria-label="Values given">
-          {values.map(({ id, value }) => (
-            <li key={id}>
-              {labelOf(id)}: {value}
+          {values.map(({ key, label, value }) => (
+            <li key={key}>
+              {label}: {value}
             </li>
           ))}
         </ul>
@@ -184,13 +203,15 @@ export function SubmissionDetail({
         <>
           <BodyText tone="secondary">
             Submitted {formatDateTime(new Date(view.data.submitted_at))}
-            {view.data.late_days > 0 && `, ${lateness(view.data.late_days)}`}
           </BodyText>
           <Files where={where} inputs={inputs} />
           {view.data.grading === null ? (
             <BodyText tone="secondary">Not graded</BodyText>
           ) : (
-            <Grading grading={view.data.grading} />
+            <Grading
+              grading={view.data.grading}
+              readText={(ask) => readText(where, ask)}
+            />
           )}
         </>
       )}

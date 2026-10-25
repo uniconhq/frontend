@@ -1,19 +1,20 @@
-import { useState, type ReactNode } from 'react';
+import { Fragment, useState, type ReactNode } from 'react';
 import type { FeedEntry, Grading } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { PageLink } from '@/ui/PageLink';
-import { OutLink } from '@/ui/OutLink';
 import { verdictLabel } from '@/ui/verdicts';
 import { formatDateTime } from '@/lib/time';
 import { taskPath } from '@/lib/organiser-paths';
-import { STATUS, bySubmission, logHref, nameOf, resultOf, submitterOf } from './feed';
-import { overLimitSentence } from '@/ui/scored/scored-text';
 import {
-  changeOf,
-  decidingValues,
-  sideWords,
-  usePublicationMeanings,
-} from './regrades';
+  STATUS,
+  byPipeline,
+  bySubmission,
+  nameOf,
+  resultOf,
+  submitterOf,
+} from './feed';
+import { overLimitSentence } from '@/ui/scored/scored-text';
+import { changeOf } from './regrades';
 import { ScoredView } from './ScoredView';
 import classes from './feed.module.css';
 
@@ -57,18 +58,9 @@ function standsLine(grading: Grading): string | null {
 /**
  * Where an attempt stands: its status, why one over the limit was not
  * graded, the reason a system error gave the organisers, the sentence a cancel told the entrant, the earlier result
- * that stands while it has none, what a finished run came to, and its log
- * where its run wrote one.
+ * that stands while it has none, and what a finished run came to.
  */
-function StatusCell({
-  path,
-  entry,
-  name,
-}: {
-  path: ContestPath;
-  entry: FeedEntry;
-  name: string;
-}) {
+function StatusCell({ entry }: { entry: FeedEntry }) {
   const { grading } = entry;
   const stands = standsLine(grading);
   return (
@@ -89,43 +81,13 @@ function StatusCell({
       {grading.status === 'done' && grading.result !== null && (
         <BodyText tone="secondary">{verdictLabel(resultOf(grading.result))}</BodyText>
       )}
-      {grading.log && entry.task !== null && (
-        <OutLink
-          href={logHref({ ...path, task: entry.task }, grading.id)}
-          label={`Log of ${name}`}
-          newTab
-        >
-          Log
-        </OutLink>
-      )}
     </>
   );
 }
 
-/**
- * What a regrade did to the submission, on Gradings read by regrade: the
- * result it replaced and its own, side by side, the kind of change under
- * the new one, and the values that decided it where nothing else did.
- */
-function ChangeCells({ path, entry }: { path: ContestPath; entry: FeedEntry }) {
-  const change = entry.grading.change;
-  const keys = change === null ? [] : decidingValues(change);
-  const meanings = usePublicationMeanings(
-    path,
-    entry.task,
-    entry.grading.publication,
-    keys.length > 0,
-  );
-  const values = keys.length > 0 ? { keys, meanings } : null;
-  return (
-    <>
-      <td>{change === null ? '—' : sideWords(change.earlier, values)}</td>
-      <td>
-        {change === null ? '—' : sideWords(change.now, values)}
-        <BodyText tone="meta">{changeOf(entry)}</BodyText>
-      </td>
-    </>
-  );
+/** What a regrade did to the submission, on Gradings read by regrade. */
+function ChangeCell({ entry }: { entry: FeedEntry }) {
+  return <td>{changeOf(entry.grading.change) ?? '—'}</td>;
 }
 
 function TimesCell({ entry }: { entry: FeedEntry }) {
@@ -160,6 +122,7 @@ function AttemptRow({
   head,
   showTask,
   compared,
+  line,
   earlier,
   scored,
   actions,
@@ -169,6 +132,8 @@ function AttemptRow({
   head: boolean;
   showTask: boolean;
   compared: boolean;
+  /** Which of the submission's runs the row grades, where it has a late line. */
+  line?: string;
   earlier?: { count: number; shown: boolean; toggle: () => void };
   scored?: { shown: boolean; toggle: () => void };
   actions: RowActions | null;
@@ -190,6 +155,7 @@ function AttemptRow({
             <BodyText tone="meta">
               {formatDateTime(new Date(grading.submitted_at))}
             </BodyText>
+            {line !== undefined && <BodyText tone="meta">{line}</BodyText>}
             {!grading.latest && (
               <BodyText tone="meta">
                 An earlier attempt; the latest is not among these.
@@ -223,7 +189,7 @@ function AttemptRow({
           </span>
         )}
       </th>
-      {compared && <ChangeCells path={path} entry={entry} />}
+      {compared && <ChangeCell entry={entry} />}
       <td>
         {grading.attempt}
         <BodyText tone="meta">publication {grading.publication}</BodyText>
@@ -234,7 +200,7 @@ function AttemptRow({
         )}
       </td>
       <td>
-        <StatusCell path={path} entry={entry} name={name} />
+        <StatusCell entry={entry} />
       </td>
       <td>
         <TimesCell entry={entry} />
@@ -243,6 +209,12 @@ function AttemptRow({
     </tr>
   );
 }
+
+/** What each pipeline grades, said where a submission has both. */
+const LINE = {
+  early: 'The runs shown during the contest',
+  late: 'The rest of its runs, graded after those',
+} as const;
 
 function Submission({
   path,
@@ -257,47 +229,62 @@ function Submission({
   compared: boolean;
   actions: RowActions | null;
 }) {
-  const [shown, setShown] = useState(false);
+  const [shown, setShown] = useState<Record<string, boolean>>({});
   const [scored, setScored] = useState(false);
-  const [head, ...earlier] = attempts;
-  if (head === undefined) return null;
-  const task = head.task;
-  const columns = (showTask ? 6 : 5) + (compared ? 2 : 0) + (actions !== null ? 1 : 0);
+  const lines = byPipeline(attempts);
+  const first = lines[0]?.attempts[0];
+  if (first === undefined) return null;
+  const task = first.task;
+  const twice = lines.some((line) => line.pipeline === 'late');
+  const columns = (showTask ? 6 : 5) + (compared ? 1 : 0) + (actions !== null ? 1 : 0);
   return (
-    <tbody aria-label={nameOf(head).replace(/, attempt \d+$/, '')}>
-      <AttemptRow
-        path={path}
-        entry={head}
-        head
-        showTask={showTask}
-        compared={compared}
-        earlier={{ count: earlier.length, shown, toggle: () => setShown(!shown) }}
-        scored={
-          task !== null
-            ? { shown: scored, toggle: () => setScored(!scored) }
-            : undefined
-        }
-        actions={actions}
-      />
-      {scored && task !== null && (
-        <tr>
-          <td colSpan={columns}>
-            <ScoredView path={path} task={task} entry={head} />
-          </td>
-        </tr>
-      )}
-      {shown &&
-        earlier.map((entry) => (
-          <AttemptRow
-            key={entry.grading.id}
-            path={path}
-            entry={entry}
-            head={false}
-            showTask={showTask}
-            compared={compared}
-            actions={actions}
-          />
-        ))}
+    <tbody aria-label={nameOf(first).replace(/, attempt \d+$/, '')}>
+      {lines.map(({ pipeline, attempts: [head, ...earlier] }, index) => {
+        if (head === undefined) return null;
+        const open = shown[pipeline] ?? false;
+        return (
+          <Fragment key={pipeline}>
+            <AttemptRow
+              path={path}
+              entry={head}
+              head
+              showTask={showTask}
+              compared={compared}
+              line={twice ? LINE[pipeline] : undefined}
+              earlier={{
+                count: earlier.length,
+                shown: open,
+                toggle: () => setShown({ ...shown, [pipeline]: !open }),
+              }}
+              scored={
+                index === 0 && task !== null
+                  ? { shown: scored, toggle: () => setScored(!scored) }
+                  : undefined
+              }
+              actions={actions}
+            />
+            {index === 0 && scored && task !== null && (
+              <tr>
+                <td colSpan={columns}>
+                  <ScoredView path={path} task={task} entry={head} />
+                </td>
+              </tr>
+            )}
+            {open &&
+              earlier.map((entry) => (
+                <AttemptRow
+                  key={entry.grading.id}
+                  path={path}
+                  entry={entry}
+                  head={false}
+                  showTask={showTask}
+                  compared={compared}
+                  actions={actions}
+                />
+              ))}
+          </Fragment>
+        );
+      })}
     </tbody>
   );
 }
@@ -305,8 +292,8 @@ function Submission({
 /**
  * Gradings, each submission once, headed by its highest attempt, with its
  * earlier attempts opening below it. The task column is left out where every
- * row is of one task. Read by a regrade, each row also gives the result the
- * regrade replaced and its own, side by side (#448). `actions`, when given,
+ * row is of one task. Read by a regrade, each row also says what the regrade
+ * did to it (#448). `actions`, when given,
  * draws what a latest attempt offers in a column of its own.
  */
 export function FeedTable({
@@ -329,12 +316,7 @@ export function FeedTable({
             {showTask && <th scope="col">Task</th>}
             <th scope="col">Submitted by</th>
             <th scope="col">Submission</th>
-            {compared && (
-              <>
-                <th scope="col">Before the regrade</th>
-                <th scope="col">After the regrade</th>
-              </>
-            )}
+            {compared && <th scope="col">What the regrade did</th>}
             <th scope="col">Attempt</th>
             <th scope="col">Status</th>
             <th scope="col">Times</th>

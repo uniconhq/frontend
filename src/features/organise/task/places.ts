@@ -8,18 +8,26 @@ import type { Place } from '../files/place';
 /**
  * Where on the task's pages each of its settings and files is changed, so a
  * save refused for one names it in words and opens it. A refusal names a
- * setting by its place in the task's settings file (`test_groups.small.show`)
- * or a file by its path (`tests/small/3/answer`); that place is turned here
- * into the card, the field and the item it belongs to, and the words for
- * them: "Tests and scoring, small: When entrants see results".
+ * setting by its place in the task's settings file (`inputs.time_limit`) or
+ * a file by its path (`checker/checker.py`); that place is turned here into
+ * the card, the field and the item it belongs to, and the words for them:
+ * "Inputs: Time limit".
  */
 
 /**
  * The cards of the task's page a setting is changed on, and its Settings
- * page, which holds its title. `tests` is the Tests and scoring card, which
- * also holds the submission rules.
+ * page, which holds its title. `tests` is the Submissions card, which holds
+ * the submission rules.
  */
-type TaskCard = 'workflow' | 'inputs' | 'tests' | 'statement' | 'settings';
+type TaskCard =
+  | 'workflow'
+  | 'inputs'
+  | 'runs'
+  | 'scoring'
+  | 'checks'
+  | 'tests'
+  | 'statement'
+  | 'settings';
 
 export type TaskPlace = {
   card: TaskCard;
@@ -27,7 +35,7 @@ export type TaskPlace = {
   label: string;
   /** The field on its card, as the card marks it (`data-field`), or none for the card. */
   field: string | null;
-  /** The input, test group or test group of a test the field belongs to (`data-item`). */
+  /** The item the field belongs to (`data-item`), when it is one of several. */
   item: string | null;
 };
 
@@ -35,18 +43,12 @@ export type TaskPlace = {
 const CARD_LABELS: Record<TaskCard, string> = {
   workflow: 'Workflow',
   inputs: 'Inputs',
-  tests: 'Tests and scoring',
+  runs: 'Runs',
+  scoring: 'Scoring',
+  checks: 'Checks',
+  tests: 'Submissions',
   statement: 'Statement',
   settings: 'Settings',
-};
-
-const GROUP_FIELDS: Record<string, [string, string]> = {
-  each: ['rule', 'Points'],
-  worst: ['rule', 'Points'],
-  pass: ['rule', 'Points'],
-  pass_at: ['rule', 'Share of tests that must pass'],
-  show: ['show', 'When entrants see results'],
-  test_weights: ['rule', 'Weights'],
 };
 
 const SUBMISSION_FIELDS: Record<string, [string, string]> = {
@@ -56,40 +58,16 @@ const SUBMISSION_FIELDS: Record<string, [string, string]> = {
   per: ['per', 'Length of the window'],
 };
 
-/** A test's place in the card: its row, by its name, in its group. */
-export function testField(test: string): string {
-  return `test:${test}`;
-}
-
-/** Where a file under `tests/` is changed: the Tests card, at its group or test. */
-function testsPlace(path: string): TaskPlace {
-  const [group, test] = path.slice('tests/'.length).split('/');
-  if (group === undefined || group === '') {
-    return { card: 'tests', label: 'Tests', field: null, item: null };
-  }
-  if (test === undefined || test === '') {
-    return { card: 'tests', label: `Tests, ${group}`, field: null, item: group };
-  }
-  return {
-    card: 'tests',
-    label: `Tests, ${group}, test ${test}`,
-    field: testField(test),
-    item: group,
-  };
-}
-
 /**
  * The card a problem of the whole file most likely concerns, by what its
  * sentence is about: the sentence is shown as it is beside it.
  */
 function wholePlace(message: string): TaskPlace {
-  const card: TaskCard = /\btest|group/i.test(message)
-    ? 'tests'
-    : /\bworkflow|\bstep/i.test(message)
-      ? 'workflow'
-      : /\binput/i.test(message)
-        ? 'inputs'
-        : 'settings';
+  const card: TaskCard = /\bworkflow|\bstep/i.test(message)
+    ? 'workflow'
+    : /\binput/i.test(message)
+      ? 'inputs'
+      : 'settings';
   return { card, label: CARD_LABELS[card], field: null, item: null };
 }
 
@@ -117,7 +95,6 @@ export function taskPlace(
   message = '',
   titles: ReadonlyMap<string, string> = new Map(),
 ): TaskPlace {
-  if (path === 'tests' || path.startsWith('tests/')) return testsPlace(path);
   if (path === 'statement.md' || path.startsWith('public/')) {
     return { card: 'statement', label: 'Statement', field: null, item: null };
   }
@@ -131,13 +108,12 @@ export function taskPlace(
       item: null,
     };
   }
-  const [top, second, third, fourth] = stepsOf(path);
+  const [top, second, third, fourth, fifth] = stepsOf(path);
   switch (top) {
     case 'name':
       return { card: 'settings', label: 'Settings: Title', field: 'name', item: null };
     case 'workflow':
     case 'steps':
-    case 'report':
       return { card: 'workflow', label: 'Workflow', field: 'workflow', item: null };
     case 'inputs': {
       if (typeof second !== 'string') {
@@ -150,52 +126,57 @@ export function taskPlace(
         item: null,
       };
     }
-    case 'credit':
-      return {
-        card: 'tests',
-        label: 'Tests and scoring: How a test earns',
-        field: 'credit',
-        item: null,
-      };
-    case 'test_groups': {
-      if (typeof second !== 'string') {
-        return {
-          card: 'tests',
-          label: 'Tests and scoring: Test groups',
-          field: null,
-          item: null,
-        };
-      }
-      const group = `Tests and scoring, ${second}`;
-      if (third === 'test_weights' && typeof fourth === 'string') {
-        return {
-          card: 'tests',
-          label: `${group}, test ${fourth}: Weight`,
-          field: testField(fourth),
-          item: second,
-        };
-      }
-      const named = typeof third === 'string' ? GROUP_FIELDS[third] : undefined;
-      return named === undefined
-        ? { card: 'tests', label: group, field: 'rule', item: second }
-        : {
-            card: 'tests',
-            label: `${group}: ${named[1]}`,
-            field: named[0],
-            item: second,
-          };
-    }
     case 'submissions': {
       const key =
         typeof fourth === 'string' ? fourth : third === undefined ? second : third;
       const named = typeof key === 'string' ? SUBMISSION_FIELDS[key] : undefined;
       return {
         card: 'tests',
-        label:
-          named === undefined
-            ? 'Tests and scoring: Submission rules'
-            : `Tests and scoring, Submission rules: ${named[1]}`,
+        label: named === undefined ? 'Submissions' : `Submissions: ${named[1]}`,
         field: named?.[0] ?? 'max',
+        item: null,
+      };
+    }
+    case 'scoring': {
+      if (second === 'values' && typeof third === 'string') {
+        return {
+          card: 'scoring',
+          label: `Scoring: ${third}`,
+          field: `value-${third}`,
+          item: null,
+        };
+      }
+      if (second === 'groups' && typeof third === 'string') {
+        return {
+          card: 'scoring',
+          label: `Scoring: ${third}`,
+          field: `group-${third}`,
+          item: null,
+        };
+      }
+      return { card: 'scoring', label: 'Scoring', field: null, item: null };
+    }
+    case 'checks': {
+      const index = typeof second === 'number' ? second : 0;
+      return {
+        card: 'checks',
+        label: `Checks: check ${String(index + 1)}`,
+        field: `check-${String(index)}`,
+        item: null,
+      };
+    }
+    case 'repeat': {
+      const axis = typeof second === 'number' ? second : 0;
+      const row = typeof fourth === 'number' ? fourth : 0;
+      const name = typeof fifth === 'string' ? fifth : null;
+      return {
+        card: 'runs',
+        label:
+          name === null
+            ? 'Runs'
+            : `Runs, axis ${String(axis + 1)}, row ${String(row + 1)}: ${name}`,
+        field:
+          name === null ? null : `axis-${String(axis)}-tuple-${String(row)}-${name}`,
         item: null,
       };
     }

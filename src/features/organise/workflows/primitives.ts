@@ -15,7 +15,11 @@ export function byRef(primitives: PrimitiveInfo[]): Map<string, PrimitiveInfo> {
 
 /** The ports of a primitive a container limit is raised from. */
 export function raisingPorts(primitive: PrimitiveInfo): Set<string> {
-  return new Set(Object.values(primitive.limits_from).map((source) => source.input));
+  return new Set(
+    Object.values(primitive.limits_from).flatMap((source) =>
+      source.input === null ? [] : [source.input],
+    ),
+  );
 }
 
 /** A usable primitive's declaration, or null for one the platform no longer reads. */

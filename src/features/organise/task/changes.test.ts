@@ -1,81 +1,56 @@
 import { describe, expect, it } from 'vitest';
-import type { GroupValues, TaskValues } from '../forms/task-values';
+import { emptyInput, emptyTuple, type TaskValues } from '../forms/task-values';
 import { changeLines } from './changes';
-import { NOTHING_STAGED } from './staged';
 
-function group(overrides: Partial<GroupValues> = {}): GroupValues {
+function task(overrides: Partial<TaskValues> = {}): TaskValues {
   return {
-    name: 'main',
-    read: true,
-    folder: true,
-    each: '',
-    worst: '',
-    pass: '',
-    passAt: '',
-    weights: [],
-    show: '',
+    name: 'Sum',
+    workflow: 'unicon/classic@v3',
+    inputs: [],
+    axes: [],
+    scoreGroups: [],
+    scoreValues: [],
+    show: {},
+    checks: [],
+    max: '',
+    rateCount: '',
+    ratePer: '',
     ...overrides,
   };
 }
 
-function task(groups: GroupValues[]): TaskValues {
-  return {
-    name: 'Sum',
-    workflow: 'unicon/classic@v1',
-    inputs: [],
-    credit: { kind: 'none', name: '' },
-    groups,
-    max: '',
-    rateCount: '',
-    ratePer: '',
-  };
-}
+const TITLES = new Map([['time_limit', 'Time limit']]);
 
-const lines = (was: GroupValues, now: GroupValues) =>
-  changeLines(task([was]), task([now]), NOTHING_STAGED, new Map());
-
-describe('what a save changes in a test group', () => {
-  it('says only its points when its total alone changes, the rule the same', () => {
-    expect(lines(group({ pass: '100' }), group({ pass: '110' }))).toEqual([
-      'main: points',
-    ]);
-    expect(
-      lines(
-        group({ each: '60', pass: '40', passAt: '0.8' }),
-        group({ each: '90', pass: '60', passAt: '0.8' }),
-      ),
-    ).toEqual(['main: points']);
+describe('what a save of the task’s cards changes', () => {
+  it('says nothing when nothing changed', () => {
+    expect(changeLines(task(), task(), TITLES)).toEqual([]);
   });
 
-  it('says how it earns points when the rule’s shape changes', () => {
-    expect(lines(group({ pass: '100' }), group({ each: '100' }))).toEqual([
-      'main: how it earns points',
+  it('names each input by its title, and one given a new file once as such', () => {
+    const was = task({
+      inputs: [{ ...emptyInput('time_limit', 'value'), value: '1' }],
+    });
+    const now = task({
+      inputs: [{ ...emptyInput('time_limit', 'value'), value: '2' }],
+    });
+    expect(changeLines(was, now, TITLES)).toEqual(['Inputs: Time limit']);
+    expect(changeLines(was, now, TITLES, ['time_limit'])).toEqual([
+      'Inputs: Time limit, a new file',
     ]);
-    expect(
-      lines(group({ each: '50', pass: '50' }), group({ each: '30', pass: '70' })),
-    ).toEqual(['main: how it earns points']);
-    expect(
-      lines(
-        group({ pass: '100', passAt: '0.5' }),
-        group({ pass: '100', passAt: '0.8' }),
-      ),
-    ).toEqual(['main: how it earns points']);
+    expect(changeLines(was, task(), TITLES)).toEqual(['Inputs: Time limit removed']);
   });
 
-  it('says both when the shape and the total change together, and nothing when only spelled differently', () => {
-    expect(lines(group({ pass: '100' }), group({ each: '120' }))).toEqual([
-      'main: points',
-      'main: how it earns points',
+  it('says the runs, the scoring, the checks and the submission rules, each once', () => {
+    const now = task({
+      axes: [{ inputs: ['input'], tuples: [emptyTuple(['input'])] }],
+      show: { score: 'now' },
+      checks: [],
+      max: '10',
+    });
+    expect(changeLines(task(), now, TITLES)).toEqual([
+      'Runs',
+      'Scoring',
+      'Submission rules',
     ]);
-    expect(lines(group({ pass: '100' }), group({ pass: '100.0' }))).toEqual([]);
-  });
-
-  it('says nothing when the share of tests that must pass is written out as all of them, as it was unset', () => {
-    expect(lines(group({ pass: '100' }), group({ pass: '100', passAt: '1' }))).toEqual(
-      [],
-    );
-    expect(lines(group({ pass: '100', passAt: '1' }), group({ pass: '100' }))).toEqual(
-      [],
-    );
   });
 });

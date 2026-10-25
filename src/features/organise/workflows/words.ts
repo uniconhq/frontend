@@ -2,7 +2,7 @@ import type { WorkflowItem } from '@/api/types';
 import { formatExact, ratioDigits } from '@/lib/exact';
 import { listed } from '@/lib/listed';
 import type { Box } from './layout';
-import type { FieldDecl, InputDecl, Ref, ReportEntry, Workflow } from './model';
+import type { Ref, OutputEntry, Workflow } from './model';
 import type { PrimitiveInfo } from './primitives';
 import { verdictLabel } from '@/ui/verdicts';
 
@@ -31,7 +31,7 @@ function outcomeName(outcome: string): string {
 }
 
 /**
- * The results a step can report, from the primitive's own words for each
+ * The verdicts a step can give, from the primitive's own words for each
  * (M56): "Accepted if the source compiles." for one; "Accepted if the source
  * compiles, otherwise Compile error." for two, since the second is all the
  * first is not; and for more, one line each, "Time limit if it runs out of
@@ -50,21 +50,6 @@ export function outcomeWords(primitive: PrimitiveInfo): string | string[] | null
       : `${outcomeName(word)} if ${when}, otherwise ${outcomeName(second[0])}.`;
   }
   return outcomes.map(([word, when]) => `${outcomeName(word)} if ${when}`);
-}
-
-/** What the shaded band on the graph says it is: the steps in it run once for each test (M55). */
-export const BAND_LABEL = 'Runs once for each test';
-
-/** How often a step runs, as its box says it. */
-export function runsWords(perTest: boolean): string {
-  return perTest ? 'For each test' : 'Once';
-}
-
-/** How often a step runs, as its drawer says it, in the band's words (M55). */
-export function runsSentence(perTest: boolean): string {
-  return perTest
-    ? `${BAND_LABEL}, so it stands in the shaded band on the graph.`
-    : 'Runs once, for the whole submission.';
 }
 
 const LIMIT_WORDS: Record<string, string> = {
@@ -99,34 +84,16 @@ export function portMarks(primitive: PrimitiveInfo, port: string): string[] {
   ].filter((mark): mark is string => mark !== null);
 }
 
-/** What stands out about a workflow's input, in words. */
-export function inputMarks(input: InputDecl): string[] {
-  return [
-    input.contestant ? 'the entrant gives it' : null,
-    input.perTest ? 'one for each test' : null,
-  ].filter((mark): mark is string => mark !== null);
-}
-
-/** What stands out about a test's field, in words. */
-export function fieldMarks(field: FieldDecl): string[] {
-  return field.public ? ['shown to entrants'] : [];
-}
-
-/** What a report entry says its number means, in words. */
-export function entryMarks(entry: ReportEntry): string[] {
-  if (entry.better === null) return [];
-  return [
-    entry.better === 'higher' || entry.better === 'lower'
-      ? `${entry.better} is better`
-      : 'the task says which is better',
-  ];
+/** A number output's unit, when the file gives one. */
+export function entryMarks(entry: OutputEntry): string[] {
+  return entry.unit === null ? [] : [entry.unit];
 }
 
 /** Where a value comes from, as a wire's label and a menu say it: "time_ms from run". */
 export function refWords(ref: Ref): string {
   if (ref.kind === 'steps') return `${ref.output} from ${ref.name}`;
   if (ref.kind === 'inputs') return `${ref.name} from the inputs`;
-  return `${ref.name} from each test`;
+  return `${ref.name} from the workflow’s files`;
 }
 
 /** Who reads a workflow, in a few words, as its page's header says it. */
@@ -147,11 +114,10 @@ export function boxName(box: Box, workflow: Workflow): string {
   if (box.kind === 'step' && box.step !== null)
     return `Step ${workflow.steps[box.step]?.id || '(no name)'}`;
   if (box.kind === 'inputs') return 'Inputs';
-  if (box.kind === 'test') return 'Each test’s files';
-  return 'Report';
+  return 'Outputs';
 }
 
-/** The steps that read a group of inputs or test files, as its box says it. */
+/** The steps that read a group of inputs, as its box says it. */
 export function readersWords(readers: string[]): string {
   if (readers.length === 0) return 'Nothing uses these yet';
   if (readers.length === 1) return `Used by ${readers[0] ?? ''}`;
@@ -208,9 +174,10 @@ function limitParts(limits: Record<string, number>): string[] {
 }
 
 /**
- * Where a port a limit grows from takes its value: "the task’s Time limit"
- * for a workflow input, named by its title, or the entrant’s when the entrant
- * gives it; "what its time_limit is given" otherwise.
+ * Where a port a limit grows from takes its value: "the Time limit input"
+ * for a workflow input, named by its title; "what its time_limit is given"
+ * otherwise. Whether the task or the entrant fills the input is the task's
+ * to say, so the workflow's words name only the input.
  */
 function sourceWords(
   step: Workflow['steps'][number] | undefined,
@@ -221,7 +188,7 @@ function sourceWords(
   if (value?.kind === 'wire' && value.ref.kind === 'inputs') {
     const name = value.ref.name;
     const input = workflow.inputs.find((found) => found.id === name);
-    return `the ${input?.contestant === true ? 'entrant’s' : 'task’s'} ${input?.title ?? name}`;
+    return `the ${input?.title ?? name} input`;
   }
   return `what its ${port} is given`;
 }
@@ -230,12 +197,11 @@ function sourceWords(
  * What a step's container gets each time it runs, in plain words (M56): "What
  * this step gets each time it runs: up to 60 seconds, 1 GB of memory, 128
  * processes, 64 MB of output", with each limit a task raises said so ("its
- * time grows with the task’s Time limit"), or "for each test" where the step
- * runs for each test as one batch, whose limits are each test's (TASK-FORMAT
- * 1.4); null when the primitive gives no limits. Then whose limits they are. A step runs the entrant's program when
+ * time grows with the Time limit input"); null when the primitive gives no
+ * limits. Then whose limits they are. A step runs the entrant's program when
  * its primitive runs what arrives at a port (`runs`) and raises its limits
  * from what it is given (`limits_from`), as Run program does to fit the
- * task's Time limit: the program then runs inside it within those. Compile
+ * Time limit input: the program then runs inside it within those. Compile
  * runs what arrives too, but takes nothing from the task, so its limits are
  * its own.
  */
@@ -249,14 +215,13 @@ export function limitsWords(
   const raised = new Map<string, string>();
   for (const [limit, source] of Object.entries(primitive.limits_from)) {
     const word = LIMIT_WORDS[limit] ?? limit;
-    if (!raised.has(word)) raised.set(word, sourceWords(step, workflow, source.input));
+    if (source.input === null || raised.has(word)) continue;
+    raised.set(word, sourceWords(step, workflow, source.input));
   }
   const grows = [...raised].map(([word, from], at) =>
     at === 0 ? `its ${word} grows with ${from}` : `its ${word} with ${from}`,
   );
-  const each =
-    primitive.batch && step?.perTest === true ? 'for each test' : 'each time it runs';
-  const gets = `What this step gets ${each}: ${parts.join(', ')}${
+  const gets = `What this step gets each time it runs: ${parts.join(', ')}${
     grows.length === 0 ? '' : `; ${listed(grows)}`
   }.`;
   const runsProgram =

@@ -255,6 +255,15 @@ describe('the statement beside its preview', { timeout: 20_000 }, () => {
               encoding: 'base64',
               remove: false,
             },
+            {
+              // The task's show lists no picture, so the save shows them now.
+              path: 'task.yaml',
+              token: 'token-task-yaml',
+              content:
+                'name: sum\nworkflow: unicon/classic@v2\nscoring:\n  show:\n    now: [public/]\n',
+              encoding: 'utf-8',
+              remove: false,
+            },
           ],
           confirm: false,
           keep_as_draft: false,
@@ -296,6 +305,7 @@ describe('the statement beside its preview', { timeout: 20_000 }, () => {
       expect(saves[1]?.changes.map((change) => change.path)).toEqual([
         'statement.md',
         'public/tree.gif',
+        'task.yaml',
       ]);
     });
 
