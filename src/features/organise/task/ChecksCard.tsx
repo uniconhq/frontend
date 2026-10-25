@@ -7,6 +7,7 @@ import { FieldBox } from '../contest/ContestFile';
 import { BuildCard, CardPart } from './BuildCard';
 import {
   entrantInputs,
+  checkProblem,
   freshKey,
   perRunEntrant,
   runsOf,
@@ -19,6 +20,7 @@ const VERDICTS = [
   'wrong_answer',
   'time_limit',
   'memory_limit',
+  'output_limit',
   'runtime_error',
   'compile_error',
 ];
@@ -137,6 +139,11 @@ export function ChecksCard({
               </div>
             ))}
           </div>
+          {checkProblem(check, index) !== undefined && (
+            <div role="alert">
+              <BodyText>{checkProblem(check, index)}</BodyText>
+            </div>
+          )}
           <Button
             size="xs"
             variant="secondary"

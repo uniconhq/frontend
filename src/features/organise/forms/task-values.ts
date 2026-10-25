@@ -10,7 +10,10 @@ import {
   writeAt,
   type Doc,
 } from './yaml-doc';
+import type { Catalogue } from '../formula/catalogue';
+import { textValues } from '../formula/gives';
 import {
+  axisColumns,
   readScoring,
   writeScoring,
   type CheckDraft,
@@ -132,6 +135,30 @@ export function emptyTuple(inputs: readonly string[]): TupleValues {
     maxSize: '',
     cells: Object.fromEntries(inputs.map((id) => [id, { entrant: false, value: '' }])),
   };
+}
+
+/** `axis` without the column `id`, in its inputs and in every tuple. */
+export function withoutInput(axis: AxisValues, id: string): AxisValues {
+  return {
+    inputs: axis.inputs.filter((item) => item !== id),
+    tuples: axis.tuples.map((tuple) => {
+      const cells = { ...tuple.cells };
+      delete cells[id];
+      return { ...tuple, cells };
+    }),
+  };
+}
+
+/**
+ * The axes with every one that has inputs first. An axis with none is not
+ * written, so it cannot sit before one that is: a refusal names axes as the
+ * file numbers them, and the card's fields use that same number.
+ */
+export function settled(axes: AxisValues[]): AxisValues[] {
+  return [
+    ...axes.filter((axis) => axis.inputs.length > 0),
+    ...axes.filter((axis) => axis.inputs.length === 0),
+  ];
 }
 
 /** How many runs the axes make: the product of their tuples, or 1 with none. */
@@ -397,11 +424,36 @@ function repeatOf(axes: AxisValues[], inputs: InputValues[]): unknown[] {
  * Write what changed between `before` and `after` into the document. A
  * manager's save leaves the admin's keys alone; the form holds them still too.
  */
+/**
+ * The task's values that give text, as the forge reads them: a run's text
+ * columns are `verdict` and each text input an axis fills.
+ */
+function givingText(values: TaskValues, catalogue: Catalogue): Set<string> {
+  const trees = Object.fromEntries(
+    values.scoreValues
+      .filter((value) => value.name.trim() !== '' && value.tree !== null)
+      .map((value) => [value.name.trim(), value.tree]),
+  );
+  const texts = axisColumns(values.axes, values.inputs)
+    .filter((column) => column.kind === 'text')
+    .map((column) => column.name);
+  return textValues(trees, new Set(['verdict', ...texts]), catalogue);
+}
+
 export function writeTask(
   doc: Doc,
   before: TaskValues,
   after: TaskValues,
-  { admin, unreadable }: { admin: boolean; unreadable: string[] },
+  {
+    admin,
+    unreadable,
+    catalogue = null,
+  }: {
+    admin: boolean;
+    unreadable: string[];
+    /** The blocks, which tell a value that gives text; none while not loaded. */
+    catalogue?: Catalogue | null;
+  },
 ): void {
   const put = (
     path: string[],
@@ -513,6 +565,9 @@ export function writeTask(
         unreadable,
       },
       (value) => value.tree,
+      (input, text) =>
+        typedValue(after.inputs.find((item) => item.id === input)?.type ?? null, text),
+      catalogue === null ? new Set() : givingText(after, catalogue),
     );
   }
 }

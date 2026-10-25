@@ -34,12 +34,11 @@ import {
   commit,
   hourBefore,
   lineOf,
-  outputNames,
+  givenValues,
   previewRows,
   problems,
   readLeaderboards,
   taskIds,
-  workflowRef,
   writeHold,
   writeLeaderboards,
   type BoardDraft,
@@ -48,6 +47,7 @@ import {
   type HoldDraft,
   type RowsKind,
   type ShowDraft,
+  type TaskGives,
   type SortDraft,
   type Who,
 } from './model';
@@ -62,7 +62,16 @@ const WAYS = [
   { value: 'asc', label: 'Lowest first' },
 ];
 
-function useOutputs(org: string, contest: string, tasks: readonly string[]): string[] {
+/**
+ * What each task gives a leaderboard, the values its settings name, read
+ * from each task's `task.yaml`, and which of them give text, from its
+ * workflow form; null until every one has been read, so no formula is
+ * called unknown meanwhile. A task whose settings cannot be read, or whose
+ * form does not say which values give text, is null: its values are not
+ * known, so what a formula reads of it is not checked here, as the forge
+ * does not check a task it cannot resolve.
+ */
+function useTaskGives(org: string, contest: string, tasks: readonly string[]): TaskGives | null {
   const files = useQueries({
     queries: tasks.map((task) => ({
       ...$api.queryOptions(
@@ -73,45 +82,35 @@ function useOutputs(org: string, contest: string, tasks: readonly string[]): str
       retry: false,
     })),
   });
-  const fileStamp = files.map((file) => file.data?.content ?? '').join('\0');
-  const refs = useMemo(() => {
-    const found = new Map<string, { owner: string; name: string; version: string }>();
-    for (const file of files) {
-      const content = file.data?.content;
-      if (content === undefined) continue;
-      const ref = workflowRef(content);
-      if (ref === null) continue;
-      found.set(`${ref.owner}/${ref.name}@${ref.version}`, ref);
-    }
-    return [...found.values()];
-    // `fileStamp` is the files. `files` is a new array every render.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fileStamp]);
-  const versions = useQueries({
-    queries: refs.map((ref) => ({
+  // Which of each task's values give text, as its workflow form says.
+  const forms = useQueries({
+    queries: tasks.map((task) => ({
       ...$api.queryOptions(
         'get',
-        '/api/v1/workflows/{owner}/{name}/versions/{version}',
-        {
-          params: { path: ref },
-        },
+        '/api/v1/orgs/{org}/contests/{contest}/tasks/{task}/workflow-form',
+        { params: { path: { org, contest, task } } },
       ),
       retry: false,
     })),
   });
-  const versionStamp = versions
-    .map((version) => version.data?.content ?? '')
-    .join('\0');
+  const pending = [...files, ...forms].some((query) => query.isPending);
+  const stamp = JSON.stringify([
+    files.map((file) => file.data?.content ?? ''),
+    forms.map((form) => form.data?.text_values ?? null),
+  ]);
   return useMemo(() => {
-    const names = new Set<string>();
-    for (const version of versions) {
-      const content = version.data?.content;
-      if (content !== undefined)
-        for (const name of outputNames(content)) names.add(name);
-    }
-    return [...names];
+    if (pending) return null;
+    return Object.fromEntries(
+      tasks.map((task, index) => {
+        const content = files[index]?.data?.content;
+        const text = forms[index]?.data?.text_values;
+        if (content === undefined || text == null) return [task, null];
+        return [task, givenValues(content, new Set(text))];
+      }),
+    );
+    // `stamp` is the files and the forms. Each list is a new array every render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [versionStamp]);
+  }, [pending, stamp, tasks]);
 }
 
 function matches(field: string, path: string): boolean {
@@ -167,13 +166,36 @@ function FieldMessages({ messages }: { messages: readonly string[] }) {
 }
 
 function renameColumn(board: BoardDraft, columnKey: string, name: string): BoardDraft {
-  const old = board.columns.find((column) => column.key === columnKey)?.name ?? '';
-  const move = <T extends { name: string }>(item: T): T =>
-    item.name === old && old !== '' ? { ...item, name } : item;
   return {
     ...board,
     columns: board.columns.map((column) =>
-      column.key === columnKey ? { ...column, name } : column,
+      column.key === columnKey
+        ? { ...column, name, moved: column.moved ?? column.name }
+        : column,
+    ),
+  };
+}
+
+/**
+ * The board with the sort and display of a renamed column moved to its new
+ * name, once the name is done: not while it is empty or another column's, so
+ * a name typed through on the way never takes another column's entries.
+ */
+function settleColumn(board: BoardDraft, columnKey: string): BoardDraft {
+  const column = board.columns.find((item) => item.key === columnKey);
+  if (column?.moved === undefined) return board;
+  const { moved: from, name: to } = column;
+  if (to.trim() === '') return board;
+  if (board.columns.some((item) => item.key !== columnKey && item.name === to))
+    return board;
+  const move = <T extends { name: string }>(item: T): T =>
+    item.name === from && from !== '' ? { ...item, name: to } : item;
+  return {
+    ...board,
+    columns: board.columns.map((item) =>
+      item.key === columnKey
+        ? { key: item.key, name: to, line: item.line, tree: item.tree }
+        : item,
     ),
     sort: board.sort.map(move),
     display: board.display.map(move),
@@ -181,10 +203,11 @@ function renameColumn(board: BoardDraft, columnKey: string, name: string): Board
 }
 
 function dropColumn(board: BoardDraft, columnKey: string): BoardDraft {
-  const name = board.columns.find((column) => column.key === columnKey)?.name ?? '';
+  const column = board.columns.find((item) => item.key === columnKey);
+  const name = column?.moved ?? column?.name ?? '';
   return {
     ...board,
-    columns: board.columns.filter((column) => column.key !== columnKey),
+    columns: board.columns.filter((item) => item.key !== columnKey),
     sort: name === '' ? board.sort : board.sort.filter((item) => item.name !== name),
     display:
       name === '' ? board.display : board.display.filter((item) => item.name !== name),
@@ -213,9 +236,11 @@ export function LeaderboardsForm({
   const [draft, setDraft] = useState(loaded);
   const [now, setNow] = useState(() => Date.now());
   const [tasks] = useState(() => taskIds(doc));
-  const outputs = useOutputs(org, contest, tasks);
   const blocks = $api.useQuery('get', '/api/v1/blocks');
-  const catalogue = blocks.data ?? null;
+  const gives = useTaskGives(org, contest, tasks);
+  const unread = tasks.filter((task) => gives?.[task] === null);
+  // Formulas are read once the blocks and what every task gives are in.
+  const catalogue = gives === null ? null : (blocks.data ?? null);
   const entrants = $api.useQuery(
     'get',
     '/api/v1/orgs/{org}/contests/{contest}/organise/entrants',
@@ -225,18 +250,21 @@ export function LeaderboardsForm({
   const start = isRecord(root) ? root['start'] : undefined;
   const end = isRecord(root) ? root['end'] : undefined;
   const local = useMemo(
-    () => problems(draft, catalogue, tasks, outputs, now, start, end),
-    [catalogue, draft, end, now, outputs, start, tasks],
+    () => problems(draft, catalogue, tasks, gives ?? {}, now, start, end, loaded.hold),
+    [catalogue, draft, end, now, gives, start, tasks, loaded.hold],
   );
   const target = useFormulaTarget();
   useOpenedField(!loaded.legacy);
   const disabled = !manager || busy || asking;
   const save = () => {
-    if (catalogue === null) return;
+    if (catalogue === null || gives === null) return;
     const at = Date.now();
     if (at !== now) setNow(at);
-    if (problems(draft, catalogue, tasks, outputs, at, start, end).length > 0) return;
-    const next = commit(draft, catalogue, tasks, outputs);
+    if (
+      problems(draft, catalogue, tasks, gives, at, start, end, loaded.hold).length > 0
+    )
+      return;
+    const next = commit(draft, catalogue, tasks, gives);
     onSave((file) => {
       writeLeaderboards(file, loaded, next);
       writeHold(file, loaded, next);
@@ -275,6 +303,11 @@ export function LeaderboardsForm({
         </BodyText>
       )}
       {blocks.isError && <BodyText>{BLOCKS_UNLOADED}</BodyText>}
+      {unread.length > 0 && (
+        <BodyText tone="secondary">
+          {`The settings of ${unread.join(', ')} could not be read, so what a leaderboard reads of ${unread.length === 1 ? 'it' : 'them'} is not checked here.`}
+        </BodyText>
+      )}
       {draft.boards.map((board) => (
         <BoardCard
           key={board.id}
@@ -283,7 +316,7 @@ export function LeaderboardsForm({
           board={board}
           boards={draft.boards}
           tasks={tasks}
-          outputs={outputs}
+          gives={gives ?? {}}
           catalogue={catalogue}
           entrants={entrants.data ?? []}
           local={local}
@@ -339,7 +372,7 @@ function BoardCard({
   board,
   boards,
   tasks,
-  outputs,
+  gives,
   catalogue,
   entrants,
   local,
@@ -357,7 +390,7 @@ function BoardCard({
   board: BoardDraft;
   boards: readonly BoardDraft[];
   tasks: readonly string[];
-  outputs: readonly string[];
+  gives: TaskGives;
   catalogue: Catalogue | null;
   entrants: { id: string; display_name: string }[];
   local: readonly FieldProblem[];
@@ -374,12 +407,14 @@ function BoardCard({
   onRemove: () => void;
 }) {
   const readings =
-    catalogue === null ? {} : boardReadings(board, boards, tasks, outputs, catalogue);
+    catalogue === null ? {} : boardReadings(board, boards, tasks, gives, catalogue);
   const texts = board.columns
     .filter((column) => readings[column.key]?.kind === 'text')
     .map((column) => column.name);
   const scope =
-    catalogue === null ? null : boardScope(board, boards, tasks, outputs, texts);
+    catalogue === null
+      ? null
+      : boardScope(board, boards, tasks, gives, catalogue.leaderboard_facts, texts);
   const names = board.columns
     .filter((column) => column.name !== '')
     .map((column) => ({ value: column.name, label: column.name }));
@@ -470,6 +505,7 @@ function BoardCard({
           onName={(name) =>
             onChange((current) => renameColumn(current, column.key, name))
           }
+          onNamed={() => onChange((current) => settleColumn(current, column.key))}
           onLine={(line) =>
             onChange((current) => ({
               ...current,
@@ -625,6 +661,7 @@ function ColumnFields({
   onFocus,
   onInsert,
   onName,
+  onNamed,
   onLine,
   onRemove,
 }: {
@@ -644,6 +681,7 @@ function ColumnFields({
   ) => void;
   onInsert: (piece: { text: string; caret?: number }) => void;
   onName: (name: string) => void;
+  onNamed: () => void;
   onLine: (line: string) => void;
   onRemove: () => void;
 }) {
@@ -657,6 +695,7 @@ function ColumnFields({
         disabled={disabled}
         error={messages[0]}
         onChange={onName}
+        onCommit={onNamed}
       />
       {messages.length > 1 && <FieldMessages messages={messages.slice(1)} />}
       {catalogue !== null && scope !== null && (

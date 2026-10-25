@@ -82,6 +82,54 @@ const PYTHON_SHA256 =
   'cc42155088fca5730758db72b2a5bca33112a941dfaa2d43098ec422ce4ea213';
 
 describe('the submit panel', () => {
+  it('gives each part of an input given per row a field of the input’s own kind', async () => {
+    server.use(
+      signedIn,
+      listing([]),
+      withPage({
+        inputs: [
+          inputField({
+            id: 'tree',
+            type: 'folder',
+            label: 'Your tree',
+            parts: [
+              { title: 'Small grid', max_size: 1024 },
+              { title: null, max_size: 1024 },
+            ],
+          }),
+          inputField({
+            id: 'seed',
+            type: 'number',
+            label: 'Seed',
+            parts: [
+              { title: null, max_size: 1024 },
+              { title: null, max_size: 1024 },
+            ],
+          }),
+        ],
+      }),
+    );
+    renderApp(PAGE);
+
+    const form = await screen.findByRole('form', { name: 'Submit' });
+    expect(within(form).getByLabelText('Small grid: a folder')).toHaveProperty(
+      'webkitdirectory',
+      true,
+    );
+    expect(within(form).getByLabelText('Part 2: a folder')).toHaveProperty(
+      'webkitdirectory',
+      true,
+    );
+    expect(within(form).getAllByRole('textbox', { name: /^Part [12]$/ })).toHaveLength(
+      2,
+    );
+    // Each input given in parts is a group named by its label, its parts under it.
+    const seed = within(form).getByRole('group', { name: 'Seed' });
+    expect(within(seed).getAllByRole('textbox', { name: /^Part [12]$/ })).toHaveLength(
+      2,
+    );
+  });
+
   it('shows a drop zone per file input, a choice for an enum and a field for each value', async () => {
     server.use(
       signedIn,
@@ -847,8 +895,8 @@ describe('a submission opened from the list', () => {
       name: 'Group samples',
     });
     expect(within(samples).getAllByText('ACCEPTED')).toHaveLength(2);
-    expect(samples).toHaveTextContent('time_ms 12');
-    expect(samples).toHaveTextContent(`memory_kb ${formatExact('2048')}`);
+    expect(samples).toHaveTextContent('Run time (ms) 12');
+    expect(samples).toHaveTextContent(`Memory used (KB) ${formatExact('2048')}`);
     expect(detail).not.toHaveTextContent(/points/);
 
     await user.click(within(detail).getByRole('button', { name: 'Show log' }));
@@ -885,7 +933,7 @@ describe('a submission opened from the list', () => {
     expect(within(detail).getByText(/does not count against the task/)).toBeVisible();
   });
 
-  it('says a delayed grading is delayed on Unicon’s side, in its row and opened, and nothing more', async () => {
+  it('says a delayed grading is delayed on Unicon’s side, in its row and opened', async () => {
     const delayed = grading({ status: 'delayed' });
     server.use(
       signedIn,
@@ -911,6 +959,42 @@ describe('a submission opened from the list', () => {
       ),
     ).toBeVisible();
     expect(within(detail).queryByRole('table')).toBeNull();
+  });
+
+  it('shows, opened, what a delayed grading gave beside its delay, a value on a failed run being checked', async () => {
+    const delayed = grading({
+      status: 'delayed',
+      run_values: [
+        {
+          name: 'score',
+          number: null,
+          text: null,
+          waiting: true,
+          self_reported: false,
+          show: 'now',
+          facts: null,
+          runs: null,
+          values: null,
+        },
+      ],
+      runs: accepted.runs,
+    });
+    server.use(
+      signedIn,
+      withPage({}),
+      listing([submission(1, delayed)]),
+      http.get(`${TASK_API}/submissions/:number`, () =>
+        HttpResponse.json(submission(1, delayed)),
+      ),
+    );
+    renderApp(`${PAGE}?submission=1`);
+
+    const detail = await screen.findByRole('region', { name: 'Submission 1' });
+    expect(await within(detail).findByText('GRADING DELAYED')).toBeVisible();
+    expect(within(detail).getByRole('region', { name: 'Group samples' })).toBeVisible();
+    expect(within(detail).getByLabelText('Values')).toHaveTextContent(
+      /score.*being checked/i,
+    );
   });
 
   it('says a submission past the limit was not graded and why, in its row and opened, with no points', async () => {
@@ -1079,6 +1163,68 @@ describe('a submission opened from the list', () => {
         .getAllByRole('listitem')
         .map((item) => item.textContent),
     ).toEqual(['Language: python', 'old: 3']);
+  });
+
+  it('shows each part of an input given in parts under it, by its row’s title or Part n', async () => {
+    server.use(
+      signedIn,
+      withPage({
+        inputs: [
+          inputField({
+            id: 'out',
+            label: 'Outputs',
+            parts: [
+              { title: 'Small', max_size: 1024 },
+              { title: null, max_size: 1024 },
+            ],
+          }),
+          inputField({
+            id: 'n',
+            type: 'number',
+            label: 'Answers',
+            parts: [
+              { title: 'Small', max_size: 0 },
+              { title: null, max_size: 0 },
+            ],
+          }),
+        ],
+      }),
+      listing([submission(1, accepted)]),
+      http.get(`${TASK_API}/submissions/:number`, () =>
+        HttpResponse.json(submission(1, accepted)),
+      ),
+      http.get(`${TASK_API}/submissions/:number/files`, () =>
+        HttpResponse.json({
+          number: 1,
+          inputs: {
+            out: {
+              files: [],
+              value: null,
+              parts: {
+                '2': { files: ['files/out/2/b.txt'], value: null },
+                '1': { files: ['files/out/1/a.txt'], value: null },
+              },
+            },
+            n: { files: [], value: null, parts: { '1': { files: [], value: '5' } } },
+          },
+        }),
+      ),
+    );
+    renderApp(`${PAGE}?submission=1`);
+
+    const detail = await screen.findByRole('region', { name: 'Submission 1' });
+    const files = await within(detail).findByRole('list', { name: 'Files' });
+    expect(
+      within(files)
+        .getAllByRole('listitem')
+        .map((item) => item.textContent),
+    ).toEqual(['Outputs, Small: 1/a.txt', 'Outputs, Part 2: 2/b.txt']);
+    expect(within(files).getAllByRole('link')[1]).toHaveAttribute(
+      'href',
+      '/-/downloads/acme/spring/sum/1/files/out/2/b.txt',
+    );
+    const given = within(detail).getByRole('list', { name: 'Values given' });
+    expect(within(given).getByRole('listitem')).toHaveTextContent('Answers, Small: 5');
   });
 
   it('names each file by its path under its input, so files of one name differ', async () => {

@@ -1945,7 +1945,8 @@ export interface paths {
          * What one submission of an entrant was made with
          * @description Each input's files by the address the download door reads them at,
          *     `/-/downloads/<org>/<contest>/<task>/entrants/<entrant>/<number>/<path>`,
-         *     or the value given. A row with no such submission is `not_found`.
+         *     or the value given, and each part's the same of an input given in parts.
+         *     A row with no such submission is `not_found`.
          */
         get: operations["listOrganisedSubmissionFiles"];
         put?: never;
@@ -2390,8 +2391,9 @@ export interface paths {
         };
         /**
          * What one of the caller's own submissions was made with
-         * @description Each input's files by their paths in the submission, or its value;
-         *     each file downloads through the download door.
+         * @description Each input's files by their paths in the submission, or its value,
+         *     and each part's the same of an input given in parts; each file
+         *     downloads through the download door.
          */
         get: operations["listMySubmissionFiles"];
         put?: never;
@@ -2537,7 +2539,9 @@ export interface paths {
          *     so the form can mend it. Either way `graded` says whether the task has a
          *     graded submission, and `newer` names the workflow's latest version when
          *     it comes after the one the task names, which the task keeps until it is
-         *     saved naming another.
+         *     saved naming another. `text_values` names the values that give text, in
+         *     the file's order, null when the settings cannot be read; a workflow
+         *     output stays a number.
          */
         get: operations["getTaskWorkflowForm"];
         put?: never;
@@ -5594,16 +5598,16 @@ export interface components {
          * RunShown
          * @description One run of a grading as its entrant sees it: the group
          *     `show` lists that shows it, its place in that group from 1 ("Test 3"),
-         *     its key as the plan gives it, leaving out a file not yet shown, its
-         *     verdict, `passed`, 1 when that is `accepted`, the numbers its steps
-         *     reported, exactly, and its texts, with the `label` and `message` shown
-         *     with its verdict, null when no step wrote one. A run in two groups
-         *     shown is shown in each; a run no group shown holds is never shown, even
-         *     when a value shown reads it. Organisers read every run, under `all` in
-         *     the task's order, with its `id`, which counts every run of the task;
-         *     `id` is null for an entrant. A run a row holds that the task's latest
-         *     publication no longer has is `dropped`, listed to organisers after the
-         *     rest; never to an entrant.
+         *     one tuple per axis, its verdict, `passed`, 1 when that is `accepted`,
+         *     the numbers its steps reported, each by its title and unit, exactly,
+         *     and its texts, with the `label` and `message` shown with its verdict,
+         *     null when no step wrote one. A run in two groups shown is shown in
+         *     each; a run no group shown holds is never shown, even when a value
+         *     shown reads it. Organisers read every run, under `all` in the task's
+         *     order, with its `id`, which counts every run of the task; `id` is null
+         *     for an entrant. A run a row holds that the task's latest publication no
+         *     longer has is `dropped`, listed to organisers after the rest; never to
+         *     an entrant.
          */
         RunShown: {
             /**
@@ -5615,10 +5619,6 @@ export interface components {
             group: string;
             /** Id */
             id: string | null;
-            /** Key */
-            key: {
-                [key: string]: unknown;
-            };
             label: components["schemas"]["TextRef"] | null;
             message: components["schemas"]["TextRef"] | null;
             /** Passed */
@@ -5626,9 +5626,7 @@ export interface components {
             /** Place */
             place: number;
             /** Reports */
-            reports: {
-                [key: string]: string;
-            };
+            reports: components["schemas"]["ShownOutput"][];
             /**
              * Texts
              * @default {}
@@ -5636,8 +5634,8 @@ export interface components {
             texts: {
                 [key: string]: components["schemas"]["TextRef"];
             };
-            /** Titles */
-            titles: (string | null)[] | null;
+            /** Tuples */
+            tuples: components["schemas"]["RunTuple"][];
             /**
              * Verdict
              * @enum {string}
@@ -5664,6 +5662,20 @@ export interface components {
             schema_version: 6;
             /** Staff */
             staff: components["schemas"]["StaffNote"][];
+        };
+        /**
+         * RunTuple
+         * @description One axis of a run: its title, null when that tuple has none, and the
+         *     columns of that axis the reader is shown, a file left out until `show`
+         *     lists it.
+         */
+        RunTuple: {
+            /** Key */
+            key: {
+                [key: string]: unknown;
+            };
+            /** Title */
+            title: string | null;
         };
         /**
          * RunValue
@@ -5858,6 +5870,23 @@ export interface components {
             visibility: components["schemas"]["Visibility"];
         };
         /**
+         * ShownOutput
+         * @description One number a run reported, named by the title its workflow gives it,
+         *     or by its own name, with its unit, null when it has none, and the
+         *     number exactly.
+         */
+        ShownOutput: {
+            /**
+             * Number
+             * @example 82.5
+             */
+            number: string;
+            /** Title */
+            title: string;
+            /** Unit */
+            unit: string | null;
+        };
+        /**
          * Slot
          * @description A slot for one file: where to send it, and when the slot stops being
          *     good. `ready` is true for a file the forge already holds, which is sent
@@ -5999,13 +6028,19 @@ export interface components {
          * SubmittedFileInput
          * @description What one input of a submission was: the paths of its files in the
          *     submission, each a download through the download door, or the value
-         *     given, a number as its exact decimal digits. It is read leniently from
-         *     the submission's `submission.json`: a member of the wrong type is left
-         *     out rather than failing the answer.
+         *     given, a number as its exact decimal digits; or, for an input given
+         *     once per tuple, its `parts` by number from "1", only the parts given,
+         *     its own `files` empty and `value` null, and `parts` null on any other.
+         *     It is read leniently from the submission's `submission.json`: a member
+         *     of the wrong type is left out rather than failing the answer.
          */
         SubmittedFileInput: {
             /** Files */
             files: string[];
+            /** Parts */
+            parts: {
+                [key: string]: components["schemas"]["SubmittedPart"];
+            } | null;
             /** Value */
             value: string | boolean | null;
         };
@@ -6041,6 +6076,20 @@ export interface components {
             uploads: string[];
             /** Value */
             value?: string | boolean | null;
+        };
+        /**
+         * SubmittedPart
+         * @description What one part of an input given in parts was: the paths of its files
+         *     in the submission, each a download through the download door, or the
+         *     value given, a number as its exact decimal digits. It is read leniently
+         *     from the submission's `submission.json`: a member of the wrong type is
+         *     left out rather than failing the answer.
+         */
+        SubmittedPart: {
+            /** Files */
+            files: string[];
+            /** Value */
+            value: string | boolean | null;
         };
         /**
          * Submitter
@@ -6461,7 +6510,9 @@ export interface components {
          *     that cannot be read or is in an old form; `graded`, whether the task has
          *     a graded submission; and `newer`, the workflow's latest version when it
          *     comes after the one the task names, which the task keeps until someone
-         *     saves it naming another (Task 10.6.5).
+         *     saves it naming another (Task 10.6.5). `text_values` names the values
+         *     that give text, in the file's order, none when the settings cannot be
+         *     read; a workflow output stays a number.
          */
         WorkflowForm: {
             /**
@@ -6478,6 +6529,8 @@ export interface components {
             newer: string | null;
             /** Problem */
             problem: string | null;
+            /** Text Values */
+            text_values: string[] | null;
             /** Workflow */
             workflow: string | null;
         };

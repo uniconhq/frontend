@@ -76,6 +76,7 @@ const UNREAD: WorkflowForm = {
   problem: 'The workflow unicon/checked@v1 cannot be read.',
   graded: false,
   newer: null,
+  text_values: null,
 };
 
 function declared(
@@ -115,6 +116,7 @@ const CHECKED: WorkflowForm = {
     declared('greeting', 'text', { optional: true }),
     declared('token', 'text'),
   ],
+  text_values: null,
 };
 
 /** unicon/checked's file, which reports the fraction its checker gives a run. */
@@ -687,6 +689,66 @@ describe('the cards that build a task', { timeout: 30_000 }, () => {
     });
   });
 
+  it('drops a run column another workflow chosen does not have, keeping its rows', async () => {
+    const { sent } = taskBackend({
+      form: CHECKED,
+      content: `name: Sum
+workflow: unicon/checked@v1
+inputs:
+  submission: entrant
+  time_limit: 2
+repeat:
+  - inputs: [checker, greeting]
+    tuples:
+      - {checker: checker/a.cpp, greeting: hi}
+      - {checker: checker/b.cpp, greeting: yo}
+`,
+    });
+    asManager();
+    const { workflow } = await openTask();
+    const runs = screen.getByRole('region', { name: 'Runs' });
+    expect(within(runs).getByRole('columnheader', { name: /checker/i })).toBeVisible();
+
+    fill(await within(workflow).findByLabelText(/^Workflow/), 'my-org/tunable');
+    await waitFor(() =>
+      expect(within(runs).queryByRole('columnheader', { name: /checker/i })).toBeNull(),
+    );
+    await save();
+
+    expect(written(await waitForSave(sent))['repeat']).toEqual([
+      { inputs: ['greeting'], tuples: [{ greeting: 'hi' }, { greeting: 'yo' }] },
+    ]);
+  });
+
+  it('offers to remove a run column the workflow does not have, and saves without it', async () => {
+    const { sent } = taskBackend({
+      form: CHECKED,
+      content: `name: Sum
+workflow: unicon/checked@v1
+inputs:
+  submission: entrant
+  time_limit: 2
+repeat:
+  - inputs: [input, answer, greeting]
+    tuples:
+      - {input: tests/1.in, answer: tests/1.ans, greeting: hi}
+`,
+    });
+    asManager();
+    await openTask();
+    const runs = screen.getByRole('region', { name: 'Runs' });
+    expect(runs).toHaveTextContent('Not an input of the workflow');
+
+    await userEvent.click(within(runs).getByRole('button', { name: 'Remove input' }));
+    await userEvent.click(within(runs).getByRole('button', { name: 'Remove answer' }));
+    expect(within(runs).queryByRole('button', { name: /^Remove / })).toBeNull();
+    await save();
+
+    expect(written(await waitForSave(sent))['repeat']).toEqual([
+      { inputs: ['greeting'], tuples: [{ greeting: 'hi' }] },
+    ]);
+  });
+
   it('removes an input’s key when its value is cleared, and one the workflow does not have', async () => {
     const { sent } = taskBackend({
       form: {
@@ -1044,6 +1106,7 @@ function runForm(workflow: string, inputs: DeclaredInput[]): WorkflowForm {
     graded: false,
     newer: null,
     inputs,
+    text_values: null,
   };
 }
 
@@ -1370,6 +1433,14 @@ describe('scoring, checks and what a save answers', { timeout: 60_000 }, () => {
     const checks = screen.getByRole('region', { name: 'Checks' });
     await userEvent.click(within(checks).getByRole('button', { name: 'Add a check' }));
     fill(within(checks).getByRole('textbox', { name: 'Solution' }), 'print(1)');
+    expect(within(checks).getByRole('alert')).toHaveTextContent(
+      'Check 1 needs the verdict or a value it should get.',
+    );
+    expect(
+      within(
+        within(checks).getByRole('combobox', { name: 'Verdict every run gets' }),
+      ).getByRole('option', { name: 'output_limit' }),
+    ).toBeInTheDocument();
     await userEvent.selectOptions(
       within(checks).getByRole('combobox', { name: 'Verdict every run gets' }),
       'accepted',
@@ -1399,6 +1470,202 @@ describe('scoring, checks and what a save answers', { timeout: 60_000 }, () => {
       },
       checks: [{ submit: { code: 'print(1)' }, expect: { verdict: 'accepted' } }],
     });
+  });
+
+  it('drops a removed part from show, moves a renamed group, and takes out a name no part has', async () => {
+    const { sent } = taskBackend({
+      content: `${ISLANDS}scoring:
+  groups:
+    samples: {input: sample.in}
+    big: {input: sample.in}
+  values:
+    total: {block: sum, over: {runs: all}, of: {run: [all, passed]}}
+    extra: 1
+  show:
+    now: [total, extra, samples, big, gone]
+`,
+      form: runForm('unicon/classic@v3', [
+        declared('code', 'file'),
+        declared('input', 'file'),
+      ]),
+    });
+    await openTask();
+    const scoring = await screen.findByRole('region', { name: 'Scoring' });
+    const parts = await within(scoring).findByRole('row', { name: /gone/ });
+    expect(parts).toHaveTextContent('Not a part of this task');
+    await userEvent.click(
+      within(parts).getByRole('button', { name: 'Stop showing gone' }),
+    );
+    const samples = within(scoring).getByRole('textbox', { name: 'Name of samples' });
+    fill(samples, 'tests');
+    fireEvent.blur(samples);
+    await userEvent.click(within(scoring).getByRole('button', { name: 'Remove big' }));
+    const removes = within(scoring).getAllByRole('button', { name: 'Remove' });
+    const extra = removes[1];
+    if (extra === undefined) throw new Error('no second value');
+    await userEvent.click(extra);
+    await save();
+
+    const file = written(sent[0]);
+    expect(file).toMatchObject({
+      scoring: {
+        groups: { tests: { input: 'sample.in' } },
+        show: { now: ['total', 'tests'] },
+      },
+    });
+    expect(JSON.stringify(file)).not.toMatch(/extra|big|gone|samples/);
+  });
+
+  it('lists a shown folder that holds nothing yet as a folder, not as a part to take out', async () => {
+    taskBackend({
+      content: `${ISLANDS}scoring:
+  values:
+    total: {block: sum, over: {runs: all}, of: {run: [all, passed]}}
+  show:
+    now: [total, public/]
+`,
+      form: runForm('unicon/classic@v3', [
+        declared('code', 'file'),
+        declared('input', 'file'),
+      ]),
+    });
+    await openTask();
+    const scoring = await screen.findByRole('region', { name: 'Scoring' });
+    const folder = await within(scoring).findByRole('row', { name: /public\// });
+    expect(folder).not.toHaveTextContent('Not a part of this task');
+    expect(folder).toHaveTextContent('A folder, empty for now');
+    expect(within(scoring).queryByText(/Not a part of this task/)).toBeNull();
+  });
+
+  it('moves a renamed group\u2019s when once its name is done, past a value\u2019s name typed on the way', async () => {
+    const { sent } = taskBackend({
+      content: `${ISLANDS}scoring:
+  groups:
+    samples: {input: sample.in}
+  values:
+    total: {block: sum, over: {runs: all}, of: {run: [all, passed]}}
+  show:
+    now: [total]
+    after_close: [samples]
+`,
+      form: runForm('unicon/classic@v3', [
+        declared('code', 'file'),
+        declared('input', 'file'),
+      ]),
+    });
+    await openTask();
+    const scoring = await screen.findByRole('region', { name: 'Scoring' });
+    const name = within(scoring).getByRole('textbox', { name: 'Name of samples' });
+    for (const typed of ['tot', 'total', 'totals']) fill(name, typed);
+    fireEvent.blur(name);
+    await save();
+
+    expect(written(sent[0])).toMatchObject({
+      scoring: { show: { now: ['total'], after_close: ['totals'] } },
+    });
+  });
+
+  it('reads each input an axis fills as a column of its run, a number or text as declared', async () => {
+    const { sent } = taskBackend({
+      content: `name: Seeds
+workflow: unicon/classic@v3
+inputs:
+  code: {entrant: {label: Solution}}
+repeat:
+  - inputs: [seed, name]
+    tuples:
+      - {seed: 1, name: small}
+      - {seed: 2, name: big}
+scoring:
+  values:
+    top: {block: max, over: {runs: all}, of: {run: [all, seed]}}
+`,
+      form: runForm('unicon/classic@v3', [
+        declared('code', 'file'),
+        declared('seed', 'number'),
+        declared('name', 'text'),
+      ]),
+    });
+    await openTask();
+    const scoring = await screen.findByRole('region', { name: 'Scoring' });
+    await userEvent.click(within(scoring).getByRole('button', { name: 'Add a value' }));
+    await typeLine(
+      'value_2',
+      'otherwise(first(all, all.verdict != "accepted").name, "none")',
+    );
+    const bar = await screen.findByRole('region', { name: 'Save the task' });
+    await waitFor(() => {
+      expect(within(bar).getByRole('button', { name: 'Save' })).toBeEnabled();
+    });
+    await save();
+    expect(written(await waitForSave(sent))).toMatchObject({
+      scoring: {
+        values: {
+          top: { block: 'max', of: { run: ['all', 'seed'] } },
+          value_2: { block: 'otherwise' },
+        },
+      },
+    });
+  });
+
+  it('leaves a stored value whose line does not read back to it to the forge, not blocking the save', async () => {
+    const { sent } = taskBackend({
+      content: `${ISLANDS}scoring:
+  values:
+    odd: {block: max, of: [1, 2], colour: red}
+`,
+      form: runForm('unicon/classic@v3', [
+        declared('code', 'file'),
+        declared('input', 'file'),
+      ]),
+    });
+    await openTask();
+    const scoring = await screen.findByRole('region', { name: 'Scoring' });
+    await userEvent.click(within(scoring).getByRole('button', { name: 'Add a value' }));
+    await typeLine('value_2', '1');
+    const bar = await screen.findByRole('region', { name: 'Save the task' });
+    await waitFor(() => {
+      expect(within(bar).getByRole('button', { name: 'Save' })).toBeEnabled();
+    });
+    await save();
+    expect(written(await waitForSave(sent))).toMatchObject({
+      scoring: { values: { odd: { block: 'max', of: [1, 2], colour: 'red' } } },
+    });
+  });
+
+  it('offers to show what the forge serves: compiled, each output, and the files but task.yaml and plans/', async () => {
+    taskBackend({
+      content: ISLANDS,
+      form: runForm('unicon/classic@v3', [
+        declared('code', 'file'),
+        declared('input', 'file'),
+      ]),
+    });
+    server.use(
+      http.get(`${TASK_API}/tree`, () =>
+        HttpResponse.json([
+          file('task.yaml'),
+          { ...file('plans'), kind: 'directory' },
+          { ...file('public'), kind: 'directory' },
+          file('sample.in'),
+        ]),
+      ),
+    );
+    await openTask();
+    const scoring = await screen.findByRole('region', { name: 'Scoring' });
+    await within(scoring).findByRole('row', { name: /public\// });
+    const names = within(scoring)
+      .getAllByRole('row')
+      .filter((row) => within(row).queryByRole('combobox') !== null)
+      .map((row) => row.querySelector('th')?.textContent);
+    expect(names).toEqual([
+      'all',
+      'compiled',
+      'fraction',
+      'time_ms',
+      'public/',
+      'sample.in',
+    ]);
   });
 
   it('refuses a value named like a group, and a loop, before the save', async () => {
@@ -1434,7 +1701,7 @@ describe('scoring, checks and what a save answers', { timeout: 60_000 }, () => {
   it('keeps a part shown now from being hidden later, once a submission is graded', async () => {
     taskBackend({
       content:
-        'name: Islands\nworkflow: unicon/classic@v3\nscoring:\n  show:\n    now: [log]\n',
+        'name: Islands\nworkflow: unicon/classic@v3\nscoring:\n  show:\n    now: [compiled]\n',
       form: {
         ...runForm('unicon/classic@v3', [declared('code', 'file')]),
         graded: true,
@@ -1442,7 +1709,9 @@ describe('scoring, checks and what a save answers', { timeout: 60_000 }, () => {
     });
     await openTask();
     const scoring = await screen.findByRole('region', { name: 'Scoring' });
-    const when = within(scoring).getByRole('combobox', { name: 'When log is shown' });
+    const when = within(scoring).getByRole('combobox', {
+      name: 'When compiled is shown',
+    });
     expect(within(when).getByRole('option', { name: 'Now' })).toBeEnabled();
     expect(
       within(when).getByRole('option', {

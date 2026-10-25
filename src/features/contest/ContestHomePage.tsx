@@ -11,11 +11,15 @@ import { SectionTitle } from '@/ui/SectionTitle';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
 import { taskPoints } from '@/ui/leaderboards/points';
+import { ShownValue } from '@/ui/number/ShownValue';
+import { formatExact } from '@/lib/exact';
 import { LeaderboardTable } from '@/ui/leaderboards/table';
 import { taskPagePath } from '@/lib/contest-paths';
 import { contestPath } from '@/lib/organiser-paths';
+import { contestStaff } from '@/lib/viewer';
+import { useSession } from '@/session';
 import { useContestParams } from '@/lib/route-params';
-import { contestViewSectionPath } from '@/lib/sections';
+import { contestViewSectionPath, entrantGradingsPath } from '@/lib/sections';
 import { formatDateTime } from '@/lib/time';
 import { ContestAnnouncements } from './threads/AnnouncementList';
 import { useMyQuestions } from './threads/questions';
@@ -30,6 +34,9 @@ import { labelOf } from './task-names';
 import { submissionHref } from './submit/submission-param';
 import { taskTimeLines } from './time-left';
 import classes from './contest.module.css';
+
+/** How often a standing on the home is read again, as the leaderboards page is. */
+const STANDING_MS = 30_000;
 
 /**
  * Where a task stands for the reader, when it is not simply open; for one
@@ -94,6 +101,7 @@ function TaskList({
   tasks,
   notApproved,
   standing,
+  staff,
 }: {
   org: string;
   contest: string;
@@ -101,6 +109,8 @@ function TaskList({
   /** Where a task stands for a reader who is not an approved entrant. */
   notApproved: string;
   standing: ContestHome['standing'];
+  /** The most a column can show is told to staff only. */
+  staff: boolean;
 }) {
   const { at, measured } = useServerClock();
   if (tasks.length === 0) {
@@ -113,7 +123,10 @@ function TaskList({
           <span className={classes.label}>{labelOf(task)}</span>
           <PageLink to={taskPagePath(org, contest, task.name)}>{task.title}</PageLink>
           {taskPoints(task.name, standing).map((points) => (
-            <span key={points.board}>{points.text}</span>
+            <span key={points.board}>
+              <ShownValue number={points.number} places={points.places} />
+              {staff && points.most !== null && ` / ${formatExact(points.most)}`}
+            </span>
           ))}
           <Standing task={task} at={at} counting={measured} notApproved={notApproved} />
         </li>
@@ -168,8 +181,13 @@ function LeaderboardCard({
   standing: ContestHome['standing'];
   staff: boolean;
 }) {
-  const open = (task: string, number: number) =>
-    `${taskPagePath(org, contest, task)}${submissionHref(number)}`;
+  // Staff open the entrant's submissions to the task; anyone else, who
+  // reads only their own row, their own submission. A standing is an
+  // approved entrant's, so the staff branch is for one who is staff too.
+  const open = (task: string, number: number, entrant: string) =>
+    staff
+      ? entrantGradingsPath(org, contest, task, entrant)
+      : `${taskPagePath(org, contest, task)}${submissionHref(number)}`;
   return (
     <Card>
       <div className={classes.stack}>
@@ -191,8 +209,11 @@ function LeaderboardCard({
   );
 }
 
-/** A visitor has no row. The public leaderboards are the contest's own page. */
-function PublicLeaderboards({ org, contest }: { org: string; contest: string }) {
+/**
+ * A visitor, or a signed-in person who is not an approved entrant, has no
+ * row here. The leaderboards are the contest's own page.
+ */
+function LeaderboardsLink({ org, contest }: { org: string; contest: string }) {
   return (
     <Card>
       <div className={classes.stack}>
@@ -239,7 +260,7 @@ function QuestionsCard({ org, contest }: { org: string; contest: string }) {
  * included. It is read again soon while they wait on an organiser or an
  * invite, and now and then otherwise, so extra time or a task released by
  * its own time reaches the page; crossing the start or the end reads it
- * again at once.
+ * again at once. While it shows a standing, it is read every thirty seconds.
  */
 function SignedInHome({ org, contest }: { org: string; contest: string }) {
   const queryClient = useQueryClient();
@@ -248,7 +269,16 @@ function SignedInHome({ org, contest }: { org: string; contest: string }) {
       'get',
       '/api/v1/orgs/{org}/contests/{contest}/home',
       { params: { path: { org, contest } } },
-      { refetchInterval: (query) => entryPollEvery(query.state.data?.registration) },
+      {
+        refetchInterval: (query) => {
+          const every = entryPollEvery(query.state.data?.registration);
+          // The stream tells no one of another entrant's grading, so a
+          // standing is read again every thirty seconds, stream or not.
+          return (query.state.data?.standing.length ?? 0) > 0
+            ? Math.min(every, STANDING_MS)
+            : every;
+        },
+      },
     ),
   );
   const readAgain = useCallback(() => {
@@ -283,6 +313,11 @@ function Home({
   home: ContestHome;
   onBoundary: () => void;
 }) {
+  const session = useSession();
+  // Leaderboard staff as the forge reads it: a role at the contest or the
+  // org, not one at a task alone, which `organises` counts.
+  const staff =
+    session.status === 'signed-in' && contestStaff(org, contest, session.me.roles);
   const entrant = home.registration.entrant;
   const approved = entrant?.status === 'approved';
   const settled = approved || home.organises;
@@ -336,15 +371,22 @@ function Home({
             tasks={home.tasks}
             notApproved={TASK_STANDING[notIn(home)]}
             standing={home.standing}
+            staff={staff}
           />
         </div>
       </Card>
-      <LeaderboardCard
-        org={org}
-        contest={contest}
-        standing={home.standing}
-        staff={home.organises}
-      />
+      {/* The forge gives a standing to an approved entrant alone: anyone else
+          reads the leaderboards on their own page. */}
+      {approved ? (
+        <LeaderboardCard
+          org={org}
+          contest={contest}
+          standing={home.standing}
+          staff={staff}
+        />
+      ) : (
+        <LeaderboardsLink org={org} contest={contest} />
+      )}
       <Card>
         <ContestAnnouncements org={org} contest={contest} />
       </Card>
@@ -395,7 +437,7 @@ function PublicHome({ org, contest }: { org: string; contest: string }) {
           <PublicTaskList org={org} contest={contest} tasks={found.tasks} />
         </div>
       </Card>
-      <PublicLeaderboards org={org} contest={contest} />
+      <LeaderboardsLink org={org} contest={contest} />
     </Page>
   );
 }

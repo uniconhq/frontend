@@ -10,7 +10,8 @@ import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
 import { ScoredResult, type TextAsk } from '@/ui/scored/ScoredResult';
 import { formatDateTime } from '@/lib/time';
-import { downloadHref, nameOf } from './download';
+import { downloadHref } from './download';
+import { nameOf, submittedItems } from '@/lib/submitted';
 import { useLiveConnected, useLiveRefused } from '@/live';
 import { serverNow } from '@/lib/time';
 import { DELAYED_SENTENCE, cancelReason, pollEvery } from './grading';
@@ -48,8 +49,9 @@ function readText(where: Where, ask: TextAsk): Promise<string> {
  * and says the submission no longer counts against the task's limit: a cancel
  * with a sentence is the one the forge leaves out of the limit, so one
  * without (made before cancels carried one) says nothing about the limit. A
- * delayed one says its grading failed on Unicon's side, and nothing else;
- * one over the limit, that it was not graded and why (#445).
+ * delayed one says its grading failed on Unicon's side, then shows the runs
+ * it did give and its values, one reading a failed run "being checked"; one
+ * over the limit, that it was not graded and why (#445).
  */
 function Grading({
   grading,
@@ -65,6 +67,7 @@ function Grading({
           <VerdictBadge verdict="delayed" />
         </div>
         <BodyText>{DELAYED_SENTENCE}</BodyText>
+        <ScoredResult grading={grading} readText={readText} />
       </>
     );
   }
@@ -116,7 +119,8 @@ function Grading({
  * What the submission was made with, input by input: each file a download of
  * the file as it was submitted, whatever its size, named with its input as
  * the form names it (its label; its key only for an input the task no longer
- * has), and each value given, as it was given.
+ * has), and each value given, as it was given; an input given in parts
+ * has each part under it.
  */
 function Files({ where, inputs: fields }: { where: Where; inputs: InputField[] }) {
   const view = queryView(
@@ -128,21 +132,14 @@ function Files({ where, inputs: fields }: { where: Where; inputs: InputField[] }
   );
   if (view.state === 'loading') return <PageSkeleton rows={1} />;
   if (view.state === 'error') return <ErrorBlock error={view.error} compact />;
-  const labelOf = (id: string) => fields.find((field) => field.id === id)?.label ?? id;
-  const inputs = Object.entries(view.data.inputs);
-  const files = inputs.flatMap(([id, input]) =>
-    input.files.map((path) => ({ id, path })),
-  );
-  const values = inputs.flatMap(([id, input]) =>
-    input.value === null ? [] : [{ id, value: String(input.value) }],
-  );
+  const { files, values } = submittedItems(view.data.inputs, fields);
   return (
     <>
       {files.length > 0 && (
         <ul className={classes.files} aria-label="Files">
-          {files.map(({ id, path }) => (
-            <li key={path}>
-              {labelOf(id)}:{' '}
+          {files.map(({ key, label, path }) => (
+            <li key={key}>
+              {label}:{' '}
               <OutLink href={downloadHref(where, path)}>{nameOf(path)}</OutLink>
             </li>
           ))}
@@ -150,9 +147,9 @@ function Files({ where, inputs: fields }: { where: Where; inputs: InputField[] }
       )}
       {values.length > 0 && (
         <ul className={classes.files} aria-label="Values given">
-          {values.map(({ id, value }) => (
-            <li key={id}>
-              {labelOf(id)}: {value}
+          {values.map(({ key, label, value }) => (
+            <li key={key}>
+              {label}: {value}
             </li>
           ))}
         </ul>

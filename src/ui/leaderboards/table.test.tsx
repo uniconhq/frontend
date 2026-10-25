@@ -219,23 +219,48 @@ describe('a leaderboard table', () => {
 });
 
 describe('a task’s points', () => {
-  it('reads the cell that counted the task, over the most that column can show', () => {
+  it('reads the cell that counted this task alone, not a total over several', () => {
     const standing = [
       board({
-        headers: [header('points', { at_most: '100' })],
+        headers: [
+          header('total', { at_most: '200' }),
+          header('points', { at_most: '100', places: 1 }),
+        ],
         rows: [
           row('ada', {
             cells: [
-              cell('points', { number: '62', counted: [{ task: 'sum', number: 1 }] }),
+              cell('total', {
+                number: '90',
+                counted: [
+                  { task: 'sum', number: 1 },
+                  { task: 'other', number: 2 },
+                ],
+              }),
+              cell('points', {
+                number: '62.25',
+                counted: [{ task: 'sum', number: 1 }],
+              }),
             ],
           }),
         ],
       }),
     ];
     expect(taskPoints('sum', standing)).toEqual([
-      { board: 'gradebook', text: '62 / 100' },
+      { board: 'gradebook', number: '62.25', places: 1, most: '100' },
     ]);
     expect(taskPoints('other', standing)).toEqual([]);
+  });
+
+  it('formats the bounds staff are told', () => {
+    renderWithProviders(
+      <LeaderboardTable
+        staff
+        board={board({
+          headers: [header('points', { at_least: '0', at_most: '1000000' })],
+        })}
+      />,
+    );
+    expect(screen.getByText('at least 0, at most 1,000,000')).toBeVisible();
   });
 });
 

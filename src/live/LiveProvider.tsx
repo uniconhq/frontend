@@ -14,13 +14,14 @@ const REOPEN_MS = [5_000, 10_000, 20_000, 40_000, 60_000];
 /**
  * Which reads each kind of nudge makes stale, by the route the read was
  * made at: a grading moves a contestant's submissions, an organiser's
- * gradings, a contest's queue and the contest home, whose standing it
- * moves, and the summaries of regrades under way, but not a
+ * gradings, a contest's queue, the contest home and the leaderboards, whose
+ * rows it moves, and the summaries of regrades under way, but not a
  * submission's files, which a grading never changes; an announcement the
  * announcement lists; and a
  * clarification the asker's questions and the organisers' inbox; a save's
  * checks the task and its publications; a release or a take-back the
- * submissions, whose shown values change with no grading moving.
+ * submissions and the leaderboards, whose shown values change with no
+ * grading moving.
  */
 const STALE: Record<string, (path: string) => boolean> = {
   grading: (path) =>
@@ -28,7 +29,8 @@ const STALE: Record<string, (path: string) => boolean> = {
     path.endsWith('/gradings') ||
     path.endsWith('/gradings/queue') ||
     path.endsWith('/gradings/regrades') ||
-    path.endsWith('/home'),
+    path.endsWith('/home') ||
+    path.endsWith('/leaderboards'),
   announcement: (path) => path.includes('/announcements'),
   clarification: (path) =>
     path.endsWith('/questions') || path.includes('/clarifications'),
@@ -39,7 +41,8 @@ const STALE: Record<string, (path: string) => boolean> = {
   // grading moving, so the open result is read again.
   results: (path) =>
     (path.includes('/submissions') && !path.endsWith('/files')) ||
-    path.endsWith('/home'),
+    path.endsWith('/home') ||
+    path.endsWith('/leaderboards'),
 };
 
 function readAt(query: Query): string | null {

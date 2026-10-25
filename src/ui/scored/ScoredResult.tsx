@@ -12,7 +12,7 @@ import { ShownValue } from '@/ui/number/ShownValue';
 import { RESULTS_AFTER } from '@/ui/number/words';
 import { VerdictBadge } from '@/ui/VerdictBadge';
 import { formatDateTime } from '@/lib/time';
-import { tupleLine } from './scored-text';
+import { reportLabel, tupleLine } from './scored-text';
 import classes from './scored.module.css';
 
 /**
@@ -115,7 +115,7 @@ function RunRow({
   run: RunShown;
   readText?: (ask: TextAsk) => Promise<string>;
 }) {
-  const line = tupleLine(run.titles, run.key);
+  const line = tupleLine(run.tuples);
   const ask = { group: run.group, place: run.place };
   return (
     <div className={classes.run}>
@@ -123,9 +123,9 @@ function RunRow({
       {line !== '' && <BodyText>{line}</BodyText>}
       <VerdictBadge verdict={run.verdict} />
       {run.dropped && <BodyText tone="secondary">Dropped</BodyText>}
-      {Object.entries(run.reports).map(([name, number]) => (
-        <span key={name}>
-          {name} <ShownValue number={number} />
+      {run.reports.map((report, index) => (
+        <span key={index}>
+          {reportLabel(report.title, report.unit)} <ShownValue number={report.number} />
         </span>
       ))}
       {Object.entries(run.texts).map(([name, ref]) => (

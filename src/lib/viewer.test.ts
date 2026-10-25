@@ -66,7 +66,9 @@ describe('viewerOf', () => {
     expect(seen(held, null).taskManager).toBe(true);
     expect(seen(held, null, 'other').taskManager).toBe(false);
     expect(seen(held, null, 'other').taskObserver).toBe(false);
-    expect(seen(held, null, 'other').contestStaff).toBe(true);
+    // A role at one task is not staff of the contest's leaderboards.
+    expect(seen(held, null).contestStaff).toBe(false);
+    expect(seen(held, null, 'other').contestStaff).toBe(false);
   });
 
   it('does not count a role at another contest', () => {

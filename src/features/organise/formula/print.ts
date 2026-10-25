@@ -1,6 +1,6 @@
 import type { Catalogue } from './catalogue';
 import type { Where } from './parse';
-import type { Tree } from './tree';
+import { written, type Tree } from './tree';
 
 const SYMBOL: Record<string, string> = {
   add: '+',
@@ -33,6 +33,10 @@ const PREC: Record<string, number> = {
   div: 6,
 };
 
+const COMPARE = 4;
+const UNARY = 7;
+const CHAINS = new Set(['add', 'mul', 'and', 'or']);
+
 type RecordTree = { [key: string]: Tree | Tree[] | undefined };
 
 function asTree(value: Tree | Tree[] | undefined): Tree {
@@ -45,7 +49,8 @@ function isRecord(tree: Tree): tree is RecordTree {
 
 /**
  * A block tree as a line. Brackets come back only where the nesting would
- * otherwise flatten, and a fold's `over` and `of` print as `group.column`.
+ * otherwise flatten, a fold's `over` and `of` print as `group.column`, and
+ * a name's `-` prints as `_`, as a formula reads it.
  */
 export function printFormula(tree: Tree, catalogue: Catalogue, where: Where): string {
   return print(tree, 0, false, catalogue, where);
@@ -64,10 +69,58 @@ function print(
     return printCall(tree, parent, right, catalogue, where);
   const leaf = leafOf(tree, parent, catalogue, where);
   if (leaf !== null) return leaf;
-  const keys = Object.keys(tree);
-  return `{${keys
-    .map((key) => `${key}: ${print(asTree(tree[key]), 0, false, catalogue, where)}`)
+  return printMap(tree, catalogue, where);
+}
+
+/**
+ * A record as a map, `{key: value, ...}`, each key bare when it reads as
+ * itself. `deep`, as weights are, prints a record in it as a map too.
+ */
+function printMap(
+  tree: RecordTree,
+  catalogue: Catalogue,
+  where: Where,
+  deep = false,
+): string {
+  return `{${Object.keys(tree)
+    .map((key) => {
+      const plain = (bare(key) || NUMBER.test(key)) && !LEAF_KEYS.has(key);
+      const child = asTree(tree[key]);
+      const value =
+        deep && isRecord(child) && typeof child.block !== 'string'
+          ? printMap(child, catalogue, where, true)
+          : print(child, 0, false, catalogue, where);
+      return `${plain ? key : quoted(key)}: ${value}`;
+    })
     .join(', ')}}`;
+}
+
+const NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
+const NUMBER = /^\d+(\.\d+)?$/;
+
+/** `text` as a formula writes a text: in quotes, each `"` and `\\` escaped. */
+function quoted(text: string): string {
+  return `"${text.replace(/[\\"]/g, (char) => `\\${char}`)}"`;
+}
+
+/**
+ * The keys a one-entry record reads as a leaf by, so a map keyed by one of
+ * them, such as weights on a group called `name`, writes the key quoted.
+ */
+const LEAF_KEYS = new Set([
+  'text',
+  'value',
+  'fact',
+  'runs',
+  'results',
+  'name',
+  'column',
+  'run',
+]);
+
+/** Whether a formula reads `text` written bare as that name. */
+function bare(text: string): boolean {
+  return NAME.test(text) && text !== 'and' && text !== 'or' && text !== 'not';
 }
 
 function leafOf(
@@ -80,7 +133,7 @@ function leafOf(
   if (keys.length !== 1 || keys[0] === undefined) return null;
   const key = keys[0];
   const value = tree[key];
-  if (key === 'text' && typeof value === 'string') return `"${value}"`;
+  if (key === 'text' && typeof value === 'string') return quoted(value);
   if (
     (key === 'value' ||
       key === 'fact' ||
@@ -89,19 +142,22 @@ function leafOf(
       key === 'name') &&
     typeof value === 'string'
   )
-    return value;
-  if (key === 'column' && typeof value === 'string') return value;
+    return written(value);
+  if (key === 'column' && typeof value === 'string') return written(value);
   if (
     key === 'column' &&
     Array.isArray(value) &&
     typeof value[0] === 'string' &&
     typeof value[1] === 'string'
   )
-    return `${value[0]}.${value[1]}`;
+    return `${written(value[0])}.${written(value[1])}`;
   if ((key === 'run' || key === 'value') && Array.isArray(value)) {
     const [record, column] = value;
-    const field = print(column ?? null, 0, false, catalogue, where);
-    if (typeof record === 'string') return `${record}.${field}`;
+    const field =
+      typeof column === 'string'
+        ? written(column)
+        : print(column ?? null, 0, false, catalogue, where);
+    if (typeof record === 'string') return `${written(record)}.${field}`;
     return `${print(record ?? null, parent, false, catalogue, where)}.${field}`;
   }
   return null;
@@ -118,16 +174,28 @@ function printCall(
   if (typeof block !== 'string') return '';
   const symbol = SYMBOL[block];
   const of = tree.of;
+  // `0 - x` is how a line's `-x` is stored, so it prints back as `-x`, which
+  // binds tighter than any operator.
+  if (block === 'sub' && Array.isArray(of) && of.length === 2 && of[0] === '0')
+    return `-${print(of[1] ?? null, UNARY, false, catalogue, where)}`;
   if (symbol !== undefined && Array.isArray(of)) {
     const prec = PREC[block] ?? 0;
     const text = of
       .map((child, index) => {
+        // A chain is one block of many inputs, so the same block nested in
+        // one keeps its brackets, or it would read back flattened.
         const nested =
-          typeof child === 'object' && child !== null && child.block === block;
+          CHAINS.has(block) &&
+          typeof child === 'object' &&
+          child !== null &&
+          child.block === block;
         return print(child, nested ? prec + 1 : prec, index > 0, catalogue, where);
       })
       .join(` ${symbol} `);
-    return parent >= prec || (right && parent === prec) ? `(${text})` : text;
+    // A comparison reads one at most, so one inside another keeps brackets;
+    // otherwise a left input of the same precedence needs none.
+    const bracket = parent > prec || (parent === prec && (right || prec === COMPARE));
+    return bracket ? `(${text})` : text;
   }
   if (block === 'not') {
     const inner = Array.isArray(of) ? (of[0] ?? null) : asTree(of);
@@ -170,10 +238,30 @@ function argumentsOf(
       folded = true;
       continue;
     }
-    const text = Array.isArray(value)
-      ? value.map((child) => print(child, 0, false, catalogue, where)).join(', ')
-      : print(value, 0, false, catalogue, where);
-    parts.push(gap ? `${key}: ${text}` : text);
+    const kind = form?.inputs[key]?.kind;
+    // A program or a language is plain text: quoted unless it reads as a name.
+    const plain =
+      (kind === 'path' || kind === 'language') && typeof value === 'string'
+        ? bare(value)
+          ? value
+          : quoted(value)
+        : null;
+    // Weights are a map, whatever their keys, never a leaf.
+    const one = asTree(value);
+    const map =
+      kind === 'weights' && isRecord(one) && typeof one.block !== 'string'
+        ? printMap(one, catalogue, where, true)
+        : null;
+    const text =
+      plain ??
+      map ??
+      (Array.isArray(value)
+        ? value.map((child) => print(child, 0, false, catalogue, where)).join(', ')
+        : print(value, 0, false, catalogue, where));
+    // A bound or a limit, a number written out, is named, so
+    // `entered(at_least: 0, at_most: 1)` says which is which.
+    const named = gap || form?.inputs[key]?.plain === true;
+    parts.push(named ? `${key}: ${text}` : text);
   }
   return parts.join(', ');
 }
@@ -199,5 +287,5 @@ function shorthand(over: Tree | Tree[], of: Tree | Tree[]): string | null {
     typeof pair[1] !== 'string'
   )
     return null;
-  return `${group}.${pair[1]}`;
+  return `${written(group)}.${written(pair[1])}`;
 }

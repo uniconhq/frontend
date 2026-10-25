@@ -8,8 +8,9 @@ import type { Me } from '@/api/types';
  *
  * A role at an org covers its contests and their tasks, and a role at a
  * contest covers its tasks. Admin outranks manager, which outranks observer.
- * Staff of the contest is any role at the org, the contest, or one of its
- * tasks, which is what the home's `organises` says.
+ * Staff of the contest, as its leaderboards read it, is a role at the org or
+ * the contest: a role at one of its tasks alone is not, though the home's
+ * `organises` counts it.
  */
 
 type Roles = Me['roles'];
@@ -40,7 +41,7 @@ function covers(
 export type Viewer = {
   /** In an approved entrant of the contest. */
   approvedEntrant: boolean;
-  /** Holds a role at the contest, counting the org and any of its tasks. */
+  /** Holds a role at the contest or the org; a role at one task is not one. */
   contestStaff: boolean;
   /** At least an observer of the task, counting the contest and the org. */
   taskObserver: boolean;
@@ -48,9 +49,18 @@ export type Viewer = {
   taskManager: boolean;
 };
 
-/** Any role at the org, the contest, or one of its tasks. */
+/**
+ * Any role at the org or the contest, as the forge reads a leaderboard for
+ * staff. A role at one of its tasks alone is not.
+ */
 export function contestStaff(org: string, contest: string, roles: Roles): boolean {
-  return covers(roles, org, contest, null, 'observer');
+  return covers(
+    roles.filter(({ names }) => names.task === null),
+    org,
+    contest,
+    null,
+    'observer',
+  );
 }
 
 export function viewerOf(
@@ -62,7 +72,7 @@ export function viewerOf(
 ): Viewer {
   return {
     approvedEntrant: entry?.entrant?.status === 'approved',
-    contestStaff: covers(roles, org, contest, null, 'observer'),
+    contestStaff: contestStaff(org, contest, roles),
     taskObserver: covers(roles, org, contest, task, 'observer'),
     taskManager: covers(roles, org, contest, task, 'manager'),
   };

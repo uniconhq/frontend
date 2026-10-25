@@ -220,6 +220,37 @@ describe("the contest's gradings feed", () => {
     );
   });
 
+  it('shows a submission’s early and late gradings each as a latest attempt, neither replacing the other', async () => {
+    const early: FeedEntry = {
+      task: 'sort',
+      label: 'A',
+      by: ada,
+      grading: { ...grading, id: 'g-early', submission_number: 4 },
+    };
+    const late: FeedEntry = {
+      ...early,
+      grading: {
+        ...early.grading,
+        id: 'g-late',
+        pipeline: 'late',
+        early: 'g-early',
+        queued_at: '2026-10-05T10:02:00Z',
+      },
+    };
+    server.use(signedIn, taskList);
+    feedAnswering(() => [late, early]);
+    renderApp(FEED);
+
+    const sub = await screen.findByRole('rowgroup', { name: 'A submission 4 by ada' });
+    const rows = within(sub).getAllByRole('row');
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toHaveTextContent('The runs shown during the contest');
+    expect(rows[1]).toHaveTextContent('The rest of its runs, graded after those');
+    expect(sub).not.toHaveTextContent('replaced');
+    expect(within(sub).queryByRole('button', { name: /earlier attempts/ })).toBeNull();
+    expect(within(sub).getAllByRole('button', { name: /^Retry/ })).toHaveLength(2);
+  });
+
   it('narrows the feed by task, status, entrant and who submitted, keeping each in the address', async () => {
     server.use(
       signedIn,

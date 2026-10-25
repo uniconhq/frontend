@@ -223,14 +223,13 @@ export function grading(overrides: Partial<GradingResult> = {}): GradingResult {
 }
 
 /** A run of the samples, accepted, with what it reported. */
-function sampleRun(place: number, reports: Record<string, string>): RunShown {
+function sampleRun(place: number, reports: RunShown['reports']): RunShown {
   return {
     group: 'samples',
     place,
     id: null,
     dropped: false,
-    key: {},
-    titles: [],
+    tuples: [{ title: null, key: {} }],
     verdict: 'accepted',
     passed: 1,
     reports,
@@ -247,7 +246,13 @@ function sampleRun(place: number, reports: Record<string, string>): RunShown {
 export const accepted = grading({
   status: 'graded',
   once: { reports: {}, texts: { log: { name: null, output: null } } },
-  runs: [sampleRun(1, { time_ms: '12', memory_kb: '2048' }), sampleRun(2, {})],
+  runs: [
+    sampleRun(1, [
+      { title: 'Run time', unit: 'ms', number: '12' },
+      { title: 'Memory used', unit: 'KB', number: '2048' },
+    ]),
+    sampleRun(2, []),
+  ],
 });
 
 export function submission(

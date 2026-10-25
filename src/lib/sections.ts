@@ -129,6 +129,20 @@ export function orgSectionPath(org: string, key: OrgSectionKey): string {
   return under(orgPath(org), sectionOf(ORG_SECTIONS, key).segment);
 }
 
+/**
+ * Where staff read one entrant's submissions to a task: the contest's
+ * gradings, kept to that task and entrant.
+ */
+export function entrantGradingsPath(
+  org: string,
+  contest: string,
+  task: string,
+  entrant: string,
+): string {
+  const search = new URLSearchParams({ task, entrant });
+  return `${contestSectionPath(org, contest, 'gradings')}?${search.toString()}`;
+}
+
 export function contestSectionPath(
   org: string,
   contest: string,

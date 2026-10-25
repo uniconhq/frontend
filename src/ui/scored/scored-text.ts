@@ -6,27 +6,28 @@ export function submissionsWords(count: number): string {
 }
 
 /**
- * How a run names the rows it came from: each tuple's title, joined with
- * " · ", and a tuple with none by its key. A number is "seed 2"; a file is
- * its name.
+ * How a run names the rows it came from: one piece per axis, joined with
+ * " · ". A tuple with a title shows that title; one without shows that
+ * axis's columns, a number as "seed 2" and a file by its name.
  */
-export function tupleLine(titles: RunShown['titles'], key: RunShown['key']): string {
-  const named = titles ?? [];
-  const entries = Object.entries(key);
-  const count = Math.max(named.length, entries.length);
+export function tupleLine(tuples: RunShown['tuples']): string {
   const parts: string[] = [];
-  for (let index = 0; index < count; index += 1) {
-    const title = named[index];
-    if (typeof title === 'string' && title !== '') {
-      parts.push(title);
+  for (const tuple of tuples) {
+    if (typeof tuple.title === 'string' && tuple.title !== '') {
+      parts.push(tuple.title);
       continue;
     }
-    const entry = entries[index];
-    if (entry === undefined) continue;
-    const shown = keyText(entry[0], entry[1]);
-    if (shown !== '') parts.push(shown);
+    for (const [name, value] of Object.entries(tuple.key)) {
+      const shown = keyText(name, value);
+      if (shown !== '') parts.push(shown);
+    }
   }
   return parts.join(' · ');
+}
+
+/** How a shown output is named: its title, and its unit in parentheses. */
+export function reportLabel(title: string, unit: string | null): string {
+  return unit !== null && unit !== '' ? `${title} (${unit})` : title;
 }
 
 function keyText(name: string, value: unknown): string {

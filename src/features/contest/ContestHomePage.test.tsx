@@ -106,6 +106,23 @@ describe('the contest page for a signed-in person', () => {
     expect(await screen.findByText('Nothing is on a leaderboard yet.')).toBeVisible();
   });
 
+  it('links one who is no approved entrant, such as an organiser, to the leaderboards', async () => {
+    server.use(
+      signedIn,
+      http.get(`${CONTEST_API}/home`, () =>
+        HttpResponse.json(home({ organises: true })),
+      ),
+    );
+    renderApp(PAGE);
+
+    await screen.findByRole('heading', { name: 'Tasks' });
+    expect(screen.getByRole('link', { name: 'See the leaderboards' })).toHaveAttribute(
+      'href',
+      '/contests/acme/spring/leaderboards',
+    );
+    expect(screen.queryByText('Nothing is on a leaderboard yet.')).toBeNull();
+  });
+
   it('shows the leaderboard note when the person is in', async () => {
     server.use(
       signedIn,

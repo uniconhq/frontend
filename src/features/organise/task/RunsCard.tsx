@@ -8,6 +8,8 @@ import { FieldBox } from '../contest/ContestFile';
 import {
   emptyTuple,
   runCount,
+  settled,
+  withoutInput,
   type AxisValues,
   type TupleValues,
 } from '../forms/task-values';
@@ -69,6 +71,12 @@ export function RunsCard({
       : `${shown.map((axis) => String(axis.tuples.length)).join(' × ')} = ${String(count)} runs.`;
   const setAxis = (index: number, axis: AxisValues) =>
     onChange(axes.map((item, at) => (at === index ? axis : item)));
+  // A column the workflow has no input for, such as the starter's after a
+  // change of workflow: the save is refused while it is there, so it can go.
+  const removeColumn = (index: number, id: string) =>
+    onChange(
+      settled(axes.map((item, at) => (at === index ? withoutInput(item, id) : item))),
+    );
   const setTuple = (index: number, row: number, tuple: TupleValues) => {
     const axis = axes[index];
     if (axis === undefined) return;
@@ -103,8 +111,23 @@ export function RunsCard({
                     <th>Title</th>
                     {axis.inputs.map((id) => {
                       const found = declared.find((item) => item.id === id);
+                      if (found !== undefined)
+                        return <th key={id}>{inputTitle(found)}</th>;
                       return (
-                        <th key={id}>{found === undefined ? id : inputTitle(found)}</th>
+                        <th key={id}>
+                          {id}
+                          <BodyText size="sm">Not an input of the workflow</BodyText>
+                          {!disabled && (
+                            <Button
+                              size="xs"
+                              variant="danger"
+                              onClick={() => removeColumn(index, id)}
+                              label={`Remove ${id}`}
+                            >
+                              Remove
+                            </Button>
+                          )}
+                        </th>
                       );
                     })}
                     {entrant && <th>Largest size</th>}

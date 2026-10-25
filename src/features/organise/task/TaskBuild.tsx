@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { queryView } from '@/api/query';
+import { $api, queryView } from '@/api/query';
 import { toApiError } from '@/api/problem';
 import type { FileContent, WorkflowForm } from '@/api/types';
 import { formatSize } from '@/lib/size';
@@ -17,8 +17,9 @@ import {
   emptyTuple,
   heldTheOtherWay,
   readTask,
+  settled,
+  withoutInput,
   writeTask,
-  type AxisValues,
   type Give,
   type InputValues,
   type TaskValues,
@@ -51,6 +52,7 @@ import { SaveBar } from './SaveBar';
 import { RunsCard } from './RunsCard';
 import { ChecksCard } from './ChecksCard';
 import { ScoringCard, type WorkflowRead } from './ScoringCard';
+import { checkProblem } from './scoring-model';
 import { SubmissionsCard } from './SubmissionsCard';
 import { WorkflowCard } from './WorkflowCard';
 import { BodyText } from '@/ui/BodyText';
@@ -157,6 +159,18 @@ function BuildForm({
         const change = kept.find((each) => each.id === input.id);
         return change === undefined ? input : { ...input, value: change.value };
       }),
+      // The runs' columns too: those the workflow chosen has no input for go,
+      // and back to the saved one, the settings' own come back.
+      axes:
+        picked === saved
+          ? read.values.axes
+          : settled(
+              before.axes.map((axis) =>
+                axis.inputs
+                  .filter((id) => !declared.inputs.some((found) => found.id === id))
+                  .reduce(withoutInput, axis),
+              ),
+            ),
     }));
   }
 
@@ -169,15 +183,6 @@ function BuildForm({
         input.id === id ? { ...input, ...change } : input,
       ),
     }));
-  // An axis with no inputs is not written, so it cannot sit before one that
-  // is: a refusal names axes as the file numbers them, and the card's fields
-  // use that same number.
-  const settleAxes = (axes: AxisValues[]): AxisValues[] => {
-    const filled: AxisValues[] = [];
-    const empty: AxisValues[] = [];
-    for (const axis of axes) (axis.inputs.length > 0 ? filled : empty).push(axis);
-    return [...filled, ...empty];
-  };
   const giveInput = (id: string, give: Give) =>
     setValues((before) => {
       const inputs = before.inputs.map((input) =>
@@ -193,7 +198,7 @@ function BuildForm({
         ...axis,
         inputs: axis.inputs.filter((item) => item !== id),
       }));
-      if (give !== 'per-run') return { ...before, inputs, axes: settleAxes(cleared) };
+      if (give !== 'per-run') return { ...before, inputs, axes: settled(cleared) };
       const axes = cleared.length === 0 ? [{ inputs: [], tuples: [] }] : cleared;
       const emptyAt = axes.findIndex((axis) => axis.inputs.length === 0);
       const target = emptyAt >= 0 ? emptyAt : 0;
@@ -210,7 +215,7 @@ function BuildForm({
               },
             }));
       axes[target] = { inputs: [...first.inputs, id], tuples };
-      return { ...before, inputs, axes: settleAxes(axes) };
+      return { ...before, inputs, axes: settled(axes) };
     });
   const moveAxis = (id: string, index: number) =>
     setValues((before) => {
@@ -231,7 +236,7 @@ function BuildForm({
         }),
       );
       axes[index] = { inputs: [...axis.inputs, id], tuples };
-      return { ...before, axes: settleAxes(axes) };
+      return { ...before, axes: settled(axes) };
     });
   const [reading, setReading] = useState<unknown>(null);
   /** Files chosen for a setting wait for the save, which writes them and points the setting at them. */
@@ -308,6 +313,7 @@ function BuildForm({
         : undefined,
     ]),
     ...(savedReadable ? scoreProblems : []),
+    ...values.checks.map(checkProblem),
   ].filter((problem): problem is string => problem !== undefined);
   const workflowRaw = useMemo(() => {
     if (text === null) return null;
@@ -327,10 +333,16 @@ function BuildForm({
       ? saving.outcome.result.errors
       : [];
 
+  // The blocks tell a value that gives text, so a check expects it as text.
+  const blocks = $api.useQuery('get', '/api/v1/blocks');
   const save = () => {
     const fresh = parseYaml(file.content);
     if ('error' in fresh) return;
-    writeTask(fresh.doc, read.values, values, { admin, unreadable: read.unreadable });
+    writeTask(fresh.doc, read.values, values, {
+      admin,
+      unreadable: read.unreadable,
+      catalogue: blocks.data ?? null,
+    });
     const content = writeOver(file.content, fresh.doc);
     setSent({ values, inputFiles });
     void saving.save({
