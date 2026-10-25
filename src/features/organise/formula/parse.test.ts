@@ -42,15 +42,28 @@ const task: FormulaScope = {
 /**
  * A leaderboard's scope as the leaderboards page builds it: its column
  * islands_last beside the gradebook, over the task islands, whose settings
- * give total and the text first_failed.
+ * give total and the texts first_failed, medal (an `if` between texts),
+ * badge (reading medal) and first_name (a text input an axis fills); and
+ * the task tour, whose medal is a number.
  */
 const ISLANDS = `name: Islands
+repeat:
+  - inputs: [name]
+    tuples: [{name: small}, {name: big}]
 scoring:
   values:
     total: {block: sum, over: {runs: all}, of: {run: [all, passed]}}
     first_failed:
       block: otherwise
       of: [{run: [{block: first, from: {runs: all}}, verdict]}, {text: none}]
+    medal: {block: if, test: {value: total}, then: {text: gold}, else: {text: silver}}
+    badge: {value: medal}
+    first_name: {run: [{block: first, from: {runs: all}}, name]}
+`;
+const TOUR = `name: Tour
+scoring:
+  values:
+    medal: 1
 `;
 const leaderboard: FormulaScope = boardScope(
   {
@@ -59,8 +72,11 @@ const leaderboard: FormulaScope = boardScope(
     columns: [{ key: 'c1', name: 'islands_last', line: null, tree: '1' }],
   },
   [{ ...blankBoard([]), key: 'gradebook' }],
-  ['islands'],
-  { islands: givenValues(ISLANDS) },
+  ['tour', 'islands'],
+  {
+    tour: givenValues(TOUR, catalogue),
+    islands: givenValues(ISLANDS, catalogue, [{ id: 'name', type: 'text' }]),
+  },
   catalogue.leaderboard_facts,
   [],
 );
@@ -101,6 +117,32 @@ describe('parseFormula', () => {
     const first = tree(text, scope);
     const printed = printFormula(first, catalogue, scope.where);
     expect(tree(printed, scope)).toEqual(first);
+  });
+
+  it('writes a text holding a quote or a backslash so it reads back the same', () => {
+    const stored: Tree = {
+      block: 'otherwise',
+      of: [
+        { run: [{ block: 'first', from: { runs: 'all' } }, 'verdict'] },
+        { text: 'a "b" \\ c' },
+      ],
+    };
+    const printed = printFormula(stored, catalogue, 'task');
+    expect(printed).toBe('otherwise(first(all).verdict, "a \\"b\\" \\\\ c")');
+    expect(tree(printed)).toEqual(stored);
+  });
+
+  it('writes weights keyed by a word a leaf is read by as a map, not as that leaf', () => {
+    for (const word of ['name', 'value', 'fact', 'runs', 'results', 'column', 'text']) {
+      const stored: Tree = {
+        block: 'count',
+        over: { runs: 'all' },
+        weights: { seed: { [word]: '2' } },
+      };
+      const printed = printFormula(stored, catalogue, 'task');
+      expect(printed).toBe(`count(all, weights: {seed: {"${word}": 2}})`);
+      expect(tree(printed)).toEqual(stored);
+    }
   });
 
   it('prints the spec lines as they were written, apart from a named pair', () => {
@@ -211,6 +253,16 @@ describe('checkFormula', () => {
     expect(
       checkFormula(parsed('latest(islands).first_failed'), leaderboard, catalogue).kind,
     ).toBe('text');
+  });
+
+  it('reads a value that gives text as the forge does, through if, another value and a text column', () => {
+    const kind = (line: string) =>
+      checkFormula(parsed(line), leaderboard, catalogue).kind;
+    expect(kind('latest(islands).medal')).toBe('text');
+    expect(kind('latest(islands).badge')).toBe('text');
+    expect(kind('latest(islands).first_name')).toBe('text');
+    expect(kind('latest(tour).medal')).toBe('number');
+    expect(messages('latest(islands).medal == "gold"', leaderboard)).toEqual([]);
   });
 
   it('names an unknown name and a per-run name outside a fold', () => {

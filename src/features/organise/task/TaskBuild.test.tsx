@@ -1433,7 +1433,9 @@ describe('scoring, checks and what a save answers', { timeout: 60_000 }, () => {
     await userEvent.click(
       within(parts).getByRole('button', { name: 'Stop showing gone' }),
     );
-    fill(within(scoring).getByRole('textbox', { name: 'Name of samples' }), 'tests');
+    const samples = within(scoring).getByRole('textbox', { name: 'Name of samples' });
+    fill(samples, 'tests');
+    fireEvent.blur(samples);
     await userEvent.click(within(scoring).getByRole('button', { name: 'Remove big' }));
     const removes = within(scoring).getAllByRole('button', { name: 'Remove' });
     const extra = removes[1];
@@ -1449,6 +1451,34 @@ describe('scoring, checks and what a save answers', { timeout: 60_000 }, () => {
       },
     });
     expect(JSON.stringify(file)).not.toMatch(/extra|big|gone|samples/);
+  });
+
+  it('moves a renamed group\u2019s when once its name is done, past a value\u2019s name typed on the way', async () => {
+    const { sent } = taskBackend({
+      content: `${ISLANDS}scoring:
+  groups:
+    samples: {input: sample.in}
+  values:
+    total: {block: sum, over: {runs: all}, of: {run: [all, passed]}}
+  show:
+    now: [total]
+    after_close: [samples]
+`,
+      form: runForm('unicon/classic@v3', [
+        declared('code', 'file'),
+        declared('input', 'file'),
+      ]),
+    });
+    await openTask();
+    const scoring = await screen.findByRole('region', { name: 'Scoring' });
+    const name = within(scoring).getByRole('textbox', { name: 'Name of samples' });
+    for (const typed of ['tot', 'total', 'totals']) fill(name, typed);
+    fireEvent.blur(name);
+    await save();
+
+    expect(written(sent[0])).toMatchObject({
+      scoring: { show: { now: ['total'], after_close: ['totals'] } },
+    });
   });
 
   it('reads each input an axis fills as a column of its run, a number or text as declared', async () => {
@@ -1491,6 +1521,31 @@ scoring:
           value_2: { block: 'otherwise' },
         },
       },
+    });
+  });
+
+  it('leaves a stored value whose line does not read back to it to the forge, not blocking the save', async () => {
+    const { sent } = taskBackend({
+      content: `${ISLANDS}scoring:
+  values:
+    odd: {block: max, of: [1, 2], colour: red}
+`,
+      form: runForm('unicon/classic@v3', [
+        declared('code', 'file'),
+        declared('input', 'file'),
+      ]),
+    });
+    await openTask();
+    const scoring = await screen.findByRole('region', { name: 'Scoring' });
+    await userEvent.click(within(scoring).getByRole('button', { name: 'Add a value' }));
+    await typeLine('value_2', '1');
+    const bar = await screen.findByRole('region', { name: 'Save the task' });
+    await waitFor(() => {
+      expect(within(bar).getByRole('button', { name: 'Save' })).toBeEnabled();
+    });
+    await save();
+    expect(written(await waitForSave(sent))).toMatchObject({
+      scoring: { values: { odd: { block: 'max', of: [1, 2], colour: 'red' } } },
     });
   });
 

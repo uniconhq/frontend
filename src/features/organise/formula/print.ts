@@ -69,17 +69,54 @@ function print(
     return printCall(tree, parent, right, catalogue, where);
   const leaf = leafOf(tree, parent, catalogue, where);
   if (leaf !== null) return leaf;
-  const keys = Object.keys(tree);
-  return `{${keys
-    .map(
-      (key) =>
-        `${bare(key) || NUMBER.test(key) ? key : `"${key}"`}: ${print(asTree(tree[key]), 0, false, catalogue, where)}`,
-    )
+  return printMap(tree, catalogue, where);
+}
+
+/**
+ * A record as a map, `{key: value, ...}`, each key bare when it reads as
+ * itself. `deep`, as weights are, prints a record in it as a map too.
+ */
+function printMap(
+  tree: RecordTree,
+  catalogue: Catalogue,
+  where: Where,
+  deep = false,
+): string {
+  return `{${Object.keys(tree)
+    .map((key) => {
+      const plain = (bare(key) || NUMBER.test(key)) && !LEAF_KEYS.has(key);
+      const child = asTree(tree[key]);
+      const value =
+        deep && isRecord(child) && typeof child.block !== 'string'
+          ? printMap(child, catalogue, where, true)
+          : print(child, 0, false, catalogue, where);
+      return `${plain ? key : quoted(key)}: ${value}`;
+    })
     .join(', ')}}`;
 }
 
 const NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
 const NUMBER = /^\d+(\.\d+)?$/;
+
+/** `text` as a formula writes a text: in quotes, each `"` and `\\` escaped. */
+function quoted(text: string): string {
+  return `"${text.replace(/[\\"]/g, (char) => `\\${char}`)}"`;
+}
+
+/**
+ * The keys a one-entry record reads as a leaf by, so a map keyed by one of
+ * them, such as weights on a group called `name`, writes the key quoted.
+ */
+const LEAF_KEYS = new Set([
+  'text',
+  'value',
+  'fact',
+  'runs',
+  'results',
+  'name',
+  'column',
+  'run',
+]);
 
 /** Whether a formula reads `text` written bare as that name. */
 function bare(text: string): boolean {
@@ -96,7 +133,7 @@ function leafOf(
   if (keys.length !== 1 || keys[0] === undefined) return null;
   const key = keys[0];
   const value = tree[key];
-  if (key === 'text' && typeof value === 'string') return `"${value}"`;
+  if (key === 'text' && typeof value === 'string') return quoted(value);
   if (
     (key === 'value' ||
       key === 'fact' ||
@@ -207,10 +244,17 @@ function argumentsOf(
       (kind === 'path' || kind === 'language') && typeof value === 'string'
         ? bare(value)
           ? value
-          : `"${value}"`
+          : quoted(value)
+        : null;
+    // Weights are a map, whatever their keys, never a leaf.
+    const one = asTree(value);
+    const map =
+      kind === 'weights' && isRecord(one) && typeof one.block !== 'string'
+        ? printMap(one, catalogue, where, true)
         : null;
     const text =
       plain ??
+      map ??
       (Array.isArray(value)
         ? value.map((child) => print(child, 0, false, catalogue, where)).join(', ')
         : print(value, 0, false, catalogue, where));

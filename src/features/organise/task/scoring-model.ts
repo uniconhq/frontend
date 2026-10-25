@@ -123,10 +123,22 @@ function asTree(value: unknown): Tree | null {
   return tree;
 }
 
+/**
+ * A value typed into a field as the input `input` declares it: a number, a
+ * boolean or text. With the type not known, whatever the text reads as.
+ */
+export type Typed = (input: string, text: string) => unknown;
+
+const guessed: Typed = (_input, text) => scalarOf(text) ?? text;
+
 /** A tree as the file writes it: a number's digits stay digits, a name stays text. */
-function yamlTree(tree: Tree, key: string | null = null): unknown {
+function yamlTree(
+  tree: Tree,
+  key: string | null = null,
+  typed: Typed = guessed,
+): unknown {
   if (tree === null) return null;
-  if (key === 'weights' && typeof tree === 'object') return weightsYaml(tree);
+  if (key === 'weights' && typeof tree === 'object') return weightsYaml(tree, typed);
   if (typeof tree === 'string') {
     if (NAME_KEYS.has(key ?? '')) return tree;
     const number = numberText(tree);
@@ -136,31 +148,38 @@ function yamlTree(tree: Tree, key: string | null = null): unknown {
   for (const [child, value] of Object.entries(tree)) {
     if (value === undefined) continue;
     written[child] = Array.isArray(value)
-      ? value.map((item) => yamlTree(item, child))
-      : yamlTree(value, child);
+      ? value.map((item) => yamlTree(item, child, typed))
+      : yamlTree(value, child, typed);
   }
   return written;
 }
 
 /**
  * A fold's weights as the file writes them: each value of the repeated input
- * a key of the type it reads as, so `{seed: {1: 2}}` keeps the number 1 the
- * runs were given, not the text "1".
+ * a key of the type the input declares, as `typed` gives it, so a number
+ * input's `{seed: {1: 2}}` keeps the number 1 the runs were given and a text
+ * input's `{name: {"1": 2}}` the text "1". The forge matches a key to a run's
+ * value by type.
  */
-function weightsYaml(tree: { [key: string]: Tree | Tree[] | undefined }): unknown {
+function weightsYaml(
+  tree: { [key: string]: Tree | Tree[] | undefined },
+  typed: Typed,
+): unknown {
   const written: Record<string, unknown> = {};
   for (const [input, values] of Object.entries(tree)) {
     if (values === undefined) continue;
     if (values === null || typeof values !== 'object' || Array.isArray(values)) {
       written[input] = Array.isArray(values)
-        ? values.map((item) => yamlTree(item))
-        : yamlTree(values);
+        ? values.map((item) => yamlTree(item, null, typed))
+        : yamlTree(values, null, typed);
       continue;
     }
     written[input] = new Map(
       Object.entries(values).map(([value, weight]) => [
-        scalarOf(value) ?? value,
-        Array.isArray(weight) || weight === undefined ? null : yamlTree(weight),
+        typed(input, value) ?? value,
+        Array.isArray(weight) || weight === undefined
+          ? null
+          : yamlTree(weight, null, typed),
       ]),
     );
   }
@@ -288,9 +307,18 @@ export function readScoring(at: (path: string[]) => unknown): ScoringRead {
   return { scoreGroups, scoreValues, show, checks, unreadable };
 }
 
-function pickEntry(picks: Record<string, string[]>): Record<string, unknown> {
+/**
+ * A group's picks as the file writes them, each value as the input declares
+ * it, as `typed` gives it: the forge matches a pick to a run's value by type,
+ * so a number input's `{seed: 1}` is not the text "1".
+ */
+function pickEntry(
+  picks: Record<string, string[]>,
+  typed: Typed,
+): Record<string, unknown> {
   const entry: Record<string, unknown> = {};
-  for (const [input, values] of Object.entries(picks)) {
+  for (const [input, given] of Object.entries(picks)) {
+    const values = given.map((value) => typed(input, value) ?? value);
     if (values.length === 1) entry[input] = values[0];
     else if (values.length > 1) entry[input] = values;
   }
@@ -347,16 +375,18 @@ export function writeScoring(
   before: ScoringRead,
   after: ScoringRead,
   trees: (value: ScoreValue) => Tree | null,
-  typed: (input: string, text: string) => unknown = (_input, text) => text,
+  typed: Typed = guessed,
+  /** The values that give text, whose expected value a check writes as text. */
+  texts: ReadonlySet<string> = new Set(),
 ): void {
   if (
     !before.unreadable.includes('scoring') &&
     JSON.stringify(
-      scoringOf(before, (value) => value.tree),
+      scoringOf(before, (value) => value.tree, typed),
       mapEntries,
-    ) !== JSON.stringify(scoringOf(after, trees), mapEntries)
+    ) !== JSON.stringify(scoringOf(after, trees, typed), mapEntries)
   ) {
-    const written = scoringOf(after, trees);
+    const written = scoringOf(after, trees, typed);
     const empty =
       written.groups === undefined &&
       written.values === undefined &&
@@ -386,28 +416,32 @@ export function writeScoring(
   }
   if (
     !before.unreadable.includes('checks') &&
-    JSON.stringify(checksOf(before.checks, typed)) !==
-      JSON.stringify(checksOf(after.checks, typed))
+    JSON.stringify(checksOf(before.checks, typed, texts)) !==
+      JSON.stringify(checksOf(after.checks, typed, texts))
   ) {
-    const written = checksOf(after.checks, typed);
+    const written = checksOf(after.checks, typed, texts);
     writeAt(doc, ['checks'], written.length === 0 ? undefined : written, {
       prune: true,
     });
   }
 }
 
-function scoringOf(read: ScoringRead, trees: (value: ScoreValue) => Tree | null) {
+function scoringOf(
+  read: ScoringRead,
+  trees: (value: ScoreValue) => Tree | null,
+  typed: Typed,
+) {
   const groups: Record<string, unknown> = {};
   for (const group of read.scoreGroups) {
     if (group.name.trim() === '') continue;
     if (group.none && Object.keys(group.picks).length === 0) continue;
-    groups[group.name.trim()] = pickEntry(group.picks);
+    groups[group.name.trim()] = pickEntry(group.picks, typed);
   }
   const values: Record<string, unknown> = {};
   for (const value of read.scoreValues) {
     if (value.name.trim() === '') continue;
     const tree = trees(value);
-    if (tree !== null) values[value.name.trim()] = yamlTree(tree);
+    if (tree !== null) values[value.name.trim()] = yamlTree(tree, null, typed);
   }
   // An empty part is left out, as the forge reads none as empty.
   const show = showLists(read.show);
@@ -420,11 +454,13 @@ function scoringOf(read: ScoringRead, trees: (value: ScoreValue) => Tree | null)
 
 /**
  * Each check as the file writes it, each input's value as `typed` gives it,
- * the input's declared type: a number as a number, not the text "5".
+ * the input's declared type: a number as a number, not the text "5"; and
+ * each value it expects as the value gives it, text for a value in `texts`.
  */
 function checksOf(
   checks: CheckDraft[],
-  typed: (input: string, text: string) => unknown,
+  typed: Typed,
+  texts: ReadonlySet<string>,
 ): unknown[] {
   return checks.map((check) => {
     const submit: Record<string, unknown> = {};
@@ -438,7 +474,9 @@ function checksOf(
     if (check.verdict.trim() !== '') expect.verdict = check.verdict.trim();
     for (const value of check.values) {
       if (value.name.trim() === '') continue;
-      const number = numberText(value.expected);
+      const number = texts.has(value.name.trim())
+        ? undefined
+        : numberText(value.expected);
       expect[value.name.trim()] =
         number instanceof NumberText ? number : value.expected;
     }

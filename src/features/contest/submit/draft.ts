@@ -1,6 +1,7 @@
 import { ApiError } from '@/api/problem';
 import type { InputField, SubmittedInput } from '@/api/types';
 import { compareDecimal } from '@/lib/exact';
+import { partTitle, partsOf } from '@/lib/submitted';
 
 /**
  * What the panel holds for one field: the files of a file or folder input;
@@ -28,19 +29,6 @@ export type UploadFile = {
   file: File;
   part: number | null;
 };
-
-/** The parts of an input given once per row, or none when it is one field. */
-export function partsOf(input: InputField): NonNullable<InputField['parts']> | null {
-  const parts = input.parts;
-  return Array.isArray(parts) && parts.length > 0 ? parts : null;
-}
-
-/** What an upload box is called: the row's title, or "Part 1", "Part 2". */
-export function partTitle(title: string | null | undefined, index: number): string {
-  return title !== null && title !== undefined && title !== ''
-    ? title
-    : `Part ${String(index + 1)}`;
-}
 
 /** Everything in the panel, by input id. Replaced whole on every change. */
 export type Draft = Readonly<Record<string, Entry>>;

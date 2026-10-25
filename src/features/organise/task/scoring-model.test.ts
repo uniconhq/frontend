@@ -285,3 +285,68 @@ describe('the columns of a run', () => {
     expect(read('max(all.code)').problems).not.toEqual([]);
   });
 });
+
+const TYPED_TASK = `name: Typed
+workflow: unicon/checked@v1
+inputs:
+  code: {entrant: {label: Solution}}
+repeat:
+  - inputs: [seed, name]
+    tuples:
+      - {seed: 1, name: "1"}
+      - {seed: 2, name: x}
+scoring:
+  groups:
+    small: {seed: 1}
+    two: {seed: [1, 2]}
+    named: {name: "1"}
+  values:
+    total: {block: sum, over: {runs: all}, of: {run: [all, passed]}, weights: {name: {"1": 2}}}
+    tries: {block: count, over: {runs: all}, weights: {seed: {1: 2}}}
+    medal: {block: if, test: {value: total}, then: {text: "1"}, else: {text: "0"}}
+    other: 1
+checks:
+  - submit: {code: ok.py}
+    expect: {total: 3, medal: "1"}
+`;
+
+describe('a write of picks, weights and what a check expects', () => {
+  it('writes each as the type its input declares, or its value gives', () => {
+    const doc = open(TYPED_TASK);
+    const { values, unreadable } = readTask(doc, [
+      declared('code', 'file'),
+      declared('seed', 'number'),
+      declared('name', 'text'),
+    ]);
+    const [check] = values.checks;
+    if (check === undefined) throw new Error('no check');
+    writeTask(
+      doc,
+      values,
+      {
+        ...values,
+        scoreValues: values.scoreValues.map((value) =>
+          value.name === 'other' ? { ...value, tree: '2' } : value,
+        ),
+        checks: [
+          {
+            ...check,
+            values: [
+              { name: 'total', expected: '4' },
+              { name: 'medal', expected: '0' },
+            ],
+          },
+        ],
+      },
+      { admin: false, unreadable, catalogue },
+    );
+    const text = writeYaml(doc);
+    expect(text).toContain('small: {seed: 1}');
+    expect(text).toContain('two: {seed: [1, 2]}');
+    expect(text).toContain('named: {name: "1"}');
+    expect(text).toContain('weights: {name: {"1": 2}}');
+    expect(text).toContain('weights: {seed: {1: 2}}');
+    expect(text).toContain('other: 2');
+    expect(text).toMatch(/expect:\n {6}total: 4\n {6}medal: "0"\n/);
+  });
+});

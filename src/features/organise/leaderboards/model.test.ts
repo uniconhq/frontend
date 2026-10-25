@@ -21,6 +21,7 @@ import {
   writeLeaderboards,
   type BoardDraft,
   type LeaderboardsDraft,
+  type TaskGives,
 } from './model';
 
 const catalogue = specCatalogue();
@@ -340,7 +341,7 @@ leaderboards:
 
 describe('a name with a -', () => {
   const tasks = ['house-prices'];
-  const gives = { 'house-prices': givenValues(HOUSE_PRICES) };
+  const gives = { 'house-prices': givenValues(HOUSE_PRICES, catalogue) };
 
   it('prints the Kaggle contest with each - as _, and reads it back to the same trees', () => {
     const read = readLeaderboards(open(KAGGLE));
@@ -420,6 +421,62 @@ describe('a name with a -', () => {
         '2030-10-01T14:00:00Z',
       ),
     ).toEqual([]);
+  });
+});
+
+/** The forge's LAST contest (forge tests/test_leaderboards.py): a column of another board's pick column. */
+const LAST = `name: Spring
+tasks:
+  - id: islands
+leaderboards:
+  one:
+    columns:
+      last: {block: latest, from: {results: islands}}
+      total: {block: otherwise, of: [{value: [last, total]}, -1]}
+    display: [total]
+  two:
+    columns:
+      total: {block: otherwise, of: [{value: [{column: [one, last]}, score]}, -1]}
+    display: [total]
+`;
+
+describe('a column of another leaderboard', () => {
+  const tasks = ['islands'];
+  const gives = {
+    islands: [
+      { name: 'total', text: false },
+      { name: 'score', text: false },
+    ],
+  };
+
+  it('reads a value off its pick column back to the tree it was printed from', () => {
+    const read = readLeaderboards(open(LAST));
+    const two = read.boards[1];
+    if (two === undefined) throw new Error('no second leaderboard');
+    const [total] = two.columns;
+    if (total === undefined) throw new Error('no column');
+    expect(lineOf(total, catalogue)).toBe('otherwise(one.last.score, -1)');
+    const reading = boardReadings(two, read.boards, tasks, gives, catalogue)[total.key];
+    expect(reading?.problems).toEqual([]);
+    expect(reading?.tree).toEqual(total.tree);
+  });
+
+  it('says when that leaderboard has no such column', () => {
+    const read = readLeaderboards(open(LAST));
+    const two = read.boards[1];
+    if (two === undefined) throw new Error('no second leaderboard');
+    const typed = {
+      ...two,
+      columns: two.columns.map((column) => ({ ...column, line: 'one.first.score' })),
+    };
+    const [total] = typed.columns;
+    if (total === undefined) throw new Error('no column');
+    const reading = boardReadings(typed, read.boards, tasks, gives, catalogue)[
+      total.key
+    ];
+    expect(reading?.problems.map((problem) => problem.message)).toEqual([
+      'one has no column first',
+    ]);
   });
 });
 
@@ -613,5 +670,64 @@ describe('a preview cut', () => {
     expect(previewRows(rows, 'c', 'own', 3)).toEqual([
       { place: null, row: { entrant: 'c' } },
     ]);
+  });
+});
+
+describe('a task whose settings cannot be read', () => {
+  const lines = ['sum(islands, islands.score)', 'otherwise(latest(islands).score, 0)'];
+  const reading = (gives: TaskGives, line: string) => {
+    const one = board({
+      key: 'one',
+      columns: [{ key: 'c', name: 'points', line, tree: null }],
+    });
+    return boardReadings(one, [one], ['islands'], gives, catalogue)['c'];
+  };
+
+  it('takes any value of it, as the forge does not check what it cannot resolve', () => {
+    for (const line of lines) {
+      expect(reading({ islands: null }, line)?.problems).toEqual([]);
+    }
+  });
+
+  it('still refuses a value a task that was read does not give', () => {
+    for (const line of lines) {
+      expect(reading({ islands: [] }, line)?.problems.length).toBeGreaterThan(0);
+    }
+  });
+
+  it('is unknown, not a task with no values, when its YAML cannot be read', () => {
+    expect(givenValues('name: [', catalogue)).toBeNull();
+    expect(givenValues('name: Islands\n', catalogue)).toEqual([]);
+  });
+});
+
+describe('a stored column whose line does not read back to it', () => {
+  const now = new Date('2026-10-25T00:00:00Z').getTime();
+  const found = (column: BoardDraft['columns'][number]) =>
+    problems(
+      draft(open(FILE), [board({ key: 'one', columns: [column] })], {
+        locked: false,
+        on: false,
+        from: '',
+        untilStaff: true,
+        until: '',
+      }),
+      catalogue,
+      ['islands'],
+      {},
+      now,
+      '2030-10-01T09:00:00Z',
+      '2030-10-01T14:00:00Z',
+    ).map((item) => item.message);
+  const odd = { block: 'max', of: ['1', '2'], colour: 'red' };
+
+  it('blocks nothing while the line is left as printed, as the stored tree is saved', () => {
+    expect(found({ key: 'c', name: 'points', line: null, tree: odd })).toEqual([]);
+  });
+
+  it('blocks the line once it is edited to read otherwise', () => {
+    expect(
+      found({ key: 'c', name: 'points', line: 'max(1, red)', tree: odd }).length,
+    ).toBeGreaterThan(0);
   });
 });

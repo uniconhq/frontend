@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { http, HttpResponse } from 'msw';
-import { screen } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@/test/user-event';
 import { renderApp } from '@/test/render';
 import { problem, server, signedIn } from '@/test/server';
@@ -160,5 +160,73 @@ describe('the grading queue', () => {
       await screen.findByText('Write the mark as a plain decimal, such as 7.5.'),
     ).toBeVisible();
     expect(posts).toBe(0);
+  });
+});
+
+describe('a queued submission opened', () => {
+  it('lists each input and each part under it, each file at the address the backend gives', async () => {
+    const user = userEvent.setup();
+    const at = '/-/downloads/acme/spring/sum/entrants/ada/4';
+    server.use(
+      signedIn,
+      http.get(QUEUE, () => HttpResponse.json([ROW])),
+      http.get(
+        '/api/v1/orgs/:org/contests/:contest/tasks/:task/organise/submissions/:number',
+        () => HttpResponse.json({ number: 4, grading: null }),
+      ),
+      http.get(
+        '/api/v1/orgs/:org/contests/:contest/tasks/:task/organise/submissions/:number/files',
+        () =>
+          HttpResponse.json({
+            number: 4,
+            inputs: {
+              code: { files: [`${at}/files/code/main.py`], value: null, parts: null },
+              out: {
+                files: [],
+                value: null,
+                parts: {
+                  '1': { files: [`${at}/files/out/1/a b.txt`], value: null },
+                  '2': { files: [], value: '7' },
+                },
+              },
+            },
+          }),
+      ),
+      http.get('/api/v1/orgs/:org/contests/:contest/tasks/:task/page', () =>
+        HttpResponse.json({
+          inputs: [
+            { id: 'code', label: 'Solution', parts: null },
+            {
+              id: 'out',
+              label: 'Outputs',
+              parts: [
+                { title: 'Small', max_size: 1024 },
+                { title: null, max_size: 1024 },
+              ],
+            },
+          ],
+        }),
+      ),
+    );
+    renderApp(PAGE);
+    await user.click(
+      await screen.findByRole('button', { name: 'Open the submission' }),
+    );
+    const files = await screen.findByRole('list', { name: 'Files' });
+    const links = await within(files).findAllByRole('link');
+    expect(links.map((link) => [link.textContent, link.getAttribute('href')])).toEqual([
+      ['main.py', `${at}/files/code/main.py`],
+      ['1/a b.txt', `${at}/files/out/1/a%20b.txt`],
+    ]);
+    await waitFor(() => {
+      expect(
+        within(files)
+          .getAllByRole('listitem')
+          .map((item) => item.textContent),
+      ).toEqual(['Solution: main.py', 'Outputs, Small: 1/a b.txt']);
+    });
+    expect(screen.getByRole('list', { name: 'Values given' })).toHaveTextContent(
+      'Outputs, Part 2: 7',
+    );
   });
 });

@@ -37,6 +37,7 @@ import { RequireSession, SessionExpiredModal, SessionProvider } from '@/session'
 import {
   CONTEST_SECTIONS,
   contestSectionPath,
+  contestViewSectionPath,
   ORG_SECTIONS,
   TASK_SECTIONS,
   taskCardPath,
@@ -77,6 +78,20 @@ function ToEntrants() {
   return (
     <Navigate to={`${contestSectionPath(org, contest, 'entrants')}${search}`} replace />
   );
+}
+
+/**
+ * A contest's Leaderboards page, at `boards` before it took the name
+ * `leaderboards`: an old link, the organiser's or the contest's own, lands
+ * there, what it asked kept.
+ */
+function ToLeaderboards({ organise = false }: { organise?: boolean }) {
+  const { org, contest } = useContestParams();
+  const { search } = useLocation();
+  const to = organise
+    ? contestSectionPath(org, contest, 'boards')
+    : contestViewSectionPath(org, contest, 'boards');
+  return <Navigate to={`${to}${search}`} replace />;
 }
 
 /** A task's Statement page, now the Statement card on the task's own page. */
@@ -123,6 +138,7 @@ const movedRoutes: RouteObject[] = [
   { path: `${CONTEST}/files`, element: <ToContestSettings /> },
   { path: `${TASK}/statement`, element: <ToStatement /> },
   { path: `${TASK}/files`, element: <ToTaskPage /> },
+  { path: `${CONTEST}/boards`, element: <ToLeaderboards organise /> },
 ];
 
 /**
@@ -186,6 +202,7 @@ export const routes: RouteObject[] = [
             path: 'contests/:org/:contest/leaderboards',
             element: <LeaderboardsPage />,
           },
+          { path: 'contests/:org/:contest/boards', element: <ToLeaderboards /> },
           { path: 'contests/:org/:contest/questions', element: <QuestionsPage /> },
           {
             path: 'contests/:org/:contest/tasks/:task',

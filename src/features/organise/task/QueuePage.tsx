@@ -310,9 +310,7 @@ function StaffSubmission({
       {files.state === 'error' && (
         <ErrorBlock error={files.error} onRetry={files.retry} />
       )}
-      {files.state === 'ready' && (
-        <StaffFiles where={where} entrant={entrant} files={files.data} />
-      )}
+      {files.state === 'ready' && <StaffFiles where={where} files={files.data} />}
       {grading === null ? (
         <BodyText tone="secondary">Not graded</BodyText>
       ) : (

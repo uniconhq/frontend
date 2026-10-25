@@ -10,10 +10,9 @@ import { TextInput } from '@/ui/TextInput';
 import { Textarea } from '@/ui/Textarea';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { formatLimit } from '@/lib/size';
+import { partTitle, partsOf } from '@/lib/submitted';
 import {
   entryOf,
-  partTitle,
-  partsOf,
   pathOf,
   takesPaths,
   type Draft,
@@ -91,12 +90,13 @@ function Refusal({ error, inputs }: { error: ApiError; inputs: InputField[] }) {
   );
 }
 
-/** The part a `too_large` names, by the title its upload box shows. */
+/** The part a `too_large` names: its input, then the title its upload box shows. */
 function namedPart(inputs: InputField[], id: string, part: unknown): string | null {
   if (typeof part !== 'number') return null;
   const input = inputs.find((found) => found.id === id);
   const found = input === undefined ? undefined : partsOf(input)?.[part - 1];
-  return found === undefined ? null : partTitle(found.title, part - 1);
+  if (input === undefined || found === undefined) return null;
+  return `${input.label}, ${partTitle(found.title, part - 1)}`;
 }
 
 /** The helper line under a file input: how large its file, or its files together, may be. */
@@ -145,8 +145,11 @@ function Field({
     );
   }
   const parts = partsOf(input) ?? [];
+  // The parts sit under their input, so two inputs given in parts tell their
+  // boxes apart.
   return (
-    <>
+    <fieldset className={classes.parts}>
+      <legend className={classes.partsLegend}>{input.label}</legend>
       {parts.map((part, index) => {
         const one = entry.parts[index];
         if (one === undefined) return null;
@@ -169,7 +172,7 @@ function Field({
           />
         );
       })}
-    </>
+    </fieldset>
   );
 }
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { http, HttpResponse } from 'msw';
-import { screen } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
 import { renderApp } from '@/test/render';
 import { server, signedIn, someone } from '@/test/server';
 import { passTime, withFakeTimers } from '@/test/timers';
@@ -100,5 +100,22 @@ describe('the leaderboards with no stream', () => {
     expect(reads).toBe(1);
     await passTime(30_000);
     expect(reads).toBe(2);
+  });
+});
+
+describe('an old leaderboards address', () => {
+  it('lands on the leaderboards, the contest’s and the organiser’s', async () => {
+    server.use(signedIn);
+    const { router } = renderApp('/contests/acme/spring/boards');
+    expect(await screen.findByText('Nothing is on a leaderboard yet.')).toBeVisible();
+    expect(router.state.location.pathname).toBe('/contests/acme/spring/leaderboards');
+
+    const organiser = renderApp('/orgs/acme/contests/spring/boards?board=gradebook');
+    await waitFor(() => {
+      expect(organiser.router.state.location.pathname).toBe(
+        '/orgs/acme/contests/spring/leaderboards',
+      );
+    });
+    expect(organiser.router.state.location.search).toBe('?board=gradebook');
   });
 });

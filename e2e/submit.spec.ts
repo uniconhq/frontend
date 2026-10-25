@@ -604,7 +604,7 @@ test('a row given in parts is one upload each, held to that part’s size', asyn
   await writeFile(big, Buffer.alloc(50 * MB + 1));
   await form.getByLabel('Big grid', { exact: true }).setInputFiles(big);
   await form.getByRole('button', { name: 'Submit' }).click();
-  await expect(page.getByRole('alert')).toContainText('Too large: Big grid');
+  await expect(page.getByRole('alert')).toContainText('Too large: Route, Big grid');
   expect(state.slots).toHaveLength(0);
 
   await form.getByRole('button', { name: 'Remove big.bin' }).click();

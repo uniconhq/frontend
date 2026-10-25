@@ -1,5 +1,11 @@
 import type { Catalogue } from '../formula/catalogue';
-import { readLine, type FormulaScope, type Kind, type Reading } from '../formula/parse';
+import {
+  readLine,
+  sameTree,
+  type FormulaScope,
+  type Kind,
+  type Reading,
+} from '../formula/parse';
 import { printFormula } from '../formula/print';
 import { unreadableProblem, written, type Tree } from '../formula/tree';
 import {
@@ -15,7 +21,8 @@ import {
   type Doc,
 } from '../forms/yaml-doc';
 import { instantOf, isoOf, localOf } from '../forms/times';
-import { formulaYaml, treeOf } from '../task/scoring-model';
+import { textValues } from '../formula/gives';
+import { axisColumns, formulaYaml, treeOf } from '../task/scoring-model';
 
 /**
  * A leaderboard as the editor holds it. The file stores a mapping of key to
@@ -31,6 +38,11 @@ export type ColumnDraft = {
   /** Stable while the name is typed. */
   key: string;
   name: string;
+  /**
+   * The name the board's sort and display still give the column while its
+   * name is typed; they follow once the name is done and no other column's.
+   */
+  moved?: string;
   line: string | null;
   tree: Tree | null;
 };
@@ -240,36 +252,44 @@ export function taskIds(doc: Doc): string[] {
 /** A value a task gives, as a leaderboard reads it: by name, and whether it is text. */
 export type GivenValue = { name: string; text: boolean };
 
-/** What each task the contest lists gives a leaderboard, by task id. */
-export type TaskGives = Readonly<Record<string, readonly GivenValue[]>>;
+/**
+ * What each task the contest lists gives a leaderboard, by task id; null for
+ * a task whose settings cannot be read, whose values are then not known.
+ */
+export type TaskGives = Readonly<Record<string, readonly GivenValue[] | null>>;
 
 /**
  * The values a task's settings give, the names under `scoring.values`, as
- * `t.v` on a leaderboard reads them. A value is text when its formula is a
- * text, a run's verdict, or an `if` or `otherwise` choosing between texts.
+ * `t.v` on a leaderboard reads them, each with whether it gives text as the
+ * forge reads it (`textValues`): a run's text columns are `verdict` and
+ * each axis input the workflow declares text, by `declared`, the task's
+ * inputs as its workflow gives them (none when that cannot be read). Null
+ * when the settings cannot be read as YAML, so their values are not known.
  */
-export function givenValues(content: string): GivenValue[] {
+export function givenValues(
+  content: string,
+  catalogue: Catalogue,
+  declared: readonly { id: string; type: string | null }[] = [],
+): GivenValue[] | null {
   const parsed = parseYaml(content);
-  if ('error' in parsed) return [];
+  if ('error' in parsed) return null;
   const top = exactJS(parsed.doc);
   if (!isRecord(top) || !isRecord(top['scoring'])) return [];
   const values = top['scoring']['values'];
   if (!isRecord(values)) return [];
-  return Object.entries(values).map(([name, tree]) => ({ name, text: textTree(tree) }));
-}
-
-function textTree(tree: unknown): boolean {
-  if (!isRecord(tree)) return false;
-  if ('text' in tree) return true;
-  const run = tree['run'];
-  if (Array.isArray(run)) return run[run.length - 1] === 'verdict';
-  const block = tree['block'];
-  if (block === 'if' || block === 'otherwise') {
-    const of = tree['of'];
-    const branches = Array.isArray(of) ? of.slice(block === 'if' ? 1 : 0) : [];
-    return branches.length > 0 && branches.every(textTree);
-  }
-  return false;
+  const repeat = Array.isArray(top['repeat']) ? top['repeat'] : [];
+  const axes = repeat.map((axis) => ({
+    inputs:
+      isRecord(axis) && Array.isArray(axis['inputs']) ? axis['inputs'].map(textOf) : [],
+  }));
+  const texts = axisColumns(axes, declared)
+    .filter((column) => column.kind === 'text')
+    .map((column) => column.name);
+  const trees = Object.fromEntries(
+    Object.entries(values).map(([name, tree]) => [name, treeOf(tree)]),
+  );
+  const text = textValues(trees, new Set(['verdict', ...texts]), catalogue);
+  return Object.keys(values).map((name) => ({ name, text: text.has(name) }));
 }
 
 /** The contest's end, an hour earlier, as the time field holds it. Empty when the end is not a time. */
@@ -340,6 +360,7 @@ export function boardScope(
   const each: string[] = [];
   const textValues: string[] = [];
   const sets = tasks.map(write);
+  const unread = sets.filter((task) => gives[real[task] ?? task] === null);
   for (const task of sets) {
     for (const value of gives[real[task] ?? task] ?? []) {
       fields[value.name] ??= value.text ? 'text' : 'number';
@@ -364,7 +385,16 @@ export function boardScope(
       .map(write),
     each,
     sets,
+    unread,
     boards: others.map((item) => write(item.key)),
+    boardColumns: Object.fromEntries(
+      others.map((item) => [
+        written(item.key),
+        item.columns
+          .filter((column) => column.name !== '')
+          .map((column) => written(column.name)),
+      ]),
+    ),
     texts: [...texts.map(written), ...textValues],
     fields,
     real,
@@ -724,11 +754,21 @@ export function problems(
       if (catalogue !== null && line.trim() === '') {
         found.push({ field, message: 'Give a formula.' });
       } else if (reading !== undefined) {
-        if (reading.unread !== null)
-          found.push({ field, message: reading.unread.message });
-        for (const problem of reading.problems)
-          found.push({ field, message: problem.message });
-        if (reading.kind !== null) kindOf.set(column.name, reading.kind);
+        // A line left as printed saves the tree it was read from. When it
+        // does not read back to that tree, neither its problems nor its kind
+        // are the stored tree's: the forge checks that tree at the save.
+        const misread =
+          catalogue !== null &&
+          column.tree !== null &&
+          line === printFormula(column.tree, catalogue, 'leaderboard') &&
+          !sameTree(reading.tree, column.tree);
+        if (!misread) {
+          if (reading.unread !== null)
+            found.push({ field, message: reading.unread.message });
+          for (const problem of reading.problems)
+            found.push({ field, message: problem.message });
+        }
+        if (reading.kind !== null && !misread) kindOf.set(column.name, reading.kind);
       }
     }
     const shown = new Set(board.display.map((item) => item.name));

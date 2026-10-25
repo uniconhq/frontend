@@ -4,7 +4,6 @@ import { taskPagePath } from '@/lib/contest-paths';
 import { useContestParams } from '@/lib/route-params';
 import { entrantGradingsPath } from '@/lib/sections';
 import { contestStaff } from '@/lib/viewer';
-import { useFallbackPoll } from '@/live';
 import { useSession } from '@/session';
 import { BodyText } from '@/ui/BodyText';
 import { Page, PageHeader } from '@/ui/Page';
@@ -21,9 +20,10 @@ const POLL_MS = 30_000;
 /**
  * The contest's leaderboards as this caller is shown them. A visitor reads
  * the public list; a signed-in person reads their own, which already
- * follows the audience, the hold and a dropped sort key. A grading or a
- * release reads them again through the live stream; with no stream, as for
- * a visitor, they are read again every thirty seconds.
+ * follows the audience, the hold and a dropped sort key. Their own grading
+ * or a release reads them again through the live stream, which tells no one
+ * of another entrant's grading, so they are also read again every thirty
+ * seconds, stream or not.
  */
 export function LeaderboardsPage() {
   const { org, contest } = useContestParams();
@@ -45,7 +45,7 @@ function SignedInBoards({ org, contest }: { org: string; contest: string }) {
     {
       params: { path: { org, contest } },
     },
-    { refetchInterval: useFallbackPoll(POLL_MS) },
+    { refetchInterval: POLL_MS },
   );
   return <Boards view={queryView(query)} org={org} contest={contest} staff={staff} />;
 }
@@ -57,7 +57,7 @@ function PublicBoards({ org, contest }: { org: string; contest: string }) {
     {
       params: { path: { org, contest } },
     },
-    { refetchInterval: useFallbackPoll(POLL_MS) },
+    { refetchInterval: POLL_MS },
   );
   return <Boards view={queryView(query)} org={org} contest={contest} staff={false} />;
 }

@@ -78,9 +78,7 @@ export function ScoredView({
             {files.state === 'error' && (
               <ErrorBlock error={files.error} onRetry={files.retry} />
             )}
-            {files.state === 'ready' && (
-              <StaffFiles where={where} entrant={entry.by.entrant} files={files.data} />
-            )}
+            {files.state === 'ready' && <StaffFiles where={where} files={files.data} />}
             <ScoredResult
               grading={view.data.grading}
               readText={(ask) => staffText(where, entry.by.entrant, ask)}

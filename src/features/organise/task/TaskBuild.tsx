@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { queryView } from '@/api/query';
+import { $api, queryView } from '@/api/query';
 import { toApiError } from '@/api/problem';
 import type { FileContent, WorkflowForm } from '@/api/types';
 import { formatSize } from '@/lib/size';
@@ -329,10 +329,16 @@ function BuildForm({
       ? saving.outcome.result.errors
       : [];
 
+  // The blocks tell a value that gives text, so a check expects it as text.
+  const blocks = $api.useQuery('get', '/api/v1/blocks');
   const save = () => {
     const fresh = parseYaml(file.content);
     if ('error' in fresh) return;
-    writeTask(fresh.doc, read.values, values, { admin, unreadable: read.unreadable });
+    writeTask(fresh.doc, read.values, values, {
+      admin,
+      unreadable: read.unreadable,
+      catalogue: blocks.data ?? null,
+    });
     const content = writeOver(file.content, fresh.doc);
     setSent({ values, inputFiles });
     void saving.save({

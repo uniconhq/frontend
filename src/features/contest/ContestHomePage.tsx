@@ -35,6 +35,9 @@ import { submissionHref } from './submit/submission-param';
 import { taskTimeLines } from './time-left';
 import classes from './contest.module.css';
 
+/** How often a standing on the home is read again, as the leaderboards page is. */
+const STANDING_MS = 30_000;
+
 /**
  * Where a task stands for the reader, when it is not simply open; for one
  * who is not an approved entrant, what is true for them (`TASK_STANDING`).
@@ -179,7 +182,8 @@ function LeaderboardCard({
   staff: boolean;
 }) {
   // Staff open the entrant's submissions to the task; anyone else, who
-  // reads only their own row, their own submission.
+  // reads only their own row, their own submission. A standing is an
+  // approved entrant's, so the staff branch is for one who is staff too.
   const open = (task: string, number: number, entrant: string) =>
     staff
       ? entrantGradingsPath(org, contest, task, entrant)
@@ -205,8 +209,11 @@ function LeaderboardCard({
   );
 }
 
-/** A visitor has no row. The public leaderboards are the contest's own page. */
-function PublicLeaderboards({ org, contest }: { org: string; contest: string }) {
+/**
+ * A visitor, or a signed-in person who is not an approved entrant, has no
+ * row here. The leaderboards are the contest's own page.
+ */
+function LeaderboardsLink({ org, contest }: { org: string; contest: string }) {
   return (
     <Card>
       <div className={classes.stack}>
@@ -253,7 +260,7 @@ function QuestionsCard({ org, contest }: { org: string; contest: string }) {
  * included. It is read again soon while they wait on an organiser or an
  * invite, and now and then otherwise, so extra time or a task released by
  * its own time reaches the page; crossing the start or the end reads it
- * again at once.
+ * again at once. While it shows a standing, it is read every thirty seconds.
  */
 function SignedInHome({ org, contest }: { org: string; contest: string }) {
   const queryClient = useQueryClient();
@@ -262,7 +269,16 @@ function SignedInHome({ org, contest }: { org: string; contest: string }) {
       'get',
       '/api/v1/orgs/{org}/contests/{contest}/home',
       { params: { path: { org, contest } } },
-      { refetchInterval: (query) => entryPollEvery(query.state.data?.registration) },
+      {
+        refetchInterval: (query) => {
+          const every = entryPollEvery(query.state.data?.registration);
+          // The stream tells no one of another entrant's grading, so a
+          // standing is read again every thirty seconds, stream or not.
+          return (query.state.data?.standing.length ?? 0) > 0
+            ? Math.min(every, STANDING_MS)
+            : every;
+        },
+      },
     ),
   );
   const readAgain = useCallback(() => {
@@ -359,12 +375,18 @@ function Home({
           />
         </div>
       </Card>
-      <LeaderboardCard
-        org={org}
-        contest={contest}
-        standing={home.standing}
-        staff={staff}
-      />
+      {/* The forge gives a standing to an approved entrant alone: anyone else
+          reads the leaderboards on their own page. */}
+      {approved ? (
+        <LeaderboardCard
+          org={org}
+          contest={contest}
+          standing={home.standing}
+          staff={staff}
+        />
+      ) : (
+        <LeaderboardsLink org={org} contest={contest} />
+      )}
       <Card>
         <ContestAnnouncements org={org} contest={contest} />
       </Card>
@@ -415,7 +437,7 @@ function PublicHome({ org, contest }: { org: string; contest: string }) {
           <PublicTaskList org={org} contest={contest} tasks={found.tasks} />
         </div>
       </Card>
-      <PublicLeaderboards org={org} contest={contest} />
+      <LeaderboardsLink org={org} contest={contest} />
     </Page>
   );
 }

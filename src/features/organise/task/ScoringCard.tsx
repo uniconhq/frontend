@@ -12,6 +12,7 @@ import { BLOCKS_UNLOADED, type Catalogue } from '../formula/catalogue';
 import {
   describeFormula,
   readLine,
+  sameTree,
   type FormulaScope,
   type Reading,
 } from '../formula/parse';
@@ -129,6 +130,10 @@ export function ScoringCard({
     ...values.scoreValues.flatMap((value) => {
       const reading = readings[value.key];
       if (reading === undefined) return [];
+      // A line not edited saves the tree it was printed from. When the print
+      // does not read back to that tree, the reading is not what is saved:
+      // the forge checks the stored tree at the save.
+      if (value.text === '' && !sameTree(reading.tree, value.tree)) return [];
       return [
         ...(reading.unread === null ? [] : [reading.unread.message]),
         ...reading.problems.map((problem) => problem.message),
@@ -206,15 +211,35 @@ export function ScoringCard({
           onChange={setGroups}
           onRename={(key, name) => {
             const old = values.scoreGroups.find((group) => group.key === key)?.name;
-            onChange({
-              scoreGroups: values.scoreGroups.map((group) =>
+            if (old !== undefined) remember(key, old);
+            setGroups(
+              values.scoreGroups.map((group) =>
                 group.key === key ? { ...group, name } : group,
               ),
-              show: old === undefined ? values.show : movedShow(values.show, old, name),
+            );
+          }}
+          onRenamed={(key) => {
+            // The when moves once the name is done, to a name nothing else
+            // has: one typed through on the way never takes another's.
+            const from = wasName[key];
+            const to = values.scoreGroups.find((group) => group.key === key)?.name;
+            if (from === undefined || to === undefined || to.trim() === '') return;
+            const taken =
+              values.scoreGroups.some(
+                (group) => group.key !== key && group.name === to,
+              ) || values.scoreValues.some((value) => value.name === to);
+            if (taken) return;
+            setWasName((known) => {
+              const rest = { ...known };
+              delete rest[key];
+              return rest;
             });
+            onChange({ show: movedShow(values.show, from, to) });
           }}
           onRemove={(key) => {
-            const old = values.scoreGroups.find((group) => group.key === key)?.name;
+            const old =
+              wasName[key] ??
+              values.scoreGroups.find((group) => group.key === key)?.name;
             onChange({
               scoreGroups: values.scoreGroups.filter((group) => group.key !== key),
               show: old === undefined ? values.show : withoutShow(values.show, old),
@@ -480,6 +505,7 @@ function Groups({
   disabled,
   onChange,
   onRename,
+  onRenamed,
   onRemove,
   onAdd,
 }: {
@@ -489,6 +515,7 @@ function Groups({
   disabled: boolean;
   onChange: (groups: ScoreGroup[]) => void;
   onRename: (key: string, name: string) => void;
+  onRenamed: (key: string) => void;
   onRemove: (key: string) => void;
   onAdd: () => void;
 }) {
@@ -511,6 +538,7 @@ function Groups({
                       value={group.name}
                       disabled={disabled}
                       onChange={(name) => onRename(group.key, name)}
+                      onCommit={() => onRenamed(group.key)}
                     />
                   </FieldBox>
                 </th>

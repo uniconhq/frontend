@@ -27,8 +27,16 @@ export type FormulaScope = {
   each: readonly string[];
   /** A task's groups, or a leaderboard's tasks. */
   sets: readonly string[];
+  /**
+   * Those of `sets` whose values cannot be read, such as a task whose
+   * settings did not load: any `set.value` of one is taken unchecked, as the
+   * forge takes a task it cannot resolve.
+   */
+  unread?: readonly string[];
   /** Other leaderboards a column may read. */
   boards?: readonly string[];
+  /** The columns of each of `boards`, when known. */
+  boardColumns?: Readonly<Record<string, readonly string[]>>;
   /** The names among `names` and `each` that are text. */
   texts?: readonly string[];
   /** What `.` reads on a pick. */
@@ -107,6 +115,25 @@ function digit(char: string | undefined): boolean {
   return char !== undefined && char >= '0' && char <= '9';
 }
 
+/**
+ * Where the text opened by the `"` at `open` closes, past each `\"` and
+ * `\\` in it, which stand for a `"` and a `\`; -1 when it never does.
+ */
+function textEnd(source: string, open: number): number {
+  for (let i = open + 1; i < source.length; i += 1) {
+    if (source[i] === '\\' && (source[i + 1] === '"' || source[i + 1] === '\\')) i += 1;
+    else if (source[i] === '"') return i;
+  }
+  return -1;
+}
+
+/** Where the text that closes at the `"` at `close` opens, read back past each `\"`. */
+function textStart(source: string, close: number): number {
+  let i = close - 1;
+  while (i >= 0 && !(source[i] === '"' && source[i - 1] !== '\\')) i -= 1;
+  return i;
+}
+
 function nameEnd(source: string, i: number): number {
   let j = i + 1;
   while (idPart(source[j] ?? '')) j += 1;
@@ -145,10 +172,13 @@ function tokenize(source: string): Tok[] | Unread {
       push({ kind: 'sym', text: two, from: i, to: i + 2 });
     else if ('+-*/<>'.includes(char)) push({ kind: 'sym', text: char, ...one });
     else if (char === '"') {
-      const close = source.indexOf('"', i + 1);
+      const close = textEnd(source, i);
       if (close < 0)
         return { message: 'This line cannot be read: a text has no closing ".', at: i };
-      push({ kind: 'str', text: source.slice(i + 1, close), from: i, to: close + 1 });
+      const text = source
+        .slice(i + 1, close)
+        .replace(/\\([\\"])/g, (_escape, char: string) => char);
+      push({ kind: 'str', text, from: i, to: close + 1 });
     } else if (fieldAt(source, i)) {
       const end = nameEnd(source, i + 1);
       push({ kind: 'field', text: source.slice(i + 1, end), from: i, to: end });
@@ -459,7 +489,22 @@ function compile(node: Ast, place: Place, each: boolean, pickOk: boolean): Built
     const record = compile(node.record, place, each, true);
     if (record.kind !== 'pick' && record.kind !== 'unknown')
       report(node.record, 'only a pick has columns to read with .');
-    const kind = scope.fields?.[node.name];
+    // A pick over one task's results, or one group's runs, reads that one's
+    // column, whose kind is its own; a pick column's, by its name alone.
+    const from = typeof record.tree === 'object' ? record.tree?.['from'] : undefined;
+    const set =
+      typeof from === 'object' && from !== null && !Array.isArray(from)
+        ? (from['results'] ?? from['runs'])
+        : undefined;
+    const pair = typeof set === 'string' ? `${set}.${node.name}` : null;
+    const kind =
+      pair !== null && scope.each.includes(pair)
+        ? (scope.texts ?? []).includes(pair)
+          ? 'text'
+          : 'number'
+        : typeof set === 'string' && (scope.unread ?? []).includes(set)
+          ? (scope.fields?.[node.name] ?? 'number')
+          : scope.fields?.[node.name];
     if (kind === undefined) report(node, say.field);
     const tree: Tree =
       scope.where === 'task'
@@ -521,7 +566,10 @@ function compileName(
   const facts = scope.where === 'task' ? catalogue.facts : catalogue.leaderboard_facts;
   if (dot !== null && scope.sets.includes(dot.group)) {
     if (!each) place.problems.push({ span: node.span, message: say.each });
-    const known = scope.each.includes(name) || scope.fields?.[dot.column] !== undefined;
+    const known =
+      scope.each.includes(name) ||
+      scope.fields?.[dot.column] !== undefined ||
+      (scope.unread ?? []).includes(dot.group);
     if (!known) place.problems.push({ span: node.span, message: say.field });
     const kind =
       texts.has(name) || scope.fields?.[dot.column] === 'text' ? 'text' : 'number';
@@ -541,7 +589,21 @@ function compileName(
     return { tree: { value: [{ column: dot.group }, dot.column] }, kind };
   }
   if (dot !== null && (scope.boards ?? []).includes(dot.group)) {
-    return { tree: { column: [dot.group, dot.column] }, kind: 'number' };
+    // `board.column`, or `board.column.field` off a pick column of it.
+    const [column = '', field, ...more] = dot.column.split('.');
+    const columns = scope.boardColumns?.[dot.group];
+    if (columns !== undefined && !columns.includes(column))
+      place.problems.push({
+        span: node.span,
+        message: `${dot.group} has no column ${column}`,
+      });
+    if (field === undefined)
+      return { tree: { column: [dot.group, column] }, kind: 'number' };
+    if (more.length > 0) place.problems.push({ span: node.span, message: say.field });
+    return {
+      tree: { value: [{ column: [dot.group, column] }, field] },
+      kind: scope.fields?.[field] === 'text' ? 'text' : 'number',
+    };
   }
   if (facts.includes(name))
     return { tree: { fact: name }, kind: texts.has(name) ? 'text' : 'number' };
@@ -954,7 +1016,7 @@ export function piecesOf(
       while (source[j] === ' ' || source[j] === '\t') j += 1;
       push(j, 'space');
     } else if (char === '"') {
-      const close = source.indexOf('"', i + 1);
+      const close = textEnd(source, i);
       push(close < 0 ? source.length : close + 1, 'text');
     } else if (digit(char)) {
       let j = i + 1;
@@ -1000,7 +1062,7 @@ export function contextAt(
   let index = 0;
   for (let i = from - 1; i >= 0; i -= 1) {
     const char = source[i];
-    if (char === '"') i = Math.max(0, source.lastIndexOf('"', i - 1));
+    if (char === '"') i = Math.max(0, textStart(source, i));
     else if (char === ')') depth += 1;
     else if (char === ',' && depth === 0) index += 1;
     else if (char === '(' && depth > 0) depth -= 1;
@@ -1034,6 +1096,30 @@ export type Reading = {
   problems: FormulaProblem[];
   unread: { message: string; at: number } | null;
 };
+
+/**
+ * Whether two trees are one, whatever order each record's keys are in, as
+ * when a line left as printed is checked against the stored tree it saves.
+ */
+export function sameTree(
+  a: Tree | Tree[] | undefined,
+  b: Tree | Tree[] | undefined,
+): boolean {
+  if (Array.isArray(a) || Array.isArray(b))
+    return (
+      Array.isArray(a) &&
+      Array.isArray(b) &&
+      a.length === b.length &&
+      a.every((item, index) => sameTree(item, b[index]))
+    );
+  if (typeof a !== 'object' || typeof b !== 'object' || a === null || b === null)
+    return a === b;
+  const keys = Object.keys(a);
+  return (
+    keys.length === Object.keys(b).length &&
+    keys.every((key) => key in b && sameTree(a[key], b[key]))
+  );
+}
 
 /** A line read and checked. */
 export function readLine(

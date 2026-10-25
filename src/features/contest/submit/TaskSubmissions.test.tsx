@@ -123,6 +123,11 @@ describe('the submit panel', () => {
     expect(within(form).getAllByRole('textbox', { name: /^Part [12]$/ })).toHaveLength(
       2,
     );
+    // Each input given in parts is a group named by its label, its parts under it.
+    const seed = within(form).getByRole('group', { name: 'Seed' });
+    expect(within(seed).getAllByRole('textbox', { name: /^Part [12]$/ })).toHaveLength(
+      2,
+    );
   });
 
   it('shows a drop zone per file input, a choice for an enum and a field for each value', async () => {
@@ -1158,6 +1163,68 @@ describe('a submission opened from the list', () => {
         .getAllByRole('listitem')
         .map((item) => item.textContent),
     ).toEqual(['Language: python', 'old: 3']);
+  });
+
+  it('shows each part of an input given in parts under it, by its row’s title or Part n', async () => {
+    server.use(
+      signedIn,
+      withPage({
+        inputs: [
+          inputField({
+            id: 'out',
+            label: 'Outputs',
+            parts: [
+              { title: 'Small', max_size: 1024 },
+              { title: null, max_size: 1024 },
+            ],
+          }),
+          inputField({
+            id: 'n',
+            type: 'number',
+            label: 'Answers',
+            parts: [
+              { title: 'Small', max_size: 0 },
+              { title: null, max_size: 0 },
+            ],
+          }),
+        ],
+      }),
+      listing([submission(1, accepted)]),
+      http.get(`${TASK_API}/submissions/:number`, () =>
+        HttpResponse.json(submission(1, accepted)),
+      ),
+      http.get(`${TASK_API}/submissions/:number/files`, () =>
+        HttpResponse.json({
+          number: 1,
+          inputs: {
+            out: {
+              files: [],
+              value: null,
+              parts: {
+                '2': { files: ['files/out/2/b.txt'], value: null },
+                '1': { files: ['files/out/1/a.txt'], value: null },
+              },
+            },
+            n: { files: [], value: null, parts: { '1': { files: [], value: '5' } } },
+          },
+        }),
+      ),
+    );
+    renderApp(`${PAGE}?submission=1`);
+
+    const detail = await screen.findByRole('region', { name: 'Submission 1' });
+    const files = await within(detail).findByRole('list', { name: 'Files' });
+    expect(
+      within(files)
+        .getAllByRole('listitem')
+        .map((item) => item.textContent),
+    ).toEqual(['Outputs, Small: 1/a.txt', 'Outputs, Part 2: 2/b.txt']);
+    expect(within(files).getAllByRole('link')[1]).toHaveAttribute(
+      'href',
+      '/-/downloads/acme/spring/sum/1/files/out/2/b.txt',
+    );
+    const given = within(detail).getByRole('list', { name: 'Values given' });
+    expect(within(given).getByRole('listitem')).toHaveTextContent('Answers, Small: 5');
   });
 
   it('names each file by its path under its input, so files of one name differ', async () => {
