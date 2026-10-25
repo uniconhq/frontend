@@ -21,8 +21,7 @@ import {
   type Doc,
 } from '../forms/yaml-doc';
 import { instantOf, isoOf, localOf } from '../forms/times';
-import { textValues } from '../formula/gives';
-import { axisColumns, formulaYaml, treeOf } from '../task/scoring-model';
+import { formulaYaml, treeOf } from '../task/scoring-model';
 
 /**
  * A leaderboard as the editor holds it. The file stores a mapping of key to
@@ -260,16 +259,14 @@ export type TaskGives = Readonly<Record<string, readonly GivenValue[] | null>>;
 
 /**
  * The values a task's settings give, the names under `scoring.values`, as
- * `t.v` on a leaderboard reads them, each with whether it gives text as the
- * forge reads it (`textValues`): a run's text columns are `verdict` and
- * each axis input the workflow declares text, by `declared`, the task's
- * inputs as its workflow gives them (none when that cannot be read). Null
- * when the settings cannot be read as YAML, so their values are not known.
+ * `t.v` on a leaderboard reads them. Whether one gives text is `text`, the
+ * names the task's workflow form says do; a formula is not read to guess.
+ * Null when the settings cannot be read as YAML, or when `text` is null
+ * because the form does not know, so the values are not known.
  */
 export function givenValues(
   content: string,
-  catalogue: Catalogue,
-  declared: readonly { id: string; type: string | null }[] = [],
+  text: ReadonlySet<string> | null,
 ): GivenValue[] | null {
   const parsed = parseYaml(content);
   if ('error' in parsed) return null;
@@ -277,18 +274,7 @@ export function givenValues(
   if (!isRecord(top) || !isRecord(top['scoring'])) return [];
   const values = top['scoring']['values'];
   if (!isRecord(values)) return [];
-  const repeat = Array.isArray(top['repeat']) ? top['repeat'] : [];
-  const axes = repeat.map((axis) => ({
-    inputs:
-      isRecord(axis) && Array.isArray(axis['inputs']) ? axis['inputs'].map(textOf) : [],
-  }));
-  const texts = axisColumns(axes, declared)
-    .filter((column) => column.kind === 'text')
-    .map((column) => column.name);
-  const trees = Object.fromEntries(
-    Object.entries(values).map(([name, tree]) => [name, treeOf(tree)]),
-  );
-  const text = textValues(trees, new Set(['verdict', ...texts]), catalogue);
+  if (text === null) return null;
   return Object.keys(values).map((name) => ({ name, text: text.has(name) }));
 }
 

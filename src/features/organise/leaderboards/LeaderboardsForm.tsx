@@ -64,17 +64,14 @@ const WAYS = [
 
 /**
  * What each task gives a leaderboard, the values its settings name, read
- * from each task's `task.yaml`; null until every one has been read, so no
- * formula is called unknown meanwhile. A task whose settings cannot be read
- * is null: its values are not known, so what a formula reads of it is not
- * checked here, as the forge does not check a task it cannot resolve.
+ * from each task's `task.yaml`, and which of them give text, from its
+ * workflow form; null until every one has been read, so no formula is
+ * called unknown meanwhile. A task whose settings cannot be read, or whose
+ * form does not say which values give text, is null: its values are not
+ * known, so what a formula reads of it is not checked here, as the forge
+ * does not check a task it cannot resolve.
  */
-function useTaskGives(
-  org: string,
-  contest: string,
-  tasks: readonly string[],
-  catalogue: Catalogue | null,
-): TaskGives | null {
+function useTaskGives(org: string, contest: string, tasks: readonly string[]): TaskGives | null {
   const files = useQueries({
     queries: tasks.map((task) => ({
       ...$api.queryOptions(
@@ -85,8 +82,7 @@ function useTaskGives(
       retry: false,
     })),
   });
-  // What each task's workflow declares, so a text input an axis fills is a
-  // text column of its runs.
+  // Which of each task's values give text, as its workflow form says.
   const forms = useQueries({
     queries: tasks.map((task) => ({
       ...$api.queryOptions(
@@ -100,23 +96,21 @@ function useTaskGives(
   const pending = [...files, ...forms].some((query) => query.isPending);
   const stamp = JSON.stringify([
     files.map((file) => file.data?.content ?? ''),
-    forms.map((form) => form.data?.inputs ?? []),
+    forms.map((form) => form.data?.text_values ?? null),
   ]);
   return useMemo(() => {
-    if (pending || catalogue === null) return null;
+    if (pending) return null;
     return Object.fromEntries(
       tasks.map((task, index) => {
         const content = files[index]?.data?.content;
-        const declared = forms[index]?.data?.inputs ?? [];
-        return [
-          task,
-          content === undefined ? null : givenValues(content, catalogue, declared),
-        ];
+        const text = forms[index]?.data?.text_values;
+        if (content === undefined || text == null) return [task, null];
+        return [task, givenValues(content, new Set(text))];
       }),
     );
     // `stamp` is the files and the forms. Each list is a new array every render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pending, stamp, tasks, catalogue]);
+  }, [pending, stamp, tasks]);
 }
 
 function matches(field: string, path: string): boolean {
@@ -243,7 +237,7 @@ export function LeaderboardsForm({
   const [now, setNow] = useState(() => Date.now());
   const [tasks] = useState(() => taskIds(doc));
   const blocks = $api.useQuery('get', '/api/v1/blocks');
-  const gives = useTaskGives(org, contest, tasks, blocks.data ?? null);
+  const gives = useTaskGives(org, contest, tasks);
   const unread = tasks.filter((task) => gives?.[task] === null);
   // Formulas are read once the blocks and what every task gives are in.
   const catalogue = gives === null ? null : (blocks.data ?? null);

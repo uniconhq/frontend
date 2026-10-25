@@ -341,7 +341,7 @@ leaderboards:
 
 describe('a name with a -', () => {
   const tasks = ['house-prices'];
-  const gives = { 'house-prices': givenValues(HOUSE_PRICES, catalogue) };
+  const gives = { 'house-prices': givenValues(HOUSE_PRICES, new Set()) };
 
   it('prints the Kaggle contest with each - as _, and reads it back to the same trees', () => {
     const read = readLeaderboards(open(KAGGLE));
@@ -696,8 +696,15 @@ describe('a task whose settings cannot be read', () => {
   });
 
   it('is unknown, not a task with no values, when its YAML cannot be read', () => {
-    expect(givenValues('name: [', catalogue)).toBeNull();
-    expect(givenValues('name: Islands\n', catalogue)).toEqual([]);
+    expect(givenValues('name: [', new Set())).toBeNull();
+    expect(givenValues('name: Islands\n', new Set())).toEqual([]);
+  });
+
+  it('takes which values give text from the form, and does not guess from a formula', () => {
+    const medal = 'name: Islands\nscoring:\n  values:\n    medal: {text: gold}\n';
+    expect(givenValues(medal, null)).toBeNull();
+    expect(givenValues(medal, new Set())).toEqual([{ name: 'medal', text: false }]);
+    expect(givenValues(medal, new Set(['medal']))).toEqual([{ name: 'medal', text: true }]);
   });
 });
 

@@ -74,8 +74,11 @@ const leaderboard: FormulaScope = boardScope(
   [{ ...blankBoard([]), key: 'gradebook' }],
   ['tour', 'islands'],
   {
-    tour: givenValues(TOUR, catalogue),
-    islands: givenValues(ISLANDS, catalogue, [{ id: 'name', type: 'text' }]),
+    tour: givenValues(TOUR, new Set()),
+    islands: givenValues(
+      ISLANDS,
+      new Set(['first_failed', 'medal', 'badge', 'first_name']),
+    ),
   },
   catalogue.leaderboard_facts,
   [],
