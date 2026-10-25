@@ -4,7 +4,7 @@ import { delay, http, HttpResponse } from 'msw';
 import userEvent from '@/test/user-event';
 import { renderApp } from '@/test/render';
 import { afterAnswers, server, signedIn } from '@/test/server';
-import { CLASSIC_V2, workflowBackend } from '@/test/workflows';
+import { CLASSIC, workflowBackend } from '@/test/workflows';
 import { comeBackToTab, fakeLiveStream, openStream, realLiveStream } from '@/test/live';
 import {
   EDITOR_PAGE,
@@ -35,7 +35,7 @@ const memoryAsText = (content: string) =>
 
 describe('saving and publishing a workflow', () => {
   it('saves a draft with a problem', async () => {
-    const backend = workflowBackend(CLASSIC_V2, { problems: memoryAsText });
+    const backend = workflowBackend(CLASSIC, { problems: memoryAsText });
     server.use(signedIn, ...backend.handlers);
     const user = userEvent.setup();
     renderApp(EDITOR_PAGE);
@@ -71,7 +71,7 @@ describe('saving and publishing a workflow', () => {
 
   it('will not publish a version of a saved draft with a problem', async () => {
     const backend = workflowBackend(
-      CLASSIC_V2.replace('memory_limit: ${{ inputs.memory_limit }}', 'memory_limit: 9'),
+      CLASSIC.replace('memory_limit: ${{ inputs.memory_limit }}', 'memory_limit: 9'),
       { problems: memoryAsText },
     );
     server.use(signedIn, ...backend.handlers);
@@ -87,7 +87,7 @@ describe('saving and publishing a workflow', () => {
   });
 
   it('will not publish a saved draft until its check has answered', async () => {
-    const backend = workflowBackend(CLASSIC_V2);
+    const backend = workflowBackend(CLASSIC);
     server.use(signedIn, ...backend.handlers);
     const user = userEvent.setup();
     renderApp(EDITOR_PAGE);
@@ -110,11 +110,11 @@ describe('saving and publishing a workflow', () => {
   });
 
   it('says in the forge’s words why it made no version', async () => {
-    const backend = workflowBackend(CLASSIC_V2, {
+    const backend = workflowBackend(CLASSIC, {
       problems: () => [
         {
           path: 'steps[0].use',
-          message: 'unicon/compile@v2 is not a primitive Unicon knows.',
+          message: 'unicon/compile@v3 is not a primitive Unicon knows.',
         },
       ],
     });
@@ -135,13 +135,13 @@ describe('saving and publishing a workflow', () => {
     const refused = await within(dialog).findByRole('alert');
     expect(refused).toHaveTextContent('No version was made');
     expect(refused).toHaveTextContent(
-      'unicon/compile@v2 is not a primitive Unicon knows.',
+      'unicon/compile@v3 is not a primitive Unicon knows.',
     );
     expect(backend.state.versions).toEqual([]);
   });
 
   it('publishes a saved draft that checks as the next version', async () => {
-    const backend = workflowBackend(CLASSIC_V2);
+    const backend = workflowBackend(CLASSIC);
     server.use(signedIn, ...backend.handlers);
     const user = userEvent.setup();
     renderApp(EDITOR_PAGE);
@@ -159,7 +159,7 @@ describe('saving and publishing a workflow', () => {
   });
 
   it('publishes the number after the highest version, whatever else is tagged', async () => {
-    const backend = workflowBackend(CLASSIC_V2, { versions: ['v1', 'beta', 'v9'] });
+    const backend = workflowBackend(CLASSIC, { versions: ['v1', 'beta', 'v9'] });
     server.use(signedIn, ...backend.handlers);
     const user = userEvent.setup();
     renderApp(EDITOR_PAGE);
@@ -183,7 +183,7 @@ describe('saving and publishing a workflow', () => {
   });
 
   it('offers the next version once someone else has published the one it offered', async () => {
-    const backend = workflowBackend(CLASSIC_V2, { versions: ['v1'] });
+    const backend = workflowBackend(CLASSIC, { versions: ['v1'] });
     server.use(signedIn, ...backend.handlers);
     const user = userEvent.setup();
     renderApp(EDITOR_PAGE);
@@ -205,7 +205,7 @@ describe('saving and publishing a workflow', () => {
   });
 
   it('asks for a save before publishing changes', async () => {
-    const backend = workflowBackend(CLASSIC_V2);
+    const backend = workflowBackend(CLASSIC);
     server.use(signedIn, ...backend.handlers);
     const user = userEvent.setup();
     renderApp(EDITOR_PAGE);
@@ -222,12 +222,12 @@ describe('saving and publishing a workflow', () => {
   });
 
   it('shows the draft or a version from the bar’s switcher', async () => {
-    const backend = workflowBackend(CLASSIC_V2, { versions: ['v1', 'v2'] });
+    const backend = workflowBackend(CLASSIC, { versions: ['v1', 'v2'] });
     server.use(
       signedIn,
       ...backend.handlers,
       http.get('/api/v1/workflows/kenny/tuned/versions/:version', () =>
-        HttpResponse.json({ content: CLASSIC_V2 }),
+        HttpResponse.json({ content: CLASSIC }),
       ),
     );
     const user = userEvent.setup();
@@ -258,7 +258,7 @@ describe('saving and publishing a workflow', () => {
   });
 
   it('opens the merge view on a save over someone else’s, matching steps by id', async () => {
-    const backend = workflowBackend(CLASSIC_V2);
+    const backend = workflowBackend(CLASSIC);
     server.use(signedIn, ...backend.handlers);
     const user = userEvent.setup();
     renderApp(EDITOR_PAGE);
@@ -269,9 +269,9 @@ describe('saving and publishing a workflow', () => {
         name: /^time_limit from the inputs/,
       }),
     );
-    backend.state.draft = CLASSIC_V2.replace(
-      'fold: max, better: lower',
-      'fold: sum, better: lower',
+    backend.state.draft = CLASSIC.replace(
+      'time_ms: {from: "${{ steps.run.time_ms }}", unit: ms}',
+      'time_ms: {from: "${{ steps.run.time_ms }}", unit: s}',
     );
     backend.state.token = 'someone-else';
     await user.click(barButton('Save'));
@@ -289,13 +289,15 @@ describe('saving and publishing a workflow', () => {
     await waitFor(() =>
       expect(backend.state.draft).toContain('args: ${{ inputs.time_limit }}'),
     );
-    expect(backend.state.draft).toContain('fold: sum');
+    expect(backend.state.draft).toContain(
+      'time_ms: {from: "${{ steps.run.time_ms }}", unit: s}',
+    );
   });
 
   it('keeps the unsaved draft when the tab comes back after someone else saved, and meets theirs at the save', async () => {
     fakeLiveStream();
     try {
-      const backend = workflowBackend(CLASSIC_V2);
+      const backend = workflowBackend(CLASSIC);
       server.use(signedIn, ...backend.handlers);
       const user = userEvent.setup();
       renderApp(EDITOR_PAGE);
@@ -307,9 +309,9 @@ describe('saving and publishing a workflow', () => {
           name: /^time_limit from the inputs/,
         }),
       );
-      backend.state.draft = CLASSIC_V2.replace(
-        'fold: max, better: lower',
-        'fold: sum, better: lower',
+      backend.state.draft = CLASSIC.replace(
+        'time_ms: {from: "${{ steps.run.time_ms }}", unit: ms}',
+        'time_ms: {from: "${{ steps.run.time_ms }}", unit: s}',
       );
       backend.state.token = 'someone-else';
       await afterAnswers(comeBackToTab);
@@ -334,7 +336,7 @@ describe('saving and publishing a workflow', () => {
   });
 
   it('merges again over a second save by someone else, from the file merged over', async () => {
-    const backend = workflowBackend(CLASSIC_V2);
+    const backend = workflowBackend(CLASSIC);
     server.use(signedIn, ...backend.handlers);
     const user = userEvent.setup();
     renderApp(EDITOR_PAGE);
@@ -345,16 +347,16 @@ describe('saving and publishing a workflow', () => {
         name: /^time_limit from the inputs/,
       }),
     );
-    backend.state.draft = CLASSIC_V2.replace(
-      'fold: max, better: lower',
-      'fold: sum, better: lower',
+    backend.state.draft = CLASSIC.replace(
+      'time_ms: {from: "${{ steps.run.time_ms }}", unit: ms}',
+      'time_ms: {from: "${{ steps.run.time_ms }}", unit: s}',
     );
     backend.state.token = 'someone-else';
     await user.click(barButton('Save'));
     await findMerge();
     backend.state.draft = backend.state.draft.replace(
-      'fold: sum, better: lower',
-      'fold: min, better: lower',
+      'time_ms: {from: "${{ steps.run.time_ms }}", unit: s}',
+      'time_ms: {from: "${{ steps.run.time_ms }}", unit: min}',
     );
     backend.state.token = 'a-third';
     await user.click(
@@ -365,7 +367,7 @@ describe('saving and publishing a workflow', () => {
 
     await waitFor(() =>
       expect(
-        within(part('ul', 'Fields that differ')).getByText(/time_ms\.fold/),
+        within(part('ul', 'Fields that differ')).getByText(/time_ms\.unit/),
       ).toBeInTheDocument(),
     );
     const fields = part('ul', 'Fields that differ');
@@ -377,11 +379,13 @@ describe('saving and publishing a workflow', () => {
     );
     await waitFor(() => expect(backend.state.token).not.toBe('a-third'));
     expect(backend.state.draft).toContain('args: ${{ inputs.time_limit }}');
-    expect(backend.state.draft).toContain('fold: min');
+    expect(backend.state.draft).toContain(
+      'time_ms: {from: "${{ steps.run.time_ms }}", unit: min}',
+    );
   });
 
   it('takes the current file in the merge view as one step undo goes back over', async () => {
-    const backend = workflowBackend(CLASSIC_V2);
+    const backend = workflowBackend(CLASSIC);
     server.use(signedIn, ...backend.handlers);
     const user = userEvent.setup();
     renderApp(EDITOR_PAGE);
@@ -392,9 +396,9 @@ describe('saving and publishing a workflow', () => {
         name: /^time_limit from the inputs/,
       }),
     );
-    backend.state.draft = CLASSIC_V2.replace(
-      'fold: max, better: lower',
-      'fold: sum, better: lower',
+    backend.state.draft = CLASSIC.replace(
+      'time_ms: {from: "${{ steps.run.time_ms }}", unit: ms}',
+      'time_ms: {from: "${{ steps.run.time_ms }}", unit: s}',
     );
     backend.state.token = 'someone-else';
     await user.click(barButton('Save'));
@@ -402,7 +406,9 @@ describe('saving and publishing a workflow', () => {
       within(await findMerge()).getByRole('button', { name: 'Discard my changes' }),
     );
 
-    expect(await fileText(user)).toContain('fold: sum');
+    expect(await fileText(user)).toContain(
+      'time_ms: {from: "${{ steps.run.time_ms }}", unit: s}',
+    );
     await user.click(toolButton('Undo'));
     expect(await fileText(user)).toContain('args: ${{ inputs.time_limit }}');
   });

@@ -38,11 +38,11 @@ describe('a definition file as the forge reads it', () => {
   });
 
   it('reads no, NO and on as text, as YAML 1.2 does', () => {
-    const parsed = parseYaml('test_groups:\n  no: {each: 1}\n  NO: {}\nflag: on\n');
+    const parsed = parseYaml('inputs:\n  no: {max: 1}\n  NO: {}\nflag: on\n');
     if ('error' in parsed) throw new Error(parsed.error);
 
     expect(parsed.doc.toJS()).toEqual({
-      test_groups: { no: { each: 1 }, NO: {} },
+      inputs: { no: { max: 1 }, NO: {} },
       flag: 'on',
     });
   });
@@ -185,16 +185,16 @@ describe('the scalars as YAML 1.2 reads them', () => {
   });
 
   it('writes a new key that looks like a date plain, and escapes a break', () => {
-    const text = edited('test_groups: {}\n', (doc) => {
-      writeAt(doc, ['test_groups', '2024-01-01'], { weight: 1 });
+    const text = edited('inputs: {}\n', (doc) => {
+      writeAt(doc, ['inputs', '2024-01-01'], { max: 1 });
       writeAt(doc, ['note'], 'a\u0085b c');
     });
 
-    expect(text).toBe('test_groups:\n  2024-01-01: {weight: 1}\nnote: "a\\Nb\\Lc"\n');
+    expect(text).toBe('inputs:\n  2024-01-01: {max: 1}\nnote: "a\\Nb\\Lc"\n');
     const parsed = parseYaml(text);
     if ('error' in parsed) throw new Error(parsed.error);
     expect(parsed.doc.toJS()).toEqual({
-      test_groups: { '2024-01-01': { weight: 1 } },
+      inputs: { '2024-01-01': { max: 1 } },
       note: 'a\u0085b c',
     });
   });

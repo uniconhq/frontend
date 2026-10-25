@@ -14,7 +14,7 @@ describe('the workflow editor', () => {
     async () => {
       const empty = [
         'inputs:',
-        '  submission: {type: folder, contestant: true}',
+        '  submission: folder',
         '  time_limit: number',
         '  memory_limit: number',
         '  input: file',
@@ -61,28 +61,27 @@ describe('the workflow editor', () => {
         await choose(`The port ${port} of ${step}`, source);
       };
       await add(/^Compile/, 'compile');
-      await add(/^Run program/, 'sandbox-run');
+      await add(/^Run program/, 'exec');
       await add(/^Compare with the answer/, 'diff-check');
       await wireFrom('source', 'compile', /^submission from the inputs/);
-      await wireFrom('binary', 'sandbox-run', /^binary from compile/);
-      await wireFrom('input', 'sandbox-run', /^input from the inputs/);
-      await wireFrom('time_limit', 'sandbox-run', /^time_limit from the inputs/);
-      await wireFrom('memory_limit', 'sandbox-run', /^memory_limit from the inputs/);
-      await wireFrom('actual', 'diff-check', /^output from sandbox-run/);
+      await wireFrom('program', 'exec', /^program from compile/);
+      await wireFrom('stdin', 'exec', /^input from the inputs/);
+      await wireFrom('time_limit', 'exec', /^time_limit from the inputs/);
+      await wireFrom('memory_limit', 'exec', /^memory_limit from the inputs/);
+      await wireFrom('actual', 'diff-check', /^output from exec/);
       await wireFrom('expected', 'diff-check', /^answer from the inputs/);
 
       const text = await fileText(user);
       for (const wire of [
         'source: ${{ inputs.submission }}',
-        'binary: ${{ steps.compile.binary }}',
-        'input: ${{ inputs.input }}',
+        'program: ${{ steps.compile.program }}',
+        'stdin: ${{ inputs.input }}',
         'time_limit: ${{ inputs.time_limit }}',
         'memory_limit: ${{ inputs.memory_limit }}',
-        'actual: ${{ steps.sandbox-run.output }}',
+        'actual: ${{ steps.exec.output }}',
         'expected: ${{ inputs.answer }}',
       ])
         expect(text).toContain(wire);
-      expect(text).not.toContain('per_test');
     },
   );
 });

@@ -27,12 +27,12 @@ import {
   OrgPage,
   OrgsPage,
   TASK_SECTION_PAGES,
+  RegradePage,
   TaskPage,
   viewFilePath,
   WorkflowPage,
   WorkflowsPage,
 } from '@/features/organise';
-import { stage6Routes } from '@/features/organise/stage6/routes';
 import { RequireSession, SessionExpiredModal, SessionProvider } from '@/session';
 import {
   CONTEST_SECTIONS,
@@ -182,7 +182,7 @@ export const routes: RouteObject[] = [
            * signed-in person, each page reading what the caller may see.
            */
           { path: 'contests/:org/:contest', element: <ContestHomePage /> },
-          { path: 'contests/:org/:contest/boards', element: <BoardsPage /> },
+          { path: 'contests/:org/:contest/leaderboards', element: <BoardsPage /> },
           { path: 'contests/:org/:contest/questions', element: <QuestionsPage /> },
           {
             path: 'contests/:org/:contest/tasks/:task',
@@ -225,13 +225,13 @@ export const routes: RouteObject[] = [
                   { path: ORG, element: <OrgPage /> },
                   { path: CONTEST, element: <ContestPage /> },
                   { path: TASK, element: <TaskPage /> },
+                  { path: `${TASK}/regrades/:regrade`, element: <RegradePage /> },
                   ...sectionRoutes,
                   ...movedRoutes,
                 ],
               },
             ],
           },
-          ...(import.meta.env.DEV ? stage6Routes : []),
           { path: '*', element: <NotFound /> },
         ],
       },

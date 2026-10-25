@@ -39,7 +39,9 @@ function tooLarge(error: ApiError): ErrorDescription {
     message:
       limit === null
         ? 'The files for this input are larger than it takes.'
-        : `The files for this input may be at most ${formatLimit(limit)} in all.`,
+        : typeof error.extensions['part'] === 'number'
+          ? `This part may be at most ${formatLimit(limit)}.`
+          : `The files for this input may be at most ${formatLimit(limit)} in all.`,
   };
 }
 

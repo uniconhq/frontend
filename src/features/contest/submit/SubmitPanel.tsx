@@ -10,7 +10,15 @@ import { TextInput } from '@/ui/TextInput';
 import { Textarea } from '@/ui/Textarea';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { formatLimit } from '@/lib/size';
-import { entryOf, pathOf, takesPaths, type Draft, type Entry } from './draft';
+import {
+  entryOf,
+  partTitle,
+  partsOf,
+  pathOf,
+  takesPaths,
+  type Draft,
+  type Entry,
+} from './draft';
 import type { Phase } from './use-submit';
 import shared from '../contest.module.css';
 import classes from './submit.module.css';
@@ -73,21 +81,26 @@ function Refusal({ error, inputs }: { error: ApiError; inputs: InputField[] }) {
         </ul>
       )}
       {error.code === 'too_large' && typeof input === 'string' && (
-        <BodyText tone="secondary">Too large: {labelOf(input)}</BodyText>
+        <BodyText tone="secondary">
+          Too large:{' '}
+          {namedPart(inputs, input, error.extensions['part']) ?? labelOf(input)}
+        </BodyText>
       )}
     </Said>
   );
 }
 
-/**
- * The helper line under a file input: how its files are named, for one that
- * takes a file per test, and how large they may be together.
- */
+/** The part a `too_large` names, by the title its upload box shows. */
+function namedPart(inputs: InputField[], id: string, part: unknown): string | null {
+  if (typeof part !== 'number') return null;
+  const input = inputs.find((found) => found.id === id);
+  const found = input === undefined ? undefined : partsOf(input)?.[part - 1];
+  return found === undefined ? null : partTitle(found.title, part - 1);
+}
+
+/** The helper line under a file input: how large its file, or its files together, may be. */
 function fileHint(input: InputField): string {
   const limit = formatLimit(input.max_size);
-  if (input.per_test) {
-    return `One file for each test, named after its test group and test, such as main/1.txt. Choose a folder that holds one folder for each test group. At most ${limit} in all.`;
-  }
   return input.type === 'folder' ? `At most ${limit} in all.` : `At most ${limit}.`;
 }
 
@@ -119,6 +132,32 @@ function Field({
 }) {
   const { label } = input;
   switch (entry.kind) {
+    case 'parts': {
+      const parts = partsOf(input) ?? [];
+      return (
+        <>
+          {parts.map((part, index) => {
+            const file = entry.files[index] ?? null;
+            const title = partTitle(part.title, index);
+            return (
+              <FileDrop
+                key={`${String(index)}:${title}`}
+                label={title}
+                description={`At most ${formatLimit(part.max_size)}.`}
+                files={file === null ? [] : [file]}
+                onChange={(files) => {
+                  const next = parts.map((_, at) => entry.files[at] ?? null);
+                  next[index] = files[0] ?? null;
+                  onChange({ kind: 'parts', files: next });
+                }}
+                progressOf={sentOf}
+                disabled={busy}
+              />
+            );
+          })}
+        </>
+      );
+    }
     case 'files':
       return (
         <FileDrop

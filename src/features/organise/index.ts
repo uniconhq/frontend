@@ -16,6 +16,7 @@ import {
   TaskPublicationsPage,
   TaskSettingsPage,
 } from './task/TaskSections';
+import { TaskQueuePage } from './task/QueuePage';
 import { ContestEntryPage } from './contest/EntryPage';
 import { EntrantsPage } from './entrants/EntrantsPage';
 import { InboxPage } from './threads/Clarifications';
@@ -25,6 +26,7 @@ export { NewOrgPage } from './orgs/NewOrgPage';
 export { OrgPage } from './org/OrgPage';
 export { ContestPage } from './contest/ContestPage';
 export { TaskPage } from './task/TaskPage';
+export { RegradePage } from './gradings/RegradePage';
 export { WorkflowsPage } from './workflows/WorkflowsPage';
 export { WorkflowPage } from './workflows/WorkflowPage';
 export { viewFilePath } from './contest/places';
@@ -52,6 +54,7 @@ export const CONTEST_SECTION_PAGES: Record<ContestSectionKey, ComponentType> = {
 
 export const TASK_SECTION_PAGES: Record<TaskSectionKey, ComponentType> = {
   gradings: TaskGradingsPage,
+  queue: TaskQueuePage,
   publications: TaskPublicationsPage,
   announcements: TaskAnnouncementsPage,
   organisers: TaskOrganisersPage,

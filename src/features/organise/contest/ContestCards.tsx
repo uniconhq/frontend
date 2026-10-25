@@ -14,6 +14,7 @@ import { FAILED_SEARCH } from '../gradings/feed';
 import shared from '../organise.module.css';
 import { Loaded } from '@/ui/feedback/Loaded';
 import { useContestSettings } from './settings';
+import { HoldLine } from './HoldLine';
 
 type Path = { org: string; contest: string };
 
@@ -115,11 +116,11 @@ export function GradingsCard({ path }: { path: Path }) {
   );
 }
 
-/** The contest's leaderboards, by name. Rebuilt in a later phase. */
+/** The contest's hold, which a manager can end. */
 export function BoardsCard({ path }: { path: Path }) {
   return (
     <div data-contest={`${path.org}/${path.contest}`}>
-      <BodyText>This page is being rebuilt.</BodyText>
+      <HoldLine path={path} />
     </div>
   );
 }

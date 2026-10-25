@@ -95,7 +95,7 @@ describe('the sidebar', () => {
 
     expect(await entries('Contest')).toEqual([
       ['Tasks', '/contests/acme/spring'],
-      ['Leaderboards', '/contests/acme/spring/boards'],
+      ['Leaderboards', '/contests/acme/spring/leaderboards'],
       ['Questions', '/contests/acme/spring/questions'],
     ]);
     const nav = screen.getByRole('navigation', { name: 'Sections' });

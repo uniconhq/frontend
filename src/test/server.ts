@@ -2,7 +2,8 @@ import { act, waitFor } from '@testing-library/react';
 import { setupServer } from 'msw/node';
 import { expect } from 'vitest';
 import { http, HttpResponse } from 'msw';
-import type { ContestHome, Me, SessionInfo, WorkflowForm } from '@/api/types';
+import type { ContestHome, Me, SessionInfo } from '@/api/types';
+import type { components } from '@/api/schema';
 
 /**
  * A fake backend for the tests, so they exercise the real client, the real
@@ -83,6 +84,34 @@ const serverTime = http.get('/api/v1/time', () =>
 const noHolders = [
   http.get('/api/v1/orgs/:org/roles', () => HttpResponse.json([])),
   http.get('/api/v1/orgs/:org/contests/:contest/roles', () => HttpResponse.json([])),
+  http.get('/api/v1/orgs/:org/contests/:contest/hold', () =>
+    HttpResponse.json({
+      from: null,
+      until: null,
+      holding: false,
+      ended_at: null,
+      ended_by: null,
+      ended_by_name: null,
+    }),
+  ),
+  http.get('/api/v1/orgs/:org/contests/:contest/tasks/:task', () =>
+    HttpResponse.json({
+      draft: false,
+      errors: [],
+      head: 'v1',
+      head_statement_written: false,
+      latest: null,
+      statement_written: false,
+      results: { released: false, history: [] },
+    }),
+  ),
+  http.get('/api/v1/orgs/:org/contests/:contest/tasks/:task/organise/queue', () =>
+    HttpResponse.json([]),
+  ),
+  http.get(
+    '/api/v1/orgs/:org/contests/:contest/tasks/:task/organise/submissions/:number/files',
+    () => HttpResponse.json({ number: 1, inputs: {} }),
+  ),
   http.get('/api/v1/orgs/:org/contests/:contest/tasks/:task/roles', () =>
     HttpResponse.json([]),
   ),
@@ -192,7 +221,7 @@ const emptyOrganising = [
       test: [],
       graded: false,
       runs: false,
-    } satisfies WorkflowForm),
+    } satisfies components['schemas']['WorkflowForm']),
   ),
 ];
 
@@ -221,9 +250,10 @@ const noThreads = [
 
 /** A contest with no boards, so no task takes marks, until a test gives some. */
 const noBoards = [
-  http.get('/api/v1/public/contests/:org/:contest/boards', () => HttpResponse.json([])),
-  http.get('/api/v1/orgs/:org/contests/:contest/boards', () => HttpResponse.json([])),
-  http.get('/api/v1/orgs/:org/contests/:contest/organise/boards', () =>
+  http.get('/api/v1/public/contests/:org/:contest/leaderboards', () =>
+    HttpResponse.json([]),
+  ),
+  http.get('/api/v1/orgs/:org/contests/:contest/leaderboards', () =>
     HttpResponse.json([]),
   ),
   http.get('/api/v1/orgs/:org/contests/:contest/tasks/:task/marks', () =>

@@ -28,7 +28,6 @@ const BORDER = 2;
 export type Shape = { width: number; gap: number; compact: boolean };
 
 export const FULL: Shape = { width: 260, gap: 88, compact: false };
-export const SMALL: Shape = { width: 150, gap: 56, compact: true };
 
 /**
  * The colours of one kind of graph: its inputs, its outputs, and the
@@ -57,7 +56,7 @@ export const PALETTES = {
   },
 } satisfies Record<string, Palette>;
 
-export type GraphPort = { name: string; side: 'in' | 'out'; said?: string };
+type GraphPort = { name: string; side: 'in' | 'out'; said?: string };
 
 export type GraphBox = {
   id: string;

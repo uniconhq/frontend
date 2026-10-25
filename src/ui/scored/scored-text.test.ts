@@ -1,5 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { overLimitSentence, submissionsWords } from './scored-text';
+import { overLimitSentence, submissionsWords, tupleLine } from './scored-text';
+
+describe('a run’s rows', () => {
+  it('joins titles, and names a row with none from its key', () => {
+    expect(tupleLine(['Big grid', null], { grid: 'big.txt', seed: 2 })).toBe(
+      'Big grid · seed 2',
+    );
+    expect(tupleLine(null, { route: 'hidden/route.txt', seed: 2 })).toBe(
+      'route.txt · seed 2',
+    );
+  });
+});
 
 describe('a submission over the task’s limit (#445)', () => {
   it('counts the limit in submissions, one or many', () => {

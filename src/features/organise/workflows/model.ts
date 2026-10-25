@@ -1,9 +1,9 @@
 import { isRecord, NumberText } from '../forms/yaml-doc';
 
 /**
- * A workflow as the editor reads its `workflow.yaml` (TASK-FORMAT.md section
- * 1.3): the inputs it declares, the fields every test has, the steps in
- * order with what each port is given, and what a run reports. The reading is
+ * A workflow as the editor reads its `workflow.yaml` (SIMPLER-CORE.md section
+ * 7): the inputs it declares, the steps in order with what each port is
+ * given, and what one run gives, its outputs. The reading is
  * forgiving, since the page draws a draft with problems as well as a good
  * one: a key of the wrong shape is skipped and the check says why, never the
  * reader.
@@ -23,7 +23,6 @@ export const VALUE_TYPES: ValueType[] = [
 /** One `${{ ... }}`: an input, a file of the workflow, or a step's output. */
 export type Ref =
   | { kind: 'inputs'; name: string }
-  | { kind: 'test'; name: string }
   | { kind: 'workflow'; name: string }
   | { kind: 'steps'; name: string; output: string };
 
@@ -45,9 +44,7 @@ export type WithValue =
 export type InputDecl = {
   id: string;
   type: string;
-  contestant: boolean;
   options: string[] | null;
-  perTest: boolean;
   optional: boolean;
   /** What the task's form names it, a line of help and its unit (#434); null when not given. */
   title: string | null;
@@ -55,17 +52,9 @@ export type InputDecl = {
   unit: string | null;
 };
 
-export type FieldDecl = {
-  name: string;
-  type: string;
-  options: string[] | null;
-  public: boolean;
-};
-
 type Step = {
   id: string;
   use: string;
-  perTest: boolean;
   with: Record<string, WithValue>;
 };
 
@@ -73,12 +62,6 @@ export type ReportEntry = {
   name: string;
   /** The output it reads, or null when `from` is not one reference. */
   from: Ref | null;
-  fold: string | null;
-  better: string | null;
-  /** `better` when it is `${{ inputs.<id> }}`. */
-  betterRef: Ref | null;
-  atLeast: NumberText | null;
-  atMost: NumberText | null;
   /**
    * What pages name the value, "Run time", and what it is counted in, "ms"
    * (M58); null when not given, and the value is then named by its key.
@@ -91,7 +74,6 @@ export type ReportEntry = {
 
 export type Workflow = {
   inputs: InputDecl[];
-  test: FieldDecl[];
   steps: Step[];
   report: ReportEntry[];
 };
@@ -104,7 +86,6 @@ function parseRef(expression: string): Ref | null {
   const parts = expression.split('.');
   const [head, name, output] = parts;
   if (head === 'inputs' && name && parts.length === 2) return { kind: 'inputs', name };
-  if (head === 'test' && name && parts.length === 2) return { kind: 'test', name };
   if (head === 'workflow' && parts.length >= 2)
     return { kind: 'workflow', name: parts.slice(1).join('.') };
   if (head === 'steps' && name && output)
@@ -116,14 +97,14 @@ function parseRef(expression: string): Ref | null {
 export function refText(ref: Ref): string {
   if (ref.kind === 'steps') return `\${{ steps.${ref.name}.${ref.output} }}`;
   if (ref.kind === 'workflow') return `\${{ workflow.${ref.name} }}`;
-  return `\${{ ${ref.kind}.${ref.name} }}`;
+  return `\${{ inputs.${ref.name} }}`;
 }
 
 /** A reference as the page names it, without the braces. */
 export function refLabel(ref: Ref): string {
   if (ref.kind === 'steps') return `${ref.name}.${ref.output}`;
   if (ref.kind === 'workflow') return ref.name;
-  return `${ref.kind}.${ref.name}`;
+  return `inputs.${ref.name}`;
 }
 
 export function sameRef(a: Ref, b: Ref): boolean {
@@ -170,11 +151,15 @@ function withValue(raw: unknown): WithValue {
     return { kind: 'literal', value: new NumberText(String(raw)) };
   if (raw instanceof NumberText || typeof raw === 'boolean')
     return { kind: 'literal', value: raw };
-  if (Array.isArray(raw)) return { kind: 'list', items: raw.map((item) => withValue(item)) };
+  if (Array.isArray(raw))
+    return { kind: 'list', items: raw.map((item) => withValue(item)) };
   if (isRecord(raw))
     return {
       kind: 'mapping',
-      entries: Object.entries(raw).map(([name, value]) => ({ name, value: withValue(value) })),
+      entries: Object.entries(raw).map(([name, value]) => ({
+        name,
+        value: withValue(value),
+      })),
     };
   if (typeof raw !== 'string') return { kind: 'invalid', raw };
   const whole = wholeRef(raw);
@@ -189,7 +174,8 @@ function withValue(raw: unknown): WithValue {
 export function refsOf(value: WithValue): Ref[] {
   if (value.kind === 'wire') return [value.ref];
   if (value.kind === 'text') return value.refs;
-  if (value.kind === 'mapping') return value.entries.flatMap((entry) => refsOf(entry.value));
+  if (value.kind === 'mapping')
+    return value.entries.flatMap((entry) => refsOf(entry.value));
   if (value.kind === 'list') return value.items.flatMap((item) => refsOf(item));
   return [];
 }
@@ -197,7 +183,8 @@ export function refsOf(value: WithValue): Ref[] {
 /** The references drawn as wires: a whole reference, including inside a mapping or a list. */
 export function wireRefs(value: WithValue): Ref[] {
   if (value.kind === 'wire') return [value.ref];
-  if (value.kind === 'mapping') return value.entries.flatMap((entry) => wireRefs(entry.value));
+  if (value.kind === 'mapping')
+    return value.entries.flatMap((entry) => wireRefs(entry.value));
   if (value.kind === 'list') return value.items.flatMap((item) => wireRefs(item));
   return [];
 }
@@ -212,13 +199,6 @@ function strings(value: unknown): string[] | null {
     : null;
 }
 
-function number(value: unknown): NumberText | null {
-  if (value instanceof NumberText) return Number.isFinite(value.value) ? value : null;
-  return typeof value === 'number' && Number.isFinite(value)
-    ? new NumberText(String(value))
-    : null;
-}
-
 /** A declaration written short (`time_limit: number`) or as a mapping. */
 function declaration(raw: unknown): Record<string, unknown> {
   if (typeof raw === 'string') return { type: raw };
@@ -230,23 +210,11 @@ function inputOf(id: string, raw: unknown): InputDecl {
   return {
     id,
     type: text(found.type) ?? '',
-    contestant: found.contestant === true,
     options: strings(found.options),
-    perTest: found.per_test === true,
     optional: found.optional === true,
     title: text(found.title),
     help: text(found.help),
     unit: text(found.unit),
-  };
-}
-
-function fieldOf(name: string, raw: unknown): FieldDecl {
-  const found = declaration(raw);
-  return {
-    name,
-    type: text(found.type) ?? '',
-    options: strings(found.options),
-    public: found.public === true,
   };
 }
 
@@ -255,11 +223,6 @@ function entryOf(name: string, raw: unknown): ReportEntry {
     return {
       name,
       from: wholeRef(raw),
-      fold: null,
-      better: null,
-      betterRef: null,
-      atLeast: null,
-      atMost: null,
       title: null,
       unit: null,
       short: true,
@@ -267,15 +230,9 @@ function entryOf(name: string, raw: unknown): ReportEntry {
   }
   const found = isRecord(raw) ? raw : {};
   const from = text(found.from);
-  const better = text(found.better);
   return {
     name,
     from: from !== null ? wholeRef(from) : null,
-    fold: text(found.fold),
-    better,
-    betterRef: better !== null ? wholeRef(better) : null,
-    atLeast: number(found.at_least),
-    atMost: number(found.at_most),
     title: text(found.title),
     unit: text(found.unit),
     short: false,
@@ -288,13 +245,12 @@ function entryOf(name: string, raw: unknown): ReportEntry {
  * and an edit or a problem at `steps[n]` lands on the box drawn for it.
  */
 function stepOf(raw: unknown): Step {
-  if (!isRecord(raw)) return { id: '', use: '', perTest: false, with: {} };
+  if (!isRecord(raw)) return { id: '', use: '', with: {} };
   const id = text(raw.id) ?? '';
   const given = isRecord(raw.with) ? raw.with : {};
   return {
     id,
     use: text(raw.use) ?? '',
-    perTest: raw.per_test === true,
     with: Object.fromEntries(
       Object.entries(given).map(([port, value]) => [port, withValue(value)]),
     ),
@@ -305,11 +261,9 @@ function stepOf(raw: unknown): Step {
 export function readWorkflow(file: unknown): Workflow {
   const top = isRecord(file) ? file : {};
   const inputs = isRecord(top.inputs) ? top.inputs : {};
-  const test = isRecord(top.test) ? top.test : {};
-  const listed = isRecord(top.outputs) ? top.outputs : isRecord(top.report) ? top.report : {};
+  const listed = isRecord(top.outputs) ? top.outputs : {};
   return {
     inputs: Object.entries(inputs).map(([id, raw]) => inputOf(id, raw)),
-    test: Object.entries(test).map(([name, raw]) => fieldOf(name, raw)),
     steps: (Array.isArray(top.steps) ? top.steps : []).map(stepOf),
     report: Object.entries(listed).map(([name, raw]) => entryOf(name, raw)),
   };

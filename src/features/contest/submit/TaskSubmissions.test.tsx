@@ -13,7 +13,6 @@ import {
   grading,
   inputField,
   languageField,
-  reported,
   submission,
   TASK_API,
   taskPage,
@@ -100,7 +99,6 @@ describe('the submit panel', () => {
             id: 'answers',
             type: 'file',
             label: 'Your answers',
-            per_test: true,
             max_size: 1024 * 1024,
           }),
           inputField({
@@ -133,7 +131,7 @@ describe('the submit panel', () => {
     const form = await screen.findByRole('form', { name: 'Submit' });
     const solution = within(form).getByLabelText('Your solution');
     const program = within(form).getByLabelText('Your program');
-    expect(form.querySelectorAll('input[type="file"]')).toHaveLength(5);
+    expect(form.querySelectorAll('input[type="file"]')).toHaveLength(4);
     expect(solution).not.toHaveAttribute('multiple');
     expect(
       within(form).getByText(/Drop a file here or choose one\. At most 10 MB\./),
@@ -144,8 +142,8 @@ describe('the submit panel', () => {
       true,
     );
     expect(within(form).getByText(/At most 5 MB in all\./)).toBeVisible();
-    expect(within(form).getByLabelText('Your answers: a folder')).toBeInTheDocument();
-    expect(within(form).getByText(/One file for each test/)).toBeVisible();
+    expect(within(form).getByLabelText('Your answers')).not.toHaveAttribute('multiple');
+    expect(within(form).getByText(/At most 1 MB\./)).toBeVisible();
     expect(within(form).getByText('language: python')).toBeVisible();
     expect(within(form).queryByRole('combobox', { name: 'language' })).toBeNull();
     expect(within(form).getByRole('combobox', { name: 'Level' })).toHaveValue('');
@@ -316,50 +314,6 @@ describe('the submit panel', () => {
         ],
       },
     });
-  });
-
-  it('sends a file per test by its name, and says why the server turns one away', async () => {
-    const slots: unknown[] = [];
-    server.use(
-      signedIn,
-      listing([]),
-      withPage({
-        inputs: [
-          inputField({
-            id: 'answers',
-            type: 'file',
-            label: 'Your answers',
-            per_test: true,
-          }),
-        ],
-      }),
-      http.post(`${TASK_API}/uploads`, async ({ request }) => {
-        slots.push(await request.json());
-        return problem(422, 'invalid_inputs', {
-          errors: [
-            {
-              input: 'answers',
-              message:
-                'Name each file of this input after a test, as <group>/<test>, such as main/1.txt.',
-            },
-          ],
-        });
-      }),
-    );
-    const user = userEvent.setup();
-    renderApp(PAGE);
-
-    await user.upload(
-      await screen.findByLabelText('Your answers'),
-      new File(['3'], '1.txt', { type: 'text/plain' }),
-    );
-    await user.click(screen.getByRole('button', { name: 'Submit' }));
-
-    const alert = await screen.findByRole('alert');
-    expect(alert).toHaveTextContent(
-      'Your answers: Name each file of this input after a test, as <group>/<test>, such as main/1.txt.',
-    );
-    expect(slots).toEqual([expect.objectContaining({ filename: '1.txt' })]);
   });
 
   it('sends a file again from the start when its connection is cut, then submits it', async () => {
@@ -871,35 +825,16 @@ describe('a submission opened from the list, nothing of it shown yet', () => {
 });
 
 describe('a submission opened from the list', () => {
-  it('shows what the run reported once and each group as the task shows it, or that it did not run', async () => {
-    const graded = grading({
-      ...accepted,
-      groups: [
-        ...accepted.groups,
-        {
-          group: 'large',
-          show: 'after_close',
-          outcome: null,
-          tests: null,
-          shown_at: '2026-09-12T11:00:00Z',
-          ran: true,
-        },
-        {
-          group: 'extra',
-          show: 'always',
-          outcome: null,
-          tests: [],
-          shown_at: null,
-          ran: false,
-        },
-      ],
-    });
+  it('shows each run by its group with what it reported, and reads the log written once when opened', async () => {
     server.use(
       signedIn,
       withPage({}),
-      listing([submission(1, graded)]),
+      listing([submission(1, accepted)]),
       http.get(`${TASK_API}/submissions/:number`, () =>
-        HttpResponse.json(submission(1, graded)),
+        HttpResponse.json(submission(1, accepted)),
+      ),
+      http.get(`${TASK_API}/submissions/:number/text`, () =>
+        HttpResponse.text('Compiled cleanly.'),
       ),
     );
     const user = userEvent.setup();
@@ -908,79 +843,18 @@ describe('a submission opened from the list', () => {
     await user.click(await screen.findByRole('link', { name: '#1' }));
 
     const detail = await screen.findByRole('region', { name: 'Submission 1' });
+    const samples = await within(detail).findByRole('region', {
+      name: 'Group samples',
+    });
+    expect(within(samples).getAllByText('ACCEPTED')).toHaveLength(2);
+    expect(samples).toHaveTextContent('time_ms 12');
+    expect(samples).toHaveTextContent(`memory_kb ${formatExact('2048')}`);
+    expect(detail).not.toHaveTextContent(/points/);
+
+    await user.click(within(detail).getByRole('button', { name: 'Show log' }));
     expect(await within(detail).findByLabelText('log')).toHaveTextContent(
       'Compiled cleanly.',
     );
-
-    const samples = within(detail).getByRole('region', { name: 'Group samples' });
-    const tests = within(samples).getByRole('table', { name: 'Tests samples' });
-    expect(within(tests).getByRole('columnheader', { name: 'time_ms' })).toBeVisible();
-    const rows = within(tests).getAllByRole('row');
-    expect(rows).toHaveLength(3);
-    expect(rows[1]).toHaveTextContent(`samples/1ACCEPTED12${formatExact('2048')}`);
-    expect(rows[2]).toHaveTextContent('samples/2ACCEPTED——');
-    expect(detail).not.toHaveTextContent(/points/);
-    expect(detail).not.toHaveTextContent('Over the tests shown');
-
-    const main = within(detail).getByRole('region', { name: 'Group main' });
-    expect(within(main).getByText('ACCEPTED')).toBeVisible();
-    expect(within(main).getByText(/^Tests shown at /)).toBeVisible();
-    expect(within(main).queryByText(/^Shown at /)).toBeNull();
-    expect(within(main).queryByRole('table')).toBeNull();
-
-    const large = within(detail).getByRole('region', { name: 'Group large' });
-    expect(within(large).getByText(/^Shown at /)).toBeVisible();
-    expect(within(large).queryByText('ACCEPTED')).toBeNull();
-    expect(within(large).queryByRole('table')).toBeNull();
-    expect(within(large).queryByText('Not run on this grading')).toBeNull();
-
-    const extra = within(detail).getByRole('region', { name: 'Group extra' });
-    expect(within(extra).getByText('Not run on this grading')).toBeVisible();
-    expect(within(extra).queryByRole('table')).toBeNull();
-  });
-
-  it('shows beside each test its credit and, scored against the best, that best', async () => {
-    const relative = grading({
-      ...accepted,
-      groups: [
-        {
-          group: 'main',
-          show: 'always',
-          outcome: 'accepted',
-          tests: [
-            {
-              test: 'main/1',
-              outcome: 'accepted',
-              values: reported({ score: '80' }),
-            },
-          ],
-          shown_at: null,
-          ran: true,
-        },
-      ],
-    });
-    server.use(
-      signedIn,
-      withPage({}),
-      listing([submission(1, relative)]),
-      http.get(`${TASK_API}/submissions/:number`, () =>
-        HttpResponse.json(submission(1, relative)),
-      ),
-    );
-    renderApp(`${PAGE}?submission=1`);
-
-    const detail = await screen.findByRole('region', { name: 'Submission 1' });
-    const tests = await within(detail).findByRole('table', { name: 'Tests main' });
-    expect(
-      within(tests)
-        .getAllByRole('columnheader')
-        .map((header) => header.textContent),
-    ).toEqual(['Test', 'Outcome', 'score']);
-    expect(
-      within(tests)
-        .getAllByRole('cell')
-        .map((cell) => cell.textContent),
-    ).toEqual(['ACCEPTED', '80']);
   });
 
   it('shows a cancelled one as cancelled, in the organisers’ words', async () => {
@@ -1247,7 +1121,7 @@ describe('a submission opened from the list', () => {
     const stopped = grading({
       status: 'graded',
       stopped: 'compile_error',
-      values: reported({}, { log: '<img src=x onerror="alert(1)">' }),
+      once: { reports: {}, texts: { log: { name: null, output: null } } },
     });
     server.use(
       signedIn,
@@ -1256,12 +1130,17 @@ describe('a submission opened from the list', () => {
       http.get(`${TASK_API}/submissions/:number`, () =>
         HttpResponse.json(submission(1, stopped)),
       ),
+      http.get(`${TASK_API}/submissions/:number/text`, () =>
+        HttpResponse.text('<img src=x onerror="alert(1)">'),
+      ),
     );
+    const user = userEvent.setup();
     renderApp(`${PAGE}?submission=1`);
 
     const detail = await screen.findByRole('region', { name: 'Submission 1' });
     expect(await within(detail).findByText('COMPILE ERROR')).toBeVisible();
-    expect(within(detail).getByLabelText('log')).toHaveTextContent(
+    await user.click(within(detail).getByRole('button', { name: 'Show log' }));
+    expect(await within(detail).findByLabelText('log')).toHaveTextContent(
       '<img src=x onerror="alert(1)">',
     );
     expect(document.querySelector('img[src="x"]')).toBeNull();

@@ -68,17 +68,21 @@ describe('the breadcrumb', () => {
 
   it('puts a contest its contestants see under the contests, with its org', async () => {
     server.use(
-      http.get('/api/v1/public/contests/:org/:contest/boards', () =>
+      http.get('/api/v1/public/contests/:org/:contest/leaderboards', () =>
         HttpResponse.json([]),
       ),
     );
-    renderApp('/contests/acme/spring/boards');
+    renderApp('/contests/acme/spring/leaderboards');
 
     expect(await trail()).toEqual([
       { label: 'Browse contests', to: '/', current: false },
       { label: 'acme', to: null, current: false },
       { label: 'spring', to: '/contests/acme/spring', current: false },
-      { label: 'Leaderboards', to: '/contests/acme/spring/boards', current: true },
+      {
+        label: 'Leaderboards',
+        to: '/contests/acme/spring/leaderboards',
+        current: true,
+      },
     ]);
   });
 

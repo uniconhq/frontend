@@ -64,18 +64,20 @@ export function Inside({
           {root}
         </Button>
         {frames.map((item, at) => (
-        <Button
-          key={`${item.title}-${String(at)}`}
-          variant="secondary"
-          onClick={() => onCrumb(at)}
-        >
-          {item.title}
-        </Button>
+          <Button
+            key={`${item.title}-${String(at)}`}
+            variant="secondary"
+            onClick={() => onCrumb(at)}
+          >
+            {item.title}
+          </Button>
         ))}
       </nav>
       {read.isPending && <BodyText>Opening {frame.title}…</BodyText>}
       {read.isError && (
-        <BodyText>{frame.use.owner}/{frame.use.name}@{frame.use.version} cannot be read.</BodyText>
+        <BodyText>
+          {frame.use.owner}/{frame.use.name}@{frame.use.version} cannot be read.
+        </BodyText>
       )}
       {text !== null && (
         <DrawnGraph
@@ -86,7 +88,8 @@ export function Inside({
           onOpenBox={(opened) => {
             const step = workflow?.steps[opened];
             const use = step === undefined ? null : parseUse(step.use);
-            if (step === undefined || use === null || byRef(primitives).has(step.use)) return;
+            if (step === undefined || use === null || byRef(primitives).has(step.use))
+              return;
             onOpen({ use, title: step.id, rest: [] });
           }}
         />

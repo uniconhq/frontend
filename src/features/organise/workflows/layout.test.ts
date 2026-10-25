@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { parseYaml } from '../forms/yaml-doc';
-import { CLASSIC_FOLDER, CLASSIC_V2, PRIMITIVES } from '@/test/workflows';
+import { CLASSIC, FOLDER, PRIMITIVES } from '@/test/workflows';
 import {
   colourOf,
   layoutWorkflow,
@@ -121,8 +121,8 @@ function columnOf(layout: Layout, key: string): number | undefined {
 }
 
 const SEEDED = [
-  ['unicon/classic@v2', CLASSIC_V2],
-  ['unicon/classic-folder@v1', CLASSIC_FOLDER],
+  ['unicon/classic@v3', CLASSIC],
+  ['a program of several files', FOLDER],
 ] as const;
 
 describe('the layout', () => {
@@ -139,7 +139,7 @@ describe('the layout', () => {
   );
 
   it('gives every port a row of its own, a step’s outputs under its inputs', () => {
-    const layout = laid(CLASSIC_V2);
+    const layout = laid(CLASSIC);
     const run = layout.boxes.find((box) => box.key === 'step:1');
     if (run === undefined) throw new Error('run is not drawn');
     const into = (port: string) =>
@@ -151,7 +151,13 @@ describe('the layout', () => {
       ...['output', 'time_ms', 'memory_kb'].map((port) => out(port)?.points[0]?.y),
     ];
 
-    expect(run.left).toEqual(['binary', 'input', 'args', 'time_limit', 'memory_limit']);
+    expect(run.left).toEqual([
+      'program',
+      'stdin',
+      'args',
+      'time_limit',
+      'memory_limit',
+    ]);
     expect(run.right).toEqual(['output', 'time_ms', 'memory_kb']);
     // args is given nothing, so it has no wire; every other row is one row down.
     const drawn = ys.filter((y): y is number => y !== undefined);
@@ -162,48 +168,43 @@ describe('the layout', () => {
     expect(rowOf(run, 'right', 'output')).toBe(5);
   });
 
-  it('puts classic@v2 in columns by what each step reads', () => {
-    const layout = laid(CLASSIC_V2);
+  it('puts classic@v3 in columns by what each step reads', () => {
+    const layout = laid(CLASSIC);
 
     expect(columnOf(layout, 'inputs:0')).toBe(0);
     expect(columnOf(layout, 'step:0')).toBe(1);
-    expect(layout.band).toEqual({ first: 2, last: 4 });
-    expect(columnOf(layout, 'test:1')).toBe(2);
-    expect(columnOf(layout, 'inputs:1')).toBe(2);
-    expect(columnOf(layout, 'step:1')).toBe(3);
-    expect(columnOf(layout, 'test:2')).toBe(3);
-    expect(columnOf(layout, 'step:2')).toBe(4);
-    expect(columnOf(layout, 'report')).toBe(5);
+    expect(columnOf(layout, 'inputs:1')).toBe(1);
+    expect(columnOf(layout, 'step:1')).toBe(2);
+    expect(columnOf(layout, 'inputs:2')).toBe(2);
+    expect(columnOf(layout, 'step:2')).toBe(3);
+    expect(columnOf(layout, 'report')).toBe(4);
     const reads = layout.boxes.find((box) => box.key === 'inputs:0');
     expect(reads?.right).toEqual(['submission', 'language']);
     expect(reads?.readers).toEqual(['compile']);
+    const limits = layout.boxes.find((box) => box.key === 'inputs:1');
+    expect(limits?.right).toEqual(['input', 'time_limit', 'memory_limit']);
+    expect(limits?.readers).toEqual(['run']);
   });
 
-  it('runs the compile log to the report through a slot in each column it crosses', () => {
-    const layout = laid(CLASSIC_V2);
+  it('runs the compile log to the outputs through a slot in each column it crosses', () => {
+    const layout = laid(CLASSIC);
 
-    const log = layout.slots.filter((slot) => slot.source === 'steps:0.compile_log');
-    expect(log.map((slot) => slot.column)).toEqual([2, 3, 4]);
-    expect(log.map((slot) => slot.label)).toEqual([
-      'compile_log from compile',
-      null,
-      null,
-    ]);
+    const log = layout.slots.filter((slot) => slot.source === 'steps:0.log');
+    expect(log.map((slot) => slot.column)).toEqual([2, 3]);
+    expect(log.map((slot) => slot.label)).toEqual(['log from compile', null]);
     const wire = layout.wires.find((found) => found.target === 'report:log');
-    expect(wire?.points).toHaveLength(2 + 2 * 3);
+    expect(wire?.points).toHaveLength(2 + 2 * 2);
   });
 
   it('gives a wire skipping two columns a slot in each', () => {
     const layout = laid(`
 inputs:
   n: number
-test:
-  input: file
 steps:
-  - {id: a, use: unicon/sandbox-run@v2, with: {time_limit: "\${{ inputs.n }}"}}
-  - {id: b, use: unicon/sandbox-run@v2, with: {binary: "\${{ steps.a.output }}"}}
-  - {id: c, use: unicon/sandbox-run@v2, with: {binary: "\${{ steps.b.output }}"}}
-  - {id: d, use: unicon/sandbox-run@v2, with: {binary: "\${{ steps.c.output }}", input: "\${{ steps.a.output }}"}}
+  - {id: a, use: unicon/exec@v1, with: {time_limit: "\${{ inputs.n }}"}}
+  - {id: b, use: unicon/exec@v1, with: {program: "\${{ steps.a.output }}"}}
+  - {id: c, use: unicon/exec@v1, with: {program: "\${{ steps.b.output }}"}}
+  - {id: d, use: unicon/exec@v1, with: {program: "\${{ steps.c.output }}", stdin: "\${{ steps.a.output }}"}}
 `);
 
     expect([0, 1, 2, 3].map((index) => columnOf(layout, `step:${index}`))).toEqual([
@@ -219,14 +220,12 @@ steps:
     const layout = laid(`
 inputs:
   limit: number
-test:
-  input: file
 steps:
-  - {id: a, use: unicon/sandbox-run@v2, with: {time_limit: "\${{ inputs.limit }}"}}
-  - {id: b, use: unicon/sandbox-run@v2, with: {binary: "\${{ steps.a.output }}"}}
+  - {id: a, use: unicon/exec@v1, with: {time_limit: "\${{ inputs.limit }}"}}
+  - {id: b, use: unicon/exec@v1, with: {program: "\${{ steps.a.output }}"}}
   - id: c
-    use: unicon/sandbox-run@v2
-    with: {binary: "\${{ steps.b.output }}", time_limit: "\${{ inputs.limit }}", memory_limit: "\${{ inputs.limit }}"}
+    use: unicon/exec@v1
+    with: {program: "\${{ steps.b.output }}", time_limit: "\${{ inputs.limit }}", memory_limit: "\${{ inputs.limit }}"}
 `);
 
     expect(columnOf(layout, 'inputs:0,2')).toBe(0);
@@ -243,22 +242,20 @@ steps:
 inputs:
   episodes: number
   time_limit: number
-test:
   input: file
 steps:
   - id: run
-    use: unicon/sandbox-run@v2
-    per_test: true
+    use: unicon/exec@v1
     with:
-      binary: \${{ test.input }}
-      input: \${{ test.input }}
+      program: \${{ inputs.input }}
+      stdin: \${{ inputs.input }}
       args: "--episodes \${{ inputs.episodes }}"
       time_limit: \${{ inputs.time_limit }}
       memory_limit: 256
 `);
 
     const group = layout.boxes.find((box) => box.kind === 'inputs');
-    expect(group?.right).toEqual(['episodes', 'time_limit']);
+    expect(group?.right).toEqual(['input', 'episodes', 'time_limit']);
     expect(group?.column).toBe(columnOf(layout, 'step:0')! - 1);
     expect(layout.wires.some((wire) => wire.to.port === 'args')).toBe(false);
     expect(layout.wires.some((wire) => wire.to.port === 'time_limit')).toBe(true);
@@ -266,20 +263,19 @@ steps:
     expect(overlaps(layout)).toEqual([]);
   });
 
-  it('stands what nothing reads in the first column, and test fields in the band', () => {
+  it('stands what nothing reads in the first column', () => {
     const layout = laid(`
 inputs:
   spare: text
-test:
   input: file
-  unused: number
 steps:
-  - {id: run, use: unicon/sandbox-run@v2, per_test: true, with: {input: "\${{ test.input }}"}}
+  - {id: first, use: unicon/compile@v3, with: {}}
+  - {id: run, use: unicon/exec@v1, with: {program: "\${{ steps.first.program }}", stdin: "\${{ inputs.input }}"}}
 `);
 
     expect(columnOf(layout, 'inputs:')).toBe(0);
-    expect(columnOf(layout, 'test:')).toBe(layout.band?.first);
-    expect(columnOf(layout, 'test:0')).toBe(layout.band?.first);
+    expect(columnOf(layout, 'step:1')).toBe(2);
+    expect(columnOf(layout, 'inputs:1')).toBe(1);
   });
 
   it('orders a column to cut the crossings its wires make', () => {
@@ -287,14 +283,12 @@ steps:
 inputs:
   a: number
   b: number
-test:
-  input: file
 steps:
-  - {id: first, use: unicon/sandbox-run@v2, with: {time_limit: "\${{ inputs.b }}"}}
-  - {id: second, use: unicon/sandbox-run@v2, with: {time_limit: "\${{ inputs.a }}"}}
+  - {id: first, use: unicon/exec@v1, with: {time_limit: "\${{ inputs.b }}"}}
+  - {id: second, use: unicon/exec@v1, with: {time_limit: "\${{ inputs.a }}"}}
   - id: last
-    use: unicon/sandbox-run@v2
-    with: {binary: "\${{ steps.second.output }}", input: "\${{ steps.first.output }}"}
+    use: unicon/exec@v1
+    with: {program: "\${{ steps.second.output }}", stdin: "\${{ steps.first.output }}"}
 `);
 
     expect(layout.crossings).toBe(0);
@@ -305,7 +299,7 @@ steps:
     expect(Array.from({ length: 12 }, (_, column) => colourOf(column))).toEqual([
       0, 1, 2, 3, 4, 3, 2, 1, 0, 1, 2, 3,
     ]);
-    const layout = laid(CLASSIC_V2);
+    const layout = laid(CLASSIC);
     for (const wire of layout.wires) {
       const source = layout.boxes.find((box) => box.key === wire.from.box);
       expect(wire.colour).toBe(colourOf(source?.column ?? -1));
@@ -313,21 +307,21 @@ steps:
   });
 
   it('draws a moved wire by redrawing the columns it changes', () => {
-    const before = laid(CLASSIC_V2);
+    const before = laid(CLASSIC);
     const after = laid(
-      CLASSIC_V2.replace(
-        'expected: ${{ test.answer }}',
-        'expected: ${{ steps.compile.binary }}',
+      CLASSIC.replace(
+        'expected: ${{ inputs.answer }}',
+        'expected: ${{ steps.compile.program }}',
       ),
     );
 
-    expect(before.boxes.some((box) => box.key === 'test:2')).toBe(true);
-    expect(after.boxes.some((box) => box.key === 'test:')).toBe(true);
+    expect(before.boxes.some((box) => box.key === 'inputs:2')).toBe(true);
+    expect(after.boxes.some((box) => box.key === 'inputs:')).toBe(true);
     expect(
       after.slots
-        .filter((slot) => slot.source === 'steps:0.binary')
+        .filter((slot) => slot.source === 'steps:0.program')
         .map((slot) => slot.column),
-    ).toEqual([2, 3]);
+    ).toEqual([2]);
     expect(behind(after)).toEqual([]);
   });
 });

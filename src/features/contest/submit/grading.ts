@@ -46,7 +46,9 @@ function unfinished(submission: Submission): boolean {
  * so a fresh submit is followed closely whatever an older one is doing. While
  * the live stream is open it says when a grading moves, so the page reads
  * again only now and then, in case a nudge was lost on the way. While it is
- * `refused`, no wait is shorter than `REFUSED_MS`. The server stamps a
+ * `refused`, no wait is shorter than `REFUSED_MS`. A submission still waiting
+ * on `reveal_at` is read again then, live stream or not, because a reveal
+ * changes what is shown without a grading moving. The server stamps a
  * submission by its own clock, which the page's estimate of it can trail, so
  * one stamped ahead of `now` has waited no time at all.
  */
@@ -56,15 +58,44 @@ export function pollEvery(
   live = false,
   refused = false,
 ): number {
-  if (live || submissions === undefined) return MEANWHILE_MS;
-  const all = Array.isArray(submissions) ? submissions : [submissions];
+  const all =
+    submissions === undefined
+      ? []
+      : Array.isArray(submissions)
+        ? submissions
+        : [submissions];
+  const reveal = revealWait(all, now);
+  if (live || submissions === undefined) {
+    return reveal === null ? MEANWHILE_MS : Math.min(MEANWHILE_MS, reveal);
+  }
   const waited = all
     .filter(unfinished)
     .map((found) => Math.max(0, now.getTime() - Date.parse(found.submitted_at)));
-  if (waited.length === 0) return MEANWHILE_MS;
-  const newest = Math.min(...waited);
-  const every = WAITING.find(([olderThan]) => newest >= olderThan)?.[1] ?? MEANWHILE_MS;
-  return refused ? Math.max(every, REFUSED_MS) : every;
+  const base =
+    waited.length === 0
+      ? MEANWHILE_MS
+      : (WAITING.find(([olderThan]) => Math.min(...waited) >= olderThan)?.[1] ??
+        MEANWHILE_MS);
+  const every = refused ? Math.max(base, REFUSED_MS) : base;
+  return reveal === null ? every : Math.min(every, reveal);
+}
+
+/**
+ * How long until the soonest reveal still ahead, or five seconds when one
+ * is already due, so a page open on it reads again then without spinning
+ * if the reveal stays set. Nothing when no submission is waiting on one.
+ */
+function revealWait(submissions: Submission[], now: Date): number | null {
+  let soonest: number | null = null;
+  for (const found of submissions) {
+    const at = found.grading?.reveal_at;
+    if (at === null || at === undefined) continue;
+    const wait = Date.parse(at) - now.getTime();
+    if (Number.isNaN(wait)) continue;
+    const next = wait > 0 ? wait : 5_000;
+    soonest = soonest === null ? next : Math.min(soonest, next);
+  }
+  return soonest;
 }
 
 /**

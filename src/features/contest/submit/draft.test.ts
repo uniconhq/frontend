@@ -22,12 +22,6 @@ const program = inputField({
   label: 'Your program',
   max_size: 20,
 });
-const answers = inputField({
-  id: 'answers',
-  type: 'file',
-  label: 'Your answers',
-  per_test: true,
-});
 /** A number of 30 significant digits, past what a float holds. */
 const THIRTY = '0.123456789012345678901234567891';
 const alpha = inputField({
@@ -72,11 +66,6 @@ describe('where each file goes under its input', () => {
   it('keeps a folder’s layout, the chosen folder’s own name left off', () => {
     expect(pathOf(program, inFolder('mine/src/Main.java'))).toBe('src/Main.java');
     expect(pathOf(program, file('Main.java', 1))).toBe('Main.java');
-  });
-
-  it('names a file per test by where it sits, or by its name as given', () => {
-    expect(pathOf(answers, inFolder('out/main/1.txt'))).toBe('main/1.txt');
-    expect(pathOf(answers, file('1.txt', 1))).toBe('1.txt');
   });
 
   it('names the one file of a file input by its name', () => {
@@ -156,6 +145,28 @@ describe('the checks before anything is sent', () => {
     expect(refused?.extensions).toEqual({ limit: 20, input: 'program' });
   });
 
+  it('holds each part to its own size, and lets one part stay empty', () => {
+    const route = inputField({
+      id: 'route',
+      parts: [
+        { title: 'Small grid', max_size: 10 * MB },
+        { title: null, max_size: 50 * MB },
+      ],
+    });
+    const small = file('a.txt', 1);
+    expect(
+      checkDraft([route], { route: { kind: 'parts', files: [small, null] } }),
+    ).toBeNull();
+    expect(checkDraft([route], emptyDraft([route]))?.extensions['errors']).toEqual([
+      { input: 'route', message: 'This input needs a file.' },
+    ]);
+    expect(
+      checkDraft([route], {
+        route: { kind: 'parts', files: [small, file('b.txt', 50 * MB + 1)] },
+      })?.extensions,
+    ).toEqual({ limit: 50 * MB, input: 'route', part: 2 });
+  });
+
   it('holds one file to its input’s size', () => {
     const refused = checkDraft([inputField({ max_size: MB })], {
       submission: { kind: 'files', files: [file('big.py', MB + 1)] },
@@ -204,6 +215,29 @@ describe('what a submit sends', () => {
       language: { uploads: [], value: 'python' },
       fast: { uploads: [], value: false },
       notes: { uploads: [], value: 'hello' },
+    });
+  });
+
+  it('sends a per-row input as one part from 1, an empty part with no upload', () => {
+    const route = inputField({
+      id: 'route',
+      parts: [
+        { title: 'Small grid', max_size: MB },
+        { title: 'Big grid', max_size: MB },
+      ],
+    });
+    const small = file('a.txt', 1);
+    expect(
+      submittedInputs(
+        [route],
+        { route: { kind: 'parts', files: [small, null] } },
+        () => 'up',
+      ),
+    ).toEqual({
+      route: {
+        uploads: [],
+        parts: { '1': { uploads: ['up'] }, '2': { uploads: [] } },
+      },
     });
   });
 });

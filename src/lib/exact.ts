@@ -203,7 +203,7 @@ export function formatExact(exact: string, places = 4): string {
 }
 
 /** How many decimals points are shown to. */
-export const POINTS_PLACES = 2;
+const POINTS_PLACES = 2;
 
 /**
  * Points earned for reading, the one way every page shows them (R17): cut,

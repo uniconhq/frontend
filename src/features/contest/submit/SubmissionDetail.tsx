@@ -1,3 +1,4 @@
+import { apiClient } from '@/api/client';
 import { $api, queryView } from '@/api/query';
 import type { GradingResult, InputField } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
@@ -7,7 +8,7 @@ import { SectionTitle } from '@/ui/SectionTitle';
 import { VerdictBadge } from '@/ui/VerdictBadge';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
-import { ScoredResult } from '@/ui/scored/ScoredResult';
+import { ScoredResult, type TextAsk } from '@/ui/scored/ScoredResult';
 import { formatDateTime } from '@/lib/time';
 import { downloadHref, nameOf } from './download';
 import { useLiveConnected, useLiveRefused } from '@/live';
@@ -19,17 +20,44 @@ import classes from './submit.module.css';
 
 type Where = { org: string; contest: string; task: string; number: number };
 
+/** A text the submission shows, read when its row is opened. */
+function readText(where: Where, ask: TextAsk): Promise<string> {
+  return apiClient
+    .GET(
+      '/api/v1/orgs/{org}/contests/{contest}/tasks/{task}/submissions/{number}/text',
+      {
+        params: {
+          path: where,
+          query: {
+            field: ask.field,
+            group: ask.group ?? undefined,
+            place: ask.place ?? undefined,
+            name: ask.name ?? undefined,
+          },
+        },
+        parseAs: 'text',
+      },
+    )
+    .then((found) => found.data ?? '');
+}
+
 /**
- * What the grading holds for the contestant: its verdict, what the run
- * reported once, such as a compile log, and each test group as the task
- * shows it. A grading the organisers cancelled holds their sentence instead,
+ * What the grading holds for the entrant: its verdict, the values and runs
+ * the task shows, and what its steps done once reported, such as a compile
+ * log. A grading the organisers cancelled holds their sentence instead,
  * and says the submission no longer counts against the task's limit: a cancel
  * with a sentence is the one the forge leaves out of the limit, so one
  * without (made before cancels carried one) says nothing about the limit. A
  * delayed one says its grading failed on Unicon's side, and nothing else;
  * one over the limit, that it was not graded and why (#445).
  */
-function Grading({ grading }: { grading: GradingResult }) {
+function Grading({
+  grading,
+  readText,
+}: {
+  grading: GradingResult;
+  readText: (ask: TextAsk) => Promise<string>;
+}) {
   if (grading.status === 'delayed') {
     return (
       <>
@@ -79,7 +107,7 @@ function Grading({ grading }: { grading: GradingResult }) {
         {/* Entrants' pages speak of a submission, not of its gradings' attempts. */}
         {grading.attempt > 1 && <BodyText tone="secondary">Graded again</BodyText>}
       </div>
-      <ScoredResult grading={grading} />
+      <ScoredResult grading={grading} readText={readText} />
     </>
   );
 }
@@ -183,7 +211,10 @@ export function SubmissionDetail({
           {view.data.grading === null ? (
             <BodyText tone="secondary">Not graded</BodyText>
           ) : (
-            <Grading grading={view.data.grading} />
+            <Grading
+              grading={view.data.grading}
+              readText={(ask) => readText(where, ask)}
+            />
           )}
         </>
       )}

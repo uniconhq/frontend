@@ -36,7 +36,7 @@ export const CONTEST_SECTIONS = [
   { key: 'entry', label: 'How people enter', segment: 'entry', card: 'grid' },
   { key: 'entrants', label: 'Entrants', segment: 'entrants', card: 'grid' },
   { key: 'gradings', label: 'Gradings', segment: 'gradings', card: 'grid' },
-  { key: 'boards', label: 'Leaderboards', segment: 'boards', card: 'grid' },
+  { key: 'boards', label: 'Leaderboards', segment: 'leaderboards', card: 'grid' },
   {
     key: 'announcements',
     label: 'Announcements',
@@ -61,6 +61,7 @@ export const CONTEST_SECTIONS = [
  */
 export const TASK_SECTIONS = [
   { key: 'gradings', label: 'Gradings', segment: 'gradings', card: 'grid' },
+  { key: 'queue', label: 'Queue', segment: 'queue', card: 'grid' },
   {
     key: 'publications',
     label: 'Publications',
@@ -109,7 +110,7 @@ export function taskCardPath(
  */
 export const CONTEST_VIEW_SECTIONS = [
   { key: 'tasks', label: 'Tasks', segment: '', card: 'grid' },
-  { key: 'boards', label: 'Leaderboards', segment: 'boards', card: 'grid' },
+  { key: 'boards', label: 'Leaderboards', segment: 'leaderboards', card: 'grid' },
   { key: 'questions', label: 'Questions', segment: 'questions', card: 'grid' },
 ] as const satisfies readonly Section[];
 

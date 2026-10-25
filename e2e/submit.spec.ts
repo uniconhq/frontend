@@ -20,7 +20,6 @@ const input = (overrides: Record<string, unknown>) => ({
   type: 'file',
   label: 'Your solution',
   options: null,
-  per_test: false,
   default: null,
   min: null,
   max: null,
@@ -47,54 +46,49 @@ const queued = {
   status: 'queued',
   stopped: null,
   outcome: null,
-  groups: [],
-  values: { numbers: {}, texts: {} },
-  meanings: [],
   reason: null,
-  points: null,
-  factor: null,
-  folded: {},
+  limit: null,
+  compiled: null,
+  once: { reports: {}, texts: {} },
+  reveal_at: null,
+  run_values: [],
+  runs: [],
+  meanings: [],
 };
 
-const ranTest = (name: string, outcome: string, timeMs: string, credit: string) => ({
-  test: name,
-  outcome,
-  values: { numbers: { time_ms: timeMs }, texts: {} },
-  credit,
-  best: null,
+const runOf = (overrides: Record<string, unknown>) => ({
+  group: 'samples',
+  place: 1,
+  id: null,
+  dropped: false,
+  key: {},
+  titles: ['Small grid'],
+  verdict: 'accepted',
+  passed: 1,
+  reports: {},
+  texts: {},
+  label: null,
+  message: null,
+  ...overrides,
 });
+
+/** A text written once, such as a compile log, read when it is opened. */
+const LOG = { log: { name: null, output: null } };
 
 const graded = {
   ...queued,
   status: 'graded',
   outcome: 'wrong_answer',
-  values: { numbers: {}, texts: { log: 'Compiled cleanly.' } },
-  points: { shown: '0', pending: '100', pending_until: '2026-09-29T12:00:00Z' },
-  factor: '1',
-  groups: [
-    {
-      group: 'samples',
-      show: 'always',
-      outcome: 'wrong_answer',
-      tests: [
-        ranTest('samples/1', 'accepted', '12', '1'),
-        ranTest('samples/2', 'wrong_answer', '30', '0'),
-      ],
-      shown_at: null,
-      ran: true,
-      points: '0',
-      max: '0',
-    },
-    {
-      group: 'main',
-      show: 'after_close',
-      outcome: null,
-      tests: null,
-      shown_at: '2026-09-29T12:00:00Z',
-      ran: true,
-      points: null,
-      max: '100',
-    },
+  once: { reports: {}, texts: LOG },
+  runs: [
+    runOf({ reports: { time_ms: '12' } }),
+    runOf({
+      place: 2,
+      titles: ['Big grid'],
+      verdict: 'wrong_answer',
+      passed: 0,
+      reports: { time_ms: '30' },
+    }),
   ],
 };
 
@@ -111,7 +105,7 @@ type State = {
   /** How often each submission has been read, so its grading can move on. */
   reads: number;
   /** Each slot asked for, as the browser described its file. */
-  slots: { input: string; filename: string }[];
+  slots: { input: string; filename: string; part?: number }[];
   /** Each file put through the upload door, as its bytes arrived. */
   sent: string[];
   completed: unknown[];
@@ -119,6 +113,11 @@ type State = {
   refusal: { status: number; code: string; extra: Record<string, unknown> } | null;
   /** The forge already holds the file, so the slot has nothing to send. */
   alreadyHeld: boolean;
+  /** Replaces an opened submission's grading from the second read of it. */
+  later: object | null;
+  detailReads: number;
+  /** What an opened submission's log holds, read when it is shown. */
+  log: string;
 };
 
 async function stubApi(page: Page, overrides: Partial<State> = {}): Promise<State> {
@@ -132,6 +131,9 @@ async function stubApi(page: Page, overrides: Partial<State> = {}): Promise<Stat
     submits: [],
     refusal: null,
     alreadyHeld: false,
+    later: null,
+    detailReads: 0,
+    log: 'Compiled cleanly.',
     ...overrides,
   };
   const json = (route: Route, body: unknown, status = 200) =>
@@ -258,9 +260,15 @@ async function stubApi(page: Page, overrides: Partial<State> = {}): Promise<Stat
     const one = /^\/submissions\/(\d+)$/.exec(path);
     if (one !== null) {
       const found = state.submissions.find((entry) => entry.number === Number(one[1]));
-      return found === undefined
-        ? route.fulfill({ status: 404, body: 'not stubbed' })
-        : json(route, found);
+      if (found === undefined)
+        return route.fulfill({ status: 404, body: 'not stubbed' });
+      state.detailReads += 1;
+      const grading =
+        state.later !== null && state.detailReads > 2 ? state.later : found.grading;
+      return json(route, { ...found, grading });
+    }
+    if (/^\/submissions\/\d+\/text$/.test(path)) {
+      return route.fulfill({ status: 200, contentType: 'text/plain', body: state.log });
     }
     if (/^\/submissions\/\d+\/files$/.test(path)) {
       return json(route, {
@@ -387,7 +395,7 @@ test('a file the forge already holds is submitted without being sent', async ({
   expect(state.completed).toHaveLength(1);
 });
 
-test('a submission opens with its log, its groups and their tests', async ({
+test('a submission opens with its runs and its log, read when it is shown', async ({
   page,
 }) => {
   await stubApi(page, {
@@ -405,21 +413,21 @@ test('a submission opens with its log, its groups and their tests', async ({
   await page.getByRole('link', { name: '#1' }).click();
   await expect(page).toHaveURL(/\?submission=1$/);
   const detail = page.getByRole('region', { name: 'Submission 1' });
+  const samples = detail.getByRole('region', { name: 'Group samples' });
+  await expect(samples.getByText('Small grid')).toBeVisible();
+  await expect(samples.getByText('WRONG ANSWER')).toBeVisible();
+  await expect(samples).toContainText('time_ms 30');
+  await detail.getByRole('button', { name: 'Show log' }).click();
   await expect(detail.getByLabel('log', { exact: true })).toHaveText(
     'Compiled cleanly.',
   );
-  const rows = detail.getByRole('table', { name: 'Tests samples' }).getByRole('row');
-  await expect(rows).toHaveCount(3);
-  await expect(rows.nth(2)).toContainText('WRONG ANSWER');
-  const main = detail.getByRole('region', { name: 'Group main' });
-  await expect(main.getByText(/^Shown at /)).toBeVisible();
-  await expect(main.getByRole('table')).toHaveCount(0);
 });
 
 test('a submission that did not compile shows that as its verdict', async ({
   page,
 }) => {
   await stubApi(page, {
+    log: 'main.cpp:1: error',
     submissions: [
       {
         number: 1,
@@ -429,7 +437,7 @@ test('a submission that did not compile shows that as its verdict', async ({
           ...queued,
           status: 'graded',
           stopped: 'compile_error',
-          values: { numbers: {}, texts: { log: 'main.cpp:1: error' } },
+          once: { reports: {}, texts: LOG },
         },
       },
     ],
@@ -441,6 +449,7 @@ test('a submission that did not compile shows that as its verdict', async ({
   ).toBeVisible();
   const detail = page.getByRole('region', { name: 'Submission 1' });
   await expect(detail.getByText('COMPILE ERROR')).toBeVisible();
+  await detail.getByRole('button', { name: 'Show log' }).click();
   await expect(detail.getByLabel('log', { exact: true })).toHaveText(
     'main.cpp:1: error',
   );
@@ -547,4 +556,122 @@ test('each refusal is said in words, and the files stay to send again', async ({
     );
   }
   expect(state.submissions).toHaveLength(0);
+});
+
+const MB = 1024 * 1024;
+
+const valueOf = (name: string, number: string, show: string) => ({
+  name,
+  number,
+  text: null,
+  waiting: false,
+  self_reported: false,
+  show,
+  facts: null,
+  runs: null,
+  values: null,
+});
+
+test('a row given in parts is one upload each, held to that part’s size', async ({
+  page,
+}, testInfo) => {
+  const state = await stubApi(page, {
+    inputs: [
+      input({
+        id: 'route',
+        label: 'Route',
+        max_size: 50 * MB,
+        parts: [
+          { title: 'Small grid', max_size: 10 * MB },
+          { title: 'Big grid', max_size: 50 * MB },
+        ],
+      }),
+    ],
+  });
+  await page.goto(PAGE);
+
+  const form = page.getByRole('form', { name: 'Submit' });
+  await expect(form.getByLabel('Small grid', { exact: true })).toBeAttached();
+  await expect(form.getByLabel('Big grid', { exact: true })).toBeAttached();
+  await expect(form.getByText('At most 50 MB.')).toBeVisible();
+
+  const big = testInfo.outputPath('big.bin');
+  await writeFile(big, Buffer.alloc(50 * MB + 1));
+  await form.getByLabel('Big grid', { exact: true }).setInputFiles(big);
+  await form.getByRole('button', { name: 'Submit' }).click();
+  await expect(page.getByRole('alert')).toContainText('Too large: Big grid');
+  expect(state.slots).toHaveLength(0);
+
+  await form.getByRole('button', { name: 'Remove big.bin' }).click();
+  await form.getByLabel('Small grid', { exact: true }).setInputFiles({
+    name: 'small.txt',
+    mimeType: 'text/plain',
+    buffer: Buffer.from('1\n'),
+  });
+  await form.getByRole('button', { name: 'Submit' }).click();
+  await expect(page.getByText('Submitted as #1.')).toBeVisible();
+  expect(
+    state.slots.map((slot) => ({
+      input: slot.input,
+      filename: slot.filename,
+      part: slot.part,
+    })),
+  ).toEqual([{ input: 'route', filename: 'small.txt', part: 1 }]);
+  expect(state.submits[0]?.inputs).toEqual({
+    route: {
+      uploads: [],
+      parts: {
+        '1': { uploads: ['00000000-0000-4000-8000-000000000001'] },
+        '2': { uploads: [] },
+      },
+    },
+  });
+});
+
+test('samples show now, and the rest appears when the task reveals', async ({
+  page,
+}) => {
+  const samples = {
+    ...queued,
+    status: 'graded',
+    reveal_at: '2026-09-29T10:00:03Z',
+    runs: [runOf({})],
+    run_values: [valueOf('score', '10', 'now')],
+    once: { reports: {}, texts: {} },
+  };
+  const revealed = {
+    ...samples,
+    reveal_at: null,
+    runs: [
+      runOf({}),
+      runOf({
+        group: 'hidden',
+        titles: ['Big grid', null],
+        key: { grid: 'big.txt', seed: 2 },
+        verdict: 'skipped',
+        passed: 0,
+      }),
+    ],
+    run_values: [valueOf('score', '10', 'now'), valueOf('full', '7', 'on_release')],
+  };
+  await stubApi(page, {
+    later: revealed,
+    submissions: [
+      {
+        number: 1,
+        submitted_at: '2026-09-29T09:30:00Z',
+        late_days: 0,
+        grading: samples,
+      },
+    ],
+  });
+  await page.goto(`${PAGE}?submission=1`);
+
+  const detail = page.getByRole('region', { name: 'Submission 1' });
+  await expect(detail.getByText('Small grid')).toBeVisible();
+  await expect(detail.getByText('score')).toBeVisible();
+  await expect(detail.getByText('Big grid · seed 2')).toHaveCount(0);
+  await expect(detail.getByText('Big grid · seed 2')).toBeVisible({ timeout: 15_000 });
+  await expect(detail.getByText('SKIPPED')).toBeVisible();
+  await expect(detail.getByText('full')).toBeVisible();
 });

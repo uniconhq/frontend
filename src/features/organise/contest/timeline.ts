@@ -17,7 +17,7 @@ function same(at: string, local: string | undefined): boolean {
  * holds the contest's start and end, in the organiser's time, so a time that
  * is the contest's own reads as such.
  */
-export function timelineWords(
+function timelineWords(
   { timeline }: TaskStanding,
   contest: { start: string; end: string } | null,
   marks: string | null,
@@ -41,14 +41,6 @@ export function timelineWords(
   return {
     when: [...parts, marked].filter((part) => part !== null).join('; '),
   };
-}
-
-/** Whether a task closes when its contest ends. */
-export function closesWithContest(
-  { timeline }: TaskStanding,
-  contest: { start: string; end: string } | null,
-): boolean {
-  return same(timeline.closes, contest?.end);
 }
 
 /** A task's timeline as one line: "open for the whole contest". */
