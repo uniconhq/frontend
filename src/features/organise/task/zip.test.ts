@@ -1,6 +1,27 @@
 import { describe, expect, it } from 'vitest';
+import {
+  BlobWriter,
+  TextReader,
+  ZipWriter,
+  type ZipWriterAddDataOptions,
+} from '@zip.js/zip.js/lib/zip-core-custom.js';
 import { makeZip } from '@/test/zip';
 import { MOST_ENTRIES, readZip, ZipError } from './zip';
+
+/** A zip written by zip.js, for the archives a real tool writes that `makeZip` does not. */
+async function written(
+  files: { name: string; text: string; options?: ZipWriterAddDataOptions }[],
+  zip64 = false,
+): Promise<Blob> {
+  const writer = new ZipWriter(new BlobWriter(), {
+    useWebWorkers: false,
+    zip64,
+  });
+  for (const { name, text, options } of files) {
+    await writer.add(name, new TextReader(text), options);
+  }
+  return writer.close();
+}
 
 describe('reading a zip of tests in the browser', () => {
   it('lists its files, stored or deflated, and reads each one’s bytes', async () => {
@@ -82,6 +103,39 @@ describe('reading a zip of tests in the browser', () => {
     const entries = await readZip(zip);
 
     expect(entries.map((entry) => entry.path)).toEqual(['small/1/input']);
+  });
+
+  it('reads a Zip64 archive', async () => {
+    const zip = await written([{ name: 'small/1/input', text: '1 2\n' }], true);
+
+    const entries = await readZip(zip);
+
+    expect(entries.map((entry) => [entry.path, entry.size])).toEqual([
+      ['small/1/input', 4],
+    ]);
+    expect(await (await entries[0]!.read()).text()).toBe('1 2\n');
+  });
+
+  it('lists an encrypted file with why it cannot be read', async () => {
+    const zip = await written([
+      { name: 'small/1/input', text: '1 2\n', options: { password: 'secret' } },
+      { name: 'small/1/answer', text: '3\n' },
+    ]);
+
+    const entries = await readZip(zip);
+
+    expect(entries.map((entry) => [entry.path, entry.problem])).toEqual([
+      ['small/1/input', 'It is encrypted.'],
+      ['small/1/answer', null],
+    ]);
+  });
+
+  it('refuses a zip with a path that leads out of its folders', async () => {
+    const zip = await makeZip([{ name: '../1/input', text: '1 2\n' }]);
+
+    await expect(readZip(zip)).rejects.toThrow(
+      '../1/input points outside the zip’s own folders, so the zip is refused.',
+    );
   });
 
   it('says a file is not a zip', async () => {
