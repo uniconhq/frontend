@@ -83,6 +83,34 @@ const serverTime = http.get('/api/v1/time', () =>
 const noHolders = [
   http.get('/api/v1/orgs/:org/roles', () => HttpResponse.json([])),
   http.get('/api/v1/orgs/:org/contests/:contest/roles', () => HttpResponse.json([])),
+  http.get('/api/v1/orgs/:org/contests/:contest/hold', () =>
+    HttpResponse.json({
+      from: null,
+      until: null,
+      holding: false,
+      ended_at: null,
+      ended_by: null,
+      ended_by_name: null,
+    }),
+  ),
+  http.get('/api/v1/orgs/:org/contests/:contest/tasks/:task', () =>
+    HttpResponse.json({
+      draft: false,
+      errors: [],
+      head: 'v1',
+      head_statement_written: false,
+      latest: null,
+      statement_written: false,
+      results: { released: false, history: [] },
+    }),
+  ),
+  http.get('/api/v1/orgs/:org/contests/:contest/tasks/:task/organise/queue', () =>
+    HttpResponse.json([]),
+  ),
+  http.get(
+    '/api/v1/orgs/:org/contests/:contest/tasks/:task/organise/submissions/:number/files',
+    () => HttpResponse.json({ number: 1, inputs: {} }),
+  ),
   http.get('/api/v1/orgs/:org/contests/:contest/tasks/:task/roles', () =>
     HttpResponse.json([]),
   ),

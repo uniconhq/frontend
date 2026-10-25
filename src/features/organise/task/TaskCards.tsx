@@ -12,6 +12,23 @@ type TaskPath = { org: string; contest: string; task: string };
 
 const TASK = '/api/v1/orgs/{org}/contests/{contest}/tasks/{task}';
 
+/** How many entrant rows are in the grading queue. */
+export function QueueCard({ path }: { path: TaskPath }) {
+  const view = queryView(
+    $api.useQuery('get', `${TASK}/organise/queue`, { params: { path } }),
+  );
+  return (
+    <Line
+      view={view}
+      say={(rows) =>
+        rows.length === 0
+          ? 'Nothing is waiting for a mark.'
+          : `${String(rows.length)} waiting for a mark.`
+      }
+    />
+  );
+}
+
 /** How many gradings there are, and how many still run. */
 export function GradingsCard({ path }: { path: TaskPath }) {
   const live = useLiveConnected();

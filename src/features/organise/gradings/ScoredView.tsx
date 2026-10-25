@@ -6,6 +6,8 @@ import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
 import { ScoredResult } from '@/ui/scored/ScoredResult';
 import { overLimitSentence } from '@/ui/scored/scored-text';
+import { StaffFiles } from '../staff-read';
+import { staffText } from '../staff-text';
 import { STATUS } from './feed';
 import classes from './feed.module.css';
 
@@ -31,6 +33,14 @@ export function ScoredView({
 }) {
   const number = entry.grading.submission_number;
   const query = { entrant: entry.by.entrant };
+  const where = { ...path, task, number };
+  const files = queryView(
+    $api.useQuery(
+      'get',
+      '/api/v1/orgs/{org}/contests/{contest}/tasks/{task}/organise/submissions/{number}/files',
+      { params: { path: where, query } },
+    ),
+  );
   const view = queryView(
     $api.useQuery(
       'get',
@@ -69,13 +79,19 @@ export function ScoredView({
                 </BodyText>
               )}
             </div>
+            {files.state === 'error' && <ErrorBlock error={files.error} onRetry={files.retry} />}
+            {files.state === 'ready' && (
+              <StaffFiles where={where} entrant={entry.by.entrant} files={files.data} />
+            )}
             <ScoredResult
               grading={view.data.grading}
               shownAt="Its entrant sees this at"
               testsShownAt="Its entrant sees its tests at"
+              readText={(ask) => staffText(where, entry.by.entrant, ask)}
             />
           </>
         ))}
     </section>
   );
 }
+

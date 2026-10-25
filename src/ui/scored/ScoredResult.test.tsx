@@ -238,6 +238,7 @@ describe('a run task’s result', () => {
             place: null,
             field: 'texts',
             name: 'log',
+            output: null,
           });
           return Promise.resolve('Compiled cleanly.');
         }}
@@ -245,5 +246,53 @@ describe('a run task’s result', () => {
     );
     await user.click(screen.getByRole('button', { name: 'Show log' }));
     expect(screen.getByLabelText('log')).toHaveTextContent('Compiled cleanly.');
+  });
+
+  it('shows when a value is shown, a dropped run and the facts', () => {
+    renderWithProviders(
+      <ScoredResult
+        grading={{
+          status: 'done',
+          groups: [],
+          meanings: [],
+          values: reported(),
+          runs: [
+            {
+              group: 'all',
+              place: 1,
+              dropped: true,
+              id: 'r',
+              key: {},
+              titles: ['Small grid'],
+              verdict: 'accepted',
+              passed: 1,
+              reports: {},
+              texts: {},
+              label: null,
+              message: null,
+            },
+          ],
+          run_values: [
+            {
+              name: 'score',
+              number: '7.5',
+              text: null,
+              waiting: false,
+              self_reported: false,
+              show: 'on_release',
+              facts: null,
+              runs: null,
+              values: null,
+            },
+          ],
+          facts: { seconds_late: '0', seconds: '1.2' },
+          compiled: 1,
+        }}
+      />,
+    );
+    expect(screen.getByText(/On release/)).toBeVisible();
+    expect(screen.getByText('Dropped')).toBeVisible();
+    expect(screen.getByText('Seconds late').closest('div')).toHaveTextContent('0');
+    expect(screen.getByText('Compiled').closest('div')).toHaveTextContent('1');
   });
 });

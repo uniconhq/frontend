@@ -8,6 +8,7 @@ import { PageLink } from '@/ui/PageLink';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { useMe } from '@/session';
 import { contestSectionPath } from '@/lib/sections';
+import { taskPath } from '@/lib/organiser-paths';
 import { holdsAt } from '../roles';
 import {
   REGRADES,
@@ -106,6 +107,11 @@ function Summary({
         {running !== null && ` ${running}`}
       </BodyText>
       {dismiss.error !== null && <ErrorBlock error={dismiss.error} compact />}
+      {task !== null && (
+        <PageLink to={`${taskPath(path.org, path.contest, task)}/regrades/${summary.id}`}>
+          What it changed
+        </PageLink>
+      )}
       {manages && (
         <div className={shared.actions}>
           <Button

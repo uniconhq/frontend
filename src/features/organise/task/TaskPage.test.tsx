@@ -478,6 +478,59 @@ describe('what the task has, under its name', { timeout: 20_000 }, () => {
   });
 });
 
+describe('releasing results', () => {
+  it('asks first and then shows who released them', async () => {
+    const user = userEvent.setup();
+    let confirmed = false;
+    server.use(
+      signedIn,
+      publicationList,
+      ...repoFiles,
+      http.get(TASK_API, () =>
+        HttpResponse.json({
+          ...publishedTask,
+          results: confirmed
+            ? {
+                released: true,
+                history: [
+                  {
+                    action: 'released',
+                    at: '2026-10-25T01:00:00Z',
+                    by: 7,
+                    by_name: 'kenny',
+                  },
+                ],
+              }
+            : { released: false, history: [] },
+        }),
+      ),
+      http.post(`${TASK_API}/results/release`, async ({ request }) => {
+        const body = (await request.json()) as { confirm: boolean };
+        if (!body.confirm) {
+          return problem(409, 'confirmation_required', {
+            detail: 'Score becomes visible to entrants.',
+          });
+        }
+        confirmed = true;
+        return HttpResponse.json({
+          released: true,
+          history: [
+            { action: 'released', at: '2026-10-25T01:00:00Z', by: 7, by_name: 'kenny' },
+          ],
+        });
+      }),
+    );
+    renderApp(TASK);
+    await user.click(await screen.findByRole('button', { name: 'Release results' }));
+    expect(await screen.findByText('Score becomes visible to entrants.')).toBeVisible();
+    const dialog = screen.getByRole('dialog');
+    await user.click(within(dialog).getByRole('button', { name: 'Release results' }));
+    expect(await screen.findByRole('list', { name: 'Results history' })).toHaveTextContent(
+      'Released by kenny',
+    );
+  });
+});
+
 describe("the task's publications", () => {
   it('lists them newest first, with whether and how each changed grading', async () => {
     server.use(signedIn, taskState, publicationList, ...repoFiles);

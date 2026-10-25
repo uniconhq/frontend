@@ -26,6 +26,8 @@ export type TextAsk = {
   place: number | null;
   field: 'texts' | 'label' | 'message';
   name: string | null;
+  /** The stored output, which staff read a text by. An entrant is not told it. */
+  output?: string | null;
 };
 
 /** What a result view reads. A run task fills `runs` and `run_values`; a test-by-test task fills `groups`. */
@@ -38,6 +40,14 @@ type ShownResult = {
   run_values?: RunValue[];
   once?: OnceShown;
   reveal_at?: string | null;
+  facts?: Record<string, string>;
+  compiled?: number | null;
+};
+
+const SHOWN_AT: Record<NonNullable<RunValue['show']>, string> = {
+  now: 'Now',
+  after_close: 'After the close',
+  on_release: 'On release',
 };
 
 /**
@@ -197,8 +207,13 @@ function showsRuns(grading: ShownResult): boolean {
   return (
     (grading.runs?.length ?? 0) > 0 ||
     (grading.run_values?.length ?? 0) > 0 ||
-    grading.status === 'submitted'
+    grading.status === 'submitted' ||
+    hasFacts(grading)
   );
+}
+
+function hasFacts(grading: ShownResult): boolean {
+  return Object.keys(grading.facts ?? {}).length > 0 || grading.compiled != null;
 }
 
 function groupsOf(runs: RunShown[]): { name: string; runs: RunShown[] }[] {
@@ -303,31 +318,37 @@ function RunRow({
       <BodyText>{`Test ${String(run.place)}`}</BodyText>
       {line !== '' && <BodyText>{line}</BodyText>}
       <VerdictBadge verdict={run.verdict} />
+      {run.dropped && <BodyText tone="secondary">Dropped</BodyText>}
       {Object.entries(run.reports).map(([name, number]) => (
         <span key={name}>
           {valueTitle(name, meaningOf(meanings, name))}{' '}
           <NumberShown name={name} number={number} meanings={meanings} />
         </span>
       ))}
-      {Object.keys(run.texts).map((name) => (
+      {Object.entries(run.texts).map(([name, ref]) => (
         <OpenText
           key={name}
           title={valueTitle(name, meaningOf(meanings, name))}
-          ask={{ ...ask, field: 'texts', name }}
+          ask={{ ...ask, field: 'texts', name: ref.name ?? name, output: ref.output }}
           readText={readText}
         />
       ))}
       {run.label !== null && (
         <OpenText
           title="Label"
-          ask={{ ...ask, field: 'label', name: null }}
+          ask={{ ...ask, field: 'label', name: run.label.name, output: run.label.output }}
           readText={readText}
         />
       )}
       {run.message !== null && (
         <OpenText
           title="Message"
-          ask={{ ...ask, field: 'message', name: null }}
+          ask={{
+            ...ask,
+            field: 'message',
+            name: run.message.name,
+            output: run.message.output,
+          }}
           readText={readText}
         />
       )}
@@ -365,7 +386,13 @@ function OnceReports({
         <OpenText
           key={name}
           title={valueTitle(name, meaningOf(meanings, name))}
-          ask={{ group: null, place: null, field: 'texts', name }}
+          ask={{
+            group: null,
+            place: null,
+            field: 'texts',
+            name: once.texts[name]?.name ?? name,
+            output: once.texts[name]?.output,
+          }}
           readText={readText}
         />
       ))}
@@ -388,7 +415,8 @@ function RunResult({
     runs.length > 0 ||
     values.length > 0 ||
     Object.keys(once.reports).length > 0 ||
-    Object.keys(once.texts).length > 0;
+    Object.keys(once.texts).length > 0 ||
+    hasFacts(grading);
   if (!shown) {
     return (
       <>
@@ -416,6 +444,7 @@ function RunResult({
                   waiting={value.waiting}
                   meanings={meanings}
                 />
+                {value.show !== null && ` ${SHOWN_AT[value.show]}`}
               </dd>
             </div>
           ))}
@@ -439,8 +468,38 @@ function RunResult({
         </section>
       ))}
       <OnceReports once={once} meanings={meanings} readText={readText} />
+      <Facts facts={grading.facts} compiled={grading.compiled} />
     </div>
   );
+}
+
+function Facts({
+  facts,
+  compiled,
+}: {
+  facts: Record<string, string> | undefined;
+  compiled: number | null | undefined;
+}) {
+  const rows = Object.entries(facts ?? {});
+  if (compiled != null && facts?.compiled === undefined) rows.push(['compiled', String(compiled)]);
+  if (rows.length === 0) return null;
+  return (
+    <dl className={classes.metrics} aria-label="Facts">
+      {rows.map(([name, number]) => (
+        <div key={name} className={classes.metric}>
+          <dt>{factTitle(name)}</dt>
+          <dd>{number}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+function factTitle(name: string): string {
+  if (name === 'seconds_late') return 'Seconds late';
+  if (name === 'seconds') return 'Seconds';
+  if (name === 'compiled') return 'Compiled';
+  return name;
 }
 
 /**

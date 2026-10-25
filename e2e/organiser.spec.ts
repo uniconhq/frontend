@@ -54,6 +54,7 @@ async function stubOrganiserApi(page: Page) {
     errors: [],
     statement_written: true,
     head_statement_written: true,
+    results: { released: false, history: [] },
   });
 
   const json = (route: Route, body: unknown, status = 200) =>

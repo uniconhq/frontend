@@ -61,6 +61,7 @@ export const CONTEST_SECTIONS = [
  */
 export const TASK_SECTIONS = [
   { key: 'gradings', label: 'Gradings', segment: 'gradings', card: 'grid' },
+  { key: 'queue', label: 'Queue', segment: 'queue', card: 'grid' },
   {
     key: 'publications',
     label: 'Publications',

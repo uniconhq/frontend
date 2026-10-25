@@ -1188,7 +1188,7 @@ describe("the contest's sections", () => {
     await says('Gradings', '3 waiting to be graded, 1 being graded.');
     await says('Announcements', '2 posted; the latest is “Task B fixed”.');
     await says('Questions', 'Nobody has asked anything yet.');
-    await says('Leaderboards', 'This page is being rebuilt.');
+    await says('Leaderboards', 'No hold.');
     await says('Contest organisers', '0 organisers');
     // A contest holds no file but its settings, so it has no Files card (M43).
     expect(screen.queryByRole('region', { name: 'Files' })).toBeNull();
@@ -1196,6 +1196,63 @@ describe("the contest's sections", () => {
     const sections = screen.getByRole('group', { name: "The contest's sections" });
     expect(within(sections).queryByRole('button')).toBeNull();
     expect(screen.queryByRole('form')).toBeNull();
+  });
+
+  it('asks before ending a hold', async () => {
+    const user = userEvent.setup();
+    let ended = false;
+    server.use(
+      signedIn,
+      standingList,
+      ...repoFiles,
+      http.get('/api/v1/orgs/:org/contests/:contest/hold', () =>
+        HttpResponse.json(
+          ended
+            ? {
+                from: '2030-10-01T13:00:00Z',
+                until: 'staff',
+                holding: false,
+                ended_at: '2026-10-25T01:00:00Z',
+                ended_by: 7,
+                ended_by_name: 'kenny',
+              }
+            : {
+                from: '2030-10-01T13:00:00Z',
+                until: 'staff',
+                holding: true,
+                ended_at: null,
+                ended_by: null,
+                ended_by_name: null,
+              },
+        ),
+      ),
+      http.post('/api/v1/orgs/:org/contests/:contest/hold/end', async ({ request }) => {
+        const body = (await request.json()) as { confirm: boolean };
+        if (!body.confirm) {
+          return problem(409, 'confirmation_required', {
+            detail: 'Every row becomes visible, and this hold cannot be put back.',
+          });
+        }
+        ended = true;
+        return HttpResponse.json({
+          from: '2030-10-01T13:00:00Z',
+          until: 'staff',
+          holding: false,
+          ended_at: '2026-10-25T01:00:00Z',
+          ended_by: 7,
+          ended_by_name: 'kenny',
+        });
+      }),
+    );
+    renderApp(CONTEST);
+    const boards = await screen.findByRole('region', { name: 'Leaderboards' });
+    await user.click(await within(boards).findByRole('button', { name: 'End the hold now' }));
+    expect(
+      await screen.findByText('Every row becomes visible, and this hold cannot be put back.'),
+    ).toBeVisible();
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'End the hold now' }));
+    expect(await within(boards).findByText(/Ended by kenny/)).toBeVisible();
+    expect(within(boards).queryByRole('button', { name: 'End the hold now' })).toBeNull();
   });
 });
 
