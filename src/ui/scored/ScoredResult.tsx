@@ -1,16 +1,43 @@
-import type { GroupShown, Reported, ValueMeaning } from '@/api/types';
+import { useRef, useState } from 'react';
+import type {
+  GroupShown,
+  OnceShown,
+  Reported,
+  RunShown,
+  RunValue,
+  ValueMeaning,
+} from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
+import { Button } from '@/ui/Button';
+import { ShownValue } from '@/ui/number/ShownValue';
+import { RESULTS_AFTER } from '@/ui/number/words';
 import { VerdictBadge } from '@/ui/VerdictBadge';
 import { formatDateTime } from '@/lib/time';
 import { inReportOrder, meaningOf, valueTitle, withUnit } from '@/lib/values';
-import { valueText } from './scored-text';
+import { tupleLine, valueText } from './scored-text';
 import classes from './scored.module.css';
 
-/** What a result view reads: groups, the values reported once, and how each is named. */
+/**
+ * Where a text is shown, so the page can read it when it is opened: a run's,
+ * by the group and place, or the steps done once, with neither.
+ */
+export type TextAsk = {
+  group: string | null;
+  place: number | null;
+  field: 'texts' | 'label' | 'message';
+  name: string | null;
+};
+
+/** What a result view reads. A run task fills `runs` and `run_values`; a test-by-test task fills `groups`. */
 type ShownResult = {
+  status?: string;
   groups: GroupShown[];
   meanings: ValueMeaning[];
   values: Reported;
+  runs?: RunShown[];
+  run_values?: RunValue[];
+  once?: OnceShown;
+  reveal_at?: string | null;
 };
 
 /**
@@ -165,22 +192,277 @@ function Group({
   );
 }
 
+/** A run task's result, rather than one graded test by test. */
+function showsRuns(grading: ShownResult): boolean {
+  return (
+    (grading.runs?.length ?? 0) > 0 ||
+    (grading.run_values?.length ?? 0) > 0 ||
+    grading.status === 'submitted'
+  );
+}
+
+function groupsOf(runs: RunShown[]): { name: string; runs: RunShown[] }[] {
+  const order: string[] = [];
+  const by = new Map<string, RunShown[]>();
+  for (const run of runs) {
+    const list = by.get(run.group);
+    if (list === undefined) {
+      order.push(run.group);
+      by.set(run.group, [run]);
+    } else {
+      list.push(run);
+    }
+  }
+  return order.map((name) => ({ name, runs: by.get(name) ?? [] }));
+}
+
+/** A number as 6.1, with its unit after it when the value has one. */
+function NumberShown({
+  name,
+  number,
+  text = null,
+  waiting = false,
+  meanings,
+}: {
+  name: string;
+  number: string | null;
+  text?: string | null;
+  waiting?: boolean;
+  meanings: ValueMeaning[];
+}) {
+  const unit = number === null ? null : (meaningOf(meanings, name)?.unit ?? null);
+  return (
+    <>
+      <ShownValue number={number} text={text} waiting={waiting} />
+      {unit !== null && unit !== '' ? ` ${unit}` : null}
+    </>
+  );
+}
+
+/** A text, read the first time it is opened and then shown as the step wrote it. */
+function OpenText({
+  title,
+  ask,
+  readText,
+}: {
+  title: string;
+  ask: TextAsk;
+  readText?: (ask: TextAsk) => Promise<string>;
+}) {
+  const [text, setText] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+  const asked = useRef(false);
+  if (readText === undefined) return null;
+  if (text !== null) {
+    return (
+      <pre className={classes.pre} aria-label={title} tabIndex={0}>
+        {text}
+      </pre>
+    );
+  }
+  return (
+    <>
+      <Button
+        size="xs"
+        variant="secondary"
+        label={`Show ${title}`}
+        onClick={() => {
+          if (asked.current) return;
+          asked.current = true;
+          void readText(ask)
+            .then((found) => {
+              setFailed(false);
+              setText(found);
+            })
+            .catch(() => {
+              asked.current = false;
+              setFailed(true);
+            });
+        }}
+      >
+        {`Show ${title}`}
+      </Button>
+      {failed && <BodyText tone="secondary">This text could not be read.</BodyText>}
+    </>
+  );
+}
+
+function RunRow({
+  run,
+  meanings,
+  readText,
+}: {
+  run: RunShown;
+  meanings: ValueMeaning[];
+  readText?: (ask: TextAsk) => Promise<string>;
+}) {
+  const line = tupleLine(run.titles, run.key);
+  const ask = { group: run.group, place: run.place };
+  return (
+    <div className={classes.run}>
+      <BodyText>{`Test ${String(run.place)}`}</BodyText>
+      {line !== '' && <BodyText>{line}</BodyText>}
+      <VerdictBadge verdict={run.verdict} />
+      {Object.entries(run.reports).map(([name, number]) => (
+        <span key={name}>
+          {valueTitle(name, meaningOf(meanings, name))}{' '}
+          <NumberShown name={name} number={number} meanings={meanings} />
+        </span>
+      ))}
+      {Object.keys(run.texts).map((name) => (
+        <OpenText
+          key={name}
+          title={valueTitle(name, meaningOf(meanings, name))}
+          ask={{ ...ask, field: 'texts', name }}
+          readText={readText}
+        />
+      ))}
+      {run.label !== null && (
+        <OpenText
+          title="Label"
+          ask={{ ...ask, field: 'label', name: null }}
+          readText={readText}
+        />
+      )}
+      {run.message !== null && (
+        <OpenText
+          title="Message"
+          ask={{ ...ask, field: 'message', name: null }}
+          readText={readText}
+        />
+      )}
+    </div>
+  );
+}
+
+function OnceReports({
+  once,
+  meanings,
+  readText,
+}: {
+  once: OnceShown;
+  meanings: ValueMeaning[];
+  readText?: (ask: TextAsk) => Promise<string>;
+}) {
+  const reports = Object.entries(once.reports);
+  const texts = Object.keys(once.texts);
+  if (reports.length === 0 && texts.length === 0) return null;
+  return (
+    <div className={classes.stack}>
+      {reports.length > 0 && (
+        <dl className={classes.metrics} aria-label="Once">
+          {reports.map(([name, number]) => (
+            <div key={name} className={classes.metric}>
+              <dt>{valueTitle(name, meaningOf(meanings, name))}</dt>
+              <dd>
+                <NumberShown name={name} number={number} meanings={meanings} />
+              </dd>
+            </div>
+          ))}
+        </dl>
+      )}
+      {texts.map((name) => (
+        <OpenText
+          key={name}
+          title={valueTitle(name, meaningOf(meanings, name))}
+          ask={{ group: null, place: null, field: 'texts', name }}
+          readText={readText}
+        />
+      ))}
+    </div>
+  );
+}
+
+function RunResult({
+  grading,
+  readText,
+}: {
+  grading: ShownResult;
+  readText?: (ask: TextAsk) => Promise<string>;
+}) {
+  const runs = grading.runs ?? [];
+  const values = grading.run_values ?? [];
+  const once = grading.once ?? { reports: {}, texts: {} };
+  const meanings = grading.meanings;
+  const shown =
+    runs.length > 0 ||
+    values.length > 0 ||
+    Object.keys(once.reports).length > 0 ||
+    Object.keys(once.texts).length > 0;
+  if (!shown) {
+    return (
+      <>
+        <BodyText>{RESULTS_AFTER}</BodyText>
+        {grading.reveal_at != null && grading.reveal_at !== '' && (
+          <BodyText tone="secondary">
+            {`Results at ${formatDateTime(new Date(grading.reveal_at))}`}
+          </BodyText>
+        )}
+      </>
+    );
+  }
+  return (
+    <div className={classes.stack}>
+      {values.length > 0 && (
+        <dl className={classes.metrics} aria-label="Values">
+          {values.map((value) => (
+            <div key={value.name} className={classes.metric}>
+              <dt>{valueTitle(value.name, meaningOf(meanings, value.name))}</dt>
+              <dd>
+                <NumberShown
+                  name={value.name}
+                  number={value.number}
+                  text={value.text}
+                  waiting={value.waiting}
+                  meanings={meanings}
+                />
+              </dd>
+            </div>
+          ))}
+        </dl>
+      )}
+      {groupsOf(runs).map((group) => (
+        <section
+          key={group.name}
+          aria-label={`Group ${group.name}`}
+          className={classes.stack}
+        >
+          <BodyText>{group.name}</BodyText>
+          {group.runs.map((run) => (
+            <RunRow
+              key={`${run.group}:${String(run.place)}`}
+              run={run}
+              meanings={meanings}
+              readText={readText}
+            />
+          ))}
+        </section>
+      ))}
+      <OnceReports once={once} meanings={meanings} readText={readText} />
+    </div>
+  );
+}
+
 /**
  * What a grading's result holds beside where it stands: what the run
  * reported once, and each test group. A contestant reads it as the task shows
  * it now; organisers read the same groups, tests and reported values, where
  * each group's time says when its contestant sees it (`shownAt`, and
- * `testsShownAt` for a group whose tests alone wait).
+ * `testsShownAt` for a group whose tests alone wait). A run task shows its
+ * values and its runs instead.
  */
 export function ScoredResult({
   grading,
   shownAt = 'Shown at',
   testsShownAt = 'Tests shown at',
+  readText,
 }: {
   grading: ShownResult;
   shownAt?: string;
   testsShownAt?: string;
+  readText?: (ask: TextAsk) => Promise<string>;
 }) {
+  if (showsRuns(grading)) return <RunResult grading={grading} readText={readText} />;
   return (
     <>
       <OnceValues values={grading.values} meanings={grading.meanings} />

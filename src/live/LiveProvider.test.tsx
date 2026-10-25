@@ -248,6 +248,42 @@ describe('where the live stream stands', () => {
     }
   });
 
+  it('reads a submission again when results are released or taken back', () => {
+    vi.useFakeTimers();
+    try {
+      const client = new QueryClient();
+      const contest = '/api/v1/orgs/{org}/contests/{contest}';
+      const task = `${contest}/tasks/{task}`;
+      const released = [
+        `${task}/submissions`,
+        `${task}/submissions/{number}`,
+        `${task}/organise/submissions/{number}`,
+        `${contest}/home`,
+      ];
+      const left = [
+        `${task}/submissions/{number}/files`,
+        `${task}/gradings`,
+        `${contest}/gradings/queue`,
+      ];
+      for (const path of [...released, ...left]) {
+        client.setQueryData(['get', path], {});
+      }
+      renderProvider(client);
+      const source = FakeSource.last;
+      act(() => source?.onopen?.());
+      act(() => {
+        source?.listeners.get('results')?.();
+        vi.advanceTimersByTime(300);
+      });
+      const stale = (paths: string[]) =>
+        paths.filter((path) => client.getQueryState(['get', path])?.isInvalidated);
+      expect(stale(released)).toEqual(released);
+      expect(stale(left)).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('marks stale, on any nudge, none of the reads a form or an editor edits from', () => {
     vi.useFakeTimers();
     try {
@@ -272,7 +308,13 @@ describe('where the live stream stands', () => {
       act(() => source?.onopen?.());
 
       act(() => {
-        for (const kind of ['grading', 'announcement', 'clarification', 'checks']) {
+        for (const kind of [
+          'grading',
+          'announcement',
+          'clarification',
+          'checks',
+          'results',
+        ]) {
           source?.listeners.get(kind)?.();
         }
         vi.advanceTimersByTime(300);

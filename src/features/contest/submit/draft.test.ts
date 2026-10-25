@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { inputField, languageField } from '@/test/contestant';
-import { checkDraft, emptyDraft, pathOf, submittedInputs, type Draft } from './draft';
+import {
+  checkDraft,
+  emptyDraft,
+  pathOf,
+  submittedInputs,
+  type Draft,
+} from './draft';
 
 const MB = 1024 * 1024;
 
@@ -156,6 +162,28 @@ describe('the checks before anything is sent', () => {
     expect(refused?.extensions).toEqual({ limit: 20, input: 'program' });
   });
 
+  it('holds each part to its own size, and lets one part stay empty', () => {
+    const route = inputField({
+      id: 'route',
+      parts: [
+        { title: 'Small grid', max_size: 10 * MB },
+        { title: null, max_size: 50 * MB },
+      ],
+    });
+    const small = file('a.txt', 1);
+    expect(
+      checkDraft([route], { route: { kind: 'parts', files: [small, null] } }),
+    ).toBeNull();
+    expect(
+      checkDraft([route], emptyDraft([route]))?.extensions['errors'],
+    ).toEqual([{ input: 'route', message: 'This input needs a file.' }]);
+    expect(
+      checkDraft([route], {
+        route: { kind: 'parts', files: [small, file('b.txt', 50 * MB + 1)] },
+      })?.extensions,
+    ).toEqual({ limit: 50 * MB, input: 'route', part: 2 });
+  });
+
   it('holds one file to its input’s size', () => {
     const refused = checkDraft([inputField({ max_size: MB })], {
       submission: { kind: 'files', files: [file('big.py', MB + 1)] },
@@ -204,6 +232,29 @@ describe('what a submit sends', () => {
       language: { uploads: [], value: 'python' },
       fast: { uploads: [], value: false },
       notes: { uploads: [], value: 'hello' },
+    });
+  });
+
+  it('sends a per-row input as one part from 1, an empty part with no upload', () => {
+    const route = inputField({
+      id: 'route',
+      parts: [
+        { title: 'Small grid', max_size: MB },
+        { title: 'Big grid', max_size: MB },
+      ],
+    });
+    const small = file('a.txt', 1);
+    expect(
+      submittedInputs(
+        [route],
+        { route: { kind: 'parts', files: [small, null] } },
+        () => 'up',
+      ),
+    ).toEqual({
+      route: {
+        uploads: [],
+        parts: { '1': { uploads: ['up'] }, '2': { uploads: [] } },
+      },
     });
   });
 });

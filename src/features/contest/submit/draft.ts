@@ -9,9 +9,33 @@ import { compareDecimal } from '@/lib/exact';
  */
 export type Entry =
   | { kind: 'files'; files: File[] }
+  | { kind: 'parts'; files: (File | null)[] }
   | { kind: 'text'; text: string }
   | { kind: 'flag'; checked: boolean }
   | { kind: 'choice'; option: string };
+
+/**
+ * One file about to be uploaded, and the part it belongs to when the input
+ * is given once per row. Parts are numbered from 1, as the slot asks.
+ */
+export type UploadFile = {
+  input: InputField;
+  file: File;
+  part: number | null;
+};
+
+/** The parts of an input given once per row, or none when it is one field. */
+export function partsOf(input: InputField): NonNullable<InputField['parts']> | null {
+  const parts = input.parts;
+  return Array.isArray(parts) && parts.length > 0 ? parts : null;
+}
+
+/** What an upload box is called: the row's title, or "Part 1", "Part 2". */
+export function partTitle(title: string | null | undefined, index: number): string {
+  return title !== null && title !== undefined && title !== ''
+    ? title
+    : `Part ${String(index + 1)}`;
+}
 
 /** Everything in the panel, by input id. Replaced whole on every change. */
 export type Draft = Readonly<Record<string, Entry>>;
@@ -22,7 +46,7 @@ const TEXT_MAX = 64 * 1024;
 /** A number as a contestant gives it: plain decimal digits, as the forge takes one. */
 const PLAIN_DECIMAL = /^-?[0-9]+(\.[0-9]+)?$/;
 
-export function takesFiles(input: InputField): boolean {
+function takesFiles(input: InputField): boolean {
   return input.type === 'file' || input.type === 'folder';
 }
 
@@ -63,8 +87,12 @@ function firstOption(input: InputField): string {
 function emptyEntry(input: InputField): Entry {
   switch (input.type) {
     case 'file':
-    case 'folder':
-      return { kind: 'files', files: [] };
+    case 'folder': {
+      const parts = partsOf(input);
+      return parts === null
+        ? { kind: 'files', files: [] }
+        : { kind: 'parts', files: parts.map(() => null) };
+    }
     case 'boolean':
       return { kind: 'flag', checked: input.default === true };
     case 'enum':
@@ -86,12 +114,40 @@ export function emptyDraft(inputs: InputField[]): Draft {
 export function entryOf(draft: Draft, input: InputField): Entry {
   const entry = draft[input.id];
   const empty = emptyEntry(input);
-  return entry !== undefined && entry.kind === empty.kind ? entry : empty;
+  if (entry === undefined || entry.kind !== empty.kind) return empty;
+  if (entry.kind === 'parts' && empty.kind === 'parts') {
+    return {
+      kind: 'parts',
+      files: empty.files.map((slot, index) => entry.files[index] ?? slot),
+    };
+  }
+  return entry;
 }
 
-export function filesOf(draft: Draft, input: InputField): File[] {
+function filesOf(draft: Draft, input: InputField): File[] {
   const entry = entryOf(draft, input);
-  return entry.kind === 'files' ? entry.files : [];
+  if (entry.kind === 'files') return entry.files;
+  if (entry.kind === 'parts') {
+    return entry.files.filter((file): file is File => file !== null);
+  }
+  return [];
+}
+
+/** Every file the draft will upload, with the part a per-row input names. */
+export function uploadsOf(inputs: InputField[], draft: Draft): UploadFile[] {
+  const found: UploadFile[] = [];
+  for (const input of inputs) {
+    if (!takesFiles(input)) continue;
+    const entry = entryOf(draft, input);
+    if (entry.kind === 'parts') {
+      entry.files.forEach((file, index) => {
+        if (file !== null) found.push({ input, file, part: index + 1 });
+      });
+    } else if (entry.kind === 'files') {
+      for (const file of entry.files) found.push({ input, file, part: null });
+    }
+  }
+  return found;
 }
 
 type Problem = { input: string; message: string };
@@ -103,6 +159,10 @@ function problemOf(input: InputField, entry: Entry): string | null {
       if (entry.files.length > 0) return null;
       return takesPaths(input)
         ? 'This input needs at least one file.'
+        : 'This input needs a file.';
+    case 'parts':
+      return entry.files.some((file) => file !== null)
+        ? null
         : 'This input needs a file.';
     case 'flag':
       return null;
@@ -155,6 +215,24 @@ export function checkDraft(inputs: InputField[], draft: Draft): ApiError | null 
   }
 
   for (const input of inputs) {
+    const entry = entryOf(draft, input);
+    if (entry.kind === 'parts') {
+      const parts = partsOf(input) ?? [];
+      for (let index = 0; index < parts.length; index += 1) {
+        const file = entry.files[index];
+        const part = parts[index];
+        if (file === null || file === undefined || part === undefined) continue;
+        if (file.size > part.max_size) {
+          return new ApiError({
+            code: 'too_large',
+            status: 0,
+            title: 'Too large for this input',
+            extensions: { limit: part.max_size, input: input.id, part: index + 1 },
+          });
+        }
+      }
+      continue;
+    }
     const total = filesOf(draft, input).reduce((sum, file) => sum + file.size, 0);
     if (total > input.max_size) {
       return new ApiError({
@@ -187,6 +265,19 @@ export function submittedInputs(
           return [
             input.id,
             { uploads: entry.files.map((file) => uploadOf(input.id, file)) },
+          ];
+        case 'parts':
+          return [
+            input.id,
+            {
+              uploads: [],
+              parts: Object.fromEntries(
+                entry.files.map((file, index) => [
+                  String(index + 1),
+                  { uploads: file === null ? [] : [uploadOf(input.id, file)] },
+                ]),
+              ),
+            },
           ];
         case 'flag':
           return [input.id, { uploads: [], value: entry.checked }];

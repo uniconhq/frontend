@@ -111,7 +111,7 @@ type State = {
   /** How often each submission has been read, so its grading can move on. */
   reads: number;
   /** Each slot asked for, as the browser described its file. */
-  slots: { input: string; filename: string }[];
+  slots: { input: string; filename: string; part?: number }[];
   /** Each file put through the upload door, as its bytes arrived. */
   sent: string[];
   completed: unknown[];
@@ -119,6 +119,9 @@ type State = {
   refusal: { status: number; code: string; extra: Record<string, unknown> } | null;
   /** The forge already holds the file, so the slot has nothing to send. */
   alreadyHeld: boolean;
+  /** Replaces an opened submission's grading from the second read of it. */
+  later: object | null;
+  detailReads: number;
 };
 
 async function stubApi(page: Page, overrides: Partial<State> = {}): Promise<State> {
@@ -132,6 +135,8 @@ async function stubApi(page: Page, overrides: Partial<State> = {}): Promise<Stat
     submits: [],
     refusal: null,
     alreadyHeld: false,
+    later: null,
+    detailReads: 0,
     ...overrides,
   };
   const json = (route: Route, body: unknown, status = 200) =>
@@ -258,9 +263,11 @@ async function stubApi(page: Page, overrides: Partial<State> = {}): Promise<Stat
     const one = /^\/submissions\/(\d+)$/.exec(path);
     if (one !== null) {
       const found = state.submissions.find((entry) => entry.number === Number(one[1]));
-      return found === undefined
-        ? route.fulfill({ status: 404, body: 'not stubbed' })
-        : json(route, found);
+      if (found === undefined) return route.fulfill({ status: 404, body: 'not stubbed' });
+      state.detailReads += 1;
+      const grading =
+        state.later !== null && state.detailReads > 2 ? state.later : found.grading;
+      return json(route, { ...found, grading });
     }
     if (/^\/submissions\/\d+\/files$/.test(path)) {
       return json(route, {
@@ -547,4 +554,138 @@ test('each refusal is said in words, and the files stay to send again', async ({
     );
   }
   expect(state.submissions).toHaveLength(0);
+});
+
+const MB = 1024 * 1024;
+
+const runOf = (overrides: Record<string, unknown>) => ({
+  group: 'samples',
+  place: 1,
+  id: null,
+  dropped: false,
+  key: {},
+  titles: ['Small grid'],
+  verdict: 'accepted',
+  passed: 1,
+  reports: {},
+  texts: {},
+  label: null,
+  message: null,
+  ...overrides,
+});
+
+const valueOf = (name: string, number: string, show: string) => ({
+  name,
+  number,
+  text: null,
+  waiting: false,
+  self_reported: false,
+  show,
+  facts: null,
+  runs: null,
+  values: null,
+});
+
+test('a row given in parts is one upload each, held to that part’s size', async ({
+  page,
+}, testInfo) => {
+  const state = await stubApi(page, {
+    inputs: [
+      input({
+        id: 'route',
+        label: 'Route',
+        max_size: 50 * MB,
+        parts: [
+          { title: 'Small grid', max_size: 10 * MB },
+          { title: 'Big grid', max_size: 50 * MB },
+        ],
+      }),
+    ],
+  });
+  await page.goto(PAGE);
+
+  const form = page.getByRole('form', { name: 'Submit' });
+  await expect(form.getByLabel('Small grid', { exact: true })).toBeAttached();
+  await expect(form.getByLabel('Big grid', { exact: true })).toBeAttached();
+  await expect(form.getByText('At most 50 MB.')).toBeVisible();
+
+  const big = testInfo.outputPath('big.bin');
+  await writeFile(big, Buffer.alloc(50 * MB + 1));
+  await form.getByLabel('Big grid', { exact: true }).setInputFiles(big);
+  await form.getByRole('button', { name: 'Submit' }).click();
+  await expect(page.getByRole('alert')).toContainText('Too large: Big grid');
+  expect(state.slots).toHaveLength(0);
+
+  await form.getByRole('button', { name: 'Remove big.bin' }).click();
+  await form.getByLabel('Small grid', { exact: true }).setInputFiles({
+    name: 'small.txt',
+    mimeType: 'text/plain',
+    buffer: Buffer.from('1\n'),
+  });
+  await form.getByRole('button', { name: 'Submit' }).click();
+  await expect(page.getByText('Submitted as #1.')).toBeVisible();
+  expect(
+    state.slots.map((slot) => ({
+      input: slot.input,
+      filename: slot.filename,
+      part: slot.part,
+    })),
+  ).toEqual([{ input: 'route', filename: 'small.txt', part: 1 }]);
+  expect(state.submits[0]?.inputs).toEqual({
+    route: {
+      uploads: [],
+      parts: {
+        '1': { uploads: ['00000000-0000-4000-8000-000000000001'] },
+        '2': { uploads: [] },
+      },
+    },
+  });
+});
+
+test('samples show now, and the rest appears when the task reveals', async ({
+  page,
+}) => {
+  const samples = {
+    ...queued,
+    status: 'graded',
+    reveal_at: '2026-09-29T10:00:03Z',
+    runs: [runOf({})],
+    run_values: [valueOf('score', '10', 'now')],
+    once: { reports: {}, texts: {} },
+  };
+  const revealed = {
+    ...samples,
+    reveal_at: null,
+    runs: [
+      runOf({}),
+      runOf({
+        group: 'hidden',
+        titles: ['Big grid', null],
+        key: { grid: 'big.txt', seed: 2 },
+        verdict: 'skipped',
+        passed: 0,
+      }),
+    ],
+    run_values: [valueOf('score', '10', 'now'), valueOf('full', '7', 'on_release')],
+  };
+  await stubApi(page, {
+    later: revealed,
+    submissions: [
+      {
+        number: 1,
+        submitted_at: '2026-09-29T09:30:00Z',
+        late_days: 0,
+        grading: samples,
+      },
+    ],
+  });
+  await page.goto(`${PAGE}?submission=1`);
+
+  const detail = page.getByRole('region', { name: 'Submission 1' });
+  await expect(detail.getByText('Small grid')).toBeVisible();
+  await expect(detail.getByText('score')).toBeVisible();
+  await expect(detail.getByText('Big grid · seed 2')).toHaveCount(0);
+  await expect(detail.getByText('Big grid · seed 2')).toBeVisible({ timeout: 15_000 });
+  await expect(detail.getByText('SKIPPED')).toBeVisible();
+  await expect(detail.getByText('full')).toBeVisible();
 });

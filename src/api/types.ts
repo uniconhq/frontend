@@ -84,6 +84,9 @@ export type GradingResult = Schemas['Result'];
 /** A row's submission as organisers read it, with everything filled in. */
 export type OrganisedSubmission = Schemas['OrganisedSubmission'];
 export type GroupShown = Schemas['GroupShown'];
+export type RunShown = Schemas['RunShown'];
+export type RunValue = Schemas['RunValue'];
+export type OnceShown = Schemas['OnceShown'];
 /** A run's reported values by name, its numbers exact and its texts apart. */
 export type Reported = Schemas['Reported'];
 /**

@@ -37,6 +37,13 @@
   font-size: 12px;
 }
 
+.run {
+  display: flex;
+  gap: 8px 14px;
+  align-items: baseline;
+  flex-wrap: wrap;
+}
+
 .verdict {
   display: flex;
   gap: 8px;

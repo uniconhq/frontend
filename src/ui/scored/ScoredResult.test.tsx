@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { screen, within } from '@testing-library/react';
+import userEvent from '@/test/user-event';
 import { formatExact } from '@/lib/exact';
 import { classicMeanings } from '@/test/organiser';
 import { renderWithProviders } from '@/test/render';
 import { graded, grading, reported } from '@/test/contestant';
+import { RESULTS_AFTER } from '@/ui/number/words';
 import { ScoredResult } from './ScoredResult';
 
 /** Classic's values as its workflow names them, in its report order (M58). */
@@ -132,5 +134,116 @@ describe("a result's values over its tests", () => {
         .map((header) => header.textContent),
     ).toEqual(['Test', 'Outcome', 'time_ms', 'memory_kb']);
     expect(within(tests).getAllByRole('row')[1]).toHaveTextContent('28');
+  });
+});
+
+describe('a run task’s result', () => {
+  it('shows values and each run by its titles, with no penalty', () => {
+    renderWithProviders(
+      <ScoredResult
+        grading={grading({
+          status: 'graded',
+          meanings: [
+            {
+              name: 'score',
+              title: 'Score',
+              unit: 'pts',
+              better: null,
+              fold: null,
+            },
+          ],
+          run_values: [
+            {
+              name: 'score',
+              number: '10',
+              text: null,
+              waiting: false,
+              self_reported: true,
+              show: 'now',
+              facts: null,
+              runs: null,
+              values: null,
+            },
+          ],
+          runs: [
+            {
+              group: 'samples',
+              place: 1,
+              id: null,
+              dropped: false,
+              key: { grid: 'big.txt', seed: 2 },
+              titles: ['Big grid', null],
+              verdict: 'skipped',
+              passed: 0,
+              reports: {},
+              texts: {},
+              label: null,
+              message: null,
+            },
+          ],
+        })}
+      />,
+    );
+
+    expect(screen.getByRole('region', { name: 'Group samples' })).toHaveTextContent(
+      'Test 1',
+    );
+    expect(screen.getByText('Big grid · seed 2')).toBeVisible();
+    expect(screen.getByText('SKIPPED')).toBeVisible();
+    expect(screen.getByText('Score').closest('div')).toHaveTextContent('10 pts');
+    expect(screen.queryByText(/penal/)).toBeNull();
+    expect(screen.queryByText(/self-reported/)).toBeNull();
+  });
+
+  it('says nothing is shown yet, and when it will be', () => {
+    renderWithProviders(
+      <ScoredResult
+        grading={grading({
+          status: 'submitted',
+          reveal_at: '2026-09-29T12:00:00Z',
+        })}
+      />,
+    );
+    expect(screen.getByText(RESULTS_AFTER)).toBeVisible();
+    expect(screen.getByText(/Results at /)).toBeVisible();
+  });
+
+  it('reads a text when it is opened', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(
+      <ScoredResult
+        grading={grading({
+          status: 'graded',
+          once: { reports: {}, texts: { log: { name: null, output: null } } },
+          runs: [
+            {
+              group: 'samples',
+              place: 1,
+              id: null,
+              dropped: false,
+              key: {},
+              titles: ['Small grid'],
+              verdict: 'accepted',
+              passed: 1,
+              reports: {},
+              texts: {},
+              label: null,
+              message: null,
+            },
+          ],
+        })}
+        readText={(ask) => {
+          expect(ask).toEqual({
+            group: null,
+            place: null,
+            field: 'texts',
+            name: 'log',
+          });
+          return Promise.resolve('Compiled cleanly.');
+        }}
+      />,
+    );
+    await user.click(screen.getByRole('button', { name: 'Show log' }));
+    expect(screen.getByLabelText('log')).toHaveTextContent('Compiled cleanly.');
   });
 });

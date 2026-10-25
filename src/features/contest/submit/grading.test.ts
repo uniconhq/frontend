@@ -78,6 +78,18 @@ describe('how often submissions are read again', () => {
     ).toEqual([1]);
   });
 
+  it('reads again when the task reveals, even while the live stream is open', () => {
+    const held: Submission = {
+      ...submitted(3, 'graded'),
+      grading: {
+        ...done,
+        reveal_at: new Date(NOW.getTime() + 5_000).toISOString(),
+      },
+    };
+    expect(pollEvery(held, NOW, true)).toBe(5_000);
+    expect(pollEvery(held, NOW)).toBe(5_000);
+  });
+
   it('is once a minute when nothing is being graded', () => {
     expect(pollEvery([submitted(3, 'graded')], NOW)).toBe(60_000);
     expect(pollEvery(undefined, NOW)).toBe(60_000);
