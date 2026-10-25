@@ -71,7 +71,11 @@ const WAYS = [
  * known, so what a formula reads of it is not checked here, as the forge
  * does not check a task it cannot resolve.
  */
-function useTaskGives(org: string, contest: string, tasks: readonly string[]): TaskGives | null {
+function useTaskGives(
+  org: string,
+  contest: string,
+  tasks: readonly string[],
+): TaskGives | null {
   const files = useQueries({
     queries: tasks.map((task) => ({
       ...$api.queryOptions(

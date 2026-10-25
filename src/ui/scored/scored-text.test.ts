@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { overLimitSentence, reportLabel, submissionsWords, tupleLine } from './scored-text';
+import {
+  overLimitSentence,
+  reportLabel,
+  submissionsWords,
+  tupleLine,
+} from './scored-text';
 
 describe('a run’s rows', () => {
   it('shows a titled tuple by its title and an untitled one by its columns', () => {
@@ -9,9 +14,9 @@ describe('a run’s rows', () => {
         { title: null, key: { seed: 2 } },
       ]),
     ).toBe('Big grid · seed 2');
-    expect(tupleLine([{ title: null, key: { route: 'hidden/route.txt', seed: 2 } }])).toBe(
-      'route.txt · seed 2',
-    );
+    expect(
+      tupleLine([{ title: null, key: { route: 'hidden/route.txt', seed: 2 } }]),
+    ).toBe('route.txt · seed 2');
   });
 });
 

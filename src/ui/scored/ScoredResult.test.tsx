@@ -8,9 +8,7 @@ import { RESULTS_AFTER } from '@/ui/number/words';
 import { ScoredResult } from './ScoredResult';
 
 /** One run of classic, accepted, with the outputs it reported. */
-function run(
-  reports: { title: string; unit: string | null; number: string }[],
-) {
+function run(reports: { title: string; unit: string | null; number: string }[]) {
   return {
     group: 'main',
     place: 1,
