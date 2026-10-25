@@ -2,7 +2,7 @@ import type { WorkflowItem } from '@/api/types';
 import { formatExact, ratioDigits } from '@/lib/exact';
 import { listed } from '@/lib/listed';
 import type { Box } from './layout';
-import type { FieldDecl, InputDecl, Ref, ReportEntry, Workflow } from './model';
+import type { Ref, ReportEntry, Workflow } from './model';
 import type { PrimitiveInfo } from './primitives';
 import { verdictLabel } from '@/ui/verdicts';
 
@@ -60,13 +60,6 @@ export function runsWords(perTest: boolean): string {
   return perTest ? 'For each test' : 'Once';
 }
 
-/** How often a step runs, as its drawer says it, in the band's words (M55). */
-export function runsSentence(perTest: boolean): string {
-  return perTest
-    ? `${BAND_LABEL}, so it stands in the shaded band on the graph.`
-    : 'Runs once, for the whole submission.';
-}
-
 const LIMIT_WORDS: Record<string, string> = {
   time_ms: 'time',
   cpu_ms: 'time',
@@ -99,27 +92,9 @@ export function portMarks(primitive: PrimitiveInfo, port: string): string[] {
   ].filter((mark): mark is string => mark !== null);
 }
 
-/** What stands out about a workflow's input, in words. */
-export function inputMarks(input: InputDecl): string[] {
-  return [
-    input.contestant ? 'the entrant gives it' : null,
-    input.perTest ? 'one for each test' : null,
-  ].filter((mark): mark is string => mark !== null);
-}
-
-/** What stands out about a test's field, in words. */
-export function fieldMarks(field: FieldDecl): string[] {
-  return field.public ? ['shown to entrants'] : [];
-}
-
-/** What a report entry says its number means, in words. */
+/** A number output's unit, when the file gives one. */
 export function entryMarks(entry: ReportEntry): string[] {
-  if (entry.better === null) return [];
-  return [
-    entry.better === 'higher' || entry.better === 'lower'
-      ? `${entry.better} is better`
-      : 'the task says which is better',
-  ];
+  return entry.unit === null ? [] : [entry.unit];
 }
 
 /** Where a value comes from, as a wire's label and a menu say it: "time_ms from run". */
@@ -148,7 +123,7 @@ export function boxName(box: Box, workflow: Workflow): string {
     return `Step ${workflow.steps[box.step]?.id || '(no name)'}`;
   if (box.kind === 'inputs') return 'Inputs';
   if (box.kind === 'test') return 'Each test’s files';
-  return 'Report';
+  return 'Outputs';
 }
 
 /** The steps that read a group of inputs or test files, as its box says it. */
@@ -249,7 +224,8 @@ export function limitsWords(
   const raised = new Map<string, string>();
   for (const [limit, source] of Object.entries(primitive.limits_from)) {
     const word = LIMIT_WORDS[limit] ?? limit;
-    if (!raised.has(word)) raised.set(word, sourceWords(step, workflow, source.input));
+    if (source.input === null || raised.has(word)) continue;
+    raised.set(word, sourceWords(step, workflow, source.input));
   }
   const grows = [...raised].map(([word, from], at) =>
     at === 0 ? `its ${word} grows with ${from}` : `its ${word} with ${from}`,

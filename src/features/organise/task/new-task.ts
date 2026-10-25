@@ -1,57 +1,14 @@
 import { apiClient } from '@/api/client';
-import type { WorkflowItem } from '@/api/types';
 import { exactJS, isRecord, parseYaml, writeAt, writeOver } from '../forms/yaml-doc';
 import { declaredOf, refParts } from './build-data';
 
-/**
- * The kinds of task New task starts from, each a workflow the platform seeds:
- * the starter's, comparing a program's output with each test's answer, and a
- * program of several files graded the same way. Any other workflow the
- * organiser may read is chosen by name. The kinds of TASK-FORMAT section 4
- * whose workflows are not built yet are not offered.
- */
-export const KINDS = [
-  {
-    value: 'classic',
-    workflow: 'unicon/classic@v2',
-    label: 'Compare output with an answer',
-    line: 'Entrants submit one source file. Each test runs it on an input and compares what it prints with the answer.',
-  },
-  {
-    value: 'folder',
-    workflow: 'unicon/classic-folder@v1',
-    label: 'A program of several files',
-    line: 'Entrants submit a folder of source files and name the one that runs first; each test is graded as above.',
-  },
-  {
-    value: 'other',
-    workflow: null,
-    label: 'Start from another workflow',
-    line: 'Any workflow you may read, chosen by name and version.',
-  },
-] as const;
-
-/** The workflow a new task starts on unless told otherwise: the starter's. */
+/** The workflow a new task is created on, until its first save names another. */
 export const STARTER = 'unicon/classic@v2';
 
-/** The kind a new task starts as, and the workflow that kind grades with. */
-export type Kind = { kind: (typeof KINDS)[number]['value']; workflow: string };
+/** The workflow a new task should move onto, empty until one is chosen. */
+export type Kind = { workflow: string };
 
-export const FIRST_KIND: Kind = { kind: 'classic', workflow: STARTER };
-
-/** Whether the organiser may read a workflow at a version, from the list of those they may. */
-export function readable(items: WorkflowItem[], ref: string): boolean {
-  const parts = refParts(ref);
-  return (
-    parts !== null &&
-    items.some(
-      (item) =>
-        item.owner === parts.owner &&
-        item.name === parts.name &&
-        item.versions.includes(parts.version),
-    )
-  );
-}
+export const FIRST_KIND: Kind = { workflow: '' };
 
 const TASK = '/api/v1/orgs/{org}/contests/{contest}/tasks/{task}';
 

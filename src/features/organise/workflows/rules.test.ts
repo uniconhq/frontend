@@ -22,6 +22,7 @@ const CHECKER: PrimitiveInfo = {
   version: 'v1',
   batch: true,
   network: false,
+  forms: {},
   limits: {},
   limits_from: {},
   inputs: {
@@ -33,6 +34,12 @@ const CHECKER: PrimitiveInfo = {
       secret: false,
       description: null,
       outcomes: null,
+      at_least: null,
+      at_most: null,
+      better: null,
+      inputs: null,
+      names: null,
+      outputs: null,
     },
     note: {
       type: 'text',
@@ -42,6 +49,12 @@ const CHECKER: PrimitiveInfo = {
       secret: false,
       description: null,
       outcomes: null,
+      at_least: null,
+      at_most: null,
+      better: null,
+      inputs: null,
+      names: null,
+      outputs: null,
     },
   },
   outputs: {
@@ -53,6 +66,12 @@ const CHECKER: PrimitiveInfo = {
       secret: false,
       description: null,
       outcomes: null,
+      at_least: null,
+      at_most: null,
+      better: null,
+      inputs: null,
+      names: null,
+      outputs: null,
     },
     outcome: {
       type: 'outcome',
@@ -62,6 +81,12 @@ const CHECKER: PrimitiveInfo = {
       secret: false,
       description: null,
       outcomes: null,
+      at_least: null,
+      at_most: null,
+      better: null,
+      inputs: null,
+      names: null,
+      outputs: null,
     },
   },
   problem: null,
@@ -165,11 +190,11 @@ describe('the drag rules', () => {
       'answers is given once for each test, so only a step that runs for each test can read it.',
     ],
     [
-      'a contestant input into a port that raises a limit',
+      'a number the entrant gives into a port that raises a limit',
       1,
       'time_limit',
       input('guess'),
-      'This value raises a limit, so the task must give it, not the entrant.',
+      null,
     ],
     [
       'a step reading its own output',
@@ -352,79 +377,38 @@ steps:
     expect(mayBeOptional(workflow, primitives, 'other')).toBe(false);
   });
 
-  it('refuses an output dropped on an entry whose meaning it cannot have', () => {
+  it('names a text output and a number output', () => {
     const workflow = readWorkflow(parse(CLASSIC_V2));
-    const time = workflow.report.find((entry) => entry.name === 'time_ms') ?? null;
 
-    expect(
-      reportRefusal(workflow, primitives, output('compile', 'compile_log'), time),
-    ).toBe('better, at_least and at_most apply only to a number, and this is text.');
-    expect(
-      reportRefusal(workflow, primitives, output('run', 'memory_kb'), time),
-    ).toBeNull();
+    expect(reportRefusal(workflow, primitives, output('compile', 'compile_log'))).toBeNull();
+    expect(reportRefusal(workflow, primitives, output('run', 'memory_kb'))).toBeNull();
   });
 
-  it('refuses running a step once while the report ranks its output', () => {
+  it('lets a step run once while an output still carries an old fold', () => {
     const workflow = readWorkflow(
       parse(`
 test: {input: file}
 steps:
   - {id: run, use: unicon/sandbox-run@v2, per_test: true, with: {}}
 report:
-  time: {from: "\${{ steps.run.time_ms }}", better: lower}
+  time: {from: "\${{ steps.run.time_ms }}", fold: max}
 `),
     );
 
-    expect(switchRefusal(workflow, 0)).toBe(
-      'The report says which way time is better, so this step runs for each test.',
-    );
-  });
-
-  it('refuses a better that is not a task enum of higher and lower, and bounds the wrong way', () => {
-    const workflow = readWorkflow(
-      parse(`
-inputs:
-  dir: {type: enum, options: [higher, lower], contestant: true}
-test: {input: file}
-steps:
-  - {id: run, use: unicon/sandbox-run@v2, per_test: true, with: {}}
-report:
-  score: {from: "\${{ steps.run.time_ms }}", better: "\${{ inputs.dir }}"}
-  bounded: {from: "\${{ steps.run.time_ms }}", at_least: 5, at_most: 1}
-`),
-    );
-    const [score, bounded] = workflow.report;
-
-    expect(
-      reportRefusal(workflow, primitives, output('run', 'time_ms'), score ?? null),
-    ).toBe('dir must be an enum input that the task gives, not the entrant.');
-    expect(
-      reportRefusal(workflow, primitives, output('run', 'time_ms'), bounded ?? null),
-    ).toBe('The upper bound must be at least the lower bound.');
-    const close = bounded && {
-      ...bounded,
-      atLeast: new NumberText('1.00000000000000000002'),
-      atMost: new NumberText('1.00000000000000000001'),
-    };
-    expect(
-      reportRefusal(workflow, primitives, output('run', 'time_ms'), close ?? null),
-    ).toBe('The upper bound must be at least the lower bound.');
+    expect(switchRefusal(workflow, 0)).toBeNull();
   });
 
   it('names what a change of a declaration newly breaks', () => {
     const before = readWorkflow(parse(CLASSIC_V2));
     const after = readWorkflow(
       parse(
-        CLASSIC_V2.replace(
-          'time_limit: number',
-          'time_limit: {type: number, contestant: true}',
-        ),
+        CLASSIC_V2.replace('time_limit: number', 'time_limit: text'),
       ),
     );
 
     expect(newProblem(before, before, primitives)).toBeNull();
     expect(newProblem(before, after, primitives)).toBe(
-      'run.time_limit: This value raises a limit, so the task must give it, not the entrant.',
+      'run.time_limit: This takes a number, not text.',
     );
   });
 });

@@ -76,15 +76,11 @@ export type WorkflowForm = Schemas['WorkflowForm'];
 export type DeclaredInput = Schemas['DeclaredInput'];
 export type DeclaredField = Schemas['DeclaredField'];
 export type TaskEntry = Schemas['TaskEntry'];
-/** An entrant's points on a task as one leaderboard counts them. */
-export type BoardPoints = Schemas['BoardPoints'];
 
 export type Upload = Schemas['Upload'];
 export type SubmittedInput = Schemas['SubmittedInput'];
 export type Submission = Schemas['Submission'];
 export type GradingResult = Schemas['Result'];
-/** What a result holds beside where it stands, the contestant's and the organisers' alike. */
-export type ScoredGrading = Omit<GradingResult, 'status'>;
 /** A row's submission as organisers read it, with everything filled in. */
 export type OrganisedSubmission = Schemas['OrganisedSubmission'];
 export type GroupShown = Schemas['GroupShown'];
@@ -92,12 +88,10 @@ export type GroupShown = Schemas['GroupShown'];
 export type Reported = Schemas['Reported'];
 /**
  * One value a task's workflow reports, as pages name it: its key, its title
- * and unit, and which way is better.
+ * and unit, and how it folds over the tests and which way is better.
  */
 export type ValueMeaning = Schemas['ValueMeaning'];
-/** A submission's line on one leaderboard covering its task. */
-export type OnBoard = Schemas['OnBoard'];
-/** One test's row of a result, with its credit once scored. */
+/** One test's row of a result: its id, its outcome, and the values its steps reported. */
 export type GradedTest = Schemas['GradedTest'];
 export type Grading = Schemas['Grading'];
 export type Rejudged = Schemas['Rejudged'];
@@ -123,13 +117,6 @@ export type Clarification = Schemas['Clarification'];
 export type GradingStatus = Schemas['GradingStatus'];
 /** Where a submission stands, as its contestant is told. */
 export type SubmissionState = GradingResult['status'];
-/** A board as its reader sees it now, or the time it is shown from. */
-export type Board = Schemas['Board'];
-export type BoardKey = Schemas['BoardKey'];
-export type BoardCell = Schemas['BoardCell'];
-export type BoardRow = Schemas['BoardRow'];
-/** A board as organisers read it: `now`, `final` and what it asks that does not hold. */
-export type OrganisedBoard = Schemas['OrganisedBoard'];
 /** The marks a row holds on a task, the most it may hold, and its close. */
 export type Marks = Schemas['Marks'];
 
@@ -141,6 +128,8 @@ export type Primitive = Schemas['Primitive'];
 export type PrimitivePort = Schemas['PrimitivePort'];
 /** A workflow a person may read, and whether they may edit it. */
 export type WorkflowItem = Schemas['WorkflowItem'];
+/** A version's inputs and outputs, for drawing it as a box. */
+export type WorkflowBox = Schemas['WorkflowBox'];
 /** A workflow as its page shows it, with the draft for one who may edit it. */
 export type WorkflowPage = Schemas['WorkflowPage'];
 /** One problem a version would be refused for, at its YAML path. */

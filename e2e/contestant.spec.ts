@@ -303,12 +303,8 @@ test('a contestant registers, waits, is let in and reads the task', async ({
 
   // In race order: the time left, then the tasks, the leaderboard and the way to ask.
   const tasks = page.getByRole('list', { name: 'Tasks' });
-  await expect(tasks).toContainText('62 / 100');
-  await expect(tasks).toContainText('More shown at');
   await expect(tasks).toContainText('Closes in');
-  await expect(
-    page.getByRole('region', { name: 'Leaderboard' }).getByText('You are 1st.'),
-  ).toBeVisible();
+  await expect(page.getByText('This page is being rebuilt.')).toBeVisible();
   await expect(
     page
       .getByRole('region', { name: 'Questions to the organisers' })

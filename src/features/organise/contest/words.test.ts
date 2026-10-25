@@ -95,12 +95,11 @@ describe("a task's timeline as one line", () => {
       errors: [],
       statement_written: false,
       head_statement_written: false,
+      results: { history: [], released: false },
     },
     timeline: {
-      worth: '1',
       release_at: '2026-10-01T09:00:00Z',
       due: '2026-10-02T09:00:00Z',
-      late_per_day: '0.25',
       closes: '2026-10-03T09:00:00Z',
     },
   };
@@ -113,29 +112,29 @@ describe("a task's timeline as one line", () => {
         null,
       ),
     ).toBe(
-      `1 point, opens with the contest; due ${formatDateTime(new Date('2026-10-02T09:00:00Z'))}, then 25% less per started day late; closes ${formatDateTime(new Date('2026-10-03T09:00:00Z'))}`,
+      `opens with the contest; due ${formatDateTime(new Date('2026-10-02T09:00:00Z'))}; closes ${formatDateTime(new Date('2026-10-03T09:00:00Z'))}`,
     );
   });
 
   it('says a task open for the whole contest in so many words (M52)', () => {
     expect(
       timelineSentence(
-        { ...standing, timeline: { ...standing.timeline, worth: '100', due: null } },
+        { ...standing, timeline: { ...standing.timeline, due: null } },
         { start: '2026-10-01T09:00:00Z', end: '2026-10-03T09:00:00Z' },
         null,
       ),
-    ).toBe('100 points, open for the whole contest');
+    ).toBe('open for the whole contest');
   });
 
-  it('says a task not yet published has its points then, and the marks a board counts', () => {
+  it('says when a task is open, and the marks a leaderboard counts', () => {
     expect(
       timelineSentence(
-        { ...standing, timeline: { ...standing.timeline, worth: null, due: null } },
+        { ...standing, timeline: { ...standing.timeline, due: null } },
         null,
         '1',
       ),
     ).toBe(
-      `points known once the task is published, opens ${formatDateTime(new Date('2026-10-01T09:00:00Z'))}; closes ${formatDateTime(new Date('2026-10-03T09:00:00Z'))}; an entrant may mark up to 1 submission`,
+      `opens ${formatDateTime(new Date('2026-10-01T09:00:00Z'))}; closes ${formatDateTime(new Date('2026-10-03T09:00:00Z'))}; an entrant may mark up to 1 submission`,
     );
   });
 });

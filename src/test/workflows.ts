@@ -44,8 +44,8 @@ steps:
       actual: \${{ steps.run.output }}
       expected: \${{ test.answer }}
 report:
-  time_ms: {from: "\${{ steps.run.time_ms }}", better: lower, at_least: 0}
-  memory_kb: {from: "\${{ steps.run.memory_kb }}", better: lower, at_least: 0}
+  time_ms: {from: "\${{ steps.run.time_ms }}", fold: max, better: lower, at_least: 0}
+  memory_kb: {from: "\${{ steps.run.memory_kb }}", fold: max, better: lower, at_least: 0}
   log: \${{ steps.compile.compile_log }}
 `;
 
@@ -85,8 +85,8 @@ steps:
     per_test: true
     with: {actual: "\${{ steps.run.output }}", expected: "\${{ test.answer }}"}
 report:
-  time_ms: {from: "\${{ steps.run.time_ms }}", better: lower, at_least: 0}
-  memory_kb: {from: "\${{ steps.run.memory_kb }}", better: lower, at_least: 0}
+  time_ms: {from: "\${{ steps.run.time_ms }}", fold: max, better: lower, at_least: 0}
+  memory_kb: {from: "\${{ steps.run.memory_kb }}", fold: max, better: lower, at_least: 0}
   log: \${{ steps.compile.compile_log }}
 `;
 
@@ -99,6 +99,12 @@ function port(type: string, more: Partial<PortDecl> = {}): PortDecl {
     secret: false,
     description: null,
     outcomes: null,
+    at_least: null,
+    at_most: null,
+    better: null,
+    inputs: null,
+    names: null,
+    outputs: null,
     ...more,
   };
 }
@@ -121,6 +127,7 @@ function retired(name: string): PrimitiveInfo {
     version: 'v1',
     batch: false,
     network: false,
+    forms: {},
     limits: {},
     limits_from: {},
     inputs: {},
@@ -139,6 +146,7 @@ export const PRIMITIVES: PrimitiveInfo[] = [
     version: 'v2',
     batch: false,
     network: false,
+    forms: {},
     limits: { ...LIMITS, time_ms: 60000, cpu_ms: 60000, memory_mb: 1024 },
     limits_from: {},
     inputs: {
@@ -178,6 +186,7 @@ export const PRIMITIVES: PrimitiveInfo[] = [
     version: 'v2',
     batch: true,
     network: false,
+    forms: {},
     limits: { ...LIMITS, pids: 32, output_mb: 1 },
     limits_from: {},
     inputs: {
@@ -208,11 +217,24 @@ export const PRIMITIVES: PrimitiveInfo[] = [
     version: 'v2',
     batch: true,
     network: false,
+    forms: {},
     limits: LIMITS,
     limits_from: {
-      time_ms: { input: 'time_limit', scale: '2000', add: '3000' },
-      cpu_ms: { input: 'time_limit', scale: '2000', add: '3000' },
-      memory_mb: { input: 'memory_limit', scale: '1', add: '256' },
+      time_ms: {
+        input: 'time_limit',
+        scale: '2000',
+        add: '3000',
+        max: null,
+        sum: null,
+      },
+      cpu_ms: { input: 'time_limit', scale: '2000', add: '3000', max: null, sum: null },
+      memory_mb: {
+        input: 'memory_limit',
+        scale: '1',
+        add: '256',
+        max: null,
+        sum: null,
+      },
     },
     inputs: {
       binary: port('file', { runs: true, description: 'The program to run.' }),
@@ -267,7 +289,9 @@ export const WORKFLOW_API = '/api/v1/workflows/kenny/tuned';
 export function workflowBackend(
   draft: string,
   options: {
-    problems?: (content: string) => { path: string; message: string }[];
+    problems?: (
+      content: string,
+    ) => { path: string; message: string; step?: string | null }[];
     versions?: string[];
   } = {},
 ) {
@@ -319,6 +343,14 @@ export function workflowBackend(
       ]),
     ),
     http.get('/api/v1/primitives', () => HttpResponse.json(PRIMITIVES)),
+    http.get('/api/v1/workflows/:owner/:name/versions/:version/box', () =>
+      HttpResponse.json({
+        inputs: [],
+        outputs: [],
+        newer_version: null,
+        run: false,
+      }),
+    ),
     http.post('/api/v1/workflows/check', async ({ request }) => {
       const { content } = (await request.json()) as { content: string };
       state.checks += 1;

@@ -19,7 +19,8 @@ const REOPEN_MS = [5_000, 10_000, 20_000, 40_000, 60_000];
  * submission's files, which a
  * grading never changes, nor a grading's log, kept once it is written
  * (`.../gradings/{grading}/log`); an announcement the announcement lists; and a
- * clarification the asker's questions and the organisers' inbox.
+ * clarification the asker's questions and the organisers' inbox; a save's
+ * checks the task and its publications.
  */
 const STALE: Record<string, (path: string) => boolean> = {
   grading: (path) =>
@@ -31,6 +32,10 @@ const STALE: Record<string, (path: string) => boolean> = {
   announcement: (path) => path.includes('/announcements'),
   clarification: (path) =>
     path.endsWith('/questions') || path.includes('/clarifications'),
+  // A save's checks ended. The id on the event is the publication; the page
+  // reads the task again, which carries the publication and its checks.
+  checks: (path) =>
+    /\/tasks\/\{task\}$/.test(path) || path.endsWith('/publications'),
 };
 
 function readAt(query: Query): string | null {

@@ -17,7 +17,6 @@ describe('the workflow editor', () => {
         '  submission: {type: folder, contestant: true}',
         '  time_limit: number',
         '  memory_limit: number',
-        'test:',
         '  input: file',
         '  answer: file',
         'steps: []',
@@ -66,24 +65,24 @@ describe('the workflow editor', () => {
       await add(/^Compare with the answer/, 'diff-check');
       await wireFrom('source', 'compile', /^submission from the inputs/);
       await wireFrom('binary', 'sandbox-run', /^binary from compile/);
-      await wireFrom('input', 'sandbox-run', /^input from each test/);
+      await wireFrom('input', 'sandbox-run', /^input from the inputs/);
       await wireFrom('time_limit', 'sandbox-run', /^time_limit from the inputs/);
       await wireFrom('memory_limit', 'sandbox-run', /^memory_limit from the inputs/);
       await wireFrom('actual', 'diff-check', /^output from sandbox-run/);
-      await wireFrom('expected', 'diff-check', /^answer from each test/);
+      await wireFrom('expected', 'diff-check', /^answer from the inputs/);
 
       const text = await fileText(user);
       for (const wire of [
         'source: ${{ inputs.submission }}',
         'binary: ${{ steps.compile.binary }}',
-        'input: ${{ test.input }}',
+        'input: ${{ inputs.input }}',
         'time_limit: ${{ inputs.time_limit }}',
         'memory_limit: ${{ inputs.memory_limit }}',
         'actual: ${{ steps.sandbox-run.output }}',
-        'expected: ${{ test.answer }}',
+        'expected: ${{ inputs.answer }}',
       ])
         expect(text).toContain(wire);
-      expect(text.match(/per_test: true/g)).toHaveLength(2);
+      expect(text).not.toContain('per_test');
     },
   );
 });

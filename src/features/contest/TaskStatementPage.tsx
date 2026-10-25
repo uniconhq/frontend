@@ -12,7 +12,6 @@ import { SectionTitle } from '@/ui/SectionTitle';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
 import { contestHomePath } from '@/lib/contest-paths';
-import { formatWorth, withPointsWord } from '@/lib/exact';
 import { useTaskParams } from '@/lib/route-params';
 import { contestViewSectionPath } from '@/lib/sections';
 import { formatDateTime } from '@/lib/time';
@@ -37,20 +36,13 @@ function rate(count: number, seconds: number): string {
 }
 
 /**
- * What the task is worth, the most points it gives, on a task that gives
- * points; when it falls due, if it does, and closes for this person, their
+ * When the task falls due, if it does, and closes for this person, their
  * extension included; and the caps a submit is counted against.
  */
 function LimitList({ page }: { page: TaskPage }) {
   const { submissions } = page;
   return (
     <dl className={classes.limits} aria-label="Limits">
-      {page.worth !== null && (
-        <>
-          <dt>Worth</dt>
-          <dd>{withPointsWord(formatWorth(page.worth))}</dd>
-        </>
-      )}
       {page.due !== null && (
         <>
           <dt>Due</dt>

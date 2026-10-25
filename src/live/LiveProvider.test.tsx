@@ -201,13 +201,14 @@ describe('where the live stream stands', () => {
         `${contest}/clarifications`,
         `${org}/clarifications`,
       ];
+      const checked = [`${task}`, `${task}/publications`];
       const untouched = [
         `${task}/submissions/{number}/files`,
         `${task}/gradings/{grading}/log`,
         `${task}/page`,
         '/api/v1/me',
       ];
-      const reads = [...graded, ...announced, ...asked, ...untouched];
+      const reads = [...graded, ...announced, ...asked, ...checked, ...untouched];
       for (const path of reads) client.setQueryData(['get', path], {});
       const stale = () =>
         reads.filter((path) => client.getQueryState(['get', path])?.isInvalidated);
@@ -233,6 +234,12 @@ describe('where the live stream stands', () => {
         vi.advanceTimersByTime(300);
       });
       expect(stale()).toEqual([...graded, ...announced, ...asked]);
+
+      act(() => {
+        source?.listeners.get('checks')?.();
+        vi.advanceTimersByTime(300);
+      });
+      expect(stale()).toEqual([...graded, ...announced, ...asked, ...checked]);
 
       act(() => source?.listeners.get('resync')?.());
       expect(stale()).toEqual(reads);
@@ -265,7 +272,7 @@ describe('where the live stream stands', () => {
       act(() => source?.onopen?.());
 
       act(() => {
-        for (const kind of ['grading', 'announcement', 'clarification']) {
+        for (const kind of ['grading', 'announcement', 'clarification', 'checks']) {
           source?.listeners.get(kind)?.();
         }
         vi.advanceTimersByTime(300);

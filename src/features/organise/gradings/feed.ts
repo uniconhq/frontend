@@ -186,6 +186,10 @@ export function bySubmission(
  * first test that did not pass, or accepted when every one did.
  */
 export function resultOf(result: NonNullable<Grading['result']>): string {
+  if (!('tests' in result)) {
+    const failed = result.runs.find((run) => run.verdict !== 'accepted');
+    return failed === undefined ? 'accepted' : failed.verdict;
+  }
   return (
     result.stopped ??
     result.tests.find((test) => test.outcome !== 'accepted')?.outcome ??

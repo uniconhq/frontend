@@ -79,14 +79,16 @@ export const TASK_SECTIONS = [
 
 /**
  * The cards that build a task, on its own page, in the order one decides the
- * next: the workflow, its inputs, the tests and their scoring, which share
- * one save, and the statement, which saves on its own. Each key is the card's
- * anchor, which the sidebar and a link to one of its fields open it by.
+ * next: the workflow, its inputs, its runs, how many submissions it takes,
+ * which share one save, and the statement, which saves on its own. Each key
+ * is the card's anchor, which the sidebar and a link to one of its fields
+ * open it by. `tests` stays the submissions card's anchor.
  */
 export const TASK_BUILD_CARDS = [
   { key: 'workflow', label: 'Workflow' },
   { key: 'inputs', label: 'Inputs' },
-  { key: 'tests', label: 'Tests and scoring' },
+  { key: 'runs', label: 'Runs' },
+  { key: 'tests', label: 'Submissions' },
   { key: 'statement', label: 'Statement' },
 ] as const;
 

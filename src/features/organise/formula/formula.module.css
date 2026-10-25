@@ -1,0 +1,201 @@
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.groupTitle {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--unicon-text-primary);
+}
+
+.paletteItem {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--unicon-border);
+  border-radius: var(--mantine-radius-sm);
+  background: var(--unicon-chrome);
+  color: var(--unicon-text-body);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.paletteItem:hover {
+  background: var(--unicon-hover);
+}
+
+.paletteItem:focus-visible {
+  outline: 2px solid var(--mantine-primary-color-filled);
+}
+
+.paletteLine {
+  font-size: 11px;
+  color: var(--unicon-text-secondary);
+}
+
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 6px;
+}
+
+.tiles .paletteLine {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.trays {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.trayRow {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  align-items: start;
+}
+
+.tray {
+  max-height: 240px;
+  overflow: auto;
+  padding: 12px;
+  border: 1px solid var(--unicon-border);
+  border-radius: var(--mantine-radius-lg);
+  background: var(--unicon-body);
+}
+
+.trayHeading {
+  margin: 6px 0 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--unicon-text-secondary);
+}
+
+.tileName {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--unicon-text-primary);
+}
+
+.chipValue,
+.chipText,
+.chipEach,
+.chipSet,
+.chipHole {
+  padding: 1px 5px;
+  margin: 0 1px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--chip) 22%, transparent);
+  color: var(--chip-ink);
+  font-weight: 500;
+}
+
+.chipValue {
+  --chip: var(--mantine-color-gold-4);
+  --chip-ink: var(--mantine-color-gold-9);
+}
+
+.chipText {
+  --chip: #fbab72;
+  --chip-ink: #9a4a12;
+}
+
+.chipEach {
+  --chip: var(--mantine-color-sunset-4);
+  --chip-ink: var(--mantine-color-sunset-8);
+}
+
+.chipSet {
+  --chip: var(--mantine-color-lilac-4);
+  --chip-ink: var(--mantine-color-lilac-8);
+}
+
+.chipHole {
+  --chip: var(--unicon-text-meta);
+  --chip-ink: var(--unicon-text-secondary);
+}
+
+.chipBlock {
+  color: var(--mantine-color-sunset-7);
+  font-weight: 600;
+}
+
+.chipNumber {
+  color: var(--mantine-color-lilac-7);
+}
+
+.chipString {
+  color: #c4612a;
+}
+
+:global([data-mantine-color-scheme='dark'])
+  :is(.chipValue, .chipText, .chipEach, .chipSet) {
+  background: color-mix(in srgb, var(--chip) 30%, transparent);
+}
+
+:global([data-mantine-color-scheme='dark']) .chipValue {
+  --chip-ink: var(--mantine-color-gold-3);
+}
+
+:global([data-mantine-color-scheme='dark']) .chipText {
+  --chip-ink: #fcc49b;
+}
+
+:global([data-mantine-color-scheme='dark']) .chipEach {
+  --chip-ink: var(--mantine-color-sunset-2);
+}
+
+:global([data-mantine-color-scheme='dark']) .chipSet {
+  --chip-ink: var(--mantine-color-lilac-2);
+}
+
+:global([data-mantine-color-scheme='dark']) .chipBlock {
+  color: var(--mantine-color-sunset-4);
+}
+
+:global([data-mantine-color-scheme='dark']) .chipNumber {
+  color: var(--mantine-color-lilac-3);
+}
+
+:global([data-mantine-color-scheme='dark']) .chipString {
+  color: #fbab72;
+}
+
+.formulaBox {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.formulaHint {
+  font-size: 12px;
+  color: var(--unicon-text-secondary);
+}
+
+.formulaSign {
+  font-family: var(--mantine-font-family-monospace);
+  color: var(--unicon-text-primary);
+}
+
+.formulaProblems {
+  font-size: 12px;
+  color: var(--unicon-text-danger);
+}
+
+@media (max-width: 760px) {
+  .trayRow {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

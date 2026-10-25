@@ -36,9 +36,10 @@ export type Declared = {
 
 /**
  * A value a run reports, with whether it is reported for each test: read
- * from a step that runs for each test, as the forge has it.
+ * from a step that runs for each test, as the forge has it, or folded over
+ * the tests.
  */
-export type ReportedValue = ReportEntry & { perTest: boolean };
+type ReportedValue = ReportEntry & { perTest: boolean };
 
 /**
  * An input as the organiser's form names it: its title, or its id (#434),
@@ -101,8 +102,9 @@ export function declaredOf(text: string): Declared | null {
     report: workflow.report.map((entry) => ({
       ...entry,
       perTest:
-        entry.from?.kind === 'steps' &&
-        workflow.steps.some((step) => step.id === entry.from?.name && step.perTest),
+        entry.fold !== null ||
+        (entry.from?.kind === 'steps' &&
+          workflow.steps.some((step) => step.id === entry.from?.name && step.perTest)),
     })),
   };
 }

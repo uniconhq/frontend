@@ -358,25 +358,14 @@ are listed under the test groups. When the workflow cannot be read, the form
 shows the `problem` and edits the `inputs` entries the file has, adding or
 removing one by id and taking an entry holding a mapping (other than
 `{secret: ...}`) as the contestant's form details and anything else as a
-value. Its test groups are the folders under `tests/` and
-the groups the file names: a folder with no entry is added at the next save,
-and an entry with no folder is marked and may be removed. Once the task has
-a graded submission (`graded` from `GET <task>/workflow-form`), a group the
-save adds must say its `show`, which the save refuses otherwise (T10): the
-field is required and says so, and the groups already in the file are left
-as they are. Each group says how it earns its points in plain words that
-speak of an entrant, with a worked example from its own number of tests
-(`task/scoring.ts`, the same words "How this contest is scored" uses), and
-lists its tests, a row each, "Test 1 · input 4 B, answer 2 B", its parts in
-the workflow's order, with a Weight where the group's rule reads weights. A
-test's name opens it in place (`task/TestView.tsx`): its parts side by side,
-each as a file shown to read (above), a folder as a tree, then its values.
-Add tests asks how, one test, many files at once named by test, or a zip,
-each said with the task's own parts and the endings each part takes
-(`task/add-words.ts`, `task/match.ts`), shows what the files make as a
-table, a row per test and a column per part with Missing where a file is
-not, and keeps Add tests greyed with its reason beside it until a test is
-complete. A choice of a few options said in sentences, such as how a test
+value. A workflow that describes one run (`runs` on that read) asks who
+gives each input: the organiser, the entrant, or one value for each run.
+The runs are one table per axis (`task/RunsCard.tsx`); a file cell is
+stored at a path the editor names, a cell may be one the entrant gives,
+and a row may have a title and a largest size. How many submissions an
+entrant may send is the Submissions card.
+
+A choice of a few options said in sentences, such as how a test
 earns or when entrants see a group's results, is radio options, each with
 what it means under it and a greyed one with why (`ui/RadioGroup.tsx`,
 M46). A form save refused

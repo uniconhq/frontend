@@ -21,5 +21,11 @@ export function publishedLine(
 ): string {
   if (latest === null) return 'Not published yet, so entrants cannot be graded on it.';
   const by = author === null ? '' : ` by ${author}`;
-  return `Entrants are graded on publication ${String(latest.number)}, saved ${formatDateTime(new Date(latest.at))}${by}.`;
+  const saved = `Entrants are graded on publication ${String(latest.number)}, saved ${formatDateTime(new Date(latest.at))}${by}.`;
+  if (latest.check === 'checking') return `${saved} Its checks are still running.`;
+  if (latest.check === 'unchecked')
+    return `Publication ${String(latest.number)} was never checked. The next save checks it.`;
+  if (latest.check === 'refused')
+    return `Publication ${String(latest.number)} was refused. Entrants stay on the last one that passed.`;
+  return saved;
 }

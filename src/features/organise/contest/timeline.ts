@@ -1,8 +1,6 @@
 import type { TaskStanding } from '@/api/types';
-import { formatWorth, withPointsWord } from '@/lib/exact';
 import { formatDateTime } from '@/lib/time';
 import type { ContestValues } from '../forms/contest-values';
-import { percentOf } from './percent';
 
 function when(at: string): string {
   return formatDateTime(new Date(at));
@@ -13,35 +11,20 @@ function same(at: string, local: string | undefined): boolean {
 }
 
 /**
- * A task's timeline in its contest, in words: `worth`, what it is worth
- * ("100 points"), and `when`, when it is open, when it falls due and what
- * a late day costs, and, when a board counts marked submissions, how many an
- * entrant may mark ("open for the whole contest, due 1 Mar 23:59, then 10%
- * less per started day late"). `contest` holds the contest's start and end,
- * in the organiser's time, so a time that is the contest's own reads as
- * such.
+ * A task's timeline in its contest, in words: when it is open and when it
+ * falls due, and, when a leaderboard counts marked submissions, how many an
+ * entrant may mark ("open for the whole contest, due 1 Mar 23:59"). `contest`
+ * holds the contest's start and end, in the organiser's time, so a time that
+ * is the contest's own reads as such.
  */
 export function timelineWords(
-  { timeline, state }: TaskStanding,
+  { timeline }: TaskStanding,
   contest: { start: string; end: string } | null,
   marks: string | null,
-): { worth: string; when: string } {
-  const worth =
-    timeline.worth !== null
-      ? withPointsWord(formatWorth(timeline.worth))
-      : state.latest === null
-        ? 'points known once the task is published'
-        : 'no points';
+): { when: string } {
   const withStart = same(timeline.release_at, contest?.start);
   const withEnd = same(timeline.closes, contest?.end);
-  const due =
-    timeline.due === null
-      ? null
-      : `due ${when(timeline.due)}, ${
-          timeline.late_per_day === null || timeline.late_per_day === '1'
-            ? 'nothing once late'
-            : `then ${percentOf(timeline.late_per_day)}% less per started day late`
-        }`;
+  const due = timeline.due === null ? null : `due ${when(timeline.due)}`;
   // In the order they come: open, due, closed.
   const parts =
     withStart && withEnd
@@ -56,7 +39,6 @@ export function timelineWords(
       ? null
       : `an entrant may mark up to ${marks} ${marks === '1' ? 'submission' : 'submissions'}`;
   return {
-    worth,
     when: [...parts, marked].filter((part) => part !== null).join('; '),
   };
 }
@@ -69,17 +51,16 @@ export function closesWithContest(
   return same(timeline.closes, contest?.end);
 }
 
-/** A task's timeline as one line: "100 points, open for the whole contest". */
+/** A task's timeline as one line: "open for the whole contest". */
 export function timelineSentence(
   standing: TaskStanding,
   contest: { start: string; end: string } | null,
   marks: string | null,
 ): string {
-  const { worth, when } = timelineWords(standing, contest, marks);
-  return `${worth}, ${when}`;
+  return timelineWords(standing, contest, marks).when;
 }
 
-/** Whether a board that counts marked submissions covers the task. */
+/** Whether a leaderboard that counts marked submissions covers the task. */
 export function markedBoardCovers(values: ContestValues, task: string): boolean {
   return values.boards.some(
     (board) =>

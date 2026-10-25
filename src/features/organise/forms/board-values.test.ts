@@ -73,7 +73,7 @@ describe('a contest’s boards as fields', () => {
         tasks: ['b'],
         over: 'after_close',
         select: 'marked',
-        order: [{ kind: 'points' }, { kind: 'value', name: 'time_ms', fold: 'max' }],
+        order: [{ kind: 'points' }, { kind: 'value', name: 'time_ms' }],
       },
     ];
 
@@ -96,20 +96,8 @@ describe('a contest’s boards as fields', () => {
         tasks: ['b'],
         over: 'after_close',
         select: 'marked',
-        order: ['points', { by: 'time_ms', fold: 'max' }],
+        order: ['points', 'time_ms'],
       },
-    ]);
-  });
-
-  it('reads a value key with how it combines across tests, and a bare value as not chosen yet', () => {
-    expect(
-      readBoards([
-        { name: 'Fast', order: [{ by: 'time_ms', fold: 'max' }] },
-        { name: 'Old', order: ['points', 'time_ms'] },
-      ])?.map((board) => board.order),
-    ).toEqual([
-      [{ kind: 'value', name: 'time_ms', fold: 'max' }],
-      [{ kind: 'points' }, { kind: 'value', name: 'time_ms', fold: '' }],
     ]);
   });
 
@@ -169,21 +157,16 @@ describe('a contest’s boards as fields', () => {
     });
   });
 
-  it('will not save an unnamed value, one with no way to combine its tests, or minutes that are not whole', () => {
+  it('will not save an unnamed value or minutes that are not whole', () => {
     expect(
       boardProblems({
         ...newBoard(),
         order: [
-          { kind: 'value', name: ' ', fold: 'max' },
-          { kind: 'value', name: 'time_ms', fold: '' },
+          { kind: 'value', name: ' ' },
           { kind: 'penalty', perAttempt: '2.5' },
           { kind: 'penalty', perAttempt: '20' },
         ],
       }),
-    ).toEqual([
-      'Give the name of the value.',
-      'Choose how the value combines across tests.',
-      'A whole number of minutes.',
-    ]);
+    ).toEqual(['Give the name of the value.', 'A whole number of minutes.']);
   });
 });

@@ -160,7 +160,7 @@ const emptyOrganising = [
       },
       organises: true,
       tasks: [],
-      boards: [],
+      standing: [],
     } satisfies ContestHome),
   ),
   /** No workflow to choose from and no primitive, until a test lists some. */
@@ -191,6 +191,7 @@ const emptyOrganising = [
       inputs: [],
       test: [],
       graded: false,
+      runs: false,
     } satisfies WorkflowForm),
   ),
 ];

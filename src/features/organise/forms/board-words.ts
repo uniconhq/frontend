@@ -68,59 +68,12 @@ export const WHO = [
   },
 ];
 
-export const KINDS = [
-  {
-    value: 'points',
-    label: 'Points, most first',
-    description: 'More points ranks higher.',
-  },
-  {
-    value: 'penalty',
-    label: 'Penalty minutes, fewest first',
-    description:
-      'The minutes from the start to each counted submission, and a set number more for each earlier attempt. Fewer ranks higher.',
-  },
-  {
-    value: 'value',
-    label: 'A value the tasks report',
-    description:
-      'A number the tasks’ workflow reports for each test, such as run time. The workflow says whether higher or lower is better; the leaderboard says how each task’s tests combine.',
-  },
-];
-
-/** How a value combines across each task's tests, as a value key chooses it. */
-export const FOLDS = [
-  { value: 'max', label: 'Highest test', said: 'highest test' },
-  { value: 'sum', label: 'Total over the tests', said: 'total over the tests' },
-  { value: 'mean', label: 'Average over the tests', said: 'average over the tests' },
-];
-
-/** Why the save would refuse penalty minutes as the first key (C3), or null. */
-export function penaltyRefusal(first: boolean): string | null {
-  return first
-    ? 'Penalty minutes only break ties, so they are never the first way to rank.'
-    : null;
-}
-
-/**
- * Why the save would refuse the best submission on each test group for a
- * board ranked by `order` (C3), or null: it needs points first and no value.
- */
-export function perGroupRefusal(order: OrderKeyValues[]): string | null {
-  const pointsFirst = order.length === 0 || order[0]?.kind === 'points';
-  return pointsFirst && !order.some((key) => key.kind === 'value')
-    ? null
-    : 'The best submission on each test group needs points ranked first and no value to rank by.';
-}
-
 /**
  * One key of a board's order in words, saying a total of what: "their total
  * points over every task, most first". `over` is the tasks the total runs
  * over, said with the first key only. A value is named by its title where
  * `values` give one, "their total run time", by its key until then (M58),
- * and ranks lowest or highest first as its workflow says is better. Points
- * and penalty minutes read as the ways to rank say them in the board's form
- * (`orderSummary`).
+ * and ranks lowest or highest first as its workflow says is better.
  */
 function keyWords(
   key: OrderKeyValues,
@@ -133,9 +86,7 @@ function keyWords(
     const name = key.name.trim();
     if (name === '') return `their total value${across}, best first`;
     const meaning = meaningOf(values ?? [], name);
-    const fold = FOLDS.find((each) => each.value === key.fold);
-    const each = fold === undefined ? '' : `, each task’s ${fold.said}`;
-    return `their total ${titleInSentence(name, meaning)}${across}${each}, ${valueFirst(meaning)}`;
+    return `their total ${titleInSentence(name, meaning)}${across}, ${valueFirst(meaning)}`;
   }
   const minutes = key.perAttempt.trim();
   return minutes === '' || minutes === '0'

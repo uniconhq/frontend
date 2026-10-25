@@ -25,9 +25,7 @@ function rows(items: WorkflowItem[]): ListRow[] {
 /**
  * Every workflow the person may read: those they may change, with the one
  * way to make a new one (M32), and those shared with them or public, each
- * going to its page. Combining workflows is off this page for now (M36):
- * `Combine` and the backend's route stay, for when it has a place among the
- * ways to make a workflow.
+ * going to its page.
  */
 export function WorkflowsPage() {
   const view = queryView($api.useQuery('get', '/api/v1/workflows'));

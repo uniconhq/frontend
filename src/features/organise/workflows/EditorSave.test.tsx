@@ -97,7 +97,7 @@ describe('saving and publishing a workflow', () => {
     await user.click(await outputButton('run', 'time_ms'));
     await user.click(
       within(await openMenu('The output time_ms of run')).getByRole('menuitem', {
-        name: 'Report it',
+        name: 'Name it as an output',
       }),
     );
     await user.click(barButton('Save'));
@@ -270,8 +270,8 @@ describe('saving and publishing a workflow', () => {
       }),
     );
     backend.state.draft = CLASSIC_V2.replace(
-      'better: lower, at_least: 0}',
-      'better: lower, at_least: 1}',
+      'fold: max, better: lower',
+      'fold: sum, better: lower',
     );
     backend.state.token = 'someone-else';
     await user.click(barButton('Save'));
@@ -289,7 +289,7 @@ describe('saving and publishing a workflow', () => {
     await waitFor(() =>
       expect(backend.state.draft).toContain('args: ${{ inputs.time_limit }}'),
     );
-    expect(backend.state.draft).toContain('better: lower, at_least: 1}');
+    expect(backend.state.draft).toContain('fold: sum');
   });
 
   it('keeps the unsaved draft when the tab comes back after someone else saved, and meets theirs at the save', async () => {
@@ -308,8 +308,8 @@ describe('saving and publishing a workflow', () => {
         }),
       );
       backend.state.draft = CLASSIC_V2.replace(
-        'better: lower, at_least: 0}',
-        'better: lower, at_least: 1}',
+        'fold: max, better: lower',
+        'fold: sum, better: lower',
       );
       backend.state.token = 'someone-else';
       await afterAnswers(comeBackToTab);
@@ -346,15 +346,15 @@ describe('saving and publishing a workflow', () => {
       }),
     );
     backend.state.draft = CLASSIC_V2.replace(
-      'better: lower, at_least: 0}',
-      'better: lower, at_least: 1}',
+      'fold: max, better: lower',
+      'fold: sum, better: lower',
     );
     backend.state.token = 'someone-else';
     await user.click(barButton('Save'));
     await findMerge();
     backend.state.draft = backend.state.draft.replace(
-      'better: lower, at_least: 1}',
-      'better: lower, at_least: 2}',
+      'fold: sum, better: lower',
+      'fold: min, better: lower',
     );
     backend.state.token = 'a-third';
     await user.click(
@@ -365,7 +365,7 @@ describe('saving and publishing a workflow', () => {
 
     await waitFor(() =>
       expect(
-        within(part('ul', 'Fields that differ')).getByText(/time_ms\.at_least/),
+        within(part('ul', 'Fields that differ')).getByText(/time_ms\.fold/),
       ).toBeInTheDocument(),
     );
     const fields = part('ul', 'Fields that differ');
@@ -377,7 +377,7 @@ describe('saving and publishing a workflow', () => {
     );
     await waitFor(() => expect(backend.state.token).not.toBe('a-third'));
     expect(backend.state.draft).toContain('args: ${{ inputs.time_limit }}');
-    expect(backend.state.draft).toContain('better: lower, at_least: 2}');
+    expect(backend.state.draft).toContain('fold: min');
   });
 
   it('takes the current file in the merge view as one step undo goes back over', async () => {
@@ -393,8 +393,8 @@ describe('saving and publishing a workflow', () => {
       }),
     );
     backend.state.draft = CLASSIC_V2.replace(
-      'better: lower, at_least: 0}',
-      'better: lower, at_least: 1}',
+      'fold: max, better: lower',
+      'fold: sum, better: lower',
     );
     backend.state.token = 'someone-else';
     await user.click(barButton('Save'));
@@ -402,7 +402,7 @@ describe('saving and publishing a workflow', () => {
       within(await findMerge()).getByRole('button', { name: 'Discard my changes' }),
     );
 
-    expect(await fileText(user)).toContain('better: lower, at_least: 1}');
+    expect(await fileText(user)).toContain('fold: sum');
     await user.click(toolButton('Undo'));
     expect(await fileText(user)).toContain('args: ${{ inputs.time_limit }}');
   });

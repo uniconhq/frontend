@@ -16,7 +16,7 @@ export type Source = { path: string; size: number; read: () => Promise<Blob> };
 export type TestFile = { field: string; entry: string; source: Source };
 
 /** A test the files make: its group when they say it, its name, and its files. */
-export type MatchedTest = {
+type MatchedTest = {
   group: string | null;
   test: string;
   files: TestFile[];
@@ -30,7 +30,7 @@ export type Matched = {
 };
 
 /** A group's or a test's name, as the format takes them: letters, digits, `_` and `-`. */
-export const NAME = /^[A-Za-z0-9_-]+$/;
+const NAME = /^[A-Za-z0-9_-]+$/;
 
 /**
  * Endings tests are commonly given, each with the fields it may stand for,
@@ -45,39 +45,6 @@ const ALIASES: Record<string, string[]> = {
   a: ['answer'],
   expected: ['answer', 'expected'],
 };
-
-/**
- * How a test's file parts are named when files are added by name, from the
- * workflow's own parts (M47): each file part's usual ending, the one an
- * example shows (`in` for `input`, `out` for `answer`, else the part's own
- * name), and the other endings taken for it, in the order `fieldOf` tries
- * them; a folder part, which only a zip's folders can hold, has none.
- */
-export type PartNaming = {
-  name: string;
-  folder: boolean;
-  ending: string | null;
-  also: string[];
-};
-
-export function namingOf(fields: DeclaredField[]): PartNaming[] {
-  const files = fields.filter((field) => field.type === 'file');
-  return fields
-    .filter((field) => field.type === 'file' || field.type === 'folder')
-    .map((field) => {
-      if (field.type === 'folder') {
-        return { name: field.name, folder: true, ending: null, also: [] };
-      }
-      const endings = [
-        ...Object.keys(ALIASES).filter(
-          (ending) => fieldOf(ending, files)?.name === field.name,
-        ),
-        field.name,
-      ].filter((ending, at, all) => all.indexOf(ending) === at);
-      const [ending = field.name, ...also] = endings;
-      return { name: field.name, folder: false, ending, also };
-    });
-}
 
 /** The field an ending names, among the workflow's file and folder fields. */
 function fieldOf(ending: string, fields: DeclaredField[]): DeclaredField | undefined {

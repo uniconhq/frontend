@@ -492,9 +492,8 @@ test('an organiser sets a task up on its cards and saves them in one save', asyn
     .getByRole('textbox', { name: /^Time limit/ });
   await expect(limit).toHaveValue('2');
   await limit.fill('3');
-  const scoring = page.getByRole('region', { name: 'Tests and scoring' });
-  await expect(scoring.getByRole('group', { name: 'main' })).toContainText(
-    'Its one test earns 100 points when it passes.',
+  await expect(page.getByRole('region', { name: 'Runs' })).toContainText(
+    'This workflow grades by its tests',
   );
 
   const bar = page.getByRole('region', { name: 'Save the task' });
@@ -535,51 +534,15 @@ test('an organiser follows the failed gradings from the contest page', async ({
   expect(state.feedAsked).toContain('status=system_error&latest=true');
 });
 
-test('an organiser reads a test in place, its parts side by side, and is told how to name test files', async ({
-  page,
-}) => {
+test('an organiser reads how many submissions a task takes', async ({ page }) => {
   const state = await stubOrganiserApi(page);
   state.orgMade = true;
   await page.goto('/orgs/acme/contests/spring/tasks/sum');
 
-  const scoring = page.getByRole('region', { name: 'Tests and scoring' });
-  const row = scoring.getByRole('listitem', { name: 'Test 1' });
-  await expect(row).toContainText('Test 1 · 1 2 → 3, expected 10 MB');
-  await row.getByRole('button', { name: /Test 1/ }).click();
-  const view = row.getByRole('region', { name: 'What test 1 holds' });
-  await expect(view.getByLabel('What input holds')).toHaveText('1 2');
-  await expect(view.getByLabel('What answer holds')).toHaveText('3');
-  const input = await view.getByRole('region', { name: 'input' }).boundingBox();
-  const answer = await view.getByRole('region', { name: 'answer' }).boundingBox();
-  expect(answer?.x ?? 0).toBeGreaterThan((input?.x ?? 0) + (input?.width ?? 0) - 1);
-  expect(Math.abs((answer?.y ?? 0) - (input?.y ?? 0))).toBeLessThan(2);
-
-  // An uploaded part downloads whole through the download door (#444).
-  await page.route('**/-/downloads/**', (route) =>
-    route.fulfill({
-      status: 200,
-      headers: { 'Content-Disposition': 'attachment; filename="expected"' },
-      body: '3\n',
-    }),
-  );
-  const expected = view.getByRole('region', { name: 'expected' });
-  await expect(expected).toContainText(
-    'It was uploaded, so it is shown by its size rather than as text.',
-  );
-  const download = expected.getByRole('link', { name: 'Download expected' });
-  await expect(download).toHaveAttribute(
-    'href',
-    `/-/downloads/acme/spring/sum/versions/${UPLOADED_AT}/tests/main/1/expected`,
-  );
-  const [saved] = await Promise.all([page.waitForEvent('download'), download.click()]);
-  expect(saved.suggestedFilename()).toBe('expected');
-
-  await scoring.getByRole('button', { name: 'Add tests', exact: true }).click();
-  const dialog = page.getByRole('dialog', { name: 'Add tests' });
-  await dialog.getByRole('radio', { name: 'Many files at once' }).check();
-  await expect(dialog.getByLabel('How to name the files')).toContainText(
-    "Name them like 1.in (test 1's input) and 1.out (test 1's answer).",
-  );
-  await expect(dialog.getByRole('button', { name: 'Add tests' })).toBeDisabled();
-  await expect(dialog).toContainText('Drop files above to see the tests they make.');
+  const submissions = page.getByRole('region', { name: 'Submissions' });
+  await expect(
+    submissions.getByRole('textbox', { name: 'Most submissions' }),
+  ).toHaveValue('');
+  await expect(submissions).toContainText('at most 50 submissions');
+  await expect(submissions).toContainText('at most 1 in any 30 seconds');
 });

@@ -2,17 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@/test/user-event';
 import { http, HttpResponse } from 'msw';
-import type { BoardPoints, TaskRelease } from '@/api/types';
-
-type Points = NonNullable<BoardPoints['points']>;
-
-/** The entrant's points on a task as the one leaderboard, Standings, counts them. */
-const standings = (points: Points): BoardPoints[] => [
-  { board: 'Standings', covers: true, points, most: '100' },
-];
+import type { TaskRelease } from '@/api/types';
 
 import { formatWhen } from '@/lib/time';
-import { icpc } from '@/test/boards';
 import { renderApp } from '@/test/render';
 import { problem, server, signedIn } from '@/test/server';
 import {
@@ -62,13 +54,12 @@ describe('the contest page for a signed-in person', () => {
       http.get(`${CONTEST_API}/home`, () =>
         HttpResponse.json(home({ registration: registration({ status: 'approved' }) })),
       ),
-      http.get(`${CONTEST_API}/boards`, () => HttpResponse.json([icpc()])),
     );
     renderApp(PAGE);
 
     const timer = await screen.findByRole('timer', { name: 'Contest countdown' });
     const tasks = screen.getByRole('heading', { name: 'Tasks' });
-    const board = await screen.findByRole('region', { name: 'Leaderboard' });
+    const board = await screen.findByText('This page is being rebuilt.');
     const announcements = screen.getByRole('heading', { name: 'Announcements' });
     const questions = screen.getByRole('region', {
       name: 'Questions to the organisers',
@@ -103,65 +94,19 @@ describe('the contest page for a signed-in person', () => {
     ).toBeNull();
   });
 
-  it('says where the person’s entrant stands on each leaderboard, with the way to them', async () => {
-    const standings = icpc();
-    const [first] = standings.rows;
-    if (first === undefined) throw new Error('the board needs a row');
+  it('says the leaderboard is being rebuilt', async () => {
     server.use(
       signedIn,
       http.get(`${CONTEST_API}/home`, () =>
-        HttpResponse.json(
-          home({
-            registration: registration({ status: 'approved', id: first.row.entrant }),
-          }),
-        ),
-      ),
-      http.get(`${CONTEST_API}/boards`, () =>
-        HttpResponse.json([
-          standings,
-          { ...standings, board: 'Later', nothing_shown: true, shown_at: null },
-        ]),
+        HttpResponse.json(home({ registration: registration({ status: 'approved' }) })),
       ),
     );
     renderApp(PAGE);
 
-    const board = await screen.findByRole('region', { name: 'Leaderboard' });
-    const places = await within(board).findByRole('list', { name: 'Where you stand' });
-    const [shown, later] = within(places).getAllByRole('listitem');
-    expect(shown).toHaveTextContent(
-      `Standings: You are ${String(first.rank)}${first.rank === 1 ? 'st' : 'th'}.`,
-    );
-    expect(later).toHaveTextContent('Later: Shown once its tasks are released.');
-    expect(
-      within(board).getByRole('link', { name: 'See the leaderboards' }),
-    ).toHaveAttribute('href', '/contests/acme/spring/boards');
+    expect(await screen.findByText('This page is being rebuilt.')).toBeVisible();
   });
 
-  it('says only the place on a board that shows the reader their own row alone', async () => {
-    const standings = icpc();
-    const [first] = standings.rows;
-    if (first === undefined) throw new Error('the board needs a row');
-    server.use(
-      signedIn,
-      http.get(`${CONTEST_API}/home`, () =>
-        HttpResponse.json(
-          home({
-            registration: registration({ status: 'approved', id: first.row.entrant }),
-          }),
-        ),
-      ),
-      http.get(`${CONTEST_API}/boards`, () =>
-        HttpResponse.json([{ ...standings, rows: [{ ...first, rank: 4 }] }]),
-      ),
-    );
-    renderApp(PAGE);
-
-    const board = await screen.findByRole('region', { name: 'Leaderboard' });
-    const places = await within(board).findByRole('list', { name: 'Where you stand' });
-    expect(within(places).getByRole('listitem')).toHaveTextContent(/^You are 4th\.$/);
-  });
-
-  it('shows no leaderboard card when the contest shows the person none', async () => {
+  it('shows the leaderboard note when the person is in', async () => {
     server.use(
       signedIn,
       http.get(`${CONTEST_API}/home`, () =>
@@ -171,8 +116,7 @@ describe('the contest page for a signed-in person', () => {
     renderApp(PAGE);
 
     await screen.findByRole('heading', { name: 'Tasks' });
-    await screen.findByRole('region', { name: 'Questions to the organisers' });
-    expect(screen.queryByRole('region', { name: 'Leaderboard' })).toBeNull();
+    expect(await screen.findByText('This page is being rebuilt.')).toBeVisible();
   });
 
   it('leads an organiser of the contest back to organising it, and nobody else', async () => {
@@ -228,8 +172,6 @@ describe('the contest page for a signed-in person', () => {
                 name: 'sum',
                 label: 'A',
                 title: 'Sum of Two',
-                worth: '100',
-                points: [],
                 release: { released: true, visible: true, open: true, closed: null },
                 due: '2026-09-12T10:45:00Z',
                 closes: '2026-09-12T11:00:00Z',
@@ -238,8 +180,6 @@ describe('the contest page for a signed-in person', () => {
                 name: 'max',
                 label: 'B',
                 title: 'Maximum',
-                worth: null,
-                points: [],
                 release: { released: true, visible: true, open: true, closed: null },
                 due: null,
                 closes: '2026-09-12T11:00:00Z',
@@ -255,87 +195,15 @@ describe('the contest page for a signed-in person', () => {
     const [sum, max] = within(tasks).getAllByRole('listitem');
     await waitFor(() => expect(sum).toHaveTextContent(/Due in (44m 5\ds|45m 00s)/));
     expect(sum).toHaveTextContent(/Closes in (59m 5\ds|1h 00m 00s)/);
-    // No points for them yet, so the task reads as its worth alone.
-    expect(sum).toHaveTextContent('100 points');
-    expect(sum).not.toHaveTextContent('/ 100');
-    expect(max).not.toHaveTextContent('points');
     expect(max).not.toHaveTextContent('Due');
     expect(max).toHaveTextContent(/Closes in /);
   });
 
-  it('shows each task as the entrant’s points out of its worth, and when held-back points are shown', async () => {
-    const task = (name: string, more: object) => ({
-      name,
-      label: name.toUpperCase(),
-      title: name,
-      worth: '100',
-      points: [],
-      release: { released: true, visible: true, open: true, closed: null },
-      due: null,
-      closes: '2026-09-12T11:00:00Z',
-      ...more,
-    });
-    const reveal = '2026-09-12T14:00:00Z';
-    server.use(
-      signedIn,
-      http.get(`${CONTEST_API}/home`, () =>
-        HttpResponse.json(
-          home({
-            registration: registration({ status: 'approved' }),
-            boards: ['Standings'],
-            tasks: [
-              task('a', {
-                points: standings({ shown: '62', pending: '0', pending_until: null }),
-              }),
-              task('b', {
-                points: standings({
-                  shown: '30',
-                  pending: '70',
-                  pending_until: reveal,
-                }),
-              }),
-              task('c', {
-                points: standings({
-                  shown: null,
-                  pending: '100',
-                  pending_until: reveal,
-                }),
-              }),
-              task('d', { worth: null }),
-              task('e', {
-                points: standings({ shown: '0', pending: '40', pending_until: reveal }),
-              }),
-            ],
-          }),
-        ),
-      ),
-    );
-    renderApp(PAGE);
-
-    const tasks = await screen.findByRole('list', { name: 'Tasks' });
-    const [a, b, c, d, e] = within(tasks).getAllByRole('listitem');
-    expect(a).toHaveTextContent('62 / 100');
-    expect(a).not.toHaveTextContent('shown at');
-    expect(b).toHaveTextContent('30 / 100');
-    expect(b).toHaveTextContent(/More shown at \S/);
-    expect(b).not.toHaveTextContent('70');
-    expect(c).toHaveTextContent('— / 100');
-    expect(c).toHaveTextContent(/Shown at \S/);
-    expect(d).not.toHaveTextContent('/');
-    expect(d).not.toHaveTextContent('points');
-    // A shown 0 is a result the entrant can see.
-    expect(e).toHaveTextContent('0 / 100');
-    expect(e).toHaveTextContent(/More shown at \S/);
-  });
-
-  it('gives a column of points for each leaderboard the entrant sees, each as that board counts the task', async () => {
-    const reveal = '2026-09-12T14:00:00Z';
-    const task = (name: string, points: BoardPoints[]) => ({
+  it('keeps the task list and says the leaderboard is being rebuilt', async () => {
+    const task = (name: string) => ({
       name,
       label: name.toUpperCase(),
       title: `Task ${name}`,
-      worth: '100',
-      points,
       release: { released: true, visible: true, open: true, closed: null },
       due: null,
       closes: '2026-09-12T11:00:00Z',
@@ -346,130 +214,20 @@ describe('the contest page for a signed-in person', () => {
         HttpResponse.json(
           home({
             registration: registration({ status: 'approved' }),
-            boards: ['Standings', 'Live groups'],
-            tasks: [
-              task('a', [
-                {
-                  board: 'Standings',
-                  covers: true,
-                  points: { shown: '62', pending: '0', pending_until: null },
-                  most: '100',
-                },
-                {
-                  board: 'Live groups',
-                  covers: true,
-                  points: { shown: '40', pending: '0', pending_until: null },
-                  most: '60',
-                },
-              ]),
-              task('b', [
-                {
-                  board: 'Standings',
-                  covers: true,
-                  points: { shown: null, pending: '100', pending_until: reveal },
-                  most: '100',
-                },
-                { board: 'Live groups', covers: false, points: null, most: null },
-              ]),
-            ],
+            tasks: [task('a'), task('b')],
           }),
         ),
       ),
     );
     renderApp(PAGE);
 
-    const table = await screen.findByRole('table', { name: 'Tasks' });
-    expect(
-      within(table)
-        .getAllByRole('columnheader')
-        .map((header) => header.textContent),
-    ).toEqual(['Task', 'Standings', 'Live groups']);
-    const [, a, b] = within(table).getAllByRole('row');
-    if (a === undefined || b === undefined) throw new Error('two tasks');
-    const cells = (row: HTMLElement) =>
-      within(row)
-        .getAllByRole('cell')
-        .map((cell) => cell.textContent);
-    expect(within(a).getByRole('rowheader')).toHaveTextContent('ATask a');
-    expect(within(a).getByRole('link', { name: 'Task a' })).toHaveAttribute(
+    const tasks = await screen.findByRole('list', { name: 'Tasks' });
+    expect(within(tasks).getByRole('link', { name: 'Task a' })).toHaveAttribute(
       'href',
       '/contests/acme/spring/tasks/a',
     );
-    expect(within(a).getByRole('rowheader')).toHaveTextContent(/Closes (in|at) /);
-    // Each board counts the task over what it covers: the live groups give 60 at most.
-    expect(cells(a)).toEqual(['62 / 100', '40 / 60']);
-    const [held, uncovered] = cells(b);
-    expect(held).toMatch(/^— \/ 100Shown at \S/);
-    expect(uncovered).toBe('—');
-  });
-
-  it('reads one number with one leaderboard, saying so where it does not cover a task', async () => {
-    server.use(
-      signedIn,
-      http.get(`${CONTEST_API}/home`, () =>
-        HttpResponse.json(
-          home({
-            registration: registration({ status: 'approved' }),
-            boards: ['Standings'],
-            tasks: [
-              {
-                name: 'sum',
-                label: 'A',
-                title: 'Sum of Two',
-                worth: '100',
-                points: [
-                  { board: 'Standings', covers: false, points: null, most: null },
-                ],
-                release: { released: true, visible: true, open: true, closed: null },
-                due: null,
-                closes: '2026-09-12T11:00:00Z',
-              },
-            ],
-          }),
-        ),
-      ),
-    );
-    renderApp(PAGE);
-
-    const tasks = await screen.findByRole('list', { name: 'Tasks' });
-    expect(within(tasks).getByRole('listitem')).toHaveTextContent(
-      'Not on the leaderboard',
-    );
+    expect(screen.getByText('This page is being rebuilt.')).toBeVisible();
     expect(screen.queryByRole('columnheader')).toBeNull();
-  });
-
-  it('reads the tasks again once held-back points are shown', async () => {
-    const soon = new Date(Date.parse('2026-09-12T10:00:00Z') + 1_500).toISOString();
-    const sum = (points: Points) => ({
-      name: 'sum',
-      label: 'A',
-      title: 'Sum of Two',
-      worth: '100',
-      points: standings(points),
-      release: { released: true, visible: true, open: true, closed: null },
-      due: null,
-      closes: '2026-09-12T11:00:00Z',
-    });
-    server.use(
-      signedIn,
-      homesInTurn([
-        home({
-          registration: registration({ status: 'approved' }),
-          boards: ['Standings'],
-          tasks: [sum({ shown: '30', pending: '70', pending_until: soon })],
-        }),
-        home({
-          registration: registration({ status: 'approved' }),
-          boards: ['Standings'],
-          tasks: [sum({ shown: '100', pending: '0', pending_until: null })],
-        }),
-      ]),
-    );
-    renderApp(PAGE);
-
-    const tasks = await screen.findByRole('list', { name: 'Tasks' });
-    expect(await within(tasks).findByText('30 / 100')).toBeVisible();
-    expect(await within(tasks).findByText('100 / 100')).toBeVisible();
   });
 
   it('says when each task falls due and closes before the server’s time is in', async () => {
@@ -492,8 +250,6 @@ describe('the contest page for a signed-in person', () => {
                 name: 'sum',
                 label: 'A',
                 title: 'Sum of Two',
-                worth: '100',
-                points: [],
                 release: { released: true, visible: true, open: true, closed: null },
                 due: '2026-09-12T10:45:00Z',
                 closes: '2026-09-12T11:00:00Z',
@@ -528,8 +284,6 @@ describe('the contest page for a signed-in person', () => {
       name,
       label: name.toUpperCase(),
       title: name,
-      worth: '100',
-      points: [],
       release: { released: true, visible: true, open: false, closed },
       due: null,
       closes: '2026-09-12T11:00:00Z',
@@ -777,20 +531,18 @@ describe('the contest page for a visitor', () => {
       `/api/v1/auth/login?next=${encodeURIComponent(PAGE)}`,
     );
     expect(screen.getByRole('link', { name: 'Sum of Two' })).toBeVisible();
+    expect(screen.getByText('This page is being rebuilt.')).toBeVisible();
     expect(screen.queryByRole('button', { name: 'Register' })).not.toBeInTheDocument();
     expect(screen.queryByRole('table')).toBeNull();
   });
 
-  it('shows the boards shown to everyone, read without a session', async () => {
+  it('says the public leaderboard is being rebuilt', async () => {
     server.use(
       http.get(`${PUBLIC_API}/:org/:contest`, () => HttpResponse.json(publicContest)),
-      http.get(`${PUBLIC_API}/:org/:contest/boards`, () =>
-        HttpResponse.json([icpc({ who: 'everyone' })]),
-      ),
     );
     renderApp(PAGE);
 
-    expect(await screen.findByRole('table', { name: 'Standings' })).toBeVisible();
+    expect(await screen.findByText('This page is being rebuilt.')).toBeVisible();
     expect(
       screen.getByRole('heading', { name: 'Spring 2026', level: 1 }),
     ).toBeVisible();

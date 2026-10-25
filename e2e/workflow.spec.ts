@@ -12,13 +12,12 @@ import { expect, test, type Locator, type Page, type Route } from '@playwright/t
 
 const CLASSIC = `# kenny/tuned, a workflow.
 inputs:
-  submission: {type: file, contestant: true}
-  language: {type: enum, options: [c, cpp, java, python], contestant: true}
-  time_limit: number
-  memory_limit: number
-test:
-  input: file
-  answer: file
+  submission: {type: file, title: Solution}
+  language: {type: enum, options: [c, cpp, java, python], title: Language}
+  time_limit: {type: number, title: Time limit}
+  memory_limit: {type: number, title: Memory limit}
+  input: {type: file, title: Input}
+  answer: {type: file, title: Answer}
 steps:
   - id: compile
     use: unicon/compile@v2
@@ -27,19 +26,17 @@ steps:
       language: \${{ inputs.language }}
   - id: run
     use: unicon/sandbox-run@v2
-    per_test: true
     with:
       binary: \${{ steps.compile.binary }}
-      input: \${{ test.input }}
+      input: \${{ inputs.input }}
       time_limit: \${{ inputs.time_limit }}
       memory_limit: \${{ inputs.memory_limit }}
   - id: check
     use: unicon/diff-check@v2
-    per_test: true
     with:
       actual: \${{ steps.run.output }}
-      expected: \${{ test.answer }}
-report:
+      expected: \${{ inputs.answer }}
+outputs:
   log: \${{ steps.compile.compile_log }}
 `;
 
@@ -152,6 +149,7 @@ async function stubWorkflowApi(page: Page) {
     }),
   );
   await page.route('**/api/v1/primitives', (route) => json(route, PRIMITIVES));
+  await page.route(/\/api\/v1\/workflows$/, (route) => json(route, []));
   await page.route('**/api/v1/workflows/check', (route) =>
     json(route, { problems: [] }),
   );
@@ -229,7 +227,7 @@ test('a wire dragged onto a port edits the file, and a refused one says why', as
   );
   await drag(page, submission, handle(page, 'step:1', 'in:memory_limit'));
   const refused = page.getByRole('alert').filter({
-    hasText: 'This value raises a limit, so the task must give it, not the entrant.',
+    hasText: 'This takes a number, not a file.',
   });
   await expect(refused).toBeVisible();
   expect(await file(page)).toContain('memory_limit: ${{ inputs.memory_limit }}');
@@ -248,7 +246,7 @@ test('a refused wire’s message covers no port, and goes on a click, on Escape 
   );
   const target = handle(page, 'step:1', 'in:memory_limit');
   const refused = page.getByRole('alert').filter({
-    hasText: 'This value raises a limit, so the task must give it, not the entrant.',
+    hasText: 'This takes a number, not a file.',
   });
 
   await drag(page, submission, target);
@@ -307,7 +305,6 @@ test('a step added from the toolbar opens in the drawer clear of its box, and is
   const added = page.getByRole('group', { name: 'Step diff-check' });
   await expect(added).toBeVisible();
   const opened = page.getByRole('complementary', { name: 'Step diff-check' });
-  await expect(opened.getByRole('radio', { name: 'Once for each test' })).toBeChecked();
   // The box stands clear of the drawer over the right of the window.
   const box = await added.boundingBox();
   const over = await opened.boundingBox();
@@ -385,5 +382,116 @@ test('every port of a step opens its menu with the mouse', async ({ page }) => {
     await page.keyboard.press('Escape');
   }
   await page.getByRole('button', { name: 'The output time_ms of run' }).click();
-  await expect(page.getByRole('menuitem', { name: 'Report it' })).toBeVisible();
+  await expect(page.getByRole('menuitem', { name: 'Name it as an output' })).toBeVisible();
+});
+
+test('a box opens two levels in, and a problem opens the step inside', async ({ page }) => {
+  const json = (route: Route, body: unknown) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(body),
+    });
+  const draft = 'steps:\n  - {id: build, use: kenny/inner@v1}\n';
+  const inner = 'steps:\n  - {id: compile, use: kenny/deep@v1}\n';
+  const deep = 'steps:\n  - {id: link, use: unicon/compile@v2}\n';
+  const box = {
+    inputs: [
+      {
+        name: 'source',
+        type: 'folder',
+        optional: false,
+        options: null,
+        title: null,
+        unit: null,
+      },
+    ],
+    outputs: [
+      {
+        name: 'program',
+        type: 'file',
+        title: null,
+        unit: null,
+        at_least: null,
+        at_most: null,
+        better: null,
+      },
+    ],
+    newer_version: null,
+    run: true,
+  };
+  await page.route('**/api/v1/time', (route) =>
+    json(route, { now: '2026-10-09T10:00:00Z' }),
+  );
+  await page.route('**/api/v1/me', (route) =>
+    json(route, {
+      user: { id: 7, username: 'kenny', name: null, avatar_url: null, email: null },
+      roles: [],
+      degraded: false,
+    }),
+  );
+  await page.route('**/api/v1/primitives', (route) => json(route, PRIMITIVES));
+  await page.route(/\/api\/v1\/workflows$/, (route) =>
+    json(route, [
+      {
+        owner: 'kenny',
+        name: 'inner',
+        visibility: 'private',
+        versions: ['v1'],
+        editable: true,
+      },
+      {
+        owner: 'kenny',
+        name: 'deep',
+        visibility: 'private',
+        versions: ['v1'],
+        editable: true,
+      },
+    ]),
+  );
+  await page.route('**/api/v1/workflows/check', (route) =>
+    json(route, {
+      problems: [{ path: 'steps[0]', message: 'The link failed.', step: 'build/compile/link' }],
+    }),
+  );
+  await page.route('**/api/v1/workflows/kenny/tuned', (route) =>
+    json(route, {
+      owner: 'kenny',
+      name: 'tuned',
+      visibility: 'private',
+      versions: [],
+      editable: true,
+      draft: { content: draft, token: 'token-1' },
+      readers: [],
+    }),
+  );
+  await page.route(/\/versions\/[^/]+\/box$/, (route) => {
+    const newer = route.request().url().includes('/inner/') ? 'v2' : null;
+    return json(route, { ...box, newer_version: newer });
+  });
+  await page.route(/\/versions\/v1$/, (route) =>
+    json(route, {
+      content: route.request().url().includes('/inner/') ? inner : deep,
+    }),
+  );
+
+  await page.setViewportSize({ width: 1600, height: 1000 });
+  await page.goto('/workflows/kenny/tuned');
+  await expect(page.getByRole('group', { name: 'Step build' })).toBeVisible();
+  await expect(page.getByText('A newer version is v2')).toBeVisible();
+  await page
+    .getByRole('region', { name: 'Problems' })
+    .getByRole('button', { name: 'Step build' })
+    .click();
+  await expect(page.getByRole('group', { name: 'Step link' })).toBeVisible();
+  const crumbs = page.getByRole('navigation', { name: 'Where this box sits' });
+  await expect(crumbs.getByRole('button', { name: 'compile' })).toBeVisible();
+  await crumbs.getByRole('button', { name: 'tuned' }).click();
+  await expect(page.getByRole('group', { name: 'Step build' })).toBeVisible();
+  await page.getByRole('button', { name: 'Open build' }).click();
+  await expect(page.getByRole('group', { name: 'Step compile' })).toBeVisible();
+  await page.getByRole('button', { name: 'Open compile' }).click();
+  await expect(page.getByRole('group', { name: 'Step link' })).toBeVisible();
+  await crumbs.getByRole('button', { name: 'build' }).click();
+  await expect(page.getByRole('group', { name: 'Step compile' })).toBeVisible();
 });
