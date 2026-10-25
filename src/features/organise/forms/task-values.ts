@@ -137,6 +137,30 @@ export function emptyTuple(inputs: readonly string[]): TupleValues {
   };
 }
 
+/** `axis` without the column `id`, in its inputs and in every tuple. */
+export function withoutInput(axis: AxisValues, id: string): AxisValues {
+  return {
+    inputs: axis.inputs.filter((item) => item !== id),
+    tuples: axis.tuples.map((tuple) => {
+      const cells = { ...tuple.cells };
+      delete cells[id];
+      return { ...tuple, cells };
+    }),
+  };
+}
+
+/**
+ * The axes with every one that has inputs first. An axis with none is not
+ * written, so it cannot sit before one that is: a refusal names axes as the
+ * file numbers them, and the card's fields use that same number.
+ */
+export function settled(axes: AxisValues[]): AxisValues[] {
+  return [
+    ...axes.filter((axis) => axis.inputs.length > 0),
+    ...axes.filter((axis) => axis.inputs.length === 0),
+  ];
+}
+
 /** How many runs the axes make: the product of their tuples, or 1 with none. */
 export function runCount(axes: readonly AxisValues[]): number {
   const counted = axes.filter((axis) => axis.inputs.length > 0);

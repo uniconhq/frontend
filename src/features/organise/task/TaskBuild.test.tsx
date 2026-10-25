@@ -689,6 +689,66 @@ describe('the cards that build a task', { timeout: 30_000 }, () => {
     });
   });
 
+  it('drops a run column another workflow chosen does not have, keeping its rows', async () => {
+    const { sent } = taskBackend({
+      form: CHECKED,
+      content: `name: Sum
+workflow: unicon/checked@v1
+inputs:
+  submission: entrant
+  time_limit: 2
+repeat:
+  - inputs: [checker, greeting]
+    tuples:
+      - {checker: checker/a.cpp, greeting: hi}
+      - {checker: checker/b.cpp, greeting: yo}
+`,
+    });
+    asManager();
+    const { workflow } = await openTask();
+    const runs = screen.getByRole('region', { name: 'Runs' });
+    expect(within(runs).getByRole('columnheader', { name: /checker/i })).toBeVisible();
+
+    fill(await within(workflow).findByLabelText(/^Workflow/), 'my-org/tunable');
+    await waitFor(() =>
+      expect(within(runs).queryByRole('columnheader', { name: /checker/i })).toBeNull(),
+    );
+    await save();
+
+    expect(written(await waitForSave(sent))['repeat']).toEqual([
+      { inputs: ['greeting'], tuples: [{ greeting: 'hi' }, { greeting: 'yo' }] },
+    ]);
+  });
+
+  it('offers to remove a run column the workflow does not have, and saves without it', async () => {
+    const { sent } = taskBackend({
+      form: CHECKED,
+      content: `name: Sum
+workflow: unicon/checked@v1
+inputs:
+  submission: entrant
+  time_limit: 2
+repeat:
+  - inputs: [input, answer, greeting]
+    tuples:
+      - {input: tests/1.in, answer: tests/1.ans, greeting: hi}
+`,
+    });
+    asManager();
+    await openTask();
+    const runs = screen.getByRole('region', { name: 'Runs' });
+    expect(runs).toHaveTextContent('Not an input of the workflow');
+
+    await userEvent.click(within(runs).getByRole('button', { name: 'Remove input' }));
+    await userEvent.click(within(runs).getByRole('button', { name: 'Remove answer' }));
+    expect(within(runs).queryByRole('button', { name: /^Remove / })).toBeNull();
+    await save();
+
+    expect(written(await waitForSave(sent))['repeat']).toEqual([
+      { inputs: ['greeting'], tuples: [{ greeting: 'hi' }] },
+    ]);
+  });
+
   it('removes an input’s key when its value is cleared, and one the workflow does not have', async () => {
     const { sent } = taskBackend({
       form: {
