@@ -7,6 +7,7 @@ import { count } from '../hub/count';
 import { AnnouncementsLine, Line } from '../hub/lines';
 import { announcementsQuery } from '../threads/announcements';
 import { publishedLine } from './published';
+import { UNPUBLISHED, isUnpublished, retryQueue } from './queue';
 
 type TaskPath = { org: string; contest: string; task: string };
 
@@ -15,8 +16,14 @@ const TASK = '/api/v1/orgs/{org}/contests/{contest}/tasks/{task}';
 /** How many entrant rows are in the grading queue. */
 export function QueueCard({ path }: { path: TaskPath }) {
   const view = queryView(
-    $api.useQuery('get', `${TASK}/organise/queue`, { params: { path } }),
+    $api.useQuery(
+      'get',
+      `${TASK}/organise/queue`,
+      { params: { path } },
+      { retry: retryQueue },
+    ),
   );
+  if (isUnpublished(view)) return <BodyText>{UNPUBLISHED}</BodyText>;
   return (
     <Line
       view={view}

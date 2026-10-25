@@ -24,6 +24,7 @@ import { StaffFiles } from '../staff-read';
 import { staffText } from '../staff-text';
 import { SectionPage } from '../SectionPage';
 import classes from '../organise.module.css';
+import { UNPUBLISHED, isUnpublished, retryQueue } from './queue';
 
 type Row = components['schemas']['QueueRow'];
 type Queued = components['schemas']['QueuedSubmission'];
@@ -62,11 +63,17 @@ function Queue({
   manager: boolean;
 }) {
   const view = queryView(
-    $api.useQuery('get', QUEUE, { params: { path: { org, contest, task } } }),
+    $api.useQuery(
+      'get',
+      QUEUE,
+      { params: { path: { org, contest, task } } },
+      { retry: retryQueue },
+    ),
   );
   const [unmarked, setUnmarked] = useState(false);
   const [board, setBoard] = useState('');
   if (view.state === 'loading') return <PageSkeleton />;
+  if (isUnpublished(view)) return <BodyText tone="secondary">{UNPUBLISHED}</BodyText>;
   if (view.state === 'error')
     return <ErrorBlock error={view.error} onRetry={view.retry} />;
   const boards = leaderboardsOf(view.data);
