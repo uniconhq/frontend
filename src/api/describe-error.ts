@@ -336,7 +336,9 @@ export function describeError(error: ApiError): ErrorDescription {
         message:
           limit === null
             ? 'You have made every submission this task takes.'
-            : `This task takes ${limit} submissions in all, and you have made them.`,
+            : limit === 1
+              ? 'This task takes 1 submission in all, and you have made it.'
+              : `This task takes ${limit} submissions in all, and you have made them.`,
       };
     }
     case 'rate_limited':
