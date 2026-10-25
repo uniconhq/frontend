@@ -8,7 +8,7 @@ import { OutLink } from '@/ui/OutLink';
 import { Loaded } from '@/ui/feedback/Loaded';
 import { formatSize } from '@/lib/size';
 import { saveFile } from '@/lib/save-file';
-import { fileQuery, taskDownloadHref, treeQuery, type Place } from './place';
+import { fileQuery, taskDownloadHref, treeQuery, type FilePlace } from './place';
 import classes from './FilePreview.module.css';
 
 /**
@@ -117,7 +117,7 @@ function DownloadLink({
   path,
   version,
 }: {
-  place: Place;
+  place: FilePlace;
   path: string;
   version: string | null;
 }) {
@@ -150,7 +150,7 @@ export function SavedFile({
   upload,
   listedAt,
 }: {
-  place: Place;
+  place: FilePlace;
   path: string;
   /** What the file is called here, such as the part of a test it is. */
   title?: string;
@@ -205,7 +205,7 @@ function FolderLevel({
   chosen,
   onChoose,
 }: {
-  place: Place;
+  place: FilePlace;
   path: string;
   chosen: TreeEntry | null;
   onChoose: (entry: TreeEntry) => void;
@@ -293,17 +293,27 @@ export function SavedFolder({
   path,
   title = nameOf(path),
   heading = `${title}, a folder`,
+  onChoose,
 }: {
-  place: Place;
+  place: FilePlace;
   path: string;
   title?: string;
   heading?: string;
+  onChoose?: (entry: TreeEntry) => void;
 }) {
   const [chosen, setChosen] = useState<TreeEntry | null>(null);
   return (
     <section className={classes.part} aria-label={title}>
       <Head name={heading} size={null} />
-      <FolderLevel place={place} path={path} chosen={chosen} onChoose={setChosen} />
+      <FolderLevel
+        place={place}
+        path={path}
+        chosen={chosen}
+        onChoose={(entry) => {
+          setChosen(entry);
+          onChoose?.(entry);
+        }}
+      />
       {chosen !== null && (
         <SavedFile
           key={chosen.path}

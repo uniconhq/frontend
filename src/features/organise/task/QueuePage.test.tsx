@@ -23,6 +23,20 @@ const ROW = {
 };
 
 describe('the grading queue', () => {
+  it('says a task not published yet has nothing to mark, not that it is not found', async () => {
+    server.use(
+      signedIn,
+      http.get(QUEUE, () =>
+        problem(404, 'not_found', { detail: 'There is no such task.' }),
+      ),
+    );
+    renderApp(PAGE);
+    expect(
+      await screen.findByText('Nothing to mark until the task is published.'),
+    ).toBeVisible();
+    expect(screen.queryByText('There is no such task.')).toBeNull();
+  });
+
   it('saves a mark on Enter and says when', async () => {
     const user = userEvent.setup();
     let body: unknown = null;

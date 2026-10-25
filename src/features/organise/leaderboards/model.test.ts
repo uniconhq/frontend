@@ -704,7 +704,9 @@ describe('a task whose settings cannot be read', () => {
     const medal = 'name: Islands\nscoring:\n  values:\n    medal: {text: gold}\n';
     expect(givenValues(medal, null)).toBeNull();
     expect(givenValues(medal, new Set())).toEqual([{ name: 'medal', text: false }]);
-    expect(givenValues(medal, new Set(['medal']))).toEqual([{ name: 'medal', text: true }]);
+    expect(givenValues(medal, new Set(['medal']))).toEqual([
+      { name: 'medal', text: true },
+    ]);
   });
 });
 

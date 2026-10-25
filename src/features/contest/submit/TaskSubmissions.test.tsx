@@ -500,6 +500,12 @@ describe('the submit panel', () => {
       'This task takes 50 submissions in all',
     ],
     [
+      'submission_limit',
+      { limit: 1 },
+      'You have used every submission',
+      'This task takes 1 submission in all, and you have made it.',
+    ],
+    [
       'rate_limited',
       { rate: '1 per 30s', retry_at: '2999-01-01T00:00:30Z' },
       'That is too soon after your last submission',

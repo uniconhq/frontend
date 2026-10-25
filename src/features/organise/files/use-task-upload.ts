@@ -2,9 +2,9 @@ import { useRef, useState } from 'react';
 import { apiClient } from '@/api/client';
 import { type ApiError, toApiError } from '@/api/problem';
 import { arrival, hashOf, mustBeVerified, sendAndComplete } from '@/api/upload/door';
-import type { Place } from './place';
+import type { Place, WorkflowPlace } from './place';
 
-type TaskPlace = Extract<Place, { kind: 'task' }>;
+type TaskPlace = Extract<Place, { kind: 'task' }> | WorkflowPlace;
 
 /**
  * How many times a file is sent before the upload gives up: a cut connection
@@ -30,6 +30,20 @@ export type UploadState =
  * yet: what a save writing that path presents.
  */
 export async function tokenNow(place: TaskPlace, path: string): Promise<string | null> {
+  if (place.kind === 'workflow') {
+    try {
+      const { data } = await apiClient.GET(
+        '/api/v1/workflows/{owner}/{name}/files/{path}',
+        {
+          params: { path: { owner: place.owner, name: place.name, path } },
+        },
+      );
+      return data?.token ?? null;
+    } catch (error) {
+      if (toApiError(error).code === 'not_found') return null;
+      throw error;
+    }
+  }
   const task = { org: place.org, contest: place.contest, task: place.task };
   try {
     // Read past the query cache, so a file open in the editor keeps the text
@@ -59,28 +73,43 @@ export async function sendToTask(
   path: string,
   onState: (state: UploadState) => void = () => undefined,
 ): Promise<string> {
-  const task = { org: place.org, contest: place.contest, task: place.task };
   onState({ stage: 'hashing', share: 0 });
   const sha256 = await hashOf(file, (share) => onState({ stage: 'hashing', share }));
   onState({ stage: 'sending', share: 0, attempt: 1 });
-  const { data: slot } = await apiClient.POST(
-    '/api/v1/orgs/{org}/contests/{contest}/tasks/{task}/organise/uploads',
-    {
-      params: { path: task },
-      body: {
-        path,
-        size: file.size,
-        sha256,
-        content_type: file.type === '' ? null : file.type,
-      },
-    },
-  );
+  const body = {
+    path,
+    size: file.size,
+    sha256,
+    content_type: file.type === '' ? null : file.type,
+  };
+  const task =
+    place.kind === 'task'
+      ? { org: place.org, contest: place.contest, task: place.task }
+      : null;
+  const workflow =
+    place.kind === 'workflow' ? { owner: place.owner, name: place.name } : null;
+  const { data: slot } =
+    workflow !== null
+      ? await apiClient.POST('/api/v1/workflows/{owner}/{name}/uploads', {
+          params: { path: workflow },
+          body,
+        })
+      : await apiClient.POST(
+          '/api/v1/orgs/{org}/contests/{contest}/tasks/{task}/organise/uploads',
+          { params: { path: task! }, body },
+        );
   if (slot === undefined) throw new Error('The upload could not be started.');
   const completeSlot = async () => {
-    const { data } = await apiClient.POST(
-      '/api/v1/orgs/{org}/contests/{contest}/tasks/{task}/uploads/{upload}/complete',
-      { params: { path: { ...task, upload: slot.id } } },
-    );
+    const { data } =
+      workflow !== null
+        ? await apiClient.POST(
+            '/api/v1/workflows/{owner}/{name}/uploads/{upload}/complete',
+            { params: { path: { ...workflow, upload: slot.id } } },
+          )
+        : await apiClient.POST(
+            '/api/v1/orgs/{org}/contests/{contest}/tasks/{task}/uploads/{upload}/complete',
+            { params: { path: { ...task!, upload: slot.id } } },
+          );
     if (data === undefined) throw new Error('The upload could not be finished.');
     return data;
   };

@@ -319,6 +319,7 @@ export function workflowBackend(
     readers: state.readers,
   });
   const handlers = [
+    http.get(`${WORKFLOW_API}/tree`, () => HttpResponse.json([])),
     http.get(WORKFLOW_API, () => HttpResponse.json(page())),
     http.get('/api/v1/workflows', () =>
       HttpResponse.json([

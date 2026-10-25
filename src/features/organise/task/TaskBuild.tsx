@@ -239,24 +239,34 @@ function BuildForm({
       return { ...before, axes: settled(axes) };
     });
   const [reading, setReading] = useState<unknown>(null);
+  // A chosen file is read before it is part of the save. Until that read
+  // finishes, Save stays disabled, so a click in that gap cannot publish
+  // the task without the file.
+  const [pendingFiles, setPendingFiles] = useState(0);
+  const stageFile = (work: Promise<unknown>) => {
+    setPendingFiles((count) => count + 1);
+    void work.finally(() => setPendingFiles((count) => count - 1));
+  };
   /** Files chosen for a setting wait for the save, which writes them and points the setting at them. */
   const files: InputFiles = {
     place,
     staged: inputFiles,
     onChoose: (input, chosen, was) => {
       setReading(null);
-      stageInputFiles(place, input, chosen, was)
-        .then((change) => {
-          setInputFiles((before) => [
-            ...before.filter((each) => each.id !== change.id),
-            {
-              ...change,
-              was: before.find((each) => each.id === change.id)?.was ?? was,
-            },
-          ]);
-          setInput(change.id, { value: change.value });
-        })
-        .catch((error: unknown) => setReading(error));
+      stageFile(
+        stageInputFiles(place, input, chosen, was)
+          .then((change) => {
+            setInputFiles((before) => [
+              ...before.filter((each) => each.id !== change.id),
+              {
+                ...change,
+                was: before.find((each) => each.id === change.id)?.was ?? was,
+              },
+            ]);
+            setInput(change.id, { value: change.value });
+          })
+          .catch((error: unknown) => setReading(error)),
+      );
     },
     onUndo: (id) => {
       const undone = inputFiles.find((each) => each.id === id);
@@ -314,6 +324,7 @@ function BuildForm({
     ]),
     ...(savedReadable ? scoreProblems : []),
     ...values.checks.map(checkProblem),
+    pendingFiles > 0 ? 'A chosen file is still being read.' : undefined,
   ].filter((problem): problem is string => problem !== undefined);
   const workflowRaw = useMemo(() => {
     if (text === null) return null;
@@ -410,42 +421,44 @@ function BuildForm({
         onFile={(path, file) => {
           setReading(null);
           const was = path;
-          stageRunFile(place, path, file, '')
-            .then((change) => {
-              setInputFiles((before) => [
-                ...before.filter((each) => each.id !== change.id),
-                {
-                  ...change,
-                  was: before.find((each) => each.id === change.id)?.was ?? was,
-                },
-              ]);
-              const [, axisText, rowText, id] = path.split('/');
-              const axis = Number(axisText);
-              const row = Number(rowText);
-              if (id === undefined) return;
-              setValues((before) => ({
-                ...before,
-                axes: before.axes.map((item, index) =>
-                  index === axis
-                    ? {
-                        ...item,
-                        tuples: item.tuples.map((tuple, at) =>
-                          at === row
-                            ? {
-                                ...tuple,
-                                cells: {
-                                  ...tuple.cells,
-                                  [id]: { entrant: false, value: path },
-                                },
-                              }
-                            : tuple,
-                        ),
-                      }
-                    : item,
-                ),
-              }));
-            })
-            .catch((error: unknown) => setReading(error));
+          stageFile(
+            stageRunFile(place, path, file, '')
+              .then((change) => {
+                setInputFiles((before) => [
+                  ...before.filter((each) => each.id !== change.id),
+                  {
+                    ...change,
+                    was: before.find((each) => each.id === change.id)?.was ?? was,
+                  },
+                ]);
+                const [, axisText, rowText, id] = path.split('/');
+                const axis = Number(axisText);
+                const row = Number(rowText);
+                if (id === undefined) return;
+                setValues((before) => ({
+                  ...before,
+                  axes: before.axes.map((item, index) =>
+                    index === axis
+                      ? {
+                          ...item,
+                          tuples: item.tuples.map((tuple, at) =>
+                            at === row
+                              ? {
+                                  ...tuple,
+                                  cells: {
+                                    ...tuple.cells,
+                                    [id]: { entrant: false, value: path },
+                                  },
+                                }
+                              : tuple,
+                          ),
+                        }
+                      : item,
+                  ),
+                }));
+              })
+              .catch((error: unknown) => setReading(error)),
+          );
         }}
       />
       {savedReadable && (

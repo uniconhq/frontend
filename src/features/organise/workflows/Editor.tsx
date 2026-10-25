@@ -3,7 +3,7 @@ import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-quer
 import { useBlocker } from 'react-router';
 import { $api } from '@/api/query';
 import { toApiError, type ApiError } from '@/api/problem';
-import type { WorkflowPage } from '@/api/types';
+import type { SaveChange, WorkflowPage } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { UnsavedNote } from '@/ui/UnsavedNote';
 import { Button } from '@/ui/Button';
@@ -32,6 +32,7 @@ import {
 } from './edit';
 import { sourceAt, targetAt, type Target } from './ends';
 import { useNotice } from './notice';
+import { WorkflowFiles } from './Files';
 import { FileView } from './FileView';
 import { Graph } from './Graph';
 import { Inside } from './Inside';
@@ -241,6 +242,9 @@ export function Editor({
     text: page.draft.content,
     token: page.draft.token,
   });
+  const [revision, setRevision] = useState(page.draft.revision ?? null);
+  const [fileChanges, setFileChanges] = useState<SaveChange[]>([]);
+  const [uploading, setUploading] = useState(false);
   const [chosen, setChosen] = useState<Chosen | null>(null);
   const [nonce, setNonce] = useState(0);
   const [dragging, setDragging] = useState<Ref | null>(null);
@@ -338,7 +342,7 @@ export function Editor({
     [selectedKey, nonce],
   );
   const marked = useMemo(() => linesOf(text, selected), [text, selected]);
-  const dirty = text !== saved.text;
+  const dirty = text !== saved.text || fileChanges.length > 0 || uploading;
   const drawing = !mending;
 
   const change = (next: string) => {
@@ -359,9 +363,20 @@ export function Editor({
     try {
       const written = await save.mutateAsync({
         params: { path: { owner, name } },
-        body: { content, token: over.token },
+        body: {
+          content,
+          token: over.token,
+          ...(fileChanges.length === 0 ? {} : { changes: fileChanges }),
+        },
       });
       setSaved({ text: written.content, token: written.token });
+      setRevision(written.revision ?? null);
+      setFileChanges([]);
+      await queryClient.invalidateQueries({
+        queryKey: $api.queryOptions('get', '/api/v1/workflows/{owner}/{name}/tree', {
+          params: { path: { owner, name } },
+        }).queryKey,
+      });
       setConflict(null);
       return true;
     } catch (caught) {
@@ -375,6 +390,10 @@ export function Editor({
         });
         const current = fresh.draft;
         if (current !== null) {
+          if (fileChanges.length > 0 && current.content === content) {
+            setSaveError(error);
+            return false;
+          }
           setConflict({
             base: over.text,
             mine: content,
@@ -634,7 +653,7 @@ export function Editor({
         }
       >
         <Button
-          disabled={!dirty}
+          disabled={!dirty || uploading}
           loading={save.isPending}
           onClick={() => void write(text, saved)}
         >
@@ -645,6 +664,7 @@ export function Editor({
           name={name}
           versions={page.versions}
           token={saved.token}
+          revision={revision}
           dirty={dirty}
           problems={check.isSuccess ? problems.length : 0}
           checking={checking || check.isPending}
@@ -844,6 +864,17 @@ export function Editor({
       >
         {panel}
       </Drawer>
+      <WorkflowFiles
+        key={revision ?? 'draft'}
+        place={{ kind: 'workflow', owner, name }}
+        changes={fileChanges}
+        onChange={(changes) => {
+          setFileChanges(changes);
+          setPublished(null);
+        }}
+        disabled={save.isPending}
+        onBusy={setUploading}
+      />
       <LeaveGuard dirty={dirty} />
     </div>
   );

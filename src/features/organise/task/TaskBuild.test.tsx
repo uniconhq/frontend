@@ -1207,6 +1207,47 @@ describe('islands, cartpole and tour', { timeout: 60_000 }, () => {
     );
   });
 
+  it('keeps Save waiting until a chosen run file has been read', async () => {
+    let release: () => void = () => undefined;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const { sent } = taskBackend({
+      content: 'name: Islands\nworkflow: unicon/classic@v3\n',
+      form: runForm('unicon/classic@v3', [
+        declared('time_limit', 'number'),
+        declared('input', 'file'),
+      ]),
+    });
+    server.use(
+      http.get(`${TASK_API}/files/:path`, async ({ params }) => {
+        const path = decodeURIComponent(String(params['path']));
+        if (!path.startsWith('runs/')) return undefined;
+        await gate;
+        return problem(404, 'not_found');
+      }),
+    );
+    const { inputs } = await openTask();
+    fill(fieldIn(inputs, 'time_limit', 'time_limit'), '2');
+    await who(inputs, 'input', 'One for each run');
+    const bar = await screen.findByRole('region', { name: 'Save the task' });
+    const runs = screen.getByRole('region', { name: 'Runs' });
+    await userEvent.upload(
+      within(runs).getByLabelText('File for row 1 input'),
+      new File(['1'], '1.in'),
+    );
+    expect(within(bar).getByRole('button', { name: 'Save' })).toBeDisabled();
+    expect(sent).toHaveLength(0);
+    release();
+    await waitFor(() =>
+      expect(within(bar).getByRole('button', { name: 'Save' })).toBeEnabled(),
+    );
+    await save();
+    expect(sent[0]?.changes.map((change) => change.path)).toEqual(
+      expect.arrayContaining(['task.yaml', 'runs/0/0/input']),
+    );
+  });
+
   it('saves cartpole as two axes, 2 × 3 runs', async () => {
     const { sent } = taskBackend({
       content: 'name: Cartpole\nworkflow: cs2109s/cartpole@v1\n',
