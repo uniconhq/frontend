@@ -15,16 +15,6 @@
   position: absolute;
 }
 
-/* What a wire that skips a column carries, where it first passes under
- * that column's boxes. */
-.slotLabel {
-  position: absolute;
-  font-size: 11px;
-  font-weight: 600;
-  white-space: nowrap;
-  pointer-events: none;
-}
-
 .ear {
   position: absolute;
   height: 12px;
@@ -79,106 +69,6 @@
   text-overflow: ellipsis;
 }
 
-/* A small box: its name on one line, and a mark when it has a problem. */
-.compactHead {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  box-sizing: border-box;
-  flex: none;
-  padding: 0 10px;
-}
-
-.compactTitle {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--unicon-text-primary);
-  font-family: var(--mantine-font-family-monospace);
-  font-size: 13px;
-  font-weight: 700;
-}
-
-.compactMark {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex: none;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: var(--unicon-text-danger);
-  color: var(--unicon-body);
-  font-size: 11px;
-  font-weight: 700;
-}
-
-.face[data-drop] {
-  outline: 2px solid var(--unicon-text-accent);
-  outline-offset: 3px;
-}
-
-/* A dot that drags out a wire: bigger to catch, and a hand over it. */
-[data-handle] {
-  cursor: grab;
-  touch-action: none;
-}
-
-.wireHandle {
-  pointer-events: stroke;
-  cursor: grab;
-}
-
-.pin[data-handle] {
-  width: 12px;
-  height: 12px;
-}
-
-.pin[data-side='out'][data-handle] {
-  right: -7px;
-}
-
-.face[data-problem] {
-  outline: 2px dashed var(--unicon-text-danger);
-  outline-offset: 3px;
-}
-
-.foot {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  box-sizing: border-box;
-  flex: none;
-  margin-top: auto;
-  padding: 0 10px;
-  border-top: 1px solid var(--unicon-border);
-  color: var(--unicon-text-secondary);
-  font-size: 11px;
-}
-
-.file {
-  padding: 0;
-  border: 0;
-  background: transparent;
-  cursor: pointer;
-  color: var(--unicon-text-primary);
-  font-family: var(--mantine-font-family-monospace);
-  font-size: 12px;
-  font-weight: 700;
-  text-decoration: none;
-}
-
-.file:hover {
-  color: var(--unicon-text-accent);
-  text-decoration: underline;
-}
-
-.openHint {
-  color: var(--unicon-text-accent);
-  font-weight: 700;
-}
-
 .ports {
   display: flex;
   flex-direction: column;
@@ -197,11 +87,6 @@
 
 .portRow[data-side='out'] {
   justify-content: flex-end;
-}
-
-/* What a port is given reads as words, beside the port's name. */
-.portSaid {
-  font-family: var(--mantine-font-family);
 }
 
 .portRow > span:not(.dot) {

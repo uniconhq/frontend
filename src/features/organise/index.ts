@@ -7,7 +7,7 @@ import {
   ContestSettingsPage,
 } from './contest/ContestSections';
 import { GradingsFeedPage } from './gradings/GradingsFeedPage';
-import { OrganisedBoardsPage } from './boards/OrganisedBoardsPage';
+import { OrganisedLeaderboardsPage } from './leaderboards/OrganisedLeaderboardsPage';
 import { OrgOrganisersPage, OrgSettingsPage } from './org/OrgSections';
 import {
   TaskAnnouncementsPage,
@@ -46,7 +46,7 @@ export const CONTEST_SECTION_PAGES: Record<ContestSectionKey, ComponentType> = {
   entry: ContestEntryPage,
   entrants: EntrantsPage,
   gradings: GradingsFeedPage,
-  boards: OrganisedBoardsPage,
+  boards: OrganisedLeaderboardsPage,
   announcements: ContestAnnouncementsPage,
   questions: ContestQuestionsPage,
   organisers: ContestOrganisersPage,

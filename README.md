@@ -202,7 +202,7 @@ breadcrumb share both.
 
 The pages live in `src/features/organise/`: a sub-folder for each page
 (`orgs/` holds `/orgs` and `/orgs/new`, then `org/`, `contest/`, `entrants/`,
-`gradings/`, `boards/` for the leaderboards, and `task/`, which holds the
+`gradings/`, `leaderboards/`, and `task/`, which holds the
 queue too), one for the formula editor a task's values and a leaderboard's
 columns share (`formula/`), one for reading, previewing and saving the files the
 contest and task pages share (`files/`), one for the settings forms and the statement (`forms/`),
@@ -488,8 +488,8 @@ compared; with no leaderboard it lists the values each submission changed,
 and beside either the verdicts that changed, by run, past 20 runs and 100
 submissions as a count.
 
-The contest's Leaderboards page (`boards/`) is one card for each
-leaderboard, a form over `contest.yaml` (`boards/LeaderboardsForm.tsx`): its
+The contest's Leaderboards page (`leaderboards/`) is one card for each
+leaderboard, a form over `contest.yaml` (`leaderboards/LeaderboardsForm.tsx`): its
 key, which other leaderboards' formulas read it by, and its title; who sees
 it, Staff, Entrants or Everyone, and which rows, every row, each entrant's
 own row (not for everyone) or the top rows; its columns, each a name and a
@@ -964,7 +964,7 @@ src/
   features/  home (landing, the contest lists, your invites), auth (login page), account
              (profile, sessions), contest (the contestant pages, with submit/
              for the submit panel and the submissions), organise (the
-             organiser pages, with formula/ for the formula editor, boards/
+             organiser pages, with formula/ for the formula editor, leaderboards/
              for the leaderboards and workflows/ for the workflow editor)
   test/      Vitest setup, the MSW server and the organiser's and contestant's
              fixtures, the

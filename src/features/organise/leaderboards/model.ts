@@ -252,18 +252,13 @@ export function workflowRef(
   return { owner: head.slice(0, slash), name: head.slice(slash + 1), version };
 }
 
-/** The output names a workflow file declares, `outputs` or the older `report`. */
+/** The output names a workflow file declares under `outputs`. */
 export function outputNames(content: string): string[] {
   const parsed = parseYaml(content);
   if ('error' in parsed) return [];
   const top = exactJS(parsed.doc);
-  if (!isRecord(top)) return [];
-  const outputs = isRecord(top['outputs'])
-    ? top['outputs']
-    : isRecord(top['report'])
-      ? top['report']
-      : null;
-  return outputs === null ? [] : Object.keys(outputs);
+  if (!isRecord(top) || !isRecord(top['outputs'])) return [];
+  return Object.keys(top['outputs']);
 }
 
 /** The contest's end, an hour earlier, as the time field holds it. Empty when the end is not a time. */

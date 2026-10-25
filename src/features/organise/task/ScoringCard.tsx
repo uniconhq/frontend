@@ -22,7 +22,7 @@ import type { TaskValues } from '../forms/task-values';
 import { BuildCard, CardPart } from './BuildCard';
 import type { TaskPlace } from './build-data';
 import { BoxGraph } from './BoxGraph';
-import { PALETTES, type GraphBox, type GraphWire, type Shape } from './graph';
+import { TASK_PALETTE, type GraphBox, type GraphWire, type Shape } from './graph';
 import {
   FACTS,
   WHEN,
@@ -46,7 +46,7 @@ import {
 } from './scoring-model';
 import classes from './task.module.css';
 
-const SCORING: Shape = { width: 176, gap: 40, compact: false };
+const SCORING: Shape = { width: 176, gap: 40 };
 
 /**
  * How a submission is scored: what one run gives, the groups, the result as
@@ -209,8 +209,7 @@ export function ScoringCard({
             selected={chosen}
             onSelect={setChosen}
             shape={SCORING}
-            palette={PALETTES.task}
-            labels={false}
+            palette={TASK_PALETTE}
             floor={0}
             inside={(box) => {
               const value = values.scoreValues.find(

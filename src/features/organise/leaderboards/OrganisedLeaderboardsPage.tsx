@@ -5,7 +5,7 @@ import { SectionPage } from '../SectionPage';
 import { LeaderboardsForm } from './LeaderboardsForm';
 
 /** The contest's leaderboards and its hold, one card per leaderboard. */
-export function OrganisedBoardsPage() {
+export function OrganisedLeaderboardsPage() {
   const { org, contest } = useContestParams();
   return (
     <SectionPage section={sectionOf(CONTEST_SECTIONS, 'boards')}>
