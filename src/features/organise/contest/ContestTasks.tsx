@@ -18,6 +18,7 @@ import { formatDateTime, serverNow } from '@/lib/time';
 import { CreateButton } from '../Create';
 import { DefinitionErrors } from '../DefinitionErrors';
 import { definitionErrorsOf } from '../files/refusals';
+import { SaveOutcome, type Outcome } from '../files/SaveOutcome';
 import { holdsAtContest, tasksReached } from '../roles';
 import type { ContestValues } from '../forms/contest-values';
 import type { Doc } from '../forms/yaml-doc';
@@ -246,7 +247,7 @@ export function ContestTasks({ org, contest }: { org: string; contest: string })
   );
   const queryClient = useQueryClient();
   const change = useContestChange(org, contest);
-  const [moveRefused, setMoveRefused] = useState<unknown>(null);
+  const [moveRefused, setMoveRefused] = useState<Outcome | null>(null);
   /** A move asked about, while the contest has started. */
   const [asked, setAsked] = useState<Asked | null>(null);
   const started =
@@ -257,7 +258,7 @@ export function ContestTasks({ org, contest }: { org: string; contest: string })
     setMoveRefused(null);
     setAsked(null);
     const outcome = await change.apply(moved(task, by));
-    if (outcome.kind === 'refused') setMoveRefused(outcome.error);
+    if (outcome.kind === 'refused') setMoveRefused(outcome);
     await queryClient.invalidateQueries({ queryKey: standingsKey });
   };
   const create = $api.useMutation('post', TASKS, {
@@ -329,9 +330,18 @@ export function ContestTasks({ org, contest }: { org: string; contest: string })
 
   const notice =
     moveRefused !== null ? (
-      <div role="alert">
-        <ErrorBlock error={moveRefused} compact />
-      </div>
+      <SaveOutcome
+        outcome={moveRefused}
+        onConfirm={(body, asked) => {
+          void change
+            .write({ ...body, confirm: true, asked })
+            .then((answer) =>
+              setMoveRefused(answer.kind === 'refused' ? answer : null),
+            );
+        }}
+        onCancel={() => setMoveRefused(null)}
+        onReload={() => setMoveRefused(null)}
+      />
     ) : startFailed !== null ? (
       <div className={classes.panel} role="alert">
         <BodyText>

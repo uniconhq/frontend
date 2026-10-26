@@ -16,7 +16,7 @@ import { contestPath, taskPath } from '@/lib/organiser-paths';
 import { contestSectionPath, taskCardPath } from '@/lib/sections';
 import { formatDateTime, serverNow } from '@/lib/time';
 import { DefinitionErrors } from '../DefinitionErrors';
-import type { Outcome } from '../files/SaveOutcome';
+import { SaveOutcome, type Outcome } from '../files/SaveOutcome';
 import { definitionErrorsOf } from '../files/refusals';
 import type { ContestValues } from '../forms/contest-values';
 import { isoOf } from '../forms/times';
@@ -251,7 +251,7 @@ export function StatusCard({ org, contest }: { org: string; contest: string }) {
     tasks.state === 'ready' ? tasks.data.map((standing) => standing.task.name) : [],
   );
   const admin = holdsAt(useMe().roles, { kind: 'contest', org, contest }, 'admin');
-  const { apply, pending } = useContestChange(org, contest);
+  const { apply, write, pending } = useContestChange(org, contest);
   const [asking, setAsking] = useState<Ask>(null);
   const [refused, setRefused] = useState<Outcome | null>(null);
   const [visibility, setVisibility] = useState('');
@@ -379,18 +379,32 @@ export function StatusCard({ org, contest }: { org: string; contest: string }) {
                 </BodyText>
               )}
               {actions.length > 0 && <div className={shared.actions}>{actions}</div>}
-              {refused?.kind === 'refused' && (
-                <div className={shared.panel} role="alert">
-                  {ownRefusals(refused.error) ?? (
-                    <>
-                      <ErrorBlock error={refused.error} compact />
-                      <DefinitionErrors
-                        errors={definitionErrorsOf(refused.error)}
-                        placeOf={contestPlaceOf(org, contest)}
-                      />
-                    </>
-                  )}
-                </div>
+              {refused?.kind === 'refused' &&
+              refused.error.code === 'confirmation_required' ? (
+                <SaveOutcome
+                  outcome={refused}
+                  onConfirm={(body, asked) => {
+                    void write({ ...body, confirm: true, asked }).then((answer) =>
+                      setRefused(answer.kind === 'refused' ? answer : null),
+                    );
+                  }}
+                  onCancel={() => setRefused(null)}
+                  onReload={() => setRefused(null)}
+                />
+              ) : (
+                refused?.kind === 'refused' && (
+                  <div className={shared.panel} role="alert">
+                    {ownRefusals(refused.error) ?? (
+                      <>
+                        <ErrorBlock error={refused.error} compact />
+                        <DefinitionErrors
+                          errors={definitionErrorsOf(refused.error)}
+                          placeOf={contestPlaceOf(org, contest)}
+                        />
+                      </>
+                    )}
+                  </div>
+                )
               )}
               <Modal
                 opened={asking === 'open'}
