@@ -18,7 +18,7 @@ function shown(props: Parameters<typeof ShownValue>[0]) {
 
 describe('ShownValue', () => {
   it('rounds a number and keeps the exact digits on hover', () => {
-    shown({ number: '2.675', places: 2 });
+    shown({ number: '2.675', decimals: 2 });
     const value = screen.getByText(formatExact('2.675', 2));
     expect(value).toHaveAttribute('title', '2.675');
   });

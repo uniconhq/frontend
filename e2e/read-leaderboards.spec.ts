@@ -15,7 +15,7 @@ const GRADEBOOK = {
   title: 'Gradebook',
   audience: { who: 'entrants', rows: 'own' },
   headers: [
-    { name: 'points', places: null, at_least: null, at_most: '100', self_reported: [] },
+    { name: 'points', decimals: null, at_least: null, at_most: '100', self_reported: [] },
   ],
   sort: [{ column: 'points', way: 'desc' }],
   dropped: [],
@@ -45,7 +45,7 @@ const ICPC = {
   title: 'ICPC',
   audience: { who: 'everyone', rows: 'all' },
   headers: [
-    { name: 'solved', places: 0, at_least: null, at_most: null, self_reported: [] },
+    { name: 'solved', decimals: 0, at_least: null, at_most: null, self_reported: [] },
   ],
   sort: [{ column: 'solved', way: 'desc' }],
   dropped: [],

@@ -21,7 +21,7 @@ const GRADEBOOK: components['schemas']['Leaderboard'] = {
   title: 'Gradebook',
   audience: { who: 'entrants', rows: 'own' },
   headers: [
-    { name: 'points', places: null, at_least: null, at_most: '100', self_reported: [] },
+    { name: 'points', decimals: null, at_least: null, at_most: '100', self_reported: [] },
   ],
   sort: [{ column: 'points', way: 'desc' }],
   dropped: [],

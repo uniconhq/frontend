@@ -12,19 +12,19 @@ export function ShownValue({
   text = null,
   waiting = false,
   hidden = false,
-  places,
+  decimals,
 }: {
   number: string | null;
   text?: string | null;
   waiting?: boolean;
   hidden?: boolean;
   /** Decimals to round a number to. A leaderboard passes its column's. */
-  places?: number;
+  decimals?: number;
 }) {
   if (hidden) return <span>{MISSING}</span>;
   if (waiting) return <span>{BEING_CHECKED}</span>;
   if (number !== null) {
-    const shown = formatExact(number, places);
+    const shown = formatExact(number, decimals);
     return <span title={shown === number ? undefined : number}>{shown}</span>;
   }
   if (text !== null) {

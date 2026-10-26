@@ -53,25 +53,25 @@ export type Ratio = { num: bigint; den: bigint };
 
 /**
  * A fraction as plain decimal digits, rounded half away from zero, or cut
- * toward zero, to at most `places` decimals, and whether that is the
+ * toward zero, to at most `decimals` decimals, and whether that is the
  * fraction exactly: `1/4` is `0.25` exactly, `100/3` is `33.33` and not
  * exact, `200/3` is `66.67` rounded and `66.66` cut.
  */
 export function ratioDigits(
   value: Ratio,
-  places = 2,
+  decimals = 2,
   how: 'round' | 'cut' = 'round',
 ): { digits: string; exact: boolean } {
   const negative = value.num < 0n;
   const num = negative ? -value.num : value.num;
-  const scale = 10n ** BigInt(places);
+  const scale = 10n ** BigInt(decimals);
   const whole = (num * scale) / value.den;
   const left = (num * scale) % value.den;
   const units = how === 'round' && 2n * left >= value.den ? whole + 1n : whole;
-  const text = units.toString().padStart(places + 1, '0');
+  const text = units.toString().padStart(decimals + 1, '0');
   const digits =
-    places === 0 ? text : `${text.slice(0, -places)}.${text.slice(-places)}`;
-  const kept = rounded(digits, places);
+    decimals === 0 ? text : `${text.slice(0, -decimals)}.${text.slice(-decimals)}`;
+  const kept = rounded(digits, decimals);
   return {
     digits: negative && units !== 0n ? `-${kept}` : kept,
     exact: left === 0n,
@@ -88,22 +88,24 @@ function partsOf(exact: string): Parts {
 }
 
 /**
- * `exact` rounded half away from zero to at most `places` decimals, with
+ * `exact` rounded half away from zero to at most `decimals` decimals, with
  * trailing zeros dropped, still as plain digits: `"2.675"` to 2 is `"2.68"`.
  */
-export function rounded(exact: string, places: number): string {
+export function rounded(exact: string, decimals: number): string {
   const { negative, whole, fraction } = partsOf(exact);
-  if (fraction.length <= places) {
+  if (fraction.length <= decimals) {
     const kept = fraction.replace(/0+$/, '');
     const digits = kept === '' ? whole : `${whole}.${kept}`;
     return negative && digits.replace(/[0.]/g, '') !== '' ? `-${digits}` : digits;
   }
-  const scaled = BigInt(whole + fraction.slice(0, places));
-  const up = Number(fraction[places]) >= 5 ? 1n : 0n;
-  const digits = (scaled + up).toString().padStart(places + 1, '0');
+  const scaled = BigInt(whole + fraction.slice(0, decimals));
+  const up = Number(fraction[decimals]) >= 5 ? 1n : 0n;
+  const digits = (scaled + up).toString().padStart(decimals + 1, '0');
   const cut =
-    places === 0 ? digits : `${digits.slice(0, -places)}.${digits.slice(-places)}`;
-  return rounded(negative ? `-${cut}` : cut, places);
+    decimals === 0
+      ? digits
+      : `${digits.slice(0, -decimals)}.${digits.slice(-decimals)}`;
+  return rounded(negative ? `-${cut}` : cut, decimals);
 }
 
 const locale = new Intl.NumberFormat();
@@ -111,13 +113,13 @@ const decimalSign =
   locale.formatToParts(0.5).find((part) => part.type === 'decimal')?.value ?? '.';
 
 /**
- * `exact` for reading, rounded to at most `places` decimals and written the
+ * `exact` for reading, rounded to at most `decimals` decimals and written the
  * way the reader's locale writes numbers. Its whole part is grouped as an
  * integer and its decimals kept as digits, so a number past what a float
  * holds is shown whole.
  */
-export function formatExact(exact: string, places = 4): string {
-  const { negative, whole, fraction } = partsOf(rounded(exact, places));
+export function formatExact(exact: string, decimals = 4): string {
+  const { negative, whole, fraction } = partsOf(rounded(exact, decimals));
   const grouped = locale.format(BigInt(whole));
   const digits = fraction === '' ? grouped : `${grouped}${decimalSign}${fraction}`;
   return negative ? `-${digits}` : digits;

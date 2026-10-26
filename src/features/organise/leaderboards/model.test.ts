@@ -50,7 +50,7 @@ function board(over: Partial<BoardDraft> & Pick<BoardDraft, 'key'>): BoardDraft 
     top: '10',
     columns: [{ key: 'c', name: 'points', line: null, tree: '1' }],
     sort: [{ name: 'points', way: 'desc' }],
-    display: [{ name: 'points', places: '' }],
+    display: [{ name: 'points', decimals: '' }],
     ...over,
   };
 }
@@ -64,6 +64,33 @@ function draft(
 }
 
 describe('leaderboards written into contest.yaml', () => {
+  it('writes and reads a column with decimals', () => {
+    const doc = open(FILE);
+    const before = readLeaderboards(doc);
+    const next = commit(
+      draft(
+        doc,
+        [
+          board({
+            key: 'standings',
+            display: [{ name: 'points', decimals: '2' }],
+          }),
+        ],
+        before.hold,
+      ),
+      catalogue,
+      ['islands'],
+      {},
+    );
+    writeLeaderboards(doc, before, next);
+    const text = writeOver(FILE, doc);
+    expect(text).toContain('decimals: 2');
+    expect(text).not.toContain('places:');
+    expect(readLeaderboards(open(text)).boards[0]?.display).toEqual([
+      { name: 'points', decimals: '2' },
+    ]);
+  });
+
   it('writes the gradebook, the olympiad, ICPC and a hold', () => {
     const doc = open(FILE);
     const before = readLeaderboards(doc);
@@ -95,9 +122,9 @@ describe('leaderboards written into contest.yaml', () => {
               { name: 'last_solve', way: 'asc' },
             ],
             display: [
-              { name: 'solved', places: '' },
-              { name: 'penalty', places: '' },
-              { name: 'last_solve', places: '' },
+              { name: 'solved', decimals: '' },
+              { name: 'penalty', decimals: '' },
+              { name: 'last_solve', decimals: '' },
             ],
           }),
         ],
@@ -173,8 +200,8 @@ describe('leaderboards written into contest.yaml', () => {
           ),
           sort: [{ name: 'score', way: 'desc' as const }],
           display: [
-            { name: 'score', places: '' },
-            { name: 'bonus', places: '' },
+            { name: 'score', decimals: '' },
+            { name: 'bonus', decimals: '' },
           ],
         },
         { ...olympiad, key: 'olympiad_2026' },
@@ -389,7 +416,7 @@ describe('a name with a -', () => {
       key: 'rival-board',
       columns: [{ key: 'c', name: 'top-score', line: null, tree: '1' }],
       sort: [{ name: 'top-score', way: 'desc' }],
-      display: [{ name: 'top-score', places: '' }],
+      display: [{ name: 'top-score', decimals: '' }],
     });
     const one = draft(open(FILE), [own, rival], {
       locked: false,
@@ -560,14 +587,14 @@ describe('what the editor refuses', () => {
       key: 'notes',
       columns: [{ key: 'c', name: 'note', line: '"hi"', tree: null }],
       sort: [{ name: 'note', way: 'desc' }],
-      display: [{ name: 'note', places: '' }],
+      display: [{ name: 'note', decimals: '' }],
     });
     expect(text.some((item) => item.message.includes('text column'))).toBe(true);
     const pick = found({
       key: 'latest',
       columns: [{ key: 'c', name: 'last', line: 'latest(islands)', tree: null }],
       sort: [{ name: 'last', way: 'desc' }],
-      display: [{ name: 'last', places: '' }],
+      display: [{ name: 'last', decimals: '' }],
     });
     expect(
       pick.some(
