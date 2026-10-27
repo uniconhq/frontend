@@ -623,7 +623,7 @@ function BoardCard({
               if (next === undefined || next.name === '') return current;
               return {
                 ...current,
-                display: [...current.display, { name: next.name, places: '' }],
+                display: [...current.display, { name: next.name, decimals: '' }],
               };
             })
           }
@@ -799,12 +799,12 @@ function DisplayRow({
       />
       {kind !== 'text' && kind !== 'pick' && (
         <TextInput
-          label="Decimal places"
-          value={item.places}
+          label="Decimals"
+          value={item.decimals}
           inputMode="decimal"
           disabled={disabled}
           placeholder="As given"
-          onChange={(places) => onChange({ ...item, places })}
+          onChange={(decimals) => onChange({ ...item, decimals })}
         />
       )}
       <Button variant="secondary" size="xs" disabled={disabled} onClick={onRemove}>

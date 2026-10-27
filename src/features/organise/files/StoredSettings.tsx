@@ -209,7 +209,12 @@ export function StoredSettings({ place }: { place: Place }) {
         <SaveOutcome
           outcome={outcome}
           onConfirm={(body, asked) => void save({ ...body, confirm: true, asked })}
-          onKeepAsDraft={(body) => void save({ ...body, keep_as_draft: true })}
+          onKeepAsDraft={
+            place.kind === 'task'
+              ? (body) => void save({ ...body, keep_as_draft: true })
+              : undefined
+          }
+          onCancel={() => setOutcome(null)}
           onReload={() => void reload()}
           placeOf={placeOfIn(place)}
         />

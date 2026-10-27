@@ -64,5 +64,5 @@ export function useContestChange(org: string, contest: string) {
     return outcome;
   };
 
-  return { apply, pending };
+  return { apply, write, pending };
 }

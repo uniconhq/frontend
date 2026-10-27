@@ -65,7 +65,7 @@ export function LeaderboardTable({
                       number={cell?.number ?? null}
                       text={cell?.text}
                       hidden={cell?.hidden ?? false}
-                      places={header.places ?? undefined}
+                      decimals={header.decimals ?? undefined}
                     />
                     <CountedLinks
                       counted={cell?.counted ?? null}

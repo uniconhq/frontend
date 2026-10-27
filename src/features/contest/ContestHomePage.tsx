@@ -124,7 +124,7 @@ function TaskList({
           <PageLink to={taskPagePath(org, contest, task.name)}>{task.title}</PageLink>
           {taskPoints(task.name, standing).map((points) => (
             <span key={points.board}>
-              <ShownValue number={points.number} places={points.places} />
+              <ShownValue number={points.number} decimals={points.decimals} />
               {staff && points.most !== null && ` / ${formatExact(points.most)}`}
             </span>
           ))}

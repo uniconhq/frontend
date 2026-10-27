@@ -47,7 +47,7 @@ export type ColumnDraft = {
 };
 
 export type SortDraft = { name: string; way: 'desc' | 'asc' };
-export type ShowDraft = { name: string; places: string };
+export type ShowDraft = { name: string; decimals: string };
 
 export type BoardDraft = {
   id: string;
@@ -139,7 +139,7 @@ export function blankBoard(taken: readonly string[]): BoardDraft {
     top: '10',
     columns: [{ key: nextId('column'), name: 'points', line: null, tree: '1' }],
     sort: [{ name: 'points', way: 'desc' }],
-    display: [{ name: 'points', places: '' }],
+    display: [{ name: 'points', decimals: '' }],
   };
 }
 
@@ -181,14 +181,14 @@ function readSort(value: unknown): SortDraft[] {
 function readDisplay(value: unknown): ShowDraft[] {
   if (!Array.isArray(value)) return [];
   return value.flatMap((item) => {
-    if (typeof item === 'string') return [{ name: item, places: '' }];
+    if (typeof item === 'string') return [{ name: item, decimals: '' }];
     if (!isRecord(item)) return [];
     const entries = Object.entries(item);
     const first = entries[0];
     if (entries.length !== 1 || first === undefined) return [];
     const [name, how] = first;
-    const places = isRecord(how) ? textOf(how['places']) : '';
-    return [{ name, places: /^([0-9]|10)$/.test(places) ? places : '' }];
+    const decimals = isRecord(how) ? textOf(how['decimals']) : '';
+    return [{ name, decimals: /^([0-9]|10)$/.test(decimals) ? decimals : '' }];
   });
 }
 
@@ -496,9 +496,9 @@ function boardValue(board: BoardDraft): Record<string, unknown> {
   }
   if (board.display.length > 0) {
     value['display'] = board.display.map((item) =>
-      item.places === ''
+      item.decimals === ''
         ? item.name
-        : { [item.name]: { places: numberText(item.places) } },
+        : { [item.name]: { decimals: numberText(item.decimals) } },
     );
   }
   return value;
@@ -680,11 +680,11 @@ function columnNameProblem(
   return unreadableProblem(name);
 }
 
-function placesProblem(places: string): string | null {
-  if (places === '') return null;
-  return /^([0-9]|10)$/.test(places)
+function decimalsProblem(decimals: string): string | null {
+  if (decimals === '') return null;
+  return /^([0-9]|10)$/.test(decimals)
     ? null
-    : 'Give a number of decimal places from 0 to 10.';
+    : 'Give a number of decimals from 0 to 10.';
 }
 
 /**
@@ -791,16 +791,16 @@ export function problems(
       if (kind === 'pick') {
         found.push({ field: `${board.key}.display`, message: 'A pick is not shown.' });
       }
-      if (kind === 'text' && item.places !== '') {
+      if (kind === 'text' && item.decimals !== '') {
         found.push({
           field: `${board.key}.display`,
           message: 'A text column is shown as given.',
         });
       }
-      const places =
-        kind === 'number' || kind === undefined ? placesProblem(item.places) : null;
-      if (places !== null)
-        found.push({ field: `${board.key}.display`, message: places });
+      const decimals =
+        kind === 'number' || kind === undefined ? decimalsProblem(item.decimals) : null;
+      if (decimals !== null)
+        found.push({ field: `${board.key}.display`, message: decimals });
     }
   }
   found.push(...holdProblems(draft.hold, saved, now, start, end));
