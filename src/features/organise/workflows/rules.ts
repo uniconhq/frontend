@@ -149,7 +149,8 @@ function fits(
   port: { type: string; options: string[] | null; optional: boolean },
 ): string | null {
   if (port.type === 'text' && SCALARS.includes(kind.type)) return null;
-  if (port.type === 'folder' && kind.type === 'file') return null;
+  if (port.type === 'folder' && kind.type === 'file' && kind.source !== 'workflow')
+    return null;
   if (port.type === 'enum') {
     const allowed = port.options ?? [];
     if (kind.type === 'enum' && kind.options !== null) {

@@ -185,7 +185,12 @@ export function DefinitionForm({
           onConfirm={(body, asked) =>
             void send(file, { ...body, confirm: true, asked })
           }
-          onKeepAsDraft={(body) => void send(file, { ...body, keep_as_draft: true })}
+          onKeepAsDraft={
+            place.kind === 'task'
+              ? (body) => void send(file, { ...body, keep_as_draft: true })
+              : undefined
+          }
+          onCancel={() => setOutcome(null)}
           onReload={() => {
             setOutcome(null);
             void query.refetch();

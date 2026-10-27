@@ -30,7 +30,8 @@ import {
   wire,
   workflowOf,
 } from './edit';
-import { sourceAt, targetAt, type Target } from './ends';
+import { sourceAt, targetAt, workflowSources, type Target } from './ends';
+import { treeQuery, type WorkflowPlace } from '../files/place';
 import { useNotice } from './notice';
 import { WorkflowFiles } from './Files';
 import { FileView } from './FileView';
@@ -245,6 +246,35 @@ export function Editor({
   const [revision, setRevision] = useState(page.draft.revision ?? null);
   const [fileChanges, setFileChanges] = useState<SaveChange[]>([]);
   const [uploading, setUploading] = useState(false);
+  const filePlace: WorkflowPlace = { kind: 'workflow', owner, name };
+  const savedFiles = useQuery({
+    queryKey: [
+      ...$api.queryOptions('get', '/api/v1/workflows/{owner}/{name}/tree', {
+        params: { path: { owner, name } },
+      }).queryKey,
+      'wire-sources',
+    ],
+    queryFn: async () => {
+      const paths: string[] = [];
+      const folders = [''];
+      const visited = new Set<string>();
+      for (let at = 0; at < folders.length; at += 1) {
+        const folder = folders[at];
+        if (folder === undefined || visited.has(folder)) continue;
+        visited.add(folder);
+        const entries = await queryClient.fetchQuery({
+          ...treeQuery(filePlace, folder),
+          staleTime: Infinity,
+        });
+        for (const entry of entries) {
+          if (entry.kind === 'directory') folders.push(entry.path);
+          else paths.push(entry.path);
+        }
+      }
+      return paths;
+    },
+  });
+
   const [chosen, setChosen] = useState<Chosen | null>(null);
   const [nonce, setNonce] = useState(0);
   const [dragging, setDragging] = useState<Ref | null>(null);
@@ -463,6 +493,7 @@ export function Editor({
         .filter((output) => output !== 'outcome')
         .map((output): Ref => ({ kind: 'steps', name: step.id, output }));
     }),
+    ...workflowSources(savedFiles.data ?? [], fileChanges),
   ];
 
   /** What a port's menu is called, or null for a port with none. */
@@ -736,6 +767,13 @@ export function Editor({
         </Button>
       </div>
       {saveError !== null && <ErrorBlock error={saveError} compact />}
+      {savedFiles.isError && (
+        <ErrorBlock
+          error={toApiError(savedFiles.error)}
+          compact
+          onRetry={() => void savedFiles.refetch()}
+        />
+      )}
       {conflict !== null && (
         <MergeView
           key={conflict.token}

@@ -192,6 +192,8 @@ function shownValue(
   if (box.step === null) return null;
   const value = workflow.steps[box.step]?.with[port];
   if (value === undefined) return null;
+  if (value.kind === 'wire' && value.ref.kind === 'workflow')
+    return `${value.ref.name}, a ${value.ref.name.endsWith('/') ? 'folder' : 'file'} of this workflow`;
   if (value.kind === 'wire')
     return drawn.has(`port:${String(box.step)}.${port}`)
       ? null

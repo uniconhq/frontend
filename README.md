@@ -499,7 +499,7 @@ own row (not for everyone) or the top rows; its columns, each a name and a
 formula on a leaderboard, which reads the contest's tasks, its other
 leaderboards and this one's columns; Sort, the columns that order its rows
 in turn, each highest or lowest first; Display, which columns show, a number
-with its decimal places, a text column as given; and Preview as, the saved
+with its decimals, a text column as given; and Preview as, the saved
 leaderboard as one chosen entrant would see it. Under the cards is the hold:
 off, or from a time, which "An hour before the end" fills, until a time or
 until staff end it. Before the save the page refuses what the forge would (a
@@ -743,7 +743,7 @@ by a column the reader is not shown, no row has a place and the leaderboard
 says "The order is partial." A column's header says "Self-reported" when it
 reads a column an entrant could set, and staff also read its bounds, "at
 least 0, at most 100". A cell shows its value as every page does
-(`src/ui/number/ShownValue.tsx`): a number to the column's decimal places,
+(`src/ui/number/ShownValue.tsx`): a number to the column's decimals,
 its exact digits on hover, a text on one line, and "–" when it is missing or
 hidden. On the reader's own row, and on every row for staff, a cell links
 the submissions it counted, and "Submission 4, being checked" for one it

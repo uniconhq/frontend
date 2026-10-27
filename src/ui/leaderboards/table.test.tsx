@@ -17,7 +17,7 @@ const open = (task: string, number: number) =>
 function header(name: string, over: Partial<Header> = {}): Header {
   return {
     name,
-    places: null,
+    decimals: null,
     at_least: null,
     at_most: null,
     self_reported: [],
@@ -224,7 +224,7 @@ describe('a task’s points', () => {
       board({
         headers: [
           header('total', { at_most: '200' }),
-          header('points', { at_most: '100', places: 1 }),
+          header('points', { at_most: '100', decimals: 1 }),
         ],
         rows: [
           row('ada', {
@@ -246,7 +246,7 @@ describe('a task’s points', () => {
       }),
     ];
     expect(taskPoints('sum', standing)).toEqual([
-      { board: 'gradebook', number: '62.25', places: 1, most: '100' },
+      { board: 'gradebook', number: '62.25', decimals: 1, most: '100' },
     ]);
     expect(taskPoints('other', standing)).toEqual([]);
   });
