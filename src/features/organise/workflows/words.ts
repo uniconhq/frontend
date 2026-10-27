@@ -93,7 +93,7 @@ export function entryMarks(entry: OutputEntry): string[] {
 export function refWords(ref: Ref): string {
   if (ref.kind === 'steps') return `${ref.output} from ${ref.name}`;
   if (ref.kind === 'inputs') return `${ref.name} from the inputs`;
-  return `${ref.name} from the workflow’s files`;
+  return `the workflow’s ${ref.name}`;
 }
 
 /** Who reads a workflow, in a few words, as its page's header says it. */

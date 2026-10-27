@@ -436,3 +436,13 @@ describe('editing the file in place', () => {
     expect(edited).toContain('program: ${{ workflow.diff/program.yaml }}');
   });
 });
+
+it('writes a workflow-owned folder wire and keeps its comments', () => {
+  const text = wire(COMMENTED, 0, 'source', { kind: 'workflow', name: 'checker/' });
+  expect(text).toContain('source: ${{ workflow.checker/ }}');
+  expect(text).toContain('# compile once');
+  expect(workflowOf(text).steps[0]?.with.source).toEqual({
+    kind: 'wire',
+    ref: { kind: 'workflow', name: 'checker/' },
+  });
+});
