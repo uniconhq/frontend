@@ -192,6 +192,9 @@ async function stubWorkflowApi(page: Page) {
       readers: [],
     }),
   );
+  await page.route('**/api/v1/workflows/kenny/tuned/tree**', (route) =>
+    json(route, []),
+  );
 }
 
 function handle(page: Page, node: string, id: string): Locator {
@@ -498,6 +501,9 @@ test('a box opens two levels in, and a problem opens the step inside', async ({
       draft: { content: draft, token: 'token-1' },
       readers: [],
     }),
+  );
+  await page.route('**/api/v1/workflows/kenny/tuned/tree**', (route) =>
+    json(route, []),
   );
   await page.route(/\/versions\/[^/]+\/box$/, (route) => {
     const newer = route.request().url().includes('/inner/') ? 'v2' : null;

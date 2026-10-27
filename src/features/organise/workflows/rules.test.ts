@@ -344,3 +344,43 @@ steps:
     );
   });
 });
+
+describe('workflow-owned sources', () => {
+  it('requires the exact file or folder type', () => {
+    expect(
+      wireRefusal(WORKFLOW, primitives, 0, 'source', {
+        kind: 'workflow',
+        name: 'checker/',
+      }),
+    ).toBeNull();
+    expect(
+      wireRefusal(WORKFLOW, primitives, 0, 'source', {
+        kind: 'workflow',
+        name: 'checker/program.yaml',
+      }),
+    ).toBe('This takes a folder, not a file.');
+    expect(
+      wireRefusal(WORKFLOW, primitives, 1, 'stdin', {
+        kind: 'workflow',
+        name: 'checker/program.yaml',
+      }),
+    ).toBeNull();
+    expect(
+      wireRefusal(WORKFLOW, primitives, 1, 'stdin', {
+        kind: 'workflow',
+        name: 'checker/',
+      }),
+    ).toBe('This takes a file, not a folder.');
+  });
+
+  it('never reports a workflow file as an output', () => {
+    expect(
+      outputRefusal(WORKFLOW, primitives, {
+        kind: 'workflow',
+        name: 'checker/program.yaml',
+      }),
+    ).toBe(
+      "Only a step's output can be reported, not an input or a file of the workflow.",
+    );
+  });
+});

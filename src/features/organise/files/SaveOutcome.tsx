@@ -114,13 +114,15 @@ export function SaveOutcome<Body = WriteFile>({
   outcome,
   onConfirm,
   onKeepAsDraft,
+  onCancel,
   onReload,
   placeOf,
   bare = false,
 }: {
   outcome: Outcome<Body>;
   onConfirm: (body: Body, asked: string | undefined) => void;
-  onKeepAsDraft: (body: Body) => void;
+  onKeepAsDraft?: (body: Body) => void;
+  onCancel?: () => void;
   onReload: () => void;
   placeOf?: PlaceOf;
   bare?: boolean;
@@ -228,16 +230,24 @@ export function SaveOutcome<Body = WriteFile>({
         )}
         <div className={classes.actions}>
           <Button onClick={() => onConfirm(body, askedOf(error))}>
-            Publish the change
+            {onKeepAsDraft === undefined ? 'Save the change' : 'Publish the change'}
           </Button>
-          <Button variant="secondary" onClick={() => onKeepAsDraft(body)}>
-            Keep as draft
-          </Button>
+          {onKeepAsDraft !== undefined ? (
+            <Button variant="secondary" onClick={() => onKeepAsDraft(body)}>
+              Keep as draft
+            </Button>
+          ) : onCancel !== undefined ? (
+            <Button variant="secondary" onClick={onCancel}>
+              Cancel
+            </Button>
+          ) : null}
         </div>
-        <BodyText tone="secondary">
-          A draft keeps the change without publishing it: entrants see no difference
-          until it is published.
-        </BodyText>
+        {onKeepAsDraft !== undefined && (
+          <BodyText tone="secondary">
+            A draft keeps the change without publishing it: entrants see no difference
+            until it is published.
+          </BodyText>
+        )}
       </Panel>
     );
   }

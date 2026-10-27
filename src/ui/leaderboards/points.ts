@@ -9,7 +9,7 @@ export type TaskPoints = {
   /** The cell's number, its exact digits. */
   number: string;
   /** Decimals its column shows. */
-  places: number | undefined;
+  decimals: number | undefined;
   /** The most the column can show, which only staff are told. */
   most: string | null;
 };
@@ -32,7 +32,7 @@ export function taskPoints(
       found.push({
         board: board.key,
         number: cell.number,
-        places: header?.places ?? undefined,
+        decimals: header?.decimals ?? undefined,
         most: header?.at_most ?? null,
       });
       break;

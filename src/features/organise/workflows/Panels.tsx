@@ -253,8 +253,8 @@ function PortValue({
     return (
       <div className={classes.portValue}>
         <BodyText size="sm">
-          <strong>{label}</strong> takes a {decl.type}. Wire it from an input or another
-          step’s output, with its port on the graph.
+          <strong>{label}</strong> takes a {decl.type}. Wire it from an input, another
+          step’s output or one of the workflow’s files, with its port on the graph.
         </BodyText>
         {line !== undefined && (
           <BodyText size="sm" tone="secondary">

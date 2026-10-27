@@ -204,7 +204,7 @@ async function stub(page: Page) {
         headers: [
           {
             name: 'points',
-            places: null,
+            decimals: null,
             at_least: '0',
             at_most: '10',
             self_reported: [],

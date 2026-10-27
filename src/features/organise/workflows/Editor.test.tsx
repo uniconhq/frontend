@@ -4,9 +4,11 @@ import userEvent from '@/test/user-event';
 import { renderApp } from '@/test/render';
 import { delay, http, HttpResponse } from 'msw';
 import { problem, server, signedIn } from '@/test/server';
-import { CLASSIC, workflowBackend } from '@/test/workflows';
+import { CLASSIC, PRIMITIVES, WORKFLOW_API, workflowBackend } from '@/test/workflows';
+import type { SaveChange, TreeEntry } from '@/api/types';
 import {
   EDITOR_PAGE,
+  findDialog,
   barButton,
   drawer,
   fileText,
@@ -816,5 +818,252 @@ describe('the workflow editor', () => {
     expect(
       await screen.findByRole('group', { name: 'Step compile' }),
     ).toBeInTheDocument();
+  });
+});
+
+function savedEntry(path: string, kind: 'file' | 'directory' = 'file'): TreeEntry {
+  return {
+    path,
+    kind,
+    token: kind === 'file' ? 'file-token' : null,
+    size: kind === 'file' ? 12 : null,
+    upload: null,
+    version: 'files-v1',
+    start: null,
+  };
+}
+
+describe('wiring workflow files', () => {
+  it('offers saved folders and files from the Files card tree, fetched once', async () => {
+    const backend = workflowBackend(CLASSIC);
+    const reads: string[] = [];
+    server.use(signedIn, ...backend.handlers);
+    server.use(
+      http.get(`${WORKFLOW_API}/tree`, ({ request }) => {
+        const path = new URL(request.url).searchParams.get('path') ?? '';
+        reads.push(path);
+        return HttpResponse.json(
+          path === ''
+            ? [savedEntry('workflow.yaml'), savedEntry('checker', 'directory')]
+            : [savedEntry('checker/checker.cpp'), savedEntry('checker/program.yaml')],
+        );
+      }),
+    );
+    const user = userEvent.setup();
+    renderApp(EDITOR_PAGE);
+    await waitFor(() => expect(reads).toContain('checker'));
+    await user.click(await portButton('compile', 'source'));
+    const menu = await openMenu('The port source of compile');
+    const folder = within(menu).getByRole('menuitem', {
+      name: 'the workflow’s checker/',
+    });
+    expect(folder).not.toBeDisabled();
+    expect(
+      within(menu).getByRole('menuitem', {
+        name: /^the workflow’s checker\/program.yaml/,
+      }),
+    ).toHaveAttribute('data-disabled', 'true');
+    expect(within(menu).queryByRole('menuitem', { name: /workflow.yaml/ })).toBeNull();
+    await user.click(folder);
+    expect(await fileText(user)).toContain('source: ${{ workflow.checker/ }}');
+    expect(await stepBox('compile')).toHaveTextContent(
+      'checker/, a folder of this workflow',
+    );
+    expect(reads.filter((path) => path === '')).toHaveLength(1);
+    expect(reads.filter((path) => path === 'checker')).toHaveLength(1);
+  });
+
+  it('builds the islands checker with staged uploads and wires, then saves and publishes it', async () => {
+    const draft = `inputs:
+  input: file
+  output: file
+  answer: file
+steps:
+  - id: build
+    use: unicon/compile@v3
+    with: {language: cpp}
+  - id: check
+    use: unicon/exec@v1
+    with:
+      program: \${{ steps.build.program }}
+      files:
+        input: \${{ inputs.input }}
+        output: \${{ inputs.output }}
+        answer: \${{ inputs.answer }}
+      time_limit: 5
+      memory_limit: 256
+outputs:
+  score: \${{ steps.check.score }}
+  message: \${{ steps.check.message }}
+`;
+    const backend = workflowBackend(draft);
+    let nextUpload = 0;
+    let changes: SaveChange[] = [];
+    server.use(signedIn, ...backend.handlers);
+    server.use(
+      http.get('/api/v1/primitives', () =>
+        HttpResponse.json(
+          PRIMITIVES.map((primitive) =>
+            primitive.ref === 'unicon/exec@v1'
+              ? {
+                  ...primitive,
+                  inputs: {
+                    ...primitive.inputs,
+                    manifest: {
+                      ...primitive.inputs.program,
+                      runs: false,
+                      optional: true,
+                    },
+                  },
+                }
+              : primitive,
+          ),
+        ),
+      ),
+      http.get(`${WORKFLOW_API}/files/*`, () => problem(404, 'not_found')),
+      http.post(`${WORKFLOW_API}/uploads`, () =>
+        HttpResponse.json({
+          id: `upload-${String(++nextUpload)}`,
+          url: `/-/uploads/${String(nextUpload)}`,
+          ready: false,
+          expires_at: '2026-10-27T12:00:00Z',
+        }),
+      ),
+      http.put('/-/uploads/:id', () => new HttpResponse(null)),
+      http.post(`${WORKFLOW_API}/uploads/:id/complete`, () =>
+        HttpResponse.json({ status: 'verified' }),
+      ),
+      http.put(`${WORKFLOW_API}/draft`, async ({ request }) => {
+        const body = (await request.json()) as {
+          content: string;
+          token: string;
+          changes: SaveChange[];
+        };
+        backend.state.saves.push(body);
+        backend.state.draft = body.content;
+        backend.state.token = 'saved';
+        changes = body.changes;
+        return HttpResponse.json({
+          content: body.content,
+          token: 'saved',
+          revision: 'checker-files',
+        });
+      }),
+    );
+    const user = userEvent.setup();
+    renderApp(EDITOR_PAGE);
+    const files = await screen.findByRole('region', { name: 'Files' });
+    await user.type(within(files).getByRole('textbox', { name: 'Folder' }), 'checker');
+    await user.upload(within(files).getByLabelText('Add files'), [
+      new File(['int main() { return 0; }'], 'checker.cpp'),
+      new File(
+        [
+          'reports:\n  score: {better: higher, at_least: 0, at_most: 1}\n  message: {type: text}\n',
+        ],
+        'program.yaml',
+      ),
+    ]);
+    await user.click(within(files).getByRole('button', { name: 'Upload files' }));
+    await within(files).findByText('checker/program.yaml: uploaded, waiting for Save');
+    await user.click(await portButton('build', 'source'));
+    await user.click(
+      within(await openMenu('The port source of build')).getByRole('menuitem', {
+        name: 'the workflow’s checker/',
+      }),
+    );
+    await user.click(await portButton('check', 'manifest'));
+    await user.click(
+      within(await openMenu('The port manifest of check')).getByRole('menuitem', {
+        name: 'the workflow’s checker/program.yaml',
+      }),
+    );
+    expect(await stepBox('check')).toHaveTextContent(
+      'checker/program.yaml, a file of this workflow',
+    );
+    await user.click(barButton('Save'));
+    await waitFor(() => expect(barButton('Save')).toBeDisabled());
+    expect(backend.state.draft).toContain('${{ workflow.checker/ }}');
+    expect(backend.state.draft).toContain('${{ workflow.checker/program.yaml }}');
+    expect(changes.map((change) => change.path)).toEqual([
+      'checker/checker.cpp',
+      'checker/program.yaml',
+    ]);
+    await waitFor(() =>
+      expect(part('section', 'Problems')).toHaveTextContent('Nothing to fix'),
+    );
+    await user.click(barButton('Publish version'));
+    const publish = within(await findDialog('Publish v1')).getByRole('button', {
+      name: 'Publish v1',
+    });
+    await waitFor(() => expect(publish).toBeEnabled());
+    await user.click(publish);
+    await waitFor(() => expect(backend.state.versions).toEqual(['v1']));
+  });
+
+  it('keeps a removed file wired and shows its refusal at Publish version', async () => {
+    const text = CLASSIC.replace(
+      'stdin: ${{ inputs.input }}',
+      'stdin: ${{ workflow.data.in }}',
+    );
+    const backend = workflowBackend(text);
+    let removed = false;
+    server.use(signedIn, ...backend.handlers);
+    server.use(
+      http.get(`${WORKFLOW_API}/tree`, () =>
+        HttpResponse.json(removed ? [] : [savedEntry('data.in')]),
+      ),
+      http.get(`${WORKFLOW_API}/files/data.in`, () =>
+        HttpResponse.json({
+          path: 'data.in',
+          content: '1',
+          encoding: 'utf-8',
+          token: 'file-token',
+          upload: null,
+          version: 'files-v1',
+        }),
+      ),
+      http.put(`${WORKFLOW_API}/draft`, async ({ request }) => {
+        const body = (await request.json()) as {
+          content: string;
+          changes: SaveChange[];
+        };
+        expect(body.changes).toEqual([
+          { path: 'data.in', token: 'file-token', encoding: 'utf-8', remove: true },
+        ]);
+        removed = true;
+        return HttpResponse.json({
+          content: body.content,
+          token: 'saved',
+          revision: 'removed-file',
+        });
+      }),
+      http.post(`${WORKFLOW_API}/versions`, () =>
+        problem(422, 'invalid_definition', {
+          errors: [
+            {
+              path: 'steps[1].with.stdin',
+              message: 'The workflow has no file data.in.',
+            },
+          ],
+        }),
+      ),
+    );
+    const user = userEvent.setup();
+    renderApp(EDITOR_PAGE);
+    const files = await screen.findByRole('region', { name: 'Files' });
+    await user.click(await within(files).findByRole('button', { name: /^data.in/ }));
+    await user.click(within(files).getByRole('button', { name: 'Remove data.in' }));
+    await user.click(barButton('Save'));
+    await waitFor(() => expect(barButton('Save')).toBeDisabled());
+    expect(await fileText(user)).toContain('stdin: ${{ workflow.data.in }}');
+    expect(part('section', 'Problems')).toHaveTextContent('Nothing to fix');
+    await user.click(barButton('Publish version'));
+    const dialog = await findDialog('Publish v1');
+    await user.click(within(dialog).getByRole('button', { name: 'Publish v1' }));
+    expect(
+      await within(dialog).findByText('The workflow has no file data.in.', {
+        exact: false,
+      }),
+    ).toBeVisible();
   });
 });

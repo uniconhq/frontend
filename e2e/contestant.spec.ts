@@ -32,7 +32,7 @@ function homeStanding(): Schemas['Leaderboard'] {
     headers: [
       {
         name: 'points',
-        places: null,
+        decimals: null,
         at_least: null,
         at_most: '100',
         self_reported: [],
