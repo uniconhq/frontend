@@ -254,6 +254,8 @@ describe('a workflow one may only read', () => {
 
     expect(await screen.findByText('Builds a solution.')).toBeInTheDocument();
     const build = await screen.findByRole('group', { name: 'Step build' });
+    // On its face, as a primitive's box says what the primitive does.
+    await waitFor(() => expect(within(build).getByText(said)).toBeInTheDocument());
     await user.click(within(build).getByRole('button', { name: /^build/ }));
     const drawer = await screen.findByRole('complementary', { name: 'Step build' });
     expect(within(drawer).getByText(said)).toBeInTheDocument();

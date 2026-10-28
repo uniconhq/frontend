@@ -360,7 +360,12 @@ function headOf(
       pill: box.stacked ? 'workflow' : primitive !== null ? 'primitive' : null,
       what: primitive !== null ? primitiveTitle(primitive) : null,
       ref: step?.use ?? null,
-      description: primitive?.description ?? null,
+      description:
+        primitive !== null
+          ? primitive.description
+          : step === undefined
+            ? null
+            : (seen.workflowBoxes.get(step.use)?.description ?? null),
       step: box.step,
     };
   if (box.kind === 'input') {
