@@ -216,7 +216,8 @@ function Neighbour({
 }
 
 /**
- * Inside a box opened from the workflow being edited, as deep as it goes:
+ * Inside a box opened from the workflow being edited, or from a version
+ * shown read only, as deep as it goes:
  * the breadcrumb back to each level, then the well, which zooms in from the
  * box at the level above when a box is opened. The well holds what feeds
  * the box on its left, what it feeds on its right, and between them its

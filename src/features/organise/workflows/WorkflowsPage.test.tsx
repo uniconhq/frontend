@@ -215,6 +215,44 @@ describe('a workflow one may only read', () => {
     expect(screen.queryByRole('complementary', { name: 'Step run' })).toBeNull();
   });
 
+  it('zooms into a workflow box of a version from its Open, as the editor does', async () => {
+    const outer = ['steps:', '  - {id: build, use: acme/build@v1}', ''].join('\n');
+    const inner = ['steps:', '  - {id: compile, use: unicon/compile@v3}', ''].join('\n');
+    server.use(
+      signedIn,
+      page(['v1']),
+      primitives,
+      check(),
+      http.get('/api/v1/workflows/:owner/:name/versions/:version/box', () =>
+        HttpResponse.json({
+          inputs: [],
+          outputs: [],
+          newer_version: null,
+          run: true,
+        }),
+      ),
+      http.get('/api/v1/workflows/:owner/:name/versions/:version', ({ params }) =>
+        HttpResponse.json({ content: params.name === 'build' ? inner : outer }),
+      ),
+    );
+    const user = userEvent.setup();
+    renderApp('/workflows/unicon/classic');
+
+    await user.click(await screen.findByRole('button', { name: 'Open build' }));
+    const crumbs = await screen.findByRole('navigation', {
+      name: 'Inside the workflow',
+    });
+    expect(within(crumbs).getByText('build')).toHaveAttribute('aria-current', 'page');
+    expect(
+      await screen.findByRole('group', { name: 'Step compile' }),
+    ).toBeInTheDocument();
+
+    await user.click(within(crumbs).getByRole('button', { name: 'classic' }));
+    expect(
+      await screen.findByRole('group', { name: 'Step build' }),
+    ).toBeInTheDocument();
+  });
+
   /** What a version was frozen with, folder by folder, as its tree answers. */
   const frozen = (folders: Record<string, TreeEntry[]>) =>
     http.get('/api/v1/workflows/unicon/classic/versions/:version/tree', ({ request }) =>

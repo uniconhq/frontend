@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react';
 import type { Primitive } from '@/api/types';
-import { portsOf, useStepBoxes, workflowFrom, type BoxDecl } from './boxes';
+import { useStepBoxes, workflowFrom, type BoxDecl } from './boxes';
+import { useDrawnLayout } from './drawn-layout';
 import { Graph } from './Graph';
-import { layoutWorkflow } from './layout';
-import { pinned, warnings } from './pins';
+import { pinned } from './pins';
 import { byRef } from './primitives';
 
 const NO_PROBLEMS = pinned([], 0, [], []);
@@ -47,19 +47,13 @@ export function DrawnGraph({
   const workflow = useMemo(() => workflowFrom(text), [text]);
   const read = useStepBoxes(given === undefined ? workflow : null, map);
   const boxes = given ?? read;
-  const ports = useMemo(() => portsOf(boxes), [boxes]);
-  const warned = useMemo(
-    () => warnings(NO_PROBLEMS, workflow, (use) => boxes.get(use)?.newer ?? null),
-    [workflow, boxes],
-  );
-  const layout = useMemo(
-    () =>
-      layoutWorkflow(workflow, map, ports, {
-        open: allOpen ? 'all' : new Set(shown === null ? [] : [shown]),
-        warned: new Set(warned.keys()),
-        inputs,
-      }),
-    [workflow, map, ports, shown, warned, allOpen, inputs],
+  const { warned, layout } = useDrawnLayout(
+    workflow,
+    map,
+    boxes,
+    shown,
+    allOpen,
+    inputs,
   );
   const reveal = useMemo(
     () => (shown === null ? null : { key: shown, nonce: 0 }),
