@@ -13,6 +13,7 @@ import {
   removeStep,
   renameInput,
   renameStep,
+  setDescription,
   setEntry,
   setInput,
   setValue,
@@ -318,6 +319,18 @@ describe('editing the file in place', () => {
       'submission',
       'input',
     ]);
+  });
+
+  it('writes what the workflow does first, its comments kept, and removes it when nothing is said', () => {
+    const said = setDescription(COMMENTED, '  Runs it once.  ');
+    const twice = setDescription(said, 'Compiles it.\nThen runs it once.');
+
+    expect(said.startsWith('description: Runs it once.\n')).toBe(true);
+    expect(said).toContain('# A workflow with its notes kept.');
+    expect(workflowOf(twice).description).toBe('Compiles it.\nThen runs it once.');
+    expect(workflowOf(twice).steps).toEqual(workflowOf(COMMENTED).steps);
+    expect(setDescription(twice, '   ')).not.toContain('description');
+    expect(workflowOf(COMMENTED).description).toBeNull();
   });
 
   it('writes an output short, or with what its number means', () => {

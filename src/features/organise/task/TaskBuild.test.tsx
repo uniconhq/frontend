@@ -1889,6 +1889,7 @@ repeat:
           run: true,
           inputs: [],
           newer_version: null,
+          description: null,
           outputs: [
             {
               name: 'log',

@@ -87,6 +87,7 @@ async function stubOrganiserApi(page: Page) {
     json(route, {
       run: true,
       newer_version: null,
+      description: null,
       inputs: [],
       outputs: [],
     } satisfies Schemas['WorkflowBox']),
@@ -837,7 +838,9 @@ test('long run paths and report titles stay within the page and their Result row
     }),
   );
   await page.route('**/api/v1/workflows/unicon/classic/versions/v3/box', (route) =>
-    route.fulfill({ json: { run: true, inputs: [], outputs, newer_version: null } }),
+    route.fulfill({
+      json: { run: true, inputs: [], outputs, newer_version: null, description: null },
+    }),
   );
   await page.setViewportSize({ width: 760, height: 1000 });
   await page.goto('/orgs/acme/contests/spring/tasks/sum');

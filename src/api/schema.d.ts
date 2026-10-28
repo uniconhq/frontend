@@ -6594,9 +6594,12 @@ export interface components {
         /**
          * WorkflowBox
          * @description A workflow version as a box. `run` is false for a workflow of the
-         *     test format, and then both lists are empty.
+         *     test format, and then both lists are empty. `description` is what the
+         *     workflow says it does, or null when it says nothing.
          */
         WorkflowBox: {
+            /** Description */
+            description: string | null;
             /** Inputs */
             inputs: components["schemas"]["BoxInput"][];
             /** Newer Version */

@@ -215,9 +215,22 @@ describe('a workflow one may only read', () => {
     expect(screen.queryByRole('complementary', { name: 'Step run' })).toBeNull();
   });
 
-  it('zooms into a workflow box of a version from its Open, as the editor does', async () => {
-    const outer = ['steps:', '  - {id: build, use: acme/build@v1}', ''].join('\n');
-    const inner = ['steps:', '  - {id: compile, use: unicon/compile@v3}', ''].join('\n');
+  it('says what a version and the workflows it uses do, and zooms into a box from its Open', async () => {
+    const outer = [
+      'description: Builds a solution.',
+      'steps:',
+      '  - {id: build, use: acme/build@v1}',
+      '',
+    ].join('\n');
+    const inner = [
+      'description: |',
+      '  Compiles the code.',
+      '  Gives its log.',
+      'steps:',
+      '  - {id: compile, use: unicon/compile@v3}',
+      '',
+    ].join('\n');
+    const said = /^Compiles the code\.\s+Gives its log\.$/;
     server.use(
       signedIn,
       page(['v1']),
@@ -228,6 +241,7 @@ describe('a workflow one may only read', () => {
           inputs: [],
           outputs: [],
           newer_version: null,
+          description: 'Compiles the code.\nGives its log.\n',
           run: true,
         }),
       ),
@@ -238,6 +252,13 @@ describe('a workflow one may only read', () => {
     const user = userEvent.setup();
     renderApp('/workflows/unicon/classic');
 
+    expect(await screen.findByText('Builds a solution.')).toBeInTheDocument();
+    const build = await screen.findByRole('group', { name: 'Step build' });
+    await user.click(within(build).getByRole('button', { name: /^build/ }));
+    const drawer = await screen.findByRole('complementary', { name: 'Step build' });
+    expect(within(drawer).getByText(said)).toBeInTheDocument();
+    await user.click(within(drawer).getByRole('button', { name: /Close/ }));
+
     await user.click(await screen.findByRole('button', { name: 'Open build' }));
     const crumbs = await screen.findByRole('navigation', {
       name: 'Inside the workflow',
@@ -246,6 +267,8 @@ describe('a workflow one may only read', () => {
     expect(
       await screen.findByRole('group', { name: 'Step compile' }),
     ).toBeInTheDocument();
+    expect(screen.getByText(said)).toBeInTheDocument();
+    expect(screen.queryByText('Builds a solution.')).toBeNull();
 
     await user.click(within(crumbs).getByRole('button', { name: 'classic' }));
     expect(

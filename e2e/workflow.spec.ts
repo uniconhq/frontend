@@ -790,6 +790,7 @@ test('a box opens two levels in, and a problem opens the step inside', async ({
       },
     ],
     newer_version: null,
+    description: null,
     run: true,
   };
   await page.route('**/api/v1/time', (route) =>

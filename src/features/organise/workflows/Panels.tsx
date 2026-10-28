@@ -617,6 +617,11 @@ export function StepPanel({
                 )}.`
               : '.'}
           </BodyText>
+          {box.description !== null && (
+            <BodyText size="sm" tone="secondary">
+              <span className={classes.said}>{box.description}</span>
+            </BodyText>
+          )}
         </div>
       ) : use !== null && reading ? (
         <BodyText size="sm" tone="secondary">

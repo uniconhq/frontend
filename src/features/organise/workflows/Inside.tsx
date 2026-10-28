@@ -15,6 +15,7 @@ import {
   type Frame,
   type UseRef,
 } from './boxes';
+import { Description } from './Description';
 import { Drawer } from './Drawer';
 import { DrawnGraph } from './DrawnGraph';
 import { layoutWorkflow, PALETTE, type Box, type Layout } from './layout';
@@ -389,6 +390,7 @@ export function Inside({
                 </Button>
               )}
             </div>
+            <Description text={here?.workflow.description ?? null} />
             {read.isPending && <BodyText>Opening {frame.title}…</BodyText>}
             {read.isError && (
               <BodyText>{formatUse(frame.use)} cannot be read.</BodyText>

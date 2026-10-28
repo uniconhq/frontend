@@ -51,6 +51,7 @@ describe('the workflow editor', () => {
             inputs: [port('source')],
             outputs: [port('program')],
             newer_version: null,
+            description: null,
             run: true,
           }),
         ),

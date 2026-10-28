@@ -197,6 +197,23 @@ describe('the workflow editor', () => {
     expect(text).toContain('# unicon/classic@v3, one run of a task');
   });
 
+  it('writes what the workflow does into its file as the field is left, and undo takes it back', async () => {
+    server.use(signedIn, ...workflowBackend(CLASSIC).handlers);
+    const user = userEvent.setup();
+    renderApp(EDITOR_PAGE);
+
+    const field = await screen.findByRole('textbox', { name: 'What it does' });
+    await user.type(field, 'Judges one run by its answer.');
+    await user.tab();
+
+    expect(await fileText(user)).toBe(
+      `description: Judges one run by its answer.\n${CLASSIC}`,
+    );
+    await user.keyboard('{Escape}');
+    await user.click(toolButton('Undo'));
+    expect(screen.getByRole('textbox', { name: 'What it does' })).toHaveValue('');
+  });
+
   it('removes a step and undo brings it back with its wires', async () => {
     server.use(signedIn, ...workflowBackend(CLASSIC).handlers);
     const user = userEvent.setup();
@@ -384,6 +401,7 @@ describe('the workflow editor', () => {
           inputs: [port('source')],
           outputs: [port('program')],
           newer_version: null,
+          description: null,
           run: true,
         }),
       ),
@@ -439,6 +457,7 @@ describe('the workflow editor', () => {
           inputs: [],
           outputs: [],
           newer_version: null,
+          description: null,
           run: true,
         });
       }),
@@ -1039,6 +1058,7 @@ describe('the workflow editor', () => {
           inputs: [port('source')],
           outputs: [port('program')],
           newer_version: params.name === 'inner' ? 'v2' : null,
+          description: null,
           run: true,
         }),
       ),
@@ -1225,6 +1245,7 @@ describe('the drawer', () => {
               inputs: [port('source')],
               outputs: [port('program')],
               newer_version: params.version === 'v1' ? 'v2' : null,
+              description: null,
               run: true,
             }),
       ),

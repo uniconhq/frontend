@@ -15,6 +15,7 @@ export type UseRef = { owner: string; name: string; version: string };
 export type BoxDecl = {
   run: boolean;
   newer: string | null;
+  description: string | null;
   inputs: { name: string; type: string; optional: boolean; options: string[] | null }[];
   outputs: { name: string; type: string | null }[];
 };
@@ -45,6 +46,7 @@ function declOf(box: WorkflowBox): BoxDecl {
   return {
     run: box.run,
     newer: box.newer_version,
+    description: box.description,
     inputs: box.inputs.map((input) => ({
       name: input.name,
       type: input.type,

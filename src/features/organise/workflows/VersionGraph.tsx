@@ -3,6 +3,7 @@ import type { Primitive } from '@/api/types';
 import { Button } from '@/ui/Button';
 import { Checkbox } from '@/ui/Checkbox';
 import { parseUse, useStepBoxes, workflowFrom, type Frame } from './boxes';
+import { Description } from './Description';
 import { DRAWER_WIDTH } from './Drawer';
 import { useDrawnLayout } from './drawn-layout';
 import { DrawnGraph } from './DrawnGraph';
@@ -13,7 +14,8 @@ import { byRef } from './primitives';
 import { VersionDrawer } from './VersionDrawer';
 
 /**
- * A version drawn as the editor draws a draft, with nothing to change: a box
+ * A version drawn as the editor draws a draft, with nothing to change: what
+ * it says it does above it, a box
  * clicked opens, its drawer on the right says what it holds, a workflow box
  * opened zooms into its inside as the editor's does, Files lists every file
  * of the version, and the switch shows the inputs and files the steps read. A workflow's page puts Files and the switch on its bar, with
@@ -70,6 +72,7 @@ export function VersionGraph({
         </>,
         lines,
       )}
+      {stack.length === 0 && <Description text={workflow.description} />}
       {stack.length > 0 ? (
         <Inside
           root={name}

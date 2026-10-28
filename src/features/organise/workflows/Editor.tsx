@@ -15,6 +15,7 @@ import { MergeView } from '../forms/MergeView';
 import { parseYaml } from '../forms/yaml-doc';
 import { WorkflowBar } from './Bar';
 import { checkQuery } from './check';
+import { DescriptionField } from './Description';
 import { Drawer, DRAWER_WIDTH } from './Drawer';
 import {
   formatUse,
@@ -33,6 +34,7 @@ import {
   entryFields,
   freeName,
   sharedNames,
+  setDescription,
   setEntry,
   setInput,
   wire,
@@ -941,6 +943,12 @@ export function Editor({
               select(item.opens);
             }
           }}
+        />
+      )}
+      {drawing && stack.length === 0 && (
+        <DescriptionField
+          value={workflow.description}
+          apply={(said) => change(setDescription(text, said))}
         />
       )}
       {drawing && stack.length === 0 && (

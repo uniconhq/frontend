@@ -35,7 +35,7 @@ import { orderAfterWire } from './rules';
  * given back as it is.
  */
 
-const TOP_ORDER = ['inputs', 'steps', 'outputs'];
+const TOP_ORDER = ['description', 'inputs', 'steps', 'outputs'];
 
 type Edit = (doc: Document) => void;
 
@@ -254,6 +254,17 @@ export function removeStep(text: string, index: number): string {
     stepsOf(doc).items.splice(index, 1);
     if (!workflow.steps.some((other, at) => at !== index && other.id === step.id))
       dropUses(doc, 'steps', step.id);
+  });
+}
+
+/** What the workflow says it does, first in the file; nothing said removes it. */
+export function setDescription(text: string, description: string): string {
+  const said = description.trim();
+  return edited(text, (doc) => {
+    const root = doc.contents as YAMLMap;
+    if (said === '') root.delete('description');
+    else if (root.has('description')) root.set('description', said);
+    else root.items.unshift(doc.createPair('description', said));
   });
 }
 

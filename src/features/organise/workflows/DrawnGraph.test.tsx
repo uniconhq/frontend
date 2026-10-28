@@ -162,7 +162,10 @@ describe('a workflow drawn', () => {
       'outputs: {}',
     ].join('\n');
     const boxes = new Map([
-      ['kenny/inner@v1', { run: true, newer: 'v2', inputs: [], outputs: [] }],
+      [
+        'kenny/inner@v1',
+        { run: true, newer: 'v2', description: null, inputs: [], outputs: [] },
+      ],
     ]);
     renderWithProviders(
       <DrawnGraph text={text} primitives={PRIMITIVES} boxes={boxes} />,
@@ -188,6 +191,7 @@ describe('a workflow drawn', () => {
           ],
           outputs: [],
           newer_version: null,
+          description: null,
           run: true,
         }),
       ),

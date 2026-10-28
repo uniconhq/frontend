@@ -412,6 +412,7 @@ describe('a wire dropped on a box', () => {
         {
           run: true,
           newer: null,
+          description: null,
           inputs: [{ name: 'source', type: 'folder', optional: false, options: null }],
           outputs: [],
         },
@@ -445,6 +446,7 @@ describe('a run workflow as a step', () => {
   const box = (level: string[]) => ({
     run: true,
     newer: null,
+    description: null,
     inputs: [{ name: 'level', type: 'enum', optional: false, options: level }],
     outputs: [
       { name: 'program', type: 'file' },

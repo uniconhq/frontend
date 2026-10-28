@@ -421,6 +421,11 @@
   font-weight: 600;
 }
 
+/* What a workflow says it does, its line breaks kept. */
+.said {
+  white-space: pre-line;
+}
+
 .ref {
   overflow: hidden;
   text-overflow: ellipsis;

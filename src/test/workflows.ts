@@ -393,6 +393,7 @@ export function workflowBackend(
         inputs: [],
         outputs: [],
         newer_version: null,
+        description: null,
         run: false,
       }),
     ),
