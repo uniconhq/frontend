@@ -97,6 +97,7 @@ function BuildForm({
   saving,
   admin,
   manager,
+  onDirty,
 }: {
   place: TaskPlace;
   file: FileContent;
@@ -105,6 +106,7 @@ function BuildForm({
   saving: TaskSave;
   admin: boolean;
   manager: boolean;
+  onDirty: (dirty: boolean) => void;
 }) {
   const saved = form?.workflow ?? null;
   const savedReadable = form !== null && form.problem === null && saved !== null;
@@ -310,6 +312,10 @@ function BuildForm({
     sent?.values === values &&
     sent.inputFiles === inputFiles;
   const toSave = changed && !through;
+  // What the bar offers to save is what leaving the page would lose.
+  const dirty = toSave && lines.length > 0;
+  useEffect(() => onDirty(dirty), [dirty, onDirty]);
+  useEffect(() => () => onDirty(false), [onDirty]);
   const [scoreProblems, setScoreProblems] = useState<string[]>([]);
   const problems = [
     ...[values.max, values.rateCount, values.ratePer].map((text) =>
@@ -372,7 +378,6 @@ function BuildForm({
       {read.unreadable.length > 0 && (
         <Unread
           place={place}
-          admin={admin}
           reason={`The cards cannot read ${read.unreadable.join(', ')}.`}
           line="The cards leave that part as it is."
         />
@@ -410,15 +415,20 @@ function BuildForm({
         }
         onAdd={(id, kind) => set({ inputs: [...values.inputs, emptyInput(id, kind)] })}
         files={files}
-        disabled={disabled}
+        disabled={disabled || pendingFiles > 0}
       />
       <RunsCard
         active={declared !== null}
+        place={place}
+        staged={inputFiles}
         declared={declared?.inputs ?? []}
         axes={values.axes}
-        disabled={disabled}
+        disabled={disabled || pendingFiles > 0}
         onChange={(axes) => set({ axes })}
-        onFile={(path, file) => {
+        onDiscard={(path) =>
+          setInputFiles((before) => before.filter((file) => file.value !== path))
+        }
+        onFile={({ table: axis, row, input: id }, path, file) => {
           setReading(null);
           const was = path;
           stageFile(
@@ -431,10 +441,6 @@ function BuildForm({
                     was: before.find((each) => each.id === change.id)?.was ?? was,
                   },
                 ]);
-                const [, axisText, rowText, id] = path.split('/');
-                const axis = Number(axisText);
-                const row = Number(rowText);
-                if (id === undefined) return;
                 setValues((before) => ({
                   ...before,
                   axes: before.axes.map((item, index) =>
@@ -466,6 +472,7 @@ function BuildForm({
           <ScoringCard
             place={place}
             values={values}
+            titles={titles}
             workflowText={workflowRaw}
             workflowRead={workflowRead}
             graded={form?.graded === true}
@@ -606,12 +613,10 @@ function SaveAnswer({
 function Unread({
   place,
   reason,
-  admin,
   line,
 }: {
   place: TaskPlace;
   reason: string;
-  admin: boolean;
   line: string;
 }) {
   return (
@@ -620,9 +625,7 @@ function Unread({
         The task’s settings cannot be read: {reason} {line}
       </BodyText>
       <BodyText tone="secondary">
-        {admin
-          ? 'Fix them as text in '
-          : 'An admin of the task can fix them as text in '}
+        Fix them as text in{' '}
         <PageLink
           to={taskSectionPath(place.org, place.contest, place.task, 'settings')}
         >
@@ -645,11 +648,14 @@ export function TaskBuild({
   saving,
   admin,
   manager,
+  onDirty,
 }: {
   place: TaskPlace;
   saving: TaskSave;
   admin: boolean;
   manager: boolean;
+  /** Whether the cards hold changes not saved, as they change. */
+  onDirty: (dirty: boolean) => void;
 }) {
   const file = useOwnFile(place, PATH);
   const workflowForm = useWorkflowForm(place, true);
@@ -677,7 +683,6 @@ export function TaskBuild({
       <Unread
         place={place}
         reason={read.error}
-        admin={admin}
         line="So the cards that build the task cannot show them."
       />
     );
@@ -693,6 +698,7 @@ export function TaskBuild({
       saving={saving}
       admin={admin}
       manager={manager}
+      onDirty={onDirty}
     />
   );
 }

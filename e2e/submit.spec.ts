@@ -454,7 +454,9 @@ test('a submission that did not compile shows that on its runs, with its log', a
   await expect(detail.getByLabel('log', { exact: true })).toHaveText(
     'main.cpp:1: error',
   );
-  await expect(detail.getByLabel('Facts', { exact: true })).toHaveText(/Compiled\s*0/);
+  await expect(detail.getByLabel('Facts', { exact: true })).toHaveText(
+    /Whether it compiled\s*No/,
+  );
   await expect(detail.getByRole('table')).toHaveCount(0);
 });
 

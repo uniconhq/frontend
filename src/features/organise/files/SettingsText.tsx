@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { Fragment, useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { $api, queryView } from '@/api/query';
 import { toApiError } from '@/api/problem';
@@ -9,7 +9,7 @@ import { CodeEditor } from '@/ui/CodeEditor';
 import { PageLink } from '@/ui/PageLink';
 import { Loaded } from '@/ui/feedback/Loaded';
 import { contestPath } from '@/lib/organiser-paths';
-import { contestSectionPath, taskCardPath, taskSectionPath } from '@/lib/sections';
+import { TASK_BUILD_CARDS, contestSectionPath, taskCardPath } from '@/lib/sections';
 import { formatDateTime } from '@/lib/time';
 import { DefinitionErrors } from '../DefinitionErrors';
 import { contestPlaceOf } from '../contest/opened';
@@ -204,23 +204,29 @@ function ContestChanges({ place }: { place: Extract<Place, { kind: 'contest' }> 
   );
 }
 
-/** Where the settings are changed, as links to the pages that change them. */
+/**
+ * Where the settings are changed, as links to the pages that change them.
+ * Both settings files are read on the page whose form changes the rest of
+ * them, so that form is the one above, not a link to the page itself.
+ */
 function WhereChanged({ place }: { place: Place }) {
   if (place.kind === 'task') {
     const { org, contest, task } = place;
+    // Every card of the task's page but the statement, which is a file of its own.
+    const cards = TASK_BUILD_CARDS.filter((card) => card.key !== 'statement');
     return (
       <BodyText>
         The task’s settings as they are stored, for reading only. They are changed on
         the task’s page: its{' '}
-        <PageLink to={taskCardPath(org, contest, task, 'workflow')}>Workflow</PageLink>,{' '}
-        <PageLink to={taskCardPath(org, contest, task, 'inputs')}>Inputs</PageLink>,{' '}
-        <PageLink to={taskCardPath(org, contest, task, 'runs')}>Runs</PageLink> and{' '}
-        <PageLink to={taskCardPath(org, contest, task, 'tests')}>Submissions</PageLink>{' '}
-        cards, and its title in{' '}
-        <PageLink to={taskSectionPath(org, contest, task, 'settings')}>
-          Settings
-        </PageLink>
-        .
+        {cards.map((card, at) => (
+          <Fragment key={card.key}>
+            {at === 0 ? '' : at === cards.length - 1 ? ' and ' : ', '}
+            <PageLink to={taskCardPath(org, contest, task, card.key)}>
+              {card.label}
+            </PageLink>
+          </Fragment>
+        ))}{' '}
+        cards, and its title in the form above.
       </BodyText>
     );
   }
@@ -230,12 +236,12 @@ function WhereChanged({ place }: { place: Place }) {
       The contest’s settings as they are stored, for reading only. They are changed on
       the contest’s pages: its{' '}
       <PageLink to={contestPath(org, contest)}>status and tasks</PageLink>,{' '}
-      <PageLink to={contestSectionPath(org, contest, 'settings')}>Settings</PageLink>,{' '}
       <PageLink to={contestSectionPath(org, contest, 'entry')}>
         How people enter
       </PageLink>{' '}
       and{' '}
-      <PageLink to={contestSectionPath(org, contest, 'boards')}>Leaderboards</PageLink>.
+      <PageLink to={contestSectionPath(org, contest, 'boards')}>Leaderboards</PageLink>,
+      and the rest in the form above.
     </BodyText>
   );
 }
@@ -258,13 +264,12 @@ export function SettingsText({
   editor: ReactNode;
 }) {
   const unread = useUnread(place, file);
-  const whose = place.kind === 'task' ? 'task' : 'contest';
   const label =
     place.kind === 'task' ? 'The task’s settings' : 'The contest’s settings';
   const placeOf =
     place.kind === 'task'
       ? taskPlaceOf(place.org, place.contest, place.task)
-      : contestPlaceOf(place.org, place.contest);
+      : contestPlaceOf(place.org, place.contest, file.content);
   return (
     <div className={shared.stack}>
       {unread === null ? (
@@ -280,8 +285,8 @@ export function SettingsText({
           <DefinitionErrors errors={unread.problems} placeOf={placeOf} />
           <BodyText tone="secondary">
             {admin
-              ? 'As an admin, you can fix them here as text. The pages work again once the settings can be read.'
-              : `An admin of the ${whose} can fix them as text.`}
+              ? 'Fix them here as text. The pages work again once the settings can be read.'
+              : 'See who can on the organisers page.'}
           </BodyText>
         </div>
       )}

@@ -31,7 +31,7 @@ const UNDER: Record<string, Record<string, string>> = {
   entrants: {
     most: 'Most people in a team',
     fewest: 'Fewest people in a team',
-    locks: 'When teams are fixed',
+    locks: 'Teams are fixed',
   },
 };
 
@@ -44,9 +44,9 @@ const VALUES: Record<string, Record<string, string>> = {
   },
   locks: {
     start: 'When the contest starts',
-    first_submission: 'At its first submission',
+    first_submission: 'At a team’s first submission',
   },
-  who: { staff: 'Staff', entrants: 'Entrants', everyone: 'Everyone' },
+  who: { staff: 'Organisers only', entrants: 'Entrants', everyone: 'Anyone' },
   approval: { auto: 'Approved straight away', manual: 'An organiser approves' },
 };
 
@@ -73,7 +73,7 @@ export function contestFieldName(path: MergePath): string {
       : board;
   }
   if (top === 'hold') {
-    return typeof second === 'string' ? `Hold: ${plain(second)}` : 'Hold';
+    return typeof second === 'string' ? `Freeze: ${plain(second)}` : 'Freeze';
   }
   if (typeof second === 'string') {
     return UNDER[top]?.[second] ?? `${TOP[top] ?? plain(top)}: ${plain(second)}`;

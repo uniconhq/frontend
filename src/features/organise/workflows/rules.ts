@@ -89,6 +89,51 @@ function downstream(workflow: Workflow, index: number): Set<number> {
   return found;
 }
 
+/** One of a step's input ports, as its primitive or the workflow it runs declares it. */
+export type StepInput = {
+  name: string;
+  type: string;
+  options: string[] | null;
+  optional: boolean;
+};
+
+/**
+ * The input ports a step declares, from its primitive or the run workflow it
+ * uses; null when it uses neither one Unicon knows.
+ */
+export function stepInputs(
+  primitives: Map<string, PrimitiveInfo>,
+  boxes: ReadonlyMap<string, BoxDecl>,
+  step: Workflow['steps'][number],
+): StepInput[] | null {
+  const primitive = declared(primitives, step);
+  if (primitive !== null)
+    return Object.entries(primitive.inputs).map(([name, port]) => ({
+      name,
+      type: port.type,
+      options: port.options,
+      optional: port.optional,
+    }));
+  const boxed = boxes.get(step.use);
+  return boxed?.run === true ? boxed.inputs : null;
+}
+
+/** The outputs a step declares, by name and type, from its primitive or the workflow it runs. */
+export function stepOutputs(
+  primitives: Map<string, PrimitiveInfo>,
+  boxes: ReadonlyMap<string, BoxDecl>,
+  step: Workflow['steps'][number],
+): { name: string; type: string | null }[] {
+  const primitive = declared(primitives, step);
+  if (primitive !== null)
+    return Object.entries(primitive.outputs).map(([name, port]) => ({
+      name,
+      type: port.type,
+    }));
+  const boxed = boxes.get(step.use);
+  return boxed?.run === true ? boxed.outputs : [];
+}
+
 /** What a reference is, or the reason it cannot be read where `stepIndex` reads it. */
 function kindOf(
   workflow: Workflow,
@@ -125,7 +170,7 @@ function kindOf(
     if (upstream(workflow, read).has(stepIndex))
       return `That would make a loop: ${ref.name} already reads this step.`;
   }
-  const primitive = declared(primitives, source.use);
+  const primitive = declared(primitives, source);
   const port = primitive?.outputs[ref.output];
   const boxed = boxes
     .get(source.use)
@@ -179,15 +224,11 @@ export function wireRefusal(
 ): string | null {
   const step = workflow.steps[stepIndex];
   if (step === undefined) return 'There is no such step.';
-  const primitive = declared(primitives, step.use);
-  const boxed = boxes.get(step.use);
-  const target =
-    primitive?.inputs[port] ??
-    (boxed?.run === true
-      ? boxed.inputs.find((input) => input.name === port)
-      : undefined);
-  if (primitive === null && (boxed === undefined || !boxed.run))
+  const primitive = declared(primitives, step);
+  const inputs = stepInputs(primitives, boxes, step);
+  if (inputs === null)
     return `${step.use} is not a primitive Unicon knows. Check its owner, name and version.`;
+  const target = inputs.find((input) => input.name === port);
   if (target === undefined) return `${step.use} has no input called ${port}.`;
   const kind = kindOf(workflow, primitives, stepIndex, source, boxes);
   if (typeof kind === 'string') return kind;
@@ -202,6 +243,44 @@ export function wireRefusal(
 
 const LIMIT_AT_SAVE =
   'This value raises a limit, so it must be known when the task is saved.';
+
+/**
+ * The port of the step at `stepIndex` a wire from `source` goes to when it is
+ * dropped on the step's box rather than on a port: the input named as the
+ * source is, else the first input given nothing; or why there is none. It
+ * only picks: `wireRefusal` still decides whether the wire may be drawn.
+ */
+export function portFor(
+  workflow: Workflow,
+  primitives: Map<string, PrimitiveInfo>,
+  stepIndex: number,
+  source: Ref,
+  boxes: ReadonlyMap<string, BoxDecl> = new Map(),
+): { port: string } | { reason: string } {
+  const step = workflow.steps[stepIndex];
+  if (step === undefined) return { reason: 'There is no such step.' };
+  const ports = stepInputs(primitives, boxes, step)?.map((input) => input.name) ?? null;
+  if (ports === null)
+    return {
+      reason: `${step.use} is not a primitive Unicon knows. Check its owner, name and version.`,
+    };
+  const name =
+    source.kind === 'inputs'
+      ? source.name
+      : source.kind === 'steps'
+        ? source.output
+        : null;
+  const port =
+    ports.find((found) => found === name) ??
+    ports.find((found) => step.with[found] === undefined);
+  if (port !== undefined) return { port };
+  return {
+    reason:
+      ports.length === 0
+        ? `${step.id} takes nothing.`
+        : `Every input of ${step.id} is given something already. Open it to choose which to change.`,
+  };
+}
 
 /** Why an output may not be named as an output, or null when it may. */
 export function outputRefusal(
@@ -231,23 +310,27 @@ export function valueRefusal(
   port: string,
   value: string | NumberText | boolean,
   written: Ref[],
+  boxes: ReadonlyMap<string, BoxDecl> = new Map(),
 ): string | null {
   const step = workflow.steps[stepIndex];
-  const primitive = step !== undefined ? declared(primitives, step.use) : null;
-  const target = primitive?.inputs[port];
-  if (step === undefined || primitive === null || target === undefined) return null;
+  if (step === undefined) return null;
+  const primitive = declared(primitives, step);
+  const target = stepInputs(primitives, boxes, step)?.find(
+    (input) => input.name === port,
+  );
+  if (target === undefined) return null;
   if (written.length > 0) {
     for (const ref of written) {
       if (ref.kind === 'steps')
         return "A step's output can be given only whole, not written into text.";
-      const kind = kindOf(workflow, primitives, stepIndex, ref);
+      const kind = kindOf(workflow, primitives, stepIndex, ref, boxes);
       if (typeof kind === 'string') return kind;
       if (!SCALARS.includes(kind.type))
         return `${refText(ref)} is ${a(kind.type)}, and only text, a number, true or false or an enum can be written into text.`;
       if (kind.optional)
         return `${refText(ref)} is optional, so it can be given only whole, to an optional port, not written into text.`;
     }
-    if (raisingPorts(primitive).has(port)) return LIMIT_AT_SAVE;
+    if (primitive !== null && raisingPorts(primitive).has(port)) return LIMIT_AT_SAVE;
     if (target.type === 'enum')
       return `This takes one of ${(target.options ?? []).join(', ')}.`;
     if (target.type !== 'text') return `This takes ${a(target.type)}, not text.`;
@@ -334,7 +417,7 @@ export function mayBeOptional(
     const step = workflow.steps[use.step];
     const value = step?.with[use.port];
     if (step === undefined || value?.kind !== 'wire') return false;
-    return declared(primitives, step.use)?.inputs[use.port]?.optional === true;
+    return declared(primitives, step)?.inputs[use.port]?.optional === true;
   });
 }
 
@@ -346,24 +429,35 @@ export function mayBeOptional(
 function wiringProblems(
   workflow: Workflow,
   primitives: Map<string, PrimitiveInfo>,
+  boxes: ReadonlyMap<string, BoxDecl>,
 ): string[] {
   const found: string[] = [];
   workflow.steps.forEach((step, index) => {
     for (const [port, value] of Object.entries(step.with)) {
       const problem =
         value.kind === 'wire'
-          ? wireRefusal(workflow, primitives, index, port, value.ref)
+          ? wireRefusal(workflow, primitives, index, port, value.ref, boxes)
           : value.kind === 'text'
-            ? valueRefusal(workflow, primitives, index, port, value.text, value.refs)
+            ? valueRefusal(
+                workflow,
+                primitives,
+                index,
+                port,
+                value.text,
+                value.refs,
+                boxes,
+              )
             : value.kind === 'literal'
-              ? valueRefusal(workflow, primitives, index, port, value.value, [])
+              ? valueRefusal(workflow, primitives, index, port, value.value, [], boxes)
               : null;
       if (problem !== null) found.push(`${step.id}.${port}: ${problem}`);
     }
   });
   for (const entry of workflow.outputs) {
     const problem =
-      entry.from === null ? null : outputRefusal(workflow, primitives, entry.from);
+      entry.from === null
+        ? null
+        : outputRefusal(workflow, primitives, entry.from, boxes);
     if (problem !== null) found.push(`output ${entry.name}: ${problem}`);
   }
   return found;
@@ -374,31 +468,44 @@ export function newProblem(
   before: Workflow,
   after: Workflow,
   primitives: Map<string, PrimitiveInfo>,
+  boxes: ReadonlyMap<string, BoxDecl> = new Map(),
 ): string | null {
-  const had = new Set(wiringProblems(before, primitives));
-  return wiringProblems(after, primitives).find((problem) => !had.has(problem)) ?? null;
+  const had = new Set(wiringProblems(before, primitives, boxes));
+  return (
+    wiringProblems(after, primitives, boxes).find((problem) => !had.has(problem)) ??
+    null
+  );
 }
 
-/** The type of the step output `ref` names, or null when it is not one the primitives declare. */
+/** The type of the step output `ref` names, or null when it is not one its step declares. */
 export function outputType(
   workflow: Workflow,
   primitives: Map<string, PrimitiveInfo>,
   ref: Ref | null,
+  boxes: ReadonlyMap<string, BoxDecl> = new Map(),
 ): string | null {
   if (ref?.kind !== 'steps') return null;
   const step = workflow.steps.find((found) => found.id === ref.name);
   if (step === undefined) return null;
-  return declared(primitives, step.use)?.outputs[ref.output]?.type ?? null;
+  return (
+    stepOutputs(primitives, boxes, step).find((output) => output.name === ref.output)
+      ?.type ?? null
+  );
 }
 
 /** The step outputs an output can read: a text or number output of any step. */
 export function outputSources(
   workflow: Workflow,
   primitives: Map<string, PrimitiveInfo>,
+  boxes: ReadonlyMap<string, BoxDecl> = new Map(),
 ): Extract<Ref, { kind: 'steps' }>[] {
   return workflow.steps.flatMap((step) =>
-    Object.entries(declared(primitives, step.use)?.outputs ?? {})
-      .filter(([, port]) => port.type === 'text' || port.type === 'number')
-      .map(([output]) => ({ kind: 'steps' as const, name: step.id, output })),
+    stepOutputs(primitives, boxes, step)
+      .filter((output) => output.type === 'text' || output.type === 'number')
+      .map((output) => ({
+        kind: 'steps' as const,
+        name: step.id,
+        output: output.name,
+      })),
   );
 }

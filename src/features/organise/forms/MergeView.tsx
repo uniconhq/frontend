@@ -168,7 +168,7 @@ export function MergeView({
           <BodyText tone="secondary">
             {choosable
               ? 'Nothing has been saved yet. For each field where the two versions differ, choose the one to keep, then save. Every other field stays as it is now.'
-              : 'Nothing was saved. Only an admin can change the fields where the two versions differ, so everything stays as it is now.'}
+              : 'Nothing was saved. You can’t change the fields where the two versions differ, so everything stays as it is now.'}
             {diffs.some(holdsTime) && ` Times are in your time, ${zoneName()}.`}
           </BodyText>
           <ul className={classes.merge} aria-label="Fields that differ">
@@ -180,7 +180,7 @@ export function MergeView({
                     label={labelOf(diff, words)}
                     description={
                       held
-                        ? 'Only an admin can change this, so it stays as it is now.'
+                        ? 'You can’t change this, so it stays as it is now.'
                         : undefined
                     }
                     disabled={held}

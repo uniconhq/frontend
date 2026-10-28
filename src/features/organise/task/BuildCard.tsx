@@ -1,4 +1,6 @@
 import type { ReactNode } from 'react';
+import { useTaskParams } from '@/lib/route-params';
+import { ReadOnlyAt } from '../ReadOnlyAt';
 import classes from './task.module.css';
 
 /**
@@ -20,6 +22,7 @@ export function BuildCard({
   aside?: ReactNode;
   children: ReactNode;
 }) {
+  const place = { kind: 'task' as const, ...useTaskParams() };
   return (
     <section id={id} className={classes.card} aria-label={title} data-card={id}>
       <header className={classes.band}>
@@ -27,7 +30,14 @@ export function BuildCard({
           <h2 className={classes.cardTitle}>{title}</h2>
           <p className={classes.cardLine}>{line}</p>
         </div>
-        {aside !== undefined && <div className={classes.aside}>{aside}</div>}
+        <div className={classes.aside}>
+          {' '}
+          <ReadOnlyAt
+            place={place}
+            role={id === 'tests' || id === 'statement' ? 'admin' : 'manager'}
+          />
+          {aside}
+        </div>
       </header>
       <div className={classes.cardBody}>{children}</div>
     </section>

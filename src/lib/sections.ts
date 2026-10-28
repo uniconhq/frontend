@@ -18,6 +18,7 @@ export type Section<Key extends string = string> = {
   label: string;
   segment: string;
   card: 'grid' | 'summary';
+  line?: string;
 };
 
 export const ORG_SECTIONS = [
@@ -60,22 +61,48 @@ export const CONTEST_SECTIONS = [
  * settings as they are stored and, for its admins, every file to read (M51).
  */
 export const TASK_SECTIONS = [
-  { key: 'gradings', label: 'Gradings', segment: 'gradings', card: 'grid' },
-  { key: 'queue', label: 'Queue', segment: 'queue', card: 'grid' },
+  {
+    key: 'gradings',
+    label: 'Gradings',
+    segment: 'gradings',
+    card: 'grid',
+    line: "Every submission's grading: waiting, running, done or failed. Grade one again from here.",
+  },
+  {
+    key: 'marking',
+    label: 'Marking',
+    segment: 'marking',
+    card: 'grid',
+    line: 'Submissions waiting for a mark you give by hand. A task can leave a value to organisers; each counted submission waits here until it has its marks.',
+  },
   {
     key: 'publications',
     label: 'Publications',
     segment: 'publications',
     card: 'grid',
+    line: "A publication is the task as entrants are graded on it. Every save without problems makes a new one, numbered from 1, and entrants are graded on the newest. While the contest is running, a save asks before publishing, since it may grade earlier submissions again. If a publication's checks fail, entrants stay on the last one that passed.",
   },
   {
     key: 'announcements',
     label: 'Announcements',
     segment: 'announcements',
     card: 'grid',
+    line: 'Messages from the organisers to everyone taking the task.',
   },
-  { key: 'organisers', label: 'Task organisers', segment: 'organisers', card: 'grid' },
-  { key: 'settings', label: 'Settings', segment: 'settings', card: 'grid' },
+  {
+    key: 'organisers',
+    label: 'Task organisers',
+    segment: 'organisers',
+    card: 'grid',
+    line: 'Who can change or read this task, and what each role may do.',
+  },
+  {
+    key: 'settings',
+    label: 'Settings',
+    segment: 'settings',
+    card: 'grid',
+    line: "The task's title, and the files it is saved as.",
+  },
 ] as const satisfies readonly Section[];
 
 /**

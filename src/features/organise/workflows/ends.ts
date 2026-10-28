@@ -5,12 +5,17 @@ import type { Ref, Workflow } from './model';
 /**
  * The two ends of a wire as the graph draws them: the source a box's
  * right-hand port stands for, and the target a box's left-hand port stands
- * for, a step's port or the outputs, where `+` is an output not made yet.
+ * for, a step's port or the outputs, where `+` is an output not made yet;
+ * or the target a whole box stands for when a wire is dropped on it.
  */
 
-/** Where a wire would go: a step's port, or the outputs (one, or a new one). */
+/**
+ * Where a wire would go: a step's port; a step, whose port `portFor` picks;
+ * or the outputs (one, or a new one).
+ */
 export type Target =
   | { kind: 'port'; step: number; port: string }
+  | { kind: 'step'; step: number }
   | { kind: 'outputs'; entry: string | null };
 
 /**
@@ -21,7 +26,8 @@ export type Target =
 export type Notice = { box: string; port: string; reason: string; count: number };
 
 export function sourceAt(box: Box, port: string, workflow: Workflow): Ref | null {
-  if (box.kind === 'inputs') return { kind: 'inputs', name: port };
+  if (box.kind === 'input') return { kind: 'inputs', name: port };
+  if (box.kind === 'file') return { kind: 'workflow', name: port };
   if (box.kind === 'step' && box.step !== null) {
     const step = workflow.steps[box.step];
     return step !== undefined ? { kind: 'steps', name: step.id, output: port } : null;
@@ -29,11 +35,24 @@ export function sourceAt(box: Box, port: string, workflow: Workflow): Ref | null
   return null;
 }
 
-export function targetAt(box: Box, port: string): Target | null {
+/** A wire dropped on `target`, with the box and port a refusal is said at. */
+export type Drop = { target: Target; box: string; port: string };
+
+/** Where a wire dropped on one of a box's ports goes. */
+export type PortTarget = Exclude<Target, { kind: 'step' }>;
+
+export function targetAt(box: Box, port: string): PortTarget | null {
   if (box.kind === 'step' && box.step !== null)
     return { kind: 'port', step: box.step, port };
   if (box.kind === 'outputs')
     return { kind: 'outputs', entry: port === '+' ? null : port };
+  return null;
+}
+
+/** What a wire dropped on `box` itself, not on one of its ports, goes to. */
+export function targetOf(box: Box): Target | null {
+  if (box.kind === 'step' && box.step !== null) return { kind: 'step', step: box.step };
+  if (box.kind === 'outputs') return { kind: 'outputs', entry: null };
   return null;
 }
 

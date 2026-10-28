@@ -1,6 +1,5 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import type { DeclaredInput, TreeEntry } from '@/api/types';
+import type { DeclaredInput } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
 import { Chip } from '@/ui/Chip';
@@ -8,37 +7,11 @@ import { FileDrop } from '@/ui/FileDrop';
 import { InfoTip } from '@/ui/InfoTip';
 import { formatSize } from '@/lib/size';
 import { SavedFile, SavedFolder } from '../files/FilePreview';
-import { treeQuery } from '../files/place';
+import { useNamed } from './named-file';
 import { inputTitle, lastPart, type TaskPlace } from './build-data';
 import type { StagedInput } from './input-files';
 import shared from '../organise.module.css';
 import classes from './task.module.css';
-
-/** The folder a path is in: `checker/checker.cpp` is in `checker`. */
-function folderOf(path: string): string {
-  const end = path.lastIndexOf('/');
-  return end < 0 ? '' : path.slice(0, end);
-}
-
-/** What the setting names now, read from its folder: its entry, or null when the task has none there. */
-function useNamed(place: TaskPlace, value: string) {
-  const folder = value.endsWith('/');
-  const path = folder ? value.slice(0, -1) : value;
-  const read = useQuery({
-    ...treeQuery(place, folderOf(path)),
-    enabled: value !== '',
-    retry: false,
-  });
-  const entry: TreeEntry | null | undefined =
-    value === ''
-      ? null
-      : read.isPending
-        ? undefined
-        : read.data === undefined
-          ? null
-          : (read.data.find((found) => found.path === path) ?? null);
-  return entry;
-}
 
 /**
  * A setting of the task that is a file or a folder, such as a checker or a

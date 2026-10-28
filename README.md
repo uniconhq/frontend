@@ -178,18 +178,18 @@ a draft.
 The settings as they are stored are read at the foot of each Settings page,
 where an admin fixes them as text when the forms cannot read them.
 
-| Address                                                      | Page                                                                                             |
-| ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------ |
-| `/orgs`                                                      | the orgs your roles reach, and New org                                                           |
-| `/orgs/new`                                                  | the new org form, then the new org                                                               |
-| `/orgs/:org`                                                 | the org's display name and description, its contests, New contest, and its organisers            |
-| `/orgs/:org/contests/:contest`                               | failed gradings, the latest regrades, where each task stands, New task, and the sections         |
-| `/orgs/:org/contests/:contest/entrants`                      | every entrant, one person or a team, with approve, reject, undo, remove and manage               |
-| `/orgs/:org/contests/:contest/gradings`                      | every grading of the contest, its queue, the latest regrades, and retry, cancel and rejudge      |
-| `/orgs/:org/contests/:contest/leaderboards`                  | a card for each leaderboard, with Preview as, and the contest's hold                             |
-| `/orgs/:org/contests/:contest/tasks/:task`                   | the task's state and whether its results are released, the cards that build it, and the sections |
-| `/orgs/:org/contests/:contest/tasks/:task/queue`             | the rows the task has closed for, their counted submissions, and the marks to enter              |
-| `/orgs/:org/contests/:contest/tasks/:task/regrades/:regrade` | one regrade: each leaderboard after it, and the values and verdicts that changed                 |
+| Address                                                      | Page                                                                                                   |
+| ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------ |
+| `/orgs`                                                      | the orgs your roles reach, and New org                                                                 |
+| `/orgs/new`                                                  | the new org form, then the new org                                                                     |
+| `/orgs/:org`                                                 | the org's display name and description, its contests, New contest, and its organisers                  |
+| `/orgs/:org/contests/:contest`                               | failed gradings, the latest regrades, where each task stands, New task, and the sections               |
+| `/orgs/:org/contests/:contest/entrants`                      | every entrant, one person or a team, with approve, reject, undo, remove and manage                     |
+| `/orgs/:org/contests/:contest/gradings`                      | every grading of the contest, Waiting to be graded, the latest regrades, and retry, cancel and rejudge |
+| `/orgs/:org/contests/:contest/leaderboards`                  | a card for each leaderboard, with See it as, and the contest's hold                                    |
+| `/orgs/:org/contests/:contest/tasks/:task`                   | the task's state and whether its results are released, the cards that build it, and the sections       |
+| `/orgs/:org/contests/:contest/tasks/:task/marking`           | the rows the task has closed for, their counted submissions, and the marks to enter                    |
+| `/orgs/:org/contests/:contest/tasks/:task/regrades/:regrade` | one regrade: each leaderboard after it, and the values and verdicts that changed                       |
 
 **Every organiser page lives under `/orgs`.** The proxy in `deploy` sends
 exactly `/orgs` and `/orgs/...` to this app, and `/contests/...` for the
@@ -198,12 +198,17 @@ answers 404 behind the proxy. A new organiser page goes under `/orgs` or the
 proxy changes first. The addresses are built in `src/lib/organiser-paths.ts`,
 and a section's under its level in `src/lib/sections.ts`, the one list that
 also draws each section's card, sidebar entry and crumb; the pages and the
-breadcrumb share both.
+breadcrumb share both. The breadcrumb calls the org, the contest and the
+task by the names the pages have already read, the org's display name, the
+contest's name and the task's label and title, and asks nothing of the
+server for them; until a page has read one, or on a page that never does,
+that step is called by its address. A step with no page of its own, such as
+a contest's org on the contestant pages, is plain words rather than a chip.
 
 The pages live in `src/features/organise/`: a sub-folder for each page
 (`orgs/` holds `/orgs` and `/orgs/new`, then `org/`, `contest/`, `entrants/`,
 `gradings/`, `leaderboards/`, and `task/`, which holds the
-queue too), one for the formula editor a task's values and a leaderboard's
+Marking too), one for the formula editor a task's values and a leaderboard's
 columns share (`formula/`), one for reading, previewing and saving the files the
 contest and task pages share (`files/`), one for the settings forms and the statement (`forms/`),
 and one for the organisers section all three pages share (`people/`). The pieces more than one of those use sit at its top:
@@ -278,7 +283,8 @@ with the same props in for it (`src/test/code-editor.tsx`), and
 
 **A task's files are changed only on its cards** (M51). A file a run takes
 is uploaded in its cell on the Runs card (below) and written at
-`runs/<axis>/<row>/<input>` with the task's save. A picture for the statement
+`runs/<axis>/<row>/<input>` with the task's save. A new cell uses a suffix
+when that path is still used by another row after rows move. A picture for the statement
 is added with "Add a picture" on the Statement card, which takes only a
 picture the page can show (by its ending, as the backend serves `public/`)
 of at most 10 MB, refusing anything else in words, names it so no file
@@ -364,36 +370,43 @@ folder in its own box (above), or text or one of the org's secrets; a value
 cleared takes the key out. "The entrant gives it" takes what entrants see of
 it: a label, the options offered and the one chosen to start with, a
 starting value, a number's least and most, and the most a file or folder may
-hold. "One for each run" makes it a column of an axis on Runs. An input the
+hold. "One for each run" makes it a column of a table on Runs. An input the
 task has that the workflow does not is listed to remove, and the task cannot
 be saved until it is. When the workflow cannot be read, the card shows why
 and edits the inputs the file has, adding or removing one by its name.
 
-Runs (`task/RunsCard.tsx`) is one table per axis, with a column for each
-input given once for each run: a file cell takes an upload, a scalar cell a
-value, any cell may be one the entrant gives, and a row may have a title
-and, where the entrant gives part of it, a largest size. Under the tables it
-says how many runs that makes, "2 × 3 = 6 runs." Scoring and Checks show once
-the saved workflow can be read. Scoring (`task/ScoringCard.tsx`) reads the
-catalogue of what a formula can use, `GET /blocks`, and has four parts. What
-one submission gives is a table of the runs, by their rows' titles, with a
-column for the verdict, `passed` and each output by its title and unit,
-filled with made-up numbers to show the shape. Groups is a column of dots
-for each group against the runs, `all` built in, each group saved as the
-inputs' values it picks. The whole result draws every value as a flow, from
-the runs through the groups to Result (`task/BoxGraph.tsx`), its wires worked
-out from the formulas; a value clicked opens wide with its formula line
-inside, and under the flow each part of a result, every value, every group's
-runs, the compile log and the task's files, says when entrants see it: Now,
-After the close, On release or Never. Then a card for each value: its name,
-when it is shown, a chip saying number, text or to fix, and its formula
-line. Before the save the card refuses a value named like another value, a
-group, a fact or `all`, and a value that reads itself round other values,
-naming the loop. Checks (`task/ChecksCard.tsx`) are made-up submissions the
-save grades: the entrant's inputs, one for each run where the entrant gives
-part of it, and the verdict every run gets or the values it should get. How
-many submissions an entrant may send is the Submissions card, whose anchor
-is still `tests`, so an old link to the tests card opens it.
+Runs (`task/RunsCard.tsx`) lines up one 44 px row per test: its optional
+name, each workflow input's title and type, a file's name and size, or a
+scalar field. A cell's menu replaces or removes its file, gives it to the
+entrant, and opens that row's size limit. Add files pairs matching names
+(`1.in`, `1.ans`) into rows through the same staged upload path. A second
+table is behind “Run each row more than once, with different settings”;
+its rows cross the first table's, and the foot says “8 rows × 3 = 24 runs”.
+
+Scoring and Checks show once the saved workflow can be read. Scoring reads
+`GET /blocks` and the workflow box's output types. Every run appears in the
+example table, with each column's type and unit. Groups is a narrow grid of
+checkboxes, one row per table row, with the name, remove action and one
+Shown control in each group's column, and `all` built in. Existing
+input-value picks remain the saved format; overlapping picks update the
+other matching ticks and the count together.
+
+The whole result is a map (`flow/BoxGraph.tsx`): Runs, groups, values, then
+an always-open Result listing values, each group's runs, outputs and files,
+with type, unit and when shown. Clicking goes to the corresponding card or
+grid column. Each value has one formula card: name, Shown, kind, formula,
+words, tiles while focused, then its own small flow. A bad formula keeps
+its last parsed flow dimmed. “Also shown to entrants” holds outputs and
+files; every part has exactly one Shown control. Checks are made-up
+submissions graded by every save, which is refused if a result differs.
+The Submissions card keeps the `tests` anchor for old links.
+
+Each task card and section begins with its purpose. `TASK_SECTIONS` holds
+the shared lines, labels and addresses for the hub, sidebar, crumbs and
+pages. Publications explains what entrants are graded on before its list.
+Read only chips link to the organisers page; fields, including formulas,
+stay readable without offering changes. Only organisers pages explain
+roles, using the same per-level words as their role pickers.
 
 The formula editor (`features/organise/formula/`) edits one value or one
 leaderboard column as a line of text, told whether it is in a task or on a
@@ -404,9 +417,8 @@ the blocks, never the text. Names show coloured by kind as they are typed;
 what fits at the cursor is offered as it is typed or with Ctrl+Space; a
 mistake is underlined once the line is left, so a half-typed word is never
 called wrong; a refused save is underlined where its path points; and under
-the line it says what the formula means in words. The tiles under it, one
-for each name and block in scope, put a piece at the cursor of the line last
-written in.
+the line it says what the formula means in words. The focused card opens its 420 px tile columns above its small flow;
+a tile puts a piece at that line’s cursor. Read-only lines have no tray.
 
 A choice of a few options said in sentences, such as who sees a leaderboard
 or when a task opens, is radio options, each with
@@ -449,7 +461,7 @@ refused one lists each failing check with its runs. The live stream's
 `checks` nudge reads the task again when a save's checks end; the page does
 not poll for them.
 
-A task's Queue (`task/QueuePage.tsx`) is one block for each entrant row the
+A task's Marking (`task/QueuePage.tsx`) is one block for each entrant row the
 task has closed for, with when it closed: each counted submission, with the
 leaderboard and column that counted it, and a box for each mark the task
 leaves to staff, by its value's name. A manager's mark is sent once the box
@@ -457,7 +469,10 @@ is left or Enter is pressed, as the exact digits typed, and says when it was
 saved; an empty box clears it, and a refusal is said under the box. An
 observer reads each mark, "–" for one not entered. "Open the submission"
 shows its files, each a download, and its result as staff read it (below).
-"Unmarked only" and a choice of leaderboard cut the list.
+"Unmarked only" and a choice of leaderboard cut the list. The hub counts
+submissions still missing a mark. A task without hand-marked values says
+“Nothing is waiting for a mark.” The old `/queue` address redirects to
+`/marking`, preserving its query and fragment.
 
 The contest page lists its tasks in the contest's order, each by its letter
 and name, with where it stands (`GET <contest>/organise/tasks`): its latest
@@ -491,24 +506,14 @@ compared; with no leaderboard it lists the values each submission changed,
 and beside either the verdicts that changed, by run, past 20 runs and 100
 submissions as a count.
 
-The contest's Leaderboards page (`leaderboards/`) is one card for each
-leaderboard, a form over `contest.yaml` (`leaderboards/LeaderboardsForm.tsx`): its
-key, which other leaderboards' formulas read it by, and its title; who sees
-it, Staff, Entrants or Everyone, and which rows, every row, each entrant's
-own row (not for everyone) or the top rows; its columns, each a name and a
-formula on a leaderboard, which reads the contest's tasks, its other
-leaderboards and this one's columns; Sort, the columns that order its rows
-in turn, each highest or lowest first; Display, which columns show, a number
-with its decimals, a text column as given; and Preview as, the saved
-leaderboard as one chosen entrant would see it. Under the cards is the hold:
-off, or from a time, which "An hour before the end" fills, until a time or
-until staff end it. Before the save the page refuses what the forge would (a
-key that is a task's, a sort on a text column or a column not displayed, a
-hold that starts in the past), and a refused save is said on the field it
-names, a formula's underlined where its path points. Only a manager of the
-contest changes them. The Leaderboards card on the contest's page says where
-the hold stands, from when until when and who ended it, with "End the hold
-now" for a contest manager, asked first and not undone.
+The contest's Leaderboards page is a card per leaderboard over `contest.yaml`.
+One Name makes a valid unique key until the first save, then the key stays
+fixed and is shown as its link. Audience and rows are two explained choices,
+with a sentence saying organisers see every row. Each column is a formula
+card with its own small flow. Ranking and Shown on the leaderboard are
+ordered lists with sized choices, and See it as previews a chosen entrant.
+The hold remains below the cards. Existing validation, refusal paths and
+`PUT C/files/contest.yaml` are unchanged.
 
 The contest's Gradings page (`gradings/`) lists every grading of its tasks
 newest first, each submission once by its task, who made it and its number,
@@ -581,13 +586,14 @@ own, which the proxy sends here beside `/orgs`.
 | ------------------------------------ | ---------------------------------------------------------------------------------------- |
 | `/workflows`                         | every workflow you may read, those you may change first; New workflow                    |
 | `/workflows/:owner/:name`            | for one you may edit, the editor over its draft; otherwise its latest version, read-only |
-| `/workflows/:owner/:name?version=v1` | that version, read-only, with Copy into a new workflow                                   |
+| `/workflows/:owner/:name?version=v1` | that version, read-only                                                                  |
 
-There is one way to make a workflow, New workflow: from the starter (compile,
-run on the run's input, compare with the run's answer) or as a copy of any
-version one can read, under oneself or an org one manages; a version's "Copy
-into a new workflow" opens the same dialog with that version chosen. A
-workflow is not combined from others: it uses another as a box (below).
+New workflow asks only for Owner and Name. `POST /api/v1/workflows` makes
+an empty private draft: a header comment and `steps: []`. Its editor opens
+with the tray and “A workflow needs at least one step. Add one from the
+tray.” It has no versions and cannot make one until it
+has a valid step. Reuse another workflow as a box; the version page has no
+copy action. The existing copy API remains available.
 
 **The editor is the only place a workflow is edited** (PROPOSAL.md section
 12, #377). `features/organise/workflows/` holds it. `model.ts` reads
@@ -597,20 +603,25 @@ passes: one the forge refuses to serve, one that does not parse, and one the
 check refuses, as it refuses the format before 2026-10-07, open one state,
 "This version cannot be opened", with the forge's reason. `layout.ts` works out where everything stands
 from the file alone, and nothing of it is stored: a step one column right
-of the furthest step it reads, the outputs last; inputs grouped by exactly
-the steps that read them, text with one written in counting, just before the
-first; a slot of its own in each column a wire skips, shared by the wires
-from one port and labelled at its first; each column sorted by where its
-wires come from and go, a few sweeps each way, keeping the fewest crossings;
-and five colours cut from the mark's gradient, the columns taking them 1 to 5
-and back. Every port has a row of its own, a step's outputs under its
-inputs. Every wire joins neighbouring columns, so none passes behind a box.
+of the furthest step it reads, the outputs last; each input a box of its own
+in the first column, as the task gives it; each file or folder of the
+workflow a step reads (`${{ workflow.<path> }}`) a box of its own in the
+next, as the workflow gives it, the same on every run; a slot of its own in each column a wire skips, shared
+by the wires from one port and labelled at its first; each column sorted by
+where its wires come from and go, a few sweeps each way, keeping the fewest
+crossings; and the mark's gradient (`PALETTE`), the inputs lilac, the
+workflow's files blue, the outputs gold, and the steps' columns the colours between, in turn and back,
+each wire the colour of the box it leaves. A box is closed: its head, its
+first problem or "vN is out", "needs a, b · gives c", and one pin a side,
+where its wires meet it. The box selected opens and widens, a row for every
+port, a step's outputs under its inputs, each in the box's colour. Every
+wire joins neighbouring columns, so none passes behind a box.
 React Flow draws the boxes and wires at those places and handles the drags;
 it places nothing, and no box can be dragged. The graph is always at its
 actual size (`Graph.tsx`): no zoom, no pan of React Flow's own and no fit on
 change; it is as tall as its tallest column, so the page scrolls down it,
 and slides sideways in its frame with a scrollbar, Shift and the wheel, or a
-trackpad. React Flow's attribution is hidden (`proOptions.hideAttribution`,
+trackpad, each edge of the frame fading while more of the graph is past it. React Flow's attribution is hidden (`proOptions.hideAttribution`,
 which its MIT licence allows; its authors ask those who hide it to consider
 sponsoring them). A version's page and a task's Workflow card draw the same
 graph (`DrawnGraph.tsx`).
@@ -618,12 +629,17 @@ graph (`DrawnGraph.tsx`).
 A step whose `use:` names a workflow at a version is a box (`boxes.ts`),
 drawn as one node with that workflow's inputs as its ports in and its outputs
 as its ports out, from `GET /workflows/{owner}/{name}/versions/{version}/box`,
-so the page never parses an inner workflow's file. Its Open shows the
-workflow it uses at that version as a graph of its own, read-only
-(`Inside.tsx`); a box inside it opens the same way, and the line of buttons
-above that graph names where you are, each going back to its level. A
-problem whose step path runs into a box opens the innermost one. A box says
-"A newer version is v3" when its workflow has one; moving to it is an edit
+so the page never parses an inner workflow's file. Its Open, on the box or in
+its drawer, zooms into the well (`Inside.tsx`): the workflow it uses at that
+version, read-only with every box open, between what feeds the box at the
+level above and what it feeds, each a button that opens it when it is a
+workflow box and otherwise goes back up with it selected. Over the well a
+bar names the version, that a newer one is out, and Details, which opens
+the step's drawer: editable at the draft, read-only deeper down. A box
+inside opens the same way, and the breadcrumb "Inside the workflow" names
+each level, going back to it. The tray, Undo and Redo are off inside a box. A problem whose
+step path runs into a box opens the innermost one. A box says "v3 is out"
+when its workflow has a newer version; Move to it in its drawer is an edit
 of its `use:`. A task's grading never sees a box: the forge flattens the
 boxes into their steps when it checks and saves.
 
@@ -639,10 +655,12 @@ primitives' declarations decide, in the forge's own words: the type under
 the two widenings, an enum's options, an optional output into a required
 port, a step output into a port a limit is raised from, and a loop. A refused drop marks the port with ✕ and says why
 over its box's title, covering no port, until the next press, Escape or
-wire, or five seconds, fading as it goes (`notice.ts`, M53). Every port's
-name is a button whose menu does what a drag does, each wire it could take
-listed and one it may not shown with the reason, so the keyboard reaches
-everything. A drag starts at an output and ends at an input. A change on a
+wire, or five seconds, fading as it goes (`notice.ts`, M53). A box's head is
+a button that opens it, and in an open box every port's name is a button
+whose menu does what a drag does, each wire it could take listed and one it
+may not shown with the reason, so the keyboard reaches everything. A drag starts at an output or a closed box's pin and ends at
+an input, or on a closed box, which takes the port of the same name, else
+the first empty one. A change on a
 panel that would newly break a wire, a value or an output, such as a
 version whose port no longer takes what it is given, is refused there with
 the same reason, and so is a step's output named as an output it cannot be. `edit.ts` makes every change as an edit of the YAML document in
@@ -662,31 +680,49 @@ the last of thirty digits is an edit.
 The page (M32, M37): a bar that stays at the top of the window, with the
 switcher between the draft and each version, a line saying which one is
 shown and what that means, and Save, "Publish version", Share and "View
-file"; under it the toolbar, Undo, Redo, "Add step" (the primitives as a
-menu, the newest version of each, with its title, what it does and its
-reference, then every version of each workflow the person can read but this
-one, to add as a box), Inputs and Outputs; then the
-problems; then the graph across the page's whole width. The box selected
+file"; under it Undo and Redo; then the problems; then, on the draft's
+graph, the tray (`Tray.tsx`): an input of each type, the newest version of
+each primitive with its title, what it does and its reference, and every
+version of each workflow the person can read but this one, found by owner or
+name, to add as a box. A click adds one, and the layout places it and opens
+its drawer. Then the graph across the page's whole width. The box selected
 opens in a drawer from the right (`Drawer.tsx`), over the graph, which
-scrolls the box clear of it; × or Escape closes it. A step's drawer holds
-its name, its version, What it takes, a value for each port without a wire
-with the port's description, What it gives, and Details. The outputs'
-drawer lists each output with the step output it reads, a title and, for a
-number, a unit, and adds one from what the steps give. The inputs' drawer offers each declaration only the keys
-the format allows it and the title and help the task's form names it by
-(#434), and a unit for a number alone, dropped when the type changes away
-(M54); an older input of another type with a unit shows it only to clear.
+slides the box out from under it, and only then; the page scrolls only to
+bring a box's head into the window. × or Escape closes it. A step's drawer holds
+its name, what it runs, for a workflow box "vN is out" with Move to it and
+Open, then What it takes: a Select per port offering only the sources
+the drag rules would let it be wired from, and for a port of a plain type
+"A fixed value", whose field shows once it is chosen; then What it gives, its version, and Details. The
+outputs' drawer lists each output with From, the step output it reads, a
+title and, for a number, a unit, and adds one from what the steps give. An
+input's drawer offers it only the keys the format allows and the title and
+help the task's form names it by (#434), and a unit for a number alone,
+dropped when the type changes away (M54); an older input of another type
+with a unit shows it only to clear. A file or folder input's Comes from
+makes it a file of the workflow instead: one of its files, or a file
+uploaded there, staged for Save as the Files drawer's are; every port that
+read the input reads the file, and the input goes. A workflow file's drawer
+names the file, moves its readers to another, and lets the task supply it
+again, as an input named after the file. Under them, Read by names the
+ports that read it. Files on the bar opens a drawer of every file of the
+workflow but `workflow.yaml`, which View YAML shows: the saved files, a
+chosen one shown with Replace and Remove; the changes waiting for Save; and
+Add files, which uploads each file as it is dropped, into the folder named
+beside it when one is. Removing a file a step reads asks first, naming the
+steps (`Files.tsx`).
 
 A moment after each change the definition goes to `POST /workflows/check`
 (a check that did not run says so, never that it passed), and each problem
 is pinned by its YAML path to the step, port, input or output it names, its message beside its mark, and listed in the banner above the
 graph, each a link that opens its box (`Problems.tsx`). A draft with
 problems saves; "Publish version" names the next version, `v` and the
-number after the highest (`versions.ts`), says what publishing means, asks
-for a save first, and is held while the check finds problems; a version the
+number after the highest (`versions.ts`), says what publishing means, and is
+held while the check finds problems; with changes not saved it offers "Save
+and publish vN", which saves them and publishes what was saved, and stops,
+saying why, when the save fails or meets someone else's. A version the
 forge still refuses says why, with every problem. A version is made of the
 save the page made, with its token, or not at all. A save over someone
-else's opens the merge view with steps matched by `id`. "View file" shows
+else's opens the merge view with steps matched by `id`. "View YAML" shows
 the file a save writes, read-only, with the selected box's lines marked. A
 draft whose file does not read cannot be drawn, so it opens as text to mend,
 with Save and Undo, a run of typing one step back, and the graph returns
@@ -862,11 +898,14 @@ stream is open (below) a nudge says when a grading moves, and the list is
 read again then and once a minute besides. While it is not, the list is read
 by how long the newest grading still to finish has waited: every two seconds
 for its first half minute, every five to two minutes, every fifteen after,
-and every minute when nothing is being graded. The Result is the
+and every minute when nothing is being graded. The Status is the
 submission's state as a badge, by the attempt that counts: `queued`,
 `grading`, `graded`, `submitted` (graded, its results after the contest),
 `delayed`, `over_limit` or `cancelled`. A submission keeps its result while
-it is graded again, whatever the new attempt comes to (#442).
+it is graded again, whatever the new attempt comes to (#442). The Result
+beside it says what it came to: "Did not compile", each value it is shown
+("score: 7.5"), or how many of the tests it is shown it passed ("Passed 2
+of 3 tests"), and nothing while none of it is shown.
 One with no result whose grading failed on the platform's side is
 `delayed`: it reads `GRADING DELAYED` with "A problem on Unicon's side.
 Nothing is lost, and it does not use up a submission.", and is followed as
@@ -876,7 +915,10 @@ often as a list with nothing grading is. One past the task's limit reads
 `OVER THE LIMIT` with "Not graded: you had reached the limit of 3
 submissions for this task."
 `src/ui/verdicts.ts` has a label for every outcome and state, and
-`src/ui/VerdictBadge.tsx` puts each in one of the handoff's six colour pairs; an outcome it does not know
+`src/ui/VerdictBadge.tsx` puts each in one of the handoff's six colour
+pairs, or in a seventh, blue, for a finished grading, so `GRADED` never
+reads like one still waiting in grey; `GRADING DELAYED`, `CANCELLED` and
+`OVER THE LIMIT` take the limit's amber. An outcome it does not know
 shows under its own name in the neutral one.
 
 `?submission=<n>` opens one submission above the list

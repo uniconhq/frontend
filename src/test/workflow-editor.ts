@@ -4,7 +4,7 @@ import { DRAFT_FILE } from '@/features/organise/workflows/words';
 
 /**
  * Finding things on the workflow editor's page, each inside the part of the
- * page it belongs to: the bar, the toolbar, a box, a drawer, a menu. Each
+ * page it belongs to: the bar, its tools, a box, a drawer, a menu. Each
  * part is found by its element and its name, by a selector: a query by label
  * over the whole page has jsdom work out every field's labels again after
  * each change, which on a graph of boxes and ports cost these tests most of
@@ -38,22 +38,28 @@ export function findPart(
 /** The editor's page for kenny/tuned, the workflow `workflowBackend` serves. */
 export const EDITOR_PAGE = '/workflows/kenny/tuned';
 
-/** A button on the bar, which holds Save, Publish version, Share and View file. */
+/** A button on the bar, which holds Save, Publish version, Share and View YAML. */
 export function barButton(name: string): HTMLElement {
   return within(part('[role="toolbar"]', 'The workflow')).getByRole('button', { name });
 }
 
-/** A button on the toolbar, which holds Undo, Redo, Add step and the boxes. */
+/** A button of the graph's tools on the bar, which hold Undo, Redo and Files. */
 export function toolButton(name: string): HTMLElement {
-  return within(part('[role="toolbar"]', 'Editing')).getByRole('button', { name });
+  return within(part('[role="group"]', 'Editing')).getByRole('button', { name });
+}
+
+/** The drawer of every file of the workflow, opened from the bar. */
+export async function openFiles(user: UserEvent): Promise<HTMLElement> {
+  await user.click(await waitFor(() => toolButton('Files')));
+  return findPart('section', 'Files');
 }
 
 /**
  * The draft's file as a save would write it, read where a person reads it:
- * "View file" on the bar, a dialog closed again with Escape.
+ * "View YAML" on the bar, a dialog closed again with Escape.
  */
 export async function fileText(user: UserEvent): Promise<string> {
-  await user.click(barButton('View file'));
+  await user.click(barButton('View YAML'));
   const dialog = await waitFor(() => {
     const found = document.querySelector<HTMLElement>('[role="dialog"]');
     if (found === null) throw new Error('No dialog is open.');
@@ -71,17 +77,70 @@ export function stepBox(id: string): Promise<HTMLElement> {
   return findPart('[role="group"]', `Step ${id}`);
 }
 
-/** The button of a step's input port, whose menu wires it. */
-export async function portButton(step: string, port: string): Promise<HTMLElement> {
-  return within(await stepBox(step)).getByRole('button', {
+/**
+ * A step's box, opened as a person opens it, by its head: a closed box shows
+ * its head and a line, and its ports only once it is selected.
+ */
+async function openBox(
+  user: UserEvent,
+  name: string,
+  head: string,
+): Promise<HTMLElement> {
+  const box = await findPart('[role="group"]', name);
+  if (!box.hasAttribute('data-open'))
+    await user.click(within(box).getByRole('button', { name: new RegExp(`^${head}`) }));
+  return waitFor(() => {
+    const open = part('[role="group"]', name);
+    if (!open.hasAttribute('data-open'))
+      throw new Error(`The box ${name} is not open.`);
+    return open;
+  });
+}
+
+/** A button of the tray over the graph, in its group: Inputs, Primitives or Workflows. */
+export function trayButton(group: string, name: string | RegExp): HTMLElement {
+  return within(part('section', group)).getByRole('button', { name });
+}
+
+/** An input's box opened by its head, which opens that input's drawer. */
+export function openInput(user: UserEvent, id: string): Promise<HTMLElement> {
+  return openBox(user, `Input ${id}`, id);
+}
+
+/** The outputs' box, always open, with its head clicked to open the outputs' drawer. */
+export async function openOutputs(user: UserEvent): Promise<HTMLElement> {
+  const box = await findPart('[role="group"]', 'Outputs');
+  if (partOrNull('aside', 'Outputs') === null)
+    await user.click(within(box).getByRole('button', { name: /^Outputs/ }));
+  return box;
+}
+
+/** The button of a step's input port, whose menu wires it, its box opened first. */
+export async function portButton(
+  user: UserEvent,
+  step: string,
+  port: string,
+): Promise<HTMLElement> {
+  return within(await openBox(user, `Step ${step}`, step)).getByRole('button', {
     name: `The port ${port} of ${step}`,
   });
 }
 
-/** The button of a step's output, whose menu wires it onward or reports it. */
-export async function outputButton(step: string, output: string): Promise<HTMLElement> {
-  return within(await stepBox(step)).getByRole('button', {
+/** The button of a step's output, whose menu wires it onward or reports it, its box opened first. */
+export async function outputButton(
+  user: UserEvent,
+  step: string,
+  output: string,
+): Promise<HTMLElement> {
+  return within(await openBox(user, `Step ${step}`, step)).getByRole('button', {
     name: `The output ${output} of ${step}`,
+  });
+}
+
+/** The button of one of the workflow's outputs, whose menu changes what it reads, the outputs' box opened first. */
+export async function entryButton(user: UserEvent, name: string): Promise<HTMLElement> {
+  return within(await openOutputs(user)).getByRole('button', {
+    name: `The output ${name}`,
   });
 }
 

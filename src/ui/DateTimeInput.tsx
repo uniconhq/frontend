@@ -7,7 +7,7 @@ import { useFieldLabel } from './FieldLabel';
  * local time (`2026-06-01T17:00`, seconds when `seconds`). The page converts
  * to and from the time it stores; this only shows and takes the local value.
  * `description` reads under the box, and `info` is background behind an ⓘ
- * beside the label.
+ * beside the label. `width` is as `TextInput`'s; full width when absent.
  */
 export function DateTimeInput({
   label,
@@ -17,6 +17,7 @@ export function DateTimeInput({
   info,
   disabled = false,
   seconds = false,
+  width,
 }: {
   label: string;
   value: string;
@@ -25,6 +26,7 @@ export function DateTimeInput({
   info?: ReactNode;
   disabled?: boolean;
   seconds?: boolean;
+  width?: 'lg';
 }) {
   const { inputLabel, id, wrap } = useFieldLabel({ label, info });
   return wrap(
@@ -37,6 +39,7 @@ export function DateTimeInput({
       value={value}
       onChange={(event) => onChange(event.currentTarget.value)}
       disabled={disabled}
+      style={width === undefined ? undefined : { width: '16rem', maxWidth: '100%' }}
       radius="sm"
     />,
   );

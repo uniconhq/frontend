@@ -20,7 +20,10 @@ export const LINE = 22;
 const BORDER = 2;
 
 /** How wide boxes are and how far apart their columns stand. */
-export type Shape = { width: number; gap: number };
+export type Shape = { width: number; gap: number; compact?: boolean };
+
+export const SMALL: Shape = { width: 150, gap: 56, compact: true };
+export const COMPACT = 40;
 
 /**
  * The colours of one kind of graph: its inputs, its outputs, and the
@@ -35,7 +38,22 @@ export const TASK_PALETTE: Palette = {
   output: '#5b8def',
 };
 
-type GraphPort = { name: string; side: 'in' | 'out' };
+export const RESULT_ROW = 28;
+export type GraphPort = {
+  name: string;
+  side: 'in' | 'out';
+  label?: string;
+  kind?: string;
+  when?: string;
+  /** How `when` is drawn: stands out while shown now, dimmed while never. */
+  shown?: 'now' | 'later' | 'never';
+  detail?: string;
+  /** What a row holds, drawn as tags under it, such as a group's columns. */
+  parts?: string[];
+  heading?: boolean;
+  pin?: boolean;
+  rows?: number;
+};
 
 export type GraphBox = {
   id: string;
@@ -52,9 +70,12 @@ export type GraphBox = {
   /** The leftmost column it stands in, however little feeds it. */
   least?: number;
   ports: GraphPort[];
+  alwaysOpen?: boolean;
+  rowHeight?: number;
 };
 
 export type GraphWire = {
+  label?: string;
   from: string;
   fromPort: string;
   to: string;
@@ -74,6 +95,7 @@ export type PlacedBox = {
 };
 
 export type Layout = {
+  shape: Shape;
   placed: PlacedBox[];
   /**
    * The height a source's wire crosses each column at, by `box.port`:
@@ -90,8 +112,14 @@ function aboveRows(box: GraphBox, inside: number): number {
   return HEAD + (box.warn !== undefined ? LINE : 0) + inside;
 }
 
-function boxHeight(box: GraphBox, open: boolean, inside: number): number {
-  const rows = open ? box.ports.length * GEOMETRY.row + GEOMETRY.foot : 0;
+function boxHeight(box: GraphBox, open: boolean, inside: number, shape: Shape): number {
+  if (shape.compact) return STACK + BORDER * 2 + COMPACT;
+  const rows = open
+    ? box.ports.reduce(
+        (height, port) => height + (port.rows ?? 1) * (box.rowHeight ?? GEOMETRY.row),
+        0,
+      ) + GEOMETRY.foot
+    : 0;
   return STACK + BORDER * 2 + aboveRows(box, inside) + rows;
 }
 
@@ -161,7 +189,7 @@ export function layoutGraph(
     if (box.role !== 'output') rankOf(box.id, roles, least, joined, rank, visiting);
   }
   const last = Math.max(
-    1,
+    0,
     ...boxes.filter((box) => box.role !== 'output').map((box) => rank.get(box.id) ?? 0),
   );
   for (const box of boxes) if (box.role === 'output') rank.set(box.id, last + 1);
@@ -174,7 +202,7 @@ export function layoutGraph(
     columns.set(column, list);
   }
 
-  const open = (box: GraphBox) => box.id === selected;
+  const open = (box: GraphBox) => box.alwaysOpen === true || box.id === selected;
   const spans = new Map<number, { x: number; width: number }>();
   let next = 24;
   for (let column = 0; column <= Math.max(0, ...columns.keys()); column += 1) {
@@ -197,7 +225,7 @@ export function layoutGraph(
     let y = 20;
     for (const box of columns.get(column) ?? []) {
       const inside = open(box) ? (insides.get(box.id) ?? 0) : 0;
-      const boxHeightPx = boxHeight(box, open(box), inside);
+      const boxHeightPx = boxHeight(box, open(box), inside, shape);
       const colour = colourAt(palette, box.role, column);
       const boxWidth = open(box) ? (box.wide ?? shape.width) : shape.width;
       placed.push({
@@ -226,7 +254,7 @@ export function layoutGraph(
     width = Math.max(width, x + columnWidth + 24);
     height = Math.max(height, y);
   }
-  return { placed, through, columns: spans, width, height };
+  return { shape, placed, through, columns: spans, width, height };
 }
 
 /** How far down a box a port's wire meets it. */
@@ -235,7 +263,9 @@ function portTop(
   name: string,
   side: 'in' | 'out',
   open: boolean,
+  shape: Shape,
 ): number {
+  if (shape.compact) return STACK + BORDER + COMPACT / 2;
   const { box } = place;
   if (!open) return PIN_TOP;
   const index = box.ports.findIndex((port) => port.name === name && port.side === side);
@@ -244,8 +274,13 @@ function portTop(
     STACK +
     BORDER +
     aboveRows(box, place.inside) +
-    index * GEOMETRY.row +
-    GEOMETRY.row / 2
+    box.ports
+      .slice(0, index)
+      .reduce(
+        (height, port) => height + (port.rows ?? 1) * (box.rowHeight ?? GEOMETRY.row),
+        0,
+      ) +
+    (box.rowHeight ?? GEOMETRY.row) / 2
   );
 }
 
@@ -262,8 +297,24 @@ export function wirePath(
   to: PlacedBox,
   selected: string | null,
 ): string {
-  const y1 = from.y + portTop(from, wire.fromPort, 'out', from.box.id === selected);
-  const y2 = to.y + portTop(to, wire.toPort, 'in', to.box.id === selected);
+  const y1 =
+    from.y +
+    portTop(
+      from,
+      wire.fromPort,
+      'out',
+      from.box.alwaysOpen === true || from.box.id === selected,
+      layout.shape,
+    );
+  const y2 =
+    to.y +
+    portTop(
+      to,
+      wire.toPort,
+      'in',
+      to.box.alwaysOpen === true || to.box.id === selected,
+      layout.shape,
+    );
   const x1 = from.x + from.width;
   const x2 = to.x;
   if (x2 <= x1) {

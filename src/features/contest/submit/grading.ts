@@ -1,5 +1,7 @@
 import type { GradingResult, SubmissionState, Submission } from '@/api/types';
+import { formatExact } from '@/lib/exact';
 import { serverNow } from '@/lib/time';
+import { BEING_CHECKED, MISSING } from '@/ui/number/words';
 
 /**
  * How often a contestant's submissions are read again: soon while a grading
@@ -124,4 +126,31 @@ export function justFinished(
 /** Newest first, whatever order they arrived in. */
 export function newestFirst(submissions: Submission[]): Submission[] {
   return [...submissions].sort((a, b) => b.number - a.number);
+}
+
+/**
+ * What a submission came to, in one line for its row of the list: that it
+ * did not compile; else each value it is shown, by name, as the submission
+ * shows it; else how many of the tests it is shown it passed. Empty while
+ * nothing of it is shown, which its status already says.
+ */
+export function resultLine(grading: GradingResult | null): string {
+  if (grading === null) return '';
+  if (grading.compiled === 0) return 'Did not compile';
+  if (grading.run_values.length > 0) {
+    return grading.run_values
+      .map((value) => {
+        const shown = value.waiting
+          ? BEING_CHECKED
+          : value.number !== null
+            ? formatExact(value.number)
+            : (value.text ?? MISSING);
+        return `${value.name}: ${shown}`;
+      })
+      .join(' · ');
+  }
+  const tests = grading.runs.length;
+  if (tests === 0) return '';
+  const passed = grading.runs.reduce((sum, run) => sum + run.passed, 0);
+  return `Passed ${String(passed)} of ${String(tests)} ${tests === 1 ? 'test' : 'tests'}`;
 }

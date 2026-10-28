@@ -5,7 +5,7 @@ import { Modal } from '@/ui/Modal';
 import classes from './workflows.module.css';
 
 /**
- * "View file" (M37, M11): the file the workflow is stored as, read-only, in a
+ * "View YAML" (M37, M11): the YAML file the workflow is stored as, read-only, in a
  * dialog of its own, out of the editing area. It is for checking: the graph
  * and the drawer are where it changes. The lines of the box selected are
  * marked.
@@ -16,7 +16,7 @@ export function FileView({
   text,
   marked,
 }: {
-  /** The dialog's title, such as "The draft's file". */
+  /** The dialog's title, such as "The draft's YAML". */
   title: string;
   /** What the file is called, for a screen reader and a test. */
   label: string;
@@ -27,7 +27,7 @@ export function FileView({
   return (
     <>
       <Button variant="secondary" onClick={() => setOpen(true)}>
-        View file
+        View YAML
       </Button>
       <Modal opened={open} onClose={() => setOpen(false)} title={title} wide>
         {open && (

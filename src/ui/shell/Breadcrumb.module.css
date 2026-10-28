@@ -15,9 +15,14 @@
   text-overflow: ellipsis;
   padding: 2px 8px;
   border-radius: var(--mantine-radius-xs);
-  background: var(--unicon-hover);
   color: var(--unicon-text-body);
   vertical-align: middle;
+}
+
+/* A step with no page of its own: plain words, not a chip, so it is not taken for a link. */
+.plain {
+  padding-inline: 0;
+  color: var(--unicon-text-secondary);
 }
 
 .caret {
@@ -32,6 +37,7 @@
 }
 
 .link {
+  background: var(--unicon-hover);
   text-decoration: none;
 }
 

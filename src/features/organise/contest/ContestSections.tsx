@@ -22,6 +22,8 @@ export function ContestSettingsPage() {
   const { org, contest } = useContestParams();
   return (
     <SectionPage
+      place={{ kind: 'contest', org, contest }}
+      role="admin"
       section={sectionOf(CONTEST_SECTIONS, 'settings')}
       links={<PageLink to={viewFilePath(org, contest)}>View file</PageLink>}
     >

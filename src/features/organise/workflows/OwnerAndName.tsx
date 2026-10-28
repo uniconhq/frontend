@@ -23,7 +23,7 @@ export function OwnerAndName({
         value={owner}
         options={owners.map((each) => ({ value: each, label: each }))}
         onChange={setOwner}
-        description="Yourself, or an org where you are a manager or an admin."
+        description="Yourself, or an org you can create workflows in."
       />
       <TextInput label="Name" value={name} onChange={setName} required />
     </>

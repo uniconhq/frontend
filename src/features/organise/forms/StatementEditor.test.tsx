@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@/test/user-event';
 import { http, HttpResponse } from 'msw';
 import { renderApp } from '@/test/render';
@@ -91,6 +91,66 @@ describe('the statement beside its preview', { timeout: 20_000 }, () => {
         keep_as_draft: false,
       },
     ]);
+  });
+
+  it('asks before leaving with changes not saved, and leaves at once after the save', async () => {
+    statementBackend(() =>
+      HttpResponse.json({
+        number: 3,
+        grading_changed: false,
+        changes: [],
+        notes: [],
+        regraded: 0,
+        effect: unchanged,
+      }),
+    );
+    // The statement as saved is read back with its new token.
+    let saved: { content: string; token: string } | null = null;
+    server.use(
+      http.put(`${TASK_API}/files/:path`, async ({ request }) => {
+        const body = (await request.json()) as { content: string };
+        saved = { content: body.content, token: 'token-saved' };
+        return HttpResponse.json({
+          number: 3,
+          grading_changed: false,
+          changes: [],
+          notes: [],
+          regraded: 0,
+          effect: unchanged,
+        });
+      }),
+      http.get(`${TASK_API}/files/:path`, ({ params }) =>
+        params['path'] === 'statement.md' && saved !== null
+          ? HttpResponse.json({
+              path: 'statement.md',
+              encoding: 'utf-8',
+              ...saved,
+              upload: null,
+              version: '4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e',
+            })
+          : undefined,
+      ),
+    );
+    const away = '/orgs/acme/contests/spring';
+    const { router } = renderApp('/orgs/acme/contests/spring/tasks/sum/statement');
+
+    const source = await screen.findByRole('textbox', { name: 'Statement source' });
+    const page = router.state.location.pathname;
+    fireEvent.change(source, { target: { value: '# Sum of two\n' } });
+    await act(() => router.navigate(away));
+    const asking = await screen.findByRole('dialog', { name: 'Leave without saving?' });
+    expect(asking).toHaveTextContent('Your changes to the statement are not saved.');
+    await userEvent.click(within(asking).getByRole('button', { name: 'Stay' }));
+    expect(router.state.location.pathname).toBe(page);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Save statement' }));
+    await screen.findByText('Saved and published as publication 3.');
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Save statement' })).toBeDisabled(),
+    );
+    await act(() => router.navigate(away));
+    await waitFor(() => expect(router.state.location.pathname).toBe(away));
+    expect(screen.queryByRole('dialog', { name: 'Leave without saving?' })).toBeNull();
   });
 
   it('draws the task’s own pictures in the preview and says how to show one', async () => {
@@ -486,7 +546,7 @@ describe('the statement beside its preview', { timeout: 20_000 }, () => {
       await screen.findByRole('textbox', { name: 'Statement source' }),
     ).toHaveAttribute('readonly');
     expect(
-      screen.getByText('Only an admin of the task can change the statement.'),
+      within(screen.getByRole('region', { name: 'Statement' })).getByText('Read only'),
     ).toBeVisible();
     expect(
       screen.queryByRole('button', { name: 'Save statement' }),

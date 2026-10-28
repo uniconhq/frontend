@@ -81,8 +81,8 @@ describe("the task's gradings", () => {
     const table = await screen.findByRole('table', { name: 'Gradings' });
     const [, newest, oldest] = within(table).getAllByRole('row');
     expect(newest).toHaveTextContent('Submission 4');
-    expect(newest).toHaveTextContent('Waiting for a machine');
-    expect(oldest).toHaveTextContent('System error');
+    expect(newest).toHaveTextContent('Sent, waiting for a machine');
+    expect(oldest).toHaveTextContent('Failed on Unicon’s side');
     expect(oldest).toHaveTextContent(
       'The grading machine lost its run before it began.',
     );
@@ -277,7 +277,12 @@ describe("the task's gradings", () => {
 
   it.each([
     ['invalid_reason', 422, {}, 'That sentence will not do'],
-    ['wrong_status', 409, { current: 'done' }, 'It is no longer a system error'],
+    [
+      'wrong_status',
+      409,
+      { current: 'done' },
+      'It no longer reads as failed on Unicon’s side',
+    ],
     ['conflict', 409, {}, 'A later attempt is there'],
   ])(
     'shows a refused cancel, %s, with its sentence',
@@ -311,7 +316,8 @@ describe("the task's gradings", () => {
       const alert = await within(dialog).findByRole('alert');
       expect(alert).toHaveTextContent(title);
       expect(alert).toHaveTextContent(`${code} detail`);
-      if (code === 'wrong_status') expect(alert).toHaveTextContent('It is done now.');
+      if (code === 'wrong_status')
+        expect(alert).toHaveTextContent('Its status now: Done.');
     },
   );
 
@@ -358,7 +364,7 @@ describe("the task's gradings", () => {
     const earlier = within(third).getAllByRole('row')[1];
     if (earlier === undefined) throw new Error('no earlier attempt shown');
     expect(earlier).toHaveTextContent('Submission 3, replaced');
-    expect(earlier).toHaveTextContent('System error');
+    expect(earlier).toHaveTextContent('Failed on Unicon’s side');
     expect(earlier).toHaveTextContent(
       'The grading machine lost its run before it began.',
     );
@@ -422,7 +428,7 @@ describe("the task's gradings", () => {
     expect(
       within(second).getByRole('button', { name: 'Show earlier attempts (1)' }),
     ).toBeVisible();
-    expect(second).toHaveTextContent('Queued');
+    expect(second).toHaveTextContent('Not sent to a machine yet');
   });
 
   it('rejudges the whole task after saying what that does', async () => {
@@ -511,7 +517,7 @@ describe("the task's gradings", () => {
     );
     renderApp(TASK);
 
-    expect(await screen.findByText('System error')).toBeVisible();
+    expect(await screen.findByText('Failed on Unicon’s side')).toBeVisible();
     expect(screen.queryByRole('button', { name: /Retry/ })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Rejudge' })).toBeNull();
   });

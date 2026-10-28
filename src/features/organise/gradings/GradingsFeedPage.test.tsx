@@ -171,9 +171,9 @@ describe("the contest's gradings feed", () => {
     renderApp(FEED);
 
     const table = await screen.findByRole('table', { name: 'Gradings' });
-    const depth = screen.getByLabelText('Queue');
-    expect(depth).toHaveTextContent('Queued4');
-    expect(depth).toHaveTextContent('Waiting for a machine2');
+    const depth = screen.getByLabelText('Waiting to be graded');
+    expect(depth).toHaveTextContent('Not sent to a machine yet4');
+    expect(depth).toHaveTextContent('Sent, waiting for a machine2');
 
     const groups = within(table).getAllByRole('rowgroup').slice(1);
     expect(groups).toHaveLength(3);
@@ -183,7 +183,7 @@ describe("the contest's gradings feed", () => {
       'href',
       '/orgs/acme/contests/spring/tasks/sum',
     );
-    expect(sum).toHaveTextContent('Queued');
+    expect(sum).toHaveTextContent('Not sent to a machine yet');
     expect(within(sum).getAllByRole('row')).toHaveLength(1);
 
     expect(team).toHaveTextContent('Lovelaces (grace)');
@@ -214,7 +214,7 @@ describe("the contest's gradings feed", () => {
 
     const rows = within(sum).getAllByRole('row');
     expect(rows).toHaveLength(2);
-    expect(rows[1]).toHaveTextContent('System error');
+    expect(rows[1]).toHaveTextContent('Failed on Unicon’s side');
     expect(rows[1]).toHaveTextContent(
       'The grading machine lost its run before it began.',
     );
@@ -376,7 +376,7 @@ describe("the contest's gradings feed", () => {
     ).not.toBeChecked();
   });
 
-  it('counts the failed gradings beside the queue, and shows them on asking', async () => {
+  it('counts the failed gradings apart from those waiting, and shows them on asking', async () => {
     server.use(
       signedIn,
       taskList,
@@ -388,9 +388,16 @@ describe("the contest's gradings feed", () => {
     const user = userEvent.setup();
     renderApp(FEED);
 
-    const depth = await screen.findByLabelText('Queue');
-    await waitFor(() => expect(depth).toHaveTextContent('Failed2'));
-    expect(depth).not.toHaveTextContent('waiting for you');
+    expect(
+      await screen.findByRole('heading', { level: 2, name: 'Waiting to be graded' }),
+    ).toBeVisible();
+    const depth = await screen.findByLabelText('Waiting to be graded');
+    const failed = await screen.findByRole('group', { name: 'Failed gradings' });
+    await waitFor(() =>
+      expect(failed).toHaveTextContent('2 gradings failed on Unicon’s side.'),
+    );
+    expect(depth).not.toHaveTextContent(/failed/i);
+    expect(screen.queryByRole('heading', { name: 'Queue' })).toBeNull();
     expect(
       screen.getByText(/again once by itself\. If that fails too, it waits for you/),
     ).toBeVisible();
@@ -456,7 +463,7 @@ describe('acting on the feed', () => {
       name: 'Grade submission 1 again?',
     });
     expect(dialog).toHaveTextContent(
-      "Lovelaces (grace)'s submission 1 to sort runs again on the same version of the task it was graded on (publication 2). For when the grading itself went wrong, such as a system error. To grade it against the task as it is now, rejudge the task.",
+      "Lovelaces (grace)'s submission 1 to sort runs again on the same version of the task it was graded on (publication 2). For when the grading itself went wrong, such as one that failed on Unicon’s side. To grade it against the task as it is now, rejudge the task.",
     );
     expect(dialog).toHaveTextContent(
       'The new result replaces this one. This one stays in the list, marked as replaced.',
@@ -472,7 +479,7 @@ describe('acting on the feed', () => {
     const group = await screen.findByRole('rowgroup', {
       name: 'A submission 1 by Lovelaces (grace)',
     });
-    await waitFor(() => expect(group).toHaveTextContent('Queued'));
+    await waitFor(() => expect(group).toHaveTextContent('Not sent to a machine yet'));
     expect(retriedAt).toEqual(['sort/g-sort-1']);
     expect(screen.queryByRole('dialog')).toBeNull();
     await waitFor(() => expect(queueReads).toBe(2));
@@ -558,9 +565,9 @@ describe('acting on the feed', () => {
     );
 
     const alert = await within(dialog).findByRole('alert');
-    expect(alert).toHaveTextContent('It is no longer a system error');
+    expect(alert).toHaveTextContent('It no longer reads as failed on Unicon’s side');
     expect(alert).toHaveTextContent('The grading is no longer a system error.');
-    expect(alert).toHaveTextContent('It is queued now.');
+    expect(alert).toHaveTextContent('Its status now: Not sent to a machine yet.');
   });
 
   it('offers Rejudge without a filter, asking which task first and saying what it does', async () => {
@@ -703,7 +710,7 @@ describe('acting on the feed', () => {
     const broken = await screen.findByRole('rowgroup', {
       name: 'B submission 3 by ada',
     });
-    expect(broken).toHaveTextContent('System error');
+    expect(broken).toHaveTextContent('Failed on Unicon’s side');
     expect(broken).not.toHaveTextContent('The entrant and the leaderboards');
   });
 
@@ -1033,7 +1040,9 @@ describe('the feed without the stream', () => {
 
     await waitFor(() => expect(sum).toHaveTextContent('Done'));
     await waitFor(() =>
-      expect(screen.getByLabelText('Queue')).toHaveTextContent('Queued0'),
+      expect(screen.getByLabelText('Waiting to be graded')).toHaveTextContent(
+        'Not sent to a machine yet0',
+      ),
     );
   });
 });
@@ -1084,8 +1093,10 @@ describe('the feed kept up to date', () => {
     renderApp(FEED);
 
     const sum = await screen.findByRole('rowgroup', { name: 'B submission 3 by ada' });
-    expect(sum).toHaveTextContent('Queued');
-    expect(screen.getByLabelText('Queue')).toHaveTextContent('Queued1');
+    expect(sum).toHaveTextContent('Not sent to a machine yet');
+    expect(screen.getByLabelText('Waiting to be graded')).toHaveTextContent(
+      'Not sent to a machine yet1',
+    );
     FakeSource.last?.onopen?.();
 
     now = [{ ...retried, grading: { ...retried.grading, status: 'running' } }];
@@ -1094,7 +1105,9 @@ describe('the feed kept up to date', () => {
 
     await waitFor(() => expect(sum).toHaveTextContent('Running'));
     await waitFor(() =>
-      expect(screen.getByLabelText('Queue')).toHaveTextContent('Queued0'),
+      expect(screen.getByLabelText('Waiting to be graded')).toHaveTextContent(
+        'Not sent to a machine yet0',
+      ),
     );
   });
 });

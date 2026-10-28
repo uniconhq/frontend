@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { screen, within } from '@testing-library/react';
-import { http, HttpResponse } from 'msw';
+import { screen, waitFor, within } from '@testing-library/react';
+import { delay, http, HttpResponse } from 'msw';
+import { CONTEST_API, TASK_API, home, taskPage } from '@/test/contestant';
 import { renderApp } from '@/test/render';
 import { server, signedIn } from '@/test/server';
 
@@ -103,5 +104,72 @@ describe('the breadcrumb', () => {
 
     expect(await trail()).toEqual(steps);
     expect(screen.queryByText('▾')).toBeNull();
+  });
+
+  it('names the contest and the task as their pages do, the org in plain words', async () => {
+    let askedOrg = 0;
+    server.use(
+      signedIn,
+      http.get('/api/v1/orgs/:org', () => {
+        askedOrg += 1;
+        return HttpResponse.json({ display_name: 'Acme University', description: '' });
+      }),
+      http.get(`${CONTEST_API}/home`, () => HttpResponse.json(home())),
+      http.get(`${TASK_API}/page`, () => HttpResponse.json(taskPage)),
+      http.get(`${TASK_API}/submissions`, () => HttpResponse.json([])),
+    );
+    renderApp('/contests/acme/spring/tasks/sum');
+
+    await screen.findByRole('heading', { name: 'A. Sum of Two', level: 1 });
+    expect(await trail()).toEqual([
+      { label: 'Browse contests', to: '/', current: false },
+      { label: 'acme', to: null, current: false },
+      { label: 'Spring 2026', to: '/contests/acme/spring', current: false },
+      { label: 'A. Sum of Two', to: '/contests/acme/spring/tasks/sum', current: true },
+    ]);
+    // The trail asks nothing of its own: an entrant's pages never read the org.
+    expect(askedOrg).toBe(0);
+    const org = screen.getByText('acme', { selector: 'span' });
+    expect(org).toHaveClass(/_plain_/);
+    expect(org).not.toHaveClass(/_link_/);
+  });
+
+  it('calls each step by its address until its page has read its name', async () => {
+    server.use(
+      signedIn,
+      http.get(`${CONTEST_API}/home`, async () => {
+        await delay('infinite');
+        return HttpResponse.json(home());
+      }),
+      http.get(`${TASK_API}/page`, async () => {
+        await delay('infinite');
+        return HttpResponse.json(taskPage);
+      }),
+    );
+    renderApp('/contests/acme/spring/tasks/sum');
+
+    expect((await trail()).map((step) => step.label)).toEqual([
+      'Browse contests',
+      'acme',
+      'spring',
+      'sum',
+    ]);
+  });
+
+  it('names an org by its display name once its page has read it', async () => {
+    server.use(
+      signedIn,
+      http.get('/api/v1/orgs/:org', () =>
+        HttpResponse.json({ display_name: 'Acme University', description: '' }),
+      ),
+    );
+    renderApp('/orgs/acme');
+
+    await waitFor(async () =>
+      expect((await trail()).map((step) => step.label)).toEqual([
+        'Orgs',
+        'Acme University',
+      ]),
+    );
   });
 });

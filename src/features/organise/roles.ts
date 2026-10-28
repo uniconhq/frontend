@@ -45,12 +45,39 @@ export const ROLE_LABEL: Record<RoleName, string> = {
 };
 
 /** What each role lets its holder do, under a choice of role. */
-export const ROLE_MEANS: Record<RoleName, string> = {
-  admin: 'Everything a manager does, and gives or takes the admin role.',
-  manager:
-    'Changes and publishes, approves registrations, and gives the manager and observer roles.',
-  observer: 'Sees everything here and changes nothing.',
+export const ROLE_AREAS = [
+  'Change settings',
+  'Publish',
+  'Manage entrants',
+  'Give roles',
+] as const;
+const ROLE_MEANS: Record<RoleName, readonly string[]> = {
+  admin: [
+    'Change every setting.',
+    'Publish changes.',
+    'Manage entrants and approve registrations.',
+    'Give or take every role, including admin.',
+  ],
+  manager: [
+    'Change grading and schedule settings.',
+    'Publish changes.',
+    'Manage entrants and approve registrations.',
+    'Give or take manager and observer roles.',
+  ],
+  observer: [
+    'Read settings without changing them.',
+    'Read publications without publishing.',
+    'Read entrants without changing them.',
+    'Read roles without giving or taking them.',
+  ],
 };
+
+/** A task role never reaches the contest's entrants. */
+export function roleMeans(role: RoleName, kind: RolePlace['kind']): readonly string[] {
+  return ROLE_MEANS[role].map((line, index) =>
+    kind === 'task' && index === 2 ? 'Entrants are managed at contest level.' : line,
+  );
+}
 
 /** The roles a person may hand out, or invite someone to: admin only by an admin. */
 export function offered(administers: boolean): RoleName[] {

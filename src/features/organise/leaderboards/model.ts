@@ -53,6 +53,7 @@ export type BoardDraft = {
   id: string;
   key: string;
   title: string;
+  saved: boolean;
   who: Who;
   rows: RowsKind;
   /** How many top rows, when `rows` is `top`. */
@@ -82,12 +83,12 @@ export type LeaderboardsDraft = {
 export type FieldProblem = { field: string; message: string };
 
 /** A leaderboard key is a task handle: the save refuses a longer one. */
-export const KEY_MAX = 24;
+const KEY_MAX = 24;
 const KEY = /^[a-z0-9][a-z0-9_-]*$/;
 const COLUMN_MAX = 40;
 const COLUMN = /^[a-z][a-z0-9_-]*$/;
 
-export const OWN_EVERYONE =
+const OWN_EVERYONE =
   'A leaderboard shown to everyone cannot show each entrant only their own row, ' +
   'since a guest has none. Show every row or the top rows.';
 
@@ -118,22 +119,24 @@ export function lineOf(column: ColumnDraft, catalogue: Catalogue | null): string
   return printFormula(column.tree, catalogue, 'leaderboard');
 }
 
-export function blankColumn(): ColumnDraft {
-  return { key: nextId('column'), name: '', line: null, tree: '1' };
+export function blankColumn(
+  taken: readonly string[],
+  start = taken.length + 1,
+): ColumnDraft {
+  let n = start;
+  const occupied = new Set(taken.map(written));
+  while (occupied.has(`column_${String(n)}`)) n += 1;
+  return { key: nextId('column'), name: `column_${String(n)}`, line: null, tree: '1' };
 }
 
 /** A new leaderboard: staff's, one number column, ordered by it. */
 export function blankBoard(taken: readonly string[]): BoardDraft {
-  let key = 'board';
-  let n = 2;
-  while (taken.includes(key)) {
-    key = `board${String(n)}`;
-    n += 1;
-  }
+  const key = keyFromName('', taken);
   return {
     id: nextId('board'),
     key,
     title: '',
+    saved: false,
     who: 'staff',
     rows: 'all',
     top: '10',
@@ -141,6 +144,54 @@ export function blankBoard(taken: readonly string[]): BoardDraft {
     sort: [{ name: 'points', way: 'desc' }],
     display: [{ name: 'points', decimals: '' }],
   };
+}
+
+/** A readable key made once while a leaderboard is new. */
+export function keyFromName(name: string, taken: readonly string[]): string {
+  let base = name
+    .toLowerCase()
+    .replace(/[\s-]+/g, '_')
+    .replace(/[^a-z0-9_]/g, '');
+  if (base === '') base = 'leaderboard';
+  if (/^[0-9_]/.test(base)) base = `board_${base}`;
+  base = base.slice(0, KEY_MAX);
+  const occupied = new Set(taken.map(written));
+  let key = base;
+  let suffix = 2;
+  while (occupied.has(key) || unreadableProblem(key) !== null) {
+    const end = `_${String(suffix)}`;
+    key = base.slice(0, KEY_MAX - end.length) + end;
+    suffix += 1;
+  }
+  return key;
+}
+
+export function withBoardName(
+  board: BoardDraft,
+  title: string,
+  taken: readonly string[],
+): BoardDraft {
+  return {
+    ...board,
+    title,
+    key: board.saved
+      ? board.key
+      : keyFromName(title, [...taken, ...board.columns.map((column) => column.name)]),
+  };
+}
+
+export function audienceSentence(who: Who, rows: RowsKind, top: string): string {
+  if (who === 'staff') return 'Only organisers see this leaderboard, every row of it.';
+  if (who === 'entrants') {
+    if (rows === 'own')
+      return 'Each entrant sees only their own row, with no place. Organisers always see every row, ranked.';
+    if (rows === 'top')
+      return `Entrants see the top ${top} rows, and their own row when it is lower. Organisers always see every row.`;
+    return 'Entrants see every row, ranked. Organisers always see every row.';
+  }
+  if (rows === 'top')
+    return `Anyone sees the top ${top} rows; a signed-in entrant also sees their own row when it is lower. Organisers always see every row.`;
+  return 'Anyone, signed in or not, sees every row, ranked. Organisers always see every row.';
 }
 
 function readWho(value: unknown): Who {
@@ -200,6 +251,7 @@ function readBoard(key: string, value: unknown): BoardDraft {
     id: nextId('board'),
     key,
     title: textOf(node['title']),
+    saved: true,
     who: readWho(audience['who']),
     rows: rows.rows,
     top: rows.top,
@@ -823,7 +875,7 @@ function holdProblems(
   const found: FieldProblem[] = [];
   const from = isoOf(hold.from);
   if (from === undefined) {
-    found.push({ field: 'hold.from', message: 'Give the time the hold starts.' });
+    found.push({ field: 'hold.from', message: 'Give the time the freeze starts.' });
     return found;
   }
   const fromAt = new Date(from).getTime();
@@ -845,15 +897,15 @@ function holdProblems(
   ) {
     found.push({
       field: 'hold.from',
-      message: 'The hold starts after the contest opens and before it ends.',
+      message: 'The freeze starts after the contest opens and before it ends.',
     });
   }
   if (hold.untilStaff) return found;
   const until = isoOf(hold.until);
   if (until === undefined) {
-    found.push({ field: 'hold.until', message: 'Give the time the hold runs until.' });
+    found.push({ field: 'hold.until', message: 'Give the time the freeze ends.' });
   } else if (new Date(until).getTime() <= fromAt) {
-    found.push({ field: 'hold.until', message: 'The hold ends before it starts.' });
+    found.push({ field: 'hold.until', message: 'The freeze ends before it starts.' });
   }
   return found;
 }

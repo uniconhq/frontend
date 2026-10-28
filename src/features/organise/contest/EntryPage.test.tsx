@@ -281,13 +281,11 @@ describe('how people enter', { timeout: 20_000 }, () => {
     settings(`${BASE}registration:\n  ways:\n    - signup: {code: x}\n`);
     const form = await openForm();
 
-    expect(form).toHaveTextContent('Only an admin of the contest can change these.');
+    expect(screen.getByText('Read only')).toBeVisible();
     expect(way(form, 'Sign-up').getByLabelText('Code')).toBeDisabled();
     expect(within(form).queryByRole('button', { name: 'Remove Sign-up' })).toBeNull();
-    await waitFor(() =>
-      expect(
-        within(form).getByRole('button', { name: 'Save how people enter' }),
-      ).toBeDisabled(),
-    );
+    expect(
+      within(form).queryByRole('button', { name: 'Save how people enter' }),
+    ).toBeNull();
   });
 });

@@ -7,7 +7,7 @@ import { Textarea as MantineTextarea } from '@mantine/core';
  * scrolls inside it and the save button stays in place. `readOnly` keeps the
  * text as it is while something is working on it, `autoFocus` takes the
  * focus as the field appears, and `required` will not let a form send it
- * empty.
+ * empty. `onCommit` runs as the field is left.
  */
 export function Textarea({
   label,
@@ -18,6 +18,9 @@ export function Textarea({
   autoFocus = false,
   required = false,
   rows = 4,
+  description,
+  placeholder,
+  onCommit,
 }: {
   label: string;
   value: string;
@@ -27,12 +30,18 @@ export function Textarea({
   autoFocus?: boolean;
   required?: boolean;
   rows?: number;
+  description?: string;
+  placeholder?: string;
+  onCommit?: () => void;
 }) {
   return (
     <MantineTextarea
       label={label}
       value={value}
       onChange={(event) => onChange(event.currentTarget.value)}
+      onBlur={onCommit}
+      description={description}
+      placeholder={placeholder}
       readOnly={readOnly}
       autoFocus={autoFocus}
       required={required}

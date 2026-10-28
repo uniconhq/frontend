@@ -40,11 +40,7 @@ function Form({ doc, busy, asking, onSave, admin }: FormProps & { admin: boolean
           label="Title"
           value={name}
           onChange={setName}
-          description={
-            admin
-              ? 'What entrants see the task called, on its pages and in the contest.'
-              : 'Only an admin of the task can change its title.'
-          }
+          description="What entrants see the task called, on its pages and in the contest."
           disabled={!admin || asking}
         />
       </FieldBox>

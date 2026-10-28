@@ -140,8 +140,8 @@ function Consequence({ asking }: { asking: Asking }) {
         <BodyText>
           {submission} to {asking.task} runs again on the same version of the task it
           was graded on (publication {grading.publication}). For when the grading itself
-          went wrong, such as a system error. To grade it against the task as it is now,
-          rejudge the task.
+          went wrong, such as one that failed on Unicon’s side. To grade it against the
+          task as it is now, rejudge the task.
         </BodyText>
         <BodyText tone="secondary">
           {grading.status === 'done'
@@ -226,8 +226,8 @@ const CANCEL_REFUSED: Words = {
     fallback: `Give the entrant a sentence of 1 to ${String(REASON_MAX)} characters.`,
   },
   wrong_status: {
-    title: 'It is no longer a system error',
-    fallback: 'Only a grading that reads as a system error can be cancelled.',
+    title: 'It no longer reads as failed on Unicon’s side',
+    fallback: 'Only a grading that failed on Unicon’s side can be cancelled.',
   },
   conflict: {
     title: 'A later attempt is there',
@@ -256,9 +256,7 @@ const REFUSED: Record<Asking['kind'], Words> = {
 
 /** A status a refusal names, in the feed's words when it is one of them. */
 function statusNow(status: string): string {
-  return Object.hasOwn(STATUS, status)
-    ? STATUS[status as GradingStatus].toLowerCase()
-    : status;
+  return Object.hasOwn(STATUS, status) ? STATUS[status as GradingStatus] : status;
 }
 
 /** A refusal in the dialog. A rejudge with nothing published to grade against says so. */
@@ -283,7 +281,7 @@ function Refusal({ asking, error }: { asking: Asking; error: unknown }) {
         <BodyText tone="secondary">{words.title}</BodyText>
         <BodyText tone="secondary">{refused.detail ?? words.fallback}</BodyText>
         {refused.code === 'wrong_status' && typeof current === 'string' && (
-          <BodyText tone="secondary">It is {statusNow(current)} now.</BodyText>
+          <BodyText tone="secondary">Its status now: {statusNow(current)}.</BodyText>
         )}
       </div>
     );

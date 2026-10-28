@@ -4,11 +4,16 @@ import {
   addStep,
   clearPort,
   entryFields,
+  fileToInput,
+  idOfPath,
+  inputToFile,
+  moveFile,
   removeEntry,
   removeInput,
   removeStep,
   renameInput,
   renameStep,
+  setDescription,
   setEntry,
   setInput,
   setValue,
@@ -316,6 +321,18 @@ describe('editing the file in place', () => {
     ]);
   });
 
+  it('writes what the workflow does first, its comments kept, and removes it when nothing is said', () => {
+    const said = setDescription(COMMENTED, '  Runs it once.  ');
+    const twice = setDescription(said, 'Compiles it.\nThen runs it once.');
+
+    expect(said.startsWith('description: Runs it once.\n')).toBe(true);
+    expect(said).toContain('# A workflow with its notes kept.');
+    expect(workflowOf(twice).description).toBe('Compiles it.\nThen runs it once.');
+    expect(workflowOf(twice).steps).toEqual(workflowOf(COMMENTED).steps);
+    expect(setDescription(twice, '   ')).not.toContain('description');
+    expect(workflowOf(COMMENTED).description).toBeNull();
+  });
+
   it('writes an output short, or with what its number means', () => {
     const short = setEntry(COMMENTED, 'time', {
       from: { kind: 'steps', name: 'run', output: 'time_ms' },
@@ -444,5 +461,75 @@ it('writes a workflow-owned folder wire and keeps its comments', () => {
   expect(workflowOf(text).steps[0]?.with.source).toEqual({
     kind: 'wire',
     ref: { kind: 'workflow', name: 'checker/' },
+  });
+});
+
+describe('an input given by the workflow, and a file given by the task', () => {
+  const READS = `inputs:
+  answer: {type: file, title: Answer}  # the expected output
+  input: file
+steps:
+  - id: check
+    use: unicon/exec@v1
+    with:
+      stdin: \${{ inputs.input }}
+      files:
+        answer: \${{ inputs.answer }}
+      args: "--answer \${{ inputs.answer }}"
+`;
+
+  it('makes every reader of an input read the file instead, and drops the input', () => {
+    const given = inputToFile(READS, 'answer', 'data/answer.txt');
+
+    expect(given).not.toContain('answer: {type: file');
+    expect(given).toContain('answer: ${{ workflow.data/answer.txt }}');
+    expect(given).toContain('args: "--answer ${{ workflow.data/answer.txt }}"');
+    expect(given).toContain('stdin: ${{ inputs.input }}');
+    expect(workflowOf(given).inputs.map((input) => input.id)).toEqual(['input']);
+  });
+
+  it('makes a file an input again, read wherever the file was', () => {
+    const back = fileToInput(
+      inputToFile(READS, 'answer', 'data/answer.txt'),
+      'data/answer.txt',
+      'answer',
+      'file',
+    );
+
+    expect(workflowOf(back).inputs.find((input) => input.id === 'answer')?.type).toBe(
+      'file',
+    );
+    expect(back).toContain('answer: ${{ inputs.answer }}');
+    expect(back).not.toContain('workflow.');
+  });
+
+  it('declares the first input of a workflow that had none', () => {
+    const text =
+      'steps:\n  - {id: diff, use: unicon/compile@v3, with: {source: "${{ workflow.diff/ }}"}}\n';
+    const back = fileToInput(text, 'diff/', 'diff', 'folder');
+
+    expect(workflowOf(back).inputs).toMatchObject([{ id: 'diff', type: 'folder' }]);
+    expect(back).toContain('${{ inputs.diff }}');
+  });
+
+  it('moves the readers of one file to another, and no other reference', () => {
+    const text = inputToFile(READS, 'answer', 'a.txt').replace(
+      'stdin: ${{ inputs.input }}',
+      'stdin: ${{ workflow.a.txt.bak }}',
+    );
+    const moved = moveFile(text, 'a.txt', 'b.txt');
+
+    expect(moved).toContain('answer: ${{ workflow.b.txt }}');
+    expect(moved).toContain('stdin: ${{ workflow.a.txt.bak }}');
+  });
+
+  it('names an input after a path’s last part, without its extension', () => {
+    expect(idOfPath('diff/')).toBe('diff');
+    expect(idOfPath('checker/program.yaml')).toBe('program');
+    expect(idOfPath('Data Sets/answer-1.txt')).toBe('answer_1');
+    expect(idOfPath('.hidden')).toBe('file');
+    // The forge takes a name only when it starts with a letter.
+    expect(idOfPath('tests/01.in')).toBe('file_01');
+    expect(idOfPath(`${'a'.repeat(39)}_b.txt`)).toBe('a'.repeat(39));
   });
 });

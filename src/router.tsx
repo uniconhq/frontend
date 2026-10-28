@@ -41,6 +41,7 @@ import {
   ORG_SECTIONS,
   TASK_SECTIONS,
   taskCardPath,
+  taskSectionPath,
 } from '@/lib/sections';
 import { taskPath } from '@/lib/organiser-paths';
 import { useContestParams, useTaskParams } from '@/lib/route-params';
@@ -130,7 +131,19 @@ function ToContestSettings() {
   );
 }
 
+function ToMarking() {
+  const { org, contest, task } = useTaskParams();
+  const { search, hash } = useLocation();
+  return (
+    <Navigate
+      to={`${taskSectionPath(org, contest, task, 'marking')}${search}${hash}`}
+      replace
+    />
+  );
+}
+
 const movedRoutes: RouteObject[] = [
+  { path: `${TASK}/queue`, element: <ToMarking /> },
   ...['contestants', 'teams'].map((segment) => ({
     path: `${CONTEST}/${segment}`,
     element: <ToEntrants />,

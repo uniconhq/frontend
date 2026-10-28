@@ -30,13 +30,13 @@ describe('how big a team is, as the settings card says it', () => {
 describe('the contest’s settings in words for the merge', () => {
   it('names each setting as its page does, a task and a board by name', () => {
     expect(contestFieldName(['name'])).toBe('Name');
-    expect(contestFieldName(['entrants', 'locks'])).toBe('When teams are fixed');
+    expect(contestFieldName(['entrants', 'locks'])).toBe('Teams are fixed');
     expect(contestFieldName(['registration', 'ways'])).toBe('Ways in');
     expect(contestFieldName(['tasks', { key: 'id', value: 'sum' }, 'due'])).toBe(
       'Task sum: Due',
     );
     expect(contestFieldName(['leaderboards', 'standings', 'audience'])).toBe(
-      'Leaderboard standings: Who sees it',
+      'Leaderboard standings: Who can see this leaderboard?',
     );
     expect(contestFieldName(['tasks'])).toBe('Tasks');
   });
@@ -47,7 +47,7 @@ describe('the contest’s settings in words for the merge', () => {
       'Only its entrants and organisers',
     );
     expect(contestValueWords(['entrants', 'locks'], 'first_submission')).toBe(
-      'At its first submission',
+      'At a team’s first submission',
     );
     expect(
       contestValueWords(
@@ -57,7 +57,7 @@ describe('the contest’s settings in words for the merge', () => {
     ).toBe('People you invite, Sign-up “Guests”');
     expect(
       contestValueWords(['entrants'], { most: new NumberText('3'), locks: 'start' }),
-    ).toBe('Most people in a team: 3; When teams are fixed: When the contest starts');
+    ).toBe('Most people in a team: 3; Teams are fixed: When the contest starts');
     expect(contestValueWords(['name'], 'Spring')).toBeNull();
   });
 });

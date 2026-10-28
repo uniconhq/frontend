@@ -1,3 +1,4 @@
+import { ReadOnlyAt } from '../ReadOnlyAt';
 import type { ApiError } from '@/api/problem';
 import { useState, type ReactNode } from 'react';
 import { $api, queryView } from '@/api/query';
@@ -317,6 +318,7 @@ export function StatusCard({ org, contest }: { org: string; contest: string }) {
           }
           return (
             <>
+              <ReadOnlyAt place={{ kind: 'contest', org, contest }} role="admin" />
               <div className={classes.statusHead}>
                 <Chip
                   tone={
@@ -373,11 +375,6 @@ export function StatusCard({ org, contest }: { org: string; contest: string }) {
                   still be moved in Settings.
                 </BodyText>
               )}
-              {!admin && standing === 'draft' && (
-                <BodyText tone="secondary">
-                  Only an admin of the contest can open it.
-                </BodyText>
-              )}
               {actions.length > 0 && <div className={shared.actions}>{actions}</div>}
               {refused?.kind === 'refused' &&
               refused.error.code === 'confirmation_required' ? (
@@ -399,7 +396,7 @@ export function StatusCard({ org, contest }: { org: string; contest: string }) {
                         <ErrorBlock error={refused.error} compact />
                         <DefinitionErrors
                           errors={definitionErrorsOf(refused.error)}
-                          placeOf={contestPlaceOf(org, contest)}
+                          placeOf={contestPlaceOf(org, contest, refused.body.content)}
                         />
                       </>
                     )}
