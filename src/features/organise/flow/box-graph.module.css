@@ -1,0 +1,244 @@
+/* The box graph: its boxes, pins, wires and ports. */
+
+.stage {
+  position: relative;
+}
+
+.wires {
+  position: absolute;
+  inset: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.placed {
+  position: absolute;
+}
+
+.ear {
+  position: absolute;
+  height: 12px;
+  border: 2px solid var(--unicon-border-strong);
+  border-radius: var(--mantine-radius-sm);
+  background: var(--unicon-chrome);
+}
+
+/* The editor's box border is as wide as its layout says; this graph's is 2px. */
+.face {
+  --box-border: 2px;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  padding: 0;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.pin {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  transform: translateY(-50%);
+}
+
+.pin[data-side='in'] {
+  left: -5px;
+}
+
+.pin[data-side='out'] {
+  right: -5px;
+}
+
+/* A box's parts each keep a fixed height, so the layout knows where each
+ * wire meets it without measuring. */
+.head {
+  box-sizing: border-box;
+  flex: none;
+  justify-content: flex-start;
+}
+
+.line {
+  display: block;
+  box-sizing: border-box;
+  flex: none;
+  max-width: none;
+  margin: 0;
+  padding: 4px 10px 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.ports {
+  display: flex;
+  flex-direction: column;
+}
+
+.portRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px;
+  color: var(--unicon-text-primary);
+  font-family: var(--mantine-font-family-monospace);
+  font-size: 12px;
+}
+
+.portRow[data-side='out'] {
+  justify-content: flex-end;
+}
+
+.portRow > span:not(.dot) {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.portRow[data-out-first] {
+  border-top: 1px dashed var(--unicon-border);
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  flex: none;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+/* What an open box holds, such as a value's formula, above its ports. */
+.inside {
+  padding: 8px 10px 10px;
+  border-top: 1px solid var(--unicon-border);
+  cursor: auto;
+}
+
+.face[data-read-only] {
+  cursor: default;
+}
+
+.head[data-compact] {
+  padding: 3px 8px 0;
+  border-bottom: 0;
+}
+.head[data-compact] > span {
+  line-height: 18px;
+}
+.head[data-compact] p {
+  display: block;
+  margin: 0;
+  line-height: 14px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* The Result box reads as a table: a line between rows, the row under the
+   pointer lit, and its kind and when-shown in columns of their own, so a
+   row's three parts line up with every other row's. */
+.resultRow {
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  box-sizing: border-box;
+  padding: 4px 10px;
+  font-size: 11px;
+}
+.resultRow:not([data-heading]) + .resultRow:not([data-heading]) {
+  border-top: 1px solid var(--unicon-border);
+}
+.resultRow:not([data-heading]):hover {
+  background: var(--unicon-hover);
+}
+.resultRow[data-heading] {
+  justify-content: flex-end;
+  padding-bottom: 2px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--unicon-text-secondary);
+}
+.resultMain {
+  flex-shrink: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 52px 92px;
+  gap: 8px;
+  align-items: center;
+  height: 20px;
+}
+.resultName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.resultRow:not([data-heading]) .resultName {
+  font-weight: 600;
+  color: var(--unicon-text-body);
+}
+.resultRow:not([data-heading]) .resultKind {
+  color: var(--unicon-text-secondary);
+}
+.resultRow:not([data-heading]) .resultWhen {
+  justify-self: start;
+  padding: 0 7px;
+  border-radius: 9px;
+  line-height: 17px;
+  white-space: nowrap;
+  background: var(--unicon-hover);
+  color: var(--unicon-text-body);
+}
+.resultWhen[data-shown='now'] {
+  background: color-mix(in srgb, #5b8def 22%, transparent);
+  color: var(--unicon-text-body);
+  font-weight: 600;
+}
+.resultRow:not([data-heading]) .resultWhen[data-shown='never'] {
+  background: none;
+  padding: 0;
+  color: var(--unicon-text-secondary);
+}
+.resultParts {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  gap: 4px;
+  margin-top: 4px;
+  overflow: auto;
+}
+.resultTag {
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 0 5px;
+  border: 1px solid var(--unicon-border);
+  border-radius: 4px;
+  font-size: 10px;
+  line-height: 14px;
+  color: var(--unicon-text-secondary);
+  white-space: nowrap;
+}
+.resultDetail {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  overflow-wrap: anywhere;
+  margin-top: 4px;
+  font-size: 10px;
+  line-height: 14px;
+  color: var(--unicon-text-secondary);
+}
+.resultPin {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  left: -5px;
+  transform: translateY(-50%);
+}

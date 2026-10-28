@@ -20,11 +20,3 @@
   outline: 2px solid var(--unicon-text-accent);
   outline-offset: 1px;
 }
-
-.dropdown {
-  background: var(--unicon-body);
-  border: 1px solid var(--unicon-border-strong);
-  color: var(--unicon-text-body);
-  font-size: 13px;
-  line-height: 1.5;
-}

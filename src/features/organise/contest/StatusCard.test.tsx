@@ -325,9 +325,7 @@ describe("the contest's status", () => {
     renderApp(CONTEST);
 
     const card = await status();
-    expect(
-      await within(card).findByText('Only an admin of the contest can open it.'),
-    ).toBeVisible();
+    expect(await within(card).findByText('Read only')).toBeVisible();
     expect(within(card).queryByRole('button', { name: 'Open the contest' })).toBeNull();
     expect(
       within(card).queryByRole('button', { name: 'Change who sees it' }),

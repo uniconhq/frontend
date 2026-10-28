@@ -1,3 +1,14 @@
+import {
+  runsOf,
+  submissionRuns,
+  runName,
+  ticksOf,
+  withTick,
+  inGroup,
+  outputColumns,
+  type ScoreGroup,
+} from './scoring-model';
+import { emptyTuple, type AxisValues } from '../forms/task-values';
 import { describe, expect, it } from 'vitest';
 import { specCatalogue } from '../formula/catalogue';
 import { readLine, type FormulaScope } from '../formula/parse';
@@ -349,4 +360,149 @@ describe('a write of picks, weights and what a check expects', () => {
     expect(text).toContain('other: 2');
     expect(text).toMatch(/expect:\n {6}total: 4\n {6}medal: "0"\n/);
   });
+});
+
+describe('group ticks on tables', () => {
+  const table = (input: string, values: string[]): AxisValues => ({
+    inputs: [input],
+    tuples: values.map((value) => ({
+      ...emptyTuple([input]),
+      cells: { [input]: { entrant: false, value } },
+    })),
+  });
+  const tables = [
+    table('input', ['small/1.in', 'small/2.in']),
+    table('seed', ['1', '2', '3']),
+  ];
+  const none: ScoreGroup = {
+    key: 'g',
+    name: 'small',
+    picks: {},
+    none: true,
+    saved: 'never',
+  };
+  it('makes the one run every submission makes while no input repeats', () => {
+    expect(submissionRuns([])).toEqual([{ id: '0', title: 'The one run', cells: {} }]);
+    expect(submissionRuns([{ inputs: [], tuples: [emptyTuple([])] }])).toHaveLength(1);
+    expect(submissionRuns(tables)).toEqual(runsOf(tables));
+  });
+  it('names a run from its files and values unless titled', () => {
+    const rows = runsOf(tables);
+    expect(runName(rows[0]!, tables)).toBe('small/1.in, 1');
+    expect(runName({ ...rows[0]!, title: 'Sample' }, tables)).toBe('Sample');
+  });
+  it('ignores the old value retained behind an entrant cell when a group is ticked', () => {
+    const axis: AxisValues = {
+      inputs: ['input', 'route'],
+      tuples: [
+        {
+          ...emptyTuple(['input', 'route']),
+          cells: {
+            input: { entrant: false, value: 'a.in' },
+            route: { entrant: true, value: 'old-route.txt' },
+          },
+        },
+        {
+          ...emptyTuple(['input', 'route']),
+          cells: {
+            input: { entrant: false, value: 'b.in' },
+            route: { entrant: true, value: '' },
+          },
+        },
+      ],
+    };
+    const runs = runsOf([axis]);
+    const picked = withTick(none, axis, 0, true, runs);
+    expect(picked.none).toBe(false);
+    expect(picked.picks).toEqual({ input: ['a.in'] });
+    expect(ticksOf(picked, [axis])).toEqual([[true, false]]);
+    expect(runs.filter((run) => inGroup(run, picked)).map((run) => run.id)).toEqual([
+      '0',
+    ]);
+  });
+
+  it('picks one seed across every row of the first table', () => {
+    const runs = runsOf(tables);
+    const picked = withTick(none, tables[1]!, 0, true, runs);
+    expect(runs.filter((run) => inGroup(run, picked)).map((run) => run.cells)).toEqual([
+      { input: 'small/1.in', seed: '1' },
+      { input: 'small/2.in', seed: '1' },
+    ]);
+    expect(ticksOf(picked, tables)).toEqual([
+      [true, true],
+      [true, false, false],
+    ]);
+  });
+  it('keeps a named all-runs group explicit for the saved format', () => {
+    const runs = runsOf([tables[0]!]);
+    const one = withTick(none, tables[0]!, 0, true, runs);
+    const all = withTick(one, tables[0]!, 1, true, runs);
+    expect(all.picks).toEqual({ input: ['small/1.in', 'small/2.in'] });
+    expect(all.none).toBe(false);
+    expect(ticksOf(all, [tables[0]!])).toEqual([[true, true]]);
+  });
+  it('keeps an empty table empty while another table’s selection is remembered', () => {
+    const runs = runsOf(tables);
+    const seed = withTick(none, tables[1]!, 0, true, runs);
+    const first = withTick(seed, tables[0]!, 1, false, runs);
+    const empty = withTick(first, tables[0]!, 0, false, runs);
+    expect(runs.filter((run) => inGroup(run, empty))).toEqual([]);
+    expect(ticksOf(empty, tables)).toEqual([
+      [false, false],
+      [true, false, false],
+    ]);
+    expect(withTick(empty, tables[0]!, 0, true, runs).picks).toEqual({
+      input: ['small/1.in'],
+      seed: ['1'],
+    });
+  });
+  it('uses the workflow’s text-values list for text outputs', () => {
+    expect(
+      outputColumns(
+        { outputs: { log: { title: 'Compile log' }, time: { unit: 'ms' } } },
+        ['log'],
+      ).map((column) => column.kind),
+    ).toEqual(['text', 'number']);
+  });
+});
+
+it('keeps equal input values together when the file cannot distinguish rows', () => {
+  const table: AxisValues = {
+    inputs: ['input', 'answer'],
+    tuples: [
+      {
+        ...emptyTuple(['input', 'answer']),
+        cells: {
+          input: { entrant: false, value: '1' },
+          answer: { entrant: false, value: 'a' },
+        },
+      },
+      {
+        ...emptyTuple(['input', 'answer']),
+        cells: {
+          input: { entrant: false, value: '2' },
+          answer: { entrant: false, value: 'b' },
+        },
+      },
+      {
+        ...emptyTuple(['input', 'answer']),
+        cells: {
+          input: { entrant: false, value: '1' },
+          answer: { entrant: false, value: 'b' },
+        },
+      },
+    ],
+  };
+  const runs = runsOf([table]);
+  const first = withTick(
+    { key: 'g', name: 'g', picks: {}, none: true, saved: 'never' },
+    table,
+    0,
+    true,
+    runs,
+  );
+  const next = withTick(first, table, 1, true, runs);
+  expect(ticksOf(next, [table])).toEqual([[true, true, true]]);
+  expect(next.none).toBe(false);
+  expect(ticksOf(withTick(next, table, 2, false, runs), [table])[0]?.[2]).toBe(false);
 });

@@ -3,6 +3,18 @@
   max-width: 320px;
 }
 
+/* A submit refused: the panel edged and its title set in the danger colour. */
+.refused {
+  border-left: 3px solid var(--unicon-text-danger);
+}
+
+.refusedTitle {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--unicon-text-danger);
+}
+
 .problems {
   margin: 0;
   padding-left: 18px;

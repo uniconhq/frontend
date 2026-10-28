@@ -300,7 +300,7 @@ function Facts({
       {rows.map(([name, number]) => (
         <div key={name} className={classes.metric}>
           <dt>{factTitle(name)}</dt>
-          <dd>{number}</dd>
+          <dd>{factText(name, number)}</dd>
         </div>
       ))}
     </dl>
@@ -310,6 +310,13 @@ function Facts({
 function factTitle(name: string): string {
   if (name === 'seconds_late') return 'Seconds late';
   if (name === 'seconds') return 'Seconds';
-  if (name === 'compiled') return 'Compiled';
-  return name;
+  if (name === 'compiled') return 'Whether it compiled';
+  const words = name.replaceAll('_', ' ');
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+/** A fact as it reads: whether it compiled is a yes or a no, not 1 or 0. */
+function factText(name: string, number: string): string {
+  if (name === 'compiled') return Number(number) === 0 ? 'No' : 'Yes';
+  return number;
 }

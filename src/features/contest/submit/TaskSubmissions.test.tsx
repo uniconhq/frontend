@@ -4,7 +4,6 @@ import userEvent from '@/test/user-event';
 import { http, HttpResponse } from 'msw';
 import type { GradingResult, Submission, TaskPage } from '@/api/types';
 import { formatExact } from '@/lib/exact';
-import { formatWhen } from '@/lib/time';
 import { renderApp } from '@/test/render';
 import { problem, server, signedIn } from '@/test/server';
 import { fakeTimerUser, passTime, withFakeTimers } from '@/test/timers';
@@ -269,6 +268,9 @@ describe('the submit panel', () => {
 
     await user.click(screen.getByRole('button', { name: 'Submit' }));
     expect(await screen.findByText('Submitted as #1.')).toBeVisible();
+    expect(
+      screen.getByText('Submitted as #1.').closest('[role="status"]'),
+    ).not.toHaveClass(/_refused_/);
     expect(made.bodies).toHaveLength(2);
     expect(made.bodies[1]?.idempotency_key).toBe(made.bodies[0]?.idempotency_key);
     expect(store.seen.slots).toHaveLength(1);
@@ -301,6 +303,11 @@ describe('the submit panel', () => {
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent('The submission does not fit the task');
     expect(alert).toHaveTextContent('Language: Choose one of python, cpp.');
+    // A refusal is edged and titled as one, never like a submission made.
+    expect(alert).toHaveClass(/_refused_/);
+    expect(within(alert).getByText('The submission does not fit the task')).toHaveClass(
+      /_refusedTitle_/,
+    );
     expect(store.seen.slots).toHaveLength(0);
   });
 
@@ -819,33 +826,52 @@ describe('the submissions list', () => {
       expect.stringMatching(/^#4.*GRADING$/),
       expect.stringMatching(/^#3.*OVER THE LIMIT/),
       expect.stringMatching(/^#2.*CANCELLED$/),
-      expect.stringMatching(/^#1.*GRADED$/),
+      expect.stringMatching(/^#1.*GRADEDPassed 2 of 2 tests$/),
     ]);
   });
 
-  it('says each submission’s points in its row, or when held-back points are shown', async () => {
+  it('says what each submission came to beside its status, nothing while none of it is shown', async () => {
+    const valued = grading({
+      status: 'graded',
+      run_values: [
+        {
+          name: 'score',
+          number: '7.50',
+          text: null,
+          waiting: false,
+          self_reported: false,
+          show: null,
+          facts: null,
+          runs: null,
+          values: null,
+        },
+      ],
+    });
     server.use(
       signedIn,
       withPage({}),
       listing([
         submission(1, accepted),
-        submission(2, accepted),
-        submission(3, accepted),
+        submission(2, grading({ status: 'graded', compiled: 0 })),
+        submission(3, valued),
         submission(4, grading({ status: 'queued' })),
       ]),
     );
     renderApp(PAGE);
 
     const list = await screen.findByRole('table', { name: 'Your submissions' });
-    const at = formatWhen(new Date('2026-09-12T14:00:00Z'));
+    expect(within(list).getByRole('columnheader', { name: 'Result' })).toBeVisible();
     const cells = within(list)
       .getAllByRole('row')
       .slice(1)
-      .map((row) => row.lastElementChild?.textContent);
-    expect(cells).toEqual(['QUEUED', 'GRADED', 'GRADED', 'GRADED']);
-    expect(list).not.toHaveTextContent(/points/);
+      .map((row) => [...row.children].slice(2).map((cell) => cell.textContent));
+    expect(cells).toEqual([
+      ['QUEUED', ''],
+      ['GRADED', `score: ${formatExact('7.50')}`],
+      ['GRADED', 'Did not compile'],
+      ['GRADED', 'Passed 2 of 2 tests'],
+    ]);
     expect(within(list).queryByRole('columnheader', { name: 'Points' })).toBeNull();
-    expect(at).toBe(formatWhen(new Date('2026-09-12T14:00:00Z')));
   });
 
   it('leaves points out of the list on a task that gives none', async () => {

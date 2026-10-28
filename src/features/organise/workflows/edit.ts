@@ -18,6 +18,8 @@ import {
 import {
   readWorkflow,
   refText,
+  sameRef,
+  wholeRef,
   type Ref,
   type OutputEntry,
   type Workflow,
@@ -33,7 +35,7 @@ import { orderAfterWire } from './rules';
  * given back as it is.
  */
 
-const TOP_ORDER = ['inputs', 'steps', 'outputs'];
+const TOP_ORDER = ['description', 'inputs', 'steps', 'outputs'];
 
 type Edit = (doc: Document) => void;
 
@@ -121,6 +123,14 @@ function declarationNode(declaration: Record<string, unknown>): unknown {
   return Object.keys(kept).length === 1 && typeof kept.type === 'string'
     ? kept.type
     : kept;
+}
+
+/** The names inputs and outputs share: the forge refuses an output named as an input. */
+export function sharedNames(workflow: Workflow): string[] {
+  return [
+    ...workflow.inputs.map((input) => input.id),
+    ...workflow.outputs.map((entry) => entry.name),
+  ];
 }
 
 /** A free id for a new step, input or output: `base`, then `base-2`, `base-3`. */
@@ -247,6 +257,17 @@ export function removeStep(text: string, index: number): string {
   });
 }
 
+/** What the workflow says it does, first in the file; nothing said removes it. */
+export function setDescription(text: string, description: string): string {
+  const said = description.trim();
+  return edited(text, (doc) => {
+    const root = doc.contents as YAMLMap;
+    if (said === '') root.delete('description');
+    else if (root.has('description')) root.set('description', said);
+    else root.items.unshift(doc.createPair('description', said));
+  });
+}
+
 /** The step renamed, every reference to it following. */
 export function renameStep(text: string, index: number, id: string): string {
   const step = workflowOf(text).steps[index];
@@ -343,6 +364,62 @@ export function renameInput(text: string, from: string, to: string): string {
     renameKey(doc, 'inputs', from, to);
     rewriteStrings(doc, (value) => renamed(value, 'inputs', from, to));
   });
+}
+
+/** Every reference that is `from` written as `to`, wherever the steps and the outputs read it. */
+function swapRefs(doc: Document, from: Ref, to: Ref): void {
+  rewriteStrings(doc, (value) =>
+    value.replace(REF, (whole) => {
+      const ref = wholeRef(whole);
+      return ref !== null && sameRef(ref, from) ? refText(to) : whole;
+    }),
+  );
+}
+
+/** Every reference to the workflow file `from` written as one to `to`. */
+export function moveFile(text: string, from: string, to: string): string {
+  return edited(text, (doc) =>
+    swapRefs(doc, { kind: 'workflow', name: from }, { kind: 'workflow', name: to }),
+  );
+}
+
+/** An input the workflow gives instead: every step that read it reads the file at `path`, and the input goes. */
+export function inputToFile(text: string, id: string, path: string): string {
+  return edited(text, (doc) => {
+    swapRefs(doc, { kind: 'inputs', name: id }, { kind: 'workflow', name: path });
+    writeAt(doc, ['inputs', id], undefined);
+  });
+}
+
+/** A file of the workflow the task gives instead: the input `id`, of `type`, read wherever the file was. */
+export function fileToInput(
+  text: string,
+  path: string,
+  id: string,
+  type: 'file' | 'folder',
+): string {
+  return edited(text, (doc) => {
+    top<YAMLMap>(doc, 'inputs');
+    writeAt(doc, ['inputs', id], declarationNode({ type }));
+    swapRefs(doc, { kind: 'workflow', name: path }, { kind: 'inputs', name: id });
+  });
+}
+
+/**
+ * An input's id made from a file's path: its last part, without its
+ * extension, as the forge takes a name, starting with a letter.
+ */
+export function idOfPath(path: string): string {
+  const last = path.replace(/\/$/, '').split('/').pop() ?? '';
+  const stem = last.includes('.') ? last.slice(0, last.lastIndexOf('.')) : last;
+  const words = stem
+    .toLowerCase()
+    .replace(/[^a-z0-9_]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+  if (words === '') return 'file';
+  return (/^[a-z]/.test(words) ? words : `file_${words}`)
+    .slice(0, 40)
+    .replace(/_+$/, '');
 }
 
 /** An input removed, with every port value and output reading it. */

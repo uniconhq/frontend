@@ -105,3 +105,15 @@ describe('ink on the accent fill', () => {
     });
   }
 });
+
+describe('a verdict’s label on its own fill', () => {
+  for (const [name, pair] of Object.entries(uniconTokens.verdict)) {
+    for (const scheme of SCHEMES) {
+      it(`${name} clears 4.5:1 in ${scheme}`, () => {
+        const [fill, ink] = pair[scheme];
+        const ratio = contrastRatio(ink, fill);
+        expect(ratio, `on ${fill}: ${ratio.toFixed(2)}:1`).toBeGreaterThanOrEqual(4.5);
+      });
+    }
+  }
+});

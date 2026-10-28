@@ -1,6 +1,7 @@
 import { contestPath } from '@/lib/organiser-paths';
 import { contestSectionPath } from '@/lib/sections';
 import { letterOf } from '../forms/contest-values';
+import { exactJS, isRecord, parseYaml, textOf } from '../forms/yaml-doc';
 
 /**
  * Where on the contest's pages each of its settings is changed, so a save
@@ -8,7 +9,8 @@ import { letterOf } from '../forms/contest-values';
  * saves names each setting the same way. A refusal names a setting by its
  * place in the settings file (`tasks[1].due`); that place is turned here
  * into the page, the part of the page and the field, and the words for
- * them: "Tasks, B: Due".
+ * them: "Tasks, B: Due". Each is said in the words its page shows, and a
+ * leaderboard by the name its card is headed with.
  */
 
 /** The part of the contest's pages a setting is changed on. */
@@ -54,7 +56,7 @@ const SETTINGS: Record<string, [string, string]> = {
 const TEAMS: Record<string, string> = {
   most: 'Most people in a team',
   fewest: 'Fewest people in a team',
-  locks: 'When teams are fixed',
+  locks: 'Teams are fixed',
 };
 
 const STATUS: Record<string, string> = {
@@ -82,15 +84,37 @@ export const TASK_FIELDS: Record<string, string> = {
   release_at: 'Opens',
   due: 'Due',
   closes: 'Closes',
-  marks: 'Marks',
+  marks: 'Submissions each entrant may mark',
 };
+
+/** Each leaderboard's name by its key, as the settings in `text` give it. */
+export type BoardNames = Readonly<Record<string, string>>;
+
+/**
+ * The name each leaderboard of the settings is given, by its key: the name
+ * its card is headed with. One with no name, or settings that cannot be
+ * read, are left out, to be named by their key.
+ */
+export function boardNames(text: string): BoardNames {
+  const parsed = parseYaml(text);
+  if ('error' in parsed) return {};
+  const root = exactJS(parsed.doc);
+  const boards = isRecord(root) ? root['leaderboards'] : undefined;
+  if (!isRecord(boards)) return {};
+  const names: Record<string, string> = {};
+  for (const [key, board] of Object.entries(boards)) {
+    const title = isRecord(board) ? textOf(board['title']).trim() : '';
+    if (title !== '') names[key] = title;
+  }
+  return names;
+}
 
 /**
  * Where a setting of the contest, by its place in the settings file, is
  * changed. The file as a whole, or a setting no page has, is the settings
- * page as a whole.
+ * page as a whole. `names` gives the leaderboards' names, by key.
  */
-export function contestPlace(path: string): ContestPlace {
+export function contestPlace(path: string, names: BoardNames = {}): ContestPlace {
   const steps = stepsOf(path);
   const [top, second, third, fourth] = steps;
   const whole: ContestPlace = {
@@ -160,11 +184,12 @@ export function contestPlace(path: string): ContestPlace {
     };
   }
   if (top === 'hold') {
-    const named = second === 'from' ? 'From' : second === 'until' ? 'Until' : undefined;
+    const named =
+      second === 'from' ? 'Freeze from' : second === 'until' ? 'Until' : undefined;
     return {
       part: 'boards',
       label:
-        named === undefined ? 'Leaderboards, Hold' : `Leaderboards, Hold: ${named}`,
+        named === undefined ? 'Leaderboards, Freeze' : `Leaderboards, Freeze: ${named}`,
       field: typeof second === 'string' ? `hold.${second}` : 'hold.from',
       item: null,
     };
@@ -173,26 +198,37 @@ export function contestPlace(path: string): ContestPlace {
     if (typeof second !== 'string') {
       return { part: 'boards', label: 'Leaderboards', field: null, item: null };
     }
-    return leaderboardPlace(second, third, fourth);
+    return leaderboardPlace(second, names[second] ?? second, third, fourth);
   }
   return whole;
 }
 
+/** A leaderboard's parts, as its card heads them or labels their fields. */
 export const BOARD_PARTS: Record<string, string> = {
-  title: 'Title',
-  columns: 'Column',
-  sort: 'Sort',
-  display: 'Display',
-  audience: 'Who sees it',
+  title: 'Name',
+  columns: 'Columns',
+  sort: 'Ranking',
+  display: 'Shown on the leaderboard',
+  audience: 'Who can see this leaderboard?',
 };
 
-/** A leaderboard stored as a mapping, named by its key. `item` stays empty: the key is in the field. */
+/** Who sees a leaderboard and how much of it, as its two questions ask. */
+const AUDIENCE: Record<string, string> = {
+  who: 'Who can see this leaderboard?',
+  rows: 'How many rows do they see?',
+};
+
+/**
+ * A leaderboard stored as a mapping, found by its key and named by `name`.
+ * `item` stays empty: the key is in the field.
+ */
 function leaderboardPlace(
   key: string,
+  name: string,
   third: string | number | undefined,
   fourth: string | number | undefined,
 ): ContestPlace {
-  const board = `Leaderboards, ${key}`;
+  const board = `Leaderboards, ${name}`;
   if (third === 'columns' && typeof fourth === 'string') {
     return {
       part: 'boards',
@@ -202,8 +238,7 @@ function leaderboardPlace(
     };
   }
   if (third === 'audience' && typeof fourth === 'string') {
-    const named =
-      fourth === 'who' ? 'Who sees it' : fourth === 'rows' ? 'Rows' : fourth;
+    const named = AUDIENCE[fourth] ?? BOARD_PARTS['audience'];
     return {
       part: 'boards',
       label: `${board}: ${named}`,

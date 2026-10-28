@@ -8,7 +8,10 @@ import { LeaderboardsForm } from './LeaderboardsForm';
 export function OrganisedLeaderboardsPage() {
   const { org, contest } = useContestParams();
   return (
-    <SectionPage section={sectionOf(CONTEST_SECTIONS, 'boards')}>
+    <SectionPage
+      place={{ kind: 'contest', org, contest }}
+      section={sectionOf(CONTEST_SECTIONS, 'boards')}
+    >
       <ContestFile org={org} contest={contest}>
         {(props) => <LeaderboardsForm org={org} contest={contest} {...props} />}
       </ContestFile>

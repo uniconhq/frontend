@@ -8,8 +8,12 @@ import classes from './organise.module.css';
  */
 export type ProblemPlace = { label: string; to: string };
 
-/** Where a problem, by its place in the file and its sentence, is fixed. */
-export type PlaceOf = (path: string, message: string) => ProblemPlace;
+/**
+ * Where a problem, by its place in the file and its sentence, is fixed.
+ * `sent` is the file's text as the refused save sent it, for the names it
+ * gives what a place's keys stand for.
+ */
+export type PlaceOf = (path: string, message: string, sent?: string) => ProblemPlace;
 
 /**
  * What is wrong with a definition file. With `placeOf`, each problem names

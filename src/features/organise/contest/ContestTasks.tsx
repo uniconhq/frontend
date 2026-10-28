@@ -359,8 +359,7 @@ export function ContestTasks({ org, contest }: { org: string; contest: string })
         <BodyText>The contest&apos;s settings cannot be read</BodyText>
         <BodyText tone="secondary">
           Each task&apos;s timeline comes from the contest&apos;s settings, which have
-          problems. Fix each problem where it is listed, or, as an admin, fix them as
-          text in{' '}
+          problems. Fix each problem where it is listed, or fix them as text in{' '}
           <PageLink to={viewFilePath(org, contest)}>the stored settings</PageLink>.
         </BodyText>
         {definitionErrorsOf(view.error).length > 0 ? (

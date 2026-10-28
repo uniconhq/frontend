@@ -24,6 +24,7 @@ export function Select({
   required = false,
   disabled = false,
   labelHidden = false,
+  width,
 }: {
   label: string;
   value: string;
@@ -37,6 +38,7 @@ export function Select({
   required?: boolean;
   disabled?: boolean;
   labelHidden?: boolean;
+  width?: 'xs' | 'sm' | 'md' | 'lg';
 }) {
   const { inputLabel, id, wrap } = useFieldLabel({ label, info, required });
   const data =
@@ -55,6 +57,13 @@ export function Select({
       onChange={(event) => onChange(event.currentTarget.value)}
       required={required}
       disabled={disabled}
+      style={{
+        width:
+          width === undefined
+            ? undefined
+            : { xs: '5rem', sm: '12rem', md: '14rem', lg: '16rem' }[width],
+        maxWidth: '100%',
+      }}
       radius="sm"
     />,
   );

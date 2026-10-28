@@ -16,8 +16,8 @@ import { verdictLabel } from '@/ui/verdicts';
  * runs (`limitsWords`).
  */
 
-/** What the editor, a test and a screen reader call the draft's file. */
-export const DRAFT_FILE = 'The draft’s file';
+/** What the editor, a test and a screen reader call the draft's YAML file. */
+export const DRAFT_FILE = 'The draft’s YAML';
 
 /** A primitive as a person names it: its title, or its name without one (#436). */
 export function primitiveTitle(primitive: PrimitiveInfo): string {
@@ -109,19 +109,49 @@ export function visibilityWords(
     : `Shared with ${String(count)} ${count === 1 ? 'person' : 'people'}`;
 }
 
-/** The name a box is read out by, and the title of the drawer it opens. */
+const TYPE_WORDS: Record<string, string> = {
+  text: 'Text',
+  number: 'Number',
+  boolean: 'True or false',
+  enum: 'One of a list',
+  file: 'File',
+  folder: 'Folder',
+};
+
+/** A value's type as a person names it: "One of a list" for `enum`. */
+export function typeWords(type: string): string {
+  return TYPE_WORDS[type] ?? type;
+}
+
+/** What a file of the workflow is by its path: a folder ends in `/`. */
+export function fileType(path: string): 'file' | 'folder' {
+  return path.endsWith('/') ? 'folder' : 'file';
+}
+
+/** What a closed step's box says it needs and gives: "needs source, language · gives program". */
+export function needsWords(inputs: string[], outputs: string[]): string {
+  return [
+    inputs.length === 0 ? null : `needs ${inputs.join(', ')}`,
+    outputs.length === 0 ? null : `gives ${outputs.join(', ')}`,
+  ]
+    .filter((part) => part !== null)
+    .join(' · ');
+}
+
+/** The name a box is read out by. */
 export function boxName(box: Box, workflow: Workflow): string {
   if (box.kind === 'step' && box.step !== null)
     return `Step ${workflow.steps[box.step]?.id || '(no name)'}`;
-  if (box.kind === 'inputs') return 'Inputs';
+  if (box.kind === 'input') return `Input ${box.right[0] ?? ''}`;
+  if (box.kind === 'file') return `Workflow file ${box.right[0] ?? ''}`;
   return 'Outputs';
 }
 
-/** The steps that read a group of inputs, as its box says it. */
+/** The steps that read an input or a file, as its box says it. */
 export function readersWords(readers: string[]): string {
-  if (readers.length === 0) return 'Nothing uses these yet';
-  if (readers.length === 1) return `Used by ${readers[0] ?? ''}`;
-  return `Used by ${listed(readers)}`;
+  if (readers.length === 0) return 'Read by nothing yet';
+  if (readers.length === 1) return `Read by ${readers[0] ?? ''}`;
+  return `Read by ${listed(readers)}`;
 }
 
 /** A time limit in milliseconds as seconds: "60 seconds", "1.5 seconds", "1 second". */

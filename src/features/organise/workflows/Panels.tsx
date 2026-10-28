@@ -1,15 +1,28 @@
-import { useState } from 'react';
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
 import { ActionMenu } from '@/ui/ActionMenu';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
 import { Checkbox } from '@/ui/Checkbox';
+import { FileDrop } from '@/ui/FileDrop';
 import { Select } from '@/ui/Select';
 import { TextInput } from '@/ui/TextInput';
 import { NumberText, numberText } from '../forms/yaml-doc';
 import {
   clearPort,
   entryFields,
+  fileToInput,
   freeName,
+  idOfPath,
+  inputToFile,
+  moveFile,
+  sharedNames,
   removeEntry,
   removeInput,
   removeStep,
@@ -25,13 +38,19 @@ import {
   type InputFields,
   workflowOf,
 } from './edit';
+import { formatUse, parseUse, type BoxDecl } from './boxes';
+import { BoxFiles, UploadProgress } from './Files';
+import { useStagedUpload, type Staging } from './staged-upload';
 import {
   VALUE_TYPES,
   refLabel,
   refProblem,
   refsIn,
+  refsOf,
+  sameRef,
   wholeRef,
   refText,
+  type Ref,
   type InputDecl,
   type OutputEntry,
   type Workflow,
@@ -41,6 +60,8 @@ import { declared, type PrimitiveInfo } from './primitives';
 import {
   mayBeOptional,
   newProblem,
+  stepInputs,
+  stepOutputs,
   outputType,
   outputSources,
   outputRefusal,
@@ -48,11 +69,14 @@ import {
   wireRefusal,
 } from './rules';
 import {
+  fileType,
   limitsWords,
+  needsWords,
   outcomeWords,
   portMarks,
   primitiveTitle,
   refWords,
+  typeWords,
 } from './words';
 import classes from './workflows.module.css';
 
@@ -76,8 +100,32 @@ const OUTPUT_NAME = /^[a-z][a-z0-9_]*$/;
  */
 const RESERVED = ['verdict', 'passed', 'outcome', 'points', 'penalty'];
 const SCALARS = ['text', 'number', 'boolean', 'enum'];
+/** A port's choice of a value written in the drawer, which no reference is written as. */
+const FIXED = 'fixed';
 
 /** Why `name` cannot be an id among `taken`, or null when it can. */
+/** Whether the panels change the file, or show a version, which nothing changes. */
+const Editing = createContext(true);
+
+/** What only changes the file, such as Remove, left out of a version's panel. */
+function EditOnly({ children }: { children: ReactNode }) {
+  return useContext(Editing) ? children : null;
+}
+
+/**
+ * A panel as a version's page shows it: what the editor's drawer shows,
+ * every field locked, and what only changes the file left out.
+ */
+export function LockedPanel({ children }: { children: ReactNode }) {
+  return (
+    <Editing.Provider value={false}>
+      <fieldset disabled className={classes.locked}>
+        {children}
+      </fieldset>
+    </Editing.Provider>
+  );
+}
+
 function handleProblem(name: string, taken: string[]): string | null {
   if (!HANDLE.test(name))
     return 'Use at most 40 lower case letters, digits, hyphens (-) and underscores (_), starting with a letter or a digit.';
@@ -145,50 +193,36 @@ function portLine(primitive: PrimitiveInfo, port: string): string | undefined {
   return line === '' ? undefined : line;
 }
 
+/** What one of a step's ports takes, from its primitive or the workflow it runs. */
+type PortShape = {
+  name: string;
+  type: string;
+  options: string[] | null;
+  optional: boolean;
+  line: string | undefined;
+};
+
+/** A value written for a port that takes a plain value: text, a number, true or false, or one of a list. */
 function PortValue({
   text,
   workflow,
   primitives,
+  boxes,
   index,
-  port,
+  shape,
   change,
 }: {
   text: string;
   workflow: Workflow;
   primitives: Map<string, PrimitiveInfo>;
+  boxes: ReadonlyMap<string, BoxDecl>;
   index: number;
-  port: string;
+  shape: PortShape;
   change: Change;
 }) {
-  const step = workflow.steps[index];
-  const primitive = step !== undefined ? declared(primitives, step.use) : null;
-  const decl = primitive?.inputs[port];
-  const value = step?.with[port];
-  if (step === undefined || primitive === null || decl === undefined) return null;
-  const label = `${port}${decl.optional ? ' (optional)' : ''}`;
-  const line = portLine(primitive, port);
-  if (value?.kind === 'wire')
-    return (
-      <div className={classes.portValue}>
-        <BodyText size="sm">
-          <strong>{label}</strong> takes {refWords(value.ref)}.
-        </BodyText>
-        {line !== undefined && (
-          <BodyText size="sm" tone="secondary">
-            {line}
-          </BodyText>
-        )}
-        <div>
-          <Button
-            size="xs"
-            variant="secondary"
-            onClick={() => change(clearPort(text, index, port))}
-          >
-            Remove the wire to {port}
-          </Button>
-        </div>
-      </div>
-    );
+  const port = shape.name;
+  const value = workflow.steps[index]?.with[port];
+  const label = `Value of ${port}`;
   const current =
     value === undefined
       ? ''
@@ -198,9 +232,9 @@ function PortValue({
           : String(value.value)
         : value.kind === 'text'
           ? value.text
-          : value.kind === 'mapping' || value.kind === 'list'
-            ? ''
-            : JSON.stringify(value.raw);
+          : value.kind === 'invalid'
+            ? JSON.stringify(value.raw)
+            : '';
   const apply = (raw: string | NumberText | boolean | undefined): string | null => {
     if (raw === undefined || raw === '') {
       change(clearPort(text, index, port));
@@ -208,7 +242,7 @@ function PortValue({
     }
     const whole = typeof raw === 'string' ? wholeRef(raw) : null;
     if (whole !== null) {
-      const refused = wireRefusal(workflow, primitives, index, port, whole);
+      const refused = wireRefusal(workflow, primitives, index, port, whole, boxes);
       if (refused !== null) return refused;
       change(wire(text, index, port, whole));
       return null;
@@ -216,18 +250,25 @@ function PortValue({
     const bad = typeof raw === 'string' ? refProblem(raw) : null;
     if (bad !== null) return bad;
     const written = (typeof raw === 'string' ? refsIn(raw) : []) ?? [];
-    const refused = valueRefusal(workflow, primitives, index, port, raw, written);
+    const refused = valueRefusal(
+      workflow,
+      primitives,
+      index,
+      port,
+      raw,
+      written,
+      boxes,
+    );
     if (refused !== null) return refused;
     change(setValue(text, index, port, raw));
     return null;
   };
-  if (decl.type === 'boolean')
+  if (shape.type === 'boolean')
     return (
       <Select
         label={label}
         value={current}
         placeholder="No value"
-        description={line}
         options={[
           { value: 'true', label: 'true' },
           { value: 'false', label: 'false' },
@@ -235,33 +276,18 @@ function PortValue({
         onChange={(chosen) => apply(chosen === '' ? undefined : chosen === 'true')}
       />
     );
-  if (decl.type === 'enum')
+  if (shape.type === 'enum')
     return (
       <Select
         label={label}
         value={current}
         placeholder="No value"
-        description={line}
-        options={(decl.options ?? []).map((option) => ({
+        options={(shape.options ?? []).map((option) => ({
           value: option,
           label: option,
         }))}
         onChange={(chosen) => apply(chosen === '' ? undefined : chosen)}
       />
-    );
-  if (decl.type === 'file' || decl.type === 'folder')
-    return (
-      <div className={classes.portValue}>
-        <BodyText size="sm">
-          <strong>{label}</strong> takes a {decl.type}. Wire it from an input, another
-          step’s output or one of the workflow’s files, with its port on the graph.
-        </BodyText>
-        {line !== undefined && (
-          <BodyText size="sm" tone="secondary">
-            {line}
-          </BodyText>
-        )}
-      </div>
     );
   const insertable = [
     ...workflow.inputs
@@ -269,33 +295,148 @@ function PortValue({
       .map((input) => ({ kind: 'inputs' as const, name: input.id })),
   ];
   return (
-    <div className={classes.stack}>
+    <>
       <CommitField
         label={label}
         value={current}
         description={
-          decl.type === 'text' && insertable.length > 0
-            ? [line, 'Write in an input’s value with “Write in a value”.']
-                .filter((part) => part !== undefined)
-                .join(' ')
-            : line
+          shape.type === 'text' && insertable.length > 0
+            ? 'Write in an input’s value with “Write in a value”.'
+            : undefined
         }
-        apply={(typedText) => apply(typed(typedText, decl.type))}
+        apply={(typedText) => apply(typed(typedText, shape.type))}
       />
-      {decl.type === 'text' && insertable.length > 0 && (
-        <ActionMenu
-          button
-          text="Write in a value"
-          label={`Write a value into ${port}`}
-          entries={insertable.map((ref) => ({
-            kind: 'item' as const,
-            text: refWords(ref),
-            onSelect: () => {
-              apply(
-                `${current}${current === '' || /\s$/.test(current) ? '' : ' '}${refText(ref)}`,
-              );
-            },
-          }))}
+      {shape.type === 'text' && insertable.length > 0 && (
+        <EditOnly>
+          <ActionMenu
+            button
+            text="Write in a value"
+            label={`Write a value into ${port}`}
+            entries={insertable.map((ref) => ({
+              kind: 'item' as const,
+              text: refWords(ref),
+              onSelect: () => {
+                apply(
+                  `${current}${current === '' || /\s$/.test(current) ? '' : ' '}${refText(ref)}`,
+                );
+              },
+            }))}
+          />
+        </EditOnly>
+      )}
+    </>
+  );
+}
+
+/**
+ * One of a step's ports: one choice of where its value comes from, offering
+ * only the sources that fit, and for a port that takes a plain value, a fixed
+ * value, whose field shows once it is chosen. A value the drawer cannot edit, several values as a mapping of
+ * files or a value written on a file port, is said here and can be cleared;
+ * its parts are changed in the file.
+ */
+function PortRow({
+  text,
+  workflow,
+  primitives,
+  boxes,
+  index,
+  shape,
+  fitting,
+  change,
+}: {
+  text: string;
+  workflow: Workflow;
+  primitives: Map<string, PrimitiveInfo>;
+  boxes: ReadonlyMap<string, BoxDecl>;
+  index: number;
+  shape: PortShape;
+  /** The sources the port may be wired from. */
+  fitting: Ref[];
+  change: Change;
+}) {
+  const [writing, setWriting] = useState(false);
+  const port = shape.name;
+  const value = workflow.steps[index]?.with[port];
+  const label = `${port}${shape.optional ? ' (optional)' : ''}`;
+  const plain = SCALARS.includes(shape.type);
+  const fixed =
+    value?.kind === 'mapping' || value?.kind === 'list'
+      ? (() => {
+          const read = refsOf(value).map(refWords);
+          return `takes several values${read.length > 0 ? `: ${read.join(', ')}` : ''}.`;
+        })()
+      : value !== undefined && value.kind !== 'wire' && !plain
+        ? `is given ${
+            value.kind === 'literal'
+              ? value.value instanceof NumberText
+                ? value.value.text
+                : String(value.value)
+              : value.kind === 'text'
+                ? value.text
+                : JSON.stringify(value.raw)
+          }, which is not a ${shape.type}.`
+        : null;
+  if (fixed !== null) {
+    return (
+      <div className={classes.portValue}>
+        <BodyText size="sm">
+          <strong>{label}</strong> {fixed}
+        </BodyText>
+        {shape.line !== undefined && (
+          <BodyText size="sm" tone="secondary">
+            {shape.line}
+          </BodyText>
+        )}
+        <EditOnly>
+          <div>
+            <Button
+              size="xs"
+              variant="secondary"
+              onClick={() => change(clearPort(text, index, port))}
+            >
+              Clear {port}
+            </Button>
+          </div>
+        </EditOnly>
+      </div>
+    );
+  }
+  const wired = value?.kind === 'wire' ? value.ref : null;
+  // A wire the rules now refuse is still shown, so the Select says what it is.
+  const offered =
+    wired === null || fitting.some((ref) => sameRef(ref, wired))
+      ? fitting
+      : [...fitting, wired];
+  const valued = plain && wired === null && (value !== undefined || writing);
+  return (
+    <div className={classes.stack}>
+      <Select
+        label={label}
+        value={wired !== null ? refText(wired) : valued ? FIXED : ''}
+        placeholder="Nothing yet"
+        description={shape.line}
+        options={[
+          ...(plain ? [{ value: FIXED, label: 'A fixed value' }] : []),
+          ...offered.map((ref) => ({ value: refText(ref), label: refWords(ref) })),
+        ]}
+        onChange={(chosen) => {
+          setWriting(chosen === FIXED);
+          const ref = offered.find((found) => refText(found) === chosen);
+          if (ref !== undefined) change(wire(text, index, port, ref));
+          else if (value !== undefined && (chosen !== FIXED || wired !== null))
+            change(clearPort(text, index, port));
+        }}
+      />
+      {valued && (
+        <PortValue
+          text={text}
+          workflow={workflow}
+          primitives={primitives}
+          boxes={boxes}
+          index={index}
+          shape={shape}
+          change={change}
         />
       )}
     </div>
@@ -360,70 +501,80 @@ function Details({
   );
 }
 
+/**
+ * A step in the order the drawer shows it: its name; what it runs; that a
+ * newer version of the workflow it runs is out, and Open to see inside;
+ * where each port is wired from; what it gives; then its version, Details
+ * and Remove.
+ */
 export function StepPanel({
   text,
   workflow,
   primitives,
+  boxes,
+  reading,
   pinned,
   index,
+  fitting,
   change,
   onRemoved,
+  onZoom,
 }: {
   text: string;
   workflow: Workflow;
   primitives: Map<string, PrimitiveInfo>;
+  /** The run workflows' boxes, by the reference a step uses. */
+  boxes: ReadonlyMap<string, BoxDecl>;
+  /** Whether a workflow's box is still being read. */
+  reading: boolean;
   pinned: Pinned;
   index: number;
+  /** The sources the port `port` may be wired from, as the graph's wires are checked. */
+  fitting: (port: string) => Ref[];
   change: Change;
   onRemoved: () => void;
+  /** Shows the inside of the workflow the step runs. */
+  onZoom: () => void;
 }) {
   const [versionRefused, setVersionRefused] = useState<string | null>(null);
   const step = workflow.steps[index];
   if (step === undefined) return null;
-  const primitive = declared(primitives, step.use);
+  const primitive = declared(primitives, step);
+  const use = primitive === null ? parseUse(step.use) : null;
+  const box = primitive === null ? boxes.get(step.use) : undefined;
+  const newer = box?.newer ?? null;
   const versions = [...primitives.values()].filter(
     (found) =>
       found.problem === null && primitive !== null && found.name === primitive.name,
   );
+  const shapes: PortShape[] = (stepInputs(primitives, boxes, step) ?? []).map(
+    (input) => ({
+      ...input,
+      line: primitive === null ? undefined : portLine(primitive, input.name),
+    }),
+  );
+  const outputs = stepOutputs(primitives, boxes, step)
+    .filter((output) => output.type !== 'outcome')
+    .map((output) => ({
+      ...output,
+      description: primitive?.outputs[output.name]?.description ?? null,
+    }));
+  const newerRef =
+    use === null || newer === null ? null : formatUse({ ...use, version: newer });
   const problems = [
     ...(pinned.steps.get(index) ?? []),
-    ...Object.keys(step.with).flatMap(
-      (port) => pinned.ports.get(`${String(index)}.${port}`) ?? [],
-    ),
-    ...Object.keys(primitive?.inputs ?? {})
-      .filter((port) => !(port in step.with))
-      .flatMap((port) => pinned.ports.get(`${String(index)}.${port}`) ?? []),
+    ...[
+      ...new Set([...Object.keys(step.with), ...shapes.map((shape) => shape.name)]),
+    ].flatMap((port) => pinned.ports.get(`${String(index)}.${port}`) ?? []),
   ];
-  const outputs = Object.entries(primitive?.outputs ?? {}).filter(
-    ([, port]) => port.type !== 'outcome',
-  );
+  /** Writes `written`, unless it breaks a wire the old version kept. */
+  const moveTo = (written: string) => {
+    const broken = newProblem(workflow, workflowOf(written), primitives, boxes);
+    setVersionRefused(broken);
+    if (broken === null) change(written);
+  };
   return (
     <section className={classes.panel} aria-label={`The step ${step.id}`}>
-      {primitive !== null ? (
-        <div className={classes.stack}>
-          <BodyText size="sm">
-            <strong>{primitiveTitle(primitive)}</strong>{' '}
-            <span className={classes.ref}>{primitive.ref}</span>
-          </BodyText>
-          {primitive.description !== null && (
-            <BodyText size="sm" tone="secondary">
-              {primitive.description}
-            </BodyText>
-          )}
-        </div>
-      ) : (
-        <BodyText size="sm">
-          {step.use} is not a primitive Unicon has now. Choose another version, or
-          remove the step.
-        </BodyText>
-      )}
-      {problems.length > 0 && (
-        <ul className={classes.problems} aria-label="Problems with this step">
-          {problems.map((problem) => (
-            <li key={`${problem.path} ${problem.message}`}>{problem.message}</li>
-          ))}
-        </ul>
-      )}
       <CommitField
         label="Name"
         value={step.id}
@@ -437,6 +588,144 @@ export function StepPanel({
           return problem;
         }}
       />
+      {primitive !== null ? (
+        <div className={classes.stack}>
+          <BodyText size="sm">
+            <strong>{primitiveTitle(primitive)}</strong>{' '}
+            <span className={classes.ref}>{primitive.ref}</span>
+          </BodyText>
+          {primitive.description !== null && (
+            <BodyText size="sm" tone="secondary">
+              {primitive.description}
+            </BodyText>
+          )}
+        </div>
+      ) : use !== null && box !== undefined ? (
+        <div className={classes.stack}>
+          <BodyText size="sm">
+            <strong>
+              {use.owner}/{use.name}
+            </strong>{' '}
+            <span className={classes.ref}>{step.use}</span>
+          </BodyText>
+          <BodyText size="sm" tone="secondary">
+            A workflow run as one step
+            {shapes.length + outputs.length > 0
+              ? `: it ${needsWords(
+                  shapes.map((shape) => shape.name),
+                  outputs.map((output) => output.name),
+                )}.`
+              : '.'}
+          </BodyText>
+          {box.description !== null && (
+            <BodyText size="sm" tone="secondary">
+              <span className={classes.said}>{box.description}</span>
+            </BodyText>
+          )}
+        </div>
+      ) : use !== null && reading ? (
+        <BodyText size="sm" tone="secondary">
+          Reading {step.use}…
+        </BodyText>
+      ) : use !== null ? (
+        <BodyText size="sm">
+          Unicon cannot run {step.use} as a step: it is not a workflow you can read, or
+          it is a test workflow, which is not run as a box. Choose another, or remove
+          the step.
+        </BodyText>
+      ) : (
+        <BodyText size="sm">
+          {step.use} is not a primitive or a workflow Unicon has now. Choose another
+          version, or remove the step.
+        </BodyText>
+      )}
+      {problems.length > 0 && (
+        <ul className={classes.problems} aria-label="Problems with this step">
+          {problems.map((problem) => (
+            <li key={`${problem.path} ${problem.message}`}>{problem.message}</li>
+          ))}
+        </ul>
+      )}
+      {newer !== null && newerRef !== null && (
+        <div className={classes.stack}>
+          <BodyText size="sm">{newer} is out.</BodyText>
+          <EditOnly>
+            <div>
+              <Button
+                size="xs"
+                variant="secondary"
+                // Its box is needed to check that every wire and value still fits.
+                disabled={!boxes.has(newerRef)}
+                onClick={() => moveTo(setUse(text, index, newerRef))}
+              >
+                Move to it
+              </Button>
+            </div>
+          </EditOnly>
+          {!boxes.has(newerRef) && (
+            <BodyText size="sm" tone="secondary">
+              {reading
+                ? `Reading ${newer}…`
+                : `${newer} could not be read, so the step cannot move to it yet.`}
+            </BodyText>
+          )}
+          {versionRefused !== null && (
+            <p className={classes.problemText} role="alert">
+              {versionRefused}
+            </p>
+          )}
+        </div>
+      )}
+      {box !== undefined && (
+        <EditOnly>
+          <div>
+            <Button
+              size="xs"
+              variant="secondary"
+              onClick={onZoom}
+              label={`Open ${step.id}`}
+            >
+              Open
+            </Button>
+          </div>
+        </EditOnly>
+      )}
+      {shapes.length > 0 && (
+        <>
+          <Part>What it takes</Part>
+          {shapes.map((shape) => (
+            <PortRow
+              key={shape.name}
+              text={text}
+              workflow={workflow}
+              primitives={primitives}
+              boxes={boxes}
+              index={index}
+              shape={shape}
+              fitting={fitting(shape.name)}
+              change={change}
+            />
+          ))}
+        </>
+      )}
+      {outputs.length > 0 && (
+        <>
+          <Part>What it gives</Part>
+          <ul className={classes.outputs} aria-label="What it gives">
+            {outputs.map((output) => (
+              <li key={output.name}>
+                <strong>{output.name}</strong>{' '}
+                <span className={classes.ref}>{output.type}</span>
+                {output.description !== null && (
+                  <BodyText size="sm" tone="secondary">
+                    {output.description}
+                  </BodyText>
+                )}
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
       {versions.length > 1 && primitive !== null && (
         <Select
           label="Version"
@@ -446,77 +735,33 @@ export function StepPanel({
             label: found.version,
           }))}
           error={versionRefused ?? undefined}
-          onChange={(use) => {
-            const written = setUse(text, index, use);
-            const broken = newProblem(workflow, workflowOf(written), primitives);
-            setVersionRefused(broken);
-            if (broken === null) change(written);
-          }}
+          onChange={(chosen) => moveTo(setUse(text, index, chosen))}
         />
       )}
       {primitive !== null && (
-        <>
-          <Part>What it takes</Part>
-          {Object.keys(primitive.inputs).map((port) => (
-            <PortValue
-              key={port}
-              text={text}
-              workflow={workflow}
-              primitives={primitives}
-              index={index}
-              port={port}
-              change={change}
-            />
-          ))}
-          {outputs.length > 0 && (
-            <>
-              <Part>What it gives</Part>
-              <ul className={classes.outputs} aria-label="What it gives">
-                {outputs.map(([name, port]) => (
-                  <li key={name}>
-                    <strong>{name}</strong>{' '}
-                    <span className={classes.ref}>{port.type}</span>
-                    {port.description !== null && (
-                      <BodyText size="sm" tone="secondary">
-                        {port.description}
-                      </BodyText>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            </>
-          )}
-          <Details primitive={primitive} step={step} workflow={workflow} />
-        </>
+        <Details primitive={primitive} step={step} workflow={workflow} />
       )}
-      <div>
-        <Button
-          size="xs"
-          variant="danger"
-          onClick={() => {
-            change(removeStep(text, index));
-            onRemoved();
-          }}
-        >
-          Remove the step {step.id}
-        </Button>
-      </div>
+      <EditOnly>
+        <div>
+          <Button
+            size="xs"
+            variant="danger"
+            onClick={() => {
+              change(removeStep(text, index));
+              onRemoved();
+            }}
+          >
+            Remove the step {step.id}
+          </Button>
+        </div>
+      </EditOnly>
     </section>
   );
 }
 
-const TYPE_WORDS: Record<string, string> = {
-  text: 'Text',
-  number: 'Number',
-  boolean: 'True or false',
-  enum: 'One of a list',
-  file: 'File',
-  folder: 'Folder',
-};
-
 const TYPE_OPTIONS = VALUE_TYPES.map((type) => ({
   value: type,
-  label: TYPE_WORDS[type] ?? type,
+  label: typeWords(type),
 }));
 
 function optionsText(options: string[] | null): string {
@@ -540,18 +785,30 @@ function InputRow({
   text,
   workflow,
   primitives,
+  boxes,
   input,
   pinned,
+  files,
+  staging,
   change,
+  onRenamed,
+  onGiven,
 }: {
   text: string;
   workflow: Workflow;
   primitives: Map<string, PrimitiveInfo>;
+  boxes: ReadonlyMap<string, BoxDecl>;
   input: InputDecl;
   pinned: Pinned;
+  files: Ref[];
+  staging: Staging;
   change: Change;
+  onRenamed: (id: string) => void;
+  onGiven: (path: string) => void;
 }) {
   const [refused, setRefused] = useState<string | null>(null);
+  const [giving, setGiving] = useState(false);
+  const isFile = input.type === 'file' || input.type === 'folder';
   const fields: InputFields = {
     type: input.type,
     options: input.options,
@@ -568,11 +825,18 @@ function InputRow({
     // A unit goes after a number's title on the task's form, and only there (M54).
     if (merged.type !== 'number') merged.unit = null;
     const written = setInput(text, input.id, merged);
-    const broken = newProblem(workflow, workflowOf(written), primitives);
+    const broken = newProblem(workflow, workflowOf(written), primitives, boxes);
     setRefused(broken);
     if (broken === null) change(written);
   };
   const problems = pinned.inputs.get(input.id) ?? [];
+  const readers = workflow.steps.flatMap((step) =>
+    Object.entries(step.with)
+      .filter(([, value]) =>
+        refsOf(value).some((ref) => ref.kind === 'inputs' && ref.name === input.id),
+      )
+      .map(([port]) => `${step.id}.${port}`),
+  );
   return (
     <li className={classes.declaration} aria-label={`The input ${input.id}`}>
       <CommitField
@@ -582,14 +846,48 @@ function InputRow({
         apply={(id) => {
           const problem = handleProblem(
             id,
-            workflow.inputs
-              .filter((other) => other.id !== input.id)
-              .map((other) => other.id),
+            sharedNames(workflow).filter((other) => other !== input.id),
           );
-          if (problem === null) change(renameInput(text, input.id, id));
+          if (problem === null) {
+            change(renameInput(text, input.id, id));
+            onRenamed(id);
+          }
           return problem;
         }}
       />
+      {isFile && (
+        <Select
+          label="Comes from"
+          value={giving ? 'workflow' : 'task'}
+          options={[
+            { value: 'task', label: 'The task, on every run' },
+            readers.length === 0
+              ? {
+                  value: 'workflow',
+                  label: `A ${input.type} of this workflow, once a step reads it`,
+                  disabled: true,
+                }
+              : { value: 'workflow', label: `A ${input.type} of this workflow` },
+          ]}
+          onChange={(chosen) => setGiving(chosen === 'workflow')}
+        />
+      )}
+      {isFile && giving && (
+        <GiveFromWorkflow
+          id={input.id}
+          type={input.type === 'folder' ? 'folder' : 'file'}
+          files={files}
+          staging={staging}
+          onFile={(path) => {
+            const written = inputToFile(text, input.id, path);
+            const broken = newProblem(workflow, workflowOf(written), primitives, boxes);
+            setRefused(broken);
+            if (broken !== null) return;
+            change(written);
+            onGiven(path);
+          }}
+        />
+      )}
       <Select
         label="Type"
         value={input.type}
@@ -665,60 +963,213 @@ function InputRow({
           {refused}
         </p>
       )}
-      <div>
-        <Button
-          size="xs"
-          variant="secondary"
-          onClick={() => change(removeInput(text, input.id))}
-        >
-          Remove the input {input.id}
-        </Button>
-      </div>
+      <Part>Read by</Part>
+      <BodyText size="sm">
+        {readers.length === 0 ? 'Nothing yet' : readers.join(', ')}
+      </BodyText>
+      <EditOnly>
+        <div>
+          <Button
+            size="xs"
+            variant="danger"
+            onClick={() => change(removeInput(text, input.id))}
+          >
+            Remove the input {input.id}
+          </Button>
+        </div>
+      </EditOnly>
     </li>
   );
 }
 
-/** A new input's name and type, added in place. */
-function AddDeclaration({
-  label,
-  button,
-  taken,
-  onAdd,
+/**
+ * The file of the workflow an input becomes: one already among its files, or
+ * a file uploaded here, which waits for Save as the Files drawer's do.
+ */
+function GiveFromWorkflow({
+  id,
+  type,
+  files,
+  staging,
+  onFile,
 }: {
-  label: string;
-  button: string;
-  taken: string[];
-  onAdd: (id: string, type: string) => void;
+  id: string;
+  type: 'file' | 'folder';
+  files: Ref[];
+  staging: Staging;
+  onFile: (path: string) => void;
 }) {
-  const [id, setId] = useState('');
-  const [type, setType] = useState('file');
-  const [problem, setProblem] = useState<string | null>(null);
+  const { upload, state, error, busy } = useStagedUpload(staging);
+  const [taken, setTaken] = useState<string | null>(null);
+  // An upload ends later: it becomes the file of the draft as it is then,
+  // and of nothing once this choice is gone, its file staged all the same.
+  const latest = useRef<((path: string) => void) | null>(onFile);
+  useEffect(() => {
+    latest.current = onFile;
+  });
+  useEffect(
+    () => () => {
+      latest.current = null;
+    },
+    [],
+  );
+  const locked = staging.disabled || busy;
+  const fitting = files.filter((ref) => fileType(ref.name) === type);
   return (
-    <form
-      className={classes.add}
-      aria-label={button}
-      onSubmit={(event) => {
-        event.preventDefault();
-        const found = handleProblem(id, taken);
-        setProblem(found);
-        if (found !== null) return;
-        onAdd(id, type);
-        setId('');
-      }}
-    >
-      <TextInput
-        label={label}
-        value={id}
-        onChange={setId}
-        error={problem ?? undefined}
+    <div className={classes.stack}>
+      <BodyText size="sm" tone="secondary">
+        Tasks no longer give it. Every step that reads {id} reads this {type} instead,
+        saved with the workflow and the same on every run.
+      </BodyText>
+      <Select
+        label={`The ${type}`}
+        value=""
+        placeholder={fitting.length === 0 ? `No ${type} yet` : `Choose a ${type}`}
+        options={fitting.map((ref) => ({ value: ref.name, label: ref.name }))}
+        disabled={locked}
+        onChange={(path) => {
+          if (path !== '') onFile(path);
+        }}
       />
-      <Select label="Of type" value={type} options={TYPE_OPTIONS} onChange={setType} />
-      <div>
-        <Button size="xs" type="submit">
-          {button}
-        </Button>
-      </div>
-    </form>
+      {type === 'file' ? (
+        <>
+          <FileDrop
+            label="Or upload one"
+            files={[]}
+            disabled={locked}
+            onChange={(chosen) => {
+              const [file] = chosen;
+              // A file of the same name is replaced only in its own drawer, or in Files.
+              const same = files.some((ref) => ref.name === file?.name);
+              setTaken(same && file !== undefined ? file.name : null);
+              if (same) return;
+              void upload(chosen, (each) => each.name).then((sent) => {
+                const [path] = sent ?? [];
+                if (path !== undefined) latest.current?.(path);
+              });
+            }}
+          />
+          {taken !== null && (
+            <p className={classes.problemText} role="alert">
+              The workflow already has a file {taken}. Choose it above, or replace it in
+              Files.
+            </p>
+          )}
+          <UploadProgress state={state} error={error} />
+        </>
+      ) : (
+        <BodyText size="sm" tone="secondary">
+          Upload a folder in Files, then choose it here.
+        </BodyText>
+      )}
+    </div>
+  );
+}
+
+/**
+ * The drawer of a file of the workflow a step reads: which file it is, which
+ * steps read it, and a way to have the task give it instead, as an input.
+ */
+export function FilePanel({
+  text,
+  workflow,
+  primitives,
+  boxes,
+  path,
+  files,
+  listed,
+  staging,
+  change,
+  onMoved,
+  onSupplied,
+}: {
+  text: string;
+  workflow: Workflow;
+  primitives: Map<string, PrimitiveInfo>;
+  boxes: ReadonlyMap<string, BoxDecl>;
+  /** The file or folder of the box selected. */
+  path: string;
+  /** The workflow's files and folders, saved and staged. */
+  files: Ref[];
+  /** Whether the saved files are read yet, so `files` holds every one. */
+  listed: boolean;
+  staging: Staging;
+  change: Change;
+  /** The steps read the file at `path` now, which the drawer follows. */
+  onMoved: (path: string) => void;
+  /** The file is the input `id` now, which the drawer follows. */
+  onSupplied: (id: string) => void;
+}) {
+  const [refused, setRefused] = useState<string | null>(null);
+  /** `written` as the draft, unless it newly breaks a wire, which is said instead. */
+  const apply = (written: string): boolean => {
+    const broken = newProblem(workflow, workflowOf(written), primitives, boxes);
+    setRefused(broken);
+    if (broken === null) change(written);
+    return broken === null;
+  };
+  const type = fileType(path);
+  const fitting = files.filter((ref) => fileType(ref.name) === type);
+  const known = fitting.some((ref) => ref.name === path);
+  const readers = workflow.steps.flatMap((step) =>
+    Object.entries(step.with)
+      .filter(([, value]) =>
+        refsOf(value).some((ref) => ref.kind === 'workflow' && ref.name === path),
+      )
+      .map(([port]) => `${step.id}.${port}`),
+  );
+  return (
+    <section className={classes.panel} aria-label="The workflow file">
+      <BodyText size="sm" tone="secondary">
+        A {type} of this workflow: saved with it and with every version it publishes,
+        and the same on every run. The task does not give it.
+      </BodyText>
+      <Select
+        label={`The ${type}`}
+        value={path}
+        options={[
+          ...(known ? [] : [{ value: path, label: path }]),
+          ...fitting.map((ref) => ({ value: ref.name, label: ref.name })),
+        ]}
+        onChange={(to) => {
+          if (to !== path && apply(moveFile(text, path, to))) onMoved(to);
+        }}
+      />
+      {listed && !known && (
+        <p className={classes.problemText}>
+          {path} is not among this workflow’s files yet. Upload it below, or choose
+          another.
+        </p>
+      )}
+      {refused !== null && (
+        <p className={classes.problemText} role="alert">
+          {refused}
+        </p>
+      )}
+      <Part>Read by</Part>
+      <BodyText size="sm">
+        {readers.length === 0 ? 'Nothing yet' : readers.join(', ')}
+      </BodyText>
+      <EditOnly>
+        <BoxFiles key={path} path={path} staging={staging} />
+        <div>
+          <Button
+            size="xs"
+            variant="secondary"
+            onClick={() => {
+              const id = freeName(
+                idOfPath(path),
+                [...sharedNames(workflow), ...RESERVED],
+                '_',
+              );
+              if (apply(fileToInput(text, path, id, type))) onSupplied(id);
+            }}
+          >
+            Let the task supply it instead
+          </Button>
+        </div>
+      </EditOnly>
+    </section>
   );
 }
 
@@ -726,27 +1177,38 @@ export function InputsPanel({
   text,
   workflow,
   primitives,
+  boxes,
   pinned,
-  ids,
+  id,
+  files,
+  staging,
   change,
+  onRenamed,
+  onGiven,
 }: {
   text: string;
   workflow: Workflow;
   primitives: Map<string, PrimitiveInfo>;
+  boxes: ReadonlyMap<string, BoxDecl>;
   pinned: Pinned;
-  /** The inputs of the box selected; every input when none. */
-  ids: string[] | null;
+  /** The input of the box selected. */
+  id: string;
+  /** The workflow's files and folders, saved and staged. */
+  files: Ref[];
+  staging: Staging;
   change: Change;
+  /** The input was renamed `id`, which the drawer follows. */
+  onRenamed: (id: string) => void;
+  /** The input is the workflow's file at `path` now, which the drawer follows. */
+  onGiven: (path: string) => void;
 }) {
-  const shown = workflow.inputs.filter(
-    (input) => ids === null || ids.includes(input.id),
-  );
+  const shown = workflow.inputs.filter((input) => input.id === id);
   return (
     <section className={classes.panel} aria-label="The inputs">
       <BodyText size="sm" tone="secondary">
-        What the workflow asks for: settings each task gives, such as a time limit, and
-        what each entrant gives, such as their program. The task’s form names each by
-        its title.
+        An input: what a task gives this workflow for each run, such as a time limit, or
+        what each entrant gives, such as their program. The task’s form names it by its
+        title.
       </BodyText>
       <ul className={classes.list}>
         {shown.map((input) => (
@@ -755,22 +1217,17 @@ export function InputsPanel({
             text={text}
             workflow={workflow}
             primitives={primitives}
+            boxes={boxes}
             input={input}
             pinned={pinned}
+            files={files}
+            staging={staging}
             change={change}
+            onRenamed={onRenamed}
+            onGiven={onGiven}
           />
         ))}
       </ul>
-      <AddDeclaration
-        label="New input"
-        button="Add an input"
-        taken={workflow.inputs.map((input) => input.id)}
-        onAdd={(id, type) =>
-          change(
-            setInput(text, id, { type, options: type === 'enum' ? ['a', 'b'] : null }),
-          )
-        }
-      />
     </section>
   );
 }
@@ -779,6 +1236,7 @@ function EntryRow({
   text,
   workflow,
   primitives,
+  boxes,
   entry,
   pinned,
   change,
@@ -786,15 +1244,21 @@ function EntryRow({
   text: string;
   workflow: Workflow;
   primitives: Map<string, PrimitiveInfo>;
+  boxes: ReadonlyMap<string, BoxDecl>;
   entry: OutputEntry;
   pinned: Pinned;
   change: Change;
 }) {
   const [refused, setRefused] = useState<string | null>(null);
   const from = entry.from;
-  const type = outputType(workflow, primitives, from);
+  const type = outputType(workflow, primitives, from, boxes);
   const isNumber = type === 'number';
-  const sources = outputSources(workflow, primitives);
+  // What the file reads is still shown when it is not offered, so From says what it is.
+  const sources = outputSources(workflow, primitives, boxes);
+  const offered =
+    from === null || from.kind !== 'steps' || sources.some((ref) => sameRef(ref, from))
+      ? sources
+      : [...sources, from];
   const write = (next: Partial<EntryFields>) => {
     const reads = next.from ?? from;
     if (reads === null) return;
@@ -802,7 +1266,7 @@ function EntryRow({
       setEntry(
         text,
         entry.name,
-        entryFields(entry, outputType(workflow, primitives, reads), {
+        entryFields(entry, outputType(workflow, primitives, reads, boxes), {
           ...next,
           from: reads,
         }),
@@ -820,26 +1284,22 @@ function EntryRow({
             return "An output's name may use only lower case letters, digits and underscores (_), starting with a letter.";
           if (RESERVED.includes(name))
             return `${name} is a name Unicon uses itself, for what it gives every run. Give this output another name.`;
-          if (
-            workflow.outputs.some(
-              (other) => other.name === name && other.name !== entry.name,
-            )
-          )
+          if (name !== entry.name && sharedNames(workflow).includes(name))
             return 'Another one already has that name. Choose another.';
           change(renameEntry(text, entry.name, name));
           return null;
         }}
       />
       <Select
-        label="Reads"
+        label="From"
         value={from !== null ? refLabel(from) : ''}
         placeholder="Nothing yet"
         error={refused ?? undefined}
-        options={sources.map((ref) => ({ value: refLabel(ref), label: refWords(ref) }))}
+        options={offered.map((ref) => ({ value: refLabel(ref), label: refWords(ref) }))}
         onChange={(chosen) => {
-          const ref = sources.find((found) => refLabel(found) === chosen);
+          const ref = offered.find((found) => refLabel(found) === chosen);
           if (ref === undefined) return;
-          const refused = outputRefusal(workflow, primitives, ref);
+          const refused = outputRefusal(workflow, primitives, ref, boxes);
           setRefused(refused);
           if (refused === null) write({ from: ref });
         }}
@@ -878,15 +1338,17 @@ function EntryRow({
           {problem.message}
         </p>
       ))}
-      <div>
-        <Button
-          size="xs"
-          variant="secondary"
-          onClick={() => change(removeEntry(text, entry.name))}
-        >
-          Remove {entry.name} from the outputs
-        </Button>
-      </div>
+      <EditOnly>
+        <div>
+          <Button
+            size="xs"
+            variant="danger"
+            onClick={() => change(removeEntry(text, entry.name))}
+          >
+            Remove {entry.name} from the outputs
+          </Button>
+        </div>
+      </EditOnly>
     </li>
   );
 }
@@ -895,16 +1357,18 @@ export function OutputsPanel({
   text,
   workflow,
   primitives,
+  boxes,
   pinned,
   change,
 }: {
   text: string;
   workflow: Workflow;
   primitives: Map<string, PrimitiveInfo>;
+  boxes: ReadonlyMap<string, BoxDecl>;
   pinned: Pinned;
   change: Change;
 }) {
-  const sources = outputSources(workflow, primitives);
+  const sources = outputSources(workflow, primitives, boxes);
   const [chosen, setChosen] = useState('');
   return (
     <section className={classes.panel} aria-label="Outputs">
@@ -919,6 +1383,7 @@ export function OutputsPanel({
             text={text}
             workflow={workflow}
             primitives={primitives}
+            boxes={boxes}
             entry={entry}
             pinned={pinned}
             change={change}
@@ -926,37 +1391,35 @@ export function OutputsPanel({
         ))}
       </ul>
       {sources.length > 0 && (
-        <div className={classes.add}>
-          <Select
-            label="A step’s output to add"
-            value={chosen}
-            placeholder="Choose an output"
-            options={sources.map((ref) => ({
-              value: refLabel(ref),
-              label: refWords(ref),
-            }))}
-            onChange={setChosen}
-          />
-          <div>
-            <Button
-              size="xs"
-              disabled={chosen === ''}
-              onClick={() => {
-                const ref = sources.find((found) => refLabel(found) === chosen);
-                if (ref === undefined) return;
-                const name = freeName(
-                  ref.output,
-                  workflow.outputs.map((entry) => entry.name),
-                  '_',
-                );
-                change(setEntry(text, name, { from: ref }));
-                setChosen('');
-              }}
-            >
-              Add an output
-            </Button>
+        <EditOnly>
+          <div className={classes.add}>
+            <Select
+              label="A step’s output to add"
+              value={chosen}
+              placeholder="Choose an output"
+              options={sources.map((ref) => ({
+                value: refLabel(ref),
+                label: refWords(ref),
+              }))}
+              onChange={setChosen}
+            />
+            <div>
+              <Button
+                size="xs"
+                disabled={chosen === ''}
+                onClick={() => {
+                  const ref = sources.find((found) => refLabel(found) === chosen);
+                  if (ref === undefined) return;
+                  const name = freeName(ref.output, sharedNames(workflow), '_');
+                  change(setEntry(text, name, { from: ref }));
+                  setChosen('');
+                }}
+              >
+                Add an output
+              </Button>
+            </div>
           </div>
-        </div>
+        </EditOnly>
       )}
     </section>
   );

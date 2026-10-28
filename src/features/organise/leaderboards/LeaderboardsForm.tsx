@@ -3,6 +3,8 @@ import { useQueries } from '@tanstack/react-query';
 import { $api } from '@/api/query';
 import type { DefinitionError } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
+import { Card } from '@/ui/Card';
+import { IconButton } from '@/ui/IconButton';
 import { Button } from '@/ui/Button';
 import { RadioGroup } from '@/ui/RadioGroup';
 import { Select } from '@/ui/Select';
@@ -11,21 +13,29 @@ import { heldCount } from '@/ui/number/words';
 import { TextInput } from '@/ui/TextInput';
 import { Checkbox } from '@/ui/Checkbox';
 import { useMe } from '@/session';
-import { FormulaLine, FormulaTiles, type FormulaMark } from '../formula/Editor';
+import type { FormulaMark } from '../formula/Editor';
+import { FormulaCard } from '../formula/FormulaCard';
+import { Chip } from '@/ui/Chip';
+import { describeFormula, type FormulaScope } from '../formula/parse';
+import { written } from '../formula/tree';
+import type { FlowAbout } from '../formula/flow';
 import { BLOCKS_UNLOADED, type Catalogue } from '../formula/catalogue';
-import { useFormulaTarget } from '../formula/target';
 import { FieldBox } from '../contest/ContestFile';
 import { useOpenedField } from '../contest/opened';
 import type { FormProps } from '../forms/DefinitionFile';
+import { LeaveGuard } from '@/ui/LeaveGuard';
 import { TimeField } from '../forms/fields';
-import { exactJS, isRecord } from '../forms/yaml-doc';
+import { exactJS, isRecord, parseYaml, textOf } from '../forms/yaml-doc';
 import { holdsAt } from '../roles';
 import { viewFilePath } from '../contest/places';
 import { PageLink } from '@/ui/PageLink';
+import { SectionTitle } from '@/ui/SectionTitle';
+import { CardPart } from '../task/BuildCard';
 import shared from '../organise.module.css';
+import classes from './leaderboards.module.css';
 import {
-  KEY_MAX,
-  OWN_EVERYONE,
+  audienceSentence,
+  withBoardName,
   blankBoard,
   blankColumn,
   boardReadings,
@@ -75,7 +85,7 @@ function useTaskGives(
   org: string,
   contest: string,
   tasks: readonly string[],
-): TaskGives | null {
+): { values: TaskGives; titles: Record<string, string> } | null {
   const files = useQueries({
     queries: tasks.map((task) => ({
       ...$api.queryOptions(
@@ -104,7 +114,7 @@ function useTaskGives(
   ]);
   return useMemo(() => {
     if (pending) return null;
-    return Object.fromEntries(
+    const values = Object.fromEntries(
       tasks.map((task, index) => {
         const content = files[index]?.data?.content;
         const text = forms[index]?.data?.text_values;
@@ -112,6 +122,14 @@ function useTaskGives(
         return [task, givenValues(content, new Set(text))];
       }),
     );
+    const titles = Object.fromEntries(
+      tasks.map((task, index) => {
+        const parsed = parseYaml(files[index]?.data?.content ?? '');
+        const root = 'error' in parsed ? null : exactJS(parsed.doc);
+        return [task, isRecord(root) ? textOf(root['name']) || task : task];
+      }),
+    );
+    return { values, titles };
     // `stamp` is the files and the forms. Each list is a new array every render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pending, stamp, tasks]);
@@ -218,6 +236,13 @@ function dropColumn(board: BoardDraft, columnKey: string): BoardDraft {
   };
 }
 
+/** What a leaderboard's card is headed with: its name, or its key until it has one. */
+function boardTitle(board: BoardDraft): string {
+  const title = board.title.trim();
+  if (title !== '') return title;
+  return board.key === '' ? 'New leaderboard' : board.key;
+}
+
 function setWho(board: BoardDraft, who: Who): BoardDraft {
   return {
     ...board,
@@ -232,16 +257,23 @@ export function LeaderboardsForm({
   doc,
   busy,
   asking,
+  saved,
   onSave,
   refused,
 }: FormProps & { org: string; contest: string }) {
   const manager = holdsAt(useMe().roles, { kind: 'contest', org, contest }, 'manager');
   const [loaded] = useState(() => readLeaderboards(doc));
   const [draft, setDraft] = useState(loaded);
+  // Once a save of this draft went through, leaving loses nothing, even
+  // before the file is read back.
+  const [sent, setSent] = useState<typeof draft | null>(null);
+  const unsaved =
+    JSON.stringify(draft) !== JSON.stringify(loaded) && !(saved && sent === draft);
   const [now, setNow] = useState(() => Date.now());
   const [tasks] = useState(() => taskIds(doc));
   const blocks = $api.useQuery('get', '/api/v1/blocks');
-  const gives = useTaskGives(org, contest, tasks);
+  const taskData = useTaskGives(org, contest, tasks);
+  const gives = taskData?.values ?? null;
   const unread = tasks.filter((task) => gives?.[task] === null);
   // Formulas are read once the blocks and what every task gives are in.
   const catalogue = gives === null ? null : (blocks.data ?? null);
@@ -257,7 +289,6 @@ export function LeaderboardsForm({
     () => problems(draft, catalogue, tasks, gives ?? {}, now, start, end, loaded.hold),
     [catalogue, draft, end, now, gives, start, tasks, loaded.hold],
   );
-  const target = useFormulaTarget();
   useOpenedField(!loaded.legacy);
   const disabled = !manager || busy || asking;
   const save = () => {
@@ -269,6 +300,7 @@ export function LeaderboardsForm({
     )
       return;
     const next = commit(draft, catalogue, tasks, gives);
+    setSent(draft);
     onSave((file) => {
       writeLeaderboards(file, loaded, next);
       writeHold(file, loaded, next);
@@ -281,7 +313,7 @@ export function LeaderboardsForm({
           These leaderboards cannot be read, so they cannot be changed here.
         </BodyText>
         <BodyText tone="secondary">
-          An admin can fix them as text in{' '}
+          Fix them as text in{' '}
           <PageLink to={viewFilePath(org, contest)}>the stored settings</PageLink>.
         </BodyText>
       </div>
@@ -301,11 +333,6 @@ export function LeaderboardsForm({
         save();
       }}
     >
-      {!manager && (
-        <BodyText tone="secondary">
-          Only a manager of the contest can change these.
-        </BodyText>
-      )}
       {blocks.isError && <BodyText>{BLOCKS_UNLOADED}</BodyText>}
       {unread.length > 0 && (
         <BodyText tone="secondary">
@@ -326,10 +353,7 @@ export function LeaderboardsForm({
           local={local}
           refused={refused}
           disabled={disabled}
-          focused={target.place}
-          onFocus={(name, insert) => target.focus(name, insert, name)}
-          onInsert={target.insert}
-          tileTarget={target.place === null ? null : target.target}
+          titles={taskData?.titles ?? {}}
           onChange={(change) => edit(board.id, change)}
           onRemove={() =>
             setDraft((current) => ({
@@ -339,33 +363,55 @@ export function LeaderboardsForm({
           }
         />
       ))}
-      <Button
-        variant="secondary"
-        disabled={disabled}
-        onClick={() =>
-          setDraft((current) => ({
-            ...current,
-            boards: [
-              ...current.boards,
-              blankBoard(current.boards.map((board) => board.key)),
-            ],
-          }))
-        }
-      >
-        Add a leaderboard
-      </Button>
-      <HoldFields
-        hold={draft.hold}
-        end={end}
-        local={local}
-        refused={refused}
-        disabled={disabled}
-        locked={loaded.hold.locked}
-        onChange={(hold) => setDraft((current) => ({ ...current, hold }))}
-      />
-      <Button type="submit" disabled={disabled || catalogue === null} loading={busy}>
-        Save
-      </Button>
+      <div className={classes.ownWidth}>
+        {!disabled && (
+          <Button
+            variant="secondary"
+            disabled={disabled}
+            onClick={() =>
+              setDraft((current) => ({
+                ...current,
+                boards: [
+                  ...current.boards,
+                  blankBoard([
+                    ...tasks,
+                    ...current.boards.map((board) => board.key),
+                    ...current.boards.flatMap((board) =>
+                      board.columns.map((column) => column.name),
+                    ),
+                  ]),
+                ],
+              }))
+            }
+          >
+            Add a leaderboard
+          </Button>
+        )}
+      </div>
+      {/* A freeze set with no leaderboard left stays shown, so it can be turned off. */}
+      {(draft.boards.length > 0 || draft.hold.on) && (
+        <HoldFields
+          hold={draft.hold}
+          end={end}
+          local={local}
+          refused={refused}
+          disabled={disabled}
+          locked={loaded.hold.locked}
+          onChange={(hold) => setDraft((current) => ({ ...current, hold }))}
+        />
+      )}
+      {!disabled && (
+        <div className={classes.ownWidth}>
+          <Button
+            type="submit"
+            disabled={disabled || catalogue === null}
+            loading={busy}
+          >
+            Save
+          </Button>
+        </div>
+      )}
+      <LeaveGuard dirty={unsaved} what="Your changes to the leaderboards" />
     </form>
   );
 }
@@ -382,10 +428,7 @@ function BoardCard({
   local,
   refused,
   disabled,
-  focused,
-  tileTarget,
-  onFocus,
-  onInsert,
+  titles,
   onChange,
   onRemove,
 }: {
@@ -400,253 +443,381 @@ function BoardCard({
   local: readonly FieldProblem[];
   refused: readonly DefinitionError[];
   disabled: boolean;
-  focused: string | null;
-  tileTarget: string | null;
-  onFocus: (
-    name: string,
-    insert: (piece: { text: string; caret?: number }) => void,
-  ) => void;
-  onInsert: (piece: { text: string; caret?: number }) => void;
+  titles: Record<string, string>;
   onChange: (change: (board: BoardDraft) => BoardDraft) => void;
   onRemove: () => void;
 }) {
+  const [added, setAdded] = useState<string | null>(null);
   const readings =
     catalogue === null ? {} : boardReadings(board, boards, tasks, gives, catalogue);
   const texts = board.columns
     .filter((column) => readings[column.key]?.kind === 'text')
     .map((column) => column.name);
+  const others = boards.filter((other) => other.id !== board.id);
+  const otherReadings = others.map((other) => ({
+    board: other,
+    readings:
+      catalogue === null ? {} : boardReadings(other, boards, tasks, gives, catalogue),
+  }));
+  const otherKinds = otherReadings.flatMap(({ board: other, readings }) =>
+    other.columns.map((column) => ({
+      name: `${written(other.key)}.${written(column.name)}`,
+      kind: readings[column.key]?.kind,
+    })),
+  );
   const scope =
     catalogue === null
       ? null
-      : boardScope(board, boards, tasks, gives, catalogue.leaderboard_facts, texts);
+      : {
+          ...boardScope(board, boards, tasks, gives, catalogue.leaderboard_facts, [
+            ...texts,
+            ...otherKinds
+              .filter((column) => column.kind === 'text')
+              .map((column) => column.name),
+          ]),
+          picks: board.columns
+            .filter((column) => readings[column.key]?.kind === 'pick')
+            .map((column) => written(column.name))
+            .concat(
+              otherKinds
+                .filter((column) => column.kind === 'pick')
+                .map((column) => column.name),
+            ),
+        };
   const names = board.columns
     .filter((column) => column.name !== '')
     .map((column) => ({ value: column.name, label: column.name }));
+  const flowNames = new Map<string, Omit<FlowAbout, 'name'>>();
+  for (const task of tasks)
+    flowNames.set(written(task), { kind: 'task', description: titles[task] ?? task });
+  for (const column of board.columns) {
+    const node = readings[column.key]?.node;
+    flowNames.set(written(column.name), {
+      kind: 'column',
+      description:
+        node != null && scope !== null
+          ? describeFormula(node, scope)
+          : lineOf(column, catalogue),
+    });
+  }
+  for (const { board: other, readings } of otherReadings) {
+    for (const column of other.columns) {
+      const node = readings[column.key]?.node;
+      flowNames.set(`${written(other.key)}.${written(column.name)}`, {
+        kind: 'column',
+        description:
+          node != null && scope !== null
+            ? describeFormula(node, scope)
+            : lineOf(column, catalogue),
+      });
+    }
+  }
   const at = (field: string) => messagesFor(field, local, refused);
   return (
     <section
       aria-label={`Leaderboard ${board.key === '' ? 'new' : board.key}`}
       className={shared.stack}
     >
-      <FieldBox name={`${board.key}.key`}>
-        <TextInput
-          label="Key"
-          value={board.key}
-          maxLength={KEY_MAX}
-          disabled={disabled}
-          error={at(`${board.key}.key`)[0]}
-          onChange={(key) => onChange((current) => ({ ...current, key }))}
-        />
-      </FieldBox>
-      <FieldBox name={`${board.key}.title`}>
-        <TextInput
-          label="Title"
-          value={board.title}
-          disabled={disabled}
-          error={at(`${board.key}.title`)[0]}
-          onChange={(title) => onChange((current) => ({ ...current, title }))}
-        />
-      </FieldBox>
-      <FieldBox name={`${board.key}.audience.who`}>
-        <RadioGroup
-          label="Who sees it"
-          value={board.who}
-          disabled={disabled}
-          error={at(`${board.key}.audience.who`)[0]}
-          options={[
-            { value: 'staff', label: 'Staff', description: 'Entrants do not see it.' },
-            { value: 'entrants', label: 'Entrants' },
-            { value: 'everyone', label: 'Everyone' },
-          ]}
-          onChange={(who) => onChange((current) => setWho(current, who as Who))}
-        />
-      </FieldBox>
-      <FieldBox name={`${board.key}.audience.rows`}>
-        <RadioGroup
-          label="Rows"
-          value={board.rows}
-          disabled={disabled}
-          error={at(`${board.key}.audience.rows`)[0]}
-          options={[
-            { value: 'all', label: 'Every row' },
-            {
-              value: 'own',
-              label: "Each entrant's own row",
-              disabled: board.who === 'everyone',
-              reason: OWN_EVERYONE,
-            },
-            { value: 'top', label: 'The top rows' },
-          ]}
-          onChange={(rows) =>
-            onChange((current) => ({ ...current, rows: rows as RowsKind }))
-          }
-        />
-        {board.rows === 'top' && (
-          <TextInput
-            label="How many"
-            value={board.top}
-            inputMode="decimal"
+      <Card>
+        <div className={shared.stack}>
+          <div className={classes.head}>
+            <SectionTitle>{boardTitle(board)}</SectionTitle>
+            {!disabled && (
+              <Button variant="secondary" disabled={disabled} onClick={onRemove}>
+                Remove leaderboard
+              </Button>
+            )}
+          </div>
+          <div>
+            <FieldBox name={`${board.key}.key`}>
+              <FieldBox name={`${board.key}.title`}>
+                <TextInput
+                  label="Name"
+                  value={board.title}
+                  placeholder={board.key}
+                  width="lg"
+                  disabled={disabled}
+                  error={at(`${board.key}.key`)[0] ?? at(`${board.key}.title`)[0]}
+                  onChange={(title) =>
+                    onChange((current) =>
+                      withBoardName(current, title, [
+                        ...tasks,
+                        ...boards
+                          .filter((other) => other.id !== current.id)
+                          .map((other) => other.key),
+                        ...boards.flatMap((other) =>
+                          other.columns.map((column) => column.name),
+                        ),
+                      ]),
+                    )
+                  }
+                />
+              </FieldBox>
+            </FieldBox>
+            <BodyText size="sm" tone="secondary">
+              Its link and its name in other leaderboards' formulas: {board.key}
+            </BodyText>
+          </div>
+          <div className={classes.audience}>
+            <FieldBox name={`${board.key}.audience.who`}>
+              <RadioGroup
+                label="Who can see this leaderboard?"
+                value={board.who}
+                disabled={disabled}
+                error={at(`${board.key}.audience.who`)[0]}
+                options={[
+                  {
+                    value: 'staff',
+                    label: 'Organisers only',
+                    description:
+                      'Entrants never see it. Use it to check the numbers first.',
+                  },
+                  {
+                    value: 'entrants',
+                    label: 'Entrants',
+                    description: 'Everyone entered in this contest, once signed in.',
+                  },
+                  {
+                    value: 'everyone',
+                    label: 'Anyone',
+                    description:
+                      "People who are not signed in too, on the contest's public page.",
+                  },
+                ]}
+                onChange={(who) => onChange((current) => setWho(current, who as Who))}
+              />
+            </FieldBox>
+            <FieldBox name={`${board.key}.audience.rows`}>
+              <RadioGroup
+                label="How many rows do they see?"
+                value={board.rows}
+                disabled={disabled || board.who === 'staff'}
+                description={
+                  board.who === 'staff'
+                    ? 'Organisers always see every row, so this matters once entrants can see it.'
+                    : undefined
+                }
+                error={at(`${board.key}.audience.rows`)[0]}
+                options={[
+                  {
+                    value: 'all',
+                    label: 'Every row',
+                    description: "Every entrant's row, ranked.",
+                  },
+                  {
+                    value: 'own',
+                    label: 'Only their own row',
+                    description:
+                      'Each entrant sees their row and no place, like a grade.',
+                    disabled: board.who === 'everyone',
+                    reason:
+                      'Someone who is not signed in has no row. Choose Entrants to use this.',
+                  },
+                  {
+                    value: 'top',
+                    label: 'The top rows',
+                    description:
+                      'Rows tied with the last stay, and each entrant also sees their own row.',
+                    beside: (
+                      <TextInput
+                        label="How many"
+                        value={board.top}
+                        inputMode="decimal"
+                        width="xs"
+                        disabled={disabled || board.who === 'staff'}
+                        onChange={(top) => onChange((current) => ({ ...current, top }))}
+                      />
+                    ),
+                  },
+                ]}
+                onChange={(rows) =>
+                  onChange((current) => ({ ...current, rows: rows as RowsKind }))
+                }
+              />
+            </FieldBox>
+          </div>
+          <div className={classes.sentence}>
+            <BodyText>{audienceSentence(board.who, board.rows, board.top)}</BodyText>
+          </div>
+          <CardPart title="Columns">
+            {board.columns.map((column) => (
+              <ColumnFields
+                key={column.key}
+                column={column}
+                boardKey={board.key}
+                kind={readings[column.key]?.kind ?? null}
+                catalogue={catalogue}
+                scope={scope}
+                local={local}
+                refused={refused}
+                disabled={disabled}
+                names={flowNames}
+                autoFocus={added === column.key}
+                onName={(name) =>
+                  onChange((current) => renameColumn(current, column.key, name))
+                }
+                onNamed={() => onChange((current) => settleColumn(current, column.key))}
+                onLine={(line) =>
+                  onChange((current) => ({
+                    ...current,
+                    columns: current.columns.map((item) =>
+                      item.key === column.key ? { ...item, line } : item,
+                    ),
+                  }))
+                }
+                onRemove={() => onChange((current) => dropColumn(current, column.key))}
+              />
+            ))}
+            <div className={classes.ownWidth}>
+              {!disabled && (
+                <Button
+                  variant="secondary"
+                  disabled={disabled}
+                  onClick={() => {
+                    const column = blankColumn(
+                      [
+                        ...board.columns.map((column) => column.name),
+                        ...tasks,
+                        ...boards.map((other) => other.key),
+                      ],
+                      board.columns.length + 1,
+                    );
+                    setAdded(column.key);
+                    onChange((current) => ({
+                      ...current,
+                      columns: [...current.columns, column],
+                    }));
+                  }}
+                >
+                  Add a column
+                </Button>
+              )}
+            </div>
+          </CardPart>
+          <CardPart
+            title="Ranking"
+            line="Each one after the first breaks the ties the ones before it leave."
+          >
+            <FieldBox name={`${board.key}.sort`}>
+              <FieldMessages messages={at(`${board.key}.sort`)} />
+              {board.sort.map((item, index) => (
+                <SortRow
+                  key={`${item.name}:${String(index)}`}
+                  item={item}
+                  index={index}
+                  names={names.filter(
+                    (name) =>
+                      name.value === item.name ||
+                      !board.sort.some((other) => other.name === name.value),
+                  )}
+                  disabled={disabled}
+                  onChange={(sort) =>
+                    onChange((current) => ({
+                      ...current,
+                      sort: current.sort.map((entry, atIndex) =>
+                        atIndex === index ? sort : entry,
+                      ),
+                    }))
+                  }
+                  onRemove={() =>
+                    onChange((current) => ({
+                      ...current,
+                      sort: current.sort.filter((_, atIndex) => atIndex !== index),
+                    }))
+                  }
+                />
+              ))}
+              {!disabled && (
+                <Button
+                  variant="secondary"
+                  disabled={disabled || names.length === 0}
+                  onClick={() =>
+                    onChange((current) => {
+                      const next = current.columns.find(
+                        (column) =>
+                          !current.sort.some((item) => item.name === column.name),
+                      );
+                      if (next === undefined || next.name === '') return current;
+                      return {
+                        ...current,
+                        sort: [...current.sort, { name: next.name, way: 'desc' }],
+                      };
+                    })
+                  }
+                >
+                  {board.sort.length === 0 ? 'Rank by' : 'Add a tie-break'}
+                </Button>
+              )}
+            </FieldBox>
+          </CardPart>
+          <CardPart title="Shown on the leaderboard">
+            <FieldBox name={`${board.key}.display`}>
+              <FieldMessages messages={at(`${board.key}.display`)} />
+              {board.display.map((item, index) => (
+                <DisplayRow
+                  key={`${item.name}:${String(index)}`}
+                  item={item}
+                  names={names}
+                  kind={
+                    readings[
+                      board.columns.find((column) => column.name === item.name)?.key ??
+                        ''
+                    ]?.kind
+                  }
+                  disabled={disabled}
+                  onChange={(display) =>
+                    onChange((current) => ({
+                      ...current,
+                      display: current.display.map((entry, atIndex) =>
+                        atIndex === index ? display : entry,
+                      ),
+                    }))
+                  }
+                  onRemove={() =>
+                    onChange((current) => ({
+                      ...current,
+                      display: current.display.filter(
+                        (_, atIndex) => atIndex !== index,
+                      ),
+                    }))
+                  }
+                />
+              ))}
+              {!disabled && (
+                <Button
+                  variant="secondary"
+                  disabled={disabled || names.length === 0}
+                  onClick={() =>
+                    onChange((current) => {
+                      const next = current.columns.find(
+                        (column) =>
+                          !current.display.some((item) => item.name === column.name),
+                      );
+                      if (next === undefined || next.name === '') return current;
+                      return {
+                        ...current,
+                        display: [
+                          ...current.display,
+                          { name: next.name, decimals: '' },
+                        ],
+                      };
+                    })
+                  }
+                >
+                  Add a column to show
+                </Button>
+              )}
+            </FieldBox>
+          </CardPart>
+          <Preview
+            org={org}
+            contest={contest}
+            board={board}
+            entrants={entrants}
             disabled={disabled}
-            onChange={(top) => onChange((current) => ({ ...current, top }))}
           />
-        )}
-      </FieldBox>
-      {board.columns.map((column) => (
-        <ColumnFields
-          key={column.key}
-          column={column}
-          boardKey={board.key}
-          kind={readings[column.key]?.kind ?? null}
-          catalogue={catalogue}
-          scope={scope}
-          local={local}
-          refused={refused}
-          disabled={disabled}
-          focused={focused === column.key}
-          tileTarget={tileTarget}
-          onFocus={onFocus}
-          onInsert={onInsert}
-          onName={(name) =>
-            onChange((current) => renameColumn(current, column.key, name))
-          }
-          onNamed={() => onChange((current) => settleColumn(current, column.key))}
-          onLine={(line) =>
-            onChange((current) => ({
-              ...current,
-              columns: current.columns.map((item) =>
-                item.key === column.key ? { ...item, line } : item,
-              ),
-            }))
-          }
-          onRemove={() => onChange((current) => dropColumn(current, column.key))}
-        />
-      ))}
-      <Button
-        variant="secondary"
-        disabled={disabled}
-        onClick={() =>
-          onChange((current) => ({
-            ...current,
-            columns: [...current.columns, blankColumn()],
-          }))
-        }
-      >
-        Add a column
-      </Button>
-      <FieldBox name={`${board.key}.sort`}>
-        <BodyText>Sort</BodyText>
-        <BodyText tone="secondary">
-          Each column after the first breaks the ties the ones before it leave.
-        </BodyText>
-        <FieldMessages messages={at(`${board.key}.sort`)} />
-        {board.sort.map((item, index) => (
-          <SortRow
-            key={`${item.name}:${String(index)}`}
-            item={item}
-            names={names}
-            disabled={disabled}
-            onChange={(sort) =>
-              onChange((current) => ({
-                ...current,
-                sort: current.sort.map((entry, atIndex) =>
-                  atIndex === index ? sort : entry,
-                ),
-              }))
-            }
-            onRemove={() =>
-              onChange((current) => ({
-                ...current,
-                sort: current.sort.filter((_, atIndex) => atIndex !== index),
-              }))
-            }
-          />
-        ))}
-        <Button
-          variant="secondary"
-          size="xs"
-          disabled={disabled || names.length === 0}
-          onClick={() =>
-            onChange((current) => {
-              const next = current.columns.find(
-                (column) => !current.sort.some((item) => item.name === column.name),
-              );
-              if (next === undefined || next.name === '') return current;
-              return {
-                ...current,
-                sort: [...current.sort, { name: next.name, way: 'desc' }],
-              };
-            })
-          }
-        >
-          Add a sort
-        </Button>
-      </FieldBox>
-      <FieldBox name={`${board.key}.display`}>
-        <BodyText>Display</BodyText>
-        <FieldMessages messages={at(`${board.key}.display`)} />
-        {board.display.map((item, index) => (
-          <DisplayRow
-            key={`${item.name}:${String(index)}`}
-            item={item}
-            names={names}
-            kind={
-              readings[
-                board.columns.find((column) => column.name === item.name)?.key ?? ''
-              ]?.kind
-            }
-            disabled={disabled}
-            onChange={(display) =>
-              onChange((current) => ({
-                ...current,
-                display: current.display.map((entry, atIndex) =>
-                  atIndex === index ? display : entry,
-                ),
-              }))
-            }
-            onRemove={() =>
-              onChange((current) => ({
-                ...current,
-                display: current.display.filter((_, atIndex) => atIndex !== index),
-              }))
-            }
-          />
-        ))}
-        <Button
-          variant="secondary"
-          size="xs"
-          disabled={disabled || names.length === 0}
-          onClick={() =>
-            onChange((current) => {
-              const next = current.columns.find(
-                (column) => !current.display.some((item) => item.name === column.name),
-              );
-              if (next === undefined || next.name === '') return current;
-              return {
-                ...current,
-                display: [...current.display, { name: next.name, decimals: '' }],
-              };
-            })
-          }
-        >
-          Add a column to show
-        </Button>
-      </FieldBox>
-      <Preview
-        org={org}
-        contest={contest}
-        board={board}
-        entrants={entrants}
-        disabled={disabled}
-      />
-      <Button
-        variant="secondary"
-        size="xs"
-        label={`Remove ${board.key === '' ? 'leaderboard' : board.key}`}
-        disabled={disabled}
-        onClick={onRemove}
-      >
-        Remove
-      </Button>
+        </div>
+      </Card>
     </section>
   );
 }
@@ -660,10 +831,8 @@ function ColumnFields({
   local,
   refused,
   disabled,
-  focused,
-  tileTarget,
-  onFocus,
-  onInsert,
+  names,
+  autoFocus,
   onName,
   onNamed,
   onLine,
@@ -673,17 +842,12 @@ function ColumnFields({
   boardKey: string;
   kind: string | null;
   catalogue: Catalogue | null;
-  scope: ReturnType<typeof boardScope> | null;
+  scope: FormulaScope | null;
   local: readonly FieldProblem[];
   refused: readonly DefinitionError[];
   disabled: boolean;
-  focused: boolean;
-  tileTarget: string | null;
-  onFocus: (
-    name: string,
-    insert: (piece: { text: string; caret?: number }) => void,
-  ) => void;
-  onInsert: (piece: { text: string; caret?: number }) => void;
+  names: ReadonlyMap<string, Omit<FlowAbout, 'name'>>;
+  autoFocus: boolean;
   onName: (name: string) => void;
   onNamed: () => void;
   onLine: (line: string) => void;
@@ -691,57 +855,69 @@ function ColumnFields({
 }) {
   const field = columnField(boardKey, column);
   const messages = messagesFor(field, local, refused);
-  return (
-    <div data-field={field} aria-label={column.name === '' ? 'Column' : column.name}>
+  const name = column.name === '' ? 'the new column' : column.name;
+  const head = (
+    <div className={classes.head}>
       <TextInput
         label="Name"
         value={column.name}
+        width="lg"
         disabled={disabled}
-        error={messages[0]}
+        error={catalogue === null || scope === null ? messages[0] : undefined}
         onChange={onName}
         onCommit={onNamed}
       />
-      {messages.length > 1 && <FieldMessages messages={messages.slice(1)} />}
-      {catalogue !== null && scope !== null && (
-        <FormulaLine
-          label={column.name === '' ? column.key : column.name}
+      <Chip tone={messages.length > 0 ? 'warn' : 'quiet'}>
+        {lineOf(column, catalogue).trim() === ''
+          ? 'empty'
+          : messages.length > 0
+            ? 'to fix'
+            : (kind ?? 'to fix')}
+      </Chip>
+      <span className={classes.gap} />
+      {!disabled && (
+        <IconButton
+          sign="✕"
+          label={`Remove ${column.name === '' ? 'column' : column.name}`}
+          disabled={disabled}
+          onClick={onRemove}
+        />
+      )}
+    </div>
+  );
+  return (
+    <div role="group" data-field={field} aria-label={name}>
+      {catalogue === null || scope === null ? (
+        <Card>{head}</Card>
+      ) : (
+        <FormulaCard
+          disabled={disabled}
+          head={head}
+          name={name}
+          names={names}
+          label={name}
           scope={scope}
           catalogue={catalogue}
           value={lineOf(column, catalogue)}
           marks={marksFor(field, refused)}
-          onFocusLine={(insert) => onFocus(column.key, insert)}
+          trouble={messages[0]}
+          autoFocus={autoFocus}
           onChange={onLine}
         />
       )}
-      {focused && catalogue !== null && scope !== null && (
-        <FormulaTiles
-          scope={scope}
-          catalogue={catalogue}
-          target={tileTarget}
-          onInsert={onInsert}
-        />
-      )}
-      {kind === 'text' && <BodyText tone="secondary">Shown as given.</BodyText>}
-      <Button
-        variant="secondary"
-        size="xs"
-        label={`Remove ${column.name === '' ? 'column' : column.name}`}
-        disabled={disabled}
-        onClick={onRemove}
-      >
-        Remove
-      </Button>
     </div>
   );
 }
 
 function SortRow({
+  index,
   item,
   names,
   disabled,
   onChange,
   onRemove,
 }: {
+  index: number;
   item: SortDraft;
   names: { value: string; label: string }[];
   disabled: boolean;
@@ -749,9 +925,11 @@ function SortRow({
   onRemove: () => void;
 }) {
   return (
-    <div>
+    <div className={classes.row}>
+      <span>{index === 0 ? 'Rank by' : 'then'}</span>
       <Select
-        label="Column"
+        label={`Rank by, ${String(index + 1)}${index === 0 ? 'st' : index === 1 ? 'nd' : index === 2 ? 'rd' : 'th'}`}
+        width="md"
         labelHidden
         value={item.name}
         options={names}
@@ -759,15 +937,22 @@ function SortRow({
         onChange={(name) => onChange({ ...item, name })}
       />
       <Select
-        label="Order"
+        label={`Order of ${item.name}`}
+        labelHidden
+        width="sm"
         value={item.way}
         options={WAYS}
         disabled={disabled}
         onChange={(way) => onChange({ ...item, way: way === 'asc' ? 'asc' : 'desc' })}
       />
-      <Button variant="secondary" size="xs" disabled={disabled} onClick={onRemove}>
-        Remove
-      </Button>
+      {!disabled && (
+        <IconButton
+          sign="✕"
+          label={`Remove ranking ${String(index + 1)}`}
+          disabled={disabled}
+          onClick={onRemove}
+        />
+      )}
     </div>
   );
 }
@@ -788,9 +973,10 @@ function DisplayRow({
   onRemove: () => void;
 }) {
   return (
-    <div>
+    <div className={classes.row}>
       <Select
-        label="Column"
+        label={`Shown column ${item.name}`}
+        width="md"
         labelHidden
         value={item.name}
         options={names}
@@ -798,18 +984,30 @@ function DisplayRow({
         onChange={(name) => onChange({ ...item, name })}
       />
       {kind !== 'text' && kind !== 'pick' && (
-        <TextInput
-          label="Decimals"
-          value={item.decimals}
-          inputMode="decimal"
+        <>
+          <span>with</span>
+          <TextInput
+            label={`Decimals of ${item.name}`}
+            labelHidden
+            width="xs"
+            value={item.decimals}
+            inputMode="decimal"
+            disabled={disabled}
+            placeholder="As given"
+            onChange={(decimals) => onChange({ ...item, decimals })}
+          />
+          <span>decimals</span>
+        </>
+      )}
+      {kind === 'text' && <BodyText tone="secondary">shown as text</BodyText>}
+      {!disabled && (
+        <IconButton
+          sign="✕"
+          label={`Stop showing ${item.name}`}
           disabled={disabled}
-          placeholder="As given"
-          onChange={(decimals) => onChange({ ...item, decimals })}
+          onClick={onRemove}
         />
       )}
-      <Button variant="secondary" size="xs" disabled={disabled} onClick={onRemove}>
-        Remove
-      </Button>
     </div>
   );
 }
@@ -849,7 +1047,8 @@ function Preview({
   return (
     <FieldBox name={`${board.key}.preview`}>
       <Select
-        label="Preview as"
+        label="See it as"
+        width="lg"
         value={entrant}
         options={options}
         placeholder="An entrant"
@@ -944,59 +1143,75 @@ function HoldFields({
   const from = messagesFor('hold.from', local, refused);
   const until = messagesFor('hold.until', local, refused);
   return (
-    <section aria-label="Hold" className={shared.stack}>
-      <BodyText>Hold</BodyText>
-      {locked && (
-        <BodyText>The hold cannot be read. Set it again to replace it.</BodyText>
-      )}
-      <Checkbox
-        label="Hold"
-        checked={hold.on}
-        disabled={disabled}
-        description="From a time, other rows count only submissions made before it."
-        onChange={(on) => onChange({ ...hold, on })}
-      />
-      {hold.on && (
-        <>
-          <FieldBox name="hold.from">
-            <TimeField
-              label="From"
-              value={hold.from}
-              disabled={disabled}
-              onChange={(next) => onChange({ ...hold, from: next })}
-            />
-            <FieldMessages messages={from} />
-            <Button
-              variant="secondary"
-              disabled={disabled || hour === ''}
-              onClick={() => onChange({ ...hold, from: hour })}
-            >
-              An hour before the end
-            </Button>
-          </FieldBox>
-          <FieldBox name="hold.until">
-            <RadioGroup
-              label="Until"
-              value={hold.untilStaff ? 'staff' : 'time'}
-              disabled={disabled}
-              error={until[0]}
-              options={[
-                { value: 'staff', label: 'Until staff end it' },
-                { value: 'time', label: 'Until a time' },
-              ]}
-              onChange={(value) => onChange({ ...hold, untilStaff: value === 'staff' })}
-            />
-            {!hold.untilStaff && (
-              <TimeField
-                label="Until"
-                value={hold.until}
-                disabled={disabled}
-                onChange={(next) => onChange({ ...hold, until: next })}
-              />
-            )}
-          </FieldBox>
-        </>
-      )}
+    <section aria-label="Freeze">
+      <Card>
+        <div className={shared.stack}>
+          <SectionTitle>Freeze</SectionTitle>
+          <BodyText tone="secondary">
+            Keep the final results a surprise. From a time you pick, people stop seeing
+            each other's new results: every leaderboard stays as it was, with a note
+            like "3 held" for what came in since. Entrants still see their own results,
+            and organisers see everything. When the freeze ends, everything held back
+            shows up at once.
+          </BodyText>
+          {locked && (
+            <BodyText>The freeze cannot be read. Set it again to replace it.</BodyText>
+          )}
+          <Checkbox
+            label="Freeze the leaderboards near the end"
+            checked={hold.on}
+            disabled={disabled}
+            onChange={(on) => onChange({ ...hold, on })}
+          />
+          {hold.on && (
+            <>
+              <FieldBox name="hold.from">
+                <TimeField
+                  label="Freeze from"
+                  value={hold.from}
+                  width="lg"
+                  disabled={disabled}
+                  onChange={(next) => onChange({ ...hold, from: next })}
+                />
+                <FieldMessages messages={from} />
+                {!disabled && (
+                  <Button
+                    variant="secondary"
+                    disabled={disabled || hour === ''}
+                    onClick={() => onChange({ ...hold, from: hour })}
+                  >
+                    An hour before the end
+                  </Button>
+                )}
+              </FieldBox>
+              <FieldBox name="hold.until">
+                <RadioGroup
+                  label="Until"
+                  value={hold.untilStaff ? 'staff' : 'time'}
+                  disabled={disabled}
+                  error={until[0]}
+                  options={[
+                    { value: 'staff', label: 'An organiser ends it' },
+                    { value: 'time', label: 'A time' },
+                  ]}
+                  onChange={(value) =>
+                    onChange({ ...hold, untilStaff: value === 'staff' })
+                  }
+                />
+                {!hold.untilStaff && (
+                  <TimeField
+                    label="End the freeze at"
+                    value={hold.until}
+                    width="lg"
+                    disabled={disabled}
+                    onChange={(next) => onChange({ ...hold, until: next })}
+                  />
+                )}
+              </FieldBox>
+            </>
+          )}
+        </div>
+      </Card>
     </section>
   );
 }

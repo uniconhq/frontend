@@ -10,10 +10,12 @@ import { lookOf, type Verdict } from './verdicts';
  * ships with the colour: a verdict must never be carried by colour alone.
  *
  * A verdict is the outcome a run gave, or where a grading or a submission
- * stands. The six colour pairs are the handoff's, so every outcome and
- * status takes one of them: passing, failing, a limit, a build or platform
- * error, under way, and waiting or neutral. `done` and `graded` are neutral,
- * since a grading as a whole neither passes nor fails; its runs do.
+ * stands. Six colour pairs are the handoff's: passing, failing, a limit, a
+ * build or platform error, under way, and waiting or neutral. A seventh,
+ * `finished`, is for `done` and `graded`: a grading as a whole neither passes
+ * nor fails, its runs do, but one that has finished must not read as one
+ * still waiting. A delayed, cancelled or over-the-limit one takes the limit's
+ * pair, as something held it up.
  */
 
 /**

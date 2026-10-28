@@ -12,6 +12,15 @@ export type Place =
 
 export type WorkflowPlace = { kind: 'workflow'; owner: string; name: string };
 export type FilePlace = Place | WorkflowPlace;
+/** A workflow's version, whose files are listed and downloaded, never read here. */
+export type VersionPlace = {
+  kind: 'version';
+  owner: string;
+  name: string;
+  version: string;
+};
+/** A place whose files are listed. */
+export type ListedPlace = FilePlace | VersionPlace;
 
 const CONTEST_TREE = '/api/v1/orgs/{org}/contests/{contest}/tree';
 const TASK_TREE = '/api/v1/orgs/{org}/contests/{contest}/tasks/{task}/tree';
@@ -38,7 +47,40 @@ export function taskDownloadHref(
   return `/-/downloads/${[...parts, ...path.split('/')].map(encodeURIComponent).join('/')}`;
 }
 
-export function treeQuery(place: FilePlace, folder: string) {
+/**
+ * Where one of the files a workflow's version was frozen with downloads
+ * from: the same download door, which the backend opens for anyone who may
+ * read the version, at the version's own name.
+ */
+export function versionDownloadHref(place: VersionPlace, path: string): string {
+  const parts = ['workflows', place.owner, place.name, 'versions', place.version];
+  return `/-/downloads/${[...parts, ...path.split('/')].map(encodeURIComponent).join('/')}`;
+}
+
+/**
+ * Where one of the files of a workflow's draft downloads from, as last
+ * saved: the same download door, which the backend opens for anyone who may
+ * change the workflow.
+ */
+export function draftDownloadHref(place: WorkflowPlace, path: string): string {
+  const parts = ['workflows', place.owner, place.name, 'draft'];
+  return `/-/downloads/${[...parts, ...path.split('/')].map(encodeURIComponent).join('/')}`;
+}
+
+export function treeQuery(place: ListedPlace, folder: string) {
+  if (place.kind === 'version')
+    return widenQuery(
+      $api.queryOptions(
+        'get',
+        '/api/v1/workflows/{owner}/{name}/versions/{version}/tree',
+        {
+          params: {
+            path: { owner: place.owner, name: place.name, version: place.version },
+            query: { path: folder },
+          },
+        },
+      ),
+    );
   if (place.kind === 'workflow')
     return widenQuery(
       $api.queryOptions('get', '/api/v1/workflows/{owner}/{name}/tree', {

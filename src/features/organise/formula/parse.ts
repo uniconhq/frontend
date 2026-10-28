@@ -27,6 +27,10 @@ export type FormulaScope = {
   each: readonly string[];
   /** A task's groups, or a leaderboard's tasks. */
   sets: readonly string[];
+  /** The actual run names in each group, for its tile's count and explanation. */
+  members?: Readonly<Record<string, readonly string[]>>;
+  /** Names that hold a picked run or submission rather than a number. */
+  picks?: readonly string[];
   /**
    * Those of `sets` whose values cannot be read, such as a task whose
    * settings did not load: any `set.value` of one is taken unchecked, as the

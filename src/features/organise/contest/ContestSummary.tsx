@@ -4,7 +4,7 @@ import { Loaded } from '@/ui/feedback/Loaded';
 import { contestSectionPath } from '@/lib/sections';
 import { formatDateTime } from '@/lib/time';
 import { registrationSentence } from '../forms/ways';
-import { VISIBILITY_CHOICES, teamsSentence } from './words';
+import { teamsSentence } from './words';
 import { useContestSettings } from './settings';
 import classes from './contest.module.css';
 
@@ -14,9 +14,10 @@ function when(local: string): string {
 }
 
 /**
- * The contest's settings at a glance, at the top of its page: when it runs,
- * who sees it, how people enter, as one sentence, and whether in teams. The
- * card goes to the settings page, where they are changed.
+ * The contest's settings at a glance, at the top of its page: its schedule,
+ * as the settings page names it, how people enter, as one sentence, and
+ * whether in teams. The card goes to the settings page, where they are
+ * changed. Who sees the contest is on its Status card, where it is changed.
  */
 export function ContestSummary({ org, contest }: { org: string; contest: string }) {
   const view = useContestSettings(org, contest);
@@ -29,16 +30,9 @@ export function ContestSummary({ org, contest }: { org: string; contest: string 
           ) : (
             <dl className={classes.summary} aria-label="The settings">
               <div>
-                <dt>Runs</dt>
+                <dt>Schedule</dt>
                 <dd>
                   {when(values.start)} to {when(values.end)}
-                </dd>
-              </div>
-              <div>
-                <dt>Who sees it</dt>
-                <dd>
-                  {VISIBILITY_CHOICES.find((one) => one.value === values.visibility)
-                    ?.label ?? 'Not set'}
                 </dd>
               </div>
               <div>

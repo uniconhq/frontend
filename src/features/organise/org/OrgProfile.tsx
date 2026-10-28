@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { $api, queryView } from '@/api/query';
-import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
 import { SectionTitle } from '@/ui/SectionTitle';
 import { TextInput } from '@/ui/TextInput';
@@ -162,9 +161,6 @@ export function OrgProfile({ org }: { org: string }) {
             )}
           </>
         ))}
-      {view.state === 'ready' && !editing && !administers && (
-        <BodyText tone="secondary">Only an admin of the org can change these.</BodyText>
-      )}
     </div>
   );
 }

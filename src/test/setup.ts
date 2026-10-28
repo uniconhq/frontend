@@ -84,6 +84,7 @@ beforeAll(() => {
 
 afterEach(() => {
   cleanup();
+  localStorage.clear();
   server.resetHandlers();
   resetSessionExpiry();
   resetServerClock();

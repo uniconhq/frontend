@@ -30,7 +30,7 @@ import { entryPollEvery } from './entry/poll';
 import { YourEntry } from './entry/YourEntry';
 import { notIn, TASK_STANDING } from './entry/not-in';
 import { SignInButtons, SignInPrompt } from './SignInPrompt';
-import { labelOf } from './task-names';
+import { labelOf } from '@/lib/task-names';
 import { submissionHref } from './submit/submission-param';
 import { taskTimeLines } from './time-left';
 import classes from './contest.module.css';

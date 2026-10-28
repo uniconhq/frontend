@@ -83,6 +83,7 @@ export function TimeField({
   hint,
   info,
   disabled = false,
+  width,
 }: {
   label: string;
   value: string;
@@ -91,6 +92,7 @@ export function TimeField({
   hint?: string;
   info?: ReactNode;
   disabled?: boolean;
+  width?: 'lg';
 }) {
   const description =
     raw !== undefined && value === ''
@@ -105,6 +107,7 @@ export function TimeField({
       info={info}
       disabled={disabled}
       seconds={value.length > 16}
+      width={width}
     />
   );
 }

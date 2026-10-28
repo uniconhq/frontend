@@ -1,3 +1,4 @@
+import { keyFromName, withBoardName, audienceSentence, blankBoard } from './model';
 import { describe, expect, it } from 'vitest';
 import { specCatalogue } from '../formula/catalogue';
 import {
@@ -45,6 +46,7 @@ function board(over: Partial<BoardDraft> & Pick<BoardDraft, 'key'>): BoardDraft 
   return {
     id: over.key,
     title: '',
+    saved: true,
     who: 'staff',
     rows: 'all',
     top: '10',
@@ -766,4 +768,65 @@ describe('a stored column whose line does not read back to it', () => {
       found({ key: 'c', name: 'points', line: 'max(1, red)', tree: odd }).length,
     ).toBeGreaterThan(0);
   });
+});
+
+describe('one leaderboard name', () => {
+  it.each([
+    ['Course Grade-book!', 'course_grade_book'],
+    ['2026 results', 'board_2026_results'],
+    ['', 'leaderboard'],
+    ['é!@', 'leaderboard'],
+    ['and', 'and_2'],
+    ['_Results', 'board__results'],
+    ['a'.repeat(30), 'a'.repeat(24)],
+  ])('makes the key for %s', (name, key) => expect(keyFromName(name, [])).toBe(key));
+  it('avoids tasks, keys, and their written forms within the length limit', () => {
+    expect(keyFromName('Course grade', ['course-grade', 'course_grade_2'])).toBe(
+      'course_grade_3',
+    );
+    expect(keyFromName('a'.repeat(30), ['a'.repeat(24)])).toBe('a'.repeat(22) + '_2');
+  });
+  it('keeps a new name independent of a column in its own formula scope', () => {
+    const fresh = blankBoard([]);
+    const named = withBoardName(fresh, 'Points', []);
+    expect(named.title).toBe('Points');
+    expect(named.key).toBe('points_2');
+  });
+  it('keeps a saved key when its name changes', () => {
+    const fresh = blankBoard([]);
+    expect(withBoardName(fresh, 'Standings', []).key).toBe('standings');
+    expect(withBoardName({ ...fresh, saved: true }, 'Standings', []).key).toBe(
+      fresh.key,
+    );
+  });
+  it.each([
+    ['staff', 'all', 'Only organisers see this leaderboard, every row of it.'],
+    [
+      'entrants',
+      'all',
+      'Entrants see every row, ranked. Organisers always see every row.',
+    ],
+    [
+      'entrants',
+      'own',
+      'Each entrant sees only their own row, with no place. Organisers always see every row, ranked.',
+    ],
+    [
+      'entrants',
+      'top',
+      'Entrants see the top 10 rows, and their own row when it is lower. Organisers always see every row.',
+    ],
+    [
+      'everyone',
+      'all',
+      'Anyone, signed in or not, sees every row, ranked. Organisers always see every row.',
+    ],
+    [
+      'everyone',
+      'top',
+      'Anyone sees the top 10 rows; a signed-in entrant also sees their own row when it is lower. Organisers always see every row.',
+    ],
+  ] as const)('explains %s / %s', (who, rows, line) =>
+    expect(audienceSentence(who, rows, '10')).toBe(line),
+  );
 });

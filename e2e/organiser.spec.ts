@@ -1,3 +1,4 @@
+import { specCatalogue } from '../src/features/organise/formula/catalogue';
 import { expect, test, type Page, type Route } from '@playwright/test';
 import type { components } from '../src/api/schema';
 
@@ -80,6 +81,16 @@ async function stubOrganiserApi(page: Page) {
   );
   await page.route('**/api/v1/workflows/unicon/classic/versions/v3', (route) =>
     json(route, { content: CLASSIC }),
+  );
+  await page.route('**/api/v1/blocks', (route) => json(route, specCatalogue()));
+  await page.route('**/api/v1/workflows/unicon/classic/versions/v3/box', (route) =>
+    json(route, {
+      run: true,
+      newer_version: null,
+      description: null,
+      inputs: [],
+      outputs: [],
+    } satisfies Schemas['WorkflowBox']),
   );
   await page.route('**/api/v1/primitives', (route) => json(route, []));
   await page.route('**/api/v1/me', (route) =>
@@ -493,7 +504,7 @@ test('an organiser sets a task up on its cards and saves them in one save', asyn
   await expect(limit).toHaveValue('2');
   await limit.fill('3');
   await expect(page.getByRole('region', { name: 'Runs' })).toContainText(
-    'This makes 1 run.',
+    'A submission runs once, since nothing changes from run to run.',
   );
 
   const bar = page.getByRole('region', { name: 'Save the task' });
@@ -529,7 +540,9 @@ test('an organiser follows the failed gradings from the contest page', async ({
   await expect(
     page.getByRole('checkbox', { name: 'Latest attempts only' }),
   ).toBeChecked();
-  await expect(page.getByLabel('Queue')).toContainText('Failed2');
+  await expect(page.getByRole('group', { name: 'Failed gradings' })).toContainText(
+    '2 gradings failed on Unicon’s side.',
+  );
   await expect(page.getByText('No grading matches these filters.')).toBeVisible();
   expect(state.feedAsked).toContain('status=system_error&latest=true');
 });
@@ -543,6 +556,450 @@ test('an organiser reads how many submissions a task takes', async ({ page }) =>
   await expect(
     submissions.getByRole('textbox', { name: 'Most submissions' }),
   ).toHaveValue('');
-  await expect(submissions).toContainText('at most 50 submissions');
-  await expect(submissions).toContainText('at most 1 in any 30 seconds');
+  await expect(submissions).toContainText(
+    'How many times each entrant may submit, and how often.',
+  );
+  await expect(
+    submissions.getByRole('textbox', { name: 'Most submissions' }),
+  ).toHaveAttribute('placeholder', '50');
+});
+
+test('an organiser ticks the named runs of a group and keeps its shown setting on rename', async ({
+  page,
+}) => {
+  const state = await stubOrganiserApi(page);
+  state.orgMade = true;
+  state.taskYaml += `repeat:
+  - inputs: [input]
+    tuples:
+      - {title: Sample 1, input: samples/1.in}
+      - {input: small/1.in}
+scoring:
+  groups:
+    samples: {input: samples/1.in}
+  show:
+    now: [samples]
+`;
+  await page.goto('/orgs/acme/contests/spring/tasks/sum');
+  const groups = page.getByRole('table', { name: 'Groups', exact: true });
+  await groups
+    .getByRole('checkbox', { name: 'small/1.in in samples', exact: true })
+    .check();
+  await expect(
+    groups.getByRole('checkbox', { name: 'Sample 1 in samples', exact: true }),
+  ).toBeChecked();
+  await groups
+    .getByRole('textbox', { name: 'Name of samples', exact: true })
+    .fill('tests');
+  await groups
+    .getByRole('textbox', { name: 'Name of tests', exact: true })
+    .press('Tab');
+  await expect(
+    groups.getByRole('combobox', { name: 'When tests is shown', exact: true }),
+  ).toHaveValue('now');
+});
+
+test('the result flow goes to a value’s only formula and reads its shown setting', async ({
+  page,
+}) => {
+  const state = await stubOrganiserApi(page);
+  state.orgMade = true;
+  state.taskYaml += `repeat:
+  - inputs: [input]
+    tuples: [{input: sample.in}]
+scoring:
+  groups: {samples: {input: sample.in}}
+  values: {points: 1}
+`;
+  await page.goto('/orgs/acme/contests/spring/tasks/sum');
+  const result = page.getByRole('list', { name: 'Result', exact: true });
+  await expect(result.getByText('points', { exact: true })).toBeVisible();
+  await expect(result.getByText('samples', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'points number', exact: true }).click();
+  await expect(
+    page.getByRole('textbox', { name: 'points', exact: true }),
+  ).toBeFocused();
+  await expect(page.getByRole('textbox', { name: 'points', exact: true })).toHaveCount(
+    1,
+  );
+  const card = page.getByRole('group', { name: 'Value points', exact: true });
+  await card
+    .getByRole('combobox', { name: 'Shown to entrants', exact: true })
+    .selectOption('after_close');
+  await expect(
+    result.getByRole('listitem').filter({ hasText: /^points/ }),
+  ).toContainText('After the close');
+  await expect(page.locator('[data-show-part="points"]')).toHaveCount(1);
+  await page.getByRole('button', { name: 'samples group', exact: true }).click();
+  await expect(page.locator('[id="group-samples"]')).toHaveAttribute(
+    'data-marked',
+    'true',
+  );
+});
+
+test('the Runs card pairs files, lines up its cells, and gives a cell to the entrant through its menu', async ({
+  page,
+}) => {
+  const state = await stubOrganiserApi(page);
+  state.orgMade = true;
+  state.taskYaml += 'repeat:\n  - inputs: [input, answer]\n    tuples: []\n';
+  await page.route(
+    '**/api/v1/orgs/acme/contests/spring/tasks/sum/files/runs*',
+    (route) =>
+      route.fulfill({
+        status: 404,
+        contentType: 'application/problem+json',
+        body: JSON.stringify({
+          type: 'about:blank',
+          title: 'Not found',
+          status: 404,
+          detail: 'not_found',
+          code: 'not_found',
+        }),
+      }),
+  );
+  await page.route(
+    '**/api/v1/orgs/acme/contests/spring/tasks/sum/workflow-form',
+    (route) =>
+      route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({
+          workflow: 'unicon/classic@v3',
+          newer: null,
+          problem: null,
+          graded: false,
+          text_values: [],
+          inputs: ['input', 'answer'].map((id) => ({
+            id,
+            type: 'file',
+            title: id,
+            help: null,
+            unit: null,
+            options: null,
+            optional: false,
+          })),
+        }),
+      }),
+  );
+  await page.route('**/api/v1/workflows/unicon/classic/versions/v3', (route) =>
+    route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({
+        content: CLASSIC.replace(
+          'inputs:\n',
+          'inputs:\n  input: file\n  answer: file\n',
+        ),
+      }),
+    }),
+  );
+  await page.goto('/orgs/acme/contests/spring/tasks/sum');
+  const runs = page.getByRole('region', { name: 'Runs', exact: true });
+  await runs.getByLabel('Add files', { exact: true }).setInputFiles([
+    { name: '1.in', mimeType: 'text/plain', buffer: Buffer.from('1') },
+    { name: '1.ans', mimeType: 'text/plain', buffer: Buffer.from('2') },
+  ]);
+  await runs.getByRole('button', { name: 'Add these', exact: true }).click();
+  await expect(runs.getByText('New', { exact: true })).toHaveCount(2);
+  const cells = await runs
+    .getByRole('table', { name: 'Runs', exact: true })
+    .locator('tbody tr')
+    .first()
+    .locator('td')
+    .evaluateAll((cells: { getBoundingClientRect: () => { height: number } }[]) =>
+      cells.map((cell) => cell.getBoundingClientRect().height),
+    );
+  expect(Math.max(...cells) - Math.min(...cells)).toBeLessThan(1);
+  expect(Math.max(...cells)).toBeLessThanOrEqual(45);
+  await runs
+    .getByRole('button', { name: 'Actions for row 1 answer', exact: true })
+    .click();
+  await page
+    .getByRole('menuitem', { name: 'The entrant gives this one', exact: true })
+    .click();
+  await expect(
+    runs.getByText('The entrant gives it · up to 10 MB', { exact: true }),
+  ).toBeVisible();
+});
+
+test('an old queue bookmark opens Marking and keeps its query', async ({ page }) => {
+  const state = await stubOrganiserApi(page);
+  state.orgMade = true;
+  await page.route(
+    '**/api/v1/orgs/acme/contests/spring/tasks/sum/organise/queue',
+    (route) => route.fulfill({ json: [] }),
+  );
+  await page.goto('/orgs/acme/contests/spring/tasks/sum/queue?unmarked=true');
+  await expect(page).toHaveURL(/\/marking\?unmarked=true$/);
+  await expect(
+    page.getByRole('heading', { name: 'Marking', exact: true }),
+  ).toBeVisible();
+  await expect(page.getByText('Nothing is waiting for a mark.')).toBeVisible();
+});
+
+test('a new workflow asks only for its owner and name and opens an empty draft', async ({
+  page,
+}) => {
+  await stubOrganiserApi(page);
+  const message = 'A workflow needs at least one step. Add one from the tray.';
+  let made: unknown = null;
+  await page.route('**/api/v1/workflows', async (route) => {
+    if (route.request().method() === 'POST') {
+      made = route.request().postDataJSON();
+      return route.fulfill({ status: 201, json: { owner: 'kenny', name: 'empty' } });
+    }
+    return route.fulfill({ json: [] });
+  });
+  await page.route('**/api/v1/workflows/kenny/empty', (route) =>
+    route.fulfill({
+      json: {
+        owner: 'kenny',
+        name: 'empty',
+        visibility: 'private',
+        versions: [],
+        editable: true,
+        readers: [],
+        draft: { content: 'steps: []\n', token: 'empty-token', revision: 'empty-head' },
+      },
+    }),
+  );
+  await page.route('**/api/v1/workflows/kenny/empty/tree**', (route) =>
+    route.fulfill({ json: [] }),
+  );
+  await page.route('**/api/v1/workflows/check', (route) =>
+    route.fulfill({ json: { problems: [{ path: 'steps', message }] } }),
+  );
+  await page.goto('/workflows');
+  await page.getByRole('button', { name: 'New workflow', exact: true }).click();
+  const form = page.getByRole('form', { name: 'New workflow' });
+  await expect(form.getByRole('combobox')).toHaveCount(1);
+  await expect(form.getByRole('textbox')).toHaveCount(1);
+  await expect(form.getByRole('radio')).toHaveCount(0);
+  await form.getByRole('textbox', { name: /Name/ }).fill('empty');
+  await form.getByRole('button', { name: 'Create workflow' }).click();
+  await expect(page).toHaveURL(/\/workflows\/kenny\/empty$/);
+  await expect(page.getByText(message, { exact: false })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Add to the workflow' })).toBeVisible();
+  await expect(page.getByRole('group', { name: /^Step / })).toHaveCount(0);
+  expect(made).toEqual({ owner: 'kenny', name: 'empty' });
+});
+
+test('long run paths and report titles stay within the page and their Result rows', async ({
+  page,
+}) => {
+  const state = await stubOrganiserApi(page);
+  state.orgMade = true;
+  const path = `tests/${'z'.repeat(240)}/1.in`;
+  state.taskYaml = `name: Islands\nworkflow: unicon/classic@v3\nrepeat:\n  - inputs: [input]\n    tuples: [{input: ${path}}]\nscoring:\n  groups: {samples: {input: ${path}}}\n`;
+  const outputs = Array.from({ length: 12 }, (_, index) => ({
+    name: `out_${index}`,
+    title: `Detailed report number ${index} from the program being tested`,
+    type: 'number',
+    unit: 'seconds',
+    better: null,
+    at_least: null,
+    at_most: null,
+  }));
+  await page.route(
+    '**/api/v1/orgs/acme/contests/spring/tasks/sum/workflow-form',
+    (route) =>
+      route.fulfill({
+        json: {
+          workflow: 'unicon/classic@v3',
+          newer: null,
+          problem: null,
+          graded: false,
+          text_values: [],
+          inputs: [
+            {
+              id: 'input',
+              type: 'file',
+              title: 'Input',
+              help: null,
+              unit: null,
+              options: null,
+              optional: false,
+            },
+          ],
+        },
+      }),
+  );
+  await page.route('**/api/v1/workflows/unicon/classic/versions/v3', (route) =>
+    route.fulfill({
+      json: {
+        content:
+          'inputs: {input: file}\nsteps: []\noutputs:\n' +
+          outputs
+            .map(
+              (output) =>
+                `  ${output.name}: {from: 1, title: ${output.title}, unit: seconds}`,
+            )
+            .join('\n'),
+      },
+    }),
+  );
+  await page.route('**/api/v1/workflows/unicon/classic/versions/v3/box', (route) =>
+    route.fulfill({
+      json: { run: true, inputs: [], outputs, newer_version: null, description: null },
+    }),
+  );
+  await page.setViewportSize({ width: 760, height: 1000 });
+  await page.goto('/orgs/acme/contests/spring/tasks/sum');
+  await expect(
+    page.getByRole('table', { name: 'What one submission gives' }),
+  ).toBeVisible();
+  expect(
+    await page
+      .locator('html')
+      .evaluate((el: { scrollWidth: number }) => el.scrollWidth),
+  ).toBeLessThanOrEqual(760);
+  const result = page.getByRole('list', { name: 'Result', exact: true });
+  const detail = result.locator('[class*="resultParts"]').first();
+  await expect(detail).toBeVisible();
+  const sizes = await detail.evaluate(
+    (el: {
+      getBoundingClientRect: () => { bottom: number };
+      parentElement: { getBoundingClientRect: () => { bottom: number } } | null;
+    }) => ({
+      detail: el.getBoundingClientRect().bottom,
+      row: el.parentElement?.getBoundingClientRect().bottom ?? 0,
+    }),
+  );
+  expect(sizes.detail).toBeLessThanOrEqual(sizes.row);
+  await detail.focus();
+  await detail.press('Space');
+  await expect
+    .poll(() => detail.evaluate((element: { scrollTop: number }) => element.scrollTop))
+    .toBeGreaterThan(0);
+});
+
+test('Islands explains formula shapes and inserts a tile without offering its own value', async ({
+  page,
+}) => {
+  const state = await stubOrganiserApi(page);
+  state.orgMade = true;
+  state.taskYaml =
+    state.taskYaml.replace('name: Sum', 'name: Islands') +
+    `repeat:
+  - inputs: [input]
+    tuples:
+      - {input: small/1.in}
+      - {input: small/2.in}
+      - {input: small/3.in}
+scoring:
+  groups: {small: {input: [small/1.in, small/2.in, small/3.in]}}
+  values: {points: 1}
+`;
+  await page.route('**/api/v1/workflows/unicon/classic/versions/v3', (route) =>
+    route.fulfill({
+      json: { content: CLASSIC + 'outputs: {score: 1, time_ms: 1}\n' },
+    }),
+  );
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto('/orgs/acme/contests/spring/tasks/sum');
+  const card = page.getByRole('group', { name: 'Value points', exact: true });
+  const line = card.getByRole('textbox', { name: 'points', exact: true });
+  await line.click();
+  await expect(
+    card.getByRole('button', { name: 'points one number', exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    card.getByRole('button', { name: 'small a group · 3 runs', exact: true }),
+  ).toBeVisible();
+  await line.press('Home');
+  const tile = card.getByRole('button', {
+    name: 'sum(…) numbers → one number',
+    exact: true,
+  });
+  await tile.hover();
+  const help = page.getByRole('tooltip');
+  await expect(help).toContainText('sum(small.score)');
+  await expect(help).toContainText("a column summed over a group's runs");
+  await expect(help).toContainText('Takes');
+  await expect(help).toContainText('Gives');
+  const bounds = await help.boundingBox();
+  const lineBounds = await line.boundingBox();
+  expect(bounds!.y).toBeGreaterThanOrEqual(lineBounds!.y + lineBounds!.height);
+  await expect(line).toBeFocused();
+  await line.press('Escape');
+  await expect(help).toHaveCount(0);
+  await line.hover();
+  await tile.hover();
+  await expect(help).toBeVisible();
+  for (const text of await card.locator('[class*="paletteItem"]').all()) {
+    expect(
+      await text.evaluate(
+        (element: { scrollWidth: number; clientWidth: number }) =>
+          element.scrollWidth <= element.clientWidth,
+      ),
+    ).toBe(true);
+  }
+  await tile.focus();
+  await expect(help).toBeVisible();
+  await expect(tile).toBeFocused();
+  await tile.press('Escape');
+  await expect(help).toHaveCount(0);
+  await tile.click();
+  await expect(line).toHaveText('sum()1');
+  await line.fill('');
+  await expect(card.getByText('empty', { exact: true })).toBeVisible();
+  await card.getByRole('button', { name: 'Total score sum(all.score)' }).click();
+  await expect(line).toHaveText('sum(all.score)');
+  await page.setViewportSize({ width: 1440, height: 420 });
+  const min = card.getByRole('button', {
+    name: 'min(…) numbers → one number',
+    exact: true,
+  });
+  await min.scrollIntoViewIfNeeded();
+  await min.evaluate(
+    (element: {
+      getBoundingClientRect: () => { bottom: number };
+      ownerDocument: {
+        defaultView: {
+          innerHeight: number;
+          scrollBy: (x: number, y: number) => void;
+        } | null;
+      };
+    }) => {
+      const view = element.ownerDocument.defaultView;
+      if (view !== null)
+        view.scrollBy(
+          0,
+          element.getBoundingClientRect().bottom - view.innerHeight + 12,
+        );
+    },
+  );
+  await min.hover();
+  await expect(help).toBeVisible();
+  expect((await help.boundingBox())!.height).toBeGreaterThan(200);
+  await min.focus();
+  await min.press('PageDown');
+  expect(
+    await help.evaluate((element: { scrollTop: number }) => element.scrollTop),
+  ).toBeGreaterThan(0);
+  await expect(min).toBeFocused();
+});
+
+test.describe('a formula tray on a touch screen', () => {
+  test.use({ hasTouch: true });
+  test('the information button explains a tile and the tile inserts once', async ({
+    page,
+  }) => {
+    const state = await stubOrganiserApi(page);
+    state.orgMade = true;
+    state.taskYaml += 'scoring: {values: {points: 1}}\n';
+    await page.setViewportSize({ width: 760, height: 1000 });
+    await page.goto('/orgs/acme/contests/spring/tasks/sum');
+    const card = page.getByRole('group', { name: 'Value points', exact: true });
+    const line = card.getByRole('textbox', { name: 'points', exact: true });
+    await line.tap();
+    const about = card.getByRole('button', { name: 'About sum(…)', exact: true });
+    await expect(about).toBeVisible();
+    await about.tap();
+    await expect(page.getByRole('tooltip')).toContainText('Takes');
+    await expect(line).toHaveText('1');
+    await card
+      .getByRole('button', { name: 'sum(…) numbers → one number', exact: true })
+      .tap();
+    await expect(line).toHaveText('1sum()');
+  });
 });

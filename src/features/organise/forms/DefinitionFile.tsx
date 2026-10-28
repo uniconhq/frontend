@@ -29,6 +29,11 @@ export type FormProps = {
    * file as it was asked about, so the form holds it until answered.
    */
   asking: boolean;
+  /**
+   * Whether the last save went through, so what it sent is saved even while
+   * the file is read back: a form's guard on leaving lets go of it then.
+   */
+  saved: boolean;
   /** Apply the form's changes to a fresh copy of the document and save it. */
   onSave: (change: (doc: Doc) => void) => void;
   refused: DefinitionError[];
@@ -152,7 +157,7 @@ export function DefinitionForm({
           </BodyText>
           <BodyText tone="secondary">{read.error}</BodyText>
           <BodyText tone="secondary">
-            An admin can fix them as text in{' '}
+            Fix them as text in{' '}
             <PageLink to={mendAt(place)}>the stored settings</PageLink>.
           </BodyText>
         </div>
@@ -161,6 +166,7 @@ export function DefinitionForm({
           {children({
             doc: read.doc,
             busy,
+            saved: outcome !== null && outcome.kind !== 'refused',
             asking:
               outcome?.kind === 'refused' &&
               outcome.error.code === 'confirmation_required',
@@ -180,7 +186,11 @@ export function DefinitionForm({
       {outcome !== null && (
         <SaveOutcome
           outcome={outcome}
-          placeOf={placeOf}
+          placeOf={
+            placeOf === undefined || outcome.kind !== 'refused'
+              ? placeOf
+              : (where, message) => placeOf(where, message, outcome.body.content)
+          }
           bare={bare}
           onConfirm={(body, asked) =>
             void send(file, { ...body, confirm: true, asked })
