@@ -86,7 +86,11 @@
   }
 }
 
-/* The time left on a task, at the top of its page. */
+/*
+ * The time left on a task, at the top of its page: a line under the title in
+ * the body font, its digits each as wide so the count does not shift as it
+ * ticks.
+ */
 .timeLeft {
   display: flex;
   flex-wrap: wrap;
@@ -95,9 +99,8 @@
 }
 
 .timeLine {
-  font-family: var(--mantine-font-family-monospace);
-  font-size: 18px;
-  font-weight: 600;
+  font-size: var(--mantine-font-size-lg);
+  font-weight: 500;
   color: var(--unicon-text-body);
   font-variant-numeric: tabular-nums;
 }

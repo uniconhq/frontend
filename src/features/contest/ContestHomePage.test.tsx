@@ -42,7 +42,8 @@ describe('the contest page for a signed-in person', () => {
       '/contests/acme/spring/tasks/sum',
     );
     const trail = screen.getByRole('navigation', { name: 'Breadcrumb' });
-    expect(within(trail).getByRole('link', { name: 'spring' })).toHaveAttribute(
+    // The trail calls the contest by the name its home gave, not its address.
+    expect(within(trail).getByRole('link', { name: 'Spring 2026' })).toHaveAttribute(
       'href',
       PAGE,
     );

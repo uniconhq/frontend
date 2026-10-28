@@ -21,7 +21,7 @@ import { BySession } from './BySession';
 import { SignInPrompt } from './SignInPrompt';
 import { TaskCountdown } from './TaskCountdown';
 import { TaskSubmissions } from './submit/TaskSubmissions';
-import { headingOf } from './task-names';
+import { headingOf } from '@/lib/task-names';
 import classes from './contest.module.css';
 
 /** How often the page is read again, so a release or an extension reaches it. */

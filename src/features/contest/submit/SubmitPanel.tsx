@@ -1,4 +1,5 @@
 import { useEffect, useRef, type FormEvent, type ReactNode } from 'react';
+import { describeError } from '@/api/describe-error';
 import type { ApiError } from '@/api/problem';
 import type { InputField } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
@@ -8,7 +9,6 @@ import { FileDrop } from '@/ui/FileDrop';
 import { Select } from '@/ui/Select';
 import { TextInput } from '@/ui/TextInput';
 import { Textarea } from '@/ui/Textarea';
-import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { formatLimit } from '@/lib/size';
 import { partTitle, partsOf } from '@/lib/submitted';
 import {
@@ -31,15 +31,17 @@ export type Notice = { kind: 'submitted'; number: number };
 /**
  * A panel that takes the focus as it appears, so the answer to the person's
  * own click is what a keyboard or a screen reader lands on: `status` for an
- * answer, `alert` for a refusal.
+ * answer, `alert` for a refusal, which is edged in the danger colour so it
+ * never reads like a submission made.
  */
 function Said({ role, children }: { role: 'status' | 'alert'; children: ReactNode }) {
   const panel = useRef<HTMLDivElement>(null);
   useEffect(() => {
     panel.current?.focus();
   }, []);
+  const look = role === 'alert' ? `${shared.panel} ${classes.refused}` : shared.panel;
   return (
-    <div ref={panel} className={shared.panel} role={role} tabIndex={-1}>
+    <div ref={panel} className={look} role={role} tabIndex={-1}>
       {children}
     </div>
   );
@@ -68,9 +70,11 @@ function Refusal({ error, inputs }: { error: ApiError; inputs: InputField[] }) {
   const labelOf = (id: string) => inputs.find((input) => input.id === id)?.label ?? id;
   const problems = error.code === 'invalid_inputs' ? problemsOf(error) : [];
   const input = error.extensions['input'];
+  const { title, message } = describeError(error);
   return (
     <Said role="alert">
-      <ErrorBlock error={error} compact />
+      <p className={classes.refusedTitle}>{title}</p>
+      <BodyText>{message}</BodyText>
       {problems.length > 0 && (
         <ul className={classes.problems}>
           {problems.map((problem) => (
