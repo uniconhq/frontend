@@ -68,6 +68,8 @@ describe("a contest's stored settings, on its Settings page (M43)", () => {
     expect(
       within(part).getByRole('link', { name: 'How people enter' }),
     ).toHaveAttribute('href', '/orgs/acme/contests/spring/entry');
+    expect(within(part).queryByRole('link', { name: 'Settings' })).toBeNull();
+    expect(part).toHaveTextContent('and the rest in the form above.');
     await user.click(within(part).getByRole('button', { name: 'Every change' }));
     const changes = await within(part).findByRole('list', {
       name: 'Changes to the settings',
@@ -181,6 +183,16 @@ describe("a task's files, each on its own form (M51)", () => {
     expect(
       within(screen.getByRole('main')).getByRole('link', { name: 'Inputs' }),
     ).toHaveAttribute('href', '/orgs/acme/contests/spring/tasks/sum?card=inputs');
+    // Every card that writes the settings, and none that links to this page.
+    const part = await stored();
+    expect(
+      within(part)
+        .getAllByRole('link')
+        .map((link) => link.textContent),
+    ).toEqual(['Workflow', 'Inputs', 'Runs', 'Scoring', 'Checks', 'Submissions']);
+    expect(part).toHaveTextContent(
+      'Workflow, Inputs, Runs, Scoring, Checks and Submissions cards, and its title in the form above.',
+    );
   });
 });
 
@@ -538,7 +550,7 @@ describe('mending settings that do not read', () => {
     renderApp(TASK_SETTINGS);
 
     expect(
-      await screen.findByText('An admin of the task can fix them as text.'),
+      await screen.findByText('See who can on the organisers page.'),
     ).toBeVisible();
     expect(
       screen.getByRole('textbox', { name: 'The task’s settings' }),

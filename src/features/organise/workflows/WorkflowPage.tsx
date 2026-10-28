@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router';
 import { $api, queryView } from '@/api/query';
@@ -21,11 +21,9 @@ import { WorkflowBar } from './Bar';
 import { checkQuery } from './check';
 import { Editor } from './Editor';
 import { FileView } from './FileView';
-import type { Box } from './layout';
-import { DrawnGraph } from './DrawnGraph';
-import { linesOf, type Selected } from './lines';
-import { NewWorkflowButton } from './NewWorkflow';
+import { linesOf } from './lines';
 import { ShareButton } from './SharePanel';
+import { VersionGraph } from './VersionGraph';
 import { latestVersion } from './versions';
 import { visibilityWords } from './words';
 import classes from './workflows.module.css';
@@ -56,7 +54,9 @@ export function WorkflowPage() {
         meta={
           page.state === 'ready' ? (
             <>
-              <Chip>{visibilityWords(page.data)}</Chip>
+              <Chip tone={page.data.visibility === 'public' ? 'live' : 'quiet'}>
+                {visibilityWords(page.data)}
+              </Chip>
               <BodyText size="sm" tone="secondary">
                 {page.data.versions.length === 0
                   ? 'No version yet'
@@ -234,39 +234,27 @@ function Drawn({
   text: string;
   primitives: Primitive[];
 }) {
-  const [selected, setSelected] = useState<string | null>(null);
-  const [box, setBox] = useState<Box | undefined>(undefined);
-  const lines: Selected | null =
-    box === undefined
-      ? null
-      : box.kind === 'step' && box.step !== null
-        ? { kind: 'step', index: box.step }
-        : box.kind === 'inputs'
-          ? { kind: 'inputs', ids: box.right }
-          : { kind: 'outputs' };
-  const ref = `${page.owner}/${page.name}@${version}`;
   return (
-    <>
-      <WorkflowBar page={page} version={version}>
-        <NewWorkflowButton source={ref} label="Copy into a new workflow" />
-        {page.editable && <ShareButton page={page} />}
-        <FileView
-          title={`The file of ${version}`}
-          label={`The file of ${version}`}
-          text={text}
-          marked={linesOf(text, lines)}
-        />
-      </WorkflowBar>
-      <SectionTitle>{ref}</SectionTitle>
-      <DrawnGraph
-        text={text}
-        primitives={primitives}
-        selected={selected}
-        onSelect={(key, found) => {
-          setSelected(key);
-          setBox(found);
-        }}
-      />
-    </>
+    <VersionGraph
+      owner={page.owner}
+      name={page.name}
+      version={version}
+      text={text}
+      primitives={primitives}
+      bar={(tools, selected) => (
+        <>
+          <WorkflowBar page={page} version={version} tools={tools}>
+            {page.editable && <ShareButton page={page} />}
+            <FileView
+              title={`The YAML of ${version}`}
+              label={`The YAML of ${version}`}
+              text={text}
+              marked={linesOf(text, selected)}
+            />
+          </WorkflowBar>
+          <SectionTitle>{`${page.owner}/${page.name}@${version}`}</SectionTitle>
+        </>
+      )}
+    />
   );
 }

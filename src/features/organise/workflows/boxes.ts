@@ -1,9 +1,10 @@
 import { useMemo } from 'react';
-import { useQueries } from '@tanstack/react-query';
+import { useIsFetching, useQueries } from '@tanstack/react-query';
 import { apiClient } from '@/api/client';
 import { $api } from '@/api/query';
-import type { WorkflowBox } from '@/api/types';
+import type { Visibility, WorkflowBox } from '@/api/types';
 import { exactJS, parseYaml } from '../forms/yaml-doc';
+import type { StepPorts } from './layout';
 import { readWorkflow, type Workflow } from './model';
 import type { PrimitiveInfo } from './primitives';
 
@@ -18,11 +19,15 @@ export type BoxDecl = {
   outputs: { name: string; type: string | null }[];
 };
 
-/** Where Open has gone: a workflow, the step that opened it, and the steps still inside. */
-export type Frame = { use: UseRef; title: string; rest: string[] };
+/**
+ * Where Open has gone: a workflow, the step that opened it, the steps of a
+ * problem's path still inside it, and the box to show selected there, by
+ * its key, when Inside goes back up to it.
+ */
+export type Frame = { use: UseRef; title: string; rest: string[]; mark: string | null };
 
-/** A run workflow the Add step menu can place, at one version. */
-export type PaletteWorkflow = UseRef;
+/** A run workflow the tray can place, at one version, with who reads it. */
+export type PaletteWorkflow = UseRef & { visibility: Visibility };
 
 export function formatUse(use: UseRef): string {
   return `${use.owner}/${use.name}@${use.version}`;
@@ -50,7 +55,7 @@ function declOf(box: WorkflowBox): BoxDecl {
   };
 }
 
-function boxOptions(use: UseRef) {
+export function boxOptions(use: UseRef) {
   return $api.queryOptions(
     'get',
     '/api/v1/workflows/{owner}/{name}/versions/{version}/box',
@@ -92,9 +97,50 @@ export function useBoxes(refs: readonly UseRef[]): Map<string, BoxDecl> {
   }, [refs, stamp]);
 }
 
-function workflowFrom(content: string): Workflow {
+/** The ports of each run workflow's box, as the layout draws them. */
+export function portsOf(boxes: ReadonlyMap<string, BoxDecl>): Map<string, StepPorts> {
+  const found = new Map<string, StepPorts>();
+  for (const [use, box] of boxes)
+    found.set(use, {
+      inputs: box.inputs.map((input) => input.name),
+      outputs: box.outputs.map((output) => output.name),
+    });
+  return found;
+}
+
+/**
+ * Whether any workflow's box is being read for the first time: one read
+ * again in the background, as on the window's focus, already has its answer.
+ */
+export function useReadingBoxes(): boolean {
+  return (
+    useIsFetching({
+      queryKey: ['get', '/api/v1/workflows/{owner}/{name}/versions/{version}/box'],
+      predicate: (query) => query.state.data === undefined,
+    }) > 0
+  );
+}
+
+/** A version's file read as a workflow, forgiving one with problems. */
+export function workflowFrom(content: string): Workflow {
   const parsed = parseYaml(content);
   return readWorkflow('error' in parsed ? null : exactJS(parsed.doc));
+}
+
+/** The boxes of the run workflows a workflow's steps use, as they are read. */
+export function useStepBoxes(
+  workflow: Workflow | null,
+  primitives: Map<string, PrimitiveInfo>,
+): Map<string, BoxDecl> {
+  const uses = useMemo(
+    () =>
+      (workflow?.steps ?? []).flatMap((step) => {
+        const parsed = primitives.has(step.use) ? null : parseUse(step.use);
+        return parsed === null ? [] : [parsed];
+      }),
+    [workflow, primitives],
+  );
+  return useBoxes(uses);
 }
 
 /**
@@ -116,7 +162,7 @@ export async function framesFor(
     const use = step === undefined ? null : parseUse(step.use);
     if (step === undefined || use === null || primitives.has(step.use))
       return frames.length > 0 ? frames : null;
-    frames.push({ use, title: step.id, rest: parts.slice(at + 1) });
+    frames.push({ use, title: step.id, rest: parts.slice(at + 1), mark: null });
     if (at === parts.length - 2) break;
     const { data } = await apiClient.GET(
       '/api/v1/workflows/{owner}/{name}/versions/{version}',

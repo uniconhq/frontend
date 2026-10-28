@@ -8,6 +8,9 @@ import {
   newProblem,
   orderAfterWire,
   outputRefusal,
+  outputSources,
+  outputType,
+  portFor,
   valueRefusal,
   wireRefusal,
 } from './rules';
@@ -381,6 +384,105 @@ describe('workflow-owned sources', () => {
       }),
     ).toBe(
       "Only a step's output can be reported, not an input or a file of the workflow.",
+    );
+  });
+});
+
+describe('a wire dropped on a box', () => {
+  it('goes to the input named as its source, given or not', () => {
+    expect(portFor(WORKFLOW, primitives, 1, output('compile', 'program'))).toEqual({
+      port: 'program',
+    });
+  });
+
+  it('else goes to the first input given nothing, leaving the refusal to the drag rules', () => {
+    expect(portFor(WORKFLOW, primitives, 1, input('limit'))).toEqual({ port: 'stdin' });
+    expect(wireRefusal(WORKFLOW, primitives, 1, 'stdin', input('limit'))).toBe(
+      'This takes a file, not a number.',
+    );
+  });
+
+  it('picks from a run workflow’s inputs as its box declares them', () => {
+    const boxed = readWorkflow(
+      parse('steps:\n  - {id: build, use: kenny/inner@v1, with: {}}\n'),
+    );
+    const boxes = new Map([
+      [
+        'kenny/inner@v1',
+        {
+          run: true,
+          newer: null,
+          inputs: [{ name: 'source', type: 'folder', optional: false, options: null }],
+          outputs: [],
+        },
+      ],
+    ]);
+    expect(portFor(boxed, primitives, 0, input('submission'), boxes)).toEqual({
+      port: 'source',
+    });
+  });
+
+  it('says why when every input is given something, or the step is unknown', () => {
+    const full = readWorkflow(parse(CLASSIC));
+    expect(portFor(full, primitives, 2, input('submission'))).toEqual({
+      reason:
+        'Every input of check is given something already. Open it to choose which to change.',
+    });
+    const unknown = readWorkflow(
+      parse('steps:\n  - {id: x, use: kenny/nothing@v1, with: {}}\n'),
+    );
+    expect(portFor(unknown, primitives, 0, input('submission'))).toEqual({
+      reason:
+        'kenny/nothing@v1 is not a primitive Unicon knows. Check its owner, name and version.',
+    });
+  });
+});
+
+describe('a run workflow as a step', () => {
+  const boxed = readWorkflow(
+    parse('steps:\n  - {id: build, use: kenny/inner@v1, with: {level: high}}\n'),
+  );
+  const box = (level: string[]) => ({
+    run: true,
+    newer: null,
+    inputs: [{ name: 'level', type: 'enum', optional: false, options: level }],
+    outputs: [
+      { name: 'program', type: 'file' },
+      { name: 'took_ms', type: 'number' },
+    ],
+  });
+  const boxes = new Map([
+    ['kenny/inner@v1', box(['low', 'high'])],
+    ['kenny/inner@v2', box(['low'])],
+  ]);
+
+  it('takes a value its box declares, and refuses one it does not', () => {
+    expect(valueRefusal(boxed, primitives, 0, 'level', 'low', [], boxes)).toBeNull();
+    expect(valueRefusal(boxed, primitives, 0, 'level', 'mid', [], boxes)).toBe(
+      'This takes one of low, high.',
+    );
+  });
+
+  it('offers its text and number outputs to be reported, with their types', () => {
+    expect(outputSources(boxed, primitives, boxes)).toEqual([
+      { kind: 'steps', name: 'build', output: 'took_ms' },
+    ]);
+    expect(
+      outputType(
+        boxed,
+        primitives,
+        { kind: 'steps', name: 'build', output: 'took_ms' },
+        boxes,
+      ),
+    ).toBe('number');
+  });
+
+  it('refuses a version whose box would refuse a value the step gives', () => {
+    const moved = readWorkflow(
+      parse('steps:\n  - {id: build, use: kenny/inner@v2, with: {level: high}}\n'),
+    );
+    expect(newProblem(boxed, moved, primitives, boxes)).toBe(
+      'build.level: This takes one of low.',
     );
   });
 });

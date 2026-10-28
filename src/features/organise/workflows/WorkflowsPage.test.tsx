@@ -1,10 +1,12 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@/test/user-event';
 import { http, HttpResponse } from 'msw';
+import type { TreeEntry } from '@/api/types';
 import { renderApp } from '@/test/render';
 import { problem, server, signedIn } from '@/test/server';
 import { CLASSIC, PRIMITIVES, WORKFLOW_API, workflowBackend } from '@/test/workflows';
+import { INPUTS_SHOWN_KEY } from './inputs-shown';
 
 const LISTED = [
   {
@@ -46,7 +48,7 @@ describe('the workflows page', () => {
     expect(others).toHaveTextContent('Public · Latest version v2');
   });
 
-  it('makes a workflow from the starter under the person or an org they manage', async () => {
+  it('makes an empty workflow under the person or an org they manage', async () => {
     let made: unknown = null;
     server.use(
       signedIn,
@@ -62,7 +64,11 @@ describe('the workflows page', () => {
 
     await user.click(await screen.findByRole('button', { name: 'New workflow' }));
     const form = await screen.findByRole('form', { name: 'New workflow' });
-    expect(within(form).getByRole('radio', { name: 'The starter' })).toBeChecked();
+    expect(within(form).queryByRole('radio')).toBeNull();
+    expect(within(form).getAllByRole('textbox')).toHaveLength(1);
+    expect(form).toHaveTextContent(
+      'It starts empty. Add its steps from the tray: primitives, or other workflows as boxes.',
+    );
     const owner = within(form).getByRole('combobox', { name: /Owner/ });
     expect(
       within(owner)
@@ -79,98 +85,6 @@ describe('the workflows page', () => {
     expect(made).toEqual({ owner: 'acme', name: 'fresh' });
   });
 
-  it('greys out a copy, saying why under it, while no workflow one can read has a version', async () => {
-    server.use(
-      signedIn,
-      http.get('/api/v1/workflows', () =>
-        HttpResponse.json([
-          {
-            owner: 'kenny',
-            name: 'draft-only',
-            versions: [],
-            editable: true,
-            visibility: 'private',
-          },
-        ]),
-      ),
-    );
-    const user = userEvent.setup();
-    renderApp('/workflows');
-
-    await user.click(await screen.findByRole('button', { name: 'New workflow' }));
-    const form = await screen.findByRole('form', { name: 'New workflow' });
-    const copy = within(form).getByRole('radio', { name: 'A copy of a version' });
-    await waitFor(() =>
-      expect(copy).toHaveAccessibleDescription(
-        'Every step of a workflow you can read, as it is at that version. No workflow you can read has a version yet.',
-      ),
-    );
-    expect(copy).toBeDisabled();
-  });
-
-  it('greys out a copy, saying the workflows could not be read, when their list fails', async () => {
-    server.use(
-      signedIn,
-      http.get('/api/v1/workflows', () => problem(403, 'forbidden')),
-    );
-    const user = userEvent.setup();
-    renderApp('/workflows');
-
-    await user.click(await screen.findByRole('button', { name: 'New workflow' }));
-    const form = await screen.findByRole('form', { name: 'New workflow' });
-    const copy = within(form).getByRole('radio', { name: 'A copy of a version' });
-    await waitFor(() =>
-      expect(copy).toHaveAccessibleDescription(
-        'Every step of a workflow you can read, as it is at that version. The list of workflows you can read did not load. Close this and open it again to try again.',
-      ),
-    );
-    expect(copy).toBeDisabled();
-  });
-
-  it('makes a workflow as a copy of a version, from the same form', async () => {
-    let asked: unknown = null;
-    server.use(
-      signedIn,
-      listed,
-      http.post('/api/v1/workflow-copies', async ({ request }) => {
-        asked = await request.json();
-        return HttpResponse.json({ owner: 'kenny', name: 'tuned' }, { status: 201 });
-      }),
-      ...workflowBackend(CLASSIC).handlers,
-    );
-    const user = userEvent.setup();
-    const { router } = renderApp('/workflows');
-
-    await user.click(await screen.findByRole('button', { name: 'New workflow' }));
-    const form = await screen.findByRole('form', { name: 'New workflow' });
-    await user.click(within(form).getByRole('radio', { name: 'A copy of a version' }));
-    const version = within(form).getByRole('combobox', { name: 'Version to copy' });
-    expect(
-      within(version)
-        .getAllByRole('option')
-        .map((option) => option.textContent),
-    ).toEqual([
-      'Choose a version',
-      'acme/graders@v1',
-      'unicon/classic@v1',
-      'unicon/classic@v2',
-    ]);
-    const create = within(form).getByRole('button', { name: 'Create workflow' });
-    await user.type(within(form).getByRole('textbox', { name: /^Name/ }), 'tuned');
-    expect(create).toBeDisabled();
-    await user.selectOptions(version, 'unicon/classic@v2');
-    await user.click(create);
-
-    await waitFor(() =>
-      expect(router.state.location.pathname).toBe('/workflows/kenny/tuned'),
-    );
-    expect(asked).toEqual({
-      source: 'unicon/classic@v2',
-      owner: 'kenny',
-      name: 'tuned',
-    });
-  });
-
   it('offers no way to combine workflows for now', async () => {
     server.use(signedIn, listed);
     renderApp('/workflows');
@@ -182,6 +96,11 @@ describe('the workflows page', () => {
 });
 
 describe('a workflow one may only read', () => {
+  // The file boxes' tests read boxes a browser shows once it chooses to.
+  beforeEach(() => {
+    localStorage.setItem(INPUTS_SHOWN_KEY, 'shown');
+  });
+
   const page = (versions: string[]) =>
     http.get('/api/v1/workflows/unicon/classic', () =>
       HttpResponse.json({
@@ -216,7 +135,7 @@ describe('a workflow one may only read', () => {
     '',
   ].join('\n');
 
-  it('draws its latest version, read-only, with its file behind View file', async () => {
+  it('draws its latest version, read-only, with its file behind View YAML', async () => {
     server.use(signedIn, page(['v1', 'v2']), primitives, version(CLASSIC), check());
     const user = userEvent.setup();
     renderApp('/workflows/unicon/classic');
@@ -225,6 +144,8 @@ describe('a workflow one may only read', () => {
       await screen.findByRole('heading', { name: 'unicon/classic@v2' }),
     ).toBeInTheDocument();
     expect(await screen.findByRole('group', { name: 'Step run' })).toBeInTheDocument();
+    // A public workflow's chip stands out, as anyone can use it.
+    expect(screen.getByText('Public', { selector: 'span' })).toHaveClass(/_live_/);
     expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /The port/ })).not.toBeInTheDocument();
     const showing = screen.getByRole('combobox', { name: 'Showing' });
@@ -235,11 +156,172 @@ describe('a workflow one may only read', () => {
         .map((option) => option.textContent),
     ).toEqual(['v2, the latest version', 'Version v1']);
     expect(screen.getByText(/You are looking at v2, a version/)).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'View file' }));
-    const dialog = await screen.findByRole('dialog', { name: 'The file of v2' });
+    await user.click(screen.getByRole('button', { name: 'View YAML' }));
+    const dialog = await screen.findByRole('dialog', { name: 'The YAML of v2' });
     expect(
-      within(dialog).getByLabelText<HTMLTextAreaElement>('The file of v2').value,
+      within(dialog).getByLabelText<HTMLTextAreaElement>('The YAML of v2').value,
     ).toBe(CLASSIC);
+  });
+
+  it('hides a version’s inputs as the editor does, popping them out from a step’s tab', async () => {
+    localStorage.setItem(INPUTS_SHOWN_KEY, 'hidden');
+    server.use(signedIn, page(['v1', 'v2']), primitives, version(CLASSIC), check());
+    const user = userEvent.setup();
+    renderApp('/workflows/unicon/classic');
+
+    const run = await screen.findByRole('group', { name: 'Step run' });
+    expect(screen.queryByRole('group', { name: /^Input / })).toBeNull();
+    await user.hover(within(run).getByRole('button', { name: '3 inputs of Step run' }));
+    const input = await screen.findByRole('group', { name: 'Input input' });
+    await user.click(within(input).getByRole('button'));
+    await waitFor(() =>
+      expect(screen.queryByRole('group', { name: 'Input input' })).toBeNull(),
+    );
+
+    await user.click(screen.getByRole('checkbox', { name: 'Show inputs and files' }));
+    expect(
+      await screen.findByRole('group', { name: 'Input input' }),
+    ).toBeInTheDocument();
+  });
+
+  it('says a step’s folder port takes a file or a folder', async () => {
+    server.use(signedIn, page(['v1', 'v2']), primitives, version(CLASSIC), check());
+    const user = userEvent.setup();
+    renderApp('/workflows/unicon/classic');
+
+    const compile = await screen.findByRole('group', { name: 'Step compile' });
+    await user.click(within(compile).getByRole('button', { name: /^compile/ }));
+    expect(await within(compile).findByText(/^file or folder · /)).toBeInTheDocument();
+  });
+
+  it('opens a box of a version in the editor’s drawer, every field locked and nothing to remove', async () => {
+    server.use(signedIn, page(['v1', 'v2']), primitives, version(CLASSIC), check());
+    const user = userEvent.setup();
+    renderApp('/workflows/unicon/classic');
+
+    const run = await screen.findByRole('group', { name: 'Step run' });
+    await user.click(within(run).getByRole('button', { name: /^run/ }));
+    const drawer = await screen.findByRole('complementary', { name: 'Step run' });
+    const name = within(drawer).getByRole('textbox', { name: 'Name' });
+    expect(name).toHaveValue('run');
+    expect(name).toBeDisabled();
+    const stdin = within(drawer).getByRole('combobox', { name: /^stdin/ });
+    expect(stdin).toHaveDisplayValue('input from the inputs');
+    expect(stdin).toBeDisabled();
+    expect(within(drawer).queryByRole('button', { name: /^Remove/ })).toBeNull();
+    expect(within(drawer).getByText('What it gives')).toBeInTheDocument();
+
+    await user.click(within(drawer).getByRole('button', { name: /Close/ }));
+    expect(screen.queryByRole('complementary', { name: 'Step run' })).toBeNull();
+  });
+
+  /** What a version was frozen with, folder by folder, as its tree answers. */
+  const frozen = (folders: Record<string, TreeEntry[]>) =>
+    http.get('/api/v1/workflows/unicon/classic/versions/:version/tree', ({ request }) =>
+      HttpResponse.json(
+        folders[new URL(request.url).searchParams.get('path') ?? ''] ?? [],
+      ),
+    );
+  const entry = (
+    path: string,
+    kind: TreeEntry['kind'],
+    size: number | null = null,
+  ) => ({
+    path,
+    kind,
+    size,
+    upload: null,
+    start: null,
+    token: null,
+    version: null,
+  });
+
+  it('lists the files of a workflow folder’s box in its drawer, each downloading through the door', async () => {
+    const upload = { size: 5_000_000, digest: 'a'.repeat(64) };
+    server.use(
+      signedIn,
+      page(['v1']),
+      primitives,
+      version(
+        CLASSIC.replace('stdin: ${{ inputs.input }}', 'stdin: ${{ workflow.data/ }}'),
+      ),
+      check(),
+      frozen({ data: [{ ...entry('data/big input.bin', 'file', 130), upload }] }),
+    );
+    const user = userEvent.setup();
+    renderApp('/workflows/unicon/classic');
+
+    const box = await screen.findByRole('group', { name: 'Workflow file data/' });
+    await user.click(within(box).getByRole('button', { name: /^data\// }));
+    const files = await screen.findByRole('complementary', { name: 'Workflow file' });
+    await user.click(
+      await within(files).findByRole('button', { name: /^big input\.bin/ }),
+    );
+    expect(
+      within(files).getByRole('link', { name: 'Download big input.bin' }),
+    ).toHaveAttribute(
+      'href',
+      '/-/downloads/workflows/unicon/classic/versions/v1/data/big%20input.bin',
+    );
+    // An upload by the size of what it holds, not of its pointer.
+    expect(
+      within(within(files).getByRole('region', { name: 'big input.bin' })).getByText(
+        '4.8 MB',
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it('lists the version’s files from Files on the bar, all but its workflow.yaml, which View YAML shows', async () => {
+    server.use(
+      signedIn,
+      page(['v1']),
+      primitives,
+      version(CLASSIC),
+      check(),
+      frozen({
+        '': [entry('workflow.yaml', 'file', 900), entry('score.py', 'file', 30)],
+      }),
+    );
+    const user = userEvent.setup();
+    renderApp('/workflows/unicon/classic');
+
+    await screen.findByRole('group', { name: 'Step run' });
+    await user.click(screen.getByRole('button', { name: 'Files' }));
+    const files = await screen.findByRole('complementary', { name: 'Files' });
+    expect(
+      await within(files).findByRole('button', { name: /^score\.py/ }),
+    ).toBeInTheDocument();
+    expect(within(files).queryByRole('button', { name: /^workflow\.yaml/ })).toBeNull();
+  });
+
+  it('downloads the file a workflow file’s box stands for from its drawer', async () => {
+    server.use(
+      signedIn,
+      page(['v1']),
+      primitives,
+      version(
+        CLASSIC.replace(
+          'stdin: ${{ inputs.input }}',
+          'stdin: ${{ workflow.data/input.txt }}',
+        ),
+      ),
+      check(),
+      frozen({}),
+    );
+    const user = userEvent.setup();
+    renderApp('/workflows/unicon/classic');
+
+    const box = await screen.findByRole('group', {
+      name: 'Workflow file data/input.txt',
+    });
+    await user.click(within(box).getByRole('button', { name: /^data\/input\.txt/ }));
+    const drawer = await screen.findByRole('complementary', { name: 'Workflow file' });
+    expect(
+      within(drawer).getByRole('link', { name: 'Download input.txt' }),
+    ).toHaveAttribute(
+      'href',
+      '/-/downloads/workflows/unicon/classic/versions/v1/data/input.txt',
+    );
   });
 
   it('opens a version in the old format in the state of one that cannot be opened, with the forge’s reason', async () => {
@@ -300,44 +382,13 @@ describe('a workflow one may only read', () => {
     expect(state).toHaveTextContent(`Overall: ${reason}`);
   });
 
-  it('copies the version into a private workflow of one’s own', async () => {
-    let asked: unknown = null;
-    server.use(
-      signedIn,
-      page(['v2']),
-      primitives,
-      version(CLASSIC),
-      check(),
-      http.post('/api/v1/workflow-copies', async ({ request }) => {
-        asked = await request.json();
-        return HttpResponse.json({ owner: 'kenny', name: 'tuned' }, { status: 201 });
-      }),
-      ...workflowBackend(CLASSIC).handlers,
-    );
-    const user = userEvent.setup();
-    const { router } = renderApp('/workflows/unicon/classic');
-
-    await user.click(
-      await screen.findByRole('button', { name: 'Copy into a new workflow' }),
-    );
-    const form = await screen.findByRole('form', { name: 'New workflow' });
+  it('offers no copy action on a version', async () => {
+    server.use(signedIn, page(['v2']), primitives, version(CLASSIC), check());
+    renderApp('/workflows/unicon/classic');
+    await screen.findByText('unicon/classic@v2', { selector: 'h2' });
     expect(
-      within(form).getByRole('radio', { name: 'A copy of a version' }),
-    ).toBeChecked();
-    expect(within(form).getByRole('combobox', { name: 'Version to copy' })).toHaveValue(
-      'unicon/classic@v2',
-    );
-    await user.type(within(form).getByRole('textbox', { name: /^Name/ }), 'tuned');
-    await user.click(within(form).getByRole('button', { name: 'Create workflow' }));
-
-    await waitFor(() =>
-      expect(router.state.location.pathname).toBe('/workflows/kenny/tuned'),
-    );
-    expect(asked).toEqual({
-      source: 'unicon/classic@v2',
-      owner: 'kenny',
-      name: 'tuned',
-    });
+      screen.queryByRole('button', { name: 'Copy into a new workflow' }),
+    ).toBeNull();
   });
 });
 
@@ -371,7 +422,7 @@ describe('who reads a workflow', () => {
     await user.click(within(panel).getByRole('button', { name: 'Share' }));
     const readers = await within(panel).findByRole('list', { name: 'Shared with' });
     expect(within(readers).getByText('ada')).toBeInTheDocument();
-    expect(await screen.findByText('Shared with 1 person')).toBeInTheDocument();
+    expect(await screen.findByText('Shared with 1 person')).toHaveClass(/_quiet_/);
 
     // Making it public would take it from ada, so it asks first.
     await user.click(within(panel).getByRole('radio', { name: /^Public/ }));
@@ -387,6 +438,12 @@ describe('who reads a workflow', () => {
 
     await user.click(within(panel).getByRole('radio', { name: /^Public/ }));
     await waitFor(() => expect(backend.state.visibility).toBe('public'));
+    // The header's chip, not the panel's radio of the same name, stands out now.
+    await waitFor(() =>
+      expect(
+        screen.getAllByText('Public').find((found) => !panel.contains(found)),
+      ).toHaveClass(/_live_/),
+    );
     expect(WORKFLOW_API).toBe('/api/v1/workflows/kenny/tuned');
   });
 });

@@ -8,7 +8,16 @@ import { OutLink } from '@/ui/OutLink';
 import { Loaded } from '@/ui/feedback/Loaded';
 import { formatSize } from '@/lib/size';
 import { saveFile } from '@/lib/save-file';
-import { fileQuery, taskDownloadHref, treeQuery, type FilePlace } from './place';
+import {
+  draftDownloadHref,
+  fileQuery,
+  taskDownloadHref,
+  treeQuery,
+  versionDownloadHref,
+  type FilePlace,
+  type ListedPlace,
+  type VersionPlace,
+} from './place';
 import classes from './FilePreview.module.css';
 
 /**
@@ -17,8 +26,14 @@ import classes from './FilePreview.module.css';
  * size and Download; and a file that is an upload, or too big to read here,
  * by its size and Download as a link to the download door (#444), which
  * streams it whatever its size; and a folder as a small tree, a file in it
- * shown once chosen.
+ * shown once chosen. A workflow version's files are listed and downloaded
+ * only, each by its size and Download. Every file of a workflow, its draft's
+ * or a version's, downloads through the door, so each Download there is the
+ * same link.
  */
+
+/** Nothing left out of a folder's listing. */
+const NONE: readonly string[] = [];
 
 /** How many lines a text shows before Show all. */
 const FIRST_LINES = 12;
@@ -52,16 +67,20 @@ function firstOf(text: string): { shown: string; more: boolean } {
 
 /**
  * Text as a part shows it: its first lines, Show all for the rest, and
- * Download; or, for bytes that are not text, that it is not text.
+ * Download; or, for bytes that are not text, that it is not text. Download
+ * is a link to the download door where the file has one (`href`), as every
+ * other download of the place is, and otherwise saves the bytes read.
  */
 function Shown({
   name,
   text,
+  href,
   onDownload,
 }: {
   name: string;
   /** The text, or null for bytes that are not text. */
   text: string | null;
+  href: string | null;
   onDownload: () => void;
 }) {
   const [all, setAll] = useState(false);
@@ -84,14 +103,20 @@ function Shown({
             {all ? 'Show less' : 'Show all'}
           </Button>
         )}
-        <Button
-          size="xs"
-          variant="secondary"
-          onClick={onDownload}
-          label={`Download ${name}`}
-        >
-          Download
-        </Button>
+        {href !== null ? (
+          <OutLink href={href} label={`Download ${name}`}>
+            Download
+          </OutLink>
+        ) : (
+          <Button
+            size="xs"
+            variant="secondary"
+            onClick={onDownload}
+            label={`Download ${name}`}
+          >
+            Download
+          </Button>
+        )}
       </div>
     </>
   );
@@ -108,9 +133,25 @@ function Head({ name, size }: { name: string; size: number | null }) {
 }
 
 /**
+ * Where a file of `place` downloads from through the download door: a
+ * task's at `version`, a workflow draft's as last saved; null at a contest,
+ * or for a task's file without a version.
+ */
+function doorHref(
+  place: FilePlace,
+  path: string,
+  version: string | null,
+): string | null {
+  if (place.kind === 'workflow') return draftDownloadHref(place, path);
+  if (place.kind === 'task' && version !== null)
+    return taskDownloadHref(place, version, path);
+  return null;
+}
+
+/**
  * Download for a file the page does not read whole, as a link to the
- * download door at `version`; nothing at a contest or without a version,
- * where the file's size alone is shown.
+ * download door; nothing where there is none, and the file's size alone is
+ * shown.
  */
 function DownloadLink({
   place,
@@ -121,16 +162,45 @@ function DownloadLink({
   path: string;
   version: string | null;
 }) {
-  if (place.kind !== 'task' || version === null) return null;
+  const href = doorHref(place, path, version);
+  if (href === null) return null;
   return (
     <div className={classes.actions}>
-      <OutLink
-        href={taskDownloadHref(place, version, path)}
-        label={`Download ${nameOf(path)}`}
-      >
+      <OutLink href={href} label={`Download ${nameOf(path)}`}>
         Download
       </OutLink>
     </div>
+  );
+}
+
+/**
+ * One of the files a workflow's version was frozen with, by its size and
+ * Download, which streams it through the download door whatever its size.
+ * It is not read here: a version's files are listed and downloaded only.
+ */
+export function VersionFile({
+  place,
+  path,
+  title = nameOf(path),
+  size,
+}: {
+  place: VersionPlace;
+  path: string;
+  title?: string;
+  size: number | null;
+}) {
+  return (
+    <section className={classes.part} aria-label={title}>
+      <Head name={title} size={size} />
+      <div className={classes.actions}>
+        <OutLink
+          href={versionDownloadHref(place, path)}
+          label={`Download ${nameOf(path)}`}
+        >
+          Download
+        </OutLink>
+      </div>
+    </section>
   );
 }
 
@@ -189,6 +259,7 @@ export function SavedFile({
             <Shown
               name={title}
               text={file.encoding === 'utf-8' ? file.content : null}
+              href={place.kind === 'workflow' ? draftDownloadHref(place, path) : null}
               onDownload={() => saveFile(name, blobOf(file))}
             />
           )}
@@ -198,24 +269,30 @@ export function SavedFile({
   );
 }
 
-/** One folder's entries, folders first, a folder opening below itself. */
+/**
+ * One folder's entries, folders first, a folder opening below itself; the
+ * paths in `leaveOut` are not listed.
+ */
 function FolderLevel({
   place,
   path,
   chosen,
   onChoose,
+  leaveOut,
 }: {
-  place: FilePlace;
+  place: ListedPlace;
   path: string;
   chosen: TreeEntry | null;
   onChoose: (entry: TreeEntry) => void;
+  leaveOut: readonly string[];
 }) {
   const view = queryView(useQuery(treeQuery(place, path)));
   const [open, setOpen] = useState<ReadonlySet<string>>(new Set());
   return (
     <Loaded view={view} compact>
-      {(entries: TreeEntry[]) =>
-        entries.length === 0 ? (
+      {(listed: TreeEntry[]) => {
+        const entries = listed.filter((entry) => !leaveOut.includes(entry.path));
+        return entries.length === 0 ? (
           <BodyText tone="secondary">It is empty.</BodyText>
         ) : (
           <ul className={classes.tree}>
@@ -255,6 +332,7 @@ function FolderLevel({
                           path={entry.path}
                           chosen={chosen}
                           onChoose={onChoose}
+                          leaveOut={leaveOut}
                         />
                       )}
                     </li>
@@ -278,15 +356,15 @@ function FolderLevel({
                 );
               })}
           </ul>
-        )
-      }
+        );
+      }}
     </Loaded>
   );
 }
 
 /**
  * A folder as a small tree, the file chosen in it shown below; `path` ""
- * is the whole of the place, every file it holds.
+ * is the whole of the place, every file it holds but those in `leaveOut`.
  */
 export function SavedFolder({
   place,
@@ -294,12 +372,15 @@ export function SavedFolder({
   title = nameOf(path),
   heading = `${title}, a folder`,
   onChoose,
+  leaveOut = NONE,
 }: {
-  place: FilePlace;
+  place: ListedPlace;
   path: string;
   title?: string;
   heading?: string;
   onChoose?: (entry: TreeEntry) => void;
+  /** Paths not listed, such as a file shown elsewhere on the page. */
+  leaveOut?: readonly string[];
 }) {
   const [chosen, setChosen] = useState<TreeEntry | null>(null);
   return (
@@ -309,22 +390,32 @@ export function SavedFolder({
         place={place}
         path={path}
         chosen={chosen}
+        leaveOut={leaveOut}
         onChoose={(entry) => {
           setChosen(entry);
           onChoose?.(entry);
         }}
       />
-      {chosen !== null && (
-        <SavedFile
-          key={chosen.path}
-          place={place}
-          path={chosen.path}
-          title={path === '' ? chosen.path : chosen.path.slice(path.length + 1)}
-          size={chosen.size}
-          upload={chosen.upload}
-          listedAt={chosen.version}
-        />
-      )}
+      {chosen !== null &&
+        (place.kind === 'version' ? (
+          <VersionFile
+            key={chosen.path}
+            place={place}
+            path={chosen.path}
+            title={path === '' ? chosen.path : chosen.path.slice(path.length + 1)}
+            size={chosen.upload?.size ?? chosen.size}
+          />
+        ) : (
+          <SavedFile
+            key={chosen.path}
+            place={place}
+            path={chosen.path}
+            title={path === '' ? chosen.path : chosen.path.slice(path.length + 1)}
+            size={chosen.size}
+            upload={chosen.upload}
+            listedAt={chosen.version}
+          />
+        ))}
     </section>
   );
 }

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { screen, within } from '@testing-library/react';
 import userEvent from '@/test/user-event';
 import { renderApp } from '@/test/render';
+import { http, HttpResponse } from 'msw';
 import { server, signedIn } from '@/test/server';
 import { workflowBackend } from '@/test/workflows';
 import { EDITOR_PAGE, fileText } from '@/test/workflow-editor';
@@ -9,7 +10,7 @@ import { EDITOR_PAGE, fileText } from '@/test/workflow-editor';
 describe('the workflow editor', () => {
   // Tabbing to each control walks the whole page, so this takes a while.
   it(
-    'builds three wired steps from Add step by keyboard alone',
+    'builds three wired steps, an input and a workflow from the tray by keyboard alone',
     { timeout: 60_000 },
     async () => {
       const empty = [
@@ -22,7 +23,40 @@ describe('the workflow editor', () => {
         'steps: []',
         '',
       ].join('\n');
-      server.use(signedIn, ...workflowBackend(empty).handlers);
+      const port = (name: string) => ({
+        name,
+        type: 'file',
+        title: null,
+        unit: null,
+        at_least: null,
+        at_most: null,
+        better: null,
+        optional: false,
+        options: null,
+      });
+      server.use(
+        http.get('/api/v1/workflows', () =>
+          HttpResponse.json([
+            {
+              owner: 'kenny',
+              name: 'inner',
+              visibility: 'private',
+              versions: ['v1'],
+              editable: true,
+            },
+          ]),
+        ),
+        http.get('/api/v1/workflows/:owner/:name/versions/:version/box', () =>
+          HttpResponse.json({
+            inputs: [port('source')],
+            outputs: [port('program')],
+            newer_version: null,
+            run: true,
+          }),
+        ),
+        signedIn,
+        ...workflowBackend(empty).handlers,
+      );
       const user = userEvent.setup();
       renderApp(EDITOR_PAGE);
 
@@ -44,25 +78,36 @@ describe('the workflow editor', () => {
         expect(found).toHaveFocus();
         await user.keyboard('{Enter}');
       };
-      const add = async (item: RegExp, id: string) => {
-        await press(await screen.findByRole('button', { name: 'Add step' }));
-        await choose('Add step', item);
-        // The new step's drawer takes the focus, and Escape closes it.
-        const drawer = await screen.findByRole('complementary', { name: `Step ${id}` });
-        expect(
-          within(drawer).getByRole('heading', { name: `Step ${id}` }),
-        ).toHaveFocus();
+      const add = async (group: string, item: string, drawerName: string) => {
+        await screen.findByRole('region', { name: group });
+        await press(
+          await within(screen.getByRole('region', { name: group })).findByRole(
+            'button',
+            { name: item },
+          ),
+        );
+        // The new box's drawer takes the focus, and Escape closes it.
+        const drawer = await screen.findByRole('complementary', { name: drawerName });
+        expect(within(drawer).getByRole('heading', { name: drawerName })).toHaveFocus();
         await user.keyboard('{Escape}');
       };
       const wireFrom = async (port: string, step: string, source: RegExp) => {
+        // A closed box opens by Enter on its head, and shows its ports.
+        const box = await screen.findByRole('group', { name: `Step ${step}` });
+        if (!box.hasAttribute('data-open'))
+          await press(
+            within(box).getByRole('button', { name: new RegExp(`^${step}`) }),
+          );
         await press(
           await screen.findByRole('button', { name: `The port ${port} of ${step}` }),
         );
         await choose(`The port ${port} of ${step}`, source);
       };
-      await add(/^Compile/, 'compile');
-      await add(/^Run program/, 'exec');
-      await add(/^Compare with the answer/, 'diff-check');
+      await add('Primitives', 'Compile', 'Step compile');
+      await add('Primitives', 'Run program', 'Step exec');
+      await add('Primitives', 'Compare with the answer', 'Step diff-check');
+      await add('Inputs', 'Text', 'Inputs');
+      await add('Workflows', 'kenny/inner@v1', 'Step inner');
       await wireFrom('source', 'compile', /^submission from the inputs/);
       await wireFrom('program', 'exec', /^program from compile/);
       await wireFrom('stdin', 'exec', /^input from the inputs/);
@@ -80,6 +125,8 @@ describe('the workflow editor', () => {
         'memory_limit: ${{ inputs.memory_limit }}',
         'actual: ${{ steps.exec.output }}',
         'expected: ${{ inputs.answer }}',
+        '  text: text\n',
+        'use: kenny/inner@v1',
       ])
         expect(text).toContain(wire);
     },

@@ -72,7 +72,7 @@ export function placed(problems: DefinitionProblem[], workflow: Workflow): Place
       return {
         problem,
         where: `Input ${pin.id}`,
-        opens: { kind: 'inputs', ids: [pin.id] },
+        opens: { kind: 'input', id: pin.id },
       };
     if (
       pin.kind === 'entry' &&
@@ -109,5 +109,40 @@ export function pinned(
       add(found.entries, pin.name, problem);
     else found.page.push(problem);
   }
+  return found;
+}
+
+/** What the line under a box's head says: its first problem, or that a newer version is out. */
+export type Warning =
+  { kind: 'problem'; problem: DefinitionProblem } | { kind: 'newer'; version: string };
+
+/**
+ * The line under each box's head, by the box's key (`layout.ts`): a step's
+ * first problem, its own or a port's, else a newer version of the workflow
+ * it uses; an input's first problem; the outputs' first.
+ */
+export function warnings(
+  pins: Pinned,
+  workflow: Workflow,
+  newerOf: (use: string) => string | null,
+): Map<string, Warning> {
+  const found = new Map<string, Warning>();
+  const problem = (key: string, list: DefinitionProblem[]) => {
+    const first = list[0];
+    if (first !== undefined) found.set(key, { kind: 'problem', problem: first });
+  };
+  workflow.steps.forEach((step, index) => {
+    const key = `step:${String(index)}`;
+    problem(key, [
+      ...(pins.steps.get(index) ?? []),
+      ...[...pins.ports]
+        .filter(([port]) => port.startsWith(`${String(index)}.`))
+        .flatMap(([, list]) => list),
+    ]);
+    const version = newerOf(step.use);
+    if (!found.has(key) && version !== null) found.set(key, { kind: 'newer', version });
+  });
+  for (const [id, list] of pins.inputs) problem(`input:${id}`, list);
+  problem('outputs', [...pins.entries.values()].flat());
   return found;
 }

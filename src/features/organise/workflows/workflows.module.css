@@ -24,16 +24,12 @@
 .bar {
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-end;
+  align-items: center;
   gap: 8px 16px;
 }
 
 .switch {
   min-width: 220px;
-}
-
-.status {
-  padding-bottom: 8px;
 }
 
 .barActions {
@@ -54,10 +50,6 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
-}
-
-.toolGap {
-  width: 12px;
 }
 
 .actions {
@@ -195,6 +187,23 @@
   gap: 14px;
 }
 
+/* Add files in the Files drawer: the drop, and beside it the folder the
+ * files go into; one under the other where the drawer is narrow. */
+.addFiles {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  align-items: start;
+  gap: 8px 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--unicon-border);
+}
+
+@media (max-width: 480px) {
+  .addFiles {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 .part {
   margin: 6px 0 0;
   color: var(--unicon-text-primary);
@@ -256,6 +265,62 @@
   border-top: 1px solid var(--unicon-border);
 }
 
+/* Around the graph's frame, a fade on each edge with more of the graph past
+ * it, the whole height of the frame, so it shows wherever the page has
+ * scrolled to; it takes no clicks. */
+.frameEdges {
+  position: relative;
+}
+
+.frameEdges::before,
+.frameEdges::after {
+  content: '';
+  position: absolute;
+  top: 1px;
+  bottom: 1px;
+  z-index: 5;
+  width: 56px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 150ms;
+}
+
+.frameEdges::before {
+  left: 1px;
+  border-radius: var(--mantine-radius-sm) 0 0 var(--mantine-radius-sm);
+  background: linear-gradient(
+    to right,
+    var(--unicon-body),
+    color-mix(in srgb, var(--unicon-body) 60%, transparent) 40%,
+    transparent
+  );
+  box-shadow: inset 6px 0 6px -6px rgb(0 0 0 / 0.5);
+}
+
+.frameEdges::after {
+  right: 1px;
+  border-radius: 0 var(--mantine-radius-sm) var(--mantine-radius-sm) 0;
+  background: linear-gradient(
+    to left,
+    var(--unicon-body),
+    color-mix(in srgb, var(--unicon-body) 60%, transparent) 40%,
+    transparent
+  );
+  box-shadow: inset -6px 0 6px -6px rgb(0 0 0 / 0.5);
+}
+
+.frameEdges[data-more-left]::before,
+.frameEdges[data-more-right]::after {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .frameEdges::before,
+  .frameEdges::after {
+    transition: none;
+  }
+}
+
 /* The graph's frame: the page's whole width, the graph at its actual size
  * inside it, sliding sideways when it is wider. */
 .frame {
@@ -271,11 +336,15 @@
   min-width: 100%;
 }
 
+/* A box's face, under the room every box keeps above it for a workflow
+ * box's ears. Each part has a fixed height (`BOX` in layout.ts, read here
+ * as --box-*), so the layout knows where each wire meets it. */
 .box {
   position: relative;
   width: 100%;
-  height: 100%;
-  border: 2px solid var(--unicon-border-strong);
+  height: calc(100% - var(--box-stack));
+  margin-top: var(--box-stack);
+  border: var(--box-border) solid var(--unicon-border-strong);
   border-radius: var(--mantine-radius-sm);
   background: var(--unicon-chrome);
   color: var(--unicon-text-body);
@@ -286,16 +355,13 @@
   box-shadow: 0 0 0 3px var(--unicon-border-strong);
 }
 
-.box[data-dimmed] {
-  opacity: 0.55;
-}
-
 /* A box's head: its name and how often it runs, its primitive's title with
  * the reference small beside it, and what the primitive does, or the box's
  * problem in its place. */
 .header {
   display: flex;
   flex-direction: column;
+  height: var(--box-head);
   padding: 6px 10px 0;
   border-bottom: 1px solid var(--unicon-border);
   overflow: hidden;
@@ -307,8 +373,9 @@
   align-items: stretch;
   gap: 1px;
   width: 100%;
-  padding: 0;
+  padding: 6px 10px 0;
   border: 0;
+  border-bottom: 1px solid var(--unicon-border);
   background: transparent;
   color: inherit;
   font: inherit;
@@ -335,6 +402,18 @@
   font-size: 13px;
   font-weight: 700;
   color: var(--unicon-text-primary);
+}
+
+/* What kind of box it is, beside its name. */
+.pill {
+  flex: none;
+  margin-left: auto;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--unicon-hover);
+  color: var(--unicon-text-secondary);
+  font-size: 11px;
+  font-weight: 600;
 }
 
 .primitiveTitle {
@@ -375,6 +454,147 @@
   color: var(--unicon-text-danger);
 }
 
+/* A line under the head: what is wrong, or what a closed step needs and gives. */
+.line {
+  display: block;
+  height: var(--box-line);
+  max-width: none;
+  margin: 0;
+  padding: 4px 10px 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* A closed box's pin each side, on its title line. */
+.pin {
+  width: 8px;
+  height: 8px;
+  min-width: 0;
+  min-height: 0;
+  border: 0;
+}
+
+/*
+ * The tab on a box's left standing for the inputs it reads while they are
+ * not drawn: under the closed box's pin and above an open box's first row,
+ * where no wire ends.
+ */
+.fedTab {
+  position: absolute;
+  top: 44px;
+  right: calc(100% + var(--box-border));
+  padding: 2px 8px;
+  border: 0;
+  border-radius: 10px 0 0 10px;
+  color: #2a1f33;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.fedTab:focus-visible {
+  outline: 2px solid var(--mantine-primary-color-filled);
+  outline-offset: 1px;
+}
+
+/* A version's panel: the editor's, every field locked. */
+.locked {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+/* Locked, its fields are read as plainly as text, not greyed out as fields
+ * waiting to be allowed. */
+.locked :is(input, select, textarea):disabled {
+  opacity: 1;
+  color: var(--unicon-text-body);
+  -webkit-text-fill-color: var(--unicon-text-body);
+  cursor: default;
+}
+
+/* The card a step's tab pops its inputs out on, opaque over the graph; on
+ * the tab's right, its boxes stand on its far side, wired back to the tab. */
+.peek {
+  display: flex;
+  box-sizing: content-box;
+  border: 1px solid var(--unicon-border-strong);
+  border-radius: var(--mantine-radius-sm);
+  background: var(--unicon-body);
+  box-shadow: var(--mantine-shadow-md);
+}
+
+.peek[data-side='right'] {
+  flex-direction: row-reverse;
+}
+
+.peekBoxes {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 12px;
+  width: var(--box-closed);
+}
+
+.peekWires {
+  flex: none;
+  overflow: visible;
+}
+
+.peekLabel {
+  fill: var(--unicon-text-secondary);
+  font-size: 11px;
+}
+
+/* While a wire is dragged, a closed box that would take it, and one that would not. */
+.box[data-drop='offered'] {
+  outline: 2px dashed var(--unicon-text-accent);
+  outline-offset: 3px;
+}
+
+.box[data-drop='refused'] {
+  opacity: 0.6;
+}
+
+/* A workflow box's ears, above its face, so it reads as a stack. */
+.ear {
+  position: absolute;
+  height: var(--box-stack);
+  border: var(--box-border) solid var(--unicon-border-strong);
+  border-radius: var(--mantine-radius-sm);
+  background: var(--unicon-chrome);
+}
+
+/* A workflow box's foot, which opens it. */
+.foot {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: var(--box-foot);
+  padding: 0 10px;
+  border: 0;
+  border-top: 1px solid var(--unicon-border);
+  background: transparent;
+  color: var(--unicon-text-accent);
+  font: inherit;
+  font-weight: 700;
+  text-align: right;
+  cursor: pointer;
+}
+
+.foot:hover {
+  background: var(--unicon-hover);
+}
+
+.foot:focus-visible {
+  outline: 2px solid var(--mantine-primary-color-filled);
+}
+
 /* Every port has a row of its own across the box: inputs first, outputs
  * under them, their handles on the left and on the right. The row lets the
  * pointer through to the box, and only what it holds takes it. */
@@ -402,9 +622,11 @@
   opacity: 0.6;
 }
 
+/* An open box's port dot, in the box's colour as its pins are. */
 .handle {
   width: 10px;
   height: 10px;
+  border: 0;
 }
 
 .port {
@@ -574,4 +796,286 @@
 
 .row > * {
   pointer-events: auto;
+}
+
+/* A box's node, scrolled into the window with room around it, as it is sideways. */
+.node {
+  scroll-margin: 16px;
+}
+
+/* The tray over the graph: an input of each type, the primitives, the workflows. */
+.trays {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.trayRow {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  align-items: start;
+}
+
+.tray {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 240px;
+  overflow: auto;
+  padding: 12px;
+  border: 1px solid var(--unicon-border);
+  border-radius: var(--mantine-radius-lg);
+  background: var(--unicon-body);
+}
+
+.trayTitle {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--unicon-text-primary);
+}
+
+.trayItem {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--unicon-border);
+  border-radius: var(--mantine-radius-sm);
+  background: var(--unicon-chrome);
+  color: var(--unicon-text-body);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.trayItem:hover {
+  background: var(--unicon-hover);
+}
+
+.trayItem:focus-visible {
+  outline: 2px solid var(--mantine-primary-color-filled);
+}
+
+.trayName {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--unicon-text-primary);
+}
+
+.trayLine {
+  font-size: 11px;
+  color: var(--unicon-text-secondary);
+}
+
+.trayNote {
+  font-family: var(--mantine-font-family-monospace);
+  font-size: 10px;
+  color: var(--unicon-text-meta);
+}
+
+/* Inside a box: the breadcrumb back to each level, and the well the box
+ * zooms into, between what feeds it and what it feeds. */
+
+.crumb {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.crumbPart {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.crumbButton {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: var(--mantine-radius-xs);
+  background: var(--unicon-hover);
+  color: var(--unicon-text-body);
+  font: inherit;
+  font-size: 13px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.crumbButton:hover:not([data-here]) {
+  text-decoration: underline;
+}
+
+.crumbButton[data-here] {
+  color: var(--unicon-text-primary);
+  font-weight: 700;
+  cursor: default;
+}
+
+.crumbButton:focus-visible {
+  outline: 2px solid var(--mantine-primary-color-filled);
+}
+
+.caret {
+  color: var(--unicon-text-faint);
+  font-size: 12px;
+}
+
+.zoom[data-zooms] {
+  animation: zoom-in 320ms cubic-bezier(0.2, 0.7, 0.2, 1);
+  transform-origin: var(--zoom-x, 50%) var(--zoom-y, 40%);
+}
+
+@keyframes zoom-in {
+  from {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.well {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  padding: 16px;
+  border: 1px solid var(--unicon-border);
+  border-radius: var(--mantine-radius-lg);
+  background: var(--unicon-body);
+  overflow: hidden;
+}
+
+.well[data-in] {
+  grid-template-columns: 148px minmax(0, 1fr);
+}
+
+.well[data-out] {
+  grid-template-columns: minmax(0, 1fr) 148px;
+}
+
+.well[data-in][data-out] {
+  grid-template-columns: 148px minmax(0, 1fr) 148px;
+}
+
+.wellCentre {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.wellBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.side {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.side[data-side='in'] {
+  transform: translateX(-12px);
+}
+
+.side[data-side='out'] {
+  transform: translateX(12px);
+}
+
+.neighbour {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 2px solid;
+  border-radius: var(--mantine-radius-sm);
+  background: var(--unicon-chrome);
+  color: var(--unicon-text-body);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.neighbour:focus-visible {
+  outline: 2px solid var(--mantine-primary-color-filled);
+}
+
+.side[data-side='in'] .neighbour::after,
+.side[data-side='out'] .neighbour::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  width: 20px;
+  border-top: 2px solid var(--unicon-border);
+}
+
+.side[data-side='in'] .neighbour::after {
+  left: 100%;
+}
+
+.side[data-side='out'] .neighbour::before {
+  right: 100%;
+}
+
+.neighbourName {
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--unicon-text-primary);
+  font-size: 13px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.neighbourLine {
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--unicon-text-secondary);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .zoom[data-zooms] {
+    animation: none;
+  }
+}
+
+@media (max-width: 760px) {
+  .well,
+  .well[data-in],
+  .well[data-out],
+  .well[data-in][data-out] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .side[data-side='in'],
+  .side[data-side='out'] {
+    transform: none;
+  }
+
+  .side .neighbour::before,
+  .side .neighbour::after {
+    display: none;
+  }
 }

@@ -1,52 +1,78 @@
 import { useEffect, useMemo, useReducer, useState, type KeyboardEvent } from 'react';
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useBlocker } from 'react-router';
 import { $api } from '@/api/query';
 import { toApiError, type ApiError } from '@/api/problem';
 import type { SaveChange, WorkflowPage } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { UnsavedNote } from '@/ui/UnsavedNote';
 import { Button } from '@/ui/Button';
+import { Checkbox } from '@/ui/Checkbox';
 import { CodeEditor } from '@/ui/CodeEditor';
-import { Modal } from '@/ui/Modal';
+import { LeaveGuard } from '@/ui/LeaveGuard';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { type MenuEntry } from '@/ui/ActionMenu';
-import { useMarkColours } from '@/ui/brand/mark-colours';
 import { MergeView } from '../forms/MergeView';
 import { parseYaml } from '../forms/yaml-doc';
-import { AddStep } from './AddStep';
 import { WorkflowBar } from './Bar';
 import { checkQuery } from './check';
 import { Drawer, DRAWER_WIDTH } from './Drawer';
-import { formatUse, framesFor, parseUse, useBoxes, type Frame } from './boxes';
+import {
+  formatUse,
+  framesFor,
+  parseUse,
+  portsOf,
+  useBoxes,
+  useReadingBoxes,
+  type Frame,
+  type PaletteWorkflow,
+} from './boxes';
 import {
   addStep,
   addUse,
   clearPort,
   entryFields,
   freeName,
+  sharedNames,
   setEntry,
   setInput,
   wire,
   workflowOf,
 } from './edit';
-import { sourceAt, targetAt, workflowSources, type Target } from './ends';
+import {
+  sourceAt,
+  targetAt,
+  workflowSources,
+  type Drop,
+  type PortTarget,
+  type Target,
+} from './ends';
 import { treeQuery, type WorkflowPlace } from '../files/place';
 import { useNotice } from './notice';
 import { WorkflowFiles } from './Files';
+import type { Staging } from './staged-upload';
 import { FileView } from './FileView';
 import { Graph } from './Graph';
 import { Inside } from './Inside';
-import { layoutWorkflow, type Box, type StepPorts } from './layout';
-import { linesOf, type Selected } from './lines';
-import { type Ref, type Workflow } from './model';
-import { InputsPanel, OutputsPanel, StepPanel } from './Panels';
-import { pinned as pinProblems, placed } from './pins';
+import { useInputsShown } from './inputs-shown';
+import { layoutWorkflow, type Box } from './layout';
+import { drawerTitle, linesOf, selectionOf, type Selected } from './lines';
+import { refsOf, type Ref, type ValueType, type Workflow } from './model';
+import { FilePanel, InputsPanel, OutputsPanel, StepPanel } from './Panels';
+import { pinned as pinProblems, placed, warnings } from './pins';
 import { Problems } from './Problems';
-import { byRef, declared, type PrimitiveInfo } from './primitives';
-import { PublishVersion } from './Publish';
-import { outputType, outputSources, outputRefusal, wireRefusal } from './rules';
+import { byRef, type PrimitiveInfo } from './primitives';
+import { PublishVersion, type SaveOutcome } from './Publish';
+import {
+  outputType,
+  outputSources,
+  stepInputs,
+  stepOutputs,
+  outputRefusal,
+  portFor,
+  wireRefusal,
+} from './rules';
 import { ShareButton } from './SharePanel';
+import { Tray } from './Tray';
 import { DRAFT_FILE, refWords } from './words';
 import classes from './workflows.module.css';
 
@@ -55,10 +81,10 @@ import classes from './workflows.module.css';
  * (#377). The graph is drawn from the draft every time, at its actual size;
  * each change is an edit of the YAML document in place, comments and all,
  * kept in the page's history for undo and redo. The bar above says it is the
- * draft and holds Save, "Publish version", Share and "View file" (M32); the
- * toolbar under it holds Undo, Redo, "Add step", the inputs and the outputs
- * (M37). The box selected opens in a drawer on the
- * right. A moment after each change the draft is checked as a version would
+ * draft and holds Save, "Publish version", Share and "View YAML" (M32); the
+ * toolbar under it holds Undo and Redo (M37), and the tray over the graph adds
+ * an input, a primitive or a run workflow. The box selected opens, and opens
+ * in a drawer on the right. A moment after each change the draft is checked as a version would
  * be, and each problem is said in the banner, linked to its box, and beside
  * its mark on the box (M31). A draft with problems saves; a version of one is
  * refused. A draft whose file cannot be read cannot be drawn, so it is fixed
@@ -138,17 +164,14 @@ function useCheck(text: string) {
   return { check, checking: settled !== text || check.isPlaceholderData };
 }
 
-/** The box a selection stands on now, found again after the layout moved. */
-function boxOf(boxes: Box[], selected: Selected | null): string | null {
+/** The key of the box a selection stands on (`layout.ts`), or null for none. */
+function boxOf(selected: Selected | null): string | null {
   if (selected === null) return null;
   if (selected.kind === 'outputs') return 'outputs';
+  if (selected.kind === 'files') return null;
   if (selected.kind === 'step') return `step:${String(selected.index)}`;
-  const ids = selected.ids;
-  return (
-    boxes.find(
-      (box) => box.kind === 'inputs' && box.right.some((name) => ids.includes(name)),
-    )?.key ?? null
-  );
+  if (selected.kind === 'file') return `file:${selected.path}`;
+  return `input:${selected.id}`;
 }
 
 /**
@@ -160,67 +183,35 @@ type Chosen =
   Exclude<Selected, { kind: 'step' }> | { kind: 'step'; id: string; index: number };
 
 function chosenStep(chosen: Chosen | null, workflow: Workflow): Selected | null {
+  // An input removed, by its drawer, an undo or a merge, is no longer chosen.
+  if (chosen?.kind === 'input')
+    return workflow.inputs.some((input) => input.id === chosen.id) ? chosen : null;
+  // So is a file no step reads any more, as it has no box.
+  if (chosen?.kind === 'file')
+    return workflow.steps.some((step) =>
+      Object.values(step.with).some((value) =>
+        refsOf(value).some(
+          (ref) => ref.kind === 'workflow' && ref.name === chosen.path,
+        ),
+      ),
+    )
+      ? chosen
+      : null;
   if (chosen?.kind !== 'step') return chosen;
   const found = workflow.steps.findIndex((step) => step.id === chosen.id);
   const index = found >= 0 ? found : chosen.index;
   return index < workflow.steps.length ? { kind: 'step', index } : null;
 }
 
-function selectionOf(box: Box | undefined): Selected | null {
-  if (box === undefined) return null;
-  if (box.kind === 'step' && box.step !== null)
-    return { kind: 'step', index: box.step };
-  if (box.kind === 'inputs') return { kind: 'inputs', ids: box.right };
-  if (box.kind === 'outputs') return { kind: 'outputs' };
-  return null;
-}
-
-function drawerTitle(selected: Selected | null, workflow: Workflow): string | null {
-  if (selected === null) return null;
-  if (selected.kind === 'step')
-    return `Step ${workflow.steps[selected.index]?.id || '(no name)'}`;
-  if (selected.kind === 'inputs') return 'Inputs';
-  return 'Outputs';
-}
-
-/**
- * Leaving the page with changes not saved asks first: by a link, the
- * switcher or the browser's back, and by closing the tab.
- */
-function LeaveGuard({ dirty }: { dirty: boolean }) {
-  const blocker = useBlocker(
-    ({ currentLocation, nextLocation }) =>
-      dirty &&
-      (currentLocation.pathname !== nextLocation.pathname ||
-        currentLocation.search !== nextLocation.search),
-  );
-  useEffect(() => {
-    if (!dirty) return;
-    const warn = (event: BeforeUnloadEvent) => event.preventDefault();
-    window.addEventListener('beforeunload', warn);
-    return () => window.removeEventListener('beforeunload', warn);
-  }, [dirty]);
-  const asking = blocker.state === 'blocked';
-  return (
-    <Modal
-      opened={asking}
-      onClose={() => blocker.reset?.()}
-      title="Leave without saving?"
-    >
-      <div className={classes.stack}>
-        <BodyText size="md">
-          Your changes to the draft are not saved. Leaving loses them.
-        </BodyText>
-        <div className={classes.actions}>
-          <Button onClick={() => blocker.reset?.()}>Stay</Button>
-          <Button variant="danger" onClick={() => blocker.proceed?.()}>
-            Leave without saving
-          </Button>
-        </div>
-      </div>
-    </Modal>
-  );
-}
+/** What a new input of each type is called, before a number makes it unique. */
+const INPUT_NAMES: Record<ValueType, string> = {
+  text: 'text',
+  number: 'number',
+  boolean: 'switch',
+  enum: 'choice',
+  file: 'file',
+  folder: 'folder',
+};
 
 export function Editor({
   page,
@@ -230,7 +221,6 @@ export function Editor({
   primitives: PrimitiveInfo[];
 }) {
   const { owner, name } = page;
-  const colours = useMarkColours();
   const queryClient = useQueryClient();
   const [state, dispatch] = useReducer(history, {
     past: [],
@@ -297,19 +287,24 @@ export function Editor({
   const workflow = useMemo(() => workflowOf(text), [text]);
   const readable = $api.useQuery('get', '/api/v1/workflows', {}, { retry: false });
   const paletteRefs = useMemo(() => {
-    const found: Frame['use'][] = [];
+    const found: PaletteWorkflow[] = [];
     for (const item of readable.data ?? [])
       for (const version of item.versions) {
         const ref = `${item.owner}/${item.name}@${version}`;
         if (item.owner === page.owner && item.name === page.name) continue;
         if (!primitiveMap.has(ref))
-          found.push({ owner: item.owner, name: item.name, version });
+          found.push({
+            owner: item.owner,
+            name: item.name,
+            version,
+            visibility: item.visibility,
+          });
       }
     return found;
   }, [readable.data, primitiveMap, page.owner, page.name]);
   const boxRefs = useMemo(() => {
     const seen = new Set(paletteRefs.map((use) => formatUse(use)));
-    const found = [...paletteRefs];
+    const found: Frame['use'][] = [...paletteRefs];
     for (const step of workflow.steps) {
       if (primitiveMap.has(step.use) || seen.has(step.use)) continue;
       const parsed = parseUse(step.use);
@@ -319,24 +314,35 @@ export function Editor({
     }
     return found;
   }, [paletteRefs, workflow, primitiveMap]);
-  const boxMap = useBoxes(boxRefs);
+  const usedBoxes = useBoxes(boxRefs);
+  // The newer version a step could move to, read so Move to it can be checked
+  // even when the list of workflows has not come.
+  const newerRefs = useMemo(() => {
+    const found = new Map<string, Frame['use']>();
+    for (const step of workflow.steps) {
+      const newer = usedBoxes.get(step.use)?.newer ?? null;
+      const use = parseUse(step.use);
+      if (newer === null || use === null) continue;
+      const ref = { ...use, version: newer };
+      if (!usedBoxes.has(formatUse(ref))) found.set(formatUse(ref), ref);
+    }
+    return [...found.values()];
+  }, [workflow, usedBoxes]);
+  const newerBoxes = useBoxes(newerRefs);
+  const boxMap = useMemo(
+    () => (newerBoxes.size === 0 ? usedBoxes : new Map([...usedBoxes, ...newerBoxes])),
+    [usedBoxes, newerBoxes],
+  );
+  const readingBoxes = useReadingBoxes();
   const palette = useMemo(
-    () => paletteRefs.filter((use) => boxMap.get(formatUse(use))?.run === true),
+    () =>
+      paletteRefs.flatMap((use) => {
+        const box = boxMap.get(formatUse(use));
+        return box === undefined ? [] : [{ ...use, box }];
+      }),
     [paletteRefs, boxMap],
   );
-  const ports = useMemo(() => {
-    const found = new Map<string, StepPorts>();
-    for (const [use, box] of boxMap)
-      found.set(use, {
-        inputs: box.inputs.map((input) => input.name),
-        outputs: box.outputs.map((output) => output.name),
-      });
-    return found;
-  }, [boxMap]);
-  const layout = useMemo(
-    () => layoutWorkflow(workflow, primitiveMap, ports),
-    [workflow, primitiveMap, ports],
-  );
+  const ports = useMemo(() => portsOf(boxMap), [boxMap]);
   const { check, checking } = useCheck(text);
   const problems = useMemo(() => check.data ?? [], [check.data]);
   const pins = useMemo(
@@ -350,7 +356,28 @@ export function Editor({
     [problems, workflow],
   );
   const listed = useMemo(() => placed(problems, workflow), [problems, workflow]);
+  const warned = useMemo(
+    () => warnings(pins, workflow, (use) => boxMap.get(use)?.newer ?? null),
+    [pins, workflow, boxMap],
+  );
   const selected = useMemo(() => chosenStep(chosen, workflow), [chosen, workflow]);
+  const selectedKey = boxOf(selected);
+  const [inputsShown, showInputs] = useInputsShown();
+  const layout = useMemo(
+    () =>
+      layoutWorkflow(workflow, primitiveMap, ports, {
+        open: new Set(selectedKey === null ? [] : [selectedKey]),
+        warned: new Set(warned.keys()),
+        inputs: inputsShown ? 'shown' : 'hidden',
+      }),
+    [workflow, primitiveMap, ports, selectedKey, warned, inputsShown],
+  );
+  /** Where the step `steps` has that the workflow had not stands. */
+  const addedAt = (steps: Workflow['steps']): number => {
+    const at = steps.findIndex((step, index) => workflow.steps[index]?.id !== step.id);
+    return at < 0 ? workflow.steps.length : at;
+  };
+
   const select = (next: Selected | null, steps = workflow.steps) => {
     setNonce((count) => count + 1);
     setChosen(
@@ -366,7 +393,18 @@ export function Editor({
     if (id !== undefined && (id !== chosen.id || selected.index !== chosen.index))
       setChosen({ kind: 'step', id, index: selected.index });
   }
-  const selectedKey = boxOf(layout.boxes, selected);
+  const first = stack[0];
+  if (first !== undefined && selected?.kind === 'step') {
+    // Inside a box, only Details selects a step of the draft: the step the
+    // box is. A rename follows it; another version is that version's inside.
+    const step = workflow.steps[selected.index];
+    const use = step === undefined ? null : parseUse(step.use);
+    if (step === undefined || use === null || primitiveMap.has(step.use)) setStack([]);
+    else if (formatUse(use) !== formatUse(first.use))
+      setStack([{ use, title: step.id, rest: [], mark: null }]);
+    else if (step.id !== first.title)
+      setStack([{ ...first, title: step.id }, ...stack.slice(1)]);
+  }
   const reveal = useMemo(
     () => (selectedKey === null ? null : { key: selectedKey, nonce }),
     [selectedKey, nonce],
@@ -384,11 +422,12 @@ export function Editor({
   const save = $api.useMutation('put', '/api/v1/workflows/{owner}/{name}/draft');
 
   /** Write `content` over `over`, the file as last read: on a conflict the
-   * merge view compares with what was written over. */
+   * merge view compares with what was written over. It says what the draft
+   * was saved as, or why it was not. */
   const write = async (
     content: string,
     over: { text: string; token: string | null },
-  ) => {
+  ): Promise<SaveOutcome> => {
     setSaveError(null);
     try {
       const written = await save.mutateAsync({
@@ -408,7 +447,7 @@ export function Editor({
         }).queryKey,
       });
       setConflict(null);
-      return true;
+      return { token: written.token, revision: written.revision ?? null };
     } catch (caught) {
       const error = toApiError(caught);
       if (error.code === 'conflict') {
@@ -422,7 +461,7 @@ export function Editor({
         if (current !== null) {
           if (fileChanges.length > 0 && current.content === content) {
             setSaveError(error);
-            return false;
+            return { refused: error.detail ?? error.message };
           }
           setConflict({
             base: over.text,
@@ -430,70 +469,141 @@ export function Editor({
             current: current.content,
             token: current.token,
           });
-          return false;
+          return {
+            refused:
+              'Someone else saved the draft meanwhile. Close this to merge their changes with yours, then publish.',
+          };
         }
       }
       setSaveError(error);
-      return false;
+      return { refused: error.detail ?? error.message };
     }
   };
 
-  const refusal = (source: Ref, target: Target): string | null =>
-    target.kind === 'port'
-      ? wireRefusal(workflow, primitiveMap, target.step, target.port, source, boxMap)
-      : outputRefusal(workflow, primitiveMap, source, boxMap);
+  /** The port a wire dropped on `target` goes to, picked on a step's box, or why none. */
+  const portOf = (source: Ref, target: Target): PortTarget | string => {
+    if (target.kind !== 'step') return target;
+    const picked = portFor(workflow, primitiveMap, target.step, source, boxMap);
+    return 'reason' in picked
+      ? picked.reason
+      : { kind: 'port', step: target.step, port: picked.port };
+  };
+
+  /** Why a wire may not go to `target`; on a closed box, naming the port picked, which it does not show. */
+  const refusal = (source: Ref, target: Target): string | null => {
+    const to = portOf(source, target);
+    if (typeof to === 'string') return to;
+    if (to.kind === 'outputs')
+      return outputRefusal(workflow, primitiveMap, source, boxMap);
+    const refused = wireRefusal(
+      workflow,
+      primitiveMap,
+      to.step,
+      to.port,
+      source,
+      boxMap,
+    );
+    return refused !== null && target.kind === 'step'
+      ? `${to.port}: ${refused}`
+      : refused;
+  };
+
+  /** `base` with `source` wired into `target`, a port or the outputs. */
+  const wired = (base: string, source: Ref, target: PortTarget): string => {
+    if (target.kind === 'port') return wire(base, target.step, target.port, source);
+    if (source.kind !== 'steps') return base;
+    const existing = workflow.outputs.find((entry) => entry.name === target.entry);
+    if (existing !== undefined)
+      return setEntry(
+        base,
+        existing.name,
+        entryFields(existing, outputType(workflow, primitiveMap, source, boxMap), {
+          from: source,
+        }),
+      );
+    return setEntry(base, freeName(source.output, sharedNames(workflow), '_'), {
+      from: source,
+    });
+  };
+
+  /**
+   * Where a wire from `source` dropped on `target` goes, or null when it is
+   * refused, said at the box `box` it was dropped on, at the port picked.
+   */
+  const accepted = (
+    source: Ref,
+    target: Target,
+    box: string,
+    port: string,
+  ): PortTarget | null => {
+    const to = portOf(source, target);
+    if (typeof to === 'string') {
+      showNotice({ box, port, reason: to });
+      return null;
+    }
+    const refused = refusal(source, target);
+    if (refused === null) return to;
+    showNotice({ box, port: to.kind === 'port' ? to.port : port, reason: refused });
+    return null;
+  };
 
   const connect = (source: Ref, target: Target, box: string, port: string) => {
-    const refused = refusal(source, target);
-    if (refused !== null) {
-      showNotice({ box, port, reason: refused });
+    const to = accepted(source, target, box, port);
+    if (to !== null) change(wired(text, source, to));
+  };
+
+  /**
+   * A wire's end lifted off the port `from` and dropped on `target`, moved
+   * there in one change; dropped on nothing, the port is cleared.
+   */
+  const lift = (
+    source: Ref,
+    from: { step: number; port: string },
+    drop: Drop | null,
+  ) => {
+    if (drop === null) {
+      change(clearPort(text, from.step, from.port));
       return;
     }
-    if (target.kind === 'port') {
-      change(wire(text, target.step, target.port, source));
+    const to = accepted(source, drop.target, drop.box, drop.port);
+    if (
+      to === null ||
+      (to.kind === 'port' && to.step === from.step && to.port === from.port)
+    )
       return;
-    }
-    if (source.kind !== 'steps') return;
-    const existing = workflow.outputs.find((entry) => entry.name === target.entry);
-    if (existing !== undefined) {
-      change(
-        setEntry(
-          text,
-          existing.name,
-          entryFields(existing, outputType(workflow, primitiveMap, source), {
-            from: source,
-          }),
-        ),
-      );
-      return;
-    }
-    change(
-      setEntry(
-        text,
-        freeName(
-          source.output,
-          workflow.outputs.map((entry) => entry.name),
-          '_',
-        ),
-        { from: source },
-      ),
-    );
+    change(wired(clearPort(text, from.step, from.port), source, to));
+  };
+
+  /** Shows the inside of the workflow the step at `index` runs. */
+  const openBox = (index: number) => {
+    const step = workflow.steps[index];
+    const use = step === undefined ? null : parseUse(step.use);
+    if (step === undefined || use === null || primitiveMap.has(step.use)) return;
+    select(null);
+    setStack([{ use, title: step.id, rest: [], mark: null }]);
+  };
+
+  const files = workflowSources(savedFiles.data ?? [], fileChanges);
+  const staging: Staging = {
+    place: filePlace,
+    changes: fileChanges,
+    onChange: (update) => {
+      setFileChanges(update);
+      setPublished(null);
+    },
+    onBusy: setUploading,
+    disabled: uploading || save.isPending,
   };
 
   /** Every source a port could be wired from, in the order the file declares them. */
   const sources = (): Ref[] => [
     ...workflow.inputs.map((input): Ref => ({ kind: 'inputs', name: input.id })),
-    ...workflow.steps.flatMap((step) => {
-      const declaredOutputs = declared(primitiveMap, step.use)?.outputs;
-      const names =
-        declaredOutputs !== undefined
-          ? Object.keys(declaredOutputs)
-          : (boxMap.get(step.use)?.outputs.map((output) => output.name) ?? []);
-      return names
-        .filter((output) => output !== 'outcome')
-        .map((output): Ref => ({ kind: 'steps', name: step.id, output }));
-    }),
-    ...workflowSources(savedFiles.data ?? [], fileChanges),
+    ...workflow.steps.flatMap((step) =>
+      stepOutputs(primitiveMap, boxMap, step)
+        .filter((output) => output.type !== 'outcome')
+        .map((output): Ref => ({ kind: 'steps', name: step.id, output: output.name })),
+    ),
+    ...files,
   ];
 
   /** What a port's menu is called, or null for a port with none. */
@@ -536,7 +646,9 @@ export function Editor({
           });
         const decl =
           step !== undefined
-            ? declared(primitiveMap, step.use)?.inputs[port]
+            ? stepInputs(primitiveMap, boxMap, step)?.find(
+                (input) => input.name === port,
+              )
             : undefined;
         const value = step?.with[port];
         entries.push({ kind: 'divider' });
@@ -550,10 +662,7 @@ export function Editor({
             kind: 'item',
             text: `A new input, of type ${decl.type}, wired here`,
             onSelect: () => {
-              const id = freeName(
-                port.replaceAll('_', '-'),
-                workflow.inputs.map((input) => input.id),
-              );
+              const id = freeName(port, sharedNames(workflow), '_');
               const declaredText = setInput(text, id, {
                 type: decl.type,
                 options: decl.options,
@@ -572,7 +681,7 @@ export function Editor({
           });
       } else {
         entries.push({ kind: 'heading', text: 'Read from' });
-        for (const source of outputSources(workflow, primitiveMap))
+        for (const source of outputSources(workflow, primitiveMap, boxMap))
           entries.push({
             kind: 'item',
             text: refWords(source),
@@ -601,9 +710,7 @@ export function Editor({
       }
       entries.push({ kind: 'heading', text: 'Wire to' });
       workflow.steps.forEach((step, index) => {
-        for (const target of Object.keys(
-          declared(primitiveMap, step.use)?.inputs ?? {},
-        )) {
+        for (const { name: target } of stepInputs(primitiveMap, boxMap, step) ?? []) {
           if (source.kind === 'steps' && source.name === step.id) continue;
           const to: Target = { kind: 'port', step: index, port: target };
           entries.push({
@@ -624,6 +731,8 @@ export function Editor({
     );
     if (
       field !== null ||
+      // Nothing is changed inside a box.
+      stack.length > 0 ||
       !(event.ctrlKey || event.metaKey) ||
       (event.key.toLowerCase() !== 'z' && event.key.toLowerCase() !== 'y')
     )
@@ -637,28 +746,61 @@ export function Editor({
   const panel =
     selected === null ? null : selected.kind === 'step' ? (
       <StepPanel
+        key={workflow.steps[selected.index]?.id ?? selected.index}
         text={text}
         workflow={workflow}
         primitives={primitiveMap}
+        boxes={boxMap}
+        reading={readingBoxes}
         pinned={pins}
         index={selected.index}
+        fitting={(port) => {
+          const target: Target = { kind: 'port', step: selected.index, port };
+          return sources().filter((source) => refusal(source, target) === null);
+        }}
         change={change}
-        onRemoved={() => select(null)}
+        onRemoved={() => {
+          select(null);
+          setStack([]);
+        }}
+        onZoom={() => openBox(selected.index)}
       />
-    ) : selected.kind === 'inputs' ? (
+    ) : selected.kind === 'input' ? (
       <InputsPanel
         text={text}
         workflow={workflow}
         primitives={primitiveMap}
+        boxes={boxMap}
         pinned={pins}
-        ids={selected.ids.length > 0 ? selected.ids : null}
+        id={selected.id}
+        files={files}
+        staging={staging}
         change={change}
+        onRenamed={(id) => select({ kind: 'input', id })}
+        onGiven={(path) => select({ kind: 'file', path })}
       />
+    ) : selected.kind === 'file' ? (
+      <FilePanel
+        text={text}
+        workflow={workflow}
+        primitives={primitiveMap}
+        boxes={boxMap}
+        path={selected.path}
+        files={files}
+        listed={savedFiles.isSuccess}
+        staging={staging}
+        change={change}
+        onMoved={(path) => select({ kind: 'file', path })}
+        onSupplied={(id) => select({ kind: 'input', id })}
+      />
+    ) : selected.kind === 'files' ? (
+      <WorkflowFiles key={revision ?? 'draft'} {...staging} workflow={workflow} />
     ) : (
       <OutputsPanel
         text={text}
         workflow={workflow}
         primitives={primitiveMap}
+        boxes={boxMap}
         pinned={pins}
         change={change}
       />
@@ -682,6 +824,36 @@ export function Editor({
             </BodyText>
           )
         }
+        tools={
+          stack.length === 0 ? (
+            <>
+              <Button
+                variant="secondary"
+                disabled={state.past.length === 0}
+                onClick={() => dispatch({ kind: 'undo' })}
+              >
+                Undo
+              </Button>
+              <Button
+                variant="secondary"
+                disabled={state.future.length === 0}
+                onClick={() => dispatch({ kind: 'redo' })}
+              >
+                Redo
+              </Button>
+              {drawing && (
+                <Button variant="secondary" onClick={() => select({ kind: 'files' })}>
+                  Files
+                </Button>
+              )}
+              <Checkbox
+                label="Show inputs and files"
+                checked={inputsShown}
+                onChange={showInputs}
+              />
+            </>
+          ) : undefined
+        }
       >
         <Button
           disabled={!dirty || uploading}
@@ -699,6 +871,8 @@ export function Editor({
           dirty={dirty}
           problems={check.isSuccess ? problems.length : 0}
           checking={checking || check.isPending}
+          onSave={() => write(text, saved)}
+          canSave={!uploading && !save.isPending}
           onPublished={setPublished}
         />
         <ShareButton page={page} />
@@ -709,63 +883,6 @@ export function Editor({
           {published} is published. Tasks can choose it now.
         </p>
       )}
-      <div className={classes.tools} role="toolbar" aria-label="Editing">
-        <Button
-          variant="secondary"
-          disabled={state.past.length === 0}
-          onClick={() => dispatch({ kind: 'undo' })}
-        >
-          Undo
-        </Button>
-        <Button
-          variant="secondary"
-          disabled={state.future.length === 0}
-          onClick={() => dispatch({ kind: 'redo' })}
-        >
-          Redo
-        </Button>
-        <span className={classes.toolGap} aria-hidden />
-        <AddStep
-          primitives={primitives}
-          workflows={palette}
-          disabled={!drawing || stack.length > 0}
-          onAddWorkflow={(chosen) => {
-            const next = addUse(text, formatUse(chosen), chosen.name);
-            const steps = workflowOf(next).steps;
-            const added = steps.findIndex(
-              (step, at) => workflow.steps[at]?.id !== step.id,
-            );
-            change(next);
-            select({ kind: 'step', index: added < 0 ? workflow.steps.length : added });
-          }}
-          onAdd={(primitive) => {
-            const next = addStep(text, primitive);
-            const steps = workflowOf(next).steps;
-            const added = steps.findIndex(
-              (step, at) => workflow.steps[at]?.id !== step.id,
-            );
-            change(next);
-            select(
-              { kind: 'step', index: added < 0 ? workflow.steps.length : added },
-              steps,
-            );
-          }}
-        />
-        <Button
-          variant="secondary"
-          disabled={!drawing}
-          onClick={() => select({ kind: 'inputs', ids: [] })}
-        >
-          Inputs
-        </Button>
-        <Button
-          variant="secondary"
-          disabled={!drawing || stack.length > 0}
-          onClick={() => select({ kind: 'outputs' })}
-        >
-          Outputs
-        </Button>
-      </div>
       {saveError !== null && <ErrorBlock error={saveError} compact />}
       {savedFiles.isError && (
         <ErrorBlock
@@ -786,7 +903,7 @@ export function Editor({
           onSave={(merged) => {
             void write(merged, { text: conflict.current, token: conflict.token }).then(
               (done) => {
-                if (done) dispatch({ kind: 'change', text: merged });
+                if (!('refused' in done)) dispatch({ kind: 'change', text: merged });
               },
             );
           }}
@@ -811,23 +928,72 @@ export function Editor({
                 if (frames !== null && frames.length > 0) {
                   select(null);
                   setStack(frames);
-                } else if (item.opens !== null) select(item.opens);
+                } else if (item.opens !== null) {
+                  setStack([]);
+                  select(item.opens);
+                }
               });
               return;
             }
-            if (item.opens !== null) select(item.opens);
+            if (item.opens !== null) {
+              // A problem of the draft is shown at the draft, out of any box.
+              setStack([]);
+              select(item.opens);
+            }
+          }}
+        />
+      )}
+      {drawing && stack.length === 0 && (
+        <Tray
+          primitives={primitives}
+          workflows={palette}
+          finding={
+            readable.isError
+              ? 'failed'
+              : readable.isPending || readingBoxes
+                ? 'reading'
+                : 'done'
+          }
+          onInput={(type) => {
+            // Inputs and outputs are one set of names, which the forge
+            // writes with underscores.
+            const id = freeName(INPUT_NAMES[type], sharedNames(workflow), '_');
+            change(
+              setInput(text, id, {
+                type,
+                options: type === 'enum' ? ['a', 'b'] : null,
+              }),
+            );
+            select({ kind: 'input', id });
+          }}
+          onPrimitive={(primitive) => {
+            const next = addStep(text, primitive);
+            const steps = workflowOf(next).steps;
+            change(next);
+            select({ kind: 'step', index: addedAt(steps) }, steps);
+          }}
+          onWorkflow={(chosen) => {
+            const next = addUse(text, formatUse(chosen), chosen.name);
+            const steps = workflowOf(next).steps;
+            change(next);
+            select({ kind: 'step', index: addedAt(steps) }, steps);
           }}
         />
       )}
       {drawing && stack.length > 0 ? (
         <Inside
           root={page.name}
+          draft={{ workflow, boxes: boxMap, layout }}
           frames={stack}
           primitives={primitives}
           onCrumb={(index) =>
             setStack((current) => (index < 0 ? [] : current.slice(0, index + 1)))
           }
-          onOpen={(frame) => setStack((current) => [...current, frame])}
+          onGo={(next, box) => {
+            select(next.length === 0 ? selectionOf(box?.key) : null);
+            setStack(next);
+          }}
+          onDetails={(index) => select({ kind: 'step', index })}
         />
       ) : drawing ? (
         <Graph
@@ -835,16 +1001,9 @@ export function Editor({
           workflow={workflow}
           primitives={primitiveMap}
           workflowBoxes={boxMap}
-          onOpenBox={(index) => {
-            const step = workflow.steps[index];
-            const use = step === undefined ? null : parseUse(step.use);
-            if (step === undefined || use === null || primitiveMap.has(step.use))
-              return;
-            select(null);
-            setStack([{ use, title: step.id, rest: [] }]);
-          }}
+          onOpenBox={openBox}
           pinned={pins}
-          colours={colours}
+          warnings={warned}
           selected={selectedKey}
           readOnly={false}
           dragging={dragging}
@@ -852,15 +1011,14 @@ export function Editor({
           refusal={refusal}
           label={menuLabel}
           entries={menuEntries}
-          onSelect={(key) =>
-            select(selectionOf(layout.boxes.find((box) => box.key === key)))
-          }
+          onSelect={(key) => select(selectionOf(key))}
           onDragStart={(source) => {
             // Starting another wire puts the last refusal away.
             if (source !== null) clearNotice();
             setDragging(source);
           }}
           onDrop={connect}
+          onLift={lift}
           reveal={reveal}
           cover={selected === null ? 0 : DRAWER_WIDTH}
         />
@@ -902,18 +1060,7 @@ export function Editor({
       >
         {panel}
       </Drawer>
-      <WorkflowFiles
-        key={revision ?? 'draft'}
-        place={{ kind: 'workflow', owner, name }}
-        changes={fileChanges}
-        onChange={(changes) => {
-          setFileChanges(changes);
-          setPublished(null);
-        }}
-        disabled={save.isPending}
-        onBusy={setUploading}
-      />
-      <LeaveGuard dirty={dirty} />
+      <LeaveGuard dirty={dirty} what="Your changes to the draft" search />
     </div>
   );
 }
