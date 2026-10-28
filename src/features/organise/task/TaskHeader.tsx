@@ -77,10 +77,12 @@ function readiness(
           upload: null,
           version: null,
         });
-  const values = read === null || 'error' in read ? null : readTask(read.doc).values;
-  const needed = (form?.problem === null ? form.inputs : []).filter(
-    (input) => !input.optional,
-  );
+  const declared = form?.problem === null ? form.inputs : null;
+  // Read against the inputs declared, so one only a run gives, in `repeat`
+  // and not `inputs`, is read as given each run.
+  const values =
+    read === null || 'error' in read ? null : readTask(read.doc, declared).values;
+  const needed = (declared ?? []).filter((input) => !input.optional);
   // An input the entrant gives, or one each run gives, needs no value here.
   const missing = needed.find((input) => {
     const given = values?.inputs.find((found) => found.id === input.id);

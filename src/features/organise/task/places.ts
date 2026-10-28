@@ -174,7 +174,7 @@ export function taskPlace(
         label:
           name === null
             ? 'Runs'
-            : `Runs, axis ${String(axis + 1)}, row ${String(row + 1)}: ${name}`,
+            : `Runs, table ${String(axis + 1)}, row ${String(row + 1)}: ${name}`,
         field:
           name === null ? null : `axis-${String(axis)}-tuple-${String(row)}-${name}`,
         item: null,

@@ -46,7 +46,7 @@ describe("the contest page's header", () => {
 });
 
 describe("the contest's settings at a glance", () => {
-  it('says when it runs, who sees it, how people enter and in teams or not', async () => {
+  it('says its schedule, how people enter and in teams or not, and who sees it once, on its status', async () => {
     server.use(
       signedIn,
       standingList,
@@ -77,12 +77,21 @@ describe("the contest's settings at a glance", () => {
     const values = within(summary)
       .getAllByRole('definition')
       .map((value) => value.textContent);
+    expect(
+      within(summary)
+        .getAllByRole('term')
+        .map((term) => term.textContent),
+    ).toEqual(['Schedule', 'How people enter', 'Teams']);
     expect(values).toEqual([
       `${at('2026-10-01T09:00:00Z')} to ${at('2026-10-01T14:00:00Z')}`,
-      'Anyone, signed in or not',
       'Anyone you invite, or anyone with an @u.nus.edu email can register from when the contest opens until the contest ends. Each is approved straight away. At most 500 entrants can register.',
       'Teams of 2 to 3 people, fixed when the contest starts',
     ]);
+    const status = screen.getByRole('region', { name: 'Status' });
+    expect(
+      await within(status).findByText('Who sees it: Anyone, signed in or not'),
+    ).toBeVisible();
+    expect(screen.getAllByText(/Who sees it/)).toHaveLength(1);
     const card = screen.getByRole('region', { name: 'Settings' });
     expect(within(card).getByRole('link', { name: 'Settings' })).toHaveAttribute(
       'href',
@@ -400,7 +409,7 @@ describe("the contest's tasks", () => {
     const alert = await within(tasks).findByRole('alert');
     expect(alert).toHaveTextContent("The contest's settings cannot be read");
     expect(alert).toHaveTextContent(
-      'Fix each problem where it is listed, or, as an admin, fix them as text in the stored settings.',
+      'Fix each problem where it is listed, or fix them as text in the stored settings.',
     );
     expect(
       within(alert).getByRole('link', { name: 'the stored settings' }),
@@ -783,10 +792,10 @@ describe("the contest's sections", () => {
       ).toBeVisible();
     await says('How people enter', '1 way in: a sign-up.');
     await says('Entrants', 'Nobody has registered yet.');
-    await says('Gradings', '3 waiting to be graded, 1 being graded.');
+    await says('Gradings', '4 waiting to be graded, 1 of them sent to a machine.');
     await says('Announcements', '2 posted; the latest is “Task B fixed”.');
     await says('Questions', 'Nobody has asked anything yet.');
-    await says('Leaderboards', 'No hold.');
+    await says('Leaderboards', 'No freeze.');
     await says('Contest organisers', '0 organisers');
     // A contest holds no file but its settings, so it has no Files card (M43).
     expect(screen.queryByRole('region', { name: 'Files' })).toBeNull();
@@ -845,7 +854,7 @@ describe("the contest's sections", () => {
     renderApp(CONTEST);
     const boards = await screen.findByRole('region', { name: 'Leaderboards' });
     await user.click(
-      await within(boards).findByRole('button', { name: 'End the hold now' }),
+      await within(boards).findByRole('button', { name: 'End the freeze now' }),
     );
     expect(
       await screen.findByText(
@@ -854,12 +863,12 @@ describe("the contest's sections", () => {
     ).toBeVisible();
     await user.click(
       within(screen.getByRole('dialog')).getByRole('button', {
-        name: 'End the hold now',
+        name: 'End the freeze now',
       }),
     );
     expect(await within(boards).findByText(/Ended by kenny/)).toBeVisible();
     expect(
-      within(boards).queryByRole('button', { name: 'End the hold now' }),
+      within(boards).queryByRole('button', { name: 'End the freeze now' }),
     ).toBeNull();
   });
 });

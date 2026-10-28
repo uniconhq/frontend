@@ -37,6 +37,20 @@ describe('the grading queue', () => {
     expect(screen.queryByText('There is no such task.')).toBeNull();
   });
 
+  it('has nothing waiting when counted submissions have no hand-marked values', async () => {
+    server.use(
+      signedIn,
+      http.get(QUEUE, () =>
+        HttpResponse.json([
+          { ...ROW, submissions: [{ ...ROW.submissions[0], marks: [] }] },
+        ]),
+      ),
+    );
+    renderApp(PAGE);
+    expect(await screen.findByText('Nothing is waiting for a mark.')).toBeVisible();
+    expect(screen.queryByRole('heading', { name: 'ada' })).toBeNull();
+  });
+
   it('saves a mark on Enter and says when', async () => {
     const user = userEvent.setup();
     let body: unknown = null;

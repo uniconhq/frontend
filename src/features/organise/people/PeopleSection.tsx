@@ -28,7 +28,8 @@ import {
   isPlace,
   offered,
   ROLE_LABEL,
-  ROLE_MEANS,
+  ROLE_AREAS,
+  roleMeans,
   type RolePlace,
 } from '../roles';
 import { InvitesSection } from '../invites/InvitesSection';
@@ -39,11 +40,11 @@ import classes from './people.module.css';
  * The roles the caller may give, as Invite offers them, each with what it
  * lets its holder do: only an admin gives the admin role.
  */
-function roleOptions(administers: boolean) {
+function roleOptions(administers: boolean, kind: RolePlace['kind']) {
   return offered(administers).map((role) => ({
     value: role,
     label: ROLE_LABEL[role],
-    description: ROLE_MEANS[role],
+    description: roleMeans(role, kind).join(' '),
   }));
 }
 
@@ -218,7 +219,7 @@ function HolderRow({
               <RadioGroup
                 label="Role"
                 value={role}
-                options={roleOptions(administers)}
+                options={roleOptions(administers, place.kind)}
                 onChange={(value) => setRole(value as RoleName)}
               />
               <div className={classes.actions}>
@@ -315,6 +316,35 @@ export function PeopleSection({ place }: { place: RolePlace }) {
 
   return (
     <>
+      <Card>
+        <div className={classes.stack}>
+          <SectionTitle>What each role can do</SectionTitle>
+          <div style={{ overflowX: 'auto' }}>
+            <table className={classes.table} aria-label="What each role can do">
+              <thead>
+                <tr>
+                  <th scope="col">Role</th>
+                  {ROLE_AREAS.map((area) => (
+                    <th scope="col" key={area}>
+                      {area}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {(['admin', 'manager', 'observer'] as const).map((role) => (
+                  <tr key={role}>
+                    <th scope="row">{ROLE_LABEL[role]}</th>
+                    {roleMeans(role, place.kind).map((line) => (
+                      <td key={line}>{line}</td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </Card>
       <Card>
         <Loaded view={view}>
           {(holders) => (

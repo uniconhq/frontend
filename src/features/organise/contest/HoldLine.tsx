@@ -24,17 +24,17 @@ export function HoldLine({ path }: { path: Path }) {
   if (view.state === 'error')
     return <ErrorBlock error={view.error} onRetry={view.retry} compact />;
   const hold = view.data;
-  if (hold.from === null) return <BodyText>No hold.</BodyText>;
+  if (hold.from === null) return <BodyText>No freeze.</BodyText>;
   const until =
     hold.until === 'staff'
-      ? 'until staff end it'
+      ? 'until an organiser ends it'
       : hold.until === null
         ? ''
         : `until ${formatDateTime(new Date(hold.until))}`;
   return (
     <div className={classes.stack}>
       <BodyText>
-        {hold.holding ? 'Holding' : 'Not holding'} from{' '}
+        {hold.holding ? 'Frozen' : 'Not frozen'} from{' '}
         {formatDateTime(new Date(hold.from))} {until}
       </BodyText>
       {hold.ended_at !== null && (
@@ -66,7 +66,7 @@ function EndHold({ path }: { path: Path }) {
         },
         onError: (error) => {
           if (!confirm && isApiError(error) && error.code === 'confirmation_required') {
-            setAsking(error.detail ?? 'End the hold now?');
+            setAsking(error.detail ?? 'End the freeze now?');
             return;
           }
           setFailed(error);
@@ -77,19 +77,19 @@ function EndHold({ path }: { path: Path }) {
   return (
     <>
       <Button variant="secondary" loading={end.isPending} onClick={() => run(false)}>
-        End the hold now
+        End the freeze now
       </Button>
       {failed !== null && <ErrorBlock error={failed} compact />}
       <Modal
         opened={asking !== null}
         onClose={() => setAsking(null)}
-        title="End the hold now"
+        title="End the freeze now"
       >
         <div className={classes.stack}>
           <BodyText>{asking}</BodyText>
           <div className={classes.actions}>
             <Button loading={end.isPending} onClick={() => run(true)}>
-              End the hold now
+              End the freeze now
             </Button>
             <Button variant="secondary" onClick={() => setAsking(null)}>
               Cancel

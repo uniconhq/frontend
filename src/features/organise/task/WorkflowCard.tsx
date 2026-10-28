@@ -6,7 +6,7 @@ import { PageLink } from '@/ui/PageLink';
 import { Loaded } from '@/ui/feedback/Loaded';
 import { workflowPath } from '@/lib/organiser-paths';
 import { FieldBox } from '../contest/ContestFile';
-import { DrawnGraph } from '../workflows/DrawnGraph';
+import { VersionGraph } from '../workflows/VersionGraph';
 import { BuildCard } from './BuildCard';
 import { WorkflowPicker } from './WorkflowPicker';
 import {
@@ -31,10 +31,15 @@ function WorkflowChip({ workflow }: { workflow: string }) {
   );
 }
 
-/** The steps of the chosen version, drawn read-only, as its own page draws them. */
+/**
+ * The steps of the chosen version, drawn read-only as its own page draws
+ * them: a box clicked opens with its drawer, Files lists the version's
+ * files, and the switch shows the inputs and files the steps read.
+ */
 function Steps({ workflow }: { workflow: string }) {
   const version = queryView(useWorkflowVersion(workflow));
   const primitives = queryView(usePrimitives());
+  const parts = refParts(workflow);
   if (version.state === 'error') {
     return (
       <BodyText tone="secondary">
@@ -42,11 +47,19 @@ function Steps({ workflow }: { workflow: string }) {
       </BodyText>
     );
   }
+  if (parts === null) return null;
   return (
     <Loaded view={version} rows={4}>
       {(read) => (
         <Loaded view={primitives} rows={4}>
-          {(list) => <DrawnGraph text={read.content} primitives={list} />}
+          {(list) => (
+            <VersionGraph
+              {...parts}
+              text={read.content}
+              primitives={list}
+              bar={(tools) => <div className={shared.actions}>{tools}</div>}
+            />
+          )}
         </Loaded>
       )}
     </Loaded>
@@ -87,7 +100,7 @@ export function WorkflowCard({
     <BuildCard
       id="workflow"
       title="Workflow"
-      line="What grades the task: the steps every submission goes through."
+      line="How every submission is graded. Choose a workflow, and the cards below ask for what it needs."
       aside={saved !== null ? <WorkflowChip workflow={saved} /> : undefined}
     >
       {saved === null && chosen === '' && (

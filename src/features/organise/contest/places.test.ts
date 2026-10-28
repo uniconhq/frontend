@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { contestPlace, placeHref, stepsOf } from './places';
+import { boardNames, contestPlace, placeHref, stepsOf } from './places';
 
 describe('where a refused setting of the contest is changed', () => {
   it('splits a setting’s place as the forge writes it', () => {
@@ -75,7 +75,7 @@ describe('where a refused setting of the contest is changed', () => {
     ['tasks', 'Tasks', '/orgs/acme/contests/spring?part=tasks'],
     [
       'leaderboards.gradebook.title',
-      'Leaderboards, gradebook: Title',
+      'Leaderboards, gradebook: Name',
       '/orgs/acme/contests/spring/leaderboards?field=gradebook.title',
     ],
     [
@@ -85,17 +85,42 @@ describe('where a refused setting of the contest is changed', () => {
     ],
     [
       'leaderboards.gradebook.audience.rows',
-      'Leaderboards, gradebook: Rows',
+      'Leaderboards, gradebook: How many rows do they see?',
       '/orgs/acme/contests/spring/leaderboards?field=gradebook.audience.rows',
     ],
     [
+      'leaderboards.gradebook.audience.who',
+      'Leaderboards, gradebook: Who can see this leaderboard?',
+      '/orgs/acme/contests/spring/leaderboards?field=gradebook.audience.who',
+    ],
+    [
+      'leaderboards.gradebook.sort[1]',
+      'Leaderboards, gradebook: Ranking',
+      '/orgs/acme/contests/spring/leaderboards?field=gradebook.sort',
+    ],
+    [
+      'leaderboards.gradebook.display',
+      'Leaderboards, gradebook: Shown on the leaderboard',
+      '/orgs/acme/contests/spring/leaderboards?field=gradebook.display',
+    ],
+    [
+      'entrants.locks',
+      'Settings, Teams: Teams are fixed',
+      '/orgs/acme/contests/spring/settings?field=locks',
+    ],
+    [
+      'tasks[0].marks',
+      'Tasks, A: Submissions each entrant may mark',
+      '/orgs/acme/contests/spring?part=tasks&field=marks&item=0',
+    ],
+    [
       'hold.from',
-      'Leaderboards, Hold: From',
+      'Leaderboards, Freeze: Freeze from',
       '/orgs/acme/contests/spring/leaderboards?field=hold.from',
     ],
     [
       'hold.until',
-      'Leaderboards, Hold: Until',
+      'Leaderboards, Freeze: Until',
       '/orgs/acme/contests/spring/leaderboards?field=hold.until',
     ],
     ['', 'Settings', '/orgs/acme/contests/spring/settings'],
@@ -104,5 +129,29 @@ describe('where a refused setting of the contest is changed', () => {
     const place = contestPlace(path);
     expect(place.label).toBe(label);
     expect(placeHref('acme', 'spring', place)).toBe(href);
+  });
+
+  it('names a leaderboard as its card does, by its key while it has no name', () => {
+    const names = boardNames(
+      [
+        'leaderboards:',
+        '  icpc:',
+        '    title: ICPC',
+        '    columns: {solved: 1}',
+        '  gradebook:',
+        '    columns: {points: 1}',
+        '',
+      ].join('\n'),
+    );
+    expect(names).toEqual({ icpc: 'ICPC' });
+    const place = contestPlace('leaderboards.icpc.columns.solved', names);
+    expect(place.label).toBe('Leaderboards, ICPC: solved');
+    expect(placeHref('acme', 'spring', place)).toBe(
+      '/orgs/acme/contests/spring/leaderboards?field=icpc.columns.solved',
+    );
+    expect(contestPlace('leaderboards.gradebook.sort', names).label).toBe(
+      'Leaderboards, gradebook: Ranking',
+    );
+    expect(boardNames('leaderboards: [')).toEqual({});
   });
 });

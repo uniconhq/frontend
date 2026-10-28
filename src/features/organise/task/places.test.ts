@@ -32,17 +32,17 @@ describe('where a refused setting or file of the task is changed', () => {
     ],
     [
       'repeat[0].tuples[1].title',
-      'Runs, axis 1, row 2: title',
+      'Runs, table 1, row 2: title',
       `${PAGE}?card=runs&field=axis-0-tuple-1-title`,
     ],
     [
       'repeat[0].tuples[1].max_size',
-      'Runs, axis 1, row 2: max_size',
+      'Runs, table 1, row 2: max_size',
       `${PAGE}?card=runs&field=axis-0-tuple-1-max_size`,
     ],
     [
       'repeat[1].tuples[0].seed',
-      'Runs, axis 2, row 1: seed',
+      'Runs, table 2, row 1: seed',
       `${PAGE}?card=runs&field=axis-1-tuple-0-seed`,
     ],
     [

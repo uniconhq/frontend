@@ -101,7 +101,10 @@ export function FailedGradings({ path }: { path: Path }) {
   );
 }
 
-/** How many submissions wait to be graded, and how many are being graded. */
+/**
+ * How many gradings wait to be graded, and how many of those are sent to a
+ * machine and wait for one to take them: none is being graded yet.
+ */
 export function GradingsCard({ path }: { path: Path }) {
   const view = queryView(useQueue(path));
   return (
@@ -110,7 +113,9 @@ export function GradingsCard({ path }: { path: Path }) {
       say={({ queued, dispatched }) =>
         queued === 0 && dispatched === 0
           ? 'Nothing is waiting to be graded.'
-          : `${String(queued)} waiting to be graded, ${String(dispatched)} being graded.`
+          : dispatched === 0
+            ? `${String(queued)} waiting to be graded.`
+            : `${String(queued + dispatched)} waiting to be graded, ${String(dispatched)} of them sent to a machine.`
       }
     />
   );

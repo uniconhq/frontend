@@ -11,7 +11,7 @@ import { TextInput } from '@/ui/TextInput';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
 import { formatDateTime } from '@/lib/time';
-import { offered, ROLE_LABEL, ROLE_MEANS, type RolePlace } from '../roles';
+import { offered, ROLE_LABEL, roleMeans, type RolePlace } from '../roles';
 import { invitesQuery, useInviteChanges, useInvites, type Target } from './invites';
 import classes from './invites.module.css';
 
@@ -253,7 +253,7 @@ function InviteForm({ place, grants }: { place: RolePlace; grants: OfferedGrant[
   const meansOf = (offer: OfferedGrant) =>
     offer === 'contestant'
       ? 'Accepting registers them for this contest.'
-      : ROLE_MEANS[offer];
+      : roleMeans(offer, place.kind).join(' ');
 
   return (
     <form

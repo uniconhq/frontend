@@ -1,7 +1,8 @@
-import { useEffect, type ReactNode } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { useSearchParams } from 'react-router';
 import { $api } from '@/api/query';
 import { CardGrid, HubCard } from '@/ui/HubCard';
+import { LeaveGuard } from '@/ui/LeaveGuard';
 import { Page, PageHeader } from '@/ui/Page';
 import { useMe } from '@/session';
 import { PageLink } from '@/ui/PageLink';
@@ -27,7 +28,6 @@ import {
   GradingsCard,
   PublicationsCard,
   QueueCard,
-  SettingsCard,
 } from './TaskCards';
 import { ResultsControls } from './ResultsControls';
 
@@ -37,13 +37,13 @@ type CardLine = (props: { path: TaskPath }) => ReactNode;
 const TASK = '/api/v1/orgs/{org}/contests/{contest}/tasks/{task}';
 
 /** The line of each section's card in the grid, by its key in the list. */
-const GRID_CARDS: Record<TaskSectionKey, CardLine> = {
+const GRID_CARDS: Record<TaskSectionKey, CardLine | null> = {
   gradings: GradingsCard,
-  queue: QueueCard,
+  marking: QueueCard,
   publications: PublicationsCard,
   announcements: AnnouncementsCard,
   organisers: ({ path }) => <OrganisersLine place={{ kind: 'task', ...path }} />,
-  settings: SettingsCard,
+  settings: null,
 };
 
 /** The task's title, as its settings give it, or its name until they are read. */
@@ -104,6 +104,12 @@ export function TaskPage() {
     ]);
   });
   useOpenedCard();
+  // The build cards and the statement save apart, and either's changes not
+  // saved ask before the page is left.
+  const [build, setBuild] = useState(false);
+  const [statement, setStatement] = useState(false);
+  const onBuild = useCallback((dirty: boolean) => setBuild(dirty), []);
+  const onStatement = useCallback((dirty: boolean) => setStatement(dirty), []);
 
   return (
     <Page>
@@ -118,13 +124,19 @@ export function TaskPage() {
         <TaskStanding place={place} saving={saving} manager={manager} />
         <ResultsControls path={path} manager={manager} />
       </PageHeader>
-      <TaskBuild place={place} saving={saving} admin={admin} manager={manager} />
+      <TaskBuild
+        place={place}
+        saving={saving}
+        admin={admin}
+        manager={manager}
+        onDirty={onBuild}
+      />
       <BuildCard
         id="statement"
         title="Statement"
         line="What entrants read about the task, written beside a preview of how they see it. It is saved on its own."
       >
-        <StatementEditor place={place} admin={admin} />
+        <StatementEditor place={place} admin={admin} onDirty={onStatement} />
       </BuildCard>
       <CardGrid label="Running the task">
         {TASK_SECTIONS.map((section) => {
@@ -135,11 +147,22 @@ export function TaskPage() {
               title={section.label}
               to={taskSectionPath(org, contest, task, section.key)}
             >
-              <Line path={path} />
+              <p>{section.line}</p>
+              {Line !== null && <Line path={path} />}
             </HubCard>
           );
         })}
       </CardGrid>
+      <LeaveGuard
+        dirty={build || statement}
+        what={
+          build && statement
+            ? 'Your changes to the task and its statement'
+            : statement
+              ? 'Your changes to the statement'
+              : 'Your changes to the task'
+        }
+      />
     </Page>
   );
 }

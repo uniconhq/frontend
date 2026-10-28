@@ -11,6 +11,7 @@ import {
   CONTEST_API,
   TASK_API,
   draftTask,
+  files,
   publicationList,
   publishedTask,
   repoFiles,
@@ -296,6 +297,38 @@ describe('the task page', () => {
     ).toEqual(TASK_BUILD_CARDS.map((card) => `${TASK}?card=${card.key}`));
   });
 
+  it('counts submissions still missing a mark, rather than entrant rows', async () => {
+    const submission = (number: number, mark: string | null) => ({
+      number,
+      counted_by: [{ leaderboard: 'grades', column: 'points' }],
+      marks: [{ value: 'score', mark }],
+    });
+    server.use(
+      signedIn,
+      taskState,
+      publicationList,
+      ...repoFiles,
+      http.get(`${TASK_API}/organise/queue`, () =>
+        HttpResponse.json([
+          {
+            closed_at: '2026-10-01T12:00:00Z',
+            row: { entrant: 'ada', name: 'Ada' },
+            submissions: [
+              submission(1, null),
+              submission(2, null),
+              submission(3, '10'),
+            ],
+          },
+        ]),
+      ),
+    );
+    renderApp(TASK);
+    const marking = await screen.findByRole('region', { name: 'Marking' });
+    expect(
+      await within(marking).findByText('2 submissions waiting for marks'),
+    ).toBeVisible();
+  });
+
   it('gives each section a card in the order the sidebar lists them', async () => {
     server.use(signedIn, taskState, publicationList, ...repoFiles);
     renderApp(TASK);
@@ -396,6 +429,24 @@ describe('what the task has, under its name', { timeout: 20_000 }, () => {
       'href',
       `${TASK}?card=inputs`,
     );
+  });
+
+  it('needs no value for an input only the task’s runs give', async () => {
+    readyBackend();
+    server.use(
+      http.get(`${TASK_API}/files/task.yaml`, () =>
+        HttpResponse.json({
+          ...files['task.yaml'],
+          content:
+            'name: sum\nworkflow: unicon/classic@v3\nrepeat:\n  - inputs: [time_limit]\n    tuples: [[1], [2]]\n',
+        }),
+      ),
+    );
+    renderApp(TASK);
+
+    const row = await screen.findByRole('list', { name: 'What the task has' });
+    expect(within(row).getByText('Inputs')).toBeInTheDocument();
+    expect(within(row).queryByText(/needs a value/)).toBeNull();
   });
 
   it('says nothing of what the task lacks while its workflow is still being read', async () => {

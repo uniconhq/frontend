@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   autocompletion,
+  closeCompletion,
   startCompletion,
   type Completion,
   type CompletionContext,
@@ -11,6 +12,7 @@ import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
 import { forceLinting, linter, type Diagnostic } from '@codemirror/lint';
 import {
   Annotation,
+  Compartment,
   EditorState,
   RangeSetBuilder,
   StateEffect,
@@ -39,6 +41,10 @@ import {
   type PieceKind,
 } from './parse';
 import type { Insert, Inserter } from './target';
+import type { FlowAbout } from './flow';
+import { TileCard } from './TileCard';
+import { columnOf, inputWords, kindWords, shapeOf } from './shapes';
+import { exampleFor } from './examples';
 import classes from './formula.module.css';
 
 const SYMBOL: Record<string, string> = {
@@ -259,6 +265,8 @@ export function FormulaLine({
   marks = [],
   placeholder = 'Type, or click a tile above',
   autoFocus = false,
+  trouble,
+  disabled = false,
 }: {
   label: string;
   scope: FormulaScope;
@@ -271,11 +279,14 @@ export function FormulaLine({
   marks?: readonly FormulaMark[];
   placeholder?: string;
   autoFocus?: boolean;
+  trouble?: string;
+  disabled?: boolean;
 }) {
   const scope = useMemo(
     () => ({ ...given, names: given.names.filter((name) => name !== label) }),
     [given, label],
   );
+  const access = useRef(new Compartment());
   const host = useRef<HTMLDivElement>(null);
   const view = useRef<EditorView | null>(null);
   const [caret, setCaret] = useState<number | null>(null);
@@ -284,11 +295,27 @@ export function FormulaLine({
     [value, scope, catalogue],
   );
 
-  const latest = useRef({ scope, catalogue, onChange, onFocusLine, onPoint, marks });
-  useEffect(() => {
-    latest.current = { scope, catalogue, onChange, onFocusLine, onPoint, marks };
+  const latest = useRef({
+    scope,
+    catalogue,
+    onChange,
+    onFocusLine,
+    onPoint,
+    marks,
+    disabled,
   });
-  const start = useRef({ value, placeholder, label, autoFocus });
+  useEffect(() => {
+    latest.current = {
+      scope,
+      catalogue,
+      onChange,
+      onFocusLine,
+      onPoint,
+      marks,
+      disabled,
+    };
+  });
+  const start = useRef({ value, placeholder, label, autoFocus, disabled });
 
   useEffect(() => {
     if (host.current === null) return;
@@ -296,7 +323,7 @@ export function FormulaLine({
     const catalogueNow = () => latest.current.catalogue;
     const insert: Inserter = (piece) => {
       const current = view.current;
-      if (current === null) return;
+      if (current === null || latest.current.disabled) return;
       const doc = current.state.doc.toString();
       const { from: begin, to } = current.state.selection.main;
       const from =
@@ -318,6 +345,7 @@ export function FormulaLine({
       if (text.endsWith('()')) setTimeout(() => startCompletion(current), 0);
     };
     const source = (context: CompletionContext): CompletionResult | null => {
+      if (latest.current.disabled) return null;
       const doc = context.state.doc.toString();
       const at = contextAt(doc, context.pos, scopeNow(), catalogueNow());
       const quiet =
@@ -402,6 +430,13 @@ export function FormulaLine({
       state: EditorState.create({
         doc: initial.value,
         extensions: [
+          access.current.of([
+            EditorState.readOnly.of(initial.disabled),
+            EditorView.editable.of(!initial.disabled),
+          ]),
+          EditorState.changeFilter.of(
+            (tr) => !latest.current.disabled || tr.annotation(fromValue) === true,
+          ),
           history(),
           autocompletion({ override: [source], icons: false }),
           keymap.of([
@@ -426,16 +461,22 @@ export function FormulaLine({
           look,
           chips,
           mistakes,
-          EditorView.contentAttributes.of({ 'aria-label': initial.label }),
+          EditorView.contentAttributes.of({
+            'aria-label': initial.label,
+            role: 'textbox',
+            tabindex: '0',
+          }),
           EditorView.updateListener.of((update) => {
             const focused = update.view.hasFocus;
             if (
+              !latest.current.disabled &&
               update.docChanged &&
               !update.transactions.some((tr) => tr.annotation(fromValue) === true)
             )
               latest.current.onChange(update.state.doc.toString());
             if (update.focusChanged) {
-              if (focused) latest.current.onFocusLine?.(insert);
+              if (focused && !latest.current.disabled)
+                latest.current.onFocusLine?.(insert);
               else forceLinting(update.view);
             }
             if (update.focusChanged || update.selectionSet || update.docChanged)
@@ -445,7 +486,7 @@ export function FormulaLine({
       }),
     });
     view.current = created;
-    if (initial.autoFocus) created.focus();
+    if (initial.autoFocus && !initial.disabled) created.focus();
     return () => {
       created.destroy();
       view.current = null;
@@ -453,8 +494,18 @@ export function FormulaLine({
   }, []);
 
   useEffect(() => {
-    view.current?.contentDOM.setAttribute('aria-label', label);
-  }, [label]);
+    const current = view.current;
+    if (current === null) return;
+    current.contentDOM.setAttribute('aria-label', label);
+    current.contentDOM.setAttribute('aria-readonly', String(disabled));
+    if (disabled) closeCompletion(current);
+    current.dispatch({
+      effects: access.current.reconfigure([
+        EditorState.readOnly.of(disabled),
+        EditorView.editable.of(!disabled),
+      ]),
+    });
+  }, [label, disabled]);
 
   useEffect(() => {
     const current = view.current;
@@ -522,7 +573,9 @@ export function FormulaLine({
   return (
     <div className={classes.formulaBox}>
       <div ref={host} />
-      {context?.call !== undefined && call !== undefined ? (
+      {trouble !== undefined ? (
+        <div className={classes.formulaProblems}>{trouble}</div>
+      ) : context?.call !== undefined && call !== undefined ? (
         <div className={classes.formulaHint}>
           <span className={classes.formulaSign}>
             {signature(context.call.block, context.call.input, call)}
@@ -537,7 +590,7 @@ export function FormulaLine({
           </div>
         )
       )}
-      {caret === null && first !== undefined && (
+      {trouble === undefined && caret === null && first !== undefined && (
         <div className={classes.formulaProblems}>
           {first}
           {problems.length > 1 &&
@@ -551,7 +604,8 @@ export function FormulaLine({
 type Tile = {
   key: string;
   name: string;
-  line: string;
+  shape: string;
+  details: ReactNode;
   kind: PieceKind;
   insert: Insert;
 };
@@ -560,19 +614,16 @@ function Tiles({ tiles, onInsert }: { tiles: Tile[]; onInsert: Inserter }) {
   return (
     <div className={classes.tiles}>
       {tiles.map((tile) => (
-        <button
+        <TileCard
           key={tile.key}
-          type="button"
-          className={classes.paletteItem}
-          title={tile.line}
-          onMouseDown={(event) => event.preventDefault()}
-          onClick={() => onInsert(tile.insert)}
+          name={tile.name}
+          shape={tile.shape}
+          tone={CHIP[tile.kind]}
+          insert={tile.insert}
+          onInsert={onInsert}
         >
-          <span className={`${classes.tileName} ${CHIP[tile.kind] ?? ''}`}>
-            {tile.name}
-          </span>
-          <span className={classes.paletteLine}>{tile.line}</span>
-        </button>
+          {tile.details}
+        </TileCard>
       ))}
     </div>
   );
@@ -589,52 +640,132 @@ function Group({ title, children }: { title: string; children: ReactNode }) {
 
 /** Everything a formula can use, one tile per name and per block, plus the symbols. */
 export function FormulaTiles({
-  scope,
+  scope: given,
   catalogue,
   onInsert,
   target,
+  names,
 }: {
   scope: FormulaScope;
   catalogue: Catalogue;
   onInsert: Inserter;
   target: string | null;
+  names?: ReadonlyMap<string, Omit<FlowAbout, 'name'>>;
 }) {
+  const scope = {
+    ...given,
+    names: given.names.filter(
+      (name) => name !== target && given.real?.[name] !== target,
+    ),
+  };
   const task = scope.where === 'task';
   const texts = new Set(scope.texts ?? []);
-  const named = (names: readonly string[], kind: PieceKind, fallback: string) =>
-    names.map((name): Tile => ({
-      key: name,
-      name,
-      line: scope.about?.[name] ?? fallback,
-      kind: texts.has(name) ? 'text-value' : kind,
-      insert: { text: name },
-    }));
-  const blocks = blocksIn(catalogue, scope.where);
-  const tileOf = (name: string, words: string): Tile => {
-    const symbol = SYMBOL[name];
+  const named = (items: readonly string[], kind: PieceKind): Tile[] =>
+    items.map((name) => {
+      const members = scope.members?.[name];
+      const shape =
+        kind === 'set'
+          ? task
+            ? `a group${members === undefined ? '' : ` · ${String(members.length)} ${members.length === 1 ? 'run' : 'runs'}`}`
+            : "a task's results"
+          : kind === 'each'
+            ? `${texts.has(name) ? 'text' : 'a number'} for each ${task ? 'run' : 'submission'}`
+            : scope.picks?.includes(name)
+              ? task
+                ? 'one run'
+                : 'one submission'
+              : texts.has(name)
+                ? 'text'
+                : 'one number';
+      return {
+        key: name,
+        name,
+        shape,
+        details:
+          members === undefined ? (
+            <p>{names?.get(name)?.description ?? scope.about?.[name] ?? ''}</p>
+          ) : (
+            <ul>
+              {members.map((member, index) => (
+                <li key={index}>{member}</li>
+              ))}
+            </ul>
+          ),
+        kind: texts.has(name) ? 'text-value' : kind,
+        insert: { text: name },
+      };
+    });
+  const blocks = blocksIn(catalogue, scope.where).map((block) => ({
+    ...block,
+    forms: block.forms.filter(
+      (form) => form.scope === 'both' || form.scope === scope.where,
+    ),
+  }));
+  const tileOf = (block: Catalogue['blocks'][number]): Tile => {
+    const example = exampleFor(block, scope, catalogue);
     return {
-      key: name,
-      name: symbol ?? `${name}(…)`,
-      line: words,
+      key: block.name,
+      name: SYMBOL[block.name] ?? `${block.name}(…)`,
+      shape: shapeOf(block),
       kind: 'block',
-      insert: insertFor(name),
+      insert: insertFor(block.name),
+      details: (
+        <>
+          <p>{block.words}</p>
+          {block.forms.map((form, index) => (
+            <div key={index} className={classes.tileForm}>
+              {index > 0 && <div>or</div>}
+              <dl>
+                <dt>Takes</dt>
+                <dd>
+                  {form.given}
+                  <ul>
+                    {Object.entries(form.inputs).map(([name, input]) => (
+                      <li key={name}>
+                        {name}
+                        {input.optional ? ' (optional)' : ''}:{' '}
+                        {inputWords(input, scope.where)}
+                      </li>
+                    ))}
+                  </ul>
+                </dd>
+                <dt>Gives</dt>
+                <dd>
+                  {form.gives === 'number' ? 'one number' : kindWords(form.gives)}
+                </dd>
+              </dl>
+            </div>
+          ))}
+          {example !== null && (
+            <div className={classes.tileExample}>
+              e.g. <code>{example.formula}</code>
+              <p>{example.words}</p>
+            </div>
+          )}
+        </>
+      ),
     };
   };
-  const over = blocks.filter((block) =>
-    block.forms.some(
-      (form) => form.inputs.over !== undefined || form.inputs.from !== undefined,
-    ),
-  );
-  const maths = blocks.filter((block) => !over.includes(block));
   const columns = Object.entries(scope.fields ?? {}).map(([name, kind]): Tile => ({
     key: `.${name}`,
     name: `.${name}`,
-    line: task
-      ? `Reads ${name} off a picked run`
-      : `Reads ${name} off a picked submission`,
+    shape: `${task ? 'one run' : 'one submission'} → ${kind === 'text' ? 'text' : 'one number'}`,
+    details: (
+      <p>
+        {task
+          ? `Reads ${name} off a picked run`
+          : `Reads ${name} off a picked submission`}
+      </p>
+    ),
     kind: kind === 'text' ? 'text-value' : 'value',
     insert: { text: `.${name}` },
   }));
+  const inColumn = (column: ReturnType<typeof columnOf>) =>
+    blocks.filter((block) => columnOf(block) === column).map(tileOf);
+  const otherColumns = Object.entries(scope.boardColumns ?? {}).flatMap(
+    ([board, columns]) => columns.map((column) => `${board}.${column}`),
+  );
+  const programs = inColumn('program');
   return (
     <div className={classes.trays}>
       <BodyText size="sm" tone="secondary">
@@ -643,51 +774,50 @@ export function FormulaTiles({
           : `Click a tile to put it in ${target}, at the cursor.`}
       </BodyText>
       <div className={classes.trayRow}>
-        <Group title={task ? 'Groups' : 'Tasks'}>
+        <Group title="Start from">
+          <Tiles tiles={named(scope.sets, 'set')} onInsert={onInsert} />
           <Tiles
-            tiles={named(scope.sets, 'set', task ? 'A group of runs' : 'A task')}
-            onInsert={onInsert}
-          />
-          <h3 className={classes.trayHeading}>
-            {task ? 'For each run of a group' : 'For each submission'}
-          </h3>
-          <Tiles
-            tiles={named(
-              scope.each,
-              'each',
-              task ? 'One for each run' : 'One per submission',
-            )}
+            tiles={named([...scope.names, ...otherColumns], 'value')}
             onInsert={onInsert}
           />
         </Group>
-        <Group title={task ? 'Values and facts' : 'Columns'}>
-          <Tiles
-            tiles={named(scope.names, 'value', task ? 'A value' : 'A column')}
-            onInsert={onInsert}
-          />
+        <Group title={task ? 'For each run' : 'For each submission'}>
+          <Tiles tiles={named(scope.each, 'each')} onInsert={onInsert} />
         </Group>
-        <Group title={task ? 'Over a group' : 'Over a task'}>
-          <Tiles
-            tiles={over.map((block) => tileOf(block.name, block.words))}
-            onInsert={onInsert}
-          />
-          <h3 className={classes.trayHeading}>Read off a pick</h3>
+        <Group title="Many into one">
+          <Tiles tiles={inColumn('many')} onInsert={onInsert} />
+        </Group>
+        <Group
+          title={
+            task
+              ? 'Pick one run, then read from it'
+              : 'Pick one submission then read from it'
+          }
+        >
+          <Tiles tiles={inColumn('pick')} onInsert={onInsert} />
           <Tiles tiles={columns} onInsert={onInsert} />
         </Group>
         <Group title="Maths, tests and text">
           <Tiles
             tiles={[
-              ...maths.map((block) => tileOf(block.name, block.words)),
+              ...inColumn('maths'),
               {
                 key: 'text',
                 name: '"…"',
-                line: 'Some text, such as "none"',
+                shape: 'text',
+                details: <p>Some text, such as "none"</p>,
                 kind: 'text',
                 insert: { text: '""', caret: 1 },
               },
             ]}
             onInsert={onInsert}
           />
+          {programs.length > 0 && (
+            <>
+              <h3 className={classes.trayHeading}>Run a program</h3>
+              <Tiles tiles={programs} onInsert={onInsert} />
+            </>
+          )}
         </Group>
       </div>
     </div>

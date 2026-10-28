@@ -34,7 +34,7 @@ const ENTER =
   '/api/v1/orgs/{org}/contests/{contest}/tasks/{task}/organise/submissions/{number}/entries';
 
 /**
- * The task's grading queue: one block per entrant the task has closed
+ * The task's grading marking: one block per entrant the task has closed
  * for, each counted submission and a box for each mark a manager enters.
  */
 export function TaskQueuePage() {
@@ -45,7 +45,10 @@ export function TaskQueuePage() {
     'manager',
   );
   return (
-    <SectionPage section={sectionOf(TASK_SECTIONS, 'queue')}>
+    <SectionPage
+      place={{ kind: 'task', org, contest, task }}
+      section={sectionOf(TASK_SECTIONS, 'marking')}
+    >
       <Queue org={org} contest={contest} task={task} manager={manager} />
     </SectionPage>
   );
@@ -80,7 +83,9 @@ function Queue({
   const rows = view.data
     .map((row) => ({
       ...row,
-      submissions: row.submissions.filter((item) => shows(item, unmarked, board)),
+      submissions: row.submissions.filter(
+        (item) => item.marks.length > 0 && shows(item, unmarked, board),
+      ),
     }))
     .filter((row) => row.submissions.length > 0);
   return (

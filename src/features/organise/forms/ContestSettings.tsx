@@ -1,5 +1,8 @@
+import { useMe } from '@/session';
+import { holdsAt } from '../roles';
 import { useState } from 'react';
 import { UnsavedNote } from '@/ui/UnsavedNote';
+import { LeaveGuard } from '@/ui/LeaveGuard';
 import { Button } from '@/ui/Button';
 import { RadioGroup } from '@/ui/RadioGroup';
 import { Textarea } from '@/ui/Textarea';
@@ -12,8 +15,6 @@ import type { FormProps } from './DefinitionFile';
 import { Fieldset, NumberField, TimeField } from './fields';
 import { numberProblem } from './yaml-doc';
 import classes from './forms.module.css';
-
-const ADMIN_ONLY = 'Only an admin of the contest can change these.';
 
 /** Whether the contest is entered in teams, from its most people in one entrant. */
 function teamsOn(values: ContestValues): boolean {
@@ -28,14 +29,22 @@ function teamsOn(values: ContestValues): boolean {
  * cannot change them.
  */
 export function ContestSettings({ org, contest }: { org: string; contest: string }) {
+  const manager = holdsAt(useMe().roles, { kind: 'contest', org, contest }, 'manager');
   return (
     <ContestFile org={org} contest={contest}>
-      {(props) => <SettingsForm {...props} />}
+      {(props) => <SettingsForm {...props} manager={manager} />}
     </ContestFile>
   );
 }
 
-function SettingsForm({ doc, busy, onSave, admin }: FormProps & { admin: boolean }) {
+function SettingsForm({
+  doc,
+  busy,
+  saved,
+  onSave,
+  admin,
+  manager,
+}: FormProps & { admin: boolean; manager: boolean }) {
   const [read] = useState(() => readContest(doc));
   const [values, setValues] = useState<ContestValues>(read.values);
   useOpenedField(true);
@@ -44,6 +53,10 @@ function SettingsForm({ doc, busy, onSave, admin }: FormProps & { admin: boolean
   const raw = (path: string) => read.rawTimes[path];
   const teams = teamsOn(values);
   const changed = JSON.stringify(values) !== JSON.stringify(read.values);
+  // Once a save of these values went through, leaving loses nothing, even
+  // before the settings are read back.
+  const [sent, setSent] = useState<ContestValues | null>(null);
+  const unsaved = changed && !(saved && sent === values);
   const fewestTooMany =
     teams &&
     values.fewest !== '' &&
@@ -61,133 +74,151 @@ function SettingsForm({ doc, busy, onSave, admin }: FormProps & { admin: boolean
       aria-label="Contest settings"
       onSubmit={(event) => {
         event.preventDefault();
+        setSent(values);
         onSave((fresh) => writeContest(fresh, read.values, values, { admin }));
       }}
     >
-      <Fieldset
-        legend="Basics"
-        note={admin ? 'What the contest is called, and what it is about.' : ADMIN_ONLY}
+      <fieldset
+        disabled={!manager}
+        role="presentation"
+        style={{ border: 0, margin: 0, padding: 0, minWidth: 0 }}
+        className={classes.form}
       >
-        <FieldBox name="name">
-          <TextInput
-            label="Name"
-            value={values.name}
-            onChange={(value) => set('name', value)}
-            disabled={!admin}
-          />
-        </FieldBox>
-        <FieldBox name="description">
-          <Textarea
-            label="Description"
-            value={values.description}
-            onChange={(value) => set('description', value)}
-            readOnly={!admin}
-            rows={3}
-          />
-        </FieldBox>
-      </Fieldset>
-
-      <Fieldset
-        legend="Schedule"
-        note="When the contest runs. Each task opens at the start and closes at the end, unless its own timeline in the task list says otherwise."
-      >
-        <div className={classes.grid}>
-          <FieldBox name="start">
-            <TimeField
-              label="Start"
-              value={values.start}
-              raw={raw('start')}
-              onChange={(value) => set('start', value)}
+        <Fieldset
+          legend="Basics"
+          note="What the contest is called, and what it is about."
+        >
+          <FieldBox name="name">
+            <TextInput
+              label="Name"
+              value={values.name}
+              onChange={(value) => set('name', value)}
+              disabled={!admin}
             />
           </FieldBox>
-          <FieldBox name="end">
-            <TimeField
-              label="End"
-              value={values.end}
-              raw={raw('end')}
-              onChange={(value) => set('end', value)}
+          <FieldBox name="description">
+            <Textarea
+              label="Description"
+              value={values.description}
+              onChange={(value) => set('description', value)}
+              readOnly={!admin}
+              rows={3}
             />
           </FieldBox>
-        </div>
-      </Fieldset>
+        </Fieldset>
 
-      <Fieldset
-        legend="Teams"
-        note={
-          read.unreadable.includes('entrants')
-            ? 'These settings cannot be read here.'
-            : 'Whether people enter alone or in teams. A team registers once and shares its submissions, its extra time and its questions.'
-        }
-      >
-        <FieldBox name="most">
-          <RadioGroup
-            label="People enter"
-            value={teams ? 'teams' : 'alone'}
-            options={[
-              { value: 'alone', label: 'Alone' },
-              { value: 'teams', label: 'In teams' },
-            ]}
-            onChange={(how) =>
-              setValues((before) =>
-                how === 'teams'
-                  ? {
-                      ...before,
-                      most:
-                        before.most === '' || before.most === '1' ? '3' : before.most,
-                    }
-                  : { ...before, most: '', fewest: '' },
-              )
-            }
-          />
-        </FieldBox>
-        {teams && (
-          <>
-            <div className={classes.grid}>
-              <FieldBox name="most">
-                <NumberField
-                  label="Most people in a team"
-                  value={values.most}
-                  onChange={(value) => set('most', value)}
-                  whole
-                />
-              </FieldBox>
-              <FieldBox name="fewest">
-                <NumberField
-                  label="Fewest people in a team"
-                  value={values.fewest}
-                  onChange={(value) => set('fewest', value)}
-                  placeholder="1, so one person may enter alone"
-                  error={
-                    fewestTooMany
-                      ? 'This is more than the most people in a team.'
-                      : undefined
-                  }
-                  whole
-                />
-              </FieldBox>
-            </div>
-            <FieldBox name="locks">
-              <RadioGroup
-                label="Teams are fixed"
-                description="Until then, members may invite others, rename their team or leave it. After that, only organisers can change who is in it."
-                value={values.locks === '' ? 'start' : values.locks}
-                options={[
-                  { value: 'start', label: 'When the contest starts' },
-                  { value: 'first_submission', label: 'At a team’s first submission' },
-                ]}
-                onChange={(locks) => set('locks', locks)}
+        <Fieldset
+          legend="Schedule"
+          note="When the contest runs. Each task opens at the start and closes at the end, unless its own timeline in the task list says otherwise."
+        >
+          <div className={classes.grid}>
+            <FieldBox name="start">
+              <TimeField
+                label="Start"
+                value={values.start}
+                raw={raw('start')}
+                onChange={(value) => set('start', value)}
               />
             </FieldBox>
-          </>
-        )}
-      </Fieldset>
+            <FieldBox name="end">
+              <TimeField
+                label="End"
+                value={values.end}
+                raw={raw('end')}
+                onChange={(value) => set('end', value)}
+              />
+            </FieldBox>
+          </div>
+        </Fieldset>
 
-      <div className={shared.actions}>
-        <Button type="submit" loading={busy} disabled={!changed || problems.length > 0}>
-          Save settings
-        </Button>
-        {changed && <UnsavedNote />}
-      </div>
+        <Fieldset
+          legend="Teams"
+          note={
+            read.unreadable.includes('entrants')
+              ? 'These settings cannot be read here.'
+              : 'Whether people enter alone or in teams. A team registers once and shares its submissions, its extra time and its questions.'
+          }
+        >
+          <FieldBox name="most">
+            <RadioGroup
+              label="People enter"
+              value={teams ? 'teams' : 'alone'}
+              options={[
+                { value: 'alone', label: 'Alone' },
+                { value: 'teams', label: 'In teams' },
+              ]}
+              onChange={(how) =>
+                setValues((before) =>
+                  how === 'teams'
+                    ? {
+                        ...before,
+                        most:
+                          before.most === '' || before.most === '1' ? '3' : before.most,
+                      }
+                    : { ...before, most: '', fewest: '' },
+                )
+              }
+            />
+          </FieldBox>
+          {teams && (
+            <>
+              <div className={classes.grid}>
+                <FieldBox name="most">
+                  <NumberField
+                    label="Most people in a team"
+                    value={values.most}
+                    onChange={(value) => set('most', value)}
+                    whole
+                  />
+                </FieldBox>
+                <FieldBox name="fewest">
+                  <NumberField
+                    label="Fewest people in a team"
+                    value={values.fewest}
+                    onChange={(value) => set('fewest', value)}
+                    placeholder="1, so one person may enter alone"
+                    error={
+                      fewestTooMany
+                        ? 'This is more than the most people in a team.'
+                        : undefined
+                    }
+                    whole
+                  />
+                </FieldBox>
+              </div>
+              <FieldBox name="locks">
+                <RadioGroup
+                  label="Teams are fixed"
+                  description="Until then, members may invite others, rename their team or leave it. After that, only organisers can change who is in it."
+                  value={values.locks === '' ? 'start' : values.locks}
+                  options={[
+                    { value: 'start', label: 'When the contest starts' },
+                    {
+                      value: 'first_submission',
+                      label: 'At a team’s first submission',
+                    },
+                  ]}
+                  onChange={(locks) => set('locks', locks)}
+                />
+              </FieldBox>
+            </>
+          )}
+        </Fieldset>
+
+        {manager && (
+          <div className={shared.actions}>
+            <Button
+              type="submit"
+              loading={busy}
+              disabled={!changed || problems.length > 0}
+            >
+              Save settings
+            </Button>
+            {changed && <UnsavedNote />}
+          </div>
+        )}
+      </fieldset>
+      <LeaveGuard dirty={unsaved} what="Your changes to the settings" />
     </form>
   );
 }

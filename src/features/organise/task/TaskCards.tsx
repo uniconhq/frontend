@@ -27,11 +27,16 @@ export function QueueCard({ path }: { path: TaskPath }) {
   return (
     <Line
       view={view}
-      say={(rows) =>
-        rows.length === 0
+      say={(rows) => {
+        const pending = rows
+          .flatMap((row) => row.submissions)
+          .filter((submission) =>
+            submission.marks.some((mark) => mark.mark === null),
+          ).length;
+        return pending === 0
           ? 'Nothing is waiting for a mark.'
-          : `${String(rows.length)} waiting for a mark.`
-      }
+          : `${count(pending, 'submission', 'submissions')} waiting for marks`;
+      }}
     />
   );
 }
@@ -73,14 +78,5 @@ export function AnnouncementsCard({ path }: { path: TaskPath }) {
     <AnnouncementsLine
       view={queryView(useQuery(announcementsQuery({ kind: 'task', ...path })))}
     />
-  );
-}
-
-export function SettingsCard() {
-  return (
-    <BodyText>
-      Its title and its settings as they are stored; its admins can also read every file
-      it holds.
-    </BodyText>
   );
 }

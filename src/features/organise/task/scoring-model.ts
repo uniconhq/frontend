@@ -1,11 +1,6 @@
+import { sourcesOf } from '../formula/flow';
 import type { Catalogue } from '../formula/catalogue';
-import {
-  namesIn,
-  readLine,
-  type Ast,
-  type FormulaScope,
-  type Reading,
-} from '../formula/parse';
+import { readLine, type FormulaScope, type Reading } from '../formula/parse';
 import { printFormula } from '../formula/print';
 import { nameProblem, type Tree } from '../formula/tree';
 import {
@@ -18,23 +13,35 @@ import {
   writeAt,
   type Doc,
 } from '../forms/yaml-doc';
-import type { AxisValues, InputValues } from '../forms/task-values';
+import type { AxisValues, InputValues, TupleValues } from '../forms/task-values';
 
-/** When entrants see a part of the result. Unlisted means never. */
+/** When entrants see a part of the result. Unlisted means never, said "Not shown". */
 export type When = 'now' | 'after_close' | 'on_release' | 'never';
 
 export const WHEN: { value: When; label: string }[] = [
   { value: 'now', label: 'Now' },
   { value: 'after_close', label: 'After the close' },
   { value: 'on_release', label: 'On release' },
-  { value: 'never', label: 'Never' },
+  { value: 'never', label: 'Not shown' },
 ];
 
-/** Facts a value may read. Each is a number. */
-export const FACTS: { name: string; line: string }[] = [
-  { name: 'seconds_late', line: 'How many seconds after the due time it came in' },
-  { name: 'seconds', line: 'How many seconds the submission took' },
-  { name: 'compiled', line: '1 when it compiled, else 0' },
+/** Facts a value may read, each by what pages call it. Each is a number. */
+export const FACTS: { name: string; title: string; line: string }[] = [
+  {
+    name: 'seconds_late',
+    title: 'Seconds late',
+    line: 'How many seconds after the due time it came in',
+  },
+  {
+    name: 'seconds',
+    title: 'Seconds taken',
+    line: 'How many seconds the submission took',
+  },
+  {
+    name: 'compiled',
+    title: 'Whether it compiled',
+    line: '1 when it compiled, else 0',
+  },
 ];
 
 const NAME_KEYS = new Set([
@@ -520,9 +527,105 @@ export function runsOf(axes: AxisValues[]): RunRow[] {
   }
   return rows.map((row, index) => ({
     id: String(index),
-    title: row.titles.length === 0 ? `Run ${String(index + 1)}` : row.titles.join(', '),
+    title: runName({ title: row.titles.join(', '), cells: row.cells }, axes),
     cells: row.cells,
   }));
+}
+
+/** What the one run a submission makes is called, while no input repeats. */
+export const ONE_RUN = 'The one run';
+
+/**
+ * The runs a submission makes, as the forge crosses the axes: with no input
+ * repeated, the one run every submission makes, which `all` holds.
+ */
+export function submissionRuns(axes: AxisValues[]): RunRow[] {
+  return axes.some((axis) => axis.inputs.length > 0)
+    ? runsOf(axes)
+    : [{ id: '0', title: ONE_RUN, cells: {} }];
+}
+
+/** The row’s title, or its files and values in input order. */
+export function runName(
+  row: Pick<RunRow, 'title' | 'cells'> | TupleValues,
+  tables: readonly AxisValues[],
+): string {
+  if (row.title.trim() !== '') return row.title;
+  const cells = tables
+    .flatMap((table) => table.inputs)
+    .flatMap((input) => {
+      const cell = row.cells[input];
+      const value =
+        typeof cell === 'string' ? cell : cell?.entrant ? '' : (cell?.value ?? '');
+      return value === '' ? [] : [value];
+    });
+  return cells.join(', ') || 'No files or values yet';
+}
+
+/** Each table’s rows, checked independently, so an empty table keeps the other picks. */
+export function ticksOf(group: ScoreGroup, tables: readonly AxisValues[]): boolean[][] {
+  return tables.map((table) =>
+    runsOf([table]).map(
+      (tuple) =>
+        !(group.none && Object.keys(group.picks).length === 0) &&
+        table.inputs.every((input) => {
+          const picked = group.picks[input];
+          return picked === undefined || picked.includes(tuple.cells[input] ?? '');
+        }),
+    ),
+  );
+}
+
+/** Change a row’s picks, then let the existing writer canonicalise matching runs. */
+export function withTick(
+  group: ScoreGroup,
+  table: AxisValues,
+  row: number,
+  on: boolean,
+  runs: RunRow[],
+): ScoreGroup {
+  const ticks = ticksOf(group, [table])[0] ?? [];
+  const rows = runsOf([table]);
+  const selected = rows.filter((_, index) => (index === row ? on : ticks[index]));
+  const picks = { ...group.picks };
+  for (const input of table.inputs) {
+    if (selected.length === rows.length) delete picks[input];
+    else picks[input] = [...new Set(selected.map((tuple) => tuple.cells[input] ?? ''))];
+  }
+  // A table can contain overlapping tuples that input-value picks cannot
+  // distinguish. Removing a row drops the smallest shared value set that
+  // contains it, so the requested checkbox always turns off.
+  const removed = rows[row];
+  if (
+    !on &&
+    removed !== undefined &&
+    table.inputs.every(
+      (input) =>
+        picks[input] === undefined || picks[input].includes(removed.cells[input] ?? ''),
+    )
+  ) {
+    const input = [...table.inputs].sort((left, right) => {
+      const count = (id: string) =>
+        selected.filter((tuple) => tuple.cells[id] === removed.cells[id]).length;
+      return count(left) - count(right);
+    })[0];
+    if (input !== undefined) {
+      const value = removed.cells[input] ?? '';
+      picks[input] = (
+        picks[input] ?? rows.map((tuple) => tuple.cells[input] ?? '')
+      ).filter((each) => each !== value);
+    }
+  }
+  const candidate = { ...group, picks, none: false };
+  const matched = runs.filter((run) => inGroup(run, candidate));
+  const canonical = pickFor(runs, new Set(matched.map((run) => run.id)));
+  if (canonical === null)
+    throw new Error('Matching a pick must produce a representable group.');
+  return {
+    ...group,
+    picks: matched.length === 0 ? picks : canonical,
+    none: matched.length === 0,
+  };
 }
 
 /** Whether a run is in a group. A pick with no inputs matches every run. */
@@ -538,7 +641,7 @@ export function inGroup(row: RunRow, group: ScoreGroup): boolean {
  * group's inputs are crossed, so a set of runs that is not a rectangle has
  * no pick.
  */
-export function pickFor(
+function pickFor(
   rows: RunRow[],
   selected: ReadonlySet<string>,
 ): Record<string, string[]> | null {
@@ -556,6 +659,13 @@ export function pickFor(
       continue;
     picks[input] = values;
   }
+  if (Object.keys(picks).length === 0) {
+    const input = inputs.find((input) =>
+      rows.every((row) => row.cells[input] !== undefined),
+    );
+    if (input !== undefined)
+      picks[input] = [...new Set(rows.map((row) => row.cells[input] ?? ''))];
+  }
   const matched = rows.filter((row) =>
     Object.entries(picks).every(([input, values]) =>
       values.includes(row.cells[input] ?? ''),
@@ -565,13 +675,13 @@ export function pickFor(
 }
 
 /** What a workflow's `outputs` gives a run, beside `verdict` and `passed`. */
-export function outputColumns(file: unknown): Column[] {
+export function outputColumns(file: unknown, textValues: readonly string[]): Column[] {
   if (!isRecord(file) || !isRecord(file.outputs)) return [];
   return Object.entries(file.outputs).map(([name, entry]) => ({
     name,
     title: isRecord(entry) && textOf(entry.title) !== '' ? textOf(entry.title) : null,
     unit: isRecord(entry) && textOf(entry.unit) !== '' ? textOf(entry.unit) : null,
-    kind: 'number' as const,
+    kind: textValues.includes(name) ? ('text' as const) : ('number' as const),
   }));
 }
 
@@ -617,17 +727,6 @@ export function printed(value: ScoreValue, catalogue: Catalogue | null): string 
   return printFormula(value.tree, catalogue, 'task');
 }
 
-export function sourcesOf(node: Ast | null, names: ReadonlySet<string>): string[] {
-  if (node === null) return [];
-  return [
-    ...new Set(
-      namesIn(node)
-        .map((name) => (names.has(name) ? name : name.split('.')[0]))
-        .filter((name): name is string => name !== undefined && names.has(name)),
-    ),
-  ];
-}
-
 function loopOf(name: string, reads: Map<string, string[]>): string[] | null {
   const seen = new Set<string>();
   const walk = (at: string, path: string[]): string[] | null => {
@@ -648,6 +747,7 @@ export function troublesOf(
   groups: ScoreGroup[],
   values: ScoreValue[],
   readings: Record<string, Reading | undefined>,
+  runs: RunRow[],
 ): Map<string, string> {
   const names = new Set(values.map((value) => value.name));
   const reads = new Map(
@@ -661,9 +761,11 @@ export function troublesOf(
     const problem =
       group.name.trim() === ''
         ? 'A group needs a name.'
-        : group.none && Object.keys(group.picks).length === 0
+        : group.none || !runs.some((run) => inGroup(run, group))
           ? `${group.name} matches no runs`
-          : nameProblem(group.name);
+          : Object.keys(group.picks).length === 0
+            ? "Pick the group's runs by at least one repeated input, such as input: [tests/1.in]."
+            : nameProblem(group.name);
     if (problem !== null) troubles.set(group.key, problem);
     else if (group.name === 'all' || FACTS.some((fact) => fact.name === group.name))
       troubles.set(group.key, `${group.name} is already a name a formula reads`);
