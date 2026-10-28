@@ -2,3 +2,15 @@
 .line {
   display: block;
 }
+
+.option {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+.option > :first-child {
+  flex: 1;
+}
+.beside {
+  flex: none;
+}

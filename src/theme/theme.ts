@@ -122,7 +122,7 @@ export type TextColors = {
 };
 
 export type VerdictName =
-  'accepted' | 'rejected' | 'running' | 'limit' | 'error' | 'queued';
+  'accepted' | 'rejected' | 'running' | 'limit' | 'error' | 'finished' | 'queued';
 
 /** [background, foreground] per colour scheme. */
 type VerdictColors = Record<VerdictName, Record<ColorSchemeName, [string, string]>>;
@@ -154,6 +154,7 @@ export const uniconTokens: UniconThemeOther = {
     running: { dark: ['#3a3117', '#ffc93c'], light: ['#faeecd', '#6f4e05'] },
     limit: { dark: ['#3a2c17', '#f0a13c'], light: ['#fbe9d3', '#7d4905'] },
     error: { dark: ['#26203a', '#b79cf0'], light: ['#efeafc', '#44295c'] },
+    finished: { dark: ['#172a3a', '#7cb8f0'], light: ['#e3eefa', '#1d4f80'] },
     queued: { dark: ['#232323', '#9a9a9a'], light: ['#ececea', '#4a4a4a'] },
   },
 
@@ -218,7 +219,7 @@ export const theme = createTheme({
    * The handoff's type scale in Mantine's own five slots. Mantine's defaults
    * are a different ladder, and every component it draws for you reads them.
    *
-   *   xs 12  mono: code, verdicts, ids, timers
+   *   xs 12  mono: code, verdicts, ids
    *   sm 13  table cells, helper text, most chrome
    *   md 14  body prose
    *   lg 15  section headings

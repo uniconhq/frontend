@@ -205,6 +205,33 @@ describe('a run task’s result', () => {
     expect(screen.getByText(/On release/)).toBeVisible();
     expect(screen.getByText('Dropped')).toBeVisible();
     expect(screen.getByText('Seconds late').closest('div')).toHaveTextContent('0');
-    expect(screen.getByText('Compiled').closest('div')).toHaveTextContent('1');
+    expect(screen.getByText('Whether it compiled').closest('div')).toHaveTextContent(
+      'Yes',
+    );
+  });
+
+  it('says no when it did not compile, and names a fact it does not know in words', () => {
+    renderWithProviders(
+      <ScoredResult
+        grading={{
+          id: 'g',
+          attempt: 1,
+          status: 'done',
+          reason: null,
+          limit: null,
+          once: { reports: {}, texts: {} },
+          runs: [],
+          run_values: [],
+          facts: { compiled: '0', first_failed: '3' },
+          compiled: 0,
+        }}
+      />,
+    );
+    expect(screen.getByText('Whether it compiled').closest('div')).toHaveTextContent(
+      'No',
+    );
+    expect(screen.getByText('First failed').closest('div')).toHaveTextContent('3');
+    expect(screen.queryByText('compiled')).toBeNull();
+    expect(screen.queryByText('first_failed')).toBeNull();
   });
 });

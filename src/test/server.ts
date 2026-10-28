@@ -195,6 +195,9 @@ const emptyOrganising = [
   /** No workflow to choose from and no primitive, until a test lists some. */
   http.get('/api/v1/workflows', () => HttpResponse.json([])),
   http.get('/api/v1/primitives', () => HttpResponse.json([])),
+  http.get('/api/v1/workflows/:owner/:name/versions/:version/box', () =>
+    HttpResponse.json({ run: true, inputs: [], outputs: [], newer_version: null }),
+  ),
   http.get('/api/v1/workflows/:owner/:name/versions/:version', () =>
     problem(404, 'not_found'),
   ),

@@ -107,3 +107,27 @@
   cursor: default;
   opacity: 0.6;
 }
+
+.zone[data-layout='compact'] {
+  height: 36px;
+  box-sizing: border-box;
+  padding: 0 8px;
+  justify-content: center;
+}
+.zone[data-layout='compact'] .hint {
+  font-size: 12px;
+  white-space: nowrap;
+}
+.field[data-layout='button'] {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  align-items: center;
+  gap: 8px 12px;
+}
+.zone[data-layout='button'] {
+  padding: 7px 12px;
+  border-style: solid;
+}
+.field[data-layout='button'] .files {
+  grid-column: 1 / -1;
+}

@@ -1,5 +1,5 @@
-import { useState, type ReactNode } from 'react';
-import { Popover } from '@mantine/core';
+import type { ReactNode } from 'react';
+import { Popout } from './Popout';
 import classes from './InfoTip.module.css';
 
 /**
@@ -11,56 +11,19 @@ import classes from './InfoTip.module.css';
  * `about` names what it explains, for a screen reader: "About Worth".
  */
 export function InfoTip({ about, children }: { about: string; children: ReactNode }) {
-  const [hovered, setHovered] = useState(false);
-  const [pinned, setPinned] = useState(false);
-
   return (
-    <Popover
-      opened={hovered || pinned}
-      onClose={() => {
-        setPinned(false);
-        setHovered(false);
-      }}
-      position="top-start"
-      width={300}
-      withArrow
-      shadow="md"
-      returnFocus
+    <Popout
+      label={`About ${about}`}
+      className={classes.button}
+      button={
+        <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+          <circle cx="8" cy="8" r="7" fill="none" stroke="currentColor" />
+          <circle cx="8" cy="4.75" r="0.9" fill="currentColor" />
+          <path d="M8 7v5" stroke="currentColor" strokeWidth="1.5" />
+        </svg>
+      }
     >
-      <Popover.Target>
-        <button
-          type="button"
-          className={classes.button}
-          aria-label={`About ${about}`}
-          onMouseEnter={() => setHovered(true)}
-          onMouseLeave={() => setHovered(false)}
-          onClick={() => {
-            // A tap also counts as the pointer over it, which no tap elsewhere
-            // ends; the click alone says whether it stays open.
-            setHovered(false);
-            setPinned((open) => !open);
-          }}
-          onKeyDown={(event) => {
-            if (event.key === 'Escape') {
-              setPinned(false);
-              setHovered(false);
-            }
-          }}
-        >
-          <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
-            <circle cx="8" cy="8" r="7" fill="none" stroke="currentColor" />
-            <circle cx="8" cy="4.75" r="0.9" fill="currentColor" />
-            <path d="M8 7v5" stroke="currentColor" strokeWidth="1.5" />
-          </svg>
-        </button>
-      </Popover.Target>
-      <Popover.Dropdown
-        className={classes.dropdown}
-        onMouseEnter={() => setHovered(true)}
-        onMouseLeave={() => setHovered(false)}
-      >
-        {children}
-      </Popover.Dropdown>
-    </Popover>
+      {children}
+    </Popout>
   );
 }

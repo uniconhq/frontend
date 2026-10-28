@@ -5,11 +5,10 @@ import classes from './ActionMenu.module.css';
 
 /**
  * A menu of actions behind a button: headings, dividers and items, an item
- * that cannot be chosen shown with the reason it cannot. An item may carry a
- * line saying what it is and a small note, such as a primitive's
- * description and its reference. The workflow editor's ports use it, behind
- * a small plain button, as the keyboard's way to do what a drag does; its
- * toolbar's "Add step" uses it behind a page's button (`button`).
+ * that cannot be chosen shown with the reason it cannot. The workflow
+ * editor's ports use it, behind
+ * a small plain button, as the keyboard's way to do what a drag does; a
+ * step's drawer uses it behind a page's button (`button`).
  *
  * `entries` may be a function, called only while the menu is open: a graph
  * draws a menu on every port, and building every one's entries, and drawing
@@ -23,10 +22,6 @@ export type MenuEntry =
       kind: 'item';
       text: string;
       reason?: string | null;
-      /** A line under the item's text, saying what it is. */
-      detail?: string | null;
-      /** A small note under that, such as a reference. */
-      note?: string;
       onSelect: () => void;
     }
   | { kind: 'divider' };
@@ -40,9 +35,6 @@ type Props = {
   entries: MenuEntry[] | (() => MenuEntry[]);
   /** The button is a page's secondary Button rather than a small plain one. */
   button?: boolean;
-  disabled?: boolean;
-  /** What the menu says when it has no entries. */
-  empty?: string;
 };
 
 export function ActionMenu({ entries, ...rest }: Props) {
@@ -71,8 +63,6 @@ const DrawnMenu = memo(function DrawnMenu({
   read,
   className,
   button = false,
-  disabled = false,
-  empty,
 }: Omit<Props, 'entries'> & {
   read: () => MenuEntry[];
   /** The entries when they are a list, so a new list draws the menu again. */
@@ -91,11 +81,7 @@ const DrawnMenu = memo(function DrawnMenu({
     >
       <Menu.Target>
         {button ? (
-          <Button
-            variant="secondary"
-            disabled={disabled}
-            label={label === text ? undefined : label}
-          >
+          <Button variant="secondary" label={label === text ? undefined : label}>
             {text}
           </Button>
         ) : (
@@ -103,16 +89,12 @@ const DrawnMenu = memo(function DrawnMenu({
             type="button"
             className={`${className ?? classes.button} nodrag nopan`}
             aria-label={label}
-            disabled={disabled}
           >
             {text}
           </button>
         )}
       </Menu.Target>
       <Menu.Dropdown aria-label={label} className={classes.menu}>
-        {entries.length === 0 && empty !== undefined && (
-          <Menu.Label>{empty}</Menu.Label>
-        )}
         {entries.map((entry, at) => (
           <Fragment key={`${entry.kind} ${String(at)}`}>
             {entry.kind === 'heading' && <Menu.Label>{entry.text}</Menu.Label>}
@@ -126,12 +108,6 @@ const DrawnMenu = memo(function DrawnMenu({
                 <span className={button ? classes.menuTitle : classes.menuText}>
                   {entry.text}
                 </span>
-                {entry.detail !== undefined && entry.detail !== null && (
-                  <span className={classes.menuDetail}>{entry.detail}</span>
-                )}
-                {entry.note !== undefined && (
-                  <span className={classes.menuNote}>{entry.note}</span>
-                )}
                 {entry.reason !== undefined && entry.reason !== null && (
                   <span className={classes.menuReason}>{entry.reason}</span>
                 )}

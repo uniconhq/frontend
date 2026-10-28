@@ -36,6 +36,7 @@ export function TextInput({
   onCommit,
   autoFocus = false,
   labelHidden = false,
+  width,
 }: {
   label: string;
   value: string;
@@ -52,6 +53,7 @@ export function TextInput({
   onCommit?: () => void;
   autoFocus?: boolean;
   labelHidden?: boolean;
+  width?: 'xs' | 'sm' | 'md' | 'lg';
 }) {
   const { inputLabel, id, wrap } = useFieldLabel({ label, info, required });
   return wrap(
@@ -69,6 +71,13 @@ export function TextInput({
       maxLength={maxLength}
       inputMode={inputMode}
       disabled={disabled}
+      style={{
+        width:
+          width === undefined
+            ? undefined
+            : { xs: '5rem', sm: '12rem', md: '14rem', lg: '16rem' }[width],
+        maxWidth: '100%',
+      }}
       radius="sm"
       onBlur={onCommit}
       autoFocus={autoFocus}

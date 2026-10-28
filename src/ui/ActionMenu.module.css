@@ -23,20 +23,6 @@
   font-weight: 700;
 }
 
-.menuDetail {
-  display: block;
-  color: var(--unicon-text-secondary);
-  font-size: 12px;
-  white-space: normal;
-}
-
-.menuNote {
-  display: block;
-  color: var(--unicon-text-meta);
-  font-family: var(--mantine-font-family-monospace);
-  font-size: 10px;
-}
-
 .menuReason {
   display: block;
   font-size: 11px;
