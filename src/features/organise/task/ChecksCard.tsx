@@ -52,7 +52,7 @@ export function ChecksCard({
     <BuildCard
       id="checks"
       title="Checks"
-      line="A made-up submission the save grades, and what it should get. A task can have none."
+      line="Made-up submissions that prove the task grades correctly. Each save grades them and is refused if one gets the wrong result. A task can have none."
     >
       {values.checks.length === 0 && (
         <BodyText>No checks yet. The next save publishes without grading one.</BodyText>
@@ -144,40 +144,54 @@ export function ChecksCard({
               <BodyText>{checkProblem(check, index)}</BodyText>
             </div>
           )}
+          {!disabled && (
+            <div className={classes.ownWidth}>
+              <Button
+                size="xs"
+                variant="secondary"
+                disabled={disabled}
+                onClick={() =>
+                  update(check.key, {
+                    values: [...check.values, { name: '', expected: '' }],
+                  })
+                }
+              >
+                Add a value it should get
+              </Button>
+            </div>
+          )}
+          {!disabled && (
+            <div className={classes.ownWidth}>
+              <Button
+                size="xs"
+                variant="secondary"
+                disabled={disabled}
+                onClick={() =>
+                  set(values.checks.filter((item) => item.key !== check.key))
+                }
+              >
+                Remove this check
+              </Button>
+            </div>
+          )}
+        </CardPart>
+      ))}
+      {!disabled && (
+        <div className={classes.ownWidth}>
           <Button
-            size="xs"
             variant="secondary"
             disabled={disabled}
             onClick={() =>
-              update(check.key, {
-                values: [...check.values, { name: '', expected: '' }],
-              })
+              set([
+                ...values.checks,
+                { key: freshKey('c'), submit: {}, verdict: '', values: [] },
+              ])
             }
           >
-            Add a value it should get
+            Add a check
           </Button>
-          <Button
-            size="xs"
-            variant="secondary"
-            disabled={disabled}
-            onClick={() => set(values.checks.filter((item) => item.key !== check.key))}
-          >
-            Remove this check
-          </Button>
-        </CardPart>
-      ))}
-      <Button
-        variant="secondary"
-        disabled={disabled}
-        onClick={() =>
-          set([
-            ...values.checks,
-            { key: freshKey('c'), submit: {}, verdict: '', values: [] },
-          ])
-        }
-      >
-        Add a check
-      </Button>
+        </div>
+      )}
     </BuildCard>
   );
 }

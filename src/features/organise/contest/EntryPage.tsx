@@ -323,8 +323,7 @@ function EntryForm({
   if (unreadable) {
     return (
       <BodyText>
-        How people enter cannot be read here. Ask a platform admin to fix the contest’s
-        settings.
+        How people enter cannot be read here. Check the contest’s stored settings.
       </BodyText>
     );
   }
@@ -342,11 +341,6 @@ function EntryForm({
             it from the contest’s status, or invite people instead.
           </BodyText>
         </div>
-      )}
-      {locked && (
-        <BodyText tone="secondary">
-          Only an admin of the contest can change these.
-        </BodyText>
       )}
 
       <Fieldset
@@ -544,18 +538,20 @@ function EntryForm({
           ))}
         </ul>
       )}
-      <div className={shared.actions}>
-        <Button
-          loading={busy}
-          disabled={locked || !changed || problems.length > 0}
-          onClick={() =>
-            onSave((fresh) => writeContest(fresh, read.values, values, { admin }))
-          }
-        >
-          Save how people enter
-        </Button>
-        {changed && <UnsavedNote />}
-      </div>
+      {!locked && (
+        <div className={shared.actions}>
+          <Button
+            loading={busy}
+            disabled={locked || !changed || problems.length > 0}
+            onClick={() =>
+              onSave((fresh) => writeContest(fresh, read.values, values, { admin }))
+            }
+          >
+            Save how people enter
+          </Button>
+          {changed && <UnsavedNote />}
+        </div>
+      )}
     </div>
   );
 }
@@ -566,6 +562,8 @@ export function ContestEntryPage() {
   const manages = holdsAtContest(useMe().roles, org, contest, 'manager');
   return (
     <SectionPage
+      place={{ kind: 'contest', org, contest }}
+      role="admin"
       section={sectionOf(CONTEST_SECTIONS, 'entry')}
       links={
         <>

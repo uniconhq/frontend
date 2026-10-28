@@ -7,14 +7,24 @@ import type {
   Submitter,
 } from '@/api/types';
 
-/** Each status as the feed and its filter name it. */
+/**
+ * A grading that went wrong on Unicon's side (`system_error`), not through
+ * anything the submission did: one name for it on every page.
+ */
+export const FAILED_WORDS = 'Failed on Unicon’s side';
+
+/**
+ * Each status as the feed and its filter name it. A queued grading is not
+ * yet sent to a machine; a dispatched one is sent and waits for a machine
+ * to take it.
+ */
 export const STATUS: Record<GradingStatus, string> = {
-  queued: 'Queued',
-  dispatched: 'Waiting for a machine',
+  queued: 'Not sent to a machine yet',
+  dispatched: 'Sent, waiting for a machine',
   running: 'Running',
   done: 'Done',
   cancelled: 'Cancelled',
-  system_error: 'System error',
+  system_error: FAILED_WORDS,
   over_limit: 'Over the limit',
 };
 

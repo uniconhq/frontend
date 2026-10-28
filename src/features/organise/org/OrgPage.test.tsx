@@ -269,9 +269,7 @@ describe("the org's display name and description", () => {
         'Acme Contests',
       );
       expect(screen.queryByRole('button', { name: 'Edit' })).toBeNull();
-      expect(
-        screen.getByText('Only an admin of the org can change these.'),
-      ).toBeVisible();
+      expect(screen.getByText('Read only')).toBeVisible();
     },
   );
 
@@ -296,9 +294,7 @@ describe("the org's display name and description", () => {
     expect(fields).toHaveTextContent('Display nameAcme Contests');
     expect(fields).toHaveTextContent('DescriptionContests for Acme engineers.');
     expect(screen.queryByRole('button', { name: 'Edit' })).toBeNull();
-    expect(
-      screen.getByText('Only an admin of the org can change these.'),
-    ).toBeVisible();
+    expect(screen.getByText('Read only')).toBeVisible();
   });
 
   it("heads the org's page with them, and gives its admin a small Edit", async () => {

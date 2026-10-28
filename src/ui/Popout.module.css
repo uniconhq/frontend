@@ -1,0 +1,13 @@
+.dropdown {
+  background: var(--unicon-body);
+  border: 1px solid var(--unicon-border-strong);
+  color: var(--unicon-text-body);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.bare {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}

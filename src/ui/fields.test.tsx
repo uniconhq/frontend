@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fireEvent, screen } from '@testing-library/react';
+import { fireEvent, screen, waitForElementToBeRemoved } from '@testing-library/react';
 import userEvent from '@/test/user-event';
 import { renderWithProviders } from '@/test/render';
 import { DateTimeInput } from './DateTimeInput';
@@ -117,13 +117,19 @@ describe('a field with background behind an ⓘ', () => {
     expect(screen.queryByText('The most points the task gives.')).toBeNull();
   });
 
-  it('opens while the pointer is over it', async () => {
+  it('opens while the pointer is over it, and over what it opened', async () => {
     renderWithProviders(field);
 
     fireEvent.mouseEnter(screen.getByRole('button', { name: 'About Worth' }));
-    expect(await screen.findByText('The most points the task gives.')).toBeVisible();
+    const tip = await screen.findByText('The most points the task gives.');
+    expect(tip).toBeVisible();
+    // Crossing to what it opened keeps it open.
     fireEvent.mouseLeave(screen.getByRole('button', { name: 'About Worth' }));
-    expect(screen.queryByText('The most points the task gives.')).toBeNull();
+    fireEvent.mouseEnter(tip);
+    fireEvent.mouseLeave(tip);
+    await waitForElementToBeRemoved(() =>
+      screen.queryByText('The most points the task gives.'),
+    );
   });
 });
 
@@ -178,4 +184,68 @@ describe('a choice of a few, as radio options', () => {
     ).toBe(true);
     expect(group).toBeInTheDocument();
   });
+
+  it('says a line about the whole choice under its question, before the options', () => {
+    renderWithProviders(
+      <RadioGroup
+        label="Rule"
+        value="all"
+        options={options}
+        onChange={noop}
+        description="Set once the tests are in."
+      />,
+    );
+
+    const note = screen.getByText('Set once the tests are in.');
+    expect(follows(screen.getByText('Rule'), note)).toBe(true);
+    expect(
+      follows(note, screen.getByRole('radio', { name: 'Every test must pass' })),
+    ).toBe(true);
+  });
+});
+
+it('shows a chosen option’s extra control beside it only while chosen', () => {
+  const options = [
+    {
+      value: 'top',
+      label: 'Top rows',
+      beside: <TextInput label="How many" value="10" onChange={noop} />,
+    },
+  ];
+  const view = renderWithProviders(
+    <RadioGroup label="Rows" value="all" options={options} onChange={noop} />,
+  );
+  expect(screen.queryByLabelText('How many')).toBeNull();
+  view.rerender(
+    <RadioGroup label="Rows" value="top" options={options} onChange={noop} />,
+  );
+  expect(screen.getByLabelText('How many')).toBeVisible();
+});
+
+it.each([
+  ['xs', '5rem'],
+  ['sm', '12rem'],
+  ['md', '14rem'],
+  ['lg', '16rem'],
+] as const)('sizes fields at %s', (width, size) => {
+  renderWithProviders(
+    <>
+      <TextInput label="Name" value="" onChange={noop} width={width} />
+      <Select
+        label="Choice"
+        value="a"
+        options={[{ value: 'a', label: 'A' }]}
+        onChange={noop}
+        width={width}
+      />
+    </>,
+  );
+  for (const label of ['Name', 'Choice']) {
+    const input = screen.getByLabelText(label);
+    expect(
+      input
+        .closest('.mantine-TextInput-root, .mantine-NativeSelect-root')
+        ?.getAttribute('style'),
+    ).toContain(`width: ${size}`);
+  }
 });

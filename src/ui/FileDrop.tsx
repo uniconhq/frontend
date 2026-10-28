@@ -30,6 +30,7 @@ export function FileDrop({
   onChange,
   progressOf,
   disabled = false,
+  layout,
 }: {
   label: string;
   description?: string;
@@ -41,6 +42,7 @@ export function FileDrop({
   onChange: (files: File[]) => void;
   progressOf?: (file: File) => number | null;
   disabled?: boolean;
+  layout?: 'compact' | 'button';
 }) {
   const [dragging, setDragging] = useState(false);
   const hint = useId();
@@ -68,22 +70,25 @@ export function FileDrop({
   };
 
   return (
-    <div className={classes.field}>
+    <div className={classes.field} data-layout={layout}>
       <label
         className={classes.zone}
+        data-layout={layout}
         data-dragging={dragging || undefined}
         data-disabled={disabled || undefined}
         onDragOver={over}
         onDragLeave={() => setDragging(false)}
         onDrop={drop}
       >
-        <span className={classes.label}>{label}</span>
-        <span id={hint} className={classes.hint}>
-          {several
-            ? 'Drop files here or choose them.'
-            : 'Drop a file here or choose one.'}
-          {description !== undefined && ` ${description}`}
-        </span>
+        {layout !== 'compact' && <span className={classes.label}>{label}</span>}
+        {layout !== 'button' && (
+          <span id={hint} className={classes.hint}>
+            {several
+              ? 'Drop files here or choose them.'
+              : 'Drop a file here or choose one.'}
+            {description !== undefined && ` ${description}`}
+          </span>
+        )}
         <input
           type="file"
           className={classes.input}
@@ -98,7 +103,12 @@ export function FileDrop({
           }}
         />
       </label>
-      {folder && (
+      {layout === 'button' && (
+        <span id={hint} className={classes.hint}>
+          {description}
+        </span>
+      )}
+      {folder && layout !== 'compact' && (
         <label className={classes.folder} data-disabled={disabled || undefined}>
           Or choose a folder
           <input

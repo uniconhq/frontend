@@ -8,6 +8,7 @@ export type RadioOption = {
   /** What choosing it means, or an example of it, under its label. */
   description?: string;
   disabled?: boolean;
+  beside?: ReactNode;
   /** Why a greyed option cannot be chosen, under it, never under the group. */
   reason?: string | null;
 };
@@ -64,19 +65,26 @@ export function RadioGroup({
   const radios = options.map((option) => {
     const greyed = disabled || option.disabled === true;
     return (
-      <Radio
-        key={option.value}
-        value={option.value}
-        label={option.label}
-        description={underOption(option, option.disabled === true)}
-        disabled={greyed}
-      />
+      <div key={option.value} className={classes.option}>
+        <Radio
+          value={option.value}
+          label={option.label}
+          description={underOption(option, option.disabled === true)}
+          disabled={greyed}
+        />
+        {option.value === value && option.beside !== undefined && (
+          <div className={classes.beside}>{option.beside}</div>
+        )}
+      </div>
     );
   });
   return (
     <Radio.Group
       label={label}
       description={description}
+      // The line about the choice as a whole reads under its question, before
+      // the options, never under the last option where it reads as that one's.
+      inputWrapperOrder={['label', 'description', 'input', 'error']}
       error={error}
       withAsterisk={required}
       value={value}

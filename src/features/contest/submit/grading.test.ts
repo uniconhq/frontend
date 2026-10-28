@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { GradingResult, Submission } from '@/api/types';
-import { justFinished, pollEvery } from './grading';
+import { justFinished, pollEvery, resultLine } from './grading';
 
 const NOW = new Date('2026-09-26T10:10:00Z');
 
@@ -88,5 +88,67 @@ describe('how often submissions are read again', () => {
   it('is once a minute when nothing is being graded', () => {
     expect(pollEvery([submitted(3, 'graded')], NOW)).toBe(60_000);
     expect(pollEvery(undefined, NOW)).toBe(60_000);
+  });
+});
+
+describe('what a submission came to, in its row', () => {
+  const run = {
+    group: 'all',
+    place: 1,
+    id: null,
+    dropped: false,
+    tuples: [],
+    verdict: 'accepted' as const,
+    passed: 1,
+    reports: [],
+    texts: {},
+    label: null,
+    message: null,
+  };
+  const value = {
+    name: 'score',
+    number: null,
+    text: null,
+    waiting: false,
+    self_reported: false,
+    show: null,
+    facts: null,
+    runs: null,
+    values: null,
+  };
+
+  it('is nothing with no grading or nothing of it shown', () => {
+    expect(resultLine(null)).toBe('');
+    expect(resultLine(done)).toBe('');
+  });
+
+  it('says it did not compile before anything else', () => {
+    expect(resultLine({ ...done, compiled: 0, runs: [run] })).toBe('Did not compile');
+  });
+
+  it('says each value it is shown, by name', () => {
+    expect(
+      resultLine({
+        ...done,
+        compiled: 1,
+        runs: [run],
+        run_values: [
+          { ...value, number: '7' },
+          { ...value, name: 'note', text: 'fast' },
+          { ...value, name: 'style', waiting: true },
+          { ...value, name: 'bonus' },
+        ],
+      }),
+    ).toBe('score: 7 · note: fast · style: being checked · bonus: –');
+  });
+
+  it('says how many of its tests passed when it is shown no value', () => {
+    expect(
+      resultLine({
+        ...done,
+        runs: [run, { ...run, place: 2, verdict: 'wrong_answer', passed: 0 }],
+      }),
+    ).toBe('Passed 1 of 2 tests');
+    expect(resultLine({ ...done, runs: [run] })).toBe('Passed 1 of 1 test');
   });
 });

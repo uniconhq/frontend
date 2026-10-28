@@ -1,7 +1,8 @@
 import type { Primitive, PrimitivePort } from '@/api/types';
+import type { WithValue } from './model';
 
 /**
- * The platform's primitives as the Add step menu and the drag checks read them:
+ * The platform's primitives as the tray and the drag checks read them:
  * each version with its declared ports and the limits it raises, or the
  * reason a version in a format no longer read cannot be used.
  */
@@ -22,11 +23,49 @@ export function raisingPorts(primitive: PrimitiveInfo): Set<string> {
   );
 }
 
-/** A usable primitive's declaration, or null for one the platform no longer reads. */
+/** What `declared` reads of a step: what it uses and the ports it gives. */
+type StepGiven = { use: string; with: Readonly<Record<string, WithValue>> };
+
+/**
+ * A usable primitive's declaration as `step` uses it, or null for one the
+ * platform no longer reads. A primitive of several forms is the one form the
+ * step's ports fit, as the forge picks it (`for_step`): every required input
+ * of the form given, and no input it lacks. With none or several fitting, it
+ * has no ports, as the forge refuses the step. A programs form's step gives
+ * each program's outputs, `<program>.<output>`, by the names it gives them.
+ */
 export function declared(
   primitives: Map<string, PrimitiveInfo>,
-  use: string,
+  step: StepGiven,
 ): PrimitiveInfo | null {
-  const found = primitives.get(use);
-  return found !== undefined && found.problem === null ? found : null;
+  const found = primitives.get(step.use);
+  if (found === undefined || found.problem !== null) return null;
+  const forms = Object.values(found.forms);
+  if (forms.length === 0) return found;
+  const given = Object.keys(step.with);
+  const fits = forms.filter(
+    (form) =>
+      Object.entries(form.inputs).every(
+        ([name, port]) => port.optional || given.includes(name),
+      ) && given.every((name) => name in form.inputs),
+  );
+  const form = fits.length === 1 ? fits[0] : undefined;
+  if (form === undefined) return { ...found, inputs: {}, outputs: {} };
+  const programs = Object.entries(form.inputs).flatMap(([name, port]) => {
+    const value = step.with[name];
+    if (port.type !== 'programs' || value?.kind !== 'mapping') return [];
+    return value.entries.flatMap((program) =>
+      Object.entries(port.outputs ?? {}).map(
+        ([output, decl]) => [`${program.name}.${output}`, decl] as const,
+      ),
+    );
+  });
+  return {
+    ...found,
+    description: form.description ?? found.description,
+    limits: form.limits,
+    limits_from: form.limits_from,
+    inputs: form.inputs,
+    outputs: { ...form.outputs, ...Object.fromEntries(programs) },
+  };
 }

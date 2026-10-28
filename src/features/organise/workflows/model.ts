@@ -73,6 +73,8 @@ export type OutputEntry = {
 };
 
 export type Workflow = {
+  /** What the workflow says it does, or null when it says nothing. */
+  description: string | null;
   inputs: InputDecl[];
   steps: Step[];
   outputs: OutputEntry[];
@@ -262,7 +264,9 @@ export function readWorkflow(file: unknown): Workflow {
   const top = isRecord(file) ? file : {};
   const inputs = isRecord(top.inputs) ? top.inputs : {};
   const listed = isRecord(top.outputs) ? top.outputs : {};
+  const said = typeof top.description === 'string' ? top.description.trim() : '';
   return {
+    description: said === '' ? null : said,
     inputs: Object.entries(inputs).map(([id, raw]) => inputOf(id, raw)),
     steps: (Array.isArray(top.steps) ? top.steps : []).map(stepOf),
     outputs: Object.entries(listed).map(([name, raw]) => entryOf(name, raw)),

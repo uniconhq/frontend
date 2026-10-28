@@ -2,12 +2,17 @@ import { useEffect } from 'react';
 import { useSearchParams } from 'react-router';
 import type { ProblemPlace } from '../DefinitionErrors';
 import { whenDrawn } from '@/ui/anchor';
-import { contestPlace, FIELD_PARAM, ITEM_PARAM, placeHref } from './places';
+import { boardNames, contestPlace, FIELD_PARAM, ITEM_PARAM, placeHref } from './places';
 
-/** Where each problem a refused save of the contest's settings lists is fixed. */
-export function contestPlaceOf(org: string, contest: string) {
-  return (path: string): ProblemPlace => {
-    const place = contestPlace(path);
+/**
+ * Where each problem a refused save of the contest's settings lists is
+ * fixed. `settings`, the settings as that save sent them, names each
+ * leaderboard as its card does; a save that hands its own text over names
+ * them by that instead.
+ */
+export function contestPlaceOf(org: string, contest: string, settings?: string) {
+  return (path: string, _message: string, sent = settings): ProblemPlace => {
+    const place = contestPlace(path, sent === undefined ? {} : boardNames(sent));
     return { label: place.label, to: placeHref(org, contest, place) };
   };
 }

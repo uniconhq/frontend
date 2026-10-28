@@ -39,6 +39,8 @@ export function TaskSettingsPage() {
   const { org, contest, task } = place;
   return (
     <SectionPage
+      place={place}
+      role="admin"
       section={sectionOf(TASK_SECTIONS, 'settings')}
       intro={
         <BodyText tone="secondary">
@@ -103,7 +105,7 @@ export function TaskGradingsPage() {
   const { place } = useTaskPlace();
   const { org, contest, task } = place;
   return (
-    <SectionPage section={sectionOf(TASK_SECTIONS, 'gradings')}>
+    <SectionPage place={place} section={sectionOf(TASK_SECTIONS, 'gradings')}>
       <Card>
         <GradingsSection path={{ org, contest, task }} />
       </Card>
@@ -128,7 +130,7 @@ export function TaskPublicationsPage() {
     { params: { path: { org, contest, task } } },
   );
   return (
-    <SectionPage section={sectionOf(TASK_SECTIONS, 'publications')}>
+    <SectionPage place={place} section={sectionOf(TASK_SECTIONS, 'publications')}>
       <Card>
         <Loaded view={view} rows={2}>
           {(publications) =>
@@ -173,7 +175,7 @@ export function TaskPublicationsPage() {
 export function TaskAnnouncementsPage() {
   const { place } = useTaskPlace();
   return (
-    <SectionPage section={sectionOf(TASK_SECTIONS, 'announcements')}>
+    <SectionPage place={place} section={sectionOf(TASK_SECTIONS, 'announcements')}>
       <AnnouncementsSection place={place} />
     </SectionPage>
   );
@@ -183,7 +185,7 @@ export function TaskAnnouncementsPage() {
 export function TaskOrganisersPage() {
   const { place } = useTaskPlace();
   return (
-    <SectionPage section={sectionOf(TASK_SECTIONS, 'organisers')}>
+    <SectionPage place={place} section={sectionOf(TASK_SECTIONS, 'organisers')}>
       <PeopleSection place={place} />
     </SectionPage>
   );

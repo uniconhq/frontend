@@ -207,6 +207,13 @@
   gap: 10px;
 }
 
+/* A field that holds a short choice or a number: as wide as that needs, not the card. */
+.narrow {
+  align-self: flex-start;
+  width: 16rem;
+  max-width: 100%;
+}
+
 .runs {
   width: 100%;
   border-collapse: collapse;
@@ -215,29 +222,11 @@
 
 .runs th,
 .runs td {
+  overflow-wrap: anywhere;
   padding: 6px 8px;
   border-bottom: 1px solid var(--unicon-border);
   vertical-align: top;
   text-align: left;
-}
-
-.dot {
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  border: 1px solid var(--unicon-border);
-  background: transparent;
-}
-
-.dot[data-on] {
-  background: var(--unicon-accent, #3d7a5a);
-}
-
-.valueCard {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-top: 12px;
 }
 
 .valueHead {
@@ -245,4 +234,172 @@
   flex-wrap: wrap;
   gap: 8px;
   align-items: end;
+}
+
+.columnKind {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--unicon-text-secondary);
+}
+.groupFrame {
+  overflow: auto;
+  max-height: 520px;
+  border: 1px solid var(--unicon-border);
+}
+.groupGrid {
+  border-collapse: separate;
+  border-spacing: 0;
+  table-layout: fixed;
+  width: max-content;
+  font-size: 12px;
+}
+.groupGrid :is(th, td) {
+  width: 12rem;
+  min-width: 12rem;
+  max-width: 12rem;
+  padding: 6px 8px;
+  text-align: center;
+  border-bottom: 1px solid var(--unicon-border);
+}
+.groupGrid :is(th, td):first-child {
+  width: 14rem;
+  min-width: 14rem;
+  max-width: 14rem;
+  text-align: left;
+  position: sticky;
+  left: 0;
+  background: var(--unicon-body);
+  z-index: 1;
+  overflow-wrap: anywhere;
+}
+.groupGrid thead {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--unicon-body);
+}
+.groupHead {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.groupHead input {
+  width: 9rem;
+}
+.groupGrid td > div {
+  display: flex;
+  justify-content: center;
+}
+.groupGrid [data-empty] {
+  color: var(--unicon-text-danger);
+}
+.ownWidth {
+  align-self: flex-start;
+}
+
+.groupGrid [data-marked] {
+  outline: 2px solid var(--mantine-primary-color-filled);
+  outline-offset: -2px;
+}
+.resultFlow {
+  position: relative;
+  min-width: 0;
+}
+.resultFlow::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 20px;
+  pointer-events: none;
+  background: linear-gradient(to right, transparent, var(--unicon-body));
+}
+.valueCard {
+  scroll-margin-top: calc(var(--unicon-header-height) + 20px);
+}
+
+.formulaGap {
+  flex: 1;
+}
+
+.runTableFrame {
+  overflow-x: auto;
+}
+.runTable {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.runTable th {
+  padding: 6px;
+  text-align: left;
+  font-weight: 600;
+}
+.runTable td {
+  height: 44px;
+  box-sizing: border-box;
+  padding: 3px 6px;
+  border-bottom: 1px solid var(--unicon-border);
+  vertical-align: middle;
+}
+.runNumber {
+  width: 3rem;
+}
+.runName {
+  width: 14rem;
+}
+.runMenu {
+  width: 2rem;
+}
+.runCell {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 36px;
+  min-width: 0;
+}
+.runCell > :first-child {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.runCell > span {
+  white-space: nowrap;
+}
+/* A cell's menu: a square button as `IconButton` draws one, with a pencil,
+   so it reads apart from the row's ✕ beside it. */
+.cellMenu {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--unicon-border-strong);
+  border-radius: var(--mantine-radius-sm);
+  background: var(--unicon-body);
+  color: var(--unicon-text-body);
+  font-size: 14px;
+  cursor: pointer;
+}
+.cellMenu:hover:not(:disabled) {
+  background: var(--unicon-hover);
+}
+.runFoot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 8px;
+}
+.secondTable {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-top: 16px;
 }

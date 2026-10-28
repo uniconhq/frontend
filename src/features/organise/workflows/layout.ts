@@ -1,5 +1,5 @@
 import { refsOf, wireRefs, type Ref, type Workflow } from './model';
-import type { PrimitiveInfo } from './primitives';
+import { declared, type PrimitiveInfo } from './primitives';
 import { refWords } from './words';
 
 /**
@@ -7,12 +7,11 @@ import { refWords } from './words';
  * `workflow.yaml` alone (PROPOSAL.md section 12, #377). Nothing of it is
  * stored, so one file always draws one picture. The rules:
  *
- * - Columns. A step stands one column right of the furthest step it reads,
- *   the first in column 1. The outputs stand in the last column.
- * - Groups. Inputs read by exactly the same steps share a box, named for
- *   them, in the column just before the first of them, their rows in the
- *   order of the ports they feed. One that nothing reads stands in the first
- *   column. Text with an input written in counts as reading it.
+ * - Columns. Each input is a box of its own in the first column: the task
+ *   gives it. Each file or folder of the workflow a step reads is a box of
+ *   its own in the next: the workflow gives it, the same on every run. A
+ *   step stands one column right of the furthest step it reads, the first
+ *   after those. The outputs stand in the last column.
  * - Slots. A wire that skips columns runs through a slot of its own in each
  *   column it crosses, labelled in words with its source where it starts
  *   ("time_ms from run"), and wires
@@ -21,23 +20,26 @@ import { refWords } from './words';
  * - Order. Each column's boxes and slots are sorted by where their wires come
  *   from and then by where they go, a few sweeps each way, keeping the order
  *   with the fewest crossings; ties keep the order of `steps:`.
- * - Colour. Five colours cut from the mark's gradient, which the columns
- *   take 1 to 5 and back down, again and again; a wire takes the colour of
- *   the column it leaves.
- * - Rows. Every port has a row of its own across the box's whole width: a
- *   step's inputs first, its outputs under them, so a name, its type and
- *   what it is given never run into the port beside it.
+ * - Colour. The inputs lilac, the workflow's files blue, the outputs gold,
+ *   and the steps' columns the colours between, in turn and back
+ *   (`PALETTE`); a wire takes the colour of the box it leaves.
+ * - Open and closed. A closed box is its head and a line or two, with one
+ *   pin a side on its title line, where every wire meets it. An open box
+ *   adds a row for every port across its whole width, a step's inputs
+ *   first and its outputs under them, and each wire meets its port's row.
+ *   The outputs always stand open, so each is written out on its row.
+ *   Every part is a fixed height (`BOX`), so where a wire meets a box is
+ *   worked out here, never measured.
+ *
+ * Box keys, which the page and its tests find boxes by: `step:<index>` for
+ * a step, by its place in `steps:`; `input:<name>` for an input;
+ * `file:<path>` for a file of the workflow; `outputs`.
  */
 
+/** The rows of a box, which the scoring flow's boxes share. */
 export const GEOMETRY = {
-  /** A box's width, and a slot's. */
-  width: 320,
-  /** The space between two columns, which the wires cross. */
-  gap: 104,
-  /** A step's title rows: its name, its primitive and what the primitive does. */
+  /** A box's head: its name, what it is, and what it does. */
   header: 84,
-  /** The title rows of the inputs and the outputs. */
-  groupHeader: 50,
   /** One port's row. */
   row: 28,
   /** Below a box's last row. */
@@ -46,10 +48,55 @@ export const GEOMETRY = {
   space: 24,
 } as const;
 
-const SWEEPS = 4;
-const PINGPONG = [0, 1, 2, 3, 4, 3, 2, 1];
+/** The parts of a box, top to bottom, and how wide it is. */
+export const BOX = {
+  /** A closed box's width. */
+  closed: 260,
+  /** An open box's width, room for each port's row. */
+  open: 320,
+  /** The space between two columns, which the wires cross. */
+  gap: 88,
+  /** Room above every box for a workflow box's ears. */
+  stack: 12,
+  /** The box's border. */
+  border: 2,
+  /** Its head: its name and kind, what it is with its ref, what it does. */
+  head: GEOMETRY.header,
+  /** A line under the head: what is wrong, or what goes in and out. */
+  line: 22,
+  /** A workflow box's foot, which opens it. */
+  foot: 26,
+  /** How far down the face a closed box's pins stand: its title line. */
+  pin: 15,
+  /** Room left of the first column for a step's tab of the inputs it reads, while they are hidden. */
+  tab: 76,
+} as const;
 
-type BoxKind = 'step' | 'inputs' | 'outputs';
+/** `BOX` and the row height as the stylesheet reads them, in pixels. */
+export const BOX_PROPERTIES = Object.fromEntries(
+  Object.entries({ ...BOX, row: GEOMETRY.row }).map(([part, size]) => [
+    `--box-${part}`,
+    `${String(size)}px`,
+  ]),
+);
+
+/**
+ * The colours of a workflow's graph, the mark's gradient: lilac in, gold
+ * out, and the columns between taking the middle colours in turn and back.
+ * A file of the workflow stands apart from both, as neither the task nor a
+ * step gives it.
+ */
+export const PALETTE = {
+  input: '#c9a4e2',
+  file: '#8fb3e0',
+  middle: ['#e098c5', '#f78ca8', '#fbab72'],
+  output: '#ffc93c',
+} as const;
+
+const SWEEPS = 4;
+const BOUNCE = [...PALETTE.middle, ...PALETTE.middle.slice(1, -1).reverse()];
+
+type BoxKind = 'step' | 'input' | 'file' | 'outputs';
 
 export type Box = {
   key: string;
@@ -61,13 +108,21 @@ export type Box = {
   height: number;
   /** For a step box, the step's place in `steps:`. */
   step: number | null;
-  /** For a group, the steps it is read by, in the order of `steps:`. */
+  /** For an input or a file, the steps that read it, in the order of `steps:`. */
   readers: string[];
   /** Ports down the left: a step's inputs, the outputs' entries. */
   left: string[];
-  /** Ports down the right: a step's outputs, a group's inputs. */
+  /** Ports down the right: a step's outputs, an input or a file itself. */
   right: string[];
-  colour: number;
+  colour: string;
+  /** Drawn with a row for each port. */
+  open: boolean;
+  /** A run workflow's step, drawn as a stack with a foot that opens it. */
+  stacked: boolean;
+  /** With a line under its head saying what is wrong, or that a newer version is out. */
+  warned: boolean;
+  /** With a line saying what it needs and gives, while it is closed. */
+  needs: boolean;
 };
 
 type Slot = {
@@ -80,14 +135,14 @@ type Slot = {
   source: string;
   /** The source's name, on the slot a wire enters first. */
   label: string | null;
-  colour: number;
+  colour: string;
 };
 
 export type Point = { x: number; y: number };
 
 type Wire = {
   key: string;
-  /** `inputs:<id>` or `steps:<index>.<output>`. */
+  /** `inputs:<id>`, `workflow:<path>` or `steps:<index>.<output>`. */
   source: string;
   /** `port:<index>.<port>` or `outputs:<name>`. */
   target: string;
@@ -95,12 +150,17 @@ type Wire = {
   to: { box: string; port: string };
   /** From the source port to the target port, through each slot. */
   points: Point[];
-  colour: number;
+  colour: string;
 };
 
 export type Layout = {
   columns: number;
   boxes: Box[];
+  /**
+   * The inputs and files the steps read while they are hidden: each closed
+   * and placed nowhere, for a step's tab to pop out.
+   */
+  hidden: Box[];
   slots: Slot[];
   wires: Wire[];
   width: number;
@@ -108,18 +168,31 @@ export type Layout = {
   crossings: number;
 };
 
-/** The colour a column takes, 0 to 4: 1 to 5 and back down, again and again. */
-function colourOf(column: number): number {
-  return PINGPONG[column % PINGPONG.length] ?? 0;
+/** The colour of a box: an input's, a file's, the outputs', or its column's among the steps. */
+function colourOf(kind: BoxKind, stepColumn: number): string {
+  if (kind === 'input') return PALETTE.input;
+  if (kind === 'file') return PALETTE.file;
+  if (kind === 'outputs') return PALETTE.output;
+  return BOUNCE[(stepColumn - 1) % BOUNCE.length] ?? PALETTE.input;
 }
 
-function columnX(column: number): number {
-  return column * (GEOMETRY.width + GEOMETRY.gap);
+/** How far down its face a box's first port row stands: under its head and its problem line. */
+export function rowsTop(box: Pick<Box, 'warned'>): number {
+  return BOX.head + (box.warned ? BOX.line : 0);
 }
 
-/** The height of a box's title rows, above its first port. */
-export function headerOf(kind: BoxKind): number {
-  return kind === 'step' ? GEOMETRY.header : GEOMETRY.groupHeader;
+/** How tall a box is drawn, its ears' room and its border too. */
+function heightOf(
+  box: Pick<Box, 'open' | 'warned' | 'needs' | 'stacked'>,
+  rows: number,
+): number {
+  return (
+    BOX.stack +
+    2 * BOX.border +
+    rowsTop(box) +
+    (box.open ? rows * GEOMETRY.row + GEOMETRY.foot : box.needs ? BOX.line : 0) +
+    (box.stacked ? BOX.foot : 0)
+  );
 }
 
 /**
@@ -135,6 +208,17 @@ export function rowOf(
   return side === 'left'
     ? Math.max(box.left.indexOf(port), 0)
     : box.left.length + Math.max(box.right.indexOf(port), 0);
+}
+
+/** How far down a box a wire meets it: a closed box's pins, an open box's row. */
+function meetsAt(
+  box: Pick<Box, 'open' | 'warned' | 'left' | 'right'>,
+  side: 'left' | 'right',
+  port: string,
+): number {
+  const face = BOX.stack + BOX.border;
+  if (!box.open) return face + BOX.pin;
+  return face + rowsTop(box) + rowOf(box, side, port) * GEOMETRY.row + GEOMETRY.row / 2;
 }
 
 const OUTPUTS_BOX = 'outputs';
@@ -179,6 +263,18 @@ type Connection = {
 /** The ports of a run workflow drawn as a box, when the step is not a primitive. */
 export type StepPorts = { inputs: string[]; outputs: string[] };
 
+/**
+ * Which boxes are drawn open, or all of them, as a box's inside is; which
+ * have a line saying what is wrong, from the last check's answer; and
+ * whether the inputs and files a step reads are drawn, or left to the step
+ * to list. An input no step reads is drawn either way, so it can be found.
+ */
+export type Drawn = {
+  open: ReadonlySet<string> | 'all';
+  warned?: ReadonlySet<string>;
+  inputs?: 'shown' | 'hidden';
+};
+
 /** The ports of each step: the primitive's own, or a box's, then the rest the file uses. */
 function stepPorts(
   workflow: Workflow,
@@ -189,19 +285,17 @@ function stepPorts(
   const left: string[][] = [];
   const right: string[][] = [];
   workflow.steps.forEach((step) => {
-    const declared = primitives.get(step.use);
+    const primitive = declared(primitives, step);
     const box = boxes.get(step.use);
     const inputs =
-      declared && declared.problem === null
-        ? Object.keys(declared.inputs)
-        : (box?.inputs ?? []);
+      primitive !== null ? Object.keys(primitive.inputs) : (box?.inputs ?? []);
     left.push([
       ...inputs,
       ...Object.keys(step.with).filter((port) => !inputs.includes(port)),
     ]);
     const outputs =
-      declared && declared.problem === null
-        ? Object.keys(declared.outputs).filter((output) => output !== 'outcome')
+      primitive !== null
+        ? Object.keys(primitive.outputs).filter((output) => output !== 'outcome')
         : [...(box?.outputs ?? [])];
     right.push(outputs);
   });
@@ -243,14 +337,16 @@ function compare(a: (number | string)[], b: (number | string)[]): number {
 export function layoutWorkflow(
   workflow: Workflow,
   primitives: Map<string, PrimitiveInfo>,
-  given: ReadonlyMap<string, StepPorts> = new Map(),
+  given: ReadonlyMap<string, StepPorts>,
+  { open, warned = new Set(), inputs = 'shown' }: Drawn,
 ): Layout {
+  const isOpen = (key: string) => open === 'all' || open.has(key);
   const { steps } = workflow;
   const indexes = stepIndexes(workflow);
   const ports = stepPorts(workflow, primitives, given);
   const declaredInputs = new Set(workflow.inputs.map((input) => input.id));
 
-  // What each step reads, and who reads each input.
+  // What each step reads, and who reads each input and each file.
   const reads = steps.map(() => new Set<number>());
   const inputReaders = new Map<string, Set<number>>();
   const firstUse = new Map<string, [number, number]>();
@@ -262,14 +358,20 @@ export function layoutWorkflow(
     if (use === undefined || compare([by, port], use) < 0)
       firstUse.set(key, [by, port]);
   };
+  // The steps that read an input or a file, which a tab lists while they are hidden.
+  const readsOuter = new Set<number>();
   steps.forEach((step, index) => {
     const left = ports.left[index] ?? [];
     for (const [port, value] of Object.entries(step.with)) {
       const portIndex = left.indexOf(port);
       for (const ref of refsOf(value)) {
-        if (ref.kind === 'inputs' && declaredInputs.has(ref.name))
+        if (ref.kind === 'inputs' && declaredInputs.has(ref.name)) {
           note(`inputs:${ref.name}`, index, portIndex);
-        else if (ref.kind === 'steps') {
+          readsOuter.add(index);
+        } else if (ref.kind === 'workflow') {
+          note(`workflow:${ref.name}`, index, portIndex);
+          readsOuter.add(index);
+        } else if (ref.kind === 'steps') {
           const read = indexes.get(ref.name);
           if (read !== undefined && read < index) reads[index]?.add(read);
         }
@@ -277,15 +379,15 @@ export function layoutWorkflow(
     }
   });
 
-  // Columns.
+  // Columns: the inputs 0, the files 1, the steps from 2. A step's colour
+  // is by its place among the steps alone, so the files never change it.
   const column: number[] = steps.map(() => 0);
   steps.forEach((_, index) => {
     let at = 1;
     for (const read of reads[index] ?? []) at = Math.max(at, (column[read] ?? 0) + 1);
     column[index] = at;
   });
-  const reportColumn = Math.max(0, ...column) + 1;
-  const readerColumn = (reader: number) => column[reader] ?? 0;
+  const reportColumn = Math.max(0, ...column) + 2;
   const readerName = (reader: number) => steps[reader]?.id ?? '';
 
   // Boxes.
@@ -293,45 +395,64 @@ export function layoutWorkflow(
     base: (number | string)[];
   };
   const drafts: Draft[] = [];
-  steps.forEach((_, index) => {
+  const parts = (key: string, stacked: boolean, needs: boolean) => ({
+    open: isOpen(key),
+    stacked,
+    warned: warned.has(key),
+    needs,
+  });
+  steps.forEach((step, index) => {
+    const left = ports.left[index] ?? [];
+    const right = ports.right[index] ?? [];
+    const boxed = declared(primitives, step) === null && given.has(step.use);
     drafts.push({
       key: stepBox(index),
       kind: 'step',
-      column: column[index] ?? 1,
+      column: (column[index] ?? 1) + 1,
       step: index,
       readers: [],
-      left: ports.left[index] ?? [],
-      right: ports.right[index] ?? [],
+      left,
+      right,
       base: [index, 1],
+      ...parts(stepBox(index), boxed, left.length + right.length > 0),
     });
   });
-  const names = workflow.inputs.map((input) => input.id);
-  const groups = new Map<string, string[]>();
-  for (const name of names) {
-    const by = [...(inputReaders.get(`inputs:${name}`) ?? [])].sort((a, b) => a - b);
-    const key = by.join(',');
-    groups.set(key, [...(groups.get(key) ?? []), name]);
-  }
-  for (const [key, members] of groups) {
-    const by = key === '' ? [] : key.split(',').map(Number);
-    const at = by.length === 0 ? 0 : Math.max(0, Math.min(...by.map(readerColumn)) - 1);
-    const ordered = [...members].sort((a, b) => {
-      const first = firstUse.get(`inputs:${a}`) ?? [Infinity, names.indexOf(a)];
-      const second = firstUse.get(`inputs:${b}`) ?? [Infinity, names.indexOf(b)];
-      return compare(first, second) || names.indexOf(a) - names.indexOf(b);
-    });
-    const firstOf = firstUse.get(`inputs:${ordered[0] ?? ''}`) ?? [-1, 0];
-    drafts.push({
-      key: `inputs:${key}`,
-      kind: 'inputs',
-      column: at,
+  const hiding: Draft[] = [];
+  workflow.inputs.forEach(({ id }, place) => {
+    const by = [...(inputReaders.get(`inputs:${id}`) ?? [])].sort((a, b) => a - b);
+    const first = firstUse.get(`inputs:${id}`);
+    (inputs === 'hidden' && by.length > 0 ? hiding : drafts).push({
+      key: `input:${id}`,
+      kind: 'input',
+      column: 0,
       step: null,
       readers: by.map(readerName),
       left: [],
-      right: ordered,
-      base: [firstOf[0], 0, 0, firstOf[1]],
+      right: [id],
+      base:
+        first === undefined
+          ? [Infinity, 0, 0, place]
+          : [first[0], 0, 0, first[1], place],
+      ...parts(`input:${id}`, false, false),
     });
-  }
+  });
+  const files = [...firstUse.keys()].filter((key) => key.startsWith('workflow:'));
+  files.forEach((key, place) => {
+    const path = key.slice('workflow:'.length);
+    const by = [...(inputReaders.get(key) ?? [])].sort((a, b) => a - b);
+    const first = firstUse.get(key) ?? [Infinity, 0];
+    (inputs === 'hidden' ? hiding : drafts).push({
+      key: `file:${path}`,
+      kind: 'file',
+      column: 1,
+      step: null,
+      readers: by.map(readerName),
+      left: [],
+      right: [path],
+      base: [first[0], 0, 1, first[1], place],
+      ...parts(`file:${path}`, false, false),
+    });
+  });
   drafts.push({
     key: OUTPUTS_BOX,
     kind: 'outputs',
@@ -341,7 +462,14 @@ export function layoutWorkflow(
     left: workflow.outputs.map((entry) => entry.name),
     right: [],
     base: [Infinity, 2],
+    ...parts(OUTPUTS_BOX, false, false),
+    // Each output is written out on its row, whatever else is open.
+    open: true,
   });
+  // The colour a step takes is by its column among the steps, before any closes up.
+  const stepColumn = new Map(
+    drafts.map((draft) => [draft.key, draft.kind === 'step' ? draft.column - 1 : 0]),
+  );
 
   // Empty columns closed up.
   const used = [...new Set(drafts.map((draft) => draft.column))].sort((a, b) => a - b);
@@ -353,8 +481,10 @@ export function layoutWorkflow(
   // Connections: each wire from its source port to the port it feeds.
   const sourceBox = new Map<string, string>();
   for (const draft of drafts) {
-    if (draft.kind === 'inputs')
+    if (draft.kind === 'input')
       for (const id of draft.right) sourceBox.set(`inputs:${id}`, draft.key);
+    if (draft.kind === 'file')
+      for (const path of draft.right) sourceBox.set(`workflow:${path}`, draft.key);
   }
   const connections: Connection[] = [];
   const connect = (
@@ -403,18 +533,15 @@ export function layoutWorkflow(
 
   // Slots.
   const slots = new Map<string, Item & { source: string; label: string | null }>();
+  // Only a step's wire is labelled: an input's or a file's starts at a box
+  // in the first columns that names it already.
   const labelOf = (connection: Connection) => {
-    if (connection.source.startsWith('steps:')) {
-      const index = Number(connection.source.slice(6, connection.source.indexOf('.')));
-      return refWords({
-        kind: 'steps',
-        name: steps[index]?.id ?? '',
-        output: connection.sourcePort,
-      });
-    }
+    if (!connection.source.startsWith('steps:')) return null;
+    const index = Number(connection.source.slice(6, connection.source.indexOf('.')));
     return refWords({
-      kind: 'inputs',
-      name: connection.source.slice('inputs:'.length),
+      kind: 'steps',
+      name: steps[index]?.id ?? '',
+      output: connection.sourcePort,
     });
   };
   const chains = live.map((connection) => {
@@ -445,14 +572,15 @@ export function layoutWorkflow(
 
   // Every item of each column, and the segments between neighbouring columns.
   const items = new Map<string, Item>();
+  const rowsIn = (draft: Draft) =>
+    draft.kind === 'outputs'
+      ? draft.left.length + 1
+      : draft.left.length + draft.right.length;
   for (const draft of drafts)
     items.set(draft.key, {
       key: draft.key,
       column: draft.column,
-      rows:
-        draft.kind === 'outputs'
-          ? draft.left.length + 1
-          : Math.max(draft.left.length + draft.right.length, 1),
+      rows: draft.open ? Math.max(rowsIn(draft), 1) : 1,
       base: draft.base,
     });
   for (const slot of slots.values()) items.set(slot.key, slot);
@@ -474,7 +602,7 @@ export function layoutWorkflow(
       {
         item: source.key,
         side: 'right',
-        row: rowOf(source, 'right', connection.sourcePort),
+        row: source.open ? rowOf(source, 'right', connection.sourcePort) : 0,
       },
       ...(chains[at] ?? []).map((key): Endpoint => ({
         item: key,
@@ -484,7 +612,7 @@ export function layoutWorkflow(
       {
         item: target.key,
         side: 'left',
-        row: target.left.indexOf(connection.targetPort),
+        row: target.open ? target.left.indexOf(connection.targetPort) : 0,
       },
     ];
     for (let step = 0; step + 1 < ends.length; step += 1) {
@@ -580,19 +708,35 @@ export function layoutWorkflow(
     if (up < bestCrossings) [best, bestCrossings] = [current, up];
   }
 
-  // Coordinates.
+  // Coordinates. Each column is as wide as its widest box, after room for
+  // the tab of a step in the first one.
+  const tabbed =
+    inputs === 'hidden' &&
+    drafts.some(
+      (draft) =>
+        draft.column === 0 && draft.step !== null && readsOuter.has(draft.step),
+    );
+  const spans: { x: number; width: number }[] = [];
+  let right = tabbed ? BOX.tab : 0;
+  for (let col = 0; col < columns; col += 1) {
+    const width = Math.max(
+      BOX.closed,
+      ...drafts
+        .filter((draft) => draft.column === col)
+        .map((draft) => (draft.open ? BOX.open : BOX.closed)),
+    );
+    spans.push({ x: right, width });
+    right += width + BOX.gap;
+  }
+  const spanOf = (col: number) => spans[col] ?? { x: 0, width: BOX.closed };
   const placed = new Map<string, { x: number; y: number; height: number }>();
   let height = 0;
   best.forEach((keys, col) => {
     let y = 0;
     for (const key of keys) {
-      const item = items.get(key);
-      const isSlot = slots.has(key);
-      const kind = boxOf.get(key)?.kind ?? 'step';
-      const tall = isSlot
-        ? GEOMETRY.row
-        : headerOf(kind) + (item?.rows ?? 1) * GEOMETRY.row + GEOMETRY.foot;
-      placed.set(key, { x: columnX(col), y, height: tall });
+      const draft = boxOf.get(key);
+      const tall = draft === undefined ? GEOMETRY.row : heightOf(draft, rowsIn(draft));
+      placed.set(key, { x: spanOf(col).x, y, height: tall });
       y += tall + GEOMETRY.space;
     }
     height = Math.max(height, y - GEOMETRY.space);
@@ -602,52 +746,69 @@ export function layoutWorkflow(
       const at = placed.get(draft.key) ?? { x: 0, y: 0, height: 0 };
       const { base: _base, ...rest } = draft;
       void _base;
-      return { ...rest, ...at, width: GEOMETRY.width, colour: colourOf(draft.column) };
+      return {
+        ...rest,
+        ...at,
+        width: draft.open ? BOX.open : BOX.closed,
+        colour: colourOf(draft.kind, stepColumn.get(draft.key) ?? 1),
+      };
     })
     .sort((a, b) => a.column - b.column || a.y - b.y);
+  const hidden: Box[] = hiding.map(({ base: _base, ...rest }) => {
+    void _base;
+    const closed = { ...rest, open: false };
+    return {
+      ...closed,
+      x: 0,
+      y: 0,
+      width: BOX.closed,
+      height: heightOf(closed, 0),
+      colour: colourOf(rest.kind, 0),
+    };
+  });
+  const placedBox = new Map(boxes.map((box) => [box.key, box]));
+  const colourOfSource = (key: string) => placedBox.get(key)?.colour ?? PALETTE.input;
   const slotList: Slot[] = [...slots.values()]
     .map((slot) => {
       const at = placed.get(slot.key) ?? { x: 0, y: 0, height: GEOMETRY.row };
+      const from = live.find((connection) => connection.source === slot.source);
       return {
         key: slot.key,
         column: slot.column,
         source: slot.source,
         label: slot.label,
         ...at,
-        width: GEOMETRY.width,
-        colour: colourOf(slot.column),
+        width: spanOf(slot.column).width,
+        colour: colourOfSource(from?.sourceBox ?? ''),
       };
     })
     .sort((a, b) => a.column - b.column || a.y - b.y);
-  const portY = (key: string, row: number) => {
-    const at = placed.get(key);
-    if (at === undefined) return 0;
-    if (slots.has(key)) return at.y + GEOMETRY.row / 2;
-    const kind = boxOf.get(key)?.kind ?? 'step';
-    return at.y + headerOf(kind) + Math.max(row, 0) * GEOMETRY.row + GEOMETRY.row / 2;
-  };
   const wires: Wire[] = live.map((connection, at) => {
-    const source = boxOf.get(connection.sourceBox);
-    const target = boxOf.get(connection.targetBox);
-    const sourceRow =
-      source === undefined ? 0 : rowOf(source, 'right', connection.sourcePort);
-    const targetRow =
-      target === undefined ? 0 : rowOf(target, 'left', connection.targetPort);
-    const points: Point[] = [
-      {
-        x: columnX(source?.column ?? 0) + GEOMETRY.width,
-        y: portY(connection.sourceBox, sourceRow),
-      },
-    ];
+    const source = placedBox.get(connection.sourceBox);
+    const target = placedBox.get(connection.targetBox);
+    const y1 =
+      source === undefined
+        ? 0
+        : source.y + meetsAt(source, 'right', connection.sourcePort);
+    const points: Point[] = [{ x: (source?.x ?? 0) + (source?.width ?? 0), y: y1 }];
+    // From a box narrower than its column, straight to the column's edge.
+    const edge =
+      source === undefined ? 0 : spanOf(source.column).x + spanOf(source.column).width;
+    if (source !== undefined && source.x + source.width < edge)
+      points.push({ x: edge, y: y1 });
     for (const key of chains[at] ?? []) {
       const slot = placed.get(key);
       if (slot === undefined) continue;
-      const y = portY(key, 0);
-      points.push({ x: slot.x, y }, { x: slot.x + GEOMETRY.width, y });
+      const y = slot.y + GEOMETRY.row / 2;
+      const span = spanOf(items.get(key)?.column ?? 0);
+      points.push({ x: span.x, y }, { x: span.x + span.width, y });
     }
     points.push({
-      x: columnX(target?.column ?? 0),
-      y: portY(connection.targetBox, targetRow),
+      x: target?.x ?? 0,
+      y:
+        target === undefined
+          ? 0
+          : target.y + meetsAt(target, 'left', connection.targetPort),
     });
     return {
       key: `${connection.source}>${connection.targetKey}`,
@@ -656,15 +817,16 @@ export function layoutWorkflow(
       from: { box: connection.sourceBox, port: connection.sourcePort },
       to: { box: connection.targetBox, port: connection.targetPort },
       points,
-      colour: colourOf(source?.column ?? 0),
+      colour: colourOfSource(connection.sourceBox),
     };
   });
   return {
     columns,
     boxes,
+    hidden,
     slots: slotList,
     wires,
-    width: Math.max(0, columns * (GEOMETRY.width + GEOMETRY.gap) - GEOMETRY.gap),
+    width: Math.max(0, right - BOX.gap),
     height,
     crossings: bestCrossings,
   };

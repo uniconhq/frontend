@@ -54,7 +54,7 @@ export const CONTEST_SECTION_PAGES: Record<ContestSectionKey, ComponentType> = {
 
 export const TASK_SECTION_PAGES: Record<TaskSectionKey, ComponentType> = {
   gradings: TaskGradingsPage,
-  queue: TaskQueuePage,
+  marking: TaskQueuePage,
   publications: TaskPublicationsPage,
   announcements: TaskAnnouncementsPage,
   organisers: TaskOrganisersPage,

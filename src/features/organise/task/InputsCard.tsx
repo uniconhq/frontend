@@ -8,6 +8,7 @@ import { InfoTip } from '@/ui/InfoTip';
 import { Select } from '@/ui/Select';
 import { TextInput } from '@/ui/TextInput';
 import { FieldBox } from '../contest/ContestFile';
+import { typeWords } from '../workflows/words';
 import { NumberField } from '../forms/fields';
 import type { Give, InputValues } from '../forms/task-values';
 import { BuildCard, CardPart } from './BuildCard';
@@ -79,30 +80,34 @@ function ValueField({
   const { type } = declared;
   if (type === 'number') {
     return (
-      <NumberField
-        label={label}
-        value={input.value}
-        onChange={(value) => onChange({ value })}
-        hint={hint}
-        info={info}
-        disabled={disabled}
-      />
+      <div className={classes.narrow}>
+        <NumberField
+          label={label}
+          value={input.value}
+          onChange={(value) => onChange({ value })}
+          hint={hint}
+          info={info}
+          disabled={disabled}
+        />
+      </div>
     );
   }
   if (type === 'boolean' || type === 'enum') {
     return (
-      <Select
-        label={label}
-        value={input.value}
-        options={
-          type === 'boolean' ? YES_NO : choices(declared.options ?? [], input.value)
-        }
-        placeholder="Not set"
-        description={hint}
-        info={info}
-        onChange={(value) => onChange({ value })}
-        disabled={disabled}
-      />
+      <div className={classes.narrow}>
+        <Select
+          label={label}
+          value={input.value}
+          options={
+            type === 'boolean' ? YES_NO : choices(declared.options ?? [], input.value)
+          }
+          placeholder="Not set"
+          description={hint}
+          info={info}
+          onChange={(value) => onChange({ value })}
+          disabled={disabled}
+        />
+      </div>
     );
   }
   if ((type === 'file' || type === 'folder') && files !== undefined) {
@@ -318,16 +323,16 @@ function DeclaredItem({
               <InfoTip about={declared.title ?? declared.id}>{declared.help}</InfoTip>
             )}
           </div>
-          <Chip tone="quiet">{declared.type}</Chip>
+          <Chip tone="quiet">{typeWords(declared.type)}</Chip>
         </div>
         <div className={classes.narrow}>
           <Select
             label="Who gives it"
             value={give}
             options={[
-              { value: 'setting', label: 'You set it' },
+              { value: 'setting', label: 'You set one value' },
               { value: 'entrant', label: 'The entrant gives it' },
-              { value: 'per-run', label: 'One for each run' },
+              { value: 'per-run', label: 'You set one for each run' },
             ]}
             onChange={(next) => onGive(next as Give)}
             disabled={disabled}
@@ -336,11 +341,11 @@ function DeclaredItem({
         {perRun && axisCount > 1 && (
           <div className={classes.narrow}>
             <Select
-              label="Axis"
+              label="Table"
               value={String(axis)}
               options={Array.from({ length: axisCount }, (_, index) => ({
                 value: String(index),
-                label: `Axis ${String(index + 1)}`,
+                label: `Table ${String(index + 1)}`,
               }))}
               onChange={(next) => onAxis(Number(next))}
               disabled={disabled}
@@ -580,7 +585,7 @@ export function InputsCard({
   disabled: boolean;
 }) {
   const line =
-    'What the workflow needs, and who gives each: you, the entrant, or one for each run.';
+    'What the workflow needs, and who gives each: you once, the entrant when they submit, or a different one for every run.';
   if (declared === null) {
     return (
       <BuildCard id="inputs" title="Inputs" line={line}>

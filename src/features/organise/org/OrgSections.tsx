@@ -19,7 +19,11 @@ export function OrgOrganisersPage() {
 export function OrgSettingsPage() {
   const org = useOrgParam();
   return (
-    <SectionPage section={sectionOf(ORG_SECTIONS, 'settings')}>
+    <SectionPage
+      place={{ kind: 'org', org }}
+      role="admin"
+      section={sectionOf(ORG_SECTIONS, 'settings')}
+    >
       <Card>
         <OrgProfile org={org} />
       </Card>

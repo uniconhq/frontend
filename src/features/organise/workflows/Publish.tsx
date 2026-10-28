@@ -9,12 +9,18 @@ import { Modal } from '@/ui/Modal';
 import { nextVersion } from './versions';
 import classes from './workflows.module.css';
 
+/** What a save of the draft came to: what it was saved as, or why it was not. */
+export type SaveOutcome =
+  { token: string | null; revision: string | null } | { refused: string };
+
 /**
  * "Publish version" on the draft's bar (M32): the saved draft frozen as the
  * next version, `v` and the number after the highest, which tasks may then
  * choose. A dialog says what that means before it is done, and what the
  * forge refused, with every problem, when it does not make one. Unsaved
- * changes are not in a version, so it asks for a save first.
+ * changes are not in a version, so with changes it offers "Save and publish",
+ * which saves them with `onSave` and publishes what was saved; a save that
+ * fails or meets someone else's stops it, saying why.
  */
 export function PublishVersion({
   owner,
@@ -25,6 +31,8 @@ export function PublishVersion({
   dirty,
   problems,
   checking = false,
+  onSave,
+  canSave = true,
   onPublished,
 }: {
   owner: string;
@@ -38,10 +46,16 @@ export function PublishVersion({
   problems: number;
   /** The draft's check has not answered yet for the text as it is. */
   checking?: boolean;
+  /** Saves the changes, for "Save and publish". */
+  onSave: () => Promise<SaveOutcome>;
+  /** Whether the changes can be saved now; not while a file uploads. */
+  canSave?: boolean;
   onPublished: (version: string) => void;
 }) {
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [unsaved, setUnsaved] = useState<string | null>(null);
   const [refused, setRefused] = useState<{
     error: ApiError;
     problems: DefinitionProblem[];
@@ -55,13 +69,17 @@ export function PublishVersion({
     params: { path: { owner, name } },
   }).queryKey;
 
-  const publish = async () => {
+  const publish = async (saved: { token: string | null; revision?: string | null }) => {
     setRefused(null);
     const asked = next;
     try {
       const made = await make.mutateAsync({
         params: { path: { owner, name } },
-        body: { version: asked, token, ...(revision == null ? {} : { revision }) },
+        body: {
+          version: asked,
+          token: saved.token,
+          ...(saved.revision == null ? {} : { revision: saved.revision }),
+        },
       });
       await queryClient.invalidateQueries({ queryKey: page });
       setOpen(false);
@@ -82,12 +100,23 @@ export function PublishVersion({
     }
   };
 
+  const saveAndPublish = async () => {
+    setRefused(null);
+    setUnsaved(null);
+    setSaving(true);
+    const saved = await onSave();
+    setSaving(false);
+    if ('refused' in saved) setUnsaved(saved.refused);
+    else await publish(saved);
+  };
+
   return (
     <>
       <Button
         variant="secondary"
         onClick={() => {
           setRefused(null);
+          setUnsaved(null);
           setOpen(true);
         }}
       >
@@ -102,16 +131,17 @@ export function PublishVersion({
           </BodyText>
           {dirty && (
             <BodyText size="md">
-              You have changes that are not saved. Save them first to put them in {next}
-              .
+              {canSave
+                ? `You have changes that are not saved. Save and publish saves them, then publishes ${next}.`
+                : `You have changes that are not saved, and a file is still uploading. Wait for it to end to save and publish ${next}.`}
             </BodyText>
           )}
-          {!dirty && checking && (
+          {checking && (
             <BodyText size="md">
               The draft is still being checked. Wait a moment for its answer.
             </BodyText>
           )}
-          {!dirty && !checking && problems > 0 && (
+          {!checking && problems > 0 && (
             <BodyText size="md">
               {problems === 1
                 ? 'One problem stops'
@@ -119,6 +149,13 @@ export function PublishVersion({
               it: fix {problems === 1 ? 'it' : 'them'} first, from the list above the
               graph.
             </BodyText>
+          )}
+          {unsaved !== null && (
+            <div role="alert">
+              <BodyText size="md">
+                The draft was not saved, so nothing was published. {unsaved}
+              </BodyText>
+            </div>
           )}
           {refused !== null && (
             <div role="alert" className={classes.stack}>
@@ -139,13 +176,23 @@ export function PublishVersion({
             </div>
           )}
           <div className={classes.actions}>
-            <Button
-              loading={make.isPending}
-              disabled={dirty || checking || problems > 0}
-              onClick={() => void publish()}
-            >
-              Publish {next}
-            </Button>
+            {dirty ? (
+              <Button
+                loading={saving || make.isPending}
+                disabled={!canSave || checking || problems > 0}
+                onClick={() => void saveAndPublish()}
+              >
+                Save and publish {next}
+              </Button>
+            ) : (
+              <Button
+                loading={make.isPending}
+                disabled={checking || problems > 0}
+                onClick={() => void publish({ token, revision })}
+              >
+                Publish {next}
+              </Button>
+            )}
             <Button variant="secondary" onClick={() => setOpen(false)}>
               Cancel
             </Button>

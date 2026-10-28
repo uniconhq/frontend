@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@/test/user-event';
 import { delay, http, HttpResponse } from 'msw';
 import { parse } from 'yaml';
@@ -12,6 +12,7 @@ import type {
   WorkflowItem,
 } from '@/api/types';
 import { renderApp } from '@/test/render';
+import { CLASSIC, PRIMITIVES } from '@/test/workflows';
 import { afterAnswers, problem, server, signedIn, someone } from '@/test/server';
 import {
   TASK_API,
@@ -32,6 +33,7 @@ import {
   realLiveStream,
 } from '@/test/live';
 import { specCatalogue } from '../formula/catalogue';
+import { INPUTS_SHOWN_KEY } from '../workflows/inputs-shown';
 
 /** The names of the files handed to the browser to save, in turn. */
 const saved = vi.hoisted((): string[] => []);
@@ -320,6 +322,54 @@ async function save() {
  * suite running beside it.
  */
 describe('the cards that build a task', { timeout: 30_000 }, () => {
+  it('asks before leaving with changes not saved, and leaves at once after the save', async () => {
+    taskBackend({ form: CHECKED });
+    const page = '/orgs/acme/contests/spring/tasks/sum';
+    const away = '/orgs/acme/contests/spring';
+    const { router } = renderApp(page);
+    const inputs = await screen.findByRole('region', { name: 'Inputs' });
+
+    fill(fieldIn(inputs, 'Time limit (seconds)', /^Time limit/), '3');
+    await act(() => router.navigate(away));
+    const asking = await screen.findByRole('dialog', { name: 'Leave without saving?' });
+    expect(asking).toHaveTextContent('Your changes to the task are not saved.');
+    await userEvent.click(within(asking).getByRole('button', { name: 'Stay' }));
+    expect(router.state.location.pathname).toBe(page);
+
+    await save();
+    await screen.findByText('Saved and published as publication 4.');
+    await act(() => router.navigate(away));
+    await waitFor(() => expect(router.state.location.pathname).toBe(away));
+    expect(screen.queryByRole('dialog', { name: 'Leave without saving?' })).toBeNull();
+  });
+
+  it('names each input’s type in words, as the workflow editor does', async () => {
+    taskBackend({ form: CHECKED });
+    const { inputs } = await openTask();
+    const typeOf = (name: string) =>
+      within(within(inputs).getByRole('group', { name })).getByText(
+        /^(File|One of a list|Number|True or false|Text)$/,
+      ).textContent;
+    expect(typeOf('submission')).toBe('File');
+    expect(typeOf('language')).toBe('One of a list');
+    expect(typeOf('Time limit (seconds)')).toBe('Number');
+    expect(typeOf('strict')).toBe('True or false');
+    expect(typeOf('greeting')).toBe('Text');
+    expect(within(inputs).queryByText(/^(enum|boolean)$/)).toBeNull();
+  });
+
+  it('keeps a choice or a number on the inputs card as wide as it needs, not the card', async () => {
+    taskBackend({ form: CHECKED });
+    const { inputs } = await openTask();
+    for (const field of [
+      fieldIn(inputs, 'language', 'Who gives it'),
+      fieldIn(inputs, 'Time limit (seconds)', /^Time limit/),
+      fieldIn(inputs, 'strict', 'strict'),
+    ]) {
+      expect(field.closest('[class*="narrow"]')).not.toBeNull();
+    }
+  });
+
   it('builds the inputs from the workflow, each by its title, and saves what changed in one save', async () => {
     const { sent } = taskBackend({ form: CHECKED });
     asManager();
@@ -666,6 +716,101 @@ describe('the cards that build a task', { timeout: 30_000 }, () => {
     expect(written(await waitForSave(sent))['workflow']).toBe('unicon/checked@v3');
   });
 
+  it('shows the inputs the workflow’s steps read behind the editor’s switch, hidden at first', async () => {
+    taskBackend({ form: CHECKED });
+    server.use(
+      http.get('/api/v1/primitives', () => HttpResponse.json(PRIMITIVES)),
+      http.get('/api/v1/workflows/:owner/:name/versions/:version', () =>
+        HttpResponse.json({ content: CLASSIC }),
+      ),
+    );
+    asManager();
+    const { workflow } = await openTask();
+
+    expect(
+      await within(workflow).findByRole('group', { name: 'Step compile' }),
+    ).toBeVisible();
+    expect(
+      within(workflow).queryByRole('group', { name: 'Input submission' }),
+    ).toBeNull();
+    await userEvent.click(
+      within(workflow).getByRole('checkbox', { name: 'Show inputs and files' }),
+    );
+
+    expect(
+      within(workflow).getByRole('group', { name: 'Input submission' }),
+    ).toBeVisible();
+    expect(localStorage.getItem(INPUTS_SHOWN_KEY)).toBe('shown');
+  });
+
+  it('opens a box of the workflow in the drawer its own page opens, nothing to change', async () => {
+    taskBackend({ form: CHECKED });
+    server.use(
+      http.get('/api/v1/primitives', () => HttpResponse.json(PRIMITIVES)),
+      http.get('/api/v1/workflows/:owner/:name/versions/:version', () =>
+        HttpResponse.json({ content: CLASSIC }),
+      ),
+    );
+    asManager();
+    const { workflow } = await openTask();
+
+    const run = await within(workflow).findByRole('group', { name: 'Step run' });
+    await userEvent.click(within(run).getByRole('button', { name: /^run/ }));
+    const drawer = await screen.findByRole('complementary', { name: 'Step run' });
+    expect(within(drawer).getByRole('textbox', { name: 'Name' })).toBeDisabled();
+    expect(within(drawer).queryByRole('button', { name: /^Remove/ })).toBeNull();
+  });
+
+  it('lists another’s public workflow the list leaves out, with its versions', async () => {
+    taskBackend({
+      form: CHECKED,
+      content: TASK.replace('unicon/checked@v1', 'judgekit/special@v1'),
+    });
+    server.use(
+      http.get('/api/v1/workflows/judgekit/special', () =>
+        HttpResponse.json({
+          owner: 'judgekit',
+          name: 'special',
+          visibility: 'public',
+          versions: ['v1', 'v2'],
+          editable: false,
+          draft: null,
+          readers: [],
+        }),
+      ),
+    );
+    asManager();
+    const { workflow } = await openTask();
+
+    const picked = await within(workflow).findByLabelText(/^Workflow/);
+    expect(
+      await within(picked).findByRole('option', { name: 'judgekit/special' }),
+    ).toBeInTheDocument();
+    const versions = within(workflow).getByLabelText(/^Version/);
+    expect(
+      await within(versions).findByRole('option', { name: 'v2, the newest' }),
+    ).toBeInTheDocument();
+  });
+
+  it('says the organiser cannot see a workflow they may not read', async () => {
+    taskBackend({
+      form: CHECKED,
+      content: TASK.replace('unicon/checked@v1', 'someone/hidden@v1'),
+    });
+    server.use(
+      http.get('/api/v1/workflows/someone/hidden', () => problem(404, 'not_found')),
+    );
+    asManager();
+    const { workflow } = await openTask();
+
+    const picked = await within(workflow).findByLabelText(/^Workflow/);
+    expect(
+      await within(picked).findByRole('option', {
+        name: 'someone/hidden (you cannot see it)',
+      }),
+    ).toBeInTheDocument();
+  });
+
   it('shows the inputs of another workflow as soon as it is chosen, and drops those it does not have', async () => {
     const { sent } = taskBackend({ form: CHECKED });
     asManager();
@@ -741,7 +886,7 @@ repeat:
 
     await userEvent.click(within(runs).getByRole('button', { name: 'Remove input' }));
     await userEvent.click(within(runs).getByRole('button', { name: 'Remove answer' }));
-    expect(within(runs).queryByRole('button', { name: /^Remove / })).toBeNull();
+    expect(within(runs).queryByRole('button', { name: /^Remove (?!row )/ })).toBeNull();
     await save();
 
     expect(written(await waitForSave(sent))['repeat']).toEqual([
@@ -814,6 +959,38 @@ repeat:
     });
     expect(within(shown!).getByText('d'.repeat(64))).toBeVisible();
     expect(screen.queryByRole('region', { name: 'Inputs' })).toBeNull();
+  });
+
+  it('keeps an observer’s fields readable, hides changes, and links the role chip to task organisers', async () => {
+    taskBackend({ form: CHECKED });
+    server.use(
+      http.get('/api/v1/me', () =>
+        HttpResponse.json({
+          ...someone,
+          roles: [
+            {
+              names: { org: 'acme', contest: 'spring', task: 'sum' },
+              role: 'observer',
+            },
+          ],
+        }),
+      ),
+    );
+    const { inputs } = await openTask();
+    expect(fieldIn(inputs, 'Time limit (seconds)', /^Time limit/)).toBeDisabled();
+    const scoring = screen.getByRole('region', { name: 'Scoring' });
+    expect(within(scoring).getByText('Read only')).toBeVisible();
+    expect(within(scoring).queryByRole('button', { name: 'Add a value' })).toBeNull();
+    const checks = screen.getByRole('region', { name: 'Checks' });
+    expect(within(checks).queryByRole('button', { name: 'Add a check' })).toBeNull();
+    await userEvent.click(
+      within(scoring).getByRole('button', { name: 'About Read only' }),
+    );
+    expect(
+      within(screen.getByText(/Your role here/)).getByRole('link', {
+        name: 'Task organisers',
+      }),
+    ).toHaveAttribute('href', '/orgs/acme/contests/spring/tasks/sum/organisers');
   });
 
   it('lets an admin change the submission rules, and names a draft’s problems where they are fixed', async () => {
@@ -1142,11 +1319,11 @@ describe('islands, cartpole and tour', { timeout: 60_000 }, () => {
     );
     fill(fieldIn(inputs, 'time_limit', 'time_limit'), '2');
     fill(fieldIn(inputs, 'memory_limit', 'memory_limit'), '256');
-    await who(inputs, 'input', 'One for each run');
-    await who(inputs, 'answer', 'One for each run');
+    await who(inputs, 'input', 'You set one for each run');
+    await who(inputs, 'answer', 'You set one for each run');
 
     const runs = screen.getByRole('region', { name: 'Runs' });
-    fill(within(runs).getByRole('textbox', { name: 'Title of row 1' }), 'Sample 1');
+    fill(within(runs).getByRole('textbox', { name: 'Name of row 1' }), 'Sample 1');
     await userEvent.upload(
       within(runs).getByLabelText('File for row 1 input'),
       new File(['1'], '1.in'),
@@ -1156,7 +1333,7 @@ describe('islands, cartpole and tour', { timeout: 60_000 }, () => {
       new File(['2'], '1.ans'),
     );
     await userEvent.click(within(runs).getByRole('button', { name: 'Add a row' }));
-    fill(within(runs).getByRole('textbox', { name: 'Title of row 2' }), 'Sample 2');
+    fill(within(runs).getByRole('textbox', { name: 'Name of row 2' }), 'Sample 2');
     await userEvent.upload(
       within(runs).getByLabelText('File for row 2 input'),
       new File(['3'], '2.in'),
@@ -1229,7 +1406,7 @@ describe('islands, cartpole and tour', { timeout: 60_000 }, () => {
     );
     const { inputs } = await openTask();
     fill(fieldIn(inputs, 'time_limit', 'time_limit'), '2');
-    await who(inputs, 'input', 'One for each run');
+    await who(inputs, 'input', 'You set one for each run');
     const bar = await screen.findByRole('region', { name: 'Save the task' });
     const runs = screen.getByRole('region', { name: 'Runs' });
     await userEvent.upload(
@@ -1248,6 +1425,95 @@ describe('islands, cartpole and tour', { timeout: 60_000 }, () => {
     );
   });
 
+  it('clears a discarded upload when a run cell returns from the entrant', async () => {
+    taskBackend({
+      content:
+        'name: Tests\nworkflow: unicon/classic@v3\nrepeat:\n  - inputs: [input]\n    tuples: [{input: ""}]\n',
+      form: runForm('unicon/classic@v3', [declared('input', 'file')]),
+    });
+    await openTask();
+    const runs = screen.getByRole('region', { name: 'Runs' });
+    await userEvent.upload(
+      within(runs).getByLabelText('File for row 1 input'),
+      new File(['1'], '1.in'),
+    );
+    await within(runs).findByText('New');
+    await userEvent.click(
+      within(runs).getByRole('button', { name: 'Actions for row 1 input' }),
+    );
+    await userEvent.click(
+      screen.getByRole('menuitem', { name: 'The entrant gives this one' }),
+    );
+    await userEvent.click(
+      within(runs).getByRole('button', { name: 'Actions for row 1 input' }),
+    );
+    await userEvent.click(screen.getByRole('menuitem', { name: 'You give this one' }));
+    expect(within(runs).getByLabelText('File for row 1 input')).toBeVisible();
+    expect(within(runs).queryByText('runs/0/0/input')).toBeNull();
+  });
+
+  it('pairs two test files in one row and stages both in the task’s save', async () => {
+    const { sent } = taskBackend({
+      content:
+        'name: Tests\nworkflow: unicon/classic@v3\nrepeat:\n  - inputs: [input, answer]\n    tuples: []\n',
+      form: runForm('unicon/classic@v3', [
+        declared('input', 'file'),
+        declared('answer', 'file'),
+      ]),
+    });
+    await openTask();
+    const runs = screen.getByRole('region', { name: 'Runs' });
+    await userEvent.upload(within(runs).getByLabelText('Add files'), [
+      new File(['1'], '1.in'),
+      new File(['2'], '1.ans'),
+    ]);
+    expect(within(runs).getByText('Where these files go')).toBeVisible();
+    await userEvent.click(within(runs).getByRole('button', { name: 'Add these' }));
+    await waitFor(() => expect(within(runs).getAllByText('New')).toHaveLength(2));
+    await save();
+    expect(written(sent[0])).toMatchObject({
+      repeat: [
+        {
+          inputs: ['input', 'answer'],
+          tuples: [{ title: '1', input: 'runs/0/0/input', answer: 'runs/0/0/answer' }],
+        },
+      ],
+    });
+    expect(sent[0]?.changes.map((change) => change.path)).toEqual(
+      expect.arrayContaining(['runs/0/0/input', 'runs/0/0/answer']),
+    );
+  });
+
+  it('keeps a remaining row’s file when another row is removed and a new row uploaded', async () => {
+    const { sent } = taskBackend({
+      content:
+        'name: Files\nworkflow: unicon/classic@v3\nrepeat:\n  - inputs: [input]\n    tuples: [{input: runs/0/0/input}, {input: runs/0/1/input}]\n',
+      form: runForm('unicon/classic@v3', [declared('input', 'file')]),
+    });
+    await openTask();
+    const runs = screen.getByRole('region', { name: 'Runs' });
+    await userEvent.click(within(runs).getByRole('button', { name: 'Remove row 1' }));
+    await userEvent.click(within(runs).getByRole('button', { name: 'Add a row' }));
+    await userEvent.upload(
+      within(runs).getByLabelText('File for row 2 input'),
+      new File(['new'], 'new.in'),
+    );
+    await waitFor(() => expect(within(runs).getByText('New')).toBeVisible());
+    await save();
+    expect(written(sent[0])).toMatchObject({
+      repeat: [
+        {
+          inputs: ['input'],
+          tuples: [{ input: 'runs/0/1/input' }, { input: 'runs/0/1/input_2' }],
+        },
+      ],
+    });
+    expect(sent[0]?.changes.map((change) => change.path)).toContain('runs/0/1/input_2');
+    expect(sent[0]?.changes.map((change) => change.path)).not.toContain(
+      'runs/0/1/input',
+    );
+  });
+
   it('saves cartpole as two axes, 2 × 3 runs', async () => {
     const { sent } = taskBackend({
       content: 'name: Cartpole\nworkflow: cs2109s/cartpole@v1\n',
@@ -1262,11 +1528,14 @@ describe('islands, cartpole and tour', { timeout: 60_000 }, () => {
 
     await who(inputs, 'weights', 'The entrant gives it');
     fill(fieldIn(inputs, 'episodes', 'episodes'), '100');
-    await who(inputs, 'env', 'One for each run');
-    await userEvent.click(screen.getByRole('button', { name: 'Add an axis' }));
-    await who(inputs, 'seed', 'One for each run');
+    await who(inputs, 'env', 'You set one for each run');
+    await userEvent.click(
+      screen.getByText('Run each row more than once, with different settings'),
+    );
+    await who(inputs, 'seed', 'You set one for each run');
 
     const runs = screen.getByRole('region', { name: 'Runs' });
+    expect(runs).toHaveTextContent('1 row × 1 = 1 runRun each row');
     fill(within(runs).getByRole('textbox', { name: 'env of row 1' }), 'cartpole');
     await userEvent.click(
       within(runs).getAllByRole('button', { name: 'Add a row' })[0]!,
@@ -1280,7 +1549,7 @@ describe('islands, cartpole and tour', { timeout: 60_000 }, () => {
       within(runs).getAllByRole('button', { name: 'Add a row' })[1]!,
     );
     fill(within(runs).getByRole('textbox', { name: 'seed of row 3' }), '3');
-    expect(runs).toHaveTextContent('2 × 3 = 6 runs.');
+    expect(runs).toHaveTextContent('2 rows × 3 = 6 runs');
     await save();
 
     expect(written(sent[0])).toMatchObject({
@@ -1301,10 +1570,12 @@ describe('islands, cartpole and tour', { timeout: 60_000 }, () => {
       form: runForm('unicon/rooms@v1', [declared('env', 'text')]),
     });
     const { inputs } = await openTask();
-    await who(inputs, 'env', 'One for each run');
-    await userEvent.click(screen.getByRole('button', { name: 'Add an axis' }));
+    await who(inputs, 'env', 'You set one for each run');
+    await userEvent.click(
+      screen.getByText('Run each row more than once, with different settings'),
+    );
     await userEvent.selectOptions(
-      within(inputs).getByRole('combobox', { name: 'Axis' }),
+      within(inputs).getByRole('combobox', { name: 'Table' }),
       '1',
     );
 
@@ -1331,30 +1602,41 @@ describe('islands, cartpole and tour', { timeout: 60_000 }, () => {
     const { inputs } = await openTask();
 
     fill(fieldIn(inputs, 'best', 'best'), '1200');
-    await who(inputs, 'input', 'One for each run');
-    await who(inputs, 'route', 'One for each run');
+    await who(inputs, 'input', 'You set one for each run');
+    await who(inputs, 'route', 'You set one for each run');
 
     const runs = screen.getByRole('region', { name: 'Runs' });
-    fill(within(runs).getByRole('textbox', { name: 'Title of row 1' }), 'Small grid');
+    fill(within(runs).getByRole('textbox', { name: 'Name of row 1' }), 'Small grid');
     await userEvent.upload(
       within(runs).getByLabelText('File for row 1 input'),
       new File(['a'], '1.in'),
     );
-    const boxes = within(runs).getAllByRole('checkbox', {
-      name: 'The entrant gives it',
-    });
-    await userEvent.click(boxes[1]!);
+    await userEvent.click(
+      await within(runs).findByRole('button', { name: 'Actions for row 1 route' }),
+    );
+    await userEvent.click(
+      screen.getByRole('menuitem', { name: 'The entrant gives this one' }),
+    );
     await userEvent.click(within(runs).getByRole('button', { name: 'Add a row' }));
-    fill(within(runs).getByRole('textbox', { name: 'Title of row 2' }), 'Big grid');
+    fill(within(runs).getByRole('textbox', { name: 'Name of row 2' }), 'Big grid');
     await userEvent.upload(
       within(runs).getByLabelText('File for row 2 input'),
       new File(['b'], '2.in'),
     );
-    const later = within(runs).getAllByRole('checkbox', {
-      name: 'The entrant gives it',
-    });
-    await userEvent.click(later[3]!);
-    fill(within(runs).getByRole('textbox', { name: 'Largest size of row 2' }), '50MB');
+    await userEvent.click(
+      await within(runs).findByRole('button', { name: 'Actions for row 2 route' }),
+    );
+    await userEvent.click(
+      screen.getByRole('menuitem', { name: 'The entrant gives this one' }),
+    );
+    await userEvent.click(
+      within(runs).getByRole('button', { name: 'Actions for row 2 route' }),
+    );
+    await userEvent.click(
+      screen.getByRole('menuitem', { name: 'Set the maximum size' }),
+    );
+    fill(screen.getByRole('textbox', { name: 'Maximum size of row 2' }), '50MB');
+    await userEvent.click(screen.getByRole('button', { name: 'Close' }));
     await save();
 
     expect(written(sent[0])).toMatchObject({
@@ -1414,15 +1696,21 @@ repeat:
     const errors = within(outcome).getByRole('list', { name: 'Errors' });
     expect(errors).toHaveTextContent('Inputs: best: Not a number.');
     expect(errors).toHaveTextContent(
-      'Runs, axis 1, row 1: title: Say what this row is.',
+      'Runs, table 1, row 1: title: Say what this row is.',
     );
-    expect(errors).toHaveTextContent('Runs, axis 1, row 2: max_size: At most 2GB.');
+    expect(errors).toHaveTextContent('Runs, table 1, row 2: max_size: At most 2GB.');
     expect(errors).toHaveTextContent(
-      'Runs, axis 1, row 1: input: There is no such file.',
+      'Runs, table 1, row 1: input: There is no such file.',
     );
     expect(
       document.querySelector('[data-field="axis-0-tuple-0-title"]'),
     ).not.toBeNull();
+    await userEvent.click(
+      within(errors).getByRole('link', { name: /Runs, table 1, row 2: max_size/ }),
+    );
+    expect(
+      await screen.findByRole('textbox', { name: 'Maximum size of row 2' }),
+    ).toBeVisible();
     expect(
       document.querySelector('[data-field="axis-0-tuple-1-max_size"]'),
     ).not.toBeNull();
@@ -1454,6 +1742,234 @@ describe('scoring, checks and what a save answers', { timeout: 60_000 }, () => {
       rects.item = () => null;
       return rects;
     };
+  });
+
+  it('shows an observer the saved value formula without editing or its tray', async () => {
+    taskBackend({
+      content: `${ISLANDS}scoring:\n  values: {total: 1}\n`,
+      form: runForm('unicon/classic@v3', [
+        declared('code', 'file'),
+        declared('input', 'file'),
+      ]),
+    });
+    server.use(
+      http.get('/api/v1/me', () =>
+        HttpResponse.json({
+          ...someone,
+          roles: [
+            {
+              names: { org: 'acme', contest: 'spring', task: 'sum' },
+              role: 'observer',
+            },
+          ],
+        }),
+      ),
+    );
+    await openTask();
+    const scoring = screen.getByRole('region', { name: 'Scoring' });
+    const line = await within(scoring).findByRole('textbox', { name: 'total' });
+    expect(line).toHaveAttribute('contenteditable', 'false');
+    expect(line).toHaveAttribute('aria-readonly', 'true');
+    await userEvent.click(line);
+    expect(within(scoring).queryByText(/Click a tile to put it in/)).toBeNull();
+    expect(within(scoring).queryByRole('button', { name: 'Remove total' })).toBeNull();
+    const runs = screen.getByRole('region', { name: 'Runs' });
+    await userEvent.click(
+      within(runs).getByText('Run each row more than once, with different settings'),
+    );
+    expect(screen.queryByRole('region', { name: 'Save the task' })).toBeNull();
+  });
+
+  it('adds a value with a name free among existing values and groups after a removal', async () => {
+    taskBackend({
+      content: `${ISLANDS}scoring:\n  groups: {value_2: {input: small/1.in}}\n  values: {value_1: 1, value_3: 3}\n`,
+      form: runForm('unicon/classic@v3', [
+        declared('code', 'file'),
+        declared('input', 'file'),
+      ]),
+    });
+    await openTask();
+    const scoring = screen.getByRole('region', { name: 'Scoring' });
+    await waitFor(() =>
+      expect(
+        within(scoring).getByRole('button', { name: 'Add a value' }),
+      ).toBeEnabled(),
+    );
+    await userEvent.click(within(scoring).getByRole('button', { name: 'Add a value' }));
+    expect(within(scoring).getByRole('group', { name: 'Value value_4' })).toBeVisible();
+    expect(
+      within(scoring)
+        .getAllByRole('textbox', { name: 'Name' })
+        .map((field) => field.getAttribute('value')),
+    ).toEqual(['value_1', 'value_3', 'value_4']);
+  });
+
+  it('says a submission with no input repeated runs once, on every card that counts its runs', async () => {
+    taskBackend({
+      content: `name: Islands
+workflow: unicon/classic@v3
+inputs:
+  code: {entrant: {label: Solution}}
+  input: sample.in
+`,
+      form: runForm('unicon/classic@v3', [
+        declared('code', 'file'),
+        declared('input', 'file'),
+      ]),
+    });
+    await openTask();
+    expect(screen.getByRole('region', { name: 'Runs' })).toHaveTextContent(
+      'A submission runs once, since nothing changes from run to run.',
+    );
+    const scoring = screen.getByRole('region', { name: 'Scoring' });
+    expect(scoring).not.toHaveTextContent('No runs yet');
+    expect(scoring).not.toHaveTextContent('Every run also gives');
+    expect(scoring).toHaveTextContent(
+      'A value can also read seconds late, seconds taken and whether it compiled.',
+    );
+    const gives = within(scoring).getByRole('table', {
+      name: 'What one submission gives',
+    });
+    expect(within(gives).getByRole('row', { name: /^The one run/ })).toBeVisible();
+    const groups = within(scoring).getByRole('table', { name: 'Groups' });
+    expect(within(groups).getByRole('row', { name: /^The one run/ })).toBeVisible();
+    expect(within(groups).getByLabelText('The one run in all')).toHaveTextContent('✓');
+    expect(groups.querySelector('tfoot')).toHaveTextContent('1 run');
+    expect(groups.querySelector('tfoot')).not.toHaveTextContent('1 runs');
+    expect(
+      await within(scoring).findByRole('button', { name: 'Runs 1 run' }),
+    ).toBeVisible();
+  });
+
+  it('says what a run gives beyond the table, by its title, and the facts in words', async () => {
+    taskBackend({
+      content: `name: Islands
+workflow: unicon/classic@v3
+inputs:
+  code: {entrant: {label: Solution}}
+  input: sample.in
+repeat:
+  - inputs: [seed]
+    tuples:
+      - {seed: 1}
+      - {seed: 2}
+`,
+      form: runForm('unicon/classic@v3', [
+        declared('code', 'file'),
+        declared('input', 'file'),
+        declared('seed', 'number', { title: 'Random seed' }),
+      ]),
+    });
+    await openTask();
+    const scoring = screen.getByRole('region', { name: 'Scoring' });
+    const line = within(scoring).getByText(/^Every run also gives/);
+    expect(line).toHaveTextContent(
+      'Every run also gives Random seed. A value can also read seconds late, seconds taken and whether it compiled.',
+    );
+  });
+
+  it('uses the workflow box’s output types for the runs table', async () => {
+    taskBackend({
+      content: ISLANDS,
+      form: runForm('unicon/classic@v3', [
+        declared('code', 'file'),
+        declared('input', 'file'),
+      ]),
+    });
+    server.use(
+      http.get('/api/v1/workflows/:owner/:name/versions/:version', () =>
+        HttpResponse.json({
+          content:
+            CHECKED_YAML +
+            '  log: {from: "${{ steps.compile.log }}", title: Compile log}\n',
+        }),
+      ),
+      http.get('/api/v1/workflows/:owner/:name/versions/:version/box', () =>
+        HttpResponse.json({
+          run: true,
+          inputs: [],
+          newer_version: null,
+          description: null,
+          outputs: [
+            {
+              name: 'log',
+              type: 'file',
+              title: 'Compile log',
+              unit: null,
+              better: null,
+              at_least: null,
+              at_most: null,
+            },
+          ],
+        }),
+      ),
+    );
+    await openTask();
+    const runs = await screen.findByRole('table', {
+      name: 'What one submission gives',
+    });
+    await waitFor(() =>
+      expect(
+        within(runs).getByRole('columnheader', { name: /Compile log/ }),
+      ).toHaveTextContent('text'),
+    );
+    expect(within(runs).getByRole('cell', { name: 'text' })).toBeVisible();
+  });
+
+  it('keeps Result open with its parts and gives each shown setting one control', async () => {
+    taskBackend({
+      content: `${ISLANDS}scoring:
+  groups: {samples: {input: sample.in}}
+  values: {total: 1, foot: 2}
+  show: {now: [total, samples]}
+`,
+      form: runForm('unicon/classic@v3', [
+        declared('code', 'file'),
+        declared('input', 'file'),
+      ]),
+    });
+    server.use(
+      http.get(`${TASK_API}/tree`, () =>
+        HttpResponse.json([
+          file('statement.md'),
+          { ...file('tests'), kind: 'directory' },
+        ]),
+      ),
+    );
+    await openTask();
+    const result = await screen.findByRole('list', { name: 'Result' });
+    expect(result).toHaveTextContent('Values');
+    expect(result).toHaveTextContent('total');
+    expect(within(result).getByText('foot')).toBeVisible();
+    expect(result).toHaveTextContent(
+      'Organisers and leaderboards can still read parts marked Not shown.',
+    );
+    expect(result).toHaveTextContent('samples');
+    const detail = result.querySelector('[class*="resultDetail"]');
+    if (detail === null) throw new Error('A group has report details.');
+    expect(fireEvent.keyDown(detail, { key: ' ' })).toBe(true);
+
+    expect(result).toHaveTextContent('time_ms (ms)');
+    expect(result).toHaveTextContent('On its own');
+    expect(result).toHaveTextContent('Files to download');
+    expect(result).toHaveTextContent('statement.md');
+    expect(result).toHaveTextContent('tests/');
+    for (const part of [
+      'total',
+      'samples',
+      'all',
+      'compiled',
+      'fraction',
+      'time_ms',
+      'statement.md',
+      'tests/',
+    ]) {
+      expect(document.querySelectorAll(`[data-show-part="${part}"]`)).toHaveLength(1);
+    }
+    const value = screen.getByRole('group', { name: 'Value total' });
+    expect(
+      within(value).getByRole('combobox', { name: 'Shown to entrants' }),
+    ).toHaveValue('now');
   });
 
   it('saves islands with its text value first_failed and a check', async () => {
@@ -1540,11 +2056,12 @@ describe('scoring, checks and what a save answers', { timeout: 60_000 }, () => {
     const samples = within(scoring).getByRole('textbox', { name: 'Name of samples' });
     fill(samples, 'tests');
     fireEvent.blur(samples);
-    await userEvent.click(within(scoring).getByRole('button', { name: 'Remove big' }));
-    const removes = within(scoring).getAllByRole('button', { name: 'Remove' });
-    const extra = removes[1];
-    if (extra === undefined) throw new Error('no second value');
-    await userEvent.click(extra);
+    await userEvent.click(
+      within(scoring).getByRole('button', { name: 'Remove group big' }),
+    );
+    await userEvent.click(
+      within(scoring).getByRole('button', { name: 'Remove extra' }),
+    );
     await save();
 
     const file = written(sent[0]);
@@ -1674,6 +2191,55 @@ scoring:
     });
   });
 
+  it('says Not shown for a part entrants never see, and whether it compiled the same way in the control and the result', async () => {
+    taskBackend({
+      content: ISLANDS,
+      form: runForm('unicon/classic@v3', [
+        declared('code', 'file'),
+        declared('input', 'file'),
+      ]),
+    });
+    await openTask();
+    const scoring = await screen.findByRole('region', { name: 'Scoring' });
+    const all = within(scoring).getByRole('combobox', { name: 'When all is shown' });
+    expect(all).toHaveValue('never');
+    expect(all).toHaveDisplayValue('Not shown');
+    expect(within(scoring).queryByRole('option', { name: 'Never' })).toBeNull();
+    const compiled = within(scoring).getByRole('combobox', {
+      name: 'When compiled is shown',
+    });
+    expect(compiled).toHaveDisplayValue('Once any run is shown');
+    expect(compiled.closest('tr')).toHaveTextContent('Whether it compiledon its own');
+
+    const result = await screen.findByRole('list', { name: 'Result' });
+    const fact = within(result)
+      .getAllByRole('listitem')
+      .find((item) => item.textContent?.startsWith('Whether it compiled'));
+    expect(fact).toHaveTextContent('Whether it compiledOnce any run is shown');
+    await userEvent.selectOptions(compiled, 'after_close');
+    expect(fact).toHaveTextContent('Whether it compiledAfter the close');
+  });
+
+  it('heads the result’s groups Groups, and leaves out a heading with nothing under it', async () => {
+    taskBackend({
+      content: ISLANDS,
+      form: runForm('unicon/classic@v3', [
+        declared('code', 'file'),
+        declared('input', 'file'),
+      ]),
+    });
+    await openTask();
+    const result = await screen.findByRole('list', { name: 'Result' });
+    const lines = within(result)
+      .getAllByRole('listitem')
+      .map((item) => item.textContent);
+    expect(lines).toContain('GroupsKindShown');
+    expect(lines).toContain('On its own');
+    expect(lines.some((line) => line?.startsWith('Values'))).toBe(false);
+    expect(lines.some((line) => line?.startsWith('Runs'))).toBe(false);
+    expect(lines.some((line) => line?.startsWith('Files to download'))).toBe(false);
+  });
+
   it('offers to show what the forge serves: compiled, each output, and the files but task.yaml and plans/', async () => {
     taskBackend({
       content: ISLANDS,
@@ -1700,10 +2266,10 @@ scoring:
       .filter((row) => within(row).queryByRole('combobox') !== null)
       .map((row) => row.querySelector('th')?.textContent);
     expect(names).toEqual([
-      'all',
-      'compiled',
+      'Shown to entrants',
+      'Whether it compiled',
       'fraction',
-      'time_ms',
+      'time_ms (ms)',
       'public/',
       'sample.in',
     ]);

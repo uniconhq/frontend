@@ -19,16 +19,11 @@ export function SubmissionsCard({
   disabled: boolean;
   onChange: (change: Partial<TaskValues>) => void;
 }) {
-  const max = values.max;
-  const rate =
-    values.rateCount === '' && values.ratePer === ''
-      ? 'at most 1 in any 30 seconds'
-      : `at most ${values.rateCount === '' ? '1' : values.rateCount} in any ${values.ratePer === '' ? '30' : values.ratePer} seconds`;
   return (
     <BuildCard
       id="tests"
       title="Submissions"
-      line={`Per entrant: at most ${max === '' ? '50' : max} submissions, and ${rate}.${admin ? '' : ' Only an admin of the task can change these.'}`}
+      line="How many times each entrant may submit, and how often."
     >
       <CardPart
         title="Submission rules"

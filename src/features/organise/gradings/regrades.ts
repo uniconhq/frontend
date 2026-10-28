@@ -2,6 +2,7 @@ import { $api } from '@/api/query';
 import type { FeedEntry, RegradeChangeKind, RegradeSummary } from '@/api/types';
 import { useFallbackPoll } from '@/live';
 import { formatDateTime } from '@/lib/time';
+import { FAILED_WORDS } from './feed';
 
 /** Each task's latest regrade of many, newest first. */
 export const REGRADES = '/api/v1/orgs/{org}/contests/{contest}/gradings/regrades';
@@ -106,7 +107,7 @@ export const CHANGE_WORDS: Record<RegradeChangeKind, string> = {
   regraded: 'Graded again, over an earlier result',
   new: 'Graded for the first time',
   running: 'Still being graded',
-  failed: 'Failed on Unicon’s side',
+  failed: FAILED_WORDS,
   over_limit: 'Not graded, over the limit',
 };
 

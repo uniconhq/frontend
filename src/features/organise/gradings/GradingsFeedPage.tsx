@@ -20,6 +20,7 @@ import { SectionPage } from '../SectionPage';
 import { GradingsList } from './GradingsList';
 import { RegradeSummaries } from './RegradeSummaries';
 import { CHANGE_WORDS, regradedTask, useRegrades } from './regrades';
+import { count } from '../hub/count';
 import {
   FAILED_SEARCH,
   STATUS,
@@ -60,8 +61,9 @@ function useEntrantList(path: ContestPath): OrganisedEntrant[] {
 }
 
 /**
- * How many of the contest's gradings wait, by status, and how many failed,
- * with a link to the failed ones unless the feed already shows them.
+ * How many of the contest's gradings wait, by status, and apart from them
+ * how many failed on Unicon's side, with a link to those unless the feed
+ * already shows them.
  */
 function QueueDepthPanel({
   path,
@@ -87,13 +89,13 @@ function QueueDepthPanel({
   );
   return (
     <div className={classes.stack}>
-      <SectionTitle>Queue</SectionTitle>
+      <SectionTitle>Waiting to be graded</SectionTitle>
       {view.state === 'loading' && <PageSkeleton rows={1} />}
       {view.state === 'error' && (
         <ErrorBlock error={view.error} onRetry={view.retry} compact />
       )}
       {view.state === 'ready' && (
-        <dl className={classes.queue} aria-label="Queue">
+        <dl className={classes.queue} aria-label="Waiting to be graded">
           <div>
             <dt>{STATUS.queued}</dt>
             <dd>{view.data.queued}</dd>
@@ -102,23 +104,28 @@ function QueueDepthPanel({
             <dt>{STATUS.dispatched}</dt>
             <dd>{view.data.dispatched}</dd>
           </div>
-          <div>
-            <dt>Failed</dt>
-            <dd>{view.data.failed}</dd>
-          </div>
         </dl>
       )}
-      {view.state === 'ready' && view.data.failed > 0 && (
-        <BodyText tone="secondary">
-          Unicon tries a failed grading again once by itself. If that fails too, it
-          waits for you to retry or cancel it.
-          {!showingFailed && (
-            <>
-              {' '}
-              <PageLink to={`?${FAILED_SEARCH}`}>Show the failed gradings</PageLink>
-            </>
+      {view.state === 'ready' && (
+        <div aria-label="Failed gradings" role="group">
+          <BodyText>
+            {view.data.failed === 0
+              ? 'No grading failed on Unicon’s side.'
+              : `${count(view.data.failed, 'grading', 'gradings')} failed on Unicon’s side.`}
+          </BodyText>
+          {view.data.failed > 0 && (
+            <BodyText tone="secondary">
+              Unicon tries a failed grading again once by itself. If that fails too, it
+              waits for you to retry or cancel it.
+              {!showingFailed && (
+                <>
+                  {' '}
+                  <PageLink to={`?${FAILED_SEARCH}`}>Show the failed gradings</PageLink>
+                </>
+              )}
+            </BodyText>
           )}
-        </BodyText>
+        </div>
       )}
     </div>
   );
@@ -242,7 +249,7 @@ function FilterBar({
 
 /**
  * Every grading of the contest, newest first, for anyone with a role at the
- * contest or one of its tasks: the queue above, with the failed gradings
+ * contest or one of its tasks: what waits to be graded above, with the gradings that failed on Unicon's side
  * that wait and a link to them; the filters by task, entrant, the member who
  * submitted, status and latest attempts only, kept in the page's address;
  * and the gradings as `GradingsList` shows them, with Rejudge always there,

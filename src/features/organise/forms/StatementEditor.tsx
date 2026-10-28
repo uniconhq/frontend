@@ -160,7 +160,16 @@ function letGo(pictures: StagedPicture[]) {
  * the stored settings do, and never swaps the text being edited for
  * theirs. A statement that is an upload shows as one, never as text.
  */
-export function StatementEditor({ place, admin }: { place: Place; admin: boolean }) {
+export function StatementEditor({
+  place,
+  admin,
+  onDirty,
+}: {
+  place: Place;
+  admin: boolean;
+  /** Whether the statement holds changes not saved, as they change. */
+  onDirty: (dirty: boolean) => void;
+}) {
   const query = useOwnFile(place, PATH);
   const { write } = useFileWrite(place, PATH);
   const queryClient = useQueryClient();
@@ -243,11 +252,6 @@ export function StatementEditor({ place, admin }: { place: Place; admin: boolean
 
   return (
     <div className={classes.form}>
-      {!admin && (
-        <BodyText tone="secondary">
-          Only an admin of the task can change the statement.
-        </BodyText>
-      )}
       <Source
         key={query.data.token}
         file={query.data}
@@ -262,7 +266,9 @@ export function StatementEditor({ place, admin }: { place: Place; admin: boolean
           outcome?.kind === 'refused' && outcome.error.code === 'confirmation_required'
         }
         saved={saved}
+        through={outcome !== null && outcome.kind !== 'refused'}
         pictures={pictures}
+        onDirty={onDirty}
         onPictures={(change) =>
           setPictures((before) => {
             const after = change(before);
@@ -323,7 +329,9 @@ function Source({
   busy,
   asking,
   saved,
+  through,
   pictures,
+  onDirty,
   onPictures,
   onSave,
 }: {
@@ -338,12 +346,22 @@ function Source({
   asking: boolean;
   /** The files under `public/` now, or null while they are read. */
   saved: TreeEntry[] | null;
+  /** Whether the last save went through, before the statement is read back. */
+  through: boolean;
   pictures: StagedPicture[];
+  onDirty: (dirty: boolean) => void;
   onPictures: (change: (before: StagedPicture[]) => StagedPicture[]) => void;
   onSave: (content: string, token: string) => void;
 }) {
   const [text, setText] = useState(file.encoding === 'utf-8' ? file.content : '');
   const changed = text !== file.content || pictures.length > 0;
+  // Once a save of this text went through, its pictures with it, leaving
+  // loses nothing, even before the statement is read back.
+  const [sent, setSent] = useState<string | null>(null);
+  const dirty =
+    admin && changed && !(through && sent === text && pictures.length === 0);
+  useEffect(() => onDirty(dirty), [dirty, onDirty]);
+  useEffect(() => () => onDirty(false), [onDirty]);
   const drawn = useMemo(
     () =>
       new Map(
@@ -461,7 +479,10 @@ function Source({
           <Button
             loading={busy}
             disabled={!changed || asking}
-            onClick={() => onSave(text, file.token)}
+            onClick={() => {
+              setSent(text);
+              onSave(text, file.token);
+            }}
           >
             Save statement
           </Button>

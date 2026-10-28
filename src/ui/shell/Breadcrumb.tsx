@@ -1,4 +1,5 @@
 import { Link, useLocation, useParams } from 'react-router';
+import { $api } from '@/api/query';
 import { contestHomePath, isContestantPath, taskPagePath } from '@/lib/contest-paths';
 import {
   NEW_ORG_PATH,
@@ -21,12 +22,73 @@ import {
   taskSectionPath,
   type Section,
 } from '@/lib/sections';
+import { headingOf } from '@/lib/task-names';
 import classes from './Breadcrumb.module.css';
 
 /** A step of the trail; one with no `to` names a level that has no page of its own. */
 type Segment = { label: string; to?: string };
 
 type Params = Partial<Record<'org' | 'contest' | 'task' | 'owner' | 'name', string>>;
+
+/** What the trail calls the org, the contest and the task. */
+type Names = { org: string; contest: string; task: string };
+
+/** A read the trail never makes: it takes what a page has already read. */
+const HELD = { enabled: false } as const;
+
+/**
+ * What the trail calls the org, the contest and the task, from what the pages
+ * have already read, by the same reads: the org's display name from the org's
+ * own page, the contest's name from its home, and a task by its label and
+ * title, as its page heads it, from its page or its contest's list of tasks.
+ * Nothing is asked of the server for the trail. Until a name is in, or on a
+ * page that never reads it, the step is called by its address.
+ */
+function useNames({ org = '', contest = '', task = '' }: Params): Names {
+  const inOrg = { params: { path: { org } } };
+  const inContest = { params: { path: { org, contest } } };
+  const inTask = { params: { path: { org, contest, task } } };
+  const profile = $api.useQuery('get', '/api/v1/orgs/{org}', inOrg, HELD).data;
+  const home = $api.useQuery(
+    'get',
+    '/api/v1/orgs/{org}/contests/{contest}/home',
+    inContest,
+    HELD,
+  ).data;
+  const shown = $api.useQuery(
+    'get',
+    '/api/v1/public/contests/{org}/{contest}',
+    inContest,
+    HELD,
+  ).data;
+  const page = $api.useQuery(
+    'get',
+    '/api/v1/orgs/{org}/contests/{contest}/tasks/{task}/page',
+    inTask,
+    HELD,
+  ).data;
+  const statement = $api.useQuery(
+    'get',
+    '/api/v1/public/contests/{org}/{contest}/tasks/{task}',
+    inTask,
+    HELD,
+  ).data;
+
+  const named =
+    page ??
+    statement?.task ??
+    home?.tasks.find((found) => found.name === task) ??
+    shown?.tasks.find((found) => found.name === task);
+  const displayName = profile?.display_name;
+  return {
+    org:
+      displayName === null || displayName === undefined || displayName === ''
+        ? org
+        : displayName,
+    contest: home?.name ?? shown?.name ?? contest,
+    task: named === undefined ? task : headingOf(named),
+  };
+}
 
 /**
  * The section of a level whose page this is, from the level's own list of
@@ -47,19 +109,23 @@ function sectionCrumb<S extends Section>(
   return found === undefined ? [] : [{ label: found.label, to: pathOf(found.key) }];
 }
 
-function organiserTrail(pathname: string, { org, contest, task }: Params): Segment[] {
+function organiserTrail(
+  pathname: string,
+  { org, contest, task }: Params,
+  names: Names,
+): Segment[] {
   const segments: Segment[] = [{ label: 'Orgs', to: ORGS_PATH }];
   if (pathname === NEW_ORG_PATH)
     return [...segments, { label: 'New org', to: pathname }];
   if (org === undefined) return segments;
-  segments.push({ label: org, to: orgPath(org) });
+  segments.push({ label: names.org, to: orgPath(org) });
   if (contest === undefined) {
     return [
       ...segments,
       ...sectionCrumb(pathname, ORG_SECTIONS, (key) => orgSectionPath(org, key)),
     ];
   }
-  segments.push({ label: contest, to: contestPath(org, contest) });
+  segments.push({ label: names.contest, to: contestPath(org, contest) });
   if (task === undefined) {
     return [
       ...segments,
@@ -68,7 +134,7 @@ function organiserTrail(pathname: string, { org, contest, task }: Params): Segme
       ),
     ];
   }
-  segments.push({ label: task, to: taskPath(org, contest, task) });
+  segments.push({ label: names.task, to: taskPath(org, contest, task) });
   return [
     ...segments,
     ...sectionCrumb(pathname, TASK_SECTIONS, (key) =>
@@ -81,12 +147,19 @@ function organiserTrail(pathname: string, { org, contest, task }: Params): Segme
  * A contest as its contestants see it, under the page that lists the
  * contests; its org is named, and has no page for a contestant to go to.
  */
-function contestantTrail(pathname: string, { org, contest, task }: Params): Segment[] {
+function contestantTrail(
+  pathname: string,
+  { org, contest, task }: Params,
+  names: Names,
+): Segment[] {
   const segments: Segment[] = [{ label: 'Browse contests', to: '/' }];
   if (org === undefined || contest === undefined) return segments;
-  segments.push({ label: org }, { label: contest, to: contestHomePath(org, contest) });
+  segments.push(
+    { label: names.org },
+    { label: names.contest, to: contestHomePath(org, contest) },
+  );
   if (task !== undefined) {
-    return [...segments, { label: task, to: taskPagePath(org, contest, task) }];
+    return [...segments, { label: names.task, to: taskPagePath(org, contest, task) }];
   }
   return [
     ...segments,
@@ -104,9 +177,9 @@ const PLACES: Record<string, string> = {
   '/login': 'Sign in',
 };
 
-function trailOf(pathname: string, params: Params): Segment[] {
-  if (isOrganiserPath(pathname)) return organiserTrail(pathname, params);
-  if (isContestantPath(pathname)) return contestantTrail(pathname, params);
+function trailOf(pathname: string, params: Params, names: Names): Segment[] {
+  if (isOrganiserPath(pathname)) return organiserTrail(pathname, params, names);
+  if (isContestantPath(pathname)) return contestantTrail(pathname, params, names);
   if (pathname === WORKFLOWS_PATH || pathname.startsWith(`${WORKFLOWS_PATH}/`)) {
     const segments: Segment[] = [{ label: 'Workflows', to: WORKFLOWS_PATH }];
     const { owner, name } = params;
@@ -130,10 +203,15 @@ function trailOf(pathname: string, params: Params): Segment[] {
  * its own name. The last segment is the page being shown. The header sits
  * above the page's route, and React Router hands a parent route the params
  * its children matched, so this reads them without the page saying anything.
+ * The org, the contest and the task are called by their names once a page
+ * has read them (`useNames`). A step with no page of its own is plain words,
+ * not a chip, so it is not taken for a link; a name cut short says itself
+ * in full on hover.
  */
 export function Breadcrumb() {
   const { pathname } = useLocation();
-  const segments = trailOf(pathname, useParams());
+  const params = useParams();
+  const segments = trailOf(pathname, params, useNames(params));
 
   return (
     <nav className={classes.trail} aria-label="Breadcrumb">
@@ -145,11 +223,17 @@ export function Breadcrumb() {
             </span>
           )}
           {segment.to === undefined ? (
-            <span className={classes.segment}>{segment.label}</span>
+            <span
+              className={`${classes.segment} ${classes.plain}`}
+              title={segment.label}
+            >
+              {segment.label}
+            </span>
           ) : (
             <Link
               to={segment.to}
               className={`${classes.segment} ${classes.link}`}
+              title={segment.label}
               aria-current={index === segments.length - 1 ? 'page' : undefined}
             >
               {segment.label}

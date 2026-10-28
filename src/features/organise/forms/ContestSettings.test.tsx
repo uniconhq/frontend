@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@/test/user-event';
 import { http, HttpResponse } from 'msw';
 import { parse } from 'yaml';
@@ -168,6 +168,26 @@ describe('the contest settings form', { timeout: 20_000 }, () => {
     expect(write?.content).toContain("# the page's title");
   });
 
+  it('asks before leaving with changes not saved, and leaves at once after the save', async () => {
+    contestBackend();
+    const { router } = renderApp(PAGE);
+    const form = await screen.findByRole('form', { name: 'Contest settings' });
+    const away = '/orgs/acme/contests/spring';
+
+    fill(inBox(form, 'Basics').getByLabelText('Name'), 'Spring 2026');
+    await act(() => router.navigate(away));
+    const asking = await screen.findByRole('dialog', { name: 'Leave without saving?' });
+    expect(asking).toHaveTextContent('Your changes to the settings are not saved.');
+    await userEvent.click(within(asking).getByRole('button', { name: 'Stay' }));
+    expect(router.state.location.pathname).toBe(PAGE);
+
+    await userEvent.click(within(form).getByRole('button', { name: 'Save settings' }));
+    await screen.findByText('Saved.');
+    await act(() => router.navigate(away));
+    await waitFor(() => expect(router.state.location.pathname).toBe(away));
+    expect(screen.queryByRole('dialog', { name: 'Leave without saving?' })).toBeNull();
+  });
+
   it('takes the team settings away when people enter alone again', async () => {
     const { sent } = contestBackend({
       current: `${CONTEST}entrants:\n  most: 3\n  fewest: 2\n`,
@@ -231,7 +251,7 @@ describe('the contest settings form', { timeout: 20_000 }, () => {
     expect(inBox(form, 'Basics').getByLabelText('Description')).toHaveAttribute(
       'readonly',
     );
-    expect(form).toHaveTextContent('Only an admin of the contest can change these.');
+    expect(screen.getByText('Read only')).toBeVisible();
 
     fill(inBox(form, 'Schedule').getByLabelText(/^End/), '2026-06-01T15:00');
     await userEvent.click(within(form).getByRole('button', { name: 'Save settings' }));

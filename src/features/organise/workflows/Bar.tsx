@@ -21,14 +21,18 @@ function newestFirst(versions: readonly string[]): string[] {
 
 /**
  * The bar over a workflow (M32): which one is shown, the draft or a version,
- * as a switcher, a sentence saying what that means, and the actions for it,
- * such as Save and "Publish version" on the draft. It stays in view as the
- * page scrolls down a tall graph.
+ * as a switcher, the graph's tools, such as Undo and Show inputs and files,
+ * and the actions for it, such as Save and "Publish version" on the draft. It
+ * stays in view as the page scrolls down a tall graph, on one line where the
+ * page is wide enough; the switcher's name is for a screen reader, its value
+ * saying what is shown. Under it, once, a sentence says what that means; it
+ * scrolls away with the page.
  */
 export function WorkflowBar({
   page,
   version,
   status,
+  tools,
   children,
 }: {
   page: WorkflowPage;
@@ -36,6 +40,8 @@ export function WorkflowBar({
   version: string | null;
   /** A short line after the switcher, such as whether the draft is saved. */
   status?: ReactNode;
+  /** The graph's tools, such as Undo, Redo and Show inputs and files. */
+  tools?: ReactNode;
   children: ReactNode;
 }) {
   const navigate = useNavigate();
@@ -50,34 +56,42 @@ export function WorkflowBar({
     })),
   ];
   return (
-    <div className={classes.barFrame} data-workflow-bar>
-      <div className={classes.bar} role="toolbar" aria-label="The workflow">
-        {options.length > 0 && (
-          <div className={classes.switch}>
-            <Select
-              label="Showing"
-              value={version ?? DRAFT}
-              options={options}
-              onChange={(chosen) =>
-                void navigate(
-                  workflowPath(
-                    page.owner,
-                    page.name,
-                    chosen === DRAFT ? undefined : chosen,
-                  ),
-                )
-              }
-            />
-          </div>
-        )}
-        {status !== undefined && <div className={classes.status}>{status}</div>}
-        <div className={classes.barActions}>{children}</div>
+    <>
+      <div className={classes.barFrame} data-workflow-bar>
+        <div className={classes.bar} role="toolbar" aria-label="The workflow">
+          {options.length > 0 && (
+            <div className={classes.switch}>
+              <Select
+                label="Showing"
+                labelHidden
+                value={version ?? DRAFT}
+                options={options}
+                onChange={(chosen) =>
+                  void navigate(
+                    workflowPath(
+                      page.owner,
+                      page.name,
+                      chosen === DRAFT ? undefined : chosen,
+                    ),
+                  )
+                }
+              />
+            </div>
+          )}
+          {status !== undefined && <div>{status}</div>}
+          {tools !== undefined && (
+            <div className={classes.tools} role="group" aria-label="Editing">
+              {tools}
+            </div>
+          )}
+          <div className={classes.barActions}>{children}</div>
+        </div>
       </div>
       <p className={classes.where}>
         {version === null
-          ? 'You are editing the draft. Saving keeps your changes; publishing a version freezes the draft as it was saved, for tasks to choose.'
-          : `You are looking at ${version}, a version: it never changes, and every task that chose it grades with it.`}
+          ? 'You are editing the draft. Publishing freezes it as saved, as a version tasks can choose.'
+          : `You are looking at ${version}, a version. It never changes; tasks that chose it grade with it.`}
       </p>
-    </div>
+    </>
   );
 }

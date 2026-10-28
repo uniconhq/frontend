@@ -10,7 +10,7 @@ import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
 import { formatDateTime } from '@/lib/time';
 import { useLiveConnected, useLiveRefused } from '@/live';
 import { serverNow } from '@/lib/time';
-import { justFinished, newestFirst, pollEvery } from './grading';
+import { justFinished, newestFirst, pollEvery, resultLine } from './grading';
 import { SubmissionStatus } from './SubmissionStatus';
 import { submissionHref } from './submission-param';
 import { useMarks, type MarkState } from './use-marks';
@@ -49,8 +49,8 @@ function useJustFinished(submissions: Submission[] | undefined): string {
 
 /**
  * The caller's own submissions of the task, newest first, each with where its
- * grading stands or what came back: read again while any is still being
- * graded, soon at first and less often the longer it waits (`pollEvery`),
+ * grading stands and what it came to (`resultLine`): read again while any
+ * is still being graded, soon at first and less often the longer it waits (`pollEvery`),
  * and once a minute while the live stream tells the page, so a queued one
  * moves on to its outcome without a reload. The server answers with the
  * caller's own alone. On a task a marked leaderboard covers, each also has the
@@ -156,6 +156,7 @@ function Listed({ view, marks }: { view: QueryView<Submission[]>; marks: MarkSta
           <th scope="col">Submission</th>
           <th scope="col">Submitted</th>
           <th scope="col">Status</th>
+          <th scope="col">Result</th>
           {marks.kind === 'held' && <th scope="col">Mark</th>}
         </tr>
       </thead>
@@ -171,6 +172,7 @@ function Listed({ view, marks }: { view: QueryView<Submission[]>; marks: MarkSta
             <td>
               <SubmissionStatus grading={submission.grading} />
             </td>
+            <td>{resultLine(submission.grading)}</td>
             {marks.kind === 'held' && (
               <td>
                 <MarkCell state={marks} number={submission.number} />

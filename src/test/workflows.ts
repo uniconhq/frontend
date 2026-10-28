@@ -274,6 +274,54 @@ export const PRIMITIVES: PrimitiveInfo[] = [
   },
 ];
 
+/** A primitive of two forms, as exec declares itself: one program, or programs side by side. */
+export const FORMED: PrimitiveInfo = {
+  ref: 'unicon/exec@v2',
+  name: 'exec',
+  title: 'Run programs',
+  description: 'Runs one program, or several linked by pipes, under limits.',
+  version: 'v2',
+  batch: true,
+  network: false,
+  forms: {
+    one: {
+      description: 'Runs a program once under limits.',
+      outputs_from: 'manifest',
+      limits: LIMITS,
+      limits_from: {},
+      inputs: {
+        program: port('file', { runs: true }),
+        stdin: port('file', { optional: true }),
+        time_limit: port('number'),
+      },
+      outputs: {
+        output: port('file'),
+        time_ms: port('number'),
+        outcome: port('outcome'),
+      },
+    },
+    programs: {
+      description: 'Runs programs side by side, linked by pipes.',
+      outputs_from: 'programs',
+      limits: LIMITS,
+      limits_from: {},
+      inputs: {
+        programs: port('programs', {
+          inputs: { program: port('file', { runs: true }), time_limit: port('number') },
+          outputs: { time_ms: port('number'), memory_kb: port('number') },
+        }),
+        links: port('links', { optional: true }),
+      },
+      outputs: { facts: port('file'), outcome: port('outcome') },
+    },
+  },
+  limits: {},
+  limits_from: {},
+  inputs: {},
+  outputs: {},
+  problem: null,
+};
+
 export const WORKFLOW_API = '/api/v1/workflows/kenny/tuned';
 
 /**
@@ -345,6 +393,7 @@ export function workflowBackend(
         inputs: [],
         outputs: [],
         newer_version: null,
+        description: null,
         run: false,
       }),
     ),
