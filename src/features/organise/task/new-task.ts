@@ -3,7 +3,7 @@ import { exactJS, isRecord, parseYaml, writeAt, writeOver } from '../forms/yaml-
 import { declaredOf, refParts } from './build-data';
 
 /** The workflow a new task is created on, until its first save names another. */
-export const STARTER = 'unicon/classic@v3';
+export const STARTER = 'unicon/classic@v4';
 
 /** The workflow a new task should move onto, empty until one is chosen. */
 export type Kind = { workflow: string };

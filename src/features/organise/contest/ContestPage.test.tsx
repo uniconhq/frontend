@@ -958,7 +958,7 @@ describe('creating a task', () => {
           {
             owner: 'unicon',
             name: 'classic',
-            versions: ['v3'],
+            versions: ['v4'],
             editable: false,
             visibility: 'public',
           },
@@ -982,7 +982,7 @@ describe('creating a task', () => {
           path: 'task.yaml',
           encoding: 'utf-8',
           content:
-            'name: max\nworkflow: unicon/classic@v3\ninputs:\n  code: {entrant: {label: Your solution}}\n  language: {entrant: {label: Language, options: [python]}}\n  time_limit: 2\n  memory_limit: 256\nrepeat:\n  - inputs: [input, answer]\n    tuples:\n      - [tests/1.in, tests/1.ans]\n',
+            'name: max\nworkflow: unicon/classic@v4\ninputs:\n  code: {entrant: {label: Your solution}}\n  language: {entrant: {label: Language, options: [python]}}\n  time_limit: 2\n  memory_limit: 256\nrepeat:\n  - inputs: [input, answer]\n    tuples:\n      - [tests/1.in, tests/1.ans]\n',
           token: 'token-starter',
           upload: null,
           version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',

@@ -104,8 +104,19 @@ describe("the task's gradings", () => {
       ...repoFiles,
       http.get(`${TASK_API}/gradings`, () =>
         asEntries([
-          done(7, runsResult(['skipped', 'skipped'], { compile: 'compile_error' })),
-          done(6, runsResult(['accepted', 'accepted'], { compile: 'accepted' })),
+          done(
+            7,
+            runsResult(['compile_error', 'compile_error'], {
+              solution: 'compile_error',
+            }),
+          ),
+          done(
+            6,
+            runsResult(['accepted', 'accepted'], {
+              solution: 'accepted',
+              compare: 'accepted',
+            }),
+          ),
           done(5, runsResult(['accepted', 'time_limit', 'wrong_answer'])),
         ]),
       ),
@@ -329,7 +340,7 @@ describe("the task's gradings", () => {
       publication: 3,
       status: 'done',
       error: null,
-      result: runsResult([], { compile: 'compile_error' }),
+      result: runsResult([], { solution: 'compile_error' }),
     };
     server.use(
       signedIn,

@@ -10,7 +10,7 @@ import { EDITOR_PAGE, fileText } from '@/test/workflow-editor';
 describe('the workflow editor', () => {
   // Tabbing to each control walks the whole page, so this takes a while.
   it(
-    'builds three wired steps, an input and a workflow from the tray by keyboard alone',
+    'builds two wired steps, an input and a workflow from the tray by keyboard alone',
     { timeout: 60_000 },
     async () => {
       const empty = [
@@ -104,13 +104,11 @@ describe('the workflow editor', () => {
         );
         await choose(`The port ${port} of ${step}`, source);
       };
-      await add('Primitives', 'Compile', 'Step compile');
-      await add('Primitives', 'Run program', 'Step exec');
+      await add('Primitives', 'Run programs', 'Step exec');
       await add('Primitives', 'Compare with the answer', 'Step diff-check');
       await add('Inputs', 'Text', 'Inputs');
       await add('Workflows', 'kenny/inner@v1', 'Step inner');
-      await wireFrom('source', 'compile', /^submission from the inputs/);
-      await wireFrom('program', 'exec', /^program from compile/);
+      await wireFrom('source', 'exec', /^submission from the inputs/);
       await wireFrom('stdin', 'exec', /^input from the inputs/);
       await wireFrom('time_limit', 'exec', /^time_limit from the inputs/);
       await wireFrom('memory_limit', 'exec', /^memory_limit from the inputs/);
@@ -120,7 +118,6 @@ describe('the workflow editor', () => {
       const text = await fileText(user);
       for (const wire of [
         'source: ${{ inputs.submission }}',
-        'program: ${{ steps.compile.program }}',
         'stdin: ${{ inputs.input }}',
         'time_limit: ${{ inputs.time_limit }}',
         'memory_limit: ${{ inputs.memory_limit }}',
