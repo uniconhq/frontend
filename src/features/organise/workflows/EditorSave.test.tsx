@@ -26,7 +26,7 @@ const memoryAsText = (content: string) =>
   content.includes('memory_limit: 9')
     ? [
         {
-          path: 'steps[1].with.memory_limit',
+          path: 'steps[0].with.memory_limit',
           message: 'This takes a number, not text.',
         },
       ]
@@ -113,8 +113,8 @@ describe('saving and publishing a workflow', () => {
     const backend = workflowBackend(CLASSIC, {
       problems: () => [
         {
-          path: 'steps[0].use',
-          message: 'unicon/compile@v3 is not a primitive Unicon knows.',
+          path: 'steps[1].use',
+          message: 'unicon/diff-check@v2 is not a primitive Unicon knows.',
         },
       ],
     });
@@ -135,7 +135,7 @@ describe('saving and publishing a workflow', () => {
     const refused = await within(dialog).findByRole('alert');
     expect(refused).toHaveTextContent('No version was made');
     expect(refused).toHaveTextContent(
-      'unicon/compile@v3 is not a primitive Unicon knows.',
+      'unicon/diff-check@v2 is not a primitive Unicon knows.',
     );
     expect(backend.state.versions).toEqual([]);
   });

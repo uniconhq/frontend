@@ -29,6 +29,9 @@ function a(type: string): string {
       file: 'a file',
       folder: 'a folder',
       outcome: 'an outcome',
+      named_files: 'named files',
+      programs: 'programs',
+      links: 'links',
     }[type] ?? type
   );
 }
@@ -241,13 +244,17 @@ export function wireRefusal(
   return fits(kind, target);
 }
 
+/** The types of port a single wire never fills: each takes several values by name. */
+const MANY = ['named_files', 'programs', 'links'];
+
 const LIMIT_AT_SAVE =
   'This value raises a limit, so it must be known when the task is saved.';
 
 /**
  * The port of the step at `stepIndex` a wire from `source` goes to when it is
  * dropped on the step's box rather than on a port: the input named as the
- * source is, else the first input given nothing; or why there is none. It
+ * source is, else the first input given nothing that one wire can fill, so
+ * not a port of named files, programs or links; or why there is none. It
  * only picks: `wireRefusal` still decides whether the wire may be drawn.
  */
 export function portFor(
@@ -259,8 +266,8 @@ export function portFor(
 ): { port: string } | { reason: string } {
   const step = workflow.steps[stepIndex];
   if (step === undefined) return { reason: 'There is no such step.' };
-  const ports = stepInputs(primitives, boxes, step)?.map((input) => input.name) ?? null;
-  if (ports === null)
+  const inputs = stepInputs(primitives, boxes, step);
+  if (inputs === null)
     return {
       reason: `${step.use} is not a primitive Unicon knows. Check its owner, name and version.`,
     };
@@ -271,12 +278,14 @@ export function portFor(
         ? source.output
         : null;
   const port =
-    ports.find((found) => found === name) ??
-    ports.find((found) => step.with[found] === undefined);
-  if (port !== undefined) return { port };
+    inputs.find((found) => found.name === name) ??
+    inputs.find(
+      (found) => !MANY.includes(found.type) && step.with[found.name] === undefined,
+    );
+  if (port !== undefined) return { port: port.name };
   return {
     reason:
-      ports.length === 0
+      inputs.length === 0
         ? `${step.id} takes nothing.`
         : `Every input of ${step.id} is given something already. Open it to choose which to change.`,
   };

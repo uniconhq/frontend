@@ -171,7 +171,7 @@ describe('a workflow one may only read', () => {
 
     const run = await screen.findByRole('group', { name: 'Step run' });
     expect(screen.queryByRole('group', { name: /^Input / })).toBeNull();
-    await user.hover(within(run).getByRole('button', { name: '3 inputs of Step run' }));
+    await user.hover(within(run).getByRole('button', { name: '5 inputs of Step run' }));
     const input = await screen.findByRole('group', { name: 'Input input' });
     await user.click(within(input).getByRole('button'));
     await waitFor(() =>
@@ -189,9 +189,9 @@ describe('a workflow one may only read', () => {
     const user = userEvent.setup();
     renderApp('/workflows/unicon/classic');
 
-    const compile = await screen.findByRole('group', { name: 'Step compile' });
-    await user.click(within(compile).getByRole('button', { name: /^compile/ }));
-    expect(await within(compile).findByText(/^file or folder · /)).toBeInTheDocument();
+    const run = await screen.findByRole('group', { name: 'Step run' });
+    await user.click(within(run).getByRole('button', { name: /^run/ }));
+    expect(await within(run).findByText(/^file or folder · /)).toBeInTheDocument();
   });
 
   it('opens a box of a version in the editor’s drawer, every field locked and nothing to remove', async () => {
@@ -227,7 +227,7 @@ describe('a workflow one may only read', () => {
       '  Compiles the code.',
       '  Gives its log.',
       'steps:',
-      '  - {id: compile, use: unicon/compile@v3}',
+      '  - {id: solution, use: unicon/exec@v2}',
       '',
     ].join('\n');
     const said = /^Compiles the code\.\s+Gives its log\.$/;
@@ -267,7 +267,7 @@ describe('a workflow one may only read', () => {
     });
     expect(within(crumbs).getByText('build')).toHaveAttribute('aria-current', 'page');
     expect(
-      await screen.findByRole('group', { name: 'Step compile' }),
+      await screen.findByRole('group', { name: 'Step solution' }),
     ).toBeInTheDocument();
     expect(screen.getByText(said)).toBeInTheDocument();
     expect(screen.queryByText('Builds a solution.')).toBeNull();

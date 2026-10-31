@@ -7,7 +7,7 @@ const WORKFLOW = workflowOf(
     'inputs: {n: number}',
     'steps:',
     '  - {id: a, use: kenny/inner@v1}',
-    '  - {id: b, use: unicon/exec@v1, with: {time_limit: "${{ inputs.n }}"}}',
+    '  - {id: b, use: unicon/exec@v2, with: {time_limit: "${{ inputs.n }}"}}',
     '  - {id: c, use: kenny/inner@v1}',
     'outputs:',
     '  out: ${{ steps.b.output }}',

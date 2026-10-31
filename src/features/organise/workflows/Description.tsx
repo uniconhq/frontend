@@ -29,7 +29,7 @@ export function DescriptionField({
       onChange={setText}
       rows={2}
       description="Shown above its graph wherever it is shown, so others can tell what it is for."
-      placeholder="Compiles the solution, runs it on the test's input and compares its output with the answer."
+      placeholder="Runs the solution on the test's input and compares its output with the answer."
       onCommit={() => {
         if (text.trim() !== said) apply(text);
       }}
