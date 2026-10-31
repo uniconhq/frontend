@@ -96,6 +96,10 @@ const CHECKER: PrimitiveInfo = {
 
 const primitives = byRef([...PRIMITIVES, CHECKER]);
 
+/** What exec's one form needs, so a step given it is a program compiled and run. */
+const RUNS =
+  'source: "${{ inputs.submission }}", language: c, stdin: "${{ inputs.input }}", time_limit: 1, memory_limit: 256';
+
 const WORKFLOW = readWorkflow(
   parse(`
 inputs:
@@ -109,10 +113,10 @@ inputs:
   key: {type: text, optional: true}
   flag: boolean
 steps:
-  - {id: compile, use: unicon/compile@v3, with: {}}
-  - {id: run, use: unicon/exec@v1, with: {program: "\${{ steps.compile.program }}"}}
+  - {id: build, use: unicon/exec@v2, with: {source: "\${{ inputs.submission }}", language: c}}
+  - {id: run, use: unicon/exec@v2, with: {${RUNS}, args: "\${{ steps.build.log }}"}}
   - {id: check, use: unicon/checker-like@v1, with: {}}
-  - {id: late, use: unicon/compile@v3, with: {}}
+  - {id: late, use: unicon/exec@v2, with: {source: "\${{ inputs.submission }}", language: c}}
 `),
 );
 
@@ -160,7 +164,7 @@ describe('the drag rules', () => {
     [
       'a boolean into a file port',
       1,
-      'program',
+      'stdin',
       input('flag'),
       'This takes a file, not true or false.',
     ],
@@ -169,7 +173,7 @@ describe('the drag rules', () => {
       0,
       'language',
       input('wide'),
-      'This takes one of c, cpp, java, python, not rust.',
+      'This takes one of c, cpp, java, python, ipynb, not rust.',
     ],
     [
       'a step reading its own output',
@@ -187,16 +191,16 @@ describe('the drag rules', () => {
     ],
     [
       'an optional input into a required port',
-      1,
-      'stdin',
+      0,
+      'source',
       input('key'),
       'That input is optional, so it can be given only to an optional port.',
     ],
     [
       'a loop',
       0,
-      'source',
-      output('run', 'output'),
+      'entry',
+      output('run', 'log'),
       'That would make a loop: run already reads this step.',
     ],
   ] as const)('refuses %s with its reason', (_, step, port, source, reason) => {
@@ -208,8 +212,8 @@ describe('the drag rules', () => {
       parse(`
 inputs: {}
 steps:
-  - {id: first, use: unicon/exec@v1, with: {}}
-  - {id: second, use: unicon/exec@v1, with: {}}
+  - {id: first, use: unicon/exec@v2, with: {${RUNS}}}
+  - {id: second, use: unicon/exec@v2, with: {${RUNS}}}
 `),
     );
 
@@ -223,7 +227,7 @@ steps:
       parse(`
 steps:
   - {id: check, use: unicon/checker-like@v1, with: {}}
-  - {id: run, use: unicon/exec@v1, with: {}}
+  - {id: run, use: unicon/exec@v2, with: {${RUNS}}}
 `),
     );
 
@@ -234,13 +238,13 @@ steps:
       wireRefusal(workflow, primitives, 1, 'args', output('check', 'fraction')),
     ).toBeNull();
     expect(
-      wireRefusal(workflow, primitives, 1, 'stdin', output('check', 'fraction')),
+      wireRefusal(workflow, primitives, 1, 'source', output('check', 'fraction')),
     ).toBe('That output may be missing, so it can be given only to an optional port.');
   });
 
   it('lets a step read one listed after it when that makes no loop', () => {
     expect(
-      wireRefusal(WORKFLOW, primitives, 0, 'source', output('late', 'program')),
+      wireRefusal(WORKFLOW, primitives, 0, 'entry', output('late', 'log')),
     ).toBeNull();
   });
 
@@ -269,7 +273,7 @@ steps:
       valueRefusal(WORKFLOW, primitives, 0, 'language', '${{ inputs.limit }}s', [
         input('limit'),
       ]),
-    ).toBe('This takes one of c, cpp, java, python.');
+    ).toBe('This takes one of c, cpp, java, python, ipynb.');
     expect(
       valueRefusal(WORKFLOW, primitives, 0, 'entry', 'x ${{ inputs.missing }}', [
         input('missing'),
@@ -283,13 +287,13 @@ steps:
       '${{ inputs.key }} is optional, so it can be given only whole, to an optional port, not written into text.',
     );
     expect(valueRefusal(WORKFLOW, primitives, 0, 'language', 'rust', [])).toBe(
-      'This takes one of c, cpp, java, python.',
+      'This takes one of c, cpp, java, python, ipynb.',
     );
-    expect(valueRefusal(WORKFLOW, primitives, 1, 'program', true, [])).toBe(
+    expect(valueRefusal(WORKFLOW, primitives, 1, 'stdin', true, [])).toBe(
       'This takes a file, not true or false.',
     );
     expect(
-      valueRefusal(WORKFLOW, primitives, 1, 'program', 'x ${{ steps.run.output }}', [
+      valueRefusal(WORKFLOW, primitives, 1, 'stdin', 'x ${{ steps.run.output }}', [
         output('run', 'output'),
       ]),
     ).toBe("A step's output can be given only whole, not written into text.");
@@ -302,10 +306,10 @@ steps:
     const workflow = readWorkflow(
       parse(`
 steps:
-  - {id: a, use: unicon/compile@v3}
-  - {id: b, use: unicon/compile@v3, with: {source: "\${{ steps.a.program }}"}}
-  - {id: c, use: unicon/compile@v3, with: {source: "\${{ steps.b.program }}"}}
-  - {id: d, use: unicon/compile@v3}
+  - {id: a, use: unicon/exec@v2}
+  - {id: b, use: unicon/exec@v2, with: {entry: "\${{ steps.a.log }}"}}
+  - {id: c, use: unicon/exec@v2, with: {entry: "\${{ steps.b.log }}"}}
+  - {id: d, use: unicon/exec@v2}
 `),
     );
 
@@ -320,7 +324,7 @@ inputs:
   key: text
   other: text
 steps:
-  - {id: run, use: unicon/exec@v1, with: {args: "\${{ inputs.key }}", stdin: "\${{ inputs.other }}"}}
+  - {id: run, use: unicon/exec@v2, with: {source: "\${{ inputs.other }}", language: c, time_limit: 1, memory_limit: 256, args: "\${{ inputs.key }}"}}
 `),
     );
 
@@ -331,7 +335,7 @@ steps:
   it('names a text output and a number output', () => {
     const workflow = readWorkflow(parse(CLASSIC));
 
-    expect(outputRefusal(workflow, primitives, output('compile', 'log'))).toBeNull();
+    expect(outputRefusal(workflow, primitives, output('run', 'log'))).toBeNull();
     expect(outputRefusal(workflow, primitives, output('run', 'memory_kb'))).toBeNull();
   });
 
@@ -390,15 +394,31 @@ describe('workflow-owned sources', () => {
 
 describe('a wire dropped on a box', () => {
   it('goes to the input named as its source, given or not', () => {
-    expect(portFor(WORKFLOW, primitives, 1, output('compile', 'program'))).toEqual({
-      port: 'program',
+    expect(portFor(WORKFLOW, primitives, 1, input('language'))).toEqual({
+      port: 'language',
     });
   });
 
   it('else goes to the first input given nothing, leaving the refusal to the drag rules', () => {
-    expect(portFor(WORKFLOW, primitives, 1, input('limit'))).toEqual({ port: 'stdin' });
-    expect(wireRefusal(WORKFLOW, primitives, 1, 'stdin', input('limit'))).toBe(
-      'This takes a file, not a number.',
+    expect(portFor(WORKFLOW, primitives, 1, input('input'))).toEqual({ port: 'entry' });
+    expect(wireRefusal(WORKFLOW, primitives, 1, 'entry', input('input'))).toBe(
+      'This takes text, not a file.',
+    );
+  });
+
+  it('passes over a port of named files, which one wire cannot fill', () => {
+    const given = readWorkflow(
+      parse(`
+inputs:
+  submission: file
+  input: file
+steps:
+  - {id: run, use: unicon/exec@v2, with: {${RUNS}, entry: main.c}}
+`),
+    );
+    expect(portFor(given, primitives, 0, input('input'))).toEqual({ port: 'manifest' });
+    expect(wireRefusal(given, primitives, 0, 'files', input('input'))).toBe(
+      'This takes named files, not a file.',
     );
   });
 
@@ -425,7 +445,7 @@ describe('a wire dropped on a box', () => {
 
   it('says why when every input is given something, or the step is unknown', () => {
     const full = readWorkflow(parse(CLASSIC));
-    expect(portFor(full, primitives, 2, input('submission'))).toEqual({
+    expect(portFor(full, primitives, 1, input('submission'))).toEqual({
       reason:
         'Every input of check is given something already. Open it to choose which to change.',
     });

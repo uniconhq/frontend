@@ -255,7 +255,7 @@ describe('the task page', () => {
       // A saved workflow that reads, so the Scoring and Checks cards are there.
       http.get(`${TASK_API}/workflow-form`, () =>
         HttpResponse.json({
-          workflow: 'unicon/classic@v3',
+          workflow: 'unicon/classic@v4',
           newer: null,
           problem: null,
           graded: false,
@@ -375,7 +375,7 @@ describe('what the task has, under its name', { timeout: 20_000 }, () => {
       ),
       http.get(`${TASK_API}/workflow-form`, () =>
         HttpResponse.json({
-          workflow: 'unicon/classic@v3',
+          workflow: 'unicon/classic@v4',
           newer: null,
           problem: null,
           graded: false,
@@ -438,7 +438,7 @@ describe('what the task has, under its name', { timeout: 20_000 }, () => {
         HttpResponse.json({
           ...files['task.yaml'],
           content:
-            'name: sum\nworkflow: unicon/classic@v3\nrepeat:\n  - inputs: [time_limit]\n    tuples: [[1], [2]]\n',
+            'name: sum\nworkflow: unicon/classic@v4\nrepeat:\n  - inputs: [time_limit]\n    tuples: [[1], [2]]\n',
         }),
       ),
     );

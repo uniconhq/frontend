@@ -25,15 +25,16 @@ inputs:
   input: {type: file, title: Input}
   answer: {type: file, title: Answer}
 steps:
-  - id: compile
-    use: unicon/compile@v3
+  - id: build
+    use: unicon/exec@v2
     with:
       source: \${{ inputs.submission }}
       language: \${{ inputs.language }}
   - id: run
-    use: unicon/exec@v1
+    use: unicon/exec@v2
     with:
-      program: \${{ steps.compile.program }}
+      source: \${{ inputs.submission }}
+      language: \${{ inputs.language }}
       stdin: \${{ inputs.input }}
       time_limit: \${{ inputs.time_limit }}
       memory_limit: \${{ inputs.memory_limit }}
@@ -43,7 +44,7 @@ steps:
       actual: \${{ steps.run.output }}
       expected: \${{ inputs.answer }}
 outputs:
-  log: \${{ steps.compile.log }}
+  log: \${{ steps.build.log }}
 `;
 
 const port = (
@@ -75,30 +76,19 @@ const LIMITS = {
   gpus: 0,
 };
 
+/** What exec's forms take to compile a program. */
+const SOURCE = {
+  source: port('folder', { runs: true }),
+  language: port('enum', { options: ['c', 'cpp', 'java', 'python', 'ipynb'] }),
+  entry: port('text', { optional: true }),
+};
+
+/**
+ * The palette as the API lists it: diff-check, and exec, its ports in the
+ * order exec declares them. The editor draws an exec step as the first form
+ * holding every port it gives, which here is always the one form.
+ */
 const PRIMITIVES = [
-  {
-    ref: 'unicon/compile@v3',
-    name: 'compile',
-    title: 'Compile',
-    description: 'Compiles source files into one program.',
-    version: 'v3',
-    batch: false,
-    network: false,
-    limits: LIMITS,
-    limits_from: {},
-    forms: {},
-    inputs: {
-      source: port('folder', { runs: true }),
-      language: port('enum', { options: ['c', 'cpp', 'java', 'python'] }),
-      entry: port('text', { optional: true }),
-    },
-    outputs: {
-      program: port('file'),
-      log: port('text'),
-      outcome: port('outcome'),
-    },
-    problem: null,
-  },
   {
     ref: 'unicon/diff-check@v2',
     name: 'diff-check',
@@ -119,45 +109,66 @@ const PRIMITIVES = [
     problem: null,
   },
   {
-    ref: 'unicon/exec@v1',
+    ref: 'unicon/exec@v2',
     name: 'exec',
-    title: 'Run program',
+    title: 'Run programs',
     description:
-      'Runs a program once under limits and records its output, time and memory.',
-    version: 'v1',
+      'Compiles one program, or several linked by pipes, once, runs them under limits, and records how each ended.',
+    version: 'v2',
     batch: true,
     network: false,
-    limits: LIMITS,
-    limits_from: {
-      time_ms: {
-        input: 'time_limit',
-        scale: '2000',
-        add: '3000',
-        max: null,
-        sum: null,
+    limits: {},
+    limits_from: {},
+    forms: {
+      one: {
+        description:
+          'Compiles a program once, runs it under limits and records its output, time and memory.',
+        outputs_from: 'manifest',
+        limits: LIMITS,
+        limits_from: {
+          time_ms: {
+            input: 'time_limit',
+            scale: '2000',
+            add: '3000',
+            max: null,
+            sum: null,
+          },
+          memory_mb: {
+            input: 'memory_limit',
+            scale: '1',
+            add: '256',
+            max: null,
+            sum: null,
+          },
+        },
+        inputs: {
+          ...SOURCE,
+          stdin: port('file', { runs: false, optional: true }),
+          files: port('named_files', { runs: false, optional: true }),
+          args: port('text', { optional: true }),
+          time_limit: port('number'),
+          memory_limit: port('number'),
+        },
+        outputs: {
+          output: port('file'),
+          time_ms: port('number'),
+          memory_kb: port('number'),
+          log: port('text'),
+          outcome: port('outcome'),
+        },
       },
-      memory_mb: {
-        input: 'memory_limit',
-        scale: '1',
-        add: '256',
-        max: null,
-        sum: null,
+      build: {
+        description:
+          'Compiles a program and runs nothing, so saving a task can check that its programs compile.',
+        outputs_from: null,
+        limits: { ...LIMITS, time_ms: 1000, cpu_ms: 1000 },
+        limits_from: {},
+        inputs: SOURCE,
+        outputs: { log: port('text'), outcome: port('outcome') },
       },
     },
-    forms: {},
-    inputs: {
-      program: port('file', { runs: true }),
-      stdin: port('file', { runs: false }),
-      args: port('text', { optional: true }),
-      time_limit: port('number'),
-      memory_limit: port('number'),
-    },
-    outputs: {
-      output: port('file'),
-      time_ms: port('number'),
-      memory_kb: port('number'),
-      outcome: port('outcome'),
-    },
+    inputs: {},
+    outputs: {},
     problem: null,
   },
 ] satisfies Schemas['Primitive'][];
@@ -294,32 +305,30 @@ test('with the inputs hidden, a step’s tab sits in the gap before it and pops 
   );
   await page.setViewportSize({ width: 1600, height: 1000 });
   await page.goto('/workflows/kenny/tuned');
-  const run = page.getByRole('group', { name: 'Step run' });
-  const tab = run.getByRole('button', { name: /inputs? of Step run/ });
+  const check = page.getByRole('group', { name: 'Step check' });
+  const tab = check.getByRole('button', { name: /inputs? of Step check/ });
   await expect(tab).toBeVisible();
   await expect(page.getByRole('group', { name: /^Input / })).toHaveCount(0);
 
   const ofTab = await tab.boundingBox();
-  const ofRun = await run.boundingBox();
-  const ofCompile = await page
-    .getByRole('group', { name: 'Step compile' })
-    .boundingBox();
-  if (ofTab === null || ofRun === null || ofCompile === null)
+  const ofCheck = await check.boundingBox();
+  const ofRun = await page.getByRole('group', { name: 'Step run' }).boundingBox();
+  if (ofTab === null || ofCheck === null || ofRun === null)
     throw new Error('the tab and the boxes are drawn');
-  expect(ofTab.x + ofTab.width).toBeLessThanOrEqual(ofRun.x + 1);
-  expect(ofTab.x).toBeGreaterThanOrEqual(ofCompile.x + ofCompile.width);
+  expect(ofTab.x + ofTab.width).toBeLessThanOrEqual(ofCheck.x + 1);
+  expect(ofTab.x).toBeGreaterThanOrEqual(ofRun.x + ofRun.width);
 
   // The pointer crosses from the tab to the boxes it pops out, wired to it.
   await tab.hover();
-  const limit = page.getByRole('group', { name: 'Input time_limit' });
-  await expect(limit).toBeVisible();
-  const ofLimit = await limit.boundingBox();
-  if (ofLimit === null) throw new Error('the popped-out box is drawn');
-  expect(Math.abs(ofLimit.x + ofLimit.width + 88 - ofTab.x)).toBeLessThanOrEqual(2);
-  await limit.hover();
-  await limit.getByRole('button').click();
+  const answer = page.getByRole('group', { name: 'Input answer' });
+  await expect(answer).toBeVisible();
+  const ofAnswer = await answer.boundingBox();
+  if (ofAnswer === null) throw new Error('the popped-out box is drawn');
+  expect(Math.abs(ofAnswer.x + ofAnswer.width + 88 - ofTab.x)).toBeLessThanOrEqual(2);
+  await answer.hover();
+  await answer.getByRole('button').click();
   await expect(page.getByRole('complementary', { name: 'Inputs' })).toBeVisible();
-  await expect(limit).toBeHidden();
+  await expect(answer).toBeHidden();
 });
 
 test('a first step’s tab, with no room on its left, pops its inputs out on its right, wired back to it', async ({
@@ -333,8 +342,8 @@ test('a first step’s tab, with no room on its left, pops its inputs out on its
   await page.setViewportSize({ width: 1000, height: 1000 });
   await page.goto('/workflows/kenny/tuned');
   const tab = page
-    .getByRole('group', { name: 'Step compile' })
-    .getByRole('button', { name: /inputs? of Step compile/ });
+    .getByRole('group', { name: 'Step build' })
+    .getByRole('button', { name: /inputs? of Step build/ });
   await tab.hover();
   const submission = page.getByRole('group', { name: 'Input submission' });
   await expect(submission).toBeVisible();
@@ -402,8 +411,8 @@ test('every wire meets a handle of its boxes, open, closed and with a problem li
   );
   await page.setViewportSize({ width: 1600, height: 1000 });
   await page.goto('/workflows/kenny/tuned');
-  const compile = page.getByRole('group', { name: 'Step compile' });
-  await expect(compile.getByText('It does not build.')).toBeVisible();
+  const build = page.getByRole('group', { name: 'Step build' });
+  await expect(build.getByText('It does not build.')).toBeVisible();
   await openBox(page, 'run');
 
   const ends =
@@ -591,7 +600,13 @@ test('a lifted wire moves to the port it is dropped on, or clears its port on no
   await page.mouse.up();
   await expect.poll(() => file(page)).toContain('time_limit: ${{ inputs.time_limit }}');
 
-  // Refused, it names the port it would have gone to, which the box hides.
+  // Else to the first input given nothing.
+  await openBox(page, 'build');
+  await drag(page, handle(page, 'step:0', 'out:log'), run);
+  await expect.poll(() => file(page)).toContain('entry: ${{ steps.build.log }}');
+
+  // Refused, it names the port it would have gone to, which the box hides:
+  // args, passing over files, which takes named files and no single wire.
   await drag(page, handle(page, 'input:submission', 'out:*'), run);
   await expect(
     page.getByRole('alert').filter({ hasText: 'args: This takes text, not a file.' }),
@@ -604,7 +619,7 @@ test('only a wire that is a port’s whole value, into an open box, can be lifte
   await stubWorkflowApi(page);
   const draft = CLASSIC.replace(
     '      stdin: ${{ inputs.input }}\n',
-    '      stdin: ${{ inputs.input }}\n      files:\n        answer: ${{ inputs.answer }}\n        given: ${{ inputs.language }}\n',
+    '      stdin: ${{ inputs.input }}\n      files:\n        answer: ${{ inputs.answer }}\n        given: ${{ steps.build.log }}\n',
   );
   await page.route('**/api/v1/workflows/kenny/tuned', (route) =>
     route.fulfill({
@@ -635,7 +650,7 @@ test('only a wire that is a port’s whole value, into an open box, can be lifte
   await expect(lifts('input:time_limit')).toHaveCount(1);
   // One of the values a mapping holds is changed in the drawer.
   await expect(lifts('input:answer')).toHaveCount(0);
-  await expect(lifts('input:language')).toHaveCount(0);
+  await expect(lifts('step:0')).toHaveCount(0);
 });
 
 test('a step added below the window is scrolled into it', async ({ page }) => {
@@ -646,7 +661,7 @@ test('a step added below the window is scrolled into it', async ({ page }) => {
 
   await page
     .getByRole('region', { name: 'Primitives' })
-    .getByRole('button', { name: 'Run program' })
+    .getByRole('button', { name: 'Run programs' })
     .click();
   const added = page.getByRole('group', { name: 'Step exec' });
   await expect(added).toBeVisible();
@@ -699,7 +714,7 @@ test('the frame shades an edge with more of the graph past it, and a selected bo
   await expect(edges).not.toHaveAttribute('data-more-left', '');
 
   // A box in view, clear of where the drawer opens, leaves the graph still.
-  await openBox(page, 'compile');
+  await openBox(page, 'build');
   expect(await slid()).toBe(0);
 
   // One the drawer would cover slides out from under it.
@@ -735,9 +750,9 @@ test('every port of a step opens its menu with the mouse', async ({ page }) => {
   await expect(page.getByRole('group', { name: 'Step run' })).toBeVisible();
 
   for (const [step, port] of [
-    ['compile', 'source'],
-    ['compile', 'language'],
-    ['run', 'program'],
+    ['build', 'source'],
+    ['build', 'language'],
+    ['run', 'source'],
     ['run', 'stdin'],
     ['check', 'actual'],
   ] as const) {
@@ -766,7 +781,7 @@ test('a box opens two levels in, and a problem opens the step inside', async ({
     });
   const draft = 'steps:\n  - {id: build, use: kenny/inner@v1}\n';
   const inner = 'steps:\n  - {id: compile, use: kenny/deep@v1}\n';
-  const deep = 'steps:\n  - {id: link, use: unicon/compile@v3}\n';
+  const deep = 'steps:\n  - {id: link, use: unicon/exec@v2}\n';
   const box = {
     inputs: [
       {
