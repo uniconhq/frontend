@@ -34,16 +34,16 @@ describe('a workflow drawn', () => {
     renderWithProviders(<DrawnGraph text={CLASSIC} primitives={PRIMITIVES} />);
 
     const run = await screen.findByRole('group', { name: 'Step run' });
-    expect(within(run).getByText('Run program')).toBeInTheDocument();
-    expect(within(run).getByText('unicon/exec@v1')).toBeInTheDocument();
+    expect(within(run).getByText('Run programs')).toBeInTheDocument();
+    expect(within(run).getByText('unicon/exec@v2')).toBeInTheDocument();
     expect(
       within(run).getByText(
-        'Runs a program once under limits and records its output, time and memory.',
+        'Compiles a program once, runs it under limits and records its output, time and memory.',
       ),
     ).toBeInTheDocument();
-    const compile = screen.getByRole('group', { name: 'Step compile' });
-    expect(within(compile).getByText('Compile')).toBeInTheDocument();
-    expect(compile).not.toHaveTextContent(/once|each test/i);
+    const check = screen.getByRole('group', { name: 'Step check' });
+    expect(within(check).getByText('Compare with the answer')).toBeInTheDocument();
+    expect(check).not.toHaveTextContent(/once|each test/i);
   });
 
   it('shows a primitive without a title by its name and reference', async () => {
@@ -56,12 +56,12 @@ describe('a workflow drawn', () => {
 
     const run = await screen.findByRole('group', { name: 'Step run' });
     expect(within(run).getByText('exec')).toBeInTheDocument();
-    expect(within(run).getByText('unicon/exec@v1')).toBeInTheDocument();
+    expect(within(run).getByText('unicon/exec@v2')).toBeInTheDocument();
   });
 
   it('marks ports in plain words, and leaves out what the author never acts on', async () => {
     renderWithProviders(
-      <DrawnGraph text={CLASSIC} primitives={PRIMITIVES} selected="step:1" />,
+      <DrawnGraph text={CLASSIC} primitives={PRIMITIVES} selected="step:0" />,
     );
 
     const run = await screen.findByRole('group', { name: 'Step run' });
@@ -71,14 +71,14 @@ describe('a workflow drawn', () => {
       if (found === null || found === undefined) throw new Error(`no row ${port}`);
       return found;
     };
-    expect(row('program')).toHaveTextContent('runs this as a program');
+    expect(row('source')).toHaveTextContent('runs this as a program');
     expect(row('time_limit')).toHaveTextContent('sets the time limit');
     expect(row('memory_limit')).toHaveTextContent('sets the memory limit');
     expect(row('args')).toHaveTextContent('(optional)');
     expect(run).not.toHaveTextContent(/outcome|secret|batch|raises a limit/);
     const inputs = screen.getByRole('group', { name: 'Input submission' });
     expect(inputs).not.toHaveTextContent('the entrant gives it');
-    expect(inputs).toHaveTextContent('Read by compile');
+    expect(inputs).toHaveTextContent('Read by run');
     const report = screen.getByRole('group', { name: 'Outputs' });
     expect(report).not.toHaveTextContent('largest over the tests');
   });
@@ -100,7 +100,7 @@ describe('a workflow drawn', () => {
     renderWithProviders(
       <DrawnGraph
         text={
-          'steps:\n  - {id: diff, use: unicon/compile@v3, with: {source: "${{ workflow.diff/ }}"}}\n'
+          'steps:\n  - {id: diff, use: unicon/exec@v2, with: {source: "${{ workflow.diff/ }}"}}\n'
         }
         primitives={PRIMITIVES}
       />,
@@ -136,7 +136,7 @@ describe('a workflow drawn', () => {
     renderWithProviders(<DrawnGraph text={CLASSIC} primitives={PRIMITIVES} />);
 
     await screen.findByRole('group', { name: 'Step run' });
-    expect(screen.getByText('log from compile')).toBeInTheDocument();
+    expect(screen.getByText('log from run')).toBeInTheDocument();
   });
 
   it('opens a box when its head is clicked, with nobody else keeping the pick', async () => {

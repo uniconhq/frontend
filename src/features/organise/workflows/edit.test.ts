@@ -23,41 +23,43 @@ import {
 import { NumberText } from '../forms/yaml-doc';
 import { refText } from './model';
 
-const [, compile, , diff, run] = PRIMITIVES;
+const [, diff, , exec] = PRIMITIVES;
 
 const COMMENTED = `# A workflow with its notes kept.
 inputs:
   submission: {type: file, title: Solution}  # what they send
   time_limit: number
   input: file
+  answer: file
 steps:
-  # compile once
-  - id: compile
-    use: unicon/compile@v3
+  # compile and run once
+  - id: run
+    use: unicon/exec@v2
     with:
       source: \${{ inputs.submission }}
       language: c
-  - id: run
-    use: unicon/exec@v1
-    with:
-      program: \${{ steps.compile.program }}
       stdin: \${{ inputs.input }}
       args: "--limit \${{ inputs.time_limit }}"
       time_limit: \${{ inputs.time_limit }}
       memory_limit: 256
+  - id: check
+    use: unicon/diff-check@v2
+    with:
+      actual: \${{ steps.run.output }}
+      expected: \${{ inputs.answer }}
 outputs:
-  log: \${{ steps.compile.log }}  # shown, never ranked
+  log: \${{ steps.run.log }}  # shown, never ranked
 `;
 
 const ids = (text: string) => workflowOf(text).steps.map((step) => step.id);
 
 describe('editing the file in place', () => {
   it('keeps every comment through an edit elsewhere', () => {
-    const after = setValue(COMMENTED, 1, 'memory_limit', new NumberText('512'));
+    const after = setValue(COMMENTED, 0, 'memory_limit', new NumberText('512'));
 
     expect(after).toContain('# A workflow with its notes kept.');
     expect(after).toContain('# what they send');
-    expect(after).toContain('# compile once');
+    expect(after).toContain('# compile and run once');
     expect(after).toContain('# shown, never ranked');
     expect(after).toContain('memory_limit: 512');
   });
@@ -68,7 +70,7 @@ describe('editing the file in place', () => {
       'memory_limit: 256 # megabytes',
     );
 
-    expect(setValue(commented, 1, 'memory_limit', new NumberText('512'))).toContain(
+    expect(setValue(commented, 0, 'memory_limit', new NumberText('512'))).toContain(
       'memory_limit: 512 # megabytes',
     );
   });
@@ -88,8 +90,8 @@ describe('editing the file in place', () => {
     const text = [
       'inputs: {a: file}',
       'steps:',
-      '  - use: unicon/compile@v3',
-      '  - {id: b, use: unicon/compile@v3}',
+      '  - use: unicon/exec@v2',
+      '  - {id: b, use: unicon/exec@v2}',
       '',
     ].join('\n');
 
@@ -112,9 +114,9 @@ describe('editing the file in place', () => {
   });
 
   it('writes text that looks like a date plain', () => {
-    const text = setValue(COMMENTED, 1, 'args', '2026-10-09');
+    const text = setValue(COMMENTED, 0, 'args', '2026-10-09');
 
-    expect(workflowOf(text).steps[1]?.with.args).toEqual({
+    expect(workflowOf(text).steps[0]?.with.args).toEqual({
       kind: 'literal',
       value: '2026-10-09',
     });
@@ -124,7 +126,7 @@ describe('editing the file in place', () => {
   });
 
   it('writes yes, no and on plain, and quotes what 1.2 reads as true, false or a number', () => {
-    let text = setValue(COMMENTED, 1, 'args', 'on');
+    let text = setValue(COMMENTED, 0, 'args', 'on');
     text = setInput(text, 'mode', {
       type: 'enum',
       options: ['yes', 'no', 'true', '1_000', '12'],
@@ -133,7 +135,7 @@ describe('editing the file in place', () => {
     expect(text).toContain(
       'mode: {type: enum, options: [yes, no, "true", 1_000, "12"]}',
     );
-    expect(workflowOf(text).steps[1]?.with.args).toEqual({
+    expect(workflowOf(text).steps[0]?.with.args).toEqual({
       kind: 'literal',
       value: 'on',
     });
@@ -183,26 +185,25 @@ describe('editing the file in place', () => {
   });
 
   it('adds the first step to an empty steps: [] as a block', () => {
-    const added = addStep('steps: []\n', compile!);
+    const added = addStep('steps: []\n', exec!);
 
-    expect(added).toBe(
-      'steps:\n  - id: compile\n    use: unicon/compile@v3\n    with: {}\n',
-    );
+    expect(added).toBe('steps:\n  - id: exec\n    use: unicon/exec@v2\n    with: {}\n');
   });
 
   it('adds a step named for its primitive, at the end', () => {
-    const again = addStep(COMMENTED, compile!);
+    const once = addStep(COMMENTED, exec!);
+    const again = addStep(once, exec!);
     const check = addStep(COMMENTED, diff!);
 
-    expect(ids(again)).toEqual(['compile', 'run', 'compile-2']);
-    expect(workflowOf(again).steps[2]?.use).toBe('unicon/compile@v3');
-    expect(ids(check)).toEqual(['compile', 'run', 'diff-check']);
+    expect(ids(again)).toEqual(['run', 'check', 'exec', 'exec-2']);
+    expect(workflowOf(again).steps[3]?.use).toBe('unicon/exec@v2');
+    expect(ids(check)).toEqual(['run', 'check', 'diff-check']);
   });
 
   it('wires a port and gives one a value or nothing', () => {
     const wired = wire(COMMENTED, 0, 'entry', { kind: 'inputs', name: 'submission' });
     const valued = setValue(COMMENTED, 0, 'language', 'cpp');
-    const cleared = clearPort(COMMENTED, 1, 'args');
+    const cleared = clearPort(COMMENTED, 0, 'args');
 
     expect(workflowOf(wired).steps[0]?.with.entry).toEqual({
       kind: 'wire',
@@ -212,38 +213,38 @@ describe('editing the file in place', () => {
       kind: 'literal',
       value: 'cpp',
     });
-    expect(workflowOf(cleared).steps[1]?.with.args).toBeUndefined();
-    expect(cleared).toContain('# compile once');
+    expect(workflowOf(cleared).steps[0]?.with.args).toBeUndefined();
+    expect(cleared).toContain('# compile and run once');
   });
 
   it('moves the steps when a step comes to read a later one', () => {
-    const added = addStep(COMMENTED, compile!);
-    const moved = wire(added, 0, 'source', {
+    const added = addStep(COMMENTED, exec!);
+    const moved = wire(added, 0, 'entry', {
       kind: 'steps',
-      name: 'compile-2',
-      output: 'program',
+      name: 'exec',
+      output: 'log',
     });
 
-    expect(ids(moved)).toEqual(['compile-2', 'compile', 'run']);
-    expect(moved).toContain('# compile once');
+    expect(ids(moved)).toEqual(['exec', 'run', 'check']);
+    expect(moved).toContain('# compile and run once');
   });
 
   it('removes a step with every wire from it, and undoing is the text before', () => {
     const removed = removeStep(COMMENTED, 0);
 
-    expect(ids(removed)).toEqual(['run']);
-    expect(workflowOf(removed).steps[0]?.with.program).toBeUndefined();
+    expect(ids(removed)).toEqual(['check']);
+    expect(workflowOf(removed).steps[0]?.with.actual).toBeUndefined();
     expect(workflowOf(removed).outputs).toEqual([]);
-    expect(workflowOf(removed).steps[0]?.with.stdin).toBeDefined();
+    expect(workflowOf(removed).steps[0]?.with.expected).toBeDefined();
   });
 
   it('renames a step and an input, every reference following', () => {
-    const step = renameStep(COMMENTED, 0, 'build');
+    const step = renameStep(COMMENTED, 0, 'solution');
     const input = renameInput(COMMENTED, 'time_limit', 'limit');
     const file = renameInput(COMMENTED, 'input', 'given');
 
-    expect(step).toContain('program: ${{ steps.build.program }}');
-    expect(step).toContain('log: ${{ steps.build.log }}');
+    expect(step).toContain('actual: ${{ steps.solution.output }}');
+    expect(step).toContain('log: ${{ steps.solution.log }}');
     expect(input).toContain('limit: number');
     expect(input).toContain('args: "--limit ${{ inputs.limit }}"');
     expect(input).toContain('time_limit: ${{ inputs.limit }}');
@@ -312,12 +313,13 @@ describe('editing the file in place', () => {
   it('removes an input with every port reading it', () => {
     const removed = removeInput(COMMENTED, 'time_limit');
 
-    const runStep = workflowOf(removed).steps[1];
+    const runStep = workflowOf(removed).steps[0];
     expect(runStep?.with.args).toBeUndefined();
     expect(runStep?.with.time_limit).toBeUndefined();
     expect(workflowOf(removed).inputs.map((each) => each.id)).toEqual([
       'submission',
       'input',
+      'answer',
     ]);
   });
 
@@ -394,24 +396,24 @@ describe('editing the file in place', () => {
 
   it('builds classic from an empty file', () => {
     let text = '';
-    text = addStep(text, compile!);
-    text = addStep(text, run!);
+    text = addStep(text, exec!);
+    text = addStep(text, diff!);
     text = setInput(text, 'submission', { type: 'file' });
     text = setInput(text, 'input', { type: 'file' });
     text = wire(text, 0, 'source', { kind: 'inputs', name: 'submission' });
-    text = wire(text, 1, 'program', {
+    text = wire(text, 0, 'stdin', { kind: 'inputs', name: 'input' });
+    text = wire(text, 1, 'actual', {
       kind: 'steps',
-      name: 'compile',
-      output: 'program',
+      name: 'exec',
+      output: 'output',
     });
-    text = wire(text, 1, 'stdin', { kind: 'inputs', name: 'input' });
     text = setEntry(text, 'time_ms', {
       from: { kind: 'steps', name: 'exec', output: 'time_ms' },
     });
 
     expect(text.indexOf('inputs:')).toBeLessThan(text.indexOf('steps:'));
     expect(text.indexOf('steps:')).toBeLessThan(text.indexOf('outputs:'));
-    expect(ids(text)).toEqual(['compile', 'exec']);
+    expect(ids(text)).toEqual(['exec', 'diff-check']);
     expect(workflowOf(text).inputs.map((input) => input.id)).toEqual(
       workflowOf(CLASSIC)
         .inputs.map((input) => input.id)
@@ -423,9 +425,10 @@ describe('editing the file in place', () => {
     const text = [
       'steps:',
       '  - id: compare',
-      '    use: unicon/exec@v1',
+      '    use: unicon/exec@v2',
       '    with:',
-      '      program: ${{ workflow.diff/program.yaml }}',
+      '      source: ${{ workflow.diff/ }}',
+      '      manifest: ${{ workflow.diff/program.yaml }}',
       '      files:',
       '        output: ${{ steps.solution.output }}',
       '        answer: ${{ inputs.answer }}',
@@ -436,7 +439,7 @@ describe('editing the file in place', () => {
     const workflow = workflowOf(text);
     const files = workflow.steps[0]?.with.files;
     expect(files?.kind).toBe('mapping');
-    expect(workflow.steps[0]?.with.program).toMatchObject({
+    expect(workflow.steps[0]?.with.manifest).toMatchObject({
       kind: 'wire',
       ref: { kind: 'workflow', name: 'diff/program.yaml' },
     });
@@ -450,14 +453,14 @@ describe('editing the file in place', () => {
     if (from === null) throw new Error('the output has no source');
     const edited = setEntry(text, 'time_ms', { from, title: 'Run time', unit: 'ms' });
     expect(edited).toContain('output: ${{ steps.solution.output }}');
-    expect(edited).toContain('program: ${{ workflow.diff/program.yaml }}');
+    expect(edited).toContain('manifest: ${{ workflow.diff/program.yaml }}');
   });
 });
 
 it('writes a workflow-owned folder wire and keeps its comments', () => {
   const text = wire(COMMENTED, 0, 'source', { kind: 'workflow', name: 'checker/' });
   expect(text).toContain('source: ${{ workflow.checker/ }}');
-  expect(text).toContain('# compile once');
+  expect(text).toContain('# compile and run once');
   expect(workflowOf(text).steps[0]?.with.source).toEqual({
     kind: 'wire',
     ref: { kind: 'workflow', name: 'checker/' },
@@ -470,7 +473,7 @@ describe('an input given by the workflow, and a file given by the task', () => {
   input: file
 steps:
   - id: check
-    use: unicon/exec@v1
+    use: unicon/exec@v2
     with:
       stdin: \${{ inputs.input }}
       files:
@@ -505,7 +508,7 @@ steps:
 
   it('declares the first input of a workflow that had none', () => {
     const text =
-      'steps:\n  - {id: diff, use: unicon/compile@v3, with: {source: "${{ workflow.diff/ }}"}}\n';
+      'steps:\n  - {id: diff, use: unicon/exec@v2, with: {source: "${{ workflow.diff/ }}"}}\n';
     const back = fileToInput(text, 'diff/', 'diff', 'folder');
 
     expect(workflowOf(back).inputs).toMatchObject([{ id: 'diff', type: 'folder' }]);

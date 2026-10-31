@@ -4,22 +4,24 @@ import { problem } from './server';
 
 /**
  * Run workflows as the editor's tests draw them, and the platform's
- * primitives as the backend lists them: each primitive's v1 in the format
- * before 2026-10-07, which the platform no longer reads, and its current
- * version with its ports, its title and what it and each port do (#436), as
- * each primitive's own `primitive.yaml` says them.
+ * primitives as the backend lists them: versions the platform no longer
+ * reads, with why (diff-check's v1, in the format before 2026-10-07, and
+ * exec's v1, retired since exec's v2 compiles what it runs), and each
+ * primitive's current version with its ports, its title and what it and
+ * each port do (#436), as each primitive's own `primitive.yaml` says them.
  *
  * `CLASSIC` is one run of a task judged by comparing output with an answer,
- * as deploy's unicon/classic@v3 is (SIMPLER-CORE.md section 7): compile the
- * submission, run the program on the run's input under the task's limits,
- * and compare its output with the run's answer. Deploy's compares with a diff
- * script given a manifest, whose outputs no primitive here declares, so this
- * one compares with diff-check.
+ * in the shape of deploy's unicon/classic@v4 but not a copy of it: its `run`
+ * step compiles the submission and runs it on the run's input under the
+ * task's limits, and its `check` step compares the output with the run's
+ * answer with diff-check, where deploy's compares with a diff script run by
+ * exec given a manifest. `FOLDER` is the same with a folder of sources.
+ * `CLASSIC_V4` is deploy's workflow.yaml for unicon/classic@v4 as it is.
  */
-export const CLASSIC = `# unicon/classic@v3, one run of a task judged by comparing output with an
-# answer: compile the submission, run the program on the run's input under
-# the task's limits, and compare its output with the run's answer. The
-# format is SIMPLER-CORE.md section 7.
+export const CLASSIC = `# One run of a task judged by comparing output with an answer, in the
+# shape of unicon/classic@v4: compile the submission and run it on the
+# run's input under the task's limits, then compare its output with the
+# run's answer. The format is SIMPLER-CORE.md section 7.
 inputs:
   submission: file
   language: {type: enum, options: [c, cpp, java, python]}
@@ -28,15 +30,11 @@ inputs:
   input: file
   answer: file
 steps:
-  - id: compile
-    use: unicon/compile@v3
+  - id: run
+    use: unicon/exec@v2
     with:
       source: \${{ inputs.submission }}
       language: \${{ inputs.language }}
-  - id: run
-    use: unicon/exec@v1
-    with:
-      program: \${{ steps.compile.program }}
       stdin: \${{ inputs.input }}
       time_limit: \${{ inputs.time_limit }}
       memory_limit: \${{ inputs.memory_limit }}
@@ -48,14 +46,13 @@ steps:
 outputs:
   time_ms: {from: "\${{ steps.run.time_ms }}", unit: ms}
   memory_kb: {from: "\${{ steps.run.memory_kb }}", unit: KB}
-  log: \${{ steps.compile.log }}
+  log: \${{ steps.run.log }}
 `;
 
 /** One run of a program of several files, started from the entry point the entrant names. */
 export const FOLDER = `# A program of several files: compile the entrant's folder of sources,
-# starting from the entry point they name, run the program on the run's
-# input under the task's limits, and compare its output with the run's
-# answer.
+# starting from the entry point they name, and run it on the run's input
+# under the task's limits, then compare its output with the run's answer.
 inputs:
   program: folder
   language: {type: enum, options: [c, cpp, java, python]}
@@ -65,16 +62,12 @@ inputs:
   input: file
   answer: file
 steps:
-  - id: compile
-    use: unicon/compile@v3
+  - id: run
+    use: unicon/exec@v2
     with:
       source: \${{ inputs.program }}
       entry: \${{ inputs.entry }}
       language: \${{ inputs.language }}
-  - id: run
-    use: unicon/exec@v1
-    with:
-      program: \${{ steps.compile.program }}
       stdin: \${{ inputs.input }}
       time_limit: \${{ inputs.time_limit }}
       memory_limit: \${{ inputs.memory_limit }}
@@ -84,7 +77,47 @@ steps:
 outputs:
   time_ms: {from: "\${{ steps.run.time_ms }}", unit: ms}
   memory_kb: {from: "\${{ steps.run.memory_kb }}", unit: KB}
-  log: \${{ steps.compile.log }}
+  log: \${{ steps.run.log }}
+`;
+
+/** deploy's workflows/classic/v4/workflow.yaml, unicon/classic@v4 as deploy seeds it. */
+export const CLASSIC_V4 = `# unicon/classic@v4, workflow.yaml: one run of an entrant's program on one
+# input, its output compared word by word with the answer by the diff
+# script beside this file. The format is SIMPLER-CORE.md 7.
+inputs:
+  code: {type: folder, title: Solution}
+  language: {type: enum, options: [c, cpp, java, python], title: Language}
+  input: {type: file, title: Input}
+  answer: {type: file, title: Answer}
+  time_limit: {type: number, title: Time limit, unit: seconds}
+  memory_limit: {type: number, title: Memory limit, unit: MB}
+
+steps:
+  - id: solution
+    use: unicon/exec@v2
+    with:
+      source: \${{ inputs.code }}
+      language: \${{ inputs.language }}
+      stdin: \${{ inputs.input }}
+      time_limit: \${{ inputs.time_limit }}
+      memory_limit: \${{ inputs.memory_limit }}
+  - id: compare
+    use: unicon/exec@v2
+    with:
+      source: \${{ workflow.diff/ }}
+      language: python
+      manifest: \${{ workflow.diff/program.yaml }}
+      time_limit: 3
+      memory_limit: 256
+      files:
+        output: \${{ steps.solution.output }}
+        answer: \${{ inputs.answer }}
+
+outputs:
+  score: \${{ steps.compare.score }}
+  time_ms: {from: "\${{ steps.solution.time_ms }}", title: Run time, unit: ms}
+  memory_kb: {from: "\${{ steps.solution.memory_kb }}", title: Memory used, unit: KB}
+  log: {from: "\${{ steps.solution.log }}", title: Compile log}
 `;
 
 function port(type: string, more: Partial<PortDecl> = {}): PortDecl {
@@ -115,7 +148,8 @@ const LIMITS = {
   gpus: 0,
 };
 
-function retired(name: string): PrimitiveInfo {
+/** A version the platform lists but no longer reads, with why. */
+function retired(name: string, problem: string): PrimitiveInfo {
   return {
     ref: `unicon/${name}@v1`,
     name,
@@ -129,51 +163,305 @@ function retired(name: string): PrimitiveInfo {
     limits_from: {},
     inputs: {},
     outputs: {},
-    problem: `The primitive unicon/${name}@v1 is not in the current format.`,
+    problem,
   };
 }
 
-export const PRIMITIVES: PrimitiveInfo[] = [
-  retired('compile'),
-  {
-    ref: 'unicon/compile@v3',
-    name: 'compile',
-    title: 'Compile',
-    description: 'Compiles source files into one program.',
-    version: 'v3',
-    batch: false,
-    network: false,
-    forms: {},
-    limits: { ...LIMITS, time_ms: 60000, cpu_ms: 60000, memory_mb: 1024 },
-    limits_from: {},
-    inputs: {
-      source: port('folder', {
-        runs: true,
-        description: 'The source files to compile, with their layout.',
-      }),
-      language: port('enum', {
-        options: ['c', 'cpp', 'java', 'python'],
-        description: 'The language the source files are written in.',
-      }),
-      entry: port('text', {
-        optional: true,
-        description: 'The file the program starts from, such as src/Main.java.',
-      }),
+/** What exec's every form takes to compile a program. */
+const SOURCE = {
+  source: port('folder', {
+    runs: true,
+    description: "The program's source files, with their layout.",
+  }),
+  language: port('enum', {
+    options: ['c', 'cpp', 'java', 'python', 'ipynb'],
+    description: 'The language the source is written in; ipynb is a Jupyter notebook.',
+  }),
+  entry: port('text', {
+    optional: true,
+    description:
+      'The file the program starts from, when the folder holds more than one that could be.',
+  }),
+};
+
+/** A limit raised from a number input, as `n * scale + add`. */
+function raised(
+  from: { input: string } | { max: string } | { sum: string },
+  scale: string,
+  add: string,
+) {
+  return { input: null, max: null, sum: null, ...from, scale, add };
+}
+
+/** What a run takes and how long and how much memory it used, as exec gives them. */
+const TIME_LIMIT = port('number', {
+  description: 'Seconds of CPU time the program may use.',
+});
+const MEMORY_LIMIT = port('number', {
+  description: 'Megabytes of memory the program may use.',
+});
+const TIME_MS = port('number', {
+  better: 'lower',
+  at_least: '0',
+  description: 'The CPU time the program used, in milliseconds.',
+});
+const MEMORY_KB = port('number', {
+  better: 'lower',
+  at_least: '0',
+  description: 'The most memory the program used, in kilobytes.',
+});
+const ARGS = port('text', {
+  optional: true,
+  description: "Arguments added to the program's command line, split on spaces.",
+});
+
+/**
+ * exec as its `primitive.yaml` declares itself, its limits as the backend
+ * lists them: a program compiled once and run under limits, programs side by
+ * side, or a program compiled and run not at all, which the save uses to
+ * check that an organiser's program compiles. The editor draws a step as the
+ * first form holding every port it gives (`declared`), so a step given
+ * `source` and `language` alone is drawn as the one form.
+ */
+const EXEC: PrimitiveInfo = {
+  ref: 'unicon/exec@v2',
+  name: 'exec',
+  title: 'Run programs',
+  description:
+    'Compiles one program, or several linked by pipes, once, runs them under limits, and records how each ended.',
+  version: 'v2',
+  batch: true,
+  network: false,
+  forms: {
+    one: {
+      description:
+        'Compiles a program once, runs it under limits and records its output, time and memory.',
+      outputs_from: 'manifest',
+      limits: {
+        time_ms: 2000,
+        cpu_ms: 2000,
+        memory_mb: 1136,
+        pids: 160,
+        output_mb: 64,
+        gpus: 0,
+      },
+      limits_from: {
+        time_ms: raised({ input: 'time_limit' }, '2000', '3000'),
+        cpu_ms: raised({ input: 'time_limit' }, '2000', '3000'),
+        memory_mb: raised({ input: 'memory_limit' }, '1', '256'),
+      },
+      inputs: {
+        ...SOURCE,
+        stdin: port('file', {
+          runs: false,
+          optional: true,
+          description:
+            'What the program reads on standard input; nothing when left out.',
+        }),
+        files: port('named_files', {
+          runs: false,
+          optional: true,
+          description:
+            "Files placed read-only in the program's working directory, under their names.",
+        }),
+        loads: port('named_files', {
+          runs: true,
+          optional: true,
+          description:
+            'Code the program loads, placed as files are, such as the module a test harness imports.',
+        }),
+        manifest: port('file', {
+          runs: false,
+          optional: true,
+          description:
+            'The reports the program declares, its program.yaml as JSON, when it is one that reports, such as a checker.',
+        }),
+        self_reported: port('boolean', {
+          optional: true,
+          description:
+            "True when the program given a manifest runs the entrant's code, so a report that does not hold is the entrant's runtime error, not a fault.",
+        }),
+        args: ARGS,
+        time_limit: TIME_LIMIT,
+        memory_limit: MEMORY_LIMIT,
+      },
+      outputs: {
+        output: port('file', {
+          description: 'What the program printed on standard output.',
+        }),
+        time_ms: TIME_MS,
+        memory_kb: MEMORY_KB,
+        label: port('text', {
+          optional: true,
+          description: 'A finer name for the outcome, from a program given a manifest.',
+        }),
+        message: port('text', {
+          optional: true,
+          description: 'A message shown with the run, from a program given a manifest.',
+        }),
+        staff_message: port('text', {
+          optional: true,
+          description: 'A message only staff see, from a program given a manifest.',
+        }),
+        extras: port('folder', {
+          optional: true,
+          description:
+            'Every other file a program given a manifest reported, shown with the run and never a column.',
+        }),
+        log: port('text', { description: 'What the compiler printed, up to 64 KB.' }),
+        outcome: port('outcome', {
+          description:
+            "How the program's run ended, or that its source did not compile.",
+          outcomes: {
+            accepted:
+              'the program finishes within its limits, and given a manifest reports a verdict of 0',
+            wrong_answer: 'the program given a manifest reports a verdict of 1',
+            time_limit:
+              'it runs out of time, or a program given a manifest reports a verdict of time_limit',
+            memory_limit:
+              'it uses more memory than allowed, or a program given a manifest reports a verdict of memory_limit',
+            output_limit:
+              'it prints more than allowed, or a program given a manifest reports a verdict of output_limit',
+            runtime_error:
+              'it crashes or exits with an error, or a program given a manifest reports a verdict of runtime_error',
+            compile_error: 'the source does not compile, so nothing runs',
+          },
+        }),
+      },
     },
-    outputs: {
-      program: port('file', { description: 'The compiled program, ready to run.' }),
-      log: port('text', { description: 'Everything the compiler printed.' }),
-      outcome: port('outcome', {
-        description: 'Whether the source compiled.',
-        outcomes: {
-          accepted: 'the source compiles',
-          compile_error: 'it does not compile, or the compiler goes over a limit',
-        },
-      }),
+    programs: {
+      description:
+        'Compiles programs once, runs them side by side, linked by pipes, each under its own limits, and records how each one ended.',
+      outputs_from: 'programs',
+      limits: {
+        time_ms: 4000,
+        cpu_ms: 4000,
+        memory_mb: 1136,
+        pids: 1056,
+        output_mb: 64,
+        gpus: 0,
+      },
+      limits_from: {
+        time_ms: raised({ max: 'programs.time_limit' }, '4000', '6000'),
+        cpu_ms: raised({ max: 'programs.time_limit' }, '4000', '6000'),
+        memory_mb: raised({ sum: 'programs.memory_limit' }, '1', '512'),
+      },
+      inputs: {
+        programs: port('programs', {
+          description:
+            'The programs to run side by side, one to eight, by the names the step gives them.',
+          inputs: {
+            ...SOURCE,
+            files: port('named_files', {
+              runs: false,
+              optional: true,
+              description:
+                "Files placed read-only in this program's working directory alone, under their names, such as the hidden input.",
+            }),
+            args: ARGS,
+            time_limit: TIME_LIMIT,
+            memory_limit: MEMORY_LIMIT,
+            manifest: port('file', {
+              runs: false,
+              optional: true,
+              description:
+                'The reports the program declares, its program.yaml as JSON, for a program that reports as a checker does.',
+            }),
+            stops_others: port('boolean', {
+              optional: true,
+              description: 'True to stop every other program when this one ends.',
+            }),
+          },
+          outputs: {
+            time_ms: TIME_MS,
+            memory_kb: MEMORY_KB,
+            ended: port('enum', {
+              options: [
+                'finished',
+                'time_limit',
+                'memory_limit',
+                'output_limit',
+                'runtime_error',
+              ],
+              description: 'How the program ended, finished for a clean exit.',
+            }),
+            signal: port('text', {
+              optional: true,
+              description: 'The signal that ended the program, such as SIGPIPE.',
+            }),
+            ended_at: port('number', {
+              at_least: '0',
+              description: 'When the program ended, in milliseconds from the start.',
+            }),
+            stopped_by: port('text', {
+              optional: true,
+              description:
+                'What stopped the program, wall_clock or the name of the program whose ending stopped it.',
+            }),
+            log: port('text', {
+              description: 'What the compiler printed for the program, up to 64 KB.',
+            }),
+          },
+        }),
+        links: port('links', {
+          optional: true,
+          description:
+            'The pipes between the programs, each "<from> -> <to>"; a program\'s first each way is its standard output or input.',
+        }),
+      },
+      outputs: {
+        facts: port('file', {
+          description:
+            "Every program's facts and reports, as one JSON file, for a verdict script to read.",
+        }),
+        outcome: port('outcome', {
+          description:
+            'Whether every program was started and measured, or a source did not compile.',
+          outcomes: {
+            accepted: 'every program was started and measured, however it ended',
+            compile_error: "a program's source does not compile, so nothing runs",
+          },
+        }),
+      },
     },
-    problem: null,
+    build: {
+      description:
+        'Compiles a program and runs nothing, so saving a task can check that its programs compile.',
+      outputs_from: null,
+      limits: {
+        time_ms: 1000,
+        cpu_ms: 1000,
+        memory_mb: 1136,
+        pids: 160,
+        output_mb: 64,
+        gpus: 0,
+      },
+      limits_from: {},
+      inputs: SOURCE,
+      outputs: {
+        log: port('text', { description: 'What the compiler printed, up to 64 KB.' }),
+        outcome: port('outcome', {
+          description: 'Whether the source compiles.',
+          outcomes: {
+            accepted: 'the source compiles',
+            compile_error: 'it does not',
+          },
+        }),
+      },
+    },
   },
-  retired('diff-check'),
+  limits: {},
+  limits_from: {},
+  inputs: {},
+  outputs: {},
+  problem: null,
+};
+
+export const PRIMITIVES: PrimitiveInfo[] = [
+  retired(
+    'diff-check',
+    'The primitive unicon/diff-check@v1 is not in the current format.',
+  ),
   {
     ref: 'unicon/diff-check@v2',
     name: 'diff-check',
@@ -204,123 +492,9 @@ export const PRIMITIVES: PrimitiveInfo[] = [
     },
     problem: null,
   },
-  {
-    ref: 'unicon/exec@v1',
-    name: 'exec',
-    title: 'Run program',
-    description:
-      'Runs a program once under limits and records its output, time and memory.',
-    version: 'v1',
-    batch: true,
-    network: false,
-    forms: {},
-    limits: LIMITS,
-    limits_from: {
-      time_ms: {
-        input: 'time_limit',
-        scale: '2000',
-        add: '3000',
-        max: null,
-        sum: null,
-      },
-      cpu_ms: { input: 'time_limit', scale: '2000', add: '3000', max: null, sum: null },
-      memory_mb: {
-        input: 'memory_limit',
-        scale: '1',
-        add: '256',
-        max: null,
-        sum: null,
-      },
-    },
-    inputs: {
-      program: port('file', { runs: true, description: 'The program to run.' }),
-      stdin: port('file', {
-        runs: false,
-        description: 'What the program reads on standard input.',
-      }),
-      args: port('text', {
-        optional: true,
-        description: "Arguments added to the program's command line, split on spaces.",
-      }),
-      time_limit: port('number', {
-        description: 'Seconds of CPU time the program may use.',
-      }),
-      memory_limit: port('number', {
-        description: 'Megabytes of memory the program may use.',
-      }),
-    },
-    outputs: {
-      output: port('file', {
-        description: 'What the program printed on standard output.',
-      }),
-      time_ms: port('number', {
-        description: 'The CPU time the program used, in milliseconds.',
-      }),
-      memory_kb: port('number', {
-        description: 'The most memory the program used, in kilobytes.',
-      }),
-      outcome: port('outcome', {
-        description: 'How the program ended.',
-        outcomes: {
-          accepted: 'the program finishes within its limits',
-          time_limit: 'it runs out of time',
-          memory_limit: 'it uses more memory than allowed',
-          output_limit: 'it prints more than allowed',
-          runtime_error: 'it crashes or exits with an error',
-        },
-      }),
-    },
-    problem: null,
-  },
+  retired('exec', 'unicon/compile and unicon/exec@v1 are retired; use unicon/exec@v2.'),
+  EXEC,
 ];
-
-/** A primitive of two forms, as exec declares itself: one program, or programs side by side. */
-export const FORMED: PrimitiveInfo = {
-  ref: 'unicon/exec@v2',
-  name: 'exec',
-  title: 'Run programs',
-  description: 'Runs one program, or several linked by pipes, under limits.',
-  version: 'v2',
-  batch: true,
-  network: false,
-  forms: {
-    one: {
-      description: 'Runs a program once under limits.',
-      outputs_from: 'manifest',
-      limits: LIMITS,
-      limits_from: {},
-      inputs: {
-        program: port('file', { runs: true }),
-        stdin: port('file', { optional: true }),
-        time_limit: port('number'),
-      },
-      outputs: {
-        output: port('file'),
-        time_ms: port('number'),
-        outcome: port('outcome'),
-      },
-    },
-    programs: {
-      description: 'Runs programs side by side, linked by pipes.',
-      outputs_from: 'programs',
-      limits: LIMITS,
-      limits_from: {},
-      inputs: {
-        programs: port('programs', {
-          inputs: { program: port('file', { runs: true }), time_limit: port('number') },
-          outputs: { time_ms: port('number'), memory_kb: port('number') },
-        }),
-        links: port('links', { optional: true }),
-      },
-      outputs: { facts: port('file'), outcome: port('outcome') },
-    },
-  },
-  limits: {},
-  limits_from: {},
-  inputs: {},
-  outputs: {},
-  problem: null,
-};
 
 export const WORKFLOW_API = '/api/v1/workflows/kenny/tuned';
 
@@ -382,7 +556,7 @@ export function workflowBackend(
           owner: 'unicon',
           name: 'classic',
           visibility: 'public',
-          versions: ['v3'],
+          versions: ['v4'],
           editable: false,
         },
       ]),

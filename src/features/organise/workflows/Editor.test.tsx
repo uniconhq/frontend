@@ -4,7 +4,7 @@ import userEvent from '@/test/user-event';
 import { renderApp } from '@/test/render';
 import { delay, http, HttpResponse } from 'msw';
 import { problem, server, signedIn } from '@/test/server';
-import { CLASSIC, PRIMITIVES, WORKFLOW_API, workflowBackend } from '@/test/workflows';
+import { CLASSIC, WORKFLOW_API, workflowBackend } from '@/test/workflows';
 import type { SaveChange, TreeEntry } from '@/api/types';
 import {
   EDITOR_PAGE,
@@ -51,7 +51,7 @@ describe('the workflow editor', () => {
     // The banner says it once, with nothing beside it to say it again.
     expect(screen.queryByText(/make a version/)).toBeNull();
     expect(screen.queryByRole('group', { name: /^Step / })).toBeNull();
-    expect(trayButton('Primitives', 'Compile')).toBeVisible();
+    expect(trayButton('Primitives', 'Run programs')).toBeVisible();
   });
 
   it('draws each step, the inputs and the outputs as boxes', async () => {
@@ -59,8 +59,7 @@ describe('the workflow editor', () => {
     const user = userEvent.setup();
     renderApp(EDITOR_PAGE);
 
-    expect(await stepBox('compile')).toBeInTheDocument();
-    expect(screen.getByRole('group', { name: 'Step run' })).toBeInTheDocument();
+    expect(await stepBox('run')).toBeInTheDocument();
     expect(screen.getByRole('group', { name: 'Step check' })).toBeInTheDocument();
     expect(screen.getByRole('group', { name: 'Input submission' })).toBeInTheDocument();
     expect(screen.getByRole('group', { name: 'Outputs' })).toBeInTheDocument();
@@ -92,7 +91,7 @@ describe('the workflow editor', () => {
     await openStep(user, 'run');
     const open = screen.getByRole('complementary', { name: 'Step run' });
     expect(within(open).getByRole('heading', { name: 'Step run' })).toHaveFocus();
-    expect(within(open).getByText('Run program')).toBeInTheDocument();
+    expect(within(open).getByText('Run programs')).toBeInTheDocument();
     expect(
       within(open).getByText('Seconds of CPU time the program may use.', {
         exact: false,
@@ -127,21 +126,25 @@ describe('the workflow editor', () => {
         .getAllByRole('listitem')
         .map((item) => item.textContent),
     ).toEqual([
-      'Accepted if the program finishes within its limits',
-      'Time limit if it runs out of time',
-      'Memory limit if it uses more memory than allowed',
-      'Output limit if it prints more than allowed',
-      'Runtime error if it crashes or exits with an error',
+      'Accepted if the program finishes within its limits, and given a manifest reports a verdict of 0',
+      'Wrong answer if the program given a manifest reports a verdict of 1',
+      'Time limit if it runs out of time, or a program given a manifest reports a verdict of time_limit',
+      'Memory limit if it uses more memory than allowed, or a program given a manifest reports a verdict of memory_limit',
+      'Output limit if it prints more than allowed, or a program given a manifest reports a verdict of output_limit',
+      'Runtime error if it crashes or exits with an error, or a program given a manifest reports a verdict of runtime_error',
+      'Compile error if the source does not compile, so nothing runs',
     ]);
     // What the step gets, in seconds and whole units, the limits the task raises
     // said so, and the entrant's program inside it (M56).
     expect(details).toHaveTextContent(
-      'What this step gets each time it runs: up to 2 seconds, 256 MB of memory, 128 processes, 64 MB of output; its time grows with the time_limit input and its memory with the memory_limit input. The entrant’s program runs inside it, within the time_limit input and the memory_limit input.',
+      'What this step gets each time it runs: up to 2 seconds, 1136 MB of memory, 160 processes, 64 MB of output; its time grows with the time_limit input and its memory with the memory_limit input. The entrant’s program runs inside it, within the time_limit input and the memory_limit input.',
     );
     expect(details).not.toHaveTextContent(/GPU|ms of/);
     expect(
-      within(panel).getByRole('list', { name: 'What it gives' }),
-    ).not.toHaveTextContent('outcome');
+      within(within(panel).getByRole('list', { name: 'What it gives' }))
+        .getAllByRole('listitem')
+        .map((item) => item.textContent),
+    ).not.toContainEqual(expect.stringMatching(/^outcome/));
   });
 
   it('says a step’s limits are its own where it does not run the entrant’s program (M56)', async () => {
@@ -149,9 +152,9 @@ describe('the workflow editor', () => {
     const user = userEvent.setup();
     renderApp(EDITOR_PAGE);
 
-    const compile = await openStep(user, 'compile');
-    expect(within(compile).getByText('Details').closest('details')).toHaveTextContent(
-      'What this step gets each time it runs: up to 60 seconds, 1 GB of memory, 128 processes, 64 MB of output. These are the step’s own limits, not the entrant’s program’s.',
+    const check = await openStep(user, 'check');
+    expect(within(check).getByText('Details').closest('details')).toHaveTextContent(
+      'What this step gets each time it runs: up to 2 seconds, 256 MB of memory, 32 processes, 1 MB of output. These are the step’s own limits, not the entrant’s program’s.',
     );
   });
 
@@ -160,9 +163,9 @@ describe('the workflow editor', () => {
     const user = userEvent.setup();
     renderApp(EDITOR_PAGE);
 
-    const compile = await openStep(user, 'compile');
-    expect(within(compile).getByText('Details').closest('details')).toHaveTextContent(
-      'Verdict it gives: Accepted if the source compiles, otherwise Compile error.',
+    const check = await openStep(user, 'check');
+    expect(within(check).getByText('Details').closest('details')).toHaveTextContent(
+      'Verdict it gives: Accepted if the output matches the answer, ignoring trailing whitespace, otherwise Wrong answer.',
     );
   });
 
@@ -171,8 +174,8 @@ describe('the workflow editor', () => {
     const user = userEvent.setup();
     renderApp(EDITOR_PAGE);
 
-    await user.click(await portButton(user, 'compile', 'entry'));
-    const menu = await openMenu('The port entry of compile');
+    await user.click(await portButton(user, 'run', 'entry'));
+    const menu = await openMenu('The port entry of run');
     const file = within(menu).getByRole('menuitem', { name: /^input from the inputs/ });
     expect(file).toBeDisabled();
     expect(file).toHaveTextContent('This takes text, not a file.');
@@ -194,7 +197,7 @@ describe('the workflow editor', () => {
 
     const text = await fileText(user);
     expect(text).toContain('args: ${{ inputs.time_limit }}');
-    expect(text).toContain('# unicon/classic@v3, one run of a task');
+    expect(text).toContain('# One run of a task judged by comparing output');
   });
 
   it('writes what the workflow does into its file as the field is left, and undo takes it back', async () => {
@@ -242,19 +245,19 @@ describe('the workflow editor', () => {
     const run = await stepBox('run');
     expect(run).not.toHaveAttribute('data-open');
     expect(run).toHaveTextContent(
-      'needs program, stdin, args, time_limit, memory_limit · gives output, time_ms, memory_kb',
+      'needs source, language, entry, stdin, files, loads, manifest, self_reported, args, time_limit, memory_limit · gives output, time_ms, memory_kb, label, message, staff_message, extras, log',
     );
     expect(within(run).queryByRole('button', { name: /^The port / })).toBeNull();
 
     await openStep(user, 'run');
     const open = await stepBox('run');
     expect(open).toHaveAttribute('data-open');
-    expect(open).not.toHaveTextContent('needs program');
+    expect(open).not.toHaveTextContent('needs source');
     expect(
       within(open).getByRole('button', { name: 'The port args of run' }),
     ).toBeVisible();
     expect(open).toHaveTextContent('args(optional)text · nothing yet');
-    expect(await stepBox('compile')).not.toHaveAttribute('data-open');
+    expect(await stepBox('check')).not.toHaveAttribute('data-open');
 
     await user.click(within(drawer('Step run')).getByRole('button', { name: 'Close' }));
     expect(await stepBox('run')).not.toHaveAttribute('data-open');
@@ -262,16 +265,16 @@ describe('the workflow editor', () => {
 
   it('keeps the problems and their marks in place while the next change is checked', async () => {
     const broken = CLASSIC.replace(
-      'program: ${{ steps.compile.program }}',
-      'program: ${{ steps.compiler.program }}',
+      'actual: ${{ steps.run.output }}',
+      'actual: ${{ steps.runner.output }}',
     );
     server.use(
       signedIn,
       ...workflowBackend(broken, {
         problems: () => [
           {
-            path: 'steps[1].with.program',
-            message: 'There is no step called compiler before this one.',
+            path: 'steps[1].with.actual',
+            message: 'There is no step called runner before this one.',
           },
         ],
       }).handlers,
@@ -297,26 +300,26 @@ describe('the workflow editor', () => {
     ).toBeInTheDocument();
     expect(part('section', 'Problems')).toHaveTextContent(/One problem to fix/);
     expect(
-      within(await stepBox('run')).getByRole('note', {
-        name: 'There is no step called compiler before this one.',
+      within(await stepBox('check')).getByRole('note', {
+        name: 'There is no step called runner before this one.',
       }),
     ).toBeInTheDocument();
   });
 
   it('says each problem beside its mark and in the banner, which opens its box', async () => {
     const broken = CLASSIC.replace(
-      'program: ${{ steps.compile.program }}',
-      'program: ${{ steps.compiler.program }}',
+      'actual: ${{ steps.run.output }}',
+      'actual: ${{ steps.runner.output }}',
     );
     server.use(
       signedIn,
       ...workflowBackend(broken, {
         problems: (content) =>
-          content.includes('steps.compiler')
+          content.includes('steps.runner')
             ? [
                 {
-                  path: 'steps[1].with.program',
-                  message: 'There is no step called compiler before this one.',
+                  path: 'steps[1].with.actual',
+                  message: 'There is no step called runner before this one.',
                 },
                 { path: 'outputs', message: 'A workflow names at least one output.' },
               ]
@@ -326,15 +329,15 @@ describe('the workflow editor', () => {
     const user = userEvent.setup();
     renderApp(EDITOR_PAGE);
 
-    const step = await stepBox('run');
+    const step = await stepBox('check');
     expect(
       await within(step).findByRole('note', {
-        name: 'There is no step called compiler before this one.',
+        name: 'There is no step called runner before this one.',
       }),
     ).toBeInTheDocument();
     // The message stands beside its mark, not only behind it.
     expect(
-      within(step).getByText('There is no step called compiler before this one.', {
+      within(step).getByText('There is no step called runner before this one.', {
         selector: 'span[aria-hidden]',
       }),
     ).toBeVisible();
@@ -343,9 +346,11 @@ describe('the workflow editor', () => {
       '2 problems to fix before publishing a version. You can still save the draft with them.',
     );
     expect(banner).toHaveTextContent('Outputs: A workflow names at least one output.');
-    await user.click(within(banner).getByRole('button', { name: 'Step run, program' }));
-    expect(drawer('Step run')).toHaveTextContent(
-      'There is no step called compiler before this one.',
+    await user.click(
+      within(banner).getByRole('button', { name: 'Step check, actual' }),
+    );
+    expect(drawer('Step check')).toHaveTextContent(
+      'There is no step called runner before this one.',
     );
   });
 
@@ -357,16 +362,14 @@ describe('the workflow editor', () => {
     await stepBox('run');
     // Each primitive once, by its title, what it does and its reference.
     const primitives = part('section', 'Primitives');
-    expect(within(primitives).getAllByRole('button')).toHaveLength(3);
-    const compile = trayButton('Primitives', 'Compile');
-    expect(compile).toHaveTextContent('unicon/compile@v3');
-    await user.click(compile);
+    expect(within(primitives).getAllByRole('button')).toHaveLength(2);
+    const exec = trayButton('Primitives', 'Run programs');
+    expect(exec).toHaveTextContent('unicon/exec@v2');
+    await user.click(exec);
 
-    expect(await stepBox('compile-2')).toHaveAttribute('data-open', 'true');
-    expect(drawer('Step compile-2')).toBeInTheDocument();
-    expect(await fileText(user)).toContain(
-      '- id: compile-2\n    use: unicon/compile@v3\n',
-    );
+    expect(await stepBox('exec')).toHaveAttribute('data-open', 'true');
+    expect(drawer('Step exec')).toBeInTheDocument();
+    expect(await fileText(user)).toContain('- id: exec\n    use: unicon/exec@v2\n');
   });
 
   it('adds a run workflow from the tray, found by its name, and never this one', async () => {
@@ -472,7 +475,7 @@ describe('the workflow editor', () => {
     ).toBeInTheDocument();
     answer();
     expect(
-      await within(workflows).findByRole('button', { name: 'unicon/classic@v3' }),
+      await within(workflows).findByRole('button', { name: 'unicon/classic@v4' }),
     ).toBeInTheDocument();
     expect(workflows).not.toHaveTextContent('Finding workflows…');
   });
@@ -732,7 +735,7 @@ describe('the workflow editor', () => {
     const user = userEvent.setup();
     renderApp(EDITOR_PAGE);
 
-    const panel = await openStep(user, 'compile');
+    const panel = await openStep(user, 'run');
     await user.selectOptions(
       within(panel).getByRole('combobox', { name: 'entry (optional)' }),
       'A fixed value',
@@ -795,9 +798,7 @@ describe('the workflow editor', () => {
     expect(named).toContain(
       'time_ms: {from: "${{ steps.run.time_ms }}", title: Run time, unit: ms}',
     );
-    expect(named).toContain(
-      'log: {from: "${{ steps.compile.log }}", title: Compile log}',
-    );
+    expect(named).toContain('log: {from: "${{ steps.run.log }}", title: Compile log}');
     // The outputs' box writes each out on its row: its title, type, unit and source.
     const outputs = part('[role="group"]', 'Outputs');
     expect(within(outputs).getByText('Run time')).toBeInTheDocument();
@@ -808,7 +809,7 @@ describe('the workflow editor', () => {
     const title = within(row('log')).getByRole('textbox', { name: 'Title' });
     await user.clear(title);
     await user.type(title, '{Enter}');
-    expect(await fileText(user)).toContain('log: ${{ steps.compile.log }}\n');
+    expect(await fileText(user)).toContain('log: ${{ steps.run.log }}\n');
   });
 
   it('drops a reported value’s unit when it comes to read text, and shows one a file left on text, to clear it (M58)', async () => {
@@ -816,8 +817,8 @@ describe('the workflow editor', () => {
       signedIn,
       ...workflowBackend(
         CLASSIC.replace(
-          '  log: ${{ steps.compile.log }}\n',
-          '  log: {from: "${{ steps.compile.log }}", title: Compile log, unit: lines}\n  total_ms: {from: "${{ steps.run.time_ms }}", title: Run time, unit: ms}\n',
+          '  log: ${{ steps.run.log }}\n',
+          '  log: {from: "${{ steps.run.log }}", title: Compile log, unit: lines}\n  total_ms: {from: "${{ steps.run.time_ms }}", title: Run time, unit: ms}\n',
         ),
       ).handlers,
     );
@@ -837,7 +838,7 @@ describe('the workflow editor', () => {
     await user.clear(stray);
     await user.type(stray, '{Enter}');
     expect(await fileText(user)).toContain(
-      'log: {from: "${{ steps.compile.log }}", title: Compile log}',
+      'log: {from: "${{ steps.run.log }}", title: Compile log}',
     );
 
     expect(within(row('total_ms')).getByRole('textbox', { name: 'Unit' })).toHaveValue(
@@ -845,7 +846,7 @@ describe('the workflow editor', () => {
     );
     await user.selectOptions(
       within(row('total_ms')).getByRole('combobox', { name: 'From' }),
-      'compile.log',
+      'run.log',
     );
     await waitFor(() =>
       expect(
@@ -853,7 +854,7 @@ describe('the workflow editor', () => {
       ).toBeNull(),
     );
     expect(await fileText(user)).toContain(
-      'total_ms: {from: "${{ steps.compile.log }}", title: Run time}',
+      'total_ms: {from: "${{ steps.run.log }}", title: Run time}',
     );
   });
 
@@ -862,8 +863,8 @@ describe('the workflow editor', () => {
       signedIn,
       ...workflowBackend(
         CLASSIC.replace(
-          '  log: ${{ steps.compile.log }}\n',
-          '  log: ${{ steps.compile.log }}\n  peak: {from: "${{ steps.run.time_ms }}", title: Peak, unit: ms}\n',
+          '  log: ${{ steps.run.log }}\n',
+          '  log: ${{ steps.run.log }}\n  peak: {from: "${{ steps.run.time_ms }}", title: Peak, unit: ms}\n',
         ),
       ).handlers,
     );
@@ -882,17 +883,17 @@ describe('the workflow editor', () => {
     expect(await fileText(user)).toContain(
       'peak: {from: "${{ steps.run.memory_kb }}", title: Peak, unit: ms}',
     );
-    await readFrom('log from compile');
+    await readFrom('log from run');
     expect(await fileText(user)).toContain(
-      'peak: {from: "${{ steps.compile.log }}", title: Peak}',
+      'peak: {from: "${{ steps.run.log }}", title: Peak}',
     );
   });
 
   it('keeps a step’s drawer open when the step is renamed', async () => {
     const two = [
       'steps:',
-      '  - {id: first, use: unicon/compile@v3}',
-      '  - {id: second, use: unicon/compile@v3}',
+      '  - {id: first, use: unicon/exec@v2}',
+      '  - {id: second, use: unicon/exec@v2}',
       '',
     ].join('\n');
     server.use(signedIn, ...workflowBackend(two).handlers);
@@ -943,17 +944,18 @@ describe('the workflow editor', () => {
   it('shows a wire the layout cannot draw on its port', async () => {
     const backwards = CLASSIC.replace(
       'language: ${{ inputs.language }}',
-      ['language: ${{ inputs.language }}', '      entry: ${{ steps.run.output }}'].join(
-        '\n',
-      ),
+      [
+        'language: ${{ inputs.language }}',
+        '      args: ${{ steps.check.outcome }}',
+      ].join('\n'),
     );
     server.use(signedIn, ...workflowBackend(backwards).handlers);
     const user = userEvent.setup();
     renderApp(EDITOR_PAGE);
 
-    await openStep(user, 'compile');
-    const step = await stepBox('compile');
-    expect(within(step).getByText(/output from run, not drawn/)).toBeInTheDocument();
+    await openStep(user, 'run');
+    const step = await stepBox('run');
+    expect(within(step).getByText(/outcome from check, not drawn/)).toBeInTheDocument();
   });
 
   it('fixes a draft that cannot be read as text, with Save and Undo', async () => {
@@ -1022,7 +1024,7 @@ describe('the workflow editor', () => {
   it('opens a box two levels in, and a problem opens the step inside', async () => {
     const draft = ['steps:', '  - {id: build, use: kenny/inner@v1}', ''].join('\n');
     const inner = ['steps:', '  - {id: compile, use: kenny/deep@v1}', ''].join('\n');
-    const deep = ['steps:', '  - {id: link, use: unicon/compile@v3}', ''].join('\n');
+    const deep = ['steps:', '  - {id: link, use: unicon/exec@v2}', ''].join('\n');
     const port = (name: string) => ({
       name,
       type: 'file',
@@ -1136,8 +1138,8 @@ describe('the drawer', () => {
     const user = userEvent.setup();
     renderApp(EDITOR_PAGE);
 
-    const compile = await openStep(user, 'compile');
-    const entry = within(compile).getByRole('combobox', { name: 'entry (optional)' });
+    const run = await openStep(user, 'run');
+    const entry = within(run).getByRole('combobox', { name: 'entry (optional)' });
     const offered = within(entry)
       .getAllByRole('option')
       .map((option) => option.textContent);
@@ -1148,7 +1150,6 @@ describe('the drawer', () => {
     await user.selectOptions(entry, 'language from the inputs');
     expect(await fileText(user)).toContain('entry: ${{ inputs.language }}');
 
-    const run = await openStep(user, 'run');
     const limit = within(run).getByRole('combobox', { name: 'time_limit' });
     expect(limit).toHaveDisplayValue('time_limit from the inputs');
     await user.selectOptions(limit, 'Nothing yet');
@@ -1156,6 +1157,10 @@ describe('the drawer', () => {
       within(run).queryByRole('textbox', { name: 'Value of time_limit' }),
     ).toBeNull();
     expect(await fileText(user)).not.toContain('time_limit: ${{ inputs.time_limit }}');
+    // The step keeps its ports to wire again, though it now lacks one it needs.
+    expect(
+      within(stepPanel('run')).getByRole('combobox', { name: 'time_limit' }),
+    ).toHaveDisplayValue('Nothing yet');
   });
 
   it('shows a port’s value field once a fixed value is chosen, and clears the value on Nothing yet', async () => {
@@ -1164,27 +1169,25 @@ describe('the drawer', () => {
     renderApp(EDITOR_PAGE);
 
     const run = await openStep(user, 'run');
-    const limit = within(run).getByRole('combobox', { name: 'time_limit' });
+    const args = within(run).getByRole('combobox', { name: 'args (optional)' });
     expect(
-      within(limit)
+      within(args)
         .getAllByRole('option')
         .map((option) => option.textContent)
         .slice(0, 2),
     ).toEqual(['Nothing yet', 'A fixed value']);
     expect(within(run).queryByText('Its value, below')).toBeNull();
-    await user.selectOptions(limit, 'A fixed value');
+    await user.selectOptions(args, 'A fixed value');
     await user.type(
-      within(run).getByRole('textbox', { name: 'Value of time_limit' }),
-      '2{Enter}',
+      within(run).getByRole('textbox', { name: 'Value of args' }),
+      '--fast{Enter}',
     );
-    expect(await fileText(user)).toContain('time_limit: 2');
-    expect(limit).toHaveDisplayValue('A fixed value');
+    expect(await fileText(user)).toContain('args: --fast');
+    expect(args).toHaveDisplayValue('A fixed value');
 
-    await user.selectOptions(limit, 'Nothing yet');
-    expect(
-      within(run).queryByRole('textbox', { name: 'Value of time_limit' }),
-    ).toBeNull();
-    expect(await fileText(user)).not.toContain('time_limit: 2');
+    await user.selectOptions(args, 'Nothing yet');
+    expect(within(run).queryByRole('textbox', { name: 'Value of args' })).toBeNull();
+    expect(await fileText(user)).not.toContain('args: --fast');
   });
 
   it('offers no fixed value on a port that takes a file', async () => {
@@ -1192,8 +1195,8 @@ describe('the drawer', () => {
     const user = userEvent.setup();
     renderApp(EDITOR_PAGE);
 
-    const compile = await openStep(user, 'compile');
-    const source = within(compile).getByRole('combobox', { name: 'source' });
+    const run = await openStep(user, 'run');
+    const source = within(run).getByRole('combobox', { name: 'source' });
     expect(
       within(source)
         .getAllByRole('option')
@@ -1210,9 +1213,7 @@ describe('the drawer', () => {
     { listed = true, newer = true }: { listed?: boolean; newer?: boolean } = {},
   ) => {
     const draft = ['inputs:', '  code: file', 'steps:', ...steps, ''].join('\n');
-    const inner = ['steps:', '  - {id: compile, use: unicon/compile@v3}', ''].join(
-      '\n',
-    );
+    const inner = ['steps:', '  - {id: compile, use: unicon/exec@v2}', ''].join('\n');
     const port = (name: string) => ({
       name,
       type: 'file',
@@ -1327,7 +1328,7 @@ describe('the drawer', () => {
   it('opens a box into the well, between what feeds it and what it feeds', async () => {
     serveInner([
       '  - {id: build, use: kenny/inner@v1, with: {source: "${{ inputs.code }}"}}',
-      '  - {id: after, use: unicon/exec@v1, with: {program: "${{ steps.build.program }}"}}',
+      '  - {id: after, use: unicon/exec@v2, with: {source: "${{ steps.build.program }}"}}',
     ]);
     const user = userEvent.setup();
     renderApp(EDITOR_PAGE);
@@ -1445,7 +1446,7 @@ describe('the drawer', () => {
       selector: 'li',
     });
     expect(within(row).getByRole('heading', { name: 'Read by' })).toBeInTheDocument();
-    expect(within(row).getByText('compile.language')).toBeInTheDocument();
+    expect(within(row).getByText('run.language')).toBeInTheDocument();
   });
 });
 
@@ -1759,8 +1760,8 @@ describe('wiring workflow files', () => {
     const user = userEvent.setup();
     renderApp(EDITOR_PAGE);
     await waitFor(() => expect(reads).toContain('checker'));
-    await user.click(await portButton(user, 'compile', 'source'));
-    const menu = await openMenu('The port source of compile');
+    await user.click(await portButton(user, 'run', 'source'));
+    const menu = await openMenu('The port source of run');
     const folder = within(menu).getByRole('menuitem', {
       name: 'the workflow’s checker/',
     });
@@ -1775,7 +1776,7 @@ describe('wiring workflow files', () => {
     expect(await fileText(user)).toContain('source: ${{ workflow.checker/ }}');
     expect(
       await screen.findByRole('group', { name: 'Workflow file checker/' }),
-    ).toHaveTextContent('Read by compile');
+    ).toHaveTextContent('Read by run');
     expect(reads.filter((path) => path === '')).toHaveLength(1);
     expect(reads.filter((path) => path === 'checker')).toHaveLength(1);
   });
@@ -1786,13 +1787,10 @@ describe('wiring workflow files', () => {
   output: file
   answer: file
 steps:
-  - id: build
-    use: unicon/compile@v3
-    with: {language: cpp}
   - id: check
-    use: unicon/exec@v1
+    use: unicon/exec@v2
     with:
-      program: \${{ steps.build.program }}
+      language: cpp
       files:
         input: \${{ inputs.input }}
         output: \${{ inputs.output }}
@@ -1808,25 +1806,6 @@ outputs:
     let changes: SaveChange[] = [];
     server.use(signedIn, ...backend.handlers);
     server.use(
-      http.get('/api/v1/primitives', () =>
-        HttpResponse.json(
-          PRIMITIVES.map((primitive) =>
-            primitive.ref === 'unicon/exec@v1'
-              ? {
-                  ...primitive,
-                  inputs: {
-                    ...primitive.inputs,
-                    manifest: {
-                      ...primitive.inputs.program,
-                      runs: false,
-                      optional: true,
-                    },
-                  },
-                }
-              : primitive,
-          ),
-        ),
-      ),
       http.get(`${WORKFLOW_API}/files/*`, () => problem(404, 'not_found')),
       http.post(`${WORKFLOW_API}/uploads`, () =>
         HttpResponse.json({
@@ -1874,12 +1853,15 @@ outputs:
       ),
     ]);
     await within(files).findByText('checker/program.yaml: uploaded, waiting for Save');
-    await user.click(await portButton(user, 'build', 'source'));
+    await user.click(await portButton(user, 'check', 'source'));
     await user.click(
-      within(await openMenu('The port source of build')).getByRole('menuitem', {
+      within(await openMenu('The port source of check')).getByRole('menuitem', {
         name: 'the workflow’s checker/',
       }),
     );
+    expect(
+      await screen.findByRole('group', { name: 'Workflow file checker/' }),
+    ).toHaveTextContent('Read by check');
     await user.click(await portButton(user, 'check', 'manifest'));
     await user.click(
       within(await openMenu('The port manifest of check')).getByRole('menuitem', {
@@ -1950,7 +1932,7 @@ outputs:
         problem(422, 'invalid_definition', {
           errors: [
             {
-              path: 'steps[1].with.stdin',
+              path: 'steps[0].with.stdin',
               message: 'The workflow has no file data.in.',
             },
           ],
@@ -1988,7 +1970,7 @@ describe('the inputs shown', () => {
     );
     renderApp(EDITOR_PAGE);
 
-    await stepBox('compile');
+    await stepBox('run');
     expect(screen.queryByRole('group', { name: 'Input submission' })).toBeNull();
     expect(
       screen.queryByRole('group', { name: 'Workflow file answers/1.out' }),
@@ -2015,15 +1997,10 @@ describe('the inputs hidden', () => {
     server.use(signedIn, ...workflowBackend(CLASSIC).handlers);
     renderApp(EDITOR_PAGE);
 
-    const compile = await stepBox('compile');
+    const run = await stepBox('run');
     expect(screen.queryByRole('group', { name: /^Input / })).toBeNull();
     expect(
-      within(compile).getByRole('button', { name: '2 inputs of Step compile' }),
-    ).toBeVisible();
-    expect(
-      within(await stepBox('run')).getByRole('button', {
-        name: '3 inputs of Step run',
-      }),
+      within(run).getByRole('button', { name: '5 inputs of Step run' }),
     ).toBeVisible();
     expect(
       within(await stepBox('check')).getByRole('button', {
@@ -2038,8 +2015,8 @@ describe('the inputs hidden', () => {
     const user = userEvent.setup();
     renderApp(EDITOR_PAGE);
 
-    const tab = within(await stepBox('compile')).getByRole('button', {
-      name: '2 inputs of Step compile',
+    const tab = within(await stepBox('run')).getByRole('button', {
+      name: '5 inputs of Step run',
     });
     await user.hover(tab);
     const language = await findPart('[role="group"]', 'Input language');

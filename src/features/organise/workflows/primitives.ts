@@ -28,11 +28,13 @@ type StepGiven = { use: string; with: Readonly<Record<string, WithValue>> };
 
 /**
  * A usable primitive's declaration as `step` uses it, or null for one the
- * platform no longer reads. A primitive of several forms is the one form the
- * step's ports fit, as the forge picks it (`for_step`): every required input
- * of the form given, and no input it lacks. With none or several fitting, it
- * has no ports, as the forge refuses the step. A programs form's step gives
- * each program's outputs, `<program>.<output>`, by the names it gives them.
+ * platform no longer reads. A primitive of several forms is drawn as the
+ * first form, in the declaration's order, whose inputs hold every port the
+ * step gives, so a new step, or one with a required port not yet given, still
+ * shows the ports to wire. This only chooses what to draw: whether the step
+ * fits its form is the forge's check, at the save. A step giving ports no one
+ * form holds has none. A programs form's step gives each program's outputs,
+ * `<program>.<output>`, by the names it gives them.
  */
 export function declared(
   primitives: Map<string, PrimitiveInfo>,
@@ -43,13 +45,7 @@ export function declared(
   const forms = Object.values(found.forms);
   if (forms.length === 0) return found;
   const given = Object.keys(step.with);
-  const fits = forms.filter(
-    (form) =>
-      Object.entries(form.inputs).every(
-        ([name, port]) => port.optional || given.includes(name),
-      ) && given.every((name) => name in form.inputs),
-  );
-  const form = fits.length === 1 ? fits[0] : undefined;
+  const form = forms.find((each) => given.every((name) => name in each.inputs));
   if (form === undefined) return { ...found, inputs: {}, outputs: {} };
   const programs = Object.entries(form.inputs).flatMap(([name, port]) => {
     const value = step.with[name];
