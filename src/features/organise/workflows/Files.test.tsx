@@ -1,3 +1,4 @@
+import { partTransfer, partTransport } from '@/test/part-uploads';
 import { describe, expect, it } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
@@ -14,8 +15,13 @@ describe('the workflow files', () => {
     let published: unknown;
     let savedFile = false;
     const checked: string[][] = [];
-    server.use(signedIn, ...backend.handlers);
     server.use(
+      ...partTransport(`${WORKFLOW_API}/part-uploads`),
+      signedIn,
+      ...backend.handlers,
+    );
+    server.use(
+      ...partTransport(`${WORKFLOW_API}/part-uploads`),
       http.post('/api/v1/workflows/check', async ({ request }) => {
         const { paths } = (await request.json()) as { paths?: string[] };
         checked.push(paths ?? []);
@@ -36,18 +42,13 @@ describe('the workflow files', () => {
         ),
       ),
       http.get(`${WORKFLOW_API}/files/*`, () => problem(404, 'not_found')),
-      http.post(`${WORKFLOW_API}/uploads`, async ({ request }) => {
+      http.post(`${WORKFLOW_API}/part-uploads`, async ({ request }) => {
         sent.push(await request.json());
-        return HttpResponse.json({
-          id: 'upload-1',
-          url: '/-/uploads/upload-1',
-          ready: false,
-          expires_at: '2026-10-27T12:00:00Z',
-        });
+        return HttpResponse.json(partTransfer('upload-1'));
       }),
       http.put('/-/uploads/upload-1', () => new HttpResponse(null)),
-      http.post(`${WORKFLOW_API}/uploads/upload-1/complete`, () =>
-        HttpResponse.json({ status: 'verified' }),
+      http.post(`${WORKFLOW_API}/part-uploads/upload-1/finish`, () =>
+        HttpResponse.json(partTransfer('finished', 'stored')),
       ),
       http.put(`${WORKFLOW_API}/draft`, async ({ request }) => {
         sent.push(await request.json());
@@ -131,8 +132,13 @@ describe('the workflow files', () => {
     );
   });
   it('lists the saved files but workflow.yaml, which View YAML shows', async () => {
-    server.use(signedIn, ...workflowBackend(CLASSIC).handlers);
     server.use(
+      ...partTransport(`${WORKFLOW_API}/part-uploads`),
+      signedIn,
+      ...workflowBackend(CLASSIC).handlers,
+    );
+    server.use(
+      ...partTransport(`${WORKFLOW_API}/part-uploads`),
       http.get(`${WORKFLOW_API}/tree`, () =>
         HttpResponse.json(
           ['workflow.yaml', 'score.py'].map((path) => ({
@@ -158,8 +164,13 @@ describe('the workflow files', () => {
 
   it('removes a saved file with its token, and lets the removal be undone', async () => {
     const backend = workflowBackend(CLASSIC);
-    server.use(signedIn, ...backend.handlers);
     server.use(
+      ...partTransport(`${WORKFLOW_API}/part-uploads`),
+      signedIn,
+      ...backend.handlers,
+    );
+    server.use(
+      ...partTransport(`${WORKFLOW_API}/part-uploads`),
       http.get(`${WORKFLOW_API}/tree`, () =>
         HttpResponse.json([
           {
@@ -205,8 +216,13 @@ describe('the workflow files', () => {
   });
 
   it('downloads a saved file of the draft through the door, an upload as well as text', async () => {
-    server.use(signedIn, ...workflowBackend(CLASSIC).handlers);
     server.use(
+      ...partTransport(`${WORKFLOW_API}/part-uploads`),
+      signedIn,
+      ...workflowBackend(CLASSIC).handlers,
+    );
+    server.use(
+      ...partTransport(`${WORKFLOW_API}/part-uploads`),
       http.get(`${WORKFLOW_API}/tree`, () =>
         HttpResponse.json([
           {
@@ -269,8 +285,13 @@ describe('the workflow files', () => {
     const backend = workflowBackend(
       CLASSIC.replace('${{ inputs.answer }}', '${{ workflow.expected.out }}'),
     );
-    server.use(signedIn, ...backend.handlers);
     server.use(
+      ...partTransport(`${WORKFLOW_API}/part-uploads`),
+      signedIn,
+      ...backend.handlers,
+    );
+    server.use(
+      ...partTransport(`${WORKFLOW_API}/part-uploads`),
       http.get(`${WORKFLOW_API}/tree`, () =>
         HttpResponse.json([
           {
@@ -322,8 +343,13 @@ describe('the workflow files', () => {
   it('replaces a saved file with its read token and keeps the upload after a conflict', async () => {
     const backend = workflowBackend(CLASSIC);
     let sent: unknown;
-    server.use(signedIn, ...backend.handlers);
     server.use(
+      ...partTransport(`${WORKFLOW_API}/part-uploads`),
+      signedIn,
+      ...backend.handlers,
+    );
+    server.use(
+      ...partTransport(`${WORKFLOW_API}/part-uploads`),
       http.get(`${WORKFLOW_API}/tree`, () =>
         HttpResponse.json([
           {
@@ -347,16 +373,11 @@ describe('the workflow files', () => {
           version: 'old',
         }),
       ),
-      http.post(`${WORKFLOW_API}/uploads`, () =>
-        HttpResponse.json({
-          id: 'replacement',
-          url: null,
-          ready: true,
-          expires_at: '2026-10-27T12:00:00Z',
-        }),
+      http.post(`${WORKFLOW_API}/part-uploads`, () =>
+        HttpResponse.json(partTransfer('replacement')),
       ),
-      http.post(`${WORKFLOW_API}/uploads/replacement/complete`, () =>
-        HttpResponse.json({ status: 'verified' }),
+      http.post(`${WORKFLOW_API}/part-uploads/replacement/finish`, () =>
+        HttpResponse.json(partTransfer('finished', 'stored')),
       ),
       http.put(`${WORKFLOW_API}/draft`, async ({ request }) => {
         sent = await request.json();
@@ -398,25 +419,25 @@ describe('the workflow files', () => {
     const backend = workflowBackend(CLASSIC);
     let reads = 0;
     let completed = 0;
-    server.use(signedIn, ...backend.handlers);
     server.use(
+      ...partTransport(`${WORKFLOW_API}/part-uploads`),
+      signedIn,
+      ...backend.handlers,
+    );
+    server.use(
+      ...partTransport(`${WORKFLOW_API}/part-uploads`),
       http.get(`${WORKFLOW_API}/files/new.py`, () => {
         reads += 1;
         return reads === 1
           ? problem(404, 'not_found')
           : HttpResponse.json({ token: 'someone-elses-file' });
       }),
-      http.post(`${WORKFLOW_API}/uploads`, () =>
-        HttpResponse.json({
-          id: 'new-upload',
-          url: null,
-          ready: true,
-          expires_at: '2026-10-27T12:00:00Z',
-        }),
+      http.post(`${WORKFLOW_API}/part-uploads`, () =>
+        HttpResponse.json(partTransfer('new-upload')),
       ),
-      http.post(`${WORKFLOW_API}/uploads/new-upload/complete`, () => {
+      http.post(`${WORKFLOW_API}/part-uploads/new-upload/finish`, () => {
         completed += 1;
-        return HttpResponse.json({ status: 'verified' });
+        return HttpResponse.json(partTransfer('finished', 'stored'));
       }),
     );
     const user = userEvent.setup();

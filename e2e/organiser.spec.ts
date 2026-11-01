@@ -8,7 +8,7 @@ type Schemas = components['schemas'];
 const UPLOADED_AT = 'a1b2c3d4e5f6a7b8c9d0a1b2c3d4e5f6a7b8c9d0';
 
 /**
- * The inputs a task's form reads of unicon/classic@v4, titled for the form
+ * The inputs a task's form reads of unicon/classic@v5, titled for the form
  * (#434), with no steps: a stand-in, not deploy's, which names the solution
  * `code`, a folder, and has an input and an answer.
  */
@@ -36,7 +36,7 @@ async function stubOrganiserApi(page: Page) {
       'name: Spring 2026\nstart: 2030-10-01T09:00:00Z\nend: 2030-10-01T14:00:00Z\nstate: draft\nvisibility: signed-in\ntasks:\n  - id: sum\n',
     contestSaves: 0,
     taskYaml:
-      'name: Sum\nworkflow: unicon/classic@v4\ninputs:\n  submission: {entrant: {label: Your solution}}\n  language: {entrant: {options: [python]}}\n  time_limit: 2\n  memory_limit: 256\n',
+      'name: Sum\nworkflow: unicon/classic@v5\ninputs:\n  submission: {entrant: {label: Your solution}}\n  language: {entrant: {options: [python]}}\n  time_limit: 2\n  memory_limit: 256\n',
     taskSaves: [] as unknown[],
     /** How many gradings failed and wait, as the queue counts them. */
     failed: 0,
@@ -79,17 +79,17 @@ async function stubOrganiserApi(page: Page) {
         yanked: {},
         owner: 'unicon',
         name: 'classic',
-        versions: ['v4'],
+        versions: ['v5'],
         editable: false,
         visibility: 'public',
       },
     ] satisfies Schemas['WorkflowItem'][]),
   );
-  await page.route('**/api/v1/workflows/unicon/classic/versions/v4', (route) =>
+  await page.route('**/api/v1/workflows/unicon/classic/versions/v5', (route) =>
     json(route, { content: CLASSIC }),
   );
   await page.route('**/api/v1/blocks', (route) => json(route, specCatalogue()));
-  await page.route('**/api/v1/workflows/unicon/classic/versions/v4/box', (route) =>
+  await page.route('**/api/v1/workflows/unicon/classic/versions/v5/box', (route) =>
     json(route, {
       run: true,
       newer_version: null,
@@ -208,7 +208,7 @@ async function stubOrganiserApi(page: Page) {
         ...more,
       });
       return json(route, {
-        workflow: 'unicon/classic@v4',
+        workflow: 'unicon/classic@v5',
         newer: null,
         problem: null,
         inputs: [
@@ -671,7 +671,7 @@ test('the Runs card pairs files, lines up its cells, and gives a cell to the ent
       route.fulfill({
         contentType: 'application/json',
         body: JSON.stringify({
-          workflow: 'unicon/classic@v4',
+          workflow: 'unicon/classic@v5',
           newer: null,
           problem: null,
           graded: false,
@@ -689,7 +689,7 @@ test('the Runs card pairs files, lines up its cells, and gives a cell to the ent
         }),
       }),
   );
-  await page.route('**/api/v1/workflows/unicon/classic/versions/v4', (route) =>
+  await page.route('**/api/v1/workflows/unicon/classic/versions/v5', (route) =>
     route.fulfill({
       contentType: 'application/json',
       body: JSON.stringify({
@@ -797,7 +797,7 @@ test('long run paths and report titles stay within the page and their Result row
   const state = await stubOrganiserApi(page);
   state.orgMade = true;
   const path = `tests/${'z'.repeat(240)}/1.in`;
-  state.taskYaml = `name: Islands\nworkflow: unicon/classic@v4\nrepeat:\n  - inputs: [input]\n    tuples: [{input: ${path}}]\nscoring:\n  groups: {samples: {input: ${path}}}\n`;
+  state.taskYaml = `name: Islands\nworkflow: unicon/classic@v5\nrepeat:\n  - inputs: [input]\n    tuples: [{input: ${path}}]\nscoring:\n  groups: {samples: {input: ${path}}}\n`;
   const outputs = Array.from({ length: 12 }, (_, index) => ({
     name: `out_${index}`,
     title: `Detailed report number ${index} from the program being tested`,
@@ -812,7 +812,7 @@ test('long run paths and report titles stay within the page and their Result row
     (route) =>
       route.fulfill({
         json: {
-          workflow: 'unicon/classic@v4',
+          workflow: 'unicon/classic@v5',
           newer: null,
           problem: null,
           graded: false,
@@ -832,7 +832,7 @@ test('long run paths and report titles stay within the page and their Result row
         },
       }),
   );
-  await page.route('**/api/v1/workflows/unicon/classic/versions/v4', (route) =>
+  await page.route('**/api/v1/workflows/unicon/classic/versions/v5', (route) =>
     route.fulfill({
       json: {
         content:
@@ -846,7 +846,7 @@ test('long run paths and report titles stay within the page and their Result row
       },
     }),
   );
-  await page.route('**/api/v1/workflows/unicon/classic/versions/v4/box', (route) =>
+  await page.route('**/api/v1/workflows/unicon/classic/versions/v5/box', (route) =>
     route.fulfill({
       json: { run: true, inputs: [], outputs, newer_version: null, description: null },
     }),
@@ -898,7 +898,7 @@ scoring:
   groups: {small: {input: [small/1.in, small/2.in, small/3.in]}}
   values: {points: 1}
 `;
-  await page.route('**/api/v1/workflows/unicon/classic/versions/v4', (route) =>
+  await page.route('**/api/v1/workflows/unicon/classic/versions/v5', (route) =>
     route.fulfill({
       json: { content: CLASSIC + 'outputs: {score: 1, time_ms: 1}\n' },
     }),

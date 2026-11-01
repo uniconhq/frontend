@@ -6,7 +6,7 @@ import { outcomeWords } from './words';
 
 /** A step of exec given a source and its language: drawn as its one form. */
 const [RUN_STEP] = readWorkflow({
-  steps: [{ id: 'run', use: 'unicon/exec@v2', with: { source: 'a', language: 'c' } }],
+  steps: [{ id: 'run', use: 'unicon/exec@v3', with: { source: 'a', language: 'c' } }],
 }).steps;
 
 /** exec's one form with its outcome port holding `outcomes`. */

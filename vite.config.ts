@@ -51,6 +51,8 @@ export default defineConfig({
       // that the proxy in `deploy` puts through to the forge's large-file
       // store once the backend has said the upload may start.
       '/-/uploads': proxied({ configure: presentDevServerAsApiOrigin }),
+      // Part signatures name the API origin, including its Host header.
+      '/unicon-uploads': proxied({ changeOrigin: true }),
       // A submitted file comes back through the download door the same way.
       '/-/downloads': proxied({ configure: presentDevServerAsApiOrigin }),
       '/healthz': proxied(),

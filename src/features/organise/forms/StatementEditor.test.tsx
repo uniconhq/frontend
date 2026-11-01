@@ -1,3 +1,4 @@
+import { partTransfer, partTransport } from '@/test/part-uploads';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@/test/user-event';
@@ -22,6 +23,7 @@ function statementBackend(
 ) {
   const sent: { content: string; token: string }[] = [];
   server.use(
+    ...partTransport(`${TASK_API}/organise/part-uploads`),
     signedIn,
     taskState,
     publicationList,
@@ -107,6 +109,7 @@ describe('the statement beside its preview', { timeout: 20_000 }, () => {
     // The statement as saved is read back with its new token.
     let saved: { content: string; token: string } | null = null;
     server.use(
+      ...partTransport(`${TASK_API}/organise/part-uploads`),
       http.put(`${TASK_API}/files/:path`, async ({ request }) => {
         const body = (await request.json()) as { content: string };
         saved = { content: body.content, token: 'token-saved' };
@@ -214,6 +217,7 @@ describe('the statement beside its preview', { timeout: 20_000 }, () => {
       const saves: Save[] = [];
       const pictures = ['public/my-diagram.png', 'public/old.png'];
       server.use(
+        ...partTransport(`${TASK_API}/organise/part-uploads`),
         http.get(`${TASK_API}/tree`, ({ request }) =>
           new URL(request.url).searchParams.get('path') === 'public'
             ? HttpResponse.json(
@@ -381,19 +385,15 @@ describe('the statement beside its preview', { timeout: 20_000 }, () => {
       ]);
       const slots: unknown[] = [];
       server.use(
-        http.post(`${TASK_API}/organise/uploads`, async ({ request }) => {
+        ...partTransport(`${TASK_API}/organise/part-uploads`),
+        http.post(`${TASK_API}/organise/part-uploads`, async ({ request }) => {
           slots.push(await request.json());
           return HttpResponse.json(
-            {
-              id: `upload-${String(slots.length)}`,
-              url: null,
-              ready: true,
-              expires_at: '2026-10-07T12:00:00Z',
-            },
+            partTransfer(`upload-${String(slots.length)}`, 'stored'),
             { status: 201 },
           );
         }),
-        http.post(`${TASK_API}/uploads/:upload/complete`, ({ params }) =>
+        http.post(`${TASK_API}/organise/part-uploads/:upload/finish`, ({ params }) =>
           HttpResponse.json({
             id: String(params['upload']),
             input: '',
@@ -531,6 +531,7 @@ describe('the statement beside its preview', { timeout: 20_000 }, () => {
   it('shows a manager the statement read-only, with no way to save it', async () => {
     statementBackend(() => problem(403, 'admin_only', { keys: ['statement.md'] }));
     server.use(
+      ...partTransport(`${TASK_API}/organise/part-uploads`),
       http.get('/api/v1/me', () =>
         HttpResponse.json({
           ...someone,
@@ -567,6 +568,7 @@ describe('the statement while it is being edited', { timeout: 20_000 }, () => {
     const asked = { reads: 0, states: 0 };
     const sent: { content: string; token: string }[] = [];
     server.use(
+      ...partTransport(`${TASK_API}/organise/part-uploads`),
       signedIn,
       http.get(TASK_API, () => {
         asked.states += 1;
@@ -685,6 +687,7 @@ describe('the statement while it is being edited', { timeout: 20_000 }, () => {
     const { stored } = sharedStatement();
     const sends: { token: string; confirm: boolean; asked?: string | null }[] = [];
     server.use(
+      ...partTransport(`${TASK_API}/organise/part-uploads`),
       http.put(`${TASK_API}/files/:path`, async ({ request }) => {
         const body = (await request.clone().json()) as (typeof sends)[number];
         sends.push(body);

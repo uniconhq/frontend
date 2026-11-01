@@ -1,3 +1,4 @@
+import { PreparationStatus } from './PreparationStatus';
 import { useEffect, useRef, type ReactNode } from 'react';
 import type { ApiError } from '@/api/problem';
 import { describeError } from '@/api/describe-error';
@@ -144,6 +145,12 @@ export function SaveOutcome<Body = WriteFile>({
 
   if (outcome.kind === 'saved') {
     const { result } = outcome;
+    if ('preparation' in result)
+      return (
+        <Panel role="status">
+          <PreparationStatus id={result.preparation} />
+        </Panel>
+      );
     if ('number' in result) {
       return (
         <Panel role="status">

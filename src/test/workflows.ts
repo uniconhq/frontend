@@ -11,15 +11,15 @@ import { problem } from './server';
  * each port do (#436), as each primitive's own `primitive.yaml` says them.
  *
  * `CLASSIC` is one run of a task judged by comparing output with an answer,
- * in the shape of deploy's unicon/classic@v4 but not a copy of it: its `run`
+ * in the shape of deploy's unicon/classic@v5 but not a copy of it: its `run`
  * step compiles the submission and runs it on the run's input under the
  * task's limits, and its `check` step compares the output with the run's
  * answer with diff-check, where deploy's compares with a diff script run by
  * exec given a manifest. `FOLDER` is the same with a folder of sources.
- * `CLASSIC_V4` is deploy's workflow.yaml for unicon/classic@v4 as it is.
+ * `CLASSIC_V5` is deploy's workflow.yaml for unicon/classic@v5 as it is.
  */
 export const CLASSIC = `# One run of a task judged by comparing output with an answer, in the
-# shape of unicon/classic@v4: compile the submission and run it on the
+# shape of unicon/classic@v5: compile the submission and run it on the
 # run's input under the task's limits, then compare its output with the
 # run's answer. The format is SIMPLER-CORE.md section 7.
 inputs:
@@ -31,7 +31,7 @@ inputs:
   answer: file
 steps:
   - id: run
-    use: unicon/exec@v2
+    use: unicon/exec@v3
     with:
       source: \${{ inputs.submission }}
       language: \${{ inputs.language }}
@@ -63,7 +63,7 @@ inputs:
   answer: file
 steps:
   - id: run
-    use: unicon/exec@v2
+    use: unicon/exec@v3
     with:
       source: \${{ inputs.program }}
       entry: \${{ inputs.entry }}
@@ -80,8 +80,8 @@ outputs:
   log: \${{ steps.run.log }}
 `;
 
-/** deploy's workflows/classic/v4/workflow.yaml, unicon/classic@v4 as deploy seeds it. */
-export const CLASSIC_V4 = `# unicon/classic@v4, workflow.yaml: one run of an entrant's program on one
+/** deploy's workflows/classic/v5/workflow.yaml, unicon/classic@v5 as deploy seeds it. */
+export const CLASSIC_V5 = `# unicon/classic@v5, workflow.yaml: one run of an entrant's program on one
 # input, its output compared word by word with the answer by the diff
 # script beside this file. The format is SIMPLER-CORE.md 7.
 inputs:
@@ -94,7 +94,7 @@ inputs:
 
 steps:
   - id: solution
-    use: unicon/exec@v2
+    use: unicon/exec@v3
     with:
       source: \${{ inputs.code }}
       language: \${{ inputs.language }}
@@ -102,7 +102,7 @@ steps:
       time_limit: \${{ inputs.time_limit }}
       memory_limit: \${{ inputs.memory_limit }}
   - id: compare
-    use: unicon/exec@v2
+    use: unicon/exec@v3
     with:
       source: \${{ workflow.diff/ }}
       language: python
@@ -224,7 +224,7 @@ const ARGS = port('text', {
  * `source` and `language` alone is drawn as the one form.
  */
 const EXEC: PrimitiveInfo = {
-  ref: 'unicon/exec@v2',
+  ref: 'unicon/exec@v3',
   name: 'exec',
   title: 'Run programs',
   description:
@@ -492,7 +492,7 @@ export const PRIMITIVES: PrimitiveInfo[] = [
     },
     problem: null,
   },
-  retired('exec', 'unicon/compile and unicon/exec@v1 are retired; use unicon/exec@v2.'),
+  retired('exec', 'unicon/compile and unicon/exec@v1 are retired; use unicon/exec@v3.'),
   EXEC,
 ];
 
@@ -556,7 +556,7 @@ export function workflowBackend(
           owner: 'unicon',
           name: 'classic',
           visibility: 'public',
-          versions: ['v4'],
+          versions: ['v5'],
           editable: false,
         },
       ]),

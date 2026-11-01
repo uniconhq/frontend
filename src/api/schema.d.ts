@@ -1886,6 +1886,76 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/orgs/{org}/contests/{contest}/tasks/{task}/organise/part-uploads": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Task Part Uploads */
+        get: operations["listTaskPartUploads"];
+        put?: never;
+        /** Start Task Part Upload */
+        post: operations["startTaskPartUpload"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org}/contests/{contest}/tasks/{task}/organise/part-uploads/{upload}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Task Part Upload */
+        get: operations["readTaskPartUpload"];
+        put?: never;
+        post?: never;
+        /** Abort Task Part Upload */
+        delete: operations["abortTaskPartUpload"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org}/contests/{contest}/tasks/{task}/organise/part-uploads/{upload}/finish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Finish Task Part Upload */
+        post: operations["finishTaskPartUpload"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org}/contests/{contest}/tasks/{task}/organise/part-uploads/{upload}/sign": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Sign Task Upload Parts */
+        post: operations["signTaskUploadParts"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/orgs/{org}/contests/{contest}/tasks/{task}/organise/queue": {
         parameters: {
             query?: never;
@@ -2057,6 +2127,23 @@ export interface paths {
          * @description Oldest first.
          */
         get: operations["listTaskAnnouncements"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org}/contests/{contest}/tasks/{task}/preparation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The task's latest package preparation */
+        get: operations["readTaskPreparation"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2947,6 +3034,76 @@ export interface paths {
         get: operations["getWorkflowFile"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workflows/{owner}/{name}/part-uploads": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Workflow Part Uploads */
+        get: operations["listWorkflowPartUploads"];
+        put?: never;
+        /** Start Workflow Part Upload */
+        post: operations["startWorkflowPartUpload"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workflows/{owner}/{name}/part-uploads/{upload}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Workflow Part Upload */
+        get: operations["readWorkflowPartUpload"];
+        put?: never;
+        post?: never;
+        /** Abort Workflow Part Upload */
+        delete: operations["abortWorkflowPartUpload"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workflows/{owner}/{name}/part-uploads/{upload}/finish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Finish Workflow Part Upload */
+        post: operations["finishWorkflowPartUpload"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workflows/{owner}/{name}/part-uploads/{upload}/sign": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Sign Workflow Upload Parts */
+        post: operations["signWorkflowUploadParts"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4103,6 +4260,18 @@ export interface components {
             /** Version */
             version: string | null;
         };
+        /** FinishedPart */
+        FinishedPart: {
+            /** Etag */
+            etag: string;
+            /** Number */
+            number: number;
+        };
+        /** FinishParts */
+        FinishParts: {
+            /** Parts */
+            parts: components["schemas"]["FinishedPart"][];
+        };
         /**
          * ForgeUrl
          * @description Where a browser reaches the forge's own pages: sign-in and the account
@@ -4999,6 +5168,27 @@ export interface components {
             /** Display Name */
             display_name: string | null;
         };
+        /** Part */
+        Part: {
+            /** Etag */
+            etag: string;
+            /** Number */
+            number: number;
+            /** Size */
+            size: number;
+        };
+        /**
+         * PartUploadRequest
+         * @description A resumable organiser upload, bounded again by the deployment's cap.
+         */
+        PartUploadRequest: {
+            /** Path */
+            path: string;
+            /** Sha256 */
+            sha256: string;
+            /** Size */
+            size: number;
+        };
         /**
          * Person
          * @description Someone as another person sees them, by their forge id. Their email
@@ -5013,6 +5203,43 @@ export interface components {
             name: string | null;
             /** Username */
             username: string;
+        };
+        /** Preparation */
+        Preparation: {
+            /**
+             * Deadline At
+             * Format: date-time
+             */
+            deadline_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Reason */
+            reason: string | null;
+            result: components["schemas"]["Published"] | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "preparing" | "ready" | "refused" | "replaced";
+        };
+        /** Preparing */
+        Preparing: {
+            /**
+             * Preparation
+             * Format: uuid
+             */
+            preparation: string;
+            /**
+             * Status
+             * @default preparing
+             * @constant
+             */
+            status: "preparing";
+            /** Version */
+            version: string;
         };
         /**
          * Primitive
@@ -6066,6 +6293,11 @@ export interface components {
             /** Unit */
             unit: string | null;
         };
+        /** SignParts */
+        SignParts: {
+            /** Numbers */
+            numbers: number[];
+        };
         /**
          * Slot
          * @description A slot for one file: where to send it, and when the slot stops being
@@ -6485,6 +6717,36 @@ export interface components {
              * Format: date-time
              */
             release_at: string;
+        };
+        /** Transfer */
+        Transfer: {
+            /**
+             * Deadline At
+             * Format: date-time
+             */
+            deadline_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Part Size */
+            part_size: number;
+            /**
+             * Parts
+             * @default []
+             */
+            parts: components["schemas"]["Part"][];
+            /** Path */
+            path: string;
+            /** Reason */
+            reason: string | null;
+            /** Sha256 */
+            sha256: string;
+            /** Size */
+            size: number;
+            /** Status */
+            status: string;
         };
         /**
          * TreeEntry
@@ -9921,7 +10183,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Published"] | components["schemas"]["Draft"];
+                    "application/json": components["schemas"]["Published"] | components["schemas"]["Draft"] | components["schemas"]["Preparing"];
                 };
             };
             /** @description An error, as an RFC 9457 problem document. `code` names it. */
@@ -9959,7 +10221,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Published"] | components["schemas"]["Draft"];
+                    "application/json": components["schemas"]["Published"] | components["schemas"]["Draft"] | components["schemas"]["Preparing"];
                 };
             };
             /** @description An error, as an RFC 9457 problem document. `code` names it. */
@@ -10391,6 +10653,222 @@ export interface operations {
             };
         };
     };
+    listTaskPartUploads: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                contest: string;
+                org: string;
+                task: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Transfer"][];
+                };
+            };
+            /** @description An error, as an RFC 9457 problem document. `code` names it. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    startTaskPartUpload: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                contest: string;
+                org: string;
+                task: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PartUploadRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Transfer"];
+                };
+            };
+            /** @description An error, as an RFC 9457 problem document. `code` names it. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    readTaskPartUpload: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                contest: string;
+                org: string;
+                task: string;
+                upload: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Transfer"];
+                };
+            };
+            /** @description An error, as an RFC 9457 problem document. `code` names it. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    abortTaskPartUpload: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                contest: string;
+                org: string;
+                task: string;
+                upload: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Transfer"];
+                };
+            };
+            /** @description An error, as an RFC 9457 problem document. `code` names it. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    finishTaskPartUpload: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                contest: string;
+                org: string;
+                task: string;
+                upload: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FinishParts"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Transfer"];
+                };
+            };
+            /** @description An error, as an RFC 9457 problem document. `code` names it. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    signTaskUploadParts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                contest: string;
+                org: string;
+                task: string;
+                upload: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SignParts"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description An error, as an RFC 9457 problem document. `code` names it. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     readGradingQueue: {
         parameters: {
             query?: never;
@@ -10674,6 +11152,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Announcement"][];
+                };
+            };
+            /** @description An error, as an RFC 9457 problem document. `code` names it. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    readTaskPreparation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                contest: string;
+                org: string;
+                task: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Preparation"];
                 };
             };
             /** @description An error, as an RFC 9457 problem document. `code` names it. */
@@ -11125,7 +11636,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Published"] | components["schemas"]["Draft"];
+                    "application/json": components["schemas"]["Published"] | components["schemas"]["Draft"] | components["schemas"]["Preparing"];
                 };
             };
             /** @description An error, as an RFC 9457 problem document. `code` names it. */
@@ -12200,6 +12711,228 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FileContent"];
+                };
+            };
+            /** @description An error, as an RFC 9457 problem document. `code` names it. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    listWorkflowPartUploads: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workflow's name under its owner */
+                name: string;
+                /** @description An org's name or a person's username */
+                owner: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Transfer"][];
+                };
+            };
+            /** @description An error, as an RFC 9457 problem document. `code` names it. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    startWorkflowPartUpload: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workflow's name under its owner */
+                name: string;
+                /** @description An org's name or a person's username */
+                owner: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PartUploadRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Transfer"];
+                };
+            };
+            /** @description An error, as an RFC 9457 problem document. `code` names it. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    readWorkflowPartUpload: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workflow's name under its owner */
+                name: string;
+                /** @description An org's name or a person's username */
+                owner: string;
+                upload: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Transfer"];
+                };
+            };
+            /** @description An error, as an RFC 9457 problem document. `code` names it. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    abortWorkflowPartUpload: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workflow's name under its owner */
+                name: string;
+                /** @description An org's name or a person's username */
+                owner: string;
+                upload: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Transfer"];
+                };
+            };
+            /** @description An error, as an RFC 9457 problem document. `code` names it. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    finishWorkflowPartUpload: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workflow's name under its owner */
+                name: string;
+                /** @description An org's name or a person's username */
+                owner: string;
+                upload: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FinishParts"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Transfer"];
+                };
+            };
+            /** @description An error, as an RFC 9457 problem document. `code` names it. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    signWorkflowUploadParts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workflow's name under its owner */
+                name: string;
+                /** @description An org's name or a person's username */
+                owner: string;
+                upload: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SignParts"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
                 };
             };
             /** @description An error, as an RFC 9457 problem document. `code` names it. */

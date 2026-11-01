@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { parseYaml } from '../forms/yaml-doc';
-import { CLASSIC, CLASSIC_V4, FOLDER, PRIMITIVES } from '@/test/workflows';
+import { CLASSIC, CLASSIC_V5, FOLDER, PRIMITIVES } from '@/test/workflows';
 import {
   BOX,
   GEOMETRY,
@@ -133,7 +133,7 @@ function columnOf(layout: Layout, key: string): number | undefined {
 }
 
 const SEEDED = [
-  ['unicon/classic@v4', CLASSIC],
+  ['unicon/classic@v5', CLASSIC],
   ['a program of several files', FOLDER],
 ] as const;
 
@@ -216,7 +216,7 @@ describe('the layout', () => {
   });
 
   it('draws deploy’s classic@v4: two exec steps with their ports, the run’s output fed to the diff', () => {
-    const layout = laid(CLASSIC_V4);
+    const layout = laid(CLASSIC_V5);
     const solution = boxAt(layout, 'step:0');
     const compare = boxAt(layout, 'step:1');
     const wire = (from: string, to: string) =>
@@ -253,10 +253,10 @@ describe('the layout', () => {
 inputs:
   n: number
 steps:
-  - {id: a, use: unicon/exec@v2, with: {time_limit: "\${{ inputs.n }}"}}
-  - {id: b, use: unicon/exec@v2, with: {source: "\${{ steps.a.output }}"}}
-  - {id: c, use: unicon/exec@v2, with: {source: "\${{ steps.b.output }}"}}
-  - {id: d, use: unicon/exec@v2, with: {source: "\${{ steps.c.output }}", stdin: "\${{ steps.a.output }}"}}
+  - {id: a, use: unicon/exec@v3, with: {time_limit: "\${{ inputs.n }}"}}
+  - {id: b, use: unicon/exec@v3, with: {source: "\${{ steps.a.output }}"}}
+  - {id: c, use: unicon/exec@v3, with: {source: "\${{ steps.b.output }}"}}
+  - {id: d, use: unicon/exec@v3, with: {source: "\${{ steps.c.output }}", stdin: "\${{ steps.a.output }}"}}
 `);
 
     expect([0, 1, 2, 3].map((index) => columnOf(layout, `step:${index}`))).toEqual([
@@ -273,10 +273,10 @@ steps:
 inputs:
   limit: number
 steps:
-  - {id: a, use: unicon/exec@v2, with: {time_limit: "\${{ inputs.limit }}"}}
-  - {id: b, use: unicon/exec@v2, with: {source: "\${{ steps.a.output }}"}}
+  - {id: a, use: unicon/exec@v3, with: {time_limit: "\${{ inputs.limit }}"}}
+  - {id: b, use: unicon/exec@v3, with: {source: "\${{ steps.a.output }}"}}
   - id: c
-    use: unicon/exec@v2
+    use: unicon/exec@v3
     with: {source: "\${{ steps.b.output }}", time_limit: "\${{ inputs.limit }}", memory_limit: "\${{ inputs.limit }}"}
 `);
 
@@ -298,7 +298,7 @@ inputs:
   input: file
 steps:
   - id: run
-    use: unicon/exec@v2
+    use: unicon/exec@v3
     with:
       source: \${{ inputs.input }}
       stdin: \${{ inputs.input }}
@@ -321,8 +321,8 @@ inputs:
   spare: text
   input: file
 steps:
-  - {id: first, use: unicon/exec@v2, with: {}}
-  - {id: run, use: unicon/exec@v2, with: {source: "\${{ steps.first.output }}", stdin: "\${{ inputs.input }}"}}
+  - {id: first, use: unicon/exec@v3, with: {}}
+  - {id: run, use: unicon/exec@v3, with: {source: "\${{ steps.first.output }}", stdin: "\${{ inputs.input }}"}}
 `);
 
     expect(columnOf(layout, 'input:spare')).toBe(0);
@@ -341,10 +341,10 @@ inputs:
   a: number
   b: number
 steps:
-  - {id: first, use: unicon/exec@v2, with: {time_limit: "\${{ inputs.b }}"}}
-  - {id: second, use: unicon/exec@v2, with: {time_limit: "\${{ inputs.a }}"}}
+  - {id: first, use: unicon/exec@v3, with: {time_limit: "\${{ inputs.b }}"}}
+  - {id: second, use: unicon/exec@v3, with: {time_limit: "\${{ inputs.a }}"}}
   - id: last
-    use: unicon/exec@v2
+    use: unicon/exec@v3
     with: {source: "\${{ steps.second.output }}", stdin: "\${{ steps.first.output }}"}
 `);
 
@@ -357,11 +357,11 @@ steps:
 inputs:
   n: number
 steps:
-  - {id: a, use: unicon/exec@v2, with: {time_limit: "\${{ inputs.n }}"}}
-  - {id: b, use: unicon/exec@v2, with: {source: "\${{ steps.a.output }}"}}
-  - {id: c, use: unicon/exec@v2, with: {source: "\${{ steps.b.output }}"}}
-  - {id: d, use: unicon/exec@v2, with: {source: "\${{ steps.c.output }}"}}
-  - {id: e, use: unicon/exec@v2, with: {source: "\${{ steps.d.output }}"}}
+  - {id: a, use: unicon/exec@v3, with: {time_limit: "\${{ inputs.n }}"}}
+  - {id: b, use: unicon/exec@v3, with: {source: "\${{ steps.a.output }}"}}
+  - {id: c, use: unicon/exec@v3, with: {source: "\${{ steps.b.output }}"}}
+  - {id: d, use: unicon/exec@v3, with: {source: "\${{ steps.c.output }}"}}
+  - {id: e, use: unicon/exec@v3, with: {source: "\${{ steps.d.output }}"}}
 outputs:
   out: {from: "\${{ steps.e.output }}"}
 `);
@@ -433,7 +433,7 @@ outputs:
     const text = `
 steps:
   - {id: inner, use: kenny/inner@v1, with: {}}
-  - {id: run, use: unicon/exec@v2, with: {source: "\${{ steps.inner.out }}"}}
+  - {id: run, use: unicon/exec@v3, with: {source: "\${{ steps.inner.out }}"}}
 `;
     const parsed = parseYaml(text);
     if ('error' in parsed) throw new Error(parsed.error);
@@ -494,8 +494,8 @@ steps:
     const layout = laid(
       `
 steps:
-  - {id: a, use: unicon/exec@v2, with: {source: "\${{ steps.b.output }}"}}
-  - {id: b, use: unicon/exec@v2, with: {source: "\${{ steps.a.output }}"}}
+  - {id: a, use: unicon/exec@v3, with: {source: "\${{ steps.b.output }}"}}
+  - {id: b, use: unicon/exec@v3, with: {source: "\${{ steps.a.output }}"}}
 `,
       { open: new Set() },
     );
@@ -508,8 +508,8 @@ steps:
   it('colours the first step’s column first when the workflow has no inputs', () => {
     const layout = laid(`
 steps:
-  - {id: a, use: unicon/exec@v2, with: {}}
-  - {id: b, use: unicon/exec@v2, with: {source: "\${{ steps.a.output }}"}}
+  - {id: a, use: unicon/exec@v3, with: {}}
+  - {id: b, use: unicon/exec@v3, with: {source: "\${{ steps.a.output }}"}}
 `);
 
     expect(boxAt(layout, 'step:0').column).toBe(0);
@@ -523,9 +523,9 @@ steps:
 inputs:
   n: number
 steps:
-  - {id: a, use: unicon/exec@v2, with: {time_limit: "\${{ inputs.n }}"}}
-  - {id: b, use: unicon/exec@v2, with: {memory_limit: "\${{ inputs.n }}"}}
-  - {id: c, use: unicon/exec@v2, with: {source: "\${{ steps.a.output }}", stdin: "\${{ steps.b.output }}"}}
+  - {id: a, use: unicon/exec@v3, with: {time_limit: "\${{ inputs.n }}"}}
+  - {id: b, use: unicon/exec@v3, with: {memory_limit: "\${{ inputs.n }}"}}
+  - {id: c, use: unicon/exec@v3, with: {source: "\${{ steps.a.output }}", stdin: "\${{ steps.b.output }}"}}
 `,
       { open: new Set(['step:0']) },
     );
@@ -551,9 +551,9 @@ steps:
 inputs:
   code: folder
 steps:
-  - {id: solution, use: unicon/exec@v2, with: {source: "\${{ inputs.code }}"}}
+  - {id: solution, use: unicon/exec@v3, with: {source: "\${{ inputs.code }}"}}
   - id: compare
-    use: unicon/exec@v2
+    use: unicon/exec@v3
     with:
       source: \${{ workflow.diff/ }}
       manifest: \${{ workflow.diff/program.yaml }}

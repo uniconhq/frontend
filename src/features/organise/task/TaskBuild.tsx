@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { TaskResumeUploads } from '../files/TaskUpload';
 import { useQueryClient } from '@tanstack/react-query';
 import { $api, queryView } from '@/api/query';
 import { toApiError } from '@/api/problem';
@@ -496,6 +497,7 @@ function BuildForm({
         onChange={set}
       />
       {reading !== null && <ErrorBlock error={toApiError(reading)} compact />}
+      {manager && <TaskResumeUploads place={place} disabled={disabled} />}
       <SaveBar
         lines={toSave ? lines : []}
         notices={[]}

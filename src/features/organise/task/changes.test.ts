@@ -5,7 +5,7 @@ import { changeLines } from './changes';
 function task(overrides: Partial<TaskValues> = {}): TaskValues {
   return {
     name: 'Sum',
-    workflow: 'unicon/classic@v4',
+    workflow: 'unicon/classic@v5',
     inputs: [],
     axes: [],
     scoreGroups: [],
