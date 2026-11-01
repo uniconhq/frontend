@@ -134,6 +134,21 @@ function Consequence({ asking }: { asking: Asking }) {
       </>
     );
   }
+  const { grading } = asking.entry;
+  const entrant = entrantOf(asking.entry);
+  const submission = `${submitterOf(asking.entry.by)}'s submission ${String(grading.submission_number)}`;
+  if (
+    (asking.kind === 'retry' || asking.kind === 'from-scratch') &&
+    grading.retry_limit !== null
+  ) {
+    return (
+      <OverLimitRetry
+        asking={asking}
+        submission={submission}
+        limit={grading.retry_limit}
+      />
+    );
+  }
   if (asking.kind === 'from-scratch')
     return (
       <BodyText>
@@ -141,20 +156,8 @@ function Consequence({ asking }: { asking: Asking }) {
         times.
       </BodyText>
     );
-  const { grading } = asking.entry;
-  const entrant = entrantOf(asking.entry);
-  const submission = `${submitterOf(asking.entry.by)}'s submission ${String(grading.submission_number)}`;
   if (asking.kind === 'retry') {
     const standing = grading.status === 'done' || grading.last_good !== null;
-    if (grading.retry_limit !== null) {
-      return (
-        <OverLimitRetry
-          asking={asking}
-          submission={submission}
-          limit={grading.retry_limit}
-        />
-      );
-    }
     return (
       <>
         <BodyText>
@@ -211,7 +214,7 @@ function OverLimitRetry({
   submission,
   limit,
 }: {
-  asking: Extract<Asking, { kind: 'retry' }>;
+  asking: Extract<Asking, { kind: 'retry' | 'from-scratch' }>;
   submission: string;
   limit: number;
 }) {
