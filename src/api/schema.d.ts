@@ -1240,10 +1240,10 @@ export interface paths {
          * Give an entrant more time on the contest's tasks
          * @description It moves the entrant's due and close on the named tasks, or on every
          *     task when none are named, in place of any extension it had; zero takes
-         *     it away. One that names a task the contest does not list, would let it
-         *     submit to a task whose reveal has passed, or would leave one of its
-         *     submissions after the due or the close it was made before is
-         *     `invalid_extension`.
+         *     it away. An extension allowing submissions after hidden results were
+         *     shown asks with `confirmation_required` and `hiding`; `confirm` saves it.
+         *     Unknown tasks, or shortening an extension past an existing submission
+         *     or its due time, remain `invalid_extension`.
          */
         put: operations["extendEntrant"];
         post?: never;
@@ -1710,6 +1710,27 @@ export interface paths {
          *     latest is the one to cancel.
          */
         post: operations["cancelGrading"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org}/contests/{contest}/tasks/{task}/gradings/{grading}/from-scratch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Measure a submission again without reusing its stored outputs
+         * @description A new early attempt on the same publication; its measurements replace
+         *     this submission's stored times. The normal retry guards still apply.
+         */
+        post: operations["regradeFromScratch"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3967,6 +3988,11 @@ export interface components {
          *     none, in place of any extension there was.
          */
         ExtensionRequest: {
+            /**
+             * Confirm
+             * @default false
+             */
+            confirm: boolean;
             /** Seconds */
             seconds: number;
             /** Tasks */
@@ -5126,6 +5152,11 @@ export interface components {
             code: string;
             /** Detail */
             detail: string;
+            /**
+             * Hiding
+             * @default null
+             */
+            hiding: string[] | null;
             /** Status */
             status: number;
             /** Title */
@@ -9994,6 +10025,40 @@ export interface operations {
                 "application/json": components["schemas"]["CancelRequest"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Grading"];
+                };
+            };
+            /** @description An error, as an RFC 9457 problem document. `code` names it. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    regradeFromScratch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                contest: string;
+                grading: string;
+                org: string;
+                task: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {

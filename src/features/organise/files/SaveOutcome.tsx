@@ -228,6 +228,10 @@ export function SaveOutcome<Body = WriteFile>({
             </BodyText>
           </>
         )}
+        <Notes
+          label="Entrants have already seen this"
+          notes={stringsOf(error, 'hiding')}
+        />
         <div className={classes.actions}>
           <Button onClick={() => onConfirm(body, askedOf(error))}>
             {onKeepAsDraft === undefined ? 'Save the change' : 'Publish the change'}

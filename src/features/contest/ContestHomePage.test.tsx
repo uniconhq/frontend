@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@/test/user-event';
 import { http, HttpResponse } from 'msw';
-import type { TaskRelease } from '@/api/types';
+import type { ContestHome, TaskRelease } from '@/api/types';
 
 import { formatWhen } from '@/lib/time';
 import { renderApp } from '@/test/render';
@@ -20,6 +20,19 @@ import {
 import { passTime, withFakeTimers } from '@/test/timers';
 
 const PAGE = '/contests/acme/spring';
+
+const standing: ContestHome['standing'] = ['points', 'speed'].map((key) => ({
+  key,
+  title: key === 'points' ? 'Points' : 'Speed',
+  headers: [],
+  sort: [],
+  dropped: [],
+  rows: [
+    { row: { entrant: 'bob', name: 'Bob' }, place: 1, cells: [], held: 0, grading: 0 },
+  ],
+  audience: { rows: 'own', who: 'entrants' },
+  held_from: null,
+}));
 
 describe('the contest page for a signed-in person', () => {
   it('shows the contest, a countdown to its end and its released tasks', async () => {
@@ -53,14 +66,16 @@ describe('the contest page for a signed-in person', () => {
     server.use(
       signedIn,
       http.get(`${CONTEST_API}/home`, () =>
-        HttpResponse.json(home({ registration: registration({ status: 'approved' }) })),
+        HttpResponse.json(
+          home({ registration: registration({ status: 'approved' }), standing }),
+        ),
       ),
     );
     renderApp(PAGE);
 
     const timer = await screen.findByRole('timer', { name: 'Contest countdown' });
     const tasks = screen.getByRole('heading', { name: 'Tasks' });
-    const board = await screen.findByRole('heading', { name: 'Leaderboards' });
+    const board = await screen.findByRole('heading', { name: 'Your standing' });
     const announcements = screen.getByRole('heading', { name: 'Announcements' });
     const questions = screen.getByRole('region', {
       name: 'Questions to the organisers',
@@ -104,7 +119,8 @@ describe('the contest page for a signed-in person', () => {
     );
     renderApp(PAGE);
 
-    expect(await screen.findByText('Nothing is on a leaderboard yet.')).toBeVisible();
+    await screen.findByRole('heading', { name: 'Tasks' });
+    expect(screen.queryByRole('heading', { name: 'Your standing' })).toBeNull();
   });
 
   it('links one who is no approved entrant, such as an organiser, to the leaderboards', async () => {
@@ -124,17 +140,29 @@ describe('the contest page for a signed-in person', () => {
     expect(screen.queryByText('Nothing is on a leaderboard yet.')).toBeNull();
   });
 
-  it('shows the leaderboard note when the person is in', async () => {
+  it('shows each standing with a link to its board and omits boards without rows', async () => {
     server.use(
       signedIn,
       http.get(`${CONTEST_API}/home`, () =>
-        HttpResponse.json(home({ registration: registration({ status: 'approved' }) })),
+        HttpResponse.json(
+          home({
+            registration: registration({ status: 'approved' }),
+            standing: [
+              ...standing,
+              { ...standing[0]!, key: 'empty', title: 'Empty', rows: [] },
+            ],
+          }),
+        ),
       ),
     );
     renderApp(PAGE);
-
-    await screen.findByRole('heading', { name: 'Tasks' });
-    expect(await screen.findByText('Nothing is on a leaderboard yet.')).toBeVisible();
+    expect(await screen.findByRole('heading', { name: 'Your standing' })).toBeVisible();
+    for (const board of standing)
+      expect(screen.getByRole('link', { name: board.title })).toHaveAttribute(
+        'href',
+        `${PAGE}/leaderboards/${board.key}`,
+      );
+    expect(screen.queryByRole('table', { name: 'Empty' })).toBeNull();
   });
 
   it('leads an organiser of the contest back to organising it, and nobody else', async () => {
@@ -244,7 +272,7 @@ describe('the contest page for a signed-in person', () => {
       'href',
       '/contests/acme/spring/tasks/a',
     );
-    expect(screen.getByText('Nothing is on a leaderboard yet.')).toBeVisible();
+    expect(screen.queryByRole('heading', { name: 'Your standing' })).toBeNull();
     expect(screen.queryByRole('columnheader')).toBeNull();
   });
 

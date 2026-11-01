@@ -26,6 +26,7 @@ function asks() {
         : problem(409, 'confirmation_required', {
             detail: 'The contest is running. Save it?',
             changes: ["The Standings leaderboard's columns change."],
+            hiding: ['Entrants may have kept results shown since noon.'],
             asked: 'contest-v1',
           });
     }),
@@ -36,6 +37,9 @@ function asks() {
 async function confirm(sent: WriteFile[]) {
   const save = await screen.findByRole('button', { name: 'Save the change' });
   expect(screen.queryByRole('button', { name: 'Keep as draft' })).toBeNull();
+  expect(
+    screen.getByRole('list', { name: 'Entrants have already seen this' }),
+  ).toHaveTextContent('results shown since noon');
   expect(sent).toHaveLength(1);
   await userEvent.click(save);
   await waitFor(() => expect(sent).toHaveLength(2));

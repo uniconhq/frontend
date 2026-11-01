@@ -8,6 +8,7 @@ const LIVE_PATH = '/api/v1/live';
 const SESSION_PATH = '/api/v1/me';
 /** How long nudges are gathered before the reads they name refetch. */
 const GATHER_MS = 300;
+const LEADERBOARD_READ = /\/leaderboards(?:\/\{leaderboard\})?$/;
 /** How long after a stream is refused it is opened again, doubling to the last. */
 const REOPEN_MS = [5_000, 10_000, 20_000, 40_000, 60_000];
 
@@ -30,7 +31,7 @@ const STALE: Record<string, (path: string) => boolean> = {
     path.endsWith('/gradings/queue') ||
     path.endsWith('/gradings/regrades') ||
     path.endsWith('/home') ||
-    path.endsWith('/leaderboards'),
+    LEADERBOARD_READ.test(path),
   announcement: (path) => path.includes('/announcements'),
   clarification: (path) =>
     path.endsWith('/questions') || path.includes('/clarifications'),
@@ -42,7 +43,7 @@ const STALE: Record<string, (path: string) => boolean> = {
   results: (path) =>
     (path.includes('/submissions') && !path.endsWith('/files')) ||
     path.endsWith('/home') ||
-    path.endsWith('/leaderboards'),
+    LEADERBOARD_READ.test(path),
 };
 
 function readAt(query: Query): string | null {
