@@ -27,6 +27,27 @@ function at(iso: string): string {
 }
 
 describe('the task page', () => {
+  it('shows the picked toolchain and whether its version was named', async () => {
+    server.use(
+      signedIn,
+      publicationList,
+      ...repoFiles,
+      http.get(TASK_API, () =>
+        HttpResponse.json({
+          ...publishedTask,
+          toolchains: {
+            cpp: { picked: 'gxx 14.3.0', version: '14' },
+            python: { picked: 'python 3.14.3', version: null },
+          },
+        }),
+      ),
+    );
+    renderApp(TASK);
+    expect(await screen.findByText('C++: gcc 14.3.0 (named 14)')).toBeInTheDocument();
+    expect(
+      await screen.findByText('Python: 3.14.3 (newest when first prepared)'),
+    ).toBeInTheDocument();
+  });
   it('says what contestants are graded on, under the task’s name', async () => {
     server.use(signedIn, taskState, publicationList, ...repoFiles);
     renderApp(TASK);

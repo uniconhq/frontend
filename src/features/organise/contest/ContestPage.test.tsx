@@ -280,6 +280,7 @@ describe("the contest's tasks", () => {
         errors: [{ path: '', message: 'task.yaml is missing.' }],
         statement_written: false,
         head_statement_written: false,
+        toolchains: {},
         results: { history: [], released: false },
       },
       timeline: {
@@ -902,6 +903,7 @@ describe('creating a task', () => {
             errors: [],
             statement_written: false,
             head_statement_written: false,
+            toolchains: {},
             results: { history: [], released: false },
           },
           timeline: {

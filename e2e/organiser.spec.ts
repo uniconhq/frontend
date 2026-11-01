@@ -59,6 +59,7 @@ async function stubOrganiserApi(page: Page) {
     errors: [],
     statement_written: true,
     head_statement_written: true,
+    toolchains: {},
     results: { released: false, history: [] },
   });
 

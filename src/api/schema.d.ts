@@ -6679,6 +6679,10 @@ export interface components {
             results: components["schemas"]["Results"];
             /** Statement Written */
             statement_written: boolean;
+            /** Toolchains */
+            toolchains: {
+                [key: string]: components["schemas"]["Toolchain"];
+            };
         };
         /**
          * TextRef
@@ -6717,6 +6721,13 @@ export interface components {
              * Format: date-time
              */
             release_at: string;
+        };
+        /** Toolchain */
+        Toolchain: {
+            /** Picked */
+            picked: string;
+            /** Version */
+            version: string | null;
         };
         /** Transfer */
         Transfer: {

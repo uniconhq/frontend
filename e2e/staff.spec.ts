@@ -13,6 +13,7 @@ const TASK = {
   errors: [],
   head: 'v1',
   head_statement_written: true,
+  toolchains: {},
   latest: null,
   statement_written: true,
   results: {
