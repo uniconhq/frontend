@@ -228,6 +228,7 @@ test('a column’s flow shows its task and its picked column, and its tray uses 
       problem: null,
       inputs: [],
       graded: false,
+      yanked: null,
       text_values: [],
     } satisfies Schemas['WorkflowForm']),
   );

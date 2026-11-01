@@ -260,6 +260,7 @@ describe('the task page', () => {
           problem: null,
           graded: false,
           inputs: [],
+          yanked: null,
           text_values: null,
         } satisfies WorkflowForm),
       ),
@@ -285,8 +286,8 @@ describe('the task page', () => {
       ),
     ).toHaveValue('Write the sum of two numbers.\n');
     expect(
-      within(screen.getByRole('region', { name: 'Workflow' })).getByRole('combobox', {
-        name: 'Version',
+      within(screen.getByRole('region', { name: 'Workflow' })).getByRole('button', {
+        name: 'Choose a workflow',
       }),
     ).toBeVisible();
     const sidebar = screen.getByRole('group', { name: 'Task' });

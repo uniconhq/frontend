@@ -75,6 +75,8 @@ async function stubOrganiserApi(page: Page) {
   await page.route('**/api/v1/workflows', (route) =>
     json(route, [
       {
+        description: '',
+        yanked: {},
         owner: 'unicon',
         name: 'classic',
         versions: ['v4'],
@@ -223,6 +225,7 @@ async function stubOrganiserApi(page: Page) {
           input('memory_limit', 'number', { title: 'Memory limit', unit: 'MB' }),
         ],
         graded: false,
+        yanked: null,
         text_values: null,
       } satisfies Schemas['WorkflowForm']);
     }
@@ -672,6 +675,7 @@ test('the Runs card pairs files, lines up its cells, and gives a cell to the ent
           newer: null,
           problem: null,
           graded: false,
+          yanked: null,
           text_values: [],
           inputs: ['input', 'answer'].map((id) => ({
             id,
@@ -812,6 +816,7 @@ test('long run paths and report titles stay within the page and their Result row
           newer: null,
           problem: null,
           graded: false,
+          yanked: null,
           text_values: [],
           inputs: [
             {

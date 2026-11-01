@@ -953,23 +953,26 @@ describe('creating a task', () => {
     standingsAndCreate();
     const saves: { changes: { path: string; content: string; token: string }[] }[] = [];
     server.use(
-      http.get('/api/v1/workflows', () =>
-        HttpResponse.json([
-          {
-            owner: 'unicon',
-            name: 'classic',
-            versions: ['v4'],
-            editable: false,
-            visibility: 'public',
-          },
-          {
-            owner: 'unicon',
-            name: 'classic-folder',
-            versions: ['v1'],
-            editable: false,
-            visibility: 'public',
-          },
-        ]),
+      http.get('/api/v1/workflow-search', () =>
+        HttpResponse.json({
+          items: [
+            {
+              owner: 'unicon',
+              name: 'classic',
+              versions: ['v4'],
+              editable: false,
+              visibility: 'public',
+            },
+            {
+              owner: 'unicon',
+              name: 'classic-folder',
+              versions: ['v1'],
+              editable: false,
+              visibility: 'public',
+            },
+          ],
+          next: null,
+        }),
       ),
       http.get('/api/v1/workflows/unicon/classic-folder/versions/v1', () =>
         HttpResponse.json({
@@ -1009,9 +1012,11 @@ describe('creating a task', () => {
     await user.click(await screen.findByRole('button', { name: 'New task' }));
     const form = screen.getByRole('form', { name: 'New task' });
     await user.type(within(form).getByRole('textbox', { name: /^Name/ }), 'max');
-    await user.selectOptions(
-      await within(form).findByRole('combobox', { name: 'Workflow' }),
-      'unicon/classic-folder',
+    await user.click(
+      await within(form).findByRole('button', { name: 'Choose a workflow' }),
+    );
+    await user.click(
+      await screen.findByRole('button', { name: 'Choose unicon/classic-folder' }),
     );
     await user.click(within(form).getByRole('button', { name: 'Create task' }));
 
@@ -1036,16 +1041,19 @@ describe('creating a task', () => {
     server.use(signedIn, ...repoFiles);
     standingsAndCreate();
     server.use(
-      http.get('/api/v1/workflows', () =>
-        HttpResponse.json([
-          {
-            owner: 'unicon',
-            name: 'classic',
-            versions: ['v2'],
-            editable: false,
-            visibility: 'public',
-          },
-        ]),
+      http.get('/api/v1/workflow-search', () =>
+        HttpResponse.json({
+          items: [
+            {
+              owner: 'unicon',
+              name: 'classic',
+              versions: ['v2'],
+              editable: false,
+              visibility: 'public',
+            },
+          ],
+          next: null,
+        }),
       ),
     );
     renderApp(CONTEST);
@@ -1053,12 +1061,15 @@ describe('creating a task', () => {
     const user = userEvent.setup();
     await user.click(await screen.findByRole('button', { name: 'New task' }));
     const form = screen.getByRole('form', { name: 'New task' });
-    const workflow = await within(form).findByRole('combobox', { name: 'Workflow' });
+    await user.click(
+      await within(form).findByRole('button', { name: 'Choose a workflow' }),
+    );
+    const workflow = await screen.findByRole('dialog', { name: 'Find a workflow' });
     expect(
-      within(workflow).getByRole('option', { name: 'unicon/classic' }),
+      await within(workflow).findByRole('button', { name: 'Choose unicon/classic' }),
     ).toBeVisible();
     expect(
-      within(workflow).queryByRole('option', { name: 'unicon/classic-folder' }),
+      within(workflow).queryByRole('button', { name: 'Choose unicon/classic-folder' }),
     ).toBeNull();
   });
 

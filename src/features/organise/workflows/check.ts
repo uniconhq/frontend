@@ -6,12 +6,13 @@ import { apiClient } from '@/api/client';
  * make a version. Each text is checked once, since the answer for the same
  * text does not change while the page is open.
  */
-export function checkQuery(text: string) {
+export function checkQuery(text: string, paths?: readonly string[]) {
+  const ordered = paths === undefined ? undefined : [...paths].sort();
   return {
-    queryKey: ['workflow-check', text],
+    queryKey: ['workflow-check', text, ordered],
     queryFn: async () => {
       const { data } = await apiClient.POST('/api/v1/workflows/check', {
-        body: { content: text },
+        body: { content: text, ...(ordered === undefined ? {} : { paths: ordered }) },
       });
       return data?.problems ?? [];
     },

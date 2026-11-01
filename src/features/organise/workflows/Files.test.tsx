@@ -12,9 +12,29 @@ describe('the workflow files', () => {
     const backend = workflowBackend(CLASSIC);
     const sent: unknown[] = [];
     let published: unknown;
+    let savedFile = false;
+    const checked: string[][] = [];
     server.use(signedIn, ...backend.handlers);
     server.use(
-      http.get(`${WORKFLOW_API}/tree`, () => HttpResponse.json([])),
+      http.post('/api/v1/workflows/check', async ({ request }) => {
+        const { paths } = (await request.json()) as { paths?: string[] };
+        checked.push(paths ?? []);
+        return HttpResponse.json({
+          problems: paths?.includes('scorer/main.py')
+            ? []
+            : [
+                {
+                  path: 'steps[0].with.source',
+                  message: 'There is no file scorer/main.py in this workflow.',
+                },
+              ],
+        });
+      }),
+      http.get(`${WORKFLOW_API}/tree`, () =>
+        HttpResponse.json(
+          savedFile ? [{ path: 'scorer/main.py', type: 'file', size: 10 }] : [],
+        ),
+      ),
       http.get(`${WORKFLOW_API}/files/*`, () => problem(404, 'not_found')),
       http.post(`${WORKFLOW_API}/uploads`, async ({ request }) => {
         sent.push(await request.json());
@@ -31,6 +51,7 @@ describe('the workflow files', () => {
       ),
       http.put(`${WORKFLOW_API}/draft`, async ({ request }) => {
         sent.push(await request.json());
+        savedFile = true;
         return HttpResponse.json({
           content: CLASSIC,
           token: 'saved',
@@ -44,6 +65,7 @@ describe('the workflow files', () => {
     );
     const user = userEvent.setup();
     renderApp(EDITOR_PAGE);
+    await screen.findAllByText('There is no file scorer/main.py in this workflow.');
     const files = await openFiles(user);
     // The folder is beside the drop, and the drop uploads at once.
     await user.type(
@@ -55,6 +77,13 @@ describe('the workflow files', () => {
       new File(['print(42)\n'], 'main.py'),
     );
     await within(files).findByText('scorer/main.py: uploaded, waiting for Save');
+    await waitFor(() => expect(checked.at(-1)).toContain('scorer/main.py'));
+    await waitFor(() =>
+      expect(
+        screen.queryByText('There is no file scorer/main.py in this workflow.'),
+      ).toBeNull(),
+    );
+    expect(backend.state.saves).toEqual([]);
     // An upload waiting for Save is not in a version until it is saved.
     await user.click(barButton('Publish version'));
     expect(

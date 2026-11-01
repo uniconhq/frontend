@@ -40,6 +40,7 @@ async function stub(page: Page) {
         newer: null,
         problem: null,
         workflow: null,
+        yanked: null,
         text_values: null,
       } satisfies Schemas['WorkflowForm']);
     }

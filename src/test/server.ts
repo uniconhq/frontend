@@ -228,6 +228,7 @@ const emptyOrganising = [
       problem: null,
       inputs: [],
       graded: false,
+      yanked: null,
       text_values: [],
     } satisfies components['schemas']['WorkflowForm']),
   ),

@@ -390,6 +390,10 @@ describe('the workflow editor', () => {
       visibility: owner === 'kenny' ? 'private' : 'public',
       versions,
       editable: owner === 'kenny',
+      yanked:
+        name === 'inner'
+          ? { v1: { reason: 'Use v2', by: 7, at: '2026-11-01T00:00:00Z' } }
+          : {},
     });
     server.use(
       http.get('/api/v1/workflows', () =>
@@ -422,26 +426,37 @@ describe('the workflow editor', () => {
     expect(inner).toHaveTextContent('Private · v2');
     expect(within(workflows).getAllByRole('button')).toHaveLength(3);
     expect(
+      within(workflows).queryByRole('button', { name: 'kenny/inner@v1' }),
+    ).toBeNull();
+    expect(
       within(workflows).queryByRole('button', { name: /kenny\/tuned/ }),
     ).toBeNull();
+    server.use(
+      http.get('/api/v1/workflow-search', ({ request }) => {
+        const q = new URL(request.url).searchParams.get('q') ?? '';
+        return HttpResponse.json({
+          items: q.includes('zzz') ? [] : [item('alice', 'other', ['v1'])],
+          next: null,
+        });
+      }),
+    );
+    await user.click(
+      within(workflows).getByRole('button', { name: 'Find a workflow' }),
+    );
+    const search = await screen.findByRole('dialog', { name: 'Find a workflow' });
     await user.type(
-      within(workflows).getByRole('textbox', { name: 'Find a workflow' }),
+      within(search).getByRole('textbox', { name: 'Search workflows' }),
+      'alicezzz',
+    );
+    await within(search).findByText('No workflows match.');
+    await user.clear(within(search).getByRole('textbox', { name: 'Search workflows' }));
+    await user.type(
+      within(search).getByRole('textbox', { name: 'Search workflows' }),
       'alice',
     );
-    expect(within(workflows).getAllByRole('button')).toHaveLength(1);
-    await user.type(
-      within(workflows).getByRole('textbox', { name: 'Find a workflow' }),
-      'zzz',
+    await user.click(
+      await within(search).findByRole('button', { name: 'Choose alice/other' }),
     );
-    expect(workflows).toHaveTextContent('No workflow matches.');
-    await user.clear(
-      within(workflows).getByRole('textbox', { name: 'Find a workflow' }),
-    );
-    await user.type(
-      within(workflows).getByRole('textbox', { name: 'Find a workflow' }),
-      'alice',
-    );
-    await user.click(within(workflows).getByRole('button', { name: 'alice/other@v1' }));
 
     expect(await stepBox('other')).toHaveAttribute('data-open', 'true');
     expect(drawer('Step other')).toBeInTheDocument();

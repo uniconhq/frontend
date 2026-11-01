@@ -386,6 +386,7 @@ function BuildForm({
         saved={saved}
         newer={form?.newer ?? null}
         problem={form?.problem ?? null}
+        yanked={form?.yanked ?? null}
         value={values.workflow}
         onChange={(workflow) => set({ workflow })}
         disabled={disabled}

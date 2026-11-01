@@ -78,6 +78,7 @@ const UNREAD: WorkflowForm = {
   problem: 'The workflow unicon/checked@v1 cannot be read.',
   graded: false,
   newer: null,
+  yanked: null,
   text_values: null,
 };
 
@@ -118,6 +119,7 @@ const CHECKED: WorkflowForm = {
     declared('greeting', 'text', { optional: true }),
     declared('token', 'text'),
   ],
+  yanked: null,
   text_values: null,
 };
 
@@ -145,6 +147,8 @@ const TUNABLE_YAML = CHECKED_YAML.replace('  checker: file\n', '').replace(
 
 const WORKFLOWS: WorkflowItem[] = [
   {
+    description: '',
+    yanked: {},
     owner: 'unicon',
     name: 'checked',
     versions: ['v1', 'v3'],
@@ -152,6 +156,8 @@ const WORKFLOWS: WorkflowItem[] = [
     visibility: 'public',
   },
   {
+    description: '',
+    yanked: {},
     owner: 'my-org',
     name: 'tunable',
     versions: ['v1'],
@@ -214,6 +220,9 @@ function taskBackend(
     }),
     http.get(`${TASK_API}/workflow-form`, () => HttpResponse.json(declaredNow)),
     http.get('/api/v1/workflows', () => HttpResponse.json(WORKFLOWS)),
+    http.get('/api/v1/workflow-search', () =>
+      HttpResponse.json({ items: WORKFLOWS, next: null }),
+    ),
     http.get('/api/v1/workflows/:owner/:name/versions/:version', ({ params }) =>
       HttpResponse.json({
         content: params['name'] === 'tunable' ? TUNABLE_YAML : CHECKED_YAML,
@@ -648,7 +657,9 @@ describe('the cards that build a task', { timeout: 30_000 }, () => {
           }),
         );
       await waitFor(() =>
-        expect(screen.getByRole('combobox', { name: 'Version' })).toHaveValue('v3'),
+        expect(
+          within(workflow).getByText('unicon/checked@v3', { exact: true }),
+        ).toBeVisible(),
       );
       await waitFor(() => expect(checker().getByText('checker.py, 9 B')).toBeVisible());
       expect(checker().getByText('Replaced')).toBeVisible();
@@ -710,7 +721,9 @@ describe('the cards that build a task', { timeout: 30_000 }, () => {
     ).toBeVisible();
     await userEvent.click(within(notice).getByRole('button', { name: 'Use v3' }));
 
-    expect(within(workflow).getByLabelText('Version')).toHaveValue('v3');
+    expect(
+      within(workflow).getByText('unicon/checked@v3', { exact: true }),
+    ).toBeVisible();
     expect(sent).toEqual([]);
     await save();
     expect(written(await waitForSave(sent))['workflow']).toBe('unicon/checked@v3');
@@ -782,14 +795,12 @@ describe('the cards that build a task', { timeout: 30_000 }, () => {
     asManager();
     const { workflow } = await openTask();
 
-    const picked = await within(workflow).findByLabelText(/^Workflow/);
     expect(
-      await within(picked).findByRole('option', { name: 'judgekit/special' }),
-    ).toBeInTheDocument();
-    const versions = within(workflow).getByLabelText(/^Version/);
+      await within(workflow).findByText('judgekit/special@v1', { exact: true }),
+    ).toBeVisible();
     expect(
-      await within(versions).findByRole('option', { name: 'v2, the newest' }),
-    ).toBeInTheDocument();
+      await within(workflow).findByRole('button', { name: 'Choose a workflow' }),
+    ).toBeEnabled();
   });
 
   it('says the organiser cannot see a workflow they may not read', async () => {
@@ -803,12 +814,12 @@ describe('the cards that build a task', { timeout: 30_000 }, () => {
     asManager();
     const { workflow } = await openTask();
 
-    const picked = await within(workflow).findByLabelText(/^Workflow/);
     expect(
-      await within(picked).findByRole('option', {
-        name: 'someone/hidden (you cannot see it)',
-      }),
-    ).toBeInTheDocument();
+      await within(workflow).findByText('This workflow could not be read.'),
+    ).toBeVisible();
+    expect(
+      within(workflow).getByText('someone/hidden@v1', { exact: true }),
+    ).toBeVisible();
   });
 
   it('shows the inputs of another workflow as soon as it is chosen, and drops those it does not have', async () => {
@@ -817,7 +828,12 @@ describe('the cards that build a task', { timeout: 30_000 }, () => {
     const { inputs, workflow } = await openTask();
 
     expect(within(inputs).getByRole('group', { name: 'checker' })).toBeVisible();
-    fill(await within(workflow).findByLabelText(/^Workflow/), 'my-org/tunable');
+    await userEvent.click(
+      await within(workflow).findByRole('button', { name: 'Choose a workflow' }),
+    );
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Choose my-org/tunable' }),
+    );
     await waitFor(() =>
       expect(within(inputs).queryByRole('group', { name: 'checker' })).toBeNull(),
     );
@@ -854,7 +870,12 @@ repeat:
     const runs = screen.getByRole('region', { name: 'Runs' });
     expect(within(runs).getByRole('columnheader', { name: /checker/i })).toBeVisible();
 
-    fill(await within(workflow).findByLabelText(/^Workflow/), 'my-org/tunable');
+    await userEvent.click(
+      await within(workflow).findByRole('button', { name: 'Choose a workflow' }),
+    );
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Choose my-org/tunable' }),
+    );
     await waitFor(() =>
       expect(within(runs).queryByRole('columnheader', { name: /checker/i })).toBeNull(),
     );
@@ -1283,6 +1304,7 @@ function runForm(workflow: string, inputs: DeclaredInput[]): WorkflowForm {
     graded: false,
     newer: null,
     inputs,
+    yanked: null,
     text_values: null,
   };
 }
