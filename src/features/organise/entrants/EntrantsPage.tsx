@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useSearchParams } from 'react-router';
 import { useQueryClient } from '@tanstack/react-query';
+import { isApiError } from '@/api/problem';
+import { SaveOutcome, type Outcome } from '../files/SaveOutcome';
 import { useChange, type Change } from '@/api/change';
 import { $api, queryView } from '@/api/query';
 import type { EntrantStatus, OrganisedEntrant, OrganisedMember } from '@/api/types';
@@ -146,6 +148,11 @@ function Manage({
   const [name, setName] = useState(entrant.name ?? '');
   const [minutes, setMinutes] = useState(String(minutesOf(entrant.time_extension)));
   const [only, setOnly] = useState<string[] | null>(entrant.extension_tasks);
+  const [extensionOutcome, setExtensionOutcome] = useState<Outcome<{
+    seconds: number;
+    tasks: string[] | null;
+    confirm?: boolean;
+  }> | null>(null);
   const [typed, setTyped] = useState('');
   const [asking, setAsking] = useState<
     | { kind: 'remove'; member: OrganisedMember }
@@ -185,6 +192,33 @@ function Manage({
     );
   };
 
+  const sendExtension = async (body: {
+    seconds: number;
+    tasks: string[] | null;
+    confirm?: boolean;
+  }) => {
+    setExtensionOutcome(null);
+    await run('extension', async () => {
+      try {
+        await extend.mutateAsync({
+          params: { path: here },
+          body: { confirm: false, ...body },
+        });
+      } catch (error) {
+        if (isApiError(error) && error.code === 'confirmation_required') {
+          setExtensionOutcome({ kind: 'refused', error, body });
+          return;
+        }
+        throw error;
+      }
+      setSaid(
+        body.seconds === 0
+          ? 'The extra time is taken away.'
+          : 'The extra time is saved.',
+      );
+    });
+  };
+
   const submitExtension = (event: FormEvent) => {
     event.preventDefault();
     const checked = checkedMinutes(minutes);
@@ -192,15 +226,7 @@ function Manage({
       setSaid('Give a whole number of minutes, up to a year.');
       return;
     }
-    void run(
-      'extension',
-      () =>
-        extend.mutateAsync({
-          params: { path: here },
-          body: { seconds: checked * 60, tasks: only },
-        }),
-      checked === 0 ? 'The extra time is taken away.' : 'The extra time is saved.',
-    );
+    void sendExtension({ seconds: checked * 60, tasks: only });
   };
 
   const submitInvite = (event: FormEvent) => {
@@ -221,6 +247,15 @@ function Manage({
 
   return (
     <div className={classes.stack}>
+      {extensionOutcome !== null && (
+        <SaveOutcome
+          outcome={extensionOutcome}
+          bare
+          onConfirm={(body) => void sendExtension({ ...body, confirm: true })}
+          onCancel={() => setExtensionOutcome(null)}
+          onReload={() => setExtensionOutcome(null)}
+        />
+      )}
       {teams && (
         <form className={classes.inline} aria-label="Rename" onSubmit={submitName}>
           <TextInput label="Name" value={name} onChange={setName} maxLength={60} />

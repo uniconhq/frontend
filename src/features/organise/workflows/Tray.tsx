@@ -1,7 +1,16 @@
 import { useState, type ReactNode } from 'react';
 import { BodyText } from '@/ui/BodyText';
-import { TextInput } from '@/ui/TextInput';
-import { formatUse, type BoxDecl, type PaletteWorkflow } from './boxes';
+import { Button } from '@/ui/Button';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { WorkflowSearch } from './WorkflowSearch';
+import {
+  boxOptions,
+  parseUse,
+  formatUse,
+  type BoxDecl,
+  type PaletteWorkflow,
+  type UseRef,
+} from './boxes';
 import { VALUE_TYPES, type ValueType } from './model';
 import type { PrimitiveInfo } from './primitives';
 import { versionNumber } from './versions';
@@ -83,12 +92,14 @@ function TrayButton({
 export function Tray({
   primitives,
   workflows,
+  exclude,
   finding,
   onInput,
   onPrimitive,
   onWorkflow,
 }: {
   primitives: PrimitiveInfo[];
+  exclude: string;
   /** Run workflows, never this one, each with its box. */
   workflows: (PaletteWorkflow & { box: BoxDecl })[];
   /** Whether the workflows are still being read, could not be, or are all here. */
@@ -97,13 +108,17 @@ export function Tray({
   onPrimitive: (primitive: PrimitiveInfo) => void;
   onWorkflow: (workflow: PaletteWorkflow) => void;
 }) {
-  const [find, setFind] = useState('');
-  const query = find.trim().toLowerCase();
-  const found = workflows.filter(
-    (workflow) =>
-      query === '' ||
-      `${workflow.owner}/${workflow.name}`.toLowerCase().includes(query),
-  );
+  const [searching, setSearching] = useState(false);
+  const [refusal, setRefusal] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  // Closing the search or leaving the page forgets a choice still being read.
+  const choice = useMutation({
+    mutationFn: (use: UseRef) => queryClient.fetchQuery(boxOptions(use)),
+  });
+  const closeSearch = () => {
+    choice.reset();
+    setSearching(false);
+  };
   const steps = newest(primitives);
   return (
     <section className={classes.trays} aria-label="Add to the workflow">
@@ -138,8 +153,42 @@ export function Tray({
           ))}
         </TrayGroup>
         <TrayGroup title="Workflows">
-          <TextInput label="Find a workflow" value={find} onChange={setFind} />
-          {found.map((workflow) => {
+          <Button
+            variant="secondary"
+            onClick={() => {
+              setRefusal(null);
+              setSearching(true);
+            }}
+          >
+            Find a workflow
+          </Button>
+          {refusal !== null && <BodyText>{refusal}</BodyText>}
+          {searching && (
+            <WorkflowSearch
+              exclude={exclude}
+              problem={refusal}
+              choosing={choice.isPending}
+              onClose={closeSearch}
+              onChoose={(ref, item) => {
+                const use = parseUse(ref);
+                if (use === null || choice.isPending) return;
+                choice.mutate(use, {
+                  onSuccess: (box) => {
+                    if (!box.run) {
+                      setRefusal('Choose a run workflow to use as a step.');
+                      return;
+                    }
+                    onWorkflow({ ...use, visibility: item.visibility });
+                    setSearching(false);
+                    setRefusal(null);
+                  },
+                  onError: () =>
+                    setRefusal('This workflow could not be read. Try again.'),
+                });
+              }}
+            />
+          )}
+          {workflows.map((workflow) => {
             const ref = formatUse(workflow);
             return (
               <TrayButton
@@ -155,15 +204,13 @@ export function Tray({
               />
             );
           })}
-          {finding !== 'done' || found.length === 0 ? (
+          {finding !== 'done' || workflows.length === 0 ? (
             <BodyText size="sm" tone="secondary">
               {finding === 'reading'
                 ? 'Finding workflows…'
                 : finding === 'failed'
                   ? 'The workflows could not be read.'
-                  : workflows.length === 0
-                    ? 'No other workflow you can read runs as a step.'
-                    : 'No workflow matches.'}
+                  : 'No other workflow you can read runs as a step.'}
             </BodyText>
           ) : null}
         </TrayGroup>

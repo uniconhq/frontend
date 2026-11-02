@@ -1,27 +1,22 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { apiClient } from '@/api/client';
-import { type ApiError, toApiError } from '@/api/problem';
-import { arrival, hashOf, mustBeVerified, sendAndComplete } from '@/api/upload/door';
+import { ApiError, toApiError } from '@/api/problem';
+import { hashOf } from '@/api/upload/door';
+import { abortPartUpload, uploadInParts } from '@/api/upload/parts';
 import type { Place, WorkflowPlace } from './place';
 
 type TaskPlace = Extract<Place, { kind: 'task' }> | WorkflowPlace;
 
 /**
- * How many times a file is sent before the upload gives up: a cut connection
- * sends it again, from the start, to the same slot.
- */
-const SEND_TRIES = 3;
-
-/**
  * Where an organiser's upload is: not started, reading the file to work out
- * its SHA-256, sending it (the try it is on counting from 1), arrived and
- * waiting for the save that puts it into the task, or refused. Shares run
- * from 0 to 1.
+ * its SHA-256, sending it, being stored, arrived and waiting for the save that
+ * puts it into the task, or refused. Shares run from 0 to 1.
  */
 export type UploadState =
   | { stage: 'idle' }
   | { stage: 'hashing'; share: number }
-  | { stage: 'sending'; share: number; attempt: number }
+  | { stage: 'sending'; share: number }
+  | { stage: 'storing' }
   | { stage: 'arrived'; upload: string; path: string; token: string | null }
   | { stage: 'refused'; error: ApiError };
 
@@ -60,74 +55,35 @@ export async function tokenNow(place: TaskPlace, path: string): Promise<string |
 }
 
 /**
- * Puts a file through the upload door for a task, at a path, and answers the
- * upload's id: the SHA-256 with its progress, a slot for the path, the bytes
- * with their progress and the completion. A send the connection cut is sent
- * again from the start, to the same slot, after asking whether the bytes
- * arrived after all; a slot for a file the forge holds already needs nothing
- * sent. Nothing is in the task until a save names the upload.
+ * Hashes an organiser's file, resumes server-listed parts and waits for
+ * verified storage; aborting `signal` stops it and keeps the parts sent.
  */
 export async function sendToTask(
   place: TaskPlace,
   file: File,
   path: string,
   onState: (state: UploadState) => void = () => undefined,
+  expectedDigest?: string,
+  signal?: AbortSignal,
 ): Promise<string> {
   onState({ stage: 'hashing', share: 0 });
   const sha256 = await hashOf(file, (share) => onState({ stage: 'hashing', share }));
-  onState({ stage: 'sending', share: 0, attempt: 1 });
-  const body = {
+  if (expectedDigest !== undefined && sha256 !== expectedDigest)
+    throw new ApiError({
+      code: 'invalid_inputs',
+      status: 422,
+      title: 'Choose the same file to resume this upload',
+    });
+  onState({ stage: 'sending', share: 0 });
+  return uploadInParts(
+    place,
+    file,
     path,
-    size: file.size,
     sha256,
-    content_type: file.type === '' ? null : file.type,
-  };
-  const task =
-    place.kind === 'task'
-      ? { org: place.org, contest: place.contest, task: place.task }
-      : null;
-  const workflow =
-    place.kind === 'workflow' ? { owner: place.owner, name: place.name } : null;
-  const { data: slot } =
-    workflow !== null
-      ? await apiClient.POST('/api/v1/workflows/{owner}/{name}/uploads', {
-          params: { path: workflow },
-          body,
-        })
-      : await apiClient.POST(
-          '/api/v1/orgs/{org}/contests/{contest}/tasks/{task}/organise/uploads',
-          { params: { path: task! }, body },
-        );
-  if (slot === undefined) throw new Error('The upload could not be started.');
-  const completeSlot = async () => {
-    const { data } =
-      workflow !== null
-        ? await apiClient.POST(
-            '/api/v1/workflows/{owner}/{name}/uploads/{upload}/complete',
-            { params: { path: { ...workflow, upload: slot.id } } },
-          )
-        : await apiClient.POST(
-            '/api/v1/orgs/{org}/contests/{contest}/tasks/{task}/uploads/{upload}/complete',
-            { params: { path: { ...task!, upload: slot.id } } },
-          );
-    if (data === undefined) throw new Error('The upload could not be finished.');
-    return data;
-  };
-
-  for (let attempt = 1; ; attempt += 1) {
-    const share = (sent: number) => onState({ stage: 'sending', share: sent, attempt });
-    try {
-      const arrived = attempt === 1 ? null : await arrival(completeSlot);
-      share(0);
-      mustBeVerified(
-        arrived ?? (await sendAndComplete(slot, file, share, completeSlot)),
-      );
-      return slot.id;
-    } catch (error) {
-      const cut = toApiError(error).code === 'upload_failed';
-      if (!cut || attempt >= SEND_TRIES) throw error;
-    }
-  }
+    (share) => onState({ stage: 'sending', share }),
+    () => onState({ stage: 'storing' }),
+    signal,
+  );
 }
 
 /**
@@ -139,11 +95,15 @@ export async function sendToTask(
 export function useTaskUpload(place: TaskPlace) {
   const [state, setState] = useState<UploadState>({ stage: 'idle' });
   const busy = useRef(false);
+  const sending = useRef<AbortController | null>(null);
+  // Leaving the page stops sending and waiting; the parts sent stay to resume.
+  useEffect(() => () => sending.current?.abort(), []);
 
   const start = async (
     file: File,
     path: string,
     token?: string | null,
+    expectedDigest?: string,
   ): Promise<{ upload: string; path: string; token: string | null } | null> => {
     if (busy.current) return null;
     busy.current = true;
@@ -151,7 +111,16 @@ export function useTaskUpload(place: TaskPlace) {
       // The token is the one the caller read the file with, or the file's as
       // the upload starts, so a change made meanwhile is a conflict at the save.
       const current = token === undefined ? await tokenNow(place, path) : token;
-      const upload = await sendToTask(place, file, path, setState);
+      const controller = new AbortController();
+      sending.current = controller;
+      const upload = await sendToTask(
+        place,
+        file,
+        path,
+        setState,
+        expectedDigest,
+        controller.signal,
+      );
       const arrived = { upload, path, token: current };
       setState({ stage: 'arrived', ...arrived });
       return arrived;
@@ -166,6 +135,15 @@ export function useTaskUpload(place: TaskPlace) {
   return {
     state,
     start,
+    cancel: async (id: string): Promise<boolean> => {
+      try {
+        await abortPartUpload(place, id);
+        return true;
+      } catch (error) {
+        setState({ stage: 'refused', error: toApiError(error) });
+        return false;
+      }
+    },
     /** Forgets the upload, which is in the task only once saved. */
     reset: () => setState({ stage: 'idle' }),
   };

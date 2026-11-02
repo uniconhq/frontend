@@ -1,3 +1,4 @@
+import { PreparationStatus } from './PreparationStatus';
 import { useEffect, useRef, type ReactNode } from 'react';
 import type { ApiError } from '@/api/problem';
 import { describeError } from '@/api/describe-error';
@@ -144,6 +145,12 @@ export function SaveOutcome<Body = WriteFile>({
 
   if (outcome.kind === 'saved') {
     const { result } = outcome;
+    if ('preparation' in result)
+      return (
+        <Panel role="status">
+          <PreparationStatus id={result.preparation} />
+        </Panel>
+      );
     if ('number' in result) {
       return (
         <Panel role="status">
@@ -228,6 +235,10 @@ export function SaveOutcome<Body = WriteFile>({
             </BodyText>
           </>
         )}
+        <Notes
+          label="Entrants have already seen this"
+          notes={stringsOf(error, 'hiding')}
+        />
         <div className={classes.actions}>
           <Button onClick={() => onConfirm(body, askedOf(error))}>
             {onKeepAsDraft === undefined ? 'Save the change' : 'Publish the change'}

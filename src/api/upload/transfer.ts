@@ -64,18 +64,58 @@ function onThisOrigin(url: string): string {
  * forge keeps nothing of a body that did not finish, so the same PUT can be
  * sent again from the start.
  */
-export function sendToForge(
+export async function sendToForge(
   url: string,
   file: File,
   onShare: (share: number) => void,
 ): Promise<void> {
+  await sendBytes(url, file, onShare);
+}
+
+/** One multipart PUT, using the same stall rule as entrant uploads. */
+export async function sendPartToStore(
+  url: string,
+  body: Blob,
+  onShare: (share: number) => void,
+  signal?: AbortSignal,
+): Promise<string> {
+  const etag = await sendBytes(url, body, onShare, signal, true);
+  if (etag === null)
+    throw new ApiError({
+      code: 'upload_rejected',
+      status: 422,
+      title: 'The file store did not identify the uploaded part',
+    });
+  return etag;
+}
+
+function sendBytes(
+  url: string,
+  file: Blob,
+  onShare: (share: number) => void,
+  signal?: AbortSignal,
+  wantEtag = false,
+): Promise<string | null> {
   const share = (bytes: number) => onShare(file.size === 0 ? 1 : bytes / file.size);
   return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(new DOMException('Upload cancelled', 'AbortError'));
+      return;
+    }
     const request = new XMLHttpRequest();
     let stall: ReturnType<typeof setTimeout> | undefined;
-    const cut = () => {
+    const cleanup = () => {
       clearTimeout(stall);
-      reject(failed(true));
+      signal?.removeEventListener('abort', abort);
+    };
+    const abort = () => {
+      cleanup();
+      reject(new DOMException('Upload cancelled', 'AbortError'));
+      request.abort();
+    };
+    const cut = () => {
+      cleanup();
+      reject(Object.assign(failed(true), { source: { status: 0 } }));
     };
     const watch = (ms: number = STALL_MS) => {
       clearTimeout(stall);
@@ -84,24 +124,23 @@ export function sendToForge(
         request.abort();
       }, ms);
     };
-
     request.upload.onprogress = (event) => {
       watch();
       share(Math.min(event.loaded, file.size));
     };
-    request.upload.onload = () => watch(ANSWER_MS);
+    request.upload.onload = () => watch(wantEtag ? STALL_MS : ANSWER_MS);
     request.onload = () => {
-      clearTimeout(stall);
+      cleanup();
       if (request.status >= 200 && request.status < 300) {
         onShare(1);
-        resolve();
-      } else reject(failed());
+        resolve(wantEtag ? request.getResponseHeader('ETag') : null);
+      } else reject(Object.assign(failed(), { source: { status: request.status } }));
     };
     request.onerror = cut;
     request.ontimeout = cut;
-
     request.open('PUT', onThisOrigin(url));
     request.setRequestHeader('Content-Type', 'application/octet-stream');
+    signal?.addEventListener('abort', abort, { once: true });
     watch();
     request.send(file);
   });

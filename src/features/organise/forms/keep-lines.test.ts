@@ -9,7 +9,7 @@ const HAND_WRITTEN = [
   '  input: file',
   'steps:',
   '  - id: a  # step a',
-  '    use: unicon/exec@v2',
+  '    use: unicon/exec@v3',
   '    with: {}',
   'report: {} # none yet',
   '',

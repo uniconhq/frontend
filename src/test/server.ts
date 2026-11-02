@@ -82,6 +82,11 @@ const serverTime = http.get('/api/v1/time', () =>
 
 /** Nobody listed as holding a role anywhere, until a test says who does. */
 const noHolders = [
+  http.get(
+    '/api/v1/orgs/:org/contests/:contest/tasks/:task/organise/part-uploads',
+    () => HttpResponse.json([]),
+  ),
+  http.get('/api/v1/workflows/:owner/:name/part-uploads', () => HttpResponse.json([])),
   http.get('/api/v1/orgs/:org/roles', () => HttpResponse.json([])),
   http.get('/api/v1/orgs/:org/contests/:contest/roles', () => HttpResponse.json([])),
   http.get('/api/v1/orgs/:org/contests/:contest/hold', () =>
@@ -228,6 +233,7 @@ const emptyOrganising = [
       problem: null,
       inputs: [],
       graded: false,
+      yanked: null,
       text_values: [],
     } satisfies components['schemas']['WorkflowForm']),
   ),

@@ -52,7 +52,7 @@ export function WorkflowBar({
       : []),
     ...newestFirst(page.versions).map((each) => ({
       value: each,
-      label: each === latest ? `${each}, the latest version` : `Version ${each}`,
+      label: `${each === latest ? `${each}, the latest version` : `Version ${each}`}${page.yanked?.[each] ? ' · Not for new tasks' : ''}`,
     })),
   ];
   return (
@@ -87,6 +87,11 @@ export function WorkflowBar({
           <div className={classes.barActions}>{children}</div>
         </div>
       </div>
+      {version !== null && page.yanked?.[version] && (
+        <p className={classes.where}>
+          Not for new tasks. {page.yanked[version].reason}
+        </p>
+      )}
       <p className={classes.where}>
         {version === null
           ? 'You are editing the draft. Publishing freezes it as saved, as a version tasks can choose.'

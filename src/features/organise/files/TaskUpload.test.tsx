@@ -1,8 +1,9 @@
+import { partTransfer, partTransport } from '@/test/part-uploads';
 import { describe, expect, it } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@/test/user-event';
 import { http, HttpResponse } from 'msw';
-import type { SaveRequest, Upload } from '@/api/types';
+import type { SaveRequest } from '@/api/types';
 import { renderApp } from '@/test/render';
 import { afterAnswers, problem, server, signedIn, someone } from '@/test/server';
 import {
@@ -17,7 +18,6 @@ import {
 const STATEMENT = '/orgs/acme/contests/spring/tasks/sum?card=statement';
 const SETTINGS = '/orgs/acme/contests/spring/tasks/sum/settings';
 const UPLOAD = '0199a2c1-6b7e-7c3a-9f10-5d2e4b8a6c99';
-const DOOR = `/-/uploads/${UPLOAD}`;
 /** The SHA-256 of `1 2\n`, the file the tests upload. */
 const SHA256 = 'f251ddc12234e0da8d3b778bd0f7463fb477f16f47757f5617dc8b4ff4d4f14a';
 
@@ -43,39 +43,27 @@ function uploadRoutes({
     completes: 0,
     saves: [] as SaveRequest[],
   };
-  const verified: Upload = {
-    id: UPLOAD,
-    input: '',
-    filename: 'statement.md',
-    content_type: 'text/markdown',
-    size: 4,
-    sha256: SHA256,
-    status: 'verified',
-  };
+  const transfer = () => partTransfer(UPLOAD, held ? 'stored' : 'open');
   const handlers = [
-    http.post(`${TASK_API}/organise/uploads`, async ({ request }) => {
+    http.post(`${TASK_API}/organise/part-uploads`, async ({ request }) => {
       seen.slots.push(await request.json());
-      return HttpResponse.json(
-        {
-          id: UPLOAD,
-          url: ready ? null : DOOR,
-          ready,
-          expires_at: '2026-10-07T12:00:00Z',
-        },
-        { status: 201 },
-      );
+      return HttpResponse.json(transfer(), { status: 201 });
     }),
-    http.put(DOOR, () => {
+    http.put(`/unicon-uploads/${UPLOAD}`, () => {
       const answer = door[Math.min(seen.puts, door.length - 1)];
       seen.puts += 1;
       const response = answer?.() ?? new HttpResponse(null, { status: 200 });
-      if (response.ok) held = true;
+      if (response.ok) {
+        held = true;
+        response.headers.set('ETag', '"part"');
+      }
       return response;
     }),
-    http.post(`${TASK_API}/uploads/:upload/complete`, () => {
+    http.post(`${TASK_API}/organise/part-uploads/:upload/finish`, () => {
       seen.completes += 1;
-      return held ? HttpResponse.json(verified) : problem(409, 'upload_not_ready');
+      return held ? HttpResponse.json(transfer()) : problem(409, 'upload_not_ready');
     }),
+    ...partTransport(`${TASK_API}/organise/part-uploads`),
     http.post(`${TASK_API}/save`, async ({ request }) => {
       seen.saves.push((await request.json()) as SaveRequest);
       return HttpResponse.json({
@@ -149,14 +137,15 @@ describe('uploading a file of a task again', { timeout: 20_000 }, () => {
       await within(panel).findByText('Saved and published as publication 3.'),
     ).toBeVisible();
     expect(panel).not.toHaveTextContent(/SHA-256|hash/i);
-    expect(within(panel).queryByText(/Leaving this page loses it/)).toBeNull();
+    expect(
+      within(panel).queryByText(/It stays available under Unfinished uploads/),
+    ).toBeNull();
     expect(within(panel).queryByRole('textbox')).toBeNull();
     expect(routes.seen.slots).toEqual([
       {
         path: 'statement.md',
         size: 4,
         sha256: SHA256,
-        content_type: 'text/markdown',
       },
     ]);
     expect(routes.seen.puts).toBe(1);
@@ -193,10 +182,10 @@ describe('uploading a file of a task again', { timeout: 20_000 }, () => {
       await within(panel).findByText('Saved and published as publication 3.'),
     ).toBeVisible();
     expect(routes.seen.puts).toBe(0);
-    expect(routes.seen.completes).toBe(1);
+    expect(routes.seen.completes).toBe(0);
   });
 
-  it('sends the file again from the start when the connection is cut', async () => {
+  it('retries its single part when the connection is cut', async () => {
     const routes = uploadRoutes({
       door: [() => HttpResponse.error(), () => new HttpResponse(null, { status: 200 })],
     });
@@ -217,7 +206,7 @@ describe('uploading a file of a task again', { timeout: 20_000 }, () => {
     expect(routes.seen.slots).toHaveLength(1);
   });
 
-  it('gives up after three cut sends and says nothing was saved', async () => {
+  it('gives up after the part retries and says nothing was saved', async () => {
     const routes = uploadRoutes({
       door: [() => HttpResponse.error(), () => HttpResponse.error()],
     });
@@ -233,7 +222,7 @@ describe('uploading a file of a task again', { timeout: 20_000 }, () => {
 
     const alert = await within(panel).findByRole('alert');
     expect(alert).toHaveTextContent('The upload did not go through');
-    expect(routes.seen.puts).toBe(3);
+    expect(routes.seen.puts).toBe(5);
     expect(routes.seen.saves).toEqual([]);
   });
 
@@ -318,12 +307,14 @@ describe('uploading a file of a task again', { timeout: 20_000 }, () => {
     ]);
   });
 
-  it('keeps their file when theirs is chosen, saying the upload is lost on leaving until discarded', async () => {
+  it('keeps their file when theirs is chosen, keeping the upload recoverable until discarded', async () => {
     const saves = theirsSavedFirst();
     const panel = await uploadAndSave();
 
     await within(panel).findByRole('list', { name: 'Files that differ' });
-    expect(within(panel).getByText(/Leaving this page loses it/)).toBeVisible();
+    expect(
+      within(panel).getByText(/It stays available under Unfinished uploads/),
+    ).toBeVisible();
     await userEvent.click(
       within(panel).getByRole('button', { name: 'Save the merged version' }),
     );
@@ -335,10 +326,12 @@ describe('uploading a file of a task again', { timeout: 20_000 }, () => {
     );
     expect(saves).toHaveLength(1);
     await userEvent.click(within(panel).getByRole('button', { name: 'Discard it' }));
-    expect(within(panel).queryByText(/Leaving this page loses it/)).toBeNull();
+    expect(
+      within(panel).queryByText(/It stays available under Unfinished uploads/),
+    ).toBeNull();
   });
 
-  it('holds an upload a running contest asks to confirm, saying leaving loses it, and saves it once confirmed', async () => {
+  it('holds an upload a running contest asks to confirm, keeping it recoverable after reload, and saves it once confirmed', async () => {
     const routes = uploadRoutes();
     server.use(
       signedIn,
@@ -371,7 +364,7 @@ describe('uploading a file of a task again', { timeout: 20_000 }, () => {
     const panel = await uploadAndSave();
 
     const unsaved = await within(panel).findByText(
-      /has been uploaded but is not saved into the task\. Leaving this page loses it\./,
+      /has been uploaded but is not saved into the task\. It stays available under Unfinished uploads after reloading\./,
     );
     expect(unsaved).toHaveTextContent('statement.md, 4 B,');
     expect(
@@ -384,7 +377,9 @@ describe('uploading a file of a task again', { timeout: 20_000 }, () => {
     expect(
       await within(panel).findByText('Saved and published as publication 5.'),
     ).toBeVisible();
-    expect(within(panel).queryByText(/Leaving this page loses it/)).toBeNull();
+    expect(
+      within(panel).queryByText(/It stays available under Unfinished uploads/),
+    ).toBeNull();
     expect(routes.seen.saves).toHaveLength(2);
     expect(routes.seen.saves[1]).toEqual({
       changes: [
@@ -409,7 +404,9 @@ describe('uploading a file of a task again', { timeout: 20_000 }, () => {
       publicationList,
       uploadedStatement,
       ...repoFiles,
-      http.post(`${TASK_API}/organise/uploads`, () => problem(422, 'invalid_path')),
+      http.post(`${TASK_API}/organise/part-uploads`, () =>
+        problem(422, 'invalid_path'),
+      ),
     );
     const panel = await uploadAndSave();
 

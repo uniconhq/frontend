@@ -113,10 +113,10 @@ inputs:
   key: {type: text, optional: true}
   flag: boolean
 steps:
-  - {id: build, use: unicon/exec@v2, with: {source: "\${{ inputs.submission }}", language: c}}
-  - {id: run, use: unicon/exec@v2, with: {${RUNS}, args: "\${{ steps.build.log }}"}}
+  - {id: build, use: unicon/exec@v3, with: {source: "\${{ inputs.submission }}", language: c}}
+  - {id: run, use: unicon/exec@v3, with: {${RUNS}, args: "\${{ steps.build.log }}"}}
   - {id: check, use: unicon/checker-like@v1, with: {}}
-  - {id: late, use: unicon/exec@v2, with: {source: "\${{ inputs.submission }}", language: c}}
+  - {id: late, use: unicon/exec@v3, with: {source: "\${{ inputs.submission }}", language: c}}
 `),
 );
 
@@ -212,8 +212,8 @@ describe('the drag rules', () => {
       parse(`
 inputs: {}
 steps:
-  - {id: first, use: unicon/exec@v2, with: {${RUNS}}}
-  - {id: second, use: unicon/exec@v2, with: {${RUNS}}}
+  - {id: first, use: unicon/exec@v3, with: {${RUNS}}}
+  - {id: second, use: unicon/exec@v3, with: {${RUNS}}}
 `),
     );
 
@@ -227,7 +227,7 @@ steps:
       parse(`
 steps:
   - {id: check, use: unicon/checker-like@v1, with: {}}
-  - {id: run, use: unicon/exec@v2, with: {${RUNS}}}
+  - {id: run, use: unicon/exec@v3, with: {${RUNS}}}
 `),
     );
 
@@ -306,10 +306,10 @@ steps:
     const workflow = readWorkflow(
       parse(`
 steps:
-  - {id: a, use: unicon/exec@v2}
-  - {id: b, use: unicon/exec@v2, with: {entry: "\${{ steps.a.log }}"}}
-  - {id: c, use: unicon/exec@v2, with: {entry: "\${{ steps.b.log }}"}}
-  - {id: d, use: unicon/exec@v2}
+  - {id: a, use: unicon/exec@v3}
+  - {id: b, use: unicon/exec@v3, with: {entry: "\${{ steps.a.log }}"}}
+  - {id: c, use: unicon/exec@v3, with: {entry: "\${{ steps.b.log }}"}}
+  - {id: d, use: unicon/exec@v3}
 `),
     );
 
@@ -324,7 +324,7 @@ inputs:
   key: text
   other: text
 steps:
-  - {id: run, use: unicon/exec@v2, with: {source: "\${{ inputs.other }}", language: c, time_limit: 1, memory_limit: 256, args: "\${{ inputs.key }}"}}
+  - {id: run, use: unicon/exec@v3, with: {source: "\${{ inputs.other }}", language: c, time_limit: 1, memory_limit: 256, args: "\${{ inputs.key }}"}}
 `),
     );
 
@@ -413,7 +413,7 @@ inputs:
   submission: file
   input: file
 steps:
-  - {id: run, use: unicon/exec@v2, with: {${RUNS}, entry: main.c}}
+  - {id: run, use: unicon/exec@v3, with: {${RUNS}, entry: main.c}}
 `),
     );
     expect(portFor(given, primitives, 0, input('input'))).toEqual({ port: 'manifest' });
