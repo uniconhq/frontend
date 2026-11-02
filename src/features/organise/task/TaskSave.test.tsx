@@ -300,6 +300,7 @@ describe('saving a task file', () => {
                 changes: ['The time limit changes.'],
                 regrades: 4,
                 ...REGRADED,
+                hiding: ['Entrants may have kept samples shown since noon.'],
                 asked: 'b1c2d3e:12',
               }),
         ),
@@ -320,6 +321,9 @@ describe('saving a task file', () => {
     ]);
     expect(linesOf(alert, 'What entrants read')).toEqual([
       'Nothing entrants read changes.',
+    ]);
+    expect(linesOf(alert, 'Entrants have already seen this')).toEqual([
+      'Entrants may have kept samples shown since noon.',
     ]);
     expect(alert).not.toHaveTextContent('changes how the task grades');
 

@@ -76,6 +76,7 @@ describe("a task's timeline as one line", () => {
       errors: [],
       statement_written: false,
       head_statement_written: false,
+      toolchains: {},
       results: { history: [], released: false },
     },
     timeline: {

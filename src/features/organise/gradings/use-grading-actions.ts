@@ -13,6 +13,7 @@ type ContestPath = { org: string; contest: string };
  */
 export type Asking =
   | { kind: 'retry'; task: string; entry: FeedEntry }
+  | { kind: 'from-scratch'; task: string; entry: FeedEntry }
   | { kind: 'cancel'; task: string; entry: FeedEntry; reason: string }
   | {
       kind: 'rejudge';
@@ -53,12 +54,17 @@ export function useGradingActions(path: ContestPath) {
     '/api/v1/orgs/{org}/contests/{contest}/tasks/{task}/gradings/{grading}/retry',
     readAgain,
   );
+  const fromScratch = $api.useMutation(
+    'post',
+    '/api/v1/orgs/{org}/contests/{contest}/tasks/{task}/gradings/{grading}/from-scratch',
+    readAgain,
+  );
   const rejudge = $api.useMutation(
     'post',
     '/api/v1/orgs/{org}/contests/{contest}/tasks/{task}/rejudge',
     readAgain,
   );
-  const all = [cancel, retry, rejudge];
+  const all = [cancel, retry, fromScratch, rejudge];
 
   const reset = () => {
     for (const each of all) each.reset();
@@ -72,6 +78,8 @@ export function useGradingActions(path: ContestPath) {
         return await rejudge.mutateAsync({ params: { path: task } });
       const params = { path: { ...task, grading: asking.entry.grading.id } };
       if (asking.kind === 'retry') await retry.mutateAsync({ params });
+      else if (asking.kind === 'from-scratch')
+        await fromScratch.mutateAsync({ params });
       else await cancel.mutateAsync({ params, body: { reason: asking.reason.trim() } });
       return true;
     } catch {

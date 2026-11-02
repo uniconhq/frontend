@@ -190,6 +190,7 @@ describe('where the live stream stands', () => {
         `${contest}/gradings/regrades`,
         `${contest}/home`,
         `${contest}/leaderboards`,
+        `${contest}/leaderboards/{leaderboard}`,
       ];
       const announced = [
         `${contest}/announcements`,
@@ -260,6 +261,7 @@ describe('where the live stream stands', () => {
         `${task}/organise/submissions/{number}`,
         `${contest}/home`,
         `${contest}/leaderboards`,
+        `${contest}/leaderboards/{leaderboard}`,
       ];
       const left = [
         `${task}/submissions/{number}/files`,

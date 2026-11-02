@@ -256,6 +256,22 @@ export function TaskStanding({
               task.latest === null ? null : savedBy(task.latest, changes),
             )}
           </BodyText>
+          {Object.entries(task.toolchains ?? {}).map(([language, toolchain]) => (
+            <BodyText key={language} tone="secondary">
+              {{ c: 'C', cpp: 'C++', java: 'Java', python: 'Python' }[language] ??
+                language}
+              :{' '}
+              {toolchain.picked
+                .replace(/^gxx /, 'gcc ')
+                .replace(/^python /, '')
+                .replace(/^openjdk /, 'OpenJDK ')}{' '}
+              (
+              {toolchain.version === null
+                ? 'newest when first prepared'
+                : `named ${toolchain.version}`}
+              )
+            </BodyText>
+          ))}
           {(task.latest?.failed_checks ?? []).length > 0 && (
             <ul aria-label="Failed checks">
               {(task.latest?.failed_checks ?? []).map((check) => (

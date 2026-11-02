@@ -27,7 +27,7 @@ export type RollbackFile = Schemas['RollbackFile'];
 /** A save of several of a task's files at once, in one commit. */
 export type SaveRequest = Schemas['SaveRequest'];
 /** A task save's answer: published, or kept as a draft. */
-export type SaveResult = Schemas['Published'] | Schemas['Draft'];
+export type SaveResult = Schemas['Published'] | Schemas['Draft'] | Schemas['Preparing'];
 /**
  * What a save does, in words: whether anyone's result changes, and what runs
  * again, the scores and what entrants read. A running contest asks with it

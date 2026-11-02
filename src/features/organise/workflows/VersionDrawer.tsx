@@ -1,3 +1,13 @@
+import { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { $api } from '@/api/query';
+import { toApiError, type ApiError } from '@/api/problem';
+import type { WorkflowPage } from '@/api/types';
+import { BodyText } from '@/ui/BodyText';
+import { Button } from '@/ui/Button';
+import { Modal } from '@/ui/Modal';
+import { TextInput } from '@/ui/TextInput';
+import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { SavedFolder, VersionFile } from '../files/FilePreview';
 import type { VersionPlace } from '../files/place';
 import type { BoxDecl } from './boxes';
@@ -111,5 +121,78 @@ export function VersionDrawer({
       {panel !== null && <LockedPanel>{panel}</LockedPanel>}
       {downloads}
     </Drawer>
+  );
+}
+
+/** An owner can withdraw a version while every existing pin keeps grading. */
+export function StopNewUse({ page, version }: { page: WorkflowPage; version: string }) {
+  const [opened, setOpened] = useState(false);
+  const [reason, setReason] = useState('');
+  const [error, setError] = useState<ApiError | null>(null);
+  const client = useQueryClient();
+  const stop = $api.useMutation(
+    'post',
+    '/api/v1/workflows/{owner}/{name}/versions/{version}/yank',
+  );
+  const undo = $api.useMutation(
+    'delete',
+    '/api/v1/workflows/{owner}/{name}/versions/{version}/yank',
+  );
+  const mark = page.yanked?.[version];
+  const busy = stop.isPending || undo.isPending;
+  const apply = async () => {
+    setError(null);
+    const params = { path: { owner: page.owner, name: page.name, version } };
+    try {
+      if (mark) await undo.mutateAsync({ params });
+      else await stop.mutateAsync({ params, body: { reason: reason.trim() } });
+      // The page, the list and the search each show which versions are withdrawn.
+      await Promise.all(
+        [
+          $api.queryOptions('get', '/api/v1/workflows/{owner}/{name}', {
+            params: { path: { owner: page.owner, name: page.name } },
+          }).queryKey,
+          ['get', '/api/v1/workflows'],
+          ['workflow-search'],
+        ].map((queryKey) => client.invalidateQueries({ queryKey })),
+      );
+      setOpened(false);
+    } catch (caught) {
+      setError(toApiError(caught));
+    }
+  };
+  return (
+    <>
+      <Button variant="secondary" onClick={() => setOpened(true)}>
+        {mark ? 'Allow new use' : 'Stop new use'}
+      </Button>
+      {opened && (
+        <Modal
+          opened
+          onClose={() => setOpened(false)}
+          title={mark ? 'Allow new use' : 'Stop new use'}
+        >
+          <BodyText>Tasks already pinned to {version} keep grading with it.</BodyText>
+          {mark ? (
+            <BodyText>{mark.reason}</BodyText>
+          ) : (
+            <TextInput
+              label="Reason"
+              value={reason}
+              onChange={setReason}
+              maxLength={2048}
+            />
+          )}
+          {error && <ErrorBlock error={error} />}
+          <Button
+            loading={busy}
+            disabled={!mark && reason.trim() === ''}
+            onClick={() => void apply()}
+          >
+            {mark ? 'Allow new use' : 'Stop new use'}
+          </Button>
+        </Modal>
+      )}
+    </>
   );
 }

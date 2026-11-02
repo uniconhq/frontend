@@ -34,7 +34,7 @@ inputs:
 steps:
   # compile and run once
   - id: run
-    use: unicon/exec@v2
+    use: unicon/exec@v3
     with:
       source: \${{ inputs.submission }}
       language: c
@@ -90,8 +90,8 @@ describe('editing the file in place', () => {
     const text = [
       'inputs: {a: file}',
       'steps:',
-      '  - use: unicon/exec@v2',
-      '  - {id: b, use: unicon/exec@v2}',
+      '  - use: unicon/exec@v3',
+      '  - {id: b, use: unicon/exec@v3}',
       '',
     ].join('\n');
 
@@ -187,7 +187,7 @@ describe('editing the file in place', () => {
   it('adds the first step to an empty steps: [] as a block', () => {
     const added = addStep('steps: []\n', exec!);
 
-    expect(added).toBe('steps:\n  - id: exec\n    use: unicon/exec@v2\n    with: {}\n');
+    expect(added).toBe('steps:\n  - id: exec\n    use: unicon/exec@v3\n    with: {}\n');
   });
 
   it('adds a step named for its primitive, at the end', () => {
@@ -196,7 +196,7 @@ describe('editing the file in place', () => {
     const check = addStep(COMMENTED, diff!);
 
     expect(ids(again)).toEqual(['run', 'check', 'exec', 'exec-2']);
-    expect(workflowOf(again).steps[3]?.use).toBe('unicon/exec@v2');
+    expect(workflowOf(again).steps[3]?.use).toBe('unicon/exec@v3');
     expect(ids(check)).toEqual(['run', 'check', 'diff-check']);
   });
 
@@ -425,7 +425,7 @@ describe('editing the file in place', () => {
     const text = [
       'steps:',
       '  - id: compare',
-      '    use: unicon/exec@v2',
+      '    use: unicon/exec@v3',
       '    with:',
       '      source: ${{ workflow.diff/ }}',
       '      manifest: ${{ workflow.diff/program.yaml }}',
@@ -473,7 +473,7 @@ describe('an input given by the workflow, and a file given by the task', () => {
   input: file
 steps:
   - id: check
-    use: unicon/exec@v2
+    use: unicon/exec@v3
     with:
       stdin: \${{ inputs.input }}
       files:
@@ -508,7 +508,7 @@ steps:
 
   it('declares the first input of a workflow that had none', () => {
     const text =
-      'steps:\n  - {id: diff, use: unicon/exec@v2, with: {source: "${{ workflow.diff/ }}"}}\n';
+      'steps:\n  - {id: diff, use: unicon/exec@v3, with: {source: "${{ workflow.diff/ }}"}}\n';
     const back = fileToInput(text, 'diff/', 'diff', 'folder');
 
     expect(workflowOf(back).inputs).toMatchObject([{ id: 'diff', type: 'folder' }]);

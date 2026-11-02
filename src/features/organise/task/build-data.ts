@@ -127,21 +127,6 @@ export function usePrimitives() {
   return $api.useQuery('get', '/api/v1/primitives', {}, { staleTime: 5 * 60_000 });
 }
 
-/** The latest version of a workflow by its number, from its listed versions. */
-export function newestOf(versions: readonly string[]): string | null {
-  let best: string | null = null;
-  let highest = -1;
-  for (const version of versions) {
-    const found = /^v([1-9][0-9]*)$/.exec(version);
-    const number = found?.[1] === undefined ? 0 : Number(found[1]);
-    if (number > highest) {
-      highest = number;
-      best = version;
-    }
-  }
-  return best;
-}
-
 /** Names in natural order, `2` before `10`. */
 export function naturally(a: string, b: string): number {
   return a.localeCompare(b, undefined, { numeric: true });

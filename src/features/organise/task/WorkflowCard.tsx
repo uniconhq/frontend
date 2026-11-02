@@ -1,4 +1,5 @@
 import { queryView } from '@/api/query';
+import type { WorkflowForm } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
 import { Chip } from '@/ui/Chip';
@@ -77,6 +78,7 @@ export function WorkflowCard({
   saved,
   newer,
   problem,
+  yanked,
   value,
   onChange,
   disabled,
@@ -87,6 +89,7 @@ export function WorkflowCard({
   newer: string | null;
   /** Why the saved workflow cannot be read, when it cannot. */
   problem: string | null;
+  yanked: WorkflowForm['yanked'];
   value: string;
   onChange: (ref: string) => void;
   disabled: boolean;
@@ -109,6 +112,7 @@ export function WorkflowCard({
         </BodyText>
       )}
       {problem !== null && <BodyText>{problem}</BodyText>}
+      {yanked !== null && <BodyText>Not for new tasks. {yanked.reason}</BodyText>}
       {newerRef !== null && (
         <div className={shared.actions} role="status" aria-label="A newer version">
           <Chip tone="warn">{newer} available</Chip>

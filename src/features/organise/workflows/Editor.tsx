@@ -160,9 +160,12 @@ function useSettled<T>(value: T, delay: number): T {
  * marks do not leave and come back on every edit; `checking` says the answer
  * is not yet for the text as it is.
  */
-function useCheck(text: string) {
+function useCheck(text: string, paths: readonly string[] | undefined) {
   const settled = useSettled(text, 400);
-  const check = useQuery({ ...checkQuery(settled), placeholderData: keepPreviousData });
+  const check = useQuery({
+    ...checkQuery(settled, paths),
+    placeholderData: keepPreviousData,
+  });
   return { check, checking: settled !== text || check.isPlaceholderData };
 }
 
@@ -292,6 +295,7 @@ export function Editor({
     const found: PaletteWorkflow[] = [];
     for (const item of readable.data ?? [])
       for (const version of item.versions) {
+        if (item.yanked?.[version]) continue;
         const ref = `${item.owner}/${item.name}@${version}`;
         if (item.owner === page.owner && item.name === page.name) continue;
         if (!primitiveMap.has(ref))
@@ -345,7 +349,16 @@ export function Editor({
     [paletteRefs, boxMap],
   );
   const ports = useMemo(() => portsOf(boxMap), [boxMap]);
-  const { check, checking } = useCheck(text);
+  const checkedPaths = useMemo(() => {
+    if (savedFiles.data === undefined) return undefined;
+    const paths = new Set(savedFiles.data);
+    for (const change of fileChanges) {
+      if (change.remove) paths.delete(change.path);
+      else paths.add(change.path);
+    }
+    return [...paths].sort();
+  }, [savedFiles.data, fileChanges]);
+  const { check, checking } = useCheck(text, checkedPaths);
   const problems = useMemo(() => check.data ?? [], [check.data]);
   const pins = useMemo(
     () =>
@@ -953,6 +966,7 @@ export function Editor({
       )}
       {drawing && stack.length === 0 && (
         <Tray
+          exclude={`${page.owner}/${page.name}`}
           primitives={primitives}
           workflows={palette}
           finding={

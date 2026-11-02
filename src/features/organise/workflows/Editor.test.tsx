@@ -1,3 +1,4 @@
+import { partTransfer, partTransport } from '@/test/part-uploads';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@/test/user-event';
@@ -41,6 +42,7 @@ describe('the workflow editor', () => {
   it('opens an empty draft with its tray and the no-steps problem', async () => {
     const message = 'A workflow needs at least one step. Add one from the tray.';
     server.use(
+      ...partTransport(`${WORKFLOW_API}/part-uploads`),
       signedIn,
       ...workflowBackend('steps: []\n', {
         problems: () => [{ path: 'steps', message }],
@@ -55,7 +57,11 @@ describe('the workflow editor', () => {
   });
 
   it('draws each step, the inputs and the outputs as boxes', async () => {
-    server.use(signedIn, ...workflowBackend(CLASSIC).handlers);
+    server.use(
+      ...partTransport(`${WORKFLOW_API}/part-uploads`),
+      signedIn,
+      ...workflowBackend(CLASSIC).handlers,
+    );
     const user = userEvent.setup();
     renderApp(EDITOR_PAGE);
 
@@ -69,7 +75,11 @@ describe('the workflow editor', () => {
   });
 
   it('opens the drawer below the bar, so Save and the bar stay in reach', async () => {
-    server.use(signedIn, ...workflowBackend(CLASSIC).handlers);
+    server.use(
+      ...partTransport(`${WORKFLOW_API}/part-uploads`),
+      signedIn,
+      ...workflowBackend(CLASSIC).handlers,
+    );
     const user = userEvent.setup();
     renderApp(EDITOR_PAGE);
 
@@ -84,7 +94,11 @@ describe('the workflow editor', () => {
   });
 
   it('opens a box in a drawer, which Escape and its × close', async () => {
-    server.use(signedIn, ...workflowBackend(CLASSIC).handlers);
+    server.use(
+      ...partTransport(`${WORKFLOW_API}/part-uploads`),
+      signedIn,
+      ...workflowBackend(CLASSIC).handlers,
+    );
     const user = userEvent.setup();
     renderApp(EDITOR_PAGE);
 
@@ -106,7 +120,11 @@ describe('the workflow editor', () => {
   });
 
   it('keeps under Details what the author never acts on', async () => {
-    server.use(signedIn, ...workflowBackend(CLASSIC).handlers);
+    server.use(
+      ...partTransport(`${WORKFLOW_API}/part-uploads`),
+      signedIn,
+      ...workflowBackend(CLASSIC).handlers,
+    );
     const user = userEvent.setup();
     renderApp(EDITOR_PAGE);
 
@@ -148,7 +166,11 @@ describe('the workflow editor', () => {
   });
 
   it('says a step’s limits are its own where it does not run the entrant’s program (M56)', async () => {
-    server.use(signedIn, ...workflowBackend(CLASSIC).handlers);
+    server.use(
+      ...partTransport(`${WORKFLOW_API}/part-uploads`),
+      signedIn,
+      ...workflowBackend(CLASSIC).handlers,
+    );
     const user = userEvent.setup();
     renderApp(EDITOR_PAGE);
 
@@ -159,7 +181,11 @@ describe('the workflow editor', () => {
   });
 
   it('says the result a step of two outcomes reports as one sentence, from the primitive’s words (M56)', async () => {
-    server.use(signedIn, ...workflowBackend(CLASSIC).handlers);
+    server.use(
+      ...partTransport(`${WORKFLOW_API}/part-uploads`),
+      signedIn,
+      ...workflowBackend(CLASSIC).handlers,
+    );
     const user = userEvent.setup();
     renderApp(EDITOR_PAGE);
 
@@ -170,7 +196,11 @@ describe('the workflow editor', () => {
   });
 
   it('refuses a wire a version would refuse, saying why, in the port’s menu', async () => {
-    server.use(signedIn, ...workflowBackend(CLASSIC).handlers);
+    server.use(
+      ...partTransport(`${WORKFLOW_API}/part-uploads`),
+      signedIn,
+      ...workflowBackend(CLASSIC).handlers,
+    );
     const user = userEvent.setup();
     renderApp(EDITOR_PAGE);
 
@@ -185,7 +215,11 @@ describe('the workflow editor', () => {
   });
 
   it('wires a port from its menu, keeping the file’s comments', async () => {
-    server.use(signedIn, ...workflowBackend(CLASSIC).handlers);
+    server.use(
+      ...partTransport(`${WORKFLOW_API}/part-uploads`),
+      signedIn,
+      ...workflowBackend(CLASSIC).handlers,
+    );
     const user = userEvent.setup();
     renderApp(EDITOR_PAGE);
 
@@ -201,7 +235,11 @@ describe('the workflow editor', () => {
   });
 
   it('writes what the workflow does into its file as the field is left, and undo takes it back', async () => {
-    server.use(signedIn, ...workflowBackend(CLASSIC).handlers);
+    server.use(
+      ...partTransport(`${WORKFLOW_API}/part-uploads`),
+      signedIn,
+      ...workflowBackend(CLASSIC).handlers,
+    );
     const user = userEvent.setup();
     renderApp(EDITOR_PAGE);
 
@@ -218,7 +256,11 @@ describe('the workflow editor', () => {
   });
 
   it('removes a step and undo brings it back with its wires', async () => {
-    server.use(signedIn, ...workflowBackend(CLASSIC).handlers);
+    server.use(
+      ...partTransport(`${WORKFLOW_API}/part-uploads`),
+      signedIn,
+      ...workflowBackend(CLASSIC).handlers,
+    );
     const user = userEvent.setup();
     renderApp(EDITOR_PAGE);
 
@@ -238,7 +280,11 @@ describe('the workflow editor', () => {
   });
 
   it('draws a box closed, saying what it needs and gives, and opens it when it is selected', async () => {
-    server.use(signedIn, ...workflowBackend(CLASSIC).handlers);
+    server.use(
+      ...partTransport(`${WORKFLOW_API}/part-uploads`),
+      signedIn,
+      ...workflowBackend(CLASSIC).handlers,
+    );
     const user = userEvent.setup();
     renderApp(EDITOR_PAGE);
 
@@ -269,6 +315,7 @@ describe('the workflow editor', () => {
       'actual: ${{ steps.runner.output }}',
     );
     server.use(
+      ...partTransport(`${WORKFLOW_API}/part-uploads`),
       signedIn,
       ...workflowBackend(broken, {
         problems: () => [
@@ -285,7 +332,10 @@ describe('the workflow editor', () => {
     const banner = await findPart('section', 'Problems');
     await within(banner).findByText(/One problem to fix/);
     // The next check does not answer while the test looks.
-    server.use(http.post('/api/v1/workflows/check', () => delay('infinite')));
+    server.use(
+      ...partTransport(`${WORKFLOW_API}/part-uploads`),
+      http.post('/api/v1/workflows/check', () => delay('infinite')),
+    );
     await user.click(await outputButton(user, 'run', 'time_ms'));
     await user.click(
       within(await openMenu('The output time_ms of run')).getByRole('menuitem', {
@@ -312,6 +362,7 @@ describe('the workflow editor', () => {
       'actual: ${{ steps.runner.output }}',
     );
     server.use(
+      ...partTransport(`${WORKFLOW_API}/part-uploads`),
       signedIn,
       ...workflowBackend(broken, {
         problems: (content) =>
@@ -355,7 +406,11 @@ describe('the workflow editor', () => {
   });
 
   it('adds a step from the tray and opens its drawer', async () => {
-    server.use(signedIn, ...workflowBackend(CLASSIC).handlers);
+    server.use(
+      ...partTransport(`${WORKFLOW_API}/part-uploads`),
+      signedIn,
+      ...workflowBackend(CLASSIC).handlers,
+    );
     const user = userEvent.setup();
     renderApp(EDITOR_PAGE);
 
@@ -364,12 +419,12 @@ describe('the workflow editor', () => {
     const primitives = part('section', 'Primitives');
     expect(within(primitives).getAllByRole('button')).toHaveLength(2);
     const exec = trayButton('Primitives', 'Run programs');
-    expect(exec).toHaveTextContent('unicon/exec@v2');
+    expect(exec).toHaveTextContent('unicon/exec@v3');
     await user.click(exec);
 
     expect(await stepBox('exec')).toHaveAttribute('data-open', 'true');
     expect(drawer('Step exec')).toBeInTheDocument();
-    expect(await fileText(user)).toContain('- id: exec\n    use: unicon/exec@v2\n');
+    expect(await fileText(user)).toContain('- id: exec\n    use: unicon/exec@v3\n');
   });
 
   it('adds a run workflow from the tray, found by its name, and never this one', async () => {
@@ -390,8 +445,13 @@ describe('the workflow editor', () => {
       visibility: owner === 'kenny' ? 'private' : 'public',
       versions,
       editable: owner === 'kenny',
+      yanked:
+        name === 'inner'
+          ? { v1: { reason: 'Use v2', by: 7, at: '2026-11-01T00:00:00Z' } }
+          : {},
     });
     server.use(
+      ...partTransport(`${WORKFLOW_API}/part-uploads`),
       http.get('/api/v1/workflows', () =>
         HttpResponse.json([
           item('kenny', 'tuned', ['v1']),
@@ -422,26 +482,38 @@ describe('the workflow editor', () => {
     expect(inner).toHaveTextContent('Private · v2');
     expect(within(workflows).getAllByRole('button')).toHaveLength(3);
     expect(
+      within(workflows).queryByRole('button', { name: 'kenny/inner@v1' }),
+    ).toBeNull();
+    expect(
       within(workflows).queryByRole('button', { name: /kenny\/tuned/ }),
     ).toBeNull();
+    server.use(
+      ...partTransport(`${WORKFLOW_API}/part-uploads`),
+      http.get('/api/v1/workflow-search', ({ request }) => {
+        const q = new URL(request.url).searchParams.get('q') ?? '';
+        return HttpResponse.json({
+          items: q.includes('zzz') ? [] : [item('alice', 'other', ['v1'])],
+          next: null,
+        });
+      }),
+    );
+    await user.click(
+      within(workflows).getByRole('button', { name: 'Find a workflow' }),
+    );
+    const search = await screen.findByRole('dialog', { name: 'Find a workflow' });
     await user.type(
-      within(workflows).getByRole('textbox', { name: 'Find a workflow' }),
+      within(search).getByRole('textbox', { name: 'Search workflows' }),
+      'alicezzz',
+    );
+    await within(search).findByText('No workflows match.');
+    await user.clear(within(search).getByRole('textbox', { name: 'Search workflows' }));
+    await user.type(
+      within(search).getByRole('textbox', { name: 'Search workflows' }),
       'alice',
     );
-    expect(within(workflows).getAllByRole('button')).toHaveLength(1);
-    await user.type(
-      within(workflows).getByRole('textbox', { name: 'Find a workflow' }),
-      'zzz',
+    await user.click(
+      await within(search).findByRole('button', { name: 'Choose alice/other' }),
     );
-    expect(workflows).toHaveTextContent('No workflow matches.');
-    await user.clear(
-      within(workflows).getByRole('textbox', { name: 'Find a workflow' }),
-    );
-    await user.type(
-      within(workflows).getByRole('textbox', { name: 'Find a workflow' }),
-      'alice',
-    );
-    await user.click(within(workflows).getByRole('button', { name: 'alice/other@v1' }));
 
     expect(await stepBox('other')).toHaveAttribute('data-open', 'true');
     expect(drawer('Step other')).toBeInTheDocument();
@@ -454,6 +526,7 @@ describe('the workflow editor', () => {
       answer = resolve;
     });
     server.use(
+      ...partTransport(`${WORKFLOW_API}/part-uploads`),
       http.get('/api/v1/workflows/:owner/:name/versions/:version/box', async () => {
         await answered;
         return HttpResponse.json({
@@ -475,13 +548,14 @@ describe('the workflow editor', () => {
     ).toBeInTheDocument();
     answer();
     expect(
-      await within(workflows).findByRole('button', { name: 'unicon/classic@v4' }),
+      await within(workflows).findByRole('button', { name: 'unicon/classic@v5' }),
     ).toBeInTheDocument();
     expect(workflows).not.toHaveTextContent('Finding workflows…');
   });
 
   it('says when the tray’s workflows cannot be read', async () => {
     server.use(
+      ...partTransport(`${WORKFLOW_API}/part-uploads`),
       http.get('/api/v1/workflows', () => HttpResponse.json({}, { status: 500 })),
       signedIn,
       ...workflowBackend(CLASSIC).handlers,
@@ -495,7 +569,11 @@ describe('the workflow editor', () => {
   });
 
   it('adds an input of each type from the tray, named after its type', async () => {
-    server.use(signedIn, ...workflowBackend(CLASSIC).handlers);
+    server.use(
+      ...partTransport(`${WORKFLOW_API}/part-uploads`),
+      signedIn,
+      ...workflowBackend(CLASSIC).handlers,
+    );
     const user = userEvent.setup();
     renderApp(EDITOR_PAGE);
 
@@ -527,7 +605,11 @@ describe('the workflow editor', () => {
   });
 
   it('keeps an input’s drawer on it when it is renamed', async () => {
-    server.use(signedIn, ...workflowBackend(CLASSIC).handlers);
+    server.use(
+      ...partTransport(`${WORKFLOW_API}/part-uploads`),
+      signedIn,
+      ...workflowBackend(CLASSIC).handlers,
+    );
     const user = userEvent.setup();
     renderApp(EDITOR_PAGE);
 
@@ -552,7 +634,11 @@ describe('the workflow editor', () => {
   });
 
   it('closes an input’s drawer when the input is removed', async () => {
-    server.use(signedIn, ...workflowBackend(CLASSIC).handlers);
+    server.use(
+      ...partTransport(`${WORKFLOW_API}/part-uploads`),
+      signedIn,
+      ...workflowBackend(CLASSIC).handlers,
+    );
     const user = userEvent.setup();
     renderApp(EDITOR_PAGE);
 
@@ -569,7 +655,11 @@ describe('the workflow editor', () => {
   });
 
   it('refuses an input named as an output, as the forge would', async () => {
-    server.use(signedIn, ...workflowBackend(CLASSIC).handlers);
+    server.use(
+      ...partTransport(`${WORKFLOW_API}/part-uploads`),
+      signedIn,
+      ...workflowBackend(CLASSIC).handlers,
+    );
     const user = userEvent.setup();
     renderApp(EDITOR_PAGE);
 
@@ -590,7 +680,11 @@ describe('the workflow editor', () => {
   });
 
   it('declares an output in place', async () => {
-    server.use(signedIn, ...workflowBackend(CLASSIC).handlers);
+    server.use(
+      ...partTransport(`${WORKFLOW_API}/part-uploads`),
+      signedIn,
+      ...workflowBackend(CLASSIC).handlers,
+    );
     const user = userEvent.setup();
     renderApp(EDITOR_PAGE);
 
@@ -605,7 +699,11 @@ describe('the workflow editor', () => {
   });
 
   it('names an input for the task’s form: its title, unit and help', async () => {
-    server.use(signedIn, ...workflowBackend(CLASSIC).handlers);
+    server.use(
+      ...partTransport(`${WORKFLOW_API}/part-uploads`),
+      signedIn,
+      ...workflowBackend(CLASSIC).handlers,
+    );
     const user = userEvent.setup();
     renderApp(EDITOR_PAGE);
 
@@ -630,6 +728,7 @@ describe('the workflow editor', () => {
 
   it('offers a unit only for a number, and drops it when the type changes away (M54)', async () => {
     server.use(
+      ...partTransport(`${WORKFLOW_API}/part-uploads`),
       signedIn,
       ...workflowBackend(
         CLASSIC.replace(
@@ -670,6 +769,7 @@ describe('the workflow editor', () => {
 
   it('shows a unit a file left on another type, to clear it', async () => {
     server.use(
+      ...partTransport(`${WORKFLOW_API}/part-uploads`),
       signedIn,
       ...workflowBackend(
         CLASSIC.replace(
@@ -696,6 +796,7 @@ describe('the workflow editor', () => {
 
   it('gives a port text with an input’s value written in', async () => {
     server.use(
+      ...partTransport(`${WORKFLOW_API}/part-uploads`),
       signedIn,
       ...workflowBackend(
         CLASSIC.replace(
@@ -731,7 +832,11 @@ describe('the workflow editor', () => {
   });
 
   it('wires a port given a whole reference in its field', async () => {
-    server.use(signedIn, ...workflowBackend(CLASSIC).handlers);
+    server.use(
+      ...partTransport(`${WORKFLOW_API}/part-uploads`),
+      signedIn,
+      ...workflowBackend(CLASSIC).handlers,
+    );
     const user = userEvent.setup();
     renderApp(EDITOR_PAGE);
 
@@ -764,6 +869,7 @@ describe('the workflow editor', () => {
 
   it('names a reported value for the pages that show it: its title, and a number’s unit (M58)', async () => {
     server.use(
+      ...partTransport(`${WORKFLOW_API}/part-uploads`),
       signedIn,
       ...workflowBackend(
         CLASSIC.replace(
@@ -814,6 +920,7 @@ describe('the workflow editor', () => {
 
   it('drops a reported value’s unit when it comes to read text, and shows one a file left on text, to clear it (M58)', async () => {
     server.use(
+      ...partTransport(`${WORKFLOW_API}/part-uploads`),
       signedIn,
       ...workflowBackend(
         CLASSIC.replace(
@@ -860,6 +967,7 @@ describe('the workflow editor', () => {
 
   it('keeps a reported value’s title, and its unit while it reads a number, when it is wired to read another output', async () => {
     server.use(
+      ...partTransport(`${WORKFLOW_API}/part-uploads`),
       signedIn,
       ...workflowBackend(
         CLASSIC.replace(
@@ -892,11 +1000,15 @@ describe('the workflow editor', () => {
   it('keeps a step’s drawer open when the step is renamed', async () => {
     const two = [
       'steps:',
-      '  - {id: first, use: unicon/exec@v2}',
-      '  - {id: second, use: unicon/exec@v2}',
+      '  - {id: first, use: unicon/exec@v3}',
+      '  - {id: second, use: unicon/exec@v3}',
       '',
     ].join('\n');
-    server.use(signedIn, ...workflowBackend(two).handlers);
+    server.use(
+      ...partTransport(`${WORKFLOW_API}/part-uploads`),
+      signedIn,
+      ...workflowBackend(two).handlers,
+    );
     const user = userEvent.setup();
     renderApp(EDITOR_PAGE);
 
@@ -911,6 +1023,7 @@ describe('the workflow editor', () => {
 
   it('says the check did not run rather than that it passed', async () => {
     server.use(
+      ...partTransport(`${WORKFLOW_API}/part-uploads`),
       http.post('/api/v1/workflows/check', () => problem(503, 'forge_unavailable')),
       signedIn,
       ...workflowBackend(CLASSIC).handlers,
@@ -922,7 +1035,11 @@ describe('the workflow editor', () => {
   });
 
   it('refuses in the drawer a declaration a wire would refuse, saying why', async () => {
-    server.use(signedIn, ...workflowBackend(CLASSIC).handlers);
+    server.use(
+      ...partTransport(`${WORKFLOW_API}/part-uploads`),
+      signedIn,
+      ...workflowBackend(CLASSIC).handlers,
+    );
     const user = userEvent.setup();
     renderApp(EDITOR_PAGE);
 
@@ -949,7 +1066,11 @@ describe('the workflow editor', () => {
         '      args: ${{ steps.check.outcome }}',
       ].join('\n'),
     );
-    server.use(signedIn, ...workflowBackend(backwards).handlers);
+    server.use(
+      ...partTransport(`${WORKFLOW_API}/part-uploads`),
+      signedIn,
+      ...workflowBackend(backwards).handlers,
+    );
     const user = userEvent.setup();
     renderApp(EDITOR_PAGE);
 
@@ -960,7 +1081,11 @@ describe('the workflow editor', () => {
 
   it('fixes a draft that cannot be read as text, with Save and Undo', async () => {
     const backend = workflowBackend('steps: [\n');
-    server.use(signedIn, ...backend.handlers);
+    server.use(
+      ...partTransport(`${WORKFLOW_API}/part-uploads`),
+      signedIn,
+      ...backend.handlers,
+    );
     const user = userEvent.setup();
     renderApp(EDITOR_PAGE);
 
@@ -1001,7 +1126,11 @@ describe('the workflow editor', () => {
   });
 
   it('asks before leaving a draft with changes not saved', async () => {
-    server.use(signedIn, ...workflowBackend(CLASSIC).handlers);
+    server.use(
+      ...partTransport(`${WORKFLOW_API}/part-uploads`),
+      signedIn,
+      ...workflowBackend(CLASSIC).handlers,
+    );
     const user = userEvent.setup();
     const { router } = renderApp(EDITOR_PAGE);
 
@@ -1024,7 +1153,7 @@ describe('the workflow editor', () => {
   it('opens a box two levels in, and a problem opens the step inside', async () => {
     const draft = ['steps:', '  - {id: build, use: kenny/inner@v1}', ''].join('\n');
     const inner = ['steps:', '  - {id: compile, use: kenny/deep@v1}', ''].join('\n');
-    const deep = ['steps:', '  - {id: link, use: unicon/exec@v2}', ''].join('\n');
+    const deep = ['steps:', '  - {id: link, use: unicon/exec@v3}', ''].join('\n');
     const port = (name: string) => ({
       name,
       type: 'file',
@@ -1037,6 +1166,7 @@ describe('the workflow editor', () => {
       options: null,
     });
     server.use(
+      ...partTransport(`${WORKFLOW_API}/part-uploads`),
       http.get('/api/v1/workflows', () =>
         HttpResponse.json([
           {
@@ -1134,7 +1264,11 @@ function savedEntry(path: string, kind: 'file' | 'directory' = 'file'): TreeEntr
 
 describe('the drawer', () => {
   it('wires a step’s port from its Select, which offers only what fits', async () => {
-    server.use(signedIn, ...workflowBackend(CLASSIC).handlers);
+    server.use(
+      ...partTransport(`${WORKFLOW_API}/part-uploads`),
+      signedIn,
+      ...workflowBackend(CLASSIC).handlers,
+    );
     const user = userEvent.setup();
     renderApp(EDITOR_PAGE);
 
@@ -1164,7 +1298,11 @@ describe('the drawer', () => {
   });
 
   it('shows a port’s value field once a fixed value is chosen, and clears the value on Nothing yet', async () => {
-    server.use(signedIn, ...workflowBackend(CLASSIC).handlers);
+    server.use(
+      ...partTransport(`${WORKFLOW_API}/part-uploads`),
+      signedIn,
+      ...workflowBackend(CLASSIC).handlers,
+    );
     const user = userEvent.setup();
     renderApp(EDITOR_PAGE);
 
@@ -1191,7 +1329,11 @@ describe('the drawer', () => {
   });
 
   it('offers no fixed value on a port that takes a file', async () => {
-    server.use(signedIn, ...workflowBackend(CLASSIC).handlers);
+    server.use(
+      ...partTransport(`${WORKFLOW_API}/part-uploads`),
+      signedIn,
+      ...workflowBackend(CLASSIC).handlers,
+    );
     const user = userEvent.setup();
     renderApp(EDITOR_PAGE);
 
@@ -1213,7 +1355,7 @@ describe('the drawer', () => {
     { listed = true, newer = true }: { listed?: boolean; newer?: boolean } = {},
   ) => {
     const draft = ['inputs:', '  code: file', 'steps:', ...steps, ''].join('\n');
-    const inner = ['steps:', '  - {id: compile, use: unicon/exec@v2}', ''].join('\n');
+    const inner = ['steps:', '  - {id: compile, use: unicon/exec@v3}', ''].join('\n');
     const port = (name: string) => ({
       name,
       type: 'file',
@@ -1226,6 +1368,7 @@ describe('the drawer', () => {
       options: null,
     });
     server.use(
+      ...partTransport(`${WORKFLOW_API}/part-uploads`),
       http.get('/api/v1/workflows', () =>
         listed
           ? HttpResponse.json([
@@ -1328,7 +1471,7 @@ describe('the drawer', () => {
   it('opens a box into the well, between what feeds it and what it feeds', async () => {
     serveInner([
       '  - {id: build, use: kenny/inner@v1, with: {source: "${{ inputs.code }}"}}',
-      '  - {id: after, use: unicon/exec@v2, with: {source: "${{ steps.build.program }}"}}',
+      '  - {id: after, use: unicon/exec@v3, with: {source: "${{ steps.build.program }}"}}',
     ]);
     const user = userEvent.setup();
     renderApp(EDITOR_PAGE);
@@ -1437,7 +1580,11 @@ describe('the drawer', () => {
   });
 
   it('says which ports read an input', async () => {
-    server.use(signedIn, ...workflowBackend(CLASSIC).handlers);
+    server.use(
+      ...partTransport(`${WORKFLOW_API}/part-uploads`),
+      signedIn,
+      ...workflowBackend(CLASSIC).handlers,
+    );
     const user = userEvent.setup();
     renderApp(EDITOR_PAGE);
 
@@ -1460,17 +1607,12 @@ describe('a file the workflow gives, not the task', () => {
     let next = 0;
     return [
       http.get(`${WORKFLOW_API}/files/*`, () => problem(404, 'not_found')),
-      http.post(`${WORKFLOW_API}/uploads`, () =>
-        HttpResponse.json({
-          id: `upload-${String(++next)}`,
-          url: `/-/uploads/${String(next)}`,
-          ready: false,
-          expires_at: '2026-10-27T12:00:00Z',
-        }),
+      http.post(`${WORKFLOW_API}/part-uploads`, () =>
+        HttpResponse.json(partTransfer(`upload-${String(++next)}`)),
       ),
       http.put('/-/uploads/:id', () => new HttpResponse(null)),
-      http.post(`${WORKFLOW_API}/uploads/:id/complete`, () =>
-        HttpResponse.json({ status: 'verified' }),
+      http.post(`${WORKFLOW_API}/part-uploads/:id/finish`, () =>
+        HttpResponse.json(partTransfer('finished', 'stored')),
       ),
     ];
   };
@@ -1482,6 +1624,7 @@ describe('a file the workflow gives, not the task', () => {
 
   it('makes an input one of the workflow’s files, which moves to its own box', async () => {
     server.use(
+      ...partTransport(`${WORKFLOW_API}/part-uploads`),
       tree(['data/answer.txt']),
       signedIn,
       ...workflowBackend(CLASSIC).handlers,
@@ -1512,7 +1655,11 @@ describe('a file the workflow gives, not the task', () => {
   });
 
   it('offers no workflow file for an input that is not a file', async () => {
-    server.use(signedIn, ...workflowBackend(CLASSIC).handlers);
+    server.use(
+      ...partTransport(`${WORKFLOW_API}/part-uploads`),
+      signedIn,
+      ...workflowBackend(CLASSIC).handlers,
+    );
     const user = userEvent.setup();
     renderApp(EDITOR_PAGE);
 
@@ -1523,7 +1670,13 @@ describe('a file the workflow gives, not the task', () => {
   });
 
   it('uploads the file an input becomes from its drawer, staged for Save', async () => {
-    server.use(tree([]), ...uploads(), signedIn, ...workflowBackend(CLASSIC).handlers);
+    server.use(
+      ...partTransport(`${WORKFLOW_API}/part-uploads`),
+      tree([]),
+      ...uploads(),
+      signedIn,
+      ...workflowBackend(CLASSIC).handlers,
+    );
     const user = userEvent.setup();
     renderApp(EDITOR_PAGE);
 
@@ -1552,7 +1705,12 @@ describe('a file the workflow gives, not the task', () => {
   });
 
   it('refuses to make an input a file a port it feeds would refuse, and saying why', async () => {
-    server.use(tree(['main.c']), signedIn, ...workflowBackend(CLASSIC).handlers);
+    server.use(
+      ...partTransport(`${WORKFLOW_API}/part-uploads`),
+      tree(['main.c']),
+      signedIn,
+      ...workflowBackend(CLASSIC).handlers,
+    );
     const user = userEvent.setup();
     renderApp(EDITOR_PAGE);
 
@@ -1575,6 +1733,7 @@ describe('a file the workflow gives, not the task', () => {
 
   it('offers a workflow file only to an input a step reads', async () => {
     server.use(
+      ...partTransport(`${WORKFLOW_API}/part-uploads`),
       signedIn,
       ...workflowBackend(
         CLASSIC.replace('  answer: file\n', '  answer: file\n  spare: file\n'),
@@ -1598,10 +1757,11 @@ describe('a file the workflow gives, not the task', () => {
       finish = resolve;
     });
     server.use(
+      ...partTransport(`${WORKFLOW_API}/part-uploads`),
       tree([]),
-      http.post(`${WORKFLOW_API}/uploads/:id/complete`, async () => {
+      http.post(`${WORKFLOW_API}/part-uploads/:id/finish`, async () => {
         await done;
-        return HttpResponse.json({ status: 'verified' });
+        return HttpResponse.json(partTransfer('finished', 'stored'));
       }),
       ...uploads(),
       signedIn,
@@ -1632,6 +1792,7 @@ describe('a file the workflow gives, not the task', () => {
 
   it('uploads no file of a name the workflow has, and says where to replace it', async () => {
     server.use(
+      ...partTransport(`${WORKFLOW_API}/part-uploads`),
       tree(['answer.txt']),
       ...uploads(),
       signedIn,
@@ -1665,6 +1826,7 @@ describe('a file the workflow gives, not the task', () => {
       'stdin: ${{ workflow.data.in }}',
     );
     server.use(
+      ...partTransport(`${WORKFLOW_API}/part-uploads`),
       tree(['data.in', 'other.in']),
       signedIn,
       ...workflowBackend(text).handlers,
@@ -1706,7 +1868,12 @@ describe('a file the workflow gives, not the task', () => {
       'stdin: ${{ inputs.input }}',
       'stdin: ${{ workflow.gone.in }}',
     );
-    server.use(tree([]), signedIn, ...workflowBackend(text).handlers);
+    server.use(
+      ...partTransport(`${WORKFLOW_API}/part-uploads`),
+      tree([]),
+      signedIn,
+      ...workflowBackend(text).handlers,
+    );
     const user = userEvent.setup();
     renderApp(EDITOR_PAGE);
 
@@ -1723,6 +1890,7 @@ describe('a file the workflow gives, not the task', () => {
       'stdin: ${{ workflow.data.in }}',
     );
     server.use(
+      ...partTransport(`${WORKFLOW_API}/part-uploads`),
       http.get(`${WORKFLOW_API}/tree`, async () => {
         await delay('infinite');
         return HttpResponse.json([]);
@@ -1745,8 +1913,13 @@ describe('wiring workflow files', () => {
   it('offers saved folders and files from the Files card tree, fetched once', async () => {
     const backend = workflowBackend(CLASSIC);
     const reads: string[] = [];
-    server.use(signedIn, ...backend.handlers);
     server.use(
+      ...partTransport(`${WORKFLOW_API}/part-uploads`),
+      signedIn,
+      ...backend.handlers,
+    );
+    server.use(
+      ...partTransport(`${WORKFLOW_API}/part-uploads`),
       http.get(`${WORKFLOW_API}/tree`, ({ request }) => {
         const path = new URL(request.url).searchParams.get('path') ?? '';
         reads.push(path);
@@ -1788,7 +1961,7 @@ describe('wiring workflow files', () => {
   answer: file
 steps:
   - id: check
-    use: unicon/exec@v2
+    use: unicon/exec@v3
     with:
       language: cpp
       files:
@@ -1804,20 +1977,20 @@ outputs:
     const backend = workflowBackend(draft);
     let nextUpload = 0;
     let changes: SaveChange[] = [];
-    server.use(signedIn, ...backend.handlers);
     server.use(
+      ...partTransport(`${WORKFLOW_API}/part-uploads`),
+      signedIn,
+      ...backend.handlers,
+    );
+    server.use(
+      ...partTransport(`${WORKFLOW_API}/part-uploads`),
       http.get(`${WORKFLOW_API}/files/*`, () => problem(404, 'not_found')),
-      http.post(`${WORKFLOW_API}/uploads`, () =>
-        HttpResponse.json({
-          id: `upload-${String(++nextUpload)}`,
-          url: `/-/uploads/${String(nextUpload)}`,
-          ready: false,
-          expires_at: '2026-10-27T12:00:00Z',
-        }),
+      http.post(`${WORKFLOW_API}/part-uploads`, () =>
+        HttpResponse.json(partTransfer(`upload-${String(++nextUpload)}`)),
       ),
       http.put('/-/uploads/:id', () => new HttpResponse(null)),
-      http.post(`${WORKFLOW_API}/uploads/:id/complete`, () =>
-        HttpResponse.json({ status: 'verified' }),
+      http.post(`${WORKFLOW_API}/part-uploads/:id/finish`, () =>
+        HttpResponse.json(partTransfer('finished', 'stored')),
       ),
       http.put(`${WORKFLOW_API}/draft`, async ({ request }) => {
         const body = (await request.json()) as {
@@ -1898,8 +2071,13 @@ outputs:
     );
     const backend = workflowBackend(text);
     let removed = false;
-    server.use(signedIn, ...backend.handlers);
     server.use(
+      ...partTransport(`${WORKFLOW_API}/part-uploads`),
+      signedIn,
+      ...backend.handlers,
+    );
+    server.use(
+      ...partTransport(`${WORKFLOW_API}/part-uploads`),
       http.get(`${WORKFLOW_API}/tree`, () =>
         HttpResponse.json(removed ? [] : [savedEntry('data.in')]),
       ),
@@ -1963,6 +2141,7 @@ describe('the inputs shown', () => {
   it('hides the inputs and the files the steps read until the browser chooses otherwise', async () => {
     localStorage.removeItem(INPUTS_SHOWN_KEY);
     server.use(
+      ...partTransport(`${WORKFLOW_API}/part-uploads`),
       signedIn,
       ...workflowBackend(
         CLASSIC.replace('${{ inputs.answer }}', '${{ workflow.answers/1.out }}'),
@@ -1994,7 +2173,11 @@ describe('the inputs hidden', () => {
   });
 
   it('hides the inputs the steps read, each step saying on a tab how many it reads', async () => {
-    server.use(signedIn, ...workflowBackend(CLASSIC).handlers);
+    server.use(
+      ...partTransport(`${WORKFLOW_API}/part-uploads`),
+      signedIn,
+      ...workflowBackend(CLASSIC).handlers,
+    );
     renderApp(EDITOR_PAGE);
 
     const run = await stepBox('run');
@@ -2011,7 +2194,11 @@ describe('the inputs hidden', () => {
   });
 
   it('pops out on its tab the boxes of the inputs a step reads, each opening its drawer', async () => {
-    server.use(signedIn, ...workflowBackend(CLASSIC).handlers);
+    server.use(
+      ...partTransport(`${WORKFLOW_API}/part-uploads`),
+      signedIn,
+      ...workflowBackend(CLASSIC).handlers,
+    );
     const user = userEvent.setup();
     renderApp(EDITOR_PAGE);
 
@@ -2034,7 +2221,11 @@ describe('the inputs hidden', () => {
   });
 
   it('draws an input no step reads, so it can be found', async () => {
-    server.use(signedIn, ...workflowBackend(CLASSIC).handlers);
+    server.use(
+      ...partTransport(`${WORKFLOW_API}/part-uploads`),
+      signedIn,
+      ...workflowBackend(CLASSIC).handlers,
+    );
     const user = userEvent.setup();
     renderApp(EDITOR_PAGE);
 
@@ -2045,7 +2236,11 @@ describe('the inputs hidden', () => {
   });
 
   it('draws the inputs again on Show inputs and files, which the browser remembers', async () => {
-    server.use(signedIn, ...workflowBackend(CLASSIC).handlers);
+    server.use(
+      ...partTransport(`${WORKFLOW_API}/part-uploads`),
+      signedIn,
+      ...workflowBackend(CLASSIC).handlers,
+    );
     const user = userEvent.setup();
     renderApp(EDITOR_PAGE);
 
@@ -2060,6 +2255,7 @@ describe('the inputs hidden', () => {
 
   it('pops out a file of the workflow a step reads as its box', async () => {
     server.use(
+      ...partTransport(`${WORKFLOW_API}/part-uploads`),
       signedIn,
       ...workflowBackend(
         CLASSIC.replace('${{ inputs.answer }}', '${{ workflow.answers/1.out }}'),

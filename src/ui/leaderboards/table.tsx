@@ -22,8 +22,10 @@ export function LeaderboardTable({
   board,
   submissionTo,
   staff = false,
+  titleTo,
 }: {
   board: Leaderboard;
+  titleTo?: string;
   /** The address of one counted submission of a row's entrant, when the caller can open it. */
   submissionTo?: (task: string, number: number, entrant: string) => string;
   /** Bounds are staff only. A self-reported mark is on the header for everyone. */
@@ -33,7 +35,13 @@ export function LeaderboardTable({
   return (
     <div className={classes.board}>
       <table className={classes.table} aria-label={board.title || board.key}>
-        <caption className={classes.caption}>{board.title || board.key}</caption>
+        <caption className={classes.caption}>
+          {titleTo === undefined ? (
+            board.title || board.key
+          ) : (
+            <PageLink to={titleTo}>{board.title || board.key}</PageLink>
+          )}
+        </caption>
         <thead>
           <tr>
             <th>Place</th>

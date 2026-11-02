@@ -26,12 +26,12 @@ inputs:
   answer: {type: file, title: Answer}
 steps:
   - id: build
-    use: unicon/exec@v2
+    use: unicon/exec@v3
     with:
       source: \${{ inputs.submission }}
       language: \${{ inputs.language }}
   - id: run
-    use: unicon/exec@v2
+    use: unicon/exec@v3
     with:
       source: \${{ inputs.submission }}
       language: \${{ inputs.language }}
@@ -109,7 +109,7 @@ const PRIMITIVES = [
     problem: null,
   },
   {
-    ref: 'unicon/exec@v2',
+    ref: 'unicon/exec@v3',
     name: 'exec',
     title: 'Run programs',
     description:
@@ -781,7 +781,7 @@ test('a box opens two levels in, and a problem opens the step inside', async ({
     });
   const draft = 'steps:\n  - {id: build, use: kenny/inner@v1}\n';
   const inner = 'steps:\n  - {id: compile, use: kenny/deep@v1}\n';
-  const deep = 'steps:\n  - {id: link, use: unicon/exec@v2}\n';
+  const deep = 'steps:\n  - {id: link, use: unicon/exec@v3}\n';
   const box = {
     inputs: [
       {

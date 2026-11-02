@@ -9,8 +9,15 @@ import { TextInput } from '@/ui/TextInput';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { SavedFile, SavedFolder } from '../files/FilePreview';
 import { treeQuery } from '../files/place';
+import { OpenUploads } from '../files/OpenUploads';
+import { tokenNow } from '../files/use-task-upload';
 import { refsOf, type Workflow } from './model';
-import { useStagedUpload, type StagedUpload, type Staging } from './staged-upload';
+import {
+  staged,
+  useStagedUpload,
+  type StagedUpload,
+  type Staging,
+} from './staged-upload';
 import { fileType } from './words';
 import classes from './workflows.module.css';
 
@@ -30,6 +37,7 @@ export function UploadProgress({
           label={state.stage === 'hashing' ? 'Getting the file ready' : 'Uploading'}
         />
       )}
+      {state.stage === 'storing' && <BodyText>Finishing upload…</BodyText>}
       {error !== null && <ErrorBlock error={error} compact />}
     </>
   );
@@ -135,6 +143,31 @@ export function WorkflowFiles({
 
   return (
     <section className={classes.panel} aria-label="Files">
+      <OpenUploads
+        place={place}
+        disabled={locked}
+        onAborted={(id) =>
+          onChange((current) => current.filter((change) => change.upload !== id))
+        }
+        onStored={async (row) => {
+          staging.onBusy(true);
+          try {
+            const token = await tokenNow(place, row.path);
+            onChange((current) =>
+              staged(current, {
+                path: row.path,
+                token,
+                upload: row.id,
+                encoding: 'utf-8',
+                remove: false,
+              }),
+            );
+          } finally {
+            staging.onBusy(false);
+          }
+        }}
+        onChoose={(row, file) => send([file], () => row.path, undefined, row.sha256)}
+      />
       <BodyText size="sm" tone="secondary">
         Programs and other files the steps read as workflow.&lt;path&gt;. Changes wait
         for Save, and a published version keeps the files as they were.

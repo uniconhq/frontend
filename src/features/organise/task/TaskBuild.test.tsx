@@ -78,6 +78,7 @@ const UNREAD: WorkflowForm = {
   problem: 'The workflow unicon/checked@v1 cannot be read.',
   graded: false,
   newer: null,
+  yanked: null,
   text_values: null,
 };
 
@@ -118,6 +119,7 @@ const CHECKED: WorkflowForm = {
     declared('greeting', 'text', { optional: true }),
     declared('token', 'text'),
   ],
+  yanked: null,
   text_values: null,
 };
 
@@ -145,6 +147,8 @@ const TUNABLE_YAML = CHECKED_YAML.replace('  checker: file\n', '').replace(
 
 const WORKFLOWS: WorkflowItem[] = [
   {
+    description: '',
+    yanked: {},
     owner: 'unicon',
     name: 'checked',
     versions: ['v1', 'v3'],
@@ -152,6 +156,8 @@ const WORKFLOWS: WorkflowItem[] = [
     visibility: 'public',
   },
   {
+    description: '',
+    yanked: {},
     owner: 'my-org',
     name: 'tunable',
     versions: ['v1'],
@@ -214,6 +220,9 @@ function taskBackend(
     }),
     http.get(`${TASK_API}/workflow-form`, () => HttpResponse.json(declaredNow)),
     http.get('/api/v1/workflows', () => HttpResponse.json(WORKFLOWS)),
+    http.get('/api/v1/workflow-search', () =>
+      HttpResponse.json({ items: WORKFLOWS, next: null }),
+    ),
     http.get('/api/v1/workflows/:owner/:name/versions/:version', ({ params }) =>
       HttpResponse.json({
         content: params['name'] === 'tunable' ? TUNABLE_YAML : CHECKED_YAML,
@@ -648,7 +657,9 @@ describe('the cards that build a task', { timeout: 30_000 }, () => {
           }),
         );
       await waitFor(() =>
-        expect(screen.getByRole('combobox', { name: 'Version' })).toHaveValue('v3'),
+        expect(
+          within(workflow).getByText('unicon/checked@v3', { exact: true }),
+        ).toBeVisible(),
       );
       await waitFor(() => expect(checker().getByText('checker.py, 9 B')).toBeVisible());
       expect(checker().getByText('Replaced')).toBeVisible();
@@ -710,7 +721,9 @@ describe('the cards that build a task', { timeout: 30_000 }, () => {
     ).toBeVisible();
     await userEvent.click(within(notice).getByRole('button', { name: 'Use v3' }));
 
-    expect(within(workflow).getByLabelText('Version')).toHaveValue('v3');
+    expect(
+      within(workflow).getByText('unicon/checked@v3', { exact: true }),
+    ).toBeVisible();
     expect(sent).toEqual([]);
     await save();
     expect(written(await waitForSave(sent))['workflow']).toBe('unicon/checked@v3');
@@ -782,14 +795,12 @@ describe('the cards that build a task', { timeout: 30_000 }, () => {
     asManager();
     const { workflow } = await openTask();
 
-    const picked = await within(workflow).findByLabelText(/^Workflow/);
     expect(
-      await within(picked).findByRole('option', { name: 'judgekit/special' }),
-    ).toBeInTheDocument();
-    const versions = within(workflow).getByLabelText(/^Version/);
+      await within(workflow).findByText('judgekit/special@v1', { exact: true }),
+    ).toBeVisible();
     expect(
-      await within(versions).findByRole('option', { name: 'v2, the newest' }),
-    ).toBeInTheDocument();
+      await within(workflow).findByRole('button', { name: 'Choose a workflow' }),
+    ).toBeEnabled();
   });
 
   it('says the organiser cannot see a workflow they may not read', async () => {
@@ -803,12 +814,12 @@ describe('the cards that build a task', { timeout: 30_000 }, () => {
     asManager();
     const { workflow } = await openTask();
 
-    const picked = await within(workflow).findByLabelText(/^Workflow/);
     expect(
-      await within(picked).findByRole('option', {
-        name: 'someone/hidden (you cannot see it)',
-      }),
-    ).toBeInTheDocument();
+      await within(workflow).findByText('This workflow could not be read.'),
+    ).toBeVisible();
+    expect(
+      within(workflow).getByText('someone/hidden@v1', { exact: true }),
+    ).toBeVisible();
   });
 
   it('shows the inputs of another workflow as soon as it is chosen, and drops those it does not have', async () => {
@@ -817,7 +828,12 @@ describe('the cards that build a task', { timeout: 30_000 }, () => {
     const { inputs, workflow } = await openTask();
 
     expect(within(inputs).getByRole('group', { name: 'checker' })).toBeVisible();
-    fill(await within(workflow).findByLabelText(/^Workflow/), 'my-org/tunable');
+    await userEvent.click(
+      await within(workflow).findByRole('button', { name: 'Choose a workflow' }),
+    );
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Choose my-org/tunable' }),
+    );
     await waitFor(() =>
       expect(within(inputs).queryByRole('group', { name: 'checker' })).toBeNull(),
     );
@@ -854,7 +870,12 @@ repeat:
     const runs = screen.getByRole('region', { name: 'Runs' });
     expect(within(runs).getByRole('columnheader', { name: /checker/i })).toBeVisible();
 
-    fill(await within(workflow).findByLabelText(/^Workflow/), 'my-org/tunable');
+    await userEvent.click(
+      await within(workflow).findByRole('button', { name: 'Choose a workflow' }),
+    );
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Choose my-org/tunable' }),
+    );
     await waitFor(() =>
       expect(within(runs).queryByRole('columnheader', { name: /checker/i })).toBeNull(),
     );
@@ -1283,6 +1304,7 @@ function runForm(workflow: string, inputs: DeclaredInput[]): WorkflowForm {
     graded: false,
     newer: null,
     inputs,
+    yanked: null,
     text_values: null,
   };
 }
@@ -1294,8 +1316,8 @@ async function who(inputs: HTMLElement, id: string, gives: string) {
 describe('islands, cartpole and tour', { timeout: 60_000 }, () => {
   it('saves islands’ inputs and its runs, each file at the path the editor names', async () => {
     const { sent } = taskBackend({
-      content: 'name: Islands\nworkflow: unicon/classic@v4\n',
-      form: runForm('unicon/classic@v4', [
+      content: 'name: Islands\nworkflow: unicon/classic@v5\n',
+      form: runForm('unicon/classic@v5', [
         declared('code', 'file'),
         declared('language', 'enum', { options: ['cpp', 'python'] }),
         declared('time_limit', 'number'),
@@ -1347,7 +1369,7 @@ describe('islands, cartpole and tour', { timeout: 60_000 }, () => {
 
     expect(written(sent[0])).toMatchObject({
       name: 'Islands',
-      workflow: 'unicon/classic@v4',
+      workflow: 'unicon/classic@v5',
       inputs: {
         code: { entrant: { label: 'Your solution', max_size: '1MB' } },
         language: { entrant: { options: ['cpp', 'python'], default: 'cpp' } },
@@ -1390,8 +1412,8 @@ describe('islands, cartpole and tour', { timeout: 60_000 }, () => {
       release = resolve;
     });
     const { sent } = taskBackend({
-      content: 'name: Islands\nworkflow: unicon/classic@v4\n',
-      form: runForm('unicon/classic@v4', [
+      content: 'name: Islands\nworkflow: unicon/classic@v5\n',
+      form: runForm('unicon/classic@v5', [
         declared('time_limit', 'number'),
         declared('input', 'file'),
       ]),
@@ -1428,8 +1450,8 @@ describe('islands, cartpole and tour', { timeout: 60_000 }, () => {
   it('clears a discarded upload when a run cell returns from the entrant', async () => {
     taskBackend({
       content:
-        'name: Tests\nworkflow: unicon/classic@v4\nrepeat:\n  - inputs: [input]\n    tuples: [{input: ""}]\n',
-      form: runForm('unicon/classic@v4', [declared('input', 'file')]),
+        'name: Tests\nworkflow: unicon/classic@v5\nrepeat:\n  - inputs: [input]\n    tuples: [{input: ""}]\n',
+      form: runForm('unicon/classic@v5', [declared('input', 'file')]),
     });
     await openTask();
     const runs = screen.getByRole('region', { name: 'Runs' });
@@ -1455,8 +1477,8 @@ describe('islands, cartpole and tour', { timeout: 60_000 }, () => {
   it('pairs two test files in one row and stages both in the task’s save', async () => {
     const { sent } = taskBackend({
       content:
-        'name: Tests\nworkflow: unicon/classic@v4\nrepeat:\n  - inputs: [input, answer]\n    tuples: []\n',
-      form: runForm('unicon/classic@v4', [
+        'name: Tests\nworkflow: unicon/classic@v5\nrepeat:\n  - inputs: [input, answer]\n    tuples: []\n',
+      form: runForm('unicon/classic@v5', [
         declared('input', 'file'),
         declared('answer', 'file'),
       ]),
@@ -1487,8 +1509,8 @@ describe('islands, cartpole and tour', { timeout: 60_000 }, () => {
   it('keeps a remaining row’s file when another row is removed and a new row uploaded', async () => {
     const { sent } = taskBackend({
       content:
-        'name: Files\nworkflow: unicon/classic@v4\nrepeat:\n  - inputs: [input]\n    tuples: [{input: runs/0/0/input}, {input: runs/0/1/input}]\n',
-      form: runForm('unicon/classic@v4', [declared('input', 'file')]),
+        'name: Files\nworkflow: unicon/classic@v5\nrepeat:\n  - inputs: [input]\n    tuples: [{input: runs/0/0/input}, {input: runs/0/1/input}]\n',
+      form: runForm('unicon/classic@v5', [declared('input', 'file')]),
     });
     await openTask();
     const runs = screen.getByRole('region', { name: 'Runs' });
@@ -1719,7 +1741,7 @@ repeat:
 });
 
 const ISLANDS = `name: Islands
-workflow: unicon/classic@v4
+workflow: unicon/classic@v5
 inputs:
   code: {entrant: {label: Solution}}
 repeat:
@@ -1747,7 +1769,7 @@ describe('scoring, checks and what a save answers', { timeout: 60_000 }, () => {
   it('shows an observer the saved value formula without editing or its tray', async () => {
     taskBackend({
       content: `${ISLANDS}scoring:\n  values: {total: 1}\n`,
-      form: runForm('unicon/classic@v4', [
+      form: runForm('unicon/classic@v5', [
         declared('code', 'file'),
         declared('input', 'file'),
       ]),
@@ -1783,7 +1805,7 @@ describe('scoring, checks and what a save answers', { timeout: 60_000 }, () => {
   it('adds a value with a name free among existing values and groups after a removal', async () => {
     taskBackend({
       content: `${ISLANDS}scoring:\n  groups: {value_2: {input: small/1.in}}\n  values: {value_1: 1, value_3: 3}\n`,
-      form: runForm('unicon/classic@v4', [
+      form: runForm('unicon/classic@v5', [
         declared('code', 'file'),
         declared('input', 'file'),
       ]),
@@ -1807,12 +1829,12 @@ describe('scoring, checks and what a save answers', { timeout: 60_000 }, () => {
   it('says a submission with no input repeated runs once, on every card that counts its runs', async () => {
     taskBackend({
       content: `name: Islands
-workflow: unicon/classic@v4
+workflow: unicon/classic@v5
 inputs:
   code: {entrant: {label: Solution}}
   input: sample.in
 `,
-      form: runForm('unicon/classic@v4', [
+      form: runForm('unicon/classic@v5', [
         declared('code', 'file'),
         declared('input', 'file'),
       ]),
@@ -1844,7 +1866,7 @@ inputs:
   it('says what a run gives beyond the table, by its title, and the facts in words', async () => {
     taskBackend({
       content: `name: Islands
-workflow: unicon/classic@v4
+workflow: unicon/classic@v5
 inputs:
   code: {entrant: {label: Solution}}
   input: sample.in
@@ -1854,7 +1876,7 @@ repeat:
       - {seed: 1}
       - {seed: 2}
 `,
-      form: runForm('unicon/classic@v4', [
+      form: runForm('unicon/classic@v5', [
         declared('code', 'file'),
         declared('input', 'file'),
         declared('seed', 'number', { title: 'Random seed' }),
@@ -1871,7 +1893,7 @@ repeat:
   it('uses the workflow box’s output types for the runs table', async () => {
     taskBackend({
       content: ISLANDS,
-      form: runForm('unicon/classic@v4', [
+      form: runForm('unicon/classic@v5', [
         declared('code', 'file'),
         declared('input', 'file'),
       ]),
@@ -1923,7 +1945,7 @@ repeat:
   values: {total: 1, foot: 2}
   show: {now: [total, samples]}
 `,
-      form: runForm('unicon/classic@v4', [
+      form: runForm('unicon/classic@v5', [
         declared('code', 'file'),
         declared('input', 'file'),
       ]),
@@ -1975,7 +1997,7 @@ repeat:
   it('saves islands with its text value first_failed and a check', async () => {
     const { sent } = taskBackend({
       content: ISLANDS,
-      form: runForm('unicon/classic@v4', [
+      form: runForm('unicon/classic@v5', [
         declared('code', 'file'),
         declared('input', 'file'),
       ]),
@@ -2041,7 +2063,7 @@ repeat:
   show:
     now: [total, extra, samples, big, gone]
 `,
-      form: runForm('unicon/classic@v4', [
+      form: runForm('unicon/classic@v5', [
         declared('code', 'file'),
         declared('input', 'file'),
       ]),
@@ -2082,7 +2104,7 @@ repeat:
   show:
     now: [total, public/]
 `,
-      form: runForm('unicon/classic@v4', [
+      form: runForm('unicon/classic@v5', [
         declared('code', 'file'),
         declared('input', 'file'),
       ]),
@@ -2106,7 +2128,7 @@ repeat:
     now: [total]
     after_close: [samples]
 `,
-      form: runForm('unicon/classic@v4', [
+      form: runForm('unicon/classic@v5', [
         declared('code', 'file'),
         declared('input', 'file'),
       ]),
@@ -2126,7 +2148,7 @@ repeat:
   it('reads each input an axis fills as a column of its run, a number or text as declared', async () => {
     const { sent } = taskBackend({
       content: `name: Seeds
-workflow: unicon/classic@v4
+workflow: unicon/classic@v5
 inputs:
   code: {entrant: {label: Solution}}
 repeat:
@@ -2138,7 +2160,7 @@ scoring:
   values:
     top: {block: max, over: {runs: all}, of: {run: [all, seed]}}
 `,
-      form: runForm('unicon/classic@v4', [
+      form: runForm('unicon/classic@v5', [
         declared('code', 'file'),
         declared('seed', 'number'),
         declared('name', 'text'),
@@ -2172,7 +2194,7 @@ scoring:
   values:
     odd: {block: max, of: [1, 2], colour: red}
 `,
-      form: runForm('unicon/classic@v4', [
+      form: runForm('unicon/classic@v5', [
         declared('code', 'file'),
         declared('input', 'file'),
       ]),
@@ -2194,7 +2216,7 @@ scoring:
   it('says Not shown for a part entrants never see, and whether it compiled the same way in the control and the result', async () => {
     taskBackend({
       content: ISLANDS,
-      form: runForm('unicon/classic@v4', [
+      form: runForm('unicon/classic@v5', [
         declared('code', 'file'),
         declared('input', 'file'),
       ]),
@@ -2223,7 +2245,7 @@ scoring:
   it('heads the result’s groups Groups, and leaves out a heading with nothing under it', async () => {
     taskBackend({
       content: ISLANDS,
-      form: runForm('unicon/classic@v4', [
+      form: runForm('unicon/classic@v5', [
         declared('code', 'file'),
         declared('input', 'file'),
       ]),
@@ -2243,7 +2265,7 @@ scoring:
   it('offers to show what the forge serves: compiled, each output, and the files but task.yaml and plans/', async () => {
     taskBackend({
       content: ISLANDS,
-      form: runForm('unicon/classic@v4', [
+      form: runForm('unicon/classic@v5', [
         declared('code', 'file'),
         declared('input', 'file'),
       ]),
@@ -2278,7 +2300,7 @@ scoring:
   it('refuses a value named like a group, and a loop, before the save', async () => {
     const { sent } = taskBackend({
       content: ISLANDS,
-      form: runForm('unicon/classic@v4', [
+      form: runForm('unicon/classic@v5', [
         declared('code', 'file'),
         declared('input', 'file'),
       ]),
@@ -2308,9 +2330,9 @@ scoring:
   it('keeps a part shown now from being hidden later, once a submission is graded', async () => {
     taskBackend({
       content:
-        'name: Islands\nworkflow: unicon/classic@v4\nscoring:\n  show:\n    now: [compiled]\n',
+        'name: Islands\nworkflow: unicon/classic@v5\nscoring:\n  show:\n    now: [compiled]\n',
       form: {
-        ...runForm('unicon/classic@v4', [declared('code', 'file')]),
+        ...runForm('unicon/classic@v5', [declared('code', 'file')]),
         graded: true,
       },
     });
@@ -2330,7 +2352,7 @@ scoring:
   it('shows the summary and sends confirm and asked when a save asks first', async () => {
     const { sent } = taskBackend({
       content: ISLANDS,
-      form: runForm('unicon/classic@v4', [
+      form: runForm('unicon/classic@v5', [
         declared('code', 'file'),
         declared('input', 'file'),
       ]),
@@ -2363,7 +2385,7 @@ describe('a publication’s checks', { timeout: 30_000 }, () => {
   it('reads never checked, and still saves', async () => {
     const { sent } = taskBackend({
       content: ISLANDS,
-      form: runForm('unicon/classic@v4', [
+      form: runForm('unicon/classic@v5', [
         declared('code', 'file'),
         declared('input', 'file'),
       ]),
@@ -2390,7 +2412,7 @@ describe('a publication’s checks', { timeout: 30_000 }, () => {
   it('turns a checking publication refused on the checks nudge, and does not poll', async () => {
     taskBackend({
       content: ISLANDS,
-      form: runForm('unicon/classic@v4', [
+      form: runForm('unicon/classic@v5', [
         declared('code', 'file'),
         declared('input', 'file'),
       ]),
@@ -2464,7 +2486,7 @@ describe('scoring while what it reads is not in', { timeout: 60_000 }, () => {
     total: {block: sum, over: {runs: all}, of: {run: [all, time_ms]}}
 `;
   const islands = () =>
-    runForm('unicon/classic@v4', [declared('code', 'file'), declared('input', 'file')]);
+    runForm('unicon/classic@v5', [declared('code', 'file'), declared('input', 'file')]);
 
   it('reads an output as a number once the workflow is read', async () => {
     taskBackend({ content: SCORED, form: islands() });
