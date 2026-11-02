@@ -78,6 +78,7 @@ import {
   refWords,
   typeWords,
 } from './words';
+import { linkRoles } from './links';
 import classes from './workflows.module.css';
 
 /**
@@ -388,6 +389,7 @@ function PortRow({
             {shape.line}
           </BodyText>
         )}
+        {shape.type === 'links' && <LinkEnds step={workflow.steps[index]} />}
         <EditOnly>
           <div>
             <Button
@@ -440,6 +442,29 @@ function PortRow({
         />
       )}
     </div>
+  );
+}
+
+function LinkEnds({ step }: { step: Workflow['steps'][number] | undefined }) {
+  const programs = step?.with.programs;
+  const links = step?.with.links;
+  if (programs?.kind !== 'mapping' || links?.kind !== 'list') return null;
+  const roles = linkRoles(
+    programs.entries.map((each) => each.name),
+    links.items.map((each) =>
+      each.kind === 'literal' && typeof each.value === 'string' ? each.value : '',
+    ),
+  );
+  return (
+    <ul aria-label="Link ends">
+      {roles.map((role, index) =>
+        role === null ? null : (
+          <li key={index}>
+            {role.writer}: {role.out}; {role.reader}: {role.into}
+          </li>
+        ),
+      )}
+    </ul>
   );
 }
 

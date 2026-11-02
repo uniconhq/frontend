@@ -136,6 +136,7 @@ export const publishedTask: TaskState = {
   errors: [],
   statement_written: true,
   head_statement_written: true,
+  toolchains: {},
   results: { history: [], released: false },
 };
 
@@ -151,6 +152,7 @@ export const draftTask: TaskState = {
   ],
   statement_written: true,
   head_statement_written: true,
+  toolchains: {},
   results: { history: [], released: false },
 };
 

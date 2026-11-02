@@ -199,6 +199,49 @@ describe('the entrants page', () => {
     ]);
   });
 
+  it('shows hiding lines and confirms the exact extension that was asked about', async () => {
+    server.use(signedIn);
+    entrantsWith([red, blue]);
+    const sent: unknown[] = [];
+    server.use(
+      http.put(`${ROWS}/:id/extension`, async ({ request }) => {
+        const body = (await request.json()) as { confirm: boolean };
+        sent.push(body);
+        return body.confirm
+          ? HttpResponse.json({ ...red, time_extension: 600 })
+          : problem(409, 'confirmation_required', {
+              hiding: ['Results shown since noon may have been kept.'],
+            });
+      }),
+    );
+    const user = userEvent.setup();
+    renderApp(PAGE);
+    await user.click(
+      await screen.findByRole('button', {
+        name: 'Change the name, members and extra time of Red',
+      }),
+    );
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Red: name, members and extra time',
+    });
+    const minutes = within(dialog).getByRole('textbox', { name: /Extra minutes/ });
+    await user.clear(minutes);
+    await user.type(minutes, '10');
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Save the extra time' }),
+    );
+    expect(
+      await within(dialog).findByRole('list', {
+        name: 'Entrants have already seen this',
+      }),
+    ).toHaveTextContent('Results shown since noon');
+    await user.clear(minutes);
+    await user.type(minutes, '20');
+    await user.click(within(dialog).getByRole('button', { name: 'Save the change' }));
+    await waitFor(() => expect(sent).toHaveLength(2));
+    expect(sent[1]).toEqual({ ...(sent[0] as object), confirm: true });
+  });
+
   it('gives extra time and moves a member to another team from the row’s Name, members, extra time', async () => {
     server.use(
       signedIn,
@@ -236,7 +279,7 @@ describe('the entrants page', () => {
     await waitFor(() => expect(sent).toHaveLength(2));
     expect(sent[0]).toEqual({
       path: '/api/v1/orgs/acme/contests/spring/organise/entrants/e-red/extension',
-      body: { seconds: 600, tasks: null },
+      body: { seconds: 600, tasks: null, confirm: false },
     });
     expect(sent[1]).toEqual({
       path: '/api/v1/orgs/acme/contests/spring/organise/entrants/e-red/members/21/move',

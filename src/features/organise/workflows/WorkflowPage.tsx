@@ -24,6 +24,7 @@ import { FileView } from './FileView';
 import { linesOf } from './lines';
 import { ShareButton } from './SharePanel';
 import { VersionGraph } from './VersionGraph';
+import { StopNewUse } from './VersionDrawer';
 import { latestVersion } from './versions';
 import { visibilityWords } from './words';
 import classes from './workflows.module.css';
@@ -244,7 +245,12 @@ function Drawn({
       bar={(tools, selected) => (
         <>
           <WorkflowBar page={page} version={version} tools={tools}>
-            {page.editable && <ShareButton page={page} />}
+            {page.editable && (
+              <>
+                <ShareButton page={page} />
+                <StopNewUse key={version} page={page} version={version} />
+              </>
+            )}
             <FileView
               title={`The YAML of ${version}`}
               label={`The YAML of ${version}`}

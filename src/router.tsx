@@ -215,6 +215,10 @@ export const routes: RouteObject[] = [
             path: 'contests/:org/:contest/leaderboards',
             element: <LeaderboardsPage />,
           },
+          {
+            path: 'contests/:org/:contest/leaderboards/:leaderboard',
+            element: <LeaderboardsPage />,
+          },
           { path: 'contests/:org/:contest/boards', element: <ToLeaderboards /> },
           { path: 'contests/:org/:contest/questions', element: <QuestionsPage /> },
           {

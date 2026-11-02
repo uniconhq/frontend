@@ -5,9 +5,10 @@ import { FileDrop } from '@/ui/FileDrop';
 import { Progress } from '@/ui/Progress';
 import { formatSize } from '@/lib/size';
 import type { Place } from './place';
+import { OpenUploads } from './OpenUploads';
 import { useSaveUploads, type ArrivedUpload } from './upload-save';
 import { Refused, UploadSaveAnswer } from './UploadSaveAnswer';
-import { useTaskUpload, type UploadState } from './use-task-upload';
+import { tokenNow, useTaskUpload, type UploadState } from './use-task-upload';
 import { placeOfIn } from '../task/places';
 import shared from '../organise.module.css';
 import classes from './Files.module.css';
@@ -16,6 +17,7 @@ type TaskPlace = Extract<Place, { kind: 'task' }>;
 
 /** How far the file has got, while it is being read or sent. */
 function UnderWay({ state }: { state: UploadState }) {
+  if (state.stage === 'storing') return <BodyText>Finishing upload…</BodyText>;
   if (state.stage !== 'hashing' && state.stage !== 'sending') return null;
   const percent = Math.round(state.share * 100);
   return (
@@ -25,14 +27,10 @@ function UnderWay({ state }: { state: UploadState }) {
           ? `Getting the file ready: ${String(percent)}%`
           : `Uploading: ${String(percent)}%`}
       </BodyText>
-      {state.stage === 'sending' && state.attempt > 1 && (
-        <BodyText tone="secondary">
-          The connection was cut, so it is being sent again from the start (attempt{' '}
-          {state.attempt}).
-        </BodyText>
-      )}
       <Progress value={percent} label={state.stage === 'hashing' ? 'Read' : 'Sent'} />
-      <BodyText tone="secondary">Leaving this page now stops the upload.</BodyText>
+      <BodyText tone="secondary">
+        Choose the same file after reloading to resume its missing parts.
+      </BodyText>
     </div>
   );
 }
@@ -61,7 +59,8 @@ export function TaskUpload({
   const [held, setHeld] = useState<ArrivedUpload | null>(null);
 
   const { state } = upload;
-  const working = state.stage === 'hashing' || state.stage === 'sending';
+  const working =
+    state.stage === 'hashing' || state.stage === 'sending' || state.stage === 'storing';
 
   const saving = useSaveUploads(place, () => {
     upload.reset();
@@ -90,7 +89,8 @@ export function TaskUpload({
     await saving.save([mine]);
   };
 
-  const discard = () => {
+  const discard = async () => {
+    if (held !== null && !(await upload.cancel(held.upload))) return;
     saving.forget();
     upload.reset();
     setHeld(null);
@@ -137,15 +137,57 @@ export function TaskUpload({
           <BodyText>
             <span className={shared.mono}>{held.path}</span>
             {held.size === null ? '' : `, ${formatSize(held.size)},`} has been uploaded
-            but is not saved into the task. Leaving this page loses it.
+            but is not saved into the task. It stays available under Unfinished uploads
+            after reloading.
           </BodyText>
           <div className={shared.actions}>
-            <Button variant="secondary" onClick={discard}>
+            <Button variant="secondary" onClick={() => void discard()}>
               Discard it
             </Button>
           </div>
         </div>
       )}
     </section>
+  );
+}
+
+/** Recover an interrupted task file through the same save and confirmation flow. */
+export function TaskResumeUploads({
+  place,
+  disabled,
+}: {
+  place: TaskPlace;
+  disabled: boolean;
+}) {
+  const upload = useTaskUpload(place);
+  const saving = useSaveUploads(place, () => upload.reset());
+  const busy =
+    disabled ||
+    saving.pending ||
+    ['hashing', 'sending', 'storing'].includes(upload.state.stage);
+  return (
+    <>
+      <OpenUploads
+        place={place}
+        disabled={busy}
+        onAborted={() => {
+          saving.forget();
+          upload.reset();
+        }}
+        onStored={async (row) => {
+          const token = await tokenNow(place, row.path);
+          await saving.save([
+            { upload: row.id, path: row.path, token, size: row.size },
+          ]);
+        }}
+        onChoose={async (row, file) => {
+          const arrived = await upload.start(file, row.path, undefined, row.sha256);
+          if (arrived !== null) await saving.save([{ ...arrived, size: file.size }]);
+        }}
+      />
+      <UnderWay state={upload.state} />
+      {upload.state.stage === 'refused' && <Refused error={upload.state.error} />}
+      <UploadSaveAnswer place={place} saving={saving} placeOf={placeOfIn(place)} />
+    </>
   );
 }

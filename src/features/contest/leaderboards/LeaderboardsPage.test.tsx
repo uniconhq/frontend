@@ -73,6 +73,24 @@ describe("a contest's leaderboards", () => {
     );
   });
 
+  it.each([true, false])(
+    'opens just the linked board with signed-in=%s',
+    async (loggedIn) => {
+      if (loggedIn) server.use(signedIn);
+      server.use(
+        http.get(
+          loggedIn
+            ? '/api/v1/orgs/acme/contests/spring/leaderboards/gradebook'
+            : '/api/v1/public/contests/acme/spring/leaderboards/gradebook',
+          () => HttpResponse.json(GRADEBOOK),
+        ),
+      );
+      renderApp(`${PAGE}/gradebook`);
+      expect(await screen.findByRole('table', { name: 'Gradebook' })).toBeVisible();
+      expect(screen.getAllByRole('table')).toHaveLength(1);
+    },
+  );
+
   it('reads the public list when nobody is signed in', async () => {
     server.use(
       http.get('/api/v1/public/contests/:org/:contest/leaderboards', () =>

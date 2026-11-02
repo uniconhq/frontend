@@ -27,6 +27,27 @@ function at(iso: string): string {
 }
 
 describe('the task page', () => {
+  it('shows the picked toolchain and whether its version was named', async () => {
+    server.use(
+      signedIn,
+      publicationList,
+      ...repoFiles,
+      http.get(TASK_API, () =>
+        HttpResponse.json({
+          ...publishedTask,
+          toolchains: {
+            cpp: { picked: 'gxx 14.3.0', version: '14' },
+            python: { picked: 'python 3.14.3', version: null },
+          },
+        }),
+      ),
+    );
+    renderApp(TASK);
+    expect(await screen.findByText('C++: gcc 14.3.0 (named 14)')).toBeInTheDocument();
+    expect(
+      await screen.findByText('Python: 3.14.3 (newest when first prepared)'),
+    ).toBeInTheDocument();
+  });
   it('says what contestants are graded on, under the task’s name', async () => {
     server.use(signedIn, taskState, publicationList, ...repoFiles);
     renderApp(TASK);
@@ -255,11 +276,12 @@ describe('the task page', () => {
       // A saved workflow that reads, so the Scoring and Checks cards are there.
       http.get(`${TASK_API}/workflow-form`, () =>
         HttpResponse.json({
-          workflow: 'unicon/classic@v4',
+          workflow: 'unicon/classic@v5',
           newer: null,
           problem: null,
           graded: false,
           inputs: [],
+          yanked: null,
           text_values: null,
         } satisfies WorkflowForm),
       ),
@@ -285,8 +307,8 @@ describe('the task page', () => {
       ),
     ).toHaveValue('Write the sum of two numbers.\n');
     expect(
-      within(screen.getByRole('region', { name: 'Workflow' })).getByRole('combobox', {
-        name: 'Version',
+      within(screen.getByRole('region', { name: 'Workflow' })).getByRole('button', {
+        name: 'Choose a workflow',
       }),
     ).toBeVisible();
     const sidebar = screen.getByRole('group', { name: 'Task' });
@@ -375,7 +397,7 @@ describe('what the task has, under its name', { timeout: 20_000 }, () => {
       ),
       http.get(`${TASK_API}/workflow-form`, () =>
         HttpResponse.json({
-          workflow: 'unicon/classic@v4',
+          workflow: 'unicon/classic@v5',
           newer: null,
           problem: null,
           graded: false,
@@ -438,7 +460,7 @@ describe('what the task has, under its name', { timeout: 20_000 }, () => {
         HttpResponse.json({
           ...files['task.yaml'],
           content:
-            'name: sum\nworkflow: unicon/classic@v4\nrepeat:\n  - inputs: [time_limit]\n    tuples: [[1], [2]]\n',
+            'name: sum\nworkflow: unicon/classic@v5\nrepeat:\n  - inputs: [time_limit]\n    tuples: [[1], [2]]\n',
         }),
       ),
     );

@@ -48,6 +48,16 @@ export function AttemptActions({
           Retry
         </Button>
       )}
+      {!UNFINISHED.has(status) && status !== 'cancelled' && (
+        <Button
+          size="xs"
+          variant="secondary"
+          label={`Regrade ${name} from scratch`}
+          onClick={() => onAsk({ kind: 'from-scratch', task, entry })}
+        >
+          Regrade from scratch
+        </Button>
+      )}
       {status === 'system_error' && (
         <Button
           size="xs"
@@ -84,6 +94,8 @@ function titleOf(asking: Asking): string {
   }
   const number = String(asking.entry.grading.submission_number);
   if (asking.kind === 'retry') return `Grade submission ${number} again?`;
+  if (asking.kind === 'from-scratch')
+    return `Regrade submission ${number} from scratch?`;
   return endsAttempt(asking)
     ? `Keep submission ${number}’s earlier result?`
     : `Cancel submission ${number}?`;
@@ -93,6 +105,7 @@ function titleOf(asking: Asking): string {
 function confirmOf(asking: Asking): string {
   if (asking.kind === 'rejudge') return 'Rejudge';
   if (asking.kind === 'retry') return 'Grade it again';
+  if (asking.kind === 'from-scratch') return 'Regrade from scratch';
   return endsAttempt(asking) ? 'Keep the earlier result' : 'Cancel the submission';
 }
 
@@ -124,17 +137,27 @@ function Consequence({ asking }: { asking: Asking }) {
   const { grading } = asking.entry;
   const entrant = entrantOf(asking.entry);
   const submission = `${submitterOf(asking.entry.by)}'s submission ${String(grading.submission_number)}`;
+  if (
+    (asking.kind === 'retry' || asking.kind === 'from-scratch') &&
+    grading.retry_limit !== null
+  ) {
+    return (
+      <OverLimitRetry
+        asking={asking}
+        submission={submission}
+        limit={grading.retry_limit}
+      />
+    );
+  }
+  if (asking.kind === 'from-scratch')
+    return (
+      <BodyText>
+        Runs every test again, reusing nothing, and replaces this submission's stored
+        times.
+      </BodyText>
+    );
   if (asking.kind === 'retry') {
     const standing = grading.status === 'done' || grading.last_good !== null;
-    if (grading.retry_limit !== null) {
-      return (
-        <OverLimitRetry
-          asking={asking}
-          submission={submission}
-          limit={grading.retry_limit}
-        />
-      );
-    }
     return (
       <>
         <BodyText>
@@ -191,7 +214,7 @@ function OverLimitRetry({
   submission,
   limit,
 }: {
-  asking: Extract<Asking, { kind: 'retry' }>;
+  asking: Extract<Asking, { kind: 'retry' | 'from-scratch' }>;
   submission: string;
   limit: number;
 }) {
@@ -251,6 +274,7 @@ const RETRY_REFUSED: Words = {
 const REFUSED: Record<Asking['kind'], Words> = {
   cancel: CANCEL_REFUSED,
   retry: RETRY_REFUSED,
+  'from-scratch': RETRY_REFUSED,
   rejudge: {},
 };
 

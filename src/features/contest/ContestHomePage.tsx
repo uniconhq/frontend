@@ -188,22 +188,21 @@ function LeaderboardCard({
     staff
       ? entrantGradingsPath(org, contest, task, entrant)
       : `${taskPagePath(org, contest, task)}${submissionHref(number)}`;
+  const visible = standing.filter((board) => board.rows.length > 0);
+  if (visible.length === 0) return null;
   return (
     <Card>
       <div className={classes.stack}>
-        <SectionTitle>Leaderboards</SectionTitle>
-        {standing.length === 0 ? (
-          <BodyText tone="secondary">Nothing is on a leaderboard yet.</BodyText>
-        ) : (
-          standing.map((board) => (
-            <LeaderboardTable
-              key={board.key}
-              board={board}
-              submissionTo={open}
-              staff={staff}
-            />
-          ))
-        )}
+        <SectionTitle>Your standing</SectionTitle>
+        {visible.map((board) => (
+          <LeaderboardTable
+            key={board.key}
+            board={board}
+            submissionTo={open}
+            staff={staff}
+            titleTo={`${contestViewSectionPath(org, contest, 'boards')}/${encodeURIComponent(board.key)}`}
+          />
+        ))}
       </div>
     </Card>
   );

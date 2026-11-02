@@ -1,3 +1,4 @@
+import { useParams } from 'react-router';
 import { $api, queryView, type QueryView } from '@/api/query';
 import type { components } from '@/api/schema';
 import { taskPagePath } from '@/lib/contest-paths';
@@ -27,10 +28,61 @@ const POLL_MS = 30_000;
  */
 export function LeaderboardsPage() {
   const { org, contest } = useContestParams();
+  const { leaderboard } = useParams();
   return (
     <BySession
-      signedIn={<SignedInBoards org={org} contest={contest} />}
-      visitor={<PublicBoards org={org} contest={contest} />}
+      signedIn={
+        leaderboard === undefined ? (
+          <SignedInBoards org={org} contest={contest} />
+        ) : (
+          <OneBoard org={org} contest={contest} leaderboard={leaderboard} signedIn />
+        )
+      }
+      visitor={
+        leaderboard === undefined ? (
+          <PublicBoards org={org} contest={contest} />
+        ) : (
+          <OneBoard
+            org={org}
+            contest={contest}
+            leaderboard={leaderboard}
+            signedIn={false}
+          />
+        )
+      }
+    />
+  );
+}
+
+function OneBoard({
+  org,
+  contest,
+  leaderboard,
+  signedIn,
+}: {
+  org: string;
+  contest: string;
+  leaderboard: string;
+  signedIn: boolean;
+}) {
+  const session = useSession();
+  const staff =
+    session.status === 'signed-in' && contestStaff(org, contest, session.me.roles);
+  const query = $api.useQuery(
+    'get',
+    signedIn
+      ? '/api/v1/orgs/{org}/contests/{contest}/leaderboards/{leaderboard}'
+      : '/api/v1/public/contests/{org}/{contest}/leaderboards/{leaderboard}',
+    { params: { path: { org, contest, leaderboard } } },
+    { refetchInterval: POLL_MS },
+  );
+  const view = queryView(query);
+  return (
+    <Boards
+      view={view.state === 'ready' ? { ...view, data: [view.data] } : view}
+      org={org}
+      contest={contest}
+      staff={staff}
     />
   );
 }

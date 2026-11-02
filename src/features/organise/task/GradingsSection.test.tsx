@@ -508,6 +508,36 @@ describe("the task's gradings", () => {
     );
   });
 
+  it('regrades from scratch only after confirming the new measurements', async () => {
+    let sent = 0;
+    server.use(
+      signedIn,
+      taskState,
+      publicationList,
+      ...repoFiles,
+      http.get(`${TASK_API}/gradings`, () => asEntries([stuck])),
+      http.post(`${TASK_API}/gradings/:id/from-scratch`, () => {
+        sent++;
+        return HttpResponse.json({ ...waiting, attempt: 2 });
+      }),
+    );
+    renderApp(TASK);
+    await userEvent.click(
+      await screen.findByRole('button', {
+        name: 'Regrade B submission 3 by ada, attempt 1 from scratch',
+      }),
+    );
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog).toHaveTextContent(
+      "Runs every test again, reusing nothing, and replaces this submission's stored times.",
+    );
+    expect(sent).toBe(0);
+    await userEvent.click(
+      within(dialog).getByRole('button', { name: 'Regrade from scratch' }),
+    );
+    expect(sent).toBe(1);
+  });
+
   it('offers an observer no controls', async () => {
     server.use(
       http.get('/api/v1/me', () =>

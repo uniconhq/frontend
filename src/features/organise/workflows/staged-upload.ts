@@ -19,7 +19,7 @@ export type Staging = {
 };
 
 /** `change` staged in `current`: in the place of one at its path, keeping that one's token. */
-function staged(current: SaveChange[], change: SaveChange): SaveChange[] {
+export function staged(current: SaveChange[], change: SaveChange): SaveChange[] {
   const at = current.findIndex((found) => found.path === change.path);
   if (at < 0) return [...current, change];
   return current.map((found, place) =>
@@ -47,6 +47,7 @@ export function useStagedUpload({
     files: File[],
     pathOf: (file: File) => string,
     replacing?: TreeEntry,
+    expectedDigest?: string,
   ): Promise<string[] | null> => {
     if (disabled || busy || files.length === 0) return null;
     setBusy(true);
@@ -63,7 +64,7 @@ export function useStagedUpload({
             : replacing !== undefined
               ? replacing.token
               : await tokenNow(place, path);
-        const id = await sendToTask(place, file, path, setState);
+        const id = await sendToTask(place, file, path, setState, expectedDigest);
         const change: SaveChange = {
           path,
           token,

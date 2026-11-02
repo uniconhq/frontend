@@ -13,6 +13,7 @@ const TASK = {
   errors: [],
   head: 'v1',
   head_statement_written: true,
+  toolchains: {},
   latest: null,
   statement_written: true,
   results: {
@@ -40,6 +41,7 @@ async function stub(page: Page) {
         newer: null,
         problem: null,
         workflow: null,
+        yanked: null,
         text_values: null,
       } satisfies Schemas['WorkflowForm']);
     }
