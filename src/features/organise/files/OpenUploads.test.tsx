@@ -209,7 +209,7 @@ describe('recovering uploads after a reload', () => {
     await waitFor(() => expect(onChoose).toHaveBeenCalledWith(row, file));
   });
   it('keeps a verified but unsaved transfer available without resending its file', async () => {
-    const stored = { ...row, status: 'stored' };
+    const stored = { ...row, status: 'stored' as const };
     const { onStored } = show([stored]);
     await userEvent.click(
       await screen.findByRole('button', { name: `Use uploaded ${row.path}` }),
