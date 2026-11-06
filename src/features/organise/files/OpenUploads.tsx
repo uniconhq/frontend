@@ -1,10 +1,9 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { Button } from '@/ui/Button';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   partUploadsQuery,
   abortPartUpload,
-  readPartUpload,
   sendingHereNow,
   watchSendingHere,
   type MultipartPlace,
@@ -16,6 +15,7 @@ import { FileDrop } from '@/ui/FileDrop';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { formatSize } from '@/lib/size';
 import shared from '../organise.module.css';
+import { useOpenUploads } from './use-open-uploads';
 
 /**
  * The server remembers parts; the browser asks for the original file again.
@@ -44,6 +44,7 @@ export function OpenUploads({
   const queryClient = useQueryClient();
   const here = useSyncExternalStore(watchSendingHere, sendingHereNow);
   const options = partUploadsQuery(place);
+  const query = useOpenUploads(place);
   const run = async (work: () => Promise<unknown>) => {
     if (working || disabled) return;
     setWorking(true);
@@ -57,33 +58,6 @@ export function OpenUploads({
       void query.refetch();
     }
   };
-  const query = useQuery({
-    ...options,
-    queryFn: async (context) => {
-      const listed = await options.queryFn(context);
-      const previous = queryClient.getQueryData<PartTransfer[]>(options.queryKey) ?? [];
-      const missing = previous.filter(
-        (row) =>
-          (row.status === 'finishing' || row.status === 'refused') &&
-          !listed.some((current) => current.id === row.id),
-      );
-      const finished = await Promise.all(
-        missing.map(async (row) =>
-          row.status === 'refused'
-            ? row
-            : readPartUpload(place, row.id, context.signal),
-        ),
-      );
-      return [...listed, ...finished.filter((row) => row.status !== 'aborted')];
-    },
-    // Only an upload still under way changes without anyone here acting.
-    refetchInterval: (query) =>
-      query.state.data?.some(
-        (row) => row.status === 'open' || row.status === 'finishing',
-      )
-        ? 5000
-        : false,
-  });
   // An upload this tab stops sending may be left open to resume: read again.
   const { refetch } = query;
   const seen = useRef(here);

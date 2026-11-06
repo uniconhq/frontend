@@ -45,7 +45,12 @@ import {
 } from './build-data';
 import type { TaskSave } from './build-save';
 import { changeLines } from './changes';
-import { stageInputFiles, stageRunFile, type StagedInput } from './input-files';
+import {
+  stageInputFiles,
+  stageRunFile,
+  stageStoredUpload,
+  type StagedInput,
+} from './input-files';
 import { InputsCard, type InputFiles } from './InputsCard';
 import { taskMergeWords } from './merge-words';
 import { taskPlace, taskPlaceOf } from './places';
@@ -250,27 +255,32 @@ function BuildForm({
     setPendingFiles((count) => count + 1);
     void work.finally(() => setPendingFiles((count) => count - 1));
   };
+  /** A setting's change, once read, waits for the save, and the setting names it. */
+  const stageSetting = (work: Promise<StagedInput>, was: string) => {
+    setReading(null);
+    stageFile(
+      work
+        .then((change) => {
+          setInputFiles((before) => [
+            ...before.filter((each) => each.id !== change.id),
+            {
+              ...change,
+              was: before.find((each) => each.id === change.id)?.was ?? was,
+            },
+          ]);
+          setInput(change.id, { value: change.value });
+        })
+        .catch((error: unknown) => setReading(error)),
+    );
+  };
   /** Files chosen for a setting wait for the save, which writes them and points the setting at them. */
   const files: InputFiles = {
     place,
     staged: inputFiles,
-    onChoose: (input, chosen, was) => {
-      setReading(null);
-      stageFile(
-        stageInputFiles(place, input, chosen, was)
-          .then((change) => {
-            setInputFiles((before) => [
-              ...before.filter((each) => each.id !== change.id),
-              {
-                ...change,
-                was: before.find((each) => each.id === change.id)?.was ?? was,
-              },
-            ]);
-            setInput(change.id, { value: change.value });
-          })
-          .catch((error: unknown) => setReading(error)),
-      );
-    },
+    onChoose: (input, chosen, was) =>
+      stageSetting(stageInputFiles(place, input, chosen, was), was),
+    onUseUpload: (input, upload, was) =>
+      stageSetting(stageStoredUpload(place, input, upload, was), was),
     onUndo: (id) => {
       const undone = inputFiles.find((each) => each.id === id);
       setInputFiles((before) => before.filter((each) => each.id !== id));
@@ -585,7 +595,7 @@ function SaveAnswer({
           ? 'Taken out'
           : 'text' in change
             ? 'Its values as you set them'
-            : `${change.path.split('/').pop() ?? ''}, ${formatSize(change.source.size)}`,
+            : `${change.path.split('/').pop() ?? ''}, ${formatSize('source' in change ? change.source.size : change.size)}`,
     }));
     return (
       <FilesMerge

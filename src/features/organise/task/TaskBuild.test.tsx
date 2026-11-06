@@ -11,6 +11,7 @@ import type {
   WorkflowForm,
   WorkflowItem,
 } from '@/api/types';
+import { partTransfer } from '@/test/part-uploads';
 import { renderApp } from '@/test/render';
 import { CLASSIC, PRIMITIVES } from '@/test/workflows';
 import { afterAnswers, problem, server, signedIn, someone } from '@/test/server';
@@ -595,6 +596,94 @@ describe('the cards that build a task', { timeout: 30_000 }, () => {
     expect(await within(checker).findByText('checker.cpp, 21 B')).toBeVisible();
     await waitFor(() =>
       expect(screen.queryByRole('list', { name: 'What changed' })).toBeNull(),
+    );
+  });
+
+  it('offers an upload the door holds for a setting in its box, staging it for the save rather than saving (#570)', async () => {
+    const { sent } = taskBackend({ form: CHECKED });
+    asManager();
+    server.use(
+      http.get(`${TASK_API}/tree`, ({ request }) =>
+        new URL(request.url).searchParams.get('path') === 'checker'
+          ? HttpResponse.json([file('checker/checker.cpp', 21)])
+          : undefined,
+      ),
+      http.get(`${TASK_API}/files/:path`, ({ params }) =>
+        decodeURIComponent(String(params['path'])) === 'checker/checker.cpp'
+          ? HttpResponse.json({
+              path: 'checker/checker.cpp',
+              encoding: 'utf-8',
+              content: 'int main() { return 0; }\n',
+              token: 'token-checker',
+              upload: null,
+              version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
+            })
+          : undefined,
+      ),
+      http.get(`${TASK_API}/organise/part-uploads`, () =>
+        HttpResponse.json([
+          {
+            ...partTransfer('up-checker', 'stored'),
+            path: 'checker/big.bin',
+            size: 300 * 1024,
+          },
+          // Not one the checker's box would write, nor one that has arrived whole.
+          { ...partTransfer('up-tests', 'stored'), path: 'tests/big.bin' },
+          { ...partTransfer('up-open', 'open'), path: 'checker/open.bin' },
+        ]),
+      ),
+    );
+    const user = userEvent.setup();
+    const { inputs } = await openTask();
+
+    const checker = within(inputs).getByRole('group', { name: 'checker' });
+    await within(checker).findByText('checker.cpp, 21 B');
+    const offered = await within(checker).findByRole('button', {
+      name: 'Use uploaded: big.bin, 300 KB, for checker',
+    });
+    expect(within(checker).getAllByRole('button', { name: /^Use uploaded/ })).toEqual([
+      offered,
+    ]);
+    await user.click(offered);
+    expect(await within(checker).findByText('big.bin, 300 KB')).toBeVisible();
+    expect(within(checker).getByText('Replaced')).toBeVisible();
+    expect(within(checker).queryByRole('button', { name: /^Use uploaded/ })).toBeNull();
+    // Staged, not saved: the save bar holds it until Save.
+    expect(sent).toHaveLength(0);
+
+    // Undo clears it, and the upload is offered again.
+    await user.click(
+      within(checker).getByRole('button', { name: 'Undo the new file of checker' }),
+    );
+    expect(await within(checker).findByText('checker.cpp, 21 B')).toBeVisible();
+    await user.click(
+      await within(checker).findByRole('button', {
+        name: 'Use uploaded: big.bin, 300 KB, for checker',
+      }),
+    );
+    await within(checker).findByText('big.bin, 300 KB');
+    expect(sent).toHaveLength(0);
+    await save();
+
+    const body = await waitForSave(sent);
+    expect(written(body)['inputs']).toMatchObject({ checker: 'checker/big.bin' });
+    // Written by the upload's id, so nothing is sent again.
+    expect(body.changes.filter((change) => change.path.startsWith('checker/'))).toEqual(
+      [
+        {
+          path: 'checker/big.bin',
+          token: null,
+          upload: 'up-checker',
+          encoding: 'utf-8',
+          remove: false,
+        },
+        {
+          path: 'checker/checker.cpp',
+          token: 'token-checker',
+          remove: true,
+          encoding: 'utf-8',
+        },
+      ],
     );
   });
 
