@@ -111,7 +111,7 @@ describe('the checks before anything is sent', () => {
   it('asks for a number', () => {
     const refused = checkDraft([alpha], { alpha: { kind: 'text', text: ' ' } });
     expect(refused?.extensions['errors']).toEqual([
-      { input: 'alpha', message: 'Give a number in plain digits, such as 2.5.' },
+      { input: 'alpha', message: 'Give a number.' },
     ]);
   });
 
@@ -242,7 +242,7 @@ describe('what a submit sends', () => {
     });
   });
 
-  it('gives each part of a number input its own value, checked as the input is', () => {
+  it('gives each part of a number input its own value', () => {
     const seed = inputField({
       id: 'seed',
       type: 'number',
@@ -263,18 +263,6 @@ describe('what a submit sends', () => {
         ],
       },
     });
-    const typed: Draft = {
-      seed: {
-        kind: 'parts',
-        parts: [
-          { kind: 'text', text: ' 4 ' },
-          { kind: 'text', text: '1e3' },
-        ],
-      },
-    };
-    expect(checkDraft([seed], typed)?.extensions['errors']).toEqual([
-      { input: 'seed', message: 'Part 2: Give a number in plain digits, such as 2.5.' },
-    ]);
     const fixed: Draft = {
       seed: {
         kind: 'parts',

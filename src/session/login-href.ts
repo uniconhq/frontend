@@ -1,10 +1,8 @@
 const DEFAULT_NEXT = '/';
-const MAX_LENGTH = 2048;
 
 /** Keep in step with the forge's next_path.py; if they differ, one is a hole. */
 export function safeNext(candidate: string | null | undefined): string {
-  if (!candidate || !candidate.startsWith('/') || candidate.length > MAX_LENGTH)
-    return DEFAULT_NEXT;
+  if (!candidate || !candidate.startsWith('/')) return DEFAULT_NEXT;
   if (candidate.startsWith('//') || candidate.startsWith('/\\')) return DEFAULT_NEXT;
   // Browsers drop tabs and line breaks, so `/<tab>/x` would land on `//x`.
   if (/[\t\n\r]/.test(candidate)) return DEFAULT_NEXT;

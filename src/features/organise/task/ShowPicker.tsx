@@ -11,6 +11,7 @@ import {
   renamedInShow,
   runEntries,
   runMoments,
+  showSpot,
   withMoment,
   withRunMoment,
   withoutInShow,
@@ -28,8 +29,6 @@ import classes from './task.module.css';
 export type ShowRow = {
   name: string;
   label: string;
-  /** Why it cannot be shown, when it cannot: its boxes stay unticked. */
-  refused?: string;
 };
 
 /** The one warning, on a row: it was shown always, and entrants have been graded. */
@@ -75,6 +74,7 @@ export function ShowPicker({
   fields,
   groups,
   runs,
+  troubles,
   onChange,
 }: {
   show: Show;
@@ -92,6 +92,8 @@ export function ShowPicker({
   fields: ShowRow[];
   groups: ScoreGroup[];
   runs: RunRow[];
+  /** What the last save said of each row, by `showSpot`. */
+  troubles: ReadonlyMap<string, string>;
   onChange: (show: Show) => void;
 }) {
   // A run entry added with no field on yet, which `show` cannot hold.
@@ -127,6 +129,7 @@ export function ShowPicker({
             key={row.name}
             row={row}
             moments={momentsOf(show, kind, row.name)}
+            trouble={troubles.get(showSpot(kind, row.name))}
             warn={
               graded && hidesAlways(saved, show, { kind, name: row.name })
                 ? SEEN
@@ -210,6 +213,11 @@ export function ShowPicker({
                         />
                       )}
                     </Group>
+                    {troubles.has(showSpot('runs', of)) && (
+                      <BodyText size="sm" tone="secondary">
+                        {troubles.get(showSpot('runs', of))}
+                      </BodyText>
+                    )}
                   </th>
                 </tr>
                 {withListed(fields, listedFields).map((row) => (
@@ -218,6 +226,7 @@ export function ShowPicker({
                     row={row}
                     named={`${row.label} of ${of}`}
                     moments={runMoments(show, of, row.name)}
+                    trouble={troubles.get(showSpot('runs', of, row.name))}
                     warn={
                       graded &&
                       hidesAlways(saved, show, {
@@ -269,6 +278,7 @@ function Row({
   row,
   named = row.label,
   moments,
+  trouble,
   warn,
   disabled,
   onToggle,
@@ -277,6 +287,8 @@ function Row({
   /** What its boxes are called, when its label alone does not tell its section. */
   named?: string;
   moments: Moment[];
+  /** What the last save said of it. */
+  trouble: string | undefined;
   warn: string | undefined;
   disabled: boolean;
   onToggle: (moment: Moment, on: boolean) => void;
@@ -286,9 +298,9 @@ function Row({
     <tr data-show-part={row.name}>
       <th scope="row">
         {row.label}
-        {row.refused !== undefined && (
+        {trouble !== undefined && (
           <BodyText size="sm" tone="secondary">
-            {row.refused}
+            {trouble}
           </BodyText>
         )}
         {warn !== undefined && (
@@ -303,12 +315,7 @@ function Row({
             label={`${named}, ${moment.label}`}
             labelHidden
             checked={always || moments.includes(moment.value)}
-            disabled={
-              disabled ||
-              (always && moment.value !== 'always') ||
-              // A part that cannot be shown can only be turned off.
-              (row.refused !== undefined && !moments.includes(moment.value))
-            }
+            disabled={disabled || (always && moment.value !== 'always')}
             onChange={(on) => onToggle(moment.value, on)}
           />
         </td>
