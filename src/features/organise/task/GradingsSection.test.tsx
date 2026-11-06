@@ -49,8 +49,6 @@ const stuck: Grading = {
   deadline_at: null,
   cancel_reason: null,
   automatic: false,
-  early: null,
-  pipeline: 'early',
   limit: null,
   retry_limit: null,
   regrade: null,
@@ -508,34 +506,24 @@ describe("the task's gradings", () => {
     );
   });
 
-  it('regrades from scratch only after confirming the new measurements', async () => {
-    let sent = 0;
+  it('offers a finished attempt a retry and no regrade from scratch', async () => {
+    // #625: a retry reuses nothing and runs every step, so there is no
+    // regrade from scratch beside it.
     server.use(
       signedIn,
       taskState,
       publicationList,
       ...repoFiles,
       http.get(`${TASK_API}/gradings`, () => asEntries([stuck])),
-      http.post(`${TASK_API}/gradings/:id/from-scratch`, () => {
-        sent++;
-        return HttpResponse.json({ ...waiting, attempt: 2 });
-      }),
     );
     renderApp(TASK);
-    await userEvent.click(
+
+    expect(
       await screen.findByRole('button', {
-        name: 'Regrade B submission 3 by ada, attempt 1 from scratch',
+        name: 'Retry B submission 3 by ada, attempt 1',
       }),
-    );
-    const dialog = await screen.findByRole('dialog');
-    expect(dialog).toHaveTextContent(
-      "Runs every test again, reusing nothing, and replaces this submission's stored times.",
-    );
-    expect(sent).toBe(0);
-    await userEvent.click(
-      within(dialog).getByRole('button', { name: 'Regrade from scratch' }),
-    );
-    expect(sent).toBe(1);
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /from scratch/ })).toBeNull();
   });
 
   it('offers an observer no controls', async () => {

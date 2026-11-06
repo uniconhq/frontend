@@ -1,6 +1,5 @@
 import type {
   FeedEntry,
-  Grading,
   GradingStatus,
   RegradeChangeKind,
   RunsResult,
@@ -187,23 +186,6 @@ export function bySubmission(
     key,
     attempts: [...attempts].sort((a, b) => b.grading.attempt - a.grading.attempt),
   }));
-}
-
-/**
- * A submission's attempts by pipeline, the early ones first, each line's
- * highest attempt first. A submission whose runs are not all shown during
- * the contest is graded twice, early and late, each pipeline with attempts
- * of its own, so neither replaces the other.
- */
-export function byPipeline(
-  attempts: FeedEntry[],
-): { pipeline: Grading['pipeline']; attempts: FeedEntry[] }[] {
-  return (['early', 'late'] as const)
-    .map((pipeline) => ({
-      pipeline,
-      attempts: attempts.filter((entry) => entry.grading.pipeline === pipeline),
-    }))
-    .filter((line) => line.attempts.length > 0);
 }
 
 /**

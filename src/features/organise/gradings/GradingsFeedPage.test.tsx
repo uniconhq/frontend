@@ -28,8 +28,6 @@ const grading: Grading = {
   deadline_at: null,
   cancel_reason: null,
   automatic: false,
-  early: null,
-  pipeline: 'early',
   limit: null,
   retry_limit: null,
   regrade: null,
@@ -218,37 +216,6 @@ describe("the contest's gradings feed", () => {
     expect(rows[1]).toHaveTextContent(
       'The grading machine lost its run before it began.',
     );
-  });
-
-  it('shows a submission’s early and late gradings each as a latest attempt, neither replacing the other', async () => {
-    const early: FeedEntry = {
-      task: 'sort',
-      label: 'A',
-      by: ada,
-      grading: { ...grading, id: 'g-early', submission_number: 4 },
-    };
-    const late: FeedEntry = {
-      ...early,
-      grading: {
-        ...early.grading,
-        id: 'g-late',
-        pipeline: 'late',
-        early: 'g-early',
-        queued_at: '2026-10-05T10:02:00Z',
-      },
-    };
-    server.use(signedIn, taskList);
-    feedAnswering(() => [late, early]);
-    renderApp(FEED);
-
-    const sub = await screen.findByRole('rowgroup', { name: 'A submission 4 by ada' });
-    const rows = within(sub).getAllByRole('row');
-    expect(rows).toHaveLength(2);
-    expect(rows[0]).toHaveTextContent('The runs shown during the contest');
-    expect(rows[1]).toHaveTextContent('The rest of its runs, graded after those');
-    expect(sub).not.toHaveTextContent('replaced');
-    expect(within(sub).queryByRole('button', { name: /earlier attempts/ })).toBeNull();
-    expect(within(sub).getAllByRole('button', { name: /^Retry/ })).toHaveLength(2);
   });
 
   it('narrows the feed by task, status, entrant and who submitted, keeping each in the address', async () => {
@@ -786,54 +753,47 @@ describe('acting on the feed', () => {
     );
   });
 
-  it.each(['retry', 'from-scratch'] as const)(
-    'names an attempt over the limit before %s',
-    async (kind) => {
-      server.use(signedIn, taskList);
-      const over: FeedEntry = {
-        ...retried,
-        grading: {
-          ...stuckFirst.grading,
-          attempt: 2,
-          status: 'over_limit',
-          error: null,
-          limit: 10,
-          retry_limit: 10,
-        },
-      };
-      feedAnswering(() => [over]);
-      const user = userEvent.setup();
-      renderApp(FEED);
+  // #625: a retry is the one way to grade an attempt again, so it alone
+  // names the limit.
+  it('names an attempt over the limit before a retry', async () => {
+    server.use(signedIn, taskList);
+    const over: FeedEntry = {
+      ...retried,
+      grading: {
+        ...stuckFirst.grading,
+        attempt: 2,
+        status: 'over_limit',
+        error: null,
+        limit: 10,
+        retry_limit: 10,
+      },
+    };
+    feedAnswering(() => [over]);
+    const user = userEvent.setup();
+    renderApp(FEED);
 
-      const table = await screen.findByRole('table', { name: 'Gradings' });
-      const row = await within(table).findByRole('rowgroup', {
-        name: 'B submission 3 by ada',
-      });
-      expect(row).toHaveTextContent('Over the limit');
-      expect(row).toHaveTextContent(
-        'Not graded: the entrant had reached the limit of 10 submissions for this task.',
-      );
+    const table = await screen.findByRole('table', { name: 'Gradings' });
+    const row = await within(table).findByRole('rowgroup', {
+      name: 'B submission 3 by ada',
+    });
+    expect(row).toHaveTextContent('Over the limit');
+    expect(row).toHaveTextContent(
+      'Not graded: the entrant had reached the limit of 10 submissions for this task.',
+    );
 
-      await user.click(
-        within(row).getByRole('button', {
-          name:
-            kind === 'retry'
-              ? 'Retry B submission 3 by ada, attempt 2'
-              : 'Regrade B submission 3 by ada, attempt 2 from scratch',
-        }),
-      );
-      const asked = await screen.findByRole('dialog', {
-        name:
-          kind === 'retry'
-            ? 'Grade submission 3 again?'
-            : 'Regrade submission 3 from scratch?',
-      });
-      expect(asked).toHaveTextContent(
-        'A retry now ends not graded: ada has reached the limit of 10 submissions for sum, counting their submissions with a result, those waiting that are not delayed, and the delayed ones made before this one.',
-      );
-      expect(asked).not.toHaveTextContent('runs again on the same version');
-    },
-  );
+    await user.click(
+      within(row).getByRole('button', {
+        name: 'Retry B submission 3 by ada, attempt 2',
+      }),
+    );
+    const asked = await screen.findByRole('dialog', {
+      name: 'Grade submission 3 again?',
+    });
+    expect(asked).toHaveTextContent(
+      'A retry now ends not graded: ada has reached the limit of 10 submissions for sum, counting their submissions with a result, those waiting that are not delayed, and the delayed ones made before this one.',
+    );
+    expect(asked).not.toHaveTextContent('runs again on the same version');
+  });
 
   it('keeps a refused retry in the dialog with its sentence', async () => {
     server.use(
