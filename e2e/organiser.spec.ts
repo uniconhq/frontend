@@ -468,10 +468,15 @@ test('an organiser makes an org, walks to a task and publishes its statement', a
 
   const standing = page.getByLabel('Where the task stands');
   await expect(standing).toContainText('Entrants are graded on publication 1');
-  const sidebar = page.getByRole('navigation', { name: 'Sections' });
+  const trail = page.getByRole('navigation', { name: 'Breadcrumb' });
+  await trail
+    .getByRole('button', { name: / menu$/ })
+    .last()
+    .click();
+  const menu = page.getByRole('menu');
   // A task has no Files page: each file is changed on its own card (M51).
-  await expect(sidebar.getByRole('link', { name: 'Files' })).toHaveCount(0);
-  await sidebar.getByRole('link', { name: 'Statement' }).click();
+  await expect(menu.getByRole('menuitem', { name: 'Files' })).toHaveCount(0);
+  await menu.getByRole('menuitem', { name: 'Statement' }).click();
 
   await page
     .getByRole('textbox', { name: 'Statement source' })
@@ -488,33 +493,27 @@ test('an organiser makes an org, walks to a task and publishes its statement', a
   });
   await expect(standing).toContainText('Entrants are graded on publication 2');
 
-  // An old link to the task's Files page lands on the task's page.
-  await page.goto('/orgs/acme/contests/spring/tasks/sum/files?file=statement.md');
-  await expect(page).toHaveURL(/\/orgs\/acme\/contests\/spring\/tasks\/sum$/);
-  await expect(standing).toBeVisible();
-
-  const trail = page.getByRole('navigation', { name: 'Breadcrumb' });
-  await trail.getByRole('link', { name: 'Orgs', exact: true }).click();
-  await expect(page.getByRole('list', { name: 'Your orgs' })).toContainText('acme');
+  await trail.getByRole('link', { name: 'Home', exact: true }).click();
+  await expect(page.getByRole('region', { name: 'Orgs' })).toContainText('acme');
 });
 
-test('a contest has no Files page: an old link to one lands on its stored settings', async ({
+test('a contest has no Files page, and its old address is not found', async ({
   page,
 }) => {
   const state = await stubOrganiserApi(page);
   state.orgMade = true;
   await page.goto('/orgs/acme/contests/spring');
-  const sidebar = page.getByRole('navigation', { name: 'Sections' });
-  await expect(sidebar.getByRole('link', { name: 'Settings' })).toBeVisible();
-  await expect(sidebar.getByRole('link', { name: 'Files' })).toHaveCount(0);
+  const trail = page.getByRole('navigation', { name: 'Breadcrumb' });
+  await trail
+    .getByRole('button', { name: / menu$/ })
+    .last()
+    .click();
+  const menu = page.getByRole('menu');
+  await expect(menu.getByRole('menuitem', { name: 'Settings' })).toBeVisible();
+  await expect(menu.getByRole('menuitem', { name: 'Files' })).toHaveCount(0);
 
   await page.goto('/orgs/acme/contests/spring/files?file=contest.yaml');
-  await expect(page).toHaveURL(/\/orgs\/acme\/contests\/spring\/settings#file$/);
-  const stored = page.getByRole('region', { name: 'The settings as stored' });
-  await expect(
-    stored.getByRole('textbox', { name: 'The contest’s settings' }),
-  ).toBeVisible();
-  await expect(stored).toBeInViewport();
+  await expect(page.getByRole('heading', { name: 'Page not found' })).toBeVisible();
 });
 
 test('an organiser opens a contest from its checklist', async ({ page }) => {
@@ -523,7 +522,7 @@ test('an organiser opens a contest from its checklist', async ({ page }) => {
   await page.goto('/orgs/acme/contests/spring');
 
   const status = page.getByRole('region', { name: 'Status' });
-  await expect(status).toContainText('Only its organisers can see it.');
+  await expect(status).toContainText('Who sees it:');
   const checklist = status.getByRole('list', { name: 'Before it opens' });
   await expect(checklist).toContainText('A · Sum: published');
   await status.getByRole('button', { name: 'Open the contest' }).click();
@@ -533,7 +532,7 @@ test('an organiser opens a contest from its checklist', async ({ page }) => {
   await expect(dialog).toContainText('Registration opens now.');
   await dialog.getByRole('button', { name: 'Open the contest' }).click();
 
-  await expect(status).toContainText('Live');
+  await expect(status.getByRole('button', { name: 'Back to draft' })).toBeVisible();
   expect(state.contestYaml).toContain('state: published');
 });
 
@@ -791,21 +790,6 @@ test('the Runs card pairs files, lines up its cells, and gives a cell to the ent
   await expect(
     runs.getByText('The entrant gives it · up to 10 MB', { exact: true }),
   ).toBeVisible();
-});
-
-test('an old queue bookmark opens Marking and keeps its query', async ({ page }) => {
-  const state = await stubOrganiserApi(page);
-  state.orgMade = true;
-  await page.route(
-    '**/api/v1/orgs/acme/contests/spring/tasks/sum/organise/queue',
-    (route) => route.fulfill({ json: [] }),
-  );
-  await page.goto('/orgs/acme/contests/spring/tasks/sum/queue?unmarked=true');
-  await expect(page).toHaveURL(/\/marking\?unmarked=true$/);
-  await expect(
-    page.getByRole('heading', { name: 'Marking', exact: true }),
-  ).toBeVisible();
-  await expect(page.getByText('Nothing is waiting for a mark.')).toBeVisible();
 });
 
 test('a new workflow asks only for its owner and name and opens an empty draft', async ({

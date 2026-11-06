@@ -54,7 +54,7 @@ async function status(): Promise<HTMLElement> {
 }
 
 describe("the contest's status", () => {
-  it('says a draft is seen by its organisers alone, and lists what opening it needs', async () => {
+  it('says who sees a draft, and lists what opening it needs, leaving its state to the badge', async () => {
     server.use(
       signedIn,
       ...repoFiles,
@@ -65,8 +65,9 @@ describe("the contest's status", () => {
 
     const card = await status();
     await waitFor(() =>
-      expect(card).toHaveTextContent('DraftOnly its organisers can see it.'),
+      expect(card).toHaveTextContent('Who sees it: Anyone signed in'),
     );
+    expect(within(card).queryByText('Draft')).toBeNull();
     const list = await within(card).findByRole('list', { name: 'Before it opens' });
     expect(
       within(list)
@@ -209,18 +210,53 @@ describe("the contest's status", () => {
 
     await waitFor(() => expect(sent).toHaveLength(1));
     expect((parse(sent[0] ?? '') as { state: string }).state).toBe('published');
-    expect(await within(card).findByText(/^Live$/)).toBeVisible();
+    expect(
+      await within(card).findByRole('button', { name: 'Back to draft' }),
+    ).toBeVisible();
   });
 
-  it('takes a live contest back to draft before its start, and says why when the forge refuses', async () => {
+  it('takes a live contest back to draft, saying nothing of draft until asked', async () => {
     server.use(
       signedIn,
       ...repoFiles,
       http.get(`${CONTEST_API}/organise/tasks`, () => HttpResponse.json(ready)),
     );
-    settingsAt(
+    const sent = settingsAt(
       DRAFT.map((line) => (line === 'state: draft' ? 'state: published' : line)),
     );
+    const user = userEvent.setup();
+    renderApp(CONTEST);
+
+    const card = await status();
+    const back = await within(card).findByRole('button', { name: 'Back to draft' });
+    expect(card).toHaveTextContent('Who sees it: Anyone signed in');
+    expect(card).not.toHaveTextContent(/Live|starts|no longer/);
+    await user.click(back);
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Put the contest back to draft?',
+    });
+    expect(dialog).toHaveTextContent(
+      'Once the contest starts, it can no longer go back to draft.',
+    );
+    await user.click(within(dialog).getByRole('button', { name: 'Back to draft' }));
+
+    await waitFor(() => expect(sent).toHaveLength(1));
+    expect((parse(sent[0] ?? '') as { state: string }).state).toBe('draft');
+  });
+
+  it('offers a started contest Back to draft too, and says why not when the forge refuses', async () => {
+    server.use(
+      signedIn,
+      ...repoFiles,
+      http.get(`${CONTEST_API}/organise/tasks`, () => HttpResponse.json(ready)),
+    );
+    settingsAt([
+      'name: Spring',
+      'start: 2026-09-01T09:00:00Z',
+      'end: 2030-09-02T09:00:00Z',
+      'state: published',
+      'visibility: signed-in',
+    ]);
     server.use(
       http.put(FILE, () =>
         problem(422, 'invalid_definition', {
@@ -237,14 +273,9 @@ describe("the contest's status", () => {
     renderApp(CONTEST);
 
     const card = await status();
-    await waitFor(() =>
-      expect(card).toHaveTextContent(
-        `Anyone signed in can see it. It starts ${formatDateTime(new Date('2030-10-01T09:00:00Z'))}.`,
-      ),
-    );
-    await user.click(
-      await within(card).findByRole('button', { name: 'Back to draft' }),
-    );
+    const back = await within(card).findByRole('button', { name: 'Back to draft' });
+    expect(card).not.toHaveTextContent(/can no longer go back to draft/);
+    await user.click(back);
     const dialog = await screen.findByRole('dialog', {
       name: 'Put the contest back to draft?',
     });
@@ -274,7 +305,6 @@ describe("the contest's status", () => {
     renderApp(CONTEST);
 
     const card = await status();
-    await waitFor(() => expect(card).toHaveTextContent('Ended'));
     await user.click(await within(card).findByRole('button', { name: 'Archive' }));
     const dialog = await screen.findByRole('dialog', { name: 'Archive the contest?' });
     await user.click(within(dialog).getByRole('button', { name: 'Archive' }));

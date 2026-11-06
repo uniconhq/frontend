@@ -197,13 +197,14 @@ contestant pages below, so a page anywhere else loads in the dev server and
 answers 404 behind the proxy. A new organiser page goes under `/orgs` or the
 proxy changes first. The addresses are built in `src/lib/organiser-paths.ts`,
 and a section's under its level in `src/lib/sections.ts`, the one list that
-also draws each section's card, sidebar entry and crumb; the pages and the
-breadcrumb share both. The breadcrumb calls the org, the contest and the
-task by the names the pages have already read, the org's display name, the
-contest's name and the task's label and title, and asks nothing of the
-server for them; until a page has read one, or on a page that never does,
-that step is called by its address. A step with no page of its own, such as
-a contest's org on the contestant pages, is plain words rather than a chip.
+also draws each section's card and crumb. There is no sidebar: the
+breadcrumb starts at Home, every part is a link, and the small arrow after
+a part lists what sits under it (Home: your orgs and workflows; an org: its
+contests and sections; a contest: its tasks and sections; a task: its
+build cards and sections), read only while the menu is open. It calls the
+org, the contest and the task by the names the pages have already read, and
+until then by their addresses. An address that only used to forward to a
+new page is gone and answers not found.
 
 The pages live in `src/features/organise/`: a sub-folder for each page
 (`orgs/` holds `/orgs` and `/orgs/new`, then `org/`, `contest/`, `entrants/`,
@@ -255,9 +256,7 @@ most 255 characters, the most the forge takes.
 A contest's `contest.yaml` and a task's `task.yaml` are shown at the foot of
 their Settings page (`files/StoredSettings.tsx`, the page's `#file`), where
 "View file" leads, with their history: read-only, and for an admin, while the
-forms cannot read them, as text to fix. An old link to a contest's or a
-task's Files page lands there for a contest and on the task's page for a
-task. The text is read once and saved with the token it was read at, so a
+forms cannot read them, as text to fix. The text is read once and saved with the token it was read at, so a
 background refetch never swaps the token under someone's text. From Save
 until the file has been read again the text is read-only and Save spins,
 and nothing else makes it so; the answer takes the focus. A `conflict` shows
@@ -402,8 +401,8 @@ submissions graded by every save, which is refused if a result differs.
 The Submissions card keeps the `tests` anchor for old links.
 
 Each task card and section begins with its purpose. `TASK_SECTIONS` holds
-the shared lines, labels and addresses for the hub, sidebar, crumbs and
-pages. Publications explains what entrants are graded on before its list.
+the shared lines, labels and addresses for the hub, crumbs, breadcrumb
+menus and pages. Publications explains what entrants are graded on before its list.
 Read only chips link to the organisers page; fields, including formulas,
 stay readable without offering changes. Only organisers pages explain
 roles, using the same per-level words as their role pickers.
@@ -471,8 +470,7 @@ observer reads each mark, "–" for one not entered. "Open the submission"
 shows its files, each a download, and its result as staff read it (below).
 "Unmarked only" and a choice of leaderboard cut the list. The hub counts
 submissions still missing a mark. A task without hand-marked values says
-“Nothing is waiting for a mark.” The old `/queue` address redirects to
-`/marking`, preserving its query and fragment.
+“Nothing is waiting for a mark.”
 
 The contest page lists its tasks in the contest's order, each by its letter
 and name, with where it stands (`GET <contest>/organise/tasks`): its latest
@@ -740,7 +738,7 @@ chooses it; nothing changes until the task is saved.
 
 | Address                                | Page                                                                                                                                              |
 | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `/`                                    | the public contests for a visitor; your contests once signed in                                                                                   |
+| `/`                                    | the public contests for a visitor; once signed in, cards of your orgs and workflows, then your contests                                           |
 | `/contests/:org/:contest`              | a contest's dates, countdown, registration, your team, released tasks with your points, and your row on each leaderboard                          |
 | `/contests/:org/:contest/leaderboards` | the leaderboards as you are shown them; a visitor reads the public ones                                                                           |
 | `/contests/:org/:contest/questions`    | your questions to the organisers, and the form to ask one                                                                                         |
@@ -998,7 +996,7 @@ src/
              router and three features all read it
   live/      the live stream and whether it is open
   theme/     the design handoff's tokens, the fonts, the CSS variables
-  ui/        shell (header, sidebar, breadcrumb, account menu), feedback, brand,
+  ui/        shell (header, breadcrumb and its menus, account menu), feedback, brand,
              the wrappers: buttons, fields, the file drop zone, verdicts, and
              what both sides show: announcements and questions (threads/),
              how a value or a cell is shown (number/), a leaderboard

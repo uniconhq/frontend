@@ -135,7 +135,7 @@ export type UniconThemeOther = {
   sunsetStops: string[];
   /** The mark's size and the gap after it, as fractions of the wordmark size. */
   lockup: { markScale: number; gapScale: number };
-  shell: { headerHeight: number; sidebarWidth: number };
+  shell: { headerHeight: number };
 };
 
 declare module '@mantine/core' {
@@ -204,7 +204,7 @@ export const uniconTokens: UniconThemeOther = {
 
   lockup: { markScale: 0.525, gapScale: 0.1 },
 
-  shell: { headerHeight: 48, sidebarWidth: 178 },
+  shell: { headerHeight: 48 },
 };
 
 export const theme = createTheme({

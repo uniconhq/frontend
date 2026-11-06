@@ -84,3 +84,15 @@ export function formatDuration(ms: number): string {
   if (minutes > 0) return `${minutes}m ${two(seconds)}s`;
   return `${seconds}s`;
 }
+
+/** A stretch of time in its two largest units, such as `13d 21h`, `4h 5m` or `9m`. */
+export function formatShortDuration(ms: number): string {
+  const total = Math.max(0, Math.floor(ms / 1000));
+  const days = Math.floor(total / 86_400);
+  const hours = Math.floor((total % 86_400) / 3600);
+  const minutes = Math.floor((total % 3600) / 60);
+  if (days > 0) return `${days}d ${hours}h`;
+  if (hours > 0) return `${hours}h ${minutes}m`;
+  if (minutes > 0) return `${minutes}m`;
+  return `${total % 60}s`;
+}

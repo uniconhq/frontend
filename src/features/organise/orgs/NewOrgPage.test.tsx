@@ -75,10 +75,13 @@ describe('creating an org', () => {
     const user = await createOrg('beta');
     await screen.findByRole('heading', { name: 'beta', level: 1 });
     const trail = screen.getByRole('navigation', { name: 'Breadcrumb' });
-    await user.click(within(trail).getByRole('link', { name: 'Orgs' }));
+    await user.click(within(trail).getByRole('link', { name: 'Home' }));
 
-    const list = await screen.findByRole('list', { name: 'Your orgs' });
-    expect(within(list).getByRole('link', { name: 'beta' })).toBeInTheDocument();
+    const orgs = await screen.findByRole('region', { name: 'Orgs' });
+    expect(await within(orgs).findByRole('link', { name: 'beta' })).toHaveAttribute(
+      'href',
+      '/orgs/beta',
+    );
   });
 
   it('holds the description to 255 characters', async () => {

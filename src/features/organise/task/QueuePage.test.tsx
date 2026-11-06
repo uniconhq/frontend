@@ -5,7 +5,7 @@ import userEvent from '@/test/user-event';
 import { renderApp } from '@/test/render';
 import { problem, server, signedIn } from '@/test/server';
 
-const PAGE = '/orgs/acme/contests/spring/tasks/sum/queue';
+const PAGE = '/orgs/acme/contests/spring/tasks/sum/marking';
 const QUEUE = '/api/v1/orgs/:org/contests/:contest/tasks/:task/organise/queue';
 const ENTER =
   '/api/v1/orgs/:org/contests/:contest/tasks/:task/organise/submissions/:number/entries';

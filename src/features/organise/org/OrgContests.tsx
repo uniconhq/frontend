@@ -17,7 +17,8 @@ import {
 import { contestPath } from '@/lib/organiser-paths';
 import { serverNow } from '@/lib/time';
 import { CreateButton } from '../Create';
-import { contestsReached, holdsAt } from '../roles';
+import { contestsReached } from '@/lib/reached';
+import { holdsAt } from '../roles';
 
 const CONTESTS = '/api/v1/orgs/{org}/contests';
 const HOME = '/api/v1/orgs/{org}/contests/{contest}/home';

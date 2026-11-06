@@ -387,13 +387,4 @@ describe('the entrants page', () => {
 
     expect(await screen.findByText('Nobody has registered yet.')).toBeVisible();
   });
-
-  it('is where the old contestants and teams pages lead', async () => {
-    server.use(signedIn);
-    const { router } = renderApp('/orgs/acme/contests/spring/teams?status=pending');
-
-    await screen.findByText('Nobody has registered yet.');
-    expect(router.state.location.pathname).toBe(PAGE);
-    expect(router.state.location.search).toBe('?status=pending');
-  });
 });

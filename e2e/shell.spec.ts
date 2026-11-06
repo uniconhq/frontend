@@ -63,8 +63,8 @@ test('the shell and the landing page render', async ({ page }) => {
   await page.goto('/');
 
   await expect(page.getByRole('heading', { name: 'Unicon', level: 1 })).toBeVisible();
-  await expect(page.getByRole('navigation', { name: 'Sections' })).toContainText(
-    'Browse contests',
+  await expect(page.getByRole('navigation', { name: 'Breadcrumb' })).toContainText(
+    'Home',
   );
   await expect(page.getByText(/Deadlines and countdowns follow Unicon/)).toBeVisible();
 });
@@ -74,7 +74,7 @@ test('an unknown address renders the 404 inside the shell', async ({ page }) => 
   await page.goto('/no-such-page');
 
   await expect(page.getByRole('heading', { name: 'Page not found' })).toBeVisible();
-  await expect(page.getByRole('navigation', { name: 'Sections' })).toBeVisible();
+  await expect(page.getByRole('navigation', { name: 'Breadcrumb' })).toBeVisible();
 });
 
 test('the login page offers one button out of the app', async ({ page }) => {

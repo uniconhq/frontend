@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { screen, within } from '@testing-library/react';
+import { screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import { renderWithProviders } from '@/test/render';
 import { SessionProvider } from '@/session';
@@ -16,12 +16,13 @@ function renderShell(page: React.ReactNode) {
 }
 
 describe('AppShell', () => {
-  it('renders the lockup, the top places and the page', async () => {
+  it('renders the lockup, the breadcrumb and the page, with no sidebar', async () => {
     renderShell(<p>page content</p>);
 
     expect(await screen.findByText('unicon')).toBeInTheDocument();
-    const sections = screen.getByRole('navigation', { name: 'Sections' });
-    expect(within(sections).getByRole('group', { name: 'Unicon' })).toBeInTheDocument();
+    expect(screen.getByRole('navigation', { name: 'Breadcrumb' })).toBeInTheDocument();
+    expect(screen.queryByRole('navigation', { name: 'Sections' })).toBeNull();
+    expect(screen.getAllByRole('navigation')).toHaveLength(1);
     expect(screen.getByText('page content')).toBeInTheDocument();
   });
 
@@ -33,21 +34,5 @@ describe('AppShell', () => {
     expect(document.getElementById('main')).toContainElement(
       screen.getByText('page content'),
     );
-  });
-
-  it('lists only places that exist, every one a link', async () => {
-    renderShell(null);
-
-    const sections = await screen.findByRole('navigation', { name: 'Sections' });
-    expect(
-      await within(sections).findByRole('link', { name: 'Browse contests' }),
-    ).toHaveAttribute('href', '/');
-    for (const placeholder of ['Tasks', 'Contest setup', 'Task authoring', 'Runners']) {
-      expect(within(sections).queryByText(placeholder)).not.toBeInTheDocument();
-    }
-    const items = within(sections)
-      .getAllByRole('group')
-      .flatMap((group) => [...group.children].slice(1));
-    expect(items.every((item) => item.tagName === 'A')).toBe(true);
   });
 });

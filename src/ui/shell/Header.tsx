@@ -4,14 +4,10 @@ import { Breadcrumb } from './Breadcrumb';
 import { AccountMenu } from './AccountMenu';
 import classes from './Header.module.css';
 
-/**
- * Lockup on the left, clicking it goes to browse; then the breadcrumb, where
- * you are. On the right the account slot: a sign-in link or the avatar menu.
- */
 export function Header() {
   return (
     <header className={classes.header}>
-      <Link to="/" className={classes.lockup} aria-label="Unicon, browse contests">
+      <Link to="/" className={classes.lockup} aria-label="Unicon, home">
         <UniconLockup size={16} />
       </Link>
       <Breadcrumb />
