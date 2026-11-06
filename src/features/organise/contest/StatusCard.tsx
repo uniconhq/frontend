@@ -238,7 +238,7 @@ export function StatusCard({ org, contest }: { org: string; contest: string }) {
 
   const run = async (change: Parameters<typeof apply>[0]) => {
     setRefused(null);
-    const outcome = await apply(change);
+    const outcome = await apply(change, { retry: true });
     setAsking(null);
     if (outcome.kind === 'refused') setRefused(outcome);
   };

@@ -9,9 +9,10 @@ import { copyOf, type Values } from '../forms/values';
 /**
  * One change to the contest's settings made by a button, such as opening
  * the contest: the settings read afresh, the change applied to a copy of
- * them, and the values saved with the version just read. A save someone
- * else's beat in the meantime is made again once on the settings as they
- * are then, since a change of one setting means the same on either.
+ * them, and the values saved with the version just read. With `retry`, a
+ * save someone else's beat in the meantime is made again once on the
+ * settings as they are then, for a change that means the same on either,
+ * such as setting the status. Without it the conflict is answered.
  */
 export function useContestChange(org: string, contest: string) {
   const place = { kind: 'contest' as const, org, contest };
@@ -58,11 +59,14 @@ export function useContestChange(org: string, contest: string) {
     return settingsWrite.write({ ...body, values: fresh });
   };
 
-  const apply = async (change: (values: Values) => void) => {
+  const apply = async (
+    change: (values: Values) => void,
+    { retry }: { retry: boolean },
+  ) => {
     setPending(true);
     try {
       const outcome = await once(change);
-      return outcome.kind === 'refused' && outcome.error.code === 'conflict'
+      return retry && outcome.kind === 'refused' && outcome.error.code === 'conflict'
         ? await once(change)
         : outcome;
     } finally {
