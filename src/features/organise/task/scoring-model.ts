@@ -938,6 +938,52 @@ export function troublesOf(
   return troubles;
 }
 
+/** A row of the show grid: a part by its kind and name, or a run entry's field or its `of`. */
+export function showSpot(
+  kind: ShowKind | 'runs',
+  name: string,
+  field?: string,
+): string {
+  return JSON.stringify(field === undefined ? [kind, name] : [kind, name, field]);
+}
+
+/**
+ * What the forge said of each part `show` names, by its row (`showSpot`):
+ * the problems at its place in `show` as the file writes it.
+ */
+export function showTroublesOf(
+  show: Show,
+  errors: readonly DefinitionError[],
+): Map<string, string> {
+  const said = new Map<string, string[]>();
+  const add = (spot: string, message: string) => {
+    const before = said.get(spot) ?? [];
+    if (!before.includes(message)) said.set(spot, [...before, message]);
+  };
+  for (const error of errors) {
+    const [top, second, moment, kind, index, part, place] = error.path;
+    if (top !== 'scoring' || second !== 'show' || typeof index !== 'number') continue;
+    const shown = MOMENTS.find(({ value }) => value === moment)?.value;
+    if (shown === undefined) continue;
+    if (kind === 'runs') {
+      const entry = show[shown].runs.filter((each) => each.fields.length > 0)[index];
+      if (entry === undefined) continue;
+      const field = part === 'fields' && typeof place === 'number' ? place : null;
+      if (field === null) add(showSpot('runs', entry.of), error.message);
+      else {
+        const name = entry.fields[field];
+        if (name !== undefined) add(showSpot('runs', entry.of, name), error.message);
+      }
+      continue;
+    }
+    const listed = KINDS.find((each) => each === kind);
+    if (listed === undefined) continue;
+    const name = show[shown][listed].filter((each) => each.trim() !== '')[index];
+    if (name !== undefined) add(showSpot(listed, name), error.message);
+  }
+  return new Map([...said].map(([spot, messages]) => [spot, messages.join(' ')]));
+}
+
 /** Other values' lines, with `from` read as `to`, once `to` is free to take. */
 export function renamed(
   values: ScoreValue[],

@@ -33,9 +33,6 @@ export type UploadFile = {
 /** Everything in the panel, by input id. Replaced whole on every change. */
 export type Draft = Readonly<Record<string, Entry>>;
 
-/** A number as a contestant gives it: plain decimal digits, as the forge takes one. */
-const PLAIN_DECIMAL = /^-?[0-9]+(\.[0-9]+)?$/;
-
 function takesFiles(input: InputField): boolean {
   return input.type === 'file' || input.type === 'folder';
 }
@@ -189,15 +186,13 @@ function oneProblem(input: InputField, entry: OneEntry): string | null {
       break;
   }
   if (input.type === 'text') return null;
-  return PLAIN_DECIMAL.test(entry.text.trim())
-    ? null
-    : 'Give a number in plain digits, such as 2.5.';
+  return entry.text.trim() === '' ? 'Give a number.' : null;
 }
 
 /**
  * The refusals the browser can tell before anything is sent, as the same
  * errors the server would answer, so the panel says them the same way: an
- * input left empty, an option not chosen or a number not written as one, as
+ * input left empty or an option not chosen, as
  * `invalid_inputs`; and an input whose files together are larger than it
  * takes, as `too_large`. The object store gives no usable error for a file
  * over its limit, so the sizes are checked here, before any upload starts.

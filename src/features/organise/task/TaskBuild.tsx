@@ -143,6 +143,16 @@ function BuildForm({
   // A file chosen for a setting stays while the new one still takes that
   // input as the same kind, a file or a folder, the setting naming it; else
   // it goes with the input.
+  // Back to a saved workflow that cannot be read, the settings come back as read.
+  if (declared === null && picked === saved && typedFor !== picked) {
+    setTypedFor(picked);
+    if (inputFiles.length > 0) setInputFiles([]);
+    setValues((before) => ({
+      ...before,
+      inputs: read.values.inputs,
+      axes: read.values.axes,
+    }));
+  }
   if (declared !== null && typedFor !== picked) {
     setTypedFor(picked);
     const kept = inputFiles.filter((change) => {
@@ -484,6 +494,7 @@ function BuildForm({
             graded={form?.graded === true}
             disabled={disabled}
             errors={fieldErrors}
+            sentShow={sent?.values.show ?? values.show}
             onChange={set}
             onProblems={setScoreProblems}
           />

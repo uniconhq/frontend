@@ -55,6 +55,7 @@ import {
   renamed,
   ONE_RUN,
   scopeOf,
+  showTroublesOf,
   troublesOf,
   valueTree,
   withLine,
@@ -89,9 +90,6 @@ const RUN_FIELDS: ShowRow[] = [
   { name: 'message', label: 'Message' },
 ];
 
-/** Why an output that is a file cannot be shown. */
-const A_FILE = 'A file, and entrants are shown numbers and text.';
-
 /** How far the picked workflow file has been read, for its outputs. */
 export type WorkflowRead = 'loading' | 'failed' | 'ready';
 
@@ -112,6 +110,7 @@ export function ScoringCard({
   graded,
   disabled,
   errors,
+  sentShow,
   onChange,
   onProblems,
 }: {
@@ -130,6 +129,8 @@ export function ScoringCard({
   disabled: boolean;
   /** What the forge said of the last save, each at its path. */
   errors: DefinitionError[];
+  /** `show` as the last save sent it, which the errors' paths count in. */
+  sentShow: Show;
   onChange: (change: Partial<TaskValues>) => void;
   /** What stops the save: a formula line that does not read. */
   onProblems: (problems: string[]) => void;
@@ -601,6 +602,7 @@ export function ScoringCard({
           fields={shown.fields}
           groups={values.scoreGroups}
           runs={rows}
+          troubles={showTroublesOf(sentShow, errors)}
           onChange={(show) => onChange({ show })}
         />
       </CardPart>
@@ -814,7 +816,6 @@ function showRows(
   const output = (each: BoxOutput): ShowRow => ({
     name: each.name,
     label: `${each.title ?? each.name}${each.unit === null ? '' : ` (${each.unit})`}`,
-    ...(each.type === 'file' || each.type === 'folder' ? { refused: A_FILE } : {}),
   });
   // With nothing repeated the box cannot be told so, and says null: every
   // step is then done once, as the planner classes them.
@@ -834,7 +835,6 @@ function showRows(
       .map((input) => ({
         name: input.id,
         label: titles.get(input.id) ?? input.id,
-        ...(input.secret ? { refused: 'A secret, which is never shown.' } : {}),
       })),
     outputs: [
       ...(box ?? []).filter(once).map(output),

@@ -27,6 +27,8 @@ import {
   renamedInShow,
   runMoments,
   scopeOf,
+  showSpot,
+  showTroublesOf,
   troublesOf,
   valueTree,
   withLine,
@@ -523,6 +525,29 @@ describe('what the forge said of a group or a value', () => {
     expect([...troubles]).toEqual([
       ['g1', 'Give the group a name.'],
       ['v1', 'a is listed twice.'],
+    ]);
+  });
+
+  it('stands by the row of show it names, counted in show as the file writes it', () => {
+    const show = emptyShow();
+    show.always.inputs = ['token'];
+    show.after_release.runs = [
+      { of: 'samples', fields: [] },
+      { of: 'all', fields: ['verdict', 'log'] },
+    ];
+    const troubles = showTroublesOf(show, [
+      { path: ['scoring', 'show', 'always', 'inputs', 0], message: 'A secret.' },
+      {
+        path: ['scoring', 'show', 'after_release', 'runs', 0, 'fields', 1],
+        message: 'A file.',
+      },
+      { path: ['scoring', 'show', 'after_release', 'runs', 0, 'of'], message: 'Of.' },
+      { path: ['scoring', 'show', 'always', 'outputs', 3], message: 'No such row.' },
+    ]);
+    expect([...troubles]).toEqual([
+      [showSpot('inputs', 'token'), 'A secret.'],
+      [showSpot('runs', 'all', 'log'), 'A file.'],
+      [showSpot('runs', 'all'), 'Of.'],
     ]);
   });
 });

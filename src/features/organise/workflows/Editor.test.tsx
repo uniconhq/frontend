@@ -1,6 +1,6 @@
 import { partTransfer, partTransport } from '@/test/part-uploads';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { screen, waitFor, within } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import type { UserEvent } from '@testing-library/user-event';
 import { delay, http, HttpResponse } from 'msw';
 import { problem, server } from '@/test/server';
@@ -1045,6 +1045,25 @@ describe('the workflow editor', () => {
       await screen.findByRole('button', { name: 'Leave without saving' }),
     );
     await waitFor(() => expect(router.state.location.pathname).toBe('/workflows'));
+  });
+
+  it('reads the draft again each time the editor opens', async () => {
+    let reads = 0;
+    const { user, router } = openEditor({
+      handlers: [
+        http.get(`${WORKFLOW_API}/draft`, () => {
+          reads += 1;
+        }),
+      ],
+    });
+    await waitFor(() => barButton('Save'));
+    expect(reads).toBe(1);
+    await user.click(screen.getByRole('link', { name: 'All workflows' }));
+    await waitFor(() => expect(router.state.location.pathname).toBe('/workflows'));
+
+    await act(() => router.navigate(EDITOR_PAGE));
+    await waitFor(() => barButton('Save'));
+    expect(reads).toBe(2);
   });
 
   it('opens a box two levels in, and a problem opens the step inside', async () => {

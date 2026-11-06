@@ -950,6 +950,68 @@ repeat:
     });
   });
 
+  it('keeps the stored inputs and runs when the saved workflow that cannot be read is chosen again', async () => {
+    const { sent } = taskBackend({
+      content: `name: Sum
+workflow: unicon/checked@v1
+inputs:
+  submission: entrant
+  checker: checker/checker.cpp
+  time_limit: 2
+  token: {secret: judge-token}
+repeat:
+  - inputs: [answer, greeting]
+    tuples:
+      - {answer: tests/1.ans, greeting: hi}
+`,
+    });
+    const { inputs, tests, workflow } = await openTask();
+    const runs = screen.getByRole('region', { name: 'Runs' });
+
+    await userEvent.click(
+      await within(workflow).findByRole('button', { name: 'Choose a workflow' }),
+    );
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Choose my-org/tunable' }),
+    );
+    expect(
+      await within(inputs).findByRole('group', { name: 'Time limit (seconds)' }),
+    ).toBeVisible();
+    expect(within(inputs).queryByRole('group', { name: 'checker' })).toBeNull();
+    await waitFor(() =>
+      expect(within(runs).queryByRole('columnheader', { name: /answer/i })).toBeNull(),
+    );
+
+    await userEvent.click(
+      within(workflow).getByRole('button', { name: 'Choose a workflow' }),
+    );
+    await userEvent.selectOptions(
+      await screen.findByRole('combobox', { name: 'Version of unicon/checked' }),
+      'v1',
+    );
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Choose unicon/checked' }),
+    );
+    expect(await within(inputs).findByText('Choose a workflow.')).toBeVisible();
+
+    fill(within(tests).getByLabelText('Most submissions'), '20');
+    await save();
+    const saved = written(await waitForSave(sent));
+    expect(saved['workflow']).toBe('unicon/checked@v1');
+    expect(saved['inputs']).toEqual({
+      submission: 'entrant',
+      checker: 'checker/checker.cpp',
+      time_limit: 2,
+      token: { secret: 'judge-token' },
+    });
+    expect(saved['repeat']).toEqual([
+      {
+        inputs: ['answer', 'greeting'],
+        tuples: [{ answer: 'tests/1.ans', greeting: 'hi' }],
+      },
+    ]);
+  });
+
   it('asks for a workflow, with why, when the task names none, and shows its inputs once one is chosen', async () => {
     taskBackend({
       content: 'name: Sum\n',
@@ -2030,9 +2092,6 @@ repeat:
     expect(cell('foot', 'Always')).not.toBeChecked();
     expect(cell('Verdict of samples', 'Always')).toBeChecked();
     expect(cell('Passed of samples', 'Always')).not.toBeChecked();
-    const log = grid.querySelector('[data-show-part="log"]');
-    expect(log).toHaveTextContent('A file, and entrants are shown numbers and text.');
-    expect(cell('Compile log', 'Always')).toBeDisabled();
     expect(
       within(grid).getByRole('rowgroup', { name: 'Runs: samples' }),
     ).toHaveTextContent('time_ms (ms)');
@@ -2440,7 +2499,7 @@ scoring:
     expect(lines.some((line) => line?.startsWith('Shared inputs'))).toBe(false);
   });
 
-  it('offers the settings every run shares, what is given once and what each run gives, refusing a secret and a file', async () => {
+  it('offers the settings every run shares, what is given once and what each run gives', async () => {
     taskBackend({
       content: `${ISLANDS.replace(
         '  code: {entrant: {label: Solution}}\n',
@@ -2491,12 +2550,79 @@ scoring:
       'fraction',
       'time_ms',
     ]);
-    expect(grid.querySelector('[data-show-part="token"]')).toHaveTextContent(
-      'A secret, which is never shown.',
-    );
-    expect(cell('token', 'Always')).toBeDisabled();
     expect(cell('Time limit', 'Always')).toBeEnabled();
     expect(grid.querySelector('[data-show-part="code"]')).toBeNull();
+  });
+
+  it('sends a secret and a file to show, and shows the forge’s word on each row', async () => {
+    const { sent } = taskBackend({
+      content: `${ISLANDS.replace(
+        '  code: {entrant: {label: Solution}}\n',
+        '  code: {entrant: {label: Solution}}\n  token: {secret: judge-token}\n',
+      )}scoring:
+  groups: {samples: {input: sample.in}}
+  show:
+    always:
+      runs: [{of: samples, fields: [verdict]}]
+`,
+      form: runForm('unicon/classic@v6', [
+        declared('code', 'file'),
+        declared('input', 'file'),
+        declared('token', 'text'),
+      ]),
+      answer: () =>
+        problem(422, 'invalid_definition', {
+          errors: [
+            {
+              path: ['scoring', 'show', 'always', 'inputs', 0],
+              message: 'A secret is never shown. Remove it.',
+            },
+            {
+              path: ['scoring', 'show', 'always', 'outputs', 0],
+              message: 'log is a file, and show shows numbers and text. Remove it.',
+            },
+            {
+              path: ['scoring', 'show', 'always', 'runs', 0, 'fields', 0],
+              message: 'The forge’s word on verdict.',
+            },
+          ],
+        }),
+    });
+    server.use(
+      checkedBox([{ name: 'log', type: 'file', once: true, title: 'Compile log' }]),
+    );
+    await openTask();
+    const grid = await screen.findByRole('table', { name: 'What entrants see' });
+    await waitFor(() => expect(cell('Compile log', 'Always')).toBeEnabled());
+    await userEvent.click(cell('token', 'Always'));
+    await userEvent.click(cell('Compile log', 'Always'));
+    await save();
+
+    await expect.poll(() => sent.length).toBe(1);
+    expect(written(sent[0])['scoring']).toMatchObject({
+      show: {
+        always: {
+          inputs: ['token'],
+          outputs: ['log'],
+          runs: [{ of: 'samples', fields: ['verdict'] }],
+        },
+      },
+    });
+    await waitFor(() =>
+      expect(grid.querySelector('[data-show-part="token"]')).toHaveTextContent(
+        'A secret is never shown. Remove it.',
+      ),
+    );
+    expect(grid.querySelector('[data-show-part="log"]')).toHaveTextContent(
+      'log is a file, and show shows numbers and text. Remove it.',
+    );
+    const entry = within(grid).getByRole('rowgroup', { name: 'Runs: samples' });
+    expect(entry.querySelector('[data-show-part="verdict"]')).toHaveTextContent(
+      'The forge’s word on verdict.',
+    );
+    expect(entry.querySelector('[data-show-part="passed"]')).not.toHaveTextContent(
+      'The forge’s word',
+    );
   });
 
   it('leaves a badly written value name, and a loop, to the save', async () => {
