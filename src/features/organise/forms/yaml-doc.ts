@@ -521,11 +521,10 @@ export function numberText(text: string): NumberText | number | undefined {
 }
 
 /** Why a number field cannot be saved, or undefined when it can. */
-export function numberProblem(text: string, whole = false): string | undefined {
+export function numberProblem(text: string): string | undefined {
   const value = numberOf(text);
   if (value === undefined) return undefined;
   if (Number.isNaN(value)) return 'Enter a number.';
   if (!Number.isFinite(value)) return 'Enter a smaller number.';
-  if (whole && !Number.isInteger(value)) return 'Enter a whole number.';
   return undefined;
 }

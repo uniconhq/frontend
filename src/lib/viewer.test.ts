@@ -1,10 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import type { Me } from '@/api/types';
-import { viewerOf } from './viewer';
+import { contestStaff } from './viewer';
 
 const ORG = 'acme';
 const CONTEST = 'spring';
-const TASK = 'sum';
 
 function role(
   held: 'admin' | 'manager' | 'observer',
@@ -13,70 +12,34 @@ function role(
   return { role: held, names };
 }
 
-function entry(status: 'approved' | 'pending') {
-  return { entrant: { status } };
+function staff(roles: Me['roles']) {
+  return contestStaff(ORG, CONTEST, roles);
 }
 
-function seen(
-  roles: Me['roles'],
-  mine: { entrant: { status: string } | null } | null,
-  task = TASK,
-) {
-  return viewerOf(ORG, CONTEST, task, roles, mine);
-}
-
-describe('viewerOf', () => {
-  it('is none of them with no role and no entrant', () => {
-    expect(seen([], null)).toEqual({
-      approvedEntrant: false,
-      contestStaff: false,
-      taskObserver: false,
-      taskManager: false,
-    });
+describe('contestStaff', () => {
+  it('is no one with no role', () => {
+    expect(staff([])).toBe(false);
   });
 
-  it('is an approved entrant only once the entrant is approved', () => {
-    expect(seen([], entry('pending')).approvedEntrant).toBe(false);
-    expect(seen([], entry('approved')).approvedEntrant).toBe(true);
-  });
-
-  it('counts an org admin as staff, an observer and a manager of the task', () => {
-    expect(
-      seen([role('admin', { org: ORG, contest: null, task: null })], null),
-    ).toEqual({
-      approvedEntrant: false,
-      contestStaff: true,
-      taskObserver: true,
-      taskManager: true,
-    });
-  });
-
-  it('counts a contest observer as staff and an observer, not a manager', () => {
-    const view = seen(
-      [role('observer', { org: ORG, contest: CONTEST, task: null })],
-      null,
+  it('counts a role at the org or at the contest', () => {
+    expect(staff([role('admin', { org: ORG, contest: null, task: null })])).toBe(true);
+    expect(staff([role('observer', { org: ORG, contest: CONTEST, task: null })])).toBe(
+      true,
     );
-    expect(view.contestStaff).toBe(true);
-    expect(view.taskObserver).toBe(true);
-    expect(view.taskManager).toBe(false);
   });
 
-  it('counts a manager of this task, and not of another', () => {
-    const held = [role('manager', { org: ORG, contest: CONTEST, task: TASK })];
-    expect(seen(held, null).taskManager).toBe(true);
-    expect(seen(held, null, 'other').taskManager).toBe(false);
-    expect(seen(held, null, 'other').taskObserver).toBe(false);
-    // A role at one task is not staff of the contest's leaderboards.
-    expect(seen(held, null).contestStaff).toBe(false);
-    expect(seen(held, null, 'other').contestStaff).toBe(false);
-  });
-
-  it('does not count a role at another contest', () => {
-    const view = seen(
-      [role('admin', { org: ORG, contest: 'other', task: null })],
-      null,
+  it('does not count a role at one task alone', () => {
+    expect(staff([role('manager', { org: ORG, contest: CONTEST, task: 'sum' })])).toBe(
+      false,
     );
-    expect(view.contestStaff).toBe(false);
-    expect(view.taskObserver).toBe(false);
+  });
+
+  it('does not count a role at another contest or org', () => {
+    expect(staff([role('admin', { org: ORG, contest: 'other', task: null })])).toBe(
+      false,
+    );
+    expect(staff([role('admin', { org: 'globex', contest: null, task: null })])).toBe(
+      false,
+    );
   });
 });

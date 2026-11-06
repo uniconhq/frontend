@@ -202,30 +202,45 @@ describe('the contest settings form', { timeout: 20_000 }, () => {
     expect(parse(sent[0]?.content ?? '')).not.toHaveProperty('entrants');
   });
 
-  it('offers nothing for a grading that fails, and takes the retired setting out of a file that still has it', async () => {
-    const { sent } = contestBackend({
-      current: `${CONTEST}on_system_error: last_result\n`,
-    });
+  it('offers nothing for a grading that fails', async () => {
+    contestBackend();
     const form = await openForm();
 
     expect(within(form).queryByText(/grading fails/i)).toBeNull();
-    fill(inBox(form, 'Basics').getByLabelText('Name'), 'Spring 2026');
-    await userEvent.click(within(form).getByRole('button', { name: 'Save settings' }));
-
-    await screen.findByText('Saved.');
-    expect(parse(sent[0]?.content ?? '')).not.toHaveProperty('on_system_error');
   });
 
-  it('will not save a team whose fewest is more than its most', async () => {
-    contestBackend({ current: `${CONTEST}entrants: {most: 3}\n` });
+  it('sends a fewest over the most, and opens the field the save refused', async () => {
+    const { sent } = contestBackend({ current: `${CONTEST}entrants: {most: 3}\n` });
+    const message = 'This must be at most 3, the most people in a team.';
+    server.use(
+      http.put(FILE, async ({ request }) => {
+        sent.push((await request.json()) as { content: string; token: string });
+        return problem(422, 'invalid_definition', {
+          errors: [{ path: 'entrants.fewest', message }],
+        });
+      }),
+    );
+    const user = userEvent.setup();
     const form = await openForm();
 
     fill(inBox(form, 'Teams').getByLabelText('Fewest people in a team'), '4');
+    await user.click(within(form).getByRole('button', { name: 'Save settings' }));
 
-    expect(
-      inBox(form, 'Teams').getByLabelText('Fewest people in a team'),
-    ).toBeInvalid();
-    expect(within(form).getByRole('button', { name: 'Save settings' })).toBeDisabled();
+    const alert = await screen.findByRole('alert');
+    expect(parse(sent[0]?.content ?? '')).toMatchObject({
+      entrants: { most: 3, fewest: 4 },
+    });
+    expect(alert).toHaveTextContent(
+      `Settings, Teams: Fewest people in a team: ${message}`,
+    );
+    await user.click(
+      within(alert).getByRole('link', {
+        name: 'Settings, Teams: Fewest people in a team',
+      }),
+    );
+    await waitFor(() =>
+      expect(screen.getByLabelText('Fewest people in a team')).toHaveFocus(),
+    );
   });
 
   it('shows the notes the boards report once the save is written', async () => {

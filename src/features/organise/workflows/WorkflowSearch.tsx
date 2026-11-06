@@ -99,12 +99,7 @@ export function WorkflowSearch({
   return (
     <Modal opened onClose={onClose} title="Find a workflow" wide>
       <div className={classes.stack}>
-        <TextInput
-          label="Search workflows"
-          value={text}
-          onChange={setText}
-          maxLength={256}
-        />
+        <TextInput label="Search workflows" value={text} onChange={setText} />
         <div role="group" aria-label="Search scope" className={classes.barActions}>
           {(
             [

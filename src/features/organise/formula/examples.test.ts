@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { specCatalogue } from './catalogue';
+import { specCatalogue } from '@/test/catalogue';
 import { exampleFor, startersFor } from './examples';
 import { readLine, type FormulaScope } from './parse';
 

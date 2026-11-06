@@ -208,7 +208,7 @@ export function ScoringCard({
       ]),
     );
   }, [catalogue, scope, values.scoreValues]);
-  const troubles = troublesOf(values.scoreGroups, values.scoreValues, readings, rows);
+  const troubles = troublesOf(values.scoreGroups, values.scoreValues);
   const blocked = [
     ...troubles.values(),
     ...values.scoreValues.flatMap((value) => {
@@ -585,7 +585,6 @@ export function ScoringCard({
           saved={savedShow}
           graded={graded}
           disabled={disabled}
-          known={outputTypes.data !== undefined}
           values={shown.values}
           settings={shown.settings}
           outputs={shown.outputs}

@@ -35,8 +35,7 @@ export function SubmissionsCard({
               label="Most submissions"
               value={values.max}
               onChange={(value) => onChange({ max: value })}
-              placeholder="50"
-              whole
+              placeholder="Default"
               disabled={disabled || !admin}
             />
           </FieldBox>
@@ -45,8 +44,7 @@ export function SubmissionsCard({
               label="Submissions in a window"
               value={values.rateCount}
               onChange={(value) => onChange({ rateCount: value })}
-              placeholder="1"
-              whole
+              placeholder="Default"
               disabled={disabled || !admin}
             />
           </FieldBox>
@@ -55,8 +53,7 @@ export function SubmissionsCard({
               label="Length of the window (seconds)"
               value={values.ratePer}
               onChange={(value) => onChange({ ratePer: value })}
-              placeholder="30"
-              whole
+              placeholder="Default"
               disabled={disabled || !admin}
             />
           </FieldBox>

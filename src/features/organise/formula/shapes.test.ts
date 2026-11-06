@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { specCatalogue } from './catalogue';
+import { specCatalogue } from '@/test/catalogue';
 import { columnOf, inputWords, kindWords, shapeOf } from './shapes';
 
 const catalogue = specCatalogue();

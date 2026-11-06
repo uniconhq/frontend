@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import { renderWithProviders } from '@/test/render';
 import { FormulaCard } from './FormulaCard';
-import { specCatalogue } from './catalogue';
+import { specCatalogue } from '@/test/catalogue';
 import type { FormulaScope } from './parse';
 
 const scope: FormulaScope = { where: 'task', names: ['late'], sets: [], each: [] };

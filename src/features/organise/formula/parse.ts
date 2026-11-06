@@ -1,5 +1,5 @@
 import type { Catalogue } from './catalogue';
-import { limitProblem, type Tree } from './tree';
+import type { Tree } from './tree';
 
 /** Where a node sits in the line, as string offsets. */
 export type Span = { from: number; to: number };
@@ -861,8 +861,6 @@ export function checkFormula(
 ): { problems: FormulaProblem[]; kind: Kind; tree: Tree } {
   const place: Place = { scope, catalogue, problems: [] };
   const built = compile(node, place, false, scope.where === 'leaderboard');
-  const size = limitProblem(built.tree);
-  if (size !== null) place.problems.push({ message: size });
   const problems = [...place.problems].sort(
     (a, b) => (a.span?.from ?? 0) - (b.span?.from ?? 0),
   );

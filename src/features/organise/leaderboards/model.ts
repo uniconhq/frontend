@@ -1,13 +1,7 @@
 import type { Catalogue } from '../formula/catalogue';
-import {
-  readLine,
-  sameTree,
-  type FormulaScope,
-  type Kind,
-  type Reading,
-} from '../formula/parse';
+import { readLine, sameTree, type FormulaScope, type Reading } from '../formula/parse';
 import { printFormula } from '../formula/print';
-import { unreadableProblem, written, type Tree } from '../formula/tree';
+import { written, type Tree } from '../formula/tree';
 import {
   exactAt,
   exactJS,
@@ -25,8 +19,8 @@ import { formulaYaml, treeOf } from '../task/scoring-model';
 
 /**
  * A leaderboard as the editor holds it. The file stores a mapping of key to
- * leaderboard (a list is an old contest, left untouched). A column's `line`
- * is what the organiser typed; null means the line is the tree's print.
+ * leaderboard. A column's `line` is what the organiser typed; null means the
+ * line is the tree's print.
  */
 
 /** Who a leaderboard is shown to, and which rows they are given. */
@@ -76,21 +70,12 @@ export type HoldDraft = {
 export type LeaderboardsDraft = {
   boards: BoardDraft[];
   hold: HoldDraft;
-  /** Stored as a list, which this page does not rewrite. */
-  legacy: boolean;
 };
 
 export type FieldProblem = { field: string; message: string };
 
 /** A leaderboard key is a task handle: the save refuses a longer one. */
 const KEY_MAX = 24;
-const KEY = /^[a-z0-9][a-z0-9_-]*$/;
-const COLUMN_MAX = 40;
-const COLUMN = /^[a-z][a-z0-9_-]*$/;
-
-const OWN_EVERYONE =
-  'A leaderboard shown to everyone cannot show each entrant only their own row, ' +
-  'since a guest has none. Show every row or the top rows.';
 
 let count = 0;
 
@@ -158,7 +143,7 @@ export function keyFromName(name: string, taken: readonly string[]): string {
   const occupied = new Set(taken.map(written));
   let key = base;
   let suffix = 2;
-  while (occupied.has(key) || unreadableProblem(key) !== null) {
+  while (occupied.has(key)) {
     const end = `_${String(suffix)}`;
     key = base.slice(0, KEY_MAX - end.length) + end;
     suffix += 1;
@@ -274,18 +259,16 @@ function readHold(value: unknown): HoldDraft {
   return { locked: false, on: true, from, untilStaff: false, until };
 }
 
-/** The leaderboards and the hold as the form edits them. A list is left as stored. */
+/** The leaderboards and the hold as the form edits them. */
 export function readLeaderboards(doc: Doc): LeaderboardsDraft {
   const node = exactJS(doc);
   const root = isRecord(node) ? node : {};
   const boards = root['leaderboards'];
-  const hold = readHold(root['hold']);
-  if (boards === undefined) return { boards: [], hold, legacy: false };
-  if (!isRecord(boards)) return { boards: [], hold, legacy: true };
   return {
-    boards: Object.entries(boards).map(([key, value]) => readBoard(key, value)),
-    hold,
-    legacy: false,
+    boards: isRecord(boards)
+      ? Object.entries(boards).map(([key, value]) => readBoard(key, value))
+      : [],
+    hold: readHold(root['hold']),
   };
 }
 
@@ -564,16 +547,17 @@ function holdValue(hold: HoldDraft): { from: Time; until: Time | string } | unde
   return { from: new Time(from), until: until === 'staff' ? 'staff' : new Time(until) };
 }
 
-/** Write the leaderboards when they changed. A list in the file is left as stored. */
+/** Write the leaderboards when they changed. */
 export function writeLeaderboards(
   doc: Doc,
   before: LeaderboardsDraft,
   after: LeaderboardsDraft,
 ): void {
-  if (before.legacy || after.legacy || sameBoards(before, after)) return;
-  if (after.boards.length === 0) {
+  if (sameBoards(before, after)) return;
+  // Leaderboards stored as anything but a mapping are written fresh.
+  if (after.boards.length === 0 || !isRecord(exactAt(doc, ['leaderboards']))) {
     writeAt(doc, ['leaderboards'], undefined);
-    return;
+    if (after.boards.length === 0) return;
   }
   // Each leaderboard is written over its own entry, key by key, so a board
   // or a column left as it was keeps its place, its style and its comments,
@@ -655,136 +639,34 @@ export function writeHold(
   writeAt(doc, ['hold', 'until'], value.until);
 }
 
-function keyProblem(
-  key: string,
-  keys: readonly string[],
-  tasks: readonly string[],
-): string | null {
-  if (key === '') return 'Give the leaderboard a key.';
-  if (!KEY.test(key)) {
-    return (
-      `'${key}' cannot be used as a name. Use only lower case letters, digits, hyphens (-) ` +
-      'and underscores (_), starting with a letter or a digit.'
-    );
-  }
-  if (key.length > KEY_MAX) {
-    return `'${key}' is longer than ${String(KEY_MAX)} characters. Choose a shorter name.`;
-  }
-  if (keys.filter((item) => item === key).length > 1)
-    return 'Another leaderboard has this key.';
-  if (tasks.includes(key)) {
-    return (
-      `${key} is a task of the contest, and tasks and leaderboards share one set of names, ` +
-      'so a column can read either. Name the leaderboard otherwise.'
-    );
-  }
-  const unreadable = unreadableProblem(key);
-  if (unreadable !== null) return unreadable;
-  // A key reads as a task, or as a key before it, once each `-` is `_`.
-  const before = keys.slice(0, keys.indexOf(key));
-  const other = [...tasks, ...before].find(
-    (item) => item !== key && written(item) === written(key),
-  );
-  if (other !== undefined) {
-    return (
-      `${key} reads as ${other} in a formula, where each - is written _. ` +
-      'Name the leaderboard otherwise.'
-    );
-  }
-  return null;
-}
-
-function columnNameProblem(
-  name: string,
-  names: readonly string[],
-  tasks: readonly string[],
-  keys: readonly string[],
-): string | null {
-  if (name === '') return 'Give the column a name.';
-  if (!COLUMN.test(name) || name.length > COLUMN_MAX) {
-    return (
-      `'${name}' cannot be a column's name. Use at most ${String(COLUMN_MAX)} lower case ` +
-      'letters, digits, hyphens (-) and underscores (_), starting with a letter.'
-    );
-  }
-  if (names.filter((item) => item === name).length > 1)
-    return 'Another column has this name.';
-  if (tasks.includes(name) || keys.includes(name)) {
-    const what = tasks.includes(name) ? 'a task' : 'a leaderboard';
-    return (
-      `${name} is ${what} of the contest, and tasks, leaderboards and a leaderboard's ` +
-      'columns share one set of names, so a.b always reads one thing. Name the column ' +
-      'otherwise.'
-    );
-  }
-  // A name reads as a task, a leaderboard or a column before it, once each
-  // `-` is `_`.
-  const before = names.slice(0, names.indexOf(name));
-  const other = [...tasks, ...keys, ...before].find(
-    (item) => item !== name && written(item) === written(name),
-  );
-  if (other !== undefined) {
-    return (
-      `${name} reads as ${other} in a formula, where each - is written _. ` +
-      'Name the column otherwise.'
-    );
-  }
-  return unreadableProblem(name);
-}
-
-function decimalsProblem(decimals: string): string | null {
-  if (decimals === '') return null;
-  return /^([0-9]|10)$/.test(decimals)
-    ? null
-    : 'Give a number of decimals from 0 to 10.';
-}
-
 /**
- * What the editor refuses before a save. A formula's kind comes from reading
- * its line: a pick is not shown or sorted, a text column is not sorted, and
- * every sort column is displayed.
+ * What the editor refuses before a save: what the file has no place for,
+ * and what the formula line cannot be read as. The forge checks the rest.
  */
 export function problems(
   draft: LeaderboardsDraft,
   catalogue: Catalogue | null,
   tasks: readonly string[],
   gives: TaskGives,
-  now: number,
-  start: unknown,
-  end: unknown,
-  saved: HoldDraft | null = null,
 ): FieldProblem[] {
-  if (draft.legacy) return [];
   const found: FieldProblem[] = [];
   const keys = draft.boards.map((board) => board.key);
   for (const board of draft.boards) {
-    const key = keyProblem(board.key, keys, tasks);
-    if (key !== null) found.push({ field: `${board.key}.key`, message: key });
-    if (board.who === 'everyone' && board.rows === 'own') {
-      found.push({ field: `${board.key}.audience.rows`, message: OWN_EVERYONE });
-    }
-    if (board.rows === 'top' && !/^[1-9]\d*$/.test(board.top)) {
+    if (keys.filter((item) => item === board.key).length > 1)
       found.push({
-        field: `${board.key}.audience.rows`,
-        message: 'Give how many rows, at least 1.',
+        field: `${board.key}.key`,
+        message: 'Another leaderboard has this key.',
       });
-    }
-    if (board.columns.length === 0) {
-      found.push({
-        field: `${board.key}.columns`,
-        message: 'Give the leaderboard a column.',
-      });
-    }
     const names = board.columns.map((column) => column.name);
     const readings =
       catalogue === null
         ? {}
         : boardReadings(board, draft.boards, tasks, gives, catalogue);
-    const kindOf = new Map<string, Kind>();
     for (const column of board.columns) {
       const field = columnField(board.key, column);
-      const name = columnNameProblem(column.name, names, tasks, keys);
-      if (name !== null) found.push({ field, message: name });
+      if (column.name === '') found.push({ field, message: 'Give the column a name.' });
+      else if (names.filter((item) => item === column.name).length > 1)
+        found.push({ field, message: 'Another column has this name.' });
       const line = lineOf(column, catalogue);
       const reading = readings[column.key];
       // The line is the tree's print, which needs the catalogue. Until it
@@ -793,8 +675,8 @@ export function problems(
         found.push({ field, message: 'Give a formula.' });
       } else if (reading !== undefined) {
         // A line left as printed saves the tree it was read from. When it
-        // does not read back to that tree, neither its problems nor its kind
-        // are the stored tree's: the forge checks that tree at the save.
+        // does not read back to that tree, its problems are not the stored
+        // tree's: the forge checks that tree at the save.
         const misread =
           catalogue !== null &&
           column.tree !== null &&
@@ -806,106 +688,14 @@ export function problems(
           for (const problem of reading.problems)
             found.push({ field, message: problem.message });
         }
-        if (reading.kind !== null && !misread) kindOf.set(column.name, reading.kind);
       }
     }
-    const shown = new Set(board.display.map((item) => item.name));
-    for (const item of board.sort) {
-      const column = board.columns.find((entry) => entry.name === item.name);
-      const kind = kindOf.get(item.name);
-      if (column === undefined) {
-        found.push({
-          field: `${board.key}.sort`,
-          message: 'Choose a column of this leaderboard.',
-        });
-      }
-      if (column !== undefined && kind === 'text') {
-        found.push({
-          field: columnField(board.key, column),
-          message: 'A text column is not used to order the rows.',
-        });
-      }
-      if (kind === 'pick') {
-        found.push({
-          field: `${board.key}.sort`,
-          message: 'A pick is not used to order the rows.',
-        });
-      }
-      if (!shown.has(item.name)) {
-        found.push({
-          field: `${board.key}.sort`,
-          message: `Display ${item.name}. The rows are ordered by it.`,
-        });
-      }
-    }
-    for (const item of board.display) {
-      const kind = kindOf.get(item.name);
-      if (kind === 'pick') {
-        found.push({ field: `${board.key}.display`, message: 'A pick is not shown.' });
-      }
-      if (kind === 'text' && item.decimals !== '') {
-        found.push({
-          field: `${board.key}.display`,
-          message: 'A text column is shown as given.',
-        });
-      }
-      const decimals =
-        kind === 'number' || kind === undefined ? decimalsProblem(item.decimals) : null;
-      if (decimals !== null)
-        found.push({ field: `${board.key}.display`, message: decimals });
-    }
   }
-  found.push(...holdProblems(draft.hold, saved, now, start, end));
-  return found;
-}
-
-/**
- * The hold's problems. As the forge checks it, a start already passed or
- * outside the contest is refused only when the save sets or moves the
- * hold: one stored that has since started is kept as it is.
- */
-function holdProblems(
-  hold: HoldDraft,
-  saved: HoldDraft | null,
-  now: number,
-  start: unknown,
-  end: unknown,
-): FieldProblem[] {
-  if (!hold.on) return [];
-  const found: FieldProblem[] = [];
-  const from = isoOf(hold.from);
-  if (from === undefined) {
-    found.push({ field: 'hold.from', message: 'Give the time the freeze starts.' });
-    return found;
-  }
-  const fromAt = new Date(from).getTime();
-  const was = saved?.on === true ? isoOf(saved.from) : undefined;
-  const moved = was === undefined || new Date(was).getTime() !== fromAt;
-  if (moved && fromAt <= now) {
-    found.push({
-      field: 'hold.from',
-      message: 'That time has passed. Give a time still to come.',
-    });
-  }
-  const opened = instantOf(start);
-  const closed = instantOf(end);
-  if (
-    moved &&
-    opened !== null &&
-    closed !== null &&
-    (fromAt <= opened || fromAt >= closed)
-  ) {
-    found.push({
-      field: 'hold.from',
-      message: 'The freeze starts after the contest opens and before it ends.',
-    });
-  }
-  if (hold.untilStaff) return found;
-  const until = isoOf(hold.until);
-  if (until === undefined) {
-    found.push({ field: 'hold.until', message: 'Give the time the freeze ends.' });
-  } else if (new Date(until).getTime() <= fromAt) {
-    found.push({ field: 'hold.until', message: 'The freeze ends before it starts.' });
+  if (draft.hold.on) {
+    if (isoOf(draft.hold.from) === undefined)
+      found.push({ field: 'hold.from', message: 'Give the time the freeze starts.' });
+    if (!draft.hold.untilStaff && isoOf(draft.hold.until) === undefined)
+      found.push({ field: 'hold.until', message: 'Give the time the freeze ends.' });
   }
   return found;
 }

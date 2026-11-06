@@ -351,7 +351,6 @@ export function ConfirmDialog({
               }
               value={asking.reason}
               onChange={(reason) => onChange({ ...asking, reason })}
-              maxLength={REASON_MAX}
               required
             />
           )}

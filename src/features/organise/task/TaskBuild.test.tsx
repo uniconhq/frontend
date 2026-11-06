@@ -33,7 +33,7 @@ import {
   openStream,
   realLiveStream,
 } from '@/test/live';
-import { specCatalogue } from '../formula/catalogue';
+import { specCatalogue } from '@/test/catalogue';
 import { INPUTS_SHOWN_KEY } from '../workflows/inputs-shown';
 
 /** The names of the files handed to the browser to save, in turn. */
@@ -2130,9 +2130,6 @@ repeat:
     const checks = screen.getByRole('region', { name: 'Checks' });
     await userEvent.click(within(checks).getByRole('button', { name: 'Add a check' }));
     fill(within(checks).getByRole('textbox', { name: 'Solution' }), 'print(1)');
-    expect(within(checks).getByRole('alert')).toHaveTextContent(
-      'Check 1 needs the verdict or a value it should get.',
-    );
     expect(
       within(
         within(checks).getByRole('combobox', { name: 'Verdict every run gets' }),
@@ -2190,8 +2187,7 @@ repeat:
     });
     await openTask();
     const scoring = await screen.findByRole('region', { name: 'Scoring' });
-    const gone = scoring.querySelector('[data-show-part="gone"]');
-    expect(gone).toHaveTextContent('Not a part of this task');
+    expect(scoring.querySelector('[data-show-part="gone"]')).toHaveTextContent('gone');
     await userEvent.click(cell('gone', 'Always'));
     const samples = within(scoring).getByRole('textbox', { name: 'Name of samples' });
     fill(samples, 'tests');
@@ -2216,7 +2212,7 @@ repeat:
     expect(JSON.stringify(file)).not.toMatch(/extra|big|gone|samples/);
   });
 
-  it('says where a name shown in the wrong section belongs', async () => {
+  it('lists a name shown in the wrong section where the file has it, to turn off', async () => {
     taskBackend({
       content: `${ISLANDS}scoring:
   groups: {samples: {input: sample.in}}
@@ -2241,20 +2237,12 @@ repeat:
         .find((group) => group.textContent?.startsWith(section))
         ?.querySelector(`[data-show-part="${name}"]`);
     await waitFor(() =>
-      expect(row('Once outputs', 'time_ms')).toHaveTextContent(
-        "time_ms is given for each run, so show it among a run's fields.",
-      ),
+      expect(row('Once outputs', 'time_ms')).toHaveTextContent('time_ms'),
     );
-    expect(row('Shared inputs', 'input')).toHaveTextContent(
-      "input is given for each run, so show it among a run's fields.",
-    );
+    expect(row('Shared inputs', 'input')).toHaveTextContent('input');
     const entry = within(grid).getByRole('rowgroup', { name: 'Runs: samples' });
-    expect(entry.querySelector('[data-show-part="total"]')).toHaveTextContent(
-      'total is a value, so show it under Values.',
-    );
-    expect(entry.querySelector('[data-show-part="gone"]')).toHaveTextContent(
-      'Not a part of this task',
-    );
+    expect(entry.querySelector('[data-show-part="total"]')).toHaveTextContent('total');
+    expect(entry.querySelector('[data-show-part="gone"]')).toHaveTextContent('gone');
   });
 
   it('greys the later moments under Always only, and writes a name on at both under both', async () => {
@@ -2339,7 +2327,7 @@ repeat:
     });
   });
 
-  it('drops runs added with nothing on once their group is removed, and says a group read from the file is none', async () => {
+  it('drops runs added with nothing on once their group is removed, and keeps runs of a group the file names but lacks', async () => {
     taskBackend({
       content: `${ISLANDS}scoring:
   groups: {samples: {input: sample.in}}
@@ -2356,9 +2344,7 @@ repeat:
     });
     await openTask();
     const scoring = await screen.findByRole('region', { name: 'Scoring' });
-    expect(
-      within(scoring).getByRole('rowgroup', { name: 'Runs: gone' }),
-    ).toHaveTextContent('The task has no group gone, so the save is refused.');
+    expect(within(scoring).getByRole('rowgroup', { name: 'Runs: gone' })).toBeVisible();
 
     await userEvent.click(within(scoring).getByRole('button', { name: 'Add runs' }));
     await userEvent.selectOptions(
@@ -2587,7 +2573,7 @@ scoring:
     expect(grid.querySelector('[data-show-part="code"]')).toBeNull();
   });
 
-  it('refuses a value named like a group, and a loop, before the save', async () => {
+  it('leaves a badly written value name, and a loop, to the save', async () => {
     const { sent } = taskBackend({
       content: ISLANDS,
       form: runForm('unicon/classic@v6', [
@@ -2597,24 +2583,20 @@ scoring:
     });
     await openTask();
     const scoring = await screen.findByRole('region', { name: 'Scoring' });
-    await userEvent.click(within(scoring).getByRole('button', { name: 'Add a group' }));
     await userEvent.click(within(scoring).getByRole('button', { name: 'Add a value' }));
-    fill(within(scoring).getByRole('textbox', { name: 'Name' }), 'group_1');
-    expect(scoring).toHaveTextContent('a group is called group_1 too: rename one');
-    const bar = screen.getByRole('region', { name: 'Save the task' });
-    expect(within(bar).getByRole('button', { name: 'Save' })).toBeDisabled();
-
-    fill(within(scoring).getByRole('textbox', { name: 'Name' }), 'left');
     await userEvent.click(within(scoring).getByRole('button', { name: 'Add a value' }));
     const names = within(scoring).getAllByRole('textbox', { name: 'Name' });
+    fill(names[0]!, 'Left');
     fill(names[1]!, 'right');
-    await typeLine('left', 'right');
-    await typeLine('right', 'left');
-    expect(scoring).toHaveTextContent(
-      'reads itself, round left → right → left: break the loop',
-    );
-    expect(within(bar).getByRole('button', { name: 'Save' })).toBeDisabled();
-    expect(sent).toEqual([]);
+    await typeLine('Left', 'right');
+    await typeLine('right', 'Left');
+    await save();
+
+    const { scoring: saved } = written(sent[0]) as { scoring: { values: object } };
+    expect(saved.values).toEqual({
+      Left: { value: 'right' },
+      right: { value: 'Left' },
+    });
   });
 
   it('warns on its row before what was shown always is hidden, once a submission is graded', async () => {

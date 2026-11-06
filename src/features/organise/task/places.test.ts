@@ -56,16 +56,9 @@ describe('where a refused setting or file of the task is changed', () => {
       `${PAGE}?card=checks&field=check-0`,
     ],
     ['statement.md', 'Statement', `${PAGE}?card=statement`],
-    // A setting's own files, under its folder (M51), or under inputs/ for an
-    // input whose id is a folder the format gives meaning to.
+    // A setting's own files, under its folder (M51).
     ['checker/checker.py', 'Inputs: Checker', `${PAGE}?card=inputs&field=checker`],
     ['checker/lib/util.h', 'Inputs: Checker', `${PAGE}?card=inputs&field=checker`],
-    [
-      'inputs/tests/runner.py',
-      'Inputs: Tests to run',
-      `${PAGE}?card=inputs&field=tests`,
-    ],
-    ['inputs/checker/a.py', 'Inputs: Checker', `${PAGE}?card=inputs&field=checker`],
   ])('%s is %s', (path, label, to) => {
     expect(taskPlaceOf('acme', 'spring', 'sum', TITLES)(path, '')).toEqual({
       label,

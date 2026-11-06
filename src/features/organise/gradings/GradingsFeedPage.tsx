@@ -40,8 +40,6 @@ const MEANWHILE_MS = 60_000;
 /** How many gradings the feed reads, the backend's own default. */
 const LIMIT = 100;
 
-const USERNAME_MAX = 40;
-
 type ContestPath = { org: string; contest: string };
 
 /**
@@ -236,7 +234,6 @@ function FilterBar({
           }
           value={user}
           onChange={setUser}
-          maxLength={USERNAME_MAX}
         />
         <Button type="submit" variant="secondary">
           Filter

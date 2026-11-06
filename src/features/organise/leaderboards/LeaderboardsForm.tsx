@@ -27,8 +27,6 @@ import { LeaveGuard } from '@/ui/LeaveGuard';
 import { TimeField } from '../forms/fields';
 import { exactJS, isRecord, parseYaml, textOf } from '../forms/yaml-doc';
 import { holdsAt } from '../roles';
-import { viewFilePath } from '../contest/places';
-import { PageLink } from '@/ui/PageLink';
 import { SectionTitle } from '@/ui/SectionTitle';
 import { CardPart } from '../task/BuildCard';
 import shared from '../organise.module.css';
@@ -269,7 +267,6 @@ export function LeaderboardsForm({
   const [sent, setSent] = useState<typeof draft | null>(null);
   const unsaved =
     JSON.stringify(draft) !== JSON.stringify(loaded) && !(saved && sent === draft);
-  const [now, setNow] = useState(() => Date.now());
   const [tasks] = useState(() => taskIds(doc));
   const blocks = $api.useQuery('get', '/api/v1/blocks');
   const taskData = useTaskGives(org, contest, tasks);
@@ -283,22 +280,16 @@ export function LeaderboardsForm({
     { params: { path: { org, contest } } },
   );
   const root = exactJS(doc);
-  const start = isRecord(root) ? root['start'] : undefined;
   const end = isRecord(root) ? root['end'] : undefined;
   const local = useMemo(
-    () => problems(draft, catalogue, tasks, gives ?? {}, now, start, end, loaded.hold),
-    [catalogue, draft, end, now, gives, start, tasks, loaded.hold],
+    () => problems(draft, catalogue, tasks, gives ?? {}),
+    [catalogue, draft, gives, tasks],
   );
-  useOpenedField(!loaded.legacy);
+  useOpenedField(true);
   const disabled = !manager || busy || asking;
   const save = () => {
     if (catalogue === null || gives === null) return;
-    const at = Date.now();
-    if (at !== now) setNow(at);
-    if (
-      problems(draft, catalogue, tasks, gives, at, start, end, loaded.hold).length > 0
-    )
-      return;
+    if (local.length > 0) return;
     const next = commit(draft, catalogue, tasks, gives);
     setSent(draft);
     onSave((file) => {
@@ -306,19 +297,6 @@ export function LeaderboardsForm({
       writeHold(file, loaded, next);
     });
   };
-  if (loaded.legacy) {
-    return (
-      <div role="alert">
-        <BodyText>
-          These leaderboards cannot be read, so they cannot be changed here.
-        </BodyText>
-        <BodyText tone="secondary">
-          Fix them as text in{' '}
-          <PageLink to={viewFilePath(org, contest)}>the stored settings</PageLink>.
-        </BodyText>
-      </div>
-    );
-  }
   const edit = (id: string, change: (board: BoardDraft) => BoardDraft) =>
     setDraft((current) => ({
       ...current,

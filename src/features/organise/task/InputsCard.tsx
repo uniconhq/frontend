@@ -251,8 +251,8 @@ function EntrantFields({
             label="Maximum size"
             value={input.maxSize}
             onChange={(maxSize) => onChange({ maxSize })}
-            placeholder="10MB"
-            description="Such as 500KB or 2MB. 10MB if left empty."
+            placeholder="Default"
+            description="Such as 500KB or 2MB. The default if left empty."
             disabled={disabled}
           />
         )}
@@ -446,7 +446,7 @@ function UnknownItem({
               label="Maximum size"
               value={input.maxSize}
               onChange={(maxSize) => onChange({ maxSize })}
-              placeholder="10MB"
+              placeholder="Default"
               description="For files, such as 1MB."
               disabled={disabled}
             />

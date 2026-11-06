@@ -93,18 +93,10 @@ import classes from './workflows.module.css';
 
 type Change = (next: string) => void;
 
-const HANDLE = /^[a-z0-9][a-z0-9_-]{0,39}$/;
-const OUTPUT_NAME = /^[a-z][a-z0-9_]*$/;
-/**
- * Names Unicon uses itself, as the forge refuses them: what it gives every
- * run, its verdict and `passed`, and the older names it still keeps.
- */
-const RESERVED = ['verdict', 'passed', 'outcome', 'points', 'penalty'];
 const SCALARS = ['text', 'number', 'boolean', 'enum'];
 /** A port's choice of a value written in the drawer, which no reference is written as. */
 const FIXED = 'fixed';
 
-/** Why `name` cannot be an id among `taken`, or null when it can. */
 /** Whether the panels change the file, or show a version, which nothing changes. */
 const Editing = createContext(true);
 
@@ -127,12 +119,8 @@ export function LockedPanel({ children }: { children: ReactNode }) {
   );
 }
 
-function handleProblem(name: string, taken: string[]): string | null {
-  if (!HANDLE.test(name))
-    return 'Use at most 40 lower case letters, digits, hyphens (-) and underscores (_), starting with a letter or a digit.';
-  if (taken.includes(name)) return 'Another one already has that name. Choose another.';
-  return null;
-}
+/** A rename to a name already taken, which would leave the draft unreadable. */
+const TAKEN = 'Another one already has that name. Choose another.';
 
 /** A field that applies its text when it is left or Enter is pressed, refusing with a reason. */
 function CommitField({
@@ -605,12 +593,10 @@ export function StepPanel({
         value={step.id}
         description="Other steps read its outputs by this name. Renaming it changes them too."
         apply={(id) => {
-          const problem = handleProblem(
-            id,
-            workflow.steps.filter((_, at) => at !== index).map((other) => other.id),
-          );
-          if (problem === null) change(renameStep(text, index, id));
-          return problem;
+          if (workflow.steps.some((other, at) => at !== index && other.id === id))
+            return TAKEN;
+          change(renameStep(text, index, id));
+          return null;
         }}
       />
       {primitive !== null ? (
@@ -869,15 +855,11 @@ function InputRow({
         value={input.id}
         description="Steps read it by this name. Renaming it changes them too."
         apply={(id) => {
-          const problem = handleProblem(
-            id,
-            sharedNames(workflow).filter((other) => other !== input.id),
-          );
-          if (problem === null) {
-            change(renameInput(text, input.id, id));
-            onRenamed(id);
-          }
-          return problem;
+          if (sharedNames(workflow).some((other) => other !== input.id && other === id))
+            return TAKEN;
+          change(renameInput(text, input.id, id));
+          onRenamed(id);
+          return null;
         }}
       />
       {isFile && (
@@ -1182,11 +1164,7 @@ export function FilePanel({
             size="xs"
             variant="secondary"
             onClick={() => {
-              const id = freeName(
-                idOfPath(path),
-                [...sharedNames(workflow), ...RESERVED],
-                '_',
-              );
+              const id = freeName(idOfPath(path), sharedNames(workflow), '_');
               if (apply(fileToInput(text, path, id, type))) onSupplied(id);
             }}
           >
@@ -1305,12 +1283,7 @@ function EntryRow({
         value={entry.name}
         description="A task reads it by this name, as a column of its runs."
         apply={(name) => {
-          if (!OUTPUT_NAME.test(name))
-            return "An output's name may use only lower case letters, digits and underscores (_), starting with a letter.";
-          if (RESERVED.includes(name))
-            return `${name} is a name Unicon uses itself, for what it gives every run. Give this output another name.`;
-          if (name !== entry.name && sharedNames(workflow).includes(name))
-            return 'Another one already has that name. Choose another.';
+          if (name !== entry.name && sharedNames(workflow).includes(name)) return TAKEN;
           change(renameEntry(text, entry.name, name));
           return null;
         }}

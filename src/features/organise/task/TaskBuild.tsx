@@ -58,7 +58,6 @@ import { SaveBar } from './SaveBar';
 import { RunsCard } from './RunsCard';
 import { ChecksCard } from './ChecksCard';
 import { ScoringCard, type WorkflowRead } from './ScoringCard';
-import { checkProblem } from './scoring-model';
 import { SubmissionsCard } from './SubmissionsCard';
 import { WorkflowCard } from './WorkflowCard';
 import { BodyText } from '@/ui/BodyText';
@@ -338,7 +337,7 @@ function BuildForm({
   const [scoreProblems, setScoreProblems] = useState<string[]>([]);
   const problems = [
     ...[values.max, values.rateCount, values.ratePer].map((text) =>
-      numberProblem(text, true),
+      numberProblem(text),
     ),
     ...values.inputs.flatMap((input) => [
       numberProblem(input.min),
@@ -348,7 +347,6 @@ function BuildForm({
         : undefined,
     ]),
     ...(savedReadable ? scoreProblems : []),
-    ...values.checks.map(checkProblem),
     pendingFiles > 0 ? 'A chosen file is still being read.' : undefined,
   ].filter((problem): problem is string => problem !== undefined);
   const workflowRaw = useMemo(() => {

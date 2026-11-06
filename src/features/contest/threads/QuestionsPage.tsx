@@ -163,13 +163,7 @@ function AskForm({
 
   return (
     <form className={classes.form} onSubmit={send} aria-label="Ask">
-      <TextInput
-        label="Question"
-        value={title}
-        onChange={setTitle}
-        maxLength={200}
-        required
-      />
+      <TextInput label="Question" value={title} onChange={setTitle} required />
       <Textarea label="Details" value={body} onChange={setBody} rows={3} required />
       {tasks.length > 0 && (
         <Select

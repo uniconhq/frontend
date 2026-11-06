@@ -1,4 +1,4 @@
-import { specCatalogue } from '../src/features/organise/formula/catalogue';
+import { specCatalogue } from '../src/test/catalogue';
 import { expect, test, type Page, type Route } from '@playwright/test';
 import { parse } from 'yaml';
 import type { components } from '../src/api/schema';

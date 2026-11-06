@@ -231,7 +231,6 @@ function ClarificationCard({
                     label="Announcement title"
                     value={title}
                     onChange={setTitle}
-                    maxLength={200}
                     required
                   />
                 )}

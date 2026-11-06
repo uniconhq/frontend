@@ -5,12 +5,11 @@ import { TextInput } from '@/ui/TextInput';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import classes from './organise.module.css';
 
-/** The second line, with the most characters it takes when there is a limit. */
+/** The second line. */
 export type SecondField = {
   label: string;
   description?: string;
   placeholder?: string;
-  maxLength?: number;
 };
 
 /**
@@ -82,7 +81,6 @@ export function CreateForm({
         label={second.label}
         description={second.description}
         placeholder={second.placeholder}
-        maxLength={second.maxLength}
         value={other}
         onChange={setOther}
       />

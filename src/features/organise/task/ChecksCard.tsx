@@ -7,7 +7,6 @@ import { FieldBox } from '../contest/ContestFile';
 import { BuildCard, CardPart } from './BuildCard';
 import {
   entrantInputs,
-  checkProblem,
   freshKey,
   perRunEntrant,
   runsOf,
@@ -139,11 +138,6 @@ export function ChecksCard({
               </div>
             ))}
           </div>
-          {checkProblem(check, index) !== undefined && (
-            <div role="alert">
-              <BodyText>{checkProblem(check, index)}</BodyText>
-            </div>
-          )}
           {!disabled && (
             <div className={classes.ownWidth}>
               <Button

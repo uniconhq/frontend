@@ -14,7 +14,6 @@ export const NEW_ORG = {
   second: {
     label: 'Description',
     description: `Optional, at most ${String(DESCRIPTION_MAX)} characters.`,
-    maxLength: DESCRIPTION_MAX,
   } satisfies SecondField,
 };
 
