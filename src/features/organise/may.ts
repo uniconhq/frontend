@@ -32,16 +32,16 @@ function useOrgRead(org: string, enabled: boolean): OrgMay | undefined {
 }
 
 /**
- * From the org's list of contests, which tells it even while the contest's
- * settings do not read, or a task's state; undefined until read, and
- * nothing allowed if the read failed.
+ * From the contest's own read, which tells it even while its settings do
+ * not read, or a task's state; undefined until read, and nothing allowed
+ * if the read failed.
  */
 function usePlaceRead(place: Place, enabled: boolean): PlaceMay | undefined {
   const task = place.kind === 'task' ? place.task : '';
-  const listed = $api.useQuery(
+  const contest = $api.useQuery(
     'get',
-    '/api/v1/orgs/{org}/contests',
-    { params: { path: { org: place.org } } },
+    '/api/v1/orgs/{org}/contests/{contest}',
+    { params: { path: { org: place.org, contest: place.contest } } },
     { enabled: enabled && place.kind === 'contest' },
   );
   const state = $api.useQuery(
@@ -50,14 +50,8 @@ function usePlaceRead(place: Place, enabled: boolean): PlaceMay | undefined {
     { params: { path: { org: place.org, contest: place.contest, task } } },
     { enabled: enabled && place.kind === 'task' },
   );
-  const read = place.kind === 'task' ? state : listed;
-  if (read.isError) return NOTHING_AT_PLACE;
-  if (place.kind === 'task') return state.data?.may;
-  if (listed.data === undefined) return undefined;
-  return (
-    listed.data.find((contest) => contest.name === place.contest)?.may ??
-    NOTHING_AT_PLACE
-  );
+  const read = place.kind === 'task' ? state : contest;
+  return read.isError ? NOTHING_AT_PLACE : read.data?.may;
 }
 
 /** What the server says the caller may do at the org. */

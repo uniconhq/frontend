@@ -1,9 +1,9 @@
-import { isRecord, NumberText } from './yaml-doc';
+import { isRecord } from '../forms/values';
 
 /**
- * A workflow as the editor reads its `workflow.yaml` (SIMPLER-CORE.md section
- * 7): the inputs it declares, the steps in order with what each port is
- * given, and what one run gives, its outputs. The reading is
+ * A workflow as the editor reads its `workflow.yaml` values (SIMPLER-CORE.md
+ * section 7): the inputs it declares, the steps in order with what each port
+ * is given, and what one run gives, its outputs. The reading is
  * forgiving, since the page draws a draft with problems as well as a good
  * one: a key of the wrong shape is skipped and the check says why, never the
  * reader.
@@ -36,7 +36,7 @@ export type Ref =
 export type WithValue =
   | { kind: 'wire'; ref: Ref }
   | { kind: 'text'; text: string; refs: Ref[] }
-  | { kind: 'literal'; value: string | NumberText | boolean }
+  | { kind: 'literal'; value: string | number | boolean }
   | { kind: 'mapping'; entries: { name: string; value: WithValue }[] }
   | { kind: 'list'; items: WithValue[] }
   | { kind: 'invalid'; raw: unknown };
@@ -133,9 +133,7 @@ function refsIn(text: string): Ref[] | null {
 
 /** What a port is given, read from the value in the file. */
 function withValue(raw: unknown): WithValue {
-  if (typeof raw === 'number')
-    return { kind: 'literal', value: new NumberText(String(raw)) };
-  if (raw instanceof NumberText || typeof raw === 'boolean')
+  if (typeof raw === 'number' || typeof raw === 'boolean')
     return { kind: 'literal', value: raw };
   if (Array.isArray(raw))
     return { kind: 'list', items: raw.map((item) => withValue(item)) };
@@ -243,7 +241,7 @@ function stepOf(raw: unknown): Step {
   };
 }
 
-/** The workflow a parsed `workflow.yaml` holds, as far as it can be read. */
+/** The workflow `workflow.yaml`'s values hold, as far as they can be read. */
 export function readWorkflow(file: unknown): Workflow {
   const top = isRecord(file) ? file : {};
   const inputs = isRecord(top.inputs) ? top.inputs : {};

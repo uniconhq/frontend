@@ -13,6 +13,8 @@ import { problem, server, signedIn, signedInAs } from '@/test/server';
 import {
   CONTEST_API,
   contestSettings,
+  onlyAtSum,
+  onlyAtSpring,
   contestValues,
   repoFiles,
   settingsOf,
@@ -21,7 +23,7 @@ import {
   taskList,
   published,
 } from '@/test/organiser';
-import { workflowItem } from '@/test/workflows';
+import { versionOf, workflowItem } from '@/test/workflows';
 
 const CONTEST = '/orgs/acme/contests/spring';
 
@@ -475,20 +477,16 @@ describe("the contest's tasks", () => {
     expect(screen.getByRole('button', { name: 'New task' })).toBeVisible();
   });
 
-  it('shows someone refused the standings the tasks the server lists for them', async () => {
-    server.use(
-      ...signedInAs(null),
-      http.get(`${CONTEST_API}/tasks`, () =>
-        HttpResponse.json([{ name: 'sum', may_manage: true }]),
-      ),
-      ...repoFiles,
-      http.get(`${CONTEST_API}/organise/tasks`, () =>
-        problem(403, 'forbidden', {
-          detail: 'You need the observer role at acme/spring.',
-        }),
-      ),
-    );
-    renderApp(CONTEST);
+  it('leads someone with a role only at a task to it from what me names, both lists refused', async () => {
+    server.use(...onlyAtSum, ...repoFiles);
+    const user = userEvent.setup();
+    renderApp('/orgs/acme');
+
+    const contests = await screen.findByRole('list', { name: 'Contests' });
+    expect(
+      screen.getByText('Contests of this org where you have a role:'),
+    ).toBeVisible();
+    await user.click(within(contests).getByRole('link', { name: 'spring' }));
 
     expect(
       await screen.findByText('Tasks of this contest where you have a role:'),
@@ -500,6 +498,15 @@ describe("the contest's tasks", () => {
         .map((link) => [link.textContent, link.getAttribute('href')]),
     ).toEqual([['sum', '/orgs/acme/contests/spring/tasks/sum']]);
     expect(screen.queryByRole('button', { name: 'New task' })).toBeNull();
+  });
+
+  it("shows a manager with a role only at the contest its buttons, refused the org's list", async () => {
+    server.use(...onlyAtSpring, standingList, ...repoFiles);
+    renderApp(CONTEST);
+
+    expect(await screen.findByRole('button', { name: 'New task' })).toBeVisible();
+    const row = await screen.findByRole('listitem', { name: 'A · sort' });
+    expect(within(row).getAllByRole('button').length).toBeGreaterThan(0);
   });
 });
 
@@ -988,10 +995,11 @@ describe('creating a task', () => {
         }),
       ),
       http.get('/api/v1/workflows/unicon/classic-folder/versions/v1', () =>
-        HttpResponse.json({
-          content:
+        HttpResponse.json(
+          versionOf(
             'inputs:\n  program: {type: folder, title: Program}\n  language: {type: enum, options: [c, python]}\n  entry: text\n  time_limit: number\n  memory_limit: number\n  input: file\n  answer: file\nsteps: []\n',
-        }),
+          ),
+        ),
       ),
       http.get('/api/v1/orgs/acme/contests/spring/tasks/max/settings', () =>
         HttpResponse.json(

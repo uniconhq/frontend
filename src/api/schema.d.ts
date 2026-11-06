@@ -523,13 +523,34 @@ export interface paths {
         };
         /**
          * The org's contests
-         * @description The contests the caller holds a role at, above or inside, by name,
-         *     each with its state and dates and what the caller may do there.
+         * @description The contests the forge lets the caller read, by name, each with its
+         *     state and dates and what the caller may do there.
          */
         get: operations["listContests"];
         put?: never;
         /** Make a contest in the org */
         post: operations["createContest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org}/contests/{contest}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The contest, as the org's list tells it
+         * @description The contest's state and dates, null when its settings do not read,
+         *     and what the caller may do there.
+         */
+        get: operations["getContest"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1524,7 +1545,7 @@ export interface paths {
         };
         /**
          * The contest's tasks
-         * @description The tasks the caller holds a role at, by name, each with whether
+         * @description The tasks the forge lets the caller read, by name, each with whether
          *     they manage it.
          */
         get: operations["listTasks"];
@@ -3134,7 +3155,7 @@ export interface paths {
         /**
          * A workflow as its page shows it
          * @description Its visibility, versions and whether the caller may edit it; for one
-         *     who may, its draft with the token a save carries and who reads it.
+         *     who may, who reads it.
          */
         get: operations["getWorkflow"];
         put?: never;
@@ -3152,11 +3173,18 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * The draft as values
+         * @description For the person it is named for or a manager of its org: its values
+         *     with the token a save carries, or why it does not read and its text.
+         */
+        get: operations["getWorkflowDraft"];
         /**
          * Save the draft
-         * @description Write `workflow.yaml` and the file changes together, problems and all.
-         *     Each file carries its token; a conflict writes nothing.
+         * @description Write `workflow.yaml` and the file changes together, problems and all:
+         *     the values into the file as it is, keeping its comments, or the whole
+         *     text. Each file carries its token; a conflict writes nothing, and values
+         *     that cannot be written into the file are `invalid_definition`.
          */
         put: operations["saveWorkflow"];
         post?: never;
@@ -3365,8 +3393,8 @@ export interface paths {
         };
         /**
          * The definition at a version
-         * @description Read as the caller: `not_found` when there is no such version or they
-         *     may not read it.
+         * @description Its text and its values. Read as the caller: `not_found` when there is
+         *     no such version or they may not read it.
          */
         get: operations["getWorkflowVersion"];
         put?: never;
@@ -3469,10 +3497,11 @@ export interface paths {
         put?: never;
         /**
          * Check a definition on its own
-         * @description Every problem a version of the definition would be refused for, each
-         *     at its place in the file, against the primitives its steps use as the caller
-         *     reads them. Nothing is written. Given `owner` and `name`, a draft that
-         *     would hold that workflow is refused, and the problem carries `step`.
+         * @description Every problem a version of the definition, given as values or as
+         *     text, would be refused for, each at its place in the file, against the
+         *     primitives its steps use as the caller reads them. Nothing is written.
+         *     Given `owner` and `name`, a draft that would hold that workflow is
+         *     refused, and the problem carries `step`.
          */
         post: operations["checkWorkflow"];
         delete?: never;
@@ -3845,19 +3874,24 @@ export interface components {
         ChangeKind: "regraded" | "new" | "running" | "failed" | "over_limit";
         /**
          * CheckDefinition
-         * @description A `workflow.yaml` to check as a version would be, writing nothing.
-         *     `owner` and `name`, when both are given, name the workflow this text is
-         *     a draft of, so a draft that would hold that workflow is refused.
+         * @description A `workflow.yaml` to check as a version would be, writing nothing:
+         *     its `values`, or its text in `content`, one of the two. `owner` and
+         *     `name`, when both are given, name the workflow this is a draft of, so a
+         *     draft that would hold that workflow is refused.
          */
         CheckDefinition: {
             /** Content */
-            content: string;
+            content?: string | null;
             /** Name */
             name?: string | null;
             /** Owner */
             owner?: string | null;
             /** Paths */
             paths?: string[] | null;
+            /** Values */
+            values?: {
+                [key: string]: unknown;
+            } | null;
         };
         /**
          * Checked
@@ -4133,20 +4167,6 @@ export interface components {
             type: string;
             /** Unit */
             unit: string | null;
-        };
-        /**
-         * Definition
-         * @description A `workflow.yaml` as text, and the token a save of it carries back:
-         *     none for one that is not there yet. `revision` names the saved repository,
-         *     including its files, for publishing exactly that save.
-         */
-        Definition: {
-            /** Content */
-            content: string;
-            /** Revision */
-            revision: string | null;
-            /** Token */
-            token: string | null;
         };
         /**
          * DefinitionError
@@ -5003,9 +5023,10 @@ export interface components {
         };
         /**
          * ListedContest
-         * @description A contest in its org's list, by name, with its state, start and end as
-         *     its settings say them, all three null when its settings cannot be read.
-         *     `may` is what the caller may do there, told even then.
+         * @description A contest in its org's list or read alone, by name, with its state,
+         *     start and end as its settings say them, all three null when its
+         *     settings cannot be read. `may` is what the caller may do there, told
+         *     even then.
          */
         ListedContest: {
             /** End */
@@ -5070,16 +5091,22 @@ export interface components {
          * @description The signed-in user and their roles at every scope. `degraded` is set
          *     when the forge did not answer and the identity comes from the session.
          *     `orgs` are the names of the orgs a role of theirs reaches, at the org or
-         *     inside it, and `workflow_owners` the owners they may make a workflow
-         *     under: their own username first, then each org they manage.
+         *     inside it; `contests` the contests a role of theirs is held at or
+         *     inside, and `tasks` the tasks one is held at, by name only; and
+         *     `workflow_owners` the owners they may make a workflow under: their own
+         *     username first, then each org they manage.
          */
         Me: {
+            /** Contests */
+            contests: components["schemas"]["ScopeNames"][];
             /** Degraded */
             degraded: boolean;
             /** Orgs */
             orgs: string[];
             /** Roles */
             roles: components["schemas"]["HeldRole"][];
+            /** Tasks */
+            tasks: components["schemas"]["ScopeNames"][];
             user: components["schemas"]["Account"];
             /** Workflow Owners */
             workflow_owners: string[];
@@ -6509,18 +6536,24 @@ export interface components {
             verdict: "accepted" | "wrong_answer" | "time_limit" | "memory_limit" | "output_limit" | "runtime_error" | "compile_error" | "skipped" | "system_error";
         };
         /**
-         * SaveDefinition
+         * SaveDraft
          * @description A draft to write over the one read with `token`, or to create when
-         *     the token is none. `changes` writes its own files in the same commit.
-         *     Whatever it holds saves, problems and all.
+         *     the token is none: `values` written into `workflow.yaml` as it is, or,
+         *     for a draft that does not read, `content`, its whole text; one of the
+         *     two. `changes` writes its own files in the same commit. Whatever it
+         *     holds saves, problems and all.
          */
-        SaveDefinition: {
+        SaveDraft: {
             /** Changes */
             changes?: components["schemas"]["FileChange"][];
             /** Content */
-            content: string;
+            content?: string | null;
             /** Token */
             token: string | null;
+            /** Values */
+            values?: {
+                [key: string]: unknown;
+            } | null;
         };
         /**
          * SaveEffect
@@ -7427,11 +7460,18 @@ export interface components {
         };
         /**
          * VersionContent
-         * @description A workflow's `workflow.yaml` at one version.
+         * @description A workflow's `workflow.yaml` at one version: its text, and its plain
+         *     values, or null with why it does not read in `unreadable`.
          */
         VersionContent: {
             /** Content */
             content: string;
+            /** Unreadable */
+            unreadable: string | null;
+            /** Values */
+            values: {
+                [key: string]: unknown;
+            } | null;
         };
         /**
          * Visibility
@@ -7472,6 +7512,29 @@ export interface components {
             outputs: components["schemas"]["BoxOutput"][];
             /** Run */
             run: boolean;
+        };
+        /**
+         * WorkflowDraft
+         * @description A workflow's draft: its `workflow.yaml` as plain values, with the
+         *     token a save carries back, none for a file not there yet. When the file
+         *     does not read as values, `values` is null, `unreadable` says why and
+         *     `content` is its text; otherwise `content` is null. `revision` names
+         *     the saved repository, including its files, for publishing exactly that
+         *     save.
+         */
+        WorkflowDraft: {
+            /** Content */
+            content: string | null;
+            /** Revision */
+            revision: string | null;
+            /** Token */
+            token: string | null;
+            /** Unreadable */
+            unreadable: string | null;
+            /** Values */
+            values: {
+                [key: string]: unknown;
+            } | null;
         };
         /**
          * WorkflowForm
@@ -7534,9 +7597,8 @@ export interface components {
         };
         /**
          * WorkflowPage
-         * @description A workflow as its page shows it. For someone who may edit it, `draft`,
-         *     its `workflow.yaml` now, and `readers`, the usernames it is shared with;
-         *     for anyone else, no draft and no readers.
+         * @description A workflow as its page shows it. For someone who may edit it,
+         *     `readers`, the usernames it is shared with; for anyone else, none.
          */
         WorkflowPage: {
             /**
@@ -7544,7 +7606,6 @@ export interface components {
              * @default
              */
             description: string;
-            draft: components["schemas"]["Definition"] | null;
             /** Editable */
             editable: boolean;
             /** Name */
@@ -8662,6 +8723,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Named"];
+                };
+            };
+            /** @description An error, as an RFC 9457 problem document. `code` names it. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    getContest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                contest: string;
+                org: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListedContest"];
                 };
             };
             /** @description An error, as an RFC 9457 problem document. `code` names it. */
@@ -13455,6 +13548,40 @@ export interface operations {
             };
         };
     };
+    getWorkflowDraft: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workflow's name under its owner */
+                name: string;
+                /** @description An org's name or a person's username */
+                owner: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkflowDraft"];
+                };
+            };
+            /** @description An error, as an RFC 9457 problem document. `code` names it. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     saveWorkflow: {
         parameters: {
             query?: never;
@@ -13469,7 +13596,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["SaveDefinition"];
+                "application/json": components["schemas"]["SaveDraft"];
             };
         };
         responses: {
@@ -13479,7 +13606,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Definition"];
+                    "application/json": components["schemas"]["WorkflowDraft"];
                 };
             };
             /** @description An error, as an RFC 9457 problem document. `code` names it. */

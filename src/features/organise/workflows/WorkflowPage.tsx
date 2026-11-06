@@ -1,4 +1,4 @@
-import { type ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router';
 import { $api, queryView } from '@/api/query';
@@ -12,16 +12,18 @@ import { Page, PageHeader } from '@/ui/Page';
 import { PageLink } from '@/ui/PageLink';
 import { SectionTitle } from '@/ui/SectionTitle';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
+import { Loaded } from '@/ui/feedback/Loaded';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
 import { WORKFLOWS_PATH } from '@/lib/organiser-paths';
 import { useWorkflowParams } from '@/lib/route-params';
-import { parseYaml } from './yaml-doc';
 import { DefinitionErrors } from '../DefinitionErrors';
+import type { Values } from '../forms/values';
 import { WorkflowBar } from './Bar';
 import { checkQuery } from './check';
+import { draftQuery } from './draft';
 import { Editor } from './Editor';
 import { FileView } from './FileView';
-import { linesOf } from './lines';
+import { MendDraft } from './MendDraft';
 import { ShareButton } from './SharePanel';
 import { VersionGraph } from './VersionGraph';
 import { StopNewUse } from './VersionDrawer';
@@ -31,7 +33,8 @@ import classes from './workflows.module.css';
 
 /**
  * A workflow's page: its name, who reads it, and its bar (M32). For someone
- * who may edit it, the editor over its draft; for anyone else, and for any
+ * who may edit it, the editor over its draft, or the draft's text while it
+ * cannot be read; for anyone else, and for any
  * version asked for by `?version=`, the version drawn the same way at its
  * actual size, read-only, with a copy into a workflow of one's own.
  */
@@ -93,11 +96,11 @@ function Shown({
   primitives: Primitive[];
   asked: string | null;
 }) {
-  if (page.editable && asked === null && page.draft !== null)
+  if (page.editable && asked === null)
     return (
-      <Editor
+      <DraftView
         key={`${page.owner}/${page.name}`}
-        page={{ ...page, draft: page.draft }}
+        page={page}
         primitives={primitives}
       />
     );
@@ -107,6 +110,32 @@ function Shown({
       primitives={primitives}
       version={asked ?? latestVersion(page.versions) ?? null}
     />
+  );
+}
+
+/** The draft as values in the editor, or as text to fix while it does not read. */
+function DraftView({ page, primitives }: { page: Workflow; primitives: Primitive[] }) {
+  const query = useQuery(draftQuery(page.owner, page.name));
+  // Each reload starts the editor again on the draft as read.
+  const [reloads, setReloads] = useState(0);
+  const reload = () =>
+    void query.refetch().then(() => setReloads((count) => count + 1));
+  return (
+    <Loaded view={queryView(query)} rows={6}>
+      {(draft) =>
+        draft.values !== null ? (
+          <Editor
+            key={reloads}
+            page={page}
+            draft={{ ...draft, values: draft.values }}
+            primitives={primitives}
+            onReload={reload}
+          />
+        ) : (
+          <MendDraft key={reloads} page={page} draft={draft} onReload={reload} />
+        )
+      }
+    </Loaded>
   );
 }
 
@@ -128,8 +157,8 @@ function VersionView({
       { enabled: version !== null },
     ),
   );
-  const text = read.state === 'ready' ? read.data.content : null;
-  const checked = useQuery({ ...checkQuery(text ?? ''), enabled: text !== null });
+  const values = read.state === 'ready' ? read.data.values : null;
+  const checked = useQuery({ ...checkQuery(values ?? {}), enabled: values !== null });
   if (version === null)
     return (
       <BodyText>
@@ -156,6 +185,15 @@ function VersionView({
         </Unopenable>
       </>
     );
+  if (read.data.values === null)
+    return (
+      <>
+        {bar(null)}
+        <Unopenable label={ref}>
+          <BodyText>{read.data.unreadable}</BodyText>
+        </Unopenable>
+      </>
+    );
   if (checked.isPending) return <PageSkeleton rows={6} />;
   if (checked.isError)
     return (
@@ -164,17 +202,12 @@ function VersionView({
         onRetry={() => void checked.refetch()}
       />
     );
-  const parsed = parseYaml(read.data.content);
-  if (checked.data.length > 0 || 'error' in parsed)
+  if (checked.data.length > 0)
     return (
       <>
         {bar(null)}
         <Unopenable label={ref}>
-          {checked.data.length > 0 ? (
-            <DefinitionErrors errors={checked.data} />
-          ) : (
-            'error' in parsed && <BodyText>{parsed.error}</BodyText>
-          )}
+          <DefinitionErrors errors={checked.data} />
         </Unopenable>
       </>
     );
@@ -183,6 +216,7 @@ function VersionView({
       page={page}
       version={version}
       text={read.data.content}
+      values={read.data.values}
       primitives={primitives}
     />
   );
@@ -228,11 +262,13 @@ function Drawn({
   page,
   version,
   text,
+  values,
   primitives,
 }: {
   page: Workflow;
   version: string;
   text: string;
+  values: Values;
   primitives: Primitive[];
 }) {
   return (
@@ -240,9 +276,9 @@ function Drawn({
       owner={page.owner}
       name={page.name}
       version={version}
-      text={text}
+      values={values}
       primitives={primitives}
-      bar={(tools, selected) => (
+      bar={(tools) => (
         <>
           <WorkflowBar page={page} version={version} tools={tools}>
             {page.editable && (
@@ -255,7 +291,6 @@ function Drawn({
               title={`The YAML of ${version}`}
               label={`The YAML of ${version}`}
               text={text}
-              marked={linesOf(text, selected)}
             />
           </WorkflowBar>
           <SectionTitle>{`${page.owner}/${page.name}@${version}`}</SectionTitle>

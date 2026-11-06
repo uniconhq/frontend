@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseYaml } from './yaml-doc';
-import { CLASSIC, PRIMITIVES } from '@/test/workflows';
+import { CLASSIC, PRIMITIVES, valuesOf } from '@/test/workflows';
 import { GEOMETRY, WORKFLOW_PALETTE, wirePath, type Point } from '../flow/graph';
 import { BOX } from '../flow/box';
 import { layoutWorkflow, rowOf, type Box, type Drawn, type Layout } from './layout';
@@ -9,11 +8,9 @@ import { byRef } from './primitives';
 
 const primitives = byRef(PRIMITIVES);
 
-/** The layout of a file read as the editor reads it, YAML 1.1. */
+/** The layout of a file read as the server reads it into values. */
 function laid(text: string, drawn?: Drawn): Layout {
-  const parsed = parseYaml(text);
-  if ('error' in parsed) throw new Error(parsed.error);
-  return layoutWorkflow(readWorkflow(parsed.doc.toJS()), primitives, new Map(), {
+  return layoutWorkflow(readWorkflow(valuesOf(text)), primitives, new Map(), {
     open: 'all',
     ...drawn,
   });
@@ -431,9 +428,7 @@ steps:
   - {id: inner, use: kenny/inner@v1, with: {}}
   - {id: run, use: unicon/exec@v4, with: {source: "\${{ steps.inner.out }}"}}
 `;
-    const parsed = parseYaml(text);
-    if ('error' in parsed) throw new Error(parsed.error);
-    const workflow = readWorkflow(parsed.doc.toJS());
+    const workflow = readWorkflow(valuesOf(text));
     const given = new Map([['kenny/inner@v1', { inputs: ['a'], outputs: ['out'] }]]);
     const layout = layoutWorkflow(workflow, primitives, given, {
       open: new Set(),

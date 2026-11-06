@@ -4,21 +4,26 @@ import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { renderWithProviders } from '@/test/render';
 import { server } from '@/test/server';
-import { CLASSIC, PRIMITIVES, workflowBox } from '@/test/workflows';
+import { CLASSIC, PRIMITIVES, valuesOf, workflowBox } from '@/test/workflows';
 import { DrawnGraph } from './DrawnGraph';
 import { layoutWorkflow } from './layout';
-import { workflowOf } from './edit';
+import { readWorkflow } from './model';
 import { byRef } from './primitives';
 
 describe('a workflow drawn', () => {
   it('stands at its actual size, never scaled, with no logo in its corner', async () => {
     const { container } = renderWithProviders(
-      <DrawnGraph text={CLASSIC} primitives={PRIMITIVES} />,
+      <DrawnGraph workflow={readWorkflow(valuesOf(CLASSIC))} primitives={PRIMITIVES} />,
     );
     await screen.findByRole('group', { name: 'Step run' });
-    const layout = layoutWorkflow(workflowOf(CLASSIC), byRef(PRIMITIVES), new Map(), {
-      open: new Set(),
-    });
+    const layout = layoutWorkflow(
+      readWorkflow(valuesOf(CLASSIC)),
+      byRef(PRIMITIVES),
+      new Map(),
+      {
+        open: new Set(),
+      },
+    );
 
     const viewport = container.querySelector<HTMLElement>('.react-flow__viewport');
     expect(viewport?.style.transform.replaceAll(' ', '')).toBe(
@@ -31,7 +36,9 @@ describe('a workflow drawn', () => {
   });
 
   it('says what each step does: its primitive’s title and what it does', async () => {
-    renderWithProviders(<DrawnGraph text={CLASSIC} primitives={PRIMITIVES} />);
+    renderWithProviders(
+      <DrawnGraph workflow={readWorkflow(valuesOf(CLASSIC))} primitives={PRIMITIVES} />,
+    );
 
     const run = await screen.findByRole('group', { name: 'Step run' });
     expect(within(run).getByText('Run programs')).toBeInTheDocument();
@@ -52,7 +59,9 @@ describe('a workflow drawn', () => {
       title: null,
       description: null,
     }));
-    renderWithProviders(<DrawnGraph text={CLASSIC} primitives={plain} />);
+    renderWithProviders(
+      <DrawnGraph workflow={readWorkflow(valuesOf(CLASSIC))} primitives={plain} />,
+    );
 
     const run = await screen.findByRole('group', { name: 'Step run' });
     expect(within(run).getByText('exec')).toBeInTheDocument();
@@ -61,7 +70,11 @@ describe('a workflow drawn', () => {
 
   it('marks ports in plain words, and leaves out what the author never acts on', async () => {
     renderWithProviders(
-      <DrawnGraph text={CLASSIC} primitives={PRIMITIVES} selected="step:0" />,
+      <DrawnGraph
+        workflow={readWorkflow(valuesOf(CLASSIC))}
+        primitives={PRIMITIVES}
+        selected="step:0"
+      />,
     );
 
     const run = await screen.findByRole('group', { name: 'Step run' });
@@ -86,7 +99,9 @@ describe('a workflow drawn', () => {
   it('says an input no step reads is used by nothing yet', async () => {
     renderWithProviders(
       <DrawnGraph
-        text={'inputs:\n  seed: {type: number}\nsteps: []\n'}
+        workflow={readWorkflow(
+          valuesOf('inputs:\n  seed: {type: number}\nsteps: []\n'),
+        )}
         primitives={PRIMITIVES}
       />,
     );
@@ -99,9 +114,11 @@ describe('a workflow drawn', () => {
   it('draws a file of the workflow a step reads as its own box, wired to the step', async () => {
     renderWithProviders(
       <DrawnGraph
-        text={
-          'steps:\n  - {id: diff, use: unicon/exec@v4, with: {source: "${{ workflow.diff/ }}"}}\n'
-        }
+        workflow={readWorkflow(
+          valuesOf(
+            'steps:\n  - {id: diff, use: unicon/exec@v4, with: {source: "${{ workflow.diff/ }}"}}\n',
+          ),
+        )}
         primitives={PRIMITIVES}
       />,
     );
@@ -118,7 +135,11 @@ describe('a workflow drawn', () => {
       'time_ms: {title: Run time, from:',
     );
     renderWithProviders(
-      <DrawnGraph text={titled} primitives={PRIMITIVES} selected="outputs" />,
+      <DrawnGraph
+        workflow={readWorkflow(valuesOf(titled))}
+        primitives={PRIMITIVES}
+        selected="outputs"
+      />,
     );
 
     const report = await screen.findByRole('group', { name: 'Outputs' });
@@ -133,7 +154,9 @@ describe('a workflow drawn', () => {
   });
 
   it('labels a long wire by where its value comes from, in words', async () => {
-    renderWithProviders(<DrawnGraph text={CLASSIC} primitives={PRIMITIVES} />);
+    renderWithProviders(
+      <DrawnGraph workflow={readWorkflow(valuesOf(CLASSIC))} primitives={PRIMITIVES} />,
+    );
 
     await screen.findByRole('group', { name: 'Step run' });
     expect(screen.getByText('log from run')).toBeInTheDocument();
@@ -141,7 +164,9 @@ describe('a workflow drawn', () => {
 
   it('opens a box when its head is clicked, with nobody else keeping the pick', async () => {
     const user = userEvent.setup();
-    renderWithProviders(<DrawnGraph text={CLASSIC} primitives={PRIMITIVES} />);
+    renderWithProviders(
+      <DrawnGraph workflow={readWorkflow(valuesOf(CLASSIC))} primitives={PRIMITIVES} />,
+    );
 
     const run = await screen.findByRole('group', { name: 'Step run' });
     const head = within(run).getByRole('button', { expanded: false });
@@ -168,7 +193,11 @@ describe('a workflow drawn', () => {
       ],
     ]);
     renderWithProviders(
-      <DrawnGraph text={text} primitives={PRIMITIVES} boxes={boxes} />,
+      <DrawnGraph
+        workflow={readWorkflow(valuesOf(text))}
+        primitives={PRIMITIVES}
+        boxes={boxes}
+      />,
     );
 
     const build = await screen.findByRole('group', { name: 'Step build' });
@@ -197,7 +226,9 @@ describe('a workflow drawn', () => {
     );
     renderWithProviders(
       <DrawnGraph
-        text={'steps:\n  - {id: build, use: kenny/inner@v1}\n'}
+        workflow={readWorkflow(
+          valuesOf('steps:\n  - {id: build, use: kenny/inner@v1}\n'),
+        )}
         primitives={PRIMITIVES}
       />,
     );

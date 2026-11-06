@@ -1,8 +1,8 @@
 import { Menu } from '@mantine/core';
 import { Link } from 'react-router';
-import { $api, queryView, type QueryView } from '@/api/query';
+import { $api, isRefused, queryView, type QueryView } from '@/api/query';
 import { Loaded } from '@/ui/feedback/Loaded';
-import { useSession } from '@/session';
+import { useNamedContests, useNamedTasks, useSession } from '@/session';
 import { taskPagePath } from '@/lib/contest-paths';
 import { contestPath, orgPath, taskPath, workflowPath } from '@/lib/organiser-paths';
 import {
@@ -92,16 +92,23 @@ function HomeEntries() {
 }
 
 function OrgEntries({ org }: { org: string }) {
-  const contests = queryView(
+  const listed = queryView(
     $api.useQuery('get', '/api/v1/orgs/{org}/contests', { params: { path: { org } } }),
   );
+  const named = useNamedContests(org);
+  const contests: QueryView<string[]> =
+    listed.state === 'ready'
+      ? { state: 'ready', data: listed.data.map(({ name }) => name) }
+      : isRefused(listed)
+        ? { state: 'ready', data: named }
+        : listed;
   return (
     <>
       <ReadGroup
         heading="Contests"
         view={contests}
-        entries={(listed) =>
-          listed.map(({ name }) => ({ label: name, to: contestPath(org, name) }))
+        entries={(names) =>
+          names.map((name) => ({ label: name, to: contestPath(org, name) }))
         }
       />
       <Group
@@ -121,17 +128,7 @@ function ContestEntries({ org, contest }: { org: string; contest: string }) {
       params: { path: { org, contest } },
     }),
   );
-  // As on the contest's page: a role at only some of its tasks is refused
-  // the standings, and the server lists those tasks by name instead.
-  const refused = listed.state === 'error' && listed.error.code === 'forbidden';
-  const named = queryView(
-    $api.useQuery(
-      'get',
-      '/api/v1/orgs/{org}/contests/{contest}/tasks',
-      { params: { path: { org, contest } } },
-      { enabled: refused },
-    ),
-  );
+  const named = useNamedTasks(org, contest);
   const tasks: QueryView<Entry[]> =
     listed.state === 'ready'
       ? {
@@ -144,16 +141,14 @@ function ContestEntries({ org, contest }: { org: string; contest: string }) {
             };
           }),
         }
-      : refused
-        ? named.state === 'ready'
-          ? {
-              state: 'ready',
-              data: named.data.map(({ name }) => ({
-                label: name,
-                to: taskPath(org, contest, name),
-              })),
-            }
-          : named
+      : isRefused(listed)
+        ? {
+            state: 'ready',
+            data: named.map((name) => ({
+              label: name,
+              to: taskPath(org, contest, name),
+            })),
+          }
         : listed;
   return (
     <>

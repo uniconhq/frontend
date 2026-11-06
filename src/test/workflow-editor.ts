@@ -1,7 +1,6 @@
 import { waitFor, within } from '@testing-library/react';
 import type { UserEvent } from '@testing-library/user-event';
 import type { RequestHandler } from 'msw';
-import { DRAFT_FILE } from '@/features/organise/workflows/words';
 import { partTransport } from './part-uploads';
 import { renderApp } from './render';
 import { server, signedIn } from './server';
@@ -44,6 +43,8 @@ export function findPart(
 /** The editor's page for kenny/tuned, the workflow `workflowBackend` serves. */
 export const EDITOR_PAGE = '/workflows/kenny/tuned';
 
+let opened: ReturnType<typeof workflowBackend> | null = null;
+
 /**
  * The editor's page opened by kenny on `draft` (CLASSIC by default), served by
  * `workflowBackend` with `problems` and `versions`. `handlers` go ahead of the
@@ -58,6 +59,7 @@ export function openEditor({
   handlers?: RequestHandler[];
 } & NonNullable<Parameters<typeof workflowBackend>[1]> = {}) {
   const backend = workflowBackend(draft, options);
+  opened = backend;
   server.use(
     ...partTransport(`${WORKFLOW_API}/part-uploads`),
     ...handlers,
@@ -68,7 +70,7 @@ export function openEditor({
   return { user, backend, ...renderApp(EDITOR_PAGE) };
 }
 
-/** A button on the bar, which holds Save, Publish version, Share and View YAML. */
+/** A button on the bar, which holds Save, Publish version and Share. */
 export function barButton(name: string): HTMLElement {
   return within(part('[role="toolbar"]', 'The workflow')).getByRole('button', { name });
 }
@@ -84,22 +86,18 @@ export async function openFiles(user: UserEvent): Promise<HTMLElement> {
   return findPart('section', 'Files');
 }
 
-/**
- * The draft's file as a save would write it, read where a person reads it:
- * "View YAML" on the bar, a dialog closed again with Escape.
- */
-export async function fileText(user: UserEvent): Promise<string> {
-  await user.click(barButton('View YAML'));
-  const dialog = await waitFor(() => {
-    const found = document.querySelector<HTMLElement>('[role="dialog"]');
-    if (found === null) throw new Error('No dialog is open.');
-    return found;
+/** The draft's values as Save sends them, saved from the bar. */
+export async function savedValues(user: UserEvent): Promise<Record<string, unknown>> {
+  const backend = opened;
+  if (backend === null) throw new Error('No editor is open.');
+  const before = backend.state.saves.length;
+  await user.click(barButton('Save'));
+  await waitFor(() => {
+    if (backend.state.saves.length === before) throw new Error('Nothing was saved.');
   });
-  const text = within(dialog).getByLabelText<HTMLTextAreaElement>(DRAFT_FILE, {
-    selector: 'textarea',
-  }).value;
-  await user.keyboard('{Escape}');
-  return text;
+  const sent = backend.state.saves.at(-1)?.values;
+  if (sent === undefined) throw new Error('The save sent no values.');
+  return sent;
 }
 
 /** The step's box on the graph, once it is drawn. */
@@ -230,12 +228,4 @@ export function findProblems(words: RegExp): Promise<HTMLElement> {
     },
     { timeout: 3_000 },
   );
-}
-
-/** The merge view of a save over someone else's, once it is open. */
-export async function findMerge(): Promise<HTMLElement> {
-  const fields = await findPart('ul', 'Fields that differ');
-  const panel = fields.closest<HTMLElement>('[role="alert"]');
-  if (panel === null) throw new Error('The merge view has no panel.');
-  return panel;
 }

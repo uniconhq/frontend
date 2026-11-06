@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { $api, queryView } from '@/api/query';
+import { $api, isRefused, queryView } from '@/api/query';
 import { BodyText } from '@/ui/BodyText';
 import { Chip } from '@/ui/Chip';
 import { ListCard, type ListRow } from '@/ui/ListCard';
@@ -13,6 +13,7 @@ import {
 } from '@/lib/contest-state';
 import { contestPath } from '@/lib/organiser-paths';
 import { serverNow } from '@/lib/time';
+import { useNamedContests } from '@/session';
 import { CreateButton } from '../Create';
 import { useOrgMay } from '../may';
 
@@ -49,8 +50,8 @@ function datedOf(listed: {
 /**
  * An org's contests as a list card, those running now first, each row its
  * state and the date that matters, as the list gives them; "New contest" at
- * the bottom when the server says the caller may make one. The list holds
- * the contests the caller's roles reach.
+ * the bottom when the server says the caller may make one. Someone refused
+ * the list sees, by name, the contests `me` names.
  */
 export function OrgContests({ org }: { org: string }) {
   const manages = useOrgMay(org).create_contest;
@@ -59,6 +60,8 @@ export function OrgContests({ org }: { org: string }) {
     params: { path: { org } },
   }).queryKey;
   const view = queryView($api.useQuery('get', CONTESTS, { params: { path: { org } } }));
+  const named = useNamedContests(org);
+  const refused = isRefused(view);
   const create = $api.useMutation('post', CONTESTS, {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: listKey }),
   });
@@ -81,7 +84,14 @@ export function OrgContests({ org }: { org: string }) {
               <Standing contest={contest} />
             ),
         }))
-      : [];
+      : refused
+        ? named.map((name) => ({
+            key: name,
+            to: contestPath(org, name),
+            name,
+            text: name,
+          }))
+        : [];
 
   return (
     <ListCard
@@ -89,12 +99,19 @@ export function OrgContests({ org }: { org: string }) {
       rows={rows}
       empty="No contests yet."
       notice={
-        view.state === 'error' && <ErrorBlock error={view.error} onRetry={view.retry} />
+        view.state === 'error' && (
+          <>
+            <ErrorBlock error={view.error} onRetry={view.retry} />
+            {rows.length > 0 && (
+              <BodyText>Contests of this org where you have a role:</BodyText>
+            )}
+          </>
+        )
       }
       body={
         view.state === 'loading' ? (
           <PageSkeleton rows={3} />
-        ) : view.state === 'error' ? (
+        ) : view.state === 'error' && rows.length === 0 ? (
           <></>
         ) : undefined
       }

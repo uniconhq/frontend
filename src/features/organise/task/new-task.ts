@@ -28,7 +28,7 @@ export async function startOn(
     '/api/v1/workflows/{owner}/{name}/versions/{version}',
     { params: { path: parts } },
   );
-  const declared = version === undefined ? null : declaredOf(version.content);
+  const declared = version === undefined ? null : declaredOf(version.values);
   const { data: settings } = await apiClient.GET(`${TASK}/settings`, {
     params: { path: where },
   });

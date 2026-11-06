@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react';
 import type { Primitive } from '@/api/types';
-import { useStepBoxes, workflowFrom, type BoxDecl } from './boxes';
+import { useStepBoxes, type BoxDecl } from './boxes';
 import { useDrawnLayout } from './drawn-layout';
 import { Graph } from './Graph';
+import type { Workflow } from './model';
 import { pinned } from './pins';
 import { byRef } from './primitives';
 
@@ -21,7 +22,7 @@ const NO_PROBLEMS = pinned([], 0, [], []);
  * is moved clear of.
  */
 export function DrawnGraph({
-  text,
+  workflow,
   primitives,
   boxes: given,
   selected = null,
@@ -31,7 +32,7 @@ export function DrawnGraph({
   inputs = 'shown',
   cover = 0,
 }: {
-  text: string;
+  workflow: Workflow;
   primitives: Primitive[];
   boxes?: ReadonlyMap<string, BoxDecl>;
   selected?: string | null;
@@ -44,7 +45,6 @@ export function DrawnGraph({
   const [own, setOwn] = useState(selected);
   const shown = onSelect === undefined ? own : selected;
   const map = useMemo(() => byRef(primitives), [primitives]);
-  const workflow = useMemo(() => workflowFrom(text), [text]);
   const read = useStepBoxes(given === undefined ? workflow : null, map);
   const boxes = given ?? read;
   const { warned, layout } = useDrawnLayout(

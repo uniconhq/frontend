@@ -8,3 +8,4 @@ export { useEndSession } from './use-end-session';
 export { useForgeUrl, forgePage } from './forge';
 export { loginHref, currentPath, safeNext } from './login-href';
 export { reportUnauthenticated, useSessionExpired } from './expired';
+export { useNamedContests, useNamedTasks } from './named';

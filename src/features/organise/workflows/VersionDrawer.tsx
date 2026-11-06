@@ -36,7 +36,6 @@ export function VersionDrawer({
   owner,
   name,
   version,
-  text,
   workflow,
   primitives,
   boxes,
@@ -46,7 +45,6 @@ export function VersionDrawer({
   owner: string;
   name: string;
   version: string;
-  text: string;
   workflow: Workflow;
   primitives: Map<string, PrimitiveInfo>;
   boxes: ReadonlyMap<string, BoxDecl>;
@@ -60,7 +58,7 @@ export function VersionDrawer({
     onBusy: NOTHING,
     disabled: true,
   };
-  const shared = { text, workflow, primitives, boxes, change: NOTHING };
+  const shared = { workflow, primitives, boxes, change: NOTHING };
   const place: VersionPlace = { kind: 'version', owner, name, version };
   const panel =
     selected === null ? null : selected.kind === 'step' ? (

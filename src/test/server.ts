@@ -13,6 +13,7 @@ import type { components } from '@/api/schema';
 import { draftRunsOf } from './draft-runs';
 import {
   type Held,
+  listedContest,
   listedContests,
   orgMay,
   PICTURES,
@@ -38,6 +39,8 @@ export const someone: Me = {
     { names: { org: 'acme', contest: 'spring', task: null }, role: 'manager' },
   ],
   orgs: ['acme'],
+  contests: [{ org: 'acme', contest: 'spring', task: null }],
+  tasks: [],
   workflow_owners: ['kenny', 'acme'],
   degraded: false,
 };
@@ -98,6 +101,9 @@ export function signedInAs(
     ),
     http.get('/api/v1/orgs/:org/contests', () =>
       HttpResponse.json(listedContests(held)),
+    ),
+    http.get('/api/v1/orgs/:org/contests/:contest', ({ params }) =>
+      HttpResponse.json(listedContest(String(params.contest), held)),
     ),
     http.get('/api/v1/orgs/:org/contests/:contest/tasks/:task', () =>
       HttpResponse.json({ ...task, may: taskMay(held), pictures: PICTURES }),
@@ -224,6 +230,9 @@ const emptyOrganising = [
     HttpResponse.json({ display_name: null, description: '', may: orgMay('admin') }),
   ),
   http.get('/api/v1/orgs/:org/contests', () => HttpResponse.json(listedContests())),
+  http.get('/api/v1/orgs/:org/contests/:contest', ({ params }) =>
+    HttpResponse.json(listedContest(String(params.contest))),
+  ),
   /** Nobody registered for any contest, until a test registers someone. */
   http.get('/api/v1/orgs/:org/contests/:contest/organise/entrants', () =>
     HttpResponse.json([]),

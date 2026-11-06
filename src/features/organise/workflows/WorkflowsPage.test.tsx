@@ -9,6 +9,7 @@ import {
   CLASSIC,
   PRIMITIVES,
   WORKFLOW_API,
+  versionOf,
   workflowBackend,
   workflowBox,
   workflowItem,
@@ -120,7 +121,7 @@ describe('a workflow one may only read', () => {
   );
   const version = (text: string) =>
     http.get('/api/v1/workflows/unicon/classic/versions/:version', () =>
-      HttpResponse.json({ content: text }),
+      HttpResponse.json(versionOf(text)),
     );
   const check = (problems: { path: (string | number)[]; message: string }[] = []) =>
     http.post('/api/v1/workflows/check', () => HttpResponse.json({ problems }));
@@ -244,7 +245,7 @@ describe('a workflow one may only read', () => {
         ),
       ),
       http.get('/api/v1/workflows/:owner/:name/versions/:version', ({ params }) =>
-        HttpResponse.json({ content: params.name === 'build' ? inner : outer }),
+        HttpResponse.json(versionOf(params.name === 'build' ? inner : outer)),
       ),
     );
     const user = userEvent.setup();
@@ -437,14 +438,15 @@ describe('a workflow one may only read', () => {
       signedIn,
       page(['v1', 'v2']),
       primitives,
-      version('steps: [\n'),
-      check([{ path: [], message: reason }]),
+      http.get('/api/v1/workflows/unicon/classic/versions/:version', () =>
+        HttpResponse.json({ content: 'steps: [\n', values: null, unreadable: reason }),
+      ),
+      check(),
     );
     renderApp('/workflows/unicon/classic?version=v1');
 
     const state = await screen.findByRole('alert');
-    expect(state).toHaveTextContent('This version cannot be opened, because:');
-    expect(state).toHaveTextContent(`Overall: ${reason}`);
+    expect(state).toHaveTextContent(`This version cannot be opened, because:${reason}`);
   });
 
   it('offers no copy action on a version', async () => {

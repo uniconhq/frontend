@@ -1,6 +1,7 @@
 import { http, HttpResponse } from 'msw';
+import { parse } from 'yaml';
 import type { components } from '@/api/schema';
-import type { BoxOutput, WorkflowBox, WorkflowItem } from '@/api/types';
+import type { BoxOutput, WorkflowBox, WorkflowDraft, WorkflowItem } from '@/api/types';
 import type { PrimitiveInfo, PortDecl } from '@/features/organise/workflows/primitives';
 import { problem } from './server';
 
@@ -49,6 +50,35 @@ outputs:
   memory_kb: {from: "\${{ steps.run.memory_kb }}", unit: KB}
   log: \${{ steps.run.log }}
 `;
+
+type Values = Record<string, unknown>;
+
+/** A `workflow.yaml` as the server reads it into values, or why it does not read. */
+function draftOf(text: string): { values: Values } | { unreadable: string } {
+  try {
+    const data: unknown = parse(text, { version: '1.2', schema: 'core' }) ?? {};
+    return typeof data === 'object' && data !== null && !Array.isArray(data)
+      ? { values: data as Values }
+      : { unreadable: 'The file does not hold named settings.' };
+  } catch (error) {
+    return { unreadable: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+/** A `workflow.yaml`'s values, for a test whose text reads. */
+export function valuesOf(text: string): Values {
+  const read = draftOf(text);
+  if ('unreadable' in read) throw new Error(read.unreadable);
+  return read.values;
+}
+
+/** A version's file as the server answers it: its text and its values. */
+export function versionOf(text: string) {
+  const read = draftOf(text);
+  return 'values' in read
+    ? { content: text, values: read.values, unreadable: null }
+    : { content: text, values: null, unreadable: read.unreadable };
+}
 
 /** The types the server says a wire into an input port of `type` may carry. */
 export function acceptsOf(type: string): string[] {
@@ -495,30 +525,54 @@ export function filePort(name: string): components['schemas']['BoxInput'] & BoxO
   };
 }
 
+/** What a save of the draft sends. */
+type DraftSave = {
+  values?: Values;
+  content?: string;
+  token: string | null;
+  changes?: unknown[];
+};
+
 /**
  * The backend of a workflow page for kenny/tuned, which kenny may edit: its
- * draft held here, written by each save, the version check answering with
- * `problems` for whatever it is sent, and every save and version asked for
- * kept for the test to read.
+ * draft, given as text and held as values, written by each save, the
+ * version check answering with `problems` for whatever values it is sent,
+ * and every save and version asked for kept for the test to read.
  */
 export function workflowBackend(
   draft: string,
   options: {
     problems?: (
-      content: string,
+      values: Values,
     ) => { path: (string | number)[]; message: string; step?: string | null }[];
     versions?: string[];
   } = {},
 ) {
   const state = {
-    draft,
+    /** The draft as text, as it was last given whole. */
+    text: draft,
+    /** The draft's values, or null while its text does not read. */
+    values: null as Values | null,
     token: 'token-1',
-    saves: [] as { content: string; token: string | null }[],
+    saves: [] as DraftSave[],
     versions: [...(options.versions ?? [])],
     visibility: 'private' as 'private' | 'shared' | 'public',
     readers: [] as string[],
     /** How many times the version check has answered. */
     checks: 0,
+  };
+  const read = draftOf(draft);
+  state.values = 'values' in read ? read.values : null;
+  const answer = (): WorkflowDraft => {
+    const unreadable =
+      state.values === null ? (draftOf(state.text) as { unreadable: string }) : null;
+    return {
+      values: state.values,
+      unreadable: unreadable?.unreadable ?? null,
+      content: state.values === null ? state.text : null,
+      token: state.token,
+      revision: null,
+    };
   };
   // As the forge reads it back: a private workflow is shared once someone is
   // on its list, and private while nobody is, whatever was last chosen.
@@ -534,12 +588,12 @@ export function workflowBackend(
     visibility: shown(),
     versions: state.versions,
     editable: true,
-    draft: { content: state.draft, token: state.token },
     readers: state.readers,
   });
   const handlers = [
     http.get(`${WORKFLOW_API}/tree`, () => HttpResponse.json([])),
     http.get(WORKFLOW_API, () => HttpResponse.json(page())),
+    http.get(`${WORKFLOW_API}/draft`, () => HttpResponse.json(answer())),
     http.get('/api/v1/workflows', () =>
       HttpResponse.json([
         workflowItem({ visibility: shown(), versions: state.versions }),
@@ -557,17 +611,26 @@ export function workflowBackend(
       HttpResponse.json(workflowBox({ run: false })),
     ),
     http.post('/api/v1/workflows/check', async ({ request }) => {
-      const { content } = (await request.json()) as { content: string };
+      const { values } = (await request.json()) as { values: Values };
       state.checks += 1;
-      return HttpResponse.json({ problems: options.problems?.(content) ?? [] });
+      return HttpResponse.json({ problems: options.problems?.(values) ?? [] });
     }),
     http.put(`${WORKFLOW_API}/draft`, async ({ request }) => {
-      const body = (await request.json()) as { content: string; token: string | null };
+      const body = (await request.json()) as DraftSave;
       state.saves.push(body);
-      if (body.token !== state.token) return problem(409, 'conflict');
-      state.draft = body.content;
+      if (body.token !== state.token)
+        return problem(409, 'conflict', {
+          detail:
+            'The workflow kenny/tuned has changed since you opened it. Reload it, then make your changes again.',
+        });
+      if (body.values !== undefined) state.values = body.values;
+      else {
+        state.text = body.content ?? '';
+        const read = draftOf(state.text);
+        state.values = 'values' in read ? read.values : null;
+      }
       state.token = `token-${String(state.saves.length + 1)}`;
-      return HttpResponse.json({ content: state.draft, token: state.token });
+      return HttpResponse.json(answer());
     }),
     http.post(`${WORKFLOW_API}/versions`, async ({ request }) => {
       const { version } = (await request.json()) as { version: string };
@@ -575,7 +638,8 @@ export function workflowBackend(
         return problem(422, 'invalid_name', {
           detail: `'${version}' cannot name a version: a version is v and a whole number from 1, with no leading zero, such as v1, v2 or v10`,
         });
-      const found = options.problems?.(state.draft) ?? [];
+      const found =
+        state.values === null ? [] : (options.problems?.(state.values) ?? []);
       if (found.length > 0)
         return problem(422, 'invalid_definition', { errors: found });
       if (state.versions.includes(version))

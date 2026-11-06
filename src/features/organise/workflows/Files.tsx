@@ -22,7 +22,7 @@ import {
 import { fileType } from './words';
 import classes from './workflows.module.css';
 
-/** The workflow's own file, which View YAML on the bar shows, not the Files drawer. */
+/** The workflow's own file, which the graph changes, not the Files drawer. */
 const WORKFLOW_FILE = ['workflow.yaml'];
 
 /** An upload's progress and what went wrong, under the control that started it. */

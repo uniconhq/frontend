@@ -32,3 +32,8 @@ export function queryView<T>(query: UseQueryResult<T, unknown>): QueryView<T> {
   }
   return { state: 'ready', data: query.data };
 }
+
+/** Whether the server refused the read, as it does a list the caller may not read. */
+export function isRefused(view: QueryView<unknown>): boolean {
+  return view.state === 'error' && view.error.code === 'forbidden';
+}

@@ -31,7 +31,6 @@ import {
   refParts,
   useWorkflowForm,
   useWorkflowVersion,
-  workflowFileOf,
   type Declared,
   type TaskPlace,
 } from './build-data';
@@ -122,10 +121,10 @@ function BuildForm({
   const version = queryView(
     useWorkflowVersion(refParts(picked) === null ? null : picked),
   );
-  const text = version.state === 'ready' ? version.data.content : null;
+  const workflowValues = version.state === 'ready' ? version.data.values : undefined;
   // The saved workflow is as the backend reads it, which says when it cannot
   // be used; another one chosen is read from its own file.
-  const fromVersion = useMemo(() => (text === null ? null : declaredOf(text)), [text]);
+  const fromVersion = useMemo(() => declaredOf(workflowValues), [workflowValues]);
   const declared = useMemo((): Declared | null => {
     if (picked !== saved) return fromVersion;
     return savedReadable ? { inputs: form.inputs } : null;
@@ -341,16 +340,10 @@ function BuildForm({
     ...(savedReadable ? scoreProblems : []),
     pendingFiles > 0 ? 'A chosen file is still being read.' : undefined,
   ].filter((problem): problem is string => problem !== undefined);
-  const workflowRaw = useMemo(
-    () => (text === null ? null : workflowFileOf(text)),
-    [text],
-  );
   const workflowRead: WorkflowRead =
-    refParts(picked) === null ||
-    version.state === 'error' ||
-    (text !== null && workflowRaw === null)
+    refParts(picked) === null || version.state === 'error' || workflowValues === null
       ? 'failed'
-      : workflowRaw === null
+      : workflowValues === undefined
         ? 'loading'
         : 'ready';
   // What the forge said of the last save, a draft's problems or a refusal's,
@@ -486,7 +479,7 @@ function BuildForm({
             elsewhere={elsewhere}
             values={values}
             titles={titles}
-            workflowText={workflowRaw}
+            workflowValues={workflowValues ?? null}
             workflowRead={workflowRead}
             graded={form?.graded === true}
             disabled={disabled}

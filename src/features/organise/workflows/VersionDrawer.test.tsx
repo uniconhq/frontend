@@ -18,7 +18,6 @@ const page: WorkflowPage = {
   versions: ['v1'],
   yanked: {},
   readers: [],
-  draft: null,
 };
 
 describe('stopping new use', () => {

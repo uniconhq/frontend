@@ -49,7 +49,6 @@ import {
   type Target,
 } from './ends';
 import { NOTICE_MS } from './notice';
-import { NumberText } from './yaml-doc';
 import { refsOf, type OutputEntry, type Ref, type Workflow } from './model';
 import type { Pinned, Warning } from './pins';
 import { declared, type PrimitiveInfo } from './primitives';
@@ -232,10 +231,7 @@ function shownValue(seen: Seen, box: Box, port: string): string | null {
       seen.unboxed(value.ref) !== null
       ? null
       : `${refWords(value.ref)}, not drawn`;
-  if (value.kind === 'literal')
-    return value.value instanceof NumberText
-      ? `= ${value.value.text}`
-      : `= ${JSON.stringify(value.value)}`;
+  if (value.kind === 'literal') return `= ${JSON.stringify(value.value)}`;
   if (value.kind === 'text') return `= ${JSON.stringify(value.text)}`;
   if (value.kind === 'mapping' || value.kind === 'list') return null;
   return 'a value no port takes';

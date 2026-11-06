@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { problem } from '@/test/server';
-import { CLASSIC, WORKFLOW_API } from '@/test/workflows';
+import { CLASSIC, valuesOf, WORKFLOW_API } from '@/test/workflows';
 import { barButton, findDialog, openEditor, openFiles } from '@/test/workflow-editor';
 import { fileContent, treeEntry } from '@/test/organiser';
 
@@ -47,7 +47,9 @@ describe('the workflow files', () => {
           sent.push(await request.json());
           savedFile = true;
           return HttpResponse.json({
-            content: CLASSIC,
+            values: valuesOf(CLASSIC),
+            unreadable: null,
+            content: null,
             token: 'saved',
             revision: 'files-commit',
           });
@@ -96,7 +98,7 @@ describe('the workflow files', () => {
         sha256: expect.stringMatching(/^[a-f0-9]{64}$/) as string,
       }),
       {
-        content: CLASSIC,
+        values: valuesOf(CLASSIC),
         token: 'token-1',
         changes: [
           {
@@ -172,7 +174,7 @@ describe('the workflow files', () => {
     await user.click(barButton('Save'));
     await waitFor(() => expect(backend.state.saves).toHaveLength(1));
     expect(backend.state.saves[0]).toEqual({
-      content: CLASSIC,
+      values: valuesOf(CLASSIC),
       token: 'token-1',
       changes: [
         { path: 'score.py', token: 'old-file', encoding: 'utf-8', remove: true },
@@ -331,7 +333,7 @@ describe('the workflow files', () => {
     await user.click(barButton('Save'));
     await screen.findByText('The workflow has changed. Reload it.');
     expect(sent).toEqual({
-      content: CLASSIC,
+      values: valuesOf(CLASSIC),
       token: 'token-1',
       changes: [
         {
@@ -384,7 +386,7 @@ describe('the workflow files', () => {
     await waitFor(() => expect(backend.state.saves).toHaveLength(1));
     expect(reads).toBe(1);
     expect(backend.state.saves[0]).toEqual({
-      content: CLASSIC,
+      values: valuesOf(CLASSIC),
       token: 'token-1',
       changes: [
         {

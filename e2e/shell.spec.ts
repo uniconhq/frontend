@@ -42,6 +42,8 @@ async function stubApi(page: Page, options: { signedIn?: boolean } = {}) {
             },
             roles: [],
             orgs: [],
+            contests: [],
+            tasks: [],
             workflow_owners: ['kenny'],
             degraded: false,
           }),

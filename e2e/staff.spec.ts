@@ -41,6 +41,21 @@ function json(route: Route, body: unknown, status = 200) {
   });
 }
 
+/** The refusal of a read that needs a role at the org. */
+function forbidden(route: Route) {
+  return route.fulfill({
+    status: 403,
+    contentType: 'application/problem+json',
+    body: JSON.stringify({
+      type: 'about:blank',
+      title: 'Forbidden',
+      status: 403,
+      detail: 'This needs the observer role at acme.',
+      code: 'forbidden',
+    }),
+  });
+}
+
 async function stub(page: Page) {
   const state = { marked: false, released: false, holding: true };
   await page.route('**/api/v1/**', (route) => {
@@ -56,19 +71,18 @@ async function stub(page: Page) {
         text_values: null,
       } satisfies Schemas['WorkflowForm']);
     }
-    if (path === '/api/v1/orgs/acme/contests') {
-      return json(route, [
-        {
-          name: 'spring',
-          state: 'published',
-          start: '2026-10-01T09:00:00Z',
-          end: '2026-10-01T14:00:00Z',
-          may: {
-            ...MANAGER_MAY,
-            locked_keys: ['name', 'description', 'state', 'visibility', 'registration'],
-          },
+    if (path === '/api/v1/orgs/acme/contests') return forbidden(route);
+    if (path === '/api/v1/orgs/acme/contests/spring') {
+      return json(route, {
+        name: 'spring',
+        state: 'published',
+        start: '2026-10-01T09:00:00Z',
+        end: '2026-10-01T14:00:00Z',
+        may: {
+          ...MANAGER_MAY,
+          locked_keys: ['name', 'description', 'state', 'visibility', 'registration'],
         },
-      ] satisfies Schemas['ListedContest'][]);
+      } satisfies Schemas['ListedContest']);
     }
     if (path.includes('/regrades/')) {
       return json(route, {
@@ -144,6 +158,8 @@ async function stub(page: Page) {
         { names: { org: 'acme', contest: 'spring', task: null }, role: 'manager' },
       ],
       orgs: ['acme'],
+      contests: [{ org: 'acme', contest: 'spring', task: null }],
+      tasks: [],
       workflow_owners: ['kenny'],
       degraded: false,
     } satisfies Schemas['Me']),
