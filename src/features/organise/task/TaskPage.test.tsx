@@ -323,12 +323,6 @@ describe('the task page', () => {
         name: 'Choose a workflow',
       }),
     ).toBeVisible();
-    const sidebar = screen.getByRole('group', { name: 'Task' });
-    expect(
-      TASK_BUILD_CARDS.map((card) =>
-        within(sidebar).getByRole('link', { name: card.label }).getAttribute('href'),
-      ),
-    ).toEqual(TASK_BUILD_CARDS.map((card) => `${TASK}?card=${card.key}`));
   });
 
   it('counts submissions still missing a mark, rather than entrant rows', async () => {
@@ -363,7 +357,7 @@ describe('the task page', () => {
     ).toBeVisible();
   });
 
-  it('gives each section a card in the order the sidebar lists them', async () => {
+  it('gives each section a card, in the order of its sections', async () => {
     server.use(signedIn, taskState, publicationList, ...repoFiles);
     renderApp(TASK);
 
@@ -373,13 +367,6 @@ describe('the task page', () => {
         .getAllByRole('heading', { level: 2 })
         .map((heading) => within(heading).getByRole('link').getAttribute('href')),
     ).toEqual(TASK_SECTIONS.map((section) => `${TASK}/${section.segment}`));
-    const sidebar = screen.getByRole('group', { name: 'Task' });
-    expect(
-      within(sidebar)
-        .getAllByRole('link')
-        .slice(1 + TASK_BUILD_CARDS.length)
-        .map((link) => link.textContent),
-    ).toEqual(TASK_SECTIONS.map((section) => section.label));
     expect(
       await within(screen.getByRole('region', { name: 'Publications' })).findByText(
         /^Entrants are graded on publication 2/,

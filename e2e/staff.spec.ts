@@ -299,7 +299,7 @@ async function stub(page: Page) {
 
 test('a manager marks, releases, ends a hold and reads a regrade', async ({ page }) => {
   await stub(page);
-  await page.goto('/orgs/acme/contests/spring/tasks/sum/queue');
+  await page.goto('/orgs/acme/contests/spring/tasks/sum/marking');
   await page.getByRole('textbox', { name: 'score' }).fill('7.5');
   await page.getByRole('textbox', { name: 'score' }).press('Enter');
   await expect(page.getByText(/Saved /)).toBeVisible();

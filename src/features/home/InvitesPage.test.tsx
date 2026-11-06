@@ -77,7 +77,6 @@ describe('invites on the home page', () => {
     myInvites([]);
     renderApp('/');
 
-    await screen.findByText(/Signed in as/);
     await screen.findByRole('heading', { name: 'Contests' });
     expect(screen.queryByRole('heading', { name: 'Invites for you' })).toBeNull();
   });

@@ -1,21 +1,78 @@
 import { useLocation } from 'react-router';
+import { $api, queryView } from '@/api/query';
 import { PageTitle } from '@/ui/PageTitle';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
+import { CardGrid, HubCard } from '@/ui/HubCard';
+import { PageLink } from '@/ui/PageLink';
+import { Loaded } from '@/ui/feedback/Loaded';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
-import { CreateAccountLink, currentPath, loginHref, useSession } from '@/session';
+import {
+  CreateAccountLink,
+  currentPath,
+  loginHref,
+  useMe,
+  useSession,
+} from '@/session';
+import {
+  ORGS_PATH,
+  WORKFLOWS_PATH,
+  orgPath,
+  workflowPath,
+} from '@/lib/organiser-paths';
+import { orgsReached } from '@/lib/reached';
 import { MyContests, PublicContests } from './ContestList';
 import { PendingInvites } from './MyInvites';
 import { ServerClock } from './ServerClock';
 import classes from './HomePage.module.css';
 
-/**
- * The landing page, and never blank: signed out it is the door, with a way to
- * create an account when the instance is open, and the public contests, which
- * is everything a visitor may read; signed in it says who you are, shows any
- * invites waiting for you, and lists every contest you see, with where your
- * registration for each stands.
- */
+function YourOrgs() {
+  const orgs = orgsReached(useMe().roles);
+  if (orgs.length === 0) return <BodyText>You have no role at any org yet.</BodyText>;
+  return orgs.map((org) => (
+    <PageLink key={org} to={orgPath(org)}>
+      {org}
+    </PageLink>
+  ));
+}
+
+function YourWorkflows() {
+  const view = queryView($api.useQuery('get', '/api/v1/workflows'));
+  return (
+    <Loaded view={view} compact>
+      {(items) =>
+        items.length === 0 ? (
+          <BodyText>You have no workflow yet, and none is shared with you.</BodyText>
+        ) : (
+          items.map(({ owner, name }) => (
+            <PageLink key={`${owner}/${name}`} to={workflowPath(owner, name)}>
+              {owner}/{name}
+            </PageLink>
+          ))
+        )
+      }
+    </Loaded>
+  );
+}
+
+function SignedInHome() {
+  return (
+    <>
+      <CardGrid label="Your places">
+        <HubCard title="Orgs" to={ORGS_PATH}>
+          <YourOrgs />
+        </HubCard>
+        <HubCard title="Workflows" to={WORKFLOWS_PATH}>
+          <YourWorkflows />
+        </HubCard>
+      </CardGrid>
+      <PendingInvites />
+      <MyContests />
+    </>
+  );
+}
+
+/** Signed out it is the door and the public contests; signed in, your orgs, workflows and contests. */
 export function HomePage() {
   const session = useSession();
   const location = useLocation();
@@ -40,18 +97,7 @@ export function HomePage() {
         </>
       )}
 
-      {session.status === 'signed-in' && (
-        <>
-          <BodyText>
-            Signed in as {session.me.user.username}
-            {session.me.degraded
-              ? '. Forgejo is not answering, so your name and avatar are missing.'
-              : ''}
-          </BodyText>
-          <PendingInvites />
-          <MyContests />
-        </>
-      )}
+      {session.status === 'signed-in' && <SignedInHome />}
 
       <ServerClock />
     </div>

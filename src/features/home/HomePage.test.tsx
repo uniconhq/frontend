@@ -81,11 +81,49 @@ describe('HomePage', () => {
     expect(screen.queryByRole('list', { name: 'Public contests' })).toBeNull();
   });
 
-  it('greets a signed-in person instead', async () => {
-    server.use(signedIn, sessionList);
+  it('shows a signed-in person their orgs and workflows as cards, and no greeting', async () => {
+    server.use(
+      signedIn,
+      sessionList,
+      http.get('/api/v1/workflows', () =>
+        HttpResponse.json([
+          {
+            owner: 'kenny',
+            name: 'tuned',
+            description: '',
+            editable: true,
+            versions: ['1'],
+            visibility: 'private',
+            yanked: {},
+          },
+        ]),
+      ),
+    );
     renderApp('/');
 
-    expect(await screen.findByText(/Signed in as/)).toHaveTextContent('kenny');
+    const orgs = await screen.findByRole('region', { name: 'Orgs' });
+    expect(within(orgs).getByRole('link', { name: 'Orgs' })).toHaveAttribute(
+      'href',
+      '/orgs',
+    );
+    expect(within(orgs).getByRole('link', { name: 'acme' })).toHaveAttribute(
+      'href',
+      '/orgs/acme',
+    );
+    const workflows = screen.getByRole('region', { name: 'Workflows' });
+    expect(
+      await within(workflows).findByRole('link', { name: 'kenny/tuned' }),
+    ).toHaveAttribute('href', '/workflows/kenny/tuned');
+    expect(await screen.findByRole('heading', { name: 'Contests' })).toBeVisible();
+    expect(screen.queryByText(/Signed in as/)).toBeNull();
     expect(screen.queryByRole('link', { name: 'Sign in' })).not.toBeInTheDocument();
+  });
+
+  it('shows a visitor no orgs or workflows', async () => {
+    renderApp('/');
+
+    await screen.findAllByRole('link', { name: 'Sign in' });
+    expect(screen.queryByRole('region', { name: 'Orgs' })).toBeNull();
+    expect(screen.queryByRole('region', { name: 'Workflows' })).toBeNull();
   });
 });

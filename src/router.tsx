@@ -1,8 +1,6 @@
 import {
   createBrowserRouter,
-  Navigate,
   Outlet,
-  useLocation,
   useRouteError,
   type RouteObject,
 } from 'react-router';
@@ -29,31 +27,17 @@ import {
   TASK_SECTION_PAGES,
   RegradePage,
   TaskPage,
-  viewFilePath,
   WorkflowPage,
   WorkflowsPage,
 } from '@/features/organise';
 import { RequireSession, SessionExpiredModal, SessionProvider } from '@/session';
-import {
-  CONTEST_SECTIONS,
-  contestSectionPath,
-  contestViewSectionPath,
-  ORG_SECTIONS,
-  TASK_SECTIONS,
-  taskCardPath,
-  taskSectionPath,
-} from '@/lib/sections';
-import { taskPath } from '@/lib/organiser-paths';
-import { useContestParams, useTaskParams } from '@/lib/route-params';
+import { CONTEST_SECTIONS, ORG_SECTIONS, TASK_SECTIONS } from '@/lib/sections';
 
 const ORG = ':org';
 const CONTEST = `${ORG}/contests/:contest`;
 const TASK = `${CONTEST}/tasks/:task`;
 
-/**
- * A route for each section of an org, a contest or a task, from the same
- * list that draws their cards, their sidebar entries and their crumbs.
- */
+/** A route for each section, from the list that also draws its card and crumb. */
 const sectionRoutes: RouteObject[] = [
   ...ORG_SECTIONS.map((section) => {
     const Page = ORG_SECTION_PAGES[section.key];
@@ -69,96 +53,7 @@ const sectionRoutes: RouteObject[] = [
   }),
 ];
 
-/**
- * The contest's Contestants and Teams pages, now its one Entrants page: an
- * old link lands there, its filters kept.
- */
-function ToEntrants() {
-  const { org, contest } = useContestParams();
-  const { search } = useLocation();
-  return (
-    <Navigate to={`${contestSectionPath(org, contest, 'entrants')}${search}`} replace />
-  );
-}
-
-/**
- * A contest's Leaderboards page, at `boards` before it took the name
- * `leaderboards`: an old link, the organiser's or the contest's own, lands
- * there, what it asked kept.
- */
-function ToLeaderboards({ organise = false }: { organise?: boolean }) {
-  const { org, contest } = useContestParams();
-  const { search } = useLocation();
-  const to = organise
-    ? contestSectionPath(org, contest, 'boards')
-    : contestViewSectionPath(org, contest, 'boards');
-  return <Navigate to={`${to}${search}`} replace />;
-}
-
-/** A task's Statement page, now the Statement card on the task's own page. */
-function ToStatement() {
-  const { org, contest, task } = useTaskParams();
-  return <Navigate to={taskCardPath(org, contest, task, 'statement')} replace />;
-}
-
-/**
- * A task's Files page, gone now that each file has its form on the task's
- * own page (M51): an old link lands there.
- */
-function ToTaskPage() {
-  const { org, contest, task } = useTaskParams();
-  return <Navigate to={taskPath(org, contest, task)} replace />;
-}
-
-/**
- * A contest's Files page, gone since a contest holds no file but its
- * settings (M43): an old link lands on its Settings, at the settings as
- * stored when it opened a file.
- */
-function ToContestSettings() {
-  const { org, contest } = useContestParams();
-  const { search } = useLocation();
-  const opened = new URLSearchParams(search).has('file');
-  return (
-    <Navigate
-      to={
-        opened
-          ? viewFilePath(org, contest)
-          : contestSectionPath(org, contest, 'settings')
-      }
-      replace
-    />
-  );
-}
-
-function ToMarking() {
-  const { org, contest, task } = useTaskParams();
-  const { search, hash } = useLocation();
-  return (
-    <Navigate
-      to={`${taskSectionPath(org, contest, task, 'marking')}${search}${hash}`}
-      replace
-    />
-  );
-}
-
-const movedRoutes: RouteObject[] = [
-  { path: `${TASK}/queue`, element: <ToMarking /> },
-  ...['contestants', 'teams'].map((segment) => ({
-    path: `${CONTEST}/${segment}`,
-    element: <ToEntrants />,
-  })),
-  { path: `${CONTEST}/files`, element: <ToContestSettings /> },
-  { path: `${TASK}/statement`, element: <ToStatement /> },
-  { path: `${TASK}/files`, element: <ToTaskPage /> },
-  { path: `${CONTEST}/boards`, element: <ToLeaderboards organise /> },
-];
-
-/**
- * Data-router mode, because the route tree is about to get deep and loaders are
- * how those pages prefetch. The session sits above the error boundary, so a
- * page that throws still renders inside a shell that knows who you are.
- */
+/** The session sits above the error boundary, so an error page still knows who you are. */
 function SessionRoot() {
   return (
     <SessionProvider>
@@ -178,7 +73,7 @@ function ShellLayout() {
   );
 }
 
-/** A page threw. The shell stays, so the person can navigate away from it. */
+/** A page threw: the shell stays, so the person can leave. */
 function ShellError() {
   const error = useRouteError();
   return (
@@ -206,10 +101,7 @@ export const routes: RouteObject[] = [
         children: [
           { index: true, element: <HomePage /> },
           { path: 'login', element: <LoginPage /> },
-          /**
-           * A contest and its tasks at one address for a visitor and for a
-           * signed-in person, each page reading what the caller may see.
-           */
+          // One address for visitors and the signed in; each page reads what the caller may see.
           { path: 'contests/:org/:contest', element: <ContestHomePage /> },
           {
             path: 'contests/:org/:contest/leaderboards',
@@ -219,17 +111,12 @@ export const routes: RouteObject[] = [
             path: 'contests/:org/:contest/leaderboards/:leaderboard',
             element: <LeaderboardsPage />,
           },
-          { path: 'contests/:org/:contest/boards', element: <ToLeaderboards /> },
           { path: 'contests/:org/:contest/questions', element: <QuestionsPage /> },
           {
             path: 'contests/:org/:contest/tasks/:task',
             element: <TaskStatementPage />,
           },
-          /**
-           * Where an invite's mail links to, with its token after the `#`,
-           * which InviteLink moves into the tab before the guard reads the
-           * address for a sign-in's `?next=`.
-           */
+          // The invite mail's link; InviteLink keeps its token out of a sign-in's `?next=`.
           {
             path: 'invites',
             element: <InviteLink />,
@@ -244,16 +131,9 @@ export const routes: RouteObject[] = [
             element: <RequireSession />,
             children: [
               { path: 'account', element: <AccountPage /> },
-              /**
-               * A workflow is a person's or an org's, so its pages have an
-               * address of their own, which the proxy sends here as well.
-               */
               { path: 'workflows', element: <WorkflowsPage /> },
               { path: 'workflows/:owner/:name', element: <WorkflowPage /> },
-              /**
-               * Every organiser page is under /orgs, because the proxy in
-               * deploy sends exactly /orgs and /orgs/... to this app.
-               */
+              // The deploy proxy sends exactly /orgs and /orgs/... to this app.
               {
                 path: 'orgs',
                 children: [
@@ -264,7 +144,6 @@ export const routes: RouteObject[] = [
                   { path: TASK, element: <TaskPage /> },
                   { path: `${TASK}/regrades/:regrade`, element: <RegradePage /> },
                   ...sectionRoutes,
-                  ...movedRoutes,
                 ],
               },
             ],

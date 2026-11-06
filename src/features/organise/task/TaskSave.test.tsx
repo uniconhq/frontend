@@ -77,10 +77,16 @@ async function editAndSave() {
   await changeStatementAndSave();
 }
 
-/** Goes to one of the task's pages from the sidebar, as an organiser does. */
+/** Goes to one of the task's pages by the breadcrumb, as an organiser does. */
 async function goTo(section: string) {
-  const sidebar = screen.getByRole('group', { name: 'Task' });
-  await userEvent.click(within(sidebar).getByRole('link', { name: section }));
+  const trail = screen.getByRole('navigation', { name: 'Breadcrumb' });
+  const crumb = within(trail).queryByRole('link', { name: section });
+  if (crumb !== null) {
+    await userEvent.click(crumb);
+    return;
+  }
+  await userEvent.click(within(trail).getByRole('button', { name: 'sum menu' }));
+  await userEvent.click(await screen.findByRole('menuitem', { name: section }));
 }
 
 /**

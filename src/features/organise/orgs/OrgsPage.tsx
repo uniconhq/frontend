@@ -4,7 +4,8 @@ import { Page, PageHeader } from '@/ui/Page';
 import { useMe } from '@/session';
 import { orgPath } from '@/lib/organiser-paths';
 import { CreateButton } from '../Create';
-import { orgsReached, ROLE_LABEL } from '../roles';
+import { orgsReached } from '@/lib/reached';
+import { ROLE_LABEL } from '../roles';
 import { NEW_ORG, useCreateOrg } from './new-org';
 
 /**

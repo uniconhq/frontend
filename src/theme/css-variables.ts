@@ -31,7 +31,6 @@ const vars = (surfaces: Surfaces, text: TextColors) => ({
 export const cssVariablesResolver: CSSVariablesResolver = (theme) => ({
   variables: {
     '--unicon-header-height': `${theme.other.shell.headerHeight}px`,
-    '--unicon-sidebar-width': `${theme.other.shell.sidebarWidth}px`,
   },
   light: vars(theme.other.surface.light, theme.other.text.light),
   dark: vars(theme.other.surface.dark, theme.other.text.dark),

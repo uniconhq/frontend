@@ -3,12 +3,9 @@ import { Link } from 'react-router';
 import classes from './HubCard.module.css';
 
 /**
- * One section on a hub: its title, a line saying whether it needs you to go
- * in ("3 organisers, 2 invites pending"), and at most one button, always at
- * the bottom. The whole card goes to the section's page, through its title,
- * which is the card's one link; the button, when there is one, sits above
- * that link and does its own thing. Nothing destructive and no form here:
- * those are inside the section.
+ * One section on a hub: its title, a few short lines and at most one button.
+ * The whole card goes to the section's page; links and the button in it sit
+ * above that and go their own way. Nothing destructive and no form here.
  */
 export function HubCard({
   title,

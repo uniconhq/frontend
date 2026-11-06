@@ -1,5 +1,6 @@
 import { Link, useLocation, useParams } from 'react-router';
 import { $api } from '@/api/query';
+import { useSession } from '@/session';
 import { contestHomePath, isContestantPath, taskPagePath } from '@/lib/contest-paths';
 import {
   NEW_ORG_PATH,
@@ -23,26 +24,24 @@ import {
   type Section,
 } from '@/lib/sections';
 import { headingOf } from '@/lib/task-names';
+import { PlaceMenu, type Place } from './PlaceMenu';
 import classes from './Breadcrumb.module.css';
 
-/** A step of the trail; one with no `to` names a level that has no page of its own. */
-type Segment = { label: string; to?: string };
+/** A part of the trail; one with no `to` is a page that is no place, such as "Page not found". */
+type Segment = { label: string; to?: string; menu?: Place };
 
-type Params = Partial<Record<'org' | 'contest' | 'task' | 'owner' | 'name', string>>;
+type Params = Partial<
+  Record<'org' | 'contest' | 'task' | 'owner' | 'name' | '*', string>
+>;
 
-/** What the trail calls the org, the contest and the task. */
 type Names = { org: string; contest: string; task: string };
 
-/** A read the trail never makes: it takes what a page has already read. */
 const HELD = { enabled: false } as const;
 
 /**
- * What the trail calls the org, the contest and the task, from what the pages
- * have already read, by the same reads: the org's display name from the org's
- * own page, the contest's name from its home, and a task by its label and
- * title, as its page heads it, from its page or its contest's list of tasks.
- * Nothing is asked of the server for the trail. Until a name is in, or on a
- * page that never reads it, the step is called by its address.
+ * The org's, contest's and task's names from what the pages have already
+ * read: the trail never asks the server itself. Until a name is in, a part
+ * is called by its address.
  */
 function useNames({ org = '', contest = '', task = '' }: Params): Names {
   const inOrg = { params: { path: { org } } };
@@ -90,12 +89,7 @@ function useNames({ org = '', contest = '', task = '' }: Params): Names {
   };
 }
 
-/**
- * The section of a level whose page this is, from the level's own list of
- * sections, so a section's crumb is its card's and its sidebar entry's
- * label. A page below a section, such as a file open in Files, is that
- * section's.
- */
+/** The section this page is, or is below (a file open in Settings is Settings'). */
 function sectionCrumb<S extends Section>(
   pathname: string,
   sections: readonly S[],
@@ -114,18 +108,23 @@ function organiserTrail(
   { org, contest, task }: Params,
   names: Names,
 ): Segment[] {
-  const segments: Segment[] = [{ label: 'Orgs', to: ORGS_PATH }];
-  if (pathname === NEW_ORG_PATH)
-    return [...segments, { label: 'New org', to: pathname }];
-  if (org === undefined) return segments;
-  segments.push({ label: names.org, to: orgPath(org) });
+  if (pathname === ORGS_PATH) return [{ label: 'Orgs', to: ORGS_PATH }];
+  if (pathname === NEW_ORG_PATH) return [{ label: 'New org', to: pathname }];
+  if (org === undefined) return [];
+  const segments: Segment[] = [
+    { label: names.org, to: orgPath(org), menu: { kind: 'org', org } },
+  ];
   if (contest === undefined) {
     return [
       ...segments,
       ...sectionCrumb(pathname, ORG_SECTIONS, (key) => orgSectionPath(org, key)),
     ];
   }
-  segments.push({ label: names.contest, to: contestPath(org, contest) });
+  segments.push({
+    label: names.contest,
+    to: contestPath(org, contest),
+    menu: { kind: 'contest', org, contest },
+  });
   if (task === undefined) {
     return [
       ...segments,
@@ -134,7 +133,11 @@ function organiserTrail(
       ),
     ];
   }
-  segments.push({ label: names.task, to: taskPath(org, contest, task) });
+  segments.push({
+    label: names.task,
+    to: taskPath(org, contest, task),
+    menu: { kind: 'task', org, contest, task },
+  });
   return [
     ...segments,
     ...sectionCrumb(pathname, TASK_SECTIONS, (key) =>
@@ -143,21 +146,19 @@ function organiserTrail(
   ];
 }
 
-/**
- * A contest as its contestants see it, under the page that lists the
- * contests; its org is named, and has no page for a contestant to go to.
- */
 function contestantTrail(
   pathname: string,
   { org, contest, task }: Params,
   names: Names,
 ): Segment[] {
-  const segments: Segment[] = [{ label: 'Browse contests', to: '/' }];
-  if (org === undefined || contest === undefined) return segments;
-  segments.push(
-    { label: names.org },
-    { label: names.contest, to: contestHomePath(org, contest) },
-  );
+  if (org === undefined || contest === undefined) return [];
+  const segments: Segment[] = [
+    {
+      label: names.contest,
+      to: contestHomePath(org, contest),
+      menu: { kind: 'entered', org, contest },
+    },
+  ];
   if (task !== undefined) {
     return [...segments, { label: names.task, to: taskPagePath(org, contest, task) }];
   }
@@ -169,54 +170,52 @@ function contestantTrail(
   ];
 }
 
-/** Every page that is no org's or contest's, by its own name. */
 const PLACES: Record<string, string> = {
-  '/': 'Browse contests',
   '/account': 'Account',
   '/invites': 'Invites',
   '/login': 'Sign in',
+  [WORKFLOWS_PATH]: 'Workflows',
 };
 
-function trailOf(pathname: string, params: Params, names: Names): Segment[] {
+function belowHome(pathname: string, params: Params, names: Names): Segment[] {
+  if (pathname === '/') return [];
+  // Only the not-found route matches `*`.
+  if (params['*'] !== undefined) return [{ label: 'Page not found' }];
   if (isOrganiserPath(pathname)) return organiserTrail(pathname, params, names);
   if (isContestantPath(pathname)) return contestantTrail(pathname, params, names);
-  if (pathname === WORKFLOWS_PATH || pathname.startsWith(`${WORKFLOWS_PATH}/`)) {
-    const segments: Segment[] = [{ label: 'Workflows', to: WORKFLOWS_PATH }];
-    const { owner, name } = params;
-    if (owner !== undefined && name !== undefined) {
-      segments.push({ label: `${owner}/${name}`, to: workflowPath(owner, name) });
-    }
-    return segments;
+  const { owner, name } = params;
+  if (
+    pathname.startsWith(`${WORKFLOWS_PATH}/`) &&
+    owner !== undefined &&
+    name !== undefined
+  ) {
+    return [{ label: `${owner}/${name}`, to: workflowPath(owner, name) }];
   }
   const place = PLACES[pathname];
-  // An address that is no page's is said as such, not as some other page.
   return [
     place === undefined ? { label: 'Page not found' } : { label: place, to: pathname },
   ];
 }
 
 /**
- * Where you are, every step back up one click away: under `/orgs` the org,
- * the contest, the task and the section, each segment its page; under
- * `/contests` the contests, the contest's org, the contest and the task or
- * the leaderboards; the workflows and a workflow; and every other page by
- * its own name. The last segment is the page being shown. The header sits
- * above the page's route, and React Router hands a parent route the params
- * its children matched, so this reads them without the page saying anything.
- * The org, the contest and the task are called by their names once a page
- * has read them (`useNames`). A step with no page of its own is plain words,
- * not a chip, so it is not taken for a link; a name cut short says itself
- * in full on hover.
+ * Where you are, from Home down, every part a link. A part's arrow lists
+ * what sits under it, so any place along the path is one click away. The
+ * header sits above the page's route, and React Router still hands it the
+ * params the page matched.
  */
 export function Breadcrumb() {
   const { pathname } = useLocation();
   const params = useParams();
-  const segments = trailOf(pathname, params, useNames(params));
+  const signedIn = useSession().status === 'signed-in';
+  const segments: Segment[] = [
+    { label: 'Home', to: '/', menu: signedIn ? { kind: 'home' } : undefined },
+    ...belowHome(pathname, params, useNames(params)),
+  ];
 
   return (
     <nav className={classes.trail} aria-label="Breadcrumb">
       {segments.map((segment, index) => (
-        <span key={`${segment.label}:${String(index)}`} className={classes.step}>
+        <span key={segment.to ?? segment.label} className={classes.step}>
           {index > 0 && (
             <span className={classes.caret} aria-hidden="true">
               /
@@ -238,6 +237,9 @@ export function Breadcrumb() {
             >
               {segment.label}
             </Link>
+          )}
+          {segment.menu !== undefined && (
+            <PlaceMenu label={segment.label} place={segment.menu} />
           )}
         </span>
       ))}

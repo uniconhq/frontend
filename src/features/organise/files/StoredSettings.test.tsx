@@ -17,10 +17,6 @@ import { comeBackToTab, fakeLiveStream, openStream, realLiveStream } from '@/tes
 
 /** The contest's Settings page, which holds its settings as stored below its form. */
 const CONTEST_SETTINGS = '/orgs/acme/contests/spring/settings';
-/** Where a contest's Files page was, before it was taken away (M43). */
-const CONTEST_FILES = '/orgs/acme/contests/spring/files';
-/** Where a task's Files page was, before each file had its form (M51). */
-const TASK_FILES = '/orgs/acme/contests/spring/tasks/sum/files';
 /** The task's Settings page, which holds its settings as stored. */
 const TASK_SETTINGS = '/orgs/acme/contests/spring/tasks/sum/settings';
 const CONTEST_FILE = `${CONTEST_API}/files/:path`;
@@ -131,45 +127,7 @@ describe("a contest's stored settings that cannot be read", () => {
   });
 });
 
-describe('a contest has no Files page (M43)', () => {
-  it('has no Files entry, and an old link to it, or to its settings in it, lands on Settings', async () => {
-    server.use(signedIn, taskList, ...repoFiles);
-    const { router } = renderApp(`${CONTEST_FILES}?file=contest.yaml`);
-
-    expect(
-      await within(await stored()).findByRole('textbox', {
-        name: 'The contest’s settings',
-      }),
-    ).toBeVisible();
-    expect(router.state.location.pathname).toBe(CONTEST_SETTINGS);
-    expect(router.state.location.hash).toBe('#file');
-    const sidebar = screen.getByRole('group', { name: 'Contest' });
-    expect(within(sidebar).queryByRole('link', { name: 'Files' })).toBeNull();
-    expect(screen.queryByRole('navigation', { name: 'Files' })).toBeNull();
-  });
-
-  it('lands an old link to the page alone on Settings, at its top', async () => {
-    server.use(signedIn, taskList, ...repoFiles);
-    const { router } = renderApp(CONTEST_FILES);
-
-    expect(await screen.findByRole('button', { name: 'Save settings' })).toBeVisible();
-    expect(router.state.location.pathname).toBe(CONTEST_SETTINGS);
-    expect(router.state.location.hash).toBe('');
-  });
-});
-
 describe("a task's files, each on its own form (M51)", () => {
-  it('has no Files page of its own: an old link to it, or to a file in it, lands on the task’s page', async () => {
-    server.use(signedIn, taskState, publicationList, ...repoFiles);
-    const { router } = renderApp(`${TASK_FILES}?file=tests/main/1/input`);
-
-    expect(await screen.findByLabelText('Where the task stands')).toBeVisible();
-    expect(router.state.location.pathname).toBe('/orgs/acme/contests/spring/tasks/sum');
-    const sidebar = screen.getByRole('group', { name: 'Task' });
-    expect(within(sidebar).queryByRole('link', { name: 'Files' })).toBeNull();
-    expect(screen.queryByRole('region', { name: 'Files' })).toBeNull();
-  });
-
   it('opens the task’s settings on its Settings page, to read only, saying where they are changed', async () => {
     server.use(signedIn, taskState, publicationList, ...repoFiles);
     renderApp(TASK_SETTINGS);

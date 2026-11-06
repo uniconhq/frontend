@@ -1,4 +1,4 @@
-import { formatDateTime } from './time';
+import { formatDateTime, formatShortDuration } from './time';
 
 /**
  * Where a contest stands, in one word, as its organisers see it: a draft only
@@ -38,6 +38,27 @@ export function datesLine(contest: Dated, now: Date): string {
     return `Ended ${when(contest.end)}`;
   }
   return `${when(contest.start)} to ${when(contest.end)}`;
+}
+
+/**
+ * The contest's one status badge: its state, the date that matters and, with
+ * `counting`, the time left to it, such as `Live · ends Nov 19, 2026, 8:46 PM · in 13d 21h`.
+ */
+export function statusLine(contest: Dated, now: Date, counting: boolean): string {
+  const left = (at: string) =>
+    counting ? ` · in ${formatShortDuration(Date.parse(at) - now.getTime())}` : '';
+  switch (standingOf(contest, now)) {
+    case 'draft':
+      return 'Draft';
+    case 'live':
+      return now.getTime() < Date.parse(contest.start)
+        ? `Starts ${when(contest.start)}${left(contest.start)}`
+        : `Live · ends ${when(contest.end)}${left(contest.end)}`;
+    case 'finished':
+      return `Ended ${when(contest.end)}`;
+    case 'archived':
+      return 'Archived';
+  }
 }
 
 /**

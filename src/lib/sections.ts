@@ -2,16 +2,12 @@ import { contestHomePath } from './contest-paths';
 import { contestPath, orgPath, taskPath } from './organiser-paths';
 
 /**
- * The sections of an org, a contest and a task, each list in the order its
- * hub shows them. One list drives the hub's cards, the sidebar while you are
- * inside that org, contest or task, the breadcrumb's last segment, each
- * section page's title and the route table, so a card, its sidebar entry,
- * its crumb and its page cannot drift apart: a section added here has all
- * four, and one taken out loses all four.
+ * The sections of an org, a contest and a task, in the order its page shows
+ * them. One list drives the cards, the breadcrumb, each section's title and
+ * the routes, so they cannot drift apart.
  *
- * `segment` is the section's part of the address under its level. `card`
- * says where its hub shows it: in the grid of cards, as the summary at the
- * top (a contest’s settings).
+ * `segment` is the section's part of the address. `card` says where its page
+ * shows it: in the grid, or as the summary at the top (a contest's settings).
  */
 export type Section<Key extends string = string> = {
   key: Key;
@@ -105,13 +101,7 @@ export const TASK_SECTIONS = [
   },
 ] as const satisfies readonly Section[];
 
-/**
- * The cards that build a task, on its own page, in the order one decides the
- * next: the workflow, its inputs, its runs, its scoring and checks, how many
- * submissions it takes, which share one save, and the statement, which saves
- * on its own. Each key is the card's anchor, which the sidebar and a link to
- * one of its fields open it by. `tests` stays the submissions card's anchor.
- */
+/** The cards that build a task, on its page. Each key is the card's anchor (`?card=`). */
 export const TASK_BUILD_CARDS = [
   { key: 'workflow', label: 'Workflow' },
   { key: 'inputs', label: 'Inputs' },
@@ -203,15 +193,3 @@ export function sectionOf<S extends Section>(sections: readonly S[], key: S['key
   if (found === undefined) throw new Error(`no section ${key}`);
   return found;
 }
-
-/**
- * The places that are no org's, contest's or task's, which the sidebar lists
- * everywhere and alone outside any of them. `signedIn` ones are for someone
- * with an account.
- */
-export const TOP_PLACES = [
-  { label: 'Browse contests', to: '/', signedIn: false },
-  { label: 'Orgs', to: '/orgs', signedIn: true },
-  { label: 'Workflows', to: '/workflows', signedIn: true },
-  { label: 'Account', to: '/account', signedIn: true },
-] as const;

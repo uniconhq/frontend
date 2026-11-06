@@ -4,12 +4,6 @@
   min-height: 100vh;
 }
 
-.main {
-  display: flex;
-  flex: 1;
-  min-height: 0;
-}
-
 .content {
   flex: 1;
   min-width: 0;
@@ -17,15 +11,7 @@
   background: var(--unicon-canvas);
 }
 
-/*
- * On a narrow screen the sidebar runs across the top, above the page, so the
- * page keeps the screen's whole width.
- */
 @media (max-width: 760px) {
-  .main {
-    flex-direction: column;
-  }
-
   .content {
     padding: 16px;
   }

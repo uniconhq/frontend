@@ -1,9 +1,11 @@
+/* Scrolls sideways rather than cut off the deepest parts on a phone. */
 .trail {
   display: flex;
   align-items: center;
   gap: 6px;
   min-width: 0;
-  overflow: hidden;
+  overflow-x: auto;
+  scrollbar-width: none;
   font-size: 12px;
   white-space: nowrap;
 }
@@ -19,7 +21,6 @@
   vertical-align: middle;
 }
 
-/* A step with no page of its own: plain words, not a chip, so it is not taken for a link. */
 .plain {
   padding-inline: 0;
   color: var(--unicon-text-secondary);
@@ -49,4 +50,42 @@
 .link[aria-current='page'] {
   color: var(--unicon-text-primary);
   font-weight: 600;
+}
+
+.arrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 20px;
+  margin-left: -4px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--mantine-radius-xs);
+  background: transparent;
+  color: var(--unicon-text-secondary);
+  font: inherit;
+  cursor: pointer;
+}
+
+.arrow:hover {
+  background: var(--unicon-hover);
+  color: var(--unicon-text-primary);
+}
+
+.menu {
+  max-height: 420px;
+  overflow-y: auto;
+}
+
+.none {
+  padding: 4px 12px 8px;
+  color: var(--unicon-text-secondary);
+  font-size: 12px;
+}
+
+@media (max-width: 760px) {
+  .segment {
+    max-width: 140px;
+  }
 }

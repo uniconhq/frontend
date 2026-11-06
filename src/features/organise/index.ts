@@ -29,7 +29,6 @@ export { TaskPage } from './task/TaskPage';
 export { RegradePage } from './gradings/RegradePage';
 export { WorkflowsPage } from './workflows/WorkflowsPage';
 export { WorkflowPage } from './workflows/WorkflowPage';
-export { viewFilePath } from './contest/places';
 
 /**
  * Each section's page, by its key in its level's list, so the route table

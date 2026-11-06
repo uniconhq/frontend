@@ -68,28 +68,7 @@ describe('the org list', () => {
 });
 
 describe('the shell for an organiser', () => {
-  it('links to the orgs from the sidebar once signed in', async () => {
-    server.use(signedIn);
-    renderApp('/');
-
-    const sections = await screen.findByRole('navigation', { name: 'Sections' });
-    expect(await within(sections).findByRole('link', { name: 'Orgs' })).toHaveAttribute(
-      'href',
-      '/orgs',
-    );
-  });
-
-  it('leaves the link out for a visitor', async () => {
-    renderApp('/');
-
-    await screen.findAllByRole('link', { name: 'Sign in' });
-    const sections = screen.getByRole('navigation', { name: 'Sections' });
-    expect(
-      within(sections).queryByRole('link', { name: 'Orgs' }),
-    ).not.toBeInTheDocument();
-  });
-
-  it('walks the breadcrumb through the org, the contest and the task', async () => {
+  it('walks the breadcrumb from Home through the org, the contest and the task', async () => {
     server.use(
       signedIn,
       http.get(TASK_API, () =>
@@ -103,7 +82,7 @@ describe('the shell for an organiser', () => {
     const trail = await screen.findByRole('navigation', { name: 'Breadcrumb' });
     const links = within(trail).getAllByRole('link');
     expect(links.map((link) => [link.textContent, link.getAttribute('href')])).toEqual([
-      ['Orgs', '/orgs'],
+      ['Home', '/'],
       ['acme', '/orgs/acme'],
       ['spring', '/orgs/acme/contests/spring'],
       ['sum', '/orgs/acme/contests/spring/tasks/sum'],
@@ -111,15 +90,17 @@ describe('the shell for an organiser', () => {
     expect(links[3]).toHaveAttribute('aria-current', 'page');
   });
 
-  it('gives the new org form a crumb of its own, under the orgs', async () => {
+  it('gives the new org form a crumb of its own, under Home', async () => {
     server.use(signedIn);
     renderApp('/orgs/new');
 
     await screen.findByRole('heading', { name: 'New org', level: 1 });
     const trail = screen.getByRole('navigation', { name: 'Breadcrumb' });
-    const orgs = within(trail).getByRole('link', { name: 'Orgs' });
-    expect(orgs).toHaveAttribute('href', '/orgs');
-    expect(orgs).not.toHaveAttribute('aria-current');
+    expect(
+      within(trail)
+        .getAllByRole('link')
+        .map((link) => link.textContent),
+    ).toEqual(['Home', 'New org']);
     expect(within(trail).getByRole('link', { name: 'New org' })).toHaveAttribute(
       'aria-current',
       'page',

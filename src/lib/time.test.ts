@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   formatDuration,
+  formatShortDuration,
   formatWhen,
   recordServerTime,
   serverClockOffsetMs,
@@ -47,5 +48,14 @@ describe('a countdown', () => {
     expect(formatDuration((86_400 + 2 * 3600 + 5 * 60 + 9) * second + 999)).toBe(
       '1d 02h 05m 09s',
     );
+  });
+
+  it("says a badge's time left in its two largest units", () => {
+    const minute = 60_000;
+    expect(formatShortDuration(-minute)).toBe('0s');
+    expect(formatShortDuration(30_000)).toBe('30s');
+    expect(formatShortDuration(9 * minute + 59_000)).toBe('9m');
+    expect(formatShortDuration((4 * 60 + 5) * minute)).toBe('4h 5m');
+    expect(formatShortDuration((2 * 24 * 60 + 4 * 60 + 59) * minute)).toBe('2d 4h');
   });
 });

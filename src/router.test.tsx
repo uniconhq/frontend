@@ -7,6 +7,7 @@ import {
   type RouteObject,
 } from 'react-router';
 import { renderApp, renderWithProviders } from '@/test/render';
+import { server, signedIn } from '@/test/server';
 import { routes } from './router';
 
 describe('routes', () => {
@@ -17,6 +18,25 @@ describe('routes', () => {
       await screen.findByRole('heading', { name: 'Page not found', level: 1 }),
     ).toBeInTheDocument();
     expect(screen.getByText('unicon')).toBeInTheDocument();
+  });
+
+  it.each([
+    '/orgs/acme/contests/spring/boards',
+    '/orgs/acme/contests/spring/contestants',
+    '/orgs/acme/contests/spring/teams',
+    '/orgs/acme/contests/spring/files',
+    '/orgs/acme/contests/spring/tasks/sum/statement',
+    '/orgs/acme/contests/spring/tasks/sum/files',
+    '/orgs/acme/contests/spring/tasks/sum/queue',
+    '/contests/acme/spring/boards',
+  ])('answers the old address %s with the not-found page', async (path) => {
+    server.use(signedIn);
+    const { router } = renderApp(path);
+
+    expect(
+      await screen.findByRole('heading', { name: 'Page not found', level: 1 }),
+    ).toBeInTheDocument();
+    expect(router.state.location.pathname).toBe(path);
   });
 
   it('puts the landing page behind no guard at all', async () => {
@@ -57,6 +77,6 @@ describe('routes', () => {
 
     expect(await screen.findByText('the page fell over')).toBeInTheDocument();
     expect(screen.getByText('unicon')).toBeInTheDocument();
-    expect(screen.getByRole('navigation', { name: 'Sections' })).toBeInTheDocument();
+    expect(screen.getByRole('navigation', { name: 'Breadcrumb' })).toBeInTheDocument();
   });
 });

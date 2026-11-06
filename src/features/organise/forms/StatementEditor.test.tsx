@@ -51,7 +51,7 @@ function statementBackend(
 describe('the statement beside its preview', { timeout: 20_000 }, () => {
   it('shows a statement that is an upload by its size and digest, never as text', async () => {
     statementBackend(() => HttpResponse.json({}), { size: 40, digest: 'c'.repeat(64) });
-    renderApp('/orgs/acme/contests/spring/tasks/sum/statement');
+    renderApp('/orgs/acme/contests/spring/tasks/sum?card=statement');
 
     // The statement is a card of the task's whole page, which takes its reads first.
     const shown = await screen.findByRole('region', { name: 'Uploaded statement.md' });
@@ -70,7 +70,7 @@ describe('the statement beside its preview', { timeout: 20_000 }, () => {
         effect: unchanged,
       }),
     );
-    renderApp('/orgs/acme/contests/spring/tasks/sum/statement');
+    renderApp('/orgs/acme/contests/spring/tasks/sum?card=statement');
 
     const source = await screen.findByRole('textbox', { name: 'Statement source' });
     const preview = screen.getByRole('region', { name: 'What entrants see' });
@@ -135,7 +135,7 @@ describe('the statement beside its preview', { timeout: 20_000 }, () => {
       ),
     );
     const away = '/orgs/acme/contests/spring';
-    const { router } = renderApp('/orgs/acme/contests/spring/tasks/sum/statement');
+    const { router } = renderApp('/orgs/acme/contests/spring/tasks/sum?card=statement');
 
     const source = await screen.findByRole('textbox', { name: 'Statement source' });
     const page = router.state.location.pathname;
@@ -158,7 +158,7 @@ describe('the statement beside its preview', { timeout: 20_000 }, () => {
 
   it('draws the task’s own pictures in the preview and says how to show one', async () => {
     statementBackend(() => HttpResponse.json({}));
-    renderApp('/orgs/acme/contests/spring/tasks/sum/statement');
+    renderApp('/orgs/acme/contests/spring/tasks/sum?card=statement');
 
     const source = await screen.findByRole('textbox', { name: 'Statement source' });
     const preview = screen.getByRole('region', { name: 'What entrants see' });
@@ -271,7 +271,7 @@ describe('the statement beside its preview', { timeout: 20_000 }, () => {
     it('stages a picture under a name of its own, draws it from its own bytes, and saves it with the statement in one save, leaving show as it is', async () => {
       const { sent, saves } = picturesBackend();
       const user = userEvent.setup();
-      renderApp('/orgs/acme/contests/spring/tasks/sum/statement');
+      renderApp('/orgs/acme/contests/spring/tasks/sum?card=statement');
       const source = await screen.findByRole('textbox', { name: 'Statement source' });
       await screen.findByRole('list', { name: 'Pictures' });
 
@@ -340,7 +340,7 @@ describe('the statement beside its preview', { timeout: 20_000 }, () => {
           }),
       ]);
       const user = userEvent.setup();
-      renderApp('/orgs/acme/contests/spring/tasks/sum/statement');
+      renderApp('/orgs/acme/contests/spring/tasks/sum?card=statement');
       await screen.findByRole('textbox', { name: 'Statement source' });
       await screen.findByRole('list', { name: 'Pictures' });
 
@@ -396,7 +396,7 @@ describe('the statement beside its preview', { timeout: 20_000 }, () => {
         ),
       );
       const user = userEvent.setup();
-      renderApp('/orgs/acme/contests/spring/tasks/sum/statement');
+      renderApp('/orgs/acme/contests/spring/tasks/sum?card=statement');
       await screen.findByRole('textbox', { name: 'Statement source' });
       await screen.findByRole('list', { name: 'Pictures' });
 
@@ -425,7 +425,7 @@ describe('the statement beside its preview', { timeout: 20_000 }, () => {
       const { saves } = picturesBackend();
       // A file dropped on the box is not held to what its picker offers.
       const user = userEvent.setup({ applyAccept: false });
-      renderApp('/orgs/acme/contests/spring/tasks/sum/statement');
+      renderApp('/orgs/acme/contests/spring/tasks/sum?card=statement');
       const source = await screen.findByRole('textbox', { name: 'Statement source' });
       await screen.findByRole('list', { name: 'Pictures' });
 
@@ -456,7 +456,7 @@ describe('the statement beside its preview', { timeout: 20_000 }, () => {
     it('lists the pictures, says which the statement does not show, and takes one out with the statement’s save', async () => {
       const { saves } = picturesBackend();
       const user = userEvent.setup();
-      renderApp('/orgs/acme/contests/spring/tasks/sum/statement');
+      renderApp('/orgs/acme/contests/spring/tasks/sum?card=statement');
       const source = await screen.findByRole('textbox', { name: 'Statement source' });
       fireEvent.change(source, {
         target: { value: `${STATEMENT}\n![diagram](public/my-diagram.png)\n` },
@@ -498,7 +498,7 @@ describe('the statement beside its preview', { timeout: 20_000 }, () => {
     it('takes a staged picture back out, with its line, on Undo', async () => {
       const { saves } = picturesBackend();
       const user = userEvent.setup();
-      renderApp('/orgs/acme/contests/spring/tasks/sum/statement');
+      renderApp('/orgs/acme/contests/spring/tasks/sum?card=statement');
       const source = await screen.findByRole('textbox', { name: 'Statement source' });
       await screen.findByRole('list', { name: 'Pictures' });
 
@@ -531,7 +531,7 @@ describe('the statement beside its preview', { timeout: 20_000 }, () => {
         }),
       ),
     );
-    renderApp('/orgs/acme/contests/spring/tasks/sum/statement');
+    renderApp('/orgs/acme/contests/spring/tasks/sum?card=statement');
 
     expect(
       await screen.findByRole('textbox', { name: 'Statement source' }),
@@ -597,7 +597,7 @@ describe('the statement while it is being edited', { timeout: 20_000 }, () => {
 
   it('keeps the unsaved text, and does not spin, when the tab comes back', async () => {
     const { stored, asked } = sharedStatement();
-    renderApp('/orgs/acme/contests/spring/tasks/sum/statement');
+    renderApp('/orgs/acme/contests/spring/tasks/sum?card=statement');
     const source = await screen.findByRole('textbox', { name: 'Statement source' });
     openStream();
     fireEvent.change(source, { target: { value: MINE } });
@@ -624,7 +624,7 @@ describe('the statement while it is being edited', { timeout: 20_000 }, () => {
 
   it('meets someone else’s save at the save, showing both versions', async () => {
     const { stored, sent } = sharedStatement();
-    renderApp('/orgs/acme/contests/spring/tasks/sum/statement');
+    renderApp('/orgs/acme/contests/spring/tasks/sum?card=statement');
     const source = await screen.findByRole('textbox', { name: 'Statement source' });
     openStream();
     fireEvent.change(source, { target: { value: MINE } });
@@ -697,7 +697,7 @@ describe('the statement while it is being edited', { timeout: 20_000 }, () => {
       }),
     );
     const user = userEvent.setup();
-    renderApp('/orgs/acme/contests/spring/tasks/sum/statement');
+    renderApp('/orgs/acme/contests/spring/tasks/sum?card=statement');
     const source = await screen.findByRole('textbox', { name: 'Statement source' });
     fireEvent.change(source, { target: { value: MINE } });
 
@@ -734,7 +734,7 @@ describe('the statement while it is being edited', { timeout: 20_000 }, () => {
 
   it('goes on from their version, keeping my text beside it to copy from', async () => {
     const { stored } = sharedStatement();
-    renderApp('/orgs/acme/contests/spring/tasks/sum/statement');
+    renderApp('/orgs/acme/contests/spring/tasks/sum?card=statement');
     const source = await screen.findByRole('textbox', { name: 'Statement source' });
     fireEvent.change(source, { target: { value: MINE } });
     stored.content = THEIRS;

@@ -7,6 +7,7 @@ import { parse } from 'yaml';
 import { isoOf, localOf } from '../forms/times';
 import { CONTEST_SECTIONS } from '@/lib/sections';
 import { formatDateTime } from '@/lib/time';
+import { home } from '@/test/contestant';
 import { renderApp } from '@/test/render';
 import { problem, server, signedIn, someone } from '@/test/server';
 import {
@@ -34,14 +35,47 @@ describe("the contest page's header", () => {
     expect(title).toBeVisible();
     const header = title.closest('header');
     if (header === null) throw new Error('the title is in a header');
-    expect(await within(header).findByText('Draft')).toBeVisible();
+    expect(
+      await within(header).findByRole('timer', { name: 'Contest status' }),
+    ).toHaveTextContent(/^Draft$/);
     expect(screen.getByRole('link', { name: 'View as an entrant' })).toHaveAttribute(
       'href',
       '/contests/acme/spring',
     );
-    expect(
-      await screen.findByRole('timer', { name: 'Contest countdown' }),
-    ).toBeVisible();
+    expect(screen.queryByRole('timer', { name: 'Contest countdown' })).toBeNull();
+  });
+
+  // The server's clock reads 2026-09-12T10:00:00Z.
+  it.each([
+    ['a draft', { state: 'draft' }, 'Draft'],
+    [
+      'a contest yet to start',
+      { start: '2026-09-14T14:30:00Z', end: '2026-09-20T00:00:00Z' },
+      `Starts ${at('2026-09-14T14:30:00Z')} · in 2d 4h`,
+    ],
+    [
+      'a live contest',
+      { start: '2026-09-01T00:00:00Z', end: '2026-09-26T07:30:00Z' },
+      `Live · ends ${at('2026-09-26T07:30:00Z')} · in 13d 21h`,
+    ],
+    [
+      'an ended contest',
+      { start: '2026-09-01T00:00:00Z', end: '2026-09-10T00:00:00Z' },
+      `Ended ${at('2026-09-10T00:00:00Z')}`,
+    ],
+  ] as const)('says where %s stands in one badge', async (_, dates, text) => {
+    server.use(
+      signedIn,
+      standingList,
+      ...repoFiles,
+      http.get(`${CONTEST_API}/home`, () =>
+        HttpResponse.json(home({ state: 'published', ...dates })),
+      ),
+    );
+    renderApp(CONTEST);
+
+    const badge = await screen.findByRole('timer', { name: 'Contest status' });
+    await waitFor(() => expect(badge.textContent).toBe(text));
   });
 });
 
@@ -706,7 +740,7 @@ describe("a task's place in the contest, changed from its row", () => {
 });
 
 describe("the contest's sections", () => {
-  it('gives each section a card going to its page, in the order the sidebar lists them', async () => {
+  it('gives each section a card going to its page, in the order of its sections', async () => {
     server.use(signedIn, standingList, ...repoFiles);
     renderApp(CONTEST);
 
@@ -720,19 +754,6 @@ describe("the contest's sections", () => {
     );
     expect(titles.map((link) => link.getAttribute('href'))).toEqual(
       grid.map((section) => `${CONTEST}/${section.segment}`),
-    );
-
-    const sidebar = screen.getByRole('group', { name: 'Contest' });
-    expect(
-      within(sidebar)
-        .getAllByRole('link')
-        .slice(1)
-        .map((link) => [link.textContent, link.getAttribute('href')]),
-    ).toEqual(
-      CONTEST_SECTIONS.map((section) => [
-        section.label,
-        `${CONTEST}/${section.segment}`,
-      ]),
     );
   });
 

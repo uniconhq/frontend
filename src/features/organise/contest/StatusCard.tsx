@@ -5,14 +5,13 @@ import { $api, queryView } from '@/api/query';
 import type { TaskStanding } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
-import { Chip } from '@/ui/Chip';
 import { Modal } from '@/ui/Modal';
 import { PageLink } from '@/ui/PageLink';
 import { RadioGroup } from '@/ui/RadioGroup';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { Loaded } from '@/ui/feedback/Loaded';
 import { useMe } from '@/session';
-import { STANDING_WORD, standingOf, type ContestStanding } from '@/lib/contest-state';
+import { standingOf } from '@/lib/contest-state';
 import { contestPath, taskPath } from '@/lib/organiser-paths';
 import { contestSectionPath, taskCardPath } from '@/lib/sections';
 import { formatDateTime, serverNow } from '@/lib/time';
@@ -52,26 +51,6 @@ function dated(values: ContestValues) {
     start: isoOf(values.start) ?? '',
     end: isoOf(values.end) ?? '',
   } as const;
-}
-
-/** The one sentence under the contest's state. */
-function standingSentence(
-  standing: ContestStanding,
-  values: ContestValues,
-  now: Date,
-): string {
-  switch (standing) {
-    case 'draft':
-      return 'Only its organisers can see it.';
-    case 'live':
-      return now.getTime() < Date.parse(values.start)
-        ? `${visibilitySentence(values.visibility)} It starts ${when(values.start)}.`
-        : `${visibilitySentence(values.visibility)} It is live, and ends ${when(values.end)}.`;
-    case 'finished':
-      return `It ended ${when(values.end)}. Archive it once nothing more needs doing.`;
-    case 'archived':
-      return 'Its tasks can still be read, and they take no submissions.';
-  }
 }
 
 type Check = {
@@ -228,13 +207,9 @@ function ownRefusals(error: ApiError) {
 }
 
 /**
- * Where the contest stands, at the top of its page: one word and a sentence,
- * who sees it, and while it is a draft what opening it needs, each item a
- * link to where it is fixed. An admin opens it with one button, once every
- * item it needs holds, after a confirmation that says what will happen;
- * takes it back to draft until it starts; archives it once it has ended;
- * and changes who sees it. A refusal says why, the forge's own sentence
- * included, such as a contest that started in the meantime.
+ * Who sees the contest, what opening it needs while it is a draft, and an
+ * admin's buttons. Its state is the page header's badge. Going back to draft
+ * after the start is the forge's to refuse, so the button stays while live.
  */
 export function StatusCard({ org, contest }: { org: string; contest: string }) {
   const settings = useContestSettings(org, contest);
@@ -283,7 +258,6 @@ export function StatusCard({ org, contest }: { org: string; contest: string }) {
               ? checksOf(org, contest, values, tasks.data, titles)
               : [];
           const blocked = checks.some((check) => !check.ok && check.warning !== true);
-          const started = Date.parse(values.start) <= now.getTime();
           const actions: ReactNode[] = [];
           if (admin && standing === 'draft') {
             actions.push(
@@ -298,7 +272,7 @@ export function StatusCard({ org, contest }: { org: string; contest: string }) {
               </FieldBox>,
             );
           }
-          if (admin && standing === 'live' && !started) {
+          if (admin && standing === 'live') {
             actions.push(
               <FieldBox key="draft" name="state">
                 <Button variant="secondary" onClick={() => setAsking('draft')}>
@@ -320,21 +294,7 @@ export function StatusCard({ org, contest }: { org: string; contest: string }) {
             <>
               <ReadOnlyAt place={{ kind: 'contest', org, contest }} role="admin" />
               <div className={classes.statusHead}>
-                <Chip
-                  tone={
-                    standing === 'live'
-                      ? 'live'
-                      : standing === 'draft'
-                        ? 'warn'
-                        : 'quiet'
-                  }
-                >
-                  {STANDING_WORD[standing]}
-                </Chip>
-                <BodyText>{standingSentence(standing, values, now)}</BodyText>
-              </div>
-              <div className={classes.statusHead}>
-                <BodyText tone="secondary">
+                <BodyText>
                   Who sees it:{' '}
                   {VISIBILITY_CHOICES.find((one) => one.value === values.visibility)
                     ?.label ?? 'Not set'}
@@ -368,12 +328,6 @@ export function StatusCard({ org, contest }: { org: string; contest: string }) {
                     </ul>
                   )}
                 </Loaded>
-              )}
-              {standing === 'live' && started && (
-                <BodyText tone="secondary">
-                  It has started, so it can no longer go back to draft. Its end can
-                  still be moved in Settings.
-                </BodyText>
               )}
               {actions.length > 0 && <div className={shared.actions}>{actions}</div>}
               {refused?.kind === 'refused' &&

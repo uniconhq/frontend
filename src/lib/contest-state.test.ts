@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { byWhatMattersNow, datesLine, standingOf } from './contest-state';
+import { byWhatMattersNow, datesLine, standingOf, statusLine } from './contest-state';
 import { formatDateTime } from './time';
 
 const NOW = new Date('2026-10-11T12:00:00Z');
@@ -119,5 +119,47 @@ describe('the order of an org’s contests', () => {
       'stored',
       'unread',
     ]);
+  });
+});
+
+describe("the contest's status badge", () => {
+  const at = (iso: string) => formatDateTime(new Date(iso));
+
+  it('says a draft is a draft, whatever its dates', () => {
+    expect(
+      statusLine(
+        contest('draft', '2026-10-20T00:00:00Z', '2026-10-21T00:00:00Z'),
+        NOW,
+        true,
+      ),
+    ).toBe('Draft');
+  });
+
+  it('says when a scheduled contest starts, and in how long', () => {
+    const start = '2026-10-13T16:00:00Z';
+    expect(
+      statusLine(contest('published', start, '2026-10-20T00:00:00Z'), NOW, true),
+    ).toBe(`Starts ${at(start)} · in 2d 4h`);
+  });
+
+  it('says a live contest is live, when it ends, and in how long', () => {
+    const end = '2026-10-25T09:00:00Z';
+    expect(
+      statusLine(contest('published', '2026-10-01T00:00:00Z', end), NOW, true),
+    ).toBe(`Live · ends ${at(end)} · in 13d 21h`);
+  });
+
+  it('says when an ended contest ended, with nothing to count', () => {
+    const end = '2026-10-05T00:00:00Z';
+    expect(
+      statusLine(contest('published', '2026-10-01T00:00:00Z', end), NOW, true),
+    ).toBe(`Ended ${at(end)}`);
+  });
+
+  it('leaves the count out until the server clock is known', () => {
+    const end = '2026-10-25T09:00:00Z';
+    expect(
+      statusLine(contest('published', '2026-10-01T00:00:00Z', end), NOW, false),
+    ).toBe(`Live · ends ${at(end)}`);
   });
 });
