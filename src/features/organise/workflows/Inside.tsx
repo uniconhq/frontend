@@ -18,7 +18,8 @@ import {
 import { Description } from './Description';
 import { Drawer } from './Drawer';
 import { DrawnGraph } from './DrawnGraph';
-import { layoutWorkflow, PALETTE, type Box, type Layout } from './layout';
+import { WORKFLOW_PALETTE } from '../flow/graph';
+import { layoutWorkflow, type Box, type Layout } from './layout';
 import { refsOf, type Ref, type WithValue, type Workflow } from './model';
 import { byRef, type PrimitiveInfo } from './primitives';
 import { stepOutputs } from './rules';
@@ -365,7 +366,7 @@ export function Inside({
                   key={box.key}
                   box={box}
                   workflow={above.workflow}
-                  colour={PALETTE.input}
+                  colour={WORKFLOW_PALETTE.input}
                   onClick={() => visit(box)}
                 />
               ))}
@@ -428,7 +429,7 @@ export function Inside({
                   key={box.key}
                   box={box}
                   workflow={above.workflow}
-                  colour={PALETTE.middle[1]}
+                  colour={WORKFLOW_PALETTE.middle[1]}
                   onClick={() => visit(box)}
                 />
               ))}

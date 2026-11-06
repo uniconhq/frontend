@@ -27,7 +27,7 @@ import type { BoxOutput } from '@/api/types';
 import type { TaskValues, AxisValues } from '../forms/task-values';
 import { BuildCard, CardPart } from './BuildCard';
 import type { TaskPlace } from './build-data';
-import { BoxGraph } from '../flow/BoxGraph';
+import { CardGraph } from '../flow/CardGraph';
 import {
   TASK_PALETTE,
   RESULT_ROW,
@@ -402,7 +402,7 @@ export function ScoringCard({
       >
         {catalogue !== null && scope !== null && (
           <div className={classes.resultFlow}>
-            <BoxGraph
+            <CardGraph
               boxes={flowBoxes({
                 values,
                 rows,
@@ -415,11 +415,8 @@ export function ScoringCard({
               wires={flowWires(values, readings)}
               selected={chosen}
               onSelect={navigate}
-              expand={false}
               shape={SCORING}
               palette={TASK_PALETTE}
-              floor={0}
-              inside={() => null}
             />
           </div>
         )}
@@ -1058,7 +1055,7 @@ function flowBoxes({
     kind: 'what the entrant gets',
     description: 'Each part of the result, and when the entrant sees it.',
     wide: 320,
-    alwaysOpen: true,
+    open: true,
     rowHeight: RESULT_ROW,
     ports,
   });

@@ -1,3 +1,5 @@
+import { useState } from 'react';
+
 /**
  * Data worked out afresh on every draw, with each part that did not change
  * kept as the very value it was, so `memo` and React Flow see a change only
@@ -38,4 +40,19 @@ export function keepEqual<T>(before: unknown, after: T): T {
     return (fresh ? after : kept) as T;
   }
   return after;
+}
+
+/**
+ * `items`, each one equal to one given last time, by its id, given as that
+ * one; the list itself kept when nothing in it changed. What was given is
+ * held as state, set while drawing only when it changed, as React allows.
+ */
+export function useKept<T extends { id: string }>(items: T[]): T[] {
+  const [last, setLast] = useState(items);
+  const before = new Map(last.map((item) => [item.id, item]));
+  const kept = items.map((item) => keepEqual(before.get(item.id), item));
+  const same =
+    kept.length === last.length && kept.every((item, at) => item === last[at]);
+  if (!same) setLast(kept);
+  return same ? last : kept;
 }

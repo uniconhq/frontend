@@ -1,124 +1,19 @@
-/* The box graph: its boxes, pins, wires and ports. */
+/* What a card's box shows inside, which React Flow leaves to the page. */
 
-.stage {
-  position: relative;
-}
-
-.wires {
-  position: absolute;
-  inset: 0;
-  overflow: visible;
-  pointer-events: none;
-}
-
-.placed {
-  position: absolute;
-}
-
-.ear {
-  position: absolute;
-  height: 12px;
-  border: 2px solid var(--unicon-border-strong);
-  border-radius: var(--mantine-radius-sm);
-  background: var(--unicon-chrome);
-}
-
-/* The editor's box border is as wide as its layout says; this graph's is 2px. */
+/* The card's own font, not the workflow box's smaller one, and text that
+ * can be copied, which React Flow's nodes turn off. */
 .face {
-  --box-border: 2px;
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-  padding: 0;
   font: inherit;
-  text-align: left;
+  user-select: text;
+}
+
+.face[data-clickable] {
   cursor: pointer;
 }
 
-.pin {
-  position: absolute;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  transform: translateY(-50%);
-}
-
-.pin[data-side='in'] {
-  left: -5px;
-}
-
-.pin[data-side='out'] {
-  right: -5px;
-}
-
-/* A box's parts each keep a fixed height, so the layout knows where each
- * wire meets it without measuring. */
 .head {
   box-sizing: border-box;
-  flex: none;
   justify-content: flex-start;
-}
-
-.line {
-  display: block;
-  box-sizing: border-box;
-  flex: none;
-  max-width: none;
-  margin: 0;
-  padding: 4px 10px 0;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-
-.ports {
-  display: flex;
-  flex-direction: column;
-}
-
-.portRow {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  height: 28px;
-  padding: 0 10px;
-  color: var(--unicon-text-primary);
-  font-family: var(--mantine-font-family-monospace);
-  font-size: 12px;
-}
-
-.portRow[data-side='out'] {
-  justify-content: flex-end;
-}
-
-.portRow > span:not(.dot) {
-  min-width: 0;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-
-.portRow[data-out-first] {
-  border-top: 1px dashed var(--unicon-border);
-}
-
-.dot {
-  width: 8px;
-  height: 8px;
-  flex: none;
-  border-radius: 50%;
-  background: currentColor;
-}
-
-/* What an open box holds, such as a value's formula, above its ports. */
-.inside {
-  padding: 8px 10px 10px;
-  border-top: 1px solid var(--unicon-border);
-  cursor: auto;
-}
-
-.face[data-read-only] {
-  cursor: default;
 }
 
 .head[data-compact] {
@@ -136,9 +31,13 @@
   text-overflow: ellipsis;
 }
 
-/* The Result box reads as a table: a line between rows, the row under the
-   pointer lit, and its kind and when-shown in columns of their own, so a
-   row's three parts line up with every other row's. */
+.resultRows {
+  display: flex;
+  flex-direction: column;
+}
+
+/* An open box's rows read as a table: a line between rows, the row under
+   the pointer lit, and its kind and when-shown in columns of their own. */
 .resultRow {
   display: flex;
   flex-direction: column;
@@ -233,12 +132,4 @@
   font-size: 10px;
   line-height: 14px;
   color: var(--unicon-text-secondary);
-}
-.resultPin {
-  position: absolute;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  left: -5px;
-  transform: translateY(-50%);
 }

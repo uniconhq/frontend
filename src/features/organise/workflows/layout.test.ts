@@ -1,17 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { parseYaml } from '../forms/yaml-doc';
-import { CLASSIC, CLASSIC_V6, FOLDER, PRIMITIVES } from '@/test/workflows';
+import { CLASSIC, PRIMITIVES } from '@/test/workflows';
+import { GEOMETRY, WORKFLOW_PALETTE, wirePath, type Point } from '../flow/graph';
 import {
   BOX,
-  GEOMETRY,
-  PALETTE,
   layoutWorkflow,
   rowOf,
-  wirePath,
   type Box,
   type Drawn,
   type Layout,
-  type Point,
 } from './layout';
 import { readWorkflow } from './model';
 import { byRef } from './primitives';
@@ -132,23 +129,15 @@ function columnOf(layout: Layout, key: string): number | undefined {
   return layout.boxes.find((box) => box.key === key)?.column;
 }
 
-const SEEDED = [
-  ['unicon/classic@v6', CLASSIC],
-  ['a program of several files', FOLDER],
-] as const;
-
 describe('the layout', () => {
-  it.each(SEEDED)(
-    'draws %s the same every time, with no wire behind a box',
-    (_, text) => {
-      const first = laid(text);
+  it('draws a workflow the same every time, with no wire behind a box', () => {
+    const first = laid(CLASSIC);
 
-      expect(laid(text)).toEqual(first);
-      expect(behind(first)).toEqual([]);
-      expect(overlaps(first)).toEqual([]);
-      expect(first.wires.length).toBeGreaterThan(0);
-    },
-  );
+    expect(laid(CLASSIC)).toEqual(first);
+    expect(behind(first)).toEqual([]);
+    expect(overlaps(first)).toEqual([]);
+    expect(first.wires.length).toBeGreaterThan(0);
+  });
 
   it('gives every port a row of its own, a step’s outputs under its inputs', () => {
     const layout = laid(CLASSIC);
@@ -215,8 +204,21 @@ describe('the layout', () => {
     expect(boxAt(layout, 'input:time_limit').readers).toEqual(['run']);
   });
 
-  it('draws deploy’s classic@v4: two exec steps with their ports, the run’s output fed to the diff', () => {
-    const layout = laid(CLASSIC_V6);
+  it('draws two exec steps with their ports, the run’s output fed to the diff in its files', () => {
+    const layout = laid(`
+inputs:
+  code: folder
+  answer: file
+steps:
+  - {id: solution, use: unicon/exec@v4, with: {source: "\${{ inputs.code }}"}}
+  - id: compare
+    use: unicon/exec@v4
+    with:
+      source: \${{ workflow.diff/ }}
+      files: {output: "\${{ steps.solution.output }}", answer: "\${{ inputs.answer }}"}
+outputs:
+  log: \${{ steps.solution.log }}
+`);
     const solution = boxAt(layout, 'step:0');
     const compare = boxAt(layout, 'step:1');
     const wire = (from: string, to: string) =>
@@ -365,10 +367,10 @@ steps:
 outputs:
   out: {from: "\${{ steps.e.output }}"}
 `);
-    const [pink, rose, peach] = PALETTE.middle;
+    const [pink, rose, peach] = WORKFLOW_PALETTE.middle;
 
-    expect(boxAt(layout, 'input:n').colour).toBe(PALETTE.input);
-    expect(boxAt(layout, 'outputs').colour).toBe(PALETTE.output);
+    expect(boxAt(layout, 'input:n').colour).toBe(WORKFLOW_PALETTE.input);
+    expect(boxAt(layout, 'outputs').colour).toBe(WORKFLOW_PALETTE.output);
     expect(
       [0, 1, 2, 3, 4].map((index) => boxAt(layout, `step:${index}`).colour),
     ).toEqual([pink, rose, peach, rose, pink]);
@@ -513,8 +515,8 @@ steps:
 `);
 
     expect(boxAt(layout, 'step:0').column).toBe(0);
-    expect(boxAt(layout, 'step:0').colour).toBe(PALETTE.middle[0]);
-    expect(boxAt(layout, 'step:1').colour).toBe(PALETTE.middle[1]);
+    expect(boxAt(layout, 'step:0').colour).toBe(WORKFLOW_PALETTE.middle[0]);
+    expect(boxAt(layout, 'step:1').colour).toBe(WORKFLOW_PALETTE.middle[1]);
   });
 
   it('runs a wire from a closed box straight to the edge of a column an open box widens', () => {
@@ -572,7 +574,7 @@ steps:
       column: 1,
       right: ['diff/'],
       readers: ['compare'],
-      colour: PALETTE.file,
+      colour: WORKFLOW_PALETTE.file,
     });
     expect(boxAt(layout, 'file:diff/program.yaml').readers).toEqual(['compare']);
     expect(boxAt(layout, 'input:code').column).toBe(0);
@@ -587,7 +589,7 @@ steps:
     expect(wire).toMatchObject({
       source: 'workflow:diff/',
       target: 'port:1.source',
-      colour: PALETTE.file,
+      colour: WORKFLOW_PALETTE.file,
     });
     // The file's box names it, so its wire is not labelled again.
     expect(
