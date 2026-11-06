@@ -581,6 +581,34 @@ describe("a task's place in the contest, changed from its row", () => {
     ).toBeDisabled();
   });
 
+  it('moves nothing when someone else saved first, and reads the list again to move from', async () => {
+    let reads = 0;
+    server.use(
+      signedIn,
+      http.get(`${CONTEST_API}/organise/tasks`, () => {
+        reads += 1;
+        return HttpResponse.json(standings);
+      }),
+      ...repoFiles,
+    );
+    const backend = contestSettings({
+      conflictWith: { ...contestValues, tasks: [{ id: 'sum' }, { id: 'sort' }] },
+    });
+    server.use(...backend.handlers);
+    const user = userEvent.setup();
+    renderApp(CONTEST);
+
+    const row = await screen.findByRole('listitem', { name: 'A · sort' });
+    const before = reads;
+    await user.click(within(row).getByRole('button', { name: 'Move A · sort down' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'The tasks changed since this page read them, so nothing was moved. The list now shows them as they are. Move the task again if you still want to.',
+    );
+    await waitFor(() => expect(reads).toBeGreaterThan(before));
+    expect(backend.sent).toHaveLength(1);
+  });
+
   it('asks before a move once the contest has started, saying which letters change', async () => {
     server.use(signedIn, standingList, ...repoFiles);
     const sent = settingsSaved({

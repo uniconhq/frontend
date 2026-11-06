@@ -17,6 +17,7 @@ import { CreateButton } from '../Create';
 import { DefinitionErrors } from '../DefinitionErrors';
 import { definitionErrorsOf } from '../files/refusals';
 import { SaveOutcome, type Outcome } from '../files/SaveOutcome';
+import { settingsQuery } from '../files/place';
 import { usePlaceMay } from '../may';
 import type { ContestValues } from '../forms/contest-values';
 import type { SettingsBody } from '../forms/settings-hooks';
@@ -160,8 +161,7 @@ function rowOf(
 /**
  * Move the entry of task `id` by one place in the contest's list, found by
  * its id in the settings as read, so a list someone else changed since the
- * page read it, or a retry on a newer version, still moves this task. At
- * either end of the list it stays.
+ * page read it still moves this task. At either end of the list it stays.
  */
 function moved(id: string, by: -1 | 1) {
   return (values: Values) => {
@@ -251,18 +251,31 @@ export function ContestTasks({ org, contest }: { org: string; contest: string })
   const queryClient = useQueryClient();
   const change = useContestChange(org, contest);
   const [moveRefused, setMoveRefused] = useState<Outcome<SettingsBody> | null>(null);
+  // A move someone else's save beat: the list is read again to move from.
+  const [moveBeaten, setMoveBeaten] = useState(false);
   /** A move asked about, while the contest has started. */
   const [asked, setAsked] = useState<Asked | null>(null);
   const started =
     values !== null &&
     values.state === 'published' &&
     Date.parse(values.start) <= serverNow().getTime();
+  const moveAnswered = async (outcome: Outcome<SettingsBody>) => {
+    const beaten = outcome.kind === 'refused' && outcome.error.code === 'conflict';
+    setMoveBeaten(beaten);
+    setMoveRefused(outcome.kind === 'refused' && !beaten ? outcome : null);
+    await queryClient.invalidateQueries({ queryKey: standingsKey });
+    if (beaten) {
+      await queryClient.invalidateQueries({
+        queryKey: settingsQuery({ kind: 'contest', org, contest }).queryKey,
+      });
+    }
+  };
   const move = async (task: string, by: -1 | 1) => {
     setMoveRefused(null);
+    setMoveBeaten(false);
     setAsked(null);
-    const outcome = await change.apply(moved(task, by));
-    if (outcome.kind === 'refused') setMoveRefused(outcome);
-    await queryClient.invalidateQueries({ queryKey: standingsKey });
+    // A move is relative, so it is not made again on someone else's change.
+    await moveAnswered(await change.apply(moved(task, by), { retry: false }));
   };
   const create = $api.useMutation('post', TASKS, {
     onSuccess: () =>
@@ -332,15 +345,18 @@ export function ContestTasks({ org, contest }: { org: string; contest: string })
       <SaveOutcome
         outcome={moveRefused}
         onConfirm={(body, asked) => {
-          void change
-            .write({ ...body, confirm: true, asked })
-            .then((answer) =>
-              setMoveRefused(answer.kind === 'refused' ? answer : null),
-            );
+          void change.write({ ...body, confirm: true, asked }).then(moveAnswered);
         }}
         onCancel={() => setMoveRefused(null)}
         onReload={() => setMoveRefused(null)}
       />
+    ) : moveBeaten ? (
+      <div className={classes.panel} role="alert">
+        <BodyText>
+          The tasks changed since this page read them, so nothing was moved. The list
+          now shows them as they are. Move the task again if you still want to.
+        </BodyText>
+      </div>
     ) : startFailed !== null ? (
       <div className={classes.panel} role="alert">
         <BodyText>
