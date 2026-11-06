@@ -2,16 +2,17 @@ import { taskPath } from '@/lib/organiser-paths';
 import { taskSectionPath } from '@/lib/sections';
 import type { PlaceOf, ProblemPlace } from '../DefinitionErrors';
 import { contestPlaceOf } from '../contest/opened';
-import { FIELD_PARAM, ITEM_PARAM, stepsOf } from '../contest/places';
+import { FIELD_PARAM, ITEM_PARAM } from '../contest/places';
 import type { Place } from '../files/place';
+import type { ProblemPath } from '../problem-path';
 
 /**
  * Where on the task's pages each of its settings and files is changed, so a
  * save refused for one names it in words and opens it. A refusal names a
- * setting by its place in the task's settings file (`inputs.time_limit`) or
- * a file by its path (`checker/checker.py`); that place is turned here into
- * the card, the field and the item it belongs to, and the words for them:
- * "Inputs: Time limit".
+ * setting by its keys in the task's settings file (`["inputs", "time_limit"]`)
+ * or a file by its path (`["checker/checker.py"]`); that place is turned here
+ * into the card, the field and the item it belongs to, and the words for
+ * them: "Inputs: Time limit".
  */
 
 /**
@@ -85,28 +86,30 @@ function inputOfFile(path: string, titles: ReadonlyMap<string, string>): string 
 /**
  * Where a setting or file of the task, by the place a refusal names it at,
  * is changed. `titles` names each input the workflow declares as it does
- * ("Time limit"), by its id where it gives no title; `message` is the problem's sentence, which says what
- * a problem of the whole file is about.
+ * ("Time limit"), by its id where it gives no title; `message` is the
+ * problem's sentence, which says what a problem of the whole file is about.
  */
 export function taskPlace(
-  path: string,
+  path: ProblemPath,
   message = '',
   titles: ReadonlyMap<string, string> = new Map(),
 ): TaskPlace {
-  if (path === 'statement.md' || path.startsWith('public/')) {
-    return { card: 'statement', label: 'Statement', field: null, item: null };
+  const [top, second, third, fourth, fifth] = path;
+  if (path.length === 1 && typeof top === 'string') {
+    if (top === 'statement.md' || top.startsWith('public/')) {
+      return { card: 'statement', label: 'Statement', field: null, item: null };
+    }
+    if (top === 'task.yaml') return wholePlace(message);
+    const input = inputOfFile(top, titles);
+    if (input !== null) {
+      return {
+        card: 'inputs',
+        label: `Inputs: ${titles.get(input) ?? input}`,
+        field: input,
+        item: null,
+      };
+    }
   }
-  if (path === '' || path === 'task.yaml') return wholePlace(message);
-  const input = inputOfFile(path, titles);
-  if (input !== null) {
-    return {
-      card: 'inputs',
-      label: `Inputs: ${titles.get(input) ?? input}`,
-      field: input,
-      item: null,
-    };
-  }
-  const [top, second, third, fourth, fifth] = stepsOf(path);
   switch (top) {
     case 'name':
       return { card: 'settings', label: 'Settings: Title', field: 'name', item: null };
@@ -139,7 +142,7 @@ export function taskPlace(
       if (second === 'values' && typeof third === 'string') {
         return {
           card: 'scoring',
-          label: `Scoring: ${third}`,
+          label: `Scoring: ${third === '' ? 'a value with no name' : third}`,
           field: `value-${third}`,
           item: null,
         };
@@ -147,7 +150,7 @@ export function taskPlace(
       if (second === 'groups' && typeof third === 'string') {
         return {
           card: 'scoring',
-          label: `Scoring: ${third}`,
+          label: `Scoring: ${third === '' ? 'a group with no name' : third}`,
           field: `group-${third}`,
           item: null,
         };
@@ -212,7 +215,7 @@ export function taskPlaceOf(
   task: string,
   titles?: ReadonlyMap<string, string>,
 ) {
-  return (path: string, message?: string): ProblemPlace => {
+  return (path: ProblemPath, message?: string): ProblemPlace => {
     const place = taskPlace(path, message, titles);
     return { label: place.label, to: taskPlaceHref(org, contest, task, place) };
   };

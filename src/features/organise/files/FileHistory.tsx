@@ -9,8 +9,7 @@ import { Modal } from '@/ui/Modal';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
 import { formatDateTime } from '@/lib/time';
-import { useMe } from '@/session';
-import { holdsAt } from '../roles';
+import { usePlaceMay } from '../may';
 import type { Place } from './place';
 import { UploadedFile } from './UploadedFile';
 import shared from '../organise.module.css';
@@ -104,7 +103,7 @@ function Versions({
   onRollBack: (version: string) => Promise<void>;
 }) {
   const where = { org: place.org, contest: place.contest, task: place.task };
-  const manages = holdsAt(useMe().roles, place, 'manager');
+  const manages = usePlaceMay(place).manage;
   const history = queryView(
     $api.useQuery('get', '/api/v1/orgs/{org}/contests/{contest}/tasks/{task}/history', {
       params: { path: where, query: { path } },

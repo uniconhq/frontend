@@ -44,6 +44,7 @@ function question(overrides: Partial<Clarification> = {}): Clarification {
     answered: false,
     closed: false,
     messages: [],
+    may_answer: false,
     ...overrides,
   };
 }

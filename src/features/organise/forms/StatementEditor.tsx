@@ -419,9 +419,16 @@ function Source({
               onUndo={undo}
             />
           )}
-          {removing !== null && <ErrorBlock error={toApiError(removing)} compact />}
-          {admin && (
+          {removing !== null && (
+            <ErrorBlock
+              error={toApiError(removing)}
+              compact
+              heading="Couldn’t remove"
+            />
+          )}
+          {admin && task !== null && (
             <AddPicture
+              task={task}
               taken={taken}
               disabled={held || saved === null}
               onStaged={({ name, file: chosen, line }) => {

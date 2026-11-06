@@ -13,15 +13,12 @@ import {
   type ScalarTag,
   type SchemaOptions,
   type Tags,
-  type YAMLMap,
 } from 'yaml';
 import { overOriginal } from './keep-lines';
 
 /**
- * A definition file as a YAML document, edited node by node so the
- * organiser's comments, key order and untouched keys stay as they were.
- * The forms read it into fields, change the nodes whose fields changed, and
- * write the document back out; nothing is ever dumped afresh from values.
+ * A workflow file as a YAML document, edited node by node so the author's
+ * comments, key order and untouched keys stay as they were.
  */
 export type Doc = Document;
 export type Path = (string | number)[];
@@ -61,10 +58,9 @@ function escaped(found: string): string {
 }
 
 /**
- * A number as the digits it is written with, which a form writes and reads
- * so that no digit is lost: a JavaScript number holds about 17 significant
- * digits, and a bound in a file may have more. It is written bare, and
- * reads as a number.
+ * A number as the digits it is written with, so that no digit is lost: a
+ * JavaScript number holds about 17 significant digits, and a file may hold
+ * more. It is written bare, and reads as a number.
  */
 export class NumberText {
   readonly text: string;
@@ -134,7 +130,7 @@ function exactTag(tag: Tags[number]): Tags[number] {
 }
 
 /**
- * How every definition file is read and written: as the forge reads it,
+ * How a workflow file is read and written: as the forge reads it,
  * YAML 1.2's core schema, whatever `%YAML` line a file carries. Only `true`
  * and `false` are booleans, so a group named `no` is text, and `1_000`,
  * `1:30` and a date are text too. A string that would read as anything else
@@ -165,10 +161,16 @@ export function parseYaml(text: string): { doc: Doc } | { error: string } {
   return { doc };
 }
 
+/** A file's text as plain data, as `exactJS` gives it, or null when it does not read. */
+export function dataOf(text: string): unknown {
+  const parsed = parseYaml(text);
+  return 'error' in parsed ? null : exactJS(parsed.doc);
+}
+
 /**
  * The document as text. Long lines are never folded and flow collections
- * keep `{a: 1}` without inner spaces, so a line the form did not touch reads
- * as the organiser wrote it.
+ * keep `{a: 1}` without inner spaces, so a line the edit did not touch reads
+ * as it was written.
  */
 export function writeYaml(doc: Doc): string {
   return doc.toString({ lineWidth: 0, flowCollectionPadding: false });
@@ -234,37 +236,12 @@ function commentsOf(doc: Doc): string[] {
     .sort();
 }
 
-/** The document's top as a mapping, or null for an empty file. */
-export function topMap(doc: Doc): YAMLMap | null | 'not-a-mapping' {
-  if (doc.contents === null) return null;
-  return isMap(doc.contents) ? doc.contents : 'not-a-mapping';
-}
-
-/** The plain value at a path, or undefined when nothing is there. */
-export function valueAt(doc: Doc, path: Path): unknown {
-  const node: unknown = doc.getIn(path, true);
-  if (node === undefined || node === null) return undefined;
-  if (isScalar(node))
-    return node.value instanceof NumberText ? node.value.toJSON() : node.value;
-  if (isMap(node) || isSeq(node)) return node.toJSON();
-  return undefined;
-}
-
 /**
  * The document as plain values, as `toJS` gives them, with every number a
  * `NumberText` holding the digits the file writes it with.
  */
 export function exactJS(doc: Doc): unknown {
   return exactOf(doc, doc.contents);
-}
-
-/**
- * The value at a path as `exactJS` reads it, or undefined when nothing is
- * there: what a form reads a field's text from, a number as its digits.
- */
-export function exactAt(doc: Doc, path: Path): unknown {
-  const node: unknown = doc.getIn(path, true);
-  return node === undefined || node === null ? undefined : exactOf(doc, node);
 }
 
 function exactOf(doc: Doc, top: unknown): unknown {
@@ -288,24 +265,6 @@ function exactOf(doc: Doc, top: unknown): unknown {
   return walk(top);
 }
 
-/**
- * A field's text for the value at a path: a number as the digits the file
- * writes it with, so a field shows and saves every digit, and anything else
- * as `textOf` gives it.
- */
-export function textAt(doc: Doc, path: Path): string {
-  return numberTextOf(doc.getIn(path, true)) ?? textOf(valueAt(doc, path));
-}
-
-/** A time a form writes, as the text it is written as. */
-export class Time {
-  readonly text: string;
-
-  constructor(text: string) {
-    this.text = text;
-  }
-}
-
 /** Whether `value` is a mapping read from YAML, not a list or a scalar. */
 export function isRecord(value: unknown): value is Record<string, unknown> {
   return (
@@ -313,7 +272,6 @@ export function isRecord(value: unknown): value is Record<string, unknown> {
     value !== null &&
     !Array.isArray(value) &&
     !(value instanceof NumberText) &&
-    !(value instanceof Time) &&
     !(value instanceof Map)
   );
 }
@@ -356,34 +314,33 @@ export function writeAt(
   const parent: unknown = doc.getIn(path.slice(0, -1), true);
   if ((isMap(parent) || isSeq(parent)) && parent.items.length === 0)
     parent.flow = false;
-  const written = value instanceof Time ? value.text : value;
   const isPlain =
-    written === null ||
-    typeof written === 'string' ||
-    typeof written === 'number' ||
-    typeof written === 'boolean' ||
-    written instanceof NumberText;
+    value === null ||
+    typeof value === 'string' ||
+    typeof value === 'number' ||
+    typeof value === 'boolean' ||
+    value instanceof NumberText;
   const old: unknown = doc.getIn(path, true);
   if (isPlain) {
     if (isScalar(old)) {
       // A scalar already there keeps its node, so a comment on its line stays.
-      if (written instanceof NumberText) {
+      if (value instanceof NumberText) {
         // Written as its digits whatever tag the file gave the old value: a
         // `!!float` or `!!int` would write a NumberText as `.nan`.
-        old.value = written;
+        old.value = value;
         old.tag = undefined;
-      } else doc.setIn(path, written);
+      } else doc.setIn(path, value);
       return;
     }
-    const node = nodeFor(doc, written);
+    const node = nodeFor(doc, value);
     keepComments(old, node);
     doc.setIn(path, node);
     return;
   }
   if (isRecord(value) && isMap(old)) {
     // A mapping already there is changed key by key, keeping its style, its
-    // key order and the comments in it. Its keys are text, as the forge reads
-    // every key a page writes, so a `1:` is the `"1"` the form names.
+    // key order and the comments in it. Its keys are written as text, so a
+    // `1:` becomes `"1"`.
     for (const pair of [...old.items]) {
       if (isScalar(pair.key) && typeof pair.key.value !== 'string')
         pair.key.value = String(pair.key.value);
@@ -414,49 +371,6 @@ export function writeAt(
 }
 
 /**
- * Rename keys of the mapping at `path` in place, all at once, so a chain
- * (a to b, b to c) or a swap (a to b, b to a) lands as asked: each entry
- * keeps its place, its value and its comments. A key `renames` names that
- * the mapping does not have is nothing to rename. A target held by an entry
- * that is neither renamed away nor among `dropped`, the keys the write
- * takes out, is refused with an error rather than left as it was.
- */
-export function renameKeys(
-  doc: Doc,
-  path: Path,
-  renames: ReadonlyMap<string, string>,
-  dropped: ReadonlySet<string> = new Set(),
-): void {
-  const moves = new Map([...renames].filter(([from, to]) => from !== to));
-  if (moves.size === 0) return;
-  const map: unknown = path.length === 0 ? doc.contents : doc.getIn(path, true);
-  if (!isMap(map)) return;
-  const keyOf = (pair: (typeof map.items)[number]) =>
-    isScalar(pair.key) ? String(pair.key.value) : null;
-  const present = new Set(map.items.map(keyOf));
-  const targets = [...moves].filter(([from]) => present.has(from)).map(([, to]) => to);
-  const where = path.join('.');
-  if (new Set(targets).size !== targets.length)
-    throw new Error(`Two entries of ${where} cannot both be renamed to one name.`);
-  for (const target of targets) {
-    if (present.has(target) && !moves.has(target) && !dropped.has(target))
-      throw new Error(
-        `${where} already has ${target}, so nothing can be renamed to it.`,
-      );
-  }
-  // The entry a renamed one replaces is one the write takes out anyway.
-  map.items = map.items.filter((pair) => {
-    const key = keyOf(pair);
-    return key === null || moves.has(key) || !targets.includes(key);
-  });
-  for (const pair of map.items) {
-    const key = keyOf(pair);
-    const to = key === null ? undefined : moves.get(key);
-    if (to !== undefined && isScalar(pair.key)) pair.key.value = to;
-  }
-}
-
-/**
  * The node `old` replaces may carry the comment on its line or the one above
  * it; the new one keeps them, as a scalar written in place does.
  */
@@ -466,7 +380,6 @@ function keepComments(old: unknown, node: Node): void {
   node.commentBefore = old.commentBefore;
 }
 
-const NUMBER = /^-?(\d+\.?\d*|\.\d+)([eE][-+]?\d+)?$/;
 /**
  * A finite number as YAML 1.2's core schema reads one, as the forge does: a
  * decimal with an optional sign and exponent, or `0o` octal or `0x` hex.
@@ -475,56 +388,11 @@ const CORE_NUMBER =
   /^([-+]?(\.\d+|\d+(\.\d*)?)([eE][-+]?\d+)?|0o[0-7]+|0x[0-9a-fA-F]+)$/;
 
 /**
- * A value typed into a field, as the file should hold it: a number, as its
- * digits, when it reads as one, `true` or `false` as a bool, and anything
- * else as text. An empty field is no value. Used where the form cannot know
- * the type, such as an input's value, which the workflow declares.
- */
-export function scalarOf(text: string): string | NumberText | boolean | undefined {
-  const trimmed = text.trim();
-  if (trimmed === '') return undefined;
-  if (trimmed === 'true') return true;
-  if (trimmed === 'false') return false;
-  if (NUMBER.test(trimmed)) return new NumberText(trimmed);
-  return text;
-}
-
-/** A field's text for a value read from the file. */
-export function textOf(value: unknown): string {
-  if (value === undefined || value === null) return '';
-  if (value instanceof NumberText) return value.text;
-  if (typeof value === 'string') return value;
-  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
-  return JSON.stringify(value);
-}
-
-/**
- * A number typed into a field: undefined when empty, NaN when it is not a
- * number, which the form shows as an error and will not save.
- */
-function numberOf(text: string): number | undefined {
-  const trimmed = text.trim();
-  if (trimmed === '') return undefined;
-  if (!CORE_NUMBER.test(trimmed)) return Number.NaN;
-  return Number(trimmed);
-}
-
-/**
  * A number typed into a field as the file should hold it, its digits as
- * typed: undefined when empty, NaN when it is not a number, which the form
- * shows as an error and will not save.
+ * typed: undefined when empty, NaN when it is not a number.
  */
 export function numberText(text: string): NumberText | number | undefined {
   const trimmed = text.trim();
   if (trimmed === '') return undefined;
   return CORE_NUMBER.test(trimmed) ? new NumberText(trimmed) : Number.NaN;
-}
-
-/** Why a number field cannot be saved, or undefined when it can. */
-export function numberProblem(text: string): string | undefined {
-  const value = numberOf(text);
-  if (value === undefined) return undefined;
-  if (Number.isNaN(value)) return 'Enter a number.';
-  if (!Number.isFinite(value)) return 'Enter a smaller number.';
-  return undefined;
 }

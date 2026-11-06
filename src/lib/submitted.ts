@@ -29,7 +29,7 @@ type SubmittedInput = components['schemas']['SubmittedFileInput'];
 type SubmittedPart = components['schemas']['SubmittedPart'];
 
 /** One file a submission was made with, named by its input and part. */
-export type SubmittedFile = { key: string; label: string; path: string };
+export type SubmittedFile = { key: string; label: string; path: string; href: string };
 /** One value a submission was given, named by its input and part. */
 export type SubmittedValue = { key: string; label: string; value: string };
 
@@ -46,7 +46,8 @@ export function submittedItems(
   const files: SubmittedFile[] = [];
   const values: SubmittedValue[] = [];
   const add = (key: string, label: string, given: SubmittedPart) => {
-    for (const path of given.files) files.push({ key: `${key}:${path}`, label, path });
+    for (const { path, href } of given.files)
+      files.push({ key: `${key}:${path}`, label, path, href });
     if (given.value !== null) values.push({ key, label, value: String(given.value) });
   };
   for (const [id, input] of Object.entries(inputs)) {

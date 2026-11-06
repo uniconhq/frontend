@@ -12,7 +12,6 @@ import { ShownValue } from '@/ui/number/ShownValue';
 import { heldCount } from '@/ui/number/words';
 import { TextInput } from '@/ui/TextInput';
 import { Checkbox } from '@/ui/Checkbox';
-import { useMe } from '@/session';
 import type { FormulaMark } from '../formula/Editor';
 import { FormulaCard } from '../formula/FormulaCard';
 import { Chip } from '@/ui/Chip';
@@ -22,14 +21,18 @@ import type { FlowAbout } from '../formula/flow';
 import { BLOCKS_UNLOADED, type Catalogue } from '../formula/catalogue';
 import { FieldBox } from '../contest/ContestFile';
 import { useOpenedField } from '../contest/opened';
-import type { FormProps } from '../forms/DefinitionFile';
+import { viewFilePath } from '../contest/places';
+import { settingsQuery } from '../files/place';
+import type { ValuesFormProps } from '../forms/ValuesForm';
 import { LeaveGuard } from '@/ui/LeaveGuard';
+import { PageLink } from '@/ui/PageLink';
 import { TimeField } from '../forms/fields';
-import { exactJS, isRecord, parseYaml, textOf } from '../forms/yaml-doc';
-import { holdsAt } from '../roles';
+import { textOf } from '../forms/values';
+import { usePlaceMay } from '../may';
 import { SectionTitle } from '@/ui/SectionTitle';
 import { CardPart } from '../task/BuildCard';
 import shared from '../organise.module.css';
+import { isUnder, type ProblemPath } from '../problem-path';
 import classes from './leaderboards.module.css';
 import {
   audienceSentence,
@@ -53,6 +56,7 @@ import {
   type ColumnDraft,
   type FieldProblem,
   type HoldDraft,
+  type LeaderboardsDraft,
   type RowsKind,
   type ShowDraft,
   type TaskGives,
@@ -62,7 +66,8 @@ import {
 
 /**
  * The contest's leaderboards and its hold, edited on the leaderboards page
- * and written into `contest.yaml`. A 422's path marks the field it names.
+ * and saved with the contest's settings. A refusal's path marks the field
+ * it names.
  */
 
 const WAYS = [
@@ -71,26 +76,21 @@ const WAYS = [
 ];
 
 /**
- * What each task gives a leaderboard, the values its settings name, read
- * from each task's `task.yaml`, and which of them give text, from its
- * workflow form; null until every one has been read, so no formula is
- * called unknown meanwhile. A task whose settings cannot be read, or whose
- * form does not say which values give text, is null: its values are not
- * known, so what a formula reads of it is not checked here, as the forge
- * does not check a task it cannot resolve.
+ * What each task gives a leaderboard, the values its settings name, and
+ * which of them give text, from its workflow form; null until every one has
+ * been read, so no formula is called unknown meanwhile. A task whose
+ * settings cannot be read, or whose form does not say which values give
+ * text, is null: its values are not known, so what a formula reads of it is
+ * not checked here, as the forge does not check a task it cannot resolve.
  */
 function useTaskGives(
   org: string,
   contest: string,
   tasks: readonly string[],
 ): { values: TaskGives; titles: Record<string, string> } | null {
-  const files = useQueries({
+  const settings = useQueries({
     queries: tasks.map((task) => ({
-      ...$api.queryOptions(
-        'get',
-        '/api/v1/orgs/{org}/contests/{contest}/tasks/{task}/files/{path}',
-        { params: { path: { org, contest, task, path: 'task.yaml' } } },
-      ),
+      ...settingsQuery({ kind: 'task', org, contest, task }),
       retry: false,
     })),
   });
@@ -105,42 +105,55 @@ function useTaskGives(
       retry: false,
     })),
   });
-  const pending = [...files, ...forms].some((query) => query.isPending);
+  const pending = [...settings, ...forms].some((query) => query.isPending);
   const stamp = JSON.stringify([
-    files.map((file) => file.data?.content ?? ''),
+    settings.map((read) => read.data?.values ?? null),
     forms.map((form) => form.data?.text_values ?? null),
   ]);
   return useMemo(() => {
     if (pending) return null;
     const values = Object.fromEntries(
       tasks.map((task, index) => {
-        const content = files[index]?.data?.content;
+        const read = settings[index]?.data;
         const text = forms[index]?.data?.text_values;
-        if (content === undefined || text == null) return [task, null];
-        return [task, givenValues(content, new Set(text))];
+        if (read === undefined || text == null) return [task, null];
+        return [task, givenValues(read.values, new Set(text))];
       }),
     );
     const titles = Object.fromEntries(
       tasks.map((task, index) => {
-        const parsed = parseYaml(files[index]?.data?.content ?? '');
-        const root = 'error' in parsed ? null : exactJS(parsed.doc);
-        return [task, isRecord(root) ? textOf(root['name']) || task : task];
+        const read = settings[index]?.data?.values;
+        return [task, textOf(read?.['name']) || task];
       }),
     );
     return { values, titles };
-    // `stamp` is the files and the forms. Each list is a new array every render.
+    // `stamp` is the settings and the forms. Each list is a new array every render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pending, stamp, tasks]);
 }
 
-function matches(field: string, path: string): boolean {
-  if (field.startsWith('hold.')) return path === field || path.startsWith(`${field}.`);
-  const full = `leaderboards.${field}`;
-  if (path === full || path.startsWith(`${full}.`)) return true;
-  if (field.endsWith('.key')) {
-    return path === `leaderboards.${field.slice(0, -'.key'.length)}`;
+/**
+ * Where in the settings a field of the form is: `hold.from`, or a board's
+ * `<key>.<part>`, its `<key>.columns.<name>` one column and `<key>.key` the
+ * board as a whole, which holds its problems alone.
+ */
+function fieldPath(field: string): { at: ProblemPath; alone: boolean } {
+  const parts = field.split('.');
+  const [head = '', part] = parts;
+  if (head === 'hold') return { at: parts, alone: false };
+  if (part === 'key') return { at: ['leaderboards', head], alone: true };
+  if (part === 'columns') {
+    return {
+      at: ['leaderboards', head, 'columns', parts.slice(2).join('.')],
+      alone: false,
+    };
   }
-  return false;
+  return { at: ['leaderboards', ...parts], alone: false };
+}
+
+function matches(field: string, path: ProblemPath): boolean {
+  const { at, alone } = fieldPath(field);
+  return isUnder(path, at) && (!alone || path.length === at.length);
 }
 
 function messagesFor(
@@ -159,19 +172,10 @@ function messagesFor(
 }
 
 function marksFor(field: string, refused: readonly DefinitionError[]): FormulaMark[] {
-  const prefix = `leaderboards.${field}.`;
-  return refused.flatMap((error) => {
-    if (!error.path.startsWith(prefix)) return [];
-    return [
-      {
-        path: error.path
-          .slice(prefix.length)
-          .split('.')
-          .map((part) => (/^\d+$/.test(part) ? Number(part) : part)),
-        message: error.message,
-      },
-    ];
-  });
+  const { at } = fieldPath(field);
+  return refused
+    .filter((error) => error.path.length > at.length && isUnder(error.path, at))
+    .map((error) => ({ path: error.path.slice(at.length), message: error.message }));
 }
 
 function FieldMessages({ messages }: { messages: readonly string[] }) {
@@ -249,25 +253,49 @@ function setWho(board: BoardDraft, who: Who): BoardDraft {
   };
 }
 
-export function LeaderboardsForm({
+type Props = ValuesFormProps & { org: string; contest: string };
+
+/** The form, or why the leaderboards cannot be changed here. */
+export function LeaderboardsForm(props: Props) {
+  const [loaded] = useState(() => readLeaderboards(props.values));
+  if (loaded === null) {
+    return (
+      <div role="alert">
+        <BodyText>
+          The leaderboards cannot be read, so they cannot be changed here.
+        </BodyText>
+        <BodyText tone="secondary">
+          Fix them as text in{' '}
+          <PageLink to={viewFilePath(props.org, props.contest)}>
+            the stored settings
+          </PageLink>
+          .
+        </BodyText>
+      </div>
+    );
+  }
+  return <BoardsForm {...props} loaded={loaded} />;
+}
+
+function BoardsForm({
   org,
   contest,
-  doc,
+  values,
+  loaded,
   busy,
   asking,
   saved,
   onSave,
   refused,
-}: FormProps & { org: string; contest: string }) {
-  const manager = holdsAt(useMe().roles, { kind: 'contest', org, contest }, 'manager');
-  const [loaded] = useState(() => readLeaderboards(doc));
+}: Props & { loaded: LeaderboardsDraft }) {
+  const manager = usePlaceMay({ kind: 'contest', org, contest }).manage;
   const [draft, setDraft] = useState(loaded);
   // Once a save of this draft went through, leaving loses nothing, even
   // before the file is read back.
   const [sent, setSent] = useState<typeof draft | null>(null);
   const unsaved =
     JSON.stringify(draft) !== JSON.stringify(loaded) && !(saved && sent === draft);
-  const [tasks] = useState(() => taskIds(doc));
+  const [tasks] = useState(() => taskIds(values));
   const blocks = $api.useQuery('get', '/api/v1/blocks');
   const taskData = useTaskGives(org, contest, tasks);
   const gives = taskData?.values ?? null;
@@ -279,8 +307,7 @@ export function LeaderboardsForm({
     '/api/v1/orgs/{org}/contests/{contest}/organise/entrants',
     { params: { path: { org, contest } } },
   );
-  const root = exactJS(doc);
-  const end = isRecord(root) ? root['end'] : undefined;
+  const end = values['end'];
   const local = useMemo(
     () => problems(draft, catalogue, tasks, gives ?? {}),
     [catalogue, draft, gives, tasks],
@@ -292,9 +319,9 @@ export function LeaderboardsForm({
     if (local.length > 0) return;
     const next = commit(draft, catalogue, tasks, gives);
     setSent(draft);
-    onSave((file) => {
-      writeLeaderboards(file, loaded, next);
-      writeHold(file, loaded, next);
+    onSave((fresh) => {
+      writeLeaderboards(fresh, loaded, next);
+      writeHold(fresh, loaded, next);
     });
   };
   const edit = (id: string, change: (board: BoardDraft) => BoardDraft) =>

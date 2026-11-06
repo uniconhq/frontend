@@ -2,10 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@/test/user-event';
 import { http, HttpResponse } from 'msw';
-import type { Holder, Me } from '@/api/types';
+import type { Holder } from '@/api/types';
 import { renderApp } from '@/test/render';
 import { problem, server, signedIn, someone } from '@/test/server';
 import { contestList, taskList } from '@/test/organiser';
+import { holding } from '@/test/may';
 
 const ORG_ROLES = '/api/v1/orgs/:org/roles';
 const CONTEST_ROLES = '/api/v1/orgs/:org/contests/:contest/roles';
@@ -18,6 +19,7 @@ function holder(
     user: { id: 21, username: 'dee', name: 'Dee Tan', avatar_url: null, ...person },
     role: 'manager',
     at_names: { org: 'acme', contest: null, task: null },
+    may_change: true,
     ...overrides,
   };
 }
@@ -26,10 +28,6 @@ const kennyAdmin = holder(
   { id: someone.user.id, username: someone.user.username, name: someone.user.name },
   { role: 'admin' },
 );
-
-function signedInAs(roles: Me['roles']) {
-  return http.get('/api/v1/me', () => HttpResponse.json({ ...someone, roles }));
-}
 
 /** An org whose holders change as the routes are called, and what was sent. */
 function orgWith(start: Holder[]) {
@@ -160,7 +158,7 @@ describe('the organisers section', () => {
     await user.click(within(dialog).getByRole('button', { name: 'Remove' }));
 
     const alert = await within(dialog).findByRole('alert');
-    expect(alert).toHaveTextContent('That would leave no admin');
+    expect(alert).toHaveTextContent('Couldn’t change the role');
     expect(alert).toHaveTextContent('Someone else has to be an admin of acme first.');
   });
 
@@ -184,20 +182,19 @@ describe('the organisers section', () => {
     await user.click(within(form).getByRole('button', { name: 'Save' }));
 
     const alert = await within(row('kenny')).findByRole('alert');
-    expect(alert).toHaveTextContent('That would leave no admin');
+    expect(alert).toHaveTextContent('Couldn’t change the role');
     expect(alert).toHaveTextContent('Someone else has to be an admin of acme first.');
     expect(within(row('kenny')).getByRole('cell', { name: 'Admin' })).toBeVisible();
   });
 
   it('offers a manager only the roles a manager may give, as Invite does', async () => {
     server.use(
-      signedInAs([
-        { names: { org: 'acme', contest: 'spring', task: null }, role: 'manager' },
-      ]),
+      signedIn,
+      ...holding('manager'),
       taskList,
       http.get(CONTEST_ROLES, () =>
         HttpResponse.json([
-          holder({ id: 40, username: 'lee' }, { role: 'admin' }),
+          holder({ id: 40, username: 'lee' }, { role: 'admin', may_change: false }),
           holder(
             { id: someone.user.id, username: someone.user.username },
             {
@@ -236,9 +233,8 @@ describe('the organisers section', () => {
   it('keeps a refusal about the role that was sent while another is picked', async () => {
     server.use(
       // An admin whose admin role was taken away since the page was read.
-      signedInAs([
-        { names: { org: 'acme', contest: 'spring', task: null }, role: 'admin' },
-      ]),
+      signedIn,
+      ...holding('admin'),
       taskList,
       http.get(CONTEST_ROLES, () =>
         HttpResponse.json([
@@ -267,21 +263,20 @@ describe('the organisers section', () => {
     await user.click(within(form).getByRole('button', { name: 'Save' }));
 
     const alert = await within(row('kim')).findByRole('alert');
-    expect(alert).toHaveTextContent('Only an admin gives the admin role');
+    expect(alert).toHaveTextContent('Couldn’t change the role');
     expect(alert).toHaveTextContent(
       'Only an admin of acme/spring may grant admin there.',
     );
     await user.click(within(form).getByRole('radio', { name: 'Observer' }));
     expect(within(row('kim')).getByRole('alert')).toHaveTextContent(
-      'Only an admin gives the admin role',
+      'Only an admin of acme/spring may grant admin there.',
     );
   });
 
   it('does not promise contest entrant access to a task-only role', async () => {
     server.use(
-      signedInAs([
-        { names: { org: 'acme', contest: 'spring', task: 'sum' }, role: 'observer' },
-      ]),
+      signedIn,
+      ...holding('observer'),
       taskList,
       http.get('/api/v1/orgs/:org/contests/:contest/tasks/:task/roles', () =>
         HttpResponse.json([]),
@@ -298,11 +293,9 @@ describe('the organisers section', () => {
 
   it('shows an observer the list and nothing to change', async () => {
     server.use(
-      signedInAs([
-        { names: { org: 'acme', contest: null, task: null }, role: 'observer' },
-      ]),
-      contestList,
-      http.get(ORG_ROLES, () => HttpResponse.json([holder()])),
+      signedIn,
+      ...holding('observer'),
+      http.get(ORG_ROLES, () => HttpResponse.json([holder({}, { may_change: false })])),
     );
     renderApp('/orgs/acme/organisers');
     const matrix = await screen.findByRole('table', { name: 'What each role can do' });
@@ -326,18 +319,15 @@ describe('the organisers section', () => {
 
   it('is not shown to someone whose role is only at one of the tasks', async () => {
     server.use(
-      signedInAs([
-        { names: { org: 'acme', contest: 'spring', task: 'sum' }, role: 'manager' },
-      ]),
-      http.get('/api/v1/orgs/:org/contests/:contest/tasks', () =>
-        problem(403, 'forbidden'),
-      ),
+      signedIn,
+      // A manager of one of its tasks alone may do nothing at the contest.
+      ...holding(null),
     );
     renderApp('/orgs/acme/contests/spring/organisers');
 
     await screen.findByRole('heading', { name: 'Contest organisers', level: 1 });
     expect(
-      screen.getByText("Only the contest's own organisers see this list."),
+      await screen.findByText("Only the contest's own organisers see this list."),
     ).toBeVisible();
     expect(screen.queryByRole('table')).not.toBeInTheDocument();
   });

@@ -3,14 +3,16 @@ import { screen, within } from '@testing-library/react';
 import userEvent from '@/test/user-event';
 import { http, HttpResponse } from 'msw';
 import type { FeedEntry, Grading, OrganisedSubmission, Submitter } from '@/api/types';
+import { holding } from '@/test/may';
 import { renderApp } from '@/test/render';
-import { problem, server, signedIn, someone } from '@/test/server';
+import { problem, server, signedIn } from '@/test/server';
 import {
   TASK_API,
   publicationList,
   repoFiles,
   runsResult,
   taskState,
+  publishedTask,
 } from '@/test/organiser';
 
 const TASK = '/orgs/acme/contests/spring/tasks/sum/gradings';
@@ -24,7 +26,7 @@ const ada: Submitter = {
 
 /** A grading of sum, the contest's task B, as the route answers it. */
 function entry(grading: Grading, by: Submitter = ada): FeedEntry {
-  return { task: 'sum', label: 'B', by, grading };
+  return { task: 'sum', label: 'B', by, grading, may_manage: true };
 }
 
 /** The task's gradings as the route answers them, each by ada. */
@@ -284,50 +286,40 @@ describe("the task's gradings", () => {
   });
 
   it.each([
-    ['invalid_reason', 422, {}, 'That sentence will not do'],
-    [
-      'wrong_status',
-      409,
-      { current: 'done' },
-      'It no longer reads as failed on Unicon’s side',
-    ],
-    ['conflict', 409, {}, 'A later attempt is there'],
-  ])(
-    'shows a refused cancel, %s, with its sentence',
-    async (code, status, extra, title) => {
-      server.use(
-        signedIn,
-        taskState,
-        publicationList,
-        ...repoFiles,
-        http.get(`${TASK_API}/gradings`, () => asEntries([stuck])),
-        http.post(`${TASK_API}/gradings/:grading/cancel`, () =>
-          problem(status, code, extra),
-        ),
-      );
-      renderApp(TASK);
+    ['invalid_reason', 422, {}],
+    ['wrong_status', 409, { current: 'done' }],
+    ['conflict', 409, {}],
+  ])('shows a refused cancel, %s, with its sentence', async (code, status, extra) => {
+    server.use(
+      signedIn,
+      taskState,
+      publicationList,
+      ...repoFiles,
+      http.get(`${TASK_API}/gradings`, () => asEntries([stuck])),
+      http.post(`${TASK_API}/gradings/:grading/cancel`, () =>
+        problem(status, code, extra),
+      ),
+    );
+    renderApp(TASK);
 
-      await userEvent.click(
-        await screen.findByRole('button', {
-          name: 'Cancel B submission 3 by ada, attempt 1',
-        }),
-      );
-      const dialog = await screen.findByRole('dialog');
-      await userEvent.type(
-        within(dialog).getByRole('textbox', { name: /What the entrant reads/ }),
-        'The checker crashed.',
-      );
-      await userEvent.click(
-        within(dialog).getByRole('button', { name: 'Cancel the submission' }),
-      );
+    await userEvent.click(
+      await screen.findByRole('button', {
+        name: 'Cancel B submission 3 by ada, attempt 1',
+      }),
+    );
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.type(
+      within(dialog).getByRole('textbox', { name: /What the entrant reads/ }),
+      'The checker crashed.',
+    );
+    await userEvent.click(
+      within(dialog).getByRole('button', { name: 'Cancel the submission' }),
+    );
 
-      const alert = await within(dialog).findByRole('alert');
-      expect(alert).toHaveTextContent(title);
-      expect(alert).toHaveTextContent(`${code} detail`);
-      if (code === 'wrong_status')
-        expect(alert).toHaveTextContent('Its status now: Done.');
-    },
-  );
+    const alert = await within(dialog).findByRole('alert');
+    expect(alert).toHaveTextContent('Couldn’t cancel');
+    expect(alert).toHaveTextContent(`${code} detail`);
+  });
 
   it("lists a submission's attempts together, the earlier ones to read", async () => {
     const second: Grading = {
@@ -501,7 +493,7 @@ describe("the task's gradings", () => {
     await userEvent.click(within(dialog).getByRole('button', { name: 'Rejudge' }));
 
     expect(await within(dialog).findByRole('alert')).toHaveTextContent(
-      'Nothing to rejudge against',
+      'not_found detail',
     );
   });
 
@@ -527,21 +519,14 @@ describe("the task's gradings", () => {
 
   it('offers an observer no controls', async () => {
     server.use(
-      http.get('/api/v1/me', () =>
-        HttpResponse.json({
-          ...someone,
-          roles: [
-            {
-              names: { org: 'acme', contest: 'spring', task: 'sum' },
-              role: 'observer',
-            },
-          ],
-        }),
-      ),
+      signedIn,
+      ...holding('observer', publishedTask),
       taskState,
       publicationList,
       ...repoFiles,
-      http.get(`${TASK_API}/gradings`, () => asEntries([stuck])),
+      http.get(`${TASK_API}/gradings`, () =>
+        HttpResponse.json([{ ...entry(stuck), may_manage: false }]),
+      ),
     );
     renderApp(TASK);
 

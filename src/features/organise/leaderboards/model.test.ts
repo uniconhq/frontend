@@ -1,45 +1,48 @@
-import { keyFromName, withBoardName, audienceSentence, blankBoard } from './model';
 import { describe, expect, it } from 'vitest';
 import { specCatalogue } from '@/test/catalogue';
+import { copyOf, type Values } from '../forms/values';
 import {
-  exactJS,
-  isRecord,
-  parseYaml,
-  textOf,
-  writeOver,
-  type Doc,
-} from '../forms/yaml-doc';
-import {
+  audienceSentence,
+  blankBoard,
   boardReadings,
   commit,
   givenValues,
   hourBefore,
+  keyFromName,
   lineOf,
   previewRows,
   problems,
   readLeaderboards,
+  withBoardName,
   writeHold,
   writeLeaderboards,
   type BoardDraft,
+  type HoldDraft,
   type LeaderboardsDraft,
   type TaskGives,
 } from './model';
 
 const catalogue = specCatalogue();
 
-const FILE = [
-  'name: Spring',
-  'start: 2030-10-01T09:00:00Z',
-  'end: 2030-10-01T14:00:00Z',
-  'tasks:',
-  '  - id: islands',
-  '',
-].join('\n');
+const CONTEST: Values = {
+  name: 'Spring',
+  start: '2030-10-01T09:00:00Z',
+  end: '2030-10-01T14:00:00Z',
+  tasks: [{ id: 'islands' }],
+};
 
-function open(text: string): Doc {
-  const parsed = parseYaml(text);
-  if ('error' in parsed) throw new Error(parsed.error);
-  return parsed.doc;
+const OFF: HoldDraft = {
+  locked: false,
+  on: false,
+  from: '',
+  untilStaff: true,
+  until: '',
+};
+
+function read(values: Values): LeaderboardsDraft {
+  const draft = readLeaderboards(values);
+  if (draft === null) throw new Error('the leaderboards do not read');
+  return draft;
 }
 
 function board(over: Partial<BoardDraft> & Pick<BoardDraft, 'key'>): BoardDraft {
@@ -57,51 +60,51 @@ function board(over: Partial<BoardDraft> & Pick<BoardDraft, 'key'>): BoardDraft 
   };
 }
 
-function draft(
-  doc: Doc,
-  boards: BoardDraft[],
-  hold: LeaderboardsDraft['hold'],
-): LeaderboardsDraft {
-  return { ...readLeaderboards(doc), boards, hold };
+/** The values a save of `after` over `values`, read as `before`, sends, as the server takes them. */
+function saved(
+  values: Values,
+  after: LeaderboardsDraft,
+  before: LeaderboardsDraft = read(values),
+): Values {
+  const fresh = copyOf(values);
+  writeLeaderboards(fresh, before, after);
+  writeHold(fresh, before, after);
+  return JSON.parse(JSON.stringify(fresh)) as Values;
 }
 
-describe('leaderboards written into contest.yaml', () => {
+describe('leaderboards written into the values', () => {
   it('writes and reads a column with decimals', () => {
-    const doc = open(FILE);
-    const before = readLeaderboards(doc);
     const next = commit(
-      draft(
-        doc,
-        [
-          board({
-            key: 'standings',
-            display: [{ name: 'points', decimals: '2' }],
-          }),
+      {
+        boards: [
+          board({ key: 'standings', display: [{ name: 'points', decimals: '2' }] }),
         ],
-        before.hold,
-      ),
+        hold: OFF,
+      },
       catalogue,
       ['islands'],
       {},
     );
-    writeLeaderboards(doc, before, next);
-    const text = writeOver(FILE, doc);
-    expect(text).toContain('decimals: 2');
-    expect(text).not.toContain('places:');
-    expect(readLeaderboards(open(text)).boards[0]?.display).toEqual([
+    const values = saved(CONTEST, next);
+    expect(values['leaderboards']).toEqual([
+      {
+        key: 'standings',
+        columns: [{ name: 'points', formula: 1 }],
+        sort: [{ points: 'desc' }],
+        display: [{ points: { decimals: 2 } }],
+      },
+    ]);
+    expect(read(values).boards[0]?.display).toEqual([
       { name: 'points', decimals: '2' },
     ]);
   });
 
   it('writes the gradebook, the olympiad, ICPC and a hold', () => {
-    const doc = open(FILE);
-    const before = readLeaderboards(doc);
     const end = new Date('2030-10-01T14:00:00Z').getTime();
     const from = hourBefore('2030-10-01T14:00:00Z');
     const next = commit(
-      draft(
-        doc,
-        [
+      {
+        boards: [
           board({
             key: 'gradebook',
             title: 'Course gradebook',
@@ -113,86 +116,72 @@ describe('leaderboards written into contest.yaml', () => {
             key: 'icpc',
             title: 'ICPC',
             who: 'everyone',
+            rows: 'top',
+            top: '3',
             columns: [
               { key: 's', name: 'solved', line: null, tree: '1' },
               { key: 'p', name: 'penalty', line: null, tree: '1' },
-              { key: 'l', name: 'last_solve', line: null, tree: '1' },
             ],
             sort: [
               { name: 'solved', way: 'desc' },
               { name: 'penalty', way: 'asc' },
-              { name: 'last_solve', way: 'asc' },
             ],
-            display: [
-              { name: 'solved', decimals: '' },
-              { name: 'penalty', decimals: '' },
-              { name: 'last_solve', decimals: '' },
-            ],
+            display: [],
           }),
         ],
-        { locked: false, on: true, from, untilStaff: true, until: '' },
-      ),
+        hold: { locked: false, on: true, from, untilStaff: true, until: '' },
+      },
       catalogue,
       ['islands'],
       {},
     );
-    writeLeaderboards(doc, before, next);
-    writeHold(doc, before, next);
-    const saved = exactJS(doc);
-    if (
-      !isRecord(saved) ||
-      !isRecord(saved['leaderboards']) ||
-      !isRecord(saved['hold'])
-    ) {
-      throw new Error('leaderboards were not written');
-    }
-    const gradebook = saved['leaderboards']['gradebook'];
-    const icpc = saved['leaderboards']['icpc'];
-    if (!isRecord(gradebook) || !isRecord(icpc) || !isRecord(icpc['columns'])) {
-      throw new Error('a leaderboard was not written');
-    }
-    expect(gradebook['audience']).toEqual({ who: 'entrants', rows: 'own' });
-    expect(gradebook['title']).toBe('Course gradebook');
-    expect(saved['leaderboards']['olympiad']).toMatchObject({
+    const values = saved(CONTEST, next);
+    const [gradebook, olympiad, icpc] = values['leaderboards'] as Values[];
+    expect(gradebook).toMatchObject({
+      key: 'gradebook',
+      title: 'Course gradebook',
+      audience: { who: 'entrants', rows: 'own' },
+    });
+    expect(olympiad).toMatchObject({
       title: 'Olympiad',
       audience: { who: 'everyone' },
     });
-    expect(icpc['sort']).toEqual([
-      { solved: 'desc' },
-      { penalty: 'asc' },
-      { last_solve: 'asc' },
-    ]);
-    expect(textOf(icpc['columns']['solved'])).toBe('1');
-    expect(saved['hold']['until']).toBe('staff');
-    expect(new Date(textOf(saved['hold']['from'])).getTime()).toBe(
-      end - 60 * 60 * 1000,
-    );
-    expect(writeOver(FILE, doc)).toContain('gradebook:');
+    expect(icpc).toEqual({
+      key: 'icpc',
+      title: 'ICPC',
+      audience: { who: 'everyone', rows: 3 },
+      columns: [
+        { name: 'solved', formula: 1 },
+        { name: 'penalty', formula: 1 },
+      ],
+      sort: [{ solved: 'desc' }, { penalty: 'asc' }],
+    });
+    const hold = values['hold'] as Values;
+    expect(hold['until']).toBe('staff');
+    expect(new Date(hold['from'] as string).getTime()).toBe(end - 60 * 60 * 1000);
   });
 
-  it('changes only what was edited, keeping order, style and comments, and renames in place', () => {
-    const text = [
-      'name: Spring',
-      'tasks:',
-      '  - id: islands',
-      'leaderboards:',
-      '  # the course gradebook',
-      '  gradebook:',
-      '    audience: {who: everyone} # everyone reads it',
-      '    columns:',
-      '      points: 1 # one each',
-      '      bonus: 2',
-      '    sort: [{points: desc}]',
-      '    display: [points, bonus]',
-      '  olympiad:',
-      '    columns: {total: 3}',
-      '',
-    ].join('\n');
-    const doc = open(text);
-    const before = readLeaderboards(doc);
+  it('keeps a board left as it was as read and a key the form does not edit, and renames a board and a column in place', () => {
+    const values: Values = {
+      ...CONTEST,
+      leaderboards: [
+        {
+          key: 'gradebook',
+          audience: { who: 'staff' },
+          columns: [
+            { name: 'points', formula: 1 },
+            { name: 'bonus', formula: 2 },
+          ],
+          sort: [{ points: 'desc' }],
+          colour: 'red',
+        },
+        { key: 'olympiad', columns: [{ name: 'total', formula: 3 }] },
+      ],
+    };
+    const before = read(values);
     const [gradebook, olympiad] = before.boards;
     if (gradebook === undefined || olympiad === undefined) throw new Error('no boards');
-    const next = {
+    const after = {
       ...before,
       boards: [
         {
@@ -201,120 +190,75 @@ describe('leaderboards written into contest.yaml', () => {
             column.name === 'points' ? { ...column, name: 'score' } : column,
           ),
           sort: [{ name: 'score', way: 'desc' as const }],
-          display: [
-            { name: 'score', decimals: '' },
-            { name: 'bonus', decimals: '' },
-          ],
         },
         { ...olympiad, key: 'olympiad_2026' },
       ],
     };
-    writeLeaderboards(doc, before, next);
-    expect(writeOver(text, doc)).toBe(
-      [
-        'name: Spring',
-        'tasks:',
-        '  - id: islands',
-        'leaderboards:',
-        '  # the course gradebook',
-        '  gradebook:',
-        '    audience: {who: everyone} # everyone reads it',
-        '    columns:',
-        '      score: 1 # one each',
-        '      bonus: 2',
-        '    sort: [{score: desc}]',
-        '    display: [score, bonus]',
-        '  olympiad_2026:',
-        '    columns: {total: 3}',
-        '',
-      ].join('\n'),
-    );
-  });
-
-  const PAIR = [
-    'leaderboards:',
-    '  a:',
-    '    title: A',
-    '    audience: {who: staff}',
-    '    columns:',
-    '      x: 1',
-    '      y: 2',
-    '  b:',
-    '    title: B',
-    '    columns:',
-    '      y: 3',
-    '',
-  ].join('\n');
-
-  function rekeyed(edit: (board: BoardDraft) => BoardDraft): string {
-    const doc = open(PAIR);
-    const before = readLeaderboards(doc);
-    writeLeaderboards(doc, before, { ...before, boards: before.boards.map(edit) });
-    return writeOver(PAIR, doc);
-  }
-
-  it('renames a chain of leaderboards, a to b and b to c, and edits one on the way', () => {
-    expect(
-      rekeyed((item) =>
-        item.key === 'a' ? { ...item, key: 'b', title: 'A2' } : { ...item, key: 'c' },
-      ),
-    ).toBe(
-      [
-        'leaderboards:',
-        '  b:',
-        '    title: A2',
-        '    audience: {who: staff}',
-        '    columns:',
-        '      x: 1',
-        '      y: 2',
-        '  c:',
-        '    title: B',
-        '    columns:',
-        '      y: 3',
-        '',
-      ].join('\n'),
-    );
-  });
-
-  it('swaps two leaderboards, and two columns of one', () => {
-    expect(
-      rekeyed((item) => ({
-        ...item,
-        key: item.key === 'a' ? 'b' : 'a',
-        columns: item.columns.map((column) => ({
-          ...column,
-          name: column.name === 'x' ? 'y' : column.name === 'y' ? 'x' : column.name,
-        })),
-        sort: [],
-        display: [],
-      })),
-    ).toBe(
-      [
-        'leaderboards:',
-        '  b:',
-        '    title: A',
-        '    audience: {who: staff}',
-        '    columns:',
-        '      y: 1',
-        '      x: 2',
-        '  a:',
-        '    title: B',
-        '    columns:',
-        '      x: 3',
-        '',
-      ].join('\n'),
-    );
-  });
-
-  it('reads leaderboards stored as a list as none, and writes over them once one is added', () => {
-    const doc = open('leaderboards:\n  - name: Standings\n');
-    const read = readLeaderboards(doc);
-    expect(read.boards).toEqual([]);
-    writeLeaderboards(doc, read, { ...read, boards: [board({ key: 'gradebook' })] });
-    const saved = exactJS(doc);
-    expect(isRecord(saved) && Object.keys(saved['leaderboards'] as object)).toEqual([
-      'gradebook',
+    expect(saved(values, after, before)['leaderboards']).toEqual([
+      {
+        key: 'gradebook',
+        audience: { who: 'staff' },
+        columns: [
+          { name: 'score', formula: 1 },
+          { name: 'bonus', formula: 2 },
+        ],
+        colour: 'red',
+        sort: [{ score: 'desc' }],
+      },
+      { key: 'olympiad_2026', columns: [{ name: 'total', formula: 3 }] },
     ]);
+    const renamed = {
+      ...before,
+      boards: [gradebook, { ...olympiad, title: 'Olympiad' }],
+    };
+    expect((saved(values, renamed, before)['leaderboards'] as Values[])[0]).toEqual(
+      (values['leaderboards'] as Values[])[0],
+    );
+  });
+
+  it('removes the leaderboards once the last one goes, and leaves the values be when nothing changed', () => {
+    const values: Values = {
+      ...CONTEST,
+      leaderboards: [{ key: 'one', columns: [{ name: 'points', formula: 1 }] }],
+    };
+    const before = read(values);
+    expect(saved(values, { ...before, boards: [] }, before)).toEqual(CONTEST);
+    expect(saved(values, before, before)).toEqual(values);
+  });
+
+  it('sends a column with no name or no formula, and a hold with no times, as they are', () => {
+    const values = saved(CONTEST, {
+      boards: [
+        board({
+          key: 'a',
+          columns: [
+            { key: 'x', name: '', line: null, tree: '1' },
+            { key: 'y', name: 'rest', line: null, tree: null },
+            { key: 'z', name: 'rest', line: null, tree: '2' },
+          ],
+          sort: [],
+          display: [],
+        }),
+        board({ key: 'a' }),
+      ],
+      hold: { ...OFF, on: true, untilStaff: false },
+    });
+    const [first, second] = values['leaderboards'] as Values[];
+    expect(first?.['columns']).toEqual([
+      { name: '', formula: 1 },
+      { name: 'rest' },
+      { name: 'rest', formula: 2 },
+    ]);
+    expect(second?.['key']).toBe('a');
+    expect(values['hold']).toEqual({});
+  });
+
+  it('reads leaderboards or columns not given as named lists as unreadable', () => {
+    expect(readLeaderboards({ leaderboards: { a: { columns: {} } } })).toBeNull();
+    expect(
+      readLeaderboards({ leaderboards: [{ key: 'a', columns: { points: 1 } }] }),
+    ).toBeNull();
+    expect(readLeaderboards({ name: 'Spring' })?.boards).toEqual([]);
   });
 });
 
@@ -322,60 +266,95 @@ describe('leaderboards written into contest.yaml', () => {
  * The forge's Kaggle contest (forge tests/services/test_examples.py): the
  * task house-prices and its public and private leaderboards.
  */
-const HOUSE_PRICES = `name: House prices
-scoring:
-  values:
-    public: {block: max, over: {runs: public_split}, of: {run: [public_split, rmse]}}
-    private: {block: max, over: {runs: private_split}, of: {run: [private_split, rmse]}}
-`;
-const KAGGLE = `name: Kaggle
-start: 2030-10-01T09:00:00Z
-end: 2030-10-01T14:00:00Z
-tasks:
-  - {id: house-prices, marks: 2}
-leaderboards:
-  public_leaderboard:
-    title: Public
-    audience: {who: everyone}
-    columns:
-      pub:
-        block: lowest
-        from: {results: house-prices}
-        by: {value: [house-prices, public]}
-        missing: skip
-      public: {value: [{column: pub}, public]}
-      public_at: {value: [{column: pub}, seconds]}
-    sort: [{public: asc}, {public_at: asc}]
-    display: [public, public_at]
-  private_leaderboard:
-    title: Private
-    audience: {who: everyone}
-    columns:
-      pick:
-        block: otherwise
-        of:
-          - block: lowest
-            from: {results: house-prices}
-            by: {value: [house-prices, private]}
-            where: {value: [house-prices, marked]}
-            missing: skip
-          - block: lowest
-            from: {results: house-prices}
-            by: {value: [house-prices, public]}
-            missing: skip
-      private: {value: [{column: pick}, private]}
-      at: {value: [{column: pick}, seconds]}
-    sort: [{private: asc}, {at: asc}]
-    display: [private, at]
-`;
+const HOUSE_PRICES: Values = {
+  name: 'House prices',
+  scoring: {
+    values: [
+      {
+        name: 'public',
+        formula: {
+          block: 'max',
+          over: { runs: 'public_split' },
+          of: { run: ['public_split', 'rmse'] },
+        },
+      },
+      {
+        name: 'private',
+        formula: {
+          block: 'max',
+          over: { runs: 'private_split' },
+          of: { run: ['private_split', 'rmse'] },
+        },
+      },
+    ],
+  },
+};
+const KAGGLE: Values = {
+  name: 'Kaggle',
+  tasks: [{ id: 'house-prices', marks: 2 }],
+  leaderboards: [
+    {
+      key: 'public_leaderboard',
+      title: 'Public',
+      audience: { who: 'everyone' },
+      columns: [
+        {
+          name: 'pub',
+          formula: {
+            block: 'lowest',
+            from: { results: 'house-prices' },
+            by: { value: ['house-prices', 'public'] },
+            missing: 'skip',
+          },
+        },
+        { name: 'public', formula: { value: [{ column: 'pub' }, 'public'] } },
+        { name: 'public_at', formula: { value: [{ column: 'pub' }, 'seconds'] } },
+      ],
+      sort: [{ public: 'asc' }, { public_at: 'asc' }],
+      display: ['public', 'public_at'],
+    },
+    {
+      key: 'private_leaderboard',
+      title: 'Private',
+      audience: { who: 'everyone' },
+      columns: [
+        {
+          name: 'pick',
+          formula: {
+            block: 'otherwise',
+            of: [
+              {
+                block: 'lowest',
+                from: { results: 'house-prices' },
+                by: { value: ['house-prices', 'private'] },
+                where: { value: ['house-prices', 'marked'] },
+                missing: 'skip',
+              },
+              {
+                block: 'lowest',
+                from: { results: 'house-prices' },
+                by: { value: ['house-prices', 'public'] },
+                missing: 'skip',
+              },
+            ],
+          },
+        },
+        { name: 'private', formula: { value: [{ column: 'pick' }, 'private'] } },
+        { name: 'at', formula: { value: [{ column: 'pick' }, 'seconds'] } },
+      ],
+      sort: [{ private: 'asc' }, { at: 'asc' }],
+      display: ['private', 'at'],
+    },
+  ],
+};
 
 describe('a name with a -', () => {
   const tasks = ['house-prices'];
   const gives = { 'house-prices': givenValues(HOUSE_PRICES, new Set()) };
 
   it('prints the Kaggle contest with each - as _, and reads it back to the same trees', () => {
-    const read = readLeaderboards(open(KAGGLE));
-    const [pub, priv] = read.boards;
+    const { boards } = read(KAGGLE);
+    const [pub, priv] = boards;
     if (pub === undefined || priv === undefined) throw new Error('no leaderboards');
     expect(pub.columns.map((column) => lineOf(column, catalogue))).toEqual([
       'lowest(house_prices, house_prices.public, missing: skip)',
@@ -388,8 +367,8 @@ describe('a name with a -', () => {
       'pick.private',
       'pick.seconds',
     ]);
-    for (const one of read.boards) {
-      const readings = boardReadings(one, read.boards, tasks, gives, catalogue);
+    for (const one of boards) {
+      const readings = boardReadings(one, boards, tasks, gives, catalogue);
       for (const column of one.columns) {
         expect(readings[column.key]?.problems).toEqual([]);
         expect(readings[column.key]?.tree).toEqual(column.tree);
@@ -421,13 +400,7 @@ describe('a name with a -', () => {
       sort: [{ name: 'top-score', way: 'desc' }],
       display: [{ name: 'top-score', decimals: '' }],
     });
-    const one = draft(open(FILE), [own, rival], {
-      locked: false,
-      on: false,
-      from: '',
-      untilStaff: true,
-      until: '',
-    });
+    const one = { boards: [own, rival], hold: OFF };
     const next = commit(one, catalogue, tasks, gives);
     expect(next.boards[0]?.columns.map((column) => column.tree)).toEqual([
       {
@@ -445,20 +418,36 @@ describe('a name with a -', () => {
 });
 
 /** The forge's LAST contest (forge tests/test_leaderboards.py): a column of another board's pick column. */
-const LAST = `name: Spring
-tasks:
-  - id: islands
-leaderboards:
-  one:
-    columns:
-      last: {block: latest, from: {results: islands}}
-      total: {block: otherwise, of: [{value: [last, total]}, -1]}
-    display: [total]
-  two:
-    columns:
-      total: {block: otherwise, of: [{value: [{column: [one, last]}, score]}, -1]}
-    display: [total]
-`;
+const LAST: Values = {
+  name: 'Spring',
+  tasks: [{ id: 'islands' }],
+  leaderboards: [
+    {
+      key: 'one',
+      columns: [
+        { name: 'last', formula: { block: 'latest', from: { results: 'islands' } } },
+        {
+          name: 'total',
+          formula: { block: 'otherwise', of: [{ value: ['last', 'total'] }, -1] },
+        },
+      ],
+      display: ['total'],
+    },
+    {
+      key: 'two',
+      columns: [
+        {
+          name: 'total',
+          formula: {
+            block: 'otherwise',
+            of: [{ value: [{ column: ['one', 'last'] }, 'score'] }, -1],
+          },
+        },
+      ],
+      display: ['total'],
+    },
+  ],
+};
 
 describe('a column of another leaderboard', () => {
   const tasks = ['islands'];
@@ -470,20 +459,20 @@ describe('a column of another leaderboard', () => {
   };
 
   it('reads a value off its pick column back to the tree it was printed from', () => {
-    const read = readLeaderboards(open(LAST));
-    const two = read.boards[1];
+    const { boards } = read(LAST);
+    const two = boards[1];
     if (two === undefined) throw new Error('no second leaderboard');
     const [total] = two.columns;
     if (total === undefined) throw new Error('no column');
     expect(lineOf(total, catalogue)).toBe('otherwise(one.last.score, -1)');
-    const reading = boardReadings(two, read.boards, tasks, gives, catalogue)[total.key];
+    const reading = boardReadings(two, boards, tasks, gives, catalogue)[total.key];
     expect(reading?.problems).toEqual([]);
     expect(reading?.tree).toEqual(total.tree);
   });
 
   it('says when that leaderboard has no such column', () => {
-    const read = readLeaderboards(open(LAST));
-    const two = read.boards[1];
+    const { boards } = read(LAST);
+    const two = boards[1];
     if (two === undefined) throw new Error('no second leaderboard');
     const typed = {
       ...two,
@@ -491,9 +480,7 @@ describe('a column of another leaderboard', () => {
     };
     const [total] = typed.columns;
     if (total === undefined) throw new Error('no column');
-    const reading = boardReadings(typed, read.boards, tasks, gives, catalogue)[
-      total.key
-    ];
+    const reading = boardReadings(typed, boards, tasks, gives, catalogue)[total.key];
     expect(reading?.problems.map((problem) => problem.message)).toEqual([
       'one has no column first',
     ]);
@@ -501,71 +488,44 @@ describe('a column of another leaderboard', () => {
 });
 
 describe('what the editor refuses', () => {
-  const off = { locked: false, on: false, from: '', untilStaff: true, until: '' };
-
-  function found(boards: BoardDraft[], hold = off) {
-    return problems(draft(open(FILE), boards, hold), catalogue, ['islands'], {});
+  function found(boards: BoardDraft[], hold = OFF) {
+    return problems({ boards, hold }, catalogue, ['islands'], {});
   }
 
-  it('refuses only what the file has no place for: one key twice, a column with no name or a taken one', () => {
-    expect(found([board({ key: 'a' }), board({ key: 'a' })])).toContainEqual({
-      field: 'a.key',
-      message: 'Another leaderboard has this key.',
-    });
-    const columns = (...names: string[]) =>
-      found([
-        board({
-          key: 'b',
-          columns: names.map((name, at) => ({
-            key: `c${String(at)}`,
-            name,
-            line: null,
-            tree: '1',
-          })),
-          sort: [],
-          display: [],
-        }),
-      ]).map((item) => item.message);
-    expect(columns('')).toEqual(['Give the column a name.']);
-    expect(columns('x', 'x')).toEqual([
-      'Another column has this name.',
-      'Another column has this name.',
-    ]);
-  });
-
-  it('leaves every other rule of a leaderboard to the save', () => {
+  it('leaves names, keys, empty formulas, the hold and every other rule to the save', () => {
     expect(
-      found([
-        board({ key: 'islands', who: 'everyone', rows: 'own', columns: [] }),
-        board({
-          key: 'notes',
-          columns: [{ key: 'c', name: 'Note', line: '"hi"', tree: null }],
-          sort: [
-            { name: 'Note', way: 'desc' },
-            { name: 'gone', way: 'asc' },
-          ],
-          display: [{ name: 'Note', decimals: '11' }],
-        }),
-      ]),
+      found(
+        [
+          board({ key: 'islands', who: 'everyone', rows: 'own', columns: [] }),
+          board({
+            key: 'notes',
+            columns: [
+              { key: 'c', name: 'Note', line: '"hi"', tree: null },
+              { key: 'd', name: 'Note', line: '', tree: null },
+              { key: 'e', name: '', line: null, tree: '1' },
+            ],
+            sort: [
+              { name: 'Note', way: 'desc' },
+              { name: 'gone', way: 'asc' },
+            ],
+            display: [{ name: 'Note', decimals: '11' }],
+          }),
+          board({ key: 'notes' }),
+        ],
+        { ...OFF, on: true, untilStaff: false },
+      ),
     ).toEqual([]);
   });
 
-  it('does not call a saved formula empty before the catalogue loads', () => {
-    const one = draft(open(FILE), [board({ key: 'gradebook' })], off);
+  it('refuses a formula line it cannot read, on its column', () => {
     expect(
-      problems(one, null, [], {}).some((item) => item.message === 'Give a formula.'),
-    ).toBe(false);
-  });
-
-  it('asks for the hold’s times, leaving when they may be to the save', () => {
-    const on = { ...off, on: true, untilStaff: false };
-    expect(found([], on)).toEqual([
-      { field: 'hold.from', message: 'Give the time the freeze starts.' },
-      { field: 'hold.until', message: 'Give the time the freeze ends.' },
-    ]);
-    expect(
-      found([], { ...on, from: '2020-01-01T01:00', until: '2020-01-01T00:00' }),
-    ).toEqual([]);
+      found([
+        board({
+          key: 'a',
+          columns: [{ key: 'c', name: 'points', line: 'max(', tree: null }],
+        }),
+      ]).map((item) => item.field),
+    ).toEqual(['a.columns.points']);
   });
 });
 
@@ -614,13 +574,16 @@ describe('a task whose settings cannot be read', () => {
     }
   });
 
-  it('is unknown, not a task with no values, when its YAML cannot be read', () => {
-    expect(givenValues('name: [', new Set())).toBeNull();
-    expect(givenValues('name: Islands\n', new Set())).toEqual([]);
+  it('is unknown, not a task with no values, when its settings cannot be read', () => {
+    expect(givenValues(null, new Set())).toBeNull();
+    expect(givenValues({ name: 'Islands' }, new Set())).toEqual([]);
   });
 
   it('takes which values give text from the form, and does not guess from a formula', () => {
-    const medal = 'name: Islands\nscoring:\n  values:\n    medal: {text: gold}\n';
+    const medal = {
+      name: 'Islands',
+      scoring: { values: [{ name: 'medal', formula: { text: 'gold' } }] },
+    };
     expect(givenValues(medal, null)).toBeNull();
     expect(givenValues(medal, new Set())).toEqual([{ name: 'medal', text: false }]);
     expect(givenValues(medal, new Set(['medal']))).toEqual([
@@ -632,13 +595,7 @@ describe('a task whose settings cannot be read', () => {
 describe('a stored column whose line does not read back to it', () => {
   const found = (column: BoardDraft['columns'][number]) =>
     problems(
-      draft(open(FILE), [board({ key: 'one', columns: [column] })], {
-        locked: false,
-        on: false,
-        from: '',
-        untilStaff: true,
-        until: '',
-      }),
+      { boards: [board({ key: 'one', columns: [column] })], hold: OFF },
       catalogue,
       ['islands'],
       {},

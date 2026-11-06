@@ -15,7 +15,6 @@ import { FieldBox } from '../contest/ContestFile';
 import { FIELD_PARAM } from '../contest/places';
 import {
   emptyTuple,
-  runCount,
   settled,
   withoutInput,
   type AxisValues,
@@ -44,6 +43,7 @@ export function RunsCard({
   place,
   declared,
   axes,
+  count,
   staged,
   disabled,
   onChange,
@@ -54,6 +54,8 @@ export function RunsCard({
   place: TaskPlace;
   declared: readonly DeclaredInput[];
   axes: AxisValues[];
+  /** How many runs the axes make, as the server counts them; null until it answers. */
+  count: number | null;
   staged: StagedInput[];
   disabled: boolean;
   onChange: (axes: AxisValues[]) => void;
@@ -69,7 +71,6 @@ export function RunsCard({
     ) ?? [];
   const pairing =
     first === undefined ? null : pairRunFiles(pending, first, fileColumns);
-  const count = runCount(axes);
   const shown = axes.filter((axis) => axis.inputs.length > 0);
   const setAxis = (table: number, axis: AxisValues) =>
     onChange(axes.map((item, index) => (index === table ? axis : item)));
@@ -179,11 +180,13 @@ export function RunsCard({
             Add a row
           </Button>
         )}
-        <BodyText>
-          {index === 0 && shown.length > 1
-            ? `${shown.map((axis, at) => `${String(axis.tuples.length)}${at > 0 ? '' : axis.tuples.length === 1 ? ' row' : ' rows'}`).join(' × ')} = ${String(count)} ${count === 1 ? 'run' : 'runs'}`
-            : `This makes ${String(index === 0 ? count : axis.tuples.length)} ${count === 1 ? 'run' : 'runs'}.`}
-        </BodyText>
+        {count !== null && (
+          <BodyText>
+            {index === 0 && shown.length > 1
+              ? `${shown.map((axis, at) => `${String(axis.tuples.length)}${at > 0 ? '' : axis.tuples.length === 1 ? ' row' : ' rows'}`).join(' × ')} = ${String(count)} ${count === 1 ? 'run' : 'runs'}`
+              : `This makes ${String(index === 0 ? count : axis.tuples.length)} ${count === 1 ? 'run' : 'runs'}.`}
+          </BodyText>
+        )}
       </div>
     </div>
   );
@@ -575,7 +578,7 @@ function RunCell({
               path={cell.value}
               size={named.size}
               upload={named.upload}
-              listedAt={named.version}
+              href={named.href}
             />
           ))}
       </Modal>

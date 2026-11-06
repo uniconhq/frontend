@@ -4,14 +4,16 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@/test/user-event';
 import { http, HttpResponse } from 'msw';
 import type { SaveRequest } from '@/api/types';
+import { holding } from '@/test/may';
 import { renderApp } from '@/test/render';
-import { afterAnswers, problem, server, signedIn, someone } from '@/test/server';
+import { afterAnswers, problem, server, signedIn } from '@/test/server';
 import {
   TASK_API,
   publicationList,
   repoFiles,
   taskState,
   unchanged,
+  publishedTask,
 } from '@/test/organiser';
 
 /** The task's page, opened at its Statement card. */
@@ -411,7 +413,7 @@ describe('uploading a file of a task again', { timeout: 20_000 }, () => {
     const panel = await uploadAndSave();
 
     expect(await within(panel).findByRole('alert')).toHaveTextContent(
-      'That path cannot be used',
+      'invalid_path detail',
     );
   });
 
@@ -476,17 +478,8 @@ describe('uploading a file of a task again', { timeout: 20_000 }, () => {
 
   it('offers an observer no upload', async () => {
     server.use(
-      http.get('/api/v1/me', () =>
-        HttpResponse.json({
-          ...someone,
-          roles: [
-            {
-              names: { org: 'acme', contest: 'spring', task: 'sum' },
-              role: 'observer',
-            },
-          ],
-        }),
-      ),
+      signedIn,
+      ...holding('observer', publishedTask),
       taskState,
       publicationList,
       uploadedStatement,

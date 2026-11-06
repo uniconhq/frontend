@@ -30,43 +30,6 @@ export function settingsPath(place: Place): string {
   return place.kind === 'task' ? 'task.yaml' : 'contest.yaml';
 }
 
-/**
- * Where one of a task's files downloads from at one version: the download
- * door on this origin (#444). The proxy in `deploy` asks the backend whether
- * the caller holds a role reaching the task, then streams the file from the
- * forge's store whatever its size, so a big upload never passes through the
- * platform. Each part of the address is encoded on its own, so a name stays
- * one segment.
- */
-export function taskDownloadHref(
-  place: Extract<Place, { kind: 'task' }>,
-  version: string,
-  path: string,
-): string {
-  const parts = [place.org, place.contest, place.task, 'versions', version];
-  return `/-/downloads/${[...parts, ...path.split('/')].map(encodeURIComponent).join('/')}`;
-}
-
-/**
- * Where one of the files a workflow's version was frozen with downloads
- * from: the same download door, which the backend opens for anyone who may
- * read the version, at the version's own name.
- */
-export function versionDownloadHref(place: VersionPlace, path: string): string {
-  const parts = ['workflows', place.owner, place.name, 'versions', place.version];
-  return `/-/downloads/${[...parts, ...path.split('/')].map(encodeURIComponent).join('/')}`;
-}
-
-/**
- * Where one of the files of a workflow's draft downloads from, as last
- * saved: the same download door, which the backend opens for anyone who may
- * change the workflow.
- */
-export function draftDownloadHref(place: WorkflowPlace, path: string): string {
-  const parts = ['workflows', place.owner, place.name, 'draft'];
-  return `/-/downloads/${[...parts, ...path.split('/')].map(encodeURIComponent).join('/')}`;
-}
-
 export function treeQuery(place: ListedPlace, folder: string) {
   if (place.kind === 'version')
     return widenQuery(
@@ -133,6 +96,27 @@ export function fileQuery(place: FilePlace, path: string) {
       );
 }
 
+/** A place's settings as their form's values. */
+export function settingsQuery(place: Place) {
+  return place.kind === 'task'
+    ? widenQuery(
+        $api.queryOptions(
+          'get',
+          '/api/v1/orgs/{org}/contests/{contest}/tasks/{task}/settings',
+          {
+            params: {
+              path: { org: place.org, contest: place.contest, task: place.task },
+            },
+          },
+        ),
+      )
+    : widenQuery(
+        $api.queryOptions('get', '/api/v1/orgs/{org}/contests/{contest}/settings', {
+          params: { path: { org: place.org, contest: place.contest } },
+        }),
+      );
+}
+
 /**
  * What a write leaves stale. Any folder of the place may list a changed size;
  * a key without the folder matches every folder of this place and no other.
@@ -148,6 +132,7 @@ export function staleAfterWrite(place: Place): QueryKey[] {
     return [
       $api.queryOptions('get', CONTEST_TREE, { params: { path } }).queryKey,
       fileQuery(place, 'contest.yaml').queryKey,
+      settingsQuery(place).queryKey,
       $api.queryOptions('get', '/api/v1/orgs/{org}/contests/{contest}/home', {
         params: { path },
       }).queryKey,
@@ -159,6 +144,7 @@ export function staleAfterWrite(place: Place): QueryKey[] {
   const path = { org: place.org, contest: place.contest, task: place.task };
   return [
     $api.queryOptions('get', TASK_TREE, { params: { path } }).queryKey,
+    settingsQuery(place).queryKey,
     $api.queryOptions('get', '/api/v1/orgs/{org}/contests/{contest}/tasks/{task}', {
       params: { path },
     }).queryKey,

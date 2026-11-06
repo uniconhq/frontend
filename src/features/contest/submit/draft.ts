@@ -1,6 +1,7 @@
 import { ApiError } from '@/api/problem';
 import type { InputField, SubmittedInput } from '@/api/types';
 import { partTitle, partsOf } from '@/lib/submitted';
+import { formatLimit } from '@/lib/size';
 
 /**
  * What the panel holds for one field: the files of a file or folder input;
@@ -213,6 +214,7 @@ export function checkDraft(inputs: InputField[], draft: Draft): ApiError | null 
       code: 'invalid_inputs',
       status: 0,
       title: 'The submission does not fit the task',
+      detail: 'Nothing was submitted. Fix what is listed and submit again.',
       extensions: { errors: problems },
     });
   }
@@ -231,6 +233,7 @@ export function checkDraft(inputs: InputField[], draft: Draft): ApiError | null 
             code: 'too_large',
             status: 0,
             title: 'Too large for this input',
+            detail: `This part may be at most ${formatLimit(part.max_size)}.`,
             extensions: { limit: part.max_size, input: input.id, part: index + 1 },
           });
         }
@@ -244,6 +247,7 @@ export function checkDraft(inputs: InputField[], draft: Draft): ApiError | null 
         code: 'too_large',
         status: 0,
         title: 'Too large for this input',
+        detail: `The files for this input may be at most ${formatLimit(input.max_size)} in all.`,
         extensions: { limit: input.max_size, input: input.id },
       });
     }

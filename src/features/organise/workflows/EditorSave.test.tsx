@@ -26,7 +26,7 @@ const memoryAsText = (content: string) =>
   content.includes('memory_limit: 9')
     ? [
         {
-          path: 'steps[0].with.memory_limit',
+          path: ['steps', 0, 'with', 'memory_limit'],
           message: 'This takes a number, not text.',
         },
       ]
@@ -113,7 +113,7 @@ describe('saving and publishing a workflow', () => {
     const backend = workflowBackend(CLASSIC, {
       problems: () => [
         {
-          path: 'steps[1].use',
+          path: ['steps', 1, 'use'],
           message: 'unicon/diff-check@v2 is not a primitive Unicon knows.',
         },
       ],

@@ -5,16 +5,17 @@ import { delay, http, HttpResponse } from 'msw';
 import type { WorkflowForm } from '@/api/types';
 import { TASK_BUILD_CARDS, TASK_SECTIONS } from '@/lib/sections';
 import { formatDateTime } from '@/lib/time';
+import { holding } from '@/test/may';
 import { renderApp } from '@/test/render';
-import { problem, server, signedIn, someone } from '@/test/server';
+import { problem, server, signedIn } from '@/test/server';
 import {
   CONTEST_API,
   TASK_API,
   draftTask,
-  files,
   publicationList,
   publishedTask,
   repoFiles,
+  settingsOf,
   standingList,
   taskState,
   unchanged,
@@ -137,9 +138,7 @@ describe('the task page', () => {
       // is still in the contest these handlers serve.
       http.get(`${TASK_API}*`, ({ request }) => {
         const path = new URL(request.url).pathname;
-        const ofContest = ['/files/task.yaml', '/tree'].some((end) =>
-          path.endsWith(end),
-        );
+        const ofContest = ['/settings', '/tree'].some((end) => path.endsWith(end));
         if (removed && !ofContest) afterRemoval.push(path);
       }),
       signedIn,
@@ -180,14 +179,8 @@ describe('the task page', () => {
 
   it('says where it stands in its contest as text to an observer of the contest', async () => {
     server.use(
-      http.get('/api/v1/me', () =>
-        HttpResponse.json({
-          ...someone,
-          roles: [
-            { names: { org: 'acme', contest: 'spring', task: null }, role: 'observer' },
-          ],
-        }),
-      ),
+      signedIn,
+      ...holding('observer', publishedTask),
       taskState,
       publicationList,
       standingList,
@@ -271,7 +264,7 @@ describe('the task page', () => {
     );
     renderApp(TASK);
 
-    expect((await screen.findAllByText('Not found'))[0]).toBeVisible();
+    expect((await screen.findAllByText('not_found detail'))[0]).toBeVisible();
     refused = false;
     await userEvent.click(screen.getAllByRole('button', { name: 'Try again' })[0]!);
     expect(await screen.findByLabelText('Where the task stands')).toHaveTextContent(
@@ -455,12 +448,14 @@ describe('what the task has, under its name', { timeout: 20_000 }, () => {
   it('needs no value for an input only the task’s runs give', async () => {
     readyBackend();
     server.use(
-      http.get(`${TASK_API}/files/task.yaml`, () =>
-        HttpResponse.json({
-          ...files['task.yaml'],
-          content:
-            'name: sum\nworkflow: unicon/classic@v6\nrepeat:\n  - inputs: [time_limit]\n    tuples: [[1], [2]]\n',
-        }),
+      http.get(`${TASK_API}/settings`, () =>
+        HttpResponse.json(
+          settingsOf({
+            name: 'sum',
+            workflow: 'unicon/classic@v6',
+            repeat: [{ inputs: ['time_limit'], tuples: [[1], [2]] }],
+          }),
+        ),
       ),
     );
     renderApp(TASK);

@@ -25,6 +25,7 @@ function summary(more: Partial<RegradeSummary> = {}): RegradeSummary {
     graded: 120,
     running: false,
     counts: { ...counts, regraded: 117, failed: 3 },
+    may_manage: true,
     ...more,
   };
 }

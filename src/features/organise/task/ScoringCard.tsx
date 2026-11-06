@@ -54,7 +54,6 @@ import {
   printed,
   renamed,
   ONE_RUN,
-  submissionRuns,
   scopeOf,
   troublesOf,
   valueTree,
@@ -62,6 +61,7 @@ import {
   withoutInShow,
   type Column,
   type Moment,
+  type DraftRunRows,
   type RunRow,
   type ScoreGroup,
   type ScoreValue,
@@ -69,7 +69,9 @@ import {
 } from './scoring-model';
 import { ShowPicker, type ShowRow } from './ShowPicker';
 import { ShowPreview } from './ShowPreview';
+import { useDraftRuns } from './draft-runs';
 import { FIRST_NOT_PASSED } from '@/ui/scored/scored-text';
+import { isUnder } from '../problem-path';
 import classes from './task.module.css';
 
 const SCORING: Shape = { width: 160, gap: 40 };
@@ -124,9 +126,10 @@ export function ScoringCard({
   /** A graded submission exists, so what is shown always has been seen. */
   graded: boolean;
   disabled: boolean;
+  /** What the forge said of the last save, each at its path. */
   errors: DefinitionError[];
   onChange: (change: Partial<TaskValues>) => void;
-  /** What stops the save: a clash, a loop, a group with no runs, a formula. */
+  /** What stops the save: a formula line that does not read. */
   onProblems: (problems: string[]) => void;
 }) {
   const blocks = $api.useQuery('get', '/api/v1/blocks');
@@ -162,10 +165,11 @@ export function ScoringCard({
     [values.axes, values.inputs],
   );
   const readable = useMemo(() => [...columns, ...repeated], [columns, repeated]);
-  const rows = useMemo(() => submissionRuns(values.axes), [values.axes]);
+  const draft = useDraftRuns(place, values.axes, values.inputs);
+  const rows = useMemo(() => draft.runs?.runs ?? [], [draft.runs]);
   // What a run gives that the table above does not show: each input a table
   // repeats, or every column while there is no table.
-  const also = rows.length === 0 ? readable : repeated;
+  const also = draft.runs === null ? [] : rows.length === 0 ? readable : repeated;
   const [chosen, setChosen] = useState<string | null>(null);
   // `show` as read, so hiding what was shown always is warned of.
   const [savedShow] = useState(values.show);
@@ -174,7 +178,10 @@ export function ScoringCard({
     setWasName((known) => (key in known ? known : { ...known, [key]: name }));
   const scope = useMemo(
     () =>
-      catalogue === null || workflowRead !== 'ready' || outputTypes.data === undefined
+      catalogue === null ||
+      workflowRead !== 'ready' ||
+      outputTypes.data === undefined ||
+      draft.runs === null
         ? null
         : {
             ...scopeOf(values.scoreGroups, values.scoreValues, readable, catalogue),
@@ -193,6 +200,7 @@ export function ScoringCard({
       catalogue,
       readable,
       rows,
+      draft.runs,
       values.scoreGroups,
       values.scoreValues,
       workflowRead,
@@ -208,9 +216,8 @@ export function ScoringCard({
       ]),
     );
   }, [catalogue, scope, values.scoreValues]);
-  const troubles = troublesOf(values.scoreGroups, values.scoreValues);
+  const troubles = troublesOf(values.scoreGroups, values.scoreValues, errors);
   const blocked = [
-    ...troubles.values(),
     ...values.scoreValues.flatMap((value) => {
       const reading = readings[value.key];
       if (reading === undefined) return [];
@@ -292,7 +299,11 @@ export function ScoringCard({
         title="What one submission gives"
         line="One submission runs once on each row. The numbers here are made up, to show the shape."
       >
-        {rows.length === 0 ? (
+        {draft.failed && draft.runs === null ? (
+          <BodyText>The runs could not be read.</BodyText>
+        ) : draft.runs === null ? null : draft.runs.count > rows.length ? (
+          <BodyText>{`The runs make ${String(draft.runs.count)} runs, too many to list.`}</BodyText>
+        ) : rows.length === 0 ? (
           <BodyText>
             No runs yet, so a submission gives nothing until the runs have a row.
           </BodyText>
@@ -338,7 +349,7 @@ export function ScoringCard({
       >
         <Groups
           marked={chosen?.startsWith('g:') ? chosen.slice(2) : null}
-          rows={rows}
+          runs={draft.runs}
           tables={values.axes}
           groups={values.scoreGroups}
           troubles={troubles}
@@ -621,27 +632,15 @@ function editText(
 }
 
 function marksFor(errors: DefinitionError[], name: string) {
-  const prefix = `scoring.values.${name}`;
+  const top = ['scoring', 'values', name];
   return errors
-    .filter(
-      (error) =>
-        error.path === prefix ||
-        error.path.startsWith(`${prefix}.`) ||
-        error.path.startsWith(`${prefix}[`),
-    )
-    .map((error) => ({
-      path: error.path
-        .slice(prefix.length)
-        .split(/[.[\]]+/)
-        .filter((part) => part !== '')
-        .map((part) => (/^\d+$/.test(part) ? Number(part) : part)),
-      message: error.message,
-    }));
+    .filter((error) => isUnder(error.path, top))
+    .map((error) => ({ path: error.path.slice(top.length), message: error.message }));
 }
 
 function Groups({
   marked,
-  rows,
+  runs,
   tables: given,
   groups,
   troubles,
@@ -653,7 +652,8 @@ function Groups({
   onAdd,
 }: {
   marked: string | null;
-  rows: RunRow[];
+  /** The server's runs, null until they load. */
+  runs: DraftRunRows | null;
   tables: AxisValues[];
   groups: ScoreGroup[];
   troubles: Map<string, string>;
@@ -666,6 +666,7 @@ function Groups({
 }) {
   // A table whose inputs have all gone makes no run, as on the Runs card.
   const tables = given.filter((table) => table.inputs.length > 0);
+  const rows = runs?.runs ?? [];
   return (
     <>
       <div className={classes.groupFrame}>
@@ -729,6 +730,12 @@ function Groups({
               )}
               {table.tuples.map((tuple, index) => {
                 const name = runName(tuple, [table]);
+                const axis = {
+                  inputs: table.inputs,
+                  rows: runs?.axes[tableIndex] ?? [],
+                };
+                // Ticks wait until the server's rows match the table's.
+                const settled = axis.rows.length === table.tuples.length;
                 return (
                   <tr key={index}>
                     <th>{name}</th>
@@ -737,13 +744,13 @@ function Groups({
                         <Checkbox
                           label={`${name} in ${group.name}`}
                           labelHidden
-                          checked={ticksOf(group, [table])[0]?.[index] ?? false}
-                          disabled={disabled}
+                          checked={settled && (ticksOf(group, axis)[index] ?? false)}
+                          disabled={disabled || !settled}
                           onChange={(checked) =>
                             onChange(
                               groups.map((item) =>
                                 item.key === group.key
-                                  ? withTick(item, table, index, checked, rows)
+                                  ? withTick(item, axis, index, checked, rows)
                                   : item,
                               ),
                             )
@@ -774,7 +781,7 @@ function Groups({
                 {tables.length > 1
                   ? `${tables.map((table) => table.tuples.length).join(' × ')} = `
                   : ''}
-                {runCount(rows.length)}
+                {runCount(runs?.count ?? rows.length)}
               </td>
             </tr>
           </tfoot>

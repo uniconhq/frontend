@@ -58,6 +58,7 @@ function board(over: Partial<Leaderboard> = {}): Leaderboard {
     dropped: [],
     held_from: null,
     rows: [],
+    staff: false,
     ...over,
   };
 }
@@ -112,8 +113,8 @@ describe('a leaderboard table', () => {
   it('hides a cell, and keeps bounds and a self-reported mark on the header', () => {
     renderWithProviders(
       <LeaderboardTable
-        staff
         board={board({
+          staff: true,
           headers: [
             header('score', {
               at_least: '0',
@@ -139,14 +140,14 @@ describe('a leaderboard table', () => {
     expect(ada).not.toHaveTextContent('Self-reported');
   });
 
-  it('keeps bounds off the header for anyone who is not staff', () => {
+  it('shows no bounds where the server leaves them out, as it does for anyone but staff', () => {
     renderWithProviders(
       <LeaderboardTable
         board={board({
           headers: [
             header('score', {
-              at_least: '0',
-              at_most: '100',
+              at_least: null,
+              at_most: null,
               self_reported: [{ task: 'sum', value: 'score' }],
             }),
           ],
@@ -254,8 +255,8 @@ describe('a task’s points', () => {
   it('formats the bounds staff are told', () => {
     renderWithProviders(
       <LeaderboardTable
-        staff
         board={board({
+          staff: true,
           headers: [header('points', { at_least: '0', at_most: '1000000' })],
         })}
       />,

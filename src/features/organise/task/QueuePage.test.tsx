@@ -208,12 +208,26 @@ describe('a queued submission opened', () => {
           HttpResponse.json({
             number: 4,
             inputs: {
-              code: { files: [`${at}/files/code/main.py`], value: null, parts: null },
+              code: {
+                files: [
+                  { path: 'files/code/main.py', href: `${at}/files/code/main.py` },
+                ],
+                value: null,
+                parts: null,
+              },
               out: {
                 files: [],
                 value: null,
                 parts: {
-                  '1': { files: [`${at}/files/out/1/a b.txt`], value: null },
+                  '1': {
+                    files: [
+                      {
+                        path: 'files/out/1/a b.txt',
+                        href: `${at}/files/out/1/a%20b.txt`,
+                      },
+                    ],
+                    value: null,
+                  },
                   '2': { files: [], value: '7' },
                 },
               },

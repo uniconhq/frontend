@@ -15,7 +15,7 @@ import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
 import { WORKFLOWS_PATH } from '@/lib/organiser-paths';
 import { useWorkflowParams } from '@/lib/route-params';
-import { parseYaml } from '../forms/yaml-doc';
+import { parseYaml } from './yaml-doc';
 import { DefinitionErrors } from '../DefinitionErrors';
 import { WorkflowBar } from './Bar';
 import { checkQuery } from './check';

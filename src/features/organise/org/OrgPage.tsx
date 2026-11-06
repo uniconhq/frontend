@@ -6,11 +6,10 @@ import { Page, PageHeader } from '@/ui/Page';
 import { PageLink } from '@/ui/PageLink';
 import { Loaded } from '@/ui/feedback/Loaded';
 import { useFallbackPoll } from '@/live';
-import { useMe } from '@/session';
 import { useOrgParam } from '@/lib/route-params';
 import { ORG_SECTIONS, orgSectionPath, type OrgSectionKey } from '@/lib/sections';
 import { useOrganisersLine } from '../people/summary';
-import { holdsAt } from '../roles';
+import { useOrgMay } from '../may';
 import { OrgContests } from './OrgContests';
 
 const ORG = '/api/v1/orgs/{org}';
@@ -81,7 +80,7 @@ const CARDS: Record<OrgSectionKey, (props: { org: string }) => ReactNode> = {
  */
 export function OrgPage() {
   const org = useOrgParam();
-  const administers = holdsAt(useMe().roles, { kind: 'org', org }, 'admin');
+  const administers = useOrgMay(org).edit;
   const profile = $api.useQuery('get', ORG, { params: { path: { org } } }).data;
 
   return (

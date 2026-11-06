@@ -83,8 +83,12 @@ export function SessionList() {
         ))}
       </ul>
 
-      {revoke.error !== null && <ErrorBlock error={revoke.error} compact />}
-      {revokeAll.error !== null && <ErrorBlock error={revokeAll.error} compact />}
+      {revoke.error !== null && (
+        <ErrorBlock error={revoke.error} compact heading="Couldn’t sign out" />
+      )}
+      {revokeAll.error !== null && (
+        <ErrorBlock error={revokeAll.error} compact heading="Couldn’t sign out" />
+      )}
 
       <div>
         <Button

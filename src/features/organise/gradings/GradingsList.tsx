@@ -5,8 +5,6 @@ import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
-import { useMe } from '@/session';
-import { holdsAt } from '../roles';
 import { FeedTable, type RowActions } from './FeedTable';
 import { AttemptActions, ConfirmDialog, RejudgeOutcome } from './FeedActions';
 import { titleOf } from './feed';
@@ -18,7 +16,8 @@ type ContestPath = { org: string; contest: string };
 /**
  * Where a Rejudge is offered: for one task, with the button's own words when
  * not its title; or, on the contest's gradings, for whichever of `tasks` the
- * manager chooses in its confirmation, `task` chosen to begin with.
+ * manager chooses in its confirmation, `task` chosen to begin with. Each
+ * task is one the server says the caller manages.
  */
 export type RejudgeOffer =
   { task: string; button?: string } | { tasks: string[]; task: string | null };
@@ -48,7 +47,6 @@ export function GradingsList({
   empty: string;
   footer?: (entries: FeedEntry[]) => ReactNode;
 }) {
-  const roles = useMe().roles;
   const actions = useGradingActions(path);
   const [asking, setAsking] = useState<Asking | null>(null);
   const [rejudged, setRejudged] = useState<{
@@ -57,8 +55,6 @@ export function GradingsList({
   } | null>(null);
 
   const entries = view.state === 'ready' ? view.data : [];
-  const manages = (task: string | null): task is string =>
-    task !== null && holdsAt(roles, { kind: 'task', ...path, task }, 'manager');
   const titleFor = (task: string) =>
     titleOf(task, entries.find((entry) => entry.task === task)?.label ?? null);
 
@@ -77,9 +73,9 @@ export function GradingsList({
     setAsking(null);
   };
 
-  const rowActions: RowActions | null = entries.some((entry) => manages(entry.task))
+  const rowActions: RowActions | null = entries.some((entry) => entry.may_manage)
     ? (entry, name) =>
-        manages(entry.task) ? (
+        entry.may_manage && entry.task !== null ? (
           <AttemptActions task={entry.task} entry={entry} name={name} onAsk={ask} />
         ) : null
     : null;
@@ -88,9 +84,10 @@ export function GradingsList({
   const offer = ((): { words: string; asking: Asking } | null => {
     if (rejudge === null) return null;
     if ('tasks' in rejudge) {
-      const choose = rejudge.tasks
-        .filter(manages)
-        .map((task) => ({ value: task, label: titleFor(task) }));
+      const choose = rejudge.tasks.map((task) => ({
+        value: task,
+        label: titleFor(task),
+      }));
       if (choose.length === 0) return null;
       const first =
         rejudge.task !== null && choose.some((task) => task.value === rejudge.task)
@@ -106,7 +103,6 @@ export function GradingsList({
         },
       };
     }
-    if (!manages(rejudge.task)) return null;
     return {
       words: rejudge.button ?? `Rejudge ${titleFor(rejudge.task)}`,
       asking: { kind: 'rejudge', task: rejudge.task, title: titleFor(rejudge.task) },

@@ -2,49 +2,35 @@ import { describe, expect, it } from 'vitest';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@/test/user-event';
 import { http, HttpResponse } from 'msw';
-import { parse } from 'yaml';
-import type { FileContent } from '@/api/types';
+import type { WriteSettings } from '@/api/types';
+import { holding } from '@/test/may';
 import { renderApp } from '@/test/render';
-import { problem, server, signedIn, someone } from '@/test/server';
+import { problem, server, signedIn } from '@/test/server';
 import { invite } from '@/test/invites';
-import { CONTEST_API, repoFiles, taskList } from '@/test/organiser';
+import { CONTEST_API, contestSettings, repoFiles, taskList } from '@/test/organiser';
 import { localOf } from '../forms/times';
 
 const PAGE = '/orgs/acme/contests/spring/entry';
-const FILE = `${CONTEST_API}/files/:path`;
+const SETTINGS = `${CONTEST_API}/settings`;
 
-const BASE = `name: Spring
-start: 2026-06-01T09:00:00Z
-end: 2026-06-01T14:00:00Z
-state: draft
-visibility: signed-in
-`;
+const BASE = {
+  name: 'Spring',
+  start: '2026-06-01T09:00:00Z',
+  end: '2026-06-01T14:00:00Z',
+  state: 'draft',
+  visibility: 'signed-in',
+};
 
-/** The contest's settings holding `current`, each save taken and the file becoming it. */
-function settings(current: string) {
-  let file: FileContent = {
-    path: 'contest.yaml',
-    encoding: 'utf-8',
-    content: current,
-    token: 'token-1',
-    upload: null,
-    version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
-  };
-  const sent: string[] = [];
-  server.use(
-    taskList,
-    http.get(FILE, ({ params }) =>
-      params['path'] === 'contest.yaml' ? HttpResponse.json(file) : undefined,
-    ),
-    http.put(FILE, async ({ request }) => {
-      const body = (await request.json()) as { content: string };
-      sent.push(body.content);
-      file = { ...file, content: body.content, token: 'token-2' };
-      return HttpResponse.json({ version: 'v2', notes: [] });
-    }),
-    ...repoFiles,
-  );
-  return sent;
+/** The contest's settings holding `current`, each save taken; the values each sent. */
+function settings(current: Record<string, unknown>) {
+  const backend = contestSettings({ current });
+  server.use(taskList, ...backend.handlers, ...repoFiles);
+  return backend.sent;
+}
+
+/** The registration a save sent. */
+function registrationOf(sent: WriteSettings | undefined) {
+  return sent?.values['registration'] as Record<string, unknown> | undefined;
 }
 
 async function openForm(): Promise<HTMLElement> {
@@ -88,7 +74,7 @@ describe('how people enter', { timeout: 20_000 }, () => {
     );
 
     expect(await screen.findByText('Saved.')).toBeVisible();
-    expect((parse(sent[0] ?? '') as { registration: unknown }).registration).toEqual({
+    expect(registrationOf(sent[0])).toEqual({
       ways: [
         { signup: { name: 'Students', domains: ['u.nus.edu'], approval: 'auto' } },
       ],
@@ -109,9 +95,13 @@ describe('how people enter', { timeout: 20_000 }, () => {
         ]),
       ),
     );
-    settings(
-      `${BASE}registration:\n  capacity: 200\n  ways:\n    - invite: {}\n    - signup: {name: Guests, code: guest-2026}\n`,
-    );
+    settings({
+      ...BASE,
+      registration: {
+        capacity: 200,
+        ways: [{ invite: {} }, { signup: { name: 'Guests', code: 'guest-2026' } }],
+      },
+    });
     const form = await openForm();
 
     expect(
@@ -141,7 +131,7 @@ describe('how people enter', { timeout: 20_000 }, () => {
 
   it('asks for a ticked condition to be filled in before saving', async () => {
     server.use(signedIn);
-    settings(`${BASE}registration:\n  ways:\n    - signup: {}\n`);
+    settings({ ...BASE, registration: { ways: [{ signup: {} }] } });
     const user = userEvent.setup();
     const form = await openForm();
 
@@ -159,16 +149,19 @@ describe('how people enter', { timeout: 20_000 }, () => {
 
   it('sends a domain as typed and opens the one the save refused, focused', async () => {
     server.use(signedIn);
-    const sent = settings(
-      `${BASE}registration:\n  ways:\n    - signup: {domains: [u.nus.edu]}\n`,
-    );
+    const sent = settings({
+      ...BASE,
+      registration: { ways: [{ signup: { domains: ['u.nus.edu'] } }] },
+    });
     const message =
       'Give a domain such as u.nus.edu, or *.nus.edu.sg to take nus.edu.sg and every domain under it.';
     server.use(
-      http.put(FILE, async ({ request }) => {
-        sent.push(((await request.json()) as { content: string }).content);
+      http.put(SETTINGS, async ({ request }) => {
+        sent.push((await request.json()) as WriteSettings);
         return problem(422, 'invalid_definition', {
-          errors: [{ path: 'registration.ways[0].signup.domains[0]', message }],
+          errors: [
+            { path: ['registration', 'ways', 0, 'signup', 'domains', 0], message },
+          ],
         });
       }),
     );
@@ -182,8 +175,8 @@ describe('how people enter', { timeout: 20_000 }, () => {
     );
 
     const alert = await screen.findByRole('alert');
-    expect(parse(sent[0] ?? '')).toMatchObject({
-      registration: { ways: [{ signup: { domains: ['@U.nus.edu'] } }] },
+    expect(registrationOf(sent[0])).toEqual({
+      ways: [{ signup: { domains: ['@U.nus.edu'] } }],
     });
     const link = within(alert).getByRole('link', {
       name: 'How people enter, way 1: Email domains',
@@ -200,7 +193,7 @@ describe('how people enter', { timeout: 20_000 }, () => {
 
   it('removes a way once asked, adds invites, and says when nobody can register', async () => {
     server.use(signedIn);
-    const sent = settings(`${BASE}registration:\n  ways:\n    - signup: {}\n`);
+    const sent = settings({ ...BASE, registration: { ways: [{ signup: {} }] } });
     const user = userEvent.setup();
     const form = await openForm();
 
@@ -221,9 +214,7 @@ describe('how people enter', { timeout: 20_000 }, () => {
     );
 
     await screen.findByText('Saved.');
-    expect((parse(sent[0] ?? '') as { registration: unknown }).registration).toEqual({
-      ways: [{ invite: {} }],
-    });
+    expect(registrationOf(sent[0])).toEqual({ ways: [{ invite: {} }] });
   });
 
   it('sets when registration opens and closes, and how many may register', async () => {
@@ -248,18 +239,16 @@ describe('how people enter', { timeout: 20_000 }, () => {
     );
 
     await screen.findByText('Saved.');
-    const registration = (
-      parse(sent[0] ?? '') as { registration: Record<string, unknown> }
-    ).registration;
-    expect(registration['capacity']).toBe(300);
-    expect(Date.parse(String(registration['closes']))).toBe(
+    const registration = registrationOf(sent[0]);
+    expect(registration?.['capacity']).toBe(300);
+    expect(Date.parse(String(registration?.['closes']))).toBe(
       Date.parse('2026-06-01T09:00:00Z'),
     );
   });
 
   it('warns that nobody finds a contest only its entrants see to sign up', async () => {
     server.use(signedIn);
-    settings(BASE.replace('visibility: signed-in', 'visibility: hidden'));
+    settings({ ...BASE, visibility: 'hidden' });
     const form = await openForm();
 
     expect(within(form).getByRole('note')).toHaveTextContent(
@@ -269,9 +258,12 @@ describe('how people enter', { timeout: 20_000 }, () => {
 
   it('opens a way’s approval from a link that names it', async () => {
     server.use(signedIn);
-    settings(
-      `${BASE}registration:\n  ways:\n    - invite: {}\n    - signup: {name: Students, approval: manual}\n`,
-    );
+    settings({
+      ...BASE,
+      registration: {
+        ways: [{ invite: {} }, { signup: { name: 'Students', approval: 'manual' } }],
+      },
+    });
     renderApp(`${PAGE}?field=approval&item=1`);
 
     const form = await screen.findByRole('group', { name: 'How people enter' });
@@ -286,7 +278,7 @@ describe('how people enter', { timeout: 20_000 }, () => {
 
   it('keeps the page up for a link whose item or field is no name at all', async () => {
     server.use(signedIn);
-    settings(`${BASE}registration:\n  ways:\n    - invite: {}\n`);
+    settings({ ...BASE, registration: { ways: [{ invite: {} }] } });
     renderApp(`${PAGE}?field=a"]&item="`);
 
     const form = await screen.findByRole('group', { name: 'How people enter' });
@@ -298,9 +290,12 @@ describe('how people enter', { timeout: 20_000 }, () => {
 
   it('opens the advanced part to focus an email pattern a link names', async () => {
     server.use(signedIn);
-    settings(
-      `${BASE}registration:\n  ways:\n    - signup: {domains: [u.nus.edu], email_pattern: '^e'}\n`,
-    );
+    settings({
+      ...BASE,
+      registration: {
+        ways: [{ signup: { domains: ['u.nus.edu'], email_pattern: '^e' } }],
+      },
+    });
     renderApp(`${PAGE}?field=email_pattern&item=0`);
 
     const pattern = await screen.findByLabelText('Email pattern');
@@ -309,17 +304,8 @@ describe('how people enter', { timeout: 20_000 }, () => {
   });
 
   it('shows a manager how people enter, to read', async () => {
-    server.use(
-      http.get('/api/v1/me', () =>
-        HttpResponse.json({
-          ...someone,
-          roles: [
-            { names: { org: 'acme', contest: 'spring', task: null }, role: 'manager' },
-          ],
-        }),
-      ),
-    );
-    settings(`${BASE}registration:\n  ways:\n    - signup: {code: x}\n`);
+    server.use(signedIn, ...holding('manager'));
+    settings({ ...BASE, registration: { ways: [{ signup: { code: 'x' } }] } });
     const form = await openForm();
 
     expect(screen.getByText('Read only')).toBeVisible();

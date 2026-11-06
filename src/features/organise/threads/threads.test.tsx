@@ -6,6 +6,7 @@ import type { Announcement, Clarification } from '@/api/types';
 import { renderApp } from '@/test/render';
 import { server, signedIn } from '@/test/server';
 import { organisedEntrant } from '@/test/contestant';
+import { settingsOf } from '@/test/organiser';
 
 const CONTEST_API = '/api/v1/orgs/:org/contests/:contest';
 
@@ -35,6 +36,7 @@ function question(overrides: Partial<Clarification> = {}): Clarification {
     answered: false,
     closed: false,
     messages: [],
+    may_answer: true,
     ...overrides,
   };
 }
@@ -450,17 +452,8 @@ describe("a contest's questions, for its organisers", () => {
   it('says which task a question is about by its title, as the task’s settings give it', async () => {
     questionRoutes([question({ task: 'sum' })], `${CONTEST_API}/clarifications`);
     server.use(
-      http.get(`${CONTEST_API}/tasks/:task/files/:path`, ({ params }) =>
-        params['path'] === 'task.yaml'
-          ? HttpResponse.json({
-              path: 'task.yaml',
-              encoding: 'utf-8',
-              content: 'name: Sum of two\n',
-              token: 'token-task-yaml',
-              upload: null,
-              version: 'v1',
-            })
-          : undefined,
+      http.get(`${CONTEST_API}/tasks/:task/settings`, () =>
+        HttpResponse.json(settingsOf({ name: 'Sum of two' }, 'token-task-yaml')),
       ),
     );
     renderApp('/orgs/acme/contests/spring/questions');

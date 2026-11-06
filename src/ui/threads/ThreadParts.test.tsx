@@ -17,6 +17,7 @@ const question: Clarification = {
   answered: false,
   closed: false,
   messages: [],
+  may_answer: true,
 };
 
 describe("an open question's badge, for its organisers", () => {

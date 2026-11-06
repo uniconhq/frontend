@@ -45,7 +45,7 @@ describe('the workflow editor', () => {
       ...partTransport(`${WORKFLOW_API}/part-uploads`),
       signedIn,
       ...workflowBackend('steps: []\n', {
-        problems: () => [{ path: 'steps', message }],
+        problems: () => [{ path: ['steps'], message }],
       }).handlers,
     );
     renderApp(EDITOR_PAGE);
@@ -195,7 +195,7 @@ describe('the workflow editor', () => {
     );
   });
 
-  it('refuses a wire a version would refuse, saying why, in the port’s menu', async () => {
+  it('greys out a wire whose type the port does not take, saying why, in the port’s menu', async () => {
     server.use(
       ...partTransport(`${WORKFLOW_API}/part-uploads`),
       signedIn,
@@ -208,10 +208,66 @@ describe('the workflow editor', () => {
     const menu = await openMenu('The port entry of run');
     const file = within(menu).getByRole('menuitem', { name: /^input from the inputs/ });
     expect(file).toBeDisabled();
-    expect(file).toHaveTextContent('This takes text, not a file.');
+    expect(file).toHaveTextContent(
+      'This takes text, a number, true or false or one of a list, not a file.',
+    );
     expect(
       within(menu).getByRole('menuitem', { name: /^submission from the inputs/ }),
     ).toBeDisabled();
+  });
+
+  it('greys out a number output on a file port, as a drag does', async () => {
+    server.use(
+      ...partTransport(`${WORKFLOW_API}/part-uploads`),
+      signedIn,
+      ...workflowBackend(CLASSIC).handlers,
+    );
+    const user = userEvent.setup();
+    renderApp(EDITOR_PAGE);
+
+    await user.click(await portButton(user, 'check', 'expected'));
+    const menu = await openMenu('The port expected of check');
+    const time = within(menu).getByRole('menuitem', { name: /^time_ms from run/ });
+    expect(time).toBeDisabled();
+    expect(time).toHaveTextContent('This takes a file, not a number.');
+    expect(
+      within(menu).getByRole('menuitem', { name: /^output from run/ }),
+    ).not.toBeDisabled();
+  });
+
+  it('writes an optional output into a required port, then shows the forge’s sentence', async () => {
+    const draft = CLASSIC.replace(
+      'outputs:\n',
+      '  - id: again\n    use: unicon/exec@v4\n    with: {language: c}\noutputs:\n',
+    );
+    const sentence =
+      'That output may be missing, so it can be given only to an optional port.';
+    server.use(
+      ...partTransport(`${WORKFLOW_API}/part-uploads`),
+      signedIn,
+      ...workflowBackend(draft, {
+        problems: (content) =>
+          content.includes('${{ steps.run.extras }}')
+            ? [{ path: ['steps', 2, 'with', 'source'], message: sentence }]
+            : [],
+      }).handlers,
+    );
+    const user = userEvent.setup();
+    renderApp(EDITOR_PAGE);
+
+    await user.click(await portButton(user, 'again', 'source'));
+    const menu = await openMenu('The port source of again');
+    const extras = within(menu).getByRole('menuitem', { name: /^extras from run/ });
+    expect(extras).not.toBeDisabled();
+    await user.click(extras);
+
+    expect(
+      await within(part('section', 'Problems')).findByText(new RegExp(sentence)),
+    ).toBeInTheDocument();
+    expect(
+      within(await stepBox('again')).getByRole('note', { name: sentence }),
+    ).toBeInTheDocument();
+    expect(await fileText(user)).toMatch(/source: "?\$\{\{ steps\.run\.extras \}\}"?/);
   });
 
   it('wires a port from its menu, keeping the file’s comments', async () => {
@@ -320,7 +376,7 @@ describe('the workflow editor', () => {
       ...workflowBackend(broken, {
         problems: () => [
           {
-            path: 'steps[1].with.actual',
+            path: ['steps', 1, 'with', 'actual'],
             message: 'There is no step called runner before this one.',
           },
         ],
@@ -369,10 +425,10 @@ describe('the workflow editor', () => {
           content.includes('steps.runner')
             ? [
                 {
-                  path: 'steps[1].with.actual',
+                  path: ['steps', 1, 'with', 'actual'],
                   message: 'There is no step called runner before this one.',
                 },
-                { path: 'outputs', message: 'A workflow names at least one output.' },
+                { path: ['outputs'], message: 'A workflow names at least one output.' },
               ]
             : [],
       }).handlers,
@@ -438,6 +494,7 @@ describe('the workflow editor', () => {
       better: null,
       optional: false,
       options: null,
+      accepts: ['file'],
     });
     const item = (owner: string, name: string, versions: string[]) => ({
       owner,
@@ -831,7 +888,70 @@ describe('the workflow editor', () => {
     );
   });
 
-  it('wires a port given a whole reference in its field', async () => {
+  it('wires a port given a whole reference in its field, and shows what the check says of it', async () => {
+    server.use(
+      ...partTransport(`${WORKFLOW_API}/part-uploads`),
+      signedIn,
+      ...workflowBackend(CLASSIC, {
+        problems: (content) =>
+          content.includes('entry: ${{ inputs.submission }}')
+            ? [
+                {
+                  path: ['steps', 0, 'with', 'entry'],
+                  message: 'This takes text, not a file.',
+                },
+              ]
+            : content.includes('${{ inputs }}')
+              ? [
+                  {
+                    path: ['steps', 0, 'with', 'entry'],
+                    message: 'Unicon cannot read ${{ inputs }}.',
+                  },
+                ]
+              : [],
+      }).handlers,
+    );
+    const user = userEvent.setup();
+    renderApp(EDITOR_PAGE);
+
+    const panel = await openStep(user, 'run');
+    await user.selectOptions(
+      within(panel).getByRole('combobox', { name: 'entry (optional)' }),
+      'A fixed value',
+    );
+    const entry = within(panel).getByRole('textbox', { name: 'Value of entry' });
+    await user.click(entry);
+    await user.paste('${{ inputs.submission }}');
+    await user.keyboard('{Enter}');
+
+    // Written as given; the forge's sentence comes with the check after.
+    expect(
+      await within(stepPanel('run')).findByText('This takes text, not a file.'),
+    ).toBeInTheDocument();
+    expect(await fileText(user)).toContain('entry: ${{ inputs.submission }}');
+    await user.selectOptions(
+      within(stepPanel('run')).getByRole('combobox', { name: 'entry (optional)' }),
+      'A fixed value',
+    );
+    const again = within(stepPanel('run')).getByRole('textbox', {
+      name: 'Value of entry',
+    });
+    await user.click(again);
+    await user.paste('main ${{ inputs }}');
+    await user.keyboard('{Enter}');
+    expect(
+      await within(stepPanel('run')).findByText('Unicon cannot read ${{ inputs }}.'),
+    ).toBeInTheDocument();
+    const last = within(stepPanel('run')).getByRole('textbox', {
+      name: 'Value of entry',
+    });
+    await user.clear(last);
+    await user.paste('${{ inputs.language }}');
+    await user.keyboard('{Enter}');
+    expect(await fileText(user)).toContain('entry: ${{ inputs.language }}');
+  });
+
+  it('keeps a whole reference typed in a field that would make a loop out of the file', async () => {
     server.use(
       ...partTransport(`${WORKFLOW_API}/part-uploads`),
       signedIn,
@@ -847,24 +967,15 @@ describe('the workflow editor', () => {
     );
     const entry = within(panel).getByRole('textbox', { name: 'Value of entry' });
     await user.click(entry);
-    await user.paste('${{ inputs.submission }}');
+    await user.paste('${{ steps.check.outcome }}');
     await user.keyboard('{Enter}');
 
     expect(
-      await within(panel).findByText(/This takes text, not a file\./),
-    ).toBeInTheDocument();
-    await user.clear(entry);
-    await user.paste('main ${{ inputs }}');
-    await user.keyboard('{Enter}');
-    expect(
-      await within(panel).findByText(
-        'Unicon cannot read ${{ inputs }}. Write ${{ inputs.<id> }}, ${{ workflow.<path> }} or ${{ steps.<id>.<output> }}.',
+      await within(stepPanel('run')).findByText(
+        'That would make a loop: check already reads this step.',
       ),
     ).toBeInTheDocument();
-    await user.clear(entry);
-    await user.paste('${{ inputs.language }}');
-    await user.keyboard('{Enter}');
-    expect(await fileText(user)).toContain('entry: ${{ inputs.language }}');
+    expect(await fileText(user)).not.toContain('steps.check');
   });
 
   it('names a reported value for the pages that show it: its title, and a number’s unit (M58)', async () => {
@@ -1034,11 +1145,21 @@ describe('the workflow editor', () => {
     expect(screen.queryByText(/Nothing to fix/)).not.toBeInTheDocument();
   });
 
-  it('refuses in the drawer a declaration a wire would refuse, saying why', async () => {
+  it('changes a declaration and shows what the check says of the wire it breaks', async () => {
     server.use(
       ...partTransport(`${WORKFLOW_API}/part-uploads`),
       signedIn,
-      ...workflowBackend(CLASSIC).handlers,
+      ...workflowBackend(CLASSIC, {
+        problems: (content) =>
+          content.includes('time_limit: text')
+            ? [
+                {
+                  path: ['steps', 0, 'with', 'time_limit'],
+                  message: 'This takes a number, not text.',
+                },
+              ]
+            : [],
+      }).handlers,
     );
     const user = userEvent.setup();
     renderApp(EDITOR_PAGE);
@@ -1052,10 +1173,12 @@ describe('the workflow editor', () => {
       'text',
     );
 
-    expect(within(row).getByRole('alert')).toHaveTextContent(
-      'run.time_limit: This takes a number, not text.',
-    );
-    expect(await fileText(user)).toBe(CLASSIC);
+    expect(
+      await within(part('section', 'Problems')).findByText(
+        /This takes a number, not text\./,
+      ),
+    ).toBeInTheDocument();
+    expect(await fileText(user)).toContain('time_limit: text');
   });
 
   it('shows a wire the layout cannot draw on its port', async () => {
@@ -1164,6 +1287,7 @@ describe('the workflow editor', () => {
       better: null,
       optional: false,
       options: null,
+      accepts: ['file'],
     });
     server.use(
       ...partTransport(`${WORKFLOW_API}/part-uploads`),
@@ -1200,7 +1324,11 @@ describe('the workflow editor', () => {
       signedIn,
       ...workflowBackend(draft, {
         problems: () => [
-          { path: 'steps[0]', message: 'The link failed.', step: 'build/compile/link' },
+          {
+            path: ['steps', 0],
+            message: 'The link failed.',
+            step: 'build/compile/link',
+          },
         ],
       }).handlers,
     );
@@ -1259,6 +1387,7 @@ function savedEntry(path: string, kind: 'file' | 'directory' = 'file'): TreeEntr
     upload: null,
     version: 'files-v1',
     start: null,
+    href: null,
   };
 }
 
@@ -1366,6 +1495,7 @@ describe('the drawer', () => {
       better: null,
       optional: false,
       options: null,
+      accepts: ['file'],
     });
     server.use(
       ...partTransport(`${WORKFLOW_API}/part-uploads`),
@@ -1438,34 +1568,28 @@ describe('the drawer', () => {
     ).toBeInTheDocument();
   });
 
-  it('reads the newer version itself when the list of workflows fails', async () => {
+  it('moves to the newer version when the list of workflows fails', async () => {
     serveInner(['  - {id: build, use: kenny/inner@v1}'], { listed: false });
     const user = userEvent.setup();
     renderApp(EDITOR_PAGE);
 
     await openStep(user, 'build');
-    const move = await within(stepPanel('build')).findByRole('button', {
-      name: 'Move to it',
-    });
-    await waitFor(() => expect(move).toBeEnabled());
-    await user.click(move);
+    await user.click(
+      await within(stepPanel('build')).findByRole('button', { name: 'Move to it' }),
+    );
     expect(await fileText(user)).toContain('use: kenny/inner@v2');
   });
 
-  it('cannot move to a newer version whose box cannot be read, and says so', async () => {
+  it('moves to a newer version whose box cannot be read, leaving the rest to the check', async () => {
     serveInner(['  - {id: build, use: kenny/inner@v1}'], { newer: false });
     const user = userEvent.setup();
     renderApp(EDITOR_PAGE);
 
     await openStep(user, 'build');
-    expect(
-      await within(stepPanel('build')).findByText(
-        'v2 could not be read, so the step cannot move to it yet.',
-      ),
-    ).toBeInTheDocument();
-    expect(
-      within(stepPanel('build')).getByRole('button', { name: 'Move to it' }),
-    ).toBeDisabled();
+    await user.click(
+      await within(stepPanel('build')).findByRole('button', { name: 'Move to it' }),
+    );
+    expect(await fileText(user)).toContain('use: kenny/inner@v2');
   });
 
   it('opens a box into the well, between what feeds it and what it feeds', async () => {
@@ -1704,7 +1828,7 @@ describe('a file the workflow gives, not the task', () => {
     expect(await fileText(user)).toContain('expected: ${{ workflow.answer.txt }}');
   });
 
-  it('refuses to make an input a file a port it feeds would refuse, and saying why', async () => {
+  it('makes an input feeding a folder port a file of the workflow, which the forge takes', async () => {
     server.use(
       ...partTransport(`${WORKFLOW_API}/part-uploads`),
       tree(['main.c']),
@@ -1714,7 +1838,6 @@ describe('a file the workflow gives, not the task', () => {
     const user = userEvent.setup();
     renderApp(EDITOR_PAGE);
 
-    // A file input may feed a folder port; a file of the workflow may not.
     await openInput(user, 'submission');
     const inputs = drawer('Inputs');
     await user.selectOptions(
@@ -1726,9 +1849,7 @@ describe('a file the workflow gives, not the task', () => {
       'main.c',
     );
 
-    expect(await within(inputs).findByRole('alert')).toBeInTheDocument();
-    expect(screen.getByRole('group', { name: 'Input submission' })).toBeInTheDocument();
-    expect(await fileText(user)).toContain('source: ${{ inputs.submission }}');
+    expect(await fileText(user)).toContain('source: ${{ workflow.main.c }}');
   });
 
   it('offers a workflow file only to an input a step reads', async () => {
@@ -1939,11 +2060,12 @@ describe('wiring workflow files', () => {
       name: 'the workflow’s checker/',
     });
     expect(folder).not.toBeDisabled();
+    // A file fits a folder port too.
     expect(
       within(menu).getByRole('menuitem', {
         name: /^the workflow’s checker\/program.yaml/,
       }),
-    ).toHaveAttribute('data-disabled', 'true');
+    ).not.toHaveAttribute('data-disabled', 'true');
     expect(within(menu).queryByRole('menuitem', { name: /workflow.yaml/ })).toBeNull();
     await user.click(folder);
     expect(await fileText(user)).toContain('source: ${{ workflow.checker/ }}');
@@ -2110,7 +2232,7 @@ outputs:
         problem(422, 'invalid_definition', {
           errors: [
             {
-              path: 'steps[0].with.stdin',
+              path: ['steps', 0, 'with', 'stdin'],
               message: 'The workflow has no file data.in.',
             },
           ],

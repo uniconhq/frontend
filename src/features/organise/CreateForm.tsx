@@ -87,7 +87,7 @@ export function CreateForm({
       {extra}
       {error !== null && error !== undefined && (
         <div className={classes.panel} role="alert">
-          <ErrorBlock error={error} compact />
+          <ErrorBlock error={error} compact heading="Couldn’t create" />
         </div>
       )}
       <div className={classes.actions}>

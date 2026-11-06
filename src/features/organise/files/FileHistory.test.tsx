@@ -5,6 +5,7 @@ import { http, HttpResponse } from 'msw';
 import type { Holder } from '@/api/types';
 import type { components } from '@/api/schema';
 import { formatDateTime } from '@/lib/time';
+import { holding } from '@/test/may';
 import { renderApp } from '@/test/render';
 import { problem, server, signedIn, someone } from '@/test/server';
 import {
@@ -70,6 +71,7 @@ const kenny: Holder = {
   },
   role: 'admin',
   at_names: { org: 'acme', contest: null, task: null },
+  may_change: true,
 };
 
 /** The task's history and roles, counting the reads of the history and what each asked for. */
@@ -303,16 +305,7 @@ describe("a task file's history", () => {
 
   it('shows an observer the history with no rollback', async () => {
     history();
-    server.use(
-      http.get('/api/v1/me', () =>
-        HttpResponse.json({
-          ...someone,
-          roles: [
-            { names: { org: 'acme', contest: 'spring', task: null }, role: 'observer' },
-          ],
-        }),
-      ),
-    );
+    server.use(signedIn, ...holding('observer'));
     const list = await openHistory();
 
     expect(list.getAllByRole('listitem')).toHaveLength(4);

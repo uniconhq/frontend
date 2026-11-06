@@ -61,6 +61,7 @@ describe('creating an org', () => {
                     role: 'admin',
                   },
                 ],
+                orgs: ['acme', 'beta'],
               }
             : someone,
         ),

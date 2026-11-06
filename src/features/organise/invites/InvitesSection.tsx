@@ -11,7 +11,7 @@ import { TextInput } from '@/ui/TextInput';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
 import { formatDateTime } from '@/lib/time';
-import { offered, ROLE_LABEL, roleMeans, type RolePlace } from '../roles';
+import { ROLE_LABEL, roleMeans, type RolePlace } from '../roles';
 import { invitesQuery, useInviteChanges, useInvites, type Target } from './invites';
 import classes from './invites.module.css';
 
@@ -87,8 +87,8 @@ function targetOf(typed: string): Target {
 }
 
 /**
- * A refusal in words. A username nobody has reads better here than the
- * general sentence, since an address is the way to invite them.
+ * A refusal in the server's words. A username nobody has adds that an
+ * address is the way to invite them.
  */
 function Refusal({ error, typed }: { error: unknown; typed?: string }) {
   if (
@@ -100,15 +100,15 @@ function Refusal({ error, typed }: { error: unknown; typed?: string }) {
     return (
       <div role="alert">
         <BodyText tone="secondary">
-          Nobody has the username {typed}. Invite their email address instead, and they
-          can make an account.
+          {error.detail} Invite their email address instead, and they can make an
+          account.
         </BodyText>
       </div>
     );
   }
   return (
     <div role="alert">
-      <ErrorBlock error={error} compact />
+      <ErrorBlock error={error} compact heading="Couldn’t invite" />
     </div>
   );
 }
@@ -117,13 +117,11 @@ function InviteRow({
   place,
   invite,
   manages,
-  administers,
   audience,
 }: {
   place: RolePlace;
   invite: Invite;
   manages: boolean;
-  administers: boolean;
   audience: Audience;
 }) {
   const queryClient = useQueryClient();
@@ -139,7 +137,7 @@ function InviteRow({
   const { pending, error } = change;
   const name = who(invite);
   const open = invite.status === 'pending';
-  const changeable = manages && open && (invite.grants !== 'admin' || administers);
+  const changeable = invite.may_change && open;
   const mailable = !invite.expired && invite.mail_status !== 'off';
 
   /** Each change answers with the invite as it now stands, which replaces its row. */
@@ -313,16 +311,21 @@ export function InvitesSection({
   place,
   audience,
   manages,
-  administers,
+  giveAdmin,
 }: {
   place: RolePlace;
   audience: Audience;
   manages: boolean;
-  administers: boolean;
+  /** Whether the server says the caller may give the admin role here. */
+  giveAdmin: boolean;
 }) {
   const view = queryView(useInvites(place));
   const grants: OfferedGrant[] =
-    audience === 'contestants' ? ['contestant'] : offered(administers);
+    audience === 'contestants'
+      ? ['contestant']
+      : giveAdmin
+        ? ['admin', 'manager', 'observer']
+        : ['manager', 'observer'];
 
   return (
     <div className={classes.stack}>
@@ -335,7 +338,6 @@ export function InvitesSection({
           invites={view.data.filter((invite) => shownTo(audience, invite))}
           audience={audience}
           manages={manages}
-          administers={administers}
         />
       )}
     </div>
@@ -347,13 +349,11 @@ function InviteTable({
   invites,
   audience,
   manages,
-  administers,
 }: {
   place: RolePlace;
   invites: Invite[];
   audience: Audience;
   manages: boolean;
-  administers: boolean;
 }) {
   if (invites.length === 0) {
     return <BodyText tone="secondary">No invites yet.</BodyText>;
@@ -380,7 +380,6 @@ function InviteTable({
             place={place}
             invite={invite}
             manages={manages}
-            administers={administers}
             audience={audience}
           />
         ))}

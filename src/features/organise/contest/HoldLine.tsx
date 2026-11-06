@@ -6,9 +6,8 @@ import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
 import { Modal } from '@/ui/Modal';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
-import { useMe } from '@/session';
 import { formatDateTime } from '@/lib/time';
-import { holdsAt } from '../roles';
+import { usePlaceMay } from '../may';
 import classes from '../organise.module.css';
 
 type Path = { org: string; contest: string };
@@ -19,7 +18,7 @@ const END = '/api/v1/orgs/{org}/contests/{contest}/hold/end';
 /** Where the contest's hold stands, and the button that ends it. */
 export function HoldLine({ path }: { path: Path }) {
   const view = queryView($api.useQuery('get', HOLD, { params: { path } }));
-  const manager = holdsAt(useMe().roles, { kind: 'contest', ...path }, 'manager');
+  const manager = usePlaceMay({ kind: 'contest', ...path }).manage;
   if (view.state === 'loading') return null;
   if (view.state === 'error')
     return <ErrorBlock error={view.error} onRetry={view.retry} compact />;
@@ -79,7 +78,9 @@ function EndHold({ path }: { path: Path }) {
       <Button variant="secondary" loading={end.isPending} onClick={() => run(false)}>
         End the freeze now
       </Button>
-      {failed !== null && <ErrorBlock error={failed} compact />}
+      {failed !== null && (
+        <ErrorBlock error={failed} compact heading="Couldn’t change the freeze" />
+      )}
       <Modal
         opened={asking !== null}
         onClose={() => setAsking(null)}

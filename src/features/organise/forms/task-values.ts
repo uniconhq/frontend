@@ -1,15 +1,13 @@
 import type { DeclaredInput } from '@/api/types';
 import {
   isRecord,
-  exactAt,
-  numberText,
+  numberValue,
   scalarOf,
   textAt,
   textOf,
-  valueAt,
   writeAt,
-  type Doc,
-} from './yaml-doc';
+  type Values,
+} from './values';
 import type { Catalogue } from '../formula/catalogue';
 import { textValues } from '../formula/gives';
 import {
@@ -23,8 +21,8 @@ import {
 } from '../task/scoring-model';
 
 /**
- * `task.yaml` as the form's fields. Every field is text, so an empty one is
- * "not set". The form writes only what changed from what it read.
+ * `task.yaml`'s values as the form's fields. Every field is text, so an empty
+ * one is "not set". The form writes only what changed from what it read.
  *
  * The workflow's declarations, when they can be read, say which inputs there
  * are and each one's type, so a value is written as its type. Who gives each
@@ -161,13 +159,6 @@ export function settled(axes: AxisValues[]): AxisValues[] {
   ];
 }
 
-/** How many runs the axes make: the product of their tuples, or 1 with none. */
-export function runCount(axes: readonly AxisValues[]): number {
-  const counted = axes.filter((axis) => axis.inputs.length > 0);
-  if (counted.length === 0) return 1;
-  return counted.reduce((total, axis) => total * Math.max(axis.tuples.length, 1), 1);
-}
-
 /** Whether the file holds an input the other way from how the workflow declares it. */
 export function heldTheOtherWay(input: InputValues): boolean {
   return input.read && input.shape !== input.kind;
@@ -270,18 +261,23 @@ function readAxes(node: unknown): AxisValues[] | null {
 }
 
 /** `declared` are the inputs the workflow declares, when they could be read. */
-export function readTask(doc: Doc, declared: DeclaredInput[] | null = null): TaskRead {
+export function readTask(
+  values: Values,
+  declared: DeclaredInput[] | null = null,
+): TaskRead {
   const unreadable: string[] = [];
-  const at = (...path: string[]) => textAt(doc, path);
+  const at = (...path: string[]) => textAt(values, path);
+  // A key written with nothing after it holds null, as good as not there.
+  const part = (key: string) => values[key] ?? undefined;
 
-  const axes = readAxes(exactAt(doc, ['repeat']));
+  const axes = readAxes(part('repeat'));
   if (axes === null) unreadable.push('repeat');
   const axisInputs = new Set((axes ?? []).flatMap((axis) => axis.inputs));
-  const inputs = exactAt(doc, ['inputs']);
+  const inputs = part('inputs');
   if (inputs !== undefined && !isRecord(inputs)) unreadable.push('inputs');
 
-  const submissions = valueAt(doc, ['submissions']);
-  const rate = valueAt(doc, ['submissions', 'rate']);
+  const submissions = part('submissions');
+  const rate = isRecord(submissions) ? (submissions['rate'] ?? undefined) : undefined;
   if (
     (submissions !== undefined && !isRecord(submissions)) ||
     (rate !== undefined && !isRecord(rate))
@@ -309,7 +305,7 @@ export function readTask(doc: Doc, declared: DeclaredInput[] | null = null): Tas
   const withGive = [...given, ...missing].map((input) =>
     axisInputs.has(input.id) ? { ...input, give: 'per-run' as const } : input,
   );
-  const scoring = readScoring((path) => exactAt(doc, path));
+  const scoring = readScoring(values);
   unreadable.push(...scoring.unreadable);
 
   return {
@@ -348,7 +344,7 @@ function typedValue(type: string | null, text: string): unknown {
   if (text.trim() === '') return undefined;
   switch (type) {
     case 'number':
-      return numberText(text);
+      return numberValue(text);
     case 'boolean':
       return text.trim() === 'true' ? true : text.trim() === 'false' ? false : text;
     case 'text':
@@ -379,8 +375,8 @@ function inputEntry(input: InputValues): unknown {
   add('label', text(input.label));
   add('options', optionsOf(input.options));
   add('default', typedValue(input.type, input.default));
-  add('min', numberText(input.min));
-  add('max', numberText(input.max));
+  add('min', numberValue(input.min));
+  add('max', numberValue(input.max));
   add('max_size', text(input.maxSize));
   return details;
 }
@@ -399,7 +395,7 @@ function emptyEntry(input: InputValues): boolean {
 }
 
 /** `repeat` as the file holds it: every tuple a map, so a title cannot swap two values. */
-function repeatOf(axes: AxisValues[], inputs: InputValues[]): unknown[] {
+export function repeatOf(axes: AxisValues[], inputs: InputValues[]): unknown[] {
   return axes
     .filter((axis) => axis.inputs.length > 0)
     .map((axis) => ({
@@ -421,10 +417,6 @@ function repeatOf(axes: AxisValues[], inputs: InputValues[]): unknown[] {
 }
 
 /**
- * Write what changed between `before` and `after` into the document. A
- * manager's save leaves the admin's keys alone; the form holds them still too.
- */
-/**
  * The task's values that give text, as the forge reads them: a run's text
  * columns are `verdict` and each text input an axis fills.
  */
@@ -440,8 +432,12 @@ function givingText(values: TaskValues, catalogue: Catalogue): Set<string> {
   return textValues(trees, new Set(['verdict', ...texts]), catalogue);
 }
 
+/**
+ * Write what changed between `before` and `after` into the values. A
+ * manager's save leaves the admin's keys alone; the form holds them still too.
+ */
 export function writeTask(
-  doc: Doc,
+  values: Values,
   before: TaskValues,
   after: TaskValues,
   {
@@ -462,25 +458,25 @@ export function writeTask(
     as: (value: string) => unknown,
     prune = false,
   ) => {
-    if (from !== to) writeAt(doc, path, as(to), { prune });
+    if (from !== to) writeAt(values, path, as(to), { prune });
   };
 
   if (admin) {
     put(['name'], before.name, after.name, (value) => value);
     if (!unreadable.includes('submissions')) {
-      put(['submissions', 'max'], before.max, after.max, numberText, true);
+      put(['submissions', 'max'], before.max, after.max, numberValue, true);
       put(
         ['submissions', 'rate', 'count'],
         before.rateCount,
         after.rateCount,
-        numberText,
+        numberValue,
         true,
       );
       put(
         ['submissions', 'rate', 'per'],
         before.ratePer,
         after.ratePer,
-        numberText,
+        numberValue,
         true,
       );
     }
@@ -490,7 +486,7 @@ export function writeTask(
   if (!unreadable.includes('inputs')) {
     for (const input of before.inputs) {
       if (!after.inputs.some((kept) => kept.id === input.id)) {
-        writeAt(doc, ['inputs', input.id], undefined, { prune: true });
+        writeAt(values, ['inputs', input.id], undefined, { prune: true });
       }
     }
     for (const input of after.inputs) {
@@ -498,7 +494,7 @@ export function writeTask(
       const path = (key?: string) =>
         key === undefined ? ['inputs', input.id] : ['inputs', input.id, key];
       if (input.give === 'per-run') {
-        writeAt(doc, path(), undefined, { prune: true });
+        writeAt(values, path(), undefined, { prune: true });
         continue;
       }
       if (input.give === 'entrant') {
@@ -507,16 +503,16 @@ export function writeTask(
           was.give !== 'entrant' ||
           JSON.stringify(entrantEntry(was)) !== JSON.stringify(entrantEntry(input))
         ) {
-          writeAt(doc, path(), entrantEntry(input), { prune: true });
+          writeAt(values, path(), entrantEntry(input), { prune: true });
         }
         continue;
       }
       if (was === undefined && emptyEntry(input)) continue;
       if (was === undefined || was.shape !== input.kind) {
-        writeAt(doc, path(), inputEntry(input), { prune: true });
+        writeAt(values, path(), inputEntry(input), { prune: true });
       } else if (input.kind === 'value') {
         if (was.value !== input.value || was.secret !== input.secret) {
-          writeAt(doc, path(), inputEntry(input), { prune: true });
+          writeAt(values, path(), inputEntry(input), { prune: true });
         }
       } else {
         // An entrant's input left with no detail goes from the settings, as
@@ -530,8 +526,8 @@ export function writeTask(
           (value) => typedValue(input.type, value),
           true,
         );
-        put(path('min'), was.min, input.min, numberText, true);
-        put(path('max'), was.max, input.max, numberText, true);
+        put(path('min'), was.min, input.min, numberValue, true);
+        put(path('max'), was.max, input.max, numberValue, true);
         put(path('max_size'), was.maxSize, input.maxSize, text, true);
       }
     }
@@ -542,14 +538,14 @@ export function writeTask(
     JSON.stringify(before.axes) !== JSON.stringify(after.axes)
   ) {
     const written = repeatOf(after.axes, after.inputs);
-    writeAt(doc, ['repeat'], written.length === 0 ? undefined : written, {
+    writeAt(values, ['repeat'], written.length === 0 ? undefined : written, {
       prune: true,
     });
   }
 
   if (!unreadable.includes('scoring') || !unreadable.includes('checks')) {
     writeScoring(
-      doc,
+      values,
       {
         scoreGroups: before.scoreGroups,
         scoreValues: before.scoreValues,

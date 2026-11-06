@@ -1,20 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { parse } from 'yaml';
-import { CLASSIC, PRIMITIVES } from '@/test/workflows';
+import { acceptsOf, CLASSIC, PRIMITIVES } from '@/test/workflows';
 import { readWorkflow, type Ref } from './model';
 import { byRef, type PrimitiveInfo } from './primitives';
 import {
-  mayBeOptional,
-  newProblem,
+  dragRefusal,
   orderAfterWire,
-  outputRefusal,
   outputSources,
   outputType,
   portFor,
-  valueRefusal,
-  wireRefusal,
 } from './rules';
-import { NumberText } from '../forms/yaml-doc';
 
 const CHECKER: PrimitiveInfo = {
   ref: 'unicon/checker-like@v1',
@@ -30,6 +25,7 @@ const CHECKER: PrimitiveInfo = {
   inputs: {
     mode: {
       type: 'enum',
+      accepts: acceptsOf('enum'),
       options: ['exact', 'tokens'],
       optional: false,
       runs: null,
@@ -45,6 +41,7 @@ const CHECKER: PrimitiveInfo = {
     },
     note: {
       type: 'text',
+      accepts: acceptsOf('text'),
       optional: true,
       options: null,
       runs: null,
@@ -62,6 +59,7 @@ const CHECKER: PrimitiveInfo = {
   outputs: {
     fraction: {
       type: 'number',
+      accepts: null,
       optional: true,
       options: null,
       runs: null,
@@ -77,6 +75,7 @@ const CHECKER: PrimitiveInfo = {
     },
     outcome: {
       type: 'outcome',
+      accepts: null,
       optional: false,
       options: null,
       runs: null,
@@ -111,6 +110,7 @@ inputs:
   limit: number
   episodes: number
   key: {type: text, optional: true}
+  maybe: {type: folder, optional: true}
   flag: boolean
 steps:
   - {id: build, use: unicon/exec@v4, with: {source: "\${{ inputs.submission }}", language: c}}
@@ -130,36 +130,44 @@ const output = (name: string, out: string): Ref => ({
 describe('the drag rules', () => {
   it.each([
     ['a file into a folder port', 0, 'source', input('submission')],
-    ['an enum within the port’s options', 0, 'language', input('language')],
+    [
+      'an enum into an enum port, its options checked after the drop',
+      0,
+      'language',
+      input('wide'),
+    ],
     ['a number into a text port', 1, 'args', input('limit')],
     ['a boolean into a text port', 1, 'args', input('flag')],
     ['a file input into a file port', 1, 'stdin', input('input')],
-    ['an optional input into an optional port', 1, 'args', input('key')],
-    ['an input into a port that raises a limit', 1, 'time_limit', input('limit')],
     [
-      'another input into a port that raises a limit',
-      1,
-      'memory_limit',
-      input('episodes'),
+      'an optional input into a required port, checked after the drop',
+      0,
+      'source',
+      input('maybe'),
     ],
     [
-      'a step output into a port that raises no limit',
-      3,
-      'entry',
+      'a step output into a port that raises a limit, checked after the drop',
+      1,
+      'time_limit',
       output('check', 'fraction'),
     ],
-    ['an enum within an enum port', 2, 'mode', input('mode')],
-  ] as const)('lets %s be wired', (_, step, port, source) => {
-    expect(wireRefusal(WORKFLOW, primitives, step, port, source)).toBeNull();
+    [
+      'a workflow file into a folder port',
+      0,
+      'source',
+      { kind: 'workflow', name: 'checker/program.yaml' },
+    ],
+  ] as const)('lets %s be dropped', (_, step, port, source) => {
+    expect(dragRefusal(WORKFLOW, primitives, step, port, source)).toBeNull();
   });
 
   it.each([
     [
-      'the wrong type',
+      'a number into a folder port',
       0,
       'source',
       input('limit'),
-      'This takes a folder, not a number.',
+      'This takes a file or a folder, not a number.',
     ],
     [
       'a boolean into a file port',
@@ -169,32 +177,39 @@ describe('the drag rules', () => {
       'This takes a file, not true or false.',
     ],
     [
-      'an enum outside the port’s options',
-      0,
-      'language',
-      input('wide'),
-      'This takes one of c, cpp, java, kotlin, python, ipynb, javascript, typescript, csharp, rust, r, ruby, not cobol.',
-    ],
-    [
-      'a step reading its own output',
+      'a number output into a file port',
       1,
-      'memory_limit',
-      output('run', 'time_ms'),
-      'There is no step called run before this one.',
+      'stdin',
+      output('check', 'fraction'),
+      'This takes a file, not a number.',
     ],
     [
       'a number into an enum port',
       2,
       'mode',
       output('run', 'time_ms'),
-      'This takes one of exact, tokens.',
+      'This takes one of a list, not a number.',
     ],
     [
-      'an optional input into a required port',
-      0,
-      'source',
-      input('key'),
-      'That input is optional, so it can be given only to an optional port.',
+      'a folder into a file port',
+      1,
+      'stdin',
+      { kind: 'workflow', name: 'checker/' },
+      'This takes a file, not a folder.',
+    ],
+    [
+      'an outcome',
+      3,
+      'entry',
+      output('check', 'outcome'),
+      'This takes text, a number, true or false or one of a list, not an outcome.',
+    ],
+    [
+      'a step reading its own output',
+      1,
+      'memory_limit',
+      output('run', 'time_ms'),
+      'A step can’t read its own output.',
     ],
     [
       'a loop',
@@ -203,104 +218,13 @@ describe('the drag rules', () => {
       output('run', 'log'),
       'That would make a loop: run already reads this step.',
     ],
-  ] as const)('refuses %s with its reason', (_, step, port, source, reason) => {
-    expect(wireRefusal(WORKFLOW, primitives, step, port, source)).toBe(reason);
-  });
-
-  it('refuses a step output into a port that raises a limit', () => {
-    const workflow = readWorkflow(
-      parse(`
-inputs: {}
-steps:
-  - {id: first, use: unicon/exec@v4, with: {${RUNS}}}
-  - {id: second, use: unicon/exec@v4, with: {${RUNS}}}
-`),
-    );
-
-    expect(
-      wireRefusal(workflow, primitives, 1, 'time_limit', output('first', 'time_ms')),
-    ).toBe('This value raises a limit, so it must be known when the task is saved.');
-  });
-
-  it('refuses an optional output into a required port', () => {
-    const workflow = readWorkflow(
-      parse(`
-steps:
-  - {id: check, use: unicon/checker-like@v1, with: {}}
-  - {id: run, use: unicon/exec@v4, with: {${RUNS}}}
-`),
-    );
-
-    expect(
-      wireRefusal(workflow, primitives, 1, 'time_limit', output('check', 'fraction')),
-    ).toBe('This value raises a limit, so it must be known when the task is saved.');
-    expect(
-      wireRefusal(workflow, primitives, 1, 'args', output('check', 'fraction')),
-    ).toBeNull();
-    expect(
-      wireRefusal(workflow, primitives, 1, 'source', output('check', 'fraction')),
-    ).toBe('That output may be missing, so it can be given only to an optional port.');
+  ] as const)('greys out %s', (_, step, port, source, reason) => {
+    expect(dragRefusal(WORKFLOW, primitives, step, port, source)).toBe(reason);
   });
 
   it('lets a step read one listed after it when that makes no loop', () => {
     expect(
-      wireRefusal(WORKFLOW, primitives, 0, 'entry', output('late', 'log')),
-    ).toBeNull();
-  });
-
-  it('reports only text and numbers', () => {
-    expect(outputRefusal(WORKFLOW, primitives, output('run', 'time_ms'))).toBeNull();
-    expect(outputRefusal(WORKFLOW, primitives, output('run', 'output'))).toBe(
-      'steps.run.output is a file, and only text or a number can be reported.',
-    );
-    expect(outputRefusal(WORKFLOW, primitives, input('limit'))).toBe(
-      "Only a step's output can be reported, not an input or a file of the workflow.",
-    );
-  });
-
-  it('takes text with values written in only into a text port', () => {
-    expect(
-      valueRefusal(WORKFLOW, primitives, 1, 'args', '--n ${{ inputs.episodes }}', [
-        input('episodes'),
-      ]),
-    ).toBeNull();
-    expect(
-      valueRefusal(WORKFLOW, primitives, 1, 'time_limit', '${{ inputs.limit }}s', [
-        input('limit'),
-      ]),
-    ).toBe('This value raises a limit, so it must be known when the task is saved.');
-    expect(
-      valueRefusal(WORKFLOW, primitives, 0, 'language', '${{ inputs.limit }}s', [
-        input('limit'),
-      ]),
-    ).toBe(
-      'This takes one of c, cpp, java, kotlin, python, ipynb, javascript, typescript, csharp, rust, r, ruby.',
-    );
-    expect(
-      valueRefusal(WORKFLOW, primitives, 0, 'entry', 'x ${{ inputs.missing }}', [
-        input('missing'),
-      ]),
-    ).toBe('The workflow has no input called missing.');
-    expect(
-      valueRefusal(WORKFLOW, primitives, 1, 'args', 'x ${{ inputs.key }}', [
-        input('key'),
-      ]),
-    ).toBe(
-      '${{ inputs.key }} is optional, so it can be given only whole, to an optional port, not written into text.',
-    );
-    expect(valueRefusal(WORKFLOW, primitives, 0, 'language', 'cobol', [])).toBe(
-      'This takes one of c, cpp, java, kotlin, python, ipynb, javascript, typescript, csharp, rust, r, ruby.',
-    );
-    expect(valueRefusal(WORKFLOW, primitives, 1, 'stdin', true, [])).toBe(
-      'This takes a file, not true or false.',
-    );
-    expect(
-      valueRefusal(WORKFLOW, primitives, 1, 'stdin', 'x ${{ steps.run.output }}', [
-        output('run', 'output'),
-      ]),
-    ).toBe("A step's output can be given only whole, not written into text.");
-    expect(
-      valueRefusal(WORKFLOW, primitives, 1, 'time_limit', new NumberText('2'), []),
+      dragRefusal(WORKFLOW, primitives, 0, 'entry', output('late', 'log')),
     ).toBeNull();
   });
 
@@ -318,80 +242,6 @@ steps:
     expect(orderAfterWire(workflow, 0, 3)).toEqual([3, 0, 1, 2]);
     expect(orderAfterWire(workflow, 2, 3)).toEqual([0, 1, 3, 2]);
   });
-
-  it('offers optional only on an input every use of which is an optional port, whole', () => {
-    const workflow = readWorkflow(
-      parse(`
-inputs:
-  key: text
-  other: text
-steps:
-  - {id: run, use: unicon/exec@v4, with: {source: "\${{ inputs.other }}", language: c, time_limit: 1, memory_limit: 256, args: "\${{ inputs.key }}"}}
-`),
-    );
-
-    expect(mayBeOptional(workflow, primitives, 'key')).toBe(true);
-    expect(mayBeOptional(workflow, primitives, 'other')).toBe(false);
-  });
-
-  it('names a text output and a number output', () => {
-    const workflow = readWorkflow(parse(CLASSIC));
-
-    expect(outputRefusal(workflow, primitives, output('run', 'log'))).toBeNull();
-    expect(outputRefusal(workflow, primitives, output('run', 'memory_kb'))).toBeNull();
-  });
-
-  it('names what a change of a declaration newly breaks', () => {
-    const before = readWorkflow(parse(CLASSIC));
-    const after = readWorkflow(
-      parse(CLASSIC.replace('time_limit: number', 'time_limit: text')),
-    );
-
-    expect(newProblem(before, before, primitives)).toBeNull();
-    expect(newProblem(before, after, primitives)).toBe(
-      'run.time_limit: This takes a number, not text.',
-    );
-  });
-});
-
-describe('workflow-owned sources', () => {
-  it('requires the exact file or folder type', () => {
-    expect(
-      wireRefusal(WORKFLOW, primitives, 0, 'source', {
-        kind: 'workflow',
-        name: 'checker/',
-      }),
-    ).toBeNull();
-    expect(
-      wireRefusal(WORKFLOW, primitives, 0, 'source', {
-        kind: 'workflow',
-        name: 'checker/program.yaml',
-      }),
-    ).toBe('This takes a folder, not a file.');
-    expect(
-      wireRefusal(WORKFLOW, primitives, 1, 'stdin', {
-        kind: 'workflow',
-        name: 'checker/program.yaml',
-      }),
-    ).toBeNull();
-    expect(
-      wireRefusal(WORKFLOW, primitives, 1, 'stdin', {
-        kind: 'workflow',
-        name: 'checker/',
-      }),
-    ).toBe('This takes a file, not a folder.');
-  });
-
-  it('never reports a workflow file as an output', () => {
-    expect(
-      outputRefusal(WORKFLOW, primitives, {
-        kind: 'workflow',
-        name: 'checker/program.yaml',
-      }),
-    ).toBe(
-      "Only a step's output can be reported, not an input or a file of the workflow.",
-    );
-  });
 });
 
 describe('a wire dropped on a box', () => {
@@ -403,8 +253,8 @@ describe('a wire dropped on a box', () => {
 
   it('else goes to the first input given nothing, leaving the refusal to the drag rules', () => {
     expect(portFor(WORKFLOW, primitives, 1, input('input'))).toEqual({ port: 'entry' });
-    expect(wireRefusal(WORKFLOW, primitives, 1, 'entry', input('input'))).toBe(
-      'This takes text, not a file.',
+    expect(dragRefusal(WORKFLOW, primitives, 1, 'entry', input('input'))).toBe(
+      'This takes text, a number, true or false or one of a list, not a file.',
     );
   });
 
@@ -419,8 +269,8 @@ steps:
 `),
     );
     expect(portFor(given, primitives, 0, input('input'))).toEqual({ port: 'manifest' });
-    expect(wireRefusal(given, primitives, 0, 'files', input('input'))).toBe(
-      'This takes named files, not a file.',
+    expect(dragRefusal(given, primitives, 0, 'files', input('input'))).toBe(
+      'This takes named files, which no wire gives.',
     );
   });
 
@@ -435,7 +285,15 @@ steps:
           run: true,
           newer: null,
           description: null,
-          inputs: [{ name: 'source', type: 'folder', optional: false, options: null }],
+          inputs: [
+            {
+              name: 'source',
+              type: 'folder',
+              optional: false,
+              options: null,
+              accepts: acceptsOf('folder'),
+            },
+          ],
           outputs: [],
         },
       ],
@@ -465,30 +323,51 @@ describe('a run workflow as a step', () => {
   const boxed = readWorkflow(
     parse('steps:\n  - {id: build, use: kenny/inner@v1, with: {level: high}}\n'),
   );
-  const box = (level: string[]) => ({
-    run: true,
-    newer: null,
-    description: null,
-    inputs: [{ name: 'level', type: 'enum', optional: false, options: level }],
-    outputs: [
-      { name: 'program', type: 'file' },
-      { name: 'took_ms', type: 'number' },
-    ],
-  });
   const boxes = new Map([
-    ['kenny/inner@v1', box(['low', 'high'])],
-    ['kenny/inner@v2', box(['low'])],
+    [
+      'kenny/inner@v1',
+      {
+        run: true,
+        newer: null,
+        description: null,
+        inputs: [
+          {
+            name: 'level',
+            type: 'enum',
+            optional: false,
+            options: ['low', 'high'],
+            accepts: acceptsOf('enum'),
+          },
+        ],
+        outputs: [
+          { name: 'program', type: 'file' },
+          { name: 'took_ms', type: 'number' },
+        ],
+      },
+    ],
   ]);
 
-  it('takes a value its box declares, and refuses one it does not', () => {
-    expect(valueRefusal(boxed, primitives, 0, 'level', 'low', [], boxes)).toBeNull();
-    expect(valueRefusal(boxed, primitives, 0, 'level', 'mid', [], boxes)).toBe(
-      'This takes one of low, high.',
+  it('takes a wire its box says the port accepts', () => {
+    const given = readWorkflow(
+      parse(`
+inputs:
+  level: {type: enum, options: [low]}
+  count: number
+steps:
+  - {id: build, use: kenny/inner@v1, with: {}}
+`),
+    );
+    expect(
+      dragRefusal(given, primitives, 0, 'level', input('level'), boxes),
+    ).toBeNull();
+    expect(dragRefusal(given, primitives, 0, 'level', input('count'), boxes)).toBe(
+      'This takes one of a list, not a number.',
     );
   });
 
-  it('offers its text and number outputs to be reported, with their types', () => {
+  it('offers every output to be named, with its type', () => {
     expect(outputSources(boxed, primitives, boxes)).toEqual([
+      { kind: 'steps', name: 'build', output: 'program' },
       { kind: 'steps', name: 'build', output: 'took_ms' },
     ]);
     expect(
@@ -499,14 +378,5 @@ describe('a run workflow as a step', () => {
         boxes,
       ),
     ).toBe('number');
-  });
-
-  it('refuses a version whose box would refuse a value the step gives', () => {
-    const moved = readWorkflow(
-      parse('steps:\n  - {id: build, use: kenny/inner@v2, with: {level: high}}\n'),
-    );
-    expect(newProblem(boxed, moved, primitives, boxes)).toBe(
-      'build.level: This takes one of low.',
-    );
   });
 });

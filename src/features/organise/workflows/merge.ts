@@ -1,5 +1,4 @@
 import { isMap, isSeq, type Node } from 'yaml';
-import { instantOf } from './times';
 import { compareDecimal } from '@/lib/exact';
 import {
   isRecord,
@@ -11,7 +10,7 @@ import {
   type Doc,
 } from './yaml-doc';
 
-/** An item of a keyed list, named by the value of its key: `tasks[sum]`. */
+/** An item of a keyed list, named by the value of its key: `steps[run]`. */
 type ItemStep = { key: string; value: string };
 
 /**
@@ -47,33 +46,15 @@ export type FieldDiff = {
 export type Side = 'mine' | 'theirs';
 
 /**
- * What the merge knows of a definition file. `keyed` names each list whose
- * items have an identity, by the list's path (`[]` for an item of a keyed
- * list above it), and the key that names an item. `adminOnly` is the file's
- * top-level keys only an admin may change (PROPOSAL section 10).
+ * The lists whose items have an identity, by the list's path (`[]` for an
+ * item of a keyed list above it), and the key that names an item: a
+ * workflow's steps, by id.
  */
-type FileRules = {
-  keyed: { list: string; key: string }[];
-  adminOnly: string[];
-};
+type Keyed = { list: string; key: string }[];
 
-const FILE_RULES: Record<string, FileRules> = {
-  'contest.yaml': {
-    keyed: [{ list: 'tasks', key: 'id' }],
-    adminOnly: ['name', 'description', 'state', 'visibility', 'registration'],
-  },
-  'task.yaml': { keyed: [], adminOnly: ['name', 'submissions'] },
-  'workflow.yaml': { keyed: [{ list: 'steps', key: 'id' }], adminOnly: [] },
-};
+const KEYED: Keyed = [{ list: 'steps', key: 'id' }];
 
-function rulesOf(file: string): FileRules {
-  return FILE_RULES[file] ?? { keyed: [], adminOnly: [] };
-}
-
-/**
- * Equal as the file means them: two times naming the same moment are one,
- * and two numbers that are the same to the last digit, however spelled.
- */
+/** Equal as the file means them: two numbers the same to the last digit, however spelled. */
 function same(a: unknown, b: unknown): boolean {
   if (a === b) return true;
   if (a instanceof NumberText || b instanceof NumberText) {
@@ -82,10 +63,6 @@ function same(a: unknown, b: unknown): boolean {
     const right =
       b instanceof NumberText ? b.text : typeof b === 'number' ? String(b) : null;
     return left !== null && right !== null && compareDecimal(left, right) === 0;
-  }
-  if (typeof a === 'string' && typeof b === 'string') {
-    const at = instantOf(a);
-    return at !== null && at === instantOf(b);
   }
   if (Array.isArray(a) && Array.isArray(b)) {
     return a.length === b.length && a.every((item, index) => same(item, b[index]));
@@ -100,7 +77,7 @@ function same(a: unknown, b: unknown): boolean {
   return false;
 }
 
-/** A path's shape, the form a keyed-list rule names it by: `tasks[].due`. */
+/** A path's shape, the form a keyed-list rule names it by: `steps[].with`. */
 function shapeOf(path: MergePath): string {
   return path
     .map((step, index) =>
@@ -128,8 +105,6 @@ function itemsByKey(list: unknown, key: string): Map<string, unknown> | null {
   }
   return items;
 }
-
-type Keyed = FileRules['keyed'];
 
 function walk(
   path: MergePath,
@@ -209,17 +184,16 @@ function keyedList(
 
 /**
  * Every field the two versions disagree on. Mappings both sides have are
- * compared key by key, and keyed lists (the file's rules) item by item, each
- * item matched by its key, with the list's order a field of its own. Any other
- * value, a list of no keyed kind among them, is one field.
+ * compared key by key, and the steps item by item, each matched by its id,
+ * with their order a field of its own. Any other value, another list among
+ * them, is one field.
  */
 export function differences(
   base: unknown,
   mine: unknown,
   theirs: unknown,
-  file = '',
 ): FieldDiff[] {
-  return walk([], base, mine, theirs, rulesOf(file).keyed);
+  return walk([], base, mine, theirs, KEYED);
 }
 
 /** Whether one side changed the field since the organiser read it. */
@@ -245,13 +219,7 @@ export function bothChanged(diff: FieldDiff): boolean {
   return changedBy(diff, 'mine') && changedBy(diff, 'theirs');
 }
 
-/** Whether only an admin may change the field, so a manager keeps the current one. */
-export function adminOnly(diff: FieldDiff, file: string): boolean {
-  const [top] = diff.path;
-  return typeof top === 'string' && rulesOf(file).adminOnly.includes(top);
-}
-
-/** A path as the organiser reads one, each item by its key: `tasks[sum].due`. */
+/** A path as a person reads one, each item by its key: `steps[run].with`. */
 export function pathText(path: MergePath): string {
   return path
     .map((step, index) =>

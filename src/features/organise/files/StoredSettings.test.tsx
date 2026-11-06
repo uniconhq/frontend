@@ -2,14 +2,16 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@/test/user-event';
 import { http, HttpResponse } from 'msw';
+import { holding } from '@/test/may';
 import { renderApp } from '@/test/render';
-import { afterAnswers, problem, server, signedIn, someone } from '@/test/server';
+import { afterAnswers, problem, server, signedIn } from '@/test/server';
 import {
   CONTEST_API,
   TASK_API,
   files,
   publicationList,
   repoFiles,
+  settingsOf,
   taskList,
   taskState,
 } from '@/test/organiser';
@@ -122,7 +124,7 @@ describe("a contest's stored settings that cannot be read", () => {
     renderApp(CONTEST_SETTINGS);
 
     const part = await stored();
-    expect(await within(part).findByText('Not found')).toBeVisible();
+    expect(await within(part).findByText('Couldn’t load')).toBeVisible();
     expect(within(part).getByRole('button', { name: /Try again/ })).toBeVisible();
   });
 });
@@ -167,9 +169,15 @@ const BROKEN = {
   version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
 };
 
+/** The contest's settings as the forms read them: not as settings. */
+const UNREADABLE = http.get(`${CONTEST_API}/settings`, () =>
+  HttpResponse.json(settingsOf(null)),
+);
+
 /** The contest with its settings broken, each read counted as `reads` says. */
 function brokenContest(reads: { count: number } = { count: 0 }) {
   return [
+    UNREADABLE,
     http.get(CONTEST_FILE, ({ params }) => {
       if (params['path'] !== 'contest.yaml') return undefined;
       reads.count += 1;
@@ -251,6 +259,7 @@ describe("saving the contest's settings as text", () => {
         if (saved) await held;
         return HttpResponse.json(BROKEN);
       }),
+      UNREADABLE,
       ...repoFiles,
       http.put(CONTEST_FILE, () => {
         saved = true;
@@ -300,6 +309,7 @@ describe('settings someone else saved first', () => {
           ? HttpResponse.json(theirs ? THEIRS : BROKEN)
           : undefined,
       ),
+      UNREADABLE,
       ...repoFiles,
       http.put(CONTEST_FILE, async ({ request }) => {
         const body = (await request.json()) as { content: string; token: string };
@@ -431,6 +441,9 @@ describe('mending settings that do not read', () => {
           : undefined,
       ),
       http.put(TASK_FILE, answer),
+      http.get(`${TASK_API}/settings`, () =>
+        HttpResponse.json(settingsOf(null, 'token-broken')),
+      ),
       ...repoFiles,
     );
   }
@@ -439,7 +452,7 @@ describe('mending settings that do not read', () => {
     brokenBackend(() =>
       problem(422, 'invalid_definition', {
         detail: 'task.yaml does not validate.',
-        errors: [{ path: 'workflow', message: 'There is no such workflow.' }],
+        errors: [{ path: ['workflow'], message: 'There is no such workflow.' }],
       }),
     );
     renderApp(TASK_SETTINGS);
@@ -455,7 +468,7 @@ describe('mending settings that do not read', () => {
     );
     await userEvent.click(screen.getByRole('button', { name: 'Save' }));
 
-    const alert = await screen.findByText('Nothing was saved', { exact: false });
+    const alert = await screen.findByText('task.yaml does not validate.');
     const errors = within(alert.closest('[role="alert"]') as HTMLElement).getByRole(
       'list',
       { name: 'Errors' },
@@ -493,18 +506,20 @@ describe('mending settings that do not read', () => {
     expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
   });
 
+  it('offers a manager the text to mend, as the forge lets them write it', async () => {
+    brokenBackend(() => HttpResponse.json({}));
+    server.use(signedIn, ...holding('manager'));
+    renderApp(TASK_SETTINGS);
+
+    expect(
+      await screen.findByRole('textbox', { name: 'task.yaml' }),
+    ).not.toHaveAttribute('readonly');
+    expect(screen.getByRole('button', { name: 'Save' })).toBeVisible();
+  });
+
   it('shows anyone else the text to read, and who may mend it', async () => {
     brokenBackend(() => HttpResponse.json({}));
-    server.use(
-      http.get('/api/v1/me', () =>
-        HttpResponse.json({
-          ...someone,
-          roles: [
-            { names: { org: 'acme', contest: 'spring', task: 'sum' }, role: 'manager' },
-          ],
-        }),
-      ),
-    );
+    server.use(signedIn, ...holding('observer'));
     renderApp(TASK_SETTINGS);
 
     expect(
@@ -524,7 +539,7 @@ describe('mending settings that do not read', () => {
         problem(422, 'invalid_definition', {
           errors: [
             {
-              path: 'registration.invite_only',
+              path: ['registration', 'invite_only'],
               message: 'invite_only is retired: say who enters with registration.ways.',
             },
           ],

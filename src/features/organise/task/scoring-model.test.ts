@@ -1,6 +1,5 @@
 import {
-  runsOf,
-  submissionRuns,
+  draftRunRows,
   runName,
   ticksOf,
   withTick,
@@ -8,13 +7,15 @@ import {
   outputColumns,
   type ScoreGroup,
 } from './scoring-model';
+import type { DraftRun } from '@/api/types';
 import { emptyTuple, type AxisValues } from '../forms/task-values';
 import { describe, expect, it } from 'vitest';
 import { specCatalogue } from '@/test/catalogue';
 import { readLine, type FormulaScope } from '../formula/parse';
 import type { DeclaredInput } from '@/api/types';
 import { readTask, writeTask } from '../forms/task-values';
-import { exactAt, parseYaml, writeYaml, type Doc } from '../forms/yaml-doc';
+import type { Values } from '../forms/values';
+import { taskFileOf, taskValuesOf } from '@/test/task-values';
 import {
   axisColumns,
   columnsOf,
@@ -27,13 +28,13 @@ import {
   renamedInShow,
   runMoments,
   scopeOf,
+  troublesOf,
   valueTree,
   withLine,
   withMoment,
   withRunMoment,
   writeScoring,
 } from './scoring-model';
-import { parse } from 'yaml';
 
 const catalogue = specCatalogue();
 
@@ -59,16 +60,16 @@ scoring:
     by_file: {block: sum, over: {runs: all}, of: {run: [all, passed]}, weights: {input: {tests/7.in: 3}}}
 `;
 
-function open(text: string): Doc {
-  const parsed = parseYaml(text);
-  if ('error' in parsed) throw new Error(parsed.error);
-  return parsed.doc;
+function open(text: string): Values {
+  const values = taskValuesOf(text);
+  if (values === null) throw new Error('not settings');
+  return values;
 }
 
 describe('an exec value and weights', () => {
   it('print as lines a formula reads back to the same trees', () => {
     const doc = open(TASK);
-    const read = readScoring((path) => exactAt(doc, path));
+    const read = readScoring(doc);
     const lines = read.scoreValues.map((value) => printed(value, catalogue));
     expect(lines).toEqual([
       'exec("programs/mean/", python, all)',
@@ -87,7 +88,7 @@ describe('an exec value and weights', () => {
 
   it('write back each weighed value as the type the runs were given', () => {
     const doc = open(TASK);
-    const before = readScoring((path) => exactAt(doc, path));
+    const before = readScoring(doc);
     const after = {
       ...before,
       scoreValues: before.scoreValues.map((value) => ({
@@ -96,11 +97,14 @@ describe('an exec value and weights', () => {
       })),
     };
     writeScoring(doc, before, after, (value) => valueTree(value, scope, catalogue));
-    const text = writeYaml(doc);
-    expect(text).toContain('weights: {seed: {1: 4}}');
-    expect(text).toContain('weights: {input: {tests/7.in: 3}}');
-    expect(text).toContain('program: programs/mean/');
-    expect(text).toContain('language: python');
+    // A weight's key is text; the forge gives it the type of the value it names.
+    expect(taskFileOf(doc)['scoring']).toMatchObject({
+      values: {
+        spread: { program: 'programs/mean/', language: 'python' },
+        weighted: { weights: { seed: { '1': 4 } } },
+        by_file: { weights: { input: { 'tests/7.in': 3 } } },
+      },
+    });
   });
 });
 
@@ -148,18 +152,19 @@ describe('a check', () => {
       },
       { admin: false, unreadable },
     );
-    const text = writeYaml(doc);
-    expect(text).toContain('code: solutions/ok.py\n');
-    expect(text).toContain('n: 6\n');
-    expect(text).toContain('strict: false\n');
-    expect(text).toContain('mode: "7"\n');
+    expect(doc['checks']).toEqual([
+      {
+        submit: { code: 'solutions/ok.py', n: 6, strict: false, mode: '7' },
+        expect: { verdict: 'accepted' },
+      },
+    ]);
   });
 });
 
 describe('a value’s line', () => {
   it('empties, rather than springing back to the formula read', () => {
     const doc = open(TASK);
-    const [spread] = readScoring((path) => exactAt(doc, path)).scoreValues;
+    const [spread] = readScoring(doc).scoreValues;
     if (spread === undefined) throw new Error('no value');
     const emptied = withLine(spread, '', scope, catalogue);
     expect(emptied.tree).toBeNull();
@@ -236,27 +241,28 @@ describe('a show', () => {
     ]) {
       const text = `name: Sum\nscoring:\n  values: {points: 1}\n${show}`;
       const doc = open(text);
-      const before = readScoring((path) => exactAt(doc, path));
+      const read = structuredClone(doc);
+      const before = readScoring(doc);
       expect(before.unreadable).toContain('scoring');
       const after = {
         ...before,
         scoreValues: before.scoreValues.map((value) => ({ ...value, tree: '2' })),
       };
       writeScoring(doc, before, after, (value) => value.tree);
-      expect(writeYaml(doc)).toBe(text);
+      expect(doc).toEqual(read);
     }
   });
 
   it('reads a show in the shape, or none, as readable', () => {
     for (const show of ['', '  show:\n    always:\n      values: [points]\n']) {
       const doc = open(`name: Sum\nscoring:\n  values: {points: 1}\n${show}`);
-      expect(readScoring((path) => exactAt(doc, path)).unreadable).toEqual([]);
+      expect(readScoring(doc).unreadable).toEqual([]);
     }
   });
 
   it('round-trips unchanged: a switch turned on and off again writes nothing', () => {
     const doc = open(SHOWN);
-    const before = readScoring((path) => exactAt(doc, path));
+    const before = readScoring(doc);
     const toggled = withMoment(
       withMoment(before.show, 'values', 'bonus', 'always', true),
       'values',
@@ -273,12 +279,12 @@ describe('a show', () => {
     );
     expect(back).toEqual(before.show);
     writeScoring(doc, before, { ...before, show: back }, (value) => value.tree);
-    expect(writeYaml(doc)).toBe(SHOWN);
+    expect(doc).toEqual(open(SHOWN));
   });
 
   it('writes each moment as it read it when the rest of scoring changes', () => {
     const doc = open(SHOWN);
-    const before = readScoring((path) => exactAt(doc, path));
+    const before = readScoring(doc);
     const after = {
       ...before,
       scoreValues: before.scoreValues.map((value) =>
@@ -286,14 +292,15 @@ describe('a show', () => {
       ),
     };
     writeScoring(doc, before, after, (value) => value.tree);
-    const read = (text: string) =>
-      (parse(text) as { scoring: { show: unknown } }).scoring.show;
-    expect(read(writeYaml(doc))).toEqual(read(SHOWN));
+    expect(taskFileOf(doc)['scoring']).toMatchObject({
+      values: { points: 1, bonus: 3 },
+      show: (taskFileOf(open(SHOWN))['scoring'] as { show: unknown }).show,
+    });
   });
 
   it('leaves out an empty moment, list and run entry, and show itself when nothing is shown', () => {
     const doc = open(SHOWN);
-    const before = readScoring((path) => exactAt(doc, path));
+    const before = readScoring(doc);
     let show = before.show;
     for (const [moment, name] of [
       ['always', 'points'],
@@ -314,7 +321,7 @@ describe('a show', () => {
     }
     expect(show).toEqual(emptyShow());
     writeScoring(doc, before, { ...before, show }, (value) => value.tree);
-    expect(writeYaml(doc)).not.toContain('show');
+    expect(doc['scoring']).not.toHaveProperty('show');
   });
 
   it('turns both later moments on with Always, which they never do to each other', () => {
@@ -356,16 +363,11 @@ describe('a show', () => {
   });
 
   it('calls it hiding only when a part shown always stops reaching what it reached', () => {
-    const rows = runsOf([
-      {
-        inputs: ['input'],
-        tuples: ['sample.in', 'big.in'].map((value) => ({
-          title: '',
-          maxSize: '',
-          cells: { input: { entrant: false, value } },
-        })),
-      },
-    ]);
+    const rows = ['sample.in', 'big.in'].map((input, index) => ({
+      id: String(index),
+      title: input,
+      cells: { input },
+    }));
     const sample: ScoreGroup = {
       key: 'g',
       name: 'sample',
@@ -423,21 +425,21 @@ describe('a show', () => {
 });
 
 describe('a scoring write', () => {
-  it('renames a value where it stands, keeps comments, and renames it in show', () => {
-    const text = [
-      'name: Mean',
-      'scoring:',
-      '  values:',
-      '    # the main score',
-      '    score: 1 # one point',
-      '    extra: 2',
-      '  show:',
-      '    always:',
-      '      values: [score]',
-      '',
-    ].join('\n');
-    const doc = open(text);
-    const before = readScoring((path) => exactAt(doc, path));
+  it('renames a value where it stands, and renames it in show', () => {
+    const doc = open(
+      [
+        'name: Mean',
+        'scoring:',
+        '  values:',
+        '    score: 1',
+        '    extra: 2',
+        '  show:',
+        '    always:',
+        '      values: [score]',
+        '',
+      ].join('\n'),
+    );
+    const before = readScoring(doc);
     const after = {
       ...before,
       scoreValues: before.scoreValues.map((value) =>
@@ -446,34 +448,28 @@ describe('a scoring write', () => {
       show: renamedInShow(before.show, 'values', 'score', 'points'),
     };
     writeScoring(doc, before, after, (value) => value.tree);
-    expect(writeYaml(doc)).toBe(
+    expect(doc['scoring']).toEqual({
+      values: [
+        { name: 'points', formula: 1 },
+        { name: 'extra', formula: 2 },
+      ],
+      show: { always: { values: ['points'] } },
+    });
+  });
+
+  it('renames a chain of values, a to b and b to c where c is removed, each where it stands', () => {
+    const doc = open(
       [
         'name: Mean',
         'scoring:',
         '  values:',
-        '    # the main score',
-        '    points: 1 # one point',
-        '    extra: 2',
-        '  show:',
-        '    always:',
-        '      values: [points]',
+        '    a: 1',
+        '    b: 2',
+        '    c: 3',
         '',
       ].join('\n'),
     );
-  });
-
-  it('renames a chain of values, a to b and b to c where c is removed, each where it stands', () => {
-    const text = [
-      'name: Mean',
-      'scoring:',
-      '  values:',
-      '    a: 1 # first',
-      '    b: 2',
-      '    c: 3',
-      '',
-    ].join('\n');
-    const doc = open(text);
-    const before = readScoring((path) => exactAt(doc, path));
+    const before = readScoring(doc);
     const names: Record<string, string> = { a: 'b', b: 'c' };
     const after = {
       ...before,
@@ -484,11 +480,63 @@ describe('a scoring write', () => {
       ],
     };
     writeScoring(doc, before, after, (value) => value.tree);
-    expect(writeYaml(doc)).toBe(
-      ['name: Mean', 'scoring:', '  values:', '    b: 1 # first', '    c: 2', ''].join(
-        '\n',
-      ),
+    expect(doc['scoring']).toEqual({
+      values: [
+        { name: 'b', formula: 1 },
+        { name: 'c', formula: 2 },
+      ],
+    });
+  });
+
+  it('sends a group or value with no name, two values with one name and a group that picks nothing, for the forge to refuse', () => {
+    const doc = open(
+      ['name: Mean', 'scoring:', '  values:', '    a: 1', ''].join('\n'),
     );
+    const before = readScoring(doc);
+    const groups: ScoreGroup[] = [
+      { key: 'g1', name: '', picks: { seed: ['1'] }, none: false },
+      { key: 'g2', name: 'empty', picks: {}, none: true },
+    ];
+    const after = {
+      ...before,
+      scoreGroups: groups,
+      scoreValues: [
+        ...before.scoreValues,
+        { key: 'v1', name: 'a', text: '', tree: '2' },
+        { key: 'v2', name: '', text: '', tree: '3' },
+      ],
+    };
+    writeScoring(doc, before, after, (value) => value.tree);
+    expect(doc['scoring']).toEqual({
+      groups: [
+        { name: '', picks: { seed: 1 } },
+        { name: 'empty', picks: {} },
+      ],
+      values: [
+        { name: 'a', formula: 1 },
+        { name: 'a', formula: 2 },
+        { name: '', formula: 3 },
+      ],
+    });
+  });
+});
+
+describe('what the forge said of a group or a value', () => {
+  it('stands by the group or value it names, a value’s formula problems marked on the formula instead', () => {
+    const groups: ScoreGroup[] = [{ key: 'g1', name: '', picks: {}, none: true }];
+    const values = [
+      { key: 'v1', name: 'a', text: '', tree: '1' },
+      { key: 'v2', name: 'b', text: '', tree: '1' },
+    ];
+    const troubles = troublesOf(groups, values, [
+      { path: ['scoring', 'groups', ''], message: 'Give the group a name.' },
+      { path: ['scoring', 'values', 'a'], message: 'a is listed twice.' },
+      { path: ['scoring', 'values', 'b', 'of'], message: 'Not a number.' },
+    ]);
+    expect([...troubles]).toEqual([
+      ['g1', 'Give the group a name.'],
+      ['v1', 'a is listed twice.'],
+    ]);
   });
 });
 
@@ -540,7 +588,7 @@ checks:
 `;
 
 describe('a write of picks, weights and what a check expects', () => {
-  it('writes each as the type its input declares, or its value gives', () => {
+  it('writes each as the type its input declares, or its value gives, a weight’s key as text', () => {
     const doc = open(TYPED_TASK);
     const { values, unreadable } = readTask(doc, [
       declared('code', 'file'),
@@ -569,14 +617,18 @@ describe('a write of picks, weights and what a check expects', () => {
       },
       { admin: false, unreadable, catalogue },
     );
-    const text = writeYaml(doc);
-    expect(text).toContain('small: {seed: 1}');
-    expect(text).toContain('two: {seed: [1, 2]}');
-    expect(text).toContain('named: {name: "1"}');
-    expect(text).toContain('weights: {name: {"1": 2}}');
-    expect(text).toContain('weights: {seed: {1: 2}}');
-    expect(text).toContain('other: 2');
-    expect(text).toMatch(/expect:\n {6}total: 4\n {6}medal: "0"\n/);
+    const file = taskFileOf(doc);
+    expect(file['scoring']).toMatchObject({
+      groups: { small: { seed: 1 }, two: { seed: [1, 2] }, named: { name: '1' } },
+      values: {
+        total: { weights: { name: { '1': 2 } } },
+        tries: { weights: { seed: { '1': 2 } } },
+        other: 2,
+      },
+    });
+    expect(file['checks']).toEqual([
+      { submit: { code: 'ok.py' }, expect: { total: 4, medal: '0' } },
+    ]);
   });
 });
 
@@ -588,87 +640,103 @@ describe('group ticks on tables', () => {
       cells: { [input]: { entrant: false, value } },
     })),
   });
+  const run = (cells: Record<string, unknown>, titles: string[] = []): DraftRun => ({
+    titles,
+    cells,
+  });
   const tables = [
     table('input', ['small/1.in', 'small/2.in']),
     table('seed', ['1', '2', '3']),
   ];
+  // The server's answer for `tables`, a seed being a number.
+  const drafted = draftRunRows(
+    {
+      runs: ['small/1.in', 'small/2.in'].flatMap((input) =>
+        [1, 2, 3].map((seed) => run({ input, seed })),
+      ),
+      count: 6,
+      axes: [
+        [run({ input: 'small/1.in' }), run({ input: 'small/2.in' })],
+        [run({ seed: 1 }), run({ seed: 2 }), run({ seed: 3 })],
+      ],
+    },
+    tables,
+  );
+  const axisAt = (index: number) => ({
+    inputs: tables[index]!.inputs,
+    rows: drafted.axes[index]!,
+  });
   const none: ScoreGroup = {
     key: 'g',
     name: 'small',
     picks: {},
     none: true,
   };
-  it('makes the one run every submission makes while no input repeats', () => {
-    expect(submissionRuns([])).toEqual([{ id: '0', title: 'The one run', cells: {} }]);
-    expect(submissionRuns([{ inputs: [], tuples: [emptyTuple([])] }])).toHaveLength(1);
-    expect(submissionRuns(tables)).toEqual(runsOf(tables));
+  it('calls the one run every submission makes while no input repeats', () => {
+    const one = draftRunRows({ runs: [run({})], count: 1, axes: [] }, []);
+    expect(one.runs).toEqual([{ id: '0', title: 'The one run', cells: {} }]);
   });
-  it('names a run from its files and values unless titled', () => {
-    const rows = runsOf(tables);
-    expect(runName(rows[0]!, tables)).toBe('small/1.in, 1');
-    expect(runName({ ...rows[0]!, title: 'Sample' }, tables)).toBe('Sample');
+  it('names a run from its files and values unless titled, its cells as text', () => {
+    expect(drafted.runs[0]).toEqual({
+      id: '0',
+      title: 'small/1.in, 1',
+      cells: { input: 'small/1.in', seed: '1' },
+    });
+    const titled = draftRunRows(
+      { runs: [run({ seed: 1 }, ['Sample'])], count: 1, axes: [[run({ seed: 1 })]] },
+      [tables[1]!],
+    );
+    expect(titled.runs[0]?.title).toBe('Sample');
+    expect(runName({ ...drafted.runs[0]!, title: 'Sample' }, tables)).toBe('Sample');
   });
-  it('ignores the old value retained behind an entrant cell when a group is ticked', () => {
-    const axis: AxisValues = {
-      inputs: ['input', 'route'],
-      tuples: [
-        {
-          ...emptyTuple(['input', 'route']),
-          cells: {
-            input: { entrant: false, value: 'a.in' },
-            route: { entrant: true, value: 'old-route.txt' },
-          },
-        },
-        {
-          ...emptyTuple(['input', 'route']),
-          cells: {
-            input: { entrant: false, value: 'b.in' },
-            route: { entrant: true, value: '' },
-          },
-        },
-      ],
-    };
-    const runs = runsOf([axis]);
-    const picked = withTick(none, axis, 0, true, runs);
+  it('ticks only by the cells the server gives, an entrant cell left out', () => {
+    const axis = { inputs: ['input', 'route'], rows: [] };
+    const answer = draftRunRows(
+      {
+        runs: [run({ input: 'a.in' }), run({ input: 'b.in' })],
+        count: 2,
+        axes: [[run({ input: 'a.in' }), run({ input: 'b.in' })]],
+      },
+      [{ inputs: axis.inputs, tuples: [] }],
+    );
+    const runs = answer.runs;
+    const ticked = { ...axis, rows: answer.axes[0]! };
+    const picked = withTick(none, ticked, 0, true, runs);
     expect(picked.none).toBe(false);
     expect(picked.picks).toEqual({ input: ['a.in'] });
-    expect(ticksOf(picked, [axis])).toEqual([[true, false]]);
+    expect(ticksOf(picked, ticked)).toEqual([true, false]);
     expect(runs.filter((run) => inGroup(run, picked)).map((run) => run.id)).toEqual([
       '0',
     ]);
   });
 
   it('picks one seed across every row of the first table', () => {
-    const runs = runsOf(tables);
-    const picked = withTick(none, tables[1]!, 0, true, runs);
+    const runs = drafted.runs;
+    const picked = withTick(none, axisAt(1), 0, true, runs);
     expect(runs.filter((run) => inGroup(run, picked)).map((run) => run.cells)).toEqual([
       { input: 'small/1.in', seed: '1' },
       { input: 'small/2.in', seed: '1' },
     ]);
-    expect(ticksOf(picked, tables)).toEqual([
-      [true, true],
-      [true, false, false],
-    ]);
+    expect(ticksOf(picked, axisAt(0))).toEqual([true, true]);
+    expect(ticksOf(picked, axisAt(1))).toEqual([true, false, false]);
   });
   it('keeps a named all-runs group explicit for the saved format', () => {
-    const runs = runsOf([tables[0]!]);
-    const one = withTick(none, tables[0]!, 0, true, runs);
-    const all = withTick(one, tables[0]!, 1, true, runs);
+    const runs = drafted.axes[0]!;
+    const one = withTick(none, axisAt(0), 0, true, runs);
+    const all = withTick(one, axisAt(0), 1, true, runs);
     expect(all.picks).toEqual({ input: ['small/1.in', 'small/2.in'] });
     expect(all.none).toBe(false);
-    expect(ticksOf(all, [tables[0]!])).toEqual([[true, true]]);
+    expect(ticksOf(all, axisAt(0))).toEqual([true, true]);
   });
   it('keeps an empty table empty while another table’s selection is remembered', () => {
-    const runs = runsOf(tables);
-    const seed = withTick(none, tables[1]!, 0, true, runs);
-    const first = withTick(seed, tables[0]!, 1, false, runs);
-    const empty = withTick(first, tables[0]!, 0, false, runs);
+    const runs = drafted.runs;
+    const seed = withTick(none, axisAt(1), 0, true, runs);
+    const first = withTick(seed, axisAt(0), 1, false, runs);
+    const empty = withTick(first, axisAt(0), 0, false, runs);
     expect(runs.filter((run) => inGroup(run, empty))).toEqual([]);
-    expect(ticksOf(empty, tables)).toEqual([
-      [false, false],
-      [true, false, false],
-    ]);
-    expect(withTick(empty, tables[0]!, 0, true, runs).picks).toEqual({
+    expect(ticksOf(empty, axisAt(0))).toEqual([false, false]);
+    expect(ticksOf(empty, axisAt(1))).toEqual([true, false, false]);
+    expect(withTick(empty, axisAt(0), 0, true, runs).picks).toEqual({
       input: ['small/1.in'],
       seed: ['1'],
     });
@@ -684,42 +752,25 @@ describe('group ticks on tables', () => {
 });
 
 it('keeps equal input values together when the file cannot distinguish rows', () => {
-  const table: AxisValues = {
-    inputs: ['input', 'answer'],
-    tuples: [
-      {
-        ...emptyTuple(['input', 'answer']),
-        cells: {
-          input: { entrant: false, value: '1' },
-          answer: { entrant: false, value: 'a' },
-        },
-      },
-      {
-        ...emptyTuple(['input', 'answer']),
-        cells: {
-          input: { entrant: false, value: '2' },
-          answer: { entrant: false, value: 'b' },
-        },
-      },
-      {
-        ...emptyTuple(['input', 'answer']),
-        cells: {
-          input: { entrant: false, value: '1' },
-          answer: { entrant: false, value: 'b' },
-        },
-      },
-    ],
-  };
-  const runs = runsOf([table]);
+  const cells = [
+    { input: 1, answer: 'a' },
+    { input: 2, answer: 'b' },
+    { input: 1, answer: 'b' },
+  ];
+  const tuples = cells.map((cell) => ({ titles: [], cells: cell }));
+  const table: AxisValues = { inputs: ['input', 'answer'], tuples: [] };
+  const answer = draftRunRows({ runs: tuples, count: 3, axes: [tuples] }, [table]);
+  const runs = answer.runs;
+  const axis = { inputs: table.inputs, rows: answer.axes[0]! };
   const first = withTick(
     { key: 'g', name: 'g', picks: {}, none: true },
-    table,
+    axis,
     0,
     true,
     runs,
   );
-  const next = withTick(first, table, 1, true, runs);
-  expect(ticksOf(next, [table])).toEqual([[true, true, true]]);
+  const next = withTick(first, axis, 1, true, runs);
+  expect(ticksOf(next, axis)).toEqual([true, true, true]);
   expect(next.none).toBe(false);
-  expect(ticksOf(withTick(next, table, 2, false, runs), [table])[0]?.[2]).toBe(false);
+  expect(ticksOf(withTick(next, axis, 2, false, runs), axis)[2]).toBe(false);
 });

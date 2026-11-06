@@ -7,9 +7,14 @@ export type Me = Schemas['Me'];
 export type ScopeNames = Schemas['ScopeNames'];
 export type SessionInfo = Schemas['SessionInfo'];
 
-/** An org, a contest or a task by its name. */
-export type Named = Schemas['Named'];
 export type TaskState = Schemas['TaskState'];
+export type Pictures = Schemas['Pictures'];
+/** What the server says the caller may do at a contest or a task. */
+export type PlaceMay = Schemas['PlaceMay'];
+/** What the server says the caller may do at an org. */
+export type OrgMay = Schemas['OrgMay'];
+/** A task in its contest's list, and whether the caller manages it. */
+export type ListedTask = Schemas['ListedTask'];
 /** A task of a contest with its letter, its state and its timeline. */
 export type TaskStanding = Schemas['TaskStanding'];
 /** What taking a task out of its contest does: remove it, or withdraw it. */
@@ -19,6 +24,8 @@ export type DefinitionError = Schemas['DefinitionError'];
 export type TreeEntry = Schemas['TreeEntry'];
 export type FileContent = Schemas['FileContent'];
 export type WriteFile = Schemas['WriteFile'];
+export type Settings = Schemas['Settings'];
+export type WriteSettings = Schemas['WriteSettings'];
 /** One file a task's save writes or removes. */
 export type SaveChange = Schemas['FileChange'];
 /** What a file that is an upload holds: its size and SHA-256. */
@@ -106,6 +113,9 @@ export type FeedEntry = Schemas['FeedEntry'];
 /** What an entrant would be shown at a moment under a draft show, as staff preview it. */
 export type ShowPreview = Schemas['ShowPreview'];
 export type ShowPreviewRequest = Schemas['ShowPreviewRequest'];
+/** The runs a task's draft `repeat` makes, as a save would. */
+export type DraftRuns = Schemas['DraftRuns'];
+export type DraftRun = Schemas['DraftRun'];
 export type Submitter = Schemas['Submitter'];
 export type QueueDepth = Schemas['QueueDepth'];
 export type Announcement = Schemas['Announcement'];

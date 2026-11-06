@@ -6,7 +6,7 @@ import { server, signedIn, someone } from '@/test/server';
 import { TASK_API } from '@/test/organiser';
 
 describe('the org list', () => {
-  it('lists each org the roles reach, once, each linking to its page', async () => {
+  it('lists each org the session names, each linking to its page', async () => {
     server.use(
       http.get('/api/v1/me', () =>
         HttpResponse.json({
@@ -18,6 +18,7 @@ describe('the org list', () => {
               role: 'observer',
             },
           ],
+          orgs: ['acme', 'beta'],
         }),
       ),
     );
@@ -35,7 +36,9 @@ describe('the org list', () => {
 
   it('offers a new org, and says so when there are none yet', async () => {
     server.use(
-      http.get('/api/v1/me', () => HttpResponse.json({ ...someone, roles: [] })),
+      http.get('/api/v1/me', () =>
+        HttpResponse.json({ ...someone, roles: [], orgs: [] }),
+      ),
     );
     renderApp('/orgs');
 

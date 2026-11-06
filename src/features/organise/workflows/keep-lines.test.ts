@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { setInput } from '../workflows/edit';
+import { setInput } from './edit';
 import { parseYaml, writeAt, writeOver } from './yaml-doc';
 
 const HAND_WRITTEN = [

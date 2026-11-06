@@ -1,6 +1,7 @@
 import type { DefinitionError } from '@/api/types';
 import { PageLink } from '@/ui/PageLink';
 import classes from './organise.module.css';
+import type { ProblemPath } from './problem-path';
 
 /**
  * Where a problem is fixed: the setting in words and the address that opens
@@ -13,12 +14,16 @@ export type ProblemPlace = { label: string; to: string };
  * `sent` is the file's text as the refused save sent it, for the names it
  * gives what a place's keys stand for.
  */
-export type PlaceOf = (path: string, message: string, sent?: string) => ProblemPlace;
+export type PlaceOf = (
+  path: ProblemPath,
+  message: string,
+  sent?: string,
+) => ProblemPlace;
 
 /**
  * What is wrong with a definition file. With `placeOf`, each problem names
  * the part of the page and the field it is about, in words, as a link that
- * opens it; without, each is at its place in the file, an empty place being
+ * opens it; without, each is at its keys in the file, an empty place being
  * the file as a whole.
  */
 export function DefinitionErrors({
@@ -34,10 +39,10 @@ export function DefinitionErrors({
       {errors.map((error) => {
         const place = placeOf?.(error.path, error.message);
         return (
-          <li key={`${error.path}:${error.message}`}>
+          <li key={`${error.path.join('.')}:${error.message}`}>
             {place === undefined ? (
               <span className={classes.errorPath}>
-                {error.path === '' ? 'Overall' : error.path}
+                {error.path.length === 0 ? 'Overall' : error.path.join(' › ')}
               </span>
             ) : (
               <PageLink to={place.to}>{place.label}</PageLink>

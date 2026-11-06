@@ -10,7 +10,6 @@ import { PageLink } from '@/ui/PageLink';
 import { RadioGroup } from '@/ui/RadioGroup';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { Loaded } from '@/ui/feedback/Loaded';
-import { useMe } from '@/session';
 import { standingOf } from '@/lib/contest-state';
 import { contestPath, taskPath } from '@/lib/organiser-paths';
 import { contestSectionPath, taskCardPath } from '@/lib/sections';
@@ -21,8 +20,9 @@ import { definitionErrorsOf } from '../files/refusals';
 import type { ContestValues } from '../forms/contest-values';
 import { isoOf } from '../forms/times';
 import { DEFAULT_WAYS, registrationSentence } from '../forms/ways';
-import { writeAt } from '../forms/yaml-doc';
-import { holdsAt } from '../roles';
+import type { SettingsBody } from '../forms/settings-hooks';
+import { writeAt } from '../forms/values';
+import { usePlaceMay } from '../may';
 import { FieldBox } from './ContestFile';
 import { contestPlaceOf, useOpenedField } from './opened';
 import { useContestChange } from './save';
@@ -30,6 +30,7 @@ import { useContestSettings } from './settings';
 import { labelOf, useTaskTitles } from './task-entry';
 import { VISIBILITY_CHOICES, visibilitySentence } from './words';
 import shared from '../organise.module.css';
+import type { ProblemPath } from '../problem-path';
 import classes from './contest.module.css';
 
 const STANDINGS = '/api/v1/orgs/{org}/contests/{contest}/organise/tasks';
@@ -195,8 +196,9 @@ type Ask = 'open' | 'draft' | 'archive' | 'visibility' | null;
 function ownRefusals(error: ApiError) {
   const errors = definitionErrorsOf(error);
   if (errors.length === 0) return null;
-  if (!errors.every((each) => each.path === 'state' || each.path === 'visibility'))
-    return null;
+  const own = (path: ProblemPath) =>
+    path.length === 1 && (path[0] === 'state' || path[0] === 'visibility');
+  if (!errors.every((each) => own(each.path))) return null;
   return (
     <>
       {errors.map((each) => (
@@ -226,10 +228,10 @@ export function StatusCard({ org, contest }: { org: string; contest: string }) {
     contest,
     tasks.state === 'ready' ? tasks.data.map((standing) => standing.task.name) : [],
   );
-  const admin = holdsAt(useMe().roles, { kind: 'contest', org, contest }, 'admin');
+  const admin = usePlaceMay({ kind: 'contest', org, contest }).edit_admin_settings;
   const { apply, write, pending } = useContestChange(org, contest);
   const [asking, setAsking] = useState<Ask>(null);
-  const [refused, setRefused] = useState<Outcome | null>(null);
+  const [refused, setRefused] = useState<Outcome<SettingsBody> | null>(null);
   const [visibility, setVisibility] = useState('');
   const { field } = useOpenedField(settings.state === 'ready');
 
@@ -292,7 +294,7 @@ export function StatusCard({ org, contest }: { org: string; contest: string }) {
           }
           return (
             <>
-              <ReadOnlyAt place={{ kind: 'contest', org, contest }} role="admin" />
+              <ReadOnlyAt place={{ kind: 'contest', org, contest }} allowed={admin} />
               <div className={classes.statusHead}>
                 <BodyText>
                   Who sees it:{' '}
@@ -347,10 +349,14 @@ export function StatusCard({ org, contest }: { org: string; contest: string }) {
                   <div className={shared.panel} role="alert">
                     {ownRefusals(refused.error) ?? (
                       <>
-                        <ErrorBlock error={refused.error} compact />
+                        <ErrorBlock
+                          error={refused.error}
+                          compact
+                          heading="Couldn’t save"
+                        />
                         <DefinitionErrors
                           errors={definitionErrorsOf(refused.error)}
-                          placeOf={contestPlaceOf(org, contest, refused.body.content)}
+                          placeOf={contestPlaceOf(org, contest, refused.body.values)}
                         />
                       </>
                     )}
@@ -370,7 +376,7 @@ export function StatusCard({ org, contest }: { org: string; contest: string }) {
                     <Button
                       loading={pending}
                       onClick={() =>
-                        void run((doc) => writeAt(doc, ['state'], 'published'))
+                        void run((fresh) => writeAt(fresh, ['state'], 'published'))
                       }
                     >
                       Open the contest
@@ -400,7 +406,7 @@ export function StatusCard({ org, contest }: { org: string; contest: string }) {
                       variant="danger"
                       loading={pending}
                       onClick={() =>
-                        void run((doc) => writeAt(doc, ['state'], 'draft'))
+                        void run((fresh) => writeAt(fresh, ['state'], 'draft'))
                       }
                     >
                       Back to draft
@@ -426,7 +432,7 @@ export function StatusCard({ org, contest }: { org: string; contest: string }) {
                       variant="danger"
                       loading={pending}
                       onClick={() =>
-                        void run((doc) => writeAt(doc, ['state'], 'archived'))
+                        void run((fresh) => writeAt(fresh, ['state'], 'archived'))
                       }
                     >
                       Archive
@@ -458,7 +464,7 @@ export function StatusCard({ org, contest }: { org: string; contest: string }) {
                       loading={pending}
                       disabled={visibility === values.visibility || visibility === ''}
                       onClick={() =>
-                        void run((doc) => writeAt(doc, ['visibility'], visibility))
+                        void run((fresh) => writeAt(fresh, ['visibility'], visibility))
                       }
                     >
                       Save

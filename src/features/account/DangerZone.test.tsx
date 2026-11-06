@@ -44,7 +44,9 @@ describe('deactivate and delete', () => {
 
     await confirm('Deactivate account');
 
-    expect(await screen.findByText('Sign in again to confirm')).toBeInTheDocument();
+    expect(
+      await screen.findByText(/Couldn’t (delete|deactivate) the account/),
+    ).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Sign in again' })).toHaveAttribute(
       'href',
       '/api/v1/auth/login?next=%2Faccount',
@@ -70,7 +72,9 @@ describe('deactivate and delete', () => {
 
     await confirm('Deactivate account');
 
-    expect(await screen.findByText('Forgejo refused the change')).toBeInTheDocument();
+    expect(
+      await screen.findByText(/Couldn’t (delete|deactivate) the account/),
+    ).toBeInTheDocument();
     expect(
       screen.getByText('user still owns repository icpc/finals-2026'),
     ).toBeInTheDocument();
@@ -92,7 +96,7 @@ describe('deactivate and delete', () => {
     const dialog = await confirm('Delete account');
 
     expect(
-      await screen.findByText('You are the only admin of an org, contest or task'),
+      await screen.findByText(/Couldn’t (delete|deactivate) the account/),
     ).toBeVisible();
     expect(within(dialog).getByText('acme (org)')).toBeInTheDocument();
     expect(within(dialog).getByText('acme/spring (contest)')).toBeInTheDocument();
@@ -110,7 +114,9 @@ describe('deactivate and delete', () => {
 
     const dialog = await confirm('Delete account');
 
-    expect(await screen.findByText('You own workflows other people use')).toBeVisible();
+    expect(
+      await screen.findByText(/Couldn’t (delete|deactivate) the account/),
+    ).toBeVisible();
     expect(within(dialog).getByText('acme/judge')).toBeInTheDocument();
     expect(within(dialog).getByText('acme/lint')).toBeInTheDocument();
   });
@@ -126,7 +132,7 @@ describe('deactivate and delete', () => {
     const dialog = await confirm('Delete account');
 
     expect(
-      await screen.findByText('You are the only admin of an org, contest or task'),
+      await screen.findByText(/Couldn’t (delete|deactivate) the account/),
     ).toBeVisible();
     expect(within(dialog).queryByRole('list')).not.toBeInTheDocument();
   });

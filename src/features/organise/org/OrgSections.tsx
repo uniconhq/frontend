@@ -2,6 +2,7 @@ import { Card } from '@/ui/Card';
 import { useOrgParam } from '@/lib/route-params';
 import { ORG_SECTIONS, sectionOf } from '@/lib/sections';
 import { PeopleSection } from '../people/PeopleSection';
+import { useOrgMay } from '../may';
 import { SectionPage } from '../SectionPage';
 import { OrgProfile } from './OrgProfile';
 
@@ -18,10 +19,11 @@ export function OrgOrganisersPage() {
 /** The org's display name and description, which its admin changes. */
 export function OrgSettingsPage() {
   const org = useOrgParam();
+  const may = useOrgMay(org);
   return (
     <SectionPage
       place={{ kind: 'org', org }}
-      role="admin"
+      allowed={may.edit}
       section={sectionOf(ORG_SECTIONS, 'settings')}
     >
       <Card>

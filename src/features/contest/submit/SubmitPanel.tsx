@@ -62,7 +62,7 @@ function problemsOf(error: ApiError): Problem[] {
 }
 
 /**
- * A refusal in words from its code, and what it names: each problem with the
+ * A refusal in words, and what it names: each problem with the
  * input it is about, for `invalid_inputs`, and the input whose limit a file
  * broke, for `too_large`.
  */
@@ -70,7 +70,7 @@ function Refusal({ error, inputs }: { error: ApiError; inputs: InputField[] }) {
   const labelOf = (id: string) => inputs.find((input) => input.id === id)?.label ?? id;
   const problems = error.code === 'invalid_inputs' ? problemsOf(error) : [];
   const input = error.extensions['input'];
-  const { title, message } = describeError(error);
+  const { title, message } = describeError(error, 'Couldn’t submit');
   return (
     <Said role="alert">
       <p className={classes.refusedTitle}>{title}</p>

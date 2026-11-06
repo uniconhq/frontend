@@ -20,12 +20,13 @@ const GRADEBOOK: components['schemas']['Leaderboard'] = {
   key: 'gradebook',
   title: 'Gradebook',
   audience: { who: 'entrants', rows: 'own' },
+  staff: false,
   headers: [
     {
       name: 'points',
       decimals: null,
       at_least: null,
-      at_most: '100',
+      at_most: null,
       self_reported: [],
     },
   ],

@@ -23,6 +23,12 @@ import {
   registration,
 } from '@/test/contestant';
 
+/** A file a submission was made with, at the address the backend gives it. */
+const sent = (path: string) => ({
+  path,
+  href: `/-/downloads/acme/spring/sum/1/${path.split('/').map(encodeURIComponent).join('/')}`,
+});
+
 const PAGE = '/contests/acme/spring/tasks/sum';
 
 function withPage(overrides: Partial<TaskPage>) {
@@ -301,13 +307,11 @@ describe('the submit panel', () => {
     await user.click(screen.getByRole('button', { name: 'Submit' }));
 
     const alert = await screen.findByRole('alert');
-    expect(alert).toHaveTextContent('The submission does not fit the task');
+    expect(alert).toHaveTextContent('Couldn’t submit');
     expect(alert).toHaveTextContent('Language: Choose one of python, cpp.');
     // A refusal is edged and titled as one, never like a submission made.
     expect(alert).toHaveClass(/_refused_/);
-    expect(within(alert).getByText('The submission does not fit the task')).toHaveClass(
-      /_refusedTitle_/,
-    );
+    expect(within(alert).getByText('Couldn’t submit')).toHaveClass(/_refusedTitle_/);
     expect(store.seen.slots).toHaveLength(0);
   });
 
@@ -326,7 +330,7 @@ describe('the submit panel', () => {
     await user.click(screen.getByRole('button', { name: 'Submit' }));
 
     const alert = await screen.findByRole('alert');
-    expect(alert).toHaveTextContent('Too large for this input');
+    expect(alert).toHaveTextContent('Couldn’t submit');
     expect(alert).toHaveTextContent(
       'The files for this input may be at most 4 B in all.',
     );
@@ -480,85 +484,36 @@ describe('the submit panel', () => {
     expect(puts).toBe(1);
   });
 
-  const REFUSALS: [string, Record<string, unknown>, string, string][] = [
-    [
-      'task_closed',
-      { reason: 'closed' },
-      'This task has closed for you',
-      'It takes no more submissions from you.',
-    ],
-    ['archived', {}, 'The contest is archived', 'they take no submissions'],
-    [
-      'task_withdrawn',
-      { reason: 'withdrawn' },
-      'This task was withdrawn',
-      'The organisers took it out of the contest, so it takes no submissions.',
-    ],
+  const REFUSALS: [string, Record<string, unknown>, string][] = [
+    ['task_closed', { reason: 'closed' }, 'task_closed detail'],
+    ['archived', {}, 'archived detail'],
+    ['task_withdrawn', { reason: 'withdrawn' }, 'task_withdrawn detail'],
     [
       'not_approved',
       { detail: 'Only approved entrants of this contest can submit to its tasks.' },
-      'Your registration is not approved yet',
       'Only approved entrants of this contest can submit to its tasks.',
     ],
-    [
-      'submission_limit',
-      { limit: 50 },
-      'You have used every submission',
-      'This task takes 50 submissions in all',
-    ],
-    [
-      'submission_limit',
-      { limit: 1 },
-      'You have used every submission',
-      'This task takes 1 submission in all, and you have made it.',
-    ],
+    ['submission_limit', { limit: 50 }, 'submission_limit detail'],
     [
       'rate_limited',
       { rate: '1 per 30s', retry_at: '2999-01-01T00:00:30Z' },
-      'That is too soon after your last submission',
-      'You can submit again at',
+      'rate_limited detail',
     ],
-    [
-      'too_large',
-      { limit: 10 * 1024 * 1024, input: 'submission' },
-      'Too large for this input',
-      'The files for this input may be at most 10 MB in all.',
-    ],
-    [
-      'upload_not_yours',
-      { uploads: ['x'] },
-      'A file is not one you uploaded',
-      'Nothing was submitted.',
-    ],
-    [
-      'upload_not_ready',
-      { uploads: ['x'] },
-      'A file did not arrive in full',
-      'Nothing was submitted.',
-    ],
-    [
-      'upload_limit',
-      { limit: 200, bytes: 20 * 1024 * 1024 },
-      'Too many files are waiting to be submitted',
-      'Submit what you have, or try again later.',
-    ],
-    [
-      'invalid_idempotency_key',
-      {},
-      'That submission could not be sent',
-      'Reload the page and submit again.',
-    ],
+    ['too_large', { limit: 10 * 1024 * 1024, input: 'submission' }, 'too_large detail'],
+    ['upload_not_yours', { uploads: ['x'] }, 'upload_not_yours detail'],
+    ['upload_not_ready', { uploads: ['x'] }, 'upload_not_ready detail'],
+    ['upload_limit', { limit: 200, bytes: 20 * 1024 * 1024 }, 'upload_limit detail'],
+    ['invalid_idempotency_key', {}, 'invalid_idempotency_key detail'],
     [
       'invalid_inputs',
       {
         errors: [{ input: 'language', message: 'Choose one of python.' }],
       },
-      'The submission does not fit the task',
       'language: Choose one of python.',
     ],
   ];
 
-  it('says each refusal in words, with what it names, and keeps the files', async () => {
+  it('says each refusal in the server’s words, with what it names, and keeps the files', async () => {
     const store = uploadStore();
     let refusal: (typeof REFUSALS)[number] | undefined;
     server.use(
@@ -578,12 +533,12 @@ describe('the submit panel', () => {
 
     for (const each of REFUSALS) {
       refusal = each;
-      const [code, , title, sentence] = each;
+      const [code, , sentence] = each;
       await user.click(screen.getByRole('button', { name: 'Submit' }));
 
       const alert = await screen.findByRole('alert');
-      await waitFor(() => expect(alert, code).toHaveTextContent(title));
-      expect(alert, code).toHaveTextContent(sentence);
+      await waitFor(() => expect(alert, code).toHaveTextContent(sentence));
+      expect(alert, code).toHaveTextContent('Couldn’t submit');
       expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
       expect(screen.getByLabelText('Your solution: files chosen')).toHaveTextContent(
         'main.py',
@@ -599,16 +554,16 @@ describe('the submit panel', () => {
       http.post(`${TASK_API}/uploads`, () =>
         problem(413, 'too_large', { limit: 1024, input: 'submission' }),
       ),
-      'Too large for this input',
-      'The files for this input may be at most 1 KB in all.',
+      'Couldn’t submit',
+      'too_large detail',
     ],
     [
       'the completion',
       http.post(`${TASK_API}/uploads/:upload/complete`, () =>
         problem(409, 'upload_not_ready', { uploads: ['x'] }),
       ),
-      'A file did not arrive in full',
-      'Submit again to send the files again.',
+      'Couldn’t submit',
+      'upload_not_ready detail',
     ],
     [
       'an upload the forge does not hold',
@@ -1104,7 +1059,7 @@ describe('a submission opened from the list', () => {
         HttpResponse.json({
           number: 1,
           inputs: {
-            submission: { files: ['files/submission/my main.py'], value: null },
+            submission: { files: [sent('files/submission/my main.py')], value: null },
             language: { files: [], value: 'python' },
           },
         }),
@@ -1133,8 +1088,8 @@ describe('a submission opened from the list', () => {
         HttpResponse.json({
           number: 1,
           inputs: {
-            program: { files: ['files/program/main.c'], value: null },
-            checker: { files: ['files/checker/main.c'], value: null },
+            program: { files: [sent('files/program/main.c')], value: null },
+            checker: { files: [sent('files/checker/main.c')], value: null },
             language: { files: [], value: 'cpp' },
             n: { files: [], value: '5' },
             strict: { files: [], value: true },
@@ -1173,7 +1128,7 @@ describe('a submission opened from the list', () => {
         HttpResponse.json({
           number: 1,
           inputs: {
-            submission: { files: ['files/submission/main.py'], value: null },
+            submission: { files: [sent('files/submission/main.py')], value: null },
             language: { files: [], value: 'python' },
             old: { files: [], value: '3' },
           },
@@ -1233,8 +1188,8 @@ describe('a submission opened from the list', () => {
               files: [],
               value: null,
               parts: {
-                '2': { files: ['files/out/2/b.txt'], value: null },
-                '1': { files: ['files/out/1/a.txt'], value: null },
+                '2': { files: [sent('files/out/2/b.txt')], value: null },
+                '1': { files: [sent('files/out/1/a.txt')], value: null },
               },
             },
             n: { files: [], value: null, parts: { '1': { files: [], value: '5' } } },
@@ -1272,10 +1227,10 @@ describe('a submission opened from the list', () => {
           number: 1,
           inputs: {
             out: {
-              files: ['files/out/main/1.txt', 'files/out/samples/1.txt'],
+              files: [sent('files/out/main/1.txt'), sent('files/out/samples/1.txt')],
               value: null,
             },
-            program: { files: ['files/program/src/io.c'], value: null },
+            program: { files: [sent('files/program/src/io.c')], value: null },
           },
         }),
       ),

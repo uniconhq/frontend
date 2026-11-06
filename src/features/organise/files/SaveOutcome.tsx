@@ -1,7 +1,6 @@
 import { PreparationStatus } from './PreparationStatus';
 import { useEffect, useRef, type ReactNode } from 'react';
 import type { ApiError } from '@/api/problem';
-import { describeError } from '@/api/describe-error';
 import type { SaveEffect, SaveResult, WriteFile } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
@@ -199,10 +198,10 @@ export function SaveOutcome<Body = WriteFile>({
   if (error.code === 'conflict') {
     return (
       <Panel role="alert">
-        <BodyText>Someone else changed this file since you opened it.</BodyText>
+        <BodyText>{error.detail}</BodyText>
         <BodyText tone="secondary">
-          Nothing was saved, and your text is still here. Reloading shows their version
-          and replaces your text, so copy anything you want to keep first.
+          Nothing was saved, and your changes are still here. Reloading shows their
+          version and replaces your changes, so copy anything you want to keep first.
         </BodyText>
         <div className={classes.actions}>
           <Button variant="secondary" onClick={onReload}>
@@ -220,7 +219,7 @@ export function SaveOutcome<Body = WriteFile>({
         {effect === null ? (
           // A body out of step with the forge's still names what changed.
           <>
-            <ErrorBlock error={error} compact />
+            <ErrorBlock error={error} compact heading="Publish this change now?" />
             <ul className={classes.named} aria-label="What would change">
               {stringsOf(error, 'changes').map((change) => (
                 <li key={change}>{change}</li>
@@ -231,7 +230,7 @@ export function SaveOutcome<Body = WriteFile>({
           <>
             <Effect effect={effect} />
             <BodyText>
-              <strong>{describeError(error).title}</strong>
+              <strong>The contest is running. Publish this change now?</strong>
             </BodyText>
           </>
         )}
@@ -268,7 +267,7 @@ export function SaveOutcome<Body = WriteFile>({
 
   return (
     <Panel role="alert">
-      <ErrorBlock error={error} compact />
+      <ErrorBlock error={error} compact heading="Couldn’t save" />
       {named.length > 0 && (
         <ul className={classes.named} aria-label="What stands in the way">
           {named.map((item) => (

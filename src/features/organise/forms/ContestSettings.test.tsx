@@ -2,82 +2,55 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@/test/user-event';
 import { http, HttpResponse } from 'msw';
-import { parse } from 'yaml';
 import type { FileContent } from '@/api/types';
+import { holding } from '@/test/may';
 import { renderApp } from '@/test/render';
-import { afterAnswers, problem, server, signedIn, someone } from '@/test/server';
-import { CONTEST_API, repoFiles, taskList } from '@/test/organiser';
+import { afterAnswers, problem, server, signedIn } from '@/test/server';
+import { CONTEST_API, contestSettings, repoFiles, taskList } from '@/test/organiser';
 import { comeBackToTab, fakeLiveStream, openStream, realLiveStream } from '@/test/live';
 import { isoOf } from './times';
 
-const CONTEST = `name: Spring   # the page's title
-description: A short paragraph
-start: 2026-06-01T09:00:00Z
-end: 2026-06-01T14:00:00Z
-state: draft
-visibility: signed-in
-registration:
-  capacity: 100
-leaderboards:
-  standings: {title: Standings, audience: {who: entrants}}
-tasks:
-  - {id: sum}
-  - id: sort
-    withdrawn: true
-`;
+const CONTEST = {
+  name: 'Spring',
+  description: 'A short paragraph',
+  start: '2026-06-01T09:00:00Z',
+  end: '2026-06-01T14:00:00Z',
+  state: 'draft',
+  visibility: 'signed-in',
+  registration: { capacity: 100 },
+  leaderboards: [
+    { key: 'standings', title: 'Standings', audience: { who: 'entrants' } },
+  ],
+  tasks: [{ id: 'sum' }, { id: 'sort', withdrawn: true }],
+};
 
-const FILE = `${CONTEST_API}/files/:path`;
+const SETTINGS = `${CONTEST_API}/settings`;
 const PAGE = '/orgs/acme/contests/spring/settings';
 
-/**
- * The spring contest with `contest.yaml` holding `current`. Each write is
- * taken and the file becomes it, except that with `conflictWith` the first
- * write is refused as a conflict and the file becomes that text instead, as
- * if someone else had saved it. Each write taken answers `notes`, what the
- * boards report. `sent` holds each write's body.
- */
-function contestBackend({
-  current = CONTEST,
-  conflictWith,
-  notes = [],
-}: { current?: string; conflictWith?: string; notes?: string[] } = {}) {
-  let file: FileContent = {
+/** The spring contest with its settings holding `current`, as `contestSettings` keeps them. */
+function contestBackend(
+  options: Parameters<typeof contestSettings>[0] & { file?: string } = {},
+) {
+  const backend = contestSettings({ current: CONTEST, ...options });
+  const file: FileContent = {
     path: 'contest.yaml',
     encoding: 'utf-8',
-    content: current,
+    content: options.file ?? 'name: Spring\n',
     token: 'token-1',
     upload: null,
     version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
+    href: null,
   };
-  let conflicted = conflictWith === undefined;
-  const sent: { content: string; token: string }[] = [];
   server.use(
     signedIn,
     taskList,
-    http.get(FILE, ({ params }) =>
+    ...backend.handlers,
+    http.get(`${CONTEST_API}/files/:path`, ({ params }) =>
       params['path'] === 'contest.yaml' ? HttpResponse.json(file) : undefined,
     ),
-    http.put(FILE, async ({ request }) => {
-      const body = (await request.json()) as { content: string; token: string };
-      sent.push(body);
-      if (!conflicted && conflictWith !== undefined) {
-        conflicted = true;
-        file = { ...file, content: conflictWith, token: 'token-2' };
-        return problem(409, 'conflict');
-      }
-      // A save made with the token of a version since saved over is refused.
-      if (body.token !== file.token) return problem(409, 'conflict');
-      const token = `token-${String(sent.length + 2)}`;
-      file = { ...file, content: body.content, token };
-      return HttpResponse.json({ version: `version-${token}`, notes });
-    }),
     ...repoFiles,
   );
-  /** Someone else saving the settings as `content`. */
-  const elsewhere = (content: string) => {
-    file = { ...file, content, token: 'token-elsewhere' };
-  };
-  return { sent, elsewhere };
+  return backend;
 }
 
 /** Set a field's value at once, as a paste would. */
@@ -96,16 +69,7 @@ async function openForm() {
 }
 
 function asManager() {
-  server.use(
-    http.get('/api/v1/me', () =>
-      HttpResponse.json({
-        ...someone,
-        roles: [
-          { names: { org: 'acme', contest: 'spring', task: null }, role: 'manager' },
-        ],
-      }),
-    ),
-  );
+  server.use(signedIn, ...holding('manager'));
 }
 
 describe('the contest settings form', { timeout: 20_000 }, () => {
@@ -127,7 +91,7 @@ describe('the contest settings form', { timeout: 20_000 }, () => {
     );
   });
 
-  it("lets an admin change every setting here, and writes only those into the organiser's file", async () => {
+  it('lets an admin change every setting here, and sends every value with those changed', async () => {
     const { sent } = contestBackend();
     const form = await openForm();
 
@@ -151,21 +115,14 @@ describe('the contest settings form', { timeout: 20_000 }, () => {
     expect(sent).toHaveLength(1);
     const [write] = sent;
     expect(write?.token).toBe('token-1');
-    expect(parse(write?.content ?? '')).toEqual({
+    expect(write?.values).toEqual({
+      ...CONTEST,
       name: 'Spring 2026',
       description: 'Two lines\nof description',
       start: isoOf('2026-06-01T10:00'),
       end: isoOf('2026-06-01T23:30'),
-      state: 'draft',
-      visibility: 'signed-in',
-      registration: { capacity: 100 },
-      leaderboards: {
-        standings: { title: 'Standings', audience: { who: 'entrants' } },
-      },
-      tasks: [{ id: 'sum' }, { id: 'sort', withdrawn: true }],
       entrants: { most: 3, fewest: 2, locks: 'first_submission' },
     });
-    expect(write?.content).toContain("# the page's title");
   });
 
   it('asks before leaving with changes not saved, and leaves at once after the save', async () => {
@@ -190,7 +147,7 @@ describe('the contest settings form', { timeout: 20_000 }, () => {
 
   it('takes the team settings away when people enter alone again', async () => {
     const { sent } = contestBackend({
-      current: `${CONTEST}entrants:\n  most: 3\n  fewest: 2\n`,
+      current: { ...CONTEST, entrants: { most: 3, fewest: 2 } },
     });
     const form = await openForm();
 
@@ -199,7 +156,7 @@ describe('the contest settings form', { timeout: 20_000 }, () => {
     await userEvent.click(within(form).getByRole('button', { name: 'Save settings' }));
 
     await screen.findByText('Saved.');
-    expect(parse(sent[0]?.content ?? '')).not.toHaveProperty('entrants');
+    expect(sent[0]?.values).toEqual(CONTEST);
   });
 
   it('offers nothing for a grading that fails', async () => {
@@ -210,13 +167,15 @@ describe('the contest settings form', { timeout: 20_000 }, () => {
   });
 
   it('sends a fewest over the most, and opens the field the save refused', async () => {
-    const { sent } = contestBackend({ current: `${CONTEST}entrants: {most: 3}\n` });
+    const { sent } = contestBackend({
+      current: { ...CONTEST, entrants: { most: 3 } },
+    });
     const message = 'This must be at most 3, the most people in a team.';
     server.use(
-      http.put(FILE, async ({ request }) => {
-        sent.push((await request.json()) as { content: string; token: string });
+      http.put(SETTINGS, async ({ request }) => {
+        sent.push((await request.json()) as (typeof sent)[number]);
         return problem(422, 'invalid_definition', {
-          errors: [{ path: 'entrants.fewest', message }],
+          errors: [{ path: ['entrants', 'fewest'], message }],
         });
       }),
     );
@@ -227,9 +186,7 @@ describe('the contest settings form', { timeout: 20_000 }, () => {
     await user.click(within(form).getByRole('button', { name: 'Save settings' }));
 
     const alert = await screen.findByRole('alert');
-    expect(parse(sent[0]?.content ?? '')).toMatchObject({
-      entrants: { most: 3, fewest: 4 },
-    });
+    expect(sent[0]?.values).toMatchObject({ entrants: { most: 3, fewest: 4 } });
     expect(alert).toHaveTextContent(
       `Settings, Teams: Fewest people in a team: ${message}`,
     );
@@ -272,18 +229,15 @@ describe('the contest settings form', { timeout: 20_000 }, () => {
     await userEvent.click(within(form).getByRole('button', { name: 'Save settings' }));
 
     await screen.findByText('Saved.');
-    expect(parse(sent[0]?.content ?? '')).toEqual({
-      ...(parse(CONTEST) as object),
-      end: isoOf('2026-06-01T15:00'),
-    });
+    expect(sent[0]?.values).toEqual({ ...CONTEST, end: isoOf('2026-06-01T15:00') });
   });
 
   it('names a refused setting in words and opens it with the field focused', async () => {
     contestBackend();
     server.use(
-      http.put(FILE, () =>
+      http.put(SETTINGS, () =>
         problem(422, 'invalid_definition', {
-          errors: [{ path: 'end', message: 'Must be after start.' }],
+          errors: [{ path: ['end'], message: 'Must be after start.' }],
         }),
       ),
     );
@@ -293,7 +247,7 @@ describe('the contest settings form', { timeout: 20_000 }, () => {
     await user.click(within(form).getByRole('button', { name: 'Save settings' }));
 
     const alert = await screen.findByRole('alert');
-    expect(alert).toHaveTextContent('Nothing was saved');
+    expect(alert).toHaveTextContent('Couldn’t save');
     const link = within(alert).getByRole('link', { name: 'Settings, Schedule: End' });
     expect(link).toHaveAttribute('href', `${PAGE}?field=end`);
     expect(alert).toHaveTextContent('Settings, Schedule: End: Must be after start.');
@@ -302,142 +256,57 @@ describe('the contest settings form', { timeout: 20_000 }, () => {
     await waitFor(() => expect(screen.getByLabelText(/^End/)).toHaveFocus());
   });
 
-  it('shows both versions field by field in words on a conflict, and saves the fields picked', async () => {
-    const theirs = CONTEST.replace('state: draft', 'state: published').replace(
-      'name: Spring',
-      'name: Their spring',
-    );
-    const { sent } = contestBackend({ conflictWith: theirs });
-    const form = await openForm();
-
-    fill(inBox(form, 'Basics').getByLabelText('Name'), 'My spring');
-    await userEvent.click(
-      inBox(form, 'Teams').getByRole('radio', { name: 'In teams' }),
-    );
-    fill(inBox(form, 'Teams').getByLabelText('Most people in a team'), '2');
-    await userEvent.click(within(form).getByRole('button', { name: 'Save settings' }));
-
-    const merge = await screen.findByRole('list', { name: 'Fields that differ' });
-    const name = within(merge).getByRole('radiogroup', {
-      name: 'Name (both changed it)',
-    });
-    expect(within(name).getByRole('radio', { name: 'Yours: My spring' })).toBeChecked();
-    const state = within(merge).getByRole('radiogroup', {
-      name: 'Open, draft or archived',
-    });
-    expect(within(state).getByRole('radio', { name: 'Now: Open' })).toBeChecked();
-    const teams = within(merge).getByRole('radiogroup', { name: 'Teams' });
-    expect(
-      within(teams).getByRole('radio', { name: 'Yours: Most people in a team: 2' }),
-    ).toBeChecked();
-    expect(merge).not.toHaveTextContent('entrants');
-    expect(sent).toHaveLength(1);
-
-    await userEvent.click(
-      within(name).getByRole('radio', { name: 'Now: Their spring' }),
-    );
-    await userEvent.click(
-      screen.getByRole('button', { name: 'Save the merged version' }),
-    );
-
-    await screen.findByText('Saved.');
-    expect(sent).toHaveLength(2);
-    expect(sent[1]?.token).toBe('token-2');
-    expect(parse(sent[1]?.content ?? '')).toEqual({
-      ...(parse(theirs) as object),
-      entrants: { most: 2 },
-    });
-  });
-
-  it('saves the whole of one’s own version over theirs only after a warning', async () => {
-    const theirs = CONTEST.replace('name: Spring', 'name: Their spring');
-    const { sent } = contestBackend({ conflictWith: theirs });
-    const form = await openForm();
-    fill(inBox(form, 'Basics').getByLabelText('Name'), 'My spring');
-    await userEvent.click(within(form).getByRole('button', { name: 'Save settings' }));
-
-    await screen.findByRole('list', { name: 'Fields that differ' });
-    await userEvent.click(
-      screen.getByRole('button', { name: 'Save yours over theirs' }),
-    );
-    const dialog = await screen.findByRole('dialog', {
-      name: 'Save yours over theirs?',
-    });
-    expect(dialog).toHaveTextContent(
-      'This throws away what the other person changed in Name.',
-    );
-    await userEvent.click(
-      within(dialog).getByRole('button', { name: 'Save yours over theirs' }),
-    );
-
-    await screen.findByText('Saved.');
-    expect((parse(sent[1]?.content ?? '') as { name: string }).name).toBe('My spring');
-  });
-
-  it('keeps the merge open with the choices made when the merged version is refused', async () => {
-    const theirs = CONTEST.replace('name: Spring', 'name: Their spring');
-    contestBackend({ conflictWith: theirs });
-    const form = await openForm();
-    fill(inBox(form, 'Basics').getByLabelText('Name'), 'My spring');
-    await userEvent.click(within(form).getByRole('button', { name: 'Save settings' }));
-    const merge = await screen.findByRole('list', { name: 'Fields that differ' });
-    const name = within(merge).getByRole('radiogroup', {
-      name: 'Name (both changed it)',
-    });
-    await userEvent.click(
-      within(name).getByRole('radio', { name: 'Now: Their spring' }),
-    );
+  it('names a refused leaderboard by the name the sent settings give it', async () => {
+    contestBackend();
     server.use(
-      http.put(FILE, () =>
+      http.put(SETTINGS, () =>
         problem(422, 'invalid_definition', {
-          errors: [{ path: 'name', message: 'The name is refused.' }],
+          errors: [{ path: ['leaderboards', 'standings', 'sort'], message: 'No.' }],
         }),
       ),
     );
-
-    await userEvent.click(
-      screen.getByRole('button', { name: 'Save the merged version' }),
-    );
-
-    expect(await screen.findByText(/The name is refused./)).toBeVisible();
-    const kept = screen.getByRole('list', { name: 'Fields that differ' });
-    expect(
-      within(kept).getByRole('radio', { name: 'Now: Their spring' }),
-    ).toBeChecked();
-  });
-
-  it("holds a manager's admin-only fields to the current version in the merge", async () => {
-    const theirs = CONTEST.replace('name: Spring', 'name: Their spring').replace(
-      'start: 2026-06-01T09:00:00Z',
-      'start: 2026-06-01T17:00:00+08:00',
-    );
-    const { sent } = contestBackend({ conflictWith: theirs });
-    asManager();
     const form = await openForm();
-    fill(inBox(form, 'Schedule').getByLabelText(/^End/), '2026-06-01T15:00');
+    fill(inBox(form, 'Basics').getByLabelText('Name'), 'Spring 2026');
     await userEvent.click(within(form).getByRole('button', { name: 'Save settings' }));
 
-    const merge = await screen.findByRole('list', { name: 'Fields that differ' });
-    const name = within(merge).getByRole('radiogroup', { name: 'Name' });
+    const alert = await screen.findByRole('alert');
     expect(
-      within(name).getByRole('radio', { name: 'Now: Their spring' }),
-    ).toBeChecked();
-    for (const radio of within(name).getAllByRole('radio'))
-      expect(radio).toBeDisabled();
-    expect(within(merge).queryByRole('radiogroup', { name: 'Start' })).toBeNull();
+      within(alert).getByRole('link', { name: 'Leaderboards, Standings: Ranking' }),
+    ).toHaveAttribute(
+      'href',
+      '/orgs/acme/contests/spring/leaderboards?field=standings.sort',
+    );
+  });
+
+  it('says a save someone else beat was not made, and reads theirs on Reload', async () => {
+    const theirs = { ...CONTEST, name: 'Their spring' };
+    const { sent } = contestBackend({ conflictWith: theirs });
+    const form = await openForm();
+
+    fill(inBox(form, 'Basics').getByLabelText('Name'), 'My spring');
+    await userEvent.click(within(form).getByRole('button', { name: 'Save settings' }));
+
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('Nothing was saved');
+    expect(sent).toHaveLength(1);
+    expect(screen.queryByRole('list', { name: 'Fields that differ' })).toBeNull();
 
     await userEvent.click(
-      screen.getByRole('button', { name: 'Save the merged version' }),
+      within(alert).getByRole('button', { name: 'Reload the file' }),
     );
-    await screen.findByText('Saved.');
-    expect(parse(sent[1]?.content ?? '')).toEqual({
-      ...(parse(theirs) as object),
-      end: isoOf('2026-06-01T15:00'),
-    });
+    await waitFor(() =>
+      expect(
+        inBox(
+          screen.getByRole('form', { name: 'Contest settings' }),
+          'Basics',
+        ).getByLabelText('Name'),
+      ).toHaveValue('Their spring'),
+    );
+    expect(sent).toHaveLength(1);
   });
 
   it('says settings that cannot be read cannot be changed, rather than offering the text', async () => {
-    contestBackend({ current: 'name: [Spring\n' });
+    contestBackend({ current: null, file: 'name: [Spring\n' });
     renderApp(PAGE);
 
     expect(
@@ -467,7 +336,7 @@ describe(
       openStream();
       fill(inBox(form, 'Basics').getByLabelText('Name'), 'My spring');
 
-      elsewhere(CONTEST.replace('name: Spring', 'name: Their spring'));
+      elsewhere({ ...CONTEST, name: 'Their spring' });
       await afterAnswers(comeBackToTab);
 
       const now = screen.getByRole('form', { name: 'Contest settings' });
@@ -478,10 +347,7 @@ describe(
 
       await userEvent.click(save);
 
-      const merge = await screen.findByRole('list', { name: 'Fields that differ' });
-      expect(
-        within(merge).getByRole('radiogroup', { name: 'Name (both changed it)' }),
-      ).toBeVisible();
+      expect(await screen.findByRole('alert')).toHaveTextContent('Nothing was saved');
       expect(sent).toEqual([expect.objectContaining({ token: 'token-1' })]);
     });
   },

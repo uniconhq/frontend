@@ -51,7 +51,7 @@ export function definitionErrorsOf(error: ApiError): DefinitionError[] {
     (item): item is DefinitionError =>
       typeof item === 'object' &&
       item !== null &&
-      typeof (item as DefinitionError).path === 'string' &&
+      Array.isArray((item as DefinitionError).path) &&
       typeof (item as DefinitionError).message === 'string',
   );
 }

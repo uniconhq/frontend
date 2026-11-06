@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import type { Primitive } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
-import { NumberText } from '../forms/yaml-doc';
+import { NumberText } from './yaml-doc';
 import {
   formatUse,
   parseUse,

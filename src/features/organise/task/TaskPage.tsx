@@ -4,21 +4,19 @@ import { $api } from '@/api/query';
 import { CardGrid, HubCard } from '@/ui/HubCard';
 import { LeaveGuard } from '@/ui/LeaveGuard';
 import { Page, PageHeader } from '@/ui/Page';
-import { useMe } from '@/session';
 import { PageLink } from '@/ui/PageLink';
 import { useTaskParams } from '@/lib/route-params';
 import { TASK_SECTIONS, taskSectionPath, type TaskSectionKey } from '@/lib/sections';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { readTask } from '../forms/task-values';
-import { readSettings } from './build-data';
 import { TaskStanding } from './TaskHeader';
 import { whenDrawn } from '@/ui/anchor';
 import { useOpenedField } from '../contest/opened';
 import { STORED } from '../contest/places';
-import { fileQuery } from '../files/place';
+import { settingsQuery } from '../files/place';
+import { textAt } from '../forms/values';
 import { StatementEditor } from '../forms/StatementEditor';
 import { OrganisersLine } from '../hub/lines';
-import { holdsAt } from '../roles';
+import { usePlaceMay } from '../may';
 import { BuildCard } from './BuildCard';
 import { useTaskSave } from './build-save';
 import { CARD_PARAM } from './places';
@@ -52,10 +50,8 @@ function TaskTitle({
 }: {
   place: { kind: 'task'; org: string; contest: string; task: string };
 }) {
-  const file = useQuery({ ...fileQuery(place, 'task.yaml'), retry: false });
-  const read = file.data === undefined ? null : readSettings(file.data);
-  const title =
-    read === null || 'error' in read ? '' : readTask(read.doc, []).values.name.trim();
+  const settings = useQuery({ ...settingsQuery(place), retry: false });
+  const title = textAt(settings.data?.values ?? {}, ['name']).trim();
   return <>{title === '' ? place.task : title}</>;
 }
 
@@ -87,21 +83,17 @@ export function TaskPage() {
   const { org, contest, task } = useTaskParams();
   const path = { org, contest, task };
   const place = { kind: 'task' as const, ...path };
-  const roles = useMe().roles;
-  const admin = holdsAt(roles, place, 'admin');
-  const manager = holdsAt(roles, place, 'manager');
+  const may = usePlaceMay(place);
+  const admin = may.edit_admin_settings;
+  const manager = may.manage;
   const queryClient = useQueryClient();
+  // The settings are read again with every save; the workflow's form too.
   const saving = useTaskSave(place, async () => {
-    await Promise.all([
-      queryClient.invalidateQueries({
-        queryKey: [...fileQuery(place, 'task.yaml').queryKey, 'own'],
-      }),
-      queryClient.invalidateQueries({
-        queryKey: $api.queryOptions('get', `${TASK}/workflow-form`, {
-          params: { path },
-        }).queryKey,
-      }),
-    ]);
+    await queryClient.invalidateQueries({
+      queryKey: $api.queryOptions('get', `${TASK}/workflow-form`, {
+        params: { path },
+      }).queryKey,
+    });
   });
   useOpenedCard();
   // The build cards and the statement save apart, and either's changes not

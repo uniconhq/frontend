@@ -6,25 +6,27 @@ import { toApiError } from '@/api/problem';
 import { describeError } from '@/api/describe-error';
 
 /**
- * What a page shows when its data would not load. Inside the shell, never a
- * full-page replacement, so the person keeps their navigation and their drafts.
- * The words come from describeError; the code underneath is for a support
- * message, not for reading.
+ * What a page shows when something failed: `heading`, what it was doing
+ * ("Couldn't load" unless said), over the server's sentence. Inside the
+ * shell, never a full-page replacement, so the person keeps their navigation
+ * and their drafts. The code underneath is for a support message.
  *
- * `compact` is the title and the message alone, for a menu or a dialog that
- * already frames the problem and has no room for a code or a retry.
+ * `compact` is the heading and the sentence alone, for a menu or a dialog
+ * that has no room for a code or a retry.
  */
 export function ErrorBlock({
   error,
   onRetry,
   compact = false,
+  heading = 'Couldn’t load',
 }: {
   error: unknown;
   onRetry?: () => void;
   compact?: boolean;
+  heading?: string;
 }) {
   const apiError = toApiError(error);
-  const { title, message } = describeError(apiError);
+  const { title, message } = describeError(apiError, heading);
 
   if (compact) {
     return (

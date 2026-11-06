@@ -33,6 +33,7 @@ describe('the workflow editor', () => {
         better: null,
         optional: false,
         options: null,
+        accepts: ['file'],
       });
       server.use(
         http.get('/api/v1/workflows', () =>

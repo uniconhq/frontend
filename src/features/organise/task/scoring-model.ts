@@ -1,19 +1,20 @@
+import type { DefinitionError, DraftRun, DraftRuns } from '@/api/types';
 import type { Catalogue } from '../formula/catalogue';
 import { readLine, type FormulaScope } from '../formula/parse';
 import { printFormula } from '../formula/print';
 import type { Tree } from '../formula/tree';
 import {
-  NumberText,
+  entriesAt,
   isRecord,
-  numberText,
-  renameKeys,
+  numberOf,
   scalarOf,
   textOf,
   writeAt,
-  type Doc,
-} from '../forms/yaml-doc';
+  type Values,
+} from '../forms/values';
 import type { AxisValues, InputValues, TupleValues } from '../forms/task-values';
 import { FIRST_NOT_PASSED } from '@/ui/scored/scored-text';
+import { isUnder } from '../problem-path';
 
 /**
  * A moment entrants see a part of the result at: `always`, as soon as a
@@ -93,7 +94,7 @@ export type ScoreGroup = {
   name: string;
   /** Each repeated input it picks on, and the values that count (one, or any of several). */
   picks: Record<string, string[]>;
-  /** An empty pick matches no run. One read from the file matches every run. */
+  /** An empty pick matches no run, and is sent as `{}` for the forge to refuse. */
   none: boolean;
 };
 
@@ -139,7 +140,6 @@ export function freshKey(prefix: string): string {
 }
 
 function asTree(value: unknown): Tree | null {
-  if (value instanceof NumberText) return value.text;
   if (typeof value === 'number' && Number.isFinite(value)) return String(value);
   if (typeof value === 'string') return value;
   if (value === null) return null;
@@ -165,69 +165,58 @@ export type Typed = (input: string, text: string) => unknown;
 
 const guessed: Typed = (_input, text) => scalarOf(text) ?? text;
 
-/** A tree as the file writes it: a number's digits stay digits, a name stays text. */
-function yamlTree(
-  tree: Tree,
-  key: string | null = null,
-  typed: Typed = guessed,
-): unknown {
+/**
+ * A tree as the values hold it: a number leaf a number, a name text. A
+ * fold's `weights` keys stay text; the forge gives each the type of the
+ * repeated value it names.
+ */
+function treeValue(tree: Tree, key: string | null = null): unknown {
   if (tree === null) return null;
-  if (key === 'weights' && typeof tree === 'object') return weightsYaml(tree, typed);
+  if (key === 'weights' && typeof tree === 'object') return weightsValue(tree);
   if (typeof tree === 'string') {
     if (NAME_KEYS.has(key ?? '')) return tree;
-    const number = numberText(tree);
-    return number instanceof NumberText ? number : tree;
+    const number = numberOf(tree);
+    return number !== undefined && Number.isFinite(number) ? number : tree;
   }
   const written: Record<string, unknown> = {};
   for (const [child, value] of Object.entries(tree)) {
     if (value === undefined) continue;
     written[child] = Array.isArray(value)
-      ? value.map((item) => yamlTree(item, child, typed))
-      : yamlTree(value, child, typed);
+      ? value.map((item) => treeValue(item, child))
+      : treeValue(value, child);
   }
   return written;
 }
 
-/**
- * A fold's weights as the file writes them: each value of the repeated input
- * a key of the type the input declares, as `typed` gives it, so a number
- * input's `{seed: {1: 2}}` keeps the number 1 the runs were given and a text
- * input's `{name: {"1": 2}}` the text "1". The forge matches a key to a run's
- * value by type.
- */
-function weightsYaml(
-  tree: { [key: string]: Tree | Tree[] | undefined },
-  typed: Typed,
-): unknown {
+/** A fold's weights: each input's table of its values, as text, to their weights. */
+function weightsValue(tree: { [key: string]: Tree | Tree[] | undefined }): unknown {
   const written: Record<string, unknown> = {};
-  for (const [input, values] of Object.entries(tree)) {
-    if (values === undefined) continue;
-    if (values === null || typeof values !== 'object' || Array.isArray(values)) {
-      written[input] = Array.isArray(values)
-        ? values.map((item) => yamlTree(item, null, typed))
-        : yamlTree(values, null, typed);
+  for (const [input, table] of Object.entries(tree)) {
+    if (table === undefined) continue;
+    if (table === null || typeof table !== 'object' || Array.isArray(table)) {
+      written[input] = Array.isArray(table)
+        ? table.map((item) => treeValue(item))
+        : treeValue(table);
       continue;
     }
-    written[input] = new Map(
-      Object.entries(values).map(([value, weight]) => [
-        typed(input, value) ?? value,
-        Array.isArray(weight) || weight === undefined
-          ? null
-          : yamlTree(weight, null, typed),
+    written[input] = Object.fromEntries(
+      Object.entries(table).map(([value, weight]) => [
+        value,
+        Array.isArray(weight) || weight === undefined ? null : treeValue(weight),
       ]),
     );
   }
   return written;
 }
 
-/** A value read from YAML as a block tree. */
+/** A formula's value as a block tree. */
 export function treeOf(value: unknown): Tree | null {
   return asTree(value);
 }
 
-/** A block tree as the file writes it: a number's digits stay digits, a name stays text. */
-export function formulaYaml(tree: Tree): unknown {
-  return yamlTree(tree);
+/** A block tree as a formula's value. */
+export function formulaValue(tree: Tree): unknown {
+  return treeValue(tree);
 }
 
 function names(node: unknown): string[] {
@@ -307,44 +296,42 @@ export type ScoringRead = {
   unreadable: string[];
 };
 
-/** `scoring` and `checks` as the cards show them. */
-export function readScoring(at: (path: string[]) => unknown): ScoringRead {
+/**
+ * `scoring` and `checks` as the cards show them. The values give groups as
+ * `{name, picks}` and values as `{name, formula}`.
+ */
+export function readScoring(settings: Values): ScoringRead {
   const unreadable: string[] = [];
-  const scoring = at(['scoring']);
+  const scoring = settings['scoring'] ?? undefined;
   const show = readShow(isRecord(scoring) ? scoring['show'] : undefined);
   const scoreGroups: ScoreGroup[] = [];
   const scoreValues: ScoreValue[] = [];
   if (scoring !== undefined && !isRecord(scoring)) unreadable.push('scoring');
   if (isRecord(scoring)) {
     if (!showReadable(scoring['show'])) unreadable.push('scoring');
-    const groups = scoring['groups'];
-    if (groups !== undefined && !isRecord(groups)) unreadable.push('scoring');
-    if (isRecord(groups)) {
-      for (const [name, entry] of Object.entries(groups)) {
-        if (name === 'all') continue;
-        const picks = readPicks(entry);
-        scoreGroups.push({
-          key: freshKey('g'),
-          name,
-          picks,
-          none: false,
-        });
-      }
+    const groups = entriesAt(scoring, ['groups']);
+    const values = entriesAt(scoring, ['values']);
+    if (groups === null || values === null) unreadable.push('scoring');
+    for (const group of groups ?? []) {
+      const name = textOf(group['name']);
+      if (name === 'all') continue;
+      scoreGroups.push({
+        key: freshKey('g'),
+        name,
+        picks: readPicks(group['picks']),
+        none: false,
+      });
     }
-    const values = scoring['values'];
-    if (values !== undefined && !isRecord(values)) unreadable.push('scoring');
-    if (isRecord(values)) {
-      for (const [name, entry] of Object.entries(values)) {
-        scoreValues.push({
-          key: freshKey('v'),
-          name,
-          text: '',
-          tree: asTree(entry),
-        });
-      }
+    for (const value of values ?? []) {
+      scoreValues.push({
+        key: freshKey('v'),
+        name: textOf(value['name']),
+        text: '',
+        tree: asTree(value['formula']),
+      });
     }
   }
-  const checksNode = at(['checks']);
+  const checksNode = settings['checks'] ?? undefined;
   const checks: CheckDraft[] = [];
   if (checksNode !== undefined && !Array.isArray(checksNode)) unreadable.push('checks');
   if (Array.isArray(checksNode)) {
@@ -378,7 +365,7 @@ export function readScoring(at: (path: string[]) => unknown): ScoringRead {
 }
 
 /**
- * A group's picks as the file writes them, each value as the input declares
+ * A group's picks as the values hold them, each value as the input declares
  * it, as `typed` gives it: the forge matches a pick to a run's value by type,
  * so a number input's `{seed: 1}` is not the text "1".
  */
@@ -604,13 +591,13 @@ export function withLine(
   };
 }
 
-/** A `Map`, as weights are written, compared by its entries. */
-function mapEntries(_key: string, value: unknown): unknown {
-  return value instanceof Map ? [...value.entries()] : value;
-}
-
+/**
+ * Write `scoring` and `checks` into the values, each when it changed. Every
+ * group and value is sent as it is, one with no name or no runs too, for the
+ * forge to refuse at its name.
+ */
 export function writeScoring(
-  doc: Doc,
+  values: Values,
   before: ScoringRead,
   after: ScoringRead,
   trees: (value: ScoreValue) => Tree | null,
@@ -620,38 +607,13 @@ export function writeScoring(
 ): void {
   if (
     !before.unreadable.includes('scoring') &&
-    JSON.stringify(
-      scoringOf(before, (value) => value.tree, typed),
-      mapEntries,
-    ) !== JSON.stringify(scoringOf(after, trees, typed), mapEntries)
+    JSON.stringify(scoringOf(before, (value) => value.tree, typed)) !==
+      JSON.stringify(scoringOf(after, trees, typed))
   ) {
     const written = scoringOf(after, trees, typed);
-    const empty =
-      written.groups === undefined &&
-      written.values === undefined &&
-      written.show === undefined;
-    // A renamed group or value is renamed where it stands, keeping its
-    // place and its comments, before the rest is written over it.
-    // Every rename lands at once, so a chain or a swap of names is kept.
-    for (const [list, olds, news] of [
-      ['groups', before.scoreGroups, after.scoreGroups],
-      ['values', before.scoreValues, after.scoreValues],
-    ] as const) {
-      const named = new Map<string, string>(
-        news.map((item: { key: string; name: string }) => [item.key, item.name.trim()]),
-      );
-      const renames = new Map<string, string>();
-      const dropped = new Set<string>();
-      for (const old of olds) {
-        const from = old.name.trim();
-        const to = named.get(old.key);
-        if (from === '') continue;
-        if (to === undefined || to === '') dropped.add(from);
-        else renames.set(from, to);
-      }
-      renameKeys(doc, ['scoring', list], renames, dropped);
+    for (const part of ['groups', 'values', 'show'] as const) {
+      writeAt(values, ['scoring', part], written[part], { prune: true });
     }
-    writeAt(doc, ['scoring'], empty ? undefined : written, { prune: true });
   }
   if (
     !before.unreadable.includes('checks') &&
@@ -659,7 +621,7 @@ export function writeScoring(
       JSON.stringify(checksOf(after.checks, typed, texts))
   ) {
     const written = checksOf(after.checks, typed, texts);
-    writeAt(doc, ['checks'], written.length === 0 ? undefined : written, {
+    writeAt(values, ['checks'], written.length === 0 ? undefined : written, {
       prune: true,
     });
   }
@@ -670,23 +632,21 @@ function scoringOf(
   trees: (value: ScoreValue) => Tree | null,
   typed: Typed,
 ) {
-  const groups: Record<string, unknown> = {};
-  for (const group of read.scoreGroups) {
-    if (group.name.trim() === '') continue;
-    if (group.none && Object.keys(group.picks).length === 0) continue;
-    groups[group.name.trim()] = pickEntry(group.picks, typed);
-  }
-  const values: Record<string, unknown> = {};
-  for (const value of read.scoreValues) {
-    if (value.name.trim() === '') continue;
+  const groups = read.scoreGroups.map((group) => ({
+    name: group.name,
+    picks: pickEntry(group.picks, typed),
+  }));
+  const values = read.scoreValues.map((value) => {
     const tree = trees(value);
-    if (tree !== null) values[value.name.trim()] = yamlTree(tree, null, typed);
-  }
+    return tree === null
+      ? { name: value.name }
+      : { name: value.name, formula: treeValue(tree) };
+  });
   // An empty part is left out, as the forge reads none as empty.
   const show = showLists(read.show);
   const written: { groups?: unknown; values?: unknown; show?: unknown } = {};
-  if (Object.keys(groups).length > 0) written.groups = groups;
-  if (Object.keys(values).length > 0) written.values = values;
+  if (groups.length > 0) written.groups = groups;
+  if (values.length > 0) written.values = values;
   if (show !== undefined) written.show = show;
   return written;
 }
@@ -715,58 +675,54 @@ function checksOf(
       if (value.name.trim() === '') continue;
       const number = texts.has(value.name.trim())
         ? undefined
-        : numberText(value.expected);
+        : numberOf(value.expected);
       expect[value.name.trim()] =
-        number instanceof NumberText ? number : value.expected;
+        number !== undefined && Number.isFinite(number) ? number : value.expected;
     }
     return { submit, expect };
   });
 }
 
-/** The runs the axes make, first axis outermost, organiser cells only. */
-export function runsOf(axes: AxisValues[]): RunRow[] {
-  const filled = axes.filter(
-    (axis) => axis.inputs.length > 0 && axis.tuples.length > 0,
-  );
-  if (filled.length === 0) return [];
-  let rows: { titles: string[]; cells: Record<string, string> }[] = [
-    { titles: [], cells: {} },
-  ];
-  for (const axis of filled) {
-    const next: typeof rows = [];
-    for (const row of rows) {
-      for (const tuple of axis.tuples) {
-        const cells = { ...row.cells };
-        for (const input of axis.inputs) {
-          const cell = tuple.cells[input];
-          if (cell !== undefined && !cell.entrant) cells[input] = cell.value;
-        }
-        next.push({
-          titles: [...row.titles, tuple.title.trim()].filter((title) => title !== ''),
-          cells,
-        });
-      }
-    }
-    rows = next;
-  }
-  return rows.map((row, index) => ({
-    id: String(index),
-    title: runName({ title: row.titles.join(', '), cells: row.cells }, axes),
-    cells: row.cells,
-  }));
-}
-
 /** What the one run a submission makes is called, while no input repeats. */
 export const ONE_RUN = 'The one run';
 
-/**
- * The runs a submission makes, as the forge crosses the axes: with no input
- * repeated, the one run every submission makes, which `all` holds.
- */
-export function submissionRuns(axes: AxisValues[]): RunRow[] {
-  return axes.some((axis) => axis.inputs.length > 0)
-    ? runsOf(axes)
-    : [{ id: '0', title: ONE_RUN, cells: {} }];
+/** A task's runs as the server makes them from the draft, with each axis's own rows. */
+export type DraftRunRows = {
+  runs: RunRow[];
+  /** How many runs the axes make; `runs` is empty when that is more than a task may have. */
+  count: number;
+  /** Each axis's tuples as rows, for the axes that have inputs, in order. */
+  axes: RunRow[][];
+};
+
+/** The server's runs as rows: titles as `runName` gives them, cells as text. */
+export function draftRunRows(
+  answer: DraftRuns,
+  tables: readonly AxisValues[],
+): DraftRunRows {
+  const repeats = tables.some((table) => table.inputs.length > 0);
+  const filled = tables.filter((table) => table.inputs.length > 0);
+  const rowsOf = (runs: DraftRun[], named: readonly AxisValues[]): RunRow[] =>
+    runs.map((run, index) => {
+      const cells = Object.fromEntries(
+        Object.entries(run.cells).map(([input, value]) => [input, textOf(value)]),
+      );
+      return {
+        id: String(index),
+        title: repeats
+          ? runName({ title: run.titles.join(', '), cells }, named)
+          : ONE_RUN,
+        cells,
+      };
+    });
+  return {
+    runs: rowsOf(answer.runs, tables),
+    count: answer.count,
+    axes: answer.axes.map((runs, index) => {
+      const table = filled[index];
+      return table === undefined ? [] : rowsOf(runs, [table]);
+    }),
+  };
 }
 
 /** The row’s title, or its files and values in input order. */
@@ -786,30 +742,31 @@ export function runName(
   return cells.join(', ') || 'No files or values yet';
 }
 
-/** Each table’s rows, checked independently, so an empty table keeps the other picks. */
-export function ticksOf(group: ScoreGroup, tables: readonly AxisValues[]): boolean[][] {
-  return tables.map((table) =>
-    runsOf([table]).map(
-      (tuple) =>
-        !(group.none && Object.keys(group.picks).length === 0) &&
-        table.inputs.every((input) => {
-          const picked = group.picks[input];
-          return picked === undefined || picked.includes(tuple.cells[input] ?? '');
-        }),
-    ),
+/** One axis's inputs and its rows as the server makes them. */
+export type AxisRuns = { inputs: readonly string[]; rows: RunRow[] };
+
+/** Whether each of an axis's rows is in the group. */
+export function ticksOf(group: ScoreGroup, axis: AxisRuns): boolean[] {
+  return axis.rows.map(
+    (tuple) =>
+      !(group.none && Object.keys(group.picks).length === 0) &&
+      axis.inputs.every((input) => {
+        const picked = group.picks[input];
+        return picked === undefined || picked.includes(tuple.cells[input] ?? '');
+      }),
   );
 }
 
 /** Change a row’s picks, then let the existing writer canonicalise matching runs. */
 export function withTick(
   group: ScoreGroup,
-  table: AxisValues,
+  table: AxisRuns,
   row: number,
   on: boolean,
   runs: RunRow[],
 ): ScoreGroup {
-  const ticks = ticksOf(group, [table])[0] ?? [];
-  const rows = runsOf([table]);
+  const ticks = ticksOf(group, table);
+  const rows = table.rows;
   const selected = rows.filter((_, index) => (index === row ? on : ticks[index]));
   const picks = { ...group.picks };
   for (const input of table.inputs) {
@@ -952,26 +909,31 @@ export function printed(value: ScoreValue, catalogue: Catalogue | null): string 
 }
 
 /**
- * Why a value or a group cannot be saved, by its key: what the file has no
- * place for. The forge checks the rest.
+ * What the forge said of each group and value, by its key: the problems at
+ * its name, such as a name another has, none, or a group that picks no run.
+ * A value's problems inside its formula are marked on the formula instead.
  */
 export function troublesOf(
   groups: ScoreGroup[],
   values: ScoreValue[],
+  errors: readonly DefinitionError[],
 ): Map<string, string> {
   const troubles = new Map<string, string>();
+  const said = (path: readonly (string | number)[], exact: boolean) =>
+    errors
+      .filter(
+        (error) =>
+          isUnder(error.path, path) && (!exact || error.path.length === path.length),
+      )
+      .map((error) => error.message)
+      .join(' ');
   for (const group of groups) {
-    if (group.name.trim() === '') troubles.set(group.key, 'A group needs a name.');
-    // A pick of nothing reads as every run, so the writer leaves it out.
-    else if (group.none && Object.keys(group.picks).length === 0)
-      troubles.set(group.key, `${group.name} matches no runs`);
+    const message = said(['scoring', 'groups', group.name], false);
+    if (message !== '') troubles.set(group.key, message);
   }
   for (const value of values) {
-    if (value.name.trim() === '') troubles.set(value.key, 'A value needs a name.');
-    else if (
-      values.some((other) => other.key !== value.key && other.name === value.name)
-    )
-      troubles.set(value.key, `another value is called ${value.name} too: rename one`);
+    const message = said(['scoring', 'values', value.name], true);
+    if (message !== '') troubles.set(value.key, message);
   }
   return troubles;
 }

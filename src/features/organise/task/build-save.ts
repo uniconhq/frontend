@@ -7,17 +7,17 @@ import { partUploadsQuery } from '@/api/upload/parts';
 import type { Outcome } from '../files/SaveOutcome';
 import { fileQuery, staleAfterWrite } from '../files/place';
 import { sendToTask, tokenNow } from '../files/use-task-upload';
+import type { Values } from '../forms/values';
 import { taskPath, type TaskPlace } from './build-data';
 import { fileChanges, type PlannedChange, type Source } from './staged';
 
 /**
- * One save of the task's cards: the settings as the cards changed them, read
- * at a token, and every test file written or taken out, in one save, so one
- * publication and, while the contest runs, one confirmation. `base` is the
- * settings as they were read, for the merge when someone else saved first.
+ * One save of the task's cards: the settings' values as the cards changed
+ * them, read at a token, and every test file written or taken out, in one
+ * save, so one publication and, while the contest runs, one confirmation.
  */
 export type Attempt = {
-  yaml: { content: string; base: string; token: string } | null;
+  settings: { values: Values; token: string | null } | null;
   planned: PlannedChange[];
 };
 
@@ -33,8 +33,8 @@ const TASK_FILE = 'task.yaml';
 
 /**
  * Saving the task's cards. A save answered with a conflict is looked into:
- * when the settings moved, the merge of the two versions opens field by field
- * (`merge`); when a test's file moved, the files someone else changed are
+ * when the settings moved, the refusal says so, for the cards to be read
+ * again; when only a test's file moved, the files someone else changed are
  * listed (`conflicts`), each to keep theirs or to save over. Larger files go
  * through the upload door first, once: a save sent again reuses them.
  * `onSaved` hears every save that went through, published or kept as a draft.
@@ -43,17 +43,13 @@ export function useTaskSave(place: TaskPlace, onSaved: () => Promise<void> | voi
   const queryClient = useQueryClient();
   const [state, setState] = useState<SaveState>({ stage: 'idle' });
   const [outcome, setOutcome] = useState<Outcome<SaveRequest> | null>(null);
-  const [merge, setMerge] = useState<{
-    attempt: Attempt;
-    current: { content: string; token: string };
-  } | null>(null);
   const [conflicts, setConflicts] = useState<{
     attempt: Attempt;
     files: FileConflict[];
   } | null>(null);
   const uploads = useRef(new Map<string, { source: Source; id: string }>());
   /** The last save tried, which a refusal's confirmation sends again. */
-  const last = useRef<Attempt>({ yaml: null, planned: [] });
+  const last = useRef<Attempt>({ settings: null, planned: [] });
 
   const upload = async (path: string, source: Source): Promise<string> => {
     const known = uploads.current.get(path);
@@ -66,17 +62,17 @@ export function useTaskSave(place: TaskPlace, onSaved: () => Promise<void> | voi
     return id;
   };
 
-  /** Where a refused save stands: what moved, read now, and what to show for it. */
+  /**
+   * Whether a refused save is down to test files someone else changed, now
+   * listed. Settings that moved are the refusal's to say.
+   */
   const lookInto = async (attempt: Attempt) => {
-    if (attempt.yaml !== null) {
+    if (attempt.settings !== null) {
       const { data } = await apiClient.GET(
-        '/api/v1/orgs/{org}/contests/{contest}/tasks/{task}/files/{path}',
-        { params: { path: { ...taskPath(place), path: TASK_FILE } } },
+        '/api/v1/orgs/{org}/contests/{contest}/tasks/{task}/settings',
+        { params: { path: taskPath(place) } },
       );
-      if (data !== undefined && data.token !== attempt.yaml.token) {
-        setMerge({ attempt, current: { content: data.content, token: data.token } });
-        return true;
-      }
+      if (data !== undefined && data.token !== attempt.settings.token) return false;
     }
     const files = await Promise.all(
       attempt.planned.map(async (change) => {
@@ -142,13 +138,13 @@ export function useTaskSave(place: TaskPlace, onSaved: () => Promise<void> | voi
     });
     return {
       changes: [
-        ...(attempt.yaml === null
+        ...(attempt.settings === null
           ? []
           : [
               {
                 path: TASK_FILE,
-                token: attempt.yaml.token,
-                content: attempt.yaml.content,
+                token: attempt.settings.token,
+                values: attempt.settings.values,
                 encoding: 'utf-8' as const,
                 remove: false,
               },
@@ -163,7 +159,6 @@ export function useTaskSave(place: TaskPlace, onSaved: () => Promise<void> | voi
   const save = async (attempt: Attempt) => {
     last.current = attempt;
     setOutcome(null);
-    setMerge(null);
     setConflicts(null);
     let body: SaveRequest;
     try {
@@ -192,22 +187,9 @@ export function useTaskSave(place: TaskPlace, onSaved: () => Promise<void> | voi
   return {
     state,
     outcome,
-    merge,
     conflicts,
     save,
     again,
-    /** The merged settings, saved over the version read now with every other change. */
-    saveMerged: (content: string) => {
-      if (merge === null) return;
-      void save({
-        ...merge.attempt,
-        yaml: {
-          content,
-          base: merge.current.content,
-          token: merge.current.token,
-        },
-      });
-    },
     /**
      * The files someone else changed resolved: each kept as theirs, its change
      * dropped, or saved over theirs, at the token it has now.
@@ -229,7 +211,6 @@ export function useTaskSave(place: TaskPlace, onSaved: () => Promise<void> | voi
       void save({ ...conflicts.attempt, planned });
     },
     drop: () => {
-      setMerge(null);
       setConflicts(null);
       setOutcome(null);
     },

@@ -1,22 +1,21 @@
-import { isSeq } from 'yaml';
 import { isoOf, localOf, unreadableTime } from './times';
-import { readWays, writeWays, type WayValues } from './ways';
 import {
-  exactAt,
+  entriesAt,
   isRecord,
-  numberText,
+  numberOf,
   textAt,
   textOf,
-  Time,
   valueAt,
   writeAt,
-  type Doc,
-} from './yaml-doc';
+  type Path,
+  type Values,
+} from './values';
+import { readWays, writeWays, type WayValues } from './ways';
 
 /**
- * `contest.yaml` as the form's fields: text for every field, so an empty one
- * is "not set", and a time in the organiser's local time. The form writes only
- * the fields that changed from what it read.
+ * The contest's settings as the form's fields: text for every field, so an
+ * empty one is "not set", and a time in the organiser's local time. The form
+ * writes only the fields that changed from what it read.
  */
 export type ContestValues = {
   name: string;
@@ -36,7 +35,7 @@ export type ContestValues = {
   locks: string;
   /** The task entries in the order the form shows them. */
   tasks: TaskEntryValues[];
-  /** The leaderboards' keys; none while `leaderboards` is not a mapping. */
+  /** The leaderboards' keys; none while `leaderboards` is not a list of them. */
   boards: string[];
   /** The tasks whose marked submissions a leaderboard reads. */
   marked: string[];
@@ -56,21 +55,21 @@ export type TaskEntryValues = {
 const ENTRY_TIMES = ['release_at', 'due', 'closes'] as const;
 
 /**
- * What the form can read of the file. A part whose key holds something other
- * than its shape is named in `unreadable` and left out of the form, so a save
- * never touches it; the text tab still edits it.
+ * What the form can read of the settings. A part whose key holds something
+ * other than its shape is named in `unreadable` and left out of the form, so
+ * a save never touches it; the stored settings still edit it as text.
  */
 export type ContestRead = {
   values: ContestValues;
   unreadable: string[];
-  /** Times in the file the time fields cannot show, by their path. */
+  /** Times the time fields cannot show, by their path. */
   rawTimes: Record<string, string>;
 };
 
-function rawTimesOf(doc: Doc, paths: (string | number)[][]): Record<string, string> {
+function rawTimesOf(values: Values, paths: Path[]): Record<string, string> {
   const raw: Record<string, string> = {};
   for (const path of paths) {
-    const value = valueAt(doc, path);
+    const value = valueAt(values, path);
     if (unreadableTime(value)) raw[path.join('.')] = textOf(value);
   }
   return raw;
@@ -98,16 +97,16 @@ function markedTasks(node: unknown): string[] {
   return [...found];
 }
 
-export function readContest(doc: Doc): ContestRead {
+export function readContest(values: Values): ContestRead {
   const unreadable: string[] = [];
-  const registration = valueAt(doc, ['registration']);
+  const registration = valueAt(values, ['registration']);
   if (registration !== undefined && !isRecord(registration))
     unreadable.push('registration');
-  const entrants = valueAt(doc, ['entrants']);
+  const entrants = valueAt(values, ['entrants']);
   if (entrants !== undefined && !isRecord(entrants)) unreadable.push('entrants');
-  const ways = isRecord(registration) ? readWays(doc) : null;
+  const ways = isRecord(registration) ? readWays(values) : null;
   if (ways === 'unreadable') unreadable.push('ways');
-  const list = valueAt(doc, ['tasks']);
+  const list = valueAt(values, ['tasks']);
   const listOk =
     list === undefined ||
     (Array.isArray(list) &&
@@ -115,12 +114,12 @@ export function readContest(doc: Doc): ContestRead {
   if (!listOk) unreadable.push('tasks');
   const entries =
     listOk && Array.isArray(list) ? (list as Record<string, unknown>[]) : [];
-  const boards = exactAt(doc, ['leaderboards']);
+  const boards = entriesAt(values, ['leaderboards']) ?? [];
 
-  const at = (...path: (string | number)[]) => textAt(doc, path);
-  const time = (...path: (string | number)[]) => localOf(valueAt(doc, path));
+  const at = (...path: Path) => textAt(values, path);
+  const time = (...path: Path) => localOf(valueAt(values, path));
 
-  const timePaths: (string | number)[][] = [['start'], ['end']];
+  const timePaths: Path[] = [['start'], ['end']];
   if (isRecord(registration))
     timePaths.push(['registration', 'opens'], ['registration', 'closes']);
   entries.forEach((_, index) => {
@@ -129,7 +128,7 @@ export function readContest(doc: Doc): ContestRead {
 
   return {
     unreadable,
-    rawTimes: rawTimesOf(doc, timePaths),
+    rawTimes: rawTimesOf(values, timePaths),
     values: {
       name: at('name'),
       description: at('description'),
@@ -152,39 +151,33 @@ export function readContest(doc: Doc): ContestRead {
         closes: time('tasks', index, 'closes'),
         marks: at('tasks', index, 'marks'),
       })),
-      boards: isRecord(boards) ? Object.keys(boards) : [],
-      marked: isRecord(boards) ? markedTasks(boards) : [],
+      boards: boards.map((board) => textOf(board['key'])),
+      marked: markedTasks(boards),
     },
   };
 }
 
-/** A text field's value as the file holds it; an empty one is no key. */
+/** A text field's value as the settings hold it; an empty one is no key. */
 const text = (value: string) => (value === '' ? undefined : value);
-const number = (value: string) => numberText(value);
-const time = (value: string) => {
-  const iso = isoOf(value);
-  return iso === undefined ? undefined : new Time(iso);
-};
 
 /**
- * Write what changed between `before` and `after` into the document. Only
- * admin keys are skipped for a manager, though the form already holds them
- * still, so a manager's save never names one.
+ * Write what changed between `before` and `after` into the values. Admin
+ * keys are skipped for a manager, though the form already holds them still.
  */
 export function writeContest(
-  doc: Doc,
+  values: Values,
   before: ContestValues,
   after: ContestValues,
   { admin }: { admin: boolean },
 ): void {
   const put = (
-    path: (string | number)[],
+    path: Path,
     from: string,
     to: string,
     as: (value: string) => unknown,
     prune = false,
   ) => {
-    if (from !== to) writeAt(doc, path, as(to), { prune });
+    if (from !== to) writeAt(values, path, as(to), { prune });
   };
 
   if (admin) {
@@ -193,36 +186,32 @@ export function writeContest(
     put(['state'], before.state, after.state, text);
     put(['visibility'], before.visibility, after.visibility, text);
     const reg = (key: string) => ['registration', key];
-    put(reg('opens'), before.opens, after.opens, time, true);
-    put(reg('closes'), before.closes, after.closes, time, true);
-    put(reg('capacity'), before.capacity, after.capacity, number, true);
-    writeWays(doc, before.ways, after.ways);
+    put(reg('opens'), before.opens, after.opens, isoOf, true);
+    put(reg('closes'), before.closes, after.closes, isoOf, true);
+    put(reg('capacity'), before.capacity, after.capacity, numberOf, true);
+    writeWays(values, before.ways, after.ways);
   }
-  put(['start'], before.start, after.start, time);
-  put(['end'], before.end, after.end, time);
+  put(['start'], before.start, after.start, isoOf);
+  put(['end'], before.end, after.end, isoOf);
   const team = (key: string) => ['entrants', key];
-  put(team('most'), before.most, after.most, number, true);
-  put(team('fewest'), before.fewest, after.fewest, number, true);
+  put(team('most'), before.most, after.most, numberOf, true);
+  put(team('fewest'), before.fewest, after.fewest, numberOf, true);
   put(team('locks'), before.locks, after.locks, text, true);
 
-  // The list in its new order first, each entry moving with its comments;
-  // then each entry's fields, at the entry's new place.
+  // The list in its new order first, then each entry's fields at its new place.
   const order = after.tasks.map((entry) => entry.at);
-  if (order.some((from, index) => from !== index)) {
-    const list = doc.get('tasks', true);
-    if (isSeq(list)) {
-      const items = [...list.items];
-      list.items = order.map((from) => items[from]!);
-    }
+  const list = values['tasks'];
+  if (Array.isArray(list) && order.some((from, index) => from !== index)) {
+    values['tasks'] = order.map((from) => list[from] as unknown);
   }
   after.tasks.forEach((entry, index) => {
     const was = before.tasks.find((old) => old.at === entry.at);
     if (was === undefined) return;
     const field = (key: string) => ['tasks', index, key];
-    put(field('release_at'), was.releaseAt, entry.releaseAt, time);
-    put(field('due'), was.due, entry.due, time);
-    put(field('closes'), was.closes, entry.closes, time);
-    put(field('marks'), was.marks, entry.marks, number);
+    put(field('release_at'), was.releaseAt, entry.releaseAt, isoOf);
+    put(field('due'), was.due, entry.due, isoOf);
+    put(field('closes'), was.closes, entry.closes, isoOf);
+    put(field('marks'), was.marks, entry.marks, numberOf);
   });
 }
 

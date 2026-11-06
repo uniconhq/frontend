@@ -5,7 +5,6 @@ import { Loaded } from '@/ui/feedback/Loaded';
 import { useSession } from '@/session';
 import { taskPagePath } from '@/lib/contest-paths';
 import { contestPath, orgPath, taskPath, workflowPath } from '@/lib/organiser-paths';
-import { contestsReached, orgsReached, tasksReached } from '@/lib/reached';
 import {
   CONTEST_SECTIONS,
   CONTEST_VIEW_SECTIONS,
@@ -71,12 +70,12 @@ function ReadGroup<T>({
 function HomeEntries() {
   const session = useSession();
   const workflows = queryView($api.useQuery('get', '/api/v1/workflows'));
-  const roles = session.status === 'signed-in' ? session.me.roles : [];
+  const orgs = session.status === 'signed-in' ? session.me.orgs : [];
   return (
     <>
       <Group
         heading="Orgs"
-        entries={orgsReached(roles).map((org) => ({ label: org, to: orgPath(org) }))}
+        entries={orgs.map((org) => ({ label: org, to: orgPath(org) }))}
       />
       <ReadGroup
         heading="Workflows"
@@ -93,25 +92,16 @@ function HomeEntries() {
 }
 
 function OrgEntries({ org }: { org: string }) {
-  const session = useSession();
-  const roles = session.status === 'signed-in' ? session.me.roles : [];
-  const listed = queryView(
+  const contests = queryView(
     $api.useQuery('get', '/api/v1/orgs/{org}/contests', { params: { path: { org } } }),
   );
-  // As on the org's page: someone with roles only at some of its contests is refused the list.
-  const contests: QueryView<string[]> =
-    listed.state === 'ready'
-      ? { state: 'ready', data: listed.data.map((contest) => contest.name) }
-      : listed.state === 'error' && listed.error.code === 'forbidden'
-        ? { state: 'ready', data: contestsReached(roles, org) }
-        : listed;
   return (
     <>
       <ReadGroup
         heading="Contests"
         view={contests}
-        entries={(names) =>
-          names.map((contest) => ({ label: contest, to: contestPath(org, contest) }))
+        entries={(listed) =>
+          listed.map(({ name }) => ({ label: name, to: contestPath(org, name) }))
         }
       />
       <Group
@@ -126,14 +116,22 @@ function OrgEntries({ org }: { org: string }) {
 }
 
 function ContestEntries({ org, contest }: { org: string; contest: string }) {
-  const session = useSession();
-  const roles = session.status === 'signed-in' ? session.me.roles : [];
   const listed = queryView(
     $api.useQuery('get', '/api/v1/orgs/{org}/contests/{contest}/organise/tasks', {
       params: { path: { org, contest } },
     }),
   );
-  // As on the contest's page: a role at only some of its tasks is refused the list.
+  // As on the contest's page: a role at only some of its tasks is refused
+  // the standings, and the server lists those tasks by name instead.
+  const refused = listed.state === 'error' && listed.error.code === 'forbidden';
+  const named = queryView(
+    $api.useQuery(
+      'get',
+      '/api/v1/orgs/{org}/contests/{contest}/tasks',
+      { params: { path: { org, contest } } },
+      { enabled: refused },
+    ),
+  );
   const tasks: QueryView<Entry[]> =
     listed.state === 'ready'
       ? {
@@ -146,14 +144,16 @@ function ContestEntries({ org, contest }: { org: string; contest: string }) {
             };
           }),
         }
-      : listed.state === 'error' && listed.error.code === 'forbidden'
-        ? {
-            state: 'ready',
-            data: tasksReached(roles, org, contest).map((name) => ({
-              label: name,
-              to: taskPath(org, contest, name),
-            })),
-          }
+      : refused
+        ? named.state === 'ready'
+          ? {
+              state: 'ready',
+              data: named.data.map(({ name }) => ({
+                label: name,
+                to: taskPath(org, contest, name),
+              })),
+            }
+          : named
         : listed;
   return (
     <>

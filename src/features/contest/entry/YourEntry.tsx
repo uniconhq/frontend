@@ -1,8 +1,6 @@
 import { useRef, useState, type FormEvent } from 'react';
 import { useQueryClient, type Query } from '@tanstack/react-query';
 import { useChange, type Change } from '@/api/change';
-import { describeError } from '@/api/describe-error';
-import { ApiError } from '@/api/problem';
 import { $api } from '@/api/query';
 import type { ContestHome, Entrant, Invitation, MyEntry } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
@@ -117,7 +115,7 @@ function Status({ title, message, onRetry }: Standing & { onRetry?: () => void }
   );
 }
 
-/** Why the caller cannot register now, in words from its code. */
+/** Why the caller cannot register now, in the server's words. */
 function refusedStanding(entry: MyEntry): Standing {
   if (!entry.registration_open) {
     return {
@@ -131,23 +129,7 @@ function refusedStanding(entry: MyEntry): Standing {
       message: 'This contest is not taking your registration.',
     };
   }
-  if (entry.refused.code === 'forge_unavailable') {
-    // Nothing is wrong with the person: their addresses could not be read.
-    return {
-      title: 'Forgejo did not answer',
-      message:
-        'Your email addresses could not be checked just now, so whether you can register is not known yet.',
-    };
-  }
-  const { title, message } = describeError(
-    new ApiError({
-      code: entry.refused.code,
-      status: 403,
-      title: entry.refused.detail,
-      detail: entry.refused.detail,
-    }),
-  );
-  return { title, message };
+  return { title: 'You cannot register', message: entry.refused.detail };
 }
 
 /**
@@ -776,7 +758,7 @@ export function YourEntry({
       {!home.organises && <Invitations entry={entry} change={change} />}
       {change.error !== null && (
         <div className={classes.panel} role="alert">
-          <ErrorBlock error={change.error} compact />
+          <ErrorBlock error={change.error} compact heading="Couldn’t do that" />
           <div className={classes.actions}>
             <Button size="xs" variant="secondary" onClick={change.dismiss}>
               Dismiss

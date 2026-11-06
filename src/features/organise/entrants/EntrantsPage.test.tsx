@@ -3,8 +3,9 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@/test/user-event';
 import { http, HttpResponse } from 'msw';
 import type { OrganisedEntrant } from '@/api/types';
+import { holding } from '@/test/may';
 import { renderApp } from '@/test/render';
-import { problem, server, signedIn, someone } from '@/test/server';
+import { problem, server, signedIn } from '@/test/server';
 import { CONTEST_API, organisedEntrant } from '@/test/contestant';
 
 const PAGE = '/orgs/acme/contests/spring/entrants';
@@ -389,21 +390,12 @@ describe('the entrants page', () => {
     await user.click(await screen.findByRole('button', { name: 'Approve carol' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'A team in this contest needs at least 2 people',
+      'entrant_incomplete detail',
     );
   });
 
   it('shows an observer the list without actions', async () => {
-    server.use(
-      http.get('/api/v1/me', () =>
-        HttpResponse.json({
-          ...someone,
-          roles: [
-            { names: { org: 'acme', contest: 'spring', task: null }, role: 'observer' },
-          ],
-        }),
-      ),
-    );
+    server.use(signedIn, ...holding('observer'));
     entrantsWith([red]);
     renderApp(PAGE);
 

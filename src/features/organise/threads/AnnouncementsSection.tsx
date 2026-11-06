@@ -12,10 +12,9 @@ import { TextInput } from '@/ui/TextInput';
 import { Textarea } from '@/ui/Textarea';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { Loaded } from '@/ui/feedback/Loaded';
-import { useMe } from '@/session';
 import { useFallbackPoll } from '@/live';
 import { useEntrantName } from '../entrants/names';
-import { holdsAt } from '../roles';
+import { usePlaceMay } from '../may';
 import { announcementAnchor } from '@/ui/threads/anchors';
 import { AnnouncementContent } from '@/ui/threads/ThreadParts';
 import { itemClass } from '@/ui/threads/item-class';
@@ -65,7 +64,9 @@ function Composer({
     >
       <TextInput label="Title" value={title} onChange={setTitle} required />
       <Textarea label="Text" value={body} onChange={setBody} rows={4} required />
-      {change.error !== null && <ErrorBlock error={change.error} compact />}
+      {change.error !== null && (
+        <ErrorBlock error={change.error} compact heading="Couldn’t save" />
+      )}
       <div className={classes.actions}>
         <Button type="submit" loading={change.pending !== null}>
           {label}
@@ -178,7 +179,9 @@ function Managed({
           </Button>
         </div>
       )}
-      {change.error !== null && !closing && <ErrorBlock error={change.error} compact />}
+      {change.error !== null && !closing && (
+        <ErrorBlock error={change.error} compact heading="Couldn’t save" />
+      )}
       <Modal
         opened={closing}
         onClose={() => setClosing(false)}
@@ -199,7 +202,9 @@ function Managed({
           <BodyText tone="secondary">
             It stays here for the organisers, marked closed, and you can reopen it.
           </BodyText>
-          {change.error !== null && <ErrorBlock error={change.error} compact />}
+          {change.error !== null && (
+            <ErrorBlock error={change.error} compact heading="Couldn’t close" />
+          )}
           <div className={classes.actions}>
             <Button loading={change.pending === 'close'} onClick={() => void close()}>
               Close it
@@ -222,7 +227,7 @@ function Managed({
  */
 export function AnnouncementsSection({ place }: { place: AnnouncementPlace }) {
   const queryClient = useQueryClient();
-  const manages = holdsAt(useMe().roles, place, 'manager');
+  const manages = usePlaceMay(place).manage;
   const view = queryView(useManagedAnnouncements(place, useFallbackPoll(60_000)));
   const changes = useAnnouncementChanges(place);
   const readAgain = () =>

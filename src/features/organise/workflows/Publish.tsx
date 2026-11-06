@@ -167,7 +167,7 @@ export function PublishVersion({
               {refused.problems.length > 0 && (
                 <ul className={classes.problems}>
                   {refused.problems.map((problem) => (
-                    <li key={`${problem.path} ${problem.message}`}>
+                    <li key={`${problem.path.join('.')} ${problem.message}`}>
                       {problem.message}
                     </li>
                   ))}

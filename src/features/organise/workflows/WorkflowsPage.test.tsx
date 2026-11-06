@@ -120,7 +120,7 @@ describe('a workflow one may only read', () => {
     http.get('/api/v1/workflows/unicon/classic/versions/:version', () =>
       HttpResponse.json({ content: text }),
     );
-  const check = (problems: { path: string; message: string }[] = []) =>
+  const check = (problems: { path: (string | number)[]; message: string }[] = []) =>
     http.post('/api/v1/workflows/check', () => HttpResponse.json({ problems }));
   /** unicon/classic@v1 as the format before 2026-10-07 wrote it, cut short. */
   const OLD_FORMAT = [
@@ -297,6 +297,10 @@ describe('a workflow one may only read', () => {
     start: null,
     token: null,
     version: null,
+    href:
+      kind === 'file'
+        ? `/-/downloads/workflows/unicon/classic/versions/v1/${path.split('/').map(encodeURIComponent).join('/')}`
+        : null,
   });
 
   it('lists the files of a workflow folder’s box in its drawer, each downloading through the door', async () => {
@@ -369,7 +373,7 @@ describe('a workflow one may only read', () => {
         ),
       ),
       check(),
-      frozen({}),
+      frozen({ data: [entry('data/input.txt', 'file', 4)] }),
     );
     const user = userEvent.setup();
     renderApp('/workflows/unicon/classic');
@@ -394,7 +398,7 @@ describe('a workflow one may only read', () => {
       page(['v1', 'v2']),
       primitives,
       version(OLD_FORMAT),
-      check([{ path: 'outputs', message: reason }]),
+      check([{ path: ['outputs'], message: reason }]),
     );
     renderApp('/workflows/unicon/classic?version=v1');
 
@@ -436,7 +440,7 @@ describe('a workflow one may only read', () => {
       page(['v1', 'v2']),
       primitives,
       version('steps: [\n'),
-      check([{ path: '', message: reason }]),
+      check([{ path: [], message: reason }]),
     );
     renderApp('/workflows/unicon/classic?version=v1');
 

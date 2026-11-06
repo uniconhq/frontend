@@ -75,7 +75,9 @@ describe('routes', () => {
     const router = createMemoryRouter(withBoom, { initialEntries: ['/boom'] });
     renderWithProviders(<RouterProvider router={router} />);
 
-    expect(await screen.findByText('the page fell over')).toBeInTheDocument();
+    expect(
+      await screen.findByText('Something went wrong in this page'),
+    ).toBeInTheDocument();
     expect(screen.getByText('unicon')).toBeInTheDocument();
     expect(screen.getByRole('navigation', { name: 'Breadcrumb' })).toBeInTheDocument();
   });

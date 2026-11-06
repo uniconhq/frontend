@@ -8,11 +8,9 @@ import { Modal } from '@/ui/Modal';
 import { PageLink } from '@/ui/PageLink';
 import { RadioGroup } from '@/ui/RadioGroup';
 import { TextInput } from '@/ui/TextInput';
-import { useMe } from '@/session';
 import { useContestParams } from '@/lib/route-params';
 import { CONTEST_SECTIONS, contestSectionPath, sectionOf } from '@/lib/sections';
 import { readContest, writeContest, type ContestValues } from '../forms/contest-values';
-import type { FormProps } from '../forms/DefinitionFile';
 import { Fieldset, NumberField, TimeField } from '../forms/fields';
 import {
   approvesAtOnce,
@@ -21,9 +19,10 @@ import {
   registrationSentence,
   type WayValues,
 } from '../forms/ways';
-import { numberProblem } from '../forms/yaml-doc';
+import { numberProblem } from '../forms/values';
+import type { ValuesFormProps } from '../forms/ValuesForm';
 import { InvitesSection } from '../invites/InvitesSection';
-import { holdsAtContest } from '../roles';
+import { usePlaceMay } from '../may';
 import { SectionPage } from '../SectionPage';
 import { ContestFile, FieldBox } from './ContestFile';
 import { useOpenedField } from './opened';
@@ -72,7 +71,7 @@ const APPROVAL = [
   { value: 'manual', label: 'An organiser approves each one' },
 ];
 
-/** A ticked condition left empty, which the file has no place for. */
+/** A ticked condition left empty, which the settings have no place for. */
 function problemsOf(ways: WayValues[], ticks: Ticks[]): string[] {
   return ways.flatMap((way, at) => {
     if (way.kind !== 'signup') return [];
@@ -151,7 +150,7 @@ function WayCard({
                 place={{ kind: 'contest', org, contest }}
                 audience="contestants"
                 manages={manages}
-                administers={false}
+                giveAdmin={false}
               />
             ) : (
               <BodyText tone="secondary">
@@ -282,15 +281,20 @@ function WayCard({
  * see is warned of, since nobody can find it to sign up.
  */
 function EntryForm({
-  doc,
+  values: settings,
   busy,
   onSave,
   admin,
   org,
   contest,
   manages,
-}: FormProps & { admin: boolean; org: string; contest: string; manages: boolean }) {
-  const [read] = useState(() => readContest(doc));
+}: ValuesFormProps & {
+  admin: boolean;
+  org: string;
+  contest: string;
+  manages: boolean;
+}) {
+  const [read] = useState(() => readContest(settings));
   const [values, setValues] = useState<ContestValues>(read.values);
   const [ticks, setTicks] = useState<Ticks[]>(() =>
     (read.values.ways ?? []).map(ticksOf),
@@ -556,11 +560,12 @@ function EntryForm({
 /** How people enter the contest, with the link to who has. */
 export function ContestEntryPage() {
   const { org, contest } = useContestParams();
-  const manages = holdsAtContest(useMe().roles, org, contest, 'manager');
+  const may = usePlaceMay({ kind: 'contest', org, contest });
+  const manages = may.manage;
   return (
     <SectionPage
       place={{ kind: 'contest', org, contest }}
-      role="admin"
+      allowed={may.edit_admin_settings}
       section={sectionOf(CONTEST_SECTIONS, 'entry')}
       links={
         <>

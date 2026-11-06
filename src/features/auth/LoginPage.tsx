@@ -11,7 +11,7 @@ import {
   useForgeUrl,
   useSession,
 } from '@/session';
-import { loginErrorCode } from './login-errors';
+import { loginError } from './login-errors';
 import classes from './LoginPage.module.css';
 
 /**
@@ -24,7 +24,7 @@ export function LoginPage() {
   const [params] = useSearchParams();
   const session = useSession();
   const next = safeNext(params.get('next'));
-  const errorCode = loginErrorCode(params.get('error'));
+  const refused = loginError(params.get('error'));
   const forge = useForgeUrl();
 
   if (session.status === 'signed-in') return <Navigate to={next} replace />;
@@ -33,13 +33,15 @@ export function LoginPage() {
     <div className={classes.page}>
       <UniconLockup size={40} />
 
-      {errorCode !== null && (
+      {refused !== null && (
         <ErrorBlock
+          heading={refused.title}
           error={
             new ApiError({
-              code: errorCode,
+              code: refused.code,
               status: 400,
-              title: 'Sign in failed',
+              title: refused.title,
+              detail: refused.message,
             })
           }
         />
@@ -47,7 +49,7 @@ export function LoginPage() {
 
       <div className={classes.actions}>
         <Button href={loginHref(next)}>
-          {errorCode === null ? 'Sign in with Forgejo' : 'Try again'}
+          {refused === null ? 'Sign in with Forgejo' : 'Try again'}
         </Button>
         <CreateAccountLink />
       </div>

@@ -13,7 +13,7 @@ import { Checkbox } from '@/ui/Checkbox';
 import { FileDrop } from '@/ui/FileDrop';
 import { Select } from '@/ui/Select';
 import { TextInput } from '@/ui/TextInput';
-import { NumberText, numberText } from '../forms/yaml-doc';
+import { NumberText, numberText } from './yaml-doc';
 import {
   clearPort,
   entryFields,
@@ -36,7 +36,6 @@ import {
   wire,
   type EntryFields,
   type InputFields,
-  workflowOf,
 } from './edit';
 import { formatUse, parseUse, type BoxDecl } from './boxes';
 import { BoxFiles, UploadProgress } from './Files';
@@ -44,8 +43,6 @@ import { useStagedUpload, type Staging } from './staged-upload';
 import {
   VALUE_TYPES,
   refLabel,
-  refProblem,
-  refsIn,
   refsOf,
   sameRef,
   wholeRef,
@@ -58,15 +55,12 @@ import {
 import type { Pinned } from './pins';
 import { declared, type PrimitiveInfo } from './primitives';
 import {
-  mayBeOptional,
-  newProblem,
+  loopRefusal,
   stepInputs,
   stepOutputs,
   outputType,
   outputSources,
-  outputRefusal,
-  valueRefusal,
-  wireRefusal,
+  type StepInput,
 } from './rules';
 import {
   fileType,
@@ -183,28 +177,18 @@ function portLine(primitive: PrimitiveInfo, port: string): string | undefined {
 }
 
 /** What one of a step's ports takes, from its primitive or the workflow it runs. */
-type PortShape = {
-  name: string;
-  type: string;
-  options: string[] | null;
-  optional: boolean;
-  line: string | undefined;
-};
+type PortShape = StepInput & { line: string | undefined };
 
 /** A value written for a port that takes a plain value: text, a number, true or false, or one of a list. */
 function PortValue({
   text,
   workflow,
-  primitives,
-  boxes,
   index,
   shape,
   change,
 }: {
   text: string;
   workflow: Workflow;
-  primitives: Map<string, PrimitiveInfo>;
-  boxes: ReadonlyMap<string, BoxDecl>;
   index: number;
   shape: PortShape;
   change: Change;
@@ -224,33 +208,20 @@ function PortValue({
           : value.kind === 'invalid'
             ? JSON.stringify(value.raw)
             : '';
+  // Written as given, but for a loop; the check says what else is wrong.
   const apply = (raw: string | NumberText | boolean | undefined): string | null => {
     if (raw === undefined || raw === '') {
       change(clearPort(text, index, port));
       return null;
     }
     const whole = typeof raw === 'string' ? wholeRef(raw) : null;
-    if (whole !== null) {
-      const refused = wireRefusal(workflow, primitives, index, port, whole, boxes);
-      if (refused !== null) return refused;
-      change(wire(text, index, port, whole));
+    if (whole === null) {
+      change(setValue(text, index, port, raw));
       return null;
     }
-    const bad = typeof raw === 'string' ? refProblem(raw) : null;
-    if (bad !== null) return bad;
-    const written = (typeof raw === 'string' ? refsIn(raw) : []) ?? [];
-    const refused = valueRefusal(
-      workflow,
-      primitives,
-      index,
-      port,
-      raw,
-      written,
-      boxes,
-    );
-    if (refused !== null) return refused;
-    change(setValue(text, index, port, raw));
-    return null;
+    const loop = loopRefusal(workflow, index, whole);
+    if (loop === null) change(wire(text, index, port, whole));
+    return loop;
   };
   if (shape.type === 'boolean')
     return (
@@ -278,11 +249,9 @@ function PortValue({
         onChange={(chosen) => apply(chosen === '' ? undefined : chosen)}
       />
     );
-  const insertable = [
-    ...workflow.inputs
-      .filter((input) => SCALARS.includes(input.type) && !input.optional)
-      .map((input) => ({ kind: 'inputs' as const, name: input.id })),
-  ];
+  const insertable = workflow.inputs
+    .filter((input) => shape.accepts.includes(input.type))
+    .map((input) => ({ kind: 'inputs' as const, name: input.id }));
   return (
     <>
       <CommitField
@@ -327,8 +296,6 @@ function PortValue({
 function PortRow({
   text,
   workflow,
-  primitives,
-  boxes,
   index,
   shape,
   fitting,
@@ -336,8 +303,6 @@ function PortRow({
 }: {
   text: string;
   workflow: Workflow;
-  primitives: Map<string, PrimitiveInfo>;
-  boxes: ReadonlyMap<string, BoxDecl>;
   index: number;
   shape: PortShape;
   /** The sources the port may be wired from. */
@@ -422,8 +387,6 @@ function PortRow({
         <PortValue
           text={text}
           workflow={workflow}
-          primitives={primitives}
-          boxes={boxes}
           index={index}
           shape={shape}
           change={change}
@@ -549,7 +512,6 @@ export function StepPanel({
   /** Shows the inside of the workflow the step runs. */
   onZoom: () => void;
 }) {
-  const [versionRefused, setVersionRefused] = useState<string | null>(null);
   const step = workflow.steps[index];
   if (step === undefined) return null;
   const primitive = declared(primitives, step);
@@ -580,12 +542,6 @@ export function StepPanel({
       ...new Set([...Object.keys(step.with), ...shapes.map((shape) => shape.name)]),
     ].flatMap((port) => pinned.ports.get(`${String(index)}.${port}`) ?? []),
   ];
-  /** Writes `written`, unless it breaks a wire the old version kept. */
-  const moveTo = (written: string) => {
-    const broken = newProblem(workflow, workflowOf(written), primitives, boxes);
-    setVersionRefused(broken);
-    if (broken === null) change(written);
-  };
   return (
     <section className={classes.panel} aria-label={`The step ${step.id}`}>
       <CommitField
@@ -653,7 +609,9 @@ export function StepPanel({
       {problems.length > 0 && (
         <ul className={classes.problems} aria-label="Problems with this step">
           {problems.map((problem) => (
-            <li key={`${problem.path} ${problem.message}`}>{problem.message}</li>
+            <li key={`${problem.path.join('.')} ${problem.message}`}>
+              {problem.message}
+            </li>
           ))}
         </ul>
       )}
@@ -665,26 +623,12 @@ export function StepPanel({
               <Button
                 size="xs"
                 variant="secondary"
-                // Its box is needed to check that every wire and value still fits.
-                disabled={!boxes.has(newerRef)}
-                onClick={() => moveTo(setUse(text, index, newerRef))}
+                onClick={() => change(setUse(text, index, newerRef))}
               >
                 Move to it
               </Button>
             </div>
           </EditOnly>
-          {!boxes.has(newerRef) && (
-            <BodyText size="sm" tone="secondary">
-              {reading
-                ? `Reading ${newer}…`
-                : `${newer} could not be read, so the step cannot move to it yet.`}
-            </BodyText>
-          )}
-          {versionRefused !== null && (
-            <p className={classes.problemText} role="alert">
-              {versionRefused}
-            </p>
-          )}
         </div>
       )}
       {box !== undefined && (
@@ -709,8 +653,6 @@ export function StepPanel({
               key={shape.name}
               text={text}
               workflow={workflow}
-              primitives={primitives}
-              boxes={boxes}
               index={index}
               shape={shape}
               fitting={fitting(shape.name)}
@@ -745,8 +687,7 @@ export function StepPanel({
             value: found.ref,
             label: found.version,
           }))}
-          error={versionRefused ?? undefined}
-          onChange={(chosen) => moveTo(setUse(text, index, chosen))}
+          onChange={(chosen) => change(setUse(text, index, chosen))}
         />
       )}
       {primitive !== null && (
@@ -795,8 +736,6 @@ function formText(text: string): string | null {
 function InputRow({
   text,
   workflow,
-  primitives,
-  boxes,
   input,
   pinned,
   files,
@@ -807,8 +746,6 @@ function InputRow({
 }: {
   text: string;
   workflow: Workflow;
-  primitives: Map<string, PrimitiveInfo>;
-  boxes: ReadonlyMap<string, BoxDecl>;
   input: InputDecl;
   pinned: Pinned;
   files: Ref[];
@@ -817,7 +754,6 @@ function InputRow({
   onRenamed: (id: string) => void;
   onGiven: (path: string) => void;
 }) {
-  const [refused, setRefused] = useState<string | null>(null);
   const [giving, setGiving] = useState(false);
   const isFile = input.type === 'file' || input.type === 'folder';
   const fields: InputFields = {
@@ -835,10 +771,7 @@ function InputRow({
       merged.options = ['a', 'b'];
     // A unit goes after a number's title on the task's form, and only there (M54).
     if (merged.type !== 'number') merged.unit = null;
-    const written = setInput(text, input.id, merged);
-    const broken = newProblem(workflow, workflowOf(written), primitives, boxes);
-    setRefused(broken);
-    if (broken === null) change(written);
+    change(setInput(text, input.id, merged));
   };
   const problems = pinned.inputs.get(input.id) ?? [];
   const readers = workflow.steps.flatMap((step) =>
@@ -886,11 +819,7 @@ function InputRow({
           files={files}
           staging={staging}
           onFile={(path) => {
-            const written = inputToFile(text, input.id, path);
-            const broken = newProblem(workflow, workflowOf(written), primitives, boxes);
-            setRefused(broken);
-            if (broken !== null) return;
-            change(written);
+            change(inputToFile(text, input.id, path));
             onGiven(path);
           }}
         />
@@ -916,13 +845,11 @@ function InputRow({
           }}
         />
       )}
-      {(input.optional || mayBeOptional(workflow, primitives, input.id)) && (
-        <Checkbox
-          label="A task may leave it out"
-          checked={input.optional}
-          onChange={(optional) => update({ optional })}
-        />
-      )}
+      <Checkbox
+        label="A task may leave it out"
+        checked={input.optional}
+        onChange={(optional) => update({ optional })}
+      />
       <div className={classes.formText}>
         <CommitField
           label="Title on the task’s form"
@@ -965,11 +892,6 @@ function InputRow({
           {problem.message}
         </p>
       ))}
-      {refused !== null && (
-        <p className={classes.problemText} role="alert">
-          {refused}
-        </p>
-      )}
       <Part>Read by</Part>
       <BodyText size="sm">
         {readers.length === 0 ? 'Nothing yet' : readers.join(', ')}
@@ -1080,8 +1002,6 @@ function GiveFromWorkflow({
 export function FilePanel({
   text,
   workflow,
-  primitives,
-  boxes,
   path,
   files,
   listed,
@@ -1092,8 +1012,6 @@ export function FilePanel({
 }: {
   text: string;
   workflow: Workflow;
-  primitives: Map<string, PrimitiveInfo>;
-  boxes: ReadonlyMap<string, BoxDecl>;
   /** The file or folder of the box selected. */
   path: string;
   /** The workflow's files and folders, saved and staged. */
@@ -1107,14 +1025,6 @@ export function FilePanel({
   /** The file is the input `id` now, which the drawer follows. */
   onSupplied: (id: string) => void;
 }) {
-  const [refused, setRefused] = useState<string | null>(null);
-  /** `written` as the draft, unless it newly breaks a wire, which is said instead. */
-  const apply = (written: string): boolean => {
-    const broken = newProblem(workflow, workflowOf(written), primitives, boxes);
-    setRefused(broken);
-    if (broken === null) change(written);
-    return broken === null;
-  };
   const type = fileType(path);
   const fitting = files.filter((ref) => fileType(ref.name) === type);
   const known = fitting.some((ref) => ref.name === path);
@@ -1139,18 +1049,15 @@ export function FilePanel({
           ...fitting.map((ref) => ({ value: ref.name, label: ref.name })),
         ]}
         onChange={(to) => {
-          if (to !== path && apply(moveFile(text, path, to))) onMoved(to);
+          if (to === path) return;
+          change(moveFile(text, path, to));
+          onMoved(to);
         }}
       />
       {listed && !known && (
         <p className={classes.problemText}>
           {path} is not among this workflow’s files yet. Upload it below, or choose
           another.
-        </p>
-      )}
-      {refused !== null && (
-        <p className={classes.problemText} role="alert">
-          {refused}
         </p>
       )}
       <Part>Read by</Part>
@@ -1165,7 +1072,8 @@ export function FilePanel({
             variant="secondary"
             onClick={() => {
               const id = freeName(idOfPath(path), sharedNames(workflow), '_');
-              if (apply(fileToInput(text, path, id, type))) onSupplied(id);
+              change(fileToInput(text, path, id, type));
+              onSupplied(id);
             }}
           >
             Let the task supply it instead
@@ -1179,8 +1087,6 @@ export function FilePanel({
 export function InputsPanel({
   text,
   workflow,
-  primitives,
-  boxes,
   pinned,
   id,
   files,
@@ -1191,8 +1097,6 @@ export function InputsPanel({
 }: {
   text: string;
   workflow: Workflow;
-  primitives: Map<string, PrimitiveInfo>;
-  boxes: ReadonlyMap<string, BoxDecl>;
   pinned: Pinned;
   /** The input of the box selected. */
   id: string;
@@ -1219,8 +1123,6 @@ export function InputsPanel({
             key={input.id}
             text={text}
             workflow={workflow}
-            primitives={primitives}
-            boxes={boxes}
             input={input}
             pinned={pinned}
             files={files}
@@ -1252,7 +1154,6 @@ function EntryRow({
   pinned: Pinned;
   change: Change;
 }) {
-  const [refused, setRefused] = useState<string | null>(null);
   const from = entry.from;
   const type = outputType(workflow, primitives, from, boxes);
   const isNumber = type === 'number';
@@ -1292,14 +1193,10 @@ function EntryRow({
         label="From"
         value={from !== null ? refLabel(from) : ''}
         placeholder="Nothing yet"
-        error={refused ?? undefined}
         options={offered.map((ref) => ({ value: refLabel(ref), label: refWords(ref) }))}
         onChange={(chosen) => {
           const ref = offered.find((found) => refLabel(found) === chosen);
-          if (ref === undefined) return;
-          const refused = outputRefusal(workflow, primitives, ref, boxes);
-          setRefused(refused);
-          if (refused === null) write({ from: ref });
+          if (ref !== undefined) write({ from: ref });
         }}
       />
       <div className={classes.formText}>

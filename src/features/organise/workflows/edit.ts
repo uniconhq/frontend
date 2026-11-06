@@ -14,7 +14,7 @@ import {
   writeOver,
   writeYaml,
   type NumberText,
-} from '../forms/yaml-doc';
+} from './yaml-doc';
 import {
   readWorkflow,
   refText,

@@ -1,38 +1,32 @@
 import { useQueries } from '@tanstack/react-query';
 import type { TaskStanding } from '@/api/types';
-import { fileQuery } from '../files/place';
+import { settingsQuery } from '../files/place';
 import type { ContestValues } from '../forms/contest-values';
-import { readTask } from '../forms/task-values';
-import { readSettings } from '../task/build-data';
+import { textAt } from '../forms/values';
 import { markedBoardCovers, timelineSentence } from './timeline';
 
 /** Where every task of a contest stands, with its place in the contest. */
 export const STANDINGS = '/api/v1/orgs/{org}/contests/{contest}/organise/tasks';
 
 /**
- * Each task's title, as its settings give it, by its name: read for every
- * task listed, as its own page reads it. A task whose settings are not read
- * yet, or give no title, is called by its name.
+ * Each task's title, as its settings give it, by its name, read for every
+ * task listed. A task whose settings are not read yet, or give no title, is
+ * called by its name.
  */
 export function useTaskTitles(
   org: string,
   contest: string,
   names: string[],
 ): ReadonlyMap<string, string> {
-  const files = useQueries({
+  const settings = useQueries({
     queries: names.map((task) => ({
-      ...fileQuery({ kind: 'task', org, contest, task }, 'task.yaml'),
+      ...settingsQuery({ kind: 'task', org, contest, task }),
       retry: false,
     })),
   });
   return new Map(
     names.map((task, at) => {
-      const data = files[at]?.data;
-      const read = data === undefined ? null : readSettings(data);
-      const title =
-        read === null || 'error' in read
-          ? ''
-          : readTask(read.doc, []).values.name.trim();
+      const title = textAt(settings[at]?.data?.values, ['name']).trim();
       return [task, title === '' ? task : title];
     }),
   );

@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { DateTimeInput } from '@/ui/DateTimeInput';
 import { TextInput } from '@/ui/TextInput';
-import { numberProblem } from './yaml-doc';
+import { numberProblem } from './values';
 import { zoneName } from './times';
 import classes from './forms.module.css';
 

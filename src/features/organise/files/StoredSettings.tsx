@@ -15,8 +15,7 @@ import { KeptText, TextConflict } from './TextConflict';
 import { EDITED } from '@/live';
 import { UploadedFile } from './UploadedFile';
 import { SettingsText } from './SettingsText';
-import { useMe } from '@/session';
-import { holdsAt } from '../roles';
+import { usePlaceMay } from '../may';
 import { placeOfIn } from '../task/places';
 import shared from '../organise.module.css';
 import classes from './Files.module.css';
@@ -31,7 +30,7 @@ type Sent = WriteFile | RollbackFile;
 /**
  * A place's settings as they are stored, `contest.yaml` or `task.yaml`, at
  * the foot of its Settings page: to read, with where they are changed and
- * every change to them (SettingsText); and, for an admin while the pages
+ * every change to them (SettingsText); and, for a manager while the pages
  * cannot read them, as text to fix. The text is saved with the token it was
  * read with, so settings someone else changed in the meantime come back as a
  * conflict and nothing is overwritten. That is why they are read once, under
@@ -54,7 +53,7 @@ type Sent = WriteFile | RollbackFile;
 export function StoredSettings({ place }: { place: Place }) {
   const queryClient = useQueryClient();
   const path = settingsPath(place);
-  const admin = holdsAt(useMe().roles, place, 'admin');
+  const manages = usePlaceMay(place).manage;
   const { queryKey, queryFn } = fileQuery(place, path);
   const query = useQuery({
     queryKey: [...queryKey, 'editor'],
@@ -159,7 +158,7 @@ export function StoredSettings({ place }: { place: Place }) {
         <SettingsText
           place={place}
           file={file}
-          admin={admin}
+          manages={manages}
           editor={
             <TextEditor
               key={file.token}

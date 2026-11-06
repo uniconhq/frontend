@@ -123,6 +123,22 @@ export function typeWords(type: string): string {
   return TYPE_WORDS[type] ?? type;
 }
 
+const TYPE_ARTICLES: Record<string, string> = {
+  text: 'text',
+  number: 'a number',
+  boolean: 'true or false',
+  enum: 'one of a list',
+  file: 'a file',
+  folder: 'a folder',
+  outcome: 'an outcome',
+  named_files: 'named files',
+};
+
+/** A type as a sentence names one value of it: "a number". */
+export function typeArticle(type: string): string {
+  return TYPE_ARTICLES[type] ?? type;
+}
+
 /** What a file of the workflow is by its path: a folder ends in `/`. */
 export function fileType(path: string): 'file' | 'folder' {
   return path.endsWith('/') ? 'folder' : 'file';

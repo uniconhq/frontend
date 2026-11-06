@@ -50,7 +50,7 @@ function useTasks(path: ContestPath) {
   const query = $api.useQuery('get', '/api/v1/orgs/{org}/contests/{contest}/tasks', {
     params: { path },
   });
-  return (query.data ?? []).map((task) => ({ value: task.name, label: task.name }));
+  return query.data ?? [];
 }
 
 /** The contest's entrants, for the filter, by the name each goes by. */
@@ -297,12 +297,19 @@ export function GradingsFeedPage() {
               it. <PageLink to="?">Show every grading</PageLink>
             </BodyText>
           )}
-          <FilterBar filters={filters} tasks={tasks} entrants={entrants} />
+          <FilterBar
+            filters={filters}
+            tasks={tasks.map((task) => ({ value: task.name, label: task.name }))}
+            entrants={entrants}
+          />
           <GradingsList
             path={path}
             view={view}
             showTask
-            rejudge={{ tasks: tasks.map((task) => task.value), task: filters.task }}
+            rejudge={{
+              tasks: tasks.filter((task) => task.may_manage).map((task) => task.name),
+              task: filters.task,
+            }}
             empty={
               filters.regrade !== null
                 ? 'No submission of this regrade matches.'

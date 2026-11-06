@@ -1,10 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
 import { $api } from '@/api/query';
-import type { DeclaredInput, FileContent, WorkflowForm } from '@/api/types';
+import type { DeclaredInput, WorkflowForm } from '@/api/types';
 import { EDITED } from '@/live';
 import type { Place } from '../files/place';
-import { exactJS, isRecord, parseYaml, topMap, type Doc } from '../forms/yaml-doc';
 import { readWorkflow } from '../workflows/model';
+import { dataOf, isRecord } from '../workflows/yaml-doc';
 
 export type TaskPlace = Extract<Place, { kind: 'task' }>;
 
@@ -32,16 +32,6 @@ export function inputTitle(
     : `${title} (${input.unit})`;
 }
 
-/** The settings file as a document the cards can show, or why it is not one. */
-export function readSettings(file: FileContent): { doc: Doc } | { error: string } {
-  if (file.encoding !== 'utf-8') return { error: 'The file is not text.' };
-  const parsed = parseYaml(file.content);
-  if ('error' in parsed) return parsed;
-  return topMap(parsed.doc) === 'not-a-mapping'
-    ? { error: 'The file does not hold a list of settings.' }
-    : parsed;
-}
-
 /** A workflow named as a task names it, `owner/name@version`, split; null when it is not one. */
 export function refParts(
   ref: string,
@@ -52,11 +42,14 @@ export function refParts(
   return { owner, name, version };
 }
 
+/** A version's `workflow.yaml` as plain data, or null when it does not read. */
+export function workflowFileOf(text: string): unknown {
+  return dataOf(text);
+}
+
 /** A version's `workflow.yaml` as what a task's form is made of, or null when it does not read. */
 export function declaredOf(text: string): Declared | null {
-  const parsed = parseYaml(text);
-  if ('error' in parsed) return null;
-  const raw = exactJS(parsed.doc);
+  const raw = workflowFileOf(text);
   if (!isRecord(raw)) return null;
   const workflow = readWorkflow(raw);
   return {

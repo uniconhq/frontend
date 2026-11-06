@@ -16,8 +16,6 @@ import { formatExact } from '@/lib/exact';
 import { LeaderboardTable } from '@/ui/leaderboards/table';
 import { taskPagePath } from '@/lib/contest-paths';
 import { contestPath } from '@/lib/organiser-paths';
-import { contestStaff } from '@/lib/viewer';
-import { useSession } from '@/session';
 import { useContestParams } from '@/lib/route-params';
 import { contestViewSectionPath, entrantGradingsPath } from '@/lib/sections';
 import { formatDateTime } from '@/lib/time';
@@ -101,7 +99,6 @@ function TaskList({
   tasks,
   notApproved,
   standing,
-  staff,
 }: {
   org: string;
   contest: string;
@@ -109,8 +106,6 @@ function TaskList({
   /** Where a task stands for a reader who is not an approved entrant. */
   notApproved: string;
   standing: ContestHome['standing'];
-  /** The most a column can show is told to staff only. */
-  staff: boolean;
 }) {
   const { at, measured } = useServerClock();
   if (tasks.length === 0) {
@@ -125,7 +120,7 @@ function TaskList({
           {taskPoints(task.name, standing).map((points) => (
             <span key={points.board}>
               <ShownValue number={points.number} decimals={points.decimals} />
-              {staff && points.most !== null && ` / ${formatExact(points.most)}`}
+              {points.most !== null && ` / ${formatExact(points.most)}`}
             </span>
           ))}
           <Standing task={task} at={at} counting={measured} notApproved={notApproved} />
@@ -174,17 +169,15 @@ function LeaderboardCard({
   org,
   contest,
   standing,
-  staff,
 }: {
   org: string;
   contest: string;
   standing: ContestHome['standing'];
-  staff: boolean;
 }) {
-  // Staff open the entrant's submissions to the task; anyone else, who
-  // reads only their own row, their own submission. A standing is an
-  // approved entrant's, so the staff branch is for one who is staff too.
-  const open = (task: string, number: number, entrant: string) =>
+  // Staff, as the server says on each board, open the entrant's submissions
+  // to the task; anyone else, who reads only their own row, their own
+  // submission.
+  const open = (staff: boolean) => (task: string, number: number, entrant: string) =>
     staff
       ? entrantGradingsPath(org, contest, task, entrant)
       : `${taskPagePath(org, contest, task)}${submissionHref(number)}`;
@@ -198,8 +191,7 @@ function LeaderboardCard({
           <LeaderboardTable
             key={board.key}
             board={board}
-            submissionTo={open}
-            staff={staff}
+            submissionTo={open(board.staff)}
             titleTo={`${contestViewSectionPath(org, contest, 'boards')}/${encodeURIComponent(board.key)}`}
           />
         ))}
@@ -312,11 +304,6 @@ function Home({
   home: ContestHome;
   onBoundary: () => void;
 }) {
-  const session = useSession();
-  // Leaderboard staff as the forge reads it: a role at the contest or the
-  // org, not one at a task alone, which `organises` counts.
-  const staff =
-    session.status === 'signed-in' && contestStaff(org, contest, session.me.roles);
   const entrant = home.registration.entrant;
   const approved = entrant?.status === 'approved';
   const settled = approved || home.organises;
@@ -370,19 +357,13 @@ function Home({
             tasks={home.tasks}
             notApproved={TASK_STANDING[notIn(home)]}
             standing={home.standing}
-            staff={staff}
           />
         </div>
       </Card>
       {/* The forge gives a standing to an approved entrant alone: anyone else
           reads the leaderboards on their own page. */}
       {approved ? (
-        <LeaderboardCard
-          org={org}
-          contest={contest}
-          standing={home.standing}
-          staff={staff}
-        />
+        <LeaderboardCard org={org} contest={contest} standing={home.standing} />
       ) : (
         <LeaderboardsLink org={org} contest={contest} />
       )}

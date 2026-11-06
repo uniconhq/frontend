@@ -3,8 +3,9 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@/test/user-event';
 import { http, HttpResponse } from 'msw';
+import { holding } from '@/test/may';
 import { renderApp } from '@/test/render';
-import { problem, server, signedIn, someone } from '@/test/server';
+import { problem, server, signedIn } from '@/test/server';
 import {
   TASK_API,
   publicationList,
@@ -435,7 +436,7 @@ describe('the statement beside its preview', { timeout: 20_000 }, () => {
       );
       expect(
         await screen.findByText(
-          'notes.pdf is not a picture this page can show. Choose a PNG, JPEG, GIF, WebP, AVIF, APNG, BMP, ICO or SVG file.',
+          'notes.pdf is not a picture this page can show. Choose a file ending in .apng, .avif, .bmp, .gif, .ico, .jpeg, .jpg, .png, .svg or .webp.',
         ),
       ).toBeVisible();
 
@@ -522,14 +523,8 @@ describe('the statement beside its preview', { timeout: 20_000 }, () => {
     statementBackend(() => problem(403, 'admin_only', { keys: ['statement.md'] }));
     server.use(
       ...partTransport(`${TASK_API}/organise/part-uploads`),
-      http.get('/api/v1/me', () =>
-        HttpResponse.json({
-          ...someone,
-          roles: [
-            { names: { org: 'acme', contest: 'spring', task: 'sum' }, role: 'manager' },
-          ],
-        }),
-      ),
+      signedIn,
+      ...holding('manager'),
     );
     renderApp('/orgs/acme/contests/spring/tasks/sum?card=statement');
 

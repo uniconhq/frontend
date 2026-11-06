@@ -7,7 +7,8 @@ type Schemas = components['schemas'];
  * The workflow editor in a real browser against the dev server with the API
  * stubbed: React Flow draws the graph at its actual size, at the places the
  * page works out; a wire drawn by dragging from one handle to another edits
- * the file, and a drag a version would refuse says why at the port; a step
+ * the file, a port that doesn't take the wire's type is greyed out while it
+ * is dragged, and the check after the drop marks the rest; a step
  * added from the toolbar opens in the drawer, clear of the box it shows.
  * jsdom has no layout, so this is where the drags and the scrolling are
  * tried.
@@ -47,11 +48,22 @@ outputs:
   log: \${{ steps.build.log }}
 `;
 
+/** The types the server says a wire into a port of `type` may carry. */
+const accepts = (type: string): string[] =>
+  type === 'text'
+    ? ['text', 'number', 'boolean', 'enum']
+    : type === 'folder'
+      ? ['file', 'folder']
+      : type === 'named_files'
+        ? []
+        : [type];
+
 const port = (
   type: Schemas['PrimitivePort']['type'],
   more: Partial<Schemas['PrimitivePort']> = {},
 ): Schemas['PrimitivePort'] => ({
   type,
+  accepts: accepts(type),
   options: null,
   optional: false,
   runs: null,
@@ -207,6 +219,8 @@ async function stubWorkflowApi(page: Page) {
     json(route, {
       user: { id: 7, username: 'kenny', name: null, avatar_url: null, email: null },
       roles: [],
+      orgs: [],
+      workflow_owners: ['kenny'],
       degraded: false,
     } satisfies Schemas['Me']),
   );
@@ -420,7 +434,7 @@ test('every wire meets a handle of its boxes, open, closed and with a problem li
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({
-        problems: [{ path: 'steps[0]', message: 'It does not build.', step: null }],
+        problems: [{ path: ['steps', 0], message: 'It does not build.', step: null }],
       }),
     }),
   );
@@ -467,6 +481,120 @@ test('a wire dragged onto a port edits the file, and a refused one says why', as
   });
   await expect(refused).toBeVisible();
   expect(await file(page)).toContain('memory_limit: ${{ inputs.memory_limit }}');
+});
+
+/** The draft with check's expected port given nothing, so a wire dropped on check goes there. */
+async function stubOpenExpected(page: Page) {
+  await page.route('**/api/v1/workflows/kenny/tuned', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        owner: 'kenny',
+        name: 'tuned',
+        visibility: 'private',
+        versions: [],
+        editable: true,
+        draft: {
+          content: CLASSIC.replace('      expected: ${{ inputs.answer }}\n', ''),
+          token: 'token-1',
+        },
+        readers: [],
+      }),
+    }),
+  );
+}
+
+test('while a wire is dragged, a number output greys out a file port', async ({
+  page,
+}) => {
+  await stubWorkflowApi(page);
+  await stubOpenExpected(page);
+  await page.setViewportSize({ width: 1600, height: 1000 });
+  await page.goto('/workflows/kenny/tuned');
+  await openBox(page, 'run');
+  const check = page.getByRole('group', { name: 'Step check' });
+
+  const from = handle(page, 'step:1', 'out:time_ms');
+  await from.scrollIntoViewIfNeeded();
+  await from.hover();
+  await page.mouse.down();
+  const to = await check.boundingBox();
+  if (to === null) throw new Error('check is not drawn');
+  await page.mouse.move(to.x + to.width / 2, to.y + to.height / 2, { steps: 12 });
+  await expect(check).toHaveAttribute('data-drop', 'refused');
+  await expect(check).toHaveAttribute(
+    'title',
+    'expected: This takes a file, not a number.',
+  );
+  await page.mouse.up();
+  await expect(
+    page
+      .getByRole('alert')
+      .filter({ hasText: 'expected: This takes a file, not a number.' }),
+  ).toBeVisible();
+  expect(await file(page)).not.toContain('expected:');
+});
+
+test('an optional output dropped on a required port is written, and the check says why it is wrong', async ({
+  page,
+}) => {
+  await stubWorkflowApi(page);
+  await stubOpenExpected(page);
+  // exec's output as optional, for this test only.
+  const [diff, exec] = PRIMITIVES;
+  const one = exec?.forms.one;
+  if (exec === undefined || one === undefined) throw new Error('exec has no one form');
+  await page.route('**/api/v1/primitives', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([
+        diff,
+        {
+          ...exec,
+          forms: {
+            ...exec.forms,
+            one: {
+              ...one,
+              outputs: { ...one.outputs, output: port('file', { optional: true }) },
+            },
+          },
+        },
+      ]),
+    }),
+  );
+  const sentence =
+    'That output may be missing, so it can be given only to an optional port.';
+  await page.route('**/api/v1/workflows/check', async (route) => {
+    const { content } = route.request().postDataJSON() as { content: string };
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        problems: content.includes('expected: ${{ steps.run.output }}')
+          ? [{ path: ['steps', 2, 'with', 'expected'], message: sentence, step: null }]
+          : [],
+      }),
+    });
+  });
+  await page.setViewportSize({ width: 1600, height: 1000 });
+  await page.goto('/workflows/kenny/tuned');
+  await openBox(page, 'run');
+
+  await drag(
+    page,
+    handle(page, 'step:1', 'out:output'),
+    page.getByRole('group', { name: 'Step check' }),
+  );
+
+  await expect.poll(() => file(page)).toContain('expected: ${{ steps.run.output }}');
+  await expect(page.getByRole('region', { name: 'Problems' })).toContainText(sentence);
+  await expect(
+    page
+      .getByRole('group', { name: 'Step check' })
+      .getByRole('note', { name: sentence }),
+  ).toBeVisible();
 });
 
 test('a refused wire’s message covers no port, and goes on a click, on Escape or by itself (M53)', async ({
@@ -624,7 +752,10 @@ test('a lifted wire moves to the port it is dropped on, or clears its port on no
   // args, passing over files, which takes named files and no single wire.
   await drag(page, handle(page, 'input:submission', 'out:*'), run);
   await expect(
-    page.getByRole('alert').filter({ hasText: 'args: This takes text, not a file.' }),
+    page.getByRole('alert').filter({
+      hasText:
+        'args: This takes text, a number, true or false or one of a list, not a file.',
+    }),
   ).toBeVisible();
 });
 
@@ -806,6 +937,7 @@ test('a box opens two levels in, and a problem opens the step inside', async ({
         options: null,
         title: null,
         unit: null,
+        accepts: ['file', 'folder'],
       },
     ],
     outputs: [
@@ -830,6 +962,8 @@ test('a box opens two levels in, and a problem opens the step inside', async ({
     json(route, {
       user: { id: 7, username: 'kenny', name: null, avatar_url: null, email: null },
       roles: [],
+      orgs: [],
+      workflow_owners: ['kenny'],
       degraded: false,
     } satisfies Schemas['Me']),
   );
@@ -855,7 +989,7 @@ test('a box opens two levels in, and a problem opens the step inside', async ({
   await page.route('**/api/v1/workflows/check', (route) =>
     json(route, {
       problems: [
-        { path: 'steps[0]', message: 'The link failed.', step: 'build/compile/link' },
+        { path: ['steps', 0], message: 'The link failed.', step: 'build/compile/link' },
       ],
     }),
   );

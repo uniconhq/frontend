@@ -1,19 +1,41 @@
 /**
- * The codes the callback is allowed to put in `?error=`. The string came from
- * the URL bar rather than the backend, so an unknown code must not reach
- * describeError, which would fall back to a server title and detail that do not
- * exist here.
+ * Why a sign-in came back refused, in words. The callback puts only a code
+ * in `?error=`, with no sentence, so the page keeps its own words for the
+ * codes it may put there; any other code, typed into the address bar, is
+ * `sign_in_failed`.
  */
-const KNOWN = [
-  'sign_in_denied',
-  'sign_in_invalid',
-  'forge_unavailable',
-  'forge_misconfigured',
-] as const;
+const WORDS = {
+  sign_in_denied: {
+    title: 'Sign in was not approved',
+    message: 'You did not approve the sign in.',
+  },
+  sign_in_invalid: {
+    title: 'That sign in expired',
+    message: 'The sign in took too long or was started in another tab.',
+  },
+  forge_unavailable: {
+    title: 'Forgejo did not answer',
+    message:
+      'Reading works; signing in, submitting and posting will resume when it is back.',
+  },
+  forge_misconfigured: {
+    title: 'Forgejo is not set up for Unicon',
+    message: 'A platform admin has to fix the connection before anyone can sign in.',
+  },
+  sign_in_failed: {
+    title: 'Sign in failed',
+    message: 'Something went wrong on the way back from Forgejo. Try again.',
+  },
+};
 
-export type LoginErrorCode = (typeof KNOWN)[number] | 'sign_in_failed';
+type LoginErrorCode = keyof typeof WORDS;
 
-export function loginErrorCode(fromUrl: string | null): LoginErrorCode | null {
+export type LoginError = { code: LoginErrorCode; title: string; message: string };
+
+export function loginError(fromUrl: string | null): LoginError | null {
   if (fromUrl === null) return null;
-  return KNOWN.find((code) => code === fromUrl) ?? 'sign_in_failed';
+  const code = Object.hasOwn(WORDS, fromUrl)
+    ? (fromUrl as LoginErrorCode)
+    : 'sign_in_failed';
+  return { code, ...WORDS[code] };
 }

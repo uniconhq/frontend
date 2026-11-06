@@ -3,16 +3,15 @@ import { TaskResumeUploads } from '../files/TaskUpload';
 import { useQueryClient } from '@tanstack/react-query';
 import { $api, queryView } from '@/api/query';
 import { toApiError } from '@/api/problem';
-import type { FileContent, WorkflowForm } from '@/api/types';
+import type { WorkflowForm } from '@/api/types';
 import { formatSize } from '@/lib/size';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
 import { FilesMerge, type MovedFile } from '../files/FilesMerge';
-import { fileQuery, staleAfterWrite } from '../files/place';
+import { staleAfterWrite } from '../files/place';
+import { definitionErrorsOf } from '../files/refusals';
 import { SaveOutcome } from '../files/SaveOutcome';
-import { UploadedFile } from '../files/UploadedFile';
-import { useOwnFile } from '../forms/file-hooks';
-import { MergeView } from '../forms/MergeView';
+import { useOwnSettings } from '../forms/settings-hooks';
 import {
   emptyInput,
   emptyTuple,
@@ -25,21 +24,15 @@ import {
   type InputValues,
   type TaskValues,
 } from '../forms/task-values';
-import {
-  exactJS,
-  numberProblem,
-  parseYaml,
-  writeOver,
-  type Doc,
-} from '../forms/yaml-doc';
+import { copyOf, numberProblem, type Values } from '../forms/values';
 import {
   declaredOf,
   inputTitle,
-  readSettings,
   formOf,
   refParts,
   useWorkflowForm,
   useWorkflowVersion,
+  workflowFileOf,
   type Declared,
   type TaskPlace,
 } from './build-data';
@@ -52,7 +45,7 @@ import {
   type StagedInput,
 } from './input-files';
 import { InputsCard, type InputFiles } from './InputsCard';
-import { taskMergeWords } from './merge-words';
+import { useDraftRuns } from './draft-runs';
 import { taskPlace, taskPlaceOf } from './places';
 import { SaveBar } from './SaveBar';
 import { RunsCard } from './RunsCard';
@@ -66,15 +59,13 @@ import { taskSectionPath } from '@/lib/sections';
 import shared from '../organise.module.css';
 import classes from './task.module.css';
 
-const PATH = 'task.yaml';
-
 /** The workflow's inputs as the cards type them, for the workflow chosen. */
 function inputsFor(
-  doc: Doc,
+  settings: Values,
   declared: Declared,
   keepUndeclared: boolean,
 ): InputValues[] {
-  const inputs = readTask(doc, declared.inputs).values.inputs;
+  const inputs = readTask(settings, declared.inputs).values.inputs;
   return keepUndeclared
     ? inputs
     : inputs.filter((input) => declared.inputs.some((found) => found.id === input.id));
@@ -82,7 +73,7 @@ function inputsFor(
 
 /** A file this save writes or takes out, in the words the conflict names it by. */
 function movedLabel(path: string, titles: ReadonlyMap<string, string>): string {
-  const place = taskPlace(path, '', titles);
+  const place = taskPlace([path], '', titles);
   const parts = path.split('/');
   const entry =
     place.card !== 'inputs' && parts.length > 3 ? `: ${parts.slice(3).join('/')}` : '';
@@ -96,8 +87,8 @@ function movedLabel(path: string, titles: ReadonlyMap<string, string>): string {
  */
 function BuildForm({
   place,
-  file,
-  doc,
+  stored,
+  token,
   form,
   saving,
   admin,
@@ -105,8 +96,9 @@ function BuildForm({
   onDirty,
 }: {
   place: TaskPlace;
-  file: FileContent;
-  doc: Doc;
+  /** The settings' values as read, at `token`. */
+  stored: Values;
+  token: string | null;
   form: WorkflowForm | null;
   saving: TaskSave;
   admin: boolean;
@@ -115,8 +107,9 @@ function BuildForm({
 }) {
   const saved = form?.workflow ?? null;
   const savedReadable = form !== null && form.problem === null && saved !== null;
-  const [read] = useState(() => readTask(doc, savedReadable ? form.inputs : null));
+  const [read] = useState(() => readTask(stored, savedReadable ? form.inputs : null));
   const [values, setValues] = useState<TaskValues>(read.values);
+  const draftRuns = useDraftRuns(place, values.axes, values.inputs).runs;
   const queryClient = useQueryClient();
   const [inputFiles, setInputFiles] = useState<StagedInput[]>([]);
   // While a save asks before it publishes, its answer sends the cards as they
@@ -162,7 +155,7 @@ function BuildForm({
     if (kept.length !== inputFiles.length) setInputFiles(kept);
     setValues((before) => ({
       ...before,
-      inputs: inputsFor(doc, declared, picked === saved).map((input) => {
+      inputs: inputsFor(stored, declared, picked === saved).map((input) => {
         const change = kept.find((each) => each.id === input.id);
         return change === undefined ? input : { ...input, value: change.value };
       }),
@@ -349,11 +342,10 @@ function BuildForm({
     ...(savedReadable ? scoreProblems : []),
     pendingFiles > 0 ? 'A chosen file is still being read.' : undefined,
   ].filter((problem): problem is string => problem !== undefined);
-  const workflowRaw = useMemo(() => {
-    if (text === null) return null;
-    const parsed = parseYaml(text);
-    return 'error' in parsed ? null : exactJS(parsed.doc);
-  }, [text]);
+  const workflowRaw = useMemo(
+    () => (text === null ? null : workflowFileOf(text)),
+    [text],
+  );
   const workflowRead: WorkflowRead =
     refParts(picked) === null ||
     version.state === 'error' ||
@@ -362,28 +354,31 @@ function BuildForm({
       : workflowRaw === null
         ? 'loading'
         : 'ready';
-  const draftErrors =
+  // What the forge said of the last save, a draft's problems or a refusal's,
+  // shown on the fields they are about.
+  const fieldErrors =
     saving.outcome?.kind === 'saved' && 'errors' in saving.outcome.result
       ? saving.outcome.result.errors
-      : [];
+      : saving.outcome?.kind === 'refused' &&
+          saving.outcome.error.code === 'invalid_definition'
+        ? definitionErrorsOf(saving.outcome.error)
+        : [];
 
   // The blocks tell a value that gives text, so a check expects it as text.
   const blocks = $api.useQuery('get', '/api/v1/blocks');
   const save = () => {
-    const fresh = parseYaml(file.content);
-    if ('error' in fresh) return;
-    writeTask(fresh.doc, read.values, values, {
+    const fresh = copyOf(stored);
+    writeTask(fresh, read.values, values, {
       admin,
       unreadable: read.unreadable,
       catalogue: blocks.data ?? null,
     });
-    const content = writeOver(file.content, fresh.doc);
     setSent({ values, inputFiles });
     void saving.save({
-      yaml:
-        content === file.content
+      settings:
+        JSON.stringify(fresh) === JSON.stringify(stored)
           ? null
-          : { content, base: file.content, token: file.token },
+          : { values: fresh, token },
       planned: inputFiles.flatMap((change) => change.planned),
     });
   };
@@ -441,6 +436,7 @@ function BuildForm({
         staged={inputFiles}
         declared={declared?.inputs ?? []}
         axes={values.axes}
+        count={draftRuns?.count ?? null}
         disabled={disabled || pendingFiles > 0}
         onChange={(axes) => set({ axes })}
         onDiscard={(path) =>
@@ -496,11 +492,12 @@ function BuildForm({
             workflowRead={workflowRead}
             graded={form?.graded === true}
             disabled={disabled}
-            errors={draftErrors}
+            errors={fieldErrors}
             onChange={set}
             onProblems={setScoreProblems}
           />
           <ChecksCard
+            place={place}
             values={values}
             disabled={disabled}
             onChange={(checks) => set({ checks })}
@@ -527,27 +524,21 @@ function BuildForm({
           setInputFiles([]);
           saving.forget();
         }}
-        pinned={saving.merge !== null || saving.conflicts !== null || asking}
+        pinned={saving.conflicts !== null || asking}
         onClose={saving.drop}
       >
-        {(saving.outcome !== null ||
-          saving.merge !== null ||
-          saving.conflicts !== null) && (
+        {(saving.outcome !== null || saving.conflicts !== null) && (
           <SaveAnswer
             place={place}
             saving={saving}
             placeOf={placeOf}
             titles={titles}
-            admin={admin}
             onDiscard={() => {
               // My changes go, and the cards read the task as it is now.
               setValues(read.values);
               setInputFiles([]);
               saving.drop();
-              for (const queryKey of [
-                fileQuery(place, PATH).queryKey,
-                ...staleAfterWrite(place),
-              ]) {
+              for (const queryKey of staleAfterWrite(place)) {
                 void queryClient.invalidateQueries({ queryKey });
               }
             }}
@@ -558,41 +549,22 @@ function BuildForm({
   );
 }
 
-/** What the last save came back with: its answer, the merge of the settings, or the files that moved. */
+/** What the last save came back with: its answer, or the test files that moved. */
 function SaveAnswer({
   place,
   saving,
   placeOf,
   titles,
-  admin,
   onDiscard,
 }: {
   place: TaskPlace;
   saving: TaskSave;
   placeOf: ReturnType<typeof taskPlaceOf>;
   titles: ReadonlyMap<string, string>;
-  admin: boolean;
-  /** Discard my changes, from a merge: the cards read the task again. */
+  /** Discard my changes: the cards read the task again. */
   onDiscard: () => void;
 }) {
   const busy = saving.state.stage !== 'idle';
-  if (saving.merge !== null) {
-    const { attempt, current } = saving.merge;
-    return (
-      <MergeView
-        key={current.token}
-        file={PATH}
-        admin={admin}
-        baseText={attempt.yaml?.base ?? ''}
-        mineText={attempt.yaml?.content ?? ''}
-        currentText={current.content}
-        busy={busy}
-        onSave={saving.saveMerged}
-        onDrop={onDiscard}
-        words={taskMergeWords(titles)}
-      />
-    );
-  }
   if (saving.conflicts !== null) {
     const files: MovedFile[] = saving.conflicts.files.map(({ change }) => ({
       path: change.path,
@@ -620,7 +592,7 @@ function SaveAnswer({
       outcome={saving.outcome}
       onConfirm={(body, asked) => saving.again(body, { confirm: true, asked })}
       onKeepAsDraft={(body) => saving.again(body, { keep_as_draft: true })}
-      onReload={saving.drop}
+      onReload={onDiscard}
       placeOf={placeOf}
     />
   );
@@ -661,7 +633,7 @@ function Unread({
  * The task's build cards, once its settings and its workflow's form are
  * read: Workflow, Inputs, Runs, Scoring, Checks and Submissions, and their
  * one save bar; Scoring and Checks only once a saved workflow reads.
- * Settings that are an upload show as one; settings that do not read say why.
+ * Settings that do not read say why.
  */
 export function TaskBuild({
   place,
@@ -677,32 +649,25 @@ export function TaskBuild({
   /** Whether the cards hold changes not saved, as they change. */
   onDirty: (dirty: boolean) => void;
 }) {
-  const file = useOwnFile(place, PATH);
+  const settings = useOwnSettings(place);
   const workflowForm = useWorkflowForm(place, true);
-  if (file.isPending || workflowForm.isPending) {
+  if (settings.isPending || workflowForm.isPending) {
     return <PageSkeleton rows={8} />;
   }
-  if (file.data === undefined) {
+  if (settings.data === undefined) {
     return (
-      <ErrorBlock error={toApiError(file.error)} onRetry={() => void file.refetch()} />
-    );
-  }
-  if (file.data.upload) {
-    return (
-      <UploadedFile
-        place={place}
-        path={PATH}
-        upload={file.data.upload}
-        token={file.data.token}
+      <ErrorBlock
+        error={toApiError(settings.error)}
+        onRetry={() => void settings.refetch()}
       />
     );
   }
-  const read = readSettings(file.data);
-  if ('error' in read) {
+  const { values } = settings.data;
+  if (values === null) {
     return (
       <Unread
         place={place}
-        reason={read.error}
+        reason={settings.data.unreadable ?? 'The file does not hold named settings.'}
         line="So the cards that build the task cannot show them."
       />
     );
@@ -710,10 +675,10 @@ export function TaskBuild({
   const form = formOf(workflowForm);
   return (
     <BuildForm
-      key={`${file.data.token} ${JSON.stringify(form)}`}
+      key={`${settings.data.token ?? ''} ${JSON.stringify(form)}`}
       place={place}
-      file={file.data}
-      doc={read.doc}
+      stored={values}
+      token={settings.data.token}
       form={form}
       saving={saving}
       admin={admin}

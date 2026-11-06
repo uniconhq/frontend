@@ -6,6 +6,7 @@ import { StoredSettings } from '../files/StoredSettings';
 import { ContestSettings } from '../forms/ContestSettings';
 import { PeopleSection } from '../people/PeopleSection';
 import { STORED, viewFilePath } from './places';
+import { usePlaceMay } from '../may';
 import { SectionPage } from '../SectionPage';
 import { AnnouncementsSection } from '../threads/AnnouncementsSection';
 import { ContestClarifications } from '../threads/Clarifications';
@@ -20,10 +21,11 @@ import { ContestClarifications } from '../threads/Clarifications';
  */
 export function ContestSettingsPage() {
   const { org, contest } = useContestParams();
+  const may = usePlaceMay({ kind: 'contest', org, contest });
   return (
     <SectionPage
       place={{ kind: 'contest', org, contest }}
-      role="admin"
+      allowed={may.edit_admin_settings}
       section={sectionOf(CONTEST_SECTIONS, 'settings')}
       links={<PageLink to={viewFilePath(org, contest)}>View file</PageLink>}
     >

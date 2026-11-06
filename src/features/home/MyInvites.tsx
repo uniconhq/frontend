@@ -204,7 +204,7 @@ export function InviteCard({
       )}
       {error !== null && (
         <div role="alert">
-          <ErrorBlock error={error} compact />
+          <ErrorBlock error={error} compact heading="Couldn’t answer the invite" />
         </div>
       )}
     </li>

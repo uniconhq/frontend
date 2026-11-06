@@ -4,7 +4,7 @@ import userEvent from '@/test/user-event';
 import { http, HttpResponse } from 'msw';
 import type { FeedEntry, Grading, RegradeSummary } from '@/api/types';
 import { renderApp } from '@/test/render';
-import { problem, server, signedIn, someone } from '@/test/server';
+import { problem, server, signedIn } from '@/test/server';
 import { organisedEntrant } from '@/test/contestant';
 import { CONTEST_API, runsResult, standingList, taskList } from '@/test/organiser';
 import { passTime, withFakeTimers } from '@/test/timers';
@@ -48,6 +48,7 @@ const lovelaces = {
 const stuckFirst: FeedEntry = {
   task: 'sum',
   label: 'B',
+  may_manage: true,
   by: ada,
   grading: {
     ...grading,
@@ -62,6 +63,7 @@ const stuckFirst: FeedEntry = {
 const retried: FeedEntry = {
   task: 'sum',
   label: 'B',
+  may_manage: true,
   by: ada,
   grading: {
     ...stuckFirst.grading,
@@ -76,12 +78,14 @@ const retried: FeedEntry = {
 const sortByTeam: FeedEntry = {
   task: 'sort',
   label: 'A',
+  may_manage: true,
   by: lovelaces,
   grading: { ...grading, id: 'g-sort-1', submission_number: 1 },
 };
 const cancelled: FeedEntry = {
   task: 'sort',
   label: 'A',
+  may_manage: true,
   by: ada,
   grading: {
     ...grading,
@@ -122,12 +126,14 @@ const REGRADE: RegradeSummary = {
     failed: 0,
     over_limit: 0,
   },
+  may_manage: true,
 };
 
 /** ada's submission 3 to sum, which had no result before the regrade and now has one. */
 const nowGraded: FeedEntry = {
   task: 'sum',
   label: 'B',
+  may_manage: true,
   by: ada,
   grading: {
     ...grading,
@@ -387,10 +393,17 @@ describe("the contest's gradings feed", () => {
   });
 });
 
-/** Signed in with these roles alone. */
-function signedInAs(roles: typeof someone.roles) {
-  return http.get('/api/v1/me', () => HttpResponse.json({ ...someone, roles }));
+/** The contest's tasks, managed by the caller where `managed` names them. */
+function tasksManaged(managed: string[]) {
+  return http.get(`${CONTEST_API}/tasks`, () =>
+    HttpResponse.json(
+      ['sort', 'sum'].map((name) => ({ name, may_manage: managed.includes(name) })),
+    ),
+  );
 }
+
+/** A row the caller may only read. */
+const readOnly = (entry: FeedEntry): FeedEntry => ({ ...entry, may_manage: false });
 
 describe('acting on the feed', () => {
   it('retries a finished latest attempt through its task, after asking', async () => {
@@ -531,9 +544,8 @@ describe('acting on the feed', () => {
     );
 
     const alert = await within(dialog).findByRole('alert');
-    expect(alert).toHaveTextContent('It no longer reads as failed on Unicon’s side');
+    expect(alert).toHaveTextContent('Couldn’t cancel');
     expect(alert).toHaveTextContent('The grading is no longer a system error.');
-    expect(alert).toHaveTextContent('Its status now: Not sent to a machine yet.');
   });
 
   it('offers Rejudge without a filter, asking which task first and saying what it does', async () => {
@@ -608,7 +620,7 @@ describe('acting on the feed', () => {
     await user.click(within(dialog).getByRole('button', { name: 'Rejudge' }));
 
     expect(await within(dialog).findByRole('alert')).toHaveTextContent(
-      'Nothing to rejudge against',
+      'not_found detail',
     );
   });
 
@@ -817,18 +829,13 @@ describe('acting on the feed', () => {
     await user.click(within(dialog).getByRole('button', { name: 'Grade it again' }));
 
     const alert = await within(dialog).findByRole('alert');
-    expect(alert).toHaveTextContent('Not the attempt to retry');
+    expect(alert).toHaveTextContent('Couldn’t retry');
     expect(alert).toHaveTextContent('A later attempt of it is there.');
   });
 
   it('offers an observer nothing to do', async () => {
-    server.use(
-      signedInAs([
-        { names: { org: 'acme', contest: null, task: null }, role: 'observer' },
-      ]),
-      taskList,
-    );
-    feedAnswering(() => [stuckFirst, sortByTeam]);
+    server.use(signedIn, tasksManaged([]));
+    feedAnswering(() => [readOnly(stuckFirst), readOnly(sortByTeam)]);
     renderApp(`${FEED}?task=sum`);
 
     const table = await screen.findByRole('table', { name: 'Gradings' });
@@ -839,14 +846,8 @@ describe('acting on the feed', () => {
   });
 
   it("offers a task's manager the actions on that task's rows alone", async () => {
-    server.use(
-      signedInAs([
-        { names: { org: 'acme', contest: 'spring', task: null }, role: 'observer' },
-        { names: { org: 'acme', contest: 'spring', task: 'sum' }, role: 'manager' },
-      ]),
-      taskList,
-    );
-    feedAnswering(() => [stuckFirst, sortByTeam]);
+    server.use(signedIn, tasksManaged(['sum']));
+    feedAnswering(() => [stuckFirst, readOnly(sortByTeam)]);
     renderApp(FEED);
 
     expect(
@@ -950,15 +951,11 @@ describe('what a regrade changed', () => {
   });
 
   it('offers an observer the summary without Dismiss, and says while it still runs', async () => {
-    server.use(
-      signedInAs([
-        { names: { org: 'acme', contest: null, task: null }, role: 'observer' },
-      ]),
-      taskList,
-    );
+    server.use(signedIn, tasksManaged([]));
     regrades([
       {
         ...REGRADE,
+        may_manage: false,
         cause: 'save',
         running: true,
         graded: 100,

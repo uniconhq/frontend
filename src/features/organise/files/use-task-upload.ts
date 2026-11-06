@@ -73,6 +73,8 @@ export async function sendToTask(
       code: 'invalid_inputs',
       status: 422,
       title: 'Choose the same file to resume this upload',
+      detail:
+        'This is not the file the upload started with. Choose that file to resume it.',
     });
   onState({ stage: 'sending', share: 0 });
   return uploadInParts(

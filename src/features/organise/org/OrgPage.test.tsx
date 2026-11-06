@@ -4,7 +4,9 @@ import userEvent from '@/test/user-event';
 import { delay, http, HttpResponse } from 'msw';
 import { formatDateTime } from '@/lib/time';
 import { renderApp } from '@/test/render';
-import { problem, server, signedIn, someone } from '@/test/server';
+import type { RoleName } from '@/api/types';
+import { holding, listedContests, orgMay } from '@/test/may';
+import { problem, server, signedIn } from '@/test/server';
 import { ORG_API, contestList, contests, listAndCreate } from '@/test/organiser';
 import { passTimeUntil, withFakeTimers } from '@/test/timers';
 
@@ -91,27 +93,25 @@ describe('the org page', () => {
     expect(screen.getByRole('button', { name: 'New contest' })).toHaveFocus();
   });
 
-  it('shows someone who organises only some of its contests those contests, plainly', async () => {
+  it('shows someone who organises only some of its contests the ones the server lists', async () => {
     server.use(
       signedIn,
       http.get(`${ORG_API}/contests`, () =>
-        problem(403, 'forbidden', { detail: 'You need the observer role at acme.' }),
+        HttpResponse.json(listedContests(null).filter(({ name }) => name === 'spring')),
       ),
+      ...holding(null),
     );
     renderApp('/orgs/acme');
 
-    expect(
-      await screen.findByText('You organise these contests of acme:'),
-    ).toBeVisible();
-    expect(screen.queryByText('You cannot do that')).not.toBeInTheDocument();
-    expect(screen.queryByText(/forbidden/)).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Try again' })).not.toBeInTheDocument();
-    const own = screen.getByRole('list', { name: 'Contests' });
+    const own = await screen.findByRole('list', { name: 'Contests' });
     expect(within(own).getByRole('link', { name: 'spring' })).toHaveAttribute(
       'href',
       '/orgs/acme/contests/spring',
     );
-    expect(screen.queryByRole('form', { name: 'New contest' })).not.toBeInTheDocument();
+    expect(within(own).queryByRole('link', { name: 'autumn' })).toBeNull();
+    expect(
+      screen.queryByRole('button', { name: 'New contest' }),
+    ).not.toBeInTheDocument();
   });
 
   describe('when the list fails', () => {
@@ -129,7 +129,7 @@ describe('the org page', () => {
 
       // The client asks twice more before it shows the error, 0.3 s and then
       // 0.9 s later, on the fake clock.
-      await passTimeUntil(() => screen.getByText('Forgejo did not answer'), {
+      await passTimeUntil(() => screen.getByText('forge_unavailable detail'), {
         within: 10_000,
       });
       broken = false;
@@ -142,14 +142,14 @@ describe('the org page', () => {
 
 describe("the org's display name and description", () => {
   /** The org as the forge holds it, changed by each PATCH; `sent` holds each body. */
-  function profileAt(answer?: () => Response) {
+  function profileAt(answer?: () => Response, held: RoleName | null = 'admin') {
     let profile: { display_name: string | null; description: string } = {
       display_name: 'Acme Contests',
       description: 'Contests for Acme engineers.',
     };
     const sent: unknown[] = [];
     server.use(
-      http.get(ORG_API, () => HttpResponse.json(profile)),
+      http.get(ORG_API, () => HttpResponse.json({ ...profile, may: orgMay(held) })),
       http.patch(ORG_API, async ({ request }) => {
         const refused = answer?.();
         if (refused !== undefined) return refused;
@@ -163,15 +163,6 @@ describe("the org's display name and description", () => {
       }),
     );
     return sent;
-  }
-
-  function asRole(role: 'manager' | 'observer') {
-    return http.get('/api/v1/me', () =>
-      HttpResponse.json({
-        ...someone,
-        roles: [{ names: { org: 'acme', contest: null, task: null }, role }],
-      }),
-    );
   }
 
   it('shows them as the forge holds them', async () => {
@@ -260,8 +251,8 @@ describe("the org's display name and description", () => {
   it.each(['manager', 'observer'] as const)(
     'shows a %s both with no way to edit them',
     async (role) => {
-      server.use(asRole(role), contestList);
-      profileAt();
+      server.use(signedIn, contestList);
+      profileAt(undefined, role);
       renderApp('/orgs/acme/settings');
 
       expect(await screen.findByLabelText('About the org')).toHaveTextContent(
@@ -272,21 +263,16 @@ describe("the org's display name and description", () => {
     },
   );
 
-  it('shows them to an organiser of one of its contests alone, refused the list', async () => {
+  it('shows them to an organiser of one of its contests alone', async () => {
     server.use(
-      http.get('/api/v1/me', () =>
-        HttpResponse.json({
-          ...someone,
-          roles: [
-            { names: { org: 'acme', contest: 'spring', task: null }, role: 'admin' },
-          ],
-        }),
-      ),
+      signedIn,
       http.get(`${ORG_API}/contests`, () =>
-        problem(403, 'forbidden', { detail: 'You need the observer role at acme.' }),
+        HttpResponse.json(
+          listedContests('admin').filter(({ name }) => name === 'spring'),
+        ),
       ),
     );
-    profileAt();
+    profileAt(undefined, null);
     renderApp('/orgs/acme/settings');
 
     const fields = await screen.findByLabelText('About the org');
@@ -314,8 +300,8 @@ describe("the org's display name and description", () => {
   it.each(['manager', 'observer'] as const)(
     "heads the org's page with them, with no Edit for a %s",
     async (role) => {
-      server.use(asRole(role), contestList);
-      profileAt();
+      server.use(signedIn, contestList);
+      profileAt(undefined, role);
       renderApp('/orgs/acme');
 
       expect(
@@ -369,17 +355,8 @@ describe('creating a contest', () => {
 
   it('shows a refusal beside the form, keeping what was typed', async () => {
     server.use(
-      http.get('/api/v1/me', () =>
-        HttpResponse.json({
-          ...someone,
-          roles: [
-            {
-              names: { org: 'acme', contest: null, task: null },
-              role: 'manager',
-            },
-          ],
-        }),
-      ),
+      signedIn,
+      ...holding('manager'),
       contestList,
       http.post('/api/v1/orgs/acme/contests', () =>
         problem(409, 'conflict', { detail: 'The contest summer already exists.' }),
@@ -396,17 +373,7 @@ describe('creating a contest', () => {
   });
 
   it('offers no New contest to an observer, who may not make one', async () => {
-    server.use(
-      http.get('/api/v1/me', () =>
-        HttpResponse.json({
-          ...someone,
-          roles: [
-            { names: { org: 'acme', contest: null, task: null }, role: 'observer' },
-          ],
-        }),
-      ),
-      contestList,
-    );
+    server.use(signedIn, ...holding('observer'), contestList);
     renderApp('/orgs/acme');
 
     await screen.findByRole('list', { name: 'Contests' });
