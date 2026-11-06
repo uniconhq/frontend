@@ -1,18 +1,11 @@
-import { Fragment, useState, type ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import type { FeedEntry, Grading } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { PageLink } from '@/ui/PageLink';
 import { verdictLabel } from '@/ui/verdicts';
 import { formatDateTime } from '@/lib/time';
 import { taskPath } from '@/lib/organiser-paths';
-import {
-  STATUS,
-  byPipeline,
-  bySubmission,
-  nameOf,
-  resultOf,
-  submitterOf,
-} from './feed';
+import { STATUS, bySubmission, nameOf, resultOf, submitterOf } from './feed';
 import { overLimitSentence } from '@/ui/scored/scored-text';
 import { changeOf } from './regrades';
 import { ScoredView } from './ScoredView';
@@ -122,7 +115,6 @@ function AttemptRow({
   head,
   showTask,
   compared,
-  line,
   earlier,
   scored,
   actions,
@@ -132,8 +124,6 @@ function AttemptRow({
   head: boolean;
   showTask: boolean;
   compared: boolean;
-  /** Which of the submission's runs the row grades, where it has a late line. */
-  line?: string;
   earlier?: { count: number; shown: boolean; toggle: () => void };
   scored?: { shown: boolean; toggle: () => void };
   actions: RowActions | null;
@@ -155,7 +145,6 @@ function AttemptRow({
             <BodyText tone="meta">
               {formatDateTime(new Date(grading.submitted_at))}
             </BodyText>
-            {line !== undefined && <BodyText tone="meta">{line}</BodyText>}
             {!grading.latest && (
               <BodyText tone="meta">
                 An earlier attempt; the latest is not among these.
@@ -210,12 +199,6 @@ function AttemptRow({
   );
 }
 
-/** What each pipeline grades, said where a submission has both. */
-const LINE = {
-  early: 'The runs shown during the contest',
-  late: 'The rest of its runs, graded after those',
-} as const;
-
 function Submission({
   path,
   attempts,
@@ -229,62 +212,47 @@ function Submission({
   compared: boolean;
   actions: RowActions | null;
 }) {
-  const [shown, setShown] = useState<Record<string, boolean>>({});
+  const [open, setOpen] = useState(false);
   const [scored, setScored] = useState(false);
-  const lines = byPipeline(attempts);
-  const first = lines[0]?.attempts[0];
-  if (first === undefined) return null;
-  const task = first.task;
-  const twice = lines.some((line) => line.pipeline === 'late');
+  const [head, ...earlier] = attempts;
+  if (head === undefined) return null;
+  const task = head.task;
   const columns = (showTask ? 6 : 5) + (compared ? 1 : 0) + (actions !== null ? 1 : 0);
   return (
-    <tbody aria-label={nameOf(first).replace(/, attempt \d+$/, '')}>
-      {lines.map(({ pipeline, attempts: [head, ...earlier] }, index) => {
-        if (head === undefined) return null;
-        const open = shown[pipeline] ?? false;
-        return (
-          <Fragment key={pipeline}>
-            <AttemptRow
-              path={path}
-              entry={head}
-              head
-              showTask={showTask}
-              compared={compared}
-              line={twice ? LINE[pipeline] : undefined}
-              earlier={{
-                count: earlier.length,
-                shown: open,
-                toggle: () => setShown({ ...shown, [pipeline]: !open }),
-              }}
-              scored={
-                index === 0 && task !== null
-                  ? { shown: scored, toggle: () => setScored(!scored) }
-                  : undefined
-              }
-              actions={actions}
-            />
-            {index === 0 && scored && task !== null && (
-              <tr>
-                <td colSpan={columns}>
-                  <ScoredView path={path} task={task} entry={head} />
-                </td>
-              </tr>
-            )}
-            {open &&
-              earlier.map((entry) => (
-                <AttemptRow
-                  key={entry.grading.id}
-                  path={path}
-                  entry={entry}
-                  head={false}
-                  showTask={showTask}
-                  compared={compared}
-                  actions={actions}
-                />
-              ))}
-          </Fragment>
-        );
-      })}
+    <tbody aria-label={nameOf(head).replace(/, attempt \d+$/, '')}>
+      <AttemptRow
+        path={path}
+        entry={head}
+        head
+        showTask={showTask}
+        compared={compared}
+        earlier={{ count: earlier.length, shown: open, toggle: () => setOpen(!open) }}
+        scored={
+          task !== null
+            ? { shown: scored, toggle: () => setScored(!scored) }
+            : undefined
+        }
+        actions={actions}
+      />
+      {scored && task !== null && (
+        <tr>
+          <td colSpan={columns}>
+            <ScoredView path={path} task={task} entry={head} />
+          </td>
+        </tr>
+      )}
+      {open &&
+        earlier.map((entry) => (
+          <AttemptRow
+            key={entry.grading.id}
+            path={path}
+            entry={entry}
+            head={false}
+            showTask={showTask}
+            compared={compared}
+            actions={actions}
+          />
+        ))}
     </tbody>
   );
 }

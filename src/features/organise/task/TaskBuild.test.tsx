@@ -2781,8 +2781,6 @@ describe('the preview of what entrants see', { timeout: 30_000 }, () => {
       deadline_at: null,
       cancel_reason: null,
       automatic: false,
-      early: null,
-      pipeline: 'early' as const,
       limit: null,
       retry_limit: null,
       regrade: null,
