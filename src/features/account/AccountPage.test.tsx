@@ -1,8 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
-import { http, HttpResponse } from 'msw';
 import { renderApp } from '@/test/render';
-import { FORGE, server, sessionList, signedIn, someone } from '@/test/server';
+import { FORGE, server, sessionList, signedIn, signedInAs } from '@/test/server';
 
 describe('AccountPage', () => {
   it('shows the Forgejo-owned profile read-only, with a way to change it', async () => {
@@ -61,10 +60,7 @@ describe('AccountPage', () => {
   });
 
   it('leaves the roles section out when there are none', async () => {
-    server.use(
-      http.get('/api/v1/me', () => HttpResponse.json({ ...someone, roles: [] })),
-      sessionList,
-    );
+    server.use(...signedInAs(null, { roles: [] }), sessionList);
     renderApp('/account');
 
     await screen.findByText('Kenny Lewi');

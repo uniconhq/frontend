@@ -12,10 +12,9 @@ import { emptyTuple, type AxisValues } from '../forms/task-values';
 import { describe, expect, it } from 'vitest';
 import { specCatalogue } from '@/test/catalogue';
 import { readLine, type FormulaScope } from '../formula/parse';
-import type { DeclaredInput } from '@/api/types';
 import { readTask, writeTask } from '../forms/task-values';
 import type { Values } from '../forms/values';
-import { taskFileOf, taskValuesOf } from '@/test/task-values';
+import { declared, taskFileOf, taskValuesOf } from '@/test/task-values';
 import {
   axisColumns,
   columnsOf,
@@ -119,18 +118,6 @@ checks:
   - submit: {code: solutions/ok.py, n: 5, strict: true, mode: "7"}
     expect: {verdict: accepted}
 `;
-
-function declared(id: string, type: string): DeclaredInput {
-  return {
-    id,
-    type,
-    options: null,
-    optional: false,
-    title: null,
-    help: null,
-    unit: null,
-  };
-}
 
 describe('a check', () => {
   it('writes each input it gives as the type the input declares', () => {

@@ -6,6 +6,7 @@ import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
 import { OutLink } from '@/ui/OutLink';
 import { Loaded } from '@/ui/feedback/Loaded';
+import { Group } from '@/ui/layout';
 import { formatSize } from '@/lib/size';
 import { saveFile } from '@/lib/save-file';
 import {
@@ -94,7 +95,7 @@ function Shown({
           {!all && first.more && '\n…'}
         </pre>
       )}
-      <div className={classes.actions}>
+      <Group gap={6} align="stretch">
         {first?.more === true && (
           <Button size="xs" variant="secondary" onClick={() => setAll(!all)}>
             {all ? 'Show less' : 'Show all'}
@@ -114,7 +115,7 @@ function Shown({
             Download
           </Button>
         )}
-      </div>
+      </Group>
     </>
   );
 }
@@ -137,11 +138,11 @@ function Head({ name, size }: { name: string; size: number | null }) {
 function DownloadLink({ path, href }: { path: string; href: string | null }) {
   if (href === null) return null;
   return (
-    <div className={classes.actions}>
+    <Group gap={6} align="stretch">
       <OutLink href={href} label={`Download ${nameOf(path)}`}>
         Download
       </OutLink>
-    </div>
+    </Group>
   );
 }
 

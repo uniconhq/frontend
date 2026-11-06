@@ -1,10 +1,12 @@
 import { PreparationStatus } from './PreparationStatus';
-import { useEffect, useRef, type ReactNode } from 'react';
+import { type ReactNode } from 'react';
 import type { ApiError } from '@/api/problem';
 import type { SaveEffect, SaveResult, WriteFile } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
+import { Group, Stack } from '@/ui/layout';
+import { useFocusOnShow } from '@/lib/use-focus-on-show';
 import { DefinitionErrors, type PlaceOf } from '../DefinitionErrors';
 import classes from '../organise.module.css';
 import { askedOf, definitionErrorsOf, effectOf, stringsOf } from './refusals';
@@ -39,10 +41,7 @@ function short(version: string): string {
  * screen reader lands on: `status` for an answer, `alert` for a refusal.
  */
 function Panel({ role, children }: { role: 'status' | 'alert'; children: ReactNode }) {
-  const panel = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    panel.current?.focus();
-  }, []);
+  const panel = useFocusOnShow<HTMLDivElement>();
   return (
     <div ref={panel} className={classes.panel} role={role} tabIndex={-1}>
       {children}
@@ -89,14 +88,14 @@ function Effect({ effect }: { effect: SaveEffect }) {
       </BodyText>
       {PARTS.map(([part, label]) =>
         effect[part].length === 0 ? null : (
-          <div key={part} className={classes.effectPart}>
+          <Stack key={part} gap={2}>
             <BodyText>{label}</BodyText>
             <ul className={classes.named} aria-label={label}>
               {effect[part].map((line) => (
                 <li key={line}>{line}</li>
               ))}
             </ul>
-          </div>
+          </Stack>
         ),
       )}
     </>
@@ -203,11 +202,11 @@ export function SaveOutcome<Body = WriteFile>({
           Nothing was saved, and your changes are still here. Reloading shows their
           version and replaces your changes, so copy anything you want to keep first.
         </BodyText>
-        <div className={classes.actions}>
+        <Group gap="xs">
           <Button variant="secondary" onClick={onReload}>
             Reload the file
           </Button>
-        </div>
+        </Group>
       </Panel>
     );
   }
@@ -238,7 +237,7 @@ export function SaveOutcome<Body = WriteFile>({
           label="Entrants have already seen this"
           notes={stringsOf(error, 'hiding')}
         />
-        <div className={classes.actions}>
+        <Group gap="xs">
           <Button onClick={() => onConfirm(body, askedOf(error))}>
             {onKeepAsDraft === undefined ? 'Save the change' : 'Publish the change'}
           </Button>
@@ -251,7 +250,7 @@ export function SaveOutcome<Body = WriteFile>({
               Cancel
             </Button>
           ) : null}
-        </div>
+        </Group>
         {onKeepAsDraft !== undefined && (
           <BodyText tone="secondary">
             A draft keeps the change without publishing it: entrants see no difference

@@ -2,6 +2,7 @@ import { useEffect, useRef, type ReactNode } from 'react';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
 import { Progress } from '@/ui/Progress';
+import { Group } from '@/ui/layout';
 import type { SaveState } from './build-save';
 import classes from './task.module.css';
 
@@ -95,7 +96,7 @@ export function SaveBar({
         </>
       )}
       {lines.length > 0 && (
-        <div className={classes.statusLine}>
+        <Group gap="6px 10px">
           {!asking && (
             <Button loading={busy} disabled={problems.length > 0} onClick={onSave}>
               Save
@@ -110,15 +111,15 @@ export function SaveBar({
               with problems is kept as a draft.
             </BodyText>
           )}
-        </div>
+        </Group>
       )}
       {children}
       {settled && (
-        <div className={classes.statusLine}>
+        <Group gap="6px 10px">
           <Button variant="secondary" onClick={onClose} label="Close the save’s answer">
             Close
           </Button>
-        </div>
+        </Group>
       )}
     </section>
   );

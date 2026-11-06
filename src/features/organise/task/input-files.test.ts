@@ -1,23 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { http, HttpResponse } from 'msw';
-import type { DeclaredInput } from '@/api/types';
+import { declared } from '@/test/task-values';
 import { problem, server } from '@/test/server';
-import { TASK_API } from '@/test/organiser';
+import { TASK_API, fileContent, treeEntry } from '@/test/organiser';
 import { stageInputFiles, uploadFits } from './input-files';
 
 const PLACE = { kind: 'task', org: 'acme', contest: 'spring', task: 'sum' } as const;
-
-function declared(id: string, type: string): DeclaredInput {
-  return {
-    id,
-    type,
-    options: null,
-    optional: false,
-    title: null,
-    help: null,
-    unit: null,
-  };
-}
 
 /** A task whose `tests/` and `public/` hold files, each read with its token. */
 function taskWithFiles() {
@@ -31,21 +19,14 @@ function taskWithFiles() {
       const under = files[at];
       return under === undefined
         ? problem(404, 'not_found')
-        : HttpResponse.json(
-            under.map((path) => ({ path, kind: 'file', size: 1, upload: null })),
-          );
+        : HttpResponse.json(under.map((path) => treeEntry({ path, size: 1 })));
     }),
     http.get(`${TASK_API}/files/:path`, ({ params }) => {
       const path = decodeURIComponent(String(params['path']));
       return Object.values(files).flat().includes(path)
-        ? HttpResponse.json({
-            path,
-            encoding: 'utf-8',
-            content: 'x',
-            token: `token-${path}`,
-            upload: null,
-            version: null,
-          })
+        ? HttpResponse.json(
+            fileContent({ path, content: 'x', token: `token-${path}`, version: null }),
+          )
         : problem(404, 'not_found');
     }),
   );

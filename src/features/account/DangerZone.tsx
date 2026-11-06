@@ -6,6 +6,7 @@ import { Modal } from '@/ui/Modal';
 import { BodyText } from '@/ui/BodyText';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { SectionTitle } from '@/ui/SectionTitle';
+import { Group, Stack } from '@/ui/layout';
 import { loginHref, useEndSession } from '@/session';
 import { soleAdminScopes } from './sole-admin';
 import { sharedWorkflows } from './shared-workflows';
@@ -63,24 +64,24 @@ export function DangerZone() {
   };
 
   return (
-    <div className={classes.zone}>
+    <Stack gap="sm">
       <SectionTitle>Deactivate or delete your account</SectionTitle>
       <BodyText size="md">
         A platform admin can turn a deactivated account back on. A deleted account is
         gone for good.
       </BodyText>
-      <div className={classes.actions}>
+      <Group gap="sm" align="stretch">
         <Button variant="secondary" onClick={() => setAction('deactivate')}>
           Deactivate account
         </Button>
         <Button variant="danger" onClick={() => setAction('delete')}>
           Delete account
         </Button>
-      </div>
+      </Group>
 
       {action !== null && (
         <Modal opened onClose={close} title={QUESTION[action]}>
-          <div className={classes.dialog}>
+          <Stack gap={14}>
             <BodyText size="md">{EXPLANATION[action]}</BodyText>
 
             {apiError !== null && (
@@ -113,7 +114,7 @@ export function DangerZone() {
               </div>
             )}
 
-            <div className={classes.actions}>
+            <Group gap="sm" align="stretch">
               {apiError?.code === 'fresh_sign_in_required' ? (
                 <Button href={loginHref('/account')}>Sign in again</Button>
               ) : (
@@ -128,10 +129,10 @@ export function DangerZone() {
               <Button variant="secondary" onClick={close}>
                 Cancel
               </Button>
-            </div>
-          </div>
+            </Group>
+          </Stack>
         </Modal>
       )}
-    </div>
+    </Stack>
   );
 }

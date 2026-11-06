@@ -13,6 +13,7 @@ import { toApiError } from '@/api/problem';
 import { BodyText } from '@/ui/BodyText';
 import { FileDrop } from '@/ui/FileDrop';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
+import { Group } from '@/ui/layout';
 import { formatSize } from '@/lib/size';
 import shared from '../organise.module.css';
 import { useOpenUploads } from './use-open-uploads';
@@ -103,7 +104,7 @@ export function OpenUploads({
                   Cancelling throws it away, and it would have to be sent again from the
                   start.
                 </BodyText>
-                <div className={shared.actions}>
+                <Group gap="xs">
                   <Button
                     size="xs"
                     variant="danger"
@@ -115,7 +116,7 @@ export function OpenUploads({
                   <Button size="xs" variant="secondary" onClick={() => setAsking(null)}>
                     Keep it
                   </Button>
-                </div>
+                </Group>
               </div>
             ) : (
               <Button

@@ -5,25 +5,27 @@ import { http, HttpResponse } from 'msw';
 import type { TreeEntry } from '@/api/types';
 import { renderApp } from '@/test/render';
 import { problem, server, signedIn } from '@/test/server';
-import { CLASSIC, PRIMITIVES, WORKFLOW_API, workflowBackend } from '@/test/workflows';
+import {
+  CLASSIC,
+  PRIMITIVES,
+  WORKFLOW_API,
+  workflowBackend,
+  workflowBox,
+  workflowItem,
+} from '@/test/workflows';
+import { openEditor } from '@/test/workflow-editor';
 import { INPUTS_SHOWN_KEY } from './inputs-shown';
 
 const LISTED = [
-  {
-    owner: 'acme',
-    name: 'graders',
-    visibility: 'private',
-    versions: ['v1'],
-    editable: true,
-  },
-  { owner: 'kenny', name: 'tuned', visibility: 'shared', versions: [], editable: true },
-  {
+  workflowItem({ owner: 'acme', name: 'graders' }),
+  workflowItem({ visibility: 'shared', versions: [] }),
+  workflowItem({
     owner: 'unicon',
     name: 'classic',
     visibility: 'public',
     versions: ['v1', 'v2'],
     editable: false,
-  },
+  }),
 ];
 
 const listed = http.get('/api/v1/workflows', () => HttpResponse.json(LISTED));
@@ -237,13 +239,9 @@ describe('a workflow one may only read', () => {
       primitives,
       check(),
       http.get('/api/v1/workflows/:owner/:name/versions/:version/box', () =>
-        HttpResponse.json({
-          inputs: [],
-          outputs: [],
-          newer_version: null,
-          description: 'Compiles the code.\nGives its log.\n',
-          run: true,
-        }),
+        HttpResponse.json(
+          workflowBox({ description: 'Compiles the code.\nGives its log.\n' }),
+        ),
       ),
       http.get('/api/v1/workflows/:owner/:name/versions/:version', ({ params }) =>
         HttpResponse.json({ content: params.name === 'build' ? inner : outer }),
@@ -461,8 +459,7 @@ describe('a workflow one may only read', () => {
 
 describe('a workflow one may edit', () => {
   it('offers no way to combine it with others for now', async () => {
-    server.use(signedIn, ...workflowBackend(CLASSIC).handlers);
-    renderApp('/workflows/kenny/tuned');
+    openEditor();
 
     await screen.findByRole('group', { name: 'Step run' });
     expect(screen.queryByRole('form', { name: 'Combine workflows' })).toBeNull();
@@ -471,10 +468,7 @@ describe('a workflow one may edit', () => {
 
 describe('who reads a workflow', () => {
   it('applies who reads it as it is chosen, asking before it takes it from people', async () => {
-    const backend = workflowBackend(CLASSIC);
-    server.use(signedIn, ...backend.handlers);
-    const user = userEvent.setup();
-    renderApp('/workflows/kenny/tuned');
+    const { user, backend } = openEditor();
 
     await user.click(await screen.findByRole('button', { name: 'Share' }));
     const panel = await screen.findByRole('region', { name: 'Who can see it' });

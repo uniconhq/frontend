@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import type { Primitive } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
+import { Group } from '@/ui/layout';
 import { NumberText } from './yaml-doc';
 import {
   formatUse,
@@ -373,7 +374,7 @@ export function Inside({
             </section>
           )}
           <div className={classes.wellCentre}>
-            <div className={classes.wellBar}>
+            <Group gap={8} justify="space-between">
               <BodyText size="sm" tone="secondary">
                 <span className={classes.ref}>{formatUse(frame.use)}</span>
                 {newer !== null && ` · ${newer} is out`}
@@ -390,7 +391,7 @@ export function Inside({
                   Details
                 </Button>
               )}
-            </div>
+            </Group>
             <Description text={here?.workflow.description ?? null} />
             {read.isPending && <BodyText>Opening {frame.title}…</BodyText>}
             {read.isError && (

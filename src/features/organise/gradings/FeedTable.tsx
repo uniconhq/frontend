@@ -9,6 +9,7 @@ import { STATUS, bySubmission, nameOf, resultOf, submitterOf } from './feed';
 import { overLimitSentence } from '@/ui/scored/scored-text';
 import { changeOf } from './regrades';
 import { ScoredView } from './ScoredView';
+import tableClasses from '@/ui/table.module.css';
 import classes from './feed.module.css';
 
 type ContestPath = { org: string; contest: string };
@@ -277,8 +278,8 @@ export function FeedTable({
 }) {
   const compared = entries.some((entry) => entry.grading.change !== null);
   return (
-    <div className={classes.scroll}>
-      <table className={classes.table} aria-label="Gradings">
+    <div className={tableClasses.scroll}>
+      <table className={`${tableClasses.table} ${classes.heads}`} aria-label="Gradings">
         <thead>
           <tr>
             {showTask && <th scope="col">Task</th>}

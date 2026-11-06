@@ -6,8 +6,8 @@ import type { Invite } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { PageTitle } from '@/ui/PageTitle';
 import { SectionTitle } from '@/ui/SectionTitle';
-import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
-import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
+import { Loaded } from '@/ui/feedback/Loaded';
+import { Stack } from '@/ui/layout';
 import { useMe } from '@/session';
 import { forgetInviteToken, keepInviteToken, readInviteToken } from './invite-token';
 import { InviteCard, InviteList } from './MyInvites';
@@ -41,24 +41,24 @@ function OpenedInvite({ view }: { view: QueryView<Invite> }) {
   return (
     <section className={classes.section}>
       <SectionTitle>The invite from your link</SectionTitle>
-      {view.state === 'loading' && <PageSkeleton rows={1} />}
       {view.state === 'error' &&
-        (isApiError(view.error) && view.error.code === 'not_found' ? (
-          <div role="alert">
-            <BodyText>
-              This link does not open an invite for {me.user.username}. It may have been
-              sent to another account, or a newer mail may have replaced it. Sign in
-              with the account the invite was sent to, or use the link in the newest
-              mail.
-            </BodyText>
-          </div>
-        ) : (
-          <ErrorBlock error={view.error} onRetry={view.retry} />
-        ))}
-      {view.state === 'ready' && (
-        <ul className={classes.list} aria-label="The invite from your link">
-          <InviteCard invite={view.data} highlighted />
-        </ul>
+      isApiError(view.error) &&
+      view.error.code === 'not_found' ? (
+        <div role="alert">
+          <BodyText>
+            This link does not open an invite for {me.user.username}. It may have been
+            sent to another account, or a newer mail may have replaced it. Sign in with
+            the account the invite was sent to, or use the link in the newest mail.
+          </BodyText>
+        </div>
+      ) : (
+        <Loaded view={view} rows={1}>
+          {(invite) => (
+            <ul className={classes.list} aria-label="The invite from your link">
+              <InviteCard invite={invite} highlighted />
+            </ul>
+          )}
+        </Loaded>
       )}
     </section>
   );
@@ -91,7 +91,7 @@ export function InvitesPage() {
   const listed = token === null ? 'Invites for you' : 'Your other invites';
 
   return (
-    <div className={classes.page}>
+    <Stack gap={14}>
       <PageTitle>Invites</PageTitle>
       <BodyText>
         Organisers invite people to a role at an org, a contest or a task, or to a place
@@ -102,17 +102,16 @@ export function InvitesPage() {
       {token !== null && <OpenedInvite view={opened} />}
       <section className={classes.section}>
         <SectionTitle>{listed}</SectionTitle>
-        {view.state === 'loading' && <PageSkeleton rows={2} />}
-        {view.state === 'error' && (
-          <ErrorBlock error={view.error} onRetry={view.retry} />
-        )}
-        {view.state === 'ready' &&
-          (others(view.data).length === 0 ? (
-            <BodyText tone="secondary">No invites are waiting for you.</BodyText>
-          ) : (
-            <InviteList label={listed} invites={others(view.data)} />
-          ))}
+        <Loaded view={view} rows={2}>
+          {(invites) =>
+            others(invites).length === 0 ? (
+              <BodyText tone="secondary">No invites are waiting for you.</BodyText>
+            ) : (
+              <InviteList label={listed} invites={others(invites)} />
+            )
+          }
+        </Loaded>
       </section>
-    </div>
+    </Stack>
   );
 }

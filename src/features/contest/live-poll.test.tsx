@@ -3,7 +3,7 @@ import { http, HttpResponse } from 'msw';
 import { screen } from '@testing-library/react';
 import type { components } from '@/api/schema';
 import { renderApp } from '@/test/render';
-import { server, someone } from '@/test/server';
+import { server, signedInAs } from '@/test/server';
 import type * as live from '@/live';
 import { CONTEST_API, home, registration } from '@/test/contestant';
 import { passTime, withFakeTimers } from '@/test/timers';
@@ -53,17 +53,13 @@ const GRADEBOOK: components['schemas']['Leaderboard'] = {
   ],
 };
 
-const entrantOnly = http.get('/api/v1/me', () =>
-  HttpResponse.json({ ...someone, roles: [] }),
-);
-
 describe('a standing while the live stream is open', () => {
   withFakeTimers();
 
   it('reads the leaderboards again every thirty seconds', async () => {
     let reads = 0;
     server.use(
-      entrantOnly,
+      ...signedInAs(null, { roles: [] }),
       http.get('/api/v1/orgs/:org/contests/:contest/leaderboards', () => {
         reads += 1;
         return HttpResponse.json([GRADEBOOK]);
@@ -79,7 +75,7 @@ describe('a standing while the live stream is open', () => {
   it('reads the contest home again every thirty seconds while it shows a standing', async () => {
     let reads = 0;
     server.use(
-      entrantOnly,
+      ...signedInAs(null, { roles: [] }),
       http.get(`${CONTEST_API}/home`, () => {
         reads += 1;
         return HttpResponse.json(

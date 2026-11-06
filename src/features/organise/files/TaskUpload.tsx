@@ -3,6 +3,7 @@ import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
 import { FileDrop } from '@/ui/FileDrop';
 import { Progress } from '@/ui/Progress';
+import { Group } from '@/ui/layout';
 import { formatSize } from '@/lib/size';
 import type { Place } from './place';
 import { OpenUploads } from './OpenUploads';
@@ -106,7 +107,7 @@ export function TaskUpload({
           onChange={choose}
           disabled={busy}
         />
-        <div className={shared.actions}>
+        <Group gap="xs">
           <Button
             type="submit"
             loading={busy}
@@ -117,7 +118,7 @@ export function TaskUpload({
           <Button variant="secondary" onClick={onClose} disabled={busy}>
             Close
           </Button>
-        </div>
+        </Group>
       </form>
 
       <div role="status" aria-label="Uploading">
@@ -140,11 +141,11 @@ export function TaskUpload({
             but is not saved into the task. It stays available under Unfinished uploads
             after reloading.
           </BodyText>
-          <div className={shared.actions}>
+          <Group gap="xs">
             <Button variant="secondary" onClick={() => void discard()}>
               Discard it
             </Button>
-          </div>
+          </Group>
         </div>
       )}
     </section>

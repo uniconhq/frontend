@@ -6,7 +6,7 @@ import type { Announcement } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
 import { Card } from '@/ui/Card';
-import { Modal } from '@/ui/Modal';
+import { ConfirmDialog } from '@/ui/ConfirmDialog';
 import { SectionTitle } from '@/ui/SectionTitle';
 import { TextInput } from '@/ui/TextInput';
 import { Textarea } from '@/ui/Textarea';
@@ -25,6 +25,7 @@ import {
   type AnnouncementPlace,
 } from './announcements';
 import classes from '@/ui/threads/threads.module.css';
+import { Group, Stack } from '@/ui/layout';
 
 /**
  * A title and a text, the one form for posting an announcement and for
@@ -67,7 +68,7 @@ function Composer({
       {change.error !== null && (
         <ErrorBlock error={change.error} compact heading="Couldn’t save" />
       )}
-      <div className={classes.actions}>
+      <Group gap={8}>
         <Button type="submit" loading={change.pending !== null}>
           {label}
         </Button>
@@ -76,7 +77,7 @@ function Composer({
             Cancel
           </Button>
         )}
-      </div>
+      </Group>
     </form>
   );
 }
@@ -142,7 +143,7 @@ function Managed({
     >
       <AnnouncementContent announcement={announcement} />
       {manages && !announcement.closed && (
-        <div className={classes.actions}>
+        <Group gap={8}>
           <Button
             size="xs"
             variant="secondary"
@@ -162,10 +163,10 @@ function Managed({
           >
             Close
           </Button>
-        </div>
+        </Group>
       )}
       {manages && announcement.closed && (
-        <div className={classes.actions}>
+        <Group gap={8}>
           <Button
             size="xs"
             variant="secondary"
@@ -177,44 +178,38 @@ function Managed({
           >
             Reopen
           </Button>
-        </div>
+        </Group>
       )}
       {change.error !== null && !closing && (
         <ErrorBlock error={change.error} compact heading="Couldn’t save" />
       )}
-      <Modal
+      <ConfirmDialog
         opened={closing}
         onClose={() => setClosing(false)}
         title="Close this announcement?"
+        confirm="Close it"
+        cancel="Not now"
+        loading={change.pending === 'close'}
+        onConfirm={() => void close()}
       >
-        <div className={classes.stack}>
+        <BodyText>
+          Entrants will no longer see &ldquo;{name}&rdquo; on {where}. Those who have
+          read it are not told it was closed.
+        </BodyText>
+        {announcement.answers_question && (
           <BodyText>
-            Entrants will no longer see &ldquo;{name}&rdquo; on {where}. Those who have
-            read it are not told it was closed.
+            {answers === null
+              ? 'It answers a question, which will then say the answer was closed.'
+              : `It answers a question from ${asker}, whose question will then say the answer was closed.`}
           </BodyText>
-          {announcement.answers_question && (
-            <BodyText>
-              {answers === null
-                ? 'It answers a question, which will then say the answer was closed.'
-                : `It answers a question from ${asker}, whose question will then say the answer was closed.`}
-            </BodyText>
-          )}
-          <BodyText tone="secondary">
-            It stays here for the organisers, marked closed, and you can reopen it.
-          </BodyText>
-          {change.error !== null && (
-            <ErrorBlock error={change.error} compact heading="Couldn’t close" />
-          )}
-          <div className={classes.actions}>
-            <Button loading={change.pending === 'close'} onClick={() => void close()}>
-              Close it
-            </Button>
-            <Button variant="secondary" onClick={() => setClosing(false)}>
-              Not now
-            </Button>
-          </div>
-        </div>
-      </Modal>
+        )}
+        <BodyText tone="secondary">
+          It stays here for the organisers, marked closed, and you can reopen it.
+        </BodyText>
+        {change.error !== null && (
+          <ErrorBlock error={change.error} compact heading="Couldn’t close" />
+        )}
+      </ConfirmDialog>
     </li>
   );
 }
@@ -237,7 +232,7 @@ export function AnnouncementsSection({ place }: { place: AnnouncementPlace }) {
     <>
       {manages && (
         <Card>
-          <div className={classes.stack}>
+          <Stack gap="sm">
             <SectionTitle>Post an announcement</SectionTitle>
             <Composer
               label="Post announcement"
@@ -247,7 +242,7 @@ export function AnnouncementsSection({ place }: { place: AnnouncementPlace }) {
                 await readAgain();
               }}
             />
-          </div>
+          </Stack>
         </Card>
       )}
       <Card>

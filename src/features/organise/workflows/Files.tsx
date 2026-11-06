@@ -7,6 +7,7 @@ import { FileDrop } from '@/ui/FileDrop';
 import { Progress } from '@/ui/Progress';
 import { TextInput } from '@/ui/TextInput';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
+import { Group } from '@/ui/layout';
 import { SavedFile, SavedFolder } from '../files/FilePreview';
 import { treeQuery } from '../files/place';
 import { OpenUploads } from '../files/OpenUploads';
@@ -197,7 +198,7 @@ export function WorkflowFiles({
                 {listed(readers)} {readers.length === 1 ? 'reads' : 'read'}{' '}
                 {selected.path}, and would read nothing once it is removed.
               </BodyText>
-              <div className={classes.actions}>
+              <Group gap={8} align="stretch">
                 <Button
                   size="xs"
                   variant="danger"
@@ -209,7 +210,7 @@ export function WorkflowFiles({
                 <Button size="xs" variant="secondary" onClick={() => setAsking(false)}>
                   Keep it
                 </Button>
-              </div>
+              </Group>
             </div>
           ) : (
             <div>

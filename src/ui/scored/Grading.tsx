@@ -1,10 +1,10 @@
+import { Group } from '@mantine/core';
 import type { GradingResult } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { VerdictBadge } from '@/ui/VerdictBadge';
 import { ScoredResult, type TextAsk } from './ScoredResult';
 import type { ReadFiles } from './ShownInputs';
 import { DELAYED_SENTENCE, cancelReason, overLimitSentence } from './scored-text';
-import classes from './scored.module.css';
 
 /**
  * What the grading holds for the entrant: its verdict, the values and runs
@@ -29,9 +29,9 @@ export function Grading({
   if (grading.status === 'delayed') {
     return (
       <>
-        <div className={classes.verdict}>
+        <Group gap={8}>
           <VerdictBadge verdict="delayed" />
-        </div>
+        </Group>
         <BodyText>{DELAYED_SENTENCE}</BodyText>
         <ScoredResult grading={grading} readText={readText} readFiles={readFiles} />
       </>
@@ -40,9 +40,9 @@ export function Grading({
   if (grading.status === 'over_limit') {
     return (
       <>
-        <div className={classes.verdict}>
+        <Group gap={8}>
           <VerdictBadge verdict="over_limit" />
-        </div>
+        </Group>
         <BodyText>{overLimitSentence('you', grading.limit)}</BodyText>
         <BodyText tone="secondary">
           It has no result and counts on no leaderboard.
@@ -54,9 +54,9 @@ export function Grading({
     const reason = cancelReason(grading);
     return (
       <>
-        <div className={classes.verdict}>
+        <Group gap={8}>
           <VerdictBadge verdict="cancelled" />
-        </div>
+        </Group>
         <BodyText>
           Cancelled by the organisers{reason === null ? '.' : `: ${reason}`}
         </BodyText>
@@ -71,11 +71,11 @@ export function Grading({
   }
   return (
     <>
-      <div className={classes.verdict}>
+      <Group gap={8}>
         <VerdictBadge verdict={grading.status} />
         {/* Entrants' pages speak of a submission, not of its gradings' attempts. */}
         {grading.attempt > 1 && <BodyText tone="secondary">Graded again</BodyText>}
-      </div>
+      </Group>
       <ScoredResult grading={grading} readText={readText} readFiles={readFiles} />
     </>
   );

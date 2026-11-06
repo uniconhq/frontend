@@ -4,7 +4,8 @@ import { Button } from '@/ui/Button';
 import { BodyText } from '@/ui/BodyText';
 import { SectionTitle } from '@/ui/SectionTitle';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
-import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
+import { Loaded } from '@/ui/feedback/Loaded';
+import { Stack } from '@/ui/layout';
 import { useEndSession } from '@/session';
 import { formatDateTime } from '@/lib/time';
 import { describeUserAgent } from './user-agent';
@@ -48,57 +49,57 @@ export function SessionList() {
     await endSession();
   };
 
-  if (view.state === 'loading') return <PageSkeleton rows={2} />;
-  if (view.state === 'error')
-    return <ErrorBlock error={view.error} onRetry={view.retry} />;
-
   return (
-    <div className={classes.sessions}>
-      <SectionTitle order={3}>Signed in on</SectionTitle>
-      <ul className={classes.list}>
-        {view.data.map((session) => (
-          <li key={session.id} className={classes.row}>
-            <div className={classes.details}>
-              <div className={classes.device}>
-                {describeUserAgent(session.user_agent)}
-                {session.current && (
-                  <span className={classes.current}>This device</span>
-                )}
-              </div>
-              <BodyText tone="secondary">
-                Signed in {formatDateTime(new Date(session.created_at))} · last seen{' '}
-                {formatDateTime(new Date(session.last_seen_at))}
-              </BodyText>
-            </div>
-            <span className={classes.action}>
-              <Button
-                variant="secondary"
-                disabled={revoke.isPending}
-                onClick={() => void revokeOne(session.id, session.current)}
-              >
-                {session.current ? 'Sign out' : 'Sign out there'}
-              </Button>
-            </span>
-          </li>
-        ))}
-      </ul>
+    <Loaded view={view} rows={2}>
+      {(sessions) => (
+        <Stack gap="sm">
+          <SectionTitle order={3}>Signed in on</SectionTitle>
+          <ul className={classes.list}>
+            {sessions.map((session) => (
+              <li key={session.id} className={classes.row}>
+                <div className={classes.details}>
+                  <div className={classes.device}>
+                    {describeUserAgent(session.user_agent)}
+                    {session.current && (
+                      <span className={classes.current}>This device</span>
+                    )}
+                  </div>
+                  <BodyText tone="secondary">
+                    Signed in {formatDateTime(new Date(session.created_at))} · last seen{' '}
+                    {formatDateTime(new Date(session.last_seen_at))}
+                  </BodyText>
+                </div>
+                <span className={classes.action}>
+                  <Button
+                    variant="secondary"
+                    disabled={revoke.isPending}
+                    onClick={() => void revokeOne(session.id, session.current)}
+                  >
+                    {session.current ? 'Sign out' : 'Sign out there'}
+                  </Button>
+                </span>
+              </li>
+            ))}
+          </ul>
 
-      {revoke.error !== null && (
-        <ErrorBlock error={revoke.error} compact heading="Couldn’t sign out" />
-      )}
-      {revokeAll.error !== null && (
-        <ErrorBlock error={revokeAll.error} compact heading="Couldn’t sign out" />
-      )}
+          {revoke.error !== null && (
+            <ErrorBlock error={revoke.error} compact heading="Couldn’t sign out" />
+          )}
+          {revokeAll.error !== null && (
+            <ErrorBlock error={revokeAll.error} compact heading="Couldn’t sign out" />
+          )}
 
-      <div>
-        <Button
-          variant="secondary"
-          disabled={revokeAll.isPending}
-          onClick={() => void revokeEverything()}
-        >
-          Sign out everywhere
-        </Button>
-      </div>
-    </div>
+          <div>
+            <Button
+              variant="secondary"
+              disabled={revokeAll.isPending}
+              onClick={() => void revokeEverything()}
+            >
+              Sign out everywhere
+            </Button>
+          </div>
+        </Stack>
+      )}
+    </Loaded>
   );
 }

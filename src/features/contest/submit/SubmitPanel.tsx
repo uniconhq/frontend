@@ -1,4 +1,4 @@
-import { useEffect, useRef, type FormEvent, type ReactNode } from 'react';
+import { type FormEvent, type ReactNode } from 'react';
 import { describeError } from '@/api/describe-error';
 import type { ApiError } from '@/api/problem';
 import type { InputField } from '@/api/types';
@@ -11,6 +11,7 @@ import { TextInput } from '@/ui/TextInput';
 import { Textarea } from '@/ui/Textarea';
 import { formatLimit } from '@/lib/size';
 import { partTitle, partsOf } from '@/lib/submitted';
+import { useFocusOnShow } from '@/lib/use-focus-on-show';
 import {
   entryOf,
   pathOf,
@@ -35,10 +36,7 @@ export type Notice = { kind: 'submitted'; number: number };
  * never reads like a submission made.
  */
 function Said({ role, children }: { role: 'status' | 'alert'; children: ReactNode }) {
-  const panel = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    panel.current?.focus();
-  }, []);
+  const panel = useFocusOnShow<HTMLDivElement>();
   const look = role === 'alert' ? `${shared.panel} ${classes.refused}` : shared.panel;
   return (
     <div ref={panel} className={look} role={role} tabIndex={-1}>

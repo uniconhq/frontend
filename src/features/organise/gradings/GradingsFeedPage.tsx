@@ -12,6 +12,7 @@ import { Select } from '@/ui/Select';
 import { TextInput } from '@/ui/TextInput';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
+import { Group, Stack } from '@/ui/layout';
 import { useLiveConnected } from '@/live';
 import { useContestParams } from '@/lib/route-params';
 import { CONTEST_SECTIONS, sectionOf } from '@/lib/sections';
@@ -86,7 +87,7 @@ function QueueDepthPanel({
     ),
   );
   return (
-    <div className={classes.stack}>
+    <Stack gap="sm">
       <SectionTitle>Waiting to be graded</SectionTitle>
       {view.state === 'loading' && <PageSkeleton rows={1} />}
       {view.state === 'error' && (
@@ -125,7 +126,7 @@ function QueueDepthPanel({
           )}
         </div>
       )}
-    </div>
+    </Stack>
   );
 }
 
@@ -173,7 +174,7 @@ function FilterBar({
   const anySet = Object.values(filters).some((value) => value !== null);
 
   return (
-    <div className={classes.filters}>
+    <Group gap="sm" align="flex-end">
       {regrade ? (
         <Select
           label="What the regrade did"
@@ -240,7 +241,7 @@ function FilterBar({
         </Button>
       </form>
       {anySet && <PageLink to="?">Clear filters</PageLink>}
-    </div>
+    </Group>
   );
 }
 
@@ -283,7 +284,7 @@ export function GradingsFeedPage() {
       </Card>
       <RegradeSummaries path={path} />
       <Card>
-        <div className={classes.stack}>
+        <Stack gap="sm">
           <SectionTitle>
             {filters.regrade === null
               ? 'Every grading'
@@ -325,7 +326,7 @@ export function GradingsFeedPage() {
               )
             }
           />
-        </div>
+        </Stack>
       </Card>
     </SectionPage>
   );

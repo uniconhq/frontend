@@ -6,6 +6,7 @@ import type { DefinitionProblem } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
 import { Modal } from '@/ui/Modal';
+import { Group } from '@/ui/layout';
 import { nextVersion } from './versions';
 import classes from './workflows.module.css';
 
@@ -175,7 +176,7 @@ export function PublishVersion({
               )}
             </div>
           )}
-          <div className={classes.actions}>
+          <Group gap={8} align="stretch">
             {dirty ? (
               <Button
                 loading={saving || make.isPending}
@@ -196,7 +197,7 @@ export function PublishVersion({
             <Button variant="secondary" onClick={() => setOpen(false)}>
               Cancel
             </Button>
-          </div>
+          </Group>
         </div>
       </Modal>
     </>

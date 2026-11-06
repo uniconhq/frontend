@@ -6,6 +6,7 @@ import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
 import { PageLink } from '@/ui/PageLink';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
+import { Group } from '@/ui/layout';
 import { contestSectionPath } from '@/lib/sections';
 import { taskPath } from '@/lib/organiser-paths';
 import {
@@ -80,7 +81,7 @@ function Summary({ path, summary }: { path: ContestPath; summary: RegradeSummary
         </PageLink>
       )}
       {manages && (
-        <div className={shared.actions}>
+        <Group gap="xs">
           <Button
             size="xs"
             variant="secondary"
@@ -94,7 +95,7 @@ function Summary({ path, summary }: { path: ContestPath; summary: RegradeSummary
           >
             Dismiss
           </Button>
-        </div>
+        </Group>
       )}
     </li>
   );

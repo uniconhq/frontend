@@ -1,3 +1,4 @@
+import { Group } from '@mantine/core';
 import { useRef, useState } from 'react';
 import type {
   GradingResult,
@@ -105,7 +106,7 @@ function RunRow({
 }) {
   const ask = { group: run.group, place: run.place };
   return (
-    <div className={classes.run}>
+    <Group gap="8px 14px" align="baseline">
       <BodyText>{runTitle(run)}</BodyText>
       <RunInputs run={run} readFiles={readFiles} />
       {run.verdict !== null && <VerdictBadge verdict={run.verdict} />}
@@ -150,7 +151,7 @@ function RunRow({
           readText={readText}
         />
       )}
-    </div>
+    </Group>
   );
 }
 

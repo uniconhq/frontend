@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { renderWithProviders } from '@/test/render';
 import { server } from '@/test/server';
-import { CLASSIC, PRIMITIVES } from '@/test/workflows';
+import { CLASSIC, PRIMITIVES, workflowBox } from '@/test/workflows';
 import { DrawnGraph } from './DrawnGraph';
 import { layoutWorkflow } from './layout';
 import { workflowOf } from './edit';
@@ -178,23 +178,21 @@ describe('a workflow drawn', () => {
   it('reads the boxes of the workflows its steps use, as a version page draws them', async () => {
     server.use(
       http.get('/api/v1/workflows/kenny/inner/versions/v1/box', () =>
-        HttpResponse.json({
-          inputs: [
-            {
-              name: 'source',
-              type: 'folder',
-              optional: false,
-              options: null,
-              title: null,
-              unit: null,
-              accepts: ['file', 'folder'],
-            },
-          ],
-          outputs: [],
-          newer_version: null,
-          description: null,
-          run: true,
-        }),
+        HttpResponse.json(
+          workflowBox({
+            inputs: [
+              {
+                name: 'source',
+                type: 'folder',
+                optional: false,
+                options: null,
+                title: null,
+                unit: null,
+                accepts: ['file', 'folder'],
+              },
+            ],
+          }),
+        ),
       ),
     );
     renderWithProviders(

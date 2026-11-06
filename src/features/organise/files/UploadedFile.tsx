@@ -3,10 +3,10 @@ import type { UploadInfo } from '@/api/types';
 import { formatSize } from '@/lib/size';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
+import { Group } from '@/ui/layout';
 import { usePlaceMay } from '../may';
 import type { Place } from './place';
 import { TaskUpload } from './TaskUpload';
-import shared from '../organise.module.css';
 import classes from './Files.module.css';
 
 /**
@@ -57,11 +57,11 @@ export function UploadedFile({
         {token !== null && ' To change it, upload it again.'}
       </BodyText>
       {manages && !again && (
-        <div className={shared.actions}>
+        <Group gap="xs">
           <Button variant="secondary" onClick={() => setAgain(true)}>
             Upload again
           </Button>
-        </div>
+        </Group>
       )}
       {place.kind === 'task' && token !== null && again && (
         <TaskUpload

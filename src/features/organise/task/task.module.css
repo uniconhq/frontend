@@ -1,17 +1,3 @@
-/* What entrants are graded on, under the task's name. */
-.status {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.statusLine {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px 10px;
-}
-
 /* The readiness row: each part of the task ticked, or what it is missing. */
 .ready {
   list-style: none;
@@ -37,13 +23,6 @@
 .missing {
   color: var(--unicon-text-danger);
   font-weight: 700;
-}
-
-/* The cards that build a task, one under the other, the form's sections. */
-.build {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
 }
 
 .card {
@@ -85,13 +64,6 @@
   color: var(--unicon-text-secondary);
 }
 
-.aside {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-}
-
 .cardBody {
   display: flex;
   flex-direction: column;
@@ -130,32 +102,10 @@
   scroll-margin-top: calc(var(--unicon-header-height) + 12px);
 }
 
-.itemHead {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 4px 12px;
-}
-
-/* A setting that is a file or a folder: its name, what it holds and its buttons. */
-.fileSetting {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
 .settingTitle {
   font-size: 14px;
   font-weight: 500;
   color: var(--unicon-text-primary);
-}
-
-/* A box's title with its ⓘ beside it. */
-.titleRow {
-  display: flex;
-  align-items: center;
-  gap: 4px;
 }
 
 .itemTitle {
@@ -227,13 +177,6 @@
   border-bottom: 1px solid var(--unicon-border);
   vertical-align: top;
   text-align: left;
-}
-
-.valueHead {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-items: end;
 }
 
 .columnKind {
@@ -323,9 +266,6 @@
   flex: 1;
 }
 
-.runTableFrame {
-  overflow-x: auto;
-}
 .runTable {
   width: 100%;
   table-layout: fixed;
@@ -441,12 +381,6 @@
   font-weight: 600;
   background: var(--unicon-hover);
 }
-.showEntry {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-}
 .showGrid .showEmpty {
   color: var(--unicon-text-secondary);
 }
@@ -457,13 +391,6 @@
   flex-direction: column;
   gap: 10px;
   min-width: 0;
-}
-
-.previewControls {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px 24px;
-  align-items: flex-start;
 }
 
 /* Framed like a card of the entrant's own page, so it reads as theirs. */

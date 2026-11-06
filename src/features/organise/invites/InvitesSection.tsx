@@ -1,4 +1,4 @@
-import { useRef, useState, type FormEvent } from 'react';
+import { useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useChange } from '@/api/change';
 import { queryView } from '@/api/query';
@@ -7,12 +7,14 @@ import type { Grant, Invite, OfferedGrant } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
 import { RadioGroup } from '@/ui/RadioGroup';
-import { TextInput } from '@/ui/TextInput';
+import { InviteForm, type Target } from '@/ui/InviteForm';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
-import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
+import { Loaded } from '@/ui/feedback/Loaded';
+import { Group, Stack } from '@/ui/layout';
 import { formatDateTime } from '@/lib/time';
 import { ROLE_LABEL, roleMeans, type RolePlace } from '../roles';
-import { invitesQuery, useInviteChanges, useInvites, type Target } from './invites';
+import { invitesQuery, useInviteChanges, useInvites } from './invites';
+import tableClasses from '@/ui/table.module.css';
 import classes from './invites.module.css';
 
 /**
@@ -81,11 +83,6 @@ function who(invite: Invite): string {
   return invite.username ?? invite.email ?? 'Unknown';
 }
 
-/** A username, or an email address when what was typed has an `@`. */
-function targetOf(typed: string): Target {
-  return typed.includes('@') ? { email: typed } : { username: typed };
-}
-
 /**
  * A refusal in the server's words. A username nobody has adds that an
  * address is the way to invite them.
@@ -106,11 +103,7 @@ function Refusal({ error, typed }: { error: unknown; typed?: string }) {
       </div>
     );
   }
-  return (
-    <div role="alert">
-      <ErrorBlock error={error} compact heading="Couldn’t invite" />
-    </div>
-  );
+  return <ErrorBlock error={error} compact alert heading="Couldn’t invite" />;
 }
 
 function InviteRow({
@@ -152,7 +145,7 @@ function InviteRow({
   return (
     <tr ref={row} tabIndex={-1}>
       <th scope="row">
-        <div className={classes.cell}>
+        <Stack gap={2}>
           <span className={invite.username === null ? classes.mono : undefined}>
             {name}
           </span>
@@ -161,7 +154,7 @@ function InviteRow({
               ? formatDateTime(new Date(invite.created_at))
               : `By ${invite.invited_by.username}, ${formatDateTime(new Date(invite.created_at))}`}
           </BodyText>
-        </div>
+        </Stack>
       </th>
       {audience === 'organisers' ? (
         <td>{GRANT_LABEL[invite.grants]}</td>
@@ -169,25 +162,25 @@ function InviteRow({
         <td>{intoText(invite)}</td>
       )}
       <td>
-        <div className={classes.cell}>
+        <Stack gap={2}>
           <span>{standing(invite)}</span>
           <BodyText tone="secondary">{standingDate(invite)}</BodyText>
-        </div>
+        </Stack>
       </td>
       <td>
-        <div className={classes.cell}>
+        <Stack gap={2}>
           <span>{MAIL[invite.mail_status]}</span>
           {invite.mail_status === 'sent' && invite.mailed_at !== null && (
             <BodyText tone="secondary">
               {formatDateTime(new Date(invite.mailed_at))}
             </BodyText>
           )}
-        </div>
+        </Stack>
       </td>
       {manages && (
         <td>
           {changeable && (
-            <div className={classes.actions}>
+            <Group gap={6} align="stretch">
               {mailable && (
                 <Button
                   size="xs"
@@ -208,7 +201,7 @@ function InviteRow({
               >
                 Withdraw
               </Button>
-            </div>
+            </Group>
           )}
           {error !== null && <Refusal error={error} />}
         </td>
@@ -217,15 +210,16 @@ function InviteRow({
   );
 }
 
-/**
- * Someone invited by username or by email address, to a role here or to a
- * place in the contest. One field takes either: a Forgejo username has no
- * `@`, so what has one is an address.
- */
-function InviteForm({ place, grants }: { place: RolePlace; grants: OfferedGrant[] }) {
+/** Someone invited to a role here or to a place in the contest. */
+function InviteSomeone({
+  place,
+  grants,
+}: {
+  place: RolePlace;
+  grants: OfferedGrant[];
+}) {
   const queryClient = useQueryClient();
   const { create } = useInviteChanges(place);
-  const [typed, setTyped] = useState('');
   const [grant, setGrant] = useState<OfferedGrant>(
     grants.includes('manager') ? 'manager' : (grants[0] ?? 'contestant'),
   );
@@ -236,16 +230,12 @@ function InviteForm({ place, grants }: { place: RolePlace; grants: OfferedGrant[
       queryClient.invalidateQueries({ queryKey: invitesQuery(place).queryKey }),
   });
 
-  const submit = async (event: FormEvent) => {
-    event.preventDefault();
-    const target = typed.trim();
-    if (target === '') return;
+  const invite = async (target: Target, typed: string) => {
     setMade(null);
-    setTried(target);
-    if ((await change.run('invite', () => create(grant, targetOf(target)))).ok) {
-      setTyped('');
-      setMade(target);
-    }
+    setTried(typed);
+    const { ok } = await change.run('invite', () => create(grant, target));
+    if (ok) setMade(typed);
+    return ok;
   };
 
   const meansOf = (offer: OfferedGrant) =>
@@ -254,20 +244,24 @@ function InviteForm({ place, grants }: { place: RolePlace; grants: OfferedGrant[
       : roleMeans(offer, place.kind).join(' ');
 
   return (
-    <form
+    <InviteForm
+      name="Invite someone"
       className={classes.form}
-      onSubmit={(event) => void submit(event)}
-      aria-label="Invite someone"
+      description="A username for someone with an account, an email address for anyone."
+      required
+      loading={change.pending !== null}
+      onInvite={invite}
+      outcome={
+        <>
+          {made !== null && (
+            <div role="status">
+              <BodyText tone="secondary">Invited {made}.</BodyText>
+            </div>
+          )}
+          {change.error !== null && <Refusal error={change.error} typed={tried} />}
+        </>
+      }
     >
-      <div className={classes.fields}>
-        <TextInput
-          label="Username or email address"
-          description="A username for someone with an account, an email address for anyone."
-          value={typed}
-          onChange={setTyped}
-          required
-        />
-      </div>
       {grants.length > 1 && (
         <RadioGroup
           label="Role"
@@ -284,18 +278,7 @@ function InviteForm({ place, grants }: { place: RolePlace; grants: OfferedGrant[
         {grants.length > 1 ? '' : `${meansOf(grant)} `}The invite expires after{' '}
         {STANDS_DAYS} days.
       </BodyText>
-      <div className={classes.actions}>
-        <Button type="submit" loading={change.pending !== null}>
-          Invite
-        </Button>
-      </div>
-      {made !== null && (
-        <div role="status">
-          <BodyText tone="secondary">Invited {made}.</BodyText>
-        </div>
-      )}
-      {change.error !== null && <Refusal error={change.error} typed={tried} />}
-    </form>
+    </InviteForm>
   );
 }
 
@@ -328,19 +311,19 @@ export function InvitesSection({
         : ['manager', 'observer'];
 
   return (
-    <div className={classes.stack}>
-      {manages && <InviteForm place={place} grants={grants} />}
-      {view.state === 'loading' && <PageSkeleton rows={2} />}
-      {view.state === 'error' && <ErrorBlock error={view.error} onRetry={view.retry} />}
-      {view.state === 'ready' && (
-        <InviteTable
-          place={place}
-          invites={view.data.filter((invite) => shownTo(audience, invite))}
-          audience={audience}
-          manages={manages}
-        />
-      )}
-    </div>
+    <Stack gap="sm">
+      {manages && <InviteSomeone place={place} grants={grants} />}
+      <Loaded view={view} rows={2}>
+        {(invites) => (
+          <InviteTable
+            place={place}
+            invites={invites.filter((invite) => shownTo(audience, invite))}
+            audience={audience}
+            manages={manages}
+          />
+        )}
+      </Loaded>
+    </Stack>
   );
 }
 
@@ -359,7 +342,7 @@ function InviteTable({
     return <BodyText tone="secondary">No invites yet.</BodyText>;
   }
   return (
-    <table className={classes.table} aria-label="Invites">
+    <table className={tableClasses.table} aria-label="Invites">
       <thead>
         <tr>
           <th scope="col">Invited</th>

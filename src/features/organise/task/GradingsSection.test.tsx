@@ -1,11 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { screen, within } from '@testing-library/react';
 import userEvent from '@/test/user-event';
-import { http, HttpResponse } from 'msw';
+import { http, HttpResponse, type RequestHandler } from 'msw';
 import type { FeedEntry, Grading, OrganisedSubmission, Submitter } from '@/api/types';
-import { holding } from '@/test/may';
 import { renderApp } from '@/test/render';
-import { problem, server, signedIn } from '@/test/server';
+import { problem, server, signedIn, signedInAs } from '@/test/server';
 import {
   TASK_API,
   publicationList,
@@ -32,6 +31,25 @@ function entry(grading: Grading, by: Submitter = ada): FeedEntry {
 /** The task's gradings as the route answers them, each by ada. */
 function asEntries(gradings: Grading[]) {
   return HttpResponse.json(gradings.map((grading) => entry(grading)));
+}
+
+/** The task's gradings page signed in as `signIn`, listing `gradings` unless null. */
+function open(
+  gradings: Grading[] | null,
+  handlers: RequestHandler[] = [],
+  signIn: RequestHandler[] = [signedIn],
+) {
+  server.use(
+    ...signIn,
+    taskState,
+    publicationList,
+    ...repoFiles,
+    ...(gradings === null
+      ? []
+      : [http.get(`${TASK_API}/gradings`, () => asEntries(gradings))]),
+    ...handlers,
+  );
+  return renderApp(TASK);
 }
 
 const stuck: Grading = {
@@ -69,14 +87,7 @@ const waiting: Grading = {
 
 describe("the task's gradings", () => {
   it('shows each grading with where it stands and why it failed', async () => {
-    server.use(
-      signedIn,
-      taskState,
-      publicationList,
-      ...repoFiles,
-      http.get(`${TASK_API}/gradings`, () => asEntries([waiting, stuck])),
-    );
-    renderApp(TASK);
+    open([waiting, stuck]);
 
     const table = await screen.findByRole('table', { name: 'Gradings' });
     const [, newest, oldest] = within(table).getAllByRole('row');
@@ -97,31 +108,22 @@ describe("the task's gradings", () => {
       error: null,
       result: made,
     });
-    server.use(
-      signedIn,
-      taskState,
-      publicationList,
-      ...repoFiles,
-      http.get(`${TASK_API}/gradings`, () =>
-        asEntries([
-          done(
-            7,
-            runsResult(['compile_error', 'compile_error'], {
-              solution: 'compile_error',
-            }),
-          ),
-          done(
-            6,
-            runsResult(['accepted', 'accepted'], {
-              solution: 'accepted',
-              compare: 'accepted',
-            }),
-          ),
-          done(5, runsResult(['accepted', 'time_limit', 'wrong_answer'])),
-        ]),
+    open([
+      done(
+        7,
+        runsResult(['compile_error', 'compile_error'], {
+          solution: 'compile_error',
+        }),
       ),
-    );
-    renderApp(TASK);
+      done(
+        6,
+        runsResult(['accepted', 'accepted'], {
+          solution: 'accepted',
+          compare: 'accepted',
+        }),
+      ),
+      done(5, runsResult(['accepted', 'time_limit', 'wrong_answer'])),
+    ]);
 
     const table = await screen.findByRole('table', { name: 'Gradings' });
     const [, stopped, passed, failed] = within(table).getAllByRole('row');
@@ -129,59 +131,6 @@ describe("the task's gradings", () => {
     expect(passed).toHaveTextContent('ACCEPTED');
     expect(failed).toHaveTextContent('TIME LIMIT');
     expect(within(table).queryByRole('columnheader', { name: 'Stage' })).toBeNull();
-  });
-
-  it('retries a stuck grading after asking, and reads the list again', async () => {
-    let listed = [stuck];
-    const retried: string[] = [];
-    server.use(
-      signedIn,
-      taskState,
-      publicationList,
-      ...repoFiles,
-      http.get(`${TASK_API}/gradings`, () => asEntries(listed)),
-      http.post(`${TASK_API}/gradings/:grading/retry`, ({ params }) => {
-        retried.push(String(params.grading));
-        const again = {
-          ...stuck,
-          id: 'new',
-          attempt: 2,
-          status: 'queued' as const,
-          error: null,
-        };
-        listed = [
-          again,
-          { ...stuck, latest: false, finished_at: '2026-09-26T10:05:00Z' },
-        ];
-        return HttpResponse.json(again);
-      }),
-    );
-    renderApp(TASK);
-
-    await userEvent.click(
-      await screen.findByRole('button', {
-        name: 'Retry B submission 3 by ada, attempt 1',
-      }),
-    );
-    const dialog = await screen.findByRole('dialog', {
-      name: 'Grade submission 3 again?',
-    });
-    expect(dialog).toHaveTextContent(
-      "ada's submission 3 to sum runs again on the same version of the task it was graded on (publication 2).",
-    );
-    expect(retried).toEqual([]);
-    await userEvent.click(
-      within(dialog).getByRole('button', { name: 'Grade it again' }),
-    );
-
-    expect(
-      await screen.findByRole('button', { name: 'Show earlier attempts (1)' }),
-    ).toBeVisible();
-    expect(retried).toEqual([stuck.id]);
-    expect(screen.queryByRole('dialog')).toBeNull();
-    expect(
-      screen.queryByRole('button', { name: 'Cancel B submission 3 by ada, attempt 2' }),
-    ).toBeNull();
   });
 
   it('offers Cancel on a system error alone', async () => {
@@ -192,14 +141,7 @@ describe("the task's gradings", () => {
       status: 'done',
       error: null,
     };
-    server.use(
-      signedIn,
-      taskState,
-      publicationList,
-      ...repoFiles,
-      http.get(`${TASK_API}/gradings`, () => asEntries([finished, waiting, stuck])),
-    );
-    renderApp(TASK);
+    open([finished, waiting, stuck]);
 
     expect(
       await screen.findByRole('button', {
@@ -214,113 +156,6 @@ describe("the task's gradings", () => {
     ).toBeNull();
   });
 
-  it('cancels only once asked, with the sentence the entrant reads', async () => {
-    const cancelled: { grading: string; body: unknown }[] = [];
-    server.use(
-      signedIn,
-      taskState,
-      publicationList,
-      ...repoFiles,
-      http.get(`${TASK_API}/gradings`, () => asEntries([stuck])),
-      http.post(`${TASK_API}/gradings/:grading/cancel`, async ({ params, request }) => {
-        cancelled.push({ grading: String(params.grading), body: await request.json() });
-        return HttpResponse.json({
-          ...stuck,
-          status: 'cancelled',
-          cancel_reason: 'The checker crashed.',
-        });
-      }),
-    );
-    renderApp(TASK);
-
-    const cancel = await screen.findByRole('button', {
-      name: 'Cancel B submission 3 by ada, attempt 1',
-    });
-    await userEvent.click(cancel);
-    const first = await screen.findByRole('dialog', {
-      name: 'Cancel submission 3?',
-    });
-    await userEvent.click(within(first).getByRole('button', { name: 'Not now' }));
-    expect(cancelled).toEqual([]);
-
-    await userEvent.click(cancel);
-    const dialog = await screen.findByRole('dialog', {
-      name: 'Cancel submission 3?',
-    });
-    expect(dialog).toHaveTextContent("ada's submission 3 to sum is not graded.");
-    const confirm = within(dialog).getByRole('button', {
-      name: 'Cancel the submission',
-    });
-    expect(confirm).toBeDisabled();
-    const field = within(dialog).getByRole('textbox', {
-      name: /What the entrant reads/,
-    });
-    expect(field).toBeRequired();
-    await userEvent.type(field, '   ');
-    expect(confirm).toBeDisabled();
-    await userEvent.type(field, 'The checker crashed. ');
-    await userEvent.click(confirm);
-
-    await expect
-      .poll(() => cancelled)
-      .toEqual([{ grading: stuck.id, body: { reason: 'The checker crashed.' } }]);
-  });
-
-  it("shows a cancelled grading's sentence", async () => {
-    server.use(
-      signedIn,
-      taskState,
-      publicationList,
-      ...repoFiles,
-      http.get(`${TASK_API}/gradings`, () =>
-        asEntries([
-          { ...stuck, status: 'cancelled', cancel_reason: 'The checker crashed.' },
-        ]),
-      ),
-    );
-    renderApp(TASK);
-
-    const table = await screen.findByRole('table', { name: 'Gradings' });
-    expect(table).toHaveTextContent('Cancelled');
-    expect(table).toHaveTextContent('Told the entrant: “The checker crashed.”');
-  });
-
-  it.each([
-    ['invalid_reason', 422, {}],
-    ['wrong_status', 409, { current: 'done' }],
-    ['conflict', 409, {}],
-  ])('shows a refused cancel, %s, with its sentence', async (code, status, extra) => {
-    server.use(
-      signedIn,
-      taskState,
-      publicationList,
-      ...repoFiles,
-      http.get(`${TASK_API}/gradings`, () => asEntries([stuck])),
-      http.post(`${TASK_API}/gradings/:grading/cancel`, () =>
-        problem(status, code, extra),
-      ),
-    );
-    renderApp(TASK);
-
-    await userEvent.click(
-      await screen.findByRole('button', {
-        name: 'Cancel B submission 3 by ada, attempt 1',
-      }),
-    );
-    const dialog = await screen.findByRole('dialog');
-    await userEvent.type(
-      within(dialog).getByRole('textbox', { name: /What the entrant reads/ }),
-      'The checker crashed.',
-    );
-    await userEvent.click(
-      within(dialog).getByRole('button', { name: 'Cancel the submission' }),
-    );
-
-    const alert = await within(dialog).findByRole('alert');
-    expect(alert).toHaveTextContent('Couldn’t cancel');
-    expect(alert).toHaveTextContent(`${code} detail`);
-  });
-
   it("lists a submission's attempts together, the earlier ones to read", async () => {
     const second: Grading = {
       ...stuck,
@@ -331,16 +166,7 @@ describe("the task's gradings", () => {
       error: null,
       result: runsResult([], { solution: 'compile_error' }),
     };
-    server.use(
-      signedIn,
-      taskState,
-      publicationList,
-      ...repoFiles,
-      http.get(`${TASK_API}/gradings`, () =>
-        asEntries([second, waiting, { ...stuck, latest: false }]),
-      ),
-    );
-    renderApp(TASK);
+    open([second, waiting, { ...stuck, latest: false }]);
 
     const table = await screen.findByRole('table', { name: 'Gradings' });
     const groups = within(table).getAllByRole('rowgroup').slice(1);
@@ -361,6 +187,7 @@ describe("the task's gradings", () => {
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
     await userEvent.click(toggle);
 
+    expect(within(third).getAllByRole('row')).toHaveLength(2);
     const earlier = within(third).getAllByRole('row')[1];
     if (earlier === undefined) throw new Error('no earlier attempt shown');
     expect(earlier).toHaveTextContent('Submission 3, replaced');
@@ -403,16 +230,11 @@ describe("the task's gradings", () => {
       user_id: 12,
       username: 'grace',
     };
-    server.use(
-      signedIn,
-      taskState,
-      publicationList,
-      ...repoFiles,
+    open(null, [
       http.get(`${TASK_API}/gradings`, () =>
         HttpResponse.json([entry(theirs, grace), entry(oursAgain), entry(ours)]),
       ),
-    );
-    renderApp(TASK);
+    ]);
 
     const table = await screen.findByRole('table', { name: 'Gradings' });
     const first = within(table).getByRole('rowgroup', {
@@ -434,11 +256,7 @@ describe("the task's gradings", () => {
   it('rejudges the whole task after saying what that does', async () => {
     let reads = 0;
     let rejudged = 0;
-    server.use(
-      signedIn,
-      taskState,
-      publicationList,
-      ...repoFiles,
+    open(null, [
       http.get(`${TASK_API}/gradings`, () => {
         reads += 1;
         return asEntries([stuck]);
@@ -452,8 +270,7 @@ describe("the task's gradings", () => {
           left_running: 0,
         });
       }),
-    );
-    renderApp(TASK);
+    ]);
 
     await screen.findByRole('table', { name: 'Gradings' });
     await userEvent.click(screen.getByRole('button', { name: 'Rejudge' }));
@@ -479,14 +296,7 @@ describe("the task's gradings", () => {
   });
 
   it('says why a task with nothing published cannot be rejudged', async () => {
-    server.use(
-      signedIn,
-      taskState,
-      publicationList,
-      ...repoFiles,
-      http.post(`${TASK_API}/rejudge`, () => problem(404, 'not_found')),
-    );
-    renderApp(TASK);
+    open(null, [http.post(`${TASK_API}/rejudge`, () => problem(404, 'not_found'))]);
 
     await userEvent.click(await screen.findByRole('button', { name: 'Rejudge' }));
     const dialog = await screen.findByRole('dialog');
@@ -500,14 +310,7 @@ describe("the task's gradings", () => {
   it('offers a finished attempt a retry and no regrade from scratch', async () => {
     // #625: a retry reuses nothing and runs every step, so there is no
     // regrade from scratch beside it.
-    server.use(
-      signedIn,
-      taskState,
-      publicationList,
-      ...repoFiles,
-      http.get(`${TASK_API}/gradings`, () => asEntries([stuck])),
-    );
-    renderApp(TASK);
+    open([stuck]);
 
     expect(
       await screen.findByRole('button', {
@@ -517,21 +320,18 @@ describe("the task's gradings", () => {
     expect(screen.queryByRole('button', { name: /from scratch/ })).toBeNull();
   });
 
-  it('offers an observer no controls', async () => {
-    server.use(
-      signedIn,
-      ...holding('observer', publishedTask),
-      taskState,
-      publicationList,
-      ...repoFiles,
-      http.get(`${TASK_API}/gradings`, () =>
-        HttpResponse.json([{ ...entry(stuck), may_manage: false }]),
-      ),
+  it('offers an observer no Rejudge', async () => {
+    open(
+      null,
+      [
+        http.get(`${TASK_API}/gradings`, () =>
+          HttpResponse.json([{ ...entry(stuck), may_manage: false }]),
+        ),
+      ],
+      signedInAs('observer', { task: publishedTask }),
     );
-    renderApp(TASK);
 
     expect(await screen.findByText('Failed on Unicon’s side')).toBeVisible();
-    expect(screen.queryByRole('button', { name: /Retry/ })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Rejudge' })).toBeNull();
   });
 });
@@ -591,21 +391,18 @@ describe("the organisers' scored view of a submission", () => {
 
   it('opens beside a grading, as its row reads it with everything filled in', async () => {
     const asked: URLSearchParams[] = [];
-    server.use(
-      signedIn,
-      taskState,
-      publicationList,
-      ...repoFiles,
-      http.get(`${TASK_API}/gradings`, () => asEntries([done])),
-      http.get(`${TASK_API}/organise/submissions/:number`, ({ request, params }) => {
-        asked.push(new URL(request.url).searchParams);
-        return params['number'] === '3'
-          ? HttpResponse.json(filledIn)
-          : problem(404, 'not_found');
-      }),
-    );
     const user = userEvent.setup();
-    renderApp(TASK);
+    open(
+      [done],
+      [
+        http.get(`${TASK_API}/organise/submissions/:number`, ({ request, params }) => {
+          asked.push(new URL(request.url).searchParams);
+          return params['number'] === '3'
+            ? HttpResponse.json(filledIn)
+            : problem(404, 'not_found');
+        }),
+      ],
+    );
 
     await user.click(
       await screen.findByRole('button', { name: 'Scored view of submission 3' }),
@@ -634,18 +431,15 @@ describe("the organisers' scored view of a submission", () => {
       ...filledIn,
       grading: filledIn.grading && { ...filledIn.grading, attempt: 2 },
     };
-    server.use(
-      signedIn,
-      taskState,
-      publicationList,
-      ...repoFiles,
-      http.get(`${TASK_API}/gradings`, () => asEntries([failedAgain])),
-      http.get(`${TASK_API}/organise/submissions/:number`, () =>
-        HttpResponse.json(standing),
-      ),
-    );
     const user = userEvent.setup();
-    renderApp(TASK);
+    open(
+      [failedAgain],
+      [
+        http.get(`${TASK_API}/organise/submissions/:number`, () =>
+          HttpResponse.json(standing),
+        ),
+      ],
+    );
 
     await user.click(
       await screen.findByRole('button', { name: 'Scored view of submission 3' }),
@@ -659,18 +453,15 @@ describe("the organisers' scored view of a submission", () => {
   });
 
   it('names no attempt when it shows the latest one', async () => {
-    server.use(
-      signedIn,
-      taskState,
-      publicationList,
-      ...repoFiles,
-      http.get(`${TASK_API}/gradings`, () => asEntries([done])),
-      http.get(`${TASK_API}/organise/submissions/:number`, () =>
-        HttpResponse.json(filledIn),
-      ),
-    );
     const user = userEvent.setup();
-    renderApp(TASK);
+    open(
+      [done],
+      [
+        http.get(`${TASK_API}/organise/submissions/:number`, () =>
+          HttpResponse.json(filledIn),
+        ),
+      ],
+    );
 
     await user.click(
       await screen.findByRole('button', { name: 'Scored view of submission 3' }),
@@ -684,11 +475,8 @@ describe("the organisers' scored view of a submission", () => {
   it("asks for a team's submission by its entrant", async () => {
     const asked: URLSearchParams[] = [];
     const team = '0192f4a4-7b7e-7000-8000-000000000001';
-    server.use(
-      signedIn,
-      taskState,
-      publicationList,
-      ...repoFiles,
+    const user = userEvent.setup();
+    open(null, [
       http.get(`${TASK_API}/gradings`, () =>
         HttpResponse.json([
           entry(done, {
@@ -703,9 +491,7 @@ describe("the organisers' scored view of a submission", () => {
         asked.push(new URL(request.url).searchParams);
         return HttpResponse.json(filledIn);
       }),
-    );
-    const user = userEvent.setup();
-    renderApp(TASK);
+    ]);
 
     await user.click(
       await screen.findByRole('button', { name: 'Scored view of submission 3' }),

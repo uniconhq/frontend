@@ -14,7 +14,7 @@ import { Select } from '@/ui/Select';
 import { TextInput } from '@/ui/TextInput';
 import { Textarea } from '@/ui/Textarea';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
-import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
+import { Loaded } from '@/ui/feedback/Loaded';
 import { contestHomePath } from '@/lib/contest-paths';
 import { inTeams } from '@/lib/entrants';
 import { useFallbackPoll } from '@/live';
@@ -28,6 +28,7 @@ import { labelOf } from '@/lib/task-names';
 import { SignInPrompt } from '../SignInPrompt';
 import { ASK_ABOUT, QUESTIONS, useMyQuestions } from './questions';
 import classes from '@/ui/threads/threads.module.css';
+import { Group, Stack } from '@/ui/layout';
 
 /**
  * A contestant's follow-up, folded behind "Follow up" until it is wanted and
@@ -69,7 +70,7 @@ function FollowUp({
 
   if (!open) {
     return (
-      <div className={classes.actions}>
+      <Group gap={8}>
         <Button
           size="xs"
           variant="secondary"
@@ -81,7 +82,7 @@ function FollowUp({
         >
           Follow up
         </Button>
-      </div>
+      </Group>
     );
   }
   return (
@@ -106,7 +107,7 @@ function FollowUp({
       {followUp.error !== null && (
         <ErrorBlock error={followUp.error} compact heading="Couldn’t send" />
       )}
-      <div className={classes.actions}>
+      <Group gap={8}>
         <Button
           type="submit"
           size="xs"
@@ -118,7 +119,7 @@ function FollowUp({
         <Button size="xs" variant="secondary" onClick={() => setOpen(false)}>
           Cancel
         </Button>
-      </div>
+      </Group>
     </form>
   );
 }
@@ -179,11 +180,11 @@ function AskForm({
       {ask.error !== null && (
         <ErrorBlock error={ask.error} compact heading="Couldn’t send" />
       )}
-      <div className={classes.actions}>
+      <Group gap={8}>
         <Button type="submit" size="xs" loading={ask.isPending}>
           Ask
         </Button>
-      </div>
+      </Group>
     </form>
   );
 }
@@ -236,7 +237,7 @@ function Questions({
   return (
     <>
       <Card>
-        <div className={classes.stack}>
+        <Stack gap="sm">
           <SectionTitle>Ask a question</SectionTitle>
           <BodyText tone="secondary">
             {team
@@ -251,50 +252,49 @@ function Questions({
             about={about}
             onAsked={readAgain}
           />
-        </div>
+        </Stack>
       </Card>
       <Card>
-        <div className={classes.stack}>
+        <Stack gap="sm">
           <SectionTitle>
             {team ? 'Your team’s questions' : 'Your questions'}
           </SectionTitle>
-          {view.state === 'loading' && <PageSkeleton rows={2} />}
-          {view.state === 'error' && (
-            <ErrorBlock error={view.error} onRetry={view.retry} />
-          )}
-          {view.state === 'ready' && view.data.length === 0 && (
-            <BodyText tone="secondary">No questions asked yet.</BodyText>
-          )}
-          {view.state === 'ready' && view.data.length > 0 && (
-            <ol className={classes.questions} aria-label="Your questions">
-              {[...view.data].reverse().map((clarification) => (
-                <li key={clarification.number}>
-                  <QuestionThread
-                    clarification={clarification}
-                    asker={team ? 'Your team' : 'You'}
-                    taskTitle={
-                      tasks.find((task) => task.name === clarification.task)?.title
-                    }
-                    announcementAt={(link) =>
-                      openAnnouncement(link)
-                        ? {
-                            href: `${contestHomePath(org, contest)}#${announcementAnchor(link)}`,
-                          }
-                        : { gone: withdrawn(link.task) ? 'withdrawn' : 'closed' }
-                    }
-                  >
-                    <FollowUp
-                      org={org}
-                      contest={contest}
-                      clarification={clarification}
-                      onSent={readAgain}
-                    />
-                  </QuestionThread>
-                </li>
-              ))}
-            </ol>
-          )}
-        </div>
+          <Loaded view={view} rows={2}>
+            {(asked) =>
+              asked.length === 0 ? (
+                <BodyText tone="secondary">No questions asked yet.</BodyText>
+              ) : (
+                <ol className={classes.questions} aria-label="Your questions">
+                  {[...asked].reverse().map((clarification) => (
+                    <li key={clarification.number}>
+                      <QuestionThread
+                        clarification={clarification}
+                        asker={team ? 'Your team' : 'You'}
+                        taskTitle={
+                          tasks.find((task) => task.name === clarification.task)?.title
+                        }
+                        announcementAt={(link) =>
+                          openAnnouncement(link)
+                            ? {
+                                href: `${contestHomePath(org, contest)}#${announcementAnchor(link)}`,
+                              }
+                            : { gone: withdrawn(link.task) ? 'withdrawn' : 'closed' }
+                        }
+                      >
+                        <FollowUp
+                          org={org}
+                          contest={contest}
+                          clarification={clarification}
+                          onSent={readAgain}
+                        />
+                      </QuestionThread>
+                    </li>
+                  ))}
+                </ol>
+              )
+            }
+          </Loaded>
+        </Stack>
       </Card>
     </>
   );
@@ -353,29 +353,30 @@ function SignedInQuestions({ org, contest }: { org: string; contest: string }) {
           </>
         }
       />
-      {view.state === 'loading' && <PageSkeleton rows={4} />}
-      {view.state === 'error' && <ErrorBlock error={view.error} onRetry={view.retry} />}
-      {view.state === 'ready' &&
-        (view.data.registration.entrant?.status === 'approved' ? (
-          <Questions org={org} contest={contest} home={view.data} />
-        ) : (
-          <Card>
-            {view.data.organises ? (
-              <BodyText>
-                You organise this contest. Its entrants&apos; questions are answered on
-                its{' '}
-                <PageLink to={contestSectionPath(org, contest, 'questions')}>
-                  Questions
-                </PageLink>{' '}
-                page.
-              </BodyText>
-            ) : (
-              <BodyText>
-                {ASK_WORDS[notIn(view.data) as Exclude<NotIn, 'organises'>]}
-              </BodyText>
-            )}
-          </Card>
-        ))}
+      <Loaded view={view} rows={4}>
+        {(home) =>
+          home.registration.entrant?.status === 'approved' ? (
+            <Questions org={org} contest={contest} home={home} />
+          ) : (
+            <Card>
+              {home.organises ? (
+                <BodyText>
+                  You organise this contest. Its entrants&apos; questions are answered
+                  on its{' '}
+                  <PageLink to={contestSectionPath(org, contest, 'questions')}>
+                    Questions
+                  </PageLink>{' '}
+                  page.
+                </BodyText>
+              ) : (
+                <BodyText>
+                  {ASK_WORDS[notIn(home) as Exclude<NotIn, 'organises'>]}
+                </BodyText>
+              )}
+            </Card>
+          )
+        }
+      </Loaded>
     </Page>
   );
 }

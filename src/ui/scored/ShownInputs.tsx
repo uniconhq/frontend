@@ -1,3 +1,4 @@
+import { Group } from '@mantine/core';
 import { useRef, useState } from 'react';
 import type { RunShown, ShownFile, TaskRun } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
@@ -187,13 +188,13 @@ export function ShownTask({
         >
           <BodyText>{entryTitle(group.name)}</BodyText>
           {group.runs.map((run) => (
-            <div key={String(run.place)} className={classes.run}>
+            <Group key={String(run.place)} gap="8px 14px" align="baseline">
               <BodyText>{runTitle(run)}</BodyText>
               <RunInputs run={run} readFiles={readFiles} />
               {run.fields !== undefined && run.fields.length > 0 && (
                 <BodyText tone="secondary">{`${run.fields.join(', ')} ${run.fields.length === 1 ? 'appears' : 'appear'} here`}</BodyText>
               )}
-            </div>
+            </Group>
           ))}
         </section>
       ))}

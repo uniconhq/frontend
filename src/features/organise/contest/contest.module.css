@@ -61,12 +61,6 @@
   border-radius: 2px;
 }
 
-/* The arrows that move a task up or down the contest's list, side by side. */
-.moves {
-  display: flex;
-  gap: 4px;
-}
-
 /* Taking a task out of its contest, apart from its timeline at the dialog's foot. */
 .foot {
   padding-top: 12px;
@@ -100,13 +94,6 @@
   gap: 12px;
 }
 
-.starter {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 6px;
-}
-
 /* What few need, folded away under its summary. */
 .advanced summary {
   cursor: pointer;
@@ -127,13 +114,6 @@
   border: 1px solid var(--unicon-border);
   border-radius: var(--mantine-radius-md);
   background: var(--unicon-body);
-}
-
-.statusHead {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px 12px;
 }
 
 /* What opening the contest needs, each with its mark. */

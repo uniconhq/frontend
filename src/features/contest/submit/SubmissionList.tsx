@@ -1,12 +1,12 @@
 import { useState } from 'react';
-import { $api, queryView, type QueryView } from '@/api/query';
+import { $api, queryView } from '@/api/query';
 import type { Submission } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { Checkbox } from '@/ui/Checkbox';
 import { PageLink } from '@/ui/PageLink';
 import { verdictLabel } from '@/ui/verdicts';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
-import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
+import { Loaded } from '@/ui/feedback/Loaded';
 import { formatDateTime } from '@/lib/time';
 import { useLiveConnected, useLiveRefused } from '@/live';
 import { serverNow } from '@/lib/time';
@@ -14,6 +14,7 @@ import { justFinished, newestFirst, pollEvery, resultLine } from './grading';
 import { SubmissionStatus } from './SubmissionStatus';
 import { submissionHref } from './submission-param';
 import { useMarks, type MarkState } from './use-marks';
+import tableClasses from '@/ui/table.module.css';
 import classes from './submit.module.css';
 
 /**
@@ -91,7 +92,9 @@ export function SubmissionList({
         {said}
       </div>
       {marks.kind === 'held' && <MarksSummary state={marks} />}
-      <Listed view={view} marks={marks} />
+      <Loaded view={view} rows={2}>
+        {(submissions) => <Listed submissions={submissions} marks={marks} />}
+      </Loaded>
     </>
   );
 }
@@ -139,18 +142,24 @@ function MarkCell({
   );
 }
 
-function Listed({ view, marks }: { view: QueryView<Submission[]>; marks: MarkState }) {
-  if (view.state === 'loading') return <PageSkeleton rows={2} />;
-  if (view.state === 'error')
-    return <ErrorBlock error={view.error} onRetry={view.retry} />;
-  if (view.data.length === 0) {
+function Listed({
+  submissions,
+  marks,
+}: {
+  submissions: Submission[];
+  marks: MarkState;
+}) {
+  if (submissions.length === 0) {
     return (
       <BodyText tone="secondary">You have not submitted to this task yet.</BodyText>
     );
   }
 
   return (
-    <table className={classes.table} aria-label="Your submissions">
+    <table
+      className={`${tableClasses.table} ${tableClasses.compact}`}
+      aria-label="Your submissions"
+    >
       <thead>
         <tr>
           <th scope="col">Submission</th>
@@ -161,7 +170,7 @@ function Listed({ view, marks }: { view: QueryView<Submission[]>; marks: MarkSta
         </tr>
       </thead>
       <tbody>
-        {newestFirst(view.data).map((submission) => (
+        {newestFirst(submissions).map((submission) => (
           <tr key={submission.number}>
             <th scope="row">
               <PageLink to={submissionHref(submission.number)}>

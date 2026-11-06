@@ -1,9 +1,7 @@
-/*
- * A countdown in a line of other things, such as a page's header. It is in the
- * body font, its digits each as wide so the count does not shift as it ticks.
- */
+/* A line in a row; even-width digits so the count does not shift as it ticks. */
 .line {
-  font-size: var(--mantine-font-size-md);
+  font-size: var(--mantine-font-size-lg);
+  font-weight: 500;
   color: var(--unicon-text-body);
   font-variant-numeric: tabular-nums;
 }

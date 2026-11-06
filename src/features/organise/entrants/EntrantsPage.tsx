@@ -10,6 +10,8 @@ import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
 import { Card } from '@/ui/Card';
 import { Checkbox } from '@/ui/Checkbox';
+import { ConfirmDialog } from '@/ui/ConfirmDialog';
+import { InviteForm } from '@/ui/InviteForm';
 import { Modal } from '@/ui/Modal';
 import { SectionTitle } from '@/ui/SectionTitle';
 import { Select } from '@/ui/Select';
@@ -21,10 +23,12 @@ import { useContestParams } from '@/lib/route-params';
 import { CONTEST_SECTIONS, contestSectionPath, sectionOf } from '@/lib/sections';
 import { formatDateTime } from '@/lib/time';
 import { PageLink } from '@/ui/PageLink';
+import { Group, Stack } from '@/ui/layout';
 import { useInviteChanges } from '../invites/invites';
 import { usePlaceMay } from '../may';
 import { SectionPage } from '../SectionPage';
 import { ENTRANTS, entrantsLine, useEntrants } from './names';
+import tableClasses from '@/ui/table.module.css';
 import classes from './entrants.module.css';
 
 const ONE = `${ENTRANTS}/{entrant_id}` as const;
@@ -69,11 +73,6 @@ function extensionText(entrant: OrganisedEntrant): string {
   return entrant.extension_tasks === null
     ? `${minutes} on every task`
     : `${minutes} on ${entrant.extension_tasks.join(', ')}`;
-}
-
-/** A username, or an email address when what was typed has an `@`. */
-function targetOf(typed: string): { username: string } | { email: string } {
-  return typed.includes('@') ? { email: typed } : { username: typed };
 }
 
 /**
@@ -147,7 +146,6 @@ function Manage({
     tasks: string[] | null;
     confirm?: boolean;
   }> | null>(null);
-  const [typed, setTyped] = useState('');
   const [asking, setAsking] = useState<
     | { kind: 'remove'; member: OrganisedMember }
     | { kind: 'move'; member: OrganisedMember; to: string }
@@ -218,24 +216,10 @@ function Manage({
     void sendExtension({ seconds: checked * 60, tasks: only });
   };
 
-  const submitInvite = (event: FormEvent) => {
-    event.preventDefault();
-    const target = typed.trim();
-    if (target === '') return;
-    void run(
-      'invite',
-      async () => {
-        await create('contestant', targetOf(target), entrant.id);
-        setTyped('');
-      },
-      `Invited ${target}. They join ${entrant.display_name} once they accept.`,
-    );
-  };
-
   const deletable = !entrant.submitted;
 
   return (
-    <div className={classes.stack}>
+    <Stack gap="sm">
       {extensionOutcome !== null && (
         <SaveOutcome
           outcome={extensionOutcome}
@@ -248,7 +232,7 @@ function Manage({
       {teams && (
         <form className={classes.inline} aria-label="Rename" onSubmit={submitName}>
           <TextInput label="Name" value={name} onChange={setName} />
-          <div className={classes.actions}>
+          <Group gap={6} align="stretch">
             <Button
               size="xs"
               variant="secondary"
@@ -258,7 +242,7 @@ function Manage({
             >
               Rename
             </Button>
-          </div>
+          </Group>
         </form>
       )}
       <form
@@ -292,7 +276,7 @@ function Manage({
               }
             />
           ))}
-        <div className={classes.actions}>
+        <Group gap={6} align="stretch">
           <Button
             size="xs"
             variant="secondary"
@@ -302,35 +286,29 @@ function Manage({
           >
             Save the extra time
           </Button>
-        </div>
+        </Group>
       </form>
       {teams && (
-        <form
+        <InviteForm
+          name="Invite someone into it"
           className={classes.inline}
-          aria-label="Invite someone into it"
-          onSubmit={submitInvite}
-        >
-          <TextInput
-            label="Invite someone into it"
-            description="A username, or an email address for someone without an account. They join once they accept."
-            value={typed}
-            onChange={setTyped}
-          />
-          <div className={classes.actions}>
-            <Button
-              size="xs"
-              variant="secondary"
-              type="submit"
-              loading={change.pending === 'invite'}
-              disabled={busy}
-            >
-              Invite
-            </Button>
-          </div>
-        </form>
+          label="Invite someone into it"
+          description="A username, or an email address for someone without an account. They join once they accept."
+          size="xs"
+          variant="secondary"
+          loading={change.pending === 'invite'}
+          blocked={busy}
+          onInvite={(target, typed) =>
+            run(
+              'invite',
+              () => create('contestant', target, entrant.id),
+              `Invited ${typed}. They join ${entrant.display_name} once they accept.`,
+            )
+          }
+        />
       )}
       {teams && entrant.members.length > 0 && (
-        <div className={classes.stack}>
+        <Stack gap="sm">
           <SectionTitle order={3}>Members</SectionTitle>
           <ul className={classes.members} aria-label="Members">
             {entrant.members.map((member) => {
@@ -338,7 +316,7 @@ function Manage({
               return (
                 <li key={member.user_id} className={classes.member}>
                   <span>{who}</span>
-                  <div className={classes.actions}>
+                  <Group gap={6} align="stretch">
                     {others.length > 0 && (
                       <Button
                         size="xs"
@@ -359,12 +337,12 @@ function Manage({
                     >
                       Take out
                     </Button>
-                  </div>
+                  </Group>
                 </li>
               );
             })}
           </ul>
-        </div>
+        </Stack>
       )}
       {asking?.kind === 'remove' && (
         <div className={classes.panel} role="alert">
@@ -375,7 +353,7 @@ function Manage({
               ? ' Nobody is left in it, so it is deleted.'
               : ''}
           </BodyText>
-          <div className={classes.actions}>
+          <Group gap={6} align="stretch">
             <Button
               size="xs"
               variant="danger"
@@ -395,7 +373,7 @@ function Manage({
             <Button size="xs" variant="secondary" onClick={() => setAsking(null)}>
               Cancel
             </Button>
-          </div>
+          </Group>
         </div>
       )}
       {asking?.kind === 'move' && (
@@ -416,7 +394,7 @@ function Manage({
               ? '.'
               : ` and gain access to those of ${others.find((found) => found.id === asking.to)?.display_name ?? 'the other'} instead.`}
           </BodyText>
-          <div className={classes.actions}>
+          <Group gap={6} align="stretch">
             <Button
               size="xs"
               variant="danger"
@@ -436,10 +414,10 @@ function Manage({
             <Button size="xs" variant="secondary" onClick={() => setAsking(null)}>
               Cancel
             </Button>
-          </div>
+          </Group>
         </div>
       )}
-      <div className={classes.stack}>
+      <Stack gap="sm">
         <SectionTitle order={3}>Delete</SectionTitle>
         {deletable ? (
           asking?.kind === 'delete' ? (
@@ -448,7 +426,7 @@ function Manage({
                 Delete {entrant.display_name}? Its registration and invites are removed,
                 and its members are no longer entered in this contest.
               </BodyText>
-              <div className={classes.actions}>
+              <Group gap={6} align="stretch">
                 <Button
                   size="xs"
                   variant="danger"
@@ -466,10 +444,10 @@ function Manage({
                 <Button size="xs" variant="secondary" onClick={() => setAsking(null)}>
                   Cancel
                 </Button>
-              </div>
+              </Group>
             </div>
           ) : (
-            <div className={classes.actions}>
+            <Group gap={6} align="stretch">
               <Button
                 size="xs"
                 variant="danger"
@@ -478,7 +456,7 @@ function Manage({
               >
                 Delete this entrant
               </Button>
-            </div>
+            </Group>
           )
         ) : (
           <BodyText tone="secondary">
@@ -486,18 +464,16 @@ function Manage({
             submitting.
           </BodyText>
         )}
-      </div>
+      </Stack>
       {said !== null && (
         <div role="status">
           <BodyText tone="secondary">{said}</BodyText>
         </div>
       )}
       {refused !== null && (
-        <div role="alert">
-          <ErrorBlock error={refused} compact heading="Couldn’t do that" />
-        </div>
+        <ErrorBlock error={refused} compact alert heading="Couldn’t do that" />
       )}
-    </div>
+    </Stack>
   );
 }
 
@@ -585,7 +561,7 @@ function Row({
       <td>{extensionText(entrant)}</td>
       {manages && (
         <td>
-          <div className={classes.actions}>
+          <Group gap={6} align="stretch">
             {entrant.status === 'pending' && (
               <>
                 <Button
@@ -644,7 +620,7 @@ function Row({
             >
               {teams ? 'Name, members, extra time' : 'Extra time'}
             </Button>
-          </div>
+          </Group>
           {open === 'reject' && (
             <form
               className={classes.inline}
@@ -664,54 +640,39 @@ function Row({
                 onChange={setReason}
                 required
               />
-              <div className={classes.actions}>
+              <Group gap={6} align="stretch">
                 <Button size="xs" type="submit" loading={pending === 'reject'}>
                   Reject
                 </Button>
                 <Button size="xs" variant="secondary" onClick={() => show(null)}>
                   Cancel
                 </Button>
-              </div>
+              </Group>
             </form>
           )}
           {error !== null && open !== 'remove' && open !== 'manage' && (
-            <div role="alert">
-              <ErrorBlock error={error} compact heading="Couldn’t do that" />
-            </div>
+            <ErrorBlock error={error} compact alert heading="Couldn’t do that" />
           )}
-          <Modal
+          <ConfirmDialog
             opened={open === 'remove'}
             onClose={() => show(null)}
             title={`Remove ${name}?`}
+            confirm="Remove"
+            variant="danger"
+            loading={pending === 'remove'}
+            error={error}
+            refused="Couldn’t do that"
+            onConfirm={() =>
+              void decide('remove', () =>
+                remove.mutateAsync({ params: { path: here } }),
+              )
+            }
           >
-            <div className={classes.inline}>
-              <BodyText>
-                {teams ? 'Its members' : name} can no longer submit or ask. What was
-                submitted stays, and so does its place on the leaderboards.
-              </BodyText>
-              {error !== null && (
-                <div role="alert">
-                  <ErrorBlock error={error} compact heading="Couldn’t do that" />
-                </div>
-              )}
-              <div className={classes.actions}>
-                <Button
-                  variant="danger"
-                  loading={pending === 'remove'}
-                  onClick={() =>
-                    void decide('remove', () =>
-                      remove.mutateAsync({ params: { path: here } }),
-                    )
-                  }
-                >
-                  Remove
-                </Button>
-                <Button variant="secondary" onClick={() => show(null)}>
-                  Cancel
-                </Button>
-              </div>
-            </div>
-          </Modal>
+            <BodyText>
+              {teams ? 'Its members' : name} can no longer submit or ask. What was
+              submitted stays, and so does its place on the leaderboards.
+            </BodyText>
+          </ConfirmDialog>
           <Modal
             opened={open === 'manage'}
             onClose={() => show(null)}
@@ -778,10 +739,10 @@ export function EntrantsPage() {
               label: `${STATUS_WORD[value]} (${String(entrants.filter((one) => one.status === value).length)})`,
             }));
             return (
-              <div className={classes.stack}>
+              <Stack gap="sm">
                 <BodyText>{entrantsLine(entrants)}</BodyText>
                 {entrants.length > 0 && (
-                  <div className={classes.filters}>
+                  <Group gap="sm" align="flex-end">
                     <Select
                       label="Show"
                       value={status ?? ''}
@@ -789,14 +750,14 @@ export function EntrantsPage() {
                       placeholder={`Every entrant (${String(entrants.length)})`}
                       onChange={filter}
                     />
-                  </div>
+                  </Group>
                 )}
                 {entrants.length > 0 &&
                   (shown.length === 0 ? (
                     <BodyText tone="secondary">No entrants have this status.</BodyText>
                   ) : (
-                    <div className={classes.scroll}>
-                      <table className={classes.table} aria-label="Entrants">
+                    <div className={tableClasses.scroll}>
+                      <table className={tableClasses.table} aria-label="Entrants">
                         <thead>
                           <tr>
                             <th scope="col">{teams ? 'Entrant' : 'Person'}</th>
@@ -820,7 +781,7 @@ export function EntrantsPage() {
                       </table>
                     </div>
                   ))}
-              </div>
+              </Stack>
             );
           }}
         </Loaded>

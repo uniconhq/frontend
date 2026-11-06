@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Skeleton } from '@mantine/core';
+import { Group, Skeleton } from '@mantine/core';
 import type { QueryView } from '@/api/query';
 import { describeError } from '@/api/describe-error';
 import type { ApiError } from '@/api/problem';
@@ -7,7 +7,6 @@ import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
 import { ErrorBlock } from './ErrorBlock';
 import { PageSkeleton } from './PageSkeleton';
-import classes from './Loaded.module.css';
 
 /**
  * The one way a read shows while it loads and when it fails: grey lines
@@ -53,11 +52,11 @@ export function Loaded<T>({
 function CompactFailure({ error, onRetry }: { error: ApiError; onRetry: () => void }) {
   const { title } = describeError(error, 'Couldn’t load');
   return (
-    <div className={classes.failure} role="alert">
+    <Group gap="6px 10px" role="alert">
       <BodyText tone="secondary">{title}</BodyText>
       <Button size="xs" variant="secondary" onClick={onRetry}>
         Try again
       </Button>
-    </div>
+    </Group>
   );
 }

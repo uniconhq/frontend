@@ -30,6 +30,7 @@ import { TimeField } from '../forms/fields';
 import { textOf } from '../forms/values';
 import { usePlaceMay } from '../may';
 import { SectionTitle } from '@/ui/SectionTitle';
+import { Group } from '@/ui/layout';
 import { CardPart } from '../task/BuildCard';
 import shared from '../organise.module.css';
 import { isUnder, type ProblemPath } from '../problem-path';
@@ -525,14 +526,14 @@ function BoardCard({
     >
       <Card>
         <div className={shared.stack}>
-          <div className={classes.head}>
+          <Group gap="md" align="flex-start" justify="space-between">
             <SectionTitle>{boardTitle(board)}</SectionTitle>
             {!disabled && (
               <Button variant="secondary" disabled={disabled} onClick={onRemove}>
                 Remove leaderboard
               </Button>
             )}
-          </div>
+          </Group>
           <div>
             <FieldBox name={`${board.key}.key`}>
               <FieldBox name={`${board.key}.title`}>
@@ -862,7 +863,7 @@ function ColumnFields({
   const messages = messagesFor(field, local, refused);
   const name = column.name === '' ? 'the new column' : column.name;
   const head = (
-    <div className={classes.head}>
+    <Group gap="md" align="flex-start" justify="space-between">
       <TextInput
         label="Name"
         value={column.name}
@@ -888,7 +889,7 @@ function ColumnFields({
           onClick={onRemove}
         />
       )}
-    </div>
+    </Group>
   );
   return (
     <div role="group" data-field={field} aria-label={name}>

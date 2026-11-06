@@ -1,22 +1,20 @@
-import { Fragment, useState, type ReactNode } from 'react';
+import { Fragment, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { $api, queryView } from '@/api/query';
+import { $api } from '@/api/query';
 import { toApiError } from '@/api/problem';
-import type { DefinitionError, FileChange, FileContent, Settings } from '@/api/types';
+import type { DefinitionError, FileContent, Settings } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
-import { Button } from '@/ui/Button';
 import { CodeEditor } from '@/ui/CodeEditor';
 import { PageLink } from '@/ui/PageLink';
-import { Loaded } from '@/ui/feedback/Loaded';
 import { contestPath } from '@/lib/organiser-paths';
 import { TASK_BUILD_CARDS, contestSectionPath, taskCardPath } from '@/lib/sections';
-import { formatDateTime } from '@/lib/time';
 import { DefinitionErrors } from '../DefinitionErrors';
 import { contestPlaceOf } from '../contest/opened';
 import { readContest } from '../forms/contest-values';
 import { readTask } from '../forms/task-values';
 import { taskPlaceOf } from '../task/places';
 import { definitionErrorsOf } from './refusals';
+import { ContestChanges } from './FileHistory';
 import { settingsQuery, type Place } from './place';
 import shared from '../organise.module.css';
 
@@ -100,114 +98,6 @@ function unreadReason(unreadable: string[]): string | null {
   return unreadable.length === 0
     ? null
     : `The pages cannot read ${unreadable.join(', ')}.`;
-}
-
-/** Who made a change, by the username the history names them by. */
-function authorName(change: FileChange): string {
-  if (change.author !== null) return change.author;
-  if (change.author_id === null) return 'an unknown author';
-  return `account ${String(change.author_id)}`;
-}
-
-/** The contest's settings as they were at one version, to read. */
-function Version({
-  place,
-  version,
-}: {
-  place: Extract<Place, { kind: 'contest' }>;
-  version: string;
-}) {
-  const view = queryView(
-    useQuery({
-      ...$api.queryOptions(
-        'get',
-        '/api/v1/orgs/{org}/contests/{contest}/files/{path}',
-        {
-          params: {
-            path: { org: place.org, contest: place.contest, path: 'contest.yaml' },
-            query: { at: version },
-          },
-        },
-      ),
-      // A version never changes, so once read it is never read again.
-      staleTime: Infinity,
-    }),
-  );
-  return (
-    <Loaded view={view} rows={4}>
-      {(read) => (
-        <CodeEditor
-          label={`The settings as they were on ${version.slice(0, 7)}`}
-          value={read.content}
-          language="yaml"
-          rows={12}
-          readOnly
-        />
-      )}
-    </Loaded>
-  );
-}
-
-/** Every change made to the contest's settings, each opened to read as it was. */
-function ContestChanges({ place }: { place: Extract<Place, { kind: 'contest' }> }) {
-  const [open, setOpen] = useState(false);
-  const [viewing, setViewing] = useState<string | null>(null);
-  const history = queryView(
-    $api.useQuery(
-      'get',
-      '/api/v1/orgs/{org}/contests/{contest}/history',
-      {
-        params: {
-          path: { org: place.org, contest: place.contest },
-          query: { path: 'contest.yaml' },
-        },
-      },
-      { enabled: open },
-    ),
-  );
-  return (
-    <>
-      <div className={shared.actions}>
-        <Button size="xs" variant="secondary" onClick={() => setOpen(!open)}>
-          {open ? 'Hide the changes' : 'Every change'}
-        </Button>
-      </div>
-      {open && (
-        <Loaded view={history} rows={3}>
-          {(changes) => (
-            <ol className={shared.list} aria-label="Changes to the settings">
-              {changes.map((change, at) => (
-                <li key={change.version}>
-                  <BodyText>{change.message}</BodyText>
-                  <BodyText tone="secondary">
-                    {authorName(change)} · {formatDateTime(new Date(change.at))}
-                    {at === 0 && ' · as they are now'}
-                  </BodyText>
-                  {at > 0 && (
-                    <div className={shared.actions}>
-                      <Button
-                        size="xs"
-                        variant="secondary"
-                        label={`Read the settings as they were on ${formatDateTime(new Date(change.at))}`}
-                        onClick={() =>
-                          setViewing(viewing === change.version ? null : change.version)
-                        }
-                      >
-                        {viewing === change.version ? 'Close' : 'Read'}
-                      </Button>
-                    </div>
-                  )}
-                  {viewing === change.version && (
-                    <Version place={place} version={change.version} />
-                  )}
-                </li>
-              ))}
-            </ol>
-          )}
-        </Loaded>
-      )}
-    </>
-  );
 }
 
 /**

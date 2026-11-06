@@ -3,6 +3,7 @@ import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
 import { TextInput } from '@/ui/TextInput';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
+import { Group } from '@/ui/layout';
 import classes from './organise.module.css';
 
 /** The second line. */
@@ -90,7 +91,7 @@ export function CreateForm({
           <ErrorBlock error={error} compact heading="Couldn’t create" />
         </div>
       )}
-      <div className={classes.actions}>
+      <Group gap="xs">
         <Button type="submit" loading={pending} disabled={name.trim() === ''}>
           {submitLabel}
         </Button>
@@ -99,7 +100,7 @@ export function CreateForm({
             Cancel
           </Button>
         )}
-      </div>
+      </Group>
     </form>
   );
 }

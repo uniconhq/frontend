@@ -18,8 +18,8 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { useKept } from '@/lib/keep-equal';
-import flow from '../workflows/workflows.module.css';
-import { BOX_PROPERTIES } from '../workflows/layout';
+import flow from './box.module.css';
+import { BOX_PROPERTIES } from './box';
 import {
   COMPACT,
   GEOMETRY,
@@ -35,6 +35,7 @@ import {
   type Shape,
 } from './graph';
 import classes from './card-graph.module.css';
+import { Stack } from '@/ui/layout';
 
 type BoxData = {
   box: GraphBox;
@@ -223,7 +224,7 @@ const BoxView = memo(function BoxView({ data }: NodeProps<BoxNode>) {
           <Pin side="out" top={pinTop} colour={colour} />
         )}
         {open && (
-          <div className={classes.resultRows} role="list" aria-label={box.title}>
+          <Stack gap={0} role="list" aria-label={box.title}>
             {box.ports.map((port) => (
               <Row
                 key={`${port.side}:${port.name}`}
@@ -232,7 +233,7 @@ const BoxView = memo(function BoxView({ data }: NodeProps<BoxNode>) {
                 colour={colour}
               />
             ))}
-          </div>
+          </Stack>
         )}
       </div>
     </>

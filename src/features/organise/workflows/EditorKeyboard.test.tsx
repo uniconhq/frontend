@@ -1,11 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { screen, within } from '@testing-library/react';
-import userEvent from '@/test/user-event';
-import { renderApp } from '@/test/render';
 import { http, HttpResponse } from 'msw';
-import { server, signedIn } from '@/test/server';
-import { workflowBackend } from '@/test/workflows';
-import { EDITOR_PAGE, fileText } from '@/test/workflow-editor';
+import { fileText, openEditor } from '@/test/workflow-editor';
+import { workflowBox, filePort, workflowItem } from '@/test/workflows';
 
 describe('the workflow editor', () => {
   // Tabbing to each control walks the whole page, so this takes a while.
@@ -23,44 +20,22 @@ describe('the workflow editor', () => {
         'steps: []',
         '',
       ].join('\n');
-      const port = (name: string) => ({
-        name,
-        type: 'file',
-        title: null,
-        unit: null,
-        at_least: null,
-        at_most: null,
-        better: null,
-        optional: false,
-        options: null,
-        accepts: ['file'],
+      const { user } = openEditor({
+        draft: empty,
+        handlers: [
+          http.get('/api/v1/workflows', () =>
+            HttpResponse.json([workflowItem({ name: 'inner' })]),
+          ),
+          http.get('/api/v1/workflows/:owner/:name/versions/:version/box', () =>
+            HttpResponse.json(
+              workflowBox({
+                inputs: [filePort('source')],
+                outputs: [filePort('program')],
+              }),
+            ),
+          ),
+        ],
       });
-      server.use(
-        http.get('/api/v1/workflows', () =>
-          HttpResponse.json([
-            {
-              owner: 'kenny',
-              name: 'inner',
-              visibility: 'private',
-              versions: ['v1'],
-              editable: true,
-            },
-          ]),
-        ),
-        http.get('/api/v1/workflows/:owner/:name/versions/:version/box', () =>
-          HttpResponse.json({
-            inputs: [port('source')],
-            outputs: [port('program')],
-            newer_version: null,
-            description: null,
-            run: true,
-          }),
-        ),
-        signedIn,
-        ...workflowBackend(empty).handlers,
-      );
-      const user = userEvent.setup();
-      renderApp(EDITOR_PAGE);
 
       // Every control is reached by Tab and every menu item by the arrow keys.
       const tabTo = async (target: HTMLElement) => {

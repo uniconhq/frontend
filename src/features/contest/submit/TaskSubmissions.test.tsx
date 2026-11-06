@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@/test/user-event';
-import { http, HttpResponse } from 'msw';
+import { http, HttpResponse, type RequestHandler } from 'msw';
 import type { GradingResult, Submission, TaskPage } from '@/api/types';
 import { formatExact } from '@/lib/exact';
 import { renderApp } from '@/test/render';
@@ -30,12 +30,6 @@ const sent = (path: string) => ({
 });
 
 const PAGE = '/contests/acme/spring/tasks/sum';
-
-function withPage(overrides: Partial<TaskPage>) {
-  return http.get(`${TASK_API}/page`, () =>
-    HttpResponse.json({ ...taskPage, ...overrides }),
-  );
-}
 
 /**
  * The server's clock agreeing with the browser's, so a submission made
@@ -73,6 +67,34 @@ function submissions(start: Submission[] = []) {
   return { made, bodies, handlers };
 }
 
+/**
+ * The task page at `at` for someone signed in, the task read with `page` over
+ * the usual one. With `graded`, it lists submission 1 graded so, and opens it.
+ */
+function open(
+  {
+    page = {},
+    graded,
+    at = PAGE,
+  }: { page?: Partial<TaskPage>; graded?: GradingResult; at?: string },
+  ...handlers: RequestHandler[]
+) {
+  server.use(
+    signedIn,
+    http.get(`${TASK_API}/page`, () => HttpResponse.json({ ...taskPage, ...page })),
+    ...(graded === undefined
+      ? []
+      : [
+          listing([submission(1, graded)]),
+          http.get(`${TASK_API}/submissions/:number`, () =>
+            HttpResponse.json(submission(1, graded)),
+          ),
+        ]),
+    ...handlers,
+  );
+  return renderApp(at);
+}
+
 const python = () => new File(['print(1)\n'], 'main.py', { type: 'text/x-python' });
 
 /** A file as a folder picker gives it: with its path inside the folder chosen. */
@@ -88,33 +110,33 @@ const PYTHON_SHA256 =
 
 describe('the submit panel', () => {
   it('gives each part of an input given per row a field of the input’s own kind', async () => {
-    server.use(
-      signedIn,
+    open(
+      {
+        page: {
+          inputs: [
+            inputField({
+              id: 'tree',
+              type: 'folder',
+              label: 'Your tree',
+              parts: [
+                { title: 'Small grid', max_size: 1024 },
+                { title: null, max_size: 1024 },
+              ],
+            }),
+            inputField({
+              id: 'seed',
+              type: 'number',
+              label: 'Seed',
+              parts: [
+                { title: null, max_size: 1024 },
+                { title: null, max_size: 1024 },
+              ],
+            }),
+          ],
+        },
+      },
       listing([]),
-      withPage({
-        inputs: [
-          inputField({
-            id: 'tree',
-            type: 'folder',
-            label: 'Your tree',
-            parts: [
-              { title: 'Small grid', max_size: 1024 },
-              { title: null, max_size: 1024 },
-            ],
-          }),
-          inputField({
-            id: 'seed',
-            type: 'number',
-            label: 'Seed',
-            parts: [
-              { title: null, max_size: 1024 },
-              { title: null, max_size: 1024 },
-            ],
-          }),
-        ],
-      }),
     );
-    renderApp(PAGE);
 
     const form = await screen.findByRole('form', { name: 'Submit' });
     expect(within(form).getByLabelText('Small grid: a folder')).toHaveProperty(
@@ -136,50 +158,50 @@ describe('the submit panel', () => {
   });
 
   it('shows a drop zone per file input, a choice for an enum and a field for each value', async () => {
-    server.use(
-      signedIn,
+    open(
+      {
+        page: {
+          inputs: [
+            inputField(),
+            inputField({
+              id: 'program',
+              type: 'folder',
+              label: 'Your program',
+              max_size: 5 * 1024 * 1024,
+            }),
+            inputField({
+              id: 'answers',
+              type: 'file',
+              label: 'Your answers',
+              max_size: 1024 * 1024,
+            }),
+            inputField({
+              id: 'language',
+              type: 'enum',
+              label: 'language',
+              options: ['python'],
+            }),
+            inputField({
+              id: 'level',
+              type: 'enum',
+              label: 'Level',
+              options: ['easy', 'hard'],
+            }),
+            inputField({ id: 'notes', type: 'text', label: 'Notes' }),
+            inputField({
+              id: 'alpha',
+              type: 'number',
+              label: 'Alpha',
+              min: '0',
+              max: '1',
+              default: '0.5',
+            }),
+            inputField({ id: 'fast', type: 'boolean', label: 'Fast' }),
+          ],
+        },
+      },
       listing([]),
-      withPage({
-        inputs: [
-          inputField(),
-          inputField({
-            id: 'program',
-            type: 'folder',
-            label: 'Your program',
-            max_size: 5 * 1024 * 1024,
-          }),
-          inputField({
-            id: 'answers',
-            type: 'file',
-            label: 'Your answers',
-            max_size: 1024 * 1024,
-          }),
-          inputField({
-            id: 'language',
-            type: 'enum',
-            label: 'language',
-            options: ['python'],
-          }),
-          inputField({
-            id: 'level',
-            type: 'enum',
-            label: 'Level',
-            options: ['easy', 'hard'],
-          }),
-          inputField({ id: 'notes', type: 'text', label: 'Notes' }),
-          inputField({
-            id: 'alpha',
-            type: 'number',
-            label: 'Alpha',
-            min: '0',
-            max: '1',
-            default: '0.5',
-          }),
-          inputField({ id: 'fast', type: 'boolean', label: 'Fast' }),
-        ],
-      }),
     );
-    renderApp(PAGE);
 
     const form = await screen.findByRole('form', { name: 'Submit' });
     const solution = within(form).getByLabelText('Your solution');
@@ -208,9 +230,8 @@ describe('the submit panel', () => {
   it('sends each file to its slot, completes it and makes one submission', async () => {
     const store = uploadStore();
     const made = submissions();
-    server.use(signedIn, withPage({}), ...store.handlers, ...made.handlers);
     const user = userEvent.setup();
-    renderApp(PAGE);
+    open({}, ...store.handlers, ...made.handlers);
 
     await user.upload(await screen.findByLabelText('Your solution'), python());
     await user.click(screen.getByRole('button', { name: 'Submit' }));
@@ -248,9 +269,9 @@ describe('the submit panel', () => {
     const store = uploadStore();
     const made = submissions();
     let lose = true;
-    server.use(
-      signedIn,
-      withPage({}),
+    const user = userEvent.setup();
+    open(
+      {},
       ...store.handlers,
       http.post(`${TASK_API}/submissions`, async ({ request }) => {
         if (!lose) return undefined;
@@ -262,8 +283,6 @@ describe('the submit panel', () => {
       }),
       ...made.handlers,
     );
-    const user = userEvent.setup();
-    renderApp(PAGE);
 
     await user.upload(await screen.findByLabelText('Your solution'), python());
     await user.click(screen.getByRole('button', { name: 'Submit' }));
@@ -284,24 +303,24 @@ describe('the submit panel', () => {
 
   it('asks for a choice before sending anything', async () => {
     const store = uploadStore();
-    server.use(
-      signedIn,
+    const user = userEvent.setup();
+    open(
+      {
+        page: {
+          inputs: [
+            inputField(),
+            inputField({
+              id: 'language',
+              type: 'enum',
+              label: 'Language',
+              options: ['python', 'cpp'],
+            }),
+          ],
+        },
+      },
       listing([]),
-      withPage({
-        inputs: [
-          inputField(),
-          inputField({
-            id: 'language',
-            type: 'enum',
-            label: 'Language',
-            options: ['python', 'cpp'],
-          }),
-        ],
-      }),
       ...store.handlers,
     );
-    const user = userEvent.setup();
-    renderApp(PAGE);
 
     await user.upload(await screen.findByLabelText('Your solution'), python());
     await user.click(screen.getByRole('button', { name: 'Submit' }));
@@ -317,14 +336,12 @@ describe('the submit panel', () => {
 
   it('refuses files over their input’s size in the browser, before any upload', async () => {
     const store = uploadStore();
-    server.use(
-      signedIn,
+    const user = userEvent.setup();
+    open(
+      { page: { inputs: [inputField({ max_size: 4 })] } },
       listing([]),
-      withPage({ inputs: [inputField({ max_size: 4 })] }),
       ...store.handlers,
     );
-    const user = userEvent.setup();
-    renderApp(PAGE);
 
     await user.upload(await screen.findByLabelText('Your solution'), python());
     await user.click(screen.getByRole('button', { name: 'Submit' }));
@@ -341,16 +358,18 @@ describe('the submit panel', () => {
   it('sends a folder’s files by their paths inside it', async () => {
     const store = uploadStore();
     const made = submissions();
-    server.use(
-      signedIn,
-      withPage({
-        inputs: [inputField({ id: 'program', type: 'folder', label: 'Your program' })],
-      }),
+    const user = userEvent.setup();
+    open(
+      {
+        page: {
+          inputs: [
+            inputField({ id: 'program', type: 'folder', label: 'Your program' }),
+          ],
+        },
+      },
       ...store.handlers,
       ...made.handlers,
     );
-    const user = userEvent.setup();
-    renderApp(PAGE);
 
     await user.upload(await screen.findByLabelText('Your program: a folder'), [
       inFolder('mine/Main.java', 'class Main {}'),
@@ -383,9 +402,9 @@ describe('the submit panel', () => {
     const held = new Promise<void>((resolve) => {
       release = resolve;
     });
-    server.use(
-      signedIn,
-      withPage({}),
+    const user = userEvent.setup();
+    open(
+      {},
       http.put(`${DOOR_URL}:upload`, async () => {
         puts += 1;
         if (puts === 1) return HttpResponse.error();
@@ -400,8 +419,6 @@ describe('the submit panel', () => {
       ...store.handlers,
       ...made.handlers,
     );
-    const user = userEvent.setup();
-    renderApp(PAGE);
 
     await user.upload(await screen.findByLabelText('Your solution'), python());
     await user.click(screen.getByRole('button', { name: 'Submit' }));
@@ -427,9 +444,9 @@ describe('the submit panel', () => {
     const store = uploadStore();
     const made = submissions();
     let puts = 0;
-    server.use(
-      signedIn,
-      withPage({}),
+    const user = userEvent.setup();
+    open(
+      {},
       http.put(`${DOOR_URL}:upload`, () => {
         puts += 1;
         return HttpResponse.error();
@@ -440,8 +457,6 @@ describe('the submit panel', () => {
       ...store.handlers,
       ...made.handlers,
     );
-    const user = userEvent.setup();
-    renderApp(PAGE);
 
     await user.upload(await screen.findByLabelText('Your solution'), python());
     await user.click(screen.getByRole('button', { name: 'Submit' }));
@@ -458,9 +473,9 @@ describe('the submit panel', () => {
     const store = uploadStore();
     const made = submissions();
     let puts = 0;
-    server.use(
-      signedIn,
-      withPage({}),
+    const user = userEvent.setup();
+    open(
+      {},
       http.put(`${DOOR_URL}:upload`, () => {
         puts += 1;
         return new HttpResponse(null, { status: 403 });
@@ -468,8 +483,6 @@ describe('the submit panel', () => {
       ...store.handlers,
       ...made.handlers,
     );
-    const user = userEvent.setup();
-    renderApp(PAGE);
 
     await user.upload(await screen.findByLabelText('Your solution'), python());
     await user.click(screen.getByRole('button', { name: 'Submit' }));
@@ -516,10 +529,10 @@ describe('the submit panel', () => {
   it('says each refusal in the server’s words, with what it names, and keeps the files', async () => {
     const store = uploadStore();
     let refusal: (typeof REFUSALS)[number] | undefined;
-    server.use(
-      signedIn,
+    const user = userEvent.setup();
+    open(
+      {},
       listing([]),
-      withPage({}),
       ...store.handlers,
       http.post(`${TASK_API}/submissions`, () =>
         refusal === undefined
@@ -527,8 +540,6 @@ describe('the submit panel', () => {
           : problem(refusal[0] === 'rate_limited' ? 429 : 409, refusal[0], refusal[1]),
       ),
     );
-    const user = userEvent.setup();
-    renderApp(PAGE);
     await user.upload(await screen.findByLabelText('Your solution'), python());
 
     for (const each of REFUSALS) {
@@ -588,9 +599,8 @@ describe('the submit panel', () => {
     async (_, refusing, title, sentence) => {
       const store = uploadStore();
       const made = submissions();
-      server.use(signedIn, withPage({}), refusing, ...store.handlers, ...made.handlers);
       const user = userEvent.setup();
-      renderApp(PAGE);
+      open({}, refusing, ...store.handlers, ...made.handlers);
 
       await user.upload(await screen.findByLabelText('Your solution'), python());
       await user.click(screen.getByRole('button', { name: 'Submit' }));
@@ -606,8 +616,7 @@ describe('the submit panel', () => {
   );
 
   it('offers no submit on a task that takes nothing from the contestant', async () => {
-    server.use(signedIn, listing([]), withPage({ inputs: [] }));
-    renderApp(PAGE);
+    open({ page: { inputs: [] } }, listing([]));
 
     expect(
       await screen.findByText('This task takes nothing to submit from this page.'),
@@ -616,14 +625,14 @@ describe('the submit panel', () => {
   });
 
   it('offers no panel on a task that is closed, and still lists the submissions', async () => {
-    server.use(
-      signedIn,
+    open(
+      {
+        page: {
+          release: { released: true, visible: true, open: false, closed: 'closed' },
+        },
+      },
       listing([submission(1, accepted)]),
-      withPage({
-        release: { released: true, visible: true, open: false, closed: 'closed' },
-      }),
     );
-    renderApp(PAGE);
 
     expect(
       await screen.findByRole('table', { name: 'Your submissions' }),
@@ -656,22 +665,22 @@ describe('the submit panel', () => {
   ])(
     'says what is true for a reader who %s, not an approved entrant',
     async (_, mine, said) => {
-      server.use(
-        signedIn,
-        listing([]),
-        withPage({
-          release: {
-            released: true,
-            visible: true,
-            open: false,
-            closed: 'not_approved',
+      open(
+        {
+          page: {
+            release: {
+              released: true,
+              visible: true,
+              open: false,
+              closed: 'not_approved',
+            },
           },
-        }),
+        },
+        listing([]),
         http.get(`${CONTEST_API}/home`, () =>
           HttpResponse.json(home({ registration: mine })),
         ),
       );
-      renderApp(PAGE);
 
       expect(await screen.findByText(said)).toBeVisible();
       expect(screen.queryByRole('form', { name: 'Submit' })).not.toBeInTheDocument();
@@ -693,17 +702,15 @@ describe('the submissions list', () => {
       [fresh(accepted)],
     ];
     let asked = 0;
-    server.use(
-      signedIn,
+    open(
+      {},
       agreeingClock,
-      withPage({}),
       http.get(`${TASK_API}/submissions`, () => {
         const answer = turns[Math.min(asked, turns.length - 1)];
         asked += 1;
         return HttpResponse.json(answer);
       }),
     );
-    renderApp(PAGE);
 
     const list = await screen.findByRole('table', { name: 'Your submissions' });
     expect(await within(list).findByText('QUEUED')).toBeVisible();
@@ -739,17 +746,15 @@ describe('the submissions list', () => {
       ],
     ];
     let asked = 0;
-    server.use(
-      signedIn,
+    open(
+      {},
       agreeingClock,
-      withPage({}),
       http.get(`${TASK_API}/submissions`, () => {
         const answer = turns[Math.min(asked, turns.length - 1)];
         asked += 1;
         return HttpResponse.json(answer);
       }),
     );
-    renderApp(PAGE);
 
     const list = await screen.findByRole('table', { name: 'Your submissions' });
     expect(await within(list).findByText('GRADING')).toBeVisible();
@@ -763,9 +768,8 @@ describe('the submissions list', () => {
   });
 
   it('lists the newest first, each with where it stands', async () => {
-    server.use(
-      signedIn,
-      withPage({}),
+    open(
+      {},
       listing([
         submission(1, accepted),
         submission(2, grading({ status: 'cancelled' })),
@@ -773,7 +777,6 @@ describe('the submissions list', () => {
         submission(4, grading({ status: 'grading' })),
       ]),
     );
-    renderApp(PAGE);
 
     const list = await screen.findByRole('table', { name: 'Your submissions' });
     const rows = within(list).getAllByRole('row').slice(1);
@@ -802,9 +805,8 @@ describe('the submissions list', () => {
         },
       ],
     });
-    server.use(
-      signedIn,
-      withPage({}),
+    open(
+      {},
       listing([
         submission(1, accepted),
         submission(2, grading({ status: 'graded', compiled: 0 })),
@@ -812,7 +814,6 @@ describe('the submissions list', () => {
         submission(4, grading({ status: 'queued' })),
       ]),
     );
-    renderApp(PAGE);
 
     const list = await screen.findByRole('table', { name: 'Your submissions' });
     expect(within(list).getByRole('columnheader', { name: 'Result' })).toBeVisible();
@@ -830,8 +831,7 @@ describe('the submissions list', () => {
   });
 
   it('leaves points out of the list on a task that gives none', async () => {
-    server.use(signedIn, withPage({}), listing([submission(1, accepted)]));
-    renderApp(PAGE);
+    open({}, listing([submission(1, accepted)]));
 
     const list = await screen.findByRole('table', { name: 'Your submissions' });
     expect(within(list).queryByRole('columnheader', { name: 'Points' })).toBeNull();
@@ -841,16 +841,8 @@ describe('the submissions list', () => {
 describe('a submission opened from the list, nothing of it shown yet', () => {
   it('says no points are shown yet and when they are, never a shown 0', async () => {
     const hidden = grading({ ...accepted });
-    server.use(
-      signedIn,
-      withPage({}),
-      listing([submission(1, hidden)]),
-      http.get(`${TASK_API}/submissions/:number`, () =>
-        HttpResponse.json(submission(1, hidden)),
-      ),
-    );
     const user = userEvent.setup();
-    renderApp(PAGE);
+    open({ graded: hidden });
 
     await user.click(await screen.findByRole('link', { name: '#1' }));
 
@@ -861,19 +853,13 @@ describe('a submission opened from the list, nothing of it shown yet', () => {
 
 describe('a submission opened from the list', () => {
   it('shows each run by its group with what it reported, and reads the log written once when opened', async () => {
-    server.use(
-      signedIn,
-      withPage({}),
-      listing([submission(1, accepted)]),
-      http.get(`${TASK_API}/submissions/:number`, () =>
-        HttpResponse.json(submission(1, accepted)),
-      ),
+    const user = userEvent.setup();
+    open(
+      { graded: accepted },
       http.get(`${TASK_API}/submissions/:number/text`, () =>
         HttpResponse.text('Compiled cleanly.'),
       ),
     );
-    const user = userEvent.setup();
-    renderApp(PAGE);
 
     await user.click(await screen.findByRole('link', { name: '#1' }));
 
@@ -897,16 +883,8 @@ describe('a submission opened from the list', () => {
       status: 'cancelled',
       reason: 'The checker crashed on every test.',
     });
-    server.use(
-      signedIn,
-      withPage({}),
-      listing([submission(1, cancelled)]),
-      http.get(`${TASK_API}/submissions/:number`, () =>
-        HttpResponse.json(submission(1, cancelled)),
-      ),
-    );
     const user = userEvent.setup();
-    renderApp(PAGE);
+    open({ graded: cancelled });
 
     await user.click(await screen.findByRole('link', { name: '#1' }));
 
@@ -922,15 +900,7 @@ describe('a submission opened from the list', () => {
 
   it('says a delayed grading is delayed on Unicon’s side, in its row and opened', async () => {
     const delayed = grading({ status: 'delayed' });
-    server.use(
-      signedIn,
-      withPage({}),
-      listing([submission(1, delayed)]),
-      http.get(`${TASK_API}/submissions/:number`, () =>
-        HttpResponse.json(submission(1, delayed)),
-      ),
-    );
-    renderApp(`${PAGE}?submission=1`);
+    open({ graded: delayed, at: `${PAGE}?submission=1` });
 
     const list = await screen.findByRole('table', { name: 'Your submissions' });
     const [, row] = within(list).getAllByRole('row');
@@ -966,15 +936,7 @@ describe('a submission opened from the list', () => {
       ],
       runs: accepted.runs,
     });
-    server.use(
-      signedIn,
-      withPage({}),
-      listing([submission(1, delayed)]),
-      http.get(`${TASK_API}/submissions/:number`, () =>
-        HttpResponse.json(submission(1, delayed)),
-      ),
-    );
-    renderApp(`${PAGE}?submission=1`);
+    open({ graded: delayed, at: `${PAGE}?submission=1` });
 
     const detail = await screen.findByRole('region', { name: 'Submission 1' });
     expect(await within(detail).findByText('GRADING DELAYED')).toBeVisible();
@@ -986,15 +948,7 @@ describe('a submission opened from the list', () => {
 
   it('says a submission past the limit was not graded and why, in its row and opened, with no points', async () => {
     const over = grading({ status: 'over_limit', limit: 10 });
-    server.use(
-      signedIn,
-      withPage({}),
-      listing([submission(1, over)]),
-      http.get(`${TASK_API}/submissions/:number`, () =>
-        HttpResponse.json(submission(1, over)),
-      ),
-    );
-    renderApp(`${PAGE}?submission=1`);
+    open({ graded: over, at: `${PAGE}?submission=1` });
 
     const sentence =
       'Not graded: you had reached the limit of 10 submissions for this task.';
@@ -1013,15 +967,7 @@ describe('a submission opened from the list', () => {
 
   it('says nothing of the limit for a cancel that carries no sentence', async () => {
     const cancelled = grading({ status: 'cancelled', reason: null });
-    server.use(
-      signedIn,
-      withPage({}),
-      listing([submission(1, cancelled)]),
-      http.get(`${TASK_API}/submissions/:number`, () =>
-        HttpResponse.json(submission(1, cancelled)),
-      ),
-    );
-    renderApp(`${PAGE}?submission=1`);
+    open({ graded: cancelled, at: `${PAGE}?submission=1` });
 
     const detail = await screen.findByRole('region', { name: 'Submission 1' });
     expect(
@@ -1032,15 +978,7 @@ describe('a submission opened from the list', () => {
 
   it('says a submission graded again in an entrant’s words, not as an attempt', async () => {
     const again = { ...accepted, attempt: 3 };
-    server.use(
-      signedIn,
-      withPage({}),
-      listing([submission(1, again)]),
-      http.get(`${TASK_API}/submissions/:number`, () =>
-        HttpResponse.json(submission(1, again)),
-      ),
-    );
-    renderApp(`${PAGE}?submission=1`);
+    open({ graded: again, at: `${PAGE}?submission=1` });
 
     const detail = await screen.findByRole('region', { name: 'Submission 1' });
     expect(await within(detail).findByText('Graded again')).toBeVisible();
@@ -1048,13 +986,8 @@ describe('a submission opened from the list', () => {
   });
 
   it('lists the files it was made with, each a download through the door', async () => {
-    server.use(
-      signedIn,
-      withPage({}),
-      listing([submission(1, accepted)]),
-      http.get(`${TASK_API}/submissions/:number`, () =>
-        HttpResponse.json(submission(1, accepted)),
-      ),
+    open(
+      { graded: accepted, at: `${PAGE}?submission=1` },
       http.get(`${TASK_API}/submissions/:number/files`, () =>
         HttpResponse.json({
           number: 1,
@@ -1065,7 +998,6 @@ describe('a submission opened from the list', () => {
         }),
       ),
     );
-    renderApp(`${PAGE}?submission=1`);
 
     const detail = await screen.findByRole('region', { name: 'Submission 1' });
     const files = await within(detail).findByRole('list', { name: 'Files' });
@@ -1077,13 +1009,8 @@ describe('a submission opened from the list', () => {
   });
 
   it('names each file with its input, and lists each value given', async () => {
-    server.use(
-      signedIn,
-      withPage({}),
-      listing([submission(1, accepted)]),
-      http.get(`${TASK_API}/submissions/:number`, () =>
-        HttpResponse.json(submission(1, accepted)),
-      ),
+    open(
+      { graded: accepted, at: `${PAGE}?submission=1` },
       http.get(`${TASK_API}/submissions/:number/files`, () =>
         HttpResponse.json({
           number: 1,
@@ -1097,7 +1024,6 @@ describe('a submission opened from the list', () => {
         }),
       ),
     );
-    renderApp(`${PAGE}?submission=1`);
 
     const detail = await screen.findByRole('region', { name: 'Submission 1' });
     const files = await within(detail).findByRole('list', { name: 'Files' });
@@ -1115,15 +1041,14 @@ describe('a submission opened from the list', () => {
   });
 
   it('names each input as the form does, by its label, its key only for an input the task no longer has (M13)', async () => {
-    server.use(
-      signedIn,
-      withPage({
-        inputs: [inputField(), inputField({ ...languageField, label: 'Language' })],
-      }),
-      listing([submission(1, accepted)]),
-      http.get(`${TASK_API}/submissions/:number`, () =>
-        HttpResponse.json(submission(1, accepted)),
-      ),
+    open(
+      {
+        page: {
+          inputs: [inputField(), inputField({ ...languageField, label: 'Language' })],
+        },
+        graded: accepted,
+        at: `${PAGE}?submission=1`,
+      },
       http.get(`${TASK_API}/submissions/:number/files`, () =>
         HttpResponse.json({
           number: 1,
@@ -1135,7 +1060,6 @@ describe('a submission opened from the list', () => {
         }),
       ),
     );
-    renderApp(`${PAGE}?submission=1`);
 
     const detail = await screen.findByRole('region', { name: 'Submission 1' });
     const files = await within(detail).findByRole('list', { name: 'Files' });
@@ -1153,33 +1077,32 @@ describe('a submission opened from the list', () => {
   });
 
   it('shows each part of an input given in parts under it, by its row’s title or Part n', async () => {
-    server.use(
-      signedIn,
-      withPage({
-        inputs: [
-          inputField({
-            id: 'out',
-            label: 'Outputs',
-            parts: [
-              { title: 'Small', max_size: 1024 },
-              { title: null, max_size: 1024 },
-            ],
-          }),
-          inputField({
-            id: 'n',
-            type: 'number',
-            label: 'Answers',
-            parts: [
-              { title: 'Small', max_size: 0 },
-              { title: null, max_size: 0 },
-            ],
-          }),
-        ],
-      }),
-      listing([submission(1, accepted)]),
-      http.get(`${TASK_API}/submissions/:number`, () =>
-        HttpResponse.json(submission(1, accepted)),
-      ),
+    open(
+      {
+        page: {
+          inputs: [
+            inputField({
+              id: 'out',
+              label: 'Outputs',
+              parts: [
+                { title: 'Small', max_size: 1024 },
+                { title: null, max_size: 1024 },
+              ],
+            }),
+            inputField({
+              id: 'n',
+              type: 'number',
+              label: 'Answers',
+              parts: [
+                { title: 'Small', max_size: 0 },
+                { title: null, max_size: 0 },
+              ],
+            }),
+          ],
+        },
+        graded: accepted,
+        at: `${PAGE}?submission=1`,
+      },
       http.get(`${TASK_API}/submissions/:number/files`, () =>
         HttpResponse.json({
           number: 1,
@@ -1197,7 +1120,6 @@ describe('a submission opened from the list', () => {
         }),
       ),
     );
-    renderApp(`${PAGE}?submission=1`);
 
     const detail = await screen.findByRole('region', { name: 'Submission 1' });
     const files = await within(detail).findByRole('list', { name: 'Files' });
@@ -1215,13 +1137,8 @@ describe('a submission opened from the list', () => {
   });
 
   it('names each file by its path under its input, so files of one name differ', async () => {
-    server.use(
-      signedIn,
-      withPage({}),
-      listing([submission(1, accepted)]),
-      http.get(`${TASK_API}/submissions/:number`, () =>
-        HttpResponse.json(submission(1, accepted)),
-      ),
+    open(
+      { graded: accepted, at: `${PAGE}?submission=1` },
       http.get(`${TASK_API}/submissions/:number/files`, () =>
         HttpResponse.json({
           number: 1,
@@ -1235,7 +1152,6 @@ describe('a submission opened from the list', () => {
         }),
       ),
     );
-    renderApp(`${PAGE}?submission=1`);
 
     const detail = await screen.findByRole('region', { name: 'Submission 1' });
     const files = await within(detail).findByRole('list', { name: 'Files' });
@@ -1255,19 +1171,13 @@ describe('a submission opened from the list', () => {
       status: 'graded',
       once: { reports: {}, texts: { log: { name: null, output: null } } },
     });
-    server.use(
-      signedIn,
-      withPage({}),
-      listing([submission(1, stopped)]),
-      http.get(`${TASK_API}/submissions/:number`, () =>
-        HttpResponse.json(submission(1, stopped)),
-      ),
+    const user = userEvent.setup();
+    open(
+      { graded: stopped, at: `${PAGE}?submission=1` },
       http.get(`${TASK_API}/submissions/:number/text`, () =>
         HttpResponse.text('<img src=x onerror="alert(1)">'),
       ),
     );
-    const user = userEvent.setup();
-    renderApp(`${PAGE}?submission=1`);
 
     const detail = await screen.findByRole('region', { name: 'Submission 1' });
     expect(await within(detail).findByText('GRADED')).toBeVisible();
@@ -1287,9 +1197,9 @@ describe('the submit panel with fake timers', () => {
     const store = uploadStore();
     const made = submissions();
     let release: () => void = () => {};
-    server.use(
-      signedIn,
-      withPage({}),
+    const user = fakeTimerUser();
+    open(
+      {},
       http.put(`${DOOR_URL}:upload`, async () => {
         await new Promise<void>((resolve) => {
           release = resolve;
@@ -1299,8 +1209,6 @@ describe('the submit panel with fake timers', () => {
       ...store.handlers,
       ...made.handlers,
     );
-    const user = fakeTimerUser();
-    renderApp(PAGE);
 
     await user.upload(await screen.findByLabelText('Your solution'), python());
     await user.click(screen.getByRole('button', { name: 'Submit' }));

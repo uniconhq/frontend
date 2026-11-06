@@ -1,10 +1,5 @@
 import {
-  BORDER,
   GEOMETRY,
-  HEAD,
-  LINE,
-  PIN,
-  STACK,
   WORKFLOW_PALETTE,
   boxHeight,
   layoutGraph,
@@ -13,6 +8,7 @@ import {
   type Point,
   type Shape,
 } from '../flow/graph';
+import { BOX } from '../flow/box';
 import { refsOf, wireRefs, type Ref, type Workflow } from './model';
 import { declared, type PrimitiveInfo } from './primitives';
 import { refWords } from './words';
@@ -34,31 +30,6 @@ import { refWords } from './words';
  * a step, by its place in `steps:`; `input:<name>` for an input;
  * `file:<path>` for a file of the workflow; `outputs`.
  */
-
-/** A workflow box's sizes. */
-export const BOX = {
-  closed: 260,
-  open: 320,
-  /** The space between two columns, which the wires cross. */
-  gap: 88,
-  stack: STACK,
-  border: BORDER,
-  head: HEAD,
-  line: LINE,
-  /** A workflow box's foot, which opens it. */
-  foot: 26,
-  pin: PIN,
-  /** Room left of the first column for a step's tab of the inputs it reads, while they are hidden. */
-  tab: 76,
-} as const;
-
-/** `BOX` and the row height as the stylesheet reads them, in pixels. */
-export const BOX_PROPERTIES = Object.fromEntries(
-  Object.entries({ ...BOX, row: GEOMETRY.row }).map(([part, size]) => [
-    `--box-${part}`,
-    `${String(size)}px`,
-  ]),
-);
 
 const SHAPE: Shape = { width: BOX.closed, gap: BOX.gap };
 

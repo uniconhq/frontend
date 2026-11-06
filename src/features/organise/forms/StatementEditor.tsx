@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/api/client';
+import { queryView } from '@/api/query';
 import { toApiError } from '@/api/problem';
 import type { FileContent, TreeEntry, WriteFile } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
@@ -9,7 +10,8 @@ import { Button } from '@/ui/Button';
 import { Markdown } from '@/ui/Markdown';
 import { CodeEditor } from '@/ui/CodeEditor';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
-import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
+import { Loaded } from '@/ui/feedback/Loaded';
+import { Group } from '@/ui/layout';
 import type { TaskWhere } from '@/lib/task-pictures';
 import { SaveOutcome, type Outcome } from '../files/SaveOutcome';
 import { KeptText, TextConflict } from '../files/TextConflict';
@@ -20,7 +22,6 @@ import { placeOfIn } from '../task/places';
 import { fileChanges, type PlannedChange } from '../task/staged';
 import { AddPicture } from './AddPicture';
 import { StatementPictures } from './StatementPictures';
-import shared from '../organise.module.css';
 import { useFileWrite, useOwnFile } from './file-hooks';
 import { picturesNamed, type StagedPicture } from './statement-pictures';
 import classes from './forms.module.css';
@@ -196,95 +197,95 @@ export function StatementEditor({
     }
   };
 
-  if (query.isPending) return <PageSkeleton rows={6} />;
-  if (query.data === undefined) {
-    return (
-      <ErrorBlock
-        error={toApiError(query.error)}
-        onRetry={() => void query.refetch()}
-      />
-    );
-  }
-
-  if (query.data.upload) {
-    return (
-      <UploadedFile
-        place={place}
-        path={PATH}
-        upload={query.data.upload}
-        token={query.data.token}
-      />
-    );
-  }
-
   return (
-    <div className={classes.form}>
-      <Source
-        key={query.data.token}
-        file={query.data}
-        task={
-          place.kind === 'task'
-            ? { org: place.org, contest: place.contest, task: place.task }
-            : null
+    <Loaded view={queryView(query)} rows={6}>
+      {(file) => {
+        if (file.upload) {
+          return (
+            <UploadedFile
+              place={place}
+              path={PATH}
+              upload={file.upload}
+              token={file.token}
+            />
+          );
         }
-        admin={admin}
-        busy={saving}
-        asking={
-          outcome?.kind === 'refused' && outcome.error.code === 'confirmation_required'
-        }
-        saved={saved}
-        through={outcome !== null && outcome.kind !== 'refused'}
-        pictures={pictures}
-        onDirty={onDirty}
-        onPictures={(change) =>
-          setPictures((before) => {
-            const after = change(before);
-            letGo(before.filter((picture) => !after.includes(picture)));
-            return after;
-          })
-        }
-        onSave={(content, token) =>
-          void send({
-            content,
-            encoding: 'utf-8',
-            token,
-            confirm: false,
-            keep_as_draft: false,
-          })
-        }
-      />
-      {kept !== null && (
-        <KeptText text={kept} language="markdown" onDone={() => setKept(null)} />
-      )}
-      {conflict !== null && (
-        <TextConflict
-          place={place}
-          path={PATH}
-          what="the statement"
-          mine={conflict.content ?? ''}
-          language="markdown"
-          busy={saving}
-          onTakeTheirs={() => {
-            setKept(conflict.content ?? '');
-            setConflict(null);
-            void query.refetch();
-          }}
-          onOverwrite={(theirs) => void send({ ...conflict, token: theirs.token })}
-        />
-      )}
-      {outcome !== null && (
-        <SaveOutcome
-          outcome={outcome}
-          onConfirm={(body, asked) => void send({ ...body, confirm: true, asked })}
-          onKeepAsDraft={(body) => void send({ ...body, keep_as_draft: true })}
-          onReload={() => {
-            setOutcome(null);
-            void query.refetch();
-          }}
-          placeOf={placeOfIn(place)}
-        />
-      )}
-    </div>
+        return (
+          <div className={classes.form}>
+            <Source
+              key={file.token}
+              file={file}
+              task={
+                place.kind === 'task'
+                  ? { org: place.org, contest: place.contest, task: place.task }
+                  : null
+              }
+              admin={admin}
+              busy={saving}
+              asking={
+                outcome?.kind === 'refused' &&
+                outcome.error.code === 'confirmation_required'
+              }
+              saved={saved}
+              through={outcome !== null && outcome.kind !== 'refused'}
+              pictures={pictures}
+              onDirty={onDirty}
+              onPictures={(change) =>
+                setPictures((before) => {
+                  const after = change(before);
+                  letGo(before.filter((picture) => !after.includes(picture)));
+                  return after;
+                })
+              }
+              onSave={(content, token) =>
+                void send({
+                  content,
+                  encoding: 'utf-8',
+                  token,
+                  confirm: false,
+                  keep_as_draft: false,
+                })
+              }
+            />
+            {kept !== null && (
+              <KeptText text={kept} language="markdown" onDone={() => setKept(null)} />
+            )}
+            {conflict !== null && (
+              <TextConflict
+                place={place}
+                path={PATH}
+                what="the statement"
+                mine={conflict.content ?? ''}
+                language="markdown"
+                busy={saving}
+                onTakeTheirs={() => {
+                  setKept(conflict.content ?? '');
+                  setConflict(null);
+                  void query.refetch();
+                }}
+                onOverwrite={(theirs) =>
+                  void send({ ...conflict, token: theirs.token })
+                }
+              />
+            )}
+            {outcome !== null && (
+              <SaveOutcome
+                outcome={outcome}
+                onConfirm={(body, asked) =>
+                  void send({ ...body, confirm: true, asked })
+                }
+                onKeepAsDraft={(body) => void send({ ...body, keep_as_draft: true })}
+                onReload={() => {
+                  setOutcome(null);
+                  void query.refetch();
+                }}
+                placeOf={placeOfIn(place)}
+              />
+            )}
+          </div>
+        );
+      }}
+    </Loaded>
   );
 }
 
@@ -449,7 +450,7 @@ function Source({
         </>
       )}
       {admin && (
-        <div className={shared.actions}>
+        <Group gap="xs">
           <Button
             loading={busy}
             disabled={!changed || asking}
@@ -461,7 +462,7 @@ function Source({
             Save statement
           </Button>
           {changed && <UnsavedNote />}
-        </div>
+        </Group>
       )}
     </>
   );

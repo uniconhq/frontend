@@ -37,7 +37,8 @@ import {
   wirePath,
   type Point,
 } from '../flow/graph';
-import { BOX, BOX_PROPERTIES, rowOf, type Box, type Layout } from './layout';
+import { BOX, BOX_PROPERTIES } from '../flow/box';
+import { rowOf, type Box, type Layout } from './layout';
 import type { BoxDecl } from './boxes';
 import {
   sourceAt,
@@ -65,6 +66,7 @@ import {
   typeWords,
 } from './words';
 import classes from './workflows.module.css';
+import flow from '../flow/box.module.css';
 
 /**
  * The workflow drawn as boxes and wires. React Flow draws them and handles
@@ -484,7 +486,7 @@ function ProblemMark({ problem }: { problem: DefinitionProblem }) {
   return (
     <>
       <span
-        className={classes.problem}
+        className={flow.problem}
         role="note"
         aria-label={problem.message}
         title={problem.message}
@@ -584,16 +586,16 @@ const Head = memo(function Head({
   return (
     <button
       type="button"
-      className={`${classes.header} ${classes.headButton} nodrag nopan`}
+      className={`${flow.header} ${classes.headButton} nodrag nopan`}
       aria-expanded={open}
       onClick={() => actions.select(box)}
     >
-      <span className={classes.titleLine}>
-        <span className={classes.title}>{head.title}</span>
+      <span className={flow.titleLine}>
+        <span className={flow.title}>{head.title}</span>
         {head.pill !== null && <span className={classes.pill}>{head.pill}</span>}
       </span>
       {(head.what !== null || head.ref !== null) && (
-        <span className={classes.primitiveLine}>
+        <span className={flow.titleLine}>
           {head.what !== null && (
             <span className={classes.primitiveTitle}>{head.what}</span>
           )}
@@ -601,7 +603,7 @@ const Head = memo(function Head({
         </span>
       )}
       {head.description !== null && head.description !== '' && (
-        <span className={classes.description} title={head.description}>
+        <span className={flow.description} title={head.description}>
           {head.description}
         </span>
       )}
@@ -620,7 +622,7 @@ function WarningLine({ warning, rows }: { warning: Warning; rows: RowView[] }) {
     rows.some((row) => row.problems.includes(warning.problem));
   return (
     <p
-      className={`${classes.line} ${classes.headProblem}`}
+      className={`${flow.line} ${flow.headProblem}`}
       aria-hidden={repeated || undefined}
     >
       {warning.kind === 'problem' ? (
@@ -644,7 +646,7 @@ function Pin({ side, colour, live }: { side: Side; colour: string; live: boolean
       type={side === 'left' ? 'target' : 'source'}
       position={side === 'left' ? Position.Left : Position.Right}
       id={`${side === 'left' ? 'in' : 'out'}:*`}
-      className={classes.pin}
+      className={flow.pin}
       style={{ top: BOX.pin, background: colour }}
       isConnectable={live}
       isConnectableStart={live && side === 'right'}
@@ -717,7 +719,7 @@ function FedTab({ fed, box }: { fed: Fed[]; box: string }) {
                   onClickCapture={close}
                 >
                   <div
-                    className={classes.box}
+                    className={flow.box}
                     data-kind={each.kind}
                     style={{ borderColor: each.colour }}
                     role="group"
@@ -772,19 +774,19 @@ const BoxView = memo(function BoxView({ data }: NodeProps<BoxNode>) {
       {data.stacked && (
         <>
           <span
-            className={classes.ear}
+            className={flow.ear}
             style={{ top: 0, left: 16, right: 16, borderColor: data.colour }}
             aria-hidden
           />
           <span
-            className={classes.ear}
+            className={flow.ear}
             style={{ top: 6, left: 8, right: 8, borderColor: data.colour }}
             aria-hidden
           />
         </>
       )}
       <div
-        className={classes.box}
+        className={flow.box}
         data-kind={data.kind}
         data-open={data.open || undefined}
         data-selected={data.selected || undefined}
@@ -806,7 +808,7 @@ const BoxView = memo(function BoxView({ data }: NodeProps<BoxNode>) {
           <WarningLine warning={data.warning} rows={data.rows} />
         )}
         {data.needs !== null && (
-          <p className={`${classes.line} ${classes.detail}`}>{data.needs}</p>
+          <p className={`${flow.line} ${flow.detail}`}>{data.needs}</p>
         )}
         {!data.open && data.pins.left && (
           <Pin side="left" colour={data.colour} live={!actions.readOnly} />
@@ -1360,7 +1362,7 @@ export function Graph({
           data-more-left={more.left ? '' : undefined}
           data-more-right={more.right ? '' : undefined}
         >
-          <div className={classes.frame} ref={frame} style={BOX_PROPERTIES}>
+          <div className={flow.frame} ref={frame} style={BOX_PROPERTIES}>
             <div
               className={classes.canvas}
               style={{

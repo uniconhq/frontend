@@ -3,9 +3,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@/test/user-event';
 import { http, HttpResponse } from 'msw';
-import { holding } from '@/test/may';
 import { renderApp } from '@/test/render';
-import { problem, server, signedIn } from '@/test/server';
+import { problem, server, signedIn, signedInAs } from '@/test/server';
 import {
   TASK_API,
   publicationList,
@@ -13,6 +12,9 @@ import {
   repoFiles,
   taskState,
   unchanged,
+  fileContent,
+  published,
+  treeEntry,
 } from '@/test/organiser';
 import { comeBackToTab, fakeLiveStream, openStream, realLiveStream } from '@/test/live';
 
@@ -30,14 +32,14 @@ function statementBackend(
     publicationList,
     http.get(`${TASK_API}/files/:path`, ({ params }) =>
       params['path'] === 'statement.md'
-        ? HttpResponse.json({
-            path: 'statement.md',
-            encoding: 'utf-8',
-            content: STATEMENT,
-            token: 'token-statement',
-            upload,
-            version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
-          })
+        ? HttpResponse.json(
+            fileContent({
+              path: 'statement.md',
+              content: STATEMENT,
+              token: 'token-statement',
+              upload,
+            }),
+          )
         : undefined,
     ),
     http.put(`${TASK_API}/files/:path`, async ({ request }) => {
@@ -61,16 +63,7 @@ describe('the statement beside its preview', { timeout: 20_000 }, () => {
   });
 
   it('lets an admin edit the statement and shows it as contestants will', async () => {
-    const { sent } = statementBackend(() =>
-      HttpResponse.json({
-        number: 3,
-        grading_changed: false,
-        changes: [],
-        notes: [],
-        regraded: 0,
-        effect: unchanged,
-      }),
-    );
+    const { sent } = statementBackend(() => HttpResponse.json(published()));
     renderApp('/orgs/acme/contests/spring/tasks/sum?card=statement');
 
     const source = await screen.findByRole('textbox', { name: 'Statement source' });
@@ -97,16 +90,7 @@ describe('the statement beside its preview', { timeout: 20_000 }, () => {
   });
 
   it('asks before leaving with changes not saved, and leaves at once after the save', async () => {
-    statementBackend(() =>
-      HttpResponse.json({
-        number: 3,
-        grading_changed: false,
-        changes: [],
-        notes: [],
-        regraded: 0,
-        effect: unchanged,
-      }),
-    );
+    statementBackend(() => HttpResponse.json(published()));
     // The statement as saved is read back with its new token.
     let saved: { content: string; token: string } | null = null;
     server.use(
@@ -114,24 +98,17 @@ describe('the statement beside its preview', { timeout: 20_000 }, () => {
       http.put(`${TASK_API}/files/:path`, async ({ request }) => {
         const body = (await request.json()) as { content: string };
         saved = { content: body.content, token: 'token-saved' };
-        return HttpResponse.json({
-          number: 3,
-          grading_changed: false,
-          changes: [],
-          notes: [],
-          regraded: 0,
-          effect: unchanged,
-        });
+        return HttpResponse.json(published());
       }),
       http.get(`${TASK_API}/files/:path`, ({ params }) =>
         params['path'] === 'statement.md' && saved !== null
-          ? HttpResponse.json({
-              path: 'statement.md',
-              encoding: 'utf-8',
-              ...saved,
-              upload: null,
-              version: '4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e',
-            })
+          ? HttpResponse.json(
+              fileContent({
+                path: 'statement.md',
+                ...saved,
+                version: '4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e',
+              }),
+            )
           : undefined,
       ),
     );
@@ -223,26 +200,23 @@ describe('the statement beside its preview', { timeout: 20_000 }, () => {
           new URL(request.url).searchParams.get('path') === 'public'
             ? HttpResponse.json(
                 // The empty file a task made before kept the folder with (M60).
-                [...pictures, 'public/.gitkeep'].map((path) => ({
-                  path,
-                  kind: 'file',
-                  size: path.endsWith('.gitkeep') ? 0 : 9,
-                  upload: null,
-                })),
+                [...pictures, 'public/.gitkeep'].map((path) =>
+                  treeEntry({ path, size: path.endsWith('.gitkeep') ? 0 : 9 }),
+                ),
               )
             : undefined,
         ),
         http.get(`${TASK_API}/files/:path`, ({ params }) => {
           const path = decodeURIComponent(String(params['path']));
           return pictures.includes(path)
-            ? HttpResponse.json({
-                path,
-                encoding: 'utf-8',
-                content: 'x',
-                token: `token-${path}`,
-                upload: null,
-                version: null,
-              })
+            ? HttpResponse.json(
+                fileContent({
+                  path,
+                  content: 'x',
+                  token: `token-${path}`,
+                  version: null,
+                }),
+              )
             : undefined;
         }),
         http.post(`${TASK_API}/save`, async ({ request }) => {
@@ -250,15 +224,7 @@ describe('the statement beside its preview', { timeout: 20_000 }, () => {
           const answer = answers[saves.length - 1];
           return answer !== undefined
             ? answer()
-            : HttpResponse.json({
-                publication: 'p',
-                number: 4,
-                grading_changed: false,
-                changes: [],
-                notes: [],
-                regraded: 0,
-                effect: unchanged,
-              });
+            : HttpResponse.json(published({ number: 4 }));
         }),
       );
       return { sent, saves };
@@ -523,8 +489,7 @@ describe('the statement beside its preview', { timeout: 20_000 }, () => {
     statementBackend(() => problem(403, 'admin_only', { keys: ['statement.md'] }));
     server.use(
       ...partTransport(`${TASK_API}/organise/part-uploads`),
-      signedIn,
-      ...holding('manager'),
+      ...signedInAs('manager'),
     );
     renderApp('/orgs/acme/contests/spring/tasks/sum?card=statement');
 
@@ -563,26 +528,13 @@ describe('the statement while it is being edited', { timeout: 20_000 }, () => {
       http.get(`${TASK_API}/files/:path`, ({ params }) => {
         if (params['path'] !== 'statement.md') return undefined;
         asked.reads += 1;
-        return HttpResponse.json({
-          path: 'statement.md',
-          encoding: 'utf-8',
-          ...stored,
-          upload: null,
-          version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
-        });
+        return HttpResponse.json(fileContent({ path: 'statement.md', ...stored }));
       }),
       http.put(`${TASK_API}/files/:path`, async ({ request }) => {
         const body = (await request.json()) as { content: string; token: string };
         sent.push(body);
         return body.token === stored.token
-          ? HttpResponse.json({
-              number: 3,
-              grading_changed: false,
-              changes: [],
-              notes: [],
-              regraded: 0,
-              effect: unchanged,
-            })
+          ? HttpResponse.json(published())
           : problem(409, 'conflict');
       }),
       ...repoFiles,

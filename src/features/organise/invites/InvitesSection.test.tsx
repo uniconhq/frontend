@@ -4,8 +4,7 @@ import userEvent from '@/test/user-event';
 import { http, HttpResponse } from 'msw';
 import type { Invite } from '@/api/types';
 import { renderApp } from '@/test/render';
-import { problem, server, signedIn } from '@/test/server';
-import { holding } from '@/test/may';
+import { problem, server, signedIn, signedInAs } from '@/test/server';
 import { contestList, settingsOf, taskList } from '@/test/organiser';
 import { invite } from '@/test/invites';
 
@@ -260,8 +259,7 @@ describe('the organisers’ invites', () => {
 
   it('shows an observer the invites and nothing to change', async () => {
     server.use(
-      signedIn,
-      ...holding('observer'),
+      ...signedInAs('observer'),
       http.get(ORG_INVITES, () => HttpResponse.json([invite({ may_change: false })])),
     );
     renderApp('/orgs/acme/organisers');
@@ -273,8 +271,7 @@ describe('the organisers’ invites', () => {
 
   it('offers a manager no admin invite and no change to one', async () => {
     server.use(
-      signedIn,
-      ...holding('manager'),
+      ...signedInAs('manager'),
       taskList,
       http.get(CONTEST_INVITES, () =>
         HttpResponse.json([

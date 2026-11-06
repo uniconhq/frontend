@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { UnsavedNote } from '@/ui/UnsavedNote';
 import { Button } from '@/ui/Button';
 import { TextInput } from '@/ui/TextInput';
+import { Group } from '@/ui/layout';
 import { FieldBox } from '../contest/ContestFile';
 import { useOpenedField } from '../contest/opened';
 import { usePlaceMay } from '../may';
@@ -51,7 +52,7 @@ function Form({
         />
       </FieldBox>
       {admin && (
-        <div className={shared.actions}>
+        <Group gap="xs">
           <Button
             type="submit"
             loading={busy}
@@ -60,7 +61,7 @@ function Form({
             Save title
           </Button>
           {changed && <UnsavedNote />}
-        </div>
+        </Group>
       )}
     </form>
   );

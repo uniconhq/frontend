@@ -4,19 +4,21 @@ import { http, HttpResponse } from 'msw';
 import userEvent from '@/test/user-event';
 import { renderWithProviders } from '@/test/render';
 import { server } from '@/test/server';
+import { workflowItem } from '@/test/workflows';
 import { WorkflowSearch } from './WorkflowSearch';
 
-const item = (name: string) => ({
-  owner: 'ada',
-  name,
-  visibility: 'public',
-  editable: false,
-  description: 'A special checker.',
-  versions: ['v1', 'v2'],
-  yanked: {
-    v2: { reason: 'Use v1 for now', by: 7, at: '2026-11-01T00:00:00Z' },
-  },
-});
+const item = (name: string) =>
+  workflowItem({
+    owner: 'ada',
+    name,
+    visibility: 'public',
+    editable: false,
+    description: 'A special checker.',
+    versions: ['v1', 'v2'],
+    yanked: {
+      v2: { reason: 'Use v1 for now', by: 7, at: '2026-11-01T00:00:00Z' },
+    },
+  });
 
 describe('workflow search', () => {
   it('searches scopes, follows a short page, and chooses an available version', async () => {

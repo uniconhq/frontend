@@ -5,8 +5,8 @@ import { delay, http, HttpResponse } from 'msw';
 import { formatDateTime } from '@/lib/time';
 import { renderApp } from '@/test/render';
 import type { RoleName } from '@/api/types';
-import { holding, listedContests, orgMay } from '@/test/may';
-import { problem, server, signedIn } from '@/test/server';
+import { listedContests, orgMay } from '@/test/may';
+import { problem, server, signedIn, signedInAs } from '@/test/server';
 import { ORG_API, contestList, contests, listAndCreate } from '@/test/organiser';
 import { passTimeUntil, withFakeTimers } from '@/test/timers';
 
@@ -95,11 +95,10 @@ describe('the org page', () => {
 
   it('shows someone who organises only some of its contests the ones the server lists', async () => {
     server.use(
-      signedIn,
       http.get(`${ORG_API}/contests`, () =>
         HttpResponse.json(listedContests(null).filter(({ name }) => name === 'spring')),
       ),
-      ...holding(null),
+      ...signedInAs(null),
     );
     renderApp('/orgs/acme');
 
@@ -355,8 +354,7 @@ describe('creating a contest', () => {
 
   it('shows a refusal beside the form, keeping what was typed', async () => {
     server.use(
-      signedIn,
-      ...holding('manager'),
+      ...signedInAs('manager'),
       contestList,
       http.post('/api/v1/orgs/acme/contests', () =>
         problem(409, 'conflict', { detail: 'The contest summer already exists.' }),
@@ -373,7 +371,7 @@ describe('creating a contest', () => {
   });
 
   it('offers no New contest to an observer, who may not make one', async () => {
-    server.use(signedIn, ...holding('observer'), contestList);
+    server.use(...signedInAs('observer'), contestList);
     renderApp('/orgs/acme');
 
     await screen.findByRole('list', { name: 'Contests' });

@@ -3,6 +3,7 @@ import type { TaskStanding } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
 import { RadioGroup } from '@/ui/RadioGroup';
+import { Group } from '@/ui/layout';
 import { NumberField, TimeField } from '../forms/fields';
 import {
   readContest,
@@ -15,7 +16,6 @@ import type { ValuesFormProps } from '../forms/ValuesForm';
 import { ContestFile, FieldBox } from './ContestFile';
 import { useOpenedField } from './opened';
 import { markedBoardCovers } from './timeline';
-import shared from '../organise.module.css';
 import forms from '../forms/forms.module.css';
 
 /**
@@ -165,11 +165,11 @@ function EntryForm({
           />
         </FieldBox>
       )}
-      <div className={shared.actions}>
+      <Group gap="xs">
         <Button type="submit" loading={busy} disabled={!changed || problems.length > 0}>
           Save
         </Button>
-      </div>
+      </Group>
     </form>
   );
 }

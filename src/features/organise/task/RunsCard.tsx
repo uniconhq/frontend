@@ -26,6 +26,7 @@ import type { StagedInput } from './input-files';
 import { useNamed } from './named-file';
 import { runName } from './scoring-model';
 import { cellPath, pairRunFiles } from './run-files';
+import tableClasses from '@/ui/table.module.css';
 import classes from './task.module.css';
 
 function fieldName(table: number, row: number, name: string) {
@@ -76,7 +77,7 @@ export function RunsCard({
     onChange(axes.map((item, index) => (index === table ? axis : item)));
   const table = (axis: AxisValues, index: number) => (
     <div key={index}>
-      <div className={classes.runTableFrame}>
+      <div className={tableClasses.scroll}>
         <table
           className={classes.runTable}
           aria-label={index === 0 ? 'Runs' : `Table ${String(index + 1)}`}

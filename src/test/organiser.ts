@@ -1,4 +1,5 @@
 import { http, HttpResponse } from 'msw';
+import type { components } from '@/api/schema';
 import type {
   FileContent,
   ListedContest,
@@ -15,6 +16,8 @@ import type {
 } from '@/api/types';
 import { PICTURES, listedContests, taskMay } from './may';
 import { problem } from './server';
+
+type Published = components['schemas']['Published'];
 
 /**
  * The organiser's world for the tests: the acme org, its contests, the spring
@@ -85,6 +88,21 @@ export const unchanged: SaveEffect = {
   scores: ['No score changes.'],
   reading: ['Nothing entrants read changes.'],
 };
+
+/** A task save's answer once it publishes: publication 3, moving nobody's result. */
+export function published(overrides: Partial<Published> = {}): Published {
+  return {
+    number: 3,
+    grading_changed: false,
+    changes: [],
+    notes: [],
+    regraded: 0,
+    effect: unchanged,
+    check: null,
+    regrade: null,
+    ...overrides,
+  };
+}
 
 /**
  * A finished grading's result: a run for each verdict, in order, and the
@@ -217,131 +235,102 @@ const DOWNLOADS = '/-/downloads/acme/spring/sum';
 /** The commit every listed file was last changed at. */
 const LISTED_AT = '9f8e7d6c5b4a39281706f5e4d3c2b1a098765432';
 
+/** The commit every file read was last changed at. */
+const SAVED_AT = '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d';
+
+/** One entry of a folder as `GET <place>/tree?path=` lists it: a file, nothing else said. */
+export function treeEntry(
+  overrides: Pick<TreeEntry, 'path'> & Partial<TreeEntry>,
+): TreeEntry {
+  return {
+    kind: 'file',
+    size: null,
+    upload: null,
+    start: null,
+    token: null,
+    version: null,
+    href: null,
+    ...overrides,
+  };
+}
+
+/** A file as `GET <place>/files/<path>` answers it: text, read at `SAVED_AT`. */
+export function fileContent(
+  overrides: Pick<FileContent, 'path' | 'content' | 'token'> & Partial<FileContent>,
+): FileContent {
+  return {
+    encoding: 'utf-8',
+    upload: null,
+    version: SAVED_AT,
+    href: null,
+    ...overrides,
+  };
+}
+
+/** A file of the sum task as listed, with its link at the download door. */
+const listed = (path: string, size: number) =>
+  treeEntry({
+    path,
+    size,
+    version: LISTED_AT,
+    href: `${DOWNLOADS}/versions/${LISTED_AT}/${path}`,
+  });
+
 /** Folder by folder, as `GET <place>/tree?path=` answers. */
 const taskTree: Record<string, TreeEntry[]> = {
   '': [
-    {
-      path: 'task.yaml',
-      kind: 'file',
-      size: 120,
-      upload: null,
-      start: null,
-      token: null,
-      version: LISTED_AT,
-      href: `${DOWNLOADS}/versions/${LISTED_AT}/task.yaml`,
-    },
-    {
-      path: 'data',
-      kind: 'directory',
-      size: null,
-      upload: null,
-      start: null,
-      token: null,
-      version: null,
-      href: null,
-    },
-    {
-      path: 'statement.md',
-      kind: 'file',
-      size: 40,
-      upload: null,
-      start: null,
-      token: null,
-      version: LISTED_AT,
-      href: `${DOWNLOADS}/versions/${LISTED_AT}/statement.md`,
-    },
+    listed('task.yaml', 120),
+    treeEntry({ path: 'data', kind: 'directory' }),
+    listed('statement.md', 40),
   ],
-  data: [
-    {
-      path: 'data/testcases',
-      kind: 'directory',
-      size: null,
-      upload: null,
-      start: null,
-      token: null,
-      version: null,
-      href: null,
-    },
-  ],
+  data: [treeEntry({ path: 'data/testcases', kind: 'directory' })],
   'data/testcases': [
-    {
-      path: 'data/testcases/1.in',
-      kind: 'file',
-      size: 4,
-      upload: null,
-      start: null,
-      token: null,
-      version: LISTED_AT,
-      href: `${DOWNLOADS}/versions/${LISTED_AT}/data/testcases/1.in`,
-    },
-    {
-      path: 'data/testcases/logo.png',
-      kind: 'file',
-      size: 11,
-      upload: null,
-      start: null,
-      token: null,
-      version: LISTED_AT,
-      href: `${DOWNLOADS}/versions/${LISTED_AT}/data/testcases/logo.png`,
-    },
+    listed('data/testcases/1.in', 4),
+    listed('data/testcases/logo.png', 11),
   ],
 };
 
 const contestTree: Record<string, TreeEntry[]> = {
-  '': [
-    {
-      path: 'contest.yaml',
-      kind: 'file',
-      size: 80,
-      upload: null,
-      start: null,
-      token: null,
-      version: LISTED_AT,
-      href: null,
-    },
-  ],
+  '': [treeEntry({ path: 'contest.yaml', size: 80, version: LISTED_AT })],
 };
 
+/** A file of the sum task as read, with its link at the download door. */
+const saved = (
+  path: string,
+  content: string,
+  token: string,
+  more: Partial<FileContent> = {},
+) =>
+  fileContent({
+    path,
+    content,
+    token,
+    href: `${DOWNLOADS}/versions/${SAVED_AT}/${path}`,
+    ...more,
+  });
+
 export const files: Record<string, FileContent> = {
-  'task.yaml': {
-    path: 'task.yaml',
-    encoding: 'utf-8',
-    content: 'name: sum\nworkflow: unicon/classic@v6\n',
-    token: 'token-task-yaml',
-    upload: null,
-    version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
-    href: `${DOWNLOADS}/versions/3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d/task.yaml`,
-  },
-  'statement.md': {
-    path: 'statement.md',
-    encoding: 'utf-8',
-    content: 'Write the sum of two numbers.\n',
-    token: 'token-statement',
-    upload: null,
-    version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
-    href: `${DOWNLOADS}/versions/3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d/statement.md`,
-  },
-  'data/testcases/1.in': {
-    path: 'data/testcases/1.in',
-    encoding: 'utf-8',
-    content: '1 2\n',
-    token: 'token-1-in',
-    upload: null,
-    version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
-    href: `${DOWNLOADS}/versions/3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d/data/testcases/1.in`,
-  },
-  'data/testcases/logo.png': {
-    path: 'data/testcases/logo.png',
-    encoding: 'base64',
-    content: 'iVBORw0KGgoA//4=',
-    token: 'token-logo',
-    upload: null,
-    version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
-    href: `${DOWNLOADS}/versions/3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d/data/testcases/logo.png`,
-  },
-  'contest.yaml': {
+  'task.yaml': saved(
+    'task.yaml',
+    'name: sum\nworkflow: unicon/classic@v6\n',
+    'token-task-yaml',
+  ),
+  'statement.md': saved(
+    'statement.md',
+    'Write the sum of two numbers.\n',
+    'token-statement',
+  ),
+  'data/testcases/1.in': saved('data/testcases/1.in', '1 2\n', 'token-1-in'),
+  'data/testcases/logo.png': saved(
+    'data/testcases/logo.png',
+    'iVBORw0KGgoA//4=',
+    'token-logo',
+    {
+      encoding: 'base64',
+    },
+  ),
+  'contest.yaml': fileContent({
     path: 'contest.yaml',
-    encoding: 'utf-8',
     content: [
       'name: Spring',
       'start: 2026-10-01T09:00:00Z',
@@ -354,10 +343,7 @@ export const files: Record<string, FileContent> = {
       '',
     ].join('\n'),
     token: 'token-contest-yaml',
-    upload: null,
-    version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
-    href: null,
-  },
+  }),
 };
 
 function treeAnswer(tree: Record<string, TreeEntry[]>) {
@@ -389,7 +375,7 @@ export function settingsOf(
     values,
     unreadable: values === null ? 'The file does not hold named settings.' : null,
     token,
-    version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
+    version: SAVED_AT,
   };
 }
 

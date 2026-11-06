@@ -22,42 +22,6 @@
   color: var(--unicon-text-body);
 }
 
-.heading {
-  display: flex;
-  gap: 12px;
-  align-items: baseline;
-  justify-content: space-between;
-  flex-wrap: wrap;
-}
-
-.table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 13px;
-  color: var(--unicon-text-body);
-}
-
-.table th {
-  text-align: left;
-  font-weight: 600;
-  color: var(--unicon-text-secondary);
-  padding: 6px 10px 8px 0;
-  border-bottom: 1px solid var(--unicon-border);
-}
-
-.table td,
-.table tbody th {
-  vertical-align: top;
-  padding: 8px 10px 8px 0;
-  border-bottom: 1px solid var(--unicon-border);
-}
-
-/* Each row is named by its submission or its test, as a header that reads like a cell. */
-.table tbody th {
-  font-weight: 400;
-  color: var(--unicon-text-body);
-}
-
 /* Said to a screen reader and not shown: out of sight, still read. */
 .announce {
   position: absolute;

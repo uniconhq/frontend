@@ -1,12 +1,14 @@
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { queryView } from '@/api/query';
 import type { FileContent } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
 import { CodeEditor, type CodeLanguage } from '@/ui/CodeEditor';
-import { Modal } from '@/ui/Modal';
+import { ConfirmDialog } from '@/ui/ConfirmDialog';
 import { Loaded } from '@/ui/feedback/Loaded';
+import { Group } from '@/ui/layout';
+import { useFocusOnShow } from '@/lib/use-focus-on-show';
 import { fileQuery, type Place } from './place';
 import shared from '../organise.module.css';
 import classes from './Files.module.css';
@@ -33,11 +35,11 @@ export function KeptText({
         rows={10}
         readOnly
       />
-      <div className={shared.actions}>
+      <Group gap="xs">
         <Button size="xs" variant="secondary" onClick={onDone}>
           Done with it
         </Button>
-      </div>
+      </Group>
     </div>
   );
 }
@@ -72,15 +74,12 @@ export function TextConflict({
   onOverwrite: (theirs: FileContent) => void;
   onTakeTheirs: () => void;
 }) {
-  const panel = useRef<HTMLDivElement>(null);
+  const panel = useFocusOnShow<HTMLDivElement>();
   const [warning, setWarning] = useState(false);
   const { queryKey, queryFn } = fileQuery(place, path);
   const theirs = queryView(
     useQuery({ queryKey: [...queryKey, 'theirs'], queryFn, staleTime: 0, gcTime: 0 }),
   );
-  useEffect(() => {
-    panel.current?.focus();
-  }, []);
 
   return (
     <div ref={panel} className={shared.panel} role="alert" tabIndex={-1}>
@@ -109,39 +108,29 @@ export function TextConflict({
                 readOnly
               />
             </div>
-            <div className={shared.actions}>
+            <Group gap="xs">
               <Button onClick={onTakeTheirs}>Continue from theirs</Button>
               <Button variant="danger" disabled={busy} onClick={() => setWarning(true)}>
                 Save yours over theirs
               </Button>
-            </div>
-            <Modal
+            </Group>
+            <ConfirmDialog
               opened={warning}
               onClose={() => setWarning(false)}
               title="Save yours over theirs?"
+              confirm="Save yours over theirs"
+              variant="danger"
+              loading={busy}
+              onConfirm={() => {
+                setWarning(false);
+                onOverwrite(file);
+              }}
             >
-              <div className={shared.stack}>
-                <BodyText>
-                  Their change to {what} is thrown away, and yours is saved in its
-                  place. Theirs is still kept among the earlier versions.
-                </BodyText>
-                <div className={shared.actions}>
-                  <Button
-                    variant="danger"
-                    loading={busy}
-                    onClick={() => {
-                      setWarning(false);
-                      onOverwrite(file);
-                    }}
-                  >
-                    Save yours over theirs
-                  </Button>
-                  <Button variant="secondary" onClick={() => setWarning(false)}>
-                    Cancel
-                  </Button>
-                </div>
-              </div>
-            </Modal>
+              <BodyText>
+                Their change to {what} is thrown away, and yours is saved in its place.
+                Theirs is still kept among the earlier versions.
+              </BodyText>
+            </ConfirmDialog>
           </>
         )}
       </Loaded>

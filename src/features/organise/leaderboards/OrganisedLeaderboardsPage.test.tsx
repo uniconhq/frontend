@@ -2,9 +2,8 @@ import { http, HttpResponse } from 'msw';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { act, screen, waitFor, within } from '@testing-library/react';
 import { specCatalogue } from '@/test/catalogue';
-import { holding } from '@/test/may';
 import { renderApp } from '@/test/render';
-import { problem, server, signedIn } from '@/test/server';
+import { problem, server, signedIn, signedInAs } from '@/test/server';
 import {
   CONTEST_API,
   contestSettings,
@@ -55,7 +54,7 @@ describe("a contest's leaderboards for its organisers", () => {
   });
 
   it('shows observers formulas read-only without offering changes or tiles', async () => {
-    server.use(signedIn, ...holding('observer'), withBoards(STANDINGS));
+    server.use(...signedInAs('observer'), withBoards(STANDINGS));
     renderApp(PAGE);
     const line = await screen.findByRole('textbox', { name: 'points' });
     expect(line).toHaveAttribute('contenteditable', 'false');

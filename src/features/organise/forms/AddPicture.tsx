@@ -5,6 +5,7 @@ import { formatLimit } from '@/lib/size';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
 import { FileDrop } from '@/ui/FileDrop';
+import { Group } from '@/ui/layout';
 import shared from '../organise.module.css';
 import { freeName, pictureLine, pictureName } from './picture-name';
 import { pictureRefusal, picturesAllowed } from './statement-pictures';
@@ -52,7 +53,7 @@ export function AddPicture({
   return (
     <div className={shared.stack}>
       {!open && (
-        <div className={shared.actions}>
+        <Group gap="xs">
           <Button
             variant="secondary"
             onClick={() => setOpen(true)}
@@ -60,7 +61,7 @@ export function AddPicture({
           >
             Add a picture
           </Button>
-        </div>
+        </Group>
       )}
       {open && pictures !== undefined && (
         <>
@@ -75,7 +76,7 @@ export function AddPicture({
             }}
             disabled={disabled}
           />
-          <div className={shared.actions}>
+          <Group gap="xs">
             <Button
               variant="secondary"
               onClick={() => {
@@ -85,7 +86,7 @@ export function AddPicture({
             >
               Cancel
             </Button>
-          </div>
+          </Group>
         </>
       )}
       {refused !== null && (

@@ -1,4 +1,5 @@
 import type { QueryKey } from '@tanstack/react-query';
+import { byPlace, type At } from '@/api/place';
 import { $api, widenQuery } from '@/api/query';
 
 /**
@@ -6,19 +7,12 @@ import { $api, widenQuery } from '@/api/query';
  * routes are the same under either prefix, so the file components take a
  * place and these choose the address.
  */
-export type Place =
-  | { kind: 'contest'; org: string; contest: string }
-  | { kind: 'task'; org: string; contest: string; task: string };
+export type Place = At<'contest' | 'task'>;
 
-export type WorkflowPlace = { kind: 'workflow'; owner: string; name: string };
+export type WorkflowPlace = At<'workflow'>;
 export type FilePlace = Place | WorkflowPlace;
 /** A workflow's version, whose files are listed and downloaded, never read here. */
-export type VersionPlace = {
-  kind: 'version';
-  owner: string;
-  name: string;
-  version: string;
-};
+export type VersionPlace = At<'version'>;
 /** A place whose files are listed. */
 export type ListedPlace = FilePlace | VersionPlace;
 
@@ -31,90 +25,74 @@ export function settingsPath(place: Place): string {
 }
 
 export function treeQuery(place: ListedPlace, folder: string) {
-  if (place.kind === 'version')
-    return widenQuery(
-      $api.queryOptions(
-        'get',
-        '/api/v1/workflows/{owner}/{name}/versions/{version}/tree',
-        {
-          params: {
-            path: { owner: place.owner, name: place.name, version: place.version },
-            query: { path: folder },
-          },
-        },
-      ),
-    );
-  if (place.kind === 'workflow')
-    return widenQuery(
-      $api.queryOptions('get', '/api/v1/workflows/{owner}/{name}/tree', {
-        params: {
-          path: { owner: place.owner, name: place.name },
-          query: { path: folder },
-        },
-      }),
-    );
   const query = { path: folder };
-  return place.kind === 'task'
-    ? widenQuery(
-        $api.queryOptions('get', TASK_TREE, {
-          params: {
-            path: { org: place.org, contest: place.contest, task: place.task },
-            query,
-          },
+  return byPlace(place, {
+    version: (path) =>
+      widenQuery(
+        $api.queryOptions(
+          'get',
+          '/api/v1/workflows/{owner}/{name}/versions/{version}/tree',
+          { params: { path, query } },
+        ),
+      ),
+    workflow: (path) =>
+      widenQuery(
+        $api.queryOptions('get', '/api/v1/workflows/{owner}/{name}/tree', {
+          params: { path, query },
         }),
-      )
-    : widenQuery(
-        $api.queryOptions('get', CONTEST_TREE, {
-          params: { path: { org: place.org, contest: place.contest }, query },
-        }),
-      );
+      ),
+    contest: (path) =>
+      widenQuery($api.queryOptions('get', CONTEST_TREE, { params: { path, query } })),
+    task: (path) =>
+      widenQuery($api.queryOptions('get', TASK_TREE, { params: { path, query } })),
+  });
 }
 
-export function fileQuery(place: FilePlace, path: string) {
-  if (place.kind === 'workflow')
-    return widenQuery(
-      $api.queryOptions('get', '/api/v1/workflows/{owner}/{name}/files/{path}', {
-        params: { path: { owner: place.owner, name: place.name, path } },
-      }),
-    );
-  return place.kind === 'task'
-    ? widenQuery(
+/** A file of a place, or of a contest or a task as it was at version `at`. */
+export function fileQuery(place: FilePlace, path: string, at?: string) {
+  const query = at === undefined ? undefined : { at };
+  return byPlace(place, {
+    workflow: (where) =>
+      widenQuery(
+        $api.queryOptions('get', '/api/v1/workflows/{owner}/{name}/files/{path}', {
+          params: { path: { ...where, path } },
+        }),
+      ),
+    contest: (where) =>
+      widenQuery(
+        $api.queryOptions('get', '/api/v1/orgs/{org}/contests/{contest}/files/{path}', {
+          params: { path: { ...where, path }, query },
+        }),
+      ),
+    task: (where) =>
+      widenQuery(
         $api.queryOptions(
           'get',
           '/api/v1/orgs/{org}/contests/{contest}/tasks/{task}/files/{path}',
-          {
-            params: {
-              path: { org: place.org, contest: place.contest, task: place.task, path },
-            },
-          },
+          { params: { path: { ...where, path }, query } },
         ),
-      )
-    : widenQuery(
-        $api.queryOptions('get', '/api/v1/orgs/{org}/contests/{contest}/files/{path}', {
-          params: { path: { org: place.org, contest: place.contest, path } },
-        }),
-      );
+      ),
+  });
 }
 
 /** A place's settings as their form's values. */
 export function settingsQuery(place: Place) {
-  return place.kind === 'task'
-    ? widenQuery(
+  return byPlace(place, {
+    contest: (path) =>
+      widenQuery(
+        $api.queryOptions('get', '/api/v1/orgs/{org}/contests/{contest}/settings', {
+          params: { path },
+        }),
+      ),
+    task: (path) =>
+      widenQuery(
         $api.queryOptions(
           'get',
           '/api/v1/orgs/{org}/contests/{contest}/tasks/{task}/settings',
-          {
-            params: {
-              path: { org: place.org, contest: place.contest, task: place.task },
-            },
-          },
+          { params: { path } },
         ),
-      )
-    : widenQuery(
-        $api.queryOptions('get', '/api/v1/orgs/{org}/contests/{contest}/settings', {
-          params: { path: { org: place.org, contest: place.contest } },
-        }),
-      );
+      ),
+  });
 }
 
 /**
@@ -125,11 +103,10 @@ export function settingsQuery(place: Place) {
  * move with it.
  */
 export function staleAfterWrite(place: Place): QueryKey[] {
-  if (place.kind === 'contest') {
+  return byPlace(place, {
     // The contest's settings, read for its page, its home and its tasks'
     // timelines move with a write of its settings.
-    const path = { org: place.org, contest: place.contest };
-    return [
+    contest: (path) => [
       $api.queryOptions('get', CONTEST_TREE, { params: { path } }).queryKey,
       fileQuery(place, 'contest.yaml').queryKey,
       settingsQuery(place).queryKey,
@@ -139,29 +116,26 @@ export function staleAfterWrite(place: Place): QueryKey[] {
       $api.queryOptions('get', '/api/v1/orgs/{org}/contests/{contest}/organise/tasks', {
         params: { path },
       }).queryKey,
-    ];
-  }
-  const path = { org: place.org, contest: place.contest, task: place.task };
-  return [
-    $api.queryOptions('get', TASK_TREE, { params: { path } }).queryKey,
-    settingsQuery(place).queryKey,
-    $api.queryOptions('get', '/api/v1/orgs/{org}/contests/{contest}/tasks/{task}', {
-      params: { path },
-    }).queryKey,
-    $api.queryOptions(
-      'get',
-      '/api/v1/orgs/{org}/contests/{contest}/tasks/{task}/publications',
-      { params: { path } },
-    ).queryKey,
-    $api.queryOptions(
-      'get',
-      '/api/v1/orgs/{org}/contests/{contest}/tasks/{task}/history',
-      {
+    ],
+    task: (path) => [
+      $api.queryOptions('get', TASK_TREE, { params: { path } }).queryKey,
+      settingsQuery(place).queryKey,
+      $api.queryOptions('get', '/api/v1/orgs/{org}/contests/{contest}/tasks/{task}', {
         params: { path },
-      },
-    ).queryKey,
-    $api.queryOptions('get', '/api/v1/orgs/{org}/contests/{contest}/organise/tasks', {
-      params: { path: { org: place.org, contest: place.contest } },
-    }).queryKey,
-  ];
+      }).queryKey,
+      $api.queryOptions(
+        'get',
+        '/api/v1/orgs/{org}/contests/{contest}/tasks/{task}/publications',
+        { params: { path } },
+      ).queryKey,
+      $api.queryOptions(
+        'get',
+        '/api/v1/orgs/{org}/contests/{contest}/tasks/{task}/history',
+        { params: { path } },
+      ).queryKey,
+      $api.queryOptions('get', '/api/v1/orgs/{org}/contests/{contest}/organise/tasks', {
+        params: { path: { org: path.org, contest: path.contest } },
+      }).queryKey,
+    ],
+  });
 }

@@ -5,8 +5,9 @@ import { isApiError } from '@/api/problem';
 import type { components } from '@/api/schema';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
-import { Modal } from '@/ui/Modal';
+import { ConfirmDialog } from '@/ui/ConfirmDialog';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
+import { Group } from '@/ui/layout';
 import { formatDateTime } from '@/lib/time';
 import classes from '../organise.module.css';
 
@@ -95,31 +96,24 @@ function Ask({
   };
   return (
     <>
-      <div className={classes.actions}>
+      <Group gap="xs">
         <Button variant="secondary" loading={pending} onClick={() => run(false)}>
           {released ? 'Take back' : 'Release results'}
         </Button>
-      </div>
+      </Group>
       {failed !== null && (
         <ErrorBlock error={failed} heading="Couldn’t change the release" />
       )}
-      <Modal
+      <ConfirmDialog
         opened={asking !== null}
         onClose={() => setAsking(null)}
         title={released ? 'Take back' : 'Release results'}
+        confirm={released ? 'Take back' : 'Release results'}
+        loading={pending}
+        onConfirm={() => run(true)}
       >
-        <div className={classes.stack}>
-          <BodyText>{asking}</BodyText>
-          <div className={classes.actions}>
-            <Button loading={pending} onClick={() => run(true)}>
-              {released ? 'Take back' : 'Release results'}
-            </Button>
-            <Button variant="secondary" onClick={() => setAsking(null)}>
-              Cancel
-            </Button>
-          </div>
-        </div>
-      </Modal>
+        <BodyText>{asking}</BodyText>
+      </ConfirmDialog>
     </>
   );
 }

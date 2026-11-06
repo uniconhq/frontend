@@ -9,6 +9,7 @@ import { Modal } from '@/ui/Modal';
 import { RadioGroup } from '@/ui/RadioGroup';
 import { TextInput } from '@/ui/TextInput';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
+import { Group } from '@/ui/layout';
 import classes from './workflows.module.css';
 
 const OPTIONS = [
@@ -105,14 +106,14 @@ function SharePanel({ page }: { page: WorkflowPage }) {
             Making it {asking} stops sharing it with the {String(page.readers.length)}{' '}
             {page.readers.length === 1 ? 'person' : 'people'} it is shared with.
           </BodyText>
-          <div className={classes.actions}>
+          <Group gap={8} align="stretch">
             <Button size="xs" onClick={() => apply(asking)}>
               Make it {asking}
             </Button>
             <Button size="xs" variant="secondary" onClick={() => setAsking(null)}>
               Keep it shared
             </Button>
-          </div>
+          </Group>
         </div>
       )}
       {shown === 'shared' && asking === null && (

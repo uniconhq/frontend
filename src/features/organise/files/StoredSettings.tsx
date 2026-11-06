@@ -1,13 +1,14 @@
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { byPlace } from '@/api/place';
 import { $api, queryView } from '@/api/query';
 import { toApiError } from '@/api/problem';
 import type { FileContent, RollbackFile, WriteFile } from '@/api/types';
 import { UnsavedNote } from '@/ui/UnsavedNote';
 import { Button } from '@/ui/Button';
 import { CodeEditor } from '@/ui/CodeEditor';
-import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
-import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
+import { Loaded } from '@/ui/feedback/Loaded';
+import { Group } from '@/ui/layout';
 import { FileHistory } from './FileHistory';
 import { fileQuery, settingsPath, staleAfterWrite, type Place } from './place';
 import { SaveOutcome, type Outcome } from './SaveOutcome';
@@ -17,7 +18,6 @@ import { UploadedFile } from './UploadedFile';
 import { SettingsText } from './SettingsText';
 import { usePlaceMay } from '../may';
 import { placeOfIn } from '../task/places';
-import shared from '../organise.module.css';
 import classes from './Files.module.css';
 
 /**
@@ -102,22 +102,28 @@ export function StoredSettings({ place }: { place: Place }) {
     setConflict(null);
     setFocusText(false);
     try {
-      if (place.kind === 'task') {
-        const params = {
-          path: { org: place.org, contest: place.contest, task: place.task, path },
-        };
-        const result =
-          'version' in body
-            ? await rollBackTask.mutateAsync({ params, body })
-            : await writeTask.mutateAsync({ params, body });
-        setOutcome({ kind: 'saved', result });
-      } else if (!('version' in body)) {
-        const written = await writeContest.mutateAsync({
-          params: { path: { org: place.org, contest: place.contest, path } },
-          body,
-        });
-        setOutcome({ kind: 'written', version: written.version, notes: written.notes });
-      }
+      await byPlace(place, {
+        task: async (at) => {
+          const params = { path: { ...at, path } };
+          const result =
+            'version' in body
+              ? await rollBackTask.mutateAsync({ params, body })
+              : await writeTask.mutateAsync({ params, body });
+          setOutcome({ kind: 'saved', result });
+        },
+        contest: async (at) => {
+          if ('version' in body) return;
+          const written = await writeContest.mutateAsync({
+            params: { path: { ...at, path } },
+            body,
+          });
+          setOutcome({
+            kind: 'written',
+            version: written.version,
+            notes: written.notes,
+          });
+        },
+      });
     } catch (caught) {
       const error = toApiError(caught);
       // Going over theirs is another save, asked about again.
@@ -140,96 +146,100 @@ export function StoredSettings({ place }: { place: Place }) {
     await query.refetch();
   };
 
-  if (view.state === 'loading') return <PageSkeleton rows={6} />;
-  if (view.state === 'error')
-    return <ErrorBlock error={view.error} onRetry={view.retry} />;
-
-  const file = view.data;
   return (
-    <div className={classes.editor}>
-      {file.upload ? (
-        <UploadedFile
-          place={place}
-          path={file.path}
-          upload={file.upload}
-          token={file.token}
-        />
-      ) : (
-        <SettingsText
-          place={place}
-          file={file}
-          manages={manages}
-          editor={
-            <TextEditor
-              key={file.token}
+    <Loaded view={view} rows={6}>
+      {(file) => (
+        <div className={classes.editor}>
+          {file.upload ? (
+            <UploadedFile
+              place={place}
+              path={file.path}
+              upload={file.upload}
+              token={file.token}
+            />
+          ) : (
+            <SettingsText
+              place={place}
               file={file}
-              busy={busy}
-              asking={
-                outcome?.kind === 'refused' &&
-                outcome.error.code === 'confirmation_required'
+              manages={manages}
+              editor={
+                <TextEditor
+                  key={file.token}
+                  file={file}
+                  busy={busy}
+                  asking={
+                    outcome?.kind === 'refused' &&
+                    outcome.error.code === 'confirmation_required'
+                  }
+                  autoFocus={focusText}
+                  onSave={(content) =>
+                    void save({
+                      content,
+                      encoding: 'utf-8',
+                      token: file.token,
+                      confirm: false,
+                      keep_as_draft: false,
+                    })
+                  }
+                />
               }
-              autoFocus={focusText}
-              onSave={(content) =>
-                void save({
-                  content,
-                  encoding: 'utf-8',
+            />
+          )}
+          {kept !== null && (
+            <KeptText text={kept} language="yaml" onDone={() => setKept(null)} />
+          )}
+          {conflict !== null && (
+            <TextConflict
+              place={place}
+              path={path}
+              what="these settings"
+              mine={conflict.content ?? ''}
+              language="yaml"
+              busy={busy}
+              onTakeTheirs={() => {
+                setKept(conflict.content ?? '');
+                setConflict(null);
+                void reload();
+              }}
+              onOverwrite={(theirs) => {
+                setConflict(null);
+                void save({ ...conflict, token: theirs.token });
+              }}
+            />
+          )}
+          {outcome !== null && (
+            <SaveOutcome
+              outcome={outcome}
+              onConfirm={(body, asked) => void save({ ...body, confirm: true, asked })}
+              onKeepAsDraft={
+                place.kind === 'task'
+                  ? (body) => void save({ ...body, keep_as_draft: true })
+                  : undefined
+              }
+              onCancel={() => setOutcome(null)}
+              onReload={() => void reload()}
+              placeOf={placeOfIn(place)}
+            />
+          )}
+          {place.kind === 'task' && (
+            <FileHistory
+              place={place}
+              path={path}
+              language="yaml"
+              busy={busy}
+              onRollBack={(version) =>
+                save({
+                  version,
                   token: file.token,
                   confirm: false,
                   keep_as_draft: false,
                 })
               }
             />
-          }
-        />
+          )}
+        </div>
       )}
-      {kept !== null && (
-        <KeptText text={kept} language="yaml" onDone={() => setKept(null)} />
-      )}
-      {conflict !== null && (
-        <TextConflict
-          place={place}
-          path={path}
-          what="these settings"
-          mine={conflict.content ?? ''}
-          language="yaml"
-          busy={busy}
-          onTakeTheirs={() => {
-            setKept(conflict.content ?? '');
-            setConflict(null);
-            void reload();
-          }}
-          onOverwrite={(theirs) => {
-            setConflict(null);
-            void save({ ...conflict, token: theirs.token });
-          }}
-        />
-      )}
-      {outcome !== null && (
-        <SaveOutcome
-          outcome={outcome}
-          onConfirm={(body, asked) => void save({ ...body, confirm: true, asked })}
-          onKeepAsDraft={
-            place.kind === 'task'
-              ? (body) => void save({ ...body, keep_as_draft: true })
-              : undefined
-          }
-          onCancel={() => setOutcome(null)}
-          onReload={() => void reload()}
-          placeOf={placeOfIn(place)}
-        />
-      )}
-      {place.kind === 'task' && (
-        <FileHistory
-          place={place}
-          path={path}
-          language="yaml"
-          busy={busy}
-          onRollBack={(version) =>
-            save({ version, token: file.token, confirm: false, keep_as_draft: false })
-          }
-        />
-      )}
-    </div>
+    </Loaded>
   );
 }
 
@@ -269,7 +279,7 @@ function TextEditor({
         readOnly={busy || asking}
         autoFocus={autoFocus}
       />
-      <div className={shared.actions}>
+      <Group gap="xs">
         <Button
           loading={busy}
           disabled={!changed || asking}
@@ -278,7 +288,7 @@ function TextEditor({
           Save
         </Button>
         {changed && <UnsavedNote />}
-      </div>
+      </Group>
     </>
   );
 }

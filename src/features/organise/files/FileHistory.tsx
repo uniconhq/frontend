@@ -5,12 +5,12 @@ import type { FileChange, Publication } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
 import { CodeEditor, type CodeLanguage } from '@/ui/CodeEditor';
-import { Modal } from '@/ui/Modal';
-import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
-import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
+import { ConfirmDialog } from '@/ui/ConfirmDialog';
+import { Loaded } from '@/ui/feedback/Loaded';
+import { Group } from '@/ui/layout';
 import { formatDateTime } from '@/lib/time';
 import { usePlaceMay } from '../may';
-import type { Place } from './place';
+import { fileQuery, type Place } from './place';
 import { UploadedFile } from './UploadedFile';
 import shared from '../organise.module.css';
 import classes from './Files.module.css';
@@ -24,14 +24,23 @@ function short(version: string): string {
 
 /**
  * Who made a change, by the username the history names them by, whether or
- * not they still hold a role at the task. One whose account the forge no
- * longer knows shows its number, and one whose author the forge could not
- * match to an account says so.
+ * not they still hold a role. One whose account the forge no longer knows
+ * shows its number, and one it could not match to an account says so.
  */
 function authorName(change: FileChange): string {
   if (change.author !== null) return change.author;
   if (change.author_id === null) return 'an unknown author';
   return `account ${String(change.author_id)}`;
+}
+
+/** Who made a change and when, and `now` when it is the latest. */
+function Made({ change, now }: { change: FileChange; now: string | null }) {
+  return (
+    <BodyText tone="secondary">
+      {authorName(change)} · {formatDateTime(new Date(change.at))}
+      {now !== null && ` · ${now}`}
+    </BodyText>
+  );
 }
 
 /**
@@ -66,7 +75,7 @@ export function FileHistory({
 
   return (
     <div className={shared.stack}>
-      <div className={shared.actions}>
+      <Group gap="xs">
         <Button
           size="xs"
           variant="secondary"
@@ -75,7 +84,7 @@ export function FileHistory({
         >
           {open ? 'Hide history' : 'History'}
         </Button>
-      </div>
+      </Group>
       {open && (
         <Versions
           place={place}
@@ -117,173 +126,239 @@ function Versions({
   const [viewing, setViewing] = useState<string | null>(null);
   const [rolling, setRolling] = useState<string | null>(null);
 
-  if (history.state === 'loading') return <PageSkeleton rows={3} />;
-  if (history.state === 'error')
-    return <ErrorBlock error={history.error} onRetry={history.retry} />;
-  if (history.data.length === 0)
-    return <BodyText tone="secondary">No versions of {path} yet.</BodyText>;
-
-  const byVersion = new Map<string, Publication[]>();
-  for (const publication of publications.data ?? []) {
-    byVersion.set(publication.version, [
-      ...(byVersion.get(publication.version) ?? []),
-      publication,
-    ]);
-  }
-  const current = history.data[0]?.version;
-  const rollingTo = history.data.find((change) => change.version === rolling);
-
-  const rollBack = async (version: string) => {
-    setRolling(null);
-    setViewing(null);
-    await onRollBack(version);
-  };
-
   return (
-    <>
-      <ol className={classes.history} aria-label={`History of ${path}`}>
-        {history.data.map((change) => {
-          const label = short(change.version);
-          return (
-            <li key={change.version} className={classes.version}>
+    <Loaded view={history} rows={3}>
+      {(changes) => {
+        if (changes.length === 0)
+          return <BodyText tone="secondary">No versions of {path} yet.</BodyText>;
+
+        const byVersion = new Map<string, Publication[]>();
+        for (const publication of publications.data ?? []) {
+          byVersion.set(publication.version, [
+            ...(byVersion.get(publication.version) ?? []),
+            publication,
+          ]);
+        }
+        const current = changes[0]?.version;
+        const rollingTo = changes.find((change) => change.version === rolling);
+
+        const rollBack = async (version: string) => {
+          setRolling(null);
+          setViewing(null);
+          await onRollBack(version);
+        };
+        return (
+          <>
+            <ol className={classes.history} aria-label={`History of ${path}`}>
+              {changes.map((change) => {
+                const label = short(change.version);
+                return (
+                  <li key={change.version} className={classes.version}>
+                    <BodyText>
+                      <code>{label}</code> {change.message}
+                    </BodyText>
+                    <Made
+                      change={change}
+                      now={change.version === current ? 'the file as it is now' : null}
+                    />
+                    {(byVersion.get(change.version) ?? []).map((publication) => (
+                      <BodyText key={publication.number}>
+                        <strong>Publication {publication.number}</strong>
+                        {publication.grading_changed &&
+                          publication.number > 1 &&
+                          ' · changed how the task grades'}
+                      </BodyText>
+                    ))}
+                    {change.version !== current && (
+                      <Group gap="xs">
+                        <Button
+                          size="xs"
+                          variant="secondary"
+                          label={`View ${path} at ${label}`}
+                          onClick={() =>
+                            setViewing(
+                              viewing === change.version ? null : change.version,
+                            )
+                          }
+                        >
+                          {viewing === change.version ? 'Close' : 'View'}
+                        </Button>
+                        {manages && (
+                          <Button
+                            size="xs"
+                            variant="secondary"
+                            label={`Roll ${path} back to ${label}`}
+                            disabled={busy}
+                            onClick={() => setRolling(change.version)}
+                          >
+                            Roll back to this
+                          </Button>
+                        )}
+                      </Group>
+                    )}
+                    {viewing === change.version && (
+                      <OldVersion
+                        place={place}
+                        path={path}
+                        version={change.version}
+                        language={language}
+                        label={`${path} at ${label}`}
+                      />
+                    )}
+                  </li>
+                );
+              })}
+            </ol>
+            <ConfirmDialog
+              opened={rolling !== null}
+              onClose={() => setRolling(null)}
+              title="Roll this file back?"
+              confirm="Roll back"
+              onConfirm={() => rolling !== null && void rollBack(rolling)}
+            >
               <BodyText>
-                <code>{label}</code> {change.message}
+                {path} goes back to how it was{' '}
+                {rollingTo === undefined
+                  ? 'at the version chosen'
+                  : `on ${formatDateTime(new Date(rollingTo.at))}, after “${rollingTo.message}”`}
+                . This is saved as a new change, and every earlier one stays in the
+                history.
               </BodyText>
               <BodyText tone="secondary">
-                {authorName(change)} · {formatDateTime(new Date(change.at))}
-                {change.version === current && ' · the file as it is now'}
+                Like any save of the task, it publishes the task, or keeps it as a draft
+                if it has problems. Unsaved text in the editor is replaced.
               </BodyText>
-              {(byVersion.get(change.version) ?? []).map((publication) => (
-                <BodyText key={publication.number}>
-                  <strong>Publication {publication.number}</strong>
-                  {publication.grading_changed &&
-                    publication.number > 1 &&
-                    ' · changed how the task grades'}
-                </BodyText>
-              ))}
-              {change.version !== current && (
-                <div className={shared.actions}>
-                  <Button
-                    size="xs"
-                    variant="secondary"
-                    label={`View ${path} at ${label}`}
-                    onClick={() =>
-                      setViewing(viewing === change.version ? null : change.version)
-                    }
-                  >
-                    {viewing === change.version ? 'Close' : 'View'}
-                  </Button>
-                  {manages && (
-                    <Button
-                      size="xs"
-                      variant="secondary"
-                      label={`Roll ${path} back to ${label}`}
-                      disabled={busy}
-                      onClick={() => setRolling(change.version)}
-                    >
-                      Roll back to this
-                    </Button>
+            </ConfirmDialog>
+          </>
+        );
+      }}
+    </Loaded>
+  );
+}
+
+/**
+ * Every change made to the contest's settings, each opened to read as it
+ * was. Unlike a task's file it is not rolled back here.
+ */
+export function ContestChanges({
+  place,
+}: {
+  place: Extract<Place, { kind: 'contest' }>;
+}) {
+  const [open, setOpen] = useState(false);
+  const [viewing, setViewing] = useState<string | null>(null);
+  const history = queryView(
+    $api.useQuery(
+      'get',
+      '/api/v1/orgs/{org}/contests/{contest}/history',
+      {
+        params: {
+          path: { org: place.org, contest: place.contest },
+          query: { path: 'contest.yaml' },
+        },
+      },
+      { enabled: open },
+    ),
+  );
+  return (
+    <>
+      <Group gap="xs">
+        <Button size="xs" variant="secondary" onClick={() => setOpen(!open)}>
+          {open ? 'Hide the changes' : 'Every change'}
+        </Button>
+      </Group>
+      {open && (
+        <Loaded view={history} rows={3}>
+          {(changes) => (
+            <ol className={shared.list} aria-label="Changes to the settings">
+              {changes.map((change, at) => (
+                <li key={change.version}>
+                  <BodyText>{change.message}</BodyText>
+                  <Made change={change} now={at === 0 ? 'as they are now' : null} />
+                  {at > 0 && (
+                    <Group gap="xs">
+                      <Button
+                        size="xs"
+                        variant="secondary"
+                        label={`Read the settings as they were on ${formatDateTime(new Date(change.at))}`}
+                        onClick={() =>
+                          setViewing(viewing === change.version ? null : change.version)
+                        }
+                      >
+                        {viewing === change.version ? 'Close' : 'Read'}
+                      </Button>
+                    </Group>
                   )}
-                </div>
-              )}
-              {viewing === change.version && (
-                <OldVersion
-                  place={place}
-                  path={path}
-                  version={change.version}
-                  language={language}
-                />
-              )}
-            </li>
-          );
-        })}
-      </ol>
-      <Modal
-        opened={rolling !== null}
-        onClose={() => setRolling(null)}
-        title="Roll this file back?"
-      >
-        <div className={shared.stack}>
-          <BodyText>
-            {path} goes back to how it was{' '}
-            {rollingTo === undefined
-              ? 'at the version chosen'
-              : `on ${formatDateTime(new Date(rollingTo.at))}, after “${rollingTo.message}”`}
-            . This is saved as a new change, and every earlier one stays in the history.
-          </BodyText>
-          <BodyText tone="secondary">
-            Like any save of the task, it publishes the task, or keeps it as a draft if
-            it has problems. Unsaved text in the editor is replaced.
-          </BodyText>
-          <div className={shared.actions}>
-            <Button onClick={() => rolling !== null && void rollBack(rolling)}>
-              Roll back
-            </Button>
-            <Button variant="secondary" onClick={() => setRolling(null)}>
-              Cancel
-            </Button>
-          </div>
-        </div>
-      </Modal>
+                  {viewing === change.version && (
+                    <OldVersion
+                      place={place}
+                      path="contest.yaml"
+                      version={change.version}
+                      language="yaml"
+                      label={`The settings as they were on ${short(change.version)}`}
+                    />
+                  )}
+                </li>
+              ))}
+            </ol>
+          )}
+        </Loaded>
+      )}
     </>
   );
 }
 
-/** The file as it was at one version, to read and copy from. */
+/** A file as it was at one version, to read and copy from, named `label`. */
 function OldVersion({
   place,
   path,
   version,
   language,
+  label,
 }: {
-  place: TaskPlace;
+  place: Place;
   path: string;
   version: string;
   language: CodeLanguage;
+  label: string;
 }) {
   const view = queryView(
     useQuery({
-      ...$api.queryOptions(
-        'get',
-        '/api/v1/orgs/{org}/contests/{contest}/tasks/{task}/files/{path}',
-        {
-          params: {
-            path: { org: place.org, contest: place.contest, task: place.task, path },
-            query: { at: version },
-          },
-        },
-      ),
+      ...fileQuery(place, path, version),
       // A version never changes, so once read it is never read again.
       staleTime: Infinity,
     }),
   );
 
-  if (view.state === 'loading') return <PageSkeleton rows={4} />;
-  if (view.state === 'error')
-    return <ErrorBlock error={view.error} onRetry={view.retry} />;
-  if (view.data.upload)
-    return (
-      <UploadedFile
-        place={place}
-        path={path}
-        upload={view.data.upload}
-        token={null}
-        label={`${path} at ${short(version)}`}
-      />
-    );
-  if (view.data.encoding === 'base64')
-    return (
-      <BodyText tone="secondary">
-        At this version the file is not text, so it cannot be shown here.
-      </BodyText>
-    );
   return (
-    <CodeEditor
-      label={`${path} at ${short(version)}`}
-      value={view.data.content}
-      language={language}
-      rows={12}
-      readOnly
-    />
+    <Loaded view={view} rows={4}>
+      {(file) => {
+        if (file.upload)
+          return (
+            <UploadedFile
+              place={place}
+              path={path}
+              upload={file.upload}
+              token={null}
+              label={label}
+            />
+          );
+        if (file.encoding === 'base64')
+          return (
+            <BodyText tone="secondary">
+              At this version the file is not text, so it cannot be shown here.
+            </BodyText>
+          );
+        return (
+          <CodeEditor
+            label={label}
+            value={file.content}
+            language={language}
+            rows={12}
+            readOnly
+          />
+        );
+      }}
+    </Loaded>
   );
 }

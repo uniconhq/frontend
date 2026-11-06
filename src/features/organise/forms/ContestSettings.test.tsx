@@ -2,11 +2,15 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@/test/user-event';
 import { http, HttpResponse } from 'msw';
-import type { FileContent } from '@/api/types';
-import { holding } from '@/test/may';
 import { renderApp } from '@/test/render';
-import { afterAnswers, problem, server, signedIn } from '@/test/server';
-import { CONTEST_API, contestSettings, repoFiles, taskList } from '@/test/organiser';
+import { afterAnswers, problem, server, signedIn, signedInAs } from '@/test/server';
+import {
+  CONTEST_API,
+  contestSettings,
+  repoFiles,
+  taskList,
+  fileContent,
+} from '@/test/organiser';
 import { comeBackToTab, fakeLiveStream, openStream, realLiveStream } from '@/test/live';
 import { isoOf } from './times';
 
@@ -32,15 +36,11 @@ function contestBackend(
   options: Parameters<typeof contestSettings>[0] & { file?: string } = {},
 ) {
   const backend = contestSettings({ current: CONTEST, ...options });
-  const file: FileContent = {
+  const file = fileContent({
     path: 'contest.yaml',
-    encoding: 'utf-8',
     content: options.file ?? 'name: Spring\n',
     token: 'token-1',
-    upload: null,
-    version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
-    href: null,
-  };
+  });
   server.use(
     signedIn,
     taskList,
@@ -66,10 +66,6 @@ function inBox(form: HTMLElement, name: string | RegExp) {
 async function openForm() {
   renderApp(PAGE);
   return screen.findByRole('form', { name: 'Contest settings' });
-}
-
-function asManager() {
-  server.use(signedIn, ...holding('manager'));
 }
 
 describe('the contest settings form', { timeout: 20_000 }, () => {
@@ -216,7 +212,7 @@ describe('the contest settings form', { timeout: 20_000 }, () => {
 
   it("shows a manager the admin's settings read-only and saves the manager's own", async () => {
     const { sent } = contestBackend();
-    asManager();
+    server.use(...signedInAs('manager'));
     const form = await openForm();
 
     expect(inBox(form, 'Basics').getByLabelText('Name')).toBeDisabled();

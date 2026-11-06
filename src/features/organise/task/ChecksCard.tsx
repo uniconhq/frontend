@@ -3,6 +3,7 @@ import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
 import { Select } from '@/ui/Select';
 import { TextInput } from '@/ui/TextInput';
+import { Group } from '@/ui/layout';
 import { FieldBox } from '../contest/ContestFile';
 import { BuildCard, CardPart } from './BuildCard';
 import {
@@ -110,7 +111,7 @@ export function ChecksCard({
               />
             </FieldBox>
             {check.values.map((expected, at) => (
-              <div key={`${expected.name}:${String(at)}`} className={classes.valueHead}>
+              <Group key={`${expected.name}:${String(at)}`} gap={8} align="end">
                 <Select
                   label="Value"
                   value={expected.name}
@@ -138,7 +139,7 @@ export function ChecksCard({
                     })
                   }
                 />
-              </div>
+              </Group>
             ))}
           </div>
           {!disabled && (

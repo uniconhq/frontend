@@ -4,7 +4,7 @@ import { $api, queryView } from '@/api/query';
 import { isApiError } from '@/api/problem';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
-import { Modal } from '@/ui/Modal';
+import { ConfirmDialog } from '@/ui/ConfirmDialog';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { formatDateTime } from '@/lib/time';
 import { usePlaceMay } from '../may';
@@ -81,23 +81,16 @@ function EndHold({ path }: { path: Path }) {
       {failed !== null && (
         <ErrorBlock error={failed} compact heading="Couldn’t change the freeze" />
       )}
-      <Modal
+      <ConfirmDialog
         opened={asking !== null}
         onClose={() => setAsking(null)}
         title="End the freeze now"
+        confirm="End the freeze now"
+        loading={end.isPending}
+        onConfirm={() => run(true)}
       >
-        <div className={classes.stack}>
-          <BodyText>{asking}</BodyText>
-          <div className={classes.actions}>
-            <Button loading={end.isPending} onClick={() => run(true)}>
-              End the freeze now
-            </Button>
-            <Button variant="secondary" onClick={() => setAsking(null)}>
-              Cancel
-            </Button>
-          </div>
-        </div>
-      </Modal>
+        <BodyText>{asking}</BodyText>
+      </ConfirmDialog>
     </>
   );
 }

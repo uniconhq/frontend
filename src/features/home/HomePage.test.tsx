@@ -4,6 +4,7 @@ import { http, HttpResponse } from 'msw';
 import { renderApp } from '@/test/render';
 import { server, sessionList, signedIn } from '@/test/server';
 import { publicContest } from '@/test/contestant';
+import { workflowItem } from '@/test/workflows';
 
 describe('HomePage', () => {
   it('offers Sign in as a link that comes back here, never a form', async () => {
@@ -86,17 +87,7 @@ describe('HomePage', () => {
       signedIn,
       sessionList,
       http.get('/api/v1/workflows', () =>
-        HttpResponse.json([
-          {
-            owner: 'kenny',
-            name: 'tuned',
-            description: '',
-            editable: true,
-            versions: ['1'],
-            visibility: 'private',
-            yanked: {},
-          },
-        ]),
+        HttpResponse.json([workflowItem({ versions: ['1'] })]),
       ),
     );
     renderApp('/');

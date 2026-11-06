@@ -3,9 +3,8 @@ import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@/test/user-event';
 import { http, HttpResponse } from 'msw';
 import type { WriteSettings } from '@/api/types';
-import { holding } from '@/test/may';
 import { renderApp } from '@/test/render';
-import { problem, server, signedIn } from '@/test/server';
+import { problem, server, signedIn, signedInAs } from '@/test/server';
 import { invite } from '@/test/invites';
 import { CONTEST_API, contestSettings, repoFiles, taskList } from '@/test/organiser';
 import { localOf } from '../forms/times';
@@ -304,7 +303,7 @@ describe('how people enter', { timeout: 20_000 }, () => {
   });
 
   it('shows a manager how people enter, to read', async () => {
-    server.use(signedIn, ...holding('manager'));
+    server.use(...signedInAs('manager'));
     settings({ ...BASE, registration: { ways: [{ signup: { code: 'x' } }] } });
     const form = await openForm();
 

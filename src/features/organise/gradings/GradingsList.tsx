@@ -3,13 +3,12 @@ import type { QueryView } from '@/api/query';
 import type { FeedEntry, Rejudged } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
-import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
-import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
+import { Loaded } from '@/ui/feedback/Loaded';
+import { Group } from '@/ui/layout';
 import { FeedTable, type RowActions } from './FeedTable';
-import { AttemptActions, ConfirmDialog, RejudgeOutcome } from './FeedActions';
+import { AskingDialog, AttemptActions, RejudgeOutcome } from './FeedActions';
 import { titleOf } from './feed';
 import { useGradingActions, type Asking } from './use-grading-actions';
-import classes from './feed.module.css';
 
 type ContestPath = { org: string; contest: string };
 
@@ -112,7 +111,7 @@ export function GradingsList({
   return (
     <>
       {offer !== null && (
-        <div className={classes.actions}>
+        <Group gap={6} align="stretch">
           <Button
             size="xs"
             variant="secondary"
@@ -123,7 +122,7 @@ export function GradingsList({
           >
             {offer.words}
           </Button>
-        </div>
+        </Group>
       )}
       {rejudged !== null && (
         <RejudgeOutcome
@@ -132,23 +131,24 @@ export function GradingsList({
           rejudged={rejudged.rejudged}
         />
       )}
-      {view.state === 'loading' && <PageSkeleton rows={4} />}
-      {view.state === 'error' && <ErrorBlock error={view.error} onRetry={view.retry} />}
-      {view.state === 'ready' &&
-        (view.data.length === 0 ? (
-          <BodyText>{empty}</BodyText>
-        ) : (
-          <>
-            <FeedTable
-              path={path}
-              entries={view.data}
-              showTask={showTask}
-              actions={rowActions}
-            />
-            {footer?.(view.data)}
-          </>
-        ))}
-      <ConfirmDialog
+      <Loaded view={view} rows={4}>
+        {(entries) =>
+          entries.length === 0 ? (
+            <BodyText>{empty}</BodyText>
+          ) : (
+            <>
+              <FeedTable
+                path={path}
+                entries={entries}
+                showTask={showTask}
+                actions={rowActions}
+              />
+              {footer?.(entries)}
+            </>
+          )
+        }
+      </Loaded>
+      <AskingDialog
         asking={asking}
         pending={actions.pending}
         error={actions.error}

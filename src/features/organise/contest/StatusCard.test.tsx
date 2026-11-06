@@ -4,9 +4,8 @@ import userEvent from '@/test/user-event';
 import { http, HttpResponse } from 'msw';
 import type { TaskStanding } from '@/api/types';
 import { formatDateTime } from '@/lib/time';
-import { holding } from '@/test/may';
 import { renderApp } from '@/test/render';
-import { problem, server, signedIn } from '@/test/server';
+import { problem, server, signedIn, signedInAs } from '@/test/server';
 import { CONTEST_API, contestSettings, repoFiles, standings } from '@/test/organiser';
 
 const CONTEST = '/orgs/acme/contests/spring';
@@ -357,8 +356,7 @@ describe("the contest's status", () => {
 
   it('offers a manager none of the buttons, which are an admin’s', async () => {
     server.use(
-      signedIn,
-      ...holding('manager'),
+      ...signedInAs('manager'),
       ...repoFiles,
       http.get(`${CONTEST_API}/organise/tasks`, () => HttpResponse.json(ready)),
     );

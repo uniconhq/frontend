@@ -6,13 +6,13 @@ import { Button } from '@/ui/Button';
 import { Chip } from '@/ui/Chip';
 import { FileDrop } from '@/ui/FileDrop';
 import { InfoTip } from '@/ui/InfoTip';
+import { Group, Stack } from '@/ui/layout';
 import { formatSize } from '@/lib/size';
 import { SavedFile, SavedFolder } from '../files/FilePreview';
 import { useOpenUploads } from '../files/use-open-uploads';
 import { useNamed } from './named-file';
 import { inputTitle, lastPart, type TaskPlace } from './build-data';
 import { uploadFits, type StagedInput } from './input-files';
-import shared from '../organise.module.css';
 import classes from './task.module.css';
 
 /**
@@ -82,13 +82,13 @@ export function FileSetting({
   );
 
   return (
-    <div className={classes.fileSetting}>
-      <div className={classes.titleRow}>
+    <Stack gap={6}>
+      <Group gap={4} wrap="nowrap">
         <span className={classes.settingTitle}>{label}</span>
         {declared.help !== null && <InfoTip about={label}>{declared.help}</InfoTip>}
-      </div>
+      </Group>
       {staged !== undefined ? (
-        <div className={shared.actions}>
+        <Group gap="xs">
           <BodyText>{staged.summary}</BodyText>
           {/* Waiting for the task's save, marked as a picture waiting for it is. */}
           {staged.was === '' ? (
@@ -106,7 +106,7 @@ export function FileSetting({
               Undo
             </Button>
           )}
-        </div>
+        </Group>
       ) : value === '' ? (
         <>
           {hint !== undefined && <BodyText tone="secondary">{hint}</BodyText>}
@@ -114,7 +114,7 @@ export function FileSetting({
         </>
       ) : (
         <>
-          <div className={shared.actions}>
+          <Group gap="xs">
             <BodyText>
               {named === undefined
                 ? lastPart(value.replace(/\/$/, ''))
@@ -156,7 +156,7 @@ export function FileSetting({
                 Use none
               </Button>
             )}
-          </div>
+          </Group>
           {viewing &&
             named !== null &&
             named !== undefined &&
@@ -180,7 +180,7 @@ export function FileSetting({
         stored.map((row) => {
           const offered = `Use uploaded: ${lastPart(row.path)}, ${formatSize(row.size)}`;
           return (
-            <div key={row.id} className={shared.actions}>
+            <Group key={row.id} gap="xs">
               <Button
                 size="xs"
                 variant="secondary"
@@ -189,9 +189,9 @@ export function FileSetting({
               >
                 {offered}
               </Button>
-            </div>
+            </Group>
           );
         })}
-    </div>
+    </Stack>
   );
 }

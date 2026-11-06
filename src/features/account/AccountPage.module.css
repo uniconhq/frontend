@@ -1,15 +1,3 @@
-.page {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.profile {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-}
-
 .fields {
   display: flex;
   flex-direction: column;
@@ -19,12 +7,6 @@
 
 .change {
   margin-top: 12px;
-}
-
-.stack {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
 }
 
 .forgeLinks {

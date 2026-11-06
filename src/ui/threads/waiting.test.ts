@@ -1,21 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { Clarification } from '@/api/types';
+import { question } from '@/test/server';
 import { waitedWords, waitingSince } from './waiting';
 
 function asked(messages: Clarification['messages']): Clarification {
-  return {
-    contest: { org: 'acme', contest: 'spring', task: null },
-    asker: '20',
-    number: 1,
-    task: null,
-    title: 'Input size?',
-    body: 'How big is n?',
-    asked_at: '2026-09-12T09:00:00Z',
-    answered: false,
-    closed: false,
-    messages,
-    may_answer: true,
-  };
+  return question({ asked_at: '2026-09-12T09:00:00Z', messages });
 }
 
 const at = (time: string, fromAsker: boolean) => ({
