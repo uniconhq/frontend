@@ -390,15 +390,16 @@ Shown control in each group's column, and `all` built in. Existing
 input-value picks remain the saved format; overlapping picks update the
 other matching ticks and the count together.
 
-The whole result is a map (`flow/BoxGraph.tsx`): Runs, groups, values, then
-an always-open Result listing values, each group's runs, outputs and files,
-with type, unit and when shown. Clicking goes to the corresponding card or
-grid column. Each value has one formula card: name, Shown, kind, formula,
-words, tiles while focused, then its own small flow. A bad formula keeps
-its last parsed flow dimmed. “Also shown to entrants” holds outputs and
-files; every part has exactly one Shown control. Checks are made-up
-submissions graded by every save, which is refused if a result differs.
-The Submissions card keeps the `tests` anchor for old links.
+The whole result is a map, drawn by React Flow (`flow/CardGraph.tsx`):
+Runs, groups, values, then an always-open Result listing values, each
+group's runs, outputs and files, with type, unit and when shown. Clicking
+goes to the corresponding card or grid column. Each value has one formula
+card: name, Shown, kind, formula, words, tiles while focused, then its own
+small flow. A bad formula keeps its last parsed flow dimmed. “Also shown to
+entrants” holds outputs and files; every part has exactly one Shown
+control. Checks are made-up submissions graded by every save, which is
+refused if a result differs. The Submissions card keeps the `tests` anchor
+for old links.
 
 Each task card and section begins with its purpose. `TASK_SECTIONS` holds
 the shared lines, labels and addresses for the hub, crumbs, breadcrumb
@@ -599,15 +600,17 @@ copy action. The existing copy API remains available.
 with problems. A version is drawn only once the forge's check of its file
 passes: one the forge refuses to serve, one that does not parse, and one the
 check refuses, as it refuses the format before 2026-10-07, open one state,
-"This version cannot be opened", with the forge's reason. `layout.ts` works out where everything stands
-from the file alone, and nothing of it is stored: a step one column right
+"This version cannot be opened", with the forge's reason. `layout.ts` turns
+the file into boxes and wires, and `flow/graph.ts`, the one layout the
+task's cards use too, works out where everything stands from them alone;
+nothing of it is stored: a step one column right
 of the furthest step it reads, the outputs last; each input a box of its own
 in the first column, as the task gives it; each file or folder of the
 workflow a step reads (`${{ workflow.<path> }}`) a box of its own in the
 next, as the workflow gives it, the same on every run; a slot of its own in each column a wire skips, shared
 by the wires from one port and labelled at its first; each column sorted by
 where its wires come from and go, a few sweeps each way, keeping the fewest
-crossings; and the mark's gradient (`PALETTE`), the inputs lilac, the
+crossings; and the mark's gradient (`WORKFLOW_PALETTE`), the inputs lilac, the
 workflow's files blue, the outputs gold, and the steps' columns the colours between, in turn and back,
 each wire the colour of the box it leaves. A box is closed: its head, its
 first problem or "vN is out", "needs a, b · gives c", and one pin a side,

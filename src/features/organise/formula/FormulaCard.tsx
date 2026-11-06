@@ -1,7 +1,7 @@
 import { useMemo, useState, type ComponentProps, type ReactNode } from 'react';
 import { Card } from '@/ui/Card';
 import { BodyText } from '@/ui/BodyText';
-import { BoxGraph } from '../flow/BoxGraph';
+import { CardGraph } from '../flow/CardGraph';
 import { SMALL, TASK_PALETTE } from '../flow/graph';
 import { FormulaLine, FormulaTiles } from './Editor';
 import { flowOf, type FlowAbout } from './flow';
@@ -106,15 +106,7 @@ export function FormulaCard({
               Reads nothing: it is always the same.
             </BodyText>
           ) : (
-            <BoxGraph
-              {...flow}
-              selected={null}
-              shape={SMALL}
-              palette={TASK_PALETTE}
-              labels={false}
-              floor={0}
-              inside={() => null}
-            />
+            <CardGraph {...flow} selected={null} shape={SMALL} palette={TASK_PALETTE} />
           )}
         </div>
       </div>

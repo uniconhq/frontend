@@ -15,8 +15,7 @@ import { problem } from './server';
  * step compiles the submission and runs it on the run's input under the
  * task's limits, and its `check` step compares the output with the run's
  * answer with diff-check, where deploy's compares with a diff script run by
- * exec given a manifest. `FOLDER` is the same with a folder of sources.
- * `CLASSIC_V6` is deploy's workflow.yaml for unicon/classic@v6 as it is.
+ * exec given a manifest.
  */
 export const CLASSIC = `# One run of a task judged by comparing output with an answer, in the
 # shape of unicon/classic@v6: compile the submission and run it on the
@@ -47,77 +46,6 @@ outputs:
   time_ms: {from: "\${{ steps.run.time_ms }}", unit: ms}
   memory_kb: {from: "\${{ steps.run.memory_kb }}", unit: KB}
   log: \${{ steps.run.log }}
-`;
-
-/** One run of a program of several files, started from the entry point the entrant names. */
-export const FOLDER = `# A program of several files: compile the entrant's folder of sources,
-# starting from the entry point they name, and run it on the run's input
-# under the task's limits, then compare its output with the run's answer.
-inputs:
-  program: folder
-  language: {type: enum, options: [c, cpp, java, kotlin, python, javascript, typescript, csharp, rust, r, ruby]}
-  entry: text
-  time_limit: number
-  memory_limit: number
-  input: file
-  answer: file
-steps:
-  - id: run
-    use: unicon/exec@v4
-    with:
-      source: \${{ inputs.program }}
-      entry: \${{ inputs.entry }}
-      language: \${{ inputs.language }}
-      stdin: \${{ inputs.input }}
-      time_limit: \${{ inputs.time_limit }}
-      memory_limit: \${{ inputs.memory_limit }}
-  - id: check
-    use: unicon/diff-check@v2
-    with: {actual: "\${{ steps.run.output }}", expected: "\${{ inputs.answer }}"}
-outputs:
-  time_ms: {from: "\${{ steps.run.time_ms }}", unit: ms}
-  memory_kb: {from: "\${{ steps.run.memory_kb }}", unit: KB}
-  log: \${{ steps.run.log }}
-`;
-
-/** deploy's workflows/classic/v6/workflow.yaml, unicon/classic@v6 as deploy seeds it. */
-export const CLASSIC_V6 = `# unicon/classic@v6, workflow.yaml: one run of an entrant's program on one
-# input, its output compared word by word with the answer by the diff
-# script beside this file. The format is SIMPLER-CORE.md 7.
-inputs:
-  code: {type: folder, title: Solution}
-  language: {type: enum, options: [c, cpp, java, kotlin, python, javascript, typescript, csharp, rust, r, ruby], title: Language}
-  input: {type: file, title: Input}
-  answer: {type: file, title: Answer}
-  time_limit: {type: number, title: Time limit, unit: seconds}
-  memory_limit: {type: number, title: Memory limit, unit: MB}
-
-steps:
-  - id: solution
-    use: unicon/exec@v4
-    with:
-      source: \${{ inputs.code }}
-      language: \${{ inputs.language }}
-      stdin: \${{ inputs.input }}
-      time_limit: \${{ inputs.time_limit }}
-      memory_limit: \${{ inputs.memory_limit }}
-  - id: compare
-    use: unicon/exec@v4
-    with:
-      source: \${{ workflow.diff/ }}
-      language: python
-      manifest: \${{ workflow.diff/program.yaml }}
-      time_limit: 3
-      memory_limit: 256
-      files:
-        output: \${{ steps.solution.output }}
-        answer: \${{ inputs.answer }}
-
-outputs:
-  score: \${{ steps.compare.score }}
-  time_ms: {from: "\${{ steps.solution.time_ms }}", title: Run time, unit: ms}
-  memory_kb: {from: "\${{ steps.solution.memory_kb }}", title: Memory used, unit: KB}
-  log: {from: "\${{ steps.solution.log }}", title: Compile log}
 `;
 
 function port(type: string, more: Partial<PortDecl> = {}): PortDecl {

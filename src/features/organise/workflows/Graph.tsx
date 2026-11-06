@@ -27,21 +27,17 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import type { DefinitionProblem } from '@/api/types';
-import { keepEqual } from '@/lib/keep-equal';
+import { useKept } from '@/lib/keep-equal';
 import { ActionMenu, type MenuEntry } from '@/ui/ActionMenu';
 import { Popout } from '@/ui/Popout';
 import {
-  BOX,
-  BOX_PROPERTIES,
   GEOMETRY,
-  PALETTE,
-  rowOf,
+  WORKFLOW_PALETTE,
   rowsTop,
   wirePath,
-  type Box,
-  type Layout,
   type Point,
-} from './layout';
+} from '../flow/graph';
+import { BOX, BOX_PROPERTIES, rowOf, type Box, type Layout } from './layout';
 import type { BoxDecl } from './boxes';
 import {
   sourceAt,
@@ -481,21 +477,6 @@ function boxData(seen: Seen, box: Box): BoxData {
   };
 }
 
-/**
- * `items`, each one equal to one given last time, by its id, given as that
- * one; the list itself kept when nothing in it changed. What was given is
- * held as state, set while drawing only when it changed, as React allows.
- */
-function useKept<T extends { id: string }>(items: T[]): T[] {
-  const [last, setLast] = useState(items);
-  const before = new Map(last.map((item) => [item.id, item]));
-  const kept = items.map((item) => keepEqual(before.get(item.id), item));
-  const same =
-    kept.length === last.length && kept.every((item, at) => item === last[at]);
-  if (!same) setLast(kept);
-  return same ? last : kept;
-}
-
 /** A problem's mark, read out as its message, with the message beside it. */
 function ProblemMark({ problem }: { problem: DefinitionProblem }) {
   return (
@@ -700,8 +681,8 @@ function FedTab({ fed, box }: { fed: Fed[]; box: string }) {
       className={`${classes.fedTab} nodrag nopan`}
       style={{
         background: fed.some((each) => each.kind === 'input')
-          ? PALETTE.input
-          : PALETTE.file,
+          ? WORKFLOW_PALETTE.input
+          : WORKFLOW_PALETTE.file,
       }}
       button={inputsWords(fed.length)}
       position="left"
