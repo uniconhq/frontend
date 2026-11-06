@@ -3,17 +3,19 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@/test/user-event';
 import { delay, http, HttpResponse } from 'msw';
 import type { RegradeSummary, TaskStanding } from '@/api/types';
-import { parse } from 'yaml';
 import { isoOf, localOf } from '../forms/times';
 import { CONTEST_SECTIONS } from '@/lib/sections';
 import { formatDateTime } from '@/lib/time';
 import { home } from '@/test/contestant';
+import { holding, taskMay } from '@/test/may';
 import { renderApp } from '@/test/render';
-import { problem, server, signedIn, someone } from '@/test/server';
+import { problem, server, signedIn } from '@/test/server';
 import {
   CONTEST_API,
-  files,
+  contestSettings,
+  contestValues,
   repoFiles,
+  settingsOf,
   standingList,
   standings,
   taskList,
@@ -84,24 +86,24 @@ describe("the contest's settings at a glance", () => {
     server.use(
       signedIn,
       standingList,
-      http.get(`${CONTEST_API}/files/:path`, () =>
-        HttpResponse.json({
-          ...files['contest.yaml'],
-          content: [
-            'name: Spring',
-            'start: 2026-10-01T09:00:00Z',
-            'end: 2026-10-01T14:00:00Z',
-            'state: draft',
-            'visibility: everyone',
-            'registration:',
-            '  capacity: 500',
-            '  ways:',
-            '    - invite: {}',
-            '    - signup: {domains: [u.nus.edu], approval: auto}',
-            'entrants: {most: 3, fewest: 2}',
-            '',
-          ].join('\n'),
-        }),
+      http.get(`${CONTEST_API}/settings`, () =>
+        HttpResponse.json(
+          settingsOf({
+            name: 'Spring',
+            start: '2026-10-01T09:00:00Z',
+            end: '2026-10-01T14:00:00Z',
+            state: 'draft',
+            visibility: 'everyone',
+            registration: {
+              capacity: 500,
+              ways: [
+                { invite: {} },
+                { signup: { domains: ['u.nus.edu'], approval: 'auto' } },
+              ],
+            },
+            entrants: { most: 3, fewest: 2 },
+          }),
+        ),
       ),
       ...repoFiles,
     );
@@ -155,6 +157,7 @@ describe("the contest's regrades (#448)", () => {
         failed: 0,
         over_limit: 0,
       },
+      may_manage: true,
     };
     server.use(
       signedIn,
@@ -204,13 +207,10 @@ describe("the contest's tasks", () => {
     server.use(
       signedIn,
       standingList,
-      http.get(`${CONTEST_API}/tasks/:task/files/:path`, ({ params }) =>
-        params['path'] === 'task.yaml'
-          ? HttpResponse.json({
-              ...files['task.yaml']!,
-              content: `name: ${params['task'] === 'sort' ? 'Sorting' : 'Sum of two'}\n`,
-            })
-          : undefined,
+      http.get(`${CONTEST_API}/tasks/:task/settings`, ({ params }) =>
+        HttpResponse.json(
+          settingsOf({ name: params['task'] === 'sort' ? 'Sorting' : 'Sum of two' }),
+        ),
       ),
       ...repoFiles,
     );
@@ -265,20 +265,23 @@ describe("the contest's tasks", () => {
           },
         ]),
       ),
-      http.get(`${CONTEST_API}/files/:path`, () =>
-        HttpResponse.json({
-          ...files['contest.yaml'],
-          content: [
-            'name: Spring',
-            'start: 2026-10-01T09:00:00Z',
-            'end: 2026-10-15T09:00:00Z',
-            'state: draft',
-            'visibility: signed-in',
-            'leaderboards: {final: {columns: {marked: {value: [sort, marked]}}}}',
-            'tasks: [{id: sort, marks: 2}]',
-            '',
-          ].join('\n'),
-        }),
+      http.get(`${CONTEST_API}/settings`, () =>
+        HttpResponse.json(
+          settingsOf({
+            name: 'Spring',
+            start: '2026-10-01T09:00:00Z',
+            end: '2026-10-15T09:00:00Z',
+            state: 'draft',
+            visibility: 'signed-in',
+            leaderboards: [
+              {
+                key: 'final',
+                columns: [{ name: 'marked', formula: { value: ['sort', 'marked'] } }],
+              },
+            ],
+            tasks: [{ id: 'sort', marks: 2 }],
+          }),
+        ),
       ),
       ...repoFiles,
     );
@@ -311,11 +314,12 @@ describe("the contest's tasks", () => {
         head: 'a1',
         latest: null,
         draft: true,
-        errors: [{ path: '', message: 'task.yaml is missing.' }],
+        errors: [{ path: [], message: 'task.yaml is missing.' }],
         statement_written: false,
         head_statement_written: false,
         toolchains: {},
         results: { history: [], released: false },
+        may: taskMay('admin'),
       },
       timeline: {
         release_at: '2026-10-01T09:00:00Z',
@@ -361,7 +365,7 @@ describe("the contest's tasks", () => {
         if (saved) readsAfterSave += 1;
         return HttpResponse.json(standings);
       }),
-      http.put(`${CONTEST_API}/files/:path`, () => {
+      http.put(`${CONTEST_API}/settings`, () => {
         saved = true;
         return HttpResponse.json({ version: '9f8e7d6c5b4a39281706', notes: [] });
       }),
@@ -432,8 +436,8 @@ describe("the contest's tasks", () => {
           detail:
             'contest.yaml has 2 problems; the first is at tasks[0].due: It is not a time with an offset.',
           errors: [
-            { path: 'tasks[0].due', message: 'It is not a time with an offset.' },
-            { path: '', message: 'end comes before start.' },
+            { path: ['tasks', 0, 'due'], message: 'It is not a time with an offset.' },
+            { path: [], message: 'end comes before start.' },
           ],
         }),
       ),
@@ -470,22 +474,12 @@ describe("the contest's tasks", () => {
     expect(screen.getByRole('button', { name: 'New task' })).toBeVisible();
   });
 
-  it('shows someone refused the list the tasks their own roles reach', async () => {
+  it('shows someone refused the standings the tasks the server lists for them', async () => {
     server.use(
-      http.get('/api/v1/me', () =>
-        HttpResponse.json({
-          ...someone,
-          roles: [
-            {
-              names: { org: 'acme', contest: 'spring', task: 'sum' },
-              role: 'manager',
-            },
-            {
-              names: { org: 'acme', contest: 'autumn', task: 'max' },
-              role: 'manager',
-            },
-          ],
-        }),
+      signedIn,
+      ...holding(null),
+      http.get(`${CONTEST_API}/tasks`, () =>
+        HttpResponse.json([{ name: 'sum', may_manage: true }]),
       ),
       ...repoFiles,
       http.get(`${CONTEST_API}/organise/tasks`, () =>
@@ -510,23 +504,11 @@ describe("the contest's tasks", () => {
 });
 
 describe("a task's place in the contest, changed from its row", () => {
-  /** The contest's settings, each save taken and the file becoming it. */
-  function settingsSaved(content?: string) {
-    let file = files['contest.yaml']!;
-    if (content !== undefined) file = { ...file, content };
-    const sent: string[] = [];
-    server.use(
-      http.get(`${CONTEST_API}/files/:path`, ({ params }) =>
-        params['path'] === 'contest.yaml' ? HttpResponse.json(file) : undefined,
-      ),
-      http.put(`${CONTEST_API}/files/:path`, async ({ request }) => {
-        const body = (await request.json()) as { content: string };
-        sent.push(body.content);
-        file = { ...file, content: body.content, token: 'token-2' };
-        return HttpResponse.json({ version: 'v2', notes: [] });
-      }),
-    );
-    return sent;
+  /** The contest's settings, each save taken; each save's body. */
+  function settingsSaved(current?: Record<string, unknown>) {
+    const backend = contestSettings({ current });
+    server.use(...backend.handlers);
+    return backend.sent;
   }
 
   it('saves the due time chosen, exactly', async () => {
@@ -547,7 +529,8 @@ describe("a task's place in the contest, changed from its row", () => {
 
     expect(await within(dialog).findByText('Saved.')).toBeVisible();
     const [saved] = sent;
-    expect(parse(saved ?? '')).toMatchObject({
+    expect(saved?.values).toEqual({
+      ...contestValues,
       tasks: [
         { id: 'sort', due: isoOf(localOf('2026-10-15T09:00:00Z')) },
         { id: 'sum' },
@@ -590,10 +573,7 @@ describe("a task's place in the contest, changed from its row", () => {
     await user.click(within(row).getByRole('button', { name: 'Move A · sort down' }));
 
     await waitFor(() => expect(sent).toHaveLength(1));
-    expect((parse(sent[0] ?? '') as { tasks: { id: string }[] }).tasks).toEqual([
-      { id: 'sum' },
-      { id: 'sort' },
-    ]);
+    expect(sent[0]?.values['tasks']).toEqual([{ id: 'sum' }, { id: 'sort' }]);
     expect(
       within(screen.getByRole('listitem', { name: 'B · sum' })).getByRole('button', {
         name: 'Move B · sum down',
@@ -603,18 +583,13 @@ describe("a task's place in the contest, changed from its row", () => {
 
   it('asks before a move once the contest has started, saying which letters change', async () => {
     server.use(signedIn, standingList, ...repoFiles);
-    const sent = settingsSaved(
-      [
-        'name: Spring',
-        'start: 2020-01-01T09:00:00Z',
-        'end: 2099-01-01T09:00:00Z',
-        'state: published',
-        'tasks:',
-        '  - id: sort',
-        '  - id: sum',
-        '',
-      ].join('\n'),
-    );
+    const sent = settingsSaved({
+      name: 'Spring',
+      start: '2020-01-01T09:00:00Z',
+      end: '2099-01-01T09:00:00Z',
+      state: 'published',
+      tasks: [{ id: 'sort' }, { id: 'sum' }],
+    });
     const user = userEvent.setup();
     renderApp(CONTEST);
 
@@ -635,10 +610,7 @@ describe("a task's place in the contest, changed from its row", () => {
       ),
     );
     await waitFor(() => expect(sent).toHaveLength(1));
-    expect((parse(sent[0] ?? '') as { tasks: { id: string }[] }).tasks).toEqual([
-      { id: 'sum' },
-      { id: 'sort' },
-    ]);
+    expect(sent[0]?.values['tasks']).toEqual([{ id: 'sum' }, { id: 'sort' }]);
   });
 
   it('opens the dialog from the row’s second line, which ends in Change, and has no Edit button', async () => {
@@ -675,9 +647,10 @@ describe("a task's place in the contest, changed from its row", () => {
   it('moves the task whose arrow was pressed, wherever the list read fresh has it', async () => {
     server.use(signedIn, standingList, ...repoFiles);
     // Someone else put a task ahead of sort since the page read its list.
-    const sent = settingsSaved(
-      'name: Spring\ntasks:\n  - id: extra\n  - id: sort\n  - id: sum\n',
-    );
+    const sent = settingsSaved({
+      name: 'Spring',
+      tasks: [{ id: 'extra' }, { id: 'sort' }, { id: 'sum' }],
+    });
     const user = userEvent.setup();
     renderApp(CONTEST);
 
@@ -685,7 +658,7 @@ describe("a task's place in the contest, changed from its row", () => {
     await user.click(within(row).getByRole('button', { name: 'Move A · sort down' }));
 
     await waitFor(() => expect(sent).toHaveLength(1));
-    expect((parse(sent[0] ?? '') as { tasks: { id: string }[] }).tasks).toEqual([
+    expect(sent[0]?.values['tasks']).toEqual([
       { id: 'extra' },
       { id: 'sum' },
       { id: 'sort' },
@@ -719,18 +692,7 @@ describe("a task's place in the contest, changed from its row", () => {
   });
 
   it('offers an observer the line as text, with no way to change or move a task', async () => {
-    server.use(
-      http.get('/api/v1/me', () =>
-        HttpResponse.json({
-          ...someone,
-          roles: [
-            { names: { org: 'acme', contest: 'spring', task: null }, role: 'observer' },
-          ],
-        }),
-      ),
-      standingList,
-      ...repoFiles,
-    );
+    server.use(signedIn, ...holding('observer'), standingList, ...repoFiles);
     renderApp(CONTEST);
 
     const row = await screen.findByRole('listitem', { name: 'A · sort' });
@@ -926,6 +888,7 @@ describe('creating a task', () => {
             head_statement_written: false,
             toolchains: {},
             results: { history: [], released: false },
+            may: taskMay('admin'),
           },
           timeline: {
             release_at: '2026-10-01T09:00:00Z',
@@ -974,7 +937,7 @@ describe('creating a task', () => {
   it('starts a task of another kind on its workflow, in the task’s first save', async () => {
     server.use(signedIn, ...repoFiles);
     standingsAndCreate();
-    const saves: { changes: { path: string; content: string; token: string }[] }[] = [];
+    const saves: { changes: { path: string; values: unknown; token: string }[] }[] = [];
     server.use(
       http.get('/api/v1/workflow-search', () =>
         HttpResponse.json({
@@ -1003,16 +966,28 @@ describe('creating a task', () => {
             'inputs:\n  program: {type: folder, title: Program}\n  language: {type: enum, options: [c, python]}\n  entry: text\n  time_limit: number\n  memory_limit: number\n  input: file\n  answer: file\nsteps: []\n',
         }),
       ),
-      http.get('/api/v1/orgs/acme/contests/spring/tasks/max/files/task.yaml', () =>
-        HttpResponse.json({
-          path: 'task.yaml',
-          encoding: 'utf-8',
-          content:
-            'name: max\nworkflow: unicon/classic@v6\ninputs:\n  code: {entrant: {label: Your solution}}\n  language: {entrant: {label: Language, options: [python]}}\n  time_limit: 2\n  memory_limit: 256\nrepeat:\n  - inputs: [input, answer]\n    tuples:\n      - [tests/1.in, tests/1.ans]\n',
-          token: 'token-starter',
-          upload: null,
-          version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
-        }),
+      http.get('/api/v1/orgs/acme/contests/spring/tasks/max/settings', () =>
+        HttpResponse.json(
+          settingsOf(
+            {
+              name: 'max',
+              workflow: 'unicon/classic@v6',
+              inputs: {
+                code: { entrant: { label: 'Your solution' } },
+                language: { entrant: { label: 'Language', options: ['python'] } },
+                time_limit: 2,
+                memory_limit: 256,
+              },
+              repeat: [
+                {
+                  inputs: ['input', 'answer'],
+                  tuples: [['tests/1.in', 'tests/1.ans']],
+                },
+              ],
+            },
+            'token-starter',
+          ),
+        ),
       ),
       http.post(
         '/api/v1/orgs/acme/contests/spring/tasks/max/save',
@@ -1046,7 +1021,7 @@ describe('creating a task', () => {
     await expect.poll(() => saves.length).toBe(1);
     const [change] = saves[0]?.changes ?? [];
     expect(change?.token).toBe('token-starter');
-    expect(parse(change?.content ?? '')).toEqual({
+    expect(change?.values).toEqual({
       name: 'max',
       workflow: 'unicon/classic-folder@v1',
       inputs: {
@@ -1350,7 +1325,7 @@ describe('taking a task out of the contest', () => {
         problem(422, 'invalid_definition', {
           errors: [
             {
-              path: 'tasks[0].release_at',
+              path: ['tasks', 0, 'release_at'],
               message: 'sort was released already; its release cannot move later.',
             },
           ],
@@ -1370,9 +1345,7 @@ describe('taking a task out of the contest', () => {
     await user.click(within(asked).getByRole('button', { name: 'Put it back' }));
 
     const alert = await within(asked).findByRole('alert');
-    expect(alert).toHaveTextContent(
-      'It cannot go back as the contest’s settings stand:',
-    );
+    expect(alert).toHaveTextContent('invalid_definition detail');
     expect(alert).toHaveTextContent(
       'sort was released already; its release cannot move later.',
     );

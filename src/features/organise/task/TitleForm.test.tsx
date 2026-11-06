@@ -12,7 +12,7 @@ describe("the task's title", () => {
       signedIn,
       taskState,
       ...repoFiles,
-      http.put(`${TASK_API}/files/task.yaml`, () =>
+      http.post(`${TASK_API}/save`, () =>
         problem(409, 'confirmation_required', {
           changes: [],
           regrades: 0,

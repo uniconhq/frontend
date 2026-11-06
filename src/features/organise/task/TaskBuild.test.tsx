@@ -2,19 +2,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@/test/user-event';
 import { delay, http, HttpResponse } from 'msw';
-import { parse } from 'yaml';
 import type {
   DeclaredInput,
-  FileContent,
   SaveRequest,
   TreeEntry,
   WorkflowForm,
   WorkflowItem,
 } from '@/api/types';
 import { partTransfer } from '@/test/part-uploads';
+import { holding } from '@/test/may';
 import { renderApp } from '@/test/render';
 import { CLASSIC, PRIMITIVES } from '@/test/workflows';
-import { afterAnswers, problem, server, signedIn, someone } from '@/test/server';
+import { afterAnswers, problem, server, signedIn } from '@/test/server';
 import {
   TASK_API,
   CONTEST_API,
@@ -23,9 +22,11 @@ import {
   publications,
   publishedTask,
   repoFiles,
+  settingsOf,
   taskState,
   unchanged,
 } from '@/test/organiser';
+import { taskFileOf, taskValuesOf } from '@/test/task-values';
 import {
   comeBackToTab,
   fakeLiveStream,
@@ -69,6 +70,10 @@ function file(path: string, size = 4, version: string | null = LISTED_AT): TreeE
     start: null,
     token: `token-${path}`,
     version,
+    href:
+      version === null
+        ? null
+        : `/-/downloads/acme/spring/sum/versions/${version}/${path}`,
   };
 }
 
@@ -177,10 +182,10 @@ const PUBLISHED = {
 };
 
 /**
- * The sum task with its settings as above, and its workflow declaring what
- * `form` says. Each save is kept in `sent`; with
+ * The sum task with its settings as above, read and saved as values, and its
+ * workflow declaring what `form` says. Each save is kept in `sent`; with
  * `conflictWith`, the first is refused as a conflict and the settings become
- * that text, as if someone else had saved them.
+ * that text's, as if someone else had saved them.
  */
 function taskBackend(
   options: {
@@ -196,14 +201,7 @@ function taskBackend(
 ) {
   const { answer = () => HttpResponse.json(PUBLISHED), form = UNREAD } = options;
   let declaredNow = form;
-  let settings: FileContent = {
-    path: 'task.yaml',
-    encoding: 'utf-8',
-    content: options.content ?? TASK,
-    token: 'token-task',
-    upload: null,
-    version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
-  };
+  let settings = settingsOf(taskValuesOf(options.content ?? TASK), 'token-task');
   const sent: SaveRequest[] = [];
   server.use(
     signedIn,
@@ -211,13 +209,9 @@ function taskBackend(
     publicationList,
     http.get(`${TASK_API}/tree`, () => HttpResponse.json([])),
     http.get('/api/v1/blocks', () => HttpResponse.json(specCatalogue())),
-    http.get(`${TASK_API}/files/:path`, async ({ params }) => {
-      const path = decodeURIComponent(String(params['path']));
-      if (path === 'task.yaml') {
-        if (sent.length > 0) await options.readAfterSave;
-        return HttpResponse.json(settings);
-      }
-      return undefined;
+    http.get(`${TASK_API}/settings`, async () => {
+      if (sent.length > 0) await options.readAfterSave;
+      return HttpResponse.json(settings);
     }),
     http.get(`${TASK_API}/workflow-form`, () => HttpResponse.json(declaredNow)),
     http.get('/api/v1/workflows', () => HttpResponse.json(WORKFLOWS)),
@@ -233,26 +227,18 @@ function taskBackend(
       const body = (await request.json()) as SaveRequest;
       sent.push(body);
       if (options.conflictWith !== undefined && sent.length === 1) {
-        settings = {
-          ...settings,
-          content: options.conflictWith,
-          token: 'token-theirs',
-        };
+        settings = settingsOf(taskValuesOf(options.conflictWith), 'token-theirs');
         return problem(409, 'conflict');
       }
-      const yaml = body.changes.find((change) => change.path === 'task.yaml');
+      const change = body.changes.find((each) => each.path === 'task.yaml');
       // A save made with the token of settings since saved over is refused.
-      if (yaml !== undefined && yaml.token !== settings.token) {
+      if (change !== undefined && change.token !== settings.token) {
         return problem(409, 'conflict');
       }
       const answered = answer();
       // A refused save, such as one asking to confirm, writes nothing.
-      if (yaml?.content != null && answered.ok) {
-        settings = {
-          ...settings,
-          content: yaml.content,
-          token: `token-${String(sent.length)}`,
-        };
+      if (change?.values != null && answered.ok) {
+        settings = settingsOf(change.values, `token-${String(sent.length)}`);
       }
       return answered;
     }),
@@ -274,23 +260,14 @@ function taskBackend(
   }
   /** Someone else saving the task: its settings and what its workflow declares. */
   const elsewhere = (now: { content: string; form: WorkflowForm }) => {
-    settings = { ...settings, content: now.content, token: 'token-theirs' };
+    settings = settingsOf(taskValuesOf(now.content), 'token-theirs');
     declaredNow = now.form;
   };
   return { sent, elsewhere };
 }
 
 function asManager() {
-  server.use(
-    http.get('/api/v1/me', () =>
-      HttpResponse.json({
-        ...someone,
-        roles: [
-          { names: { org: 'acme', contest: 'spring', task: 'sum' }, role: 'manager' },
-        ],
-      }),
-    ),
-  );
+  server.use(signedIn, ...holding('manager', publishedTask));
 }
 
 function fill(field: HTMLElement, value: string) {
@@ -306,10 +283,10 @@ function fieldIn(
   return within(within(scope).getByRole('group', { name: box })).getByLabelText(name);
 }
 
-/** The settings a save wrote, as values. */
+/** The settings a save sent, as the file holds them. */
 function written(body: SaveRequest | undefined): Record<string, unknown> {
-  const yaml = body?.changes.find((change) => change.path === 'task.yaml');
-  return parse(yaml?.content ?? '') as Record<string, unknown>;
+  const change = body?.changes.find((each) => each.path === 'task.yaml');
+  return taskFileOf(change?.values);
 }
 
 async function openTask() {
@@ -436,10 +413,7 @@ describe('the cards that build a task', { timeout: 30_000 }, () => {
       strict: true,
       greeting: '42',
     });
-    const content = sent[0]?.changes.find(
-      (change) => change.path === 'task.yaml',
-    )?.content;
-    expect(content).toContain('name: Shortest Path   # the title');
+    expect(written(sent[0])['name']).toBe('Shortest Path');
   });
 
   it('shows, as an empty label’s placeholder, what entrants then see', async () => {
@@ -1046,46 +1020,29 @@ repeat:
     ).toBeVisible();
   });
 
-  it('shows settings that are an upload by their size and digest, not as cards', async () => {
+  it('says settings that do not read as settings, such as an upload, cannot be shown as cards', async () => {
     taskBackend();
     server.use(
-      http.get(`${TASK_API}/files/:path`, ({ params }) =>
-        params['path'] === 'task.yaml'
-          ? HttpResponse.json({
-              path: 'task.yaml',
-              encoding: 'utf-8',
-              content: `version https://git-lfs.github.com/spec/v1\noid sha256:${'d'.repeat(64)}\nsize 120\n`,
-              token: 'token-task',
-              upload: { size: 120, digest: 'd'.repeat(64) },
-              version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
-            })
-          : undefined,
+      http.get(`${TASK_API}/settings`, () =>
+        HttpResponse.json(settingsOf(null, 'token-task')),
       ),
     );
     renderApp('/orgs/acme/contests/spring/tasks/sum');
 
-    const [shown] = await screen.findAllByRole('region', {
-      name: 'Uploaded task.yaml',
-    });
-    expect(within(shown!).getByText('d'.repeat(64))).toBeVisible();
+    const unread = await screen.findByText(
+      /The task’s settings cannot be read: The file does not hold named settings\./,
+    );
+    expect(
+      within(unread.closest('[role="alert"]') as HTMLElement).getByRole('link', {
+        name: 'Settings',
+      }),
+    ).toHaveAttribute('href', '/orgs/acme/contests/spring/tasks/sum/settings');
     expect(screen.queryByRole('region', { name: 'Inputs' })).toBeNull();
   });
 
   it('keeps an observer’s fields readable, hides changes, and links the role chip to task organisers', async () => {
     taskBackend({ form: CHECKED });
-    server.use(
-      http.get('/api/v1/me', () =>
-        HttpResponse.json({
-          ...someone,
-          roles: [
-            {
-              names: { org: 'acme', contest: 'spring', task: 'sum' },
-              role: 'observer',
-            },
-          ],
-        }),
-      ),
-    );
+    server.use(signedIn, ...holding('observer', publishedTask));
     const { inputs } = await openTask();
     expect(fieldIn(inputs, 'Time limit (seconds)', /^Time limit/)).toBeDisabled();
     const scoring = screen.getByRole('region', { name: 'Scoring' });
@@ -1126,7 +1083,7 @@ repeat:
     });
   });
 
-  it('merges field by field, in words, when someone else saved the settings first', async () => {
+  it('refuses the save, rather than merging, when someone else saved the settings first', async () => {
     const theirs = TASK.replace('time_limit: 2', 'time_limit: 5');
     const { sent } = taskBackend({ conflictWith: theirs });
     const { inputs, tests } = await openTask();
@@ -1135,31 +1092,12 @@ repeat:
     fill(within(tests).getByLabelText('Most submissions'), '20');
     await save();
 
-    const merge = await screen.findByRole('list', { name: 'Fields that differ' });
-    const limit = within(merge).getByRole('radiogroup', {
-      name: 'Inputs: time_limit (both changed it)',
-    });
-    await userEvent.click(within(limit).getByRole('radio', { name: 'Now: 5' }));
     expect(
-      within(merge).getByRole('radiogroup', {
-        name: 'Submissions: Most submissions',
-      }),
+      await screen.findByRole('button', { name: 'Reload the file' }),
     ).toBeVisible();
-    await userEvent.click(
-      screen.getByRole('button', { name: 'Save the merged version' }),
-    );
-
-    expect(
-      await screen.findByText('Saved and published as publication 4.'),
-    ).toBeVisible();
-    const yaml = sent[1]?.changes.find((change) => change.path === 'task.yaml');
-    expect(yaml?.token).toBe('token-theirs');
-    const saved = written(sent[1]) as {
-      inputs: Record<string, unknown>;
-      submissions: { max: number; rate: { count: number; per: number } };
-    };
-    expect(saved.inputs['time_limit']).toBe(5);
-    expect(saved.submissions).toEqual({ max: 20, rate: { count: 1, per: 30 } });
+    expect(screen.queryByRole('list', { name: 'Fields that differ' })).toBeNull();
+    expect(sent).toHaveLength(1);
+    expect(fieldIn(inputs, 'time_limit', 'Value')).toHaveValue('3');
   });
 });
 
@@ -1195,18 +1133,15 @@ describe('the cards while the task is being changed', { timeout: 30_000 }, () =>
 
     await userEvent.click(button);
 
-    const merge = await screen.findByRole('list', { name: 'Fields that differ' });
     expect(
-      within(merge).getByRole('radiogroup', {
-        name: 'Inputs: time_limit (both changed it)',
-      }),
+      await screen.findByRole('button', { name: 'Reload the file' }),
     ).toBeVisible();
     const yaml = sent[0]?.changes.find((change) => change.path === 'task.yaml');
     expect(yaml?.token).toBe('token-task');
   });
 });
 
-describe('discarding at a conflict', { timeout: 30_000 }, () => {
+describe('reloading at a conflict', { timeout: 30_000 }, () => {
   it('drops my changes and shows the settings as they are now', async () => {
     const theirs = TASK.replace('time_limit: 2', 'time_limit: 5');
     taskBackend({ conflictWith: theirs });
@@ -1214,8 +1149,9 @@ describe('discarding at a conflict', { timeout: 30_000 }, () => {
 
     fill(within(tests).getByLabelText('Most submissions'), '20');
     await save();
-    await screen.findByRole('list', { name: 'Fields that differ' });
-    await userEvent.click(screen.getByRole('button', { name: 'Discard my changes' }));
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Reload the file' }),
+    );
 
     await waitFor(() =>
       expect(screen.queryByRole('region', { name: 'Save the task' })).toBeNull(),
@@ -1790,10 +1726,16 @@ repeat:
         HttpResponse.json({
           version: '5e6f',
           errors: [
-            { path: 'inputs.best', message: 'Not a number.' },
-            { path: 'repeat[0].tuples[0].title', message: 'Say what this row is.' },
-            { path: 'repeat[0].tuples[1].max_size', message: 'At most 2GB.' },
-            { path: 'repeat[0].tuples[0].input', message: 'There is no such file.' },
+            { path: ['inputs', 'best'], message: 'Not a number.' },
+            {
+              path: ['repeat', 0, 'tuples', 0, 'title'],
+              message: 'Say what this row is.',
+            },
+            { path: ['repeat', 0, 'tuples', 1, 'max_size'], message: 'At most 2GB.' },
+            {
+              path: ['repeat', 0, 'tuples', 0, 'input'],
+              message: 'There is no such file.',
+            },
           ],
           held_back: [],
         }),
@@ -1897,19 +1839,7 @@ describe('scoring, checks and what a save answers', { timeout: 60_000 }, () => {
         declared('input', 'file'),
       ]),
     });
-    server.use(
-      http.get('/api/v1/me', () =>
-        HttpResponse.json({
-          ...someone,
-          roles: [
-            {
-              names: { org: 'acme', contest: 'spring', task: 'sum' },
-              role: 'observer',
-            },
-          ],
-        }),
-      ),
-    );
+    server.use(signedIn, ...holding('observer', publishedTask));
     await openTask();
     const scoring = screen.getByRole('region', { name: 'Scoring' });
     const line = await within(scoring).findByRole('textbox', { name: 'total' });
@@ -1967,14 +1897,14 @@ inputs:
       'A submission runs once, since nothing changes from run to run.',
     );
     const scoring = screen.getByRole('region', { name: 'Scoring' });
+    const gives = await within(scoring).findByRole('table', {
+      name: 'What one submission gives',
+    });
     expect(scoring).not.toHaveTextContent('No runs yet');
     expect(scoring).not.toHaveTextContent('Every run also gives');
     expect(scoring).toHaveTextContent(
       'A value can also read seconds late, seconds taken and whether it compiled.',
     );
-    const gives = within(scoring).getByRole('table', {
-      name: 'What one submission gives',
-    });
     expect(within(gives).getByRole('row', { name: /^The one run/ })).toBeVisible();
     const groups = within(scoring).getByRole('table', { name: 'Groups' });
     expect(within(groups).getByRole('row', { name: /^The one run/ })).toBeVisible();
@@ -2007,10 +1937,45 @@ repeat:
     });
     await openTask();
     const scoring = screen.getByRole('region', { name: 'Scoring' });
-    const line = within(scoring).getByText(/^Every run also gives/);
+    const line = await within(scoring).findByText(/^Every run also gives/);
     expect(line).toHaveTextContent(
       'Every run also gives Random seed. A value can also read seconds late, seconds taken and whether it compiled.',
     );
+  });
+
+  it('lists the runs the server makes from the draft, and says when there are too many', async () => {
+    let sent: unknown = null;
+    server.use(
+      http.post(`${TASK_API}/draft-runs`, async ({ request }) => {
+        sent = await request.json();
+        return HttpResponse.json({ runs: [], count: 2000, axes: [[]] });
+      }),
+    );
+    taskBackend({
+      content: `name: Islands
+workflow: unicon/classic@v6
+inputs:
+  code: {entrant: {label: Solution}}
+  input: sample.in
+repeat:
+  - inputs: [seed]
+    tuples:
+      - {seed: 1, title: One}
+`,
+      form: runForm('unicon/classic@v6', [
+        declared('code', 'file'),
+        declared('input', 'file'),
+        declared('seed', 'number'),
+      ]),
+    });
+    await openTask();
+    const scoring = screen.getByRole('region', { name: 'Scoring' });
+    expect(
+      await within(scoring).findByText('The runs make 2000 runs, too many to list.'),
+    ).toBeVisible();
+    expect(sent).toEqual({
+      repeat: [{ inputs: ['seed'], tuples: [{ seed: 1, title: 'One' }] }],
+    });
   });
 
   it('uses the workflow box’s output types for the runs table', async () => {
@@ -2599,6 +2564,57 @@ scoring:
     });
   });
 
+  it('sends a group that picks nothing and a value with no name, and shows the forge’s word on each', async () => {
+    const { sent } = taskBackend({
+      content: ISLANDS,
+      form: runForm('unicon/classic@v6', [
+        declared('code', 'file'),
+        declared('input', 'file'),
+      ]),
+      answer: () =>
+        HttpResponse.json({
+          version: '5e6f',
+          errors: [
+            {
+              path: ['scoring', 'groups', 'group_1'],
+              message: 'Pick the group’s runs by at least one repeated input.',
+            },
+            { path: ['scoring', 'values', ''], message: 'Give the value a name.' },
+          ],
+          held_back: [],
+        }),
+    });
+    await openTask();
+    const scoring = await screen.findByRole('region', { name: 'Scoring' });
+    await userEvent.click(within(scoring).getByRole('button', { name: 'Add a group' }));
+    await waitFor(() =>
+      expect(
+        within(scoring).getByRole('button', { name: 'Add a value' }),
+      ).toBeEnabled(),
+    );
+    await userEvent.click(within(scoring).getByRole('button', { name: 'Add a value' }));
+    await typeLine('value_1', '1');
+    fill(within(scoring).getByRole('textbox', { name: 'Name' }), '');
+    await save();
+
+    await expect.poll(() => sent.length).toBe(1);
+    expect(written(sent[0])['scoring']).toEqual({
+      groups: { group_1: {} },
+      values: { '': 1 },
+    });
+    const now = await screen.findByRole('region', { name: 'Scoring' });
+    expect(
+      await within(now).findByText(
+        'Pick the group’s runs by at least one repeated input.',
+      ),
+    ).toBeVisible();
+    expect(
+      within(within(now).getByRole('group', { name: 'Value' })).getByText(
+        'Give the value a name.',
+      ),
+    ).toBeVisible();
+  });
+
   it('warns on its row before what was shown always is hidden, once a submission is graded', async () => {
     taskBackend({
       content:
@@ -2891,7 +2907,7 @@ describe('the preview of what entrants see', { timeout: 30_000 }, () => {
         problem(422, 'invalid_definition', {
           errors: [
             {
-              path: 'scoring.show.always.values[0]',
+              path: ['scoring', 'show', 'always', 'values', 0],
               message: 'There is no value nope.',
             },
           ],

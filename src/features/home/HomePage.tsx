@@ -20,14 +20,13 @@ import {
   orgPath,
   workflowPath,
 } from '@/lib/organiser-paths';
-import { orgsReached } from '@/lib/reached';
 import { MyContests, PublicContests } from './ContestList';
 import { PendingInvites } from './MyInvites';
 import { ServerClock } from './ServerClock';
 import classes from './HomePage.module.css';
 
 function YourOrgs() {
-  const orgs = orgsReached(useMe().roles);
+  const orgs = useMe().orgs;
   if (orgs.length === 0) return <BodyText>You have no role at any org yet.</BodyText>;
   return orgs.map((org) => (
     <PageLink key={org} to={orgPath(org)}>

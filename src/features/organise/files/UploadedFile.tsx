@@ -1,10 +1,9 @@
 import { useState } from 'react';
 import type { UploadInfo } from '@/api/types';
-import { useMe } from '@/session';
 import { formatSize } from '@/lib/size';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
-import { holdsAt } from '../roles';
+import { usePlaceMay } from '../may';
 import type { Place } from './place';
 import { TaskUpload } from './TaskUpload';
 import shared from '../organise.module.css';
@@ -37,10 +36,9 @@ export function UploadedFile({
   /** What the section is named, such as the version it is the file at. */
   label?: string;
 }) {
-  const roles = useMe().roles;
+  const may = usePlaceMay(place);
   const [again, setAgain] = useState(false);
-  const manages =
-    token !== null && place.kind === 'task' && holdsAt(roles, place, 'manager');
+  const manages = token !== null && place.kind === 'task' && may.manage;
 
   return (
     <section className={classes.editor} aria-label={label}>

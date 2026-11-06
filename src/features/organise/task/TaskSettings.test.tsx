@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { screen, within } from '@testing-library/react';
-import { http, HttpResponse } from 'msw';
 import userEvent from '@/test/user-event';
+import { holding } from '@/test/may';
 import { renderApp } from '@/test/render';
-import { server, signedIn, someone } from '@/test/server';
-import { publicationList, repoFiles, taskState } from '@/test/organiser';
+import { server, signedIn } from '@/test/server';
+import { publicationList, publishedTask, repoFiles, taskState } from '@/test/organiser';
 
 const SETTINGS = '/orgs/acme/contests/spring/tasks/sum/settings';
 
@@ -36,25 +36,16 @@ describe('every file of a task, to read (M51)', { timeout: 20_000 }, () => {
     ).toBeNull();
   });
 
-  it('offers a manager no view of every file', async () => {
+  it('offers an observer the view of every file too, as the forge lets them read it', async () => {
     server.use(
+      signedIn,
+      ...holding('observer', publishedTask),
       taskState,
       publicationList,
       ...repoFiles,
-      http.get('/api/v1/me', () =>
-        HttpResponse.json({
-          ...someone,
-          roles: [
-            { names: { org: 'acme', contest: 'spring', task: 'sum' }, role: 'manager' },
-          ],
-        }),
-      ),
     );
     renderApp(SETTINGS);
 
-    expect(
-      await screen.findByRole('region', { name: 'The settings as stored' }),
-    ).toBeVisible();
-    expect(screen.queryByRole('button', { name: 'View all files' })).toBeNull();
+    expect(await screen.findByRole('button', { name: 'View all files' })).toBeVisible();
   });
 });

@@ -20,7 +20,7 @@ import {
   wire,
   workflowOf,
 } from './edit';
-import { NumberText } from '../forms/yaml-doc';
+import { NumberText } from './yaml-doc';
 import { refText } from './model';
 
 const [, diff, , exec] = PRIMITIVES;

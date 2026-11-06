@@ -48,7 +48,7 @@ import {
   type Target,
 } from './ends';
 import { NOTICE_MS } from './notice';
-import { NumberText } from '../forms/yaml-doc';
+import { NumberText } from './yaml-doc';
 import { refsOf, type OutputEntry, type Ref, type Workflow } from './model';
 import type { Pinned, Warning } from './pins';
 import { declared, type PrimitiveInfo } from './primitives';
@@ -314,11 +314,13 @@ function rowView(
     ...(side === 'left' && primitive !== null ? portMarks(primitive, port) : []),
     ...(entry !== undefined ? entryMarks(entry) : []),
   ];
-  // A file fits a step's folder port, as a folder of one, as the forge has it.
+  const accepts =
+    side === 'left'
+      ? (decl?.accepts ?? boxed?.inputs.find((input) => input.name === port)?.accepts)
+      : undefined;
+  // A folder port the server says takes a file too.
   const typeSaid =
-    side === 'left' && step !== undefined && type === 'folder'
-      ? 'file or folder'
-      : type;
+    type === 'folder' && accepts?.includes('file') ? 'file or folder' : type;
   const said = [typeSaid, ...marks, value ?? fedBy(seen, box, port, side, entry)]
     .filter((part) => part !== null)
     .join(' · ');
@@ -1378,6 +1380,8 @@ export function Graph({
                 minZoom={1}
                 maxZoom={1}
                 panOnDrag={false}
+                // The frame scrolls; the graph never pans, on Space or a drag.
+                panActivationKeyCode={null}
                 panOnScroll={false}
                 zoomOnScroll={false}
                 zoomOnPinch={false}

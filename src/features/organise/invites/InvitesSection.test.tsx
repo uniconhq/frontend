@@ -2,18 +2,15 @@ import { describe, expect, it } from 'vitest';
 import { screen, within } from '@testing-library/react';
 import userEvent from '@/test/user-event';
 import { http, HttpResponse } from 'msw';
-import type { Invite, Me } from '@/api/types';
+import type { Invite } from '@/api/types';
 import { renderApp } from '@/test/render';
-import { problem, server, signedIn, someone } from '@/test/server';
-import { contestList, taskList } from '@/test/organiser';
+import { problem, server, signedIn } from '@/test/server';
+import { holding } from '@/test/may';
+import { contestList, settingsOf, taskList } from '@/test/organiser';
 import { invite } from '@/test/invites';
 
 const ORG_INVITES = '/api/v1/orgs/:org/invites';
 const CONTEST_INVITES = '/api/v1/orgs/:org/contests/:contest/invites';
-
-function signedInAs(roles: Me['roles']) {
-  return http.get('/api/v1/me', () => HttpResponse.json({ ...someone, roles }));
-}
 
 /** The invites at the org as the routes change them, and each body sent. */
 function orgInvites(start: Invite[]) {
@@ -194,7 +191,7 @@ describe('the organisers’ invites', () => {
     await user.click(within(form).getByRole('button', { name: 'Invite' }));
 
     expect(await within(form).findByRole('alert')).toHaveTextContent(
-      'Nobody has the username nobody. Invite their email address instead',
+      'not_found detail Invite their email address instead',
     );
   });
 
@@ -214,8 +211,8 @@ describe('the organisers’ invites', () => {
     await user.click(within(form).getByRole('button', { name: 'Invite' }));
 
     const alert = await within(form).findByRole('alert');
-    expect(alert).toHaveTextContent('They have this invite already');
-    expect(alert).toHaveTextContent('where it can be sent again');
+    expect(alert).toHaveTextContent('Couldn’t invite');
+    expect(alert).toHaveTextContent('already_invited detail');
   });
 
   it('sends an invite again and withdraws one, each row as it comes back', async () => {
@@ -263,11 +260,9 @@ describe('the organisers’ invites', () => {
 
   it('shows an observer the invites and nothing to change', async () => {
     server.use(
-      signedInAs([
-        { names: { org: 'acme', contest: null, task: null }, role: 'observer' },
-      ]),
-      contestList,
-      http.get(ORG_INVITES, () => HttpResponse.json([invite()])),
+      signedIn,
+      ...holding('observer'),
+      http.get(ORG_INVITES, () => HttpResponse.json([invite({ may_change: false })])),
     );
     renderApp('/orgs/acme/organisers');
 
@@ -278,14 +273,14 @@ describe('the organisers’ invites', () => {
 
   it('offers a manager no admin invite and no change to one', async () => {
     server.use(
-      signedInAs([
-        { names: { org: 'acme', contest: 'spring', task: null }, role: 'manager' },
-      ]),
+      signedIn,
+      ...holding('manager'),
       taskList,
       http.get(CONTEST_INVITES, () =>
         HttpResponse.json([
           invite({
             grants: 'admin',
+            may_change: false,
             where: { org: 'acme', contest: 'spring', task: null },
           }),
         ]),
@@ -332,23 +327,17 @@ describe('the contestants’ invites', () => {
         return HttpResponse.json(invite({ grants: 'contestant' }), { status: 201 });
       }),
       // Invites are made in the contest's invite way, under How people enter.
-      http.get('/api/v1/orgs/:org/contests/:contest/files/:path', () =>
-        HttpResponse.json({
-          path: 'contest.yaml',
-          encoding: 'utf-8',
-          content: [
-            'name: Spring',
-            'start: 2026-10-01T09:00:00Z',
-            'end: 2026-10-01T14:00:00Z',
-            'state: draft',
-            'visibility: signed-in',
-            'registration: {ways: [{invite: {}}]}',
-            '',
-          ].join('\n'),
-          token: 'token-contest',
-          upload: null,
-          version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
-        }),
+      http.get('/api/v1/orgs/:org/contests/:contest/settings', () =>
+        HttpResponse.json(
+          settingsOf({
+            name: 'Spring',
+            start: '2026-10-01T09:00:00Z',
+            end: '2026-10-01T14:00:00Z',
+            state: 'draft',
+            visibility: 'signed-in',
+            registration: { ways: [{ invite: {} }] },
+          }),
+        ),
       ),
     );
     const user = userEvent.setup();

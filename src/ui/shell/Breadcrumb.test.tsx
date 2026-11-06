@@ -9,9 +9,10 @@ import {
   publicContest,
   taskPage,
 } from '@/test/contestant';
+import { listedContests } from '@/test/may';
 import { standingList } from '@/test/organiser';
 import { renderApp } from '@/test/render';
-import { problem, server, signedIn, someone } from '@/test/server';
+import { problem, server, signedIn } from '@/test/server';
 import {
   CONTEST_SECTIONS,
   ORG_SECTIONS,
@@ -255,17 +256,14 @@ describe("the breadcrumb's menus", () => {
     ]);
   });
 
-  it('lists the contests their own roles reach when the org refuses its list', async () => {
+  it('lists the contests the server lists for someone holding a role at one alone', async () => {
     server.use(
-      http.get('/api/v1/me', () =>
-        HttpResponse.json({
-          ...someone,
-          roles: [
-            { names: { org: 'acme', contest: 'spring', task: null }, role: 'manager' },
-          ],
-        }),
+      signedIn,
+      http.get('/api/v1/orgs/:org/contests', () =>
+        HttpResponse.json(
+          listedContests('manager').filter(({ name }) => name === 'spring'),
+        ),
       ),
-      http.get('/api/v1/orgs/:org/contests', () => problem(403, 'forbidden')),
     );
     renderApp('/orgs/acme/contests/spring/entrants');
 
@@ -292,17 +290,13 @@ describe("the breadcrumb's menus", () => {
     ]);
   });
 
-  it('lists the tasks their own roles reach when the contest refuses its list', async () => {
+  it('lists the tasks the server names when the contest refuses its standings', async () => {
     server.use(
-      http.get('/api/v1/me', () =>
-        HttpResponse.json({
-          ...someone,
-          roles: [
-            { names: { org: 'acme', contest: 'spring', task: 'sum' }, role: 'manager' },
-          ],
-        }),
-      ),
+      signedIn,
       http.get(`${CONTEST_API}/organise/tasks`, () => problem(403, 'forbidden')),
+      http.get(`${CONTEST_API}/tasks`, () =>
+        HttpResponse.json([{ name: 'sum', may_manage: true }]),
+      ),
     );
     renderApp('/orgs/acme/contests/spring/tasks/sum/marking');
 

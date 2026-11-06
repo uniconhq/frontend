@@ -2,12 +2,41 @@ import { http, HttpResponse } from 'msw';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { act, screen, waitFor, within } from '@testing-library/react';
 import { specCatalogue } from '@/test/catalogue';
+import { holding } from '@/test/may';
 import { renderApp } from '@/test/render';
-import { problem, server, signedIn, someone } from '@/test/server';
-import { CONTEST_API, repoFiles } from '@/test/organiser';
+import { problem, server, signedIn } from '@/test/server';
+import {
+  CONTEST_API,
+  contestSettings,
+  contestValues,
+  repoFiles,
+  settingsOf,
+} from '@/test/organiser';
+import type { WriteSettings } from '@/api/types';
 import userEvent from '@/test/user-event';
 
 const PAGE = '/orgs/acme/contests/spring/leaderboards';
+
+/** The contest's settings with these leaderboards, as the form reads them. */
+function withBoards(leaderboards: unknown) {
+  return http.get(`${CONTEST_API}/settings`, () =>
+    HttpResponse.json(settingsOf({ ...contestValues, leaderboards })),
+  );
+}
+
+/** Saves the forge refuses with these problems; `sent` holds each one's body. */
+function refusing(errors: { path: (string | number)[]; message: string }[]) {
+  const sent: WriteSettings[] = [];
+  const handler = http.put(`${CONTEST_API}/settings`, async ({ request }) => {
+    sent.push((await request.json()) as WriteSettings);
+    return problem(422, 'invalid_definition', { errors });
+  });
+  return Object.assign(handler, { sent });
+}
+
+const STANDINGS = [
+  { key: 'standings', title: 'Standings', columns: [{ name: 'points', formula: 1 }] },
+];
 
 describe("a contest's leaderboards for its organisers", () => {
   beforeEach(() => {
@@ -26,29 +55,7 @@ describe("a contest's leaderboards for its organisers", () => {
   });
 
   it('shows observers formulas read-only without offering changes or tiles', async () => {
-    server.use(
-      http.get('/api/v1/me', () =>
-        HttpResponse.json({
-          ...someone,
-          roles: [
-            { names: { org: 'acme', contest: 'spring', task: null }, role: 'observer' },
-          ],
-        }),
-      ),
-    );
-    server.use(
-      http.get(`${CONTEST_API}/files/contest.yaml`, () =>
-        HttpResponse.json({
-          path: 'contest.yaml',
-          encoding: 'utf-8',
-          token: 'v0',
-          version: 'v0',
-          upload: null,
-          content:
-            'name: Spring\nleaderboards:\n  standings:\n    title: Standings\n    columns: {points: 1}\n',
-        }),
-      ),
-    );
+    server.use(signedIn, ...holding('observer'), withBoards(STANDINGS));
     renderApp(PAGE);
     const line = await screen.findByRole('textbox', { name: 'points' });
     expect(line).toHaveAttribute('contenteditable', 'false');
@@ -59,14 +66,9 @@ describe("a contest's leaderboards for its organisers", () => {
     expect(screen.queryByRole('button', { name: 'Remove points' })).toBeNull();
   });
 
-  it('adds a leaderboard and writes who sees it', async () => {
-    let sent = '';
-    server.use(
-      http.put(`${CONTEST_API}/files/:path`, async ({ request }) => {
-        sent = ((await request.json()) as { content: string }).content;
-        return HttpResponse.json({ version: '9f8e7d6c5b4a39281706', notes: [] });
-      }),
-    );
+  it('adds a leaderboard and saves who sees it with the settings', async () => {
+    const { handlers, sent } = contestSettings();
+    server.use(...handlers);
     renderApp(PAGE);
     await userEvent.click(
       await screen.findByRole('button', { name: 'Add a leaderboard' }),
@@ -80,17 +82,24 @@ describe("a contest's leaderboards for its organisers", () => {
       expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled(),
     );
     await userEvent.click(screen.getByRole('button', { name: 'Save' }));
-    await waitFor(() => expect(sent).toContain('rows: own'));
-    expect(sent).toContain('who: entrants');
-    expect(sent).toContain('leaderboard:');
+    await waitFor(() => expect(sent).toHaveLength(1));
+    expect(sent[0]?.token).toBe('token-1');
+    expect(sent[0]?.values).toEqual({
+      ...contestValues,
+      leaderboards: [
+        {
+          key: 'leaderboard',
+          audience: { who: 'entrants', rows: 'own' },
+          columns: [{ name: 'points', formula: 1 }],
+          sort: [{ points: 'desc' }],
+          display: ['points'],
+        },
+      ],
+    });
   });
 
   it('asks before leaving with changes not saved, and leaves at once after the save', async () => {
-    server.use(
-      http.put(`${CONTEST_API}/files/:path`, () =>
-        HttpResponse.json({ version: '9f8e7d6c5b4a39281706', notes: [] }),
-      ),
-    );
+    server.use(...contestSettings().handlers);
     const { router } = renderApp(PAGE);
     const away = '/orgs/acme/contests/spring';
     await userEvent.click(
@@ -124,13 +133,8 @@ describe("a contest's leaderboards for its organisers", () => {
   });
 
   it("moves a column's sort and display once its name is done, not while it is typed", async () => {
-    let sent = '';
-    server.use(
-      http.put(`${CONTEST_API}/files/:path`, async ({ request }) => {
-        sent = ((await request.json()) as { content: string }).content;
-        return HttpResponse.json({ version: '9f8e7d6c5b4a39281706', notes: [] });
-      }),
-    );
+    const { handlers, sent } = contestSettings();
+    server.use(...handlers);
     renderApp(PAGE);
     await userEvent.click(
       await screen.findByRole('button', { name: 'Add a leaderboard' }),
@@ -147,24 +151,24 @@ describe("a contest's leaderboards for its organisers", () => {
       expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled(),
     );
     await userEvent.click(screen.getByRole('button', { name: 'Save' }));
-    await waitFor(() => expect(sent).toContain('leaderboard:'));
-    expect(sent).toMatch(/sort:\n\s+- total: desc/);
-    expect(sent).not.toContain('pointsx: desc');
-    expect(sent).not.toMatch(/points: (desc|"")/);
+    await waitFor(() => expect(sent).toHaveLength(1));
+    const [board] = sent[0]?.values['leaderboards'] as Record<string, unknown>[];
+    expect(board?.['columns']).toEqual([
+      { name: 'total', formula: 1 },
+      { name: 'pointsx', formula: 1 },
+    ]);
+    expect(board?.['sort']).toEqual([{ total: 'desc' }]);
+    expect(board?.['display']).toEqual(['total']);
   });
 
   it('marks the column a save refuses', async () => {
     server.use(
-      http.put(`${CONTEST_API}/files/:path`, () =>
-        problem(422, 'invalid_definition', {
-          errors: [
-            {
-              path: 'leaderboards.gradebook.columns.points',
-              message: 'This column is refused.',
-            },
-          ],
-        }),
-      ),
+      refusing([
+        {
+          path: ['leaderboards', 'gradebook', 'columns', 'points'],
+          message: 'This column is refused.',
+        },
+      ]),
     );
     renderApp(PAGE);
     await userEvent.click(
@@ -182,13 +186,9 @@ describe("a contest's leaderboards for its organisers", () => {
 
   it('names a refused leaderboard by the name its card shows, in the page’s words', async () => {
     server.use(
-      http.put(`${CONTEST_API}/files/:path`, () =>
-        problem(422, 'invalid_definition', {
-          errors: [
-            { path: 'leaderboards.icpc.sort', message: 'Rank by a column it has.' },
-          ],
-        }),
-      ),
+      refusing([
+        { path: ['leaderboards', 'icpc', 'sort'], message: 'Rank by a column it has.' },
+      ]),
     );
     renderApp(PAGE);
     await userEvent.click(
@@ -233,17 +233,10 @@ describe("a contest's leaderboards for its organisers", () => {
 
   it('heads each card with its leaderboard’s name and each part with its own heading', async () => {
     server.use(
-      http.get(`${CONTEST_API}/files/contest.yaml`, () =>
-        HttpResponse.json({
-          path: 'contest.yaml',
-          encoding: 'utf-8',
-          token: 'v0',
-          version: 'v0',
-          upload: null,
-          content:
-            'name: Spring\nleaderboards:\n  standings:\n    title: Standings\n    columns: {points: 1}\n  icpc:\n    columns: {solved: 1}\n',
-        }),
-      ),
+      withBoards([
+        ...STANDINGS,
+        { key: 'icpc', columns: [{ name: 'solved', formula: 1 }] },
+      ]),
     );
     renderApp(PAGE);
     const standings = await screen.findByRole('region', {
@@ -287,19 +280,7 @@ describe("a contest's leaderboards for its organisers", () => {
   });
 
   it('keeps a saved leaderboard’s link when its name changes', async () => {
-    server.use(
-      http.get(`${CONTEST_API}/files/contest.yaml`, () =>
-        HttpResponse.json({
-          path: 'contest.yaml',
-          encoding: 'utf-8',
-          token: 'v0',
-          version: 'v0',
-          upload: null,
-          content:
-            'name: Spring\nleaderboards:\n  standings:\n    title: Standings\n    columns: {points: 1}\n',
-        }),
-      ),
-    );
+    server.use(withBoards(STANDINGS));
     renderApp(PAGE);
     const card = await screen.findByRole('region', { name: 'Leaderboard standings' });
     const name = within(card).getAllByRole('textbox', { name: 'Name' })[0]!;
@@ -313,13 +294,9 @@ describe("a contest's leaderboards for its organisers", () => {
 
   it('puts a refused key under Name', async () => {
     server.use(
-      http.put(`${CONTEST_API}/files/:path`, () =>
-        problem(422, 'invalid_definition', {
-          errors: [
-            { path: 'leaderboards.leaderboard', message: 'That name is taken.' },
-          ],
-        }),
-      ),
+      refusing([
+        { path: ['leaderboards', 'leaderboard'], message: 'That name is taken.' },
+      ]),
     );
     renderApp(PAGE);
     await userEvent.click(
@@ -332,9 +309,93 @@ describe("a contest's leaderboards for its organisers", () => {
     ).toHaveAccessibleDescription('That name is taken.');
   });
 
+  it("shows the forge's refusal of a column on that column", async () => {
+    const main = [{ key: 'main', columns: [{ name: 'total', formula: 1 }] }];
+    server.use(
+      withBoards(main),
+      refusing([
+        {
+          path: ['leaderboards', 'main', 'columns', 'total'],
+          message: 'Another column has this name.',
+        },
+      ]),
+    );
+    renderApp(PAGE);
+    const card = await screen.findByRole('region', { name: 'Leaderboard main' });
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled(),
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+    const column = await within(card).findByRole('group', { name: 'total' });
+    expect(within(column).getByText('Another column has this name.')).toBeVisible();
+  });
+
+  it('sends a column with no name for the forge to refuse, and shows it on that column', async () => {
+    const refused = refusing([
+      {
+        path: ['leaderboards', 'standings', 'columns', ''],
+        message: 'Give the column a name.',
+      },
+    ]);
+    server.use(withBoards(STANDINGS), refused);
+    renderApp(PAGE);
+    const card = await screen.findByRole('region', { name: 'Leaderboard standings' });
+    await userEvent.clear(within(card).getAllByRole('textbox', { name: 'Name' })[1]!);
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+    const column = within(card).getByRole('group', { name: 'the new column' });
+    expect(await within(column).findByText('Give the column a name.')).toBeVisible();
+    const [board] = refused.sent[0]?.values['leaderboards'] as Record<
+      string,
+      unknown
+    >[];
+    expect(board?.['columns']).toEqual([{ name: '', formula: 1 }]);
+  });
+
+  it('sends a freeze with no end for the forge to refuse, and shows it under Until', async () => {
+    const refused = refusing([
+      { path: ['hold', 'until'], message: 'Give the time the freeze ends.' },
+    ]);
+    server.use(withBoards(STANDINGS), refused);
+    renderApp(PAGE);
+    const freeze = await screen.findByRole('region', { name: 'Freeze' });
+    await userEvent.click(
+      within(freeze).getByRole('checkbox', {
+        name: 'Freeze the leaderboards near the end',
+      }),
+    );
+    await userEvent.click(
+      within(freeze).getByRole('button', { name: 'An hour before the end' }),
+    );
+    await userEvent.click(within(freeze).getByRole('radio', { name: 'A time' }));
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled(),
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(refused.sent).toHaveLength(1));
+    expect(Object.keys(refused.sent[0]?.values['hold'] as object)).toEqual(['from']);
+    expect(
+      await within(freeze).findByRole('radiogroup', { name: 'Until' }),
+    ).toHaveAccessibleDescription('Give the time the freeze ends.');
+  });
+
+  it('says leaderboards it cannot read cannot be changed here', async () => {
+    server.use(withBoards({ standings: { columns: { points: 1 } } }));
+    renderApp(PAGE);
+    expect(
+      await screen.findByText(
+        'The leaderboards cannot be read, so they cannot be changed here.',
+      ),
+    ).toBeVisible();
+    expect(screen.getByRole('link', { name: 'the stored settings' })).toHaveAttribute(
+      'href',
+      '/orgs/acme/contests/spring/settings#file',
+    );
+    expect(screen.queryByRole('button', { name: 'Add a leaderboard' })).toBeNull();
+  });
+
   it('says which task settings could not be read, so what is read of them is not checked', async () => {
     server.use(
-      http.get(`${CONTEST_API}/tasks/sort/files/:path`, () => problem(500, 'internal')),
+      http.get(`${CONTEST_API}/tasks/sort/settings`, () => problem(500, 'internal')),
     );
     renderApp(PAGE);
 

@@ -1,8 +1,7 @@
 import { useRef, useState, type FormEvent } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useChange } from '@/api/change';
-import { $api, queryView } from '@/api/query';
-import { isApiError } from '@/api/problem';
+import { queryView } from '@/api/query';
 import type { Holder, RoleName, ScopeNames } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
@@ -14,6 +13,7 @@ import { RadioGroup } from '@/ui/RadioGroup';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { Loaded } from '@/ui/feedback/Loaded';
 import { useMe } from '@/session';
+import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
 import {
   CONTEST_SECTIONS,
   ORG_SECTIONS,
@@ -23,25 +23,21 @@ import {
   sectionOf,
   taskSectionPath,
 } from '@/lib/sections';
-import {
-  holdsAt,
-  isPlace,
-  offered,
-  ROLE_LABEL,
-  ROLE_AREAS,
-  roleMeans,
-  type RolePlace,
-} from '../roles';
+import { ROLE_LABEL, ROLE_AREAS, roleMeans, type RolePlace } from '../roles';
+import { usePeopleMay } from '../may';
 import { InvitesSection } from '../invites/InvitesSection';
 import { holdersQuery, useHolders, useRoleChanges } from './holders';
 import classes from './people.module.css';
 
 /**
  * The roles the caller may give, as Invite offers them, each with what it
- * lets its holder do: only an admin gives the admin role.
+ * lets its holder do: the admin role only where the server says so.
  */
-function roleOptions(administers: boolean, kind: RolePlace['kind']) {
-  return offered(administers).map((role) => ({
+function roleOptions(giveAdmin: boolean, kind: RolePlace['kind']) {
+  const roles: RoleName[] = giveAdmin
+    ? ['admin', 'manager', 'observer']
+    : ['manager', 'observer'];
+  return roles.map((role) => ({
     value: role,
     label: ROLE_LABEL[role],
     description: roleMeans(role, kind).join(' '),
@@ -55,6 +51,14 @@ function givenAt(names: ScopeNames): string {
   return 'The task';
 }
 
+/** How deep a place is: the org, a contest or a task. */
+function depthOf(names: ScopeNames): number {
+  if (names.contest === null) return 0;
+  return names.task === null ? 1 : 2;
+}
+
+const DEPTH: Record<RolePlace['kind'], number> = { org: 0, contest: 1, task: 2 };
+
 /** The organisers page of the scope a role was given at, where it is changed. */
 function organisersOf(names: ScopeNames): string {
   if (names.contest === null) return orgSectionPath(names.org, 'organisers');
@@ -64,52 +68,24 @@ function organisersOf(names: ScopeNames): string {
   return taskSectionPath(names.org, names.contest, names.task, 'organisers');
 }
 
-/**
- * A refusal in words. Two read better here than the general sentence: the
- * admin role asked for by someone who is not an admin here, and the last
- * admin of a scope, whose reason names the scope.
- */
-function Refusal({ error, role }: { error: unknown; role?: RoleName }) {
-  if (isApiError(error) && error.code === 'forbidden' && role === 'admin') {
-    return (
-      <div role="alert">
-        <BodyText tone="secondary">Only an admin gives the admin role</BodyText>
-        <BodyText tone="secondary">
-          {error.detail ?? 'Ask an admin here to give it.'}
-        </BodyText>
-      </div>
-    );
-  }
-  if (isApiError(error) && error.code === 'sole_admin') {
-    return (
-      <div role="alert">
-        <BodyText tone="secondary">That would leave no admin</BodyText>
-        <BodyText tone="secondary">
-          {error.detail ?? 'Someone else has to be an admin here first.'}
-        </BodyText>
-      </div>
-    );
-  }
+/** A refused change of a role, in the server's words. */
+function Refusal({ error }: { error: unknown }) {
   return (
     <div role="alert">
-      <ErrorBlock error={error} compact />
+      <ErrorBlock error={error} compact heading="Couldn’t change the role" />
     </div>
   );
 }
 
 /**
- * What every change leaves stale: the list here, and the caller's own roles
- * when the change was to them, since those decide what every page offers.
+ * What every change leaves stale: the list here, and, when the change was
+ * to the caller, every answer, since each says what they may do.
  */
 function useAfterChange(place: RolePlace) {
   const queryClient = useQueryClient();
   return async (touchedMe: boolean) => {
     await queryClient.invalidateQueries({ queryKey: holdersQuery(place).queryKey });
-    if (touchedMe) {
-      await queryClient.invalidateQueries({
-        queryKey: $api.queryOptions('get', '/api/v1/me').queryKey,
-      });
-    }
+    if (touchedMe) await queryClient.invalidateQueries();
   };
 }
 
@@ -117,34 +93,32 @@ function HolderRow({
   place,
   holder,
   manages,
-  administers,
+  giveAdmin,
   me,
 }: {
   place: RolePlace;
   holder: Holder;
   manages: boolean;
-  administers: boolean;
+  giveAdmin: boolean;
   me: number;
 }) {
   const { grant, revoke } = useRoleChanges(place);
   const afterChange = useAfterChange(place);
   const [open, setOpen] = useState<'role' | 'remove' | null>(null);
   const [role, setRole] = useState<RoleName>(holder.role);
-  /** The role last sent, which a refusal is about, whatever is picked since. */
-  const [tried, setTried] = useState<RoleName | null>(null);
   const row = useRef<HTMLTableRowElement>(null);
   const isMe = holder.user.id === me;
   const change = useChange({ reread: () => afterChange(isMe), focus: row });
   const { error } = change;
   const pending = change.pending !== null;
   const name = holder.user.username;
-  const inherited = !isPlace(holder.at_names, place);
-  const changeable = manages && !inherited && (holder.role !== 'admin' || administers);
+  // Listed here, a role is given here or at a broader scope.
+  const inherited = depthOf(holder.at_names) < DEPTH[place.kind];
+  const changeable = holder.may_change;
 
   const show = (next: 'role' | 'remove' | null) => {
     change.dismiss();
     setRole(holder.role);
-    setTried(null);
     setOpen(next);
   };
 
@@ -158,7 +132,6 @@ function HolderRow({
       show(null);
       return;
     }
-    setTried(role);
     void run('role', () => grant(holder.user.username, role));
   };
 
@@ -219,7 +192,7 @@ function HolderRow({
               <RadioGroup
                 label="Role"
                 value={role}
-                options={roleOptions(administers, place.kind)}
+                options={roleOptions(giveAdmin, place.kind)}
                 onChange={(value) => setRole(value as RoleName)}
               />
               <div className={classes.actions}>
@@ -232,9 +205,7 @@ function HolderRow({
               </div>
             </form>
           )}
-          {error !== null && open !== 'remove' && (
-            <Refusal error={error} role={tried ?? undefined} />
-          )}
+          {error !== null && open !== 'remove' && <Refusal error={error} />}
           <Modal
             opened={open === 'remove'}
             onClose={() => show(null)}
@@ -300,12 +271,20 @@ const ORGANISERS_OF: Record<RolePlace['kind'], string> = {
  */
 export function PeopleSection({ place }: { place: RolePlace }) {
   const me = useMe();
-  const observes = holdsAt(me.roles, place, 'observer');
-  const manages = holdsAt(me.roles, place, 'manager');
-  const administers = holdsAt(me.roles, place, 'admin');
+  const may = usePeopleMay(place);
+  const observes = may?.see_people === true;
+  const manages = may?.manage_people === true;
+  const giveAdmin = may?.give_admin === true;
   const view = queryView(useHolders(place, { enabled: observes }));
   const title = ORGANISERS_OF[place.kind];
 
+  if (may === undefined) {
+    return (
+      <Card>
+        <PageSkeleton rows={3} />
+      </Card>
+    );
+  }
   if (!observes) {
     return (
       <Card>
@@ -364,7 +343,7 @@ export function PeopleSection({ place }: { place: RolePlace }) {
                     place={place}
                     holder={holder}
                     manages={manages}
-                    administers={administers}
+                    giveAdmin={giveAdmin}
                     me={me.user.id}
                   />
                 ))}
@@ -383,7 +362,7 @@ export function PeopleSection({ place }: { place: RolePlace }) {
             place={place}
             audience="organisers"
             manages={manages}
-            administers={administers}
+            giveAdmin={giveAdmin}
           />
         </div>
       </Card>

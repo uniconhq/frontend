@@ -103,7 +103,9 @@ function FollowUp({
           Sending this opens the question again for the organisers.
         </BodyText>
       )}
-      {followUp.error !== null && <ErrorBlock error={followUp.error} compact />}
+      {followUp.error !== null && (
+        <ErrorBlock error={followUp.error} compact heading="Couldn’t send" />
+      )}
       <div className={classes.actions}>
         <Button
           type="submit"
@@ -174,7 +176,9 @@ function AskForm({
           onChange={setTask}
         />
       )}
-      {ask.error !== null && <ErrorBlock error={ask.error} compact />}
+      {ask.error !== null && (
+        <ErrorBlock error={ask.error} compact heading="Couldn’t send" />
+      )}
       <div className={classes.actions}>
         <Button type="submit" size="xs" loading={ask.isPending}>
           Ask

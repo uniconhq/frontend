@@ -10,15 +10,11 @@ import { taskCardPath } from '@/lib/sections';
 import { formatDateTime } from '@/lib/time';
 import { DefinitionErrors } from '../DefinitionErrors';
 import { TaskInContest } from '../contest/TaskEntry';
-import { fileQuery } from '../files/place';
-import { readTask, runCount } from '../forms/task-values';
-import {
-  inputTitle,
-  readSettings,
-  taskPath,
-  useWorkflowForm,
-  type TaskPlace,
-} from './build-data';
+import { settingsQuery } from '../files/place';
+import { readTask } from '../forms/task-values';
+import { useDraftRuns } from './draft-runs';
+import type { Values } from '../forms/values';
+import { inputTitle, taskPath, useWorkflowForm, type TaskPlace } from './build-data';
 import type { TaskSave } from './build-save';
 import { taskPlaceOf } from './places';
 import { publishedLine, savedBy } from './published';
@@ -85,45 +81,33 @@ type Card = 'workflow' | 'inputs' | 'runs' | 'statement';
 
 type Item = { card: Card; ok: boolean; text: string };
 
-const under = (state: TaskState, ...tops: string[]) =>
-  state.errors.some((error) =>
-    tops.some(
-      (top) =>
-        error.path === top ||
-        error.path.startsWith(`${top}.`) ||
-        error.path.startsWith(`${top}/`),
-    ),
-  );
+const under = (state: TaskState, top: string) =>
+  state.errors.some((error) => error.path[0] === top);
 
 /**
  * Each part of the task, ticked when it is done or saying what it is
  * missing, in the order its cards build it: its statement, its workflow, its
  * inputs and its runs (M11).
  */
+/** The saved settings as the cards read them. */
+function savedTask(form: WorkflowForm | null, settings: Values | null) {
+  const declared = form?.problem === null ? form.inputs : null;
+  return settings === null ? null : readTask(settings, declared).values;
+}
+
 function readiness(
   state: TaskState,
   form: WorkflowForm | null,
-  settings: string | null,
+  settings: Values | null,
+  runs: number | null,
 ): Item[] {
   // The forge says whether the statement saved is written: not blank, and not
   // the one a new task starts with (M57).
   const written = state.head_statement_written;
-  const read =
-    settings === null
-      ? null
-      : readSettings({
-          path: 'task.yaml',
-          encoding: 'utf-8',
-          content: settings,
-          token: '',
-          upload: null,
-          version: null,
-        });
   const declared = form?.problem === null ? form.inputs : null;
   // Read against the inputs declared, so one only a run gives, in `repeat`
   // and not `inputs`, is read as given each run.
-  const values =
-    read === null || 'error' in read ? null : readTask(read.doc, declared).values;
+  const values = settings === null ? null : readTask(settings, declared).values;
   const needed = (declared ?? []).filter((input) => !input.optional);
   // An input the entrant gives, or one each run gives, needs no value here.
   const missing = needed.find((input) => {
@@ -131,7 +115,6 @@ function readiness(
     if (given?.give === 'entrant' || given?.give === 'per-run') return false;
     return (given?.value.trim() ?? '') === '';
   });
-  const axes = (values?.axes ?? []).filter((axis) => axis.inputs.length > 0);
   return [
     {
       card: 'statement',
@@ -163,7 +146,9 @@ function readiness(
       ok: !under(state, 'repeat'),
       text: under(state, 'repeat')
         ? 'Runs: see the problems below'
-        : `Runs: ${String(runCount(axes))}`,
+        : runs === null
+          ? 'Runs'
+          : `Runs: ${String(runs)}`,
     },
   ];
 }
@@ -263,7 +248,12 @@ export function TaskStanding({
   const state = queryView($api.useQuery('get', TASK, { params: { path } }));
   const history = $api.useQuery('get', `${TASK}/history`, { params: { path } });
   const form = useWorkflowForm(place);
-  const settings = useQuery({ ...fileQuery(place, 'task.yaml'), retry: false });
+  const settings = useQuery({ ...settingsQuery(place), retry: false });
+  const saved = savedTask(
+    form.isError ? null : (form.data ?? null),
+    settings.data?.values ?? null,
+  );
+  const runs = useDraftRuns(place, saved?.axes ?? [], saved?.inputs ?? []).runs;
   const changes: FileChange[] | undefined = history.data;
   const last = changes?.[0];
 
@@ -288,7 +278,8 @@ export function TaskStanding({
               items={readiness(
                 task,
                 form.isError ? null : (form.data ?? null),
-                settings.data?.encoding === 'utf-8' ? settings.data.content : null,
+                settings.data?.values ?? null,
+                runs?.count ?? null,
               )}
             />
           )}

@@ -1,46 +1,61 @@
 import { describe, expect, it } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
-import type { WriteFile } from '@/api/types';
+import type { WriteFile, WriteSettings } from '@/api/types';
 import { renderApp } from '@/test/render';
 import { problem, server, signedIn } from '@/test/server';
-import { CONTEST_API, files, repoFiles, standingList } from '@/test/organiser';
+import {
+  CONTEST_API,
+  files,
+  repoFiles,
+  settingsOf,
+  standingList,
+} from '@/test/organiser';
 import userEvent from '@/test/user-event';
 import { specCatalogue } from '@/test/catalogue';
 
 const CONTEST = '/orgs/acme/contests/spring';
 
-/** The exact request is held until the question is answered. */
+type Sent = WriteFile | WriteSettings;
+
+/**
+ * The exact request is held until the question is answered, whether the
+ * settings are saved as values or as the file's text.
+ */
 function asks() {
-  const sent: WriteFile[] = [];
+  const sent: Sent[] = [];
+  const answer = async ({ request }: { request: Request }) => {
+    const body = (await request.json()) as Sent;
+    sent.push(body);
+    return body.confirm
+      ? HttpResponse.json({ version: 'v2', notes: [] })
+      : problem(409, 'confirmation_required', {
+          detail: 'The contest is running. Save it?',
+          changes: ["The Standings leaderboard's columns change."],
+          hiding: ['Entrants may have kept results shown since noon.'],
+          asked: 'contest-v1',
+        });
+  };
   server.use(
     signedIn,
     standingList,
     ...repoFiles,
     http.get('/api/v1/blocks', () => HttpResponse.json(specCatalogue())),
-    http.put(`${CONTEST_API}/files/:path`, async ({ request }) => {
-      const body = (await request.json()) as WriteFile;
-      sent.push(body);
-      return body.confirm
-        ? HttpResponse.json({ version: 'v2', notes: [] })
-        : problem(409, 'confirmation_required', {
-            detail: 'The contest is running. Save it?',
-            changes: ["The Standings leaderboard's columns change."],
-            hiding: ['Entrants may have kept results shown since noon.'],
-            asked: 'contest-v1',
-          });
-    }),
+    http.put(`${CONTEST_API}/files/:path`, answer),
+    http.put(`${CONTEST_API}/settings`, answer),
   );
   return sent;
 }
 
-async function confirm(sent: WriteFile[]) {
+/** `by` is how the save sends the settings: as values or as the file's text. */
+async function confirm(sent: Sent[], by: 'values' | 'content' = 'values') {
   const save = await screen.findByRole('button', { name: 'Save the change' });
   expect(screen.queryByRole('button', { name: 'Keep as draft' })).toBeNull();
   expect(
     screen.getByRole('list', { name: 'Entrants have already seen this' }),
   ).toHaveTextContent('results shown since noon');
   expect(sent).toHaveLength(1);
+  expect(sent[0]).toHaveProperty(by);
   await userEvent.click(save);
   await waitFor(() => expect(sent).toHaveLength(2));
   expect(sent[1]).toEqual({ ...sent[0], confirm: true, asked: 'contest-v1' });
@@ -134,11 +149,12 @@ describe('contest writers answer the save question', () => {
           content: 'name: Spring\nstart: [\n',
         }),
       ),
+      http.get(`${CONTEST_API}/settings`, () => HttpResponse.json(settingsOf(null))),
     );
     renderApp(`${CONTEST}/settings`);
     const text = await screen.findByRole('textbox', { name: 'contest.yaml' });
     await userEvent.type(text, 'x');
     await userEvent.click(screen.getByRole('button', { name: 'Save' }));
-    await confirm(sent);
+    await confirm(sent, 'content');
   });
 });

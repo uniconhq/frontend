@@ -112,7 +112,7 @@ function MarksSummary({ state }: { state: Extract<MarkState, { kind: 'held' }> }
       </BodyText>
       {refusal !== null && (
         <div role="alert">
-          <ErrorBlock error={refusal} compact />
+          <ErrorBlock error={refusal} compact heading="Couldn’t mark" />
         </div>
       )}
     </>

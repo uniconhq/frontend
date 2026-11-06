@@ -51,7 +51,7 @@ export function Loaded<T>({
 }
 
 function CompactFailure({ error, onRetry }: { error: ApiError; onRetry: () => void }) {
-  const { title } = describeError(error);
+  const { title } = describeError(error, 'Couldn’t load');
   return (
     <div className={classes.failure} role="alert">
       <BodyText tone="secondary">{title}</BodyText>

@@ -10,7 +10,7 @@ export type TaskPoints = {
   number: string;
   /** Decimals its column shows. */
   decimals: number | undefined;
-  /** The most the column can show, which only staff are told. */
+  /** The most the column can show, which the server tells staff alone. */
   most: string | null;
 };
 

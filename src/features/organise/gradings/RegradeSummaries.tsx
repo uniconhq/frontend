@@ -6,10 +6,8 @@ import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
 import { PageLink } from '@/ui/PageLink';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
-import { useMe } from '@/session';
 import { contestSectionPath } from '@/lib/sections';
 import { taskPath } from '@/lib/organiser-paths';
-import { holdsAt } from '../roles';
 import {
   REGRADES,
   causeWords,
@@ -37,7 +35,6 @@ const DISMISS =
  * manager of the task, Dismiss, which takes it off for everyone.
  */
 function Summary({ path, summary }: { path: ContestPath; summary: RegradeSummary }) {
-  const roles = useMe().roles;
   const queryClient = useQueryClient();
   const dismiss = $api.useMutation('post', DISMISS, {
     onSettled: () =>
@@ -47,8 +44,7 @@ function Summary({ path, summary }: { path: ContestPath; summary: RegradeSummary
   });
   const gradings = contestSectionPath(path.org, path.contest, 'gradings');
   const { task } = summary;
-  const manages =
-    task !== null && holdsAt(roles, { kind: 'task', ...path, task }, 'manager');
+  const manages = task !== null && summary.may_manage;
   const parts = summaryParts(summary);
   const running = runningWords(summary);
   const name = regradeOf(summary);
@@ -73,7 +69,9 @@ function Summary({ path, summary }: { path: ContestPath; summary: RegradeSummary
         {causeWords(summary)}
         {running !== null && ` ${running}`}
       </BodyText>
-      {dismiss.error !== null && <ErrorBlock error={dismiss.error} compact />}
+      {dismiss.error !== null && (
+        <ErrorBlock error={dismiss.error} compact heading="Couldn’t dismiss" />
+      )}
       {task !== null && (
         <PageLink
           to={`${taskPath(path.org, path.contest, task)}/regrades/${summary.id}`}

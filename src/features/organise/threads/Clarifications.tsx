@@ -14,11 +14,9 @@ import { TextInput } from '@/ui/TextInput';
 import { Textarea } from '@/ui/Textarea';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
-import { useMe } from '@/session';
 import { useFallbackPoll } from '@/live';
 import { useOrgParam } from '@/lib/route-params';
 import { ORG_SECTIONS, sectionOf } from '@/lib/sections';
-import { holdsAtContest } from '../roles';
 import { SectionPage } from '../SectionPage';
 import { announcementAnchor } from '@/ui/threads/anchors';
 import { QuestionThread } from '@/ui/threads/ThreadParts';
@@ -78,13 +76,12 @@ function replied(clarification: Clarification): boolean {
  */
 function ClarificationCard({
   clarification,
-  manages,
   showContest,
 }: {
   clarification: Clarification;
-  manages: boolean;
   showContest: boolean;
 }) {
+  const manages = clarification.may_answer;
   const queryClient = useQueryClient();
   const reply = $api.useMutation('post', `${QUESTION}/replies`);
   const mark = $api.useMutation('put', `${QUESTION}/answered`);
@@ -276,7 +273,9 @@ function ClarificationCard({
                 <BodyText tone="secondary">
                   You can reopen it later. To answer it, write a reply instead.
                 </BodyText>
-                {change.error !== null && <ErrorBlock error={change.error} compact />}
+                {change.error !== null && (
+                  <ErrorBlock error={change.error} compact heading="Couldn’t close" />
+                )}
                 <div className={classes.actions}>
                   <Button loading={busy === 'mark'} onClick={() => void markAnswered()}>
                     Mark it answered
@@ -290,7 +289,7 @@ function ClarificationCard({
           </>
         )}
         {change.error !== null && !asking && (
-          <ErrorBlock error={change.error} compact />
+          <ErrorBlock error={change.error} compact heading="Couldn’t send" />
         )}
       </QuestionThread>
     </li>
@@ -304,7 +303,6 @@ function ClarificationCard({
  */
 export function InboxPage() {
   const org = useOrgParam();
-  const roles = useMe().roles;
   const view = queryView(
     $api.useQuery(
       'get',
@@ -340,12 +338,6 @@ export function InboxPage() {
                   key={`${clarification.contest.contest ?? ''}/${clarification.asker}/${String(clarification.number)}`}
                   clarification={clarification}
                   showContest
-                  manages={holdsAtContest(
-                    roles,
-                    clarification.contest.org,
-                    clarification.contest.contest ?? '',
-                    'manager',
-                  )}
                 />
               ))}
             </ol>
@@ -367,7 +359,6 @@ export function ContestClarifications({
   org: string;
   contest: string;
 }) {
-  const manages = holdsAtContest(useMe().roles, org, contest, 'manager');
   const [showAnswered, setShowAnswered] = useState(false);
   const view = queryView(
     $api.useQuery(
@@ -382,7 +373,6 @@ export function ContestClarifications({
     <ClarificationCard
       key={`${clarification.asker}/${String(clarification.number)}`}
       clarification={clarification}
-      manages={manages}
       showContest={false}
     />
   );

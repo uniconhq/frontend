@@ -5,7 +5,6 @@ import {
   useContext,
   useLayoutEffect,
   useRef,
-  type KeyboardEvent,
 } from 'react';
 import {
   BaseEdge,
@@ -299,7 +298,7 @@ function Row({
         </div>
       )}
       {port.parts !== undefined && (
-        <div className={classes.resultParts} tabIndex={0} onKeyDown={ownKeys}>
+        <div className={classes.resultParts} tabIndex={0}>
           {port.parts.map((part) => (
             <span key={part} className={classes.resultTag} title={part}>
               {part}
@@ -308,17 +307,12 @@ function Row({
         </div>
       )}
       {port.detail !== undefined && (
-        <div className={classes.resultDetail} tabIndex={0} onKeyDown={ownKeys}>
+        <div className={classes.resultDetail} tabIndex={0}>
           {port.detail}
         </div>
       )}
     </div>
   );
-}
-
-/** A scrolling part keeps Space: the workflow graph on the same page takes it to pan. */
-function ownKeys(event: KeyboardEvent) {
-  event.stopPropagation();
 }
 
 const WireView = memo(function WireView({ data }: EdgeProps<WireEdge>) {

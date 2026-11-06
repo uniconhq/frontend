@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { useQueryClient } from '@tanstack/react-query';
-import { isMap, isSeq } from 'yaml';
 import { $api, queryView } from '@/api/query';
 import type { TaskStanding } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
@@ -12,17 +11,16 @@ import { Modal } from '@/ui/Modal';
 import { ListCard, type ListRow } from '@/ui/ListCard';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
-import { useMe } from '@/session';
 import { taskPath } from '@/lib/organiser-paths';
 import { formatDateTime, serverNow } from '@/lib/time';
 import { CreateButton } from '../Create';
 import { DefinitionErrors } from '../DefinitionErrors';
 import { definitionErrorsOf } from '../files/refusals';
 import { SaveOutcome, type Outcome } from '../files/SaveOutcome';
-import { tasksReached } from '@/lib/reached';
-import { holdsAtContest } from '../roles';
+import { usePlaceMay } from '../may';
 import type { ContestValues } from '../forms/contest-values';
-import type { Doc } from '../forms/yaml-doc';
+import type { SettingsBody } from '../forms/settings-hooks';
+import { isRecord, type Values } from '../forms/values';
 import { contestPlaceOf } from './opened';
 import { FIELD_PARAM, ITEM_PARAM, viewFilePath } from './places';
 import { useContestChange } from './save';
@@ -166,14 +164,14 @@ function rowOf(
  * either end of the list it stays.
  */
 function moved(id: string, by: -1 | 1) {
-  return (doc: Doc) => {
-    const list = doc.get('tasks', true);
-    if (!isSeq(list)) return;
-    const from = list.items.findIndex((item) => isMap(item) && item.get('id') === id);
+  return (values: Values) => {
+    const list: unknown = values['tasks'];
+    if (!Array.isArray(list)) return;
+    const items = list as unknown[];
+    const from = items.findIndex((item) => isRecord(item) && item['id'] === id);
     const to = from + by;
-    if (from < 0 || to < 0 || to >= list.items.length) return;
-    const [item] = list.items.splice(from, 1);
-    if (item !== undefined) list.items.splice(to, 0, item);
+    if (from < 0 || to < 0 || to >= items.length) return;
+    items.splice(to, 0, ...items.splice(from, 1));
   };
 }
 
@@ -189,15 +187,14 @@ function moved(id: string, by: -1 | 1) {
  * of a task does then (#449). "New task" sits at the
  * bottom for a manager, which also adds it to the contest's tasks. A link to
  * a task's place in the contest (`?part=tasks&item=` its place in the list)
- * opens its dialog. Listing needs the observer role at the contest;
- * someone who holds a role only at one of its tasks is refused the list, so
- * the refusal comes with the tasks their own roles reach. A `contest.yaml`
+ * opens its dialog. The rows need the observer role at the contest;
+ * someone who holds a role only at one of its tasks is refused them, so the
+ * refusal comes with the tasks the server lists for them. A `contest.yaml`
  * that does not pass validation shows its errors and lists the tasks by
  * name alone, so the way to each still works while it is mended.
  */
 export function ContestTasks({ org, contest }: { org: string; contest: string }) {
-  const roles = useMe().roles;
-  const manages = holdsAtContest(roles, org, contest, 'manager');
+  const manages = usePlaceMay({ kind: 'contest', org, contest }).manage;
   const settings = useContestSettings(org, contest);
   const values = settings.state === 'ready' ? settings.data : null;
   const [search, setSearch] = useSearchParams();
@@ -244,11 +241,16 @@ export function ContestTasks({ org, contest }: { org: string; contest: string })
   );
   const unreadable = view.state === 'error' && view.error.code === 'invalid_definition';
   const names = queryView(
-    $api.useQuery('get', TASKS, { params: { path } }, { enabled: unreadable }),
+    $api.useQuery(
+      'get',
+      TASKS,
+      { params: { path } },
+      { enabled: view.state === 'error' },
+    ),
   );
   const queryClient = useQueryClient();
   const change = useContestChange(org, contest);
-  const [moveRefused, setMoveRefused] = useState<Outcome | null>(null);
+  const [moveRefused, setMoveRefused] = useState<Outcome<SettingsBody> | null>(null);
   /** A move asked about, while the contest has started. */
   const [asked, setAsked] = useState<Asked | null>(null);
   const started =
@@ -321,13 +323,9 @@ export function ContestTasks({ org, contest }: { org: string; contest: string })
             titles,
           ),
         )
-      : unreadable
-        ? names.state === 'ready'
-          ? byName(names.data.map((task) => task.name))
-          : []
-        : view.state === 'error'
-          ? byName(tasksReached(roles, org, contest))
-          : [];
+      : names.state === 'ready'
+        ? byName(names.data.map((task) => task.name))
+        : [];
 
   const notice =
     moveRefused !== null ? (

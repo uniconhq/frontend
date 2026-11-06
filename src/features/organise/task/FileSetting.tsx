@@ -169,7 +169,7 @@ export function FileSetting({
                 title={lastPart(named.path)}
                 size={named.size}
                 upload={named.upload}
-                listedAt={named.version}
+                href={named.href}
               />
             ))}
           {replacing && !disabled && drop}

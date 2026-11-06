@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { useTaskParams } from '@/lib/route-params';
+import { usePlaceMay } from '../may';
 import { ReadOnlyAt } from '../ReadOnlyAt';
 import classes from './task.module.css';
 
@@ -23,6 +24,7 @@ export function BuildCard({
   children: ReactNode;
 }) {
   const place = { kind: 'task' as const, ...useTaskParams() };
+  const may = usePlaceMay(place);
   return (
     <section id={id} className={classes.card} aria-label={title} data-card={id}>
       <header className={classes.band}>
@@ -34,7 +36,11 @@ export function BuildCard({
           {' '}
           <ReadOnlyAt
             place={place}
-            role={id === 'tests' || id === 'statement' ? 'admin' : 'manager'}
+            allowed={
+              id === 'tests' || id === 'statement'
+                ? may.edit_admin_settings
+                : may.manage
+            }
           />
           {aside}
         </div>

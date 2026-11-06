@@ -25,6 +25,7 @@ const GRADEBOOK = {
   ],
   sort: [{ column: 'points', way: 'desc' }],
   dropped: [],
+  staff: false,
   held_from: null,
   rows: [
     {
@@ -55,6 +56,7 @@ const ICPC = {
   ],
   sort: [{ column: 'solved', way: 'desc' }],
   dropped: [],
+  staff: false,
   held_from: '2030-10-01T13:00:00Z',
   rows: [
     {
@@ -102,6 +104,8 @@ async function stub(page: Page) {
         email: 'carol@example.org',
       },
       roles: [],
+      orgs: [],
+      workflow_owners: ['carol'],
       degraded: false,
     } satisfies Schemas['Me']),
   );

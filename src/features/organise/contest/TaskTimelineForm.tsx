@@ -10,8 +10,8 @@ import {
   type ContestValues,
   type TaskEntryValues,
 } from '../forms/contest-values';
-import type { FormProps } from '../forms/DefinitionFile';
-import { numberProblem } from '../forms/yaml-doc';
+import { numberProblem } from '../forms/values';
+import type { ValuesFormProps } from '../forms/ValuesForm';
 import { ContestFile, FieldBox } from './ContestFile';
 import { useOpenedField } from './opened';
 import { markedBoardCovers } from './timeline';
@@ -43,14 +43,14 @@ export function TaskTimelineForm({
 }
 
 function EntryForm({
-  doc,
+  values: settings,
   busy,
   onSave,
   admin,
   standing,
   label,
-}: FormProps & { admin: boolean; standing: TaskStanding; label: string }) {
-  const [read] = useState(() => readContest(doc));
+}: ValuesFormProps & { admin: boolean; standing: TaskStanding; label: string }) {
+  const [read] = useState(() => readContest(settings));
   const index = read.values.tasks.findIndex((entry) => entry.id === standing.task.name);
   const [entry, setEntry] = useState<TaskEntryValues | undefined>(
     read.values.tasks[index],

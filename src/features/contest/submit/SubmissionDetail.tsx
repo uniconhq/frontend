@@ -10,7 +10,7 @@ import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
 import { Grading } from '@/ui/scored/Grading';
 import type { TextAsk } from '@/ui/scored/ScoredResult';
 import { formatDateTime } from '@/lib/time';
-import { downloadHref, readShownFiles } from './download';
+import { readShownFiles } from './download';
 import { nameOf, submittedItems } from '@/lib/submitted';
 import { useLiveConnected, useLiveRefused } from '@/live';
 import { serverNow } from '@/lib/time';
@@ -63,10 +63,9 @@ function Files({ where, inputs: fields }: { where: Where; inputs: InputField[] }
     <>
       {files.length > 0 && (
         <ul className={classes.files} aria-label="Files">
-          {files.map(({ key, label, path }) => (
+          {files.map(({ key, label, path, href }) => (
             <li key={key}>
-              {label}:{' '}
-              <OutLink href={downloadHref(where, path)}>{nameOf(path)}</OutLink>
+              {label}: <OutLink href={href}>{nameOf(path)}</OutLink>
             </li>
           ))}
         </ul>

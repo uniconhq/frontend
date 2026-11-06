@@ -75,7 +75,7 @@ describe('signing out', () => {
     await signOutFromTheHeader();
 
     const menu = await screen.findByRole('menu');
-    expect(within(menu).getByText('Forgejo did not answer')).toBeInTheDocument();
+    expect(within(menu).getByText('forge_unavailable detail')).toBeInTheDocument();
     expect(
       within(menu).getByRole('menuitem', { name: 'Sign out' }),
     ).toBeInTheDocument();
@@ -100,6 +100,6 @@ describe('signing out', () => {
     answer();
 
     const menu = await screen.findByRole('menu');
-    expect(within(menu).getByText('Forgejo did not answer')).toBeInTheDocument();
+    expect(within(menu).getByText('forge_unavailable detail')).toBeInTheDocument();
   });
 });

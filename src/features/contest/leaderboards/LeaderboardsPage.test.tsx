@@ -63,7 +63,7 @@ describe("a contest's leaderboards", () => {
     server.use(
       signedIn,
       http.get('/api/v1/orgs/:org/contests/:contest/leaderboards', () =>
-        HttpResponse.json([GRADEBOOK]),
+        HttpResponse.json([{ ...GRADEBOOK, staff: true }]),
       ),
     );
     renderApp(PAGE);

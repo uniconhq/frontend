@@ -1,8 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { TaskStanding } from '@/api/types';
 import { formatDateTime } from '@/lib/time';
-import { NumberText } from '../forms/yaml-doc';
-import { contestFieldName, contestValueWords } from './merge-words';
+import { taskMay } from '@/test/may';
 import { timelineSentence } from './timeline';
 import { teamsSentence } from './words';
 
@@ -27,41 +26,6 @@ describe('how big a team is, as the settings card says it', () => {
   });
 });
 
-describe('the contest’s settings in words for the merge', () => {
-  it('names each setting as its page does, a task and a board by name', () => {
-    expect(contestFieldName(['name'])).toBe('Name');
-    expect(contestFieldName(['entrants', 'locks'])).toBe('Teams are fixed');
-    expect(contestFieldName(['registration', 'ways'])).toBe('Ways in');
-    expect(contestFieldName(['tasks', { key: 'id', value: 'sum' }, 'due'])).toBe(
-      'Task sum: Due',
-    );
-    expect(contestFieldName(['leaderboards', 'standings', 'audience'])).toBe(
-      'Leaderboard standings: Who can see this leaderboard?',
-    );
-    expect(contestFieldName(['tasks'])).toBe('Tasks');
-  });
-
-  it('says each value as the pages do, and leaves names and numbers be', () => {
-    expect(contestValueWords(['state'], 'published')).toBe('Open');
-    expect(contestValueWords(['visibility'], 'hidden')).toBe(
-      'Only its entrants and organisers',
-    );
-    expect(contestValueWords(['entrants', 'locks'], 'first_submission')).toBe(
-      'At a team’s first submission',
-    );
-    expect(
-      contestValueWords(
-        ['registration', 'ways'],
-        [{ invite: {} }, { signup: { name: 'Guests' } }],
-      ),
-    ).toBe('People you invite, Sign-up “Guests”');
-    expect(
-      contestValueWords(['entrants'], { most: new NumberText('3'), locks: 'start' }),
-    ).toBe('Most people in a team: 3; Teams are fixed: When the contest starts');
-    expect(contestValueWords(['name'], 'Spring')).toBeNull();
-  });
-});
-
 describe("a task's timeline as one line", () => {
   const standing: TaskStanding = {
     task: { name: 'sum' },
@@ -78,6 +42,7 @@ describe("a task's timeline as one line", () => {
       head_statement_written: false,
       toolchains: {},
       results: { history: [], released: false },
+      may: taskMay('admin'),
     },
     timeline: {
       release_at: '2026-10-01T09:00:00Z',

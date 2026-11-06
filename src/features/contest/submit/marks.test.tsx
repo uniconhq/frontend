@@ -73,9 +73,7 @@ describe("a contestant's marks", () => {
 
     await user.click(within(list).getByRole('checkbox', { name: 'Mark #1' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(
-      'This task counts at most 2 marked submissions.',
-    );
+    expect(await screen.findByRole('alert')).toHaveTextContent('mark_limit detail');
     expect(within(list).getByRole('checkbox', { name: 'Mark #1' })).not.toBeChecked();
 
     await user.click(within(list).getByRole('checkbox', { name: 'Mark #3' }));

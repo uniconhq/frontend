@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseYaml } from '../forms/yaml-doc';
+import { parseYaml } from './yaml-doc';
 import { CLASSIC, PRIMITIVES } from '@/test/workflows';
 import { GEOMETRY, WORKFLOW_PALETTE, wirePath, type Point } from '../flow/graph';
 import {

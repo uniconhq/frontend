@@ -1,5 +1,4 @@
 import type { ApiError } from '@/api/problem';
-import { BodyText } from '@/ui/BodyText';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import type { PlaceOf } from '../DefinitionErrors';
 import { formatSize } from '@/lib/size';
@@ -10,38 +9,16 @@ import type { useSaveUploads } from './upload-save';
 import shared from '../organise.module.css';
 
 /**
- * The words for a refusal an organiser's upload or its save can meet that
- * the app otherwise words for a contestant: an upload the forge would not
- * take for this path, or one whose bytes it has not got.
+ * The refusals of an upload itself, said on their own rather than as a
+ * save's outcome: an upload the forge would not take for this path, one
+ * whose bytes it has not got, and one that did not go through.
  */
-const UPLOAD_REFUSED: Partial<Record<string, { title: string; message: string }>> = {
-  invalid_inputs: {
-    title: 'The upload was made for another place',
-    message: 'Nothing was saved. Upload the file again for the place it is to go.',
-  },
-  upload_not_ready: {
-    title: 'The file did not arrive in full',
-    message: 'Nothing was saved. Upload it again.',
-  },
-  upload_failed: {
-    title: 'The upload did not go through',
-    message:
-      'It was sent again from the start and still did not arrive, or the file changed since it was chosen. Nothing was saved; upload it again.',
-  },
-};
+const UPLOAD_REFUSED = new Set(['invalid_inputs', 'upload_not_ready', 'upload_failed']);
 
 export function Refused({ error }: { error: ApiError }) {
-  const words = UPLOAD_REFUSED[error.code];
   return (
     <div className={shared.panel} role="alert">
-      {words === undefined ? (
-        <ErrorBlock error={error} compact />
-      ) : (
-        <>
-          <BodyText tone="secondary">{words.title}</BodyText>
-          <BodyText tone="secondary">{error.detail ?? words.message}</BodyText>
-        </>
-      )}
+      <ErrorBlock error={error} compact heading="Couldn’t upload" />
     </div>
   );
 }
@@ -68,7 +45,7 @@ export function UploadSaveAnswer({
     return size === null ? '' : `, ${formatSize(size)}`;
   };
   if (outcome === null) return null;
-  if (outcome.kind === 'refused' && UPLOAD_REFUSED[outcome.error.code] !== undefined) {
+  if (outcome.kind === 'refused' && UPLOAD_REFUSED.has(outcome.error.code)) {
     return <Refused error={outcome.error} />;
   }
   if (outcome.kind === 'refused' && outcome.error.code === 'conflict') {
@@ -79,7 +56,7 @@ export function UploadSaveAnswer({
         files={body.changes.map((change) => ({
           path: change.path,
           // In the words of the page it is changed on, "Statement", not its path.
-          label: placeOf === undefined ? change.path : placeOf(change.path, '').label,
+          label: placeOf === undefined ? change.path : placeOf([change.path], '').label,
           mine: `Your upload${sizeOf(change.path)}`,
         }))}
         busy={pending}

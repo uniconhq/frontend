@@ -9,11 +9,8 @@ import { Loaded } from '@/ui/feedback/Loaded';
 import { formatSize } from '@/lib/size';
 import { saveFile } from '@/lib/save-file';
 import {
-  draftDownloadHref,
   fileQuery,
-  taskDownloadHref,
   treeQuery,
-  versionDownloadHref,
   type FilePlace,
   type ListedPlace,
   type VersionPlace,
@@ -133,36 +130,11 @@ function Head({ name, size }: { name: string; size: number | null }) {
 }
 
 /**
- * Where a file of `place` downloads from through the download door: a
- * task's at `version`, a workflow draft's as last saved; null at a contest,
- * or for a task's file without a version.
- */
-function doorHref(
-  place: FilePlace,
-  path: string,
-  version: string | null,
-): string | null {
-  if (place.kind === 'workflow') return draftDownloadHref(place, path);
-  if (place.kind === 'task' && version !== null)
-    return taskDownloadHref(place, version, path);
-  return null;
-}
-
-/**
  * Download for a file the page does not read whole, as a link to the
- * download door; nothing where there is none, and the file's size alone is
- * shown.
+ * download door at the `href` the server gave; nothing where there is none,
+ * and the file's size alone is shown.
  */
-function DownloadLink({
-  place,
-  path,
-  version,
-}: {
-  place: FilePlace;
-  path: string;
-  version: string | null;
-}) {
-  const href = doorHref(place, path, version);
+function DownloadLink({ path, href }: { path: string; href: string | null }) {
   if (href === null) return null;
   return (
     <div className={classes.actions}>
@@ -178,39 +150,53 @@ function DownloadLink({
  * Download, which streams it through the download door whatever its size.
  * It is not read here: a version's files are listed and downloaded only.
  */
-export function VersionFile({
-  place,
+function VersionFile({
   path,
   title = nameOf(path),
   size,
+  href,
 }: {
-  place: VersionPlace;
   path: string;
   title?: string;
   size: number | null;
+  /** Where the server says the file downloads, or null while unknown. */
+  href: string | null;
 }) {
   return (
     <section className={classes.part} aria-label={title}>
       <Head name={title} size={size} />
-      <div className={classes.actions}>
-        <OutLink
-          href={versionDownloadHref(place, path)}
-          label={`Download ${nameOf(path)}`}
-        >
-          Download
-        </OutLink>
-      </div>
+      <DownloadLink path={path} href={href} />
     </section>
   );
 }
 
+/** A version's file found by its path, listed in its folder for its size and link. */
+export function ListedVersionFile({
+  place,
+  path,
+}: {
+  place: VersionPlace;
+  path: string;
+}) {
+  const folder = path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : '';
+  const listed = useQuery(treeQuery(place, folder));
+  const entry = listed.data?.find((each) => each.path === path);
+  return (
+    <VersionFile
+      path={path}
+      size={entry === undefined ? null : (entry.upload?.size ?? entry.size)}
+      href={entry?.href ?? null}
+    />
+  );
+}
+
 /**
- * One saved file, read once it is shown: an upload for the version it holds
- * its pointer at, to download it whole through the download door; a file
- * too big to read here not at all, downloaded at the version its listing
- * named (`listedAt`, the commit that last changed it), so the link fetches
- * the file whose size was shown whatever has been saved since; and any
- * other file whole, its first lines shown.
+ * One saved file, read once it is shown: an upload to download whole
+ * through the download door at the link its read gives; a file too big to
+ * read here not at all, downloaded at the link its listing gave (`href`, at
+ * the commit that last changed it), so the link fetches the file whose size
+ * was shown whatever has been saved since; and any other file whole, its
+ * first lines shown.
  */
 export function SavedFile({
   place,
@@ -218,7 +204,7 @@ export function SavedFile({
   title = nameOf(path),
   size,
   upload,
-  listedAt,
+  href,
 }: {
   place: FilePlace;
   path: string;
@@ -226,8 +212,8 @@ export function SavedFile({
   title?: string;
   size: number | null;
   upload: UploadInfo | null;
-  /** The version the listing the file was found in names it at, or null. */
-  listedAt: string | null;
+  /** Where the listing the file was found in says it downloads, or null. */
+  href: string | null;
 }) {
   const big = upload === null && size !== null && size > READ_AT_MOST;
   // An upload reads as its pointer, which is small, and says its version.
@@ -242,16 +228,12 @@ export function SavedFile({
           <BodyText tone="secondary">
             It was uploaded, so it is shown by its size rather than as text.
           </BodyText>
-          <DownloadLink
-            place={place}
-            path={path}
-            version={read.data?.version ?? null}
-          />
+          <DownloadLink path={path} href={read.data?.href ?? null} />
         </>
       ) : big ? (
         <>
           <BodyText tone="secondary">It is too big to show here.</BodyText>
-          <DownloadLink place={place} path={path} version={listedAt} />
+          <DownloadLink path={path} href={href} />
         </>
       ) : (
         <Loaded view={queryView(read)} compact>
@@ -259,7 +241,7 @@ export function SavedFile({
             <Shown
               name={title}
               text={file.encoding === 'utf-8' ? file.content : null}
-              href={place.kind === 'workflow' ? draftDownloadHref(place, path) : null}
+              href={file.href}
               onDownload={() => saveFile(name, blobOf(file))}
             />
           )}
@@ -400,10 +382,10 @@ export function SavedFolder({
         (place.kind === 'version' ? (
           <VersionFile
             key={chosen.path}
-            place={place}
             path={chosen.path}
             title={path === '' ? chosen.path : chosen.path.slice(path.length + 1)}
             size={chosen.upload?.size ?? chosen.size}
+            href={chosen.href}
           />
         ) : (
           <SavedFile
@@ -413,7 +395,7 @@ export function SavedFolder({
             title={path === '' ? chosen.path : chosen.path.slice(path.length + 1)}
             size={chosen.size}
             upload={chosen.upload}
-            listedAt={chosen.version}
+            href={chosen.href}
           />
         ))}
     </section>

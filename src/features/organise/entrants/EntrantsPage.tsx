@@ -16,14 +16,13 @@ import { Select } from '@/ui/Select';
 import { TextInput } from '@/ui/TextInput';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { Loaded } from '@/ui/feedback/Loaded';
-import { useMe } from '@/session';
 import { memberName, STATUS_WORD, wayText } from '@/lib/entrants';
 import { useContestParams } from '@/lib/route-params';
 import { CONTEST_SECTIONS, contestSectionPath, sectionOf } from '@/lib/sections';
 import { formatDateTime } from '@/lib/time';
 import { PageLink } from '@/ui/PageLink';
 import { useInviteChanges } from '../invites/invites';
-import { holdsAtContest } from '../roles';
+import { usePlaceMay } from '../may';
 import { SectionPage } from '../SectionPage';
 import { ENTRANTS, entrantsLine, useEntrants } from './names';
 import classes from './entrants.module.css';
@@ -495,7 +494,7 @@ function Manage({
       )}
       {refused !== null && (
         <div role="alert">
-          <ErrorBlock error={refused} compact />
+          <ErrorBlock error={refused} compact heading="Couldn’t do that" />
         </div>
       )}
     </div>
@@ -677,7 +676,7 @@ function Row({
           )}
           {error !== null && open !== 'remove' && open !== 'manage' && (
             <div role="alert">
-              <ErrorBlock error={error} compact />
+              <ErrorBlock error={error} compact heading="Couldn’t do that" />
             </div>
           )}
           <Modal
@@ -692,7 +691,7 @@ function Row({
               </BodyText>
               {error !== null && (
                 <div role="alert">
-                  <ErrorBlock error={error} compact />
+                  <ErrorBlock error={error} compact heading="Couldn’t do that" />
                 </div>
               )}
               <div className={classes.actions}>
@@ -745,7 +744,7 @@ function Row({
 export function EntrantsPage() {
   const { org, contest } = useContestParams();
   const path = { org, contest };
-  const manages = holdsAtContest(useMe().roles, org, contest, 'manager');
+  const manages = usePlaceMay({ kind: 'contest', org, contest }).manage;
   const [search, setSearch] = useSearchParams();
   const status = search.get(STATUS_PARAM);
   const view = queryView(useEntrants(org, contest, { every: POLL_MS }));

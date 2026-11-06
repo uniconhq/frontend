@@ -79,7 +79,9 @@ export function OpenUploads({
   return (
     <section aria-label="Unfinished uploads">
       <BodyText>Unfinished uploads</BodyText>
-      {error !== null && <ErrorBlock error={toApiError(error)} compact />}
+      {error !== null && (
+        <ErrorBlock error={toApiError(error)} compact heading="Couldn’t do that" />
+      )}
       {rows.map((row) => {
         const cancel = () =>
           void run(async () => {

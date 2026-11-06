@@ -32,6 +32,7 @@ const standing: ContestHome['standing'] = ['points', 'speed'].map((key) => ({
   ],
   audience: { rows: 'own', who: 'entrants' },
   held_from: null,
+  staff: false,
 }));
 
 describe('the contest page for a signed-in person', () => {
@@ -446,19 +447,19 @@ describe('the contest page for a signed-in person', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Register' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'That code is not right',
+      'wrong_invite_code detail',
     );
     expect(body).toEqual({ name: null, code: 'sesame' });
   });
 
   it.each([
-    ['registration_closed', 403, 'Registration is closed'],
-    ['is_staff', 403, 'You organise this contest'],
-    ['invite_required', 403, 'This contest is by invite only'],
-    ['domain_not_allowed', 403, 'Your email address is not accepted'],
-    ['already_registered', 409, 'You have registered already'],
-    ['contest_full', 409, 'The contest is full'],
-  ])('says a %s refusal in words', async (code, status, sentence) => {
+    ['registration_closed', 403],
+    ['is_staff', 403],
+    ['invite_required', 403],
+    ['domain_not_allowed', 403],
+    ['already_registered', 409],
+    ['contest_full', 409],
+  ])('says a %s refusal in the server’s words', async (code, status) => {
     server.use(
       signedIn,
       http.get(`${CONTEST_API}/home`, () => HttpResponse.json(home())),
@@ -468,7 +469,7 @@ describe('the contest page for a signed-in person', () => {
 
     await userEvent.click(await screen.findByRole('button', { name: 'Register' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(sentence);
+    expect(await screen.findByRole('alert')).toHaveTextContent(`${code} detail`);
   });
 
   it('shows the organisers’ reason for a rejection', async () => {
@@ -518,7 +519,8 @@ describe('the contest page for a signed-in person', () => {
     );
     renderApp(PAGE);
 
-    expect(await screen.findByRole('heading', { name: 'Not found' })).toBeVisible();
+    expect(await screen.findByRole('heading', { name: 'Couldn’t load' })).toBeVisible();
+    expect(screen.getByText('not_found detail')).toBeVisible();
   });
 });
 

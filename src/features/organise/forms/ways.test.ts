@@ -7,45 +7,50 @@ import {
   writeWays,
   type WayValues,
 } from './ways';
-import { parseYaml, writeOver } from './yaml-doc';
-
-function docOf(text: string) {
-  const parsed = parseYaml(text);
-  if ('error' in parsed) throw new Error(parsed.error);
-  return parsed.doc;
-}
 
 describe('the ways into a contest', () => {
   it('reads each way, none written as null, and a list it cannot show as unreadable', () => {
-    expect(readWays(docOf('name: x\n'))).toBeNull();
+    expect(readWays({ name: 'x' })).toBeNull();
     expect(
-      readWays(
-        docOf(
-          'registration:\n  ways:\n    - invite: {approval: manual}\n    - signup: {name: NUS, domains: [u.nus.edu, nus.edu.sg], code: c}\n',
-        ),
-      ),
+      readWays({
+        registration: {
+          ways: [
+            { invite: { approval: 'manual' } },
+            {
+              signup: { name: 'NUS', domains: ['u.nus.edu', 'nus.edu.sg'], code: 'c' },
+            },
+          ],
+        },
+      }),
     ).toEqual([
       { kind: 'invite', approval: 'manual' },
       newSignup({ name: 'NUS', domains: 'u.nus.edu, nus.edu.sg', code: 'c' }),
     ]);
-    expect(readWays(docOf('registration:\n  ways: open\n'))).toBe('unreadable');
-    expect(readWays(docOf('registration:\n  ways:\n    - door: {}\n'))).toBe(
-      'unreadable',
-    );
+    expect(readWays({ registration: { ways: 'open' } })).toBe('unreadable');
+    expect(readWays({ registration: { ways: [{ door: {} }] } })).toBe('unreadable');
   });
 
   it('writes the ways it changed with only what is set, and none back to the default', () => {
-    const text = 'name: x\nregistration:\n  capacity: 5\n';
-    const doc = docOf(text);
-    writeWays(doc, null, [
+    const values = { name: 'x', registration: { capacity: 5 } };
+    writeWays(values, null, [
       { kind: 'invite', approval: '' },
       newSignup({ domains: 'u.nus.edu  comp.nus.edu', approval: 'auto' }),
     ]);
-    expect(writeOver(text, doc)).toBe(
-      'name: x\nregistration:\n  capacity: 5\n  ways:\n    - invite: {}\n    - signup:\n        domains:\n          - u.nus.edu\n          - comp.nus.edu\n        approval: auto\n',
-    );
-    writeWays(doc, [], null);
-    expect(writeOver(text, doc)).toBe('name: x\nregistration:\n  capacity: 5\n');
+    expect(values).toEqual({
+      name: 'x',
+      registration: {
+        capacity: 5,
+        ways: [
+          { invite: {} },
+          { signup: { domains: ['u.nus.edu', 'comp.nus.edu'], approval: 'auto' } },
+        ],
+      },
+    });
+    writeWays(values, [], null);
+    expect(values).toEqual({ name: 'x', registration: { capacity: 5 } });
+    const only = { registration: { ways: [{ invite: {} }] } };
+    writeWays(only, [{ kind: 'invite', approval: '' }], null);
+    expect(only).toEqual({});
   });
 
   it('takes the domains as typed, split at spaces, commas and semicolons', () => {

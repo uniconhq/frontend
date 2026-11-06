@@ -1,11 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
+  dataOf,
+  exactJS,
   NumberText,
-  numberProblem,
   numberText,
   parseYaml,
-  renameKeys,
-  textAt,
   writeAt,
   writeOver,
   writeYaml,
@@ -19,7 +18,7 @@ function edited(text: string, edit: (doc: Doc) => void): string {
   return writeYaml(parsed.doc);
 }
 
-describe('a definition file as the forge reads it', () => {
+describe('a workflow file as the forge reads it', () => {
   it('makes a new mapping a plain one', () => {
     const text = edited('name: sum\n', (doc) => {
       writeAt(doc, ['submissions', 'rate'], { count: 10, per: 60 });
@@ -136,8 +135,10 @@ describe('the scalars as YAML 1.2 reads them', () => {
     expect(text).toBe(`score: 100.50\nbound: ${digits}\ntiny: 1e-9\n`);
     const parsed = parseYaml(text);
     if ('error' in parsed) throw new Error(parsed.error);
-    expect(textAt(parsed.doc, ['bound'])).toBe(digits);
-    expect(textAt(parsed.doc, ['score'])).toBe('100.50');
+    expect(exactJS(parsed.doc)).toMatchObject({
+      bound: new NumberText(digits),
+      score: new NumberText('100.50'),
+    });
   });
 
   it('writes a number typed over one tagged !!float or !!int as its digits', () => {
@@ -221,6 +222,7 @@ describe('the scalars as YAML 1.2 reads them', () => {
     const parsed = parseYaml('steps:\n  - with: {actual: *x}\n');
 
     expect(parsed).toHaveProperty('error');
+    expect(dataOf('steps:\n  - with: {actual: *x}\n')).toBeNull();
   });
 
   it('writes the first entry of an empty {} or [] as a block', () => {
@@ -264,7 +266,6 @@ describe('the scalars as YAML 1.2 reads them', () => {
 describe('a number typed into a field', () => {
   it('takes every number YAML 1.2 reads, as the forge does', () => {
     for (const typed of ['+5', '0x10', '0o17', '+.5', '5.', '-1e3']) {
-      expect(numberProblem(typed), typed).toBeUndefined();
       expect(numberText(typed), typed).toEqual(new NumberText(typed));
       const read = parseYaml(`a: ${typed}`);
       if ('error' in read) throw new Error(read.error);
@@ -283,29 +284,11 @@ describe('a number typed into a field', () => {
       '1:30',
       '.',
     ]) {
-      expect(numberProblem(typed), typed).toBe('Enter a number.');
+      expect(numberText(typed), typed).toBeNaN();
       const read = parseYaml(`a: ${typed}`);
       if ('error' in read) throw new Error(read.error);
       const value: unknown = (read.doc.toJS() as { a: unknown }).a;
       expect(typeof value === 'number' && Number.isFinite(value), typed).toBe(false);
     }
-  });
-
-  it('refuses a number past what a float holds', () => {
-    expect(numberProblem('1e9999999')).toBe('Enter a smaller number.');
-    expect(numberProblem('-1e400')).toBe('Enter a smaller number.');
-    expect(numberProblem('1e300')).toBeUndefined();
-  });
-});
-
-describe('renaming keys', () => {
-  it('refuses a name another entry keeps, rather than doing nothing', () => {
-    const parsed = parseYaml('a: 1\nb: 2\n');
-    if ('error' in parsed) throw new Error(parsed.error);
-    expect(() => {
-      renameKeys(parsed.doc, [], new Map([['a', 'b']]));
-    }).toThrow('already has b');
-    renameKeys(parsed.doc, [], new Map([['a', 'b']]), new Set(['b']));
-    expect(writeYaml(parsed.doc)).toBe('b: 1\n');
   });
 });

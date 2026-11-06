@@ -59,7 +59,7 @@ export function Problems({
       </BodyText>
       <ul className={classes.problemList}>
         {placed.map(({ problem, where, opens }) => (
-          <li key={`${problem.path} ${problem.message}`}>
+          <li key={`${problem.path.join('.')} ${problem.message}`}>
             {opens === null ? (
               <strong>{where}</strong>
             ) : (

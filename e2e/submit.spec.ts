@@ -12,7 +12,7 @@ type Schemas = components['schemas'];
  * the slot says, a folder's files by their paths in it, and one submission
  * comes of them, the list follows it from queued to its outcome, a submission
  * opens with what the task shows of it and the files it was made with to
- * download, and each refusal is said in words.
+ * download, and each refusal is said in the server's words.
  * The stub keeps just enough state for each answer to follow from the last.
  */
 const TASK = '/api/v1/orgs/acme/contests/spring/tasks/sum';
@@ -170,6 +170,8 @@ async function stubApi(page: Page, overrides: Partial<State> = {}): Promise<Stat
         email: 'carol@example.org',
       },
       roles: [],
+      orgs: [],
+      workflow_owners: ['carol'],
       degraded: false,
     } satisfies Schemas['Me']),
   );
@@ -290,7 +292,12 @@ async function stubApi(page: Page, overrides: Partial<State> = {}): Promise<Stat
         number: 1,
         inputs: {
           submission: {
-            files: ['files/submission/main.cpp'],
+            files: [
+              {
+                path: 'files/submission/main.cpp',
+                href: '/-/downloads/acme/spring/sum/1/files/submission/main.cpp',
+              },
+            ],
             value: null,
             parts: null,
           },
@@ -527,24 +534,24 @@ test('an earlier submission lists its files, each a download through the door', 
 });
 
 const REFUSALS: [string, number, Record<string, unknown>, string][] = [
-  ['task_closed', 403, { reason: 'closed' }, 'This task has closed for you'],
-  ['archived', 403, {}, 'The contest is archived'],
-  ['not_approved', 403, {}, 'Your registration is not approved yet'],
-  ['submission_limit', 409, { limit: 50 }, 'This task takes 50 submissions in all'],
+  ['task_closed', 403, { reason: 'closed' }, 'task_closed'],
+  ['archived', 403, {}, 'archived'],
+  ['not_approved', 403, {}, 'not_approved'],
+  ['submission_limit', 409, { limit: 50 }, 'submission_limit'],
   [
     'rate_limited',
     429,
     { rate: '1 per 30s', retry_at: '2999-09-29T10:00:30Z' },
-    'You can submit again at',
+    'rate_limited',
   ],
   [
     'too_large',
     413,
     { limit: 1048576, input: 'submission' },
-    'may be at most 1 MB in all',
+    'Too large: Your solution',
   ],
-  ['upload_not_yours', 404, { uploads: [] }, 'A file is not one you uploaded'],
-  ['upload_not_ready', 409, { uploads: [] }, 'A file did not arrive in full'],
+  ['upload_not_yours', 404, { uploads: [] }, 'upload_not_yours'],
+  ['upload_not_ready', 409, { uploads: [] }, 'upload_not_ready'],
   [
     'invalid_inputs',
     422,
@@ -555,7 +562,7 @@ const REFUSALS: [string, number, Record<string, unknown>, string][] = [
   ],
 ];
 
-test('each refusal is said in words, and the files stay to send again', async ({
+test('each refusal is said in the server’s words, and the files stay to send again', async ({
   page,
 }) => {
   const state = await stubApi(page);
@@ -571,6 +578,7 @@ test('each refusal is said in words, and the files stay to send again', async ({
     state.refusal = { status, code, extra };
     await page.getByRole('button', { name: 'Submit' }).click();
     const alert = page.getByRole('alert');
+    await expect(alert, code).toContainText('Couldn’t submit');
     await expect(alert, code).toContainText(sentence);
     await expect(page.getByRole('progressbar')).toHaveCount(0);
     await expect(page.getByLabel('Your solution: files chosen')).toContainText(

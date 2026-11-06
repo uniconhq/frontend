@@ -8,12 +8,11 @@ import { Modal } from '@/ui/Modal';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { useMe } from '@/session';
 import { workflowPath } from '@/lib/organiser-paths';
-import { workflowOwners } from '../roles';
 import { OwnerAndName } from './OwnerAndName';
 import classes from './workflows.module.css';
 
 function NewWorkflowForm({ onCancel }: { onCancel: () => void }) {
-  const [owner, setOwner] = useState(workflowOwners(useMe())[0] ?? '');
+  const [owner, setOwner] = useState(useMe().workflow_owners[0] ?? '');
   const [name, setName] = useState('');
   const [error, setError] = useState<ApiError | null>(null);
   const navigate = useNavigate();
@@ -36,7 +35,7 @@ function NewWorkflowForm({ onCancel }: { onCancel: () => void }) {
         It starts empty. Add its steps from the tray: primitives, or other workflows as
         boxes.
       </BodyText>
-      {error !== null && <ErrorBlock error={error} compact />}
+      {error !== null && <ErrorBlock error={error} compact heading="Couldn’t create" />}
       <div className={classes.actions}>
         <Button type="submit" loading={create.isPending} disabled={name.trim() === ''}>
           Create workflow

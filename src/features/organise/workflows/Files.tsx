@@ -38,7 +38,7 @@ export function UploadProgress({
         />
       )}
       {state.stage === 'storing' && <BodyText>Finishing upload…</BodyText>}
-      {error !== null && <ErrorBlock error={error} compact />}
+      {error !== null && <ErrorBlock error={error} compact heading="Couldn’t upload" />}
     </>
   );
 }
@@ -283,7 +283,7 @@ export function BoxFiles({ path, staging }: { path: string; staging: Staging }) 
             path={at}
             size={saved.size}
             upload={saved.upload}
-            listedAt={saved.version}
+            href={saved.href}
           />
         ))}
       {folder ? (

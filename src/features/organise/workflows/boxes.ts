@@ -3,7 +3,7 @@ import { useIsFetching, useQueries } from '@tanstack/react-query';
 import { apiClient } from '@/api/client';
 import { $api } from '@/api/query';
 import type { Visibility, WorkflowBox } from '@/api/types';
-import { exactJS, parseYaml } from '../forms/yaml-doc';
+import { dataOf } from './yaml-doc';
 import type { StepPorts } from './layout';
 import { readWorkflow, type Workflow } from './model';
 import type { PrimitiveInfo } from './primitives';
@@ -16,7 +16,13 @@ export type BoxDecl = {
   run: boolean;
   newer: string | null;
   description: string | null;
-  inputs: { name: string; type: string; optional: boolean; options: string[] | null }[];
+  inputs: {
+    name: string;
+    type: string;
+    optional: boolean;
+    options: string[] | null;
+    accepts: string[];
+  }[];
   outputs: { name: string; type: string | null }[];
 };
 
@@ -52,6 +58,7 @@ function declOf(box: WorkflowBox): BoxDecl {
       type: input.type,
       optional: input.optional,
       options: input.options,
+      accepts: input.accepts,
     })),
     outputs: box.outputs.map((output) => ({ name: output.name, type: output.type })),
   };
@@ -134,8 +141,7 @@ export function useReadingBoxes(): boolean {
 
 /** A version's file read as a workflow, forgiving one with problems. */
 export function workflowFrom(content: string): Workflow {
-  const parsed = parseYaml(content);
-  return readWorkflow('error' in parsed ? null : exactJS(parsed.doc));
+  return readWorkflow(dataOf(content));
 }
 
 /** The boxes of the run workflows a workflow's steps use, as they are read. */

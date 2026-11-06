@@ -5,7 +5,6 @@ import { Button } from '@/ui/Button';
 import { Card } from '@/ui/Card';
 import { SectionTitle } from '@/ui/SectionTitle';
 import { Loaded } from '@/ui/feedback/Loaded';
-import { useMe } from '@/session';
 import { useTaskParams } from '@/lib/route-params';
 import { TASK_SECTIONS, sectionOf } from '@/lib/sections';
 import { formatDateTime } from '@/lib/time';
@@ -18,7 +17,7 @@ import { savedBy } from './published';
 import { STORED } from '../contest/places';
 import { TitleForm } from './TitleForm';
 import { PeopleSection } from '../people/PeopleSection';
-import { holdsAt } from '../roles';
+import { usePlaceMay } from '../may';
 import { SectionPage } from '../SectionPage';
 import { AnnouncementsSection } from '../threads/AnnouncementsSection';
 import { GradingsSection } from './GradingsSection';
@@ -27,7 +26,7 @@ import classes from '../organise.module.css';
 function useTaskPlace() {
   const { org, contest, task } = useTaskParams();
   const place = { kind: 'task' as const, org, contest, task };
-  return { place, admin: holdsAt(useMe().roles, place, 'admin') };
+  return { place, may: usePlaceMay(place) };
 }
 
 /**
@@ -35,12 +34,12 @@ function useTaskPlace() {
  * runs, scoring and checks are set on the task's own page.
  */
 export function TaskSettingsPage() {
-  const { place, admin } = useTaskPlace();
+  const { place, may } = useTaskPlace();
   const { org, contest, task } = place;
   return (
     <SectionPage
       place={place}
-      role="admin"
+      allowed={may.edit_admin_settings}
       section={sectionOf(TASK_SECTIONS, 'settings')}
       intro={
         <BodyText tone="secondary">
@@ -50,20 +49,20 @@ export function TaskSettingsPage() {
       }
     >
       <Card>
-        <TitleForm place={place} admin={admin} />
+        <TitleForm place={place} />
       </Card>
       <section aria-label="The settings as stored" id={STORED}>
         <Card>
           <StoredSettings place={place} />
         </Card>
       </section>
-      {admin && <AllFiles place={place} />}
+      <AllFiles place={place} />
     </SectionPage>
   );
 }
 
 /**
- * Every file the task holds, for its admins to read (M51): the files its
+ * Every file the task holds, for its organisers to read (M51): the files its
  * forms make, and anything else in it, as a tree, a file chosen shown below.
  * Nothing here changes a file: the task's forms do that.
  */
@@ -102,10 +101,14 @@ function AllFiles({ place }: { place: Extract<Place, { kind: 'task' }> }) {
 
 /** The task's gradings with their controls, and Rejudge for the whole task. */
 export function TaskGradingsPage() {
-  const { place } = useTaskPlace();
+  const { place, may } = useTaskPlace();
   const { org, contest, task } = place;
   return (
-    <SectionPage place={place} section={sectionOf(TASK_SECTIONS, 'gradings')}>
+    <SectionPage
+      place={place}
+      allowed={may.manage}
+      section={sectionOf(TASK_SECTIONS, 'gradings')}
+    >
       <Card>
         <GradingsSection path={{ org, contest, task }} />
       </Card>
@@ -115,7 +118,7 @@ export function TaskGradingsPage() {
 
 /** Every publication of the task, newest first, with what each changed. */
 export function TaskPublicationsPage() {
-  const { place } = useTaskPlace();
+  const { place, may } = useTaskPlace();
   const { org, contest, task } = place;
   const view = queryView(
     $api.useQuery(
@@ -130,7 +133,11 @@ export function TaskPublicationsPage() {
     { params: { path: { org, contest, task } } },
   );
   return (
-    <SectionPage place={place} section={sectionOf(TASK_SECTIONS, 'publications')}>
+    <SectionPage
+      place={place}
+      allowed={may.manage}
+      section={sectionOf(TASK_SECTIONS, 'publications')}
+    >
       <Card>
         <Loaded view={view} rows={2}>
           {(publications) =>
@@ -173,9 +180,13 @@ export function TaskPublicationsPage() {
 
 /** Every announcement of the task, and for a manager the form that posts one. */
 export function TaskAnnouncementsPage() {
-  const { place } = useTaskPlace();
+  const { place, may } = useTaskPlace();
   return (
-    <SectionPage place={place} section={sectionOf(TASK_SECTIONS, 'announcements')}>
+    <SectionPage
+      place={place}
+      allowed={may.manage}
+      section={sectionOf(TASK_SECTIONS, 'announcements')}
+    >
       <AnnouncementsSection place={place} />
     </SectionPage>
   );
@@ -183,9 +194,13 @@ export function TaskAnnouncementsPage() {
 
 /** Everyone who organises the task, and the invites to join them. */
 export function TaskOrganisersPage() {
-  const { place } = useTaskPlace();
+  const { place, may } = useTaskPlace();
   return (
-    <SectionPage place={place} section={sectionOf(TASK_SECTIONS, 'organisers')}>
+    <SectionPage
+      place={place}
+      allowed={may.manage_people}
+      section={sectionOf(TASK_SECTIONS, 'organisers')}
+    >
       <PeopleSection place={place} />
     </SectionPage>
   );

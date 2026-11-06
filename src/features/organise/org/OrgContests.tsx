@@ -1,13 +1,10 @@
-import type { ReactNode } from 'react';
-import { useQueries, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import { $api, queryView } from '@/api/query';
 import { BodyText } from '@/ui/BodyText';
 import { Chip } from '@/ui/Chip';
 import { ListCard, type ListRow } from '@/ui/ListCard';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
-import { Loaded } from '@/ui/feedback/Loaded';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
-import { useMe } from '@/session';
 import {
   STANDING_WORD,
   byWhatMattersNow,
@@ -17,11 +14,9 @@ import {
 import { contestPath } from '@/lib/organiser-paths';
 import { serverNow } from '@/lib/time';
 import { CreateButton } from '../Create';
-import { contestsReached } from '@/lib/reached';
-import { holdsAt } from '../roles';
+import { useOrgMay } from '../may';
 
 const CONTESTS = '/api/v1/orgs/{org}/contests';
-const HOME = '/api/v1/orgs/{org}/contests/{contest}/home';
 
 type Dated = Parameters<typeof standingOf>[0];
 
@@ -54,14 +49,11 @@ function datedOf(listed: {
 /**
  * An org's contests as a list card, those running now first, each row its
  * state and the date that matters, as the list gives them; "New contest" at
- * the bottom for a manager of the org. Listing needs the observer role at
- * the org: someone who holds a role only at one of its contests or tasks is
- * refused the list, so the refusal comes with the contests their own roles
- * reach, each read from its home, and the way down still works.
+ * the bottom when the server says the caller may make one. The list holds
+ * the contests the caller's roles reach.
  */
 export function OrgContests({ org }: { org: string }) {
-  const roles = useMe().roles;
-  const manages = holdsAt(roles, { kind: 'org', org }, 'manager');
+  const manages = useOrgMay(org).create_contest;
   const queryClient = useQueryClient();
   const listKey = $api.queryOptions('get', CONTESTS, {
     params: { path: { org } },
@@ -71,49 +63,25 @@ export function OrgContests({ org }: { org: string }) {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: listKey }),
   });
 
-  const reached = view.state === 'error' ? contestsReached(roles, org) : [];
-  const homes = useQueries({
-    queries: reached.map((contest) =>
-      $api.queryOptions('get', HOME, { params: { path: { org, contest } } }),
-    ),
-  });
   const now = serverNow();
-  const rowOf = (name: string, detail: ReactNode): ListRow => ({
-    key: name,
-    to: contestPath(org, name),
-    name,
-    text: name,
-    detail,
-  });
   const rows: ListRow[] =
     view.state === 'ready'
       ? byWhatMattersNow(
           view.data.map((listed) => ({ name: listed.name, contest: datedOf(listed) })),
           now,
-        ).map(({ name, contest }) =>
-          rowOf(
-            name,
+        ).map(({ name, contest }) => ({
+          key: name,
+          to: contestPath(org, name),
+          name,
+          text: name,
+          detail:
             contest === null ? (
               <BodyText tone="secondary">Its settings cannot be read</BodyText>
             ) : (
               <Standing contest={contest} />
             ),
-          ),
-        )
-      : byWhatMattersNow(
-          reached.map((name, at) => ({ name, contest: homes[at]?.data ?? null, at })),
-          now,
-        ).map(({ name, at }) => {
-          const home = homes[at];
-          return rowOf(
-            name,
-            home === undefined ? undefined : (
-              <Loaded view={queryView(home)} compact>
-                {(found) => <Standing contest={found} />}
-              </Loaded>
-            ),
-          );
-        });
+        }))
+      : [];
 
   return (
     <ListCard
@@ -121,28 +89,12 @@ export function OrgContests({ org }: { org: string }) {
       rows={rows}
       empty="No contests yet."
       notice={
-        view.state === 'error' &&
-        // Organising some of its contests and not the org is a normal
-        // place to be, not a failure to try again.
-        (view.error.code === 'forbidden' ? (
-          <BodyText>
-            {rows.length > 0
-              ? `You organise these contests of ${org}:`
-              : `You have no role at ${org} or at any of its contests.`}
-          </BodyText>
-        ) : (
-          <>
-            <ErrorBlock error={view.error} onRetry={view.retry} />
-            {rows.length > 0 && (
-              <BodyText>Contests of this org where you have a role:</BodyText>
-            )}
-          </>
-        ))
+        view.state === 'error' && <ErrorBlock error={view.error} onRetry={view.retry} />
       }
       body={
         view.state === 'loading' ? (
           <PageSkeleton rows={3} />
-        ) : view.state === 'error' && rows.length === 0 ? (
+        ) : view.state === 'error' ? (
           <></>
         ) : undefined
       }

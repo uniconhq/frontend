@@ -36,7 +36,7 @@ describe('when /me will not answer', () => {
   withFakeTimers();
 
   it.each([
-    ['a 503 from the proxy', badGateway, 'Unexpected response from the server (503)'],
+    ['a 503 from the proxy', badGateway, 'Unicon did not answer as expected'],
     ['no network at all', () => HttpResponse.error(), 'Cannot reach Unicon'],
   ])('offers a retry rather than a sign-in for %s', async (_case, broken, title) => {
     const backend = meIsBrokenUntilFixed(broken);

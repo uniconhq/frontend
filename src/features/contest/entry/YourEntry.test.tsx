@@ -430,7 +430,7 @@ describe('your entry in a contest entered in teams', () => {
     await user.click(within(part).getByRole('button', { name: 'Invite' }));
 
     const alert = await within(part).findByRole('alert');
-    expect(alert).toHaveTextContent('The team is fixed now');
+    expect(alert).toHaveTextContent('roster_locked detail');
     await user.click(within(alert).getByRole('button', { name: 'Dismiss' }));
     expect(within(part).queryByRole('alert')).toBeNull();
   });
@@ -479,11 +479,11 @@ describe('your entry in a contest everyone enters alone', () => {
 
     expect(
       within(await yourEntry()).getByRole('status', { name: 'Registration' }),
-    ).toHaveTextContent('Your email address is not accepted');
+    ).toHaveTextContent('This contest takes only some email addresses, and not yours.');
     expect(screen.queryByRole('button', { name: 'Register' })).toBeNull();
   });
 
-  it('says Forgejo did not answer, not that the address is refused, and offers to try again', async () => {
+  it('says the addresses could not be checked, and offers to try again', async () => {
     let reads = 0;
     server.use(
       signedIn,
@@ -504,11 +504,9 @@ describe('your entry in a contest everyone enters alone', () => {
     const status = within(await yourEntry()).getByRole('status', {
       name: 'Registration',
     });
-    expect(status).toHaveTextContent('Forgejo did not answer');
     expect(status).toHaveTextContent(
-      'Your email addresses could not be checked just now, so whether you can register is not known yet.',
+      'Your email addresses could not be checked just now.',
     );
-    expect(status).not.toHaveTextContent('not accepted');
     const before = reads;
     await user.click(within(status).getByRole('button', { name: 'Try again' }));
     await waitFor(() => expect(reads).toBeGreaterThan(before));

@@ -45,7 +45,7 @@ function whoOf(change: FileChange | undefined): string {
 
 /**
  * Files someone else changed since a change to them was made here, the one
- * way a save meets someone else's (M27), as the settings' merge is: each file
+ * way a save meets someone else's (M27): each file
  * with what it is now, whose it is, its size and when they saved it, beside
  * what this save does to it, and a choice for each. Saving keeps their
  * version of every file left on theirs and writes this save's over the ones

@@ -4,9 +4,8 @@ import { useNavigate } from 'react-router';
 import { $api, queryView } from '@/api/query';
 import type { TakeOut, TaskStanding } from '@/api/types';
 import { Modal } from '@/ui/Modal';
-import { useMe } from '@/session';
 import { contestPath } from '@/lib/organiser-paths';
-import { holdsAtContest } from '../roles';
+import { usePlaceMay } from '../may';
 import { useContestSettings } from './settings';
 import { STANDINGS, entrySentence, labelOf, useTaskTitles } from './task-entry';
 import { TaskTimelineForm } from './TaskTimelineForm';
@@ -164,7 +163,7 @@ function EntryOfTask({
   contest: string;
   standing: TaskStanding;
 }) {
-  const manages = holdsAtContest(useMe().roles, org, contest, 'manager');
+  const manages = usePlaceMay({ kind: 'contest', org, contest }).manage;
   const settings = useContestSettings(org, contest);
   const titles = useTaskTitles(org, contest, [standing.task.name]);
   const queryClient = useQueryClient();

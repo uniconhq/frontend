@@ -125,7 +125,7 @@ function TakeOutWords({
   );
 }
 
-/** A refusal to take the task out or put it back, in the dialog's words. */
+/** A refusal to take the task out or put it back. */
 function Refusal({
   error,
   org,
@@ -140,10 +140,7 @@ function Refusal({
     const boards = refused.extensions['leaderboards'];
     return (
       <div className={shared.panel} role="alert">
-        <BodyText>
-          {refused.detail ??
-            'The task cannot be taken out of the contest as it stands.'}
-        </BodyText>
+        <BodyText>{refused.detail}</BodyText>
         {Array.isArray(boards) && boards.length > 0 && (
           <PageLink to={contestSectionPath(org, contest, 'boards')}>
             Open Leaderboards
@@ -156,14 +153,14 @@ function Refusal({
   if (refused.code === 'invalid_definition' && errors.length > 0) {
     return (
       <div className={shared.panel} role="alert">
-        <BodyText>It cannot go back as the contest’s settings stand:</BodyText>
+        <BodyText>{refused.detail}</BodyText>
         <DefinitionErrors errors={errors} placeOf={contestPlaceOf(org, contest)} />
       </div>
     );
   }
   return (
     <div role="alert">
-      <ErrorBlock error={error} compact />
+      <ErrorBlock error={error} compact heading="Couldn’t do that" />
     </div>
   );
 }

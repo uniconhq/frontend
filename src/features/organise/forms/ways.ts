@@ -1,5 +1,5 @@
 import { formatDateTime } from '@/lib/time';
-import { isRecord, nodeFor, textOf, valueAt, writeAt, type Doc } from './yaml-doc';
+import { isRecord, textOf, valueAt, writeAt, type Values } from './values';
 
 /**
  * The ways people may register for a contest (`registration.ways`), as the
@@ -37,11 +37,11 @@ export function newSignup(more: Partial<Extract<WayValues, { kind: 'signup' }>> 
 export const DEFAULT_WAYS: WayValues[] = [newSignup()];
 
 /**
- * The ways the file holds, `null` for none at all (the default), or
+ * The ways the settings hold, `null` for none at all (the default), or
  * `'unreadable'` for a list the page cannot show.
  */
-export function readWays(doc: Doc): WayValues[] | null | 'unreadable' {
-  const ways = valueAt(doc, ['registration', 'ways']);
+export function readWays(values: Values): WayValues[] | null | 'unreadable' {
+  const ways = valueAt(values, ['registration', 'ways']);
   if (ways === undefined) return null;
   if (!Array.isArray(ways)) return 'unreadable';
   const read: WayValues[] = [];
@@ -80,7 +80,7 @@ export function domainsOf(typed: string): string[] {
 /** What starts a domain that takes itself and every domain under it (#439). */
 const UNDER = '*.';
 
-/** A way as the file holds it, with only what is set. */
+/** A way as the settings hold it, with only what is set. */
 function wayItem(way: WayValues): Record<string, unknown> {
   const approval = way.approval === '' ? {} : { approval: way.approval };
   if (way.kind === 'invite') return { invite: approval };
@@ -101,17 +101,12 @@ function wayItem(way: WayValues): Record<string, unknown> {
  * place in it is all that names it, or no key for the default.
  */
 export function writeWays(
-  doc: Doc,
+  values: Values,
   before: WayValues[] | null,
   after: WayValues[] | null,
 ): void {
   if (JSON.stringify(before) === JSON.stringify(after)) return;
-  if (after === null) {
-    writeAt(doc, ['registration', 'ways'], undefined, { prune: true });
-    return;
-  }
-  writeAt(doc, ['registration', 'ways'], []);
-  doc.setIn(['registration', 'ways'], nodeFor(doc, after.map(wayItem)));
+  writeAt(values, ['registration', 'ways'], after?.map(wayItem), { prune: true });
 }
 
 /** Whether a way's people are approved straight away. */

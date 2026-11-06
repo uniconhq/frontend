@@ -1,4 +1,4 @@
-import { isRecord, NumberText } from '../forms/yaml-doc';
+import { isRecord, NumberText } from './yaml-doc';
 
 /**
  * A workflow as the editor reads its `workflow.yaml` (SIMPLER-CORE.md section
@@ -120,7 +120,7 @@ export function wholeRef(text: string): Ref | null {
 }
 
 /** Every reference written into `text`, or null when a `${{ }}` is not one. */
-export function refsIn(text: string): Ref[] | null {
+function refsIn(text: string): Ref[] | null {
   const found: Ref[] = [];
   for (const match of text.matchAll(ANY)) {
     const ref = parseRef(match[1] ?? '');
@@ -129,22 +129,6 @@ export function refsIn(text: string): Ref[] | null {
   }
   if (text.split('${{').length - 1 !== found.length) return null;
   return found;
-}
-
-/**
- * Why a `${{ }}` in `text` is not a reference, in the forge's words, or null
- * when every one is.
- */
-export function refProblem(text: string): string | null {
-  const found = [...text.matchAll(ANY)];
-  for (const match of found) {
-    const expression = match[1] ?? '';
-    if (parseRef(expression) === null)
-      return `Unicon cannot read \${{ ${expression} }}. Write \${{ inputs.<id> }}, \${{ workflow.<path> }} or \${{ steps.<id>.<output> }}.`;
-  }
-  if (text.split('${{').length - 1 !== found.length)
-    return 'A ${{ is not closed with }}, or has a brace inside it. Close each one, and remove any brace inside.';
-  return null;
 }
 
 /** What a port is given, read from the value in the file. */

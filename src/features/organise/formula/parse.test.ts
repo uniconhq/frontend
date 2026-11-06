@@ -40,25 +40,47 @@ const task: FormulaScope = {
  * badge (reading medal) and first_name (a text input an axis fills); and
  * the task tour, whose medal is a number.
  */
-const ISLANDS = `name: Islands
-repeat:
-  - inputs: [name]
-    tuples: [{name: small}, {name: big}]
-scoring:
-  values:
-    total: {block: sum, over: {runs: all}, of: {run: [all, passed]}}
-    first_failed:
-      block: otherwise
-      of: [{run: [{block: first, from: {runs: all}}, verdict]}, {text: none}]
-    medal: {block: if, test: {value: total}, then: {text: gold}, else: {text: silver}}
-    badge: {value: medal}
-    first_name: {run: [{block: first, from: {runs: all}}, name]}
-`;
-const TOUR = `name: Tour
-scoring:
-  values:
-    medal: 1
-`;
+const ISLANDS = {
+  name: 'Islands',
+  repeat: [{ inputs: ['name'], tuples: [{ name: 'small' }, { name: 'big' }] }],
+  scoring: {
+    values: [
+      {
+        name: 'total',
+        formula: {
+          block: 'sum',
+          over: { runs: 'all' },
+          of: { run: ['all', 'passed'] },
+        },
+      },
+      {
+        name: 'first_failed',
+        formula: {
+          block: 'otherwise',
+          of: [
+            { run: [{ block: 'first', from: { runs: 'all' } }, 'verdict'] },
+            { text: 'none' },
+          ],
+        },
+      },
+      {
+        name: 'medal',
+        formula: {
+          block: 'if',
+          test: { value: 'total' },
+          then: { text: 'gold' },
+          else: { text: 'silver' },
+        },
+      },
+      { name: 'badge', formula: { value: 'medal' } },
+      {
+        name: 'first_name',
+        formula: { run: [{ block: 'first', from: { runs: 'all' } }, 'name'] },
+      },
+    ],
+  },
+};
+const TOUR = { name: 'Tour', scoring: { values: [{ name: 'medal', formula: 1 }] } };
 const leaderboard: FormulaScope = boardScope(
   {
     ...blankBoard([]),

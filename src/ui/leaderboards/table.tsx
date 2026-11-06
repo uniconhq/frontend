@@ -21,15 +21,12 @@ type Counted = components['schemas']['Counted'];
 export function LeaderboardTable({
   board,
   submissionTo,
-  staff = false,
   titleTo,
 }: {
   board: Leaderboard;
   titleTo?: string;
   /** The address of one counted submission of a row's entrant, when the caller can open it. */
   submissionTo?: (task: string, number: number, entrant: string) => string;
-  /** Bounds are staff only. A self-reported mark is on the header for everyone. */
-  staff?: boolean;
 }) {
   const partial = board.dropped.length > 0;
   return (
@@ -49,7 +46,7 @@ export function LeaderboardTable({
             {board.headers.map((header) => (
               <th key={header.name}>
                 {header.name}
-                <HeaderNotes header={header} staff={staff} />
+                <HeaderNotes header={header} />
               </th>
             ))}
           </tr>
@@ -102,13 +99,12 @@ export function LeaderboardTable({
   );
 }
 
-function HeaderNotes({ header, staff }: { header: Header; staff: boolean }) {
-  const bounds = staff
-    ? [
-        header.at_least === null ? null : `at least ${formatExact(header.at_least)}`,
-        header.at_most === null ? null : `at most ${formatExact(header.at_most)}`,
-      ].filter((item) => item !== null)
-    : [];
+/** Bounds, which the server tells staff alone, and a self-reported mark. */
+function HeaderNotes({ header }: { header: Header }) {
+  const bounds = [
+    header.at_least === null ? null : `at least ${formatExact(header.at_least)}`,
+    header.at_most === null ? null : `at most ${formatExact(header.at_most)}`,
+  ].filter((item) => item !== null);
   return (
     <>
       {bounds.length > 0 && <span className={classes.note}>{bounds.join(', ')}</span>}

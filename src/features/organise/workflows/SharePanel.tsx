@@ -166,7 +166,7 @@ function SharePanel({ page }: { page: WorkflowPage }) {
           </form>
         </>
       )}
-      {error !== null && <ErrorBlock error={error} compact />}
+      {error !== null && <ErrorBlock error={error} compact heading="Couldn’t share" />}
     </section>
   );
 }

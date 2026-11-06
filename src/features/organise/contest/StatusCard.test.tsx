@@ -2,15 +2,15 @@ import { describe, expect, it } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@/test/user-event';
 import { http, HttpResponse } from 'msw';
-import { parse } from 'yaml';
-import type { FileContent, TaskStanding } from '@/api/types';
+import type { TaskStanding } from '@/api/types';
 import { formatDateTime } from '@/lib/time';
+import { holding } from '@/test/may';
 import { renderApp } from '@/test/render';
-import { problem, server, signedIn, someone } from '@/test/server';
-import { CONTEST_API, files, repoFiles, standings } from '@/test/organiser';
+import { problem, server, signedIn } from '@/test/server';
+import { CONTEST_API, contestSettings, repoFiles, standings } from '@/test/organiser';
 
 const CONTEST = '/orgs/acme/contests/spring';
-const FILE = `${CONTEST_API}/files/:path`;
+const SETTINGS = `${CONTEST_API}/settings`;
 
 /** Both tasks published without problems. */
 const ready: TaskStanding[] = standings.map((standing) => ({
@@ -18,36 +18,24 @@ const ready: TaskStanding[] = standings.map((standing) => ({
   state: { ...standing.state, draft: false, errors: [] },
 }));
 
-/** The settings as given, with each save taken and the settings becoming it. */
-function settingsAt(lines: string[]) {
-  let file: FileContent = {
-    ...files['contest.yaml']!,
-    content: [...lines, ''].join('\n'),
-  };
-  const sent: string[] = [];
-  server.use(
-    http.get(FILE, ({ params }) =>
-      params['path'] === 'contest.yaml' ? HttpResponse.json(file) : undefined,
-    ),
-    http.put(FILE, async ({ request }) => {
-      const body = (await request.json()) as { content: string };
-      sent.push(body.content);
-      file = { ...file, content: body.content, token: `token-${String(sent.length)}` };
-      return HttpResponse.json({ version: `v${String(sent.length)}`, notes: [] });
-    }),
-  );
-  return sent;
+/** The settings as given, with each save taken; each save's body. */
+function settingsAt(values: Record<string, unknown>) {
+  const backend = contestSettings({ current: values });
+  server.use(...backend.handlers);
+  return backend.sent;
 }
 
-const DRAFT = [
-  'name: Spring',
-  'start: 2030-10-01T09:00:00Z',
-  'end: 2030-10-15T09:00:00Z',
-  'state: draft',
-  'visibility: signed-in',
-  'leaderboards: {standings: {title: Standings, audience: {who: entrants}}}',
-  'tasks: [{id: sort}, {id: sum}]',
-];
+const DRAFT = {
+  name: 'Spring',
+  start: '2030-10-01T09:00:00Z',
+  end: '2030-10-15T09:00:00Z',
+  state: 'draft',
+  visibility: 'signed-in',
+  leaderboards: [
+    { key: 'standings', title: 'Standings', audience: { who: 'entrants' } },
+  ],
+  tasks: [{ id: 'sort' }, { id: 'sum' }],
+};
 
 async function status(): Promise<HTMLElement> {
   return screen.findByRole('region', { name: 'Status' });
@@ -60,7 +48,7 @@ describe("the contest's status", () => {
       ...repoFiles,
       http.get(`${CONTEST_API}/organise/tasks`, () => HttpResponse.json(standings)),
     );
-    settingsAt(DRAFT.filter((line) => !line.startsWith('leaderboards')));
+    settingsAt({ ...DRAFT, leaderboards: undefined });
     renderApp(CONTEST);
 
     const card = await status();
@@ -209,7 +197,8 @@ describe("the contest's status", () => {
     await user.click(within(dialog).getByRole('button', { name: 'Open the contest' }));
 
     await waitFor(() => expect(sent).toHaveLength(1));
-    expect((parse(sent[0] ?? '') as { state: string }).state).toBe('published');
+    expect(sent[0]?.values).toEqual({ ...DRAFT, state: 'published' });
+    expect(sent[0]?.token).toBe('token-1');
     expect(
       await within(card).findByRole('button', { name: 'Back to draft' }),
     ).toBeVisible();
@@ -221,9 +210,7 @@ describe("the contest's status", () => {
       ...repoFiles,
       http.get(`${CONTEST_API}/organise/tasks`, () => HttpResponse.json(ready)),
     );
-    const sent = settingsAt(
-      DRAFT.map((line) => (line === 'state: draft' ? 'state: published' : line)),
-    );
+    const sent = settingsAt({ ...DRAFT, state: 'published' });
     const user = userEvent.setup();
     renderApp(CONTEST);
 
@@ -241,7 +228,7 @@ describe("the contest's status", () => {
     await user.click(within(dialog).getByRole('button', { name: 'Back to draft' }));
 
     await waitFor(() => expect(sent).toHaveLength(1));
-    expect((parse(sent[0] ?? '') as { state: string }).state).toBe('draft');
+    expect(sent[0]?.values['state']).toBe('draft');
   });
 
   it('offers a started contest Back to draft too, and says why not when the forge refuses', async () => {
@@ -250,19 +237,19 @@ describe("the contest's status", () => {
       ...repoFiles,
       http.get(`${CONTEST_API}/organise/tasks`, () => HttpResponse.json(ready)),
     );
-    settingsAt([
-      'name: Spring',
-      'start: 2026-09-01T09:00:00Z',
-      'end: 2030-09-02T09:00:00Z',
-      'state: published',
-      'visibility: signed-in',
-    ]);
+    settingsAt({
+      name: 'Spring',
+      start: '2026-09-01T09:00:00Z',
+      end: '2030-09-02T09:00:00Z',
+      state: 'published',
+      visibility: 'signed-in',
+    });
     server.use(
-      http.put(FILE, () =>
+      http.put(SETTINGS, () =>
         problem(422, 'invalid_definition', {
           errors: [
             {
-              path: 'state',
+              path: ['state'],
               message: 'The contest has started, so it can no longer go back to draft.',
             },
           ],
@@ -294,13 +281,13 @@ describe("the contest's status", () => {
       ...repoFiles,
       http.get(`${CONTEST_API}/organise/tasks`, () => HttpResponse.json(ready)),
     );
-    const sent = settingsAt([
-      'name: Spring',
-      'start: 2026-09-01T09:00:00Z',
-      'end: 2026-09-02T09:00:00Z',
-      'state: published',
-      'visibility: everyone',
-    ]);
+    const sent = settingsAt({
+      name: 'Spring',
+      start: '2026-09-01T09:00:00Z',
+      end: '2026-09-02T09:00:00Z',
+      state: 'published',
+      visibility: 'everyone',
+    });
     const user = userEvent.setup();
     renderApp(CONTEST);
 
@@ -310,7 +297,7 @@ describe("the contest's status", () => {
     await user.click(within(dialog).getByRole('button', { name: 'Archive' }));
 
     await waitFor(() => expect(sent).toHaveLength(1));
-    expect((parse(sent[0] ?? '') as { state: string }).state).toBe('archived');
+    expect(sent[0]?.values['state']).toBe('archived');
   });
 
   it('changes who sees it in words', async () => {
@@ -335,19 +322,43 @@ describe("the contest's status", () => {
     await user.click(within(dialog).getByRole('button', { name: 'Save' }));
 
     await waitFor(() => expect(sent).toHaveLength(1));
-    expect((parse(sent[0] ?? '') as { visibility: string }).visibility).toBe('hidden');
+    expect(sent[0]?.values['visibility']).toBe('hidden');
+  });
+
+  it('makes a change once more on the settings someone else saved first', async () => {
+    server.use(
+      signedIn,
+      ...repoFiles,
+      http.get(`${CONTEST_API}/organise/tasks`, () => HttpResponse.json(ready)),
+    );
+    const theirs = { ...DRAFT, name: 'Their spring' };
+    const backend = contestSettings({ current: DRAFT, conflictWith: theirs });
+    server.use(...backend.handlers);
+    const user = userEvent.setup();
+    renderApp(CONTEST);
+
+    const card = await status();
+    await user.click(
+      await within(card).findByRole('button', { name: 'Change who sees it' }),
+    );
+    const dialog = await screen.findByRole('dialog', { name: 'Who sees it' });
+    await user.click(
+      within(dialog).getByRole('radio', { name: 'Only its entrants and organisers' }),
+    );
+    await user.click(within(dialog).getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => expect(backend.sent).toHaveLength(2));
+    expect(backend.sent[1]).toMatchObject({
+      token: 'token-2',
+      values: { ...theirs, visibility: 'hidden' },
+    });
+    expect(within(card).queryByRole('alert')).toBeNull();
   });
 
   it('offers a manager none of the buttons, which are an admin’s', async () => {
     server.use(
-      http.get('/api/v1/me', () =>
-        HttpResponse.json({
-          ...someone,
-          roles: [
-            { names: { org: 'acme', contest: 'spring', task: null }, role: 'manager' },
-          ],
-        }),
-      ),
+      signedIn,
+      ...holding('manager'),
       ...repoFiles,
       http.get(`${CONTEST_API}/organise/tasks`, () => HttpResponse.json(ready)),
     );

@@ -187,6 +187,7 @@ describe('a workflow drawn', () => {
               options: null,
               title: null,
               unit: null,
+              accepts: ['file', 'folder'],
             },
           ],
           outputs: [],

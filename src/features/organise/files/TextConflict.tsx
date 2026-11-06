@@ -48,7 +48,7 @@ export function KeptText({
  * saved yet. They go on from theirs, keeping their own text beside it to
  * copy what they want across, which merges the two by hand; or save theirs
  * over, after a warning that it throws away the other person's change. A
- * form's settings merge field by field instead (MergeView).
+ * form's settings are read again instead.
  */
 export function TextConflict({
   place,

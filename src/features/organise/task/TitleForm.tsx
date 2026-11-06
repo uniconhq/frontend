@@ -4,15 +4,21 @@ import { Button } from '@/ui/Button';
 import { TextInput } from '@/ui/TextInput';
 import { FieldBox } from '../contest/ContestFile';
 import { useOpenedField } from '../contest/opened';
-import { DefinitionForm, type FormProps } from '../forms/DefinitionFile';
+import { usePlaceMay } from '../may';
 import { readTask, writeTask } from '../forms/task-values';
+import { ValuesForm, type ValuesFormProps } from '../forms/ValuesForm';
 import type { TaskPlace } from './build-data';
-import { taskMergeWords } from './merge-words';
-import { placeOfIn } from './places';
+import { taskPlaceOf } from './places';
 import shared from '../organise.module.css';
 
-function Form({ doc, busy, asking, onSave, admin }: FormProps & { admin: boolean }) {
-  const [read] = useState(() => readTask(doc, []));
+function Form({
+  values,
+  busy,
+  asking,
+  onSave,
+  admin,
+}: ValuesFormProps & { admin: boolean }) {
+  const [read] = useState(() => readTask(values, []));
   const [name, setName] = useState(read.values.name);
   useOpenedField(true);
   const changed = name !== read.values.name;
@@ -65,16 +71,14 @@ function Form({ doc, busy, asking, onSave, admin }: FormProps & { admin: boolean
  * task's page, since it is the admin's and changes nothing of how the task
  * grades. Saving it is a save of the task, answered as any other.
  */
-export function TitleForm({ place, admin }: { place: TaskPlace; admin: boolean }) {
+export function TitleForm({ place }: { place: TaskPlace }) {
+  const may = usePlaceMay(place);
   return (
-    <DefinitionForm
+    <ValuesForm
       place={place}
-      path="task.yaml"
-      admin={admin}
-      words={taskMergeWords(new Map())}
-      placeOf={placeOfIn(place)}
+      placeOf={taskPlaceOf(place.org, place.contest, place.task)}
     >
-      {(props) => <Form {...props} admin={admin} />}
-    </DefinitionForm>
+      {(props) => <Form {...props} admin={may.edit_admin_settings} />}
+    </ValuesForm>
   );
 }

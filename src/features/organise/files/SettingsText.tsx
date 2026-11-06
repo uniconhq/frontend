@@ -2,7 +2,7 @@ import { Fragment, useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { $api, queryView } from '@/api/query';
 import { toApiError } from '@/api/problem';
-import type { DefinitionError, FileChange, FileContent } from '@/api/types';
+import type { DefinitionError, FileChange, FileContent, Settings } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
 import { CodeEditor } from '@/ui/CodeEditor';
@@ -15,17 +15,16 @@ import { DefinitionErrors } from '../DefinitionErrors';
 import { contestPlaceOf } from '../contest/opened';
 import { readContest } from '../forms/contest-values';
 import { readTask } from '../forms/task-values';
-import { parseYaml, topMap } from '../forms/yaml-doc';
 import { taskPlaceOf } from '../task/places';
 import { definitionErrorsOf } from './refusals';
-import type { Place } from './place';
+import { settingsQuery, type Place } from './place';
 import shared from '../organise.module.css';
 
 /**
  * A place's settings file, `contest.yaml` or `task.yaml`: changed only on the
  * place's pages, and shown here to read and check, with every change to it.
  * When it does not read, so those pages cannot change it, the page says why
- * and offers its admins the text, with each problem named; the pages come
+ * and offers its managers the text, with each problem named; the pages come
  * back once it reads.
  */
 
@@ -50,6 +49,7 @@ const TASK_KEYS = [
 function useUnread(
   place: Place,
   file: FileContent,
+  settings: Settings | undefined,
 ): { reason: string | null; problems: DefinitionError[] } | null {
   const path = { org: place.org, contest: place.contest };
   const task = $api.useQuery(
@@ -66,25 +66,25 @@ function useUnread(
   );
   if (file.encoding !== 'utf-8')
     return { reason: 'The file is not text.', problems: [] };
-  const parsed = parseYaml(file.content);
-  if ('error' in parsed) return { reason: parsed.error, problems: [] };
-  if (topMap(parsed.doc) === 'not-a-mapping') {
-    return { reason: 'The file does not hold a list of settings.', problems: [] };
-  }
-  const unreadable =
-    place.kind === 'task'
-      ? readTask(parsed.doc).unreadable
-      : readContest(parsed.doc).unreadable;
   const reason =
-    unreadable.length === 0 ? null : `The pages cannot read ${unreadable.join(', ')}.`;
+    settings === undefined
+      ? null
+      : settings.values === null
+        ? (settings.unreadable ?? 'The file does not hold a list of settings.')
+        : unreadReason(
+            place.kind === 'task'
+              ? readTask(settings.values).unreadable
+              : readContest(settings.values).unreadable,
+          );
   if (place.kind === 'task') {
+    // A setting no card reads; a file's problem is one path, said on its own card.
     const problems = (task.data?.errors ?? []).filter((error) => {
-      const top = /^[^.[/]*/.exec(error.path)?.[0] ?? '';
+      const [top] = error.path;
       return (
-        top !== '' &&
+        typeof top === 'string' &&
         !TASK_KEYS.includes(top) &&
-        !error.path.includes('/') &&
-        top !== 'statement'
+        !top.includes('/') &&
+        top !== 'statement.md'
       );
     });
     return reason === null && problems.length === 0 ? null : { reason, problems };
@@ -94,6 +94,12 @@ function useUnread(
       ? definitionErrorsOf(toApiError(standings.error))
       : [];
   return reason === null && refused.length === 0 ? null : { reason, problems: refused };
+}
+
+function unreadReason(unreadable: string[]): string | null {
+  return unreadable.length === 0
+    ? null
+    : `The pages cannot read ${unreadable.join(', ')}.`;
 }
 
 /** Who made a change, by the username the history names them by. */
@@ -248,28 +254,29 @@ function WhereChanged({ place }: { place: Place }) {
 
 /**
  * The settings file, to read, with where it is changed and every change to
- * it; or, when it does not read, why, with its problems, and for an admin
+ * it; or, when it does not read, why, with its problems, and for a manager
  * `editor`, the text to mend it in.
  */
 export function SettingsText({
   place,
   file,
-  admin,
+  manages,
   editor,
 }: {
   place: Place;
   file: FileContent;
-  admin: boolean;
-  /** The settings as text to edit and save, for an admin while they do not read. */
+  manages: boolean;
+  /** The settings as text to edit and save, for a manager while they do not read. */
   editor: ReactNode;
 }) {
-  const unread = useUnread(place, file);
+  const settings = useQuery(settingsQuery(place));
+  const unread = useUnread(place, file, settings.data);
   const label =
     place.kind === 'task' ? 'The task’s settings' : 'The contest’s settings';
   const placeOf =
     place.kind === 'task'
       ? taskPlaceOf(place.org, place.contest, place.task)
-      : contestPlaceOf(place.org, place.contest, file.content);
+      : contestPlaceOf(place.org, place.contest, settings.data?.values ?? undefined);
   return (
     <div className={shared.stack}>
       {unread === null ? (
@@ -284,13 +291,13 @@ export function SettingsText({
           )}
           <DefinitionErrors errors={unread.problems} placeOf={placeOf} />
           <BodyText tone="secondary">
-            {admin
+            {manages
               ? 'Fix them here as text. The pages work again once the settings can be read.'
               : 'See who can on the organisers page.'}
           </BodyText>
         </div>
       )}
-      {unread !== null && admin ? (
+      {unread !== null && manages ? (
         editor
       ) : (
         <CodeEditor

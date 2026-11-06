@@ -6,8 +6,7 @@ import { SectionTitle } from '@/ui/SectionTitle';
 import { TextInput } from '@/ui/TextInput';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
-import { useMe } from '@/session';
-import { holdsAt } from '../roles';
+import { useOrgMay } from '../may';
 import classes from '../organise.module.css';
 import own from './org.module.css';
 
@@ -83,7 +82,7 @@ function EditForm({
       />
       {update.error !== null && (
         <div className={classes.panel} role="alert">
-          <ErrorBlock error={update.error} compact />
+          <ErrorBlock error={update.error} compact heading="Couldn’t save" />
         </div>
       )}
       <div className={classes.actions}>
@@ -106,7 +105,7 @@ function EditForm({
  * contests or tasks, reads them with no way to edit.
  */
 export function OrgProfile({ org }: { org: string }) {
-  const administers = holdsAt(useMe().roles, { kind: 'org', org }, 'admin');
+  const administers = useOrgMay(org).edit;
   const view = queryView($api.useQuery('get', ORG, { params: { path: { org } } }));
   const [editing, setEditing] = useState(false);
   const opener = useRef<HTMLDivElement>(null);

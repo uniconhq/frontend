@@ -2,9 +2,9 @@ import type { Primitive, PrimitivePort } from '@/api/types';
 import type { WithValue } from './model';
 
 /**
- * The platform's primitives as the tray and the drag checks read them:
- * each version with its declared ports and the limits it raises, or the
- * reason a version in a format no longer read cannot be used.
+ * The platform's primitives as the tray and the graph read them: each
+ * version with its declared ports and the limits it raises, or the reason a
+ * version in a format no longer read cannot be used.
  */
 export type PrimitiveInfo = Primitive;
 export type PortDecl = PrimitivePort;
@@ -12,15 +12,6 @@ export type PortDecl = PrimitivePort;
 /** The primitives by the reference a step uses them by. */
 export function byRef(primitives: PrimitiveInfo[]): Map<string, PrimitiveInfo> {
   return new Map(primitives.map((primitive) => [primitive.ref, primitive]));
-}
-
-/** The ports of a primitive a container limit is raised from. */
-export function raisingPorts(primitive: PrimitiveInfo): Set<string> {
-  return new Set(
-    Object.values(primitive.limits_from).flatMap((source) =>
-      source.input === null ? [] : [source.input],
-    ),
-  );
 }
 
 /** What `declared` reads of a step: what it uses and the ports it gives. */

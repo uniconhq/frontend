@@ -8,6 +8,16 @@ type Schemas = components['schemas'];
  * and reads a regrade's row moving. The API is stubbed.
  */
 
+/** What a contest's manager may do there and at its tasks, as the server says. */
+const MANAGER_MAY: Schemas['PlaceMay'] = {
+  manage: true,
+  edit_admin_settings: false,
+  locked_keys: ['name', 'submissions'],
+  see_people: true,
+  manage_people: true,
+  give_admin: false,
+};
+
 const TASK = {
   draft: false,
   errors: [],
@@ -20,6 +30,7 @@ const TASK = {
     released: false,
     history: [] as Schemas['Results']['history'],
   },
+  may: MANAGER_MAY,
 } satisfies Schemas['TaskState'];
 
 function json(route: Route, body: unknown, status = 200) {
@@ -44,6 +55,20 @@ async function stub(page: Page) {
         yanked: null,
         text_values: null,
       } satisfies Schemas['WorkflowForm']);
+    }
+    if (path === '/api/v1/orgs/acme/contests') {
+      return json(route, [
+        {
+          name: 'spring',
+          state: 'published',
+          start: '2026-10-01T09:00:00Z',
+          end: '2026-10-01T14:00:00Z',
+          may: {
+            ...MANAGER_MAY,
+            locked_keys: ['name', 'description', 'state', 'visibility', 'registration'],
+          },
+        },
+      ] satisfies Schemas['ListedContest'][]);
     }
     if (path.includes('/regrades/')) {
       return json(route, {
@@ -118,16 +143,23 @@ async function stub(page: Page) {
       roles: [
         { names: { org: 'acme', contest: 'spring', task: null }, role: 'manager' },
       ],
+      orgs: ['acme'],
+      workflow_owners: ['kenny'],
       degraded: false,
     } satisfies Schemas['Me']),
   );
-  const file = (path: string, content: string): Schemas['FileContent'] => ({
+  const file = (
+    path: string,
+    content: string,
+    href: string | null = null,
+  ): Schemas['FileContent'] => ({
     path,
     encoding: 'utf-8',
     content,
     token: 't',
     upload: null,
     version: 'v0',
+    href,
   });
   await page.route(/\/files\/contest\.yaml$/, (route) =>
     json(
@@ -139,7 +171,14 @@ async function stub(page: Page) {
     ),
   );
   await page.route(/\/files\/task\.yaml$/, (route) =>
-    json(route, file('task.yaml', 'name: Sum\nworkflow: unicon/classic@v6\n')),
+    json(
+      route,
+      file(
+        'task.yaml',
+        'name: Sum\nworkflow: unicon/classic@v6\n',
+        '/-/downloads/acme/spring/sum/versions/v0/task.yaml',
+      ),
+    ),
   );
   await page.route(/\/tree(\?|$)/, (route) =>
     route.fulfill({
@@ -214,6 +253,7 @@ async function stub(page: Page) {
         ],
         sort: [{ column: 'points', way: 'desc' }],
         dropped: [],
+        staff: true,
         held_from: null,
         rows: [
           {

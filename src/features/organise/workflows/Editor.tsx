@@ -12,8 +12,8 @@ import { LeaveGuard } from '@/ui/LeaveGuard';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { type MenuEntry } from '@/ui/ActionMenu';
 import { useSettled } from '@/lib/use-settled';
-import { MergeView } from '../forms/MergeView';
-import { parseYaml } from '../forms/yaml-doc';
+import { MergeView } from './MergeView';
+import { parseYaml } from './yaml-doc';
 import { WorkflowBar } from './Bar';
 import { checkQuery } from './check';
 import { DescriptionField } from './Description';
@@ -66,13 +66,12 @@ import { Problems } from './Problems';
 import { byRef, type PrimitiveInfo } from './primitives';
 import { PublishVersion, type SaveOutcome } from './Publish';
 import {
+  dragRefusal,
   outputType,
   outputSources,
   stepInputs,
   stepOutputs,
-  outputRefusal,
   portFor,
-  wireRefusal,
 } from './rules';
 import { ShareButton } from './SharePanel';
 import { Tray } from './Tray';
@@ -311,25 +310,7 @@ export function Editor({
     }
     return found;
   }, [paletteRefs, workflow, primitiveMap]);
-  const usedBoxes = useBoxes(boxRefs);
-  // The newer version a step could move to, read so Move to it can be checked
-  // even when the list of workflows has not come.
-  const newerRefs = useMemo(() => {
-    const found = new Map<string, Frame['use']>();
-    for (const step of workflow.steps) {
-      const newer = usedBoxes.get(step.use)?.newer ?? null;
-      const use = parseUse(step.use);
-      if (newer === null || use === null) continue;
-      const ref = { ...use, version: newer };
-      if (!usedBoxes.has(formatUse(ref))) found.set(formatUse(ref), ref);
-    }
-    return [...found.values()];
-  }, [workflow, usedBoxes]);
-  const newerBoxes = useBoxes(newerRefs);
-  const boxMap = useMemo(
-    () => (newerBoxes.size === 0 ? usedBoxes : new Map([...usedBoxes, ...newerBoxes])),
-    [usedBoxes, newerBoxes],
-  );
+  const boxMap = useBoxes(boxRefs);
   const readingBoxes = useReadingBoxes();
   const palette = useMemo(
     () =>
@@ -495,13 +476,20 @@ export function Editor({
       : { kind: 'port', step: target.step, port: picked.port };
   };
 
-  /** Why a wire may not go to `target`; on a closed box, naming the port picked, which it does not show. */
+  /**
+   * Why a wire can't be dropped on `target` while dragging; on a closed box,
+   * naming the port picked, which it does not show. The check says the rest
+   * after the drop.
+   */
   const refusal = (source: Ref, target: Target): string | null => {
     const to = portOf(source, target);
     if (typeof to === 'string') return to;
+    // An output is named after the step output it reads.
     if (to.kind === 'outputs')
-      return outputRefusal(workflow, primitiveMap, source, boxMap);
-    const refused = wireRefusal(
+      return source.kind === 'steps'
+        ? null
+        : 'Only a step’s output goes in the outputs.';
+    const refused = dragRefusal(
       workflow,
       primitiveMap,
       to.step,
@@ -605,9 +593,11 @@ export function Editor({
   const sources = (): Ref[] => [
     ...workflow.inputs.map((input): Ref => ({ kind: 'inputs', name: input.id })),
     ...workflow.steps.flatMap((step) =>
-      stepOutputs(primitiveMap, boxMap, step)
-        .filter((output) => output.type !== 'outcome')
-        .map((output): Ref => ({ kind: 'steps', name: step.id, output: output.name })),
+      stepOutputs(primitiveMap, boxMap, step).map((output): Ref => ({
+        kind: 'steps',
+        name: step.id,
+        output: output.name,
+      })),
     ),
     ...files,
   ];
@@ -705,11 +695,9 @@ export function Editor({
       const source = sourceAt(box, port, workflow);
       if (source === null) return entries;
       if (source.kind === 'steps') {
-        const reported = outputRefusal(workflow, primitiveMap, source, boxMap);
         entries.push({
           kind: 'item',
           text: 'Name it as an output',
-          reason: reported,
           onSelect: () =>
             connect(source, { kind: 'outputs', entry: null }, 'outputs', '+'),
         });
@@ -775,8 +763,6 @@ export function Editor({
       <InputsPanel
         text={text}
         workflow={workflow}
-        primitives={primitiveMap}
-        boxes={boxMap}
         pinned={pins}
         id={selected.id}
         files={files}
@@ -789,8 +775,6 @@ export function Editor({
       <FilePanel
         text={text}
         workflow={workflow}
-        primitives={primitiveMap}
-        boxes={boxMap}
         path={selected.path}
         files={files}
         listed={savedFiles.isSuccess}
@@ -889,7 +873,9 @@ export function Editor({
           {published} is published. Tasks can choose it now.
         </p>
       )}
-      {saveError !== null && <ErrorBlock error={saveError} compact />}
+      {saveError !== null && (
+        <ErrorBlock error={saveError} compact heading="Couldn’t save" />
+      )}
       {savedFiles.isError && (
         <ErrorBlock
           error={toApiError(savedFiles.error)}
@@ -900,8 +886,6 @@ export function Editor({
       {conflict !== null && (
         <MergeView
           key={conflict.token}
-          file="workflow.yaml"
-          admin
           baseText={conflict.base}
           mineText={conflict.mine}
           currentText={conflict.current}

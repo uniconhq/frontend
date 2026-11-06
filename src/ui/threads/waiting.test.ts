@@ -14,6 +14,7 @@ function asked(messages: Clarification['messages']): Clarification {
     answered: false,
     closed: false,
     messages,
+    may_answer: true,
   };
 }
 

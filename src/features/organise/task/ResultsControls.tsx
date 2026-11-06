@@ -100,7 +100,9 @@ function Ask({
           {released ? 'Take back' : 'Release results'}
         </Button>
       </div>
-      {failed !== null && <ErrorBlock error={failed} />}
+      {failed !== null && (
+        <ErrorBlock error={failed} heading="Couldn’t change the release" />
+      )}
       <Modal
         opened={asking !== null}
         onClose={() => setAsking(null)}

@@ -8,7 +8,7 @@ import { Button } from '@/ui/Button';
 import { Modal } from '@/ui/Modal';
 import { TextInput } from '@/ui/TextInput';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
-import { SavedFolder, VersionFile } from '../files/FilePreview';
+import { ListedVersionFile, SavedFolder } from '../files/FilePreview';
 import type { VersionPlace } from '../files/place';
 import type { BoxDecl } from './boxes';
 import { Drawer } from './Drawer';
@@ -114,7 +114,7 @@ export function VersionDrawer({
         path={selected.path.replace(/\/$/, '')}
       />
     ) : (
-      <VersionFile key={selected.path} place={place} path={selected.path} size={null} />
+      <ListedVersionFile key={selected.path} place={place} path={selected.path} />
     );
   return (
     <Drawer title={drawerTitle(selected, workflow)} onClose={onClose}>
@@ -178,7 +178,7 @@ export function StopNewUse({ page, version }: { page: WorkflowPage; version: str
           ) : (
             <TextInput label="Reason" value={reason} onChange={setReason} />
           )}
-          {error && <ErrorBlock error={error} />}
+          {error && <ErrorBlock error={error} heading="Couldn’t change it" />}
           <Button
             loading={busy}
             disabled={!mark && reason.trim() === ''}

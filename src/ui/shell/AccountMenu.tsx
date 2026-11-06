@@ -83,7 +83,7 @@ export function AccountMenu() {
         </Menu.Item>
         {error !== null && (
           <div className={classes.signOutError} role="alert">
-            <ErrorBlock error={error} compact />
+            <ErrorBlock error={error} compact heading="Couldn’t sign out" />
           </div>
         )}
       </Menu.Dropdown>

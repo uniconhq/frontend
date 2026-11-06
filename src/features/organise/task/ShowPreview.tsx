@@ -178,16 +178,23 @@ function Answer({ view }: { view: ReturnType<typeof queryView<Preview>> }) {
       return (
         <ul className={classes.previewProblems} aria-label="Why it cannot be previewed">
           {problems.map((problem) => (
-            <li key={`${problem.path}:${problem.message}`}>{problem.message}</li>
+            <li key={`${problem.path.join('.')}:${problem.message}`}>
+              {problem.message}
+            </li>
           ))}
         </ul>
       );
     }
     if (view.error.code === 'not_found')
-      return (
-        <BodyText tone="secondary">{view.error.detail ?? NEVER_PUBLISHED}</BodyText>
-      );
-    return <ErrorBlock error={view.error} compact onRetry={view.retry} />;
+      return <BodyText tone="secondary">{view.error.detail}</BodyText>;
+    return (
+      <ErrorBlock
+        error={view.error}
+        compact
+        onRetry={view.retry}
+        heading="Couldn’t preview"
+      />
+    );
   }
   const { result, placeholders, hidden } = view.data;
   const empty =

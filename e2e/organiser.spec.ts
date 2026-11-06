@@ -1,8 +1,21 @@
 import { specCatalogue } from '../src/test/catalogue';
+import { draftRunsOf } from '../src/test/draft-runs';
+import { taskValuesOf } from '../src/test/task-values';
 import { expect, test, type Page, type Route } from '@playwright/test';
 import type { components } from '../src/api/schema';
+import { contestValuesOf, settingsOf } from './settings';
 
 type Schemas = components['schemas'];
+
+/** What an admin may do at a contest or a task, as the server says. */
+const ADMIN_MAY: Schemas['PlaceMay'] = {
+  manage: true,
+  edit_admin_settings: true,
+  locked_keys: [],
+  see_people: true,
+  manage_people: true,
+  give_admin: true,
+};
 
 /** The version the uploaded part of test 1 was last changed at. */
 const UPLOADED_AT = 'a1b2c3d4e5f6a7b8c9d0a1b2c3d4e5f6a7b8c9d0';
@@ -34,9 +47,13 @@ async function stubOrganiserApi(page: Page) {
     saved: null as unknown,
     contestYaml:
       'name: Spring 2026\nstart: 2030-10-01T09:00:00Z\nend: 2030-10-01T14:00:00Z\nstate: draft\nvisibility: signed-in\ntasks:\n  - id: sum\n',
+    /** The contest's settings as last saved, or none while `contestYaml` holds them. */
+    contestValues: null as Record<string, unknown> | null,
     contestSaves: 0,
     taskYaml:
       'name: Sum\nworkflow: unicon/classic@v6\ninputs:\n  submission: {entrant: {label: Your solution}}\n  language: {entrant: {options: [python]}}\n  time_limit: 2\n  memory_limit: 256\n',
+    /** The task's settings as last saved, or none while `taskYaml` holds them. */
+    taskValues: null as Record<string, unknown> | null,
     taskSaves: [] as unknown[],
     /** How many gradings failed and wait, as the queue counts them. */
     failed: 0,
@@ -61,6 +78,7 @@ async function stubOrganiserApi(page: Page) {
     head_statement_written: true,
     toolchains: {},
     results: { released: false, history: [] },
+    may: ADMIN_MAY,
   });
 
   const json = (route: Route, body: unknown, status = 200) =>
@@ -117,6 +135,8 @@ async function stubOrganiserApi(page: Page) {
             },
           ]
         : [],
+      orgs: state.orgMade ? ['acme'] : [],
+      workflow_owners: state.orgMade ? ['kenny', 'acme'] : ['kenny'],
       degraded: false,
     } satisfies Schemas['Me']),
   );
@@ -132,7 +152,17 @@ async function stubOrganiserApi(page: Page) {
     }
     if (path.endsWith('/roles') || path.endsWith('/invites')) return json(route, []);
     if (path === '/api/v1/orgs/acme') {
-      return json(route, { display_name: '', description: '' });
+      return json(route, {
+        display_name: '',
+        description: '',
+        may: {
+          edit: true,
+          create_contest: true,
+          see_people: true,
+          manage_people: true,
+          give_admin: true,
+        },
+      } satisfies Schemas['Org']);
     }
     if (path === '/api/v1/orgs/acme/clarifications') return json(route, []);
     if (path === '/api/v1/orgs/acme/contests/spring/home') {
@@ -159,20 +189,23 @@ async function stubOrganiserApi(page: Page) {
         tasks: [],
       });
     }
-    if (path === '/api/v1/orgs/acme/contests/spring/files/contest.yaml') {
+    if (path === '/api/v1/orgs/acme/contests/spring/settings') {
       if (request.method() === 'PUT') {
-        state.contestYaml = (request.postDataJSON() as { content: string }).content;
+        const body = request.postDataJSON() as Schemas['WriteSettings'];
+        state.contestValues = body.values;
         state.contestSaves += 1;
-        return json(route, { version: `v${String(state.contestSaves)}`, notes: [] });
+        return json(route, {
+          version: `v${String(state.contestSaves)}`,
+          notes: [],
+        } satisfies Schemas['Written']);
       }
-      return json(route, {
-        path: 'contest.yaml',
-        encoding: 'utf-8',
-        content: state.contestYaml,
-        token: `token-contest-${String(state.contestSaves)}`,
-        upload: null,
-        version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
-      });
+      return json(
+        route,
+        settingsOf(
+          state.contestValues ?? contestValuesOf(state.contestYaml),
+          `token-contest-${String(state.contestSaves)}`,
+        ),
+      );
     }
     const contest = '/api/v1/orgs/acme/contests/spring';
     if (
@@ -276,11 +309,12 @@ async function stubOrganiserApi(page: Page) {
           state: 'draft',
           start: '2026-10-01T09:00:00Z',
           end: '2026-10-01T14:00:00Z',
+          may: ADMIN_MAY,
         },
       ]);
     }
     if (path === '/api/v1/orgs/acme/contests/spring/tasks') {
-      return json(route, [{ name: 'sum' }]);
+      return json(route, [{ name: 'sum', may_manage: true }]);
     }
     if (path === '/api/v1/orgs/acme/contests/spring/organise/tasks') {
       return json(route, [
@@ -307,8 +341,24 @@ async function stubOrganiserApi(page: Page) {
     if (path === task) return json(route, taskState());
     if (path === `${task}/publications`) return json(route, []);
     if (path === `${task}/history`) return json(route, []);
+    if (path === `${task}/draft-runs` && request.method() === 'POST') {
+      const body = request.postDataJSON() as Schemas['DraftRunsRequest'];
+      return json(route, draftRunsOf(body.repeat));
+    }
+    if (path === `${task}/settings`) {
+      return json(
+        route,
+        settingsOf(
+          state.taskValues ?? taskValuesOf(state.taskYaml) ?? {},
+          `token-task-${String(state.published)}`,
+        ),
+      );
+    }
     if (path === `${task}/save` && request.method() === 'POST') {
-      state.taskSaves.push(request.postDataJSON());
+      const body = request.postDataJSON() as Schemas['SaveRequest'];
+      state.taskSaves.push(body);
+      const values = body.changes.find((change) => change.path === 'task.yaml')?.values;
+      if (values != null) state.taskValues = values;
       state.published += 1;
       return json(route, {
         number: state.published,
@@ -533,7 +583,7 @@ test('an organiser opens a contest from its checklist', async ({ page }) => {
   await dialog.getByRole('button', { name: 'Open the contest' }).click();
 
   await expect(status.getByRole('button', { name: 'Back to draft' })).toBeVisible();
-  expect(state.contestYaml).toContain('state: published');
+  expect(state.contestValues).toMatchObject({ state: 'published' });
 });
 
 test('an organiser sets a task up on its cards and saves them in one save', async ({
@@ -565,9 +615,9 @@ test('an organiser sets a task up on its cards and saves them in one save', asyn
     'The time limit changes.',
   );
   await expect(answer).not.toContainText('It changes how the task grades');
-  const [saved] = state.taskSaves as { changes: { path: string; content: string }[] }[];
+  const [saved] = state.taskSaves as Schemas['SaveRequest'][];
   expect(saved?.changes.map((change) => change.path)).toEqual(['task.yaml']);
-  expect(saved?.changes[0]?.content).toContain('time_limit: 3');
+  expect(saved?.changes[0]?.values).toMatchObject({ inputs: { time_limit: 3 } });
 });
 
 test('an organiser follows the failed gradings from the contest page', async ({
@@ -820,7 +870,7 @@ test('a new workflow asks only for its owner and name and opens an empty draft',
     route.fulfill({ json: [] }),
   );
   await page.route('**/api/v1/workflows/check', (route) =>
-    route.fulfill({ json: { problems: [{ path: 'steps', message }] } }),
+    route.fulfill({ json: { problems: [{ path: ['steps'], message }] } }),
   );
   await page.goto('/workflows');
   await page.getByRole('button', { name: 'New workflow', exact: true }).click();

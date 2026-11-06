@@ -85,7 +85,15 @@ export function DangerZone() {
 
             {apiError !== null && (
               <div className={classes.problem}>
-                <ErrorBlock error={apiError} compact />
+                <ErrorBlock
+                  error={apiError}
+                  compact
+                  heading={
+                    action === 'delete'
+                      ? 'Couldn’t delete the account'
+                      : 'Couldn’t deactivate the account'
+                  }
+                />
                 {scopes.length > 0 && (
                   <ul className={classes.named}>
                     {scopes.map((scope) => (

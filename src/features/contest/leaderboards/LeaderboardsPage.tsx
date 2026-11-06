@@ -4,8 +4,6 @@ import type { components } from '@/api/schema';
 import { taskPagePath } from '@/lib/contest-paths';
 import { useContestParams } from '@/lib/route-params';
 import { entrantGradingsPath } from '@/lib/sections';
-import { contestStaff } from '@/lib/viewer';
-import { useSession } from '@/session';
 import { BodyText } from '@/ui/BodyText';
 import { Page, PageHeader } from '@/ui/Page';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
@@ -65,9 +63,6 @@ function OneBoard({
   leaderboard: string;
   signedIn: boolean;
 }) {
-  const session = useSession();
-  const staff =
-    session.status === 'signed-in' && contestStaff(org, contest, session.me.roles);
   const query = $api.useQuery(
     'get',
     signedIn
@@ -82,15 +77,11 @@ function OneBoard({
       view={view.state === 'ready' ? { ...view, data: [view.data] } : view}
       org={org}
       contest={contest}
-      staff={staff}
     />
   );
 }
 
 function SignedInBoards({ org, contest }: { org: string; contest: string }) {
-  const session = useSession();
-  const staff =
-    session.status === 'signed-in' && contestStaff(org, contest, session.me.roles);
   const query = $api.useQuery(
     'get',
     '/api/v1/orgs/{org}/contests/{contest}/leaderboards',
@@ -99,7 +90,7 @@ function SignedInBoards({ org, contest }: { org: string; contest: string }) {
     },
     { refetchInterval: POLL_MS },
   );
-  return <Boards view={queryView(query)} org={org} contest={contest} staff={staff} />;
+  return <Boards view={queryView(query)} org={org} contest={contest} />;
 }
 
 function PublicBoards({ org, contest }: { org: string; contest: string }) {
@@ -111,26 +102,25 @@ function PublicBoards({ org, contest }: { org: string; contest: string }) {
     },
     { refetchInterval: POLL_MS },
   );
-  return <Boards view={queryView(query)} org={org} contest={contest} staff={false} />;
+  return <Boards view={queryView(query)} org={org} contest={contest} />;
 }
 
 function Boards({
   view,
   org,
   contest,
-  staff,
 }: {
   view: QueryView<Leaderboard[]>;
   org: string;
   contest: string;
-  staff: boolean;
 }) {
   if (view.state === 'loading') return <PageSkeleton />;
   if (view.state === 'error')
     return <ErrorBlock error={view.error} onRetry={view.retry} />;
-  // Staff open the entrant's submissions to the task; anyone else, who
-  // reads only their own row, their own submission.
-  const open = (task: string, number: number, entrant: string) =>
+  // Staff, as the server says on each board, open the entrant's submissions
+  // to the task; anyone else, who reads only their own row, their own
+  // submission.
+  const open = (staff: boolean) => (task: string, number: number, entrant: string) =>
     staff
       ? entrantGradingsPath(org, contest, task, entrant)
       : `${taskPagePath(org, contest, task)}${submissionHref(number)}`;
@@ -144,8 +134,7 @@ function Boards({
           <LeaderboardTable
             key={board.key}
             board={board}
-            submissionTo={open}
-            staff={staff}
+            submissionTo={open(board.staff)}
           />
         ))
       )}

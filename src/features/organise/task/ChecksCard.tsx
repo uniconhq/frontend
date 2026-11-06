@@ -9,9 +9,10 @@ import {
   entrantInputs,
   freshKey,
   perRunEntrant,
-  runsOf,
   type CheckDraft,
 } from './scoring-model';
+import { useDraftRuns } from './draft-runs';
+import type { TaskPlace } from './build-data';
 import classes from './task.module.css';
 
 const VERDICTS = [
@@ -29,15 +30,17 @@ const VERDICTS = [
  * it should get. A task with none saves as any other.
  */
 export function ChecksCard({
+  place,
   values,
   disabled,
   onChange,
 }: {
+  place: TaskPlace;
   values: TaskValues;
   disabled: boolean;
   onChange: (checks: CheckDraft[]) => void;
 }) {
-  const rows = runsOf(values.axes);
+  const rows = useDraftRuns(place, values.axes, values.inputs).runs?.runs ?? [];
   const once = entrantInputs(values.inputs);
   const perRun = perRunEntrant(values.inputs, values.axes);
   const set = (checks: CheckDraft[]) => onChange(checks);

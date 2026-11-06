@@ -1,7 +1,7 @@
 import { specCatalogue } from '../src/test/catalogue';
 import { expect, test, type Page, type Route } from '@playwright/test';
-import { parse } from 'yaml';
 import type { components } from '../src/api/schema';
+import { contestFileOf, contestValuesOf, settingsOf } from './settings';
 
 type Schemas = components['schemas'];
 
@@ -9,7 +9,7 @@ const CATALOGUE = specCatalogue();
 
 /**
  * A contest manager writes the course gradebook, the olympiad leaderboard
- * and ICPC, and a hold, into contest.yaml. The API is stubbed.
+ * and ICPC, and a hold, into the contest's settings. The API is stubbed.
  */
 
 const START = [
@@ -31,7 +31,12 @@ function json(route: Route, body: unknown, status = 200) {
 }
 
 async function stub(page: Page) {
-  const state = { yaml: START, saves: 0 };
+  const state = {
+    yaml: START,
+    /** The settings as last saved, or none while `yaml` holds them. */
+    values: null as Record<string, unknown> | null,
+    saves: 0,
+  };
 
   await page.route('**/api/v1/**', (route) => {
     if (route.request().method() === 'GET') return json(route, []);
@@ -52,17 +57,37 @@ async function stub(page: Page) {
       roles: [
         { names: { org: 'acme', contest: 'spring', task: null }, role: 'manager' },
       ],
+      orgs: ['acme'],
+      workflow_owners: ['kenny'],
       degraded: false,
     } satisfies Schemas['Me']),
   );
   await page.route('**/api/v1/blocks', (route) => json(route, CATALOGUE));
+  await page.route('**/api/v1/orgs/acme/contests', (route) =>
+    json(route, [
+      {
+        name: 'spring',
+        state: 'draft',
+        start: '2030-10-01T09:00:00Z',
+        end: '2030-10-01T14:00:00Z',
+        may: {
+          manage: true,
+          edit_admin_settings: false,
+          locked_keys: ['name', 'description', 'state', 'visibility', 'registration'],
+          see_people: true,
+          manage_people: true,
+          give_admin: false,
+        },
+      },
+    ] satisfies Schemas['ListedContest'][]),
+  );
   await page.route('**/api/v1/orgs/acme/contests/spring/organise/entrants', (route) =>
     json(route, []),
   );
-  await page.route(/\/files\/contest\.yaml$/, (route) => {
+  await page.route(/\/contests\/spring\/settings$/, (route) => {
     const request = route.request();
     if (request.method() === 'PUT') {
-      state.yaml = (request.postDataJSON() as { content: string }).content;
+      state.values = (request.postDataJSON() as Schemas['WriteSettings']).values;
       state.saves += 1;
       if (state.saves > 1) {
         return route.fulfill({
@@ -76,7 +101,7 @@ async function stub(page: Page) {
             code: 'invalid_definition',
             errors: [
               {
-                path: 'leaderboards.icpc.columns.solved',
+                path: ['leaderboards', 'icpc', 'columns', 'solved'],
                 message: 'This column is refused.',
               },
             ],
@@ -85,14 +110,13 @@ async function stub(page: Page) {
       }
       return json(route, { version: 'v1', notes: [] } satisfies Schemas['Written']);
     }
-    return json(route, {
-      path: 'contest.yaml',
-      encoding: 'utf-8',
-      content: state.yaml,
-      token: `token-${String(state.saves)}`,
-      upload: null,
-      version: 'v0',
-    } satisfies Schemas['FileContent']);
+    return json(
+      route,
+      settingsOf(
+        state.values ?? contestValuesOf(state.yaml),
+        `token-${String(state.saves)}`,
+      ),
+    );
   });
   return state;
 }
@@ -146,7 +170,7 @@ test('writes the three leaderboards and a hold, and marks a refused column', asy
   await page.getByRole('button', { name: 'Save' }).click();
   await expect(page.getByText('Saved.')).toBeVisible();
 
-  const saved = parse(state.yaml) as {
+  const saved = contestFileOf(state.values ?? {}) as {
     leaderboards: Record<
       string,
       { title?: string; audience?: { who?: string; rows?: string }; sort?: unknown }
@@ -211,15 +235,14 @@ test('a column’s flow shows its task and its picked column, and its tray uses 
       summary: {text: hello}
       recent: {block: latest, from: {results: sum}}
 `;
-  await page.route('**/tasks/sum/files/task.yaml', (route) =>
-    json(route, {
-      path: 'task.yaml',
-      content: 'name: Sum\nscoring: {values: {points: 1}}\n',
-      encoding: 'utf-8',
-      token: 't',
-      version: 'v',
-      upload: null,
-    } satisfies Schemas['FileContent']),
+  await page.route('**/tasks/sum/settings', (route) =>
+    json(
+      route,
+      settingsOf(
+        { name: 'Sum', scoring: { values: [{ name: 'points', formula: 1 }] } },
+        't',
+      ),
+    ),
   );
   await page.route('**/tasks/sum/workflow-form', (route) =>
     json(route, {

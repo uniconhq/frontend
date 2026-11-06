@@ -30,7 +30,7 @@ describe('the workflow files', () => {
             ? []
             : [
                 {
-                  path: 'steps[0].with.source',
+                  path: ['steps', 0, 'with', 'source'],
                   message: 'There is no file scorer/main.py in this workflow.',
                 },
               ],
@@ -230,6 +230,7 @@ describe('the workflow files', () => {
             kind: 'file',
             token: 'score-token',
             size: 9,
+            href: '/-/downloads/workflows/kenny/tuned/draft/score.py',
             upload: null,
             version: 'old',
             start: null,
@@ -239,6 +240,7 @@ describe('the workflow files', () => {
             kind: 'file',
             token: 'big-token',
             size: 130,
+            href: '/-/downloads/workflows/kenny/tuned/draft/big%20input.bin',
             upload: { size: 5_000_000, digest: 'a'.repeat(64) },
             version: 'old',
             start: null,
@@ -253,6 +255,7 @@ describe('the workflow files', () => {
               encoding: 'utf-8',
               token: 'score-token',
               upload: null,
+              href: '/-/downloads/workflows/kenny/tuned/draft/score.py',
               version: 'old',
             })
           : HttpResponse.json({
@@ -260,6 +263,7 @@ describe('the workflow files', () => {
               content: 'pointer',
               encoding: 'utf-8',
               token: 'big-token',
+              href: '/-/downloads/workflows/kenny/tuned/draft/big%20input.bin',
               upload: { size: 5_000_000, digest: 'a'.repeat(64) },
               version: 'old',
             }),

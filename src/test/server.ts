@@ -4,6 +4,8 @@ import { expect } from 'vitest';
 import { http, HttpResponse } from 'msw';
 import type { ContestHome, Me, SessionInfo } from '@/api/types';
 import type { components } from '@/api/schema';
+import { draftRunsOf } from './draft-runs';
+import { listedContests, orgMay, taskDetail } from './may';
 
 /**
  * A fake backend for the tests, so they exercise the real client, the real
@@ -22,6 +24,8 @@ export const someone: Me = {
     { names: { org: 'acme', contest: null, task: null }, role: 'admin' },
     { names: { org: 'acme', contest: 'spring', task: null }, role: 'manager' },
   ],
+  orgs: ['acme'],
+  workflow_owners: ['kenny', 'acme'],
   degraded: false,
 };
 
@@ -100,15 +104,7 @@ const noHolders = [
     }),
   ),
   http.get('/api/v1/orgs/:org/contests/:contest/tasks/:task', () =>
-    HttpResponse.json({
-      draft: false,
-      errors: [],
-      head: 'v1',
-      head_statement_written: false,
-      latest: null,
-      statement_written: false,
-      results: { released: false, history: [] },
-    }),
+    HttpResponse.json(taskDetail()),
   ),
   http.get('/api/v1/orgs/:org/contests/:contest/tasks/:task/organise/queue', () =>
     HttpResponse.json([]),
@@ -152,6 +148,15 @@ const nothingPreviewed = http.post(
   },
 );
 
+/** A draft's runs crossed as the forge crosses them, first axis outermost. */
+const draftRunsCrossed = http.post(
+  '/api/v1/orgs/:org/contests/:contest/tasks/:task/draft-runs',
+  async ({ request }) => {
+    const { repeat } = (await request.json()) as { repeat: unknown[] };
+    return HttpResponse.json(draftRunsOf(repeat));
+  },
+);
+
 /** No grading of any task yet, until a test says there is one. */
 const noGradings = http.get(
   '/api/v1/orgs/:org/contests/:contest/tasks/:task/gradings',
@@ -174,10 +179,15 @@ const emptyOrganising = [
   http.get('/api/v1/orgs/:org/contests/:contest/organise/tasks', () =>
     HttpResponse.json([]),
   ),
-  /** An org with no display name of its own nor description, until a test gives one. */
+  /**
+   * An org with no display name of its own nor description, until a test
+   * gives one, and its contests spring and autumn, each telling its admin
+   * they may do everything.
+   */
   http.get('/api/v1/orgs/:org', () =>
-    HttpResponse.json({ display_name: null, description: '' }),
+    HttpResponse.json({ display_name: null, description: '', may: orgMay('admin') }),
   ),
+  http.get('/api/v1/orgs/:org/contests', () => HttpResponse.json(listedContests())),
   /** Nobody registered for any contest, until a test registers someone. */
   http.get('/api/v1/orgs/:org/contests/:contest/organise/entrants', () =>
     HttpResponse.json([]),
@@ -303,6 +313,7 @@ export const server = setupServer(
   ...noInvites,
   noGradings,
   nothingPreviewed,
+  draftRunsCrossed,
   ...emptyOrganising,
   ...noThreads,
   ...noBoards,

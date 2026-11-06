@@ -1,6 +1,6 @@
 import { isMap, isSeq, LineCounter, parseDocument, type Node } from 'yaml';
 import type { LineRange } from '@/ui/CodeEditor';
-import { YAML_OPTIONS } from '../forms/yaml-doc';
+import { YAML_OPTIONS } from './yaml-doc';
 import type { Workflow } from './model';
 
 /**

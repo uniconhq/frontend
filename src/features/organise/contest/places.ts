@@ -1,16 +1,17 @@
 import { contestPath } from '@/lib/organiser-paths';
 import { contestSectionPath } from '@/lib/sections';
 import { letterOf } from '../forms/contest-values';
-import { exactJS, isRecord, parseYaml, textOf } from '../forms/yaml-doc';
+import { entriesAt, textOf, type Values } from '../forms/values';
+import type { ProblemPath } from '../problem-path';
 
 /**
  * Where on the contest's pages each of its settings is changed, so a save
- * refused for a setting names it in words and opens it, and the merge of two
- * saves names each setting the same way. A refusal names a setting by its
- * place in the settings file (`tasks[1].due`); that place is turned here
- * into the page, the part of the page and the field, and the words for
- * them: "Tasks, B: Due". Each is said in the words its page shows, and a
- * leaderboard by the name its card is headed with.
+ * refused for a setting names it in words and opens it. A refusal names a
+ * setting by its keys and list indices in the settings file
+ * (`["tasks", 1, "due"]`); that place is turned here into the page, the part
+ * of the page and the field, and the words for them: "Tasks, B: Due". Each is
+ * said in the words its page shows, and a leaderboard by the name its card
+ * is headed with.
  */
 
 /** The part of the contest's pages a setting is changed on. */
@@ -28,23 +29,6 @@ export type ContestPlace = {
   /** Which task, board or way the field belongs to, by its place in its list. */
   item: number | null;
 };
-
-/** A setting's place as the forge writes it, split: `tasks[1].due` is `tasks`, 1, `due`. */
-export function stepsOf(path: string): (string | number)[] {
-  const steps: (string | number)[] = [];
-  for (const part of path.split('.')) {
-    if (part === '') continue;
-    const found = /^([^[]*)((?:\[\d+\])*)$/.exec(part);
-    if (found === null) {
-      steps.push(part);
-      continue;
-    }
-    const [, key = '', indices = ''] = found;
-    if (key !== '') steps.push(key);
-    for (const index of indices.matchAll(/\[(\d+)\]/g)) steps.push(Number(index[1]));
-  }
-  return steps;
-}
 
 const SETTINGS: Record<string, [string, string]> = {
   name: ['Basics', 'Name'],
@@ -79,7 +63,7 @@ const WAY: Record<string, string> = {
   email_pattern: 'Email pattern',
 };
 
-export const TASK_FIELDS: Record<string, string> = {
+const TASK_FIELDS: Record<string, string> = {
   id: 'Task',
   release_at: 'Opens',
   due: 'Due',
@@ -87,24 +71,19 @@ export const TASK_FIELDS: Record<string, string> = {
   marks: 'Submissions each entrant may mark',
 };
 
-/** Each leaderboard's name by its key, as the settings in `text` give it. */
+/** Each leaderboard's name by its key. */
 export type BoardNames = Readonly<Record<string, string>>;
 
 /**
  * The name each leaderboard of the settings is given, by its key: the name
- * its card is headed with. One with no name, or settings that cannot be
- * read, are left out, to be named by their key.
+ * its card is headed with. One with no name is left out, to be named by its
+ * key.
  */
-export function boardNames(text: string): BoardNames {
-  const parsed = parseYaml(text);
-  if ('error' in parsed) return {};
-  const root = exactJS(parsed.doc);
-  const boards = isRecord(root) ? root['leaderboards'] : undefined;
-  if (!isRecord(boards)) return {};
+export function boardNames(values: Values): BoardNames {
   const names: Record<string, string> = {};
-  for (const [key, board] of Object.entries(boards)) {
-    const title = isRecord(board) ? textOf(board['title']).trim() : '';
-    if (title !== '') names[key] = title;
+  for (const board of entriesAt(values, ['leaderboards']) ?? []) {
+    const title = textOf(board['title']).trim();
+    if (title !== '') names[textOf(board['key'])] = title;
   }
   return names;
 }
@@ -114,9 +93,8 @@ export function boardNames(text: string): BoardNames {
  * changed. The file as a whole, or a setting no page has, is the settings
  * page as a whole. `names` gives the leaderboards' names, by key.
  */
-export function contestPlace(path: string, names: BoardNames = {}): ContestPlace {
-  const steps = stepsOf(path);
-  const [top, second, third, fourth] = steps;
+export function contestPlace(path: ProblemPath, names: BoardNames = {}): ContestPlace {
+  const [top, second, third, fourth, fifth] = path;
   const whole: ContestPlace = {
     part: 'settings',
     label: 'Settings',
@@ -152,7 +130,7 @@ export function contestPlace(path: string, names: BoardNames = {}): ContestPlace
     if (second === 'ways' && typeof third === 'number') {
       // A way is `{invite: {...}}` or `{signup: {...}}`: its field is under its kind.
       const field =
-        typeof fourth === 'string' && typeof steps[4] === 'string' ? steps[4] : null;
+        typeof fourth === 'string' && typeof fifth === 'string' ? fifth : null;
       const named = field === null ? undefined : WAY[field];
       const way = `How people enter, way ${String(third + 1)}`;
       return {
@@ -204,7 +182,7 @@ export function contestPlace(path: string, names: BoardNames = {}): ContestPlace
 }
 
 /** A leaderboard's parts, as its card heads them or labels their fields. */
-export const BOARD_PARTS: Record<string, string> = {
+const BOARD_PARTS: Record<string, string> = {
   title: 'Name',
   columns: 'Columns',
   sort: 'Ranking',
@@ -232,7 +210,7 @@ function leaderboardPlace(
   if (third === 'columns' && typeof fourth === 'string') {
     return {
       part: 'boards',
-      label: `${board}: ${fourth}`,
+      label: `${board}: ${fourth === '' ? 'A column with no name' : fourth}`,
       field: `${key}.columns.${fourth}`,
       item: null,
     };

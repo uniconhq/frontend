@@ -1,5 +1,4 @@
-import { isApiError, toApiError } from '@/api/problem';
-import type { FeedEntry, GradingStatus, Rejudged } from '@/api/types';
+import type { FeedEntry, Rejudged } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
 import { Modal } from '@/ui/Modal';
@@ -9,7 +8,7 @@ import { PageLink } from '@/ui/PageLink';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { submissionsWords } from '@/ui/scored/scored-text';
 import { contestSectionPath } from '@/lib/sections';
-import { STATUS, UNFINISHED, submitterOf } from './feed';
+import { UNFINISHED, submitterOf } from './feed';
 import { regradeSearch } from './regrades';
 import type { Asking } from './use-grading-actions';
 import shared from '../organise.module.css';
@@ -214,81 +213,17 @@ function OverLimitRetry({
   );
 }
 
-type Words = Partial<Record<string, { title: string; fallback: string }>>;
-
-/**
- * Why a cancel or a retry was refused, in the dialog's own words, the
- * backend's sentence in place of the fallback when it gives one.
- */
-const CANCEL_REFUSED: Words = {
-  invalid_reason: {
-    title: 'That sentence will not do',
-    fallback: `Give the entrant a sentence of 1 to ${String(REASON_MAX)} characters.`,
-  },
-  wrong_status: {
-    title: 'It no longer reads as failed on Unicon’s side',
-    fallback: 'Only a grading that failed on Unicon’s side can be cancelled.',
-  },
-  conflict: {
-    title: 'A later attempt is there',
-    fallback: 'Only the latest attempt of a submission can be cancelled.',
-  },
+const REFUSED_HEADING: Record<Asking['kind'], string> = {
+  cancel: 'Couldn’t cancel',
+  retry: 'Couldn’t retry',
+  rejudge: 'Couldn’t rejudge',
 };
 
-const RETRY_REFUSED: Words = {
-  wrong_status: {
-    title: 'It cannot be retried',
-    fallback:
-      'Only a finished grading can be retried, and never a submission the organisers cancelled.',
-  },
-  conflict: {
-    title: 'Not the attempt to retry',
-    fallback:
-      'Only the latest attempt of a submission can be retried, once no attempt of it is being graded.',
-  },
-};
-
-const REFUSED: Record<Asking['kind'], Words> = {
-  cancel: CANCEL_REFUSED,
-  retry: RETRY_REFUSED,
-  rejudge: {},
-};
-
-/** A status a refusal names, in the feed's words when it is one of them. */
-function statusNow(status: string): string {
-  return Object.hasOwn(STATUS, status) ? STATUS[status as GradingStatus] : status;
-}
-
-/** A refusal in the dialog. A rejudge with nothing published to grade against says so. */
+/** A refusal in the dialog, in the server's words. */
 function Refusal({ asking, error }: { asking: Asking; error: unknown }) {
-  if (asking.kind === 'rejudge' && isApiError(error) && error.code === 'not_found') {
-    return (
-      <div role="alert">
-        <BodyText tone="secondary">Nothing to rejudge against</BodyText>
-        <BodyText tone="secondary">
-          The task has not been published yet. Its first save without problems publishes
-          it.
-        </BodyText>
-      </div>
-    );
-  }
-  const refused = toApiError(error);
-  const words = REFUSED[asking.kind][refused.code];
-  if (words !== undefined) {
-    const current = refused.extensions['current'];
-    return (
-      <div role="alert">
-        <BodyText tone="secondary">{words.title}</BodyText>
-        <BodyText tone="secondary">{refused.detail ?? words.fallback}</BodyText>
-        {refused.code === 'wrong_status' && typeof current === 'string' && (
-          <BodyText tone="secondary">Its status now: {statusNow(current)}.</BodyText>
-        )}
-      </div>
-    );
-  }
   return (
     <div role="alert">
-      <ErrorBlock error={error} compact />
+      <ErrorBlock error={error} compact heading={REFUSED_HEADING[asking.kind]} />
     </div>
   );
 }

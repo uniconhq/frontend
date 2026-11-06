@@ -1,38 +1,29 @@
 import { publicPathOf } from '@/lib/task-pictures';
+import type { Pictures } from '@/api/types';
 import { formatLimit } from '@/lib/size';
 
 /**
- * The endings of the pictures a statement can show: the ones the backend
- * serves a task's `public/` file as a picture by; any other it serves as
- * bytes, which no page draws.
+ * Why a file chosen cannot be a statement's picture, in words, or null when
+ * it can, by the limits the server gives with the task.
  */
-const PICTURE_ENDINGS = new Set([
-  'png',
-  'jpg',
-  'jpeg',
-  'gif',
-  'webp',
-  'avif',
-  'apng',
-  'bmp',
-  'ico',
-  'svg',
-]);
-
-/** The most a picture under `public/` may be for a page to show it: the forge's limit. */
-const PICTURE_MOST = 10 * 1024 * 1024;
-
-/** Why a file chosen cannot be a statement's picture, in words, or null when it can. */
-export function pictureRefusal(file: File): string | null {
+export function pictureRefusal(file: File, pictures: Pictures): string | null {
   const dot = file.name.lastIndexOf('.');
   const ending = dot < 0 ? '' : file.name.slice(dot + 1).toLowerCase();
-  if (!PICTURE_ENDINGS.has(ending)) {
-    return `${file.name} is not a picture this page can show. Choose a PNG, JPEG, GIF, WebP, AVIF, APNG, BMP, ICO or SVG file.`;
+  if (!pictures.endings.includes(ending)) {
+    return `${file.name} is not a picture this page can show. Choose a file ending in ${picturesAllowed(pictures)}.`;
   }
-  if (file.size > PICTURE_MOST) {
-    return `${file.name} is larger than ${formatLimit(PICTURE_MOST)}, the most a picture may be. Make it smaller first.`;
+  if (file.size > pictures.most) {
+    return `${file.name} is larger than ${formatLimit(pictures.most)}, the most a picture may be. Make it smaller first.`;
   }
   return null;
+}
+
+/** The endings allowed, in words: ".png, .jpg or .svg". */
+export function picturesAllowed(pictures: Pictures): string {
+  const named = pictures.endings.map((ending) => `.${ending}`);
+  const last = named.pop();
+  if (last === undefined) return 'none';
+  return named.length === 0 ? last : `${named.join(', ')} or ${last}`;
 }
 
 /**

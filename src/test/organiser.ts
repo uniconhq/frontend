@@ -2,15 +2,18 @@ import { http, HttpResponse } from 'msw';
 import type {
   FileContent,
   ListedContest,
-  Named,
+  ListedTask,
   Outcome,
   Publication,
   RunsResult,
   SaveEffect,
+  Settings,
+  WriteSettings,
   TaskStanding,
   TaskState,
   TreeEntry,
 } from '@/api/types';
+import { PICTURES, listedContests, taskMay } from './may';
 import { problem } from './server';
 
 /**
@@ -28,19 +31,20 @@ export const TASK_API = `${CONTEST_API}/tasks/:task`;
 /** The org's contests as the list gives them, both drafts in October 2026. */
 export const contests: ListedContest[] = [
   {
-    name: 'autumn',
-    state: 'draft',
+    ...listedContests()[0]!,
     start: '2026-10-20T09:00:00Z',
     end: '2026-10-20T14:00:00Z',
   },
   {
-    name: 'spring',
-    state: 'draft',
+    ...listedContests()[1]!,
     start: '2026-10-01T09:00:00Z',
     end: '2026-10-01T14:00:00Z',
   },
 ];
-const tasks: Named[] = [{ name: 'sort' }, { name: 'sum' }];
+const tasks: ListedTask[] = [
+  { name: 'sort', may_manage: true },
+  { name: 'sum', may_manage: true },
+];
 
 export const contestList = http.get(`${ORG_API}/contests`, () =>
   HttpResponse.json(contests),
@@ -138,6 +142,7 @@ export const publishedTask: TaskState = {
   head_statement_written: true,
   toolchains: {},
   results: { history: [], released: false },
+  may: taskMay('admin'),
 };
 
 export const draftTask: TaskState = {
@@ -146,7 +151,7 @@ export const draftTask: TaskState = {
   draft: true,
   errors: [
     {
-      path: 'inputs.setter[0].value',
+      path: ['inputs', 'setter', 0, 'value'],
       message: 'There is no file under data/hidden/ in the task.',
     },
   ],
@@ -154,9 +159,12 @@ export const draftTask: TaskState = {
   head_statement_written: true,
   toolchains: {},
   results: { history: [], released: false },
+  may: taskMay('admin'),
 };
 
-export const taskState = http.get(TASK_API, () => HttpResponse.json(publishedTask));
+export const taskState = http.get(TASK_API, () =>
+  HttpResponse.json({ ...publishedTask, pictures: PICTURES }),
+);
 export const publicationList = http.get(`${TASK_API}/publications`, () =>
   HttpResponse.json(publications),
 );
@@ -203,6 +211,9 @@ export const standingList = http.get(`${CONTEST_API}/organise/tasks`, () =>
 
 // Repo files
 
+/** Where the download door serves the sum task's files. */
+const DOWNLOADS = '/-/downloads/acme/spring/sum';
+
 /** The commit every listed file was last changed at. */
 const LISTED_AT = '9f8e7d6c5b4a39281706f5e4d3c2b1a098765432';
 
@@ -217,6 +228,7 @@ const taskTree: Record<string, TreeEntry[]> = {
       start: null,
       token: null,
       version: LISTED_AT,
+      href: `${DOWNLOADS}/versions/${LISTED_AT}/task.yaml`,
     },
     {
       path: 'data',
@@ -226,6 +238,7 @@ const taskTree: Record<string, TreeEntry[]> = {
       start: null,
       token: null,
       version: null,
+      href: null,
     },
     {
       path: 'statement.md',
@@ -235,6 +248,7 @@ const taskTree: Record<string, TreeEntry[]> = {
       start: null,
       token: null,
       version: LISTED_AT,
+      href: `${DOWNLOADS}/versions/${LISTED_AT}/statement.md`,
     },
   ],
   data: [
@@ -246,6 +260,7 @@ const taskTree: Record<string, TreeEntry[]> = {
       start: null,
       token: null,
       version: null,
+      href: null,
     },
   ],
   'data/testcases': [
@@ -257,6 +272,7 @@ const taskTree: Record<string, TreeEntry[]> = {
       start: null,
       token: null,
       version: LISTED_AT,
+      href: `${DOWNLOADS}/versions/${LISTED_AT}/data/testcases/1.in`,
     },
     {
       path: 'data/testcases/logo.png',
@@ -266,6 +282,7 @@ const taskTree: Record<string, TreeEntry[]> = {
       start: null,
       token: null,
       version: LISTED_AT,
+      href: `${DOWNLOADS}/versions/${LISTED_AT}/data/testcases/logo.png`,
     },
   ],
 };
@@ -280,6 +297,7 @@ const contestTree: Record<string, TreeEntry[]> = {
       start: null,
       token: null,
       version: LISTED_AT,
+      href: null,
     },
   ],
 };
@@ -292,6 +310,7 @@ export const files: Record<string, FileContent> = {
     token: 'token-task-yaml',
     upload: null,
     version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
+    href: `${DOWNLOADS}/versions/3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d/task.yaml`,
   },
   'statement.md': {
     path: 'statement.md',
@@ -300,6 +319,7 @@ export const files: Record<string, FileContent> = {
     token: 'token-statement',
     upload: null,
     version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
+    href: `${DOWNLOADS}/versions/3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d/statement.md`,
   },
   'data/testcases/1.in': {
     path: 'data/testcases/1.in',
@@ -308,6 +328,7 @@ export const files: Record<string, FileContent> = {
     token: 'token-1-in',
     upload: null,
     version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
+    href: `${DOWNLOADS}/versions/3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d/data/testcases/1.in`,
   },
   'data/testcases/logo.png': {
     path: 'data/testcases/logo.png',
@@ -316,6 +337,7 @@ export const files: Record<string, FileContent> = {
     token: 'token-logo',
     upload: null,
     version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
+    href: `${DOWNLOADS}/versions/3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d/data/testcases/logo.png`,
   },
   'contest.yaml': {
     path: 'contest.yaml',
@@ -334,6 +356,7 @@ export const files: Record<string, FileContent> = {
     token: 'token-contest-yaml',
     upload: null,
     version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
+    href: null,
   },
 };
 
@@ -357,10 +380,88 @@ function fileAnswer({ params }: { params: Record<string, unknown> }) {
     : HttpResponse.json(file);
 }
 
-/** Both repos' trees and files, read-only; a test adds the writes it needs. */
+/** Settings as the server answers them for a form, read at `token`. */
+export function settingsOf(
+  values: Record<string, unknown> | null,
+  token: string | null = 'token-contest-yaml',
+): Settings {
+  return {
+    values,
+    unreadable: values === null ? 'The file does not hold named settings.' : null,
+    token,
+    version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
+  };
+}
+
+/** The contest's settings as values: `contest.yaml` above. */
+export const contestValues = {
+  name: 'Spring',
+  start: '2026-10-01T09:00:00Z',
+  end: '2026-10-15T09:00:00Z',
+  state: 'draft',
+  visibility: 'signed-in',
+  tasks: [{ id: 'sort' }, { id: 'sum' }],
+};
+
+/**
+ * The contest's settings, read and saved as values, holding `current`. Each
+ * save is taken and the settings become its values, except that with
+ * `conflictWith` the first is refused as a conflict and the settings become
+ * those instead, as if someone else had saved them; a save with a token since
+ * saved over is refused so too. Each save taken answers `notes`. `sent` holds
+ * each save's body, and `elsewhere` is someone else saving `values`. Its
+ * handlers go before `repoFiles`.
+ */
+export function contestSettings({
+  current = contestValues,
+  conflictWith,
+  notes = [],
+}: {
+  current?: Record<string, unknown> | null;
+  conflictWith?: Record<string, unknown>;
+  notes?: string[];
+} = {}) {
+  let settings = settingsOf(current, 'token-1');
+  let conflicted = conflictWith === undefined;
+  const sent: WriteSettings[] = [];
+  const handlers = [
+    http.get(`${CONTEST_API}/settings`, () => HttpResponse.json(settings)),
+    http.put(`${CONTEST_API}/settings`, async ({ request }) => {
+      const body = (await request.json()) as WriteSettings;
+      sent.push(body);
+      if (!conflicted && conflictWith !== undefined) {
+        conflicted = true;
+        settings = settingsOf(conflictWith, 'token-2');
+        return problem(409, 'conflict');
+      }
+      if (body.token !== settings.token) return problem(409, 'conflict');
+      const token = `token-${String(sent.length + 2)}`;
+      settings = settingsOf(body.values, token);
+      return HttpResponse.json({ version: `version-${token}`, notes });
+    }),
+  ];
+  const elsewhere = (values: Record<string, unknown>) => {
+    settings = settingsOf(values, 'token-elsewhere');
+  };
+  return { handlers, sent, elsewhere };
+}
+
+/** Both repos' trees, files and settings, read-only; a test adds the writes it needs. */
 export const repoFiles = [
   http.get(`${CONTEST_API}/tree`, treeAnswer(contestTree)),
   http.get(`${TASK_API}/tree`, treeAnswer(taskTree)),
   http.get(`${CONTEST_API}/files/:path`, fileAnswer),
   http.get(`${TASK_API}/files/:path`, fileAnswer),
+  http.get(`${CONTEST_API}/settings`, () =>
+    HttpResponse.json(settingsOf(contestValues)),
+  ),
+  // Each task's settings give it its own name as its title.
+  http.get(`${TASK_API}/settings`, ({ params }) =>
+    HttpResponse.json(
+      settingsOf(
+        { name: String(params['task']), workflow: 'unicon/classic@v6' },
+        'token-task-yaml',
+      ),
+    ),
+  ),
 ];

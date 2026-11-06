@@ -48,9 +48,17 @@ outputs:
   log: \${{ steps.run.log }}
 `;
 
+/** The types the server says a wire into an input port of `type` may carry. */
+export function acceptsOf(type: string): string[] {
+  if (type === 'text') return ['text', 'number', 'boolean', 'enum'];
+  if (type === 'folder') return ['file', 'folder'];
+  return ['named_files', 'programs', 'links'].includes(type) ? [] : [type];
+}
+
 function port(type: string, more: Partial<PortDecl> = {}): PortDecl {
   return {
     type,
+    accepts: acceptsOf(type),
     options: null,
     optional: false,
     runs: null,
@@ -453,7 +461,7 @@ export function workflowBackend(
   options: {
     problems?: (
       content: string,
-    ) => { path: string; message: string; step?: string | null }[];
+    ) => { path: (string | number)[]; message: string; step?: string | null }[];
     versions?: string[];
   } = {},
 ) {

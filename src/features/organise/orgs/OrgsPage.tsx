@@ -4,7 +4,6 @@ import { Page, PageHeader } from '@/ui/Page';
 import { useMe } from '@/session';
 import { orgPath } from '@/lib/organiser-paths';
 import { CreateButton } from '../Create';
-import { orgsReached } from '@/lib/reached';
 import { ROLE_LABEL } from '../roles';
 import { NEW_ORG, useCreateOrg } from './new-org';
 
@@ -43,15 +42,16 @@ function NewOrg() {
 }
 
 /**
- * The orgs this person holds a role at, read from the roles the session
- * already has, each with what they do there. A role at one contest or task
+ * The orgs this person holds a role at, as the session lists them, each
+ * with what they do there. A role at one contest or task
  * counts, since that is reached through its org. The session is loaded, or
  * failed, before this page renders, so the guard above it owns those two
  * states.
  */
 export function OrgsPage() {
-  const roles = useMe().roles;
-  const orgs = orgsReached(roles);
+  const me = useMe();
+  const roles = me.roles;
+  const orgs = me.orgs;
 
   return (
     <Page>

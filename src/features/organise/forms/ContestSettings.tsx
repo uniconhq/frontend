@@ -1,5 +1,4 @@
-import { useMe } from '@/session';
-import { holdsAt } from '../roles';
+import { usePlaceMay } from '../may';
 import { useState } from 'react';
 import { UnsavedNote } from '@/ui/UnsavedNote';
 import { LeaveGuard } from '@/ui/LeaveGuard';
@@ -11,9 +10,9 @@ import { ContestFile, FieldBox } from '../contest/ContestFile';
 import { useOpenedField } from '../contest/opened';
 import shared from '../organise.module.css';
 import { readContest, writeContest, type ContestValues } from './contest-values';
-import type { FormProps } from './DefinitionFile';
 import { Fieldset, NumberField, TimeField } from './fields';
-import { numberProblem } from './yaml-doc';
+import { numberProblem } from './values';
+import type { ValuesFormProps } from './ValuesForm';
 import classes from './forms.module.css';
 
 /** Whether the contest is entered in teams, from its most people in one entrant. */
@@ -29,7 +28,7 @@ function teamsOn(values: ContestValues): boolean {
  * cannot change them.
  */
 export function ContestSettings({ org, contest }: { org: string; contest: string }) {
-  const manager = holdsAt(useMe().roles, { kind: 'contest', org, contest }, 'manager');
+  const manager = usePlaceMay({ kind: 'contest', org, contest }).manage;
   return (
     <ContestFile org={org} contest={contest}>
       {(props) => <SettingsForm {...props} manager={manager} />}
@@ -38,14 +37,14 @@ export function ContestSettings({ org, contest }: { org: string; contest: string
 }
 
 function SettingsForm({
-  doc,
+  values: settings,
   busy,
   saved,
   onSave,
   admin,
   manager,
-}: FormProps & { admin: boolean; manager: boolean }) {
-  const [read] = useState(() => readContest(doc));
+}: ValuesFormProps & { admin: boolean; manager: boolean }) {
+  const [read] = useState(() => readContest(settings));
   const [values, setValues] = useState<ContestValues>(read.values);
   useOpenedField(true);
   const set = <K extends keyof ContestValues>(key: K, value: ContestValues[K]) =>

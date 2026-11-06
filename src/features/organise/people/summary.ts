@@ -1,10 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
 import { queryView, type QueryView } from '@/api/query';
 import type { Invite } from '@/api/types';
-import { useMe } from '@/session';
 import { count } from '../hub/count';
 import { invitesQuery } from '../invites/invites';
-import { holdsAt, type RolePlace } from '../roles';
+import { usePeopleMay } from '../may';
+import type { RolePlace } from '../roles';
 import { useHolders } from './holders';
 
 /**
@@ -14,11 +14,13 @@ import { useHolders } from './holders';
  * not shown the list, and the card says whose it is.
  */
 export function useOrganisersLine(place: RolePlace): QueryView<string> {
-  const observes = holdsAt(useMe().roles, place, 'observer');
+  const may = usePeopleMay(place);
+  const observes = may?.see_people === true;
   const holders = queryView(useHolders(place, { enabled: observes }));
   const invites = queryView(
     useQuery<Invite[]>({ ...invitesQuery(place), enabled: observes }),
   );
+  if (may === undefined) return { state: 'loading' };
   if (!observes) {
     return {
       state: 'ready',

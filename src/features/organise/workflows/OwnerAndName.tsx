@@ -1,7 +1,6 @@
 import { Select } from '@/ui/Select';
 import { TextInput } from '@/ui/TextInput';
 import { useMe } from '@/session';
-import { workflowOwners } from '../roles';
 
 /** Who a new workflow is made under, of those the person may, and its name. */
 export function OwnerAndName({
@@ -15,7 +14,7 @@ export function OwnerAndName({
   setOwner: (owner: string) => void;
   setName: (name: string) => void;
 }) {
-  const owners = workflowOwners(useMe());
+  const owners = useMe().workflow_owners;
   return (
     <>
       <Select

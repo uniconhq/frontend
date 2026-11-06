@@ -33,13 +33,15 @@ function homeStanding(): Schemas['Leaderboard'] {
       {
         name: 'points',
         decimals: null,
+        // The server leaves the bounds out for anyone but staff.
         at_least: null,
-        at_most: '100',
+        at_most: null,
         self_reported: [],
       },
     ],
     sort: [{ column: 'points', way: 'desc' }],
     dropped: [],
+    staff: false,
     held_from: null,
     rows: [
       {
@@ -91,6 +93,8 @@ async function stubContestantApi(page: Page, signedIn: boolean) {
             email: 'carol@example.org',
           },
           roles: [],
+          orgs: [],
+          workflow_owners: ['carol'],
           degraded: false,
         } satisfies Schemas['Me'])
       : json(

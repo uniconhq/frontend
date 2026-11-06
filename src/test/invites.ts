@@ -24,6 +24,7 @@ export function invite(overrides: Partial<Invite> = {}): Invite {
     contest_title: where.contest === null ? null : 'Spring 2026',
     mail_status: 'sent',
     mailed_at: '2026-09-10T10:00:05Z',
+    may_change: true,
     ...overrides,
   };
 }

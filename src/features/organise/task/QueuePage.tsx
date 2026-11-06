@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { $api, queryView } from '@/api/query';
-import { isApiError } from '@/api/problem';
+import { describeError } from '@/api/describe-error';
+import { toApiError } from '@/api/problem';
 import type { components } from '@/api/schema';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
@@ -14,12 +15,11 @@ import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
 import { MISSING } from '@/ui/number/words';
 import { ScoredResult } from '@/ui/scored/ScoredResult';
-import { useMe } from '@/session';
 import { useTaskParams } from '@/lib/route-params';
 import { TASK_SECTIONS, sectionOf } from '@/lib/sections';
 import { formatDateTime } from '@/lib/time';
 import { STATUS } from '../gradings/feed';
-import { holdsAt } from '../roles';
+import { usePlaceMay } from '../may';
 import { StaffFiles } from '../staff-read';
 import { staffText } from '../staff-text';
 import { SectionPage } from '../SectionPage';
@@ -39,14 +39,11 @@ const ENTER =
  */
 export function TaskQueuePage() {
   const { org, contest, task } = useTaskParams();
-  const manager = holdsAt(
-    useMe().roles,
-    { kind: 'task', org, contest, task },
-    'manager',
-  );
+  const manager = usePlaceMay({ kind: 'task', org, contest, task }).manage;
   return (
     <SectionPage
       place={{ kind: 'task', org, contest, task }}
+      allowed={manager}
       section={sectionOf(TASK_SECTIONS, 'marking')}
     >
       <Queue org={org} contest={contest} task={task} manager={manager} />
@@ -255,11 +252,7 @@ function MarkBox({
             },
             onError: (caught) => {
               setSaved(null);
-              setError(
-                isApiError(caught)
-                  ? (caught.detail ?? 'The mark was refused.')
-                  : 'The mark was refused.',
-              );
+              setError(describeError(toApiError(caught), 'Couldn’t save').message);
             },
           },
         );

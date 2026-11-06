@@ -1,9 +1,10 @@
 import type { DefinitionProblem } from '@/api/types';
+import type { ProblemPath } from '../problem-path';
 import type { Selected } from './lines';
 import type { Workflow } from './model';
 
 /**
- * Where a problem is pinned on the graph, from its YAML path: a step, or one
+ * Where a problem is pinned on the graph, from its keys: a step, or one
  * of its ports; an input or an output; or the head of the
  * page when it names nothing drawn.
  */
@@ -13,15 +14,16 @@ type Pin =
   | { kind: 'entry'; name: string }
   | { kind: 'page' };
 
-function pinOf(path: string): Pin {
-  const step = /^steps\[(\d+)\](?:\.with\.([^.[]+))?/.exec(path);
-  if (step?.[1] !== undefined)
-    return { kind: 'step', index: Number(step[1]), port: step[2] ?? null };
-  const keyed = /^(inputs|outputs)\.([^.[]+)/.exec(path);
-  if (keyed?.[2] !== undefined) {
-    if (keyed[1] === 'inputs') return { kind: 'input', id: keyed[2] };
-    return { kind: 'entry', name: keyed[2] };
+function pinOf(path: ProblemPath): Pin {
+  const [top, second, third, fourth] = path;
+  if (top === 'steps' && typeof second === 'number') {
+    const port = third === 'with' && typeof fourth === 'string' ? fourth : null;
+    return { kind: 'step', index: second, port };
   }
+  if (top === 'inputs' && typeof second === 'string')
+    return { kind: 'input', id: second };
+  if (top === 'outputs' && typeof second === 'string')
+    return { kind: 'entry', name: second };
   return { kind: 'page' };
 }
 
@@ -79,8 +81,8 @@ export function placed(problems: DefinitionProblem[], workflow: Workflow): Place
       workflow.outputs.some((entry) => entry.name === pin.name)
     )
       return { problem, where: `Outputs, ${pin.name}`, opens: { kind: 'outputs' } };
-    const head = /^[^.[]*/.exec(problem.path)?.[0] ?? '';
-    return { problem, where: WHOLE[head] ?? problem.path, opens: null };
+    const [head = ''] = problem.path;
+    return { problem, where: WHOLE[head] ?? problem.path.join(' › '), opens: null };
   });
 }
 
