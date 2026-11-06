@@ -56,15 +56,20 @@ export const orgMay = (held: Held): OrgMay => ORG_MAY[held ?? 'none'];
 const contestMay = (held: Held): PlaceMay => placeMay(held, CONTEST_LOCKED);
 export const taskMay = (held: Held): PlaceMay => placeMay(held, TASK_LOCKED);
 
-/** The org's contests as the list gives them by default: spring and autumn, drafts. */
-export function listedContests(held: Held = 'admin'): ListedContest[] {
-  return ['autumn', 'spring'].map((name) => ({
+/** A contest as its own read gives it by default: a draft. */
+export function listedContest(name: string, held: Held = 'admin'): ListedContest {
+  return {
     name,
     state: 'draft',
     start: '2026-10-01T09:00:00Z',
     end: '2026-10-15T09:00:00Z',
     may: contestMay(held),
-  }));
+  };
+}
+
+/** The org's contests as the list gives them by default: spring and autumn, drafts. */
+export function listedContests(held: Held = 'admin'): ListedContest[] {
+  return ['autumn', 'spring'].map((name) => listedContest(name, held));
 }
 
 /** The picture limits the backend gives with a task. */

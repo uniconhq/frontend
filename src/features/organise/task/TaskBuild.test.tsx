@@ -11,7 +11,7 @@ import type {
 } from '@/api/types';
 import { partTransfer } from '@/test/part-uploads';
 import { renderApp } from '@/test/render';
-import { CLASSIC, PRIMITIVES, workflowItem } from '@/test/workflows';
+import { CLASSIC, PRIMITIVES, versionOf, workflowItem } from '@/test/workflows';
 import { afterAnswers, problem, server, signedIn, signedInAs } from '@/test/server';
 import {
   TASK_API,
@@ -184,9 +184,9 @@ function taskBackend(
       HttpResponse.json({ items: WORKFLOWS, next: null }),
     ),
     http.get('/api/v1/workflows/:owner/:name/versions/:version', ({ params }) =>
-      HttpResponse.json({
-        content: params['name'] === 'tunable' ? TUNABLE_YAML : CHECKED_YAML,
-      }),
+      HttpResponse.json(
+        versionOf(params['name'] === 'tunable' ? TUNABLE_YAML : CHECKED_YAML),
+      ),
     ),
     http.post(`${TASK_API}/save`, async ({ request }) => {
       const body = (await request.json()) as SaveRequest;
@@ -662,9 +662,9 @@ describe('the cards that build a task', { timeout: 30_000 }, () => {
       server.use(
         http.get('/api/v1/workflows/:owner/:name/versions/:version', ({ params }) =>
           params['version'] === 'v3'
-            ? HttpResponse.json({
-                content: CHECKED_YAML.replace('  checker: file\n', ''),
-              })
+            ? HttpResponse.json(
+                versionOf(CHECKED_YAML.replace('  checker: file\n', '')),
+              )
             : undefined,
         ),
       );
@@ -717,7 +717,7 @@ describe('the cards that build a task', { timeout: 30_000 }, () => {
     server.use(
       http.get('/api/v1/primitives', () => HttpResponse.json(PRIMITIVES)),
       http.get('/api/v1/workflows/:owner/:name/versions/:version', () =>
-        HttpResponse.json({ content: CLASSIC }),
+        HttpResponse.json(versionOf(CLASSIC)),
       ),
     );
     asManager();
@@ -744,7 +744,7 @@ describe('the cards that build a task', { timeout: 30_000 }, () => {
     server.use(
       http.get('/api/v1/primitives', () => HttpResponse.json(PRIMITIVES)),
       http.get('/api/v1/workflows/:owner/:name/versions/:version', () =>
-        HttpResponse.json({ content: CLASSIC }),
+        HttpResponse.json(versionOf(CLASSIC)),
       ),
     );
     asManager();
@@ -1948,11 +1948,12 @@ repeat:
     });
     server.use(
       http.get('/api/v1/workflows/:owner/:name/versions/:version', () =>
-        HttpResponse.json({
-          content:
+        HttpResponse.json(
+          versionOf(
             CHECKED_YAML +
-            '  log: {from: "${{ steps.run.log }}", title: Compile log}\n',
-        }),
+              '  log: {from: "${{ steps.run.log }}", title: Compile log}\n',
+          ),
+        ),
       ),
       http.get('/api/v1/workflows/:owner/:name/versions/:version/box', () =>
         HttpResponse.json({

@@ -3,8 +3,8 @@ import { $api } from '@/api/query';
 import type { DeclaredInput, WorkflowForm } from '@/api/types';
 import { EDITED } from '@/live';
 import type { Place } from '../files/place';
+import { isRecord } from '../forms/values';
 import { readWorkflow } from '../workflows/model';
-import { dataOf, isRecord } from '../workflows/yaml-doc';
 
 export type TaskPlace = Extract<Place, { kind: 'task' }>;
 
@@ -42,16 +42,10 @@ export function refParts(
   return { owner, name, version };
 }
 
-/** A version's `workflow.yaml` as plain data, or null when it does not read. */
-export function workflowFileOf(text: string): unknown {
-  return dataOf(text);
-}
-
-/** A version's `workflow.yaml` as what a task's form is made of, or null when it does not read. */
-export function declaredOf(text: string): Declared | null {
-  const raw = workflowFileOf(text);
-  if (!isRecord(raw)) return null;
-  const workflow = readWorkflow(raw);
+/** A version's values as what a task's form is made of, or null when it does not read. */
+export function declaredOf(values: unknown): Declared | null {
+  if (!isRecord(values)) return null;
+  const workflow = readWorkflow(values);
   return {
     inputs: workflow.inputs.map((input) => ({
       id: input.id,
@@ -99,7 +93,7 @@ function builtFrom<T extends { queryKey: readonly unknown[] }>(options: T) {
   return { ...options, queryKey: [...options.queryKey, 'build'], meta: EDITED };
 }
 
-/** One version's `workflow.yaml`, which never changes once made. */
+/** One version's `workflow.yaml`, as text and values, which never changes once made. */
 export function useWorkflowVersion(ref: string | null) {
   const parts = ref === null ? null : refParts(ref);
   return $api.useQuery(

@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { useSearchParams } from 'react-router';
-import { $api, queryView } from '@/api/query';
+import { $api, isRefused, queryView } from '@/api/query';
 import type { OrganisedEntrant, QueueDepth } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
@@ -14,6 +14,7 @@ import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
 import { Group, Stack } from '@/ui/layout';
 import { useLiveConnected } from '@/live';
+import { useNamedTasks } from '@/session';
 import { useContestParams } from '@/lib/route-params';
 import { CONTEST_SECTIONS, sectionOf } from '@/lib/sections';
 import { useEntrants } from '../entrants/names';
@@ -44,14 +45,24 @@ const LIMIT = 100;
 type ContestPath = { org: string; contest: string };
 
 /**
- * The contest's tasks by name, for the filter. The rows carry each task's
- * letter, so the feed reads nothing else for one.
+ * The contest's tasks by name, for the filter, and those the caller manages,
+ * for Rejudge. The rows carry each task's letter, so the feed reads nothing
+ * else for one. Refused the list, the filter offers the tasks `me` names.
  */
-function useTasks(path: ContestPath) {
-  const query = $api.useQuery('get', '/api/v1/orgs/{org}/contests/{contest}/tasks', {
-    params: { path },
-  });
-  return query.data ?? [];
+function useTasks(path: ContestPath): { names: string[]; managed: string[] } {
+  const view = queryView(
+    $api.useQuery('get', '/api/v1/orgs/{org}/contests/{contest}/tasks', {
+      params: { path },
+    }),
+  );
+  const named = useNamedTasks(path.org, path.contest);
+  if (view.state === 'ready') {
+    return {
+      names: view.data.map((task) => task.name),
+      managed: view.data.filter((task) => task.may_manage).map((task) => task.name),
+    };
+  }
+  return { names: isRefused(view) ? named : [], managed: [] };
 }
 
 /** The contest's entrants, for the filter, by the name each goes by. */
@@ -300,7 +311,7 @@ export function GradingsFeedPage() {
           )}
           <FilterBar
             filters={filters}
-            tasks={tasks.map((task) => ({ value: task.name, label: task.name }))}
+            tasks={tasks.names.map((name) => ({ value: name, label: name }))}
             entrants={entrants}
           />
           <GradingsList
@@ -308,7 +319,7 @@ export function GradingsFeedPage() {
             view={view}
             showTask
             rejudge={{
-              tasks: tasks.filter((task) => task.may_manage).map((task) => task.name),
+              tasks: tasks.managed,
               task: filters.task,
             }}
             empty={

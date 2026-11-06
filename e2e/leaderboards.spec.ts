@@ -58,28 +58,41 @@ async function stub(page: Page) {
         { names: { org: 'acme', contest: 'spring', task: null }, role: 'manager' },
       ],
       orgs: ['acme'],
+      contests: [{ org: 'acme', contest: 'spring', task: null }],
+      tasks: [],
       workflow_owners: ['kenny'],
       degraded: false,
     } satisfies Schemas['Me']),
   );
   await page.route('**/api/v1/blocks', (route) => json(route, CATALOGUE));
   await page.route('**/api/v1/orgs/acme/contests', (route) =>
-    json(route, [
-      {
-        name: 'spring',
-        state: 'draft',
-        start: '2030-10-01T09:00:00Z',
-        end: '2030-10-01T14:00:00Z',
-        may: {
-          manage: true,
-          edit_admin_settings: false,
-          locked_keys: ['name', 'description', 'state', 'visibility', 'registration'],
-          see_people: true,
-          manage_people: true,
-          give_admin: false,
-        },
+    route.fulfill({
+      status: 403,
+      contentType: 'application/problem+json',
+      body: JSON.stringify({
+        type: 'about:blank',
+        title: 'Forbidden',
+        status: 403,
+        detail: 'This needs the observer role at acme.',
+        code: 'forbidden',
+      }),
+    }),
+  );
+  await page.route('**/api/v1/orgs/acme/contests/spring', (route) =>
+    json(route, {
+      name: 'spring',
+      state: 'draft',
+      start: '2030-10-01T09:00:00Z',
+      end: '2030-10-01T14:00:00Z',
+      may: {
+        manage: true,
+        edit_admin_settings: false,
+        locked_keys: ['name', 'description', 'state', 'visibility', 'registration'],
+        see_people: true,
+        manage_people: true,
+        give_admin: false,
       },
-    ] satisfies Schemas['ListedContest'][]),
+    } satisfies Schemas['ListedContest']),
   );
   await page.route('**/api/v1/orgs/acme/contests/spring/organise/entrants', (route) =>
     json(route, []),

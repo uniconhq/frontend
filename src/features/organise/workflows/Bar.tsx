@@ -48,9 +48,7 @@ export function WorkflowBar({
   const navigate = useNavigate();
   const latest = latestVersion(page.versions);
   const options = [
-    ...(page.editable && page.draft !== null
-      ? [{ value: DRAFT, label: 'The draft' }]
-      : []),
+    ...(page.editable ? [{ value: DRAFT, label: 'The draft' }] : []),
     ...newestFirst(page.versions).map((each) => ({
       value: each,
       label: `${each === latest ? `${each}, the latest version` : `Version ${each}`}${page.yanked?.[each] ? ' · Not for new tasks' : ''}`,

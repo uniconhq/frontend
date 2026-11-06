@@ -9,10 +9,9 @@ import {
   publicContest,
   taskPage,
 } from '@/test/contestant';
-import { listedContests } from '@/test/may';
-import { standingList } from '@/test/organiser';
+import { onlyAtSum, standingList } from '@/test/organiser';
 import { renderApp } from '@/test/render';
-import { problem, server, signedIn } from '@/test/server';
+import { server, signedIn } from '@/test/server';
 import {
   CONTEST_SECTIONS,
   ORG_SECTIONS,
@@ -247,24 +246,6 @@ describe("the breadcrumb's menus", () => {
     ]);
   });
 
-  it('lists the contests the server lists for someone holding a role at one alone', async () => {
-    server.use(
-      signedIn,
-      http.get('/api/v1/orgs/:org/contests', () =>
-        HttpResponse.json(
-          listedContests('manager').filter(({ name }) => name === 'spring'),
-        ),
-      ),
-    );
-    renderApp('/orgs/acme/contests/spring/entrants');
-
-    const menu = await menuOf('acme');
-    expect(menu.slice(0, 2)).toEqual([
-      'Contests',
-      ['spring', '/orgs/acme/contests/spring'],
-    ]);
-  });
-
   it("lists a contest's tasks and sections", async () => {
     server.use(signedIn, standingList);
     renderApp('/orgs/acme/contests/spring/entrants');
@@ -281,21 +262,28 @@ describe("the breadcrumb's menus", () => {
     ]);
   });
 
-  it('lists the tasks the server names when the contest refuses its standings', async () => {
-    server.use(
-      signedIn,
-      http.get(`${CONTEST_API}/organise/tasks`, () => problem(403, 'forbidden')),
-      http.get(`${CONTEST_API}/tasks`, () =>
-        HttpResponse.json([{ name: 'sum', may_manage: true }]),
-      ),
-    );
-    renderApp('/orgs/acme/contests/spring/tasks/sum/marking');
+  it('leads someone with a role only at a task to it from what me names, both lists refused', async () => {
+    server.use(...onlyAtSum);
+    const user = userEvent.setup();
+    renderApp('/orgs/acme/clarifications');
 
-    const menu = await menuOf('spring');
-    expect(menu.slice(0, 2)).toEqual([
+    expect((await menuOf('acme')).slice(0, 2)).toEqual([
+      'Contests',
+      ['spring', '/orgs/acme/contests/spring'],
+    ]);
+    await user.click(screen.getByRole('menuitem', { name: 'spring' }));
+    expect((await menuOf('spring')).slice(0, 2)).toEqual([
       'Tasks',
       ['sum', '/orgs/acme/contests/spring/tasks/sum'],
     ]);
+    await user.click(screen.getByRole('menuitem', { name: 'sum' }));
+    await waitFor(async () =>
+      expect((await trail()).at(-1)).toEqual({
+        label: 'sum',
+        to: '/orgs/acme/contests/spring/tasks/sum',
+        current: true,
+      }),
+    );
   });
 
   it("lists a task's build cards and sections", async () => {

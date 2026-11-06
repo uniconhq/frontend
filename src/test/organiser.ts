@@ -14,8 +14,8 @@ import type {
   TaskState,
   TreeEntry,
 } from '@/api/types';
-import { PICTURES, listedContests, taskMay } from './may';
-import { problem } from './server';
+import { PICTURES, listedContest, listedContests, taskMay } from './may';
+import { problem, signedInAs } from './server';
 
 type Published = components['schemas']['Published'];
 
@@ -55,6 +55,40 @@ export const contestList = http.get(`${ORG_API}/contests`, () =>
 export const taskList = http.get(`${CONTEST_API}/tasks`, () =>
   HttpResponse.json(tasks),
 );
+
+/**
+ * Signed in as someone holding a role only at spring's sum: refused the
+ * org's contests, spring and its tasks, with `me` naming the two.
+ */
+export const onlyAtSum = [
+  http.get(`${ORG_API}/contests`, () => problem(403, 'forbidden')),
+  http.get(CONTEST_API, () => problem(403, 'forbidden')),
+  http.get(`${CONTEST_API}/organise/tasks`, () => problem(403, 'forbidden')),
+  http.get(`${CONTEST_API}/tasks`, () => problem(403, 'forbidden')),
+  ...signedInAs(null, {
+    roles: [
+      { names: { org: 'acme', contest: 'spring', task: 'sum' }, role: 'manager' },
+    ],
+    orgs: ['acme'],
+    contests: [{ org: 'acme', contest: 'spring', task: null }],
+    tasks: [{ org: 'acme', contest: 'spring', task: 'sum' }],
+  }),
+];
+
+/**
+ * Signed in as a manager only at spring: refused the org's contests, and
+ * told a manager's flags by spring's own read.
+ */
+export const onlyAtSpring = [
+  http.get(`${ORG_API}/contests`, () => problem(403, 'forbidden')),
+  http.get(CONTEST_API, () => HttpResponse.json(listedContest('spring', 'manager'))),
+  ...signedInAs(null, {
+    roles: [{ names: { org: 'acme', contest: 'spring', task: null }, role: 'manager' }],
+    orgs: ['acme'],
+    contests: [{ org: 'acme', contest: 'spring', task: null }],
+    tasks: [],
+  }),
+];
 
 // Making one
 

@@ -14,7 +14,6 @@ import { FileDrop } from '@/ui/FileDrop';
 import { Select } from '@/ui/Select';
 import { TextInput } from '@/ui/TextInput';
 import { Stack } from '@/ui/layout';
-import { NumberText, numberText } from './yaml-doc';
 import {
   clearPort,
   entryFields,
@@ -38,6 +37,7 @@ import {
   type EntryFields,
   type InputFields,
 } from './edit';
+import type { Values } from '../forms/values';
 import { formatUse, parseUse, type BoxDecl } from './boxes';
 import { BoxFiles, UploadProgress } from './Files';
 import { useStagedUpload, type Staging } from './staged-upload';
@@ -82,11 +82,11 @@ import classes from './workflows.module.css';
  * a wire and what each port is for (#436), what the author never acts on
  * under Details; the inputs, each offering exactly what the format allows it
  * and what the task's form names it (#434); and the outputs, each with what
- * pages call it and its unit. Every change is an edit of the file
- * in place, handed up as its new text.
+ * pages call it and its unit. Every change is handed up as an edit of the
+ * draft's values.
  */
 
-type Change = (next: string) => void;
+type Change = (edit: (values: Values) => Values) => void;
 
 const SCALARS = ['text', 'number', 'boolean', 'enum'];
 /** A port's choice of a value written in the drawer, which no reference is written as. */
@@ -156,10 +156,10 @@ function CommitField({
   );
 }
 
-/** A scalar written as the file would hold it typed into a field. */
-function typed(text: string, type: string): string | NumberText {
-  const number = type === 'number' ? numberText(text) : undefined;
-  return number instanceof NumberText ? number : text;
+/** A value typed into a field: a number for a number port when it reads as one. */
+function typed(text: string, type: string): string | number {
+  const number = text.trim() === '' ? Number.NaN : Number(text);
+  return type === 'number' && Number.isFinite(number) ? number : text;
 }
 
 /** A small heading inside the drawer, over a part of what it holds. */
@@ -182,13 +182,11 @@ type PortShape = StepInput & { line: string | undefined };
 
 /** A value written for a port that takes a plain value: text, a number, true or false, or one of a list. */
 function PortValue({
-  text,
   workflow,
   index,
   shape,
   change,
 }: {
-  text: string;
   workflow: Workflow;
   index: number;
   shape: PortShape;
@@ -201,27 +199,25 @@ function PortValue({
     value === undefined
       ? ''
       : value.kind === 'literal'
-        ? value.value instanceof NumberText
-          ? value.value.text
-          : String(value.value)
+        ? String(value.value)
         : value.kind === 'text'
           ? value.text
           : value.kind === 'invalid'
             ? JSON.stringify(value.raw)
             : '';
   // Written as given, but for a loop; the check says what else is wrong.
-  const apply = (raw: string | NumberText | boolean | undefined): string | null => {
+  const apply = (raw: string | number | boolean | undefined): string | null => {
     if (raw === undefined || raw === '') {
-      change(clearPort(text, index, port));
+      change((values) => clearPort(values, index, port));
       return null;
     }
     const whole = typeof raw === 'string' ? wholeRef(raw) : null;
     if (whole === null) {
-      change(setValue(text, index, port, raw));
+      change((values) => setValue(values, index, port, raw));
       return null;
     }
     const loop = loopRefusal(workflow, index, whole);
-    if (loop === null) change(wire(text, index, port, whole));
+    if (loop === null) change((values) => wire(values, index, port, whole));
     return loop;
   };
   if (shape.type === 'boolean')
@@ -295,14 +291,12 @@ function PortValue({
  * its parts are changed in the file.
  */
 function PortRow({
-  text,
   workflow,
   index,
   shape,
   fitting,
   change,
 }: {
-  text: string;
   workflow: Workflow;
   index: number;
   shape: PortShape;
@@ -324,9 +318,7 @@ function PortRow({
       : value !== undefined && value.kind !== 'wire' && !plain
         ? `is given ${
             value.kind === 'literal'
-              ? value.value instanceof NumberText
-                ? value.value.text
-                : String(value.value)
+              ? String(value.value)
               : value.kind === 'text'
                 ? value.text
                 : JSON.stringify(value.raw)
@@ -349,7 +341,7 @@ function PortRow({
             <Button
               size="xs"
               variant="secondary"
-              onClick={() => change(clearPort(text, index, port))}
+              onClick={() => change((values) => clearPort(values, index, port))}
             >
               Clear {port}
             </Button>
@@ -379,19 +371,13 @@ function PortRow({
         onChange={(chosen) => {
           setWriting(chosen === FIXED);
           const ref = offered.find((found) => refText(found) === chosen);
-          if (ref !== undefined) change(wire(text, index, port, ref));
+          if (ref !== undefined) change((values) => wire(values, index, port, ref));
           else if (value !== undefined && (chosen !== FIXED || wired !== null))
-            change(clearPort(text, index, port));
+            change((values) => clearPort(values, index, port));
         }}
       />
       {valued && (
-        <PortValue
-          text={text}
-          workflow={workflow}
-          index={index}
-          shape={shape}
-          change={change}
-        />
+        <PortValue workflow={workflow} index={index} shape={shape} change={change} />
       )}
     </div>
   );
@@ -485,7 +471,6 @@ function Details({
  * and Remove.
  */
 export function StepPanel({
-  text,
   workflow,
   primitives,
   boxes,
@@ -497,7 +482,6 @@ export function StepPanel({
   onRemoved,
   onZoom,
 }: {
-  text: string;
   workflow: Workflow;
   primitives: Map<string, PrimitiveInfo>;
   /** The run workflows' boxes, by the reference a step uses. */
@@ -552,7 +536,7 @@ export function StepPanel({
         apply={(id) => {
           if (workflow.steps.some((other, at) => at !== index && other.id === id))
             return TAKEN;
-          change(renameStep(text, index, id));
+          change((values) => renameStep(values, index, id));
           return null;
         }}
       />
@@ -624,7 +608,7 @@ export function StepPanel({
               <Button
                 size="xs"
                 variant="secondary"
-                onClick={() => change(setUse(text, index, newerRef))}
+                onClick={() => change((values) => setUse(values, index, newerRef))}
               >
                 Move to it
               </Button>
@@ -652,7 +636,6 @@ export function StepPanel({
           {shapes.map((shape) => (
             <PortRow
               key={shape.name}
-              text={text}
               workflow={workflow}
               index={index}
               shape={shape}
@@ -688,7 +671,7 @@ export function StepPanel({
             value: found.ref,
             label: found.version,
           }))}
-          onChange={(chosen) => change(setUse(text, index, chosen))}
+          onChange={(chosen) => change((values) => setUse(values, index, chosen))}
         />
       )}
       {primitive !== null && (
@@ -700,7 +683,7 @@ export function StepPanel({
             size="xs"
             variant="danger"
             onClick={() => {
-              change(removeStep(text, index));
+              change((values) => removeStep(values, index));
               onRemoved();
             }}
           >
@@ -735,7 +718,6 @@ function formText(text: string): string | null {
 }
 
 function InputRow({
-  text,
   workflow,
   input,
   pinned,
@@ -745,7 +727,6 @@ function InputRow({
   onRenamed,
   onGiven,
 }: {
-  text: string;
   workflow: Workflow;
   input: InputDecl;
   pinned: Pinned;
@@ -772,7 +753,7 @@ function InputRow({
       merged.options = ['a', 'b'];
     // A unit goes after a number's title on the task's form, and only there (M54).
     if (merged.type !== 'number') merged.unit = null;
-    change(setInput(text, input.id, merged));
+    change((values) => setInput(values, input.id, merged));
   };
   const problems = pinned.inputs.get(input.id) ?? [];
   const readers = workflow.steps.flatMap((step) =>
@@ -791,7 +772,7 @@ function InputRow({
         apply={(id) => {
           if (sharedNames(workflow).some((other) => other !== input.id && other === id))
             return TAKEN;
-          change(renameInput(text, input.id, id));
+          change((values) => renameInput(values, input.id, id));
           onRenamed(id);
           return null;
         }}
@@ -820,7 +801,7 @@ function InputRow({
           files={files}
           staging={staging}
           onFile={(path) => {
-            change(inputToFile(text, input.id, path));
+            change((values) => inputToFile(values, input.id, path));
             onGiven(path);
           }}
         />
@@ -902,7 +883,7 @@ function InputRow({
           <Button
             size="xs"
             variant="danger"
-            onClick={() => change(removeInput(text, input.id))}
+            onClick={() => change((values) => removeInput(values, input.id))}
           >
             Remove the input {input.id}
           </Button>
@@ -1001,7 +982,6 @@ function GiveFromWorkflow({
  * steps read it, and a way to have the task give it instead, as an input.
  */
 export function FilePanel({
-  text,
   workflow,
   path,
   files,
@@ -1011,7 +991,6 @@ export function FilePanel({
   onMoved,
   onSupplied,
 }: {
-  text: string;
   workflow: Workflow;
   /** The file or folder of the box selected. */
   path: string;
@@ -1051,7 +1030,7 @@ export function FilePanel({
         ]}
         onChange={(to) => {
           if (to === path) return;
-          change(moveFile(text, path, to));
+          change((values) => moveFile(values, path, to));
           onMoved(to);
         }}
       />
@@ -1073,7 +1052,7 @@ export function FilePanel({
             variant="secondary"
             onClick={() => {
               const id = freeName(idOfPath(path), sharedNames(workflow), '_');
-              change(fileToInput(text, path, id, type));
+              change((values) => fileToInput(values, path, id, type));
               onSupplied(id);
             }}
           >
@@ -1086,7 +1065,6 @@ export function FilePanel({
 }
 
 export function InputsPanel({
-  text,
   workflow,
   pinned,
   id,
@@ -1096,7 +1074,6 @@ export function InputsPanel({
   onRenamed,
   onGiven,
 }: {
-  text: string;
   workflow: Workflow;
   pinned: Pinned;
   /** The input of the box selected. */
@@ -1122,7 +1099,6 @@ export function InputsPanel({
         {shown.map((input) => (
           <InputRow
             key={input.id}
-            text={text}
             workflow={workflow}
             input={input}
             pinned={pinned}
@@ -1139,7 +1115,6 @@ export function InputsPanel({
 }
 
 function EntryRow({
-  text,
   workflow,
   primitives,
   boxes,
@@ -1147,7 +1122,6 @@ function EntryRow({
   pinned,
   change,
 }: {
-  text: string;
   workflow: Workflow;
   primitives: Map<string, PrimitiveInfo>;
   boxes: ReadonlyMap<string, BoxDecl>;
@@ -1167,9 +1141,9 @@ function EntryRow({
   const write = (next: Partial<EntryFields>) => {
     const reads = next.from ?? from;
     if (reads === null) return;
-    change(
+    change((values) =>
       setEntry(
-        text,
+        values,
         entry.name,
         entryFields(entry, outputType(workflow, primitives, reads, boxes), {
           ...next,
@@ -1186,7 +1160,7 @@ function EntryRow({
         description="A task reads it by this name, as a column of its runs."
         apply={(name) => {
           if (name !== entry.name && sharedNames(workflow).includes(name)) return TAKEN;
-          change(renameEntry(text, entry.name, name));
+          change((values) => renameEntry(values, entry.name, name));
           return null;
         }}
       />
@@ -1239,7 +1213,7 @@ function EntryRow({
           <Button
             size="xs"
             variant="danger"
-            onClick={() => change(removeEntry(text, entry.name))}
+            onClick={() => change((values) => removeEntry(values, entry.name))}
           >
             Remove {entry.name} from the outputs
           </Button>
@@ -1250,14 +1224,12 @@ function EntryRow({
 }
 
 export function OutputsPanel({
-  text,
   workflow,
   primitives,
   boxes,
   pinned,
   change,
 }: {
-  text: string;
   workflow: Workflow;
   primitives: Map<string, PrimitiveInfo>;
   boxes: ReadonlyMap<string, BoxDecl>;
@@ -1276,7 +1248,6 @@ export function OutputsPanel({
         {workflow.outputs.map((entry) => (
           <EntryRow
             key={entry.name}
-            text={text}
             workflow={workflow}
             primitives={primitives}
             boxes={boxes}
@@ -1307,7 +1278,7 @@ export function OutputsPanel({
                   const ref = sources.find((found) => refLabel(found) === chosen);
                   if (ref === undefined) return;
                   const name = freeName(ref.output, sharedNames(workflow), '_');
-                  change(setEntry(text, name, { from: ref }));
+                  change((values) => setEntry(values, name, { from: ref }));
                   setChosen('');
                 }}
               >

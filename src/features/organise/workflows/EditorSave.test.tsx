@@ -2,26 +2,43 @@ import { describe, expect, it } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import { delay, http, HttpResponse } from 'msw';
 import { afterAnswers, server } from '@/test/server';
-import { CLASSIC } from '@/test/workflows';
+import { CLASSIC, valuesOf, versionOf } from '@/test/workflows';
 import { comeBackToTab, fakeLiveStream, openStream, realLiveStream } from '@/test/live';
 import {
   openEditor,
   part,
   barButton,
-  fileText,
   openMenu,
   outputButton,
   stepPanel,
   portButton,
   toolButton,
   findDialog,
-  findMerge,
   findProblems,
+  savedValues,
 } from '@/test/workflow-editor';
 
-/** The forge's check of a draft whose run step is given its memory as text. */
-const memoryAsText = (content: string) =>
-  content.includes('memory_limit: 9')
+type Values = Record<string, unknown>;
+
+/** The `with` of the run step in a draft's values. */
+const runOf = (values: Values | null): Values =>
+  ((values?.steps as Values[] | undefined)?.[0]?.with ?? {}) as Values;
+
+/** The draft's named outputs. */
+const outputsOf = (values: Values | null): Values => (values?.outputs ?? {}) as Values;
+
+/** The draft as someone else saved it: run's time in seconds. */
+const theirs = (): Values =>
+  valuesOf(
+    CLASSIC.replace(
+      'time_ms: {from: "${{ steps.run.time_ms }}", unit: ms}',
+      'time_ms: {from: "${{ steps.run.time_ms }}", unit: s}',
+    ),
+  );
+
+/** The forge's check of a draft whose run step is given a fixed memory. */
+const memoryAsText = (values: Values) =>
+  runOf(values).memory_limit === 9
     ? [
         {
           path: ['steps', 0, 'with', 'memory_limit'],
@@ -60,7 +77,7 @@ describe('saving and publishing a workflow', () => {
         'All changes saved.',
       ),
     ).toBeInTheDocument();
-    expect(backend.state.draft).toContain('memory_limit: 9');
+    expect(runOf(backend.state.values).memory_limit).toBe(9);
     await findProblems(/One problem to fix/);
   });
 
@@ -93,7 +110,9 @@ describe('saving and publishing a workflow', () => {
       }),
     );
     await user.click(barButton('Save'));
-    await waitFor(() => expect(backend.state.draft).toContain('time_ms_2'));
+    await waitFor(() =>
+      expect(outputsOf(backend.state.values)).toHaveProperty('time_ms_2'),
+    );
 
     await user.click(barButton('Publish version'));
     const dialog = await findDialog('Publish v1');
@@ -209,7 +228,7 @@ describe('saving and publishing a workflow', () => {
     expect(await screen.findByRole('status', { name: '' })).toHaveTextContent(
       'v1 is published.',
     );
-    expect(backend.state.draft).toContain('time_ms_2');
+    expect(outputsOf(backend.state.values)).toHaveProperty('time_ms_2');
     expect(backend.state.versions).toEqual(['v1']);
     expect(barButton('Save')).toBeDisabled();
   });
@@ -226,7 +245,6 @@ describe('saving and publishing a workflow', () => {
     );
     await findProblems(/Nothing to fix/);
     // Someone else saves the draft after the page was read.
-    backend.state.draft = `${CLASSIC}# theirs\n`;
     backend.state.token = 'theirs';
     await user.click(barButton('Publish version'));
     const dialog = await findDialog('Publish v1');
@@ -236,7 +254,7 @@ describe('saving and publishing a workflow', () => {
     await user.click(both);
 
     expect(await within(dialog).findByRole('alert')).toHaveTextContent(
-      'The draft was not saved, so nothing was published. Someone else saved the draft meanwhile.',
+      'The draft was not saved, so nothing was published. The workflow kenny/tuned has changed since you opened it.',
     );
     expect(backend.state.versions).toEqual([]);
   });
@@ -246,7 +264,7 @@ describe('saving and publishing a workflow', () => {
       versions: ['v1', 'v2'],
       handlers: [
         http.get('/api/v1/workflows/kenny/tuned/versions/:version', () =>
-          HttpResponse.json({ content: CLASSIC }),
+          HttpResponse.json(versionOf(CLASSIC)),
         ),
       ],
     });
@@ -279,7 +297,7 @@ describe('saving and publishing a workflow', () => {
     ).toBeNull();
   });
 
-  it('opens the merge view on a save over someone else’s, matching steps by id', async () => {
+  it('saves nothing over someone else’s save, and reloads the draft they saved', async () => {
     const { user, backend } = openEditor();
 
     await user.click(await portButton(user, 'run', 'args'));
@@ -288,29 +306,34 @@ describe('saving and publishing a workflow', () => {
         name: /^time_limit from the inputs/,
       }),
     );
-    backend.state.draft = CLASSIC.replace(
-      'time_ms: {from: "${{ steps.run.time_ms }}", unit: ms}',
-      'time_ms: {from: "${{ steps.run.time_ms }}", unit: s}',
-    );
+    backend.state.values = theirs();
     backend.state.token = 'someone-else';
     await user.click(barButton('Save'));
 
-    expect(
-      await screen.findByText('Someone else saved a change since you opened this.'),
-    ).toBeInTheDocument();
-    const fields = part('ul', 'Fields that differ');
-    expect(within(fields).getByText(/steps\[run\]\.with\.args/)).toBeInTheDocument();
+    const refused = await screen.findByRole('alert');
+    expect(refused).toHaveTextContent(
+      'The workflow kenny/tuned has changed since you opened it.',
+    );
+    expect(refused).toHaveTextContent('Nothing was saved.');
+    expect(barButton('Save')).toBeEnabled();
+    await user.click(within(refused).getByRole('button', { name: 'Reload the draft' }));
+
+    // Their draft, with nothing of the change left to save or undo.
+    await waitFor(() => expect(barButton('Save')).toBeDisabled());
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(toolButton('Undo')).toBeDisabled();
+    await user.click(await portButton(user, 'run', 'args'));
     await user.click(
-      within(await findMerge()).getByRole('button', {
-        name: 'Save the merged version',
+      within(await openMenu('The port args of run')).getByRole('menuitem', {
+        name: /^time_limit from the inputs/,
       }),
     );
-    await waitFor(() =>
-      expect(backend.state.draft).toContain('args: ${{ inputs.time_limit }}'),
-    );
-    expect(backend.state.draft).toContain(
-      'time_ms: {from: "${{ steps.run.time_ms }}", unit: s}',
-    );
+    const saved = await savedValues(user);
+    expect(outputsOf(saved).time_ms).toEqual({
+      from: '${{ steps.run.time_ms }}',
+      unit: 's',
+    });
+    expect(backend.state.saves.at(-1)?.token).toBe('someone-else');
   });
 
   it('keeps the unsaved draft when the tab comes back after someone else saved, and meets theirs at the save', async () => {
@@ -325,10 +348,7 @@ describe('saving and publishing a workflow', () => {
           name: /^time_limit from the inputs/,
         }),
       );
-      backend.state.draft = CLASSIC.replace(
-        'time_ms: {from: "${{ steps.run.time_ms }}", unit: ms}',
-        'time_ms: {from: "${{ steps.run.time_ms }}", unit: s}',
-      );
+      backend.state.values = theirs();
       backend.state.token = 'someone-else';
       await afterAnswers(comeBackToTab);
 
@@ -336,90 +356,20 @@ describe('saving and publishing a workflow', () => {
       expect(
         within(bar).getByText('Not saved yet: leaving this page loses these changes.'),
       ).toBeInTheDocument();
-      expect(await fileText(user)).toContain('args: ${{ inputs.time_limit }}');
       expect(barButton('Save')).not.toHaveAttribute('data-loading');
 
       await user.click(barButton('Save'));
-      expect(
-        await screen.findByText('Someone else saved a change since you opened this.'),
-      ).toBeInTheDocument();
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        'The workflow kenny/tuned has changed since you opened it.',
+      );
+      expect(runOf(backend.state.saves[0]?.values ?? null).args).toBe(
+        '${{ inputs.time_limit }}',
+      );
       expect(backend.state.saves).toEqual([
         expect.objectContaining({ token: 'token-1' }),
       ]);
     } finally {
       realLiveStream();
     }
-  });
-
-  it('merges again over a second save by someone else, from the file merged over', async () => {
-    const { user, backend } = openEditor();
-
-    await user.click(await portButton(user, 'run', 'args'));
-    await user.click(
-      within(await openMenu('The port args of run')).getByRole('menuitem', {
-        name: /^time_limit from the inputs/,
-      }),
-    );
-    backend.state.draft = CLASSIC.replace(
-      'time_ms: {from: "${{ steps.run.time_ms }}", unit: ms}',
-      'time_ms: {from: "${{ steps.run.time_ms }}", unit: s}',
-    );
-    backend.state.token = 'someone-else';
-    await user.click(barButton('Save'));
-    await findMerge();
-    backend.state.draft = backend.state.draft.replace(
-      'time_ms: {from: "${{ steps.run.time_ms }}", unit: s}',
-      'time_ms: {from: "${{ steps.run.time_ms }}", unit: min}',
-    );
-    backend.state.token = 'a-third';
-    await user.click(
-      within(await findMerge()).getByRole('button', {
-        name: 'Save the merged version',
-      }),
-    );
-
-    await waitFor(() =>
-      expect(
-        within(part('ul', 'Fields that differ')).getByText(/time_ms\.unit/),
-      ).toBeInTheDocument(),
-    );
-    const fields = part('ul', 'Fields that differ');
-    expect(within(fields).queryByText(/both changed it/)).not.toBeInTheDocument();
-    await user.click(
-      within(await findMerge()).getByRole('button', {
-        name: 'Save the merged version',
-      }),
-    );
-    await waitFor(() => expect(backend.state.token).not.toBe('a-third'));
-    expect(backend.state.draft).toContain('args: ${{ inputs.time_limit }}');
-    expect(backend.state.draft).toContain(
-      'time_ms: {from: "${{ steps.run.time_ms }}", unit: min}',
-    );
-  });
-
-  it('takes the current file in the merge view as one step undo goes back over', async () => {
-    const { user, backend } = openEditor();
-
-    await user.click(await portButton(user, 'run', 'args'));
-    await user.click(
-      within(await openMenu('The port args of run')).getByRole('menuitem', {
-        name: /^time_limit from the inputs/,
-      }),
-    );
-    backend.state.draft = CLASSIC.replace(
-      'time_ms: {from: "${{ steps.run.time_ms }}", unit: ms}',
-      'time_ms: {from: "${{ steps.run.time_ms }}", unit: s}',
-    );
-    backend.state.token = 'someone-else';
-    await user.click(barButton('Save'));
-    await user.click(
-      within(await findMerge()).getByRole('button', { name: 'Discard my changes' }),
-    );
-
-    expect(await fileText(user)).toContain(
-      'time_ms: {from: "${{ steps.run.time_ms }}", unit: s}',
-    );
-    await user.click(toolButton('Undo'));
-    expect(await fileText(user)).toContain('args: ${{ inputs.time_limit }}');
   });
 });

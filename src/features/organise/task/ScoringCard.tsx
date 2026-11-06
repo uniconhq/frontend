@@ -107,7 +107,7 @@ export function ScoringCard({
   elsewhere,
   values,
   titles,
-  workflowText,
+  workflowValues,
   workflowRead,
   graded,
   disabled,
@@ -121,8 +121,8 @@ export function ScoringCard({
   values: TaskValues;
   /** Each input's title from the workflow, by its name. */
   titles: ReadonlyMap<string, string>;
-  /** The workflow file, so the runs' columns are its outputs. */
-  workflowText: unknown;
+  /** The workflow's values, so the runs' columns are its outputs. */
+  workflowValues: unknown;
   /** Until it reads, a formula is not checked, so no output is called unknown. */
   workflowRead: WorkflowRead;
   /** A graded submission exists, so what is shown always has been seen. */
@@ -157,8 +157,8 @@ export function ScoringCard({
     [outputTypes.data],
   );
   const outputs = useMemo(
-    () => outputColumns(workflowText, textOutputs),
-    [workflowText, textOutputs],
+    () => outputColumns(workflowValues, textOutputs),
+    [workflowValues, textOutputs],
   );
   const columns = useMemo(() => columnsOf(outputs), [outputs]);
   // A formula also reads each input an axis fills, as a column of its run.

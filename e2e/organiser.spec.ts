@@ -3,7 +3,12 @@ import { draftRunsOf } from '../src/test/draft-runs';
 import { taskValuesOf } from '../src/test/task-values';
 import { expect, test, type Page, type Route } from '@playwright/test';
 import type { components } from '../src/api/schema';
-import { contestValuesOf, settingsOf } from './settings';
+import {
+  contestValuesOf,
+  settingsOf,
+  workflowDraftOf,
+  workflowVersionOf,
+} from './settings';
 
 type Schemas = components['schemas'];
 
@@ -105,7 +110,7 @@ async function stubOrganiserApi(page: Page) {
     ] satisfies Schemas['WorkflowItem'][]),
   );
   await page.route('**/api/v1/workflows/unicon/classic/versions/v6', (route) =>
-    json(route, { content: CLASSIC }),
+    json(route, workflowVersionOf(CLASSIC)),
   );
   await page.route('**/api/v1/blocks', (route) => json(route, specCatalogue()));
   await page.route('**/api/v1/workflows/unicon/classic/versions/v6/box*', (route) =>
@@ -136,6 +141,8 @@ async function stubOrganiserApi(page: Page) {
           ]
         : [],
       orgs: state.orgMade ? ['acme'] : [],
+      contests: [],
+      tasks: [],
       workflow_owners: state.orgMade ? ['kenny', 'acme'] : ['kenny'],
       degraded: false,
     } satisfies Schemas['Me']),
@@ -302,17 +309,15 @@ async function stubOrganiserApi(page: Page) {
         text_values: null,
       } satisfies Schemas['WorkflowForm']);
     }
-    if (path === '/api/v1/orgs/acme/contests') {
-      return json(route, [
-        {
-          name: 'spring',
-          state: 'draft',
-          start: '2026-10-01T09:00:00Z',
-          end: '2026-10-01T14:00:00Z',
-          may: ADMIN_MAY,
-        },
-      ]);
-    }
+    const spring: Schemas['ListedContest'] = {
+      name: 'spring',
+      state: 'draft',
+      start: '2026-10-01T09:00:00Z',
+      end: '2026-10-01T14:00:00Z',
+      may: ADMIN_MAY,
+    };
+    if (path === '/api/v1/orgs/acme/contests') return json(route, [spring]);
+    if (path === contest) return json(route, spring);
     if (path === '/api/v1/orgs/acme/contests/spring/tasks') {
       return json(route, [{ name: 'sum', may_manage: true }]);
     }
@@ -805,12 +810,11 @@ test('the Runs card pairs files, lines up its cells, and gives a cell to the ent
   await page.route('**/api/v1/workflows/unicon/classic/versions/v6', (route) =>
     route.fulfill({
       contentType: 'application/json',
-      body: JSON.stringify({
-        content: CLASSIC.replace(
-          'inputs:\n',
-          'inputs:\n  input: file\n  answer: file\n',
+      body: JSON.stringify(
+        workflowVersionOf(
+          CLASSIC.replace('inputs:\n', 'inputs:\n  input: file\n  answer: file\n'),
         ),
-      }),
+      ),
     }),
   );
   await page.goto('/orgs/acme/contests/spring/tasks/sum');
@@ -862,9 +866,11 @@ test('a new workflow asks only for its owner and name and opens an empty draft',
         versions: [],
         editable: true,
         readers: [],
-        draft: { content: 'steps: []\n', token: 'empty-token', revision: 'empty-head' },
       },
     }),
+  );
+  await page.route('**/api/v1/workflows/kenny/empty/draft', (route) =>
+    route.fulfill({ json: workflowDraftOf('steps: []\n', 'empty-token') }),
   );
   await page.route('**/api/v1/workflows/kenny/empty/tree**', (route) =>
     route.fulfill({ json: [] }),
@@ -930,16 +936,15 @@ test('long run paths and report titles stay within the page and their Result row
   );
   await page.route('**/api/v1/workflows/unicon/classic/versions/v6', (route) =>
     route.fulfill({
-      json: {
-        content:
-          'inputs: {input: file}\nsteps: []\noutputs:\n' +
+      json: workflowVersionOf(
+        'inputs: {input: file}\nsteps: []\noutputs:\n' +
           outputs
             .map(
               (output) =>
                 `  ${output.name}: {from: 1, title: ${output.title}, unit: seconds}`,
             )
             .join('\n'),
-      },
+      ),
     }),
   );
   await page.route('**/api/v1/workflows/unicon/classic/versions/v6/box*', (route) =>
@@ -996,7 +1001,7 @@ scoring:
 `;
   await page.route('**/api/v1/workflows/unicon/classic/versions/v6', (route) =>
     route.fulfill({
-      json: { content: CLASSIC + 'outputs: {score: 1, time_ms: 1}\n' },
+      json: workflowVersionOf(CLASSIC + 'outputs: {score: 1, time_ms: 1}\n'),
     }),
   );
   await page.setViewportSize({ width: 1440, height: 1000 });

@@ -4,14 +4,12 @@ import type { Primitive } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
 import { Group } from '@/ui/layout';
-import { NumberText } from './yaml-doc';
 import {
   formatUse,
   parseUse,
   portsOf,
   useStepBoxes,
   versionOptions,
-  workflowFrom,
   type BoxDecl,
   type Frame,
   type UseRef,
@@ -21,7 +19,7 @@ import { Drawer } from './Drawer';
 import { DrawnGraph } from './DrawnGraph';
 import { WORKFLOW_PALETTE } from '../flow/graph';
 import { layoutWorkflow, type Box, type Layout } from './layout';
-import { refsOf, type Ref, type WithValue, type Workflow } from './model';
+import { readWorkflow, refsOf, type Ref, type WithValue, type Workflow } from './model';
 import { byRef, type PrimitiveInfo } from './primitives';
 import { stepOutputs } from './rules';
 import { refWords } from './words';
@@ -42,10 +40,13 @@ export type Level = {
  * with the boxes of the run workflows it uses; null until it is read.
  */
 function useLevel(
-  text: string | null,
+  values: unknown,
   primitives: Map<string, PrimitiveInfo>,
 ): Level | null {
-  const workflow = useMemo(() => (text === null ? null : workflowFrom(text)), [text]);
+  const workflow = useMemo(
+    () => (values === undefined ? null : readWorkflow(values)),
+    [values],
+  );
   const boxes = useStepBoxes(workflow, primitives);
   return useMemo(
     () =>
@@ -125,8 +126,7 @@ function neighbourWords(box: Box, workflow: Workflow): { name: string; line: str
 function givenWords(value: WithValue): string {
   if (value.kind === 'wire') return refWords(value.ref);
   if (value.kind === 'text') return value.text;
-  if (value.kind === 'literal')
-    return value.value instanceof NumberText ? value.value.text : String(value.value);
+  if (value.kind === 'literal') return String(value.value);
   if (value.kind === 'invalid') return JSON.stringify(value.raw);
   const read = refsOf(value).map(refWords);
   return read.length === 0 ? 'several values' : read.join(', ');
@@ -256,8 +256,8 @@ export function Inside({
   const parent = frames.length > 1 ? frames[frames.length - 2] : undefined;
   const read = useVersion(frame?.use ?? null);
   const readAbove = useVersion(parent?.use ?? null);
-  const here = useLevel(read.data?.content ?? null, map);
-  const fetched = useLevel(readAbove.data?.content ?? null, map);
+  const here = useLevel(read.data?.values, map);
+  const fetched = useLevel(readAbove.data?.values, map);
   const above = parent === undefined ? draft : fetched;
   const path = frames.map((item) => item.title).join('/');
 
@@ -397,17 +397,17 @@ export function Inside({
             {read.isError && (
               <BodyText>{formatUse(frame.use)} cannot be read.</BodyText>
             )}
-            {read.data !== undefined && (
+            {here !== null && (
               <DrawnGraph
                 // The graph reads its pick once, so a new mark draws it again.
                 key={selected ?? ''}
-                text={read.data.content}
+                workflow={here.workflow}
                 primitives={primitives}
-                boxes={here?.boxes}
+                boxes={here.boxes}
                 selected={selected}
                 allOpen
                 onOpenBox={(opened) => {
-                  const step = here?.workflow.steps[opened];
+                  const step = here.workflow.steps[opened];
                   const use =
                     step === undefined || map.has(step.use) ? null : parseUse(step.use);
                   if (step === undefined || use === null) return;

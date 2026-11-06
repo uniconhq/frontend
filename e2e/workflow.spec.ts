@@ -1,13 +1,15 @@
 import { expect, test, type Locator, type Page, type Route } from '@playwright/test';
 import type { components } from '../src/api/schema';
+import { workflowDraftOf, workflowVersionOf } from './settings';
 
 type Schemas = components['schemas'];
+type Values = Record<string, unknown>;
 
 /**
  * The workflow editor in a real browser against the dev server with the API
  * stubbed: React Flow draws the graph at its actual size, at the places the
  * page works out; a wire drawn by dragging from one handle to another edits
- * the file, a port that doesn't take the wire's type is greyed out while it
+ * the draft, a port that doesn't take the wire's type is greyed out while it
  * is dragged, and the check after the drop marks the rest; a step
  * added from the toolbar opens in the drawer, clear of the box it shows.
  * jsdom has no layout, so this is where the drags and the scrolling are
@@ -220,6 +222,8 @@ async function stubWorkflowApi(page: Page) {
       user: { id: 7, username: 'kenny', name: null, avatar_url: null, email: null },
       roles: [],
       orgs: [],
+      contests: [],
+      tasks: [],
       workflow_owners: ['kenny'],
       degraded: false,
     } satisfies Schemas['Me']),
@@ -236,13 +240,33 @@ async function stubWorkflowApi(page: Page) {
       visibility: 'private',
       versions: [],
       editable: true,
-      draft: { content: CLASSIC, token: 'token-1' },
       readers: [],
     }),
   );
+  await serveDraft(page, CLASSIC);
   await page.route('**/api/v1/workflows/kenny/tuned/tree**', (route) =>
     json(route, []),
   );
+}
+
+/** kenny/tuned's draft read from `text`, each save answered as the forge would. */
+async function serveDraft(page: Page, text: string) {
+  let saves = 0;
+  await page.route('**/api/v1/workflows/kenny/tuned/draft', (route) => {
+    if (route.request().method() !== 'PUT')
+      return route.fulfill({ json: workflowDraftOf(text, 'token-1') });
+    const { values } = route.request().postDataJSON() as { values: Values };
+    saves += 1;
+    return route.fulfill({
+      json: {
+        values,
+        unreadable: null,
+        content: null,
+        token: `token-${String(saves + 1)}`,
+        revision: null,
+      } satisfies Schemas['WorkflowDraft'],
+    });
+  });
 }
 
 function handle(page: Page, node: string, id: string): Locator {
@@ -271,29 +295,32 @@ async function drag(page: Page, from: Locator, to: Locator) {
   await page.mouse.up();
 }
 
-/**
- * The file as a save would write it, read from CodeMirror's document in the
- * View YAML dialog, which holds every line where the page draws only those in
- * view; CodeMirror keeps its view on the content element's tile. A string the
- * browser runs, since these tests are typed without the DOM's types.
- */
-const FILE = `(() => {
-  const label = [...document.querySelectorAll('label')].find(
-    (found) => found.textContent.trim() === 'The draft’s YAML');
-  const content = document.querySelector('[aria-labelledby="' + label.id + '"]');
-  const tile = content.cmTile || content.cmView;
-  const view = tile && tile.view;
-  if (!view) throw new Error('the file view holds no CodeMirror document');
-  return view.state.doc.toString();
-})()`;
+/** Each step's ports as `port: value` lines, one a line. */
+function portLines(values: Values): string {
+  return ((values['steps'] ?? []) as { with?: Values }[])
+    .flatMap((step) => Object.entries(step.with ?? {}))
+    .map(([port, value]) =>
+      typeof value === 'string'
+        ? `${port}: ${value}`
+        : `${port}: ${JSON.stringify(value)}`,
+    )
+    .join('\n');
+}
 
-async function file(page: Page): Promise<string> {
-  await page.getByRole('button', { name: 'View YAML' }).click();
-  await expect(page.getByRole('dialog', { name: 'The draft’s YAML' })).toBeVisible();
-  const text = await page.evaluate<string>(FILE);
-  await page.keyboard.press('Escape');
-  await expect(page.getByRole('dialog', { name: 'The draft’s YAML' })).toBeHidden();
-  return text;
+function saveButton(page: Page): Locator {
+  return page
+    .getByRole('toolbar', { name: 'The workflow' })
+    .getByRole('button', { name: 'Save', exact: true });
+}
+
+/** The draft's ports as Save sends them, saved from the bar. */
+async function written(page: Page): Promise<string> {
+  const sent = page.waitForRequest(
+    (request) => request.method() === 'PUT' && request.url().endsWith('/draft'),
+  );
+  await saveButton(page).click();
+  const { values } = (await sent).postDataJSON() as { values: Values };
+  return portLines(values);
 }
 
 /**
@@ -301,7 +328,8 @@ async function file(page: Page): Promise<string> {
  * box, the right kind, up or down: the wires are drawn from the layout's
  * points, the handles where the boxes' CSS puts them, so the two agree only
  * while the heights do. Sideways, a wire ends at the box's edge and the
- * handle sits inside its border. A string the browser runs, as `FILE` is.
+ * handle sits inside its border. A string the browser runs, since these
+ * tests are typed without the DOM's types.
  */
 const WIRE_ENDS = `(() => [...document.querySelectorAll('.react-flow__edge')].map((edge) => {
   const [, from, to] = /^Edge from (.+) to (.+)$/.exec(edge.getAttribute('aria-label'));
@@ -397,7 +425,6 @@ test('a version’s box opens in the editor’s drawer, clear of the box, with e
         visibility: 'private',
         versions: ['v1'],
         editable: false,
-        draft: null,
         readers: [],
       }),
     }),
@@ -405,7 +432,7 @@ test('a version’s box opens in the editor’s drawer, clear of the box, with e
   await page.route('**/api/v1/workflows/kenny/tuned/versions/v1', (route) =>
     route.fulfill({
       contentType: 'application/json',
-      body: JSON.stringify({ content: CLASSIC }),
+      body: JSON.stringify(workflowVersionOf(CLASSIC)),
     }),
   );
   await page.setViewportSize({ width: 1600, height: 1000 });
@@ -468,7 +495,7 @@ test('a wire dragged onto a port edits the file, and a refused one says why', as
     handle(page, 'input:time_limit', 'out:*'),
     handle(page, 'step:1', 'in:args'),
   );
-  await expect.poll(() => file(page)).toContain('args: ${{ inputs.time_limit }}');
+  expect(await written(page)).toContain('args: ${{ inputs.time_limit }}');
 
   await openBox(page, 'run');
   await drag(
@@ -480,29 +507,13 @@ test('a wire dragged onto a port edits the file, and a refused one says why', as
     hasText: 'This takes a number, not a file.',
   });
   await expect(refused).toBeVisible();
-  expect(await file(page)).toContain('memory_limit: ${{ inputs.memory_limit }}');
+  // Nothing changed.
+  await expect(saveButton(page)).toBeDisabled();
 });
 
 /** The draft with check's expected port given nothing, so a wire dropped on check goes there. */
 async function stubOpenExpected(page: Page) {
-  await page.route('**/api/v1/workflows/kenny/tuned', (route) =>
-    route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        owner: 'kenny',
-        name: 'tuned',
-        visibility: 'private',
-        versions: [],
-        editable: true,
-        draft: {
-          content: CLASSIC.replace('      expected: ${{ inputs.answer }}\n', ''),
-          token: 'token-1',
-        },
-        readers: [],
-      }),
-    }),
-  );
+  await serveDraft(page, CLASSIC.replace('      expected: ${{ inputs.answer }}\n', ''));
 }
 
 test('while a wire is dragged, a number output greys out a file port', async ({
@@ -533,7 +544,7 @@ test('while a wire is dragged, a number output greys out a file port', async ({
       .getByRole('alert')
       .filter({ hasText: 'expected: This takes a file, not a number.' }),
   ).toBeVisible();
-  expect(await file(page)).not.toContain('expected:');
+  await expect(saveButton(page)).toBeDisabled();
 });
 
 test('an optional output dropped on a required port is written, and the check says why it is wrong', async ({
@@ -567,12 +578,12 @@ test('an optional output dropped on a required port is written, and the check sa
   const sentence =
     'That output may be missing, so it can be given only to an optional port.';
   await page.route('**/api/v1/workflows/check', async (route) => {
-    const { content } = route.request().postDataJSON() as { content: string };
+    const { values } = route.request().postDataJSON() as { values: Values };
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({
-        problems: content.includes('expected: ${{ steps.run.output }}')
+        problems: portLines(values).includes('expected: ${{ steps.run.output }}')
           ? [{ path: ['steps', 2, 'with', 'expected'], message: sentence, step: null }]
           : [],
       }),
@@ -588,7 +599,7 @@ test('an optional output dropped on a required port is written, and the check sa
     page.getByRole('group', { name: 'Step check' }),
   );
 
-  await expect.poll(() => file(page)).toContain('expected: ${{ steps.run.output }}');
+  expect(await written(page)).toContain('expected: ${{ steps.run.output }}');
   await expect(page.getByRole('region', { name: 'Problems' })).toContainText(sentence);
   await expect(
     page
@@ -681,14 +692,14 @@ test('a step added from the tray opens in the drawer clear of its box, and is wi
   // called output, so it goes to the first given nothing.
   await openBox(page, 'run');
   await drag(page, handle(page, 'step:1', 'out:output'), added);
-  await expect.poll(() => file(page)).toContain('actual: ${{ steps.run.output }}');
+  expect(await written(page)).toContain('actual: ${{ steps.run.output }}');
   await openBox(page, 'diff-check');
   await drag(
     page,
     handle(page, 'input:answer', 'out:*'),
     handle(page, 'step:2', 'in:expected'),
   );
-  await expect.poll(() => file(page)).toContain('expected: ${{ inputs.answer }}');
+  expect(await written(page)).toContain('expected: ${{ inputs.answer }}');
 });
 
 test('a lifted wire moves to the port it is dropped on, or clears its port on nothing, and a wire dropped on a closed box finds its port', async ({
@@ -717,13 +728,14 @@ test('a lifted wire moves to the port it is dropped on, or clears its port on no
   const args = await handle(page, 'step:1', 'in:args').boundingBox();
   if (args === null) throw new Error('no handle for args');
   await lift('time_limit', args.x + args.width / 2, args.y + args.height / 2);
-  await expect.poll(() => file(page)).toContain('args: ${{ inputs.time_limit }}');
-  expect(await file(page)).not.toContain('time_limit: ${{ inputs.time_limit }}');
+  const moved = await written(page);
+  expect(moved).toContain('args: ${{ inputs.time_limit }}');
+  expect(moved).not.toContain('time_limit: ${{ inputs.time_limit }}');
 
   const face = await run.boundingBox();
   if (face === null) throw new Error('run is not drawn');
   await lift('args', face.x - 44, face.y + face.height - 10);
-  await expect.poll(() => file(page)).not.toContain('args:');
+  expect(await written(page)).not.toContain('args:');
 
   // Closed, the box takes a wire anywhere on it, to the input of its name,
   // and while the wire is dragged says which boxes would take it.
@@ -741,12 +753,12 @@ test('a lifted wire moves to the port it is dropped on, or clears its port on no
     'refused',
   );
   await page.mouse.up();
-  await expect.poll(() => file(page)).toContain('time_limit: ${{ inputs.time_limit }}');
+  expect(await written(page)).toContain('time_limit: ${{ inputs.time_limit }}');
 
   // Else to the first input given nothing.
   await openBox(page, 'build');
   await drag(page, handle(page, 'step:0', 'out:log'), run);
-  await expect.poll(() => file(page)).toContain('entry: ${{ steps.build.log }}');
+  expect(await written(page)).toContain('entry: ${{ steps.build.log }}');
 
   // Refused, it names the port it would have gone to, which the box hides:
   // args, passing over files, which takes named files and no single wire.
@@ -767,21 +779,7 @@ test('only a wire that is a port’s whole value, into an open box, can be lifte
     '      stdin: ${{ inputs.input }}\n',
     '      stdin: ${{ inputs.input }}\n      files:\n        answer: ${{ inputs.answer }}\n        given: ${{ steps.build.log }}\n',
   );
-  await page.route('**/api/v1/workflows/kenny/tuned', (route) =>
-    route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        owner: 'kenny',
-        name: 'tuned',
-        visibility: 'private',
-        versions: [],
-        editable: true,
-        draft: { content: draft, token: 'token-1' },
-        readers: [],
-      }),
-    }),
-  );
+  await serveDraft(page, draft);
   await page.goto('/workflows/kenny/tuned');
   // The handle React Flow draws at a wire's end that lifts it.
   const lifts = (from: string) =>
@@ -963,6 +961,8 @@ test('a box opens two levels in, and a problem opens the step inside', async ({
       user: { id: 7, username: 'kenny', name: null, avatar_url: null, email: null },
       roles: [],
       orgs: [],
+      contests: [],
+      tasks: [],
       workflow_owners: ['kenny'],
       degraded: false,
     } satisfies Schemas['Me']),
@@ -1000,10 +1000,10 @@ test('a box opens two levels in, and a problem opens the step inside', async ({
       visibility: 'private',
       versions: [],
       editable: true,
-      draft: { content: draft, token: 'token-1' },
       readers: [],
     }),
   );
+  await serveDraft(page, draft);
   await page.route('**/api/v1/workflows/kenny/tuned/tree**', (route) =>
     json(route, []),
   );
@@ -1012,9 +1012,10 @@ test('a box opens two levels in, and a problem opens the step inside', async ({
     return json(route, { ...box, newer_version: newer });
   });
   await page.route(/\/versions\/v1$/, (route) =>
-    json(route, {
-      content: route.request().url().includes('/inner/') ? inner : deep,
-    }),
+    json(
+      route,
+      workflowVersionOf(route.request().url().includes('/inner/') ? inner : deep),
+    ),
   );
 
   await page.setViewportSize({ width: 1600, height: 1000 });

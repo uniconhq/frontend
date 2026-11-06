@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { useQueryClient } from '@tanstack/react-query';
-import { $api, queryView } from '@/api/query';
+import { $api, isRefused, queryView } from '@/api/query';
 import type { TaskStanding } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { Button } from '@/ui/Button';
@@ -13,6 +13,7 @@ import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
 import { taskPath } from '@/lib/organiser-paths';
 import { formatDateTime, serverNow } from '@/lib/time';
+import { useNamedTasks } from '@/session';
 import { CreateButton } from '../Create';
 import { DefinitionErrors } from '../DefinitionErrors';
 import { definitionErrorsOf } from '../files/refusals';
@@ -188,8 +189,7 @@ function moved(id: string, by: -1 | 1) {
  * bottom for a manager, which also adds it to the contest's tasks. A link to
  * a task's place in the contest (`?part=tasks&item=` its place in the list)
  * opens its dialog. The rows need the observer role at the contest;
- * someone who holds a role only at one of its tasks is refused them, so the
- * refusal comes with the tasks the server lists for them. A `contest.yaml`
+ * someone refused them sees, by name, the tasks `me` names. A `contest.yaml`
  * that does not pass validation shows its errors and lists the tasks by
  * name alone, so the way to each still works while it is mended.
  */
@@ -240,12 +240,14 @@ export function ContestTasks({ org, contest }: { org: string; contest: string })
     view.state === 'ready' ? view.data.map((standing) => standing.task.name) : [],
   );
   const unreadable = view.state === 'error' && view.error.code === 'invalid_definition';
+  const refused = isRefused(view);
+  const named = useNamedTasks(org, contest);
   const names = queryView(
     $api.useQuery(
       'get',
       TASKS,
       { params: { path } },
-      { enabled: view.state === 'error' },
+      { enabled: view.state === 'error' && !refused },
     ),
   );
   const queryClient = useQueryClient();
@@ -336,9 +338,11 @@ export function ContestTasks({ org, contest }: { org: string; contest: string })
             titles,
           ),
         )
-      : names.state === 'ready'
-        ? byName(names.data.map((task) => task.name))
-        : [];
+      : refused
+        ? byName(named)
+        : names.state === 'ready'
+          ? byName(names.data.map((task) => task.name))
+          : [];
 
   const notice =
     moveRefused !== null ? (

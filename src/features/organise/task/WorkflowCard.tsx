@@ -56,7 +56,7 @@ function Steps({ workflow }: { workflow: string }) {
           {(list) => (
             <VersionGraph
               {...parts}
-              text={read.content}
+              values={read.values ?? {}}
               primitives={list}
               bar={(tools) => <Group gap="xs">{tools}</Group>}
             />

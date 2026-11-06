@@ -1,20 +1,4 @@
-import {
-  isMap,
-  isScalar,
-  isSeq,
-  type Document,
-  type YAMLMap,
-  type YAMLSeq,
-} from 'yaml';
-import {
-  exactJS,
-  nodeFor,
-  parseYaml,
-  writeAt,
-  writeOver,
-  writeYaml,
-  type NumberText,
-} from './yaml-doc';
+import { isRecord, type Values } from '../forms/values';
 import {
   readWorkflow,
   refText,
@@ -28,84 +12,67 @@ import type { PrimitiveInfo } from './primitives';
 import { orderAfterWire } from './rules';
 
 /**
- * Every change the editor makes, as an edit of the `workflow.yaml` document
- * in place (#372): only the nodes a change touches are written, so comments,
- * key order and anything the page does not show stay as they were. Each
- * takes the file's text and gives the new text; a text that is not YAML is
- * given back as it is.
+ * Every change the editor makes to the draft's values. Each takes the values
+ * and gives new ones; the server writes them into `workflow.yaml`.
  */
+
+type Mapping = Record<string, unknown>;
 
 const TOP_ORDER = ['description', 'inputs', 'steps', 'outputs'];
 
-type Edit = (doc: Document) => void;
-
-/** `edit` applied to the document `text` holds. */
-function edited(text: string, edit: Edit): string {
-  const parsed = parseYaml(text);
-  if ('error' in parsed) return text;
-  const { doc } = parsed;
-  if (doc.contents === null || !isMap(doc.contents)) doc.contents = doc.createNode({});
-  edit(doc);
-  return writeOver(text, doc);
-}
-
-/** The workflow `text` holds now. */
-export function workflowOf(text: string): Workflow {
-  const parsed = parseYaml(text);
-  return readWorkflow('error' in parsed ? null : exactJS(parsed.doc));
+/** `edit` applied to a copy of `values`; it may give a new object instead. */
+function edited(values: Values, edit: (draft: Values) => Values | void): Values {
+  const draft = structuredClone(values);
+  return edit(draft) ?? draft;
 }
 
 /** The top-level mapping or list `key`, made in the format's place when missing. */
-function top<T extends YAMLMap | YAMLSeq>(doc: Document, key: string, list = false): T {
-  const root = doc.contents as YAMLMap;
-  const found: unknown = root.get(key, true);
-  if ((list && isSeq(found)) || (!list && isMap(found))) {
-    // An empty `[]` or `{}` takes its first entry as a block, an entry to a line.
-    const collection = found as T;
-    if (collection.items.length === 0) collection.flow = false;
-    return collection;
+function top(draft: Values, key: string, list: true): unknown[];
+function top(draft: Values, key: string, list?: false): Mapping;
+function top(draft: Values, key: string, list = false): Mapping | unknown[] {
+  const found = draft[key];
+  if (list ? Array.isArray(found) : isRecord(found))
+    return found as Mapping | unknown[];
+  const made = list ? [] : {};
+  const placed = key in draft;
+  draft[key] = made;
+  if (!placed) {
+    const rank = TOP_ORDER.indexOf(key);
+    const names = Object.keys(draft);
+    const from = names.findIndex((name) => TOP_ORDER.indexOf(name) > rank);
+    // Keys after its place move behind it, keeping their order.
+    if (from >= 0)
+      for (const name of names.slice(from)) {
+        if (name === key) continue;
+        const value = draft[name];
+        delete draft[name];
+        draft[name] = value;
+      }
   }
-  const made = doc.createNode(list ? [] : {}) as T;
-  const pair = doc.createPair(key, made);
-  const existing = root.items.findIndex(
-    (item) => isScalar(item.key) && item.key.value === key,
+  return made;
+}
+
+function stepsIn(draft: Values): unknown[] {
+  return Array.isArray(draft.steps) ? (draft.steps as unknown[]) : [];
+}
+
+/** The step at `index`, or null when it is not a mapping. */
+function stepAt(draft: Values, index: number): Mapping | null {
+  const step = stepsIn(draft)[index];
+  return isRecord(step) ? step : null;
+}
+
+/** The step's `with`, made a mapping when it is missing. */
+function withOf(step: Mapping): Mapping {
+  if (!isRecord(step.with)) step.with = {};
+  return step.with as Mapping;
+}
+
+/** `map` with the key `from` called `to`, in its place. */
+function renamedKey(map: Mapping, from: string, to: string): Mapping {
+  return Object.fromEntries(
+    Object.entries(map).map(([key, value]) => [key === from ? to : key, value]),
   );
-  if (existing >= 0) {
-    root.items[existing] = pair;
-    return made;
-  }
-  const rank = TOP_ORDER.indexOf(key);
-  const before = root.items.findIndex((item) => {
-    const name = isScalar(item.key) ? String(item.key.value) : '';
-    const at = TOP_ORDER.indexOf(name);
-    return at > rank;
-  });
-  if (before < 0) root.items.push(pair);
-  else root.items.splice(before, 0, pair);
-  return made;
-}
-
-function stepsOf(doc: Document): YAMLSeq {
-  return top<YAMLSeq>(doc, 'steps', true);
-}
-
-/** The node of the step at `index`. */
-function stepNode(doc: Document, index: number): YAMLMap | null {
-  const item: unknown = stepsOf(doc).items[index];
-  return isMap(item) ? item : null;
-}
-
-/** The step's `with`, made a mapping when it is missing or empty. */
-function withOf(doc: Document, step: YAMLMap): YAMLMap {
-  const found: unknown = step.get('with', true);
-  if (isMap(found)) {
-    // An empty `with: {}` takes its first port as a block, a port to a line.
-    if (found.items.length === 0) found.flow = false;
-    return found;
-  }
-  const made = doc.createNode({}) as YAMLMap;
-  step.set('with', made);
-  return made;
 }
 
 /** A declaration as the file writes it: the type alone, or a one-line mapping. */
@@ -142,32 +109,27 @@ export function freeName(base: string, taken: string[], separator = '-'): string
   }
 }
 
-/** Put the steps in `order`, indexes into the old order, keeping each node whole. */
-function reorder(doc: Document, order: number[]): void {
-  const steps = stepsOf(doc);
-  const old = [...steps.items];
-  steps.items = order.map((at) => old[at]).filter((item) => item !== undefined);
+/** Put the steps in `order`, indexes into the old order. */
+function reorder(draft: Values, order: number[]): void {
+  const old = stepsIn(draft);
+  draft.steps = order.map((at) => old[at]).filter((item) => item !== undefined);
+}
+
+function rewritten(value: unknown, change: (text: string) => string): unknown {
+  if (typeof value === 'string') return change(value);
+  if (Array.isArray(value)) return value.map((item) => rewritten(item, change));
+  if (isRecord(value))
+    return Object.fromEntries(
+      Object.entries(value).map(([key, inner]) => [key, rewritten(inner, change)]),
+    );
+  return value;
 }
 
 /** Every string in the steps' ports and the outputs, rewritten by `change`. */
-function rewriteStrings(doc: Document, change: (text: string) => string): void {
-  const visit = (node: unknown) => {
-    if (isMap(node)) {
-      for (const pair of node.items) {
-        if (isScalar(pair.value) && typeof pair.value.value === 'string') {
-          pair.value.value = change(pair.value.value);
-        } else visit(pair.value);
-      }
-    }
-  };
-  for (const step of stepsOf(doc).items) if (isMap(step)) visit(step.get('with', true));
-  const listed: unknown = (doc.contents as YAMLMap).get('outputs', true);
-  if (!isMap(listed)) return;
-  for (const pair of listed.items) {
-    if (isScalar(pair.value) && typeof pair.value.value === 'string') {
-      pair.value.value = change(pair.value.value);
-    } else visit(pair.value);
-  }
+function rewriteStrings(draft: Values, change: (text: string) => string): void {
+  for (const step of stepsIn(draft))
+    if (isRecord(step) && isRecord(step.with)) step.with = rewritten(step.with, change);
+  if (isRecord(draft.outputs)) draft.outputs = rewritten(draft.outputs, change);
 }
 
 const REF = /\$\{\{\s*([^{}]*?)\s*\}\}/g;
@@ -191,96 +153,76 @@ function reads(text: string, kind: Ref['kind'], name: string): boolean {
 }
 
 /** Remove every port value and output that reads `name` of `kind`. */
-function dropUses(doc: Document, kind: Ref['kind'], name: string): void {
-  for (const step of stepsOf(doc).items) {
-    if (!isMap(step)) continue;
-    const given: unknown = step.get('with', true);
-    if (!isMap(given)) continue;
-    given.items = given.items.filter(
-      (pair) =>
-        !(
-          isScalar(pair.value) &&
-          typeof pair.value.value === 'string' &&
-          reads(pair.value.value, kind, name)
-        ),
-    );
+function dropUses(draft: Values, kind: Ref['kind'], name: string): void {
+  const readsIt = (value: unknown) =>
+    typeof value === 'string' && reads(value, kind, name);
+  for (const step of stepsIn(draft)) {
+    if (!isRecord(step) || !isRecord(step.with)) continue;
+    const given = step.with;
+    for (const port of Object.keys(given)) if (readsIt(given[port])) delete given[port];
   }
-  const outputs: unknown = (doc.contents as YAMLMap).get('outputs', true);
-  if (!isMap(outputs)) return;
-  outputs.items = outputs.items.filter((pair) => {
-    const value = pair.value;
-    if (isScalar(value) && typeof value.value === 'string')
-      return !reads(value.value, kind, name);
-    if (isMap(value)) {
-      const from: unknown = value.get('from');
-      return !(typeof from === 'string' && reads(from, kind, name));
-    }
-    return true;
-  });
+  const outputs = draft.outputs;
+  if (!isRecord(outputs)) return;
+  for (const [entry, value] of Object.entries(outputs))
+    if (readsIt(value) || (isRecord(value) && readsIt(value.from)))
+      delete outputs[entry];
 }
 
 // Steps
 
 /** A step that uses a run workflow, added at the end. */
-export function addUse(text: string, ref: string, name: string): string {
-  const workflow = workflowOf(text);
-  const id = freeName(
-    name,
-    workflow.steps.map((step) => step.id),
-  );
-  return edited(text, (doc) => {
-    stepsOf(doc).items.push(nodeFor(doc, { id, use: ref, with: {} }));
+export function addUse(values: Values, ref: string, name: string): Values {
+  const taken = readWorkflow(values).steps.map((step) => step.id);
+  const id = freeName(name, taken);
+  return edited(values, (draft) => {
+    top(draft, 'steps', true).push({ id, use: ref, with: {} });
   });
 }
 
 /** A step of `primitive`, added at the end. */
-export function addStep(text: string, primitive: PrimitiveInfo): string {
-  const workflow = workflowOf(text);
-  const id = freeName(
-    primitive.name,
-    workflow.steps.map((step) => step.id),
-  );
-  return edited(text, (doc) => {
-    stepsOf(doc).items.push(nodeFor(doc, { id, use: primitive.ref, with: {} }));
-  });
+export function addStep(values: Values, primitive: PrimitiveInfo): Values {
+  return addUse(values, primitive.ref, primitive.name);
 }
 
 /** The step removed, with every wire from it and every output reading it. */
-export function removeStep(text: string, index: number): string {
-  const workflow = workflowOf(text);
+export function removeStep(values: Values, index: number): Values {
+  const workflow = readWorkflow(values);
   const step = workflow.steps[index];
-  if (step === undefined) return text;
-  return edited(text, (doc) => {
-    stepsOf(doc).items.splice(index, 1);
+  if (step === undefined) return values;
+  return edited(values, (draft) => {
+    stepsIn(draft).splice(index, 1);
     if (!workflow.steps.some((other, at) => at !== index && other.id === step.id))
-      dropUses(doc, 'steps', step.id);
+      dropUses(draft, 'steps', step.id);
   });
 }
 
 /** What the workflow says it does, first in the file; nothing said removes it. */
-export function setDescription(text: string, description: string): string {
+export function setDescription(values: Values, description: string): Values {
   const said = description.trim();
-  return edited(text, (doc) => {
-    const root = doc.contents as YAMLMap;
-    if (said === '') root.delete('description');
-    else if (root.has('description')) root.set('description', said);
-    else root.items.unshift(doc.createPair('description', said));
+  return edited(values, (draft) => {
+    if (said === '') delete draft.description;
+    else if ('description' in draft) draft.description = said;
+    else return { description: said, ...draft };
   });
 }
 
 /** The step renamed, every reference to it following. */
-export function renameStep(text: string, index: number, id: string): string {
-  const step = workflowOf(text).steps[index];
-  if (step === undefined || step.id === id) return text;
-  return edited(text, (doc) => {
-    writeAt(doc, ['steps', index, 'id'], id);
-    rewriteStrings(doc, (value) => renamed(value, 'steps', step.id, id));
+export function renameStep(values: Values, index: number, id: string): Values {
+  const step = readWorkflow(values).steps[index];
+  if (step === undefined || step.id === id) return values;
+  return edited(values, (draft) => {
+    const node = stepAt(draft, index);
+    if (node !== null) node.id = id;
+    rewriteStrings(draft, (value) => renamed(value, 'steps', step.id, id));
   });
 }
 
 /** The step's primitive at another version. */
-export function setUse(text: string, index: number, use: string): string {
-  return edited(text, (doc) => writeAt(doc, ['steps', index, 'use'], use));
+export function setUse(values: Values, index: number, use: string): Values {
+  return edited(values, (draft) => {
+    const node = stepAt(draft, index);
+    if (node !== null) node.use = use;
+  });
 }
 
 // Ports
@@ -289,41 +231,36 @@ export function setUse(text: string, index: number, use: string): string {
  * The port wired from `ref`; when it reads a step listed after this one, the
  * steps reordered so every step comes after what it reads.
  */
-export function wire(text: string, index: number, port: string, ref: Ref): string {
-  const before = workflowOf(text);
-  return edited(text, (doc) => {
-    const node = stepNode(doc, index);
+export function wire(values: Values, index: number, port: string, ref: Ref): Values {
+  const before = readWorkflow(values);
+  return edited(values, (draft) => {
+    const node = stepAt(draft, index);
     if (node === null) return;
-    withOf(doc, node).set(port, refText(ref));
+    withOf(node)[port] = refText(ref);
     if (ref.kind !== 'steps') return;
     const read = before.steps.findIndex((step) => step.id === ref.name);
-    if (read > index) {
-      const after = workflowOf(writeYaml(doc));
-      reorder(doc, orderAfterWire(after, index, read));
-    }
+    if (read > index) reorder(draft, orderAfterWire(readWorkflow(draft), index, read));
   });
 }
 
 /** The port given a value: a number, a boolean, or a string with references written in. */
 export function setValue(
-  text: string,
+  values: Values,
   index: number,
   port: string,
-  value: string | NumberText | boolean,
-): string {
-  return edited(text, (doc) => {
-    const node = stepNode(doc, index);
-    if (node === null) return;
-    withOf(doc, node);
-    writeAt(doc, ['steps', index, 'with', port], value);
+  value: string | number | boolean,
+): Values {
+  return edited(values, (draft) => {
+    const node = stepAt(draft, index);
+    if (node !== null) withOf(node)[port] = value;
   });
 }
 
 /** The port left without a value or a wire. */
-export function clearPort(text: string, index: number, port: string): string {
-  return edited(text, (doc) => {
-    const given: unknown = stepNode(doc, index)?.get('with', true);
-    if (isMap(given)) given.delete(port);
+export function clearPort(values: Values, index: number, port: string): Values {
+  return edited(values, (draft) => {
+    const given = stepAt(draft, index)?.with;
+    if (isRecord(given)) delete given[port];
   });
 }
 
@@ -344,31 +281,23 @@ export type InputFields = {
 };
 
 /** An input declared, or its declaration changed. */
-export function setInput(text: string, id: string, fields: InputFields): string {
-  return edited(text, (doc) => {
-    top<YAMLMap>(doc, 'inputs');
-    writeAt(doc, ['inputs', id], declarationNode(fields));
+export function setInput(values: Values, id: string, fields: InputFields): Values {
+  return edited(values, (draft) => {
+    top(draft, 'inputs')[id] = declarationNode(fields);
   });
 }
 
-function renameKey(doc: Document, section: string, from: string, to: string): void {
-  const map: unknown = (doc.contents as YAMLMap).get(section, true);
-  if (!isMap(map)) return;
-  for (const pair of map.items)
-    if (isScalar(pair.key) && pair.key.value === from) pair.key.value = to;
-}
-
 /** An input renamed, every reference to it following. */
-export function renameInput(text: string, from: string, to: string): string {
-  return edited(text, (doc) => {
-    renameKey(doc, 'inputs', from, to);
-    rewriteStrings(doc, (value) => renamed(value, 'inputs', from, to));
+export function renameInput(values: Values, from: string, to: string): Values {
+  return edited(values, (draft) => {
+    if (isRecord(draft.inputs)) draft.inputs = renamedKey(draft.inputs, from, to);
+    rewriteStrings(draft, (value) => renamed(value, 'inputs', from, to));
   });
 }
 
 /** Every reference that is `from` written as `to`, wherever the steps and the outputs read it. */
-function swapRefs(doc: Document, from: Ref, to: Ref): void {
-  rewriteStrings(doc, (value) =>
+function swapRefs(draft: Values, from: Ref, to: Ref): void {
+  rewriteStrings(draft, (value) =>
     value.replace(REF, (whole) => {
       const ref = wholeRef(whole);
       return ref !== null && sameRef(ref, from) ? refText(to) : whole;
@@ -377,31 +306,30 @@ function swapRefs(doc: Document, from: Ref, to: Ref): void {
 }
 
 /** Every reference to the workflow file `from` written as one to `to`. */
-export function moveFile(text: string, from: string, to: string): string {
-  return edited(text, (doc) =>
-    swapRefs(doc, { kind: 'workflow', name: from }, { kind: 'workflow', name: to }),
+export function moveFile(values: Values, from: string, to: string): Values {
+  return edited(values, (draft) =>
+    swapRefs(draft, { kind: 'workflow', name: from }, { kind: 'workflow', name: to }),
   );
 }
 
 /** An input the workflow gives instead: every step that read it reads the file at `path`, and the input goes. */
-export function inputToFile(text: string, id: string, path: string): string {
-  return edited(text, (doc) => {
-    swapRefs(doc, { kind: 'inputs', name: id }, { kind: 'workflow', name: path });
-    writeAt(doc, ['inputs', id], undefined);
+export function inputToFile(values: Values, id: string, path: string): Values {
+  return edited(values, (draft) => {
+    swapRefs(draft, { kind: 'inputs', name: id }, { kind: 'workflow', name: path });
+    if (isRecord(draft.inputs)) delete draft.inputs[id];
   });
 }
 
 /** A file of the workflow the task gives instead: the input `id`, of `type`, read wherever the file was. */
 export function fileToInput(
-  text: string,
+  values: Values,
   path: string,
   id: string,
   type: 'file' | 'folder',
-): string {
-  return edited(text, (doc) => {
-    top<YAMLMap>(doc, 'inputs');
-    writeAt(doc, ['inputs', id], declarationNode({ type }));
-    swapRefs(doc, { kind: 'workflow', name: path }, { kind: 'inputs', name: id });
+): Values {
+  return edited(values, (draft) => {
+    top(draft, 'inputs')[id] = declarationNode({ type });
+    swapRefs(draft, { kind: 'workflow', name: path }, { kind: 'inputs', name: id });
   });
 }
 
@@ -423,10 +351,10 @@ export function idOfPath(path: string): string {
 }
 
 /** An input removed, with every port value and output reading it. */
-export function removeInput(text: string, id: string): string {
-  return edited(text, (doc) => {
-    writeAt(doc, ['inputs', id], undefined);
-    dropUses(doc, 'inputs', id);
+export function removeInput(values: Values, id: string): Values {
+  return edited(values, (draft) => {
+    if (isRecord(draft.inputs)) delete draft.inputs[id];
+    dropUses(draft, 'inputs', id);
   });
 }
 
@@ -460,25 +388,27 @@ export function entryFields(
 }
 
 /** An output written, in the short form when it only reads a step's output. */
-export function setEntry(text: string, name: string, fields: EntryFields): string {
-  return edited(text, (doc) => {
-    top<YAMLMap>(doc, 'outputs');
+export function setEntry(values: Values, name: string, fields: EntryFields): Values {
+  return edited(values, (draft) => {
     const { from, ...meaning } = fields;
     const kept = Object.fromEntries(
       Object.entries(meaning).filter(
         ([, value]) => value !== undefined && value !== null,
       ),
     );
-    const value =
+    top(draft, 'outputs')[name] =
       Object.keys(kept).length === 0 ? refText(from) : { from: refText(from), ...kept };
-    writeAt(doc, ['outputs', name], value);
   });
 }
 
-export function renameEntry(text: string, from: string, to: string): string {
-  return edited(text, (doc) => renameKey(doc, 'outputs', from, to));
+export function renameEntry(values: Values, from: string, to: string): Values {
+  return edited(values, (draft) => {
+    if (isRecord(draft.outputs)) draft.outputs = renamedKey(draft.outputs, from, to);
+  });
 }
 
-export function removeEntry(text: string, name: string): string {
-  return edited(text, (doc) => writeAt(doc, ['outputs', name], undefined));
+export function removeEntry(values: Values, name: string): Values {
+  return edited(values, (draft) => {
+    if (isRecord(draft.outputs)) delete draft.outputs[name];
+  });
 }

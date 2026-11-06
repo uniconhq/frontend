@@ -94,6 +94,8 @@ async function stubContestantApi(page: Page, signedIn: boolean) {
           },
           roles: [],
           orgs: [],
+          contests: [],
+          tasks: [],
           workflow_owners: ['carol'],
           degraded: false,
         } satisfies Schemas['Me'])

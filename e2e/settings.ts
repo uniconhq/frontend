@@ -60,3 +60,20 @@ export function settingsOf(
 ): components['schemas']['Settings'] {
   return { values, unreadable: null, token, version: 'v0' };
 }
+
+/** A workflow's draft as the server answers it, read from `text` at `token`. */
+export function workflowDraftOf(
+  text: string,
+  token: string,
+): components['schemas']['WorkflowDraft'] {
+  const values = parse(text, { version: '1.2', schema: 'core' }) as Values;
+  return { values, unreadable: null, content: null, token, revision: null };
+}
+
+/** A workflow version's file as the server answers it: its text and its values. */
+export function workflowVersionOf(
+  text: string,
+): components['schemas']['VersionContent'] {
+  const values = parse(text, { version: '1.2', schema: 'core' }) as Values;
+  return { content: text, values, unreadable: null };
+}

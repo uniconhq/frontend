@@ -7,6 +7,8 @@ import { problem, server } from '@/test/server';
 import {
   CLASSIC,
   WORKFLOW_API,
+  versionOf,
+  valuesOf,
   workflowBox,
   filePort,
   workflowItem,
@@ -19,7 +21,6 @@ import {
   barButton,
   drawer,
   entryButton,
-  fileText,
   noDrawer,
   findPart,
   openInput,
@@ -31,6 +32,7 @@ import {
   stepPanel,
   outputButton,
   portButton,
+  savedValues,
   stepBox,
   toolButton,
   trayButton,
@@ -38,6 +40,14 @@ import {
 import { fileContent, treeEntry } from '@/test/organiser';
 import { INPUTS_SHOWN_KEY } from './inputs-shown';
 import { DRAFT_FILE } from './words';
+
+type Values = Record<string, unknown>;
+
+/** The `with` of the step `id` in a draft's values. */
+function withOf(values: Values, id: string): Values {
+  const step = (values.steps as Values[]).find((each) => each.id === id);
+  return (step?.with ?? {}) as Values;
+}
 
 // Most tests read the inputs' and files' boxes, which a browser shows once it
 // chooses to.
@@ -60,15 +70,15 @@ describe('the workflow editor', () => {
   });
 
   it('draws each step, the inputs and the outputs as boxes', async () => {
-    const { user } = openEditor();
+    openEditor();
 
     expect(await stepBox('run')).toBeInTheDocument();
     expect(screen.getByRole('group', { name: 'Step check' })).toBeInTheDocument();
     expect(screen.getByRole('group', { name: 'Input submission' })).toBeInTheDocument();
     expect(screen.getByRole('group', { name: 'Outputs' })).toBeInTheDocument();
-    // The file is out of the editing area, behind View YAML.
+    // The draft is values: no YAML of it to show.
     expect(screen.queryByLabelText(DRAFT_FILE)).toBeNull();
-    expect(await fileText(user)).toBe(CLASSIC);
+    expect(screen.queryByRole('button', { name: 'View YAML' })).toBeNull();
   });
 
   it('opens the drawer below the bar, so Save and the bar stay in reach', async () => {
@@ -199,8 +209,8 @@ describe('the workflow editor', () => {
       'That output may be missing, so it can be given only to an optional port.';
     const { user } = openEditor({
       draft,
-      problems: (content) =>
-        content.includes('${{ steps.run.extras }}')
+      problems: (values) =>
+        withOf(values, 'again').source === '${{ steps.run.extras }}'
           ? [{ path: ['steps', 2, 'with', 'source'], message: sentence }]
           : [],
     });
@@ -217,10 +227,12 @@ describe('the workflow editor', () => {
     expect(
       within(await stepBox('again')).getByRole('note', { name: sentence }),
     ).toBeInTheDocument();
-    expect(await fileText(user)).toMatch(/source: "?\$\{\{ steps\.run\.extras \}\}"?/);
+    expect(withOf(await savedValues(user), 'again').source).toBe(
+      '${{ steps.run.extras }}',
+    );
   });
 
-  it('wires a port from its menu, keeping the file’s comments', async () => {
+  it('wires a port from its menu, and saves it as values', async () => {
     const { user } = openEditor();
 
     await user.click(await portButton(user, 'run', 'args'));
@@ -229,9 +241,21 @@ describe('the workflow editor', () => {
       within(menu).getByRole('menuitem', { name: /^time_limit from the inputs/ }),
     );
 
-    const text = await fileText(user);
-    expect(text).toContain('args: ${{ inputs.time_limit }}');
-    expect(text).toContain('# One run of a task judged by comparing output');
+    const saved = await savedValues(user);
+    expect(withOf(saved, 'run').args).toBe('${{ inputs.time_limit }}');
+    expect(saved).toEqual({
+      ...valuesOf(CLASSIC),
+      steps: [
+        {
+          ...(valuesOf(CLASSIC).steps as Values[])[0],
+          with: {
+            ...withOf(valuesOf(CLASSIC), 'run'),
+            args: '${{ inputs.time_limit }}',
+          },
+        },
+        (valuesOf(CLASSIC).steps as Values[])[1],
+      ],
+    });
   });
 
   it('writes what the workflow does into its file as the field is left, and undo takes it back', async () => {
@@ -241,10 +265,12 @@ describe('the workflow editor', () => {
     await user.type(field, 'Judges one run by its answer.');
     await user.tab();
 
-    expect(await fileText(user)).toBe(
-      `description: Judges one run by its answer.\n${CLASSIC}`,
-    );
-    await user.keyboard('{Escape}');
+    const saved = await savedValues(user);
+    expect(saved).toEqual({
+      description: 'Judges one run by its answer.',
+      ...valuesOf(CLASSIC),
+    });
+    expect(Object.keys(saved)[0]).toBe('description');
     await user.click(toolButton('Undo'));
     expect(screen.getByRole('textbox', { name: 'What it does' })).toHaveValue('');
   });
@@ -262,9 +288,12 @@ describe('the workflow editor', () => {
     expect(noDrawer()).toBe(true);
     await user.click(toolButton('Undo'));
 
-    expect(await fileText(user)).toBe(CLASSIC);
+    expect(await stepBox('check')).toBeInTheDocument();
+    expect(barButton('Save')).toBeDisabled();
     await user.click(toolButton('Redo'));
-    expect(await fileText(user)).not.toContain('id: check');
+    expect((await savedValues(user)).steps).toEqual([
+      { ...(valuesOf(CLASSIC).steps as Values[])[0] },
+    ]);
   });
 
   it('draws a box closed, saying what it needs and gives, and opens it when it is selected', async () => {
@@ -340,8 +369,8 @@ describe('the workflow editor', () => {
     );
     const { user } = openEditor({
       draft: broken,
-      problems: (content) =>
-        content.includes('steps.runner')
+      problems: (values) =>
+        withOf(values, 'check').actual === '${{ steps.runner.output }}'
           ? [
               {
                 path: ['steps', 1, 'with', 'actual'],
@@ -390,7 +419,11 @@ describe('the workflow editor', () => {
 
     expect(await stepBox('exec')).toHaveAttribute('data-open', 'true');
     expect(drawer('Step exec')).toBeInTheDocument();
-    expect(await fileText(user)).toContain('- id: exec\n    use: unicon/exec@v4\n');
+    expect((await savedValues(user)).steps).toContainEqual({
+      id: 'exec',
+      use: 'unicon/exec@v4',
+      with: {},
+    });
   });
 
   it('adds a run workflow from the tray, found by its name, and never this one', async () => {
@@ -469,7 +502,11 @@ describe('the workflow editor', () => {
 
     expect(await stepBox('other')).toHaveAttribute('data-open', 'true');
     expect(drawer('Step other')).toBeInTheDocument();
-    expect(await fileText(user)).toContain('use: alice/other@v1');
+    expect((await savedValues(user)).steps).toContainEqual({
+      id: 'other',
+      use: 'alice/other@v1',
+      with: {},
+    });
   });
 
   it('says while the tray’s workflows are read, and when they cannot be', async () => {
@@ -527,17 +564,15 @@ describe('the workflow editor', () => {
     // A second of a type is numbered, with an underscore, as the forge names.
     await user.click(trayButton('Inputs', 'Number'));
 
-    const text = await fileText(user);
-    for (const line of [
-      '  number: number\n',
-      '  text: text\n',
-      '  switch: boolean\n',
-      '  choice: {type: enum, options: [a, b]}\n',
-      '  file: file\n',
-      '  folder: folder\n',
-      '  number_2: number\n',
-    ])
-      expect(text).toContain(line);
+    expect((await savedValues(user)).inputs).toMatchObject({
+      number: 'number',
+      text: 'text',
+      switch: 'boolean',
+      choice: { type: 'enum', options: ['a', 'b'] },
+      file: 'file',
+      folder: 'folder',
+      number_2: 'number',
+    });
   });
 
   it('keeps an input’s drawer on it when it is renamed', async () => {
@@ -560,7 +595,9 @@ describe('the workflow editor', () => {
       'data-open',
       'true',
     );
-    expect(await fileText(user)).toContain('time_limit: ${{ inputs.seconds }}');
+    expect(withOf(await savedValues(user), 'run').time_limit).toBe(
+      '${{ inputs.seconds }}',
+    );
   });
 
   it('closes an input’s drawer when the input is removed', async () => {
@@ -575,7 +612,9 @@ describe('the workflow editor', () => {
       expect(screen.queryByRole('complementary', { name: 'Inputs' })).toBeNull(),
     );
     expect(screen.queryByRole('group', { name: 'Input answer' })).toBeNull();
-    expect(await fileText(user)).not.toContain('  answer: file');
+    const saved = await savedValues(user);
+    expect(saved.inputs).not.toHaveProperty('answer');
+    expect(withOf(saved, 'check')).not.toHaveProperty('expected');
   });
 
   it('refuses an input named as an output, as the forge would', async () => {
@@ -594,7 +633,7 @@ describe('the workflow editor', () => {
         'Another one already has that name. Choose another.',
       ),
     ).toBeInTheDocument();
-    expect(await fileText(user)).toContain('  answer: file');
+    expect(barButton('Save')).toBeDisabled();
   });
 
   it('declares an output in place', async () => {
@@ -607,7 +646,9 @@ describe('the workflow editor', () => {
       }),
     );
 
-    expect(await fileText(user)).toContain('time_ms_2: ${{ steps.run.time_ms }}');
+    expect((await savedValues(user)).outputs).toMatchObject({
+      time_ms_2: '${{ steps.run.time_ms }}',
+    });
   });
 
   it('names an input for the task’s form: its title, unit and help', async () => {
@@ -627,9 +668,14 @@ describe('the workflow editor', () => {
       'The memory the program may use.{Enter}',
     );
 
-    expect(await fileText(user)).toContain(
-      'memory_limit: {type: number, title: Memory limit, unit: MB, help: The memory the program may use.}',
-    );
+    expect((await savedValues(user)).inputs).toMatchObject({
+      memory_limit: {
+        type: 'number',
+        title: 'Memory limit',
+        unit: 'MB',
+        help: 'The memory the program may use.',
+      },
+    });
   });
 
   it('offers a unit only for a number, and drops it when the type changes away (M54)', async () => {
@@ -662,9 +708,7 @@ describe('the workflow editor', () => {
         within(row('episodes')).queryByRole('textbox', { name: 'Unit' }),
       ).toBeNull(),
     );
-    const text = await fileText(user);
-    expect(text).toContain('episodes: file');
-    expect(text).not.toContain('unit: runs');
+    expect((await savedValues(user)).inputs).toMatchObject({ episodes: 'file' });
   });
 
   it('shows a unit a file left on another type, to clear it', async () => {
@@ -685,7 +729,7 @@ describe('the workflow editor', () => {
     );
     await user.clear(unit);
     await user.type(unit, '{Enter}');
-    expect(await fileText(user)).toContain('data: file');
+    expect((await savedValues(user)).inputs).toMatchObject({ data: 'file' });
   });
 
   it('gives a port text with an input’s value written in', async () => {
@@ -714,22 +758,22 @@ describe('the workflow editor', () => {
       }),
     );
 
-    expect(await fileText(user)).toMatch(
-      /args: "?--episodes \$\{\{ inputs\.episodes \}\}"?\n/,
+    expect(withOf(await savedValues(user), 'run').args).toBe(
+      '--episodes ${{ inputs.episodes }}',
     );
   });
 
   it('wires a port given a whole reference in its field, and shows what the check says of it', async () => {
     const { user } = openEditor({
-      problems: (content) =>
-        content.includes('entry: ${{ inputs.submission }}')
+      problems: (values) =>
+        withOf(values, 'run').entry === '${{ inputs.submission }}'
           ? [
               {
                 path: ['steps', 0, 'with', 'entry'],
                 message: 'This takes text, not a file.',
               },
             ]
-          : content.includes('${{ inputs }}')
+          : withOf(values, 'run').entry === 'main ${{ inputs }}'
             ? [
                 {
                   path: ['steps', 0, 'with', 'entry'],
@@ -753,7 +797,9 @@ describe('the workflow editor', () => {
     expect(
       await within(stepPanel('run')).findByText('This takes text, not a file.'),
     ).toBeInTheDocument();
-    expect(await fileText(user)).toContain('entry: ${{ inputs.submission }}');
+    expect(withOf(await savedValues(user), 'run').entry).toBe(
+      '${{ inputs.submission }}',
+    );
     await user.selectOptions(
       within(stepPanel('run')).getByRole('combobox', { name: 'entry (optional)' }),
       'A fixed value',
@@ -773,7 +819,7 @@ describe('the workflow editor', () => {
     await user.clear(last);
     await user.paste('${{ inputs.language }}');
     await user.keyboard('{Enter}');
-    expect(await fileText(user)).toContain('entry: ${{ inputs.language }}');
+    expect(withOf(await savedValues(user), 'run').entry).toBe('${{ inputs.language }}');
   });
 
   it('keeps a whole reference typed in a field that would make a loop out of the file', async () => {
@@ -794,7 +840,7 @@ describe('the workflow editor', () => {
         'That would make a loop: check already reads this step.',
       ),
     ).toBeInTheDocument();
-    expect(await fileText(user)).not.toContain('steps.check');
+    expect(barButton('Save')).toBeDisabled();
   });
 
   it('names a reported value for the pages that show it: its title, and a number’s unit (M58)', async () => {
@@ -824,11 +870,10 @@ describe('the workflow editor', () => {
       'Compile log{Enter}',
     );
 
-    const named = await fileText(user);
-    expect(named).toContain(
-      'time_ms: {from: "${{ steps.run.time_ms }}", title: Run time, unit: ms}',
-    );
-    expect(named).toContain('log: {from: "${{ steps.run.log }}", title: Compile log}');
+    expect((await savedValues(user)).outputs).toMatchObject({
+      time_ms: { from: '${{ steps.run.time_ms }}', title: 'Run time', unit: 'ms' },
+      log: { from: '${{ steps.run.log }}', title: 'Compile log' },
+    });
     // The outputs' box writes each out on its row: its title, type, unit and source.
     const outputs = part('[role="group"]', 'Outputs');
     expect(within(outputs).getByText('Run time')).toBeInTheDocument();
@@ -839,7 +884,9 @@ describe('the workflow editor', () => {
     const title = within(row('log')).getByRole('textbox', { name: 'Title' });
     await user.clear(title);
     await user.type(title, '{Enter}');
-    expect(await fileText(user)).toContain('log: ${{ steps.run.log }}\n');
+    expect((await savedValues(user)).outputs).toMatchObject({
+      log: '${{ steps.run.log }}',
+    });
   });
 
   it('drops a reported value’s unit when it comes to read text, and shows one a file left on text, to clear it (M58)', async () => {
@@ -862,9 +909,9 @@ describe('the workflow editor', () => {
     );
     await user.clear(stray);
     await user.type(stray, '{Enter}');
-    expect(await fileText(user)).toContain(
-      'log: {from: "${{ steps.run.log }}", title: Compile log}',
-    );
+    expect((await savedValues(user)).outputs).toMatchObject({
+      log: { from: '${{ steps.run.log }}', title: 'Compile log' },
+    });
 
     expect(within(row('total_ms')).getByRole('textbox', { name: 'Unit' })).toHaveValue(
       'ms',
@@ -878,9 +925,9 @@ describe('the workflow editor', () => {
         within(row('total_ms')).queryByRole('textbox', { name: 'Unit' }),
       ).toBeNull(),
     );
-    expect(await fileText(user)).toContain(
-      'total_ms: {from: "${{ steps.run.log }}", title: Run time}',
-    );
+    expect((await savedValues(user)).outputs).toMatchObject({
+      total_ms: { from: '${{ steps.run.log }}', title: 'Run time' },
+    });
   });
 
   it('keeps a reported value’s title, and its unit while it reads a number, when it is wired to read another output', async () => {
@@ -900,13 +947,13 @@ describe('the workflow editor', () => {
     };
 
     await readFrom('memory_kb from run');
-    expect(await fileText(user)).toContain(
-      'peak: {from: "${{ steps.run.memory_kb }}", title: Peak, unit: ms}',
-    );
+    expect((await savedValues(user)).outputs).toMatchObject({
+      peak: { from: '${{ steps.run.memory_kb }}', title: 'Peak', unit: 'ms' },
+    });
     await readFrom('log from run');
-    expect(await fileText(user)).toContain(
-      'peak: {from: "${{ steps.run.log }}", title: Peak}',
-    );
+    expect((await savedValues(user)).outputs).toMatchObject({
+      peak: { from: '${{ steps.run.log }}', title: 'Peak' },
+    });
   });
 
   it('keeps a step’s drawer open when the step is renamed', async () => {
@@ -924,7 +971,10 @@ describe('the workflow editor', () => {
     await user.type(name, 'opened{Enter}');
 
     expect(stepPanel('opened')).toBeInTheDocument();
-    expect(await fileText(user)).toContain('id: opened');
+    expect((await savedValues(user)).steps).toMatchObject([
+      { id: 'opened' },
+      { id: 'second' },
+    ]);
   });
 
   it('says the check did not run rather than that it passed', async () => {
@@ -940,8 +990,8 @@ describe('the workflow editor', () => {
 
   it('changes a declaration and shows what the check says of the wire it breaks', async () => {
     const { user } = openEditor({
-      problems: (content) =>
-        content.includes('time_limit: text')
+      problems: (values) =>
+        (values.inputs as Values).time_limit === 'text'
           ? [
               {
                 path: ['steps', 0, 'with', 'time_limit'],
@@ -965,7 +1015,7 @@ describe('the workflow editor', () => {
         /This takes a number, not text\./,
       ),
     ).toBeInTheDocument();
-    expect(await fileText(user)).toContain('time_limit: text');
+    expect((await savedValues(user)).inputs).toMatchObject({ time_limit: 'text' });
   });
 
   it('shows a wire the layout cannot draw on its port', async () => {
@@ -983,7 +1033,7 @@ describe('the workflow editor', () => {
     expect(within(step).getByText(/outcome from check, not drawn/)).toBeInTheDocument();
   });
 
-  it('fixes a draft that cannot be read as text, with Save and Undo', async () => {
+  it('fixes a draft that cannot be read as text, and draws it once a save reads', async () => {
     const { user, backend } = openEditor({ draft: 'steps: [\n' });
 
     const mend = await screen.findByLabelText('Fix the draft', {
@@ -992,34 +1042,35 @@ describe('the workflow editor', () => {
     expect(mend).toHaveTextContent(
       'This draft cannot be drawn, because its file cannot be read',
     );
-    // Not "nothing to fix", whatever the check says of a file that cannot be read.
-    await waitFor(() => expect(backend.state.checks).toBeGreaterThan(0));
     expect(screen.queryByText(/Nothing to fix/)).toBeNull();
     expect(
       document.querySelector('section[aria-label="Add to the workflow"]'),
     ).toBeNull();
-    const back = within(mend).getByRole('button', { name: 'Back to the graph' });
-    expect(back).toBeDisabled();
     const field = within(mend).getByRole('textbox', { name: DRAFT_FILE });
+    expect(field).toHaveValue('steps: [\n');
+    await user.clear(field);
+    await user.paste('steps: {\n');
+    await user.click(barButton('Save'));
+    await waitFor(() => expect(backend.state.saves).toHaveLength(1));
+    expect(backend.state.saves[0]).toEqual({ content: 'steps: {\n', token: 'token-1' });
+    // Still unreadable: the server's new reason is shown.
+    expect(
+      screen.getByLabelText('Fix the draft', { selector: 'section' }),
+    ).toBeInTheDocument();
+
     await user.clear(field);
     await user.paste('inputs: {input: file}\nsteps: []\n');
-    expect(back).toBeEnabled();
-    expect(mend).toHaveTextContent('The file can be read again');
-
     await user.click(barButton('Save'));
-    await waitFor(() =>
-      expect(backend.state.draft).toBe('inputs: {input: file}\nsteps: []\n'),
-    );
-    // A run of typing is one step back.
-    await user.click(toolButton('Undo'));
-    expect(field).toHaveValue('steps: [\n');
-    expect(back).toBeDisabled();
-    await user.click(toolButton('Redo'));
-    await user.click(back);
+    await waitFor(() => expect(backend.state.saves).toHaveLength(2));
+    expect(backend.state.saves[1]).toEqual({
+      content: 'inputs: {input: file}\nsteps: []\n',
+      token: 'token-2',
+    });
+    expect(await findPart('section', 'Add to the workflow')).toBeInTheDocument();
     expect(
       screen.queryByLabelText('Fix the draft', { selector: 'section' }),
     ).toBeNull();
-    expect(part('section', 'Add to the workflow')).toBeInTheDocument();
+    expect(await findPart('[role="group"]', 'Input input')).toBeInTheDocument();
   });
 
   it('asks before leaving a draft with changes not saved', async () => {
@@ -1071,7 +1122,7 @@ describe('the workflow editor', () => {
           ),
         ),
         http.get('/api/v1/workflows/:owner/:name/versions/:version', ({ params }) =>
-          HttpResponse.json({ content: params.name === 'inner' ? inner : deep }),
+          HttpResponse.json(versionOf(params.name === 'inner' ? inner : deep)),
         ),
       ],
     });
@@ -1143,7 +1194,7 @@ describe('the drawer', () => {
     expect(offered).not.toContain('input from the inputs');
     expect(offered).not.toContain('submission from the inputs');
     await user.selectOptions(entry, 'language from the inputs');
-    expect(await fileText(user)).toContain('entry: ${{ inputs.language }}');
+    expect(withOf(await savedValues(user), 'run').entry).toBe('${{ inputs.language }}');
 
     const limit = within(run).getByRole('combobox', { name: 'time_limit' });
     expect(limit).toHaveDisplayValue('time_limit from the inputs');
@@ -1151,7 +1202,7 @@ describe('the drawer', () => {
     expect(
       within(run).queryByRole('textbox', { name: 'Value of time_limit' }),
     ).toBeNull();
-    expect(await fileText(user)).not.toContain('time_limit: ${{ inputs.time_limit }}');
+    expect(withOf(await savedValues(user), 'run')).not.toHaveProperty('time_limit');
     // The step keeps its ports to wire again, though it now lacks one it needs.
     expect(
       within(stepPanel('run')).getByRole('combobox', { name: 'time_limit' }),
@@ -1175,12 +1226,12 @@ describe('the drawer', () => {
       within(run).getByRole('textbox', { name: 'Value of args' }),
       '--fast{Enter}',
     );
-    expect(await fileText(user)).toContain('args: --fast');
+    expect(withOf(await savedValues(user), 'run').args).toBe('--fast');
     expect(args).toHaveDisplayValue('A fixed value');
 
     await user.selectOptions(args, 'Nothing yet');
     expect(within(run).queryByRole('textbox', { name: 'Value of args' })).toBeNull();
-    expect(await fileText(user)).not.toContain('args: --fast');
+    expect(withOf(await savedValues(user), 'run')).not.toHaveProperty('args');
   });
 
   it('offers no fixed value on a port that takes a file', async () => {
@@ -1230,7 +1281,7 @@ describe('the drawer', () => {
                 ),
         ),
         http.get('/api/v1/workflows/:owner/:name/versions/:version', () =>
-          HttpResponse.json({ content: inner }),
+          HttpResponse.json(versionOf(inner)),
         ),
       ],
     });
@@ -1249,13 +1300,13 @@ describe('the drawer', () => {
       within(panel).getByRole('combobox', { name: 'source' }),
       'code from the inputs',
     );
-    expect(await fileText(user)).toMatch(/source: "?\$\{\{ inputs\.code \}\}"?/);
+    expect(withOf(await savedValues(user), 'build').source).toBe('${{ inputs.code }}');
 
     expect(within(stepPanel('build')).getByText('v2 is out.')).toBeInTheDocument();
     await user.click(
       within(stepPanel('build')).getByRole('button', { name: 'Move to it' }),
     );
-    expect(await fileText(user)).toContain('use: kenny/inner@v2');
+    expect((await savedValues(user)).steps).toMatchObject([{ use: 'kenny/inner@v2' }]);
     await waitFor(() =>
       expect(within(stepPanel('build')).queryByText('v2 is out.')).toBeNull(),
     );
@@ -1280,7 +1331,7 @@ describe('the drawer', () => {
     await user.click(
       await within(stepPanel('build')).findByRole('button', { name: 'Move to it' }),
     );
-    expect(await fileText(user)).toContain('use: kenny/inner@v2');
+    expect((await savedValues(user)).steps).toMatchObject([{ use: 'kenny/inner@v2' }]);
   });
 
   it('moves to a newer version whose box cannot be read, leaving the rest to the check', async () => {
@@ -1292,7 +1343,7 @@ describe('the drawer', () => {
     await user.click(
       await within(stepPanel('build')).findByRole('button', { name: 'Move to it' }),
     );
-    expect(await fileText(user)).toContain('use: kenny/inner@v2');
+    expect((await savedValues(user)).steps).toMatchObject([{ use: 'kenny/inner@v2' }]);
   });
 
   it('opens a box into the well, between what feeds it and what it feeds', async () => {
@@ -1395,7 +1446,7 @@ describe('the drawer', () => {
     await user.click(
       within(menu).getByRole('menuitem', { name: /^code from the inputs/ }),
     );
-    expect(await fileText(user)).toMatch(/source: "?\$\{\{ inputs\.code \}\}"?/);
+    expect(withOf(await savedValues(user), 'build').source).toBe('${{ inputs.code }}');
   });
 
   it('says which ports read an input', async () => {
@@ -1455,9 +1506,9 @@ describe('a file the workflow gives, not the task', () => {
     expect(
       within(drawer('Workflow file')).getByRole('combobox', { name: 'The file' }),
     ).toHaveDisplayValue('data/answer.txt');
-    const text = await fileText(user);
-    expect(text).toContain('expected: ${{ workflow.data/answer.txt }}');
-    expect(text).not.toContain('answer: file');
+    const saved = await savedValues(user);
+    expect(withOf(saved, 'check').expected).toBe('${{ workflow.data/answer.txt }}');
+    expect(saved.inputs).not.toHaveProperty('answer');
   });
 
   it('offers no workflow file for an input that is not a file', async () => {
@@ -1493,7 +1544,9 @@ describe('a file the workflow gives, not the task', () => {
         'answer.txt: uploaded, waiting for Save',
       ),
     ).toBeInTheDocument();
-    expect(await fileText(user)).toContain('expected: ${{ workflow.answer.txt }}');
+    expect(withOf(await savedValues(user), 'check').expected).toBe(
+      '${{ workflow.answer.txt }}',
+    );
   });
 
   it('makes an input feeding a folder port a file of the workflow, which the forge takes', async () => {
@@ -1510,7 +1563,9 @@ describe('a file the workflow gives, not the task', () => {
       'main.c',
     );
 
-    expect(await fileText(user)).toContain('source: ${{ workflow.main.c }}');
+    expect(withOf(await savedValues(user), 'run').source).toBe(
+      '${{ workflow.main.c }}',
+    );
   });
 
   it('offers a workflow file only to an input a step reads', async () => {
@@ -1560,7 +1615,9 @@ describe('a file the workflow gives, not the task', () => {
     expect(
       within(await openFiles(user)).getByText('answer.txt: uploaded, waiting for Save'),
     ).toBeInTheDocument();
-    expect(await fileText(user)).toContain('expected: ${{ inputs.answer }}');
+    expect(withOf(await savedValues(user), 'check').expected).toBe(
+      '${{ inputs.answer }}',
+    );
   });
 
   it('uploads no file of a name the workflow has, and says where to replace it', async () => {
@@ -1618,10 +1675,10 @@ describe('a file the workflow gives, not the task', () => {
     expect(within(drawer('Inputs')).getByRole('textbox', { name: 'Name' })).toHaveValue(
       'other',
     );
-    const after = await fileText(user);
-    expect(after).toContain('stdin: ${{ inputs.other }}');
-    expect(after).toMatch(/\n {2}other: file\n/);
-    expect(after).not.toContain('workflow.');
+    const saved = await savedValues(user);
+    expect(withOf(saved, 'run').stdin).toBe('${{ inputs.other }}');
+    expect(saved.inputs).toMatchObject({ other: 'file' });
+    expect(JSON.stringify(saved)).not.toContain('workflow.');
   });
 
   it('says when a file the steps read is not among the workflow’s files', async () => {
@@ -1692,12 +1749,14 @@ describe('wiring workflow files', () => {
     ).not.toHaveAttribute('data-disabled', 'true');
     expect(within(menu).queryByRole('menuitem', { name: /workflow.yaml/ })).toBeNull();
     await user.click(folder);
-    expect(await fileText(user)).toContain('source: ${{ workflow.checker/ }}');
     expect(
       await screen.findByRole('group', { name: 'Workflow file checker/' }),
     ).toHaveTextContent('Read by run');
     expect(reads.filter((path) => path === '')).toHaveLength(1);
     expect(reads.filter((path) => path === 'checker')).toHaveLength(1);
+    expect(withOf(await savedValues(user), 'run').source).toBe(
+      '${{ workflow.checker/ }}',
+    );
   });
 
   it('builds the islands checker with staged uploads and wires, then saves and publishes it', async () => {
@@ -1735,16 +1794,18 @@ outputs:
         ),
         http.put(`${WORKFLOW_API}/draft`, async ({ request }) => {
           const body = (await request.json()) as {
-            content: string;
+            values: Values;
             token: string;
             changes: SaveChange[];
           };
           backend.state.saves.push(body);
-          backend.state.draft = body.content;
+          backend.state.values = body.values;
           backend.state.token = 'saved';
           changes = body.changes;
           return HttpResponse.json({
-            content: body.content,
+            values: body.values,
+            unreadable: null,
+            content: null,
             token: 'saved',
             revision: 'checker-files',
           });
@@ -1786,8 +1847,10 @@ outputs:
     ).toHaveTextContent('Read by check');
     await user.click(barButton('Save'));
     await waitFor(() => expect(barButton('Save')).toBeDisabled());
-    expect(backend.state.draft).toContain('${{ workflow.checker/ }}');
-    expect(backend.state.draft).toContain('${{ workflow.checker/program.yaml }}');
+    expect(withOf(backend.state.values ?? {}, 'check')).toMatchObject({
+      source: '${{ workflow.checker/ }}',
+      manifest: '${{ workflow.checker/program.yaml }}',
+    });
     expect(changes.map((change) => change.path)).toEqual([
       'checker/checker.cpp',
       'checker/program.yaml',
@@ -1810,6 +1873,7 @@ outputs:
       'stdin: ${{ workflow.data.in }}',
     );
     let removed = false;
+    let sent: Values = {};
     const { user } = openEditor({
       draft: text,
       handlers: [
@@ -1828,15 +1892,18 @@ outputs:
         ),
         http.put(`${WORKFLOW_API}/draft`, async ({ request }) => {
           const body = (await request.json()) as {
-            content: string;
+            values: Values;
             changes: SaveChange[];
           };
           expect(body.changes).toEqual([
             { path: 'data.in', token: 'file-token', encoding: 'utf-8', remove: true },
           ]);
           removed = true;
+          sent = body.values;
           return HttpResponse.json({
-            content: body.content,
+            values: body.values,
+            unreadable: null,
+            content: null,
             token: 'saved',
             revision: 'removed-file',
           });
@@ -1856,9 +1923,11 @@ outputs:
     const files = await openFiles(user);
     await user.click(await within(files).findByRole('button', { name: /^data.in/ }));
     await user.click(within(files).getByRole('button', { name: 'Remove data.in' }));
+    await user.click(within(files).getByRole('button', { name: 'Remove it anyway' }));
     await user.click(barButton('Save'));
+    await waitFor(() => expect(removed).toBe(true));
     await waitFor(() => expect(barButton('Save')).toBeDisabled());
-    expect(await fileText(user)).toContain('stdin: ${{ workflow.data.in }}');
+    expect(withOf(sent, 'run').stdin).toBe('${{ workflow.data.in }}');
     expect(part('section', 'Problems')).toHaveTextContent('Nothing to fix');
     await user.click(barButton('Publish version'));
     const dialog = await findDialog('Publish v1');

@@ -6,7 +6,13 @@ import type { FeedEntry, Grading, RegradeSummary } from '@/api/types';
 import { renderApp } from '@/test/render';
 import { problem, server, signedIn } from '@/test/server';
 import { organisedEntrant } from '@/test/contestant';
-import { CONTEST_API, runsResult, standingList, taskList } from '@/test/organiser';
+import {
+  CONTEST_API,
+  onlyAtSum,
+  runsResult,
+  standingList,
+  taskList,
+} from '@/test/organiser';
 import { passTime, withFakeTimers } from '@/test/timers';
 
 const FEED = '/orgs/acme/contests/spring/gradings';
@@ -277,6 +283,21 @@ describe("the contest's gradings feed", () => {
       await screen.findByRole('rowgroup', { name: 'B submission 3 by ada' }),
     ).toBeVisible();
     expect(screen.getByRole('textbox', { name: 'Submitted by' })).toHaveValue('');
+  });
+
+  it('offers the tasks me names in the filter to someone refused the list', async () => {
+    server.use(...onlyAtSum);
+    feedAnswering(() => []);
+    renderApp(FEED);
+
+    const task = await screen.findByRole('combobox', { name: 'Task' });
+    await waitFor(() =>
+      expect(
+        within(task)
+          .getAllByRole('option')
+          .map((option) => option.textContent),
+      ).toEqual(['Every task', 'sum']),
+    );
   });
 
   it('reads the filters from the address it was opened at', async () => {

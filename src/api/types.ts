@@ -143,8 +143,10 @@ export type WorkflowItem = Schemas['WorkflowItem'];
 export type WorkflowBox = Schemas['WorkflowBox'];
 /** One output of a run workflow drawn as a box, and whether it is given once for every run. */
 export type BoxOutput = Schemas['BoxOutput'];
-/** A workflow as its page shows it, with the draft for one who may edit it. */
+/** A workflow as its page shows it, with its readers for one who may edit it. */
 export type WorkflowPage = Schemas['WorkflowPage'];
-/** One problem a version would be refused for, at its YAML path. */
+/** A workflow's draft as values, or its text and why while it does not read. */
+export type WorkflowDraft = Schemas['WorkflowDraft'];
+/** One problem a version would be refused for, at its path in the values. */
 export type DefinitionProblem = Schemas['DefinitionProblem'];
 export type Visibility = Schemas['Visibility'];

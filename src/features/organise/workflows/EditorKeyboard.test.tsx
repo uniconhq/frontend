@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { screen, within } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
-import { fileText, openEditor } from '@/test/workflow-editor';
+import { openEditor, savedValues } from '@/test/workflow-editor';
 import { workflowBox, filePort, workflowItem } from '@/test/workflows';
 
 describe('the workflow editor', () => {
@@ -91,18 +91,29 @@ describe('the workflow editor', () => {
       await wireFrom('actual', 'diff-check', /^output from exec/);
       await wireFrom('expected', 'diff-check', /^answer from the inputs/);
 
-      const text = await fileText(user);
-      for (const wire of [
-        'source: ${{ inputs.submission }}',
-        'stdin: ${{ inputs.input }}',
-        'time_limit: ${{ inputs.time_limit }}',
-        'memory_limit: ${{ inputs.memory_limit }}',
-        'actual: ${{ steps.exec.output }}',
-        'expected: ${{ inputs.answer }}',
-        '  text: text\n',
-        'use: kenny/inner@v1',
-      ])
-        expect(text).toContain(wire);
+      const saved = await savedValues(user);
+      expect(saved.inputs).toMatchObject({ text: 'text' });
+      expect(saved.steps).toEqual([
+        {
+          id: 'exec',
+          use: 'unicon/exec@v4',
+          with: {
+            source: '${{ inputs.submission }}',
+            stdin: '${{ inputs.input }}',
+            time_limit: '${{ inputs.time_limit }}',
+            memory_limit: '${{ inputs.memory_limit }}',
+          },
+        },
+        {
+          id: 'diff-check',
+          use: 'unicon/diff-check@v2',
+          with: {
+            actual: '${{ steps.exec.output }}',
+            expected: '${{ inputs.answer }}',
+          },
+        },
+        { id: 'inner', use: 'kenny/inner@v1', with: {} },
+      ]);
     },
   );
 });

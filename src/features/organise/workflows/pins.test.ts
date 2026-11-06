@@ -1,18 +1,21 @@
 import { describe, expect, it } from 'vitest';
-import { workflowOf } from './edit';
+import { valuesOf } from '@/test/workflows';
+import { readWorkflow } from './model';
 import { pinned, warnings } from './pins';
 
-const WORKFLOW = workflowOf(
-  [
-    'inputs: {n: number}',
-    'steps:',
-    '  - {id: a, use: kenny/inner@v1}',
-    '  - {id: b, use: unicon/exec@v4, with: {time_limit: "${{ inputs.n }}"}}',
-    '  - {id: c, use: kenny/inner@v1}',
-    'outputs:',
-    '  out: ${{ steps.b.output }}',
-    '',
-  ].join('\n'),
+const WORKFLOW = readWorkflow(
+  valuesOf(
+    [
+      'inputs: {n: number}',
+      'steps:',
+      '  - {id: a, use: kenny/inner@v1}',
+      '  - {id: b, use: unicon/exec@v4, with: {time_limit: "${{ inputs.n }}"}}',
+      '  - {id: c, use: kenny/inner@v1}',
+      'outputs:',
+      '  out: ${{ steps.b.output }}',
+      '',
+    ].join('\n'),
+  ),
 );
 
 type Path = (string | number)[];

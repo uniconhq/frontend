@@ -171,6 +171,8 @@ async function stubApi(page: Page, overrides: Partial<State> = {}): Promise<Stat
       },
       roles: [],
       orgs: [],
+      contests: [],
+      tasks: [],
       workflow_owners: ['carol'],
       degraded: false,
     } satisfies Schemas['Me']),

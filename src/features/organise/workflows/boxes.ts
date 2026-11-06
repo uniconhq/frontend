@@ -3,7 +3,6 @@ import { useIsFetching, useQueries } from '@tanstack/react-query';
 import { apiClient } from '@/api/client';
 import { $api } from '@/api/query';
 import type { Visibility, WorkflowBox } from '@/api/types';
-import { dataOf } from './yaml-doc';
 import type { StepPorts } from './layout';
 import { readWorkflow, type Workflow } from './model';
 import type { PrimitiveInfo } from './primitives';
@@ -139,11 +138,6 @@ export function useReadingBoxes(): boolean {
   );
 }
 
-/** A version's file read as a workflow, forgiving one with problems. */
-export function workflowFrom(content: string): Workflow {
-  return readWorkflow(dataOf(content));
-}
-
 /** The boxes of the run workflows a workflow's steps use, as they are read. */
 export function useStepBoxes(
   workflow: Workflow | null,
@@ -186,7 +180,7 @@ export async function framesFor(
       { params: { path: use } },
     );
     if (data === undefined) break;
-    current = workflowFrom(data.content);
+    current = readWorkflow(data.values);
   }
   return frames;
 }

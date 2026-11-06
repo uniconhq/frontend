@@ -2,14 +2,16 @@ import { useMemo, useState, type ReactNode } from 'react';
 import type { Primitive } from '@/api/types';
 import { Button } from '@/ui/Button';
 import { Checkbox } from '@/ui/Checkbox';
-import { parseUse, useStepBoxes, workflowFrom, type Frame } from './boxes';
+import type { Values } from '../forms/values';
+import { parseUse, useStepBoxes, type Frame } from './boxes';
 import { Description } from './Description';
 import { DRAWER_WIDTH } from './Drawer';
 import { useDrawnLayout } from './drawn-layout';
 import { DrawnGraph } from './DrawnGraph';
 import { Inside } from './Inside';
 import { useInputsShown } from './inputs-shown';
-import { selectionOf, type Selected } from './lines';
+import { selectionOf } from './lines';
+import { readWorkflow } from './model';
 import { byRef } from './primitives';
 import { VersionDrawer } from './VersionDrawer';
 
@@ -18,31 +20,31 @@ import { VersionDrawer } from './VersionDrawer';
  * it says it does above it, a box
  * clicked opens, its drawer on the right says what it holds, a workflow box
  * opened zooms into its inside as the editor's does, Files lists every file
- * of the version, and the switch shows the inputs and files the steps read. A workflow's page puts Files and the switch on its bar, with
- * the YAML marked where the picked box is written; a task's Workflow card
- * puts them above the graph.
+ * of the version, and the switch shows the inputs and files the steps read.
+ * A workflow's page puts Files and the switch on its bar; a task's Workflow
+ * card puts them above the graph.
  */
 export function VersionGraph({
   owner,
   name,
   version,
-  text,
+  values,
   primitives,
   bar,
 }: {
   owner: string;
   name: string;
   version: string;
-  text: string;
+  values: Values;
   primitives: Primitive[];
-  /** What goes above the graph, given Files and the switch, and the pick. */
-  bar: (tools: ReactNode, selected: Selected | null) => ReactNode;
+  /** What goes above the graph, given Files and the switch. */
+  bar: (tools: ReactNode) => ReactNode;
 }) {
   const [selected, setSelected] = useState<string | null>(null);
   const [inputsShown, showInputs] = useInputsShown();
   const lines = selectionOf(selected);
   const map = useMemo(() => byRef(primitives), [primitives]);
-  const workflow = useMemo(() => workflowFrom(text), [text]);
+  const workflow = useMemo(() => readWorkflow(values), [values]);
   const boxes = useStepBoxes(workflow, map);
   const inputs = inputsShown ? 'shown' : 'hidden';
   const { layout } = useDrawnLayout(workflow, map, boxes, selected, false, inputs);
@@ -70,7 +72,6 @@ export function VersionGraph({
             onChange={showInputs}
           />
         </>,
-        lines,
       )}
       {stack.length === 0 && <Description text={workflow.description} />}
       {stack.length > 0 ? (
@@ -90,7 +91,7 @@ export function VersionGraph({
         />
       ) : (
         <DrawnGraph
-          text={text}
+          workflow={workflow}
           primitives={primitives}
           selected={selected}
           onSelect={setSelected}
@@ -104,7 +105,6 @@ export function VersionGraph({
         owner={owner}
         name={name}
         version={version}
-        text={text}
         workflow={workflow}
         primitives={map}
         boxes={boxes}

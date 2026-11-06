@@ -105,6 +105,8 @@ async function stub(page: Page) {
       },
       roles: [],
       orgs: [],
+      contests: [],
+      tasks: [],
       workflow_owners: ['carol'],
       degraded: false,
     } satisfies Schemas['Me']),
