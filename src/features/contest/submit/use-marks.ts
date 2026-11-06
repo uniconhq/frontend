@@ -10,14 +10,10 @@ type TaskPath = { org: string; contest: string; task: string };
 const MARKS = '/api/v1/orgs/{org}/contests/{contest}/tasks/{task}/marks';
 const MARK = '/api/v1/orgs/{org}/contests/{contest}/tasks/{task}/marks/{number}';
 
-/**
- * How often the marks are read again: a team's members share one set, so a
- * mark one of them sets reaches the others, and at the row's close they turn
- * final without a reload.
- */
+// Polled so a teammate's mark shows, and marks turn final at the close.
 const MEANWHILE_MS = 30_000;
 
-/** The refusals that say there is nothing to mark, which no wait changes. */
+/** Refusals no wait changes, so polling stops. */
 const NOTHING_TO_MARK = new Set(['marks_off', 'not_approved']);
 
 function readAgainIn(marks: Marks | undefined, error: unknown): number | false {
@@ -39,15 +35,7 @@ export type MarkState =
       toggle: (number: number, marked: boolean) => void;
     };
 
-/**
- * The marks the reader's row holds on a task its `marked` boards count, and
- * a way to set or take one off, read only where the task page says the row
- * may mark (`marked`). Should the settings change under the page, a task no
- * such board covers answers `marks_off`, and a reader who is no approved
- * contestant `not_approved`; both mean there is nothing to mark. A refused
- * mark, such as one past the task's `marks`, is kept to be said until the
- * next toggle.
- */
+/** The reader's row's marks on a task, read only when the page says `marked`. */
 export function useMarks(path: TaskPath, marked: boolean): MarkState {
   const queryClient = useQueryClient();
   const [refusal, setRefusal] = useState<ApiError | null>(null);

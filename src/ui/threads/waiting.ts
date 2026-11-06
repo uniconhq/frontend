@@ -1,10 +1,8 @@
 import type { Clarification } from '@/api/types';
 
 /**
- * Since when an open question has waited for the organisers: from the
- * asker's first message after the organisers last wrote, or from its asking
- * while they have written nothing. Null once the organisers wrote last, when
- * it waits on nobody.
+ * From the asker's first message after the organisers last wrote; null once
+ * the organisers wrote last.
  */
 export function waitingSince(clarification: Clarification): string | null {
   const { messages } = clarification;
@@ -15,7 +13,6 @@ export function waitingSince(clarification: Clarification): string | null {
   );
 }
 
-/** How long something has waited, in a word or two: "5 minutes", "2 hours", "3 days". */
 export function waitedWords(ms: number): string {
   const minutes = Math.floor(ms / 60_000);
   const count = (n: number, unit: string) =>

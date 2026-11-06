@@ -1,8 +1,4 @@
-/**
- * A picture's name as a statement can write it in a link: letters, digits,
- * `.`, `_` and `-`, anything else a `-`, so `my diagram.png` is
- * `my-diagram.png`.
- */
+/** A name a statement link can hold: `my diagram.png` becomes `my-diagram.png`. */
 export function pictureName(name: string): string {
   const trimmed = name.trim();
   const dot = trimmed.lastIndexOf('.');
@@ -26,7 +22,6 @@ export function freeName(name: string, taken: ReadonlySet<string>): string {
   }
 }
 
-/** The line a statement shows a picture with: `![diagram](public/diagram.png)`. */
 export function pictureLine(chosen: string, path: string): string {
   const alt = chosen
     .replace(/\.[^.]*$/, '')

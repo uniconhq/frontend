@@ -2,13 +2,7 @@ import { createContext, useContext } from 'react';
 import type { ApiError } from '@/api/problem';
 import type { Me } from '@/api/types';
 
-/**
- * Four states, because that is all a page can do about it: wait, offer a way
- * in, show the person their own data, or say that it could not find out.
- * `unavailable` is the one that is easy to leave out: a signed-in person whose
- * backend hiccuped would otherwise be told to sign in, and that sign-in cannot
- * work either.
- */
+/** `unavailable` keeps a backend hiccup from telling a signed-in person to sign in. */
 export type Session =
   | { status: 'loading' }
   | { status: 'signed-out' }
@@ -25,11 +19,7 @@ export function useSession(): Session {
   return session;
 }
 
-/**
- * For pages behind <RequireSession>, which have already established that there
- * is a person. Throwing beats an impossible branch in every such page, and it
- * can only fire on a wiring mistake.
- */
+/** Only behind <RequireSession>; throws on a wiring mistake. */
 export function useMe(): Me {
   const session = useSession();
   if (session.status !== 'signed-in') {

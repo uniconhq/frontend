@@ -4,11 +4,8 @@ import type { ReactNode } from 'react';
 type Tone = 'body' | 'secondary' | 'meta';
 
 /**
- * Prose and helper lines. `tone` picks a text token rather than a grey, so the
- * light and dark twins stay in step. `size` is the handoff's two body sizes:
- * `sm` for helper text and chrome, `md` for prose someone reads a paragraph of.
- * `tone="meta"` is for small uppercase labels, which do not clear 4.5:1 on
- * every surface.
+ * `tone` picks a text token rather than a grey, so light and dark stay in step.
+ * `tone="meta"` is only for small uppercase labels: it does not clear 4.5:1 everywhere.
  */
 export function BodyText({
   children,

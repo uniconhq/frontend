@@ -1,14 +1,13 @@
 import { useRef, useState } from 'react';
 
-/** What a tile or a suggestion puts in the line, and where the cursor lands in it. */
+/** `caret` is where the cursor lands in `text`. */
 export type Insert = { text: string; caret?: number };
 
-/** Puts a piece in a line at its cursor. */
 export type Inserter = (piece: Insert) => void;
 
 /**
- * The line the tiles put pieces in: the last one that had the cursor. One
- * value can have a line in more than one place, so `place` says which.
+ * Tiles insert into the line focused last. One value can have a line in more
+ * than one place, so `place` says which.
  */
 export function useFormulaTarget() {
   const insert = useRef<Inserter | null>(null);

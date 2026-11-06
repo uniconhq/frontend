@@ -11,10 +11,7 @@ export function savedBy(
   );
 }
 
-/**
- * What entrants are graded on, in one line: the latest publication, when it
- * was saved and by whom, or that nothing is live yet (M21).
- */
+/** What entrants are graded on, or that nothing is live yet (M21). */
 export function publishedLine(
   latest: Publication | null,
   author: string | null = null,

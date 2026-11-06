@@ -1,4 +1,3 @@
-/* A task's own picture, never wider than the text it sits in. */
 .picture {
   display: block;
   max-width: 100%;

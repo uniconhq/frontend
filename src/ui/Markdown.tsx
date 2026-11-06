@@ -8,23 +8,14 @@ import classes from './Markdown.module.css';
 
 const NONE_STAGED: ReadonlyMap<string, string> = new Map();
 
-/** Whether a link leaves this site, and so opens apart from it. */
 function external(href: string | undefined): boolean {
   return href !== undefined && /^[a-z][a-z0-9+.-]*:/i.test(href);
 }
 
 /**
- * Every heading one level down, since what is rendered here sits inside a
- * page that has its own title: a statement's `# Sum` is the page's second
- * level, and the page keeps one first-level heading. A link out of the site
- * opens in a tab of its own and tells the other site nothing about this one.
- *
- * An image is drawn only when it is one of the task's own pictures, a file
- * under its `public/` folder named as `public/diagram.png`, and only in what
- * belongs to a task (`task`); it is read from the task's own route, under
- * the same rights as the statement. Any other image is a link to it with its
- * alt text, so reading a statement fetches nothing from a host its author
- * picked, which would hand that host every reader's address.
+ * Headings go one level down, since the page keeps its own h1. Only a task's
+ * own `public/` pictures are drawn; any other image is a link, so reading a
+ * statement fetches nothing from a host its author picked.
  */
 function componentsFor(
   task: TaskWhere | null,
@@ -69,14 +60,8 @@ function componentsFor(
 }
 
 /**
- * A statement or any other Markdown an organiser wrote, with GitHub's tables
- * and task lists. Raw HTML inside it is left out, never run, and links keep
- * only the safe kinds react-markdown lets through, since the author is not
- * the person reading it. `task` is the task it belongs to, for a statement or
- * a task's announcement, whose own pictures it draws; `staged` draws, by
- * their names under `public/`, pictures not saved yet from addresses of
- * their own bytes, as the statement's editor previews them. Application code
- * imports this, never react-markdown, which the lint rules hold it to.
+ * Raw HTML is left out, never run, since the author is not the reader.
+ * `staged` draws pictures not saved yet, as the statement editor previews them.
  */
 export function Markdown({
   children,

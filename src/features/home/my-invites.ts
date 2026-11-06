@@ -7,26 +7,16 @@ import type { Entered, Invite } from '@/api/types';
 const MINE = '/api/v1/me/invites';
 const OPEN = '/api/v1/me/invites/open';
 
-/** The refusal that means the list is behind: the invite lapsed. */
 const LAPSED = new Set(['invite_expired']);
 
-/** The caller's pending invites, lapsed ones flagged. */
 export function useMyInvites() {
   return $api.useQuery('get', MINE);
 }
 
 /**
- * Accept or decline, and leave the answer in place of the invite wherever the
- * page shows it, so the card says what came of it rather than vanishing.
- * Accepting a place in a contest registers the person, or puts them in the
- * team that invited them, and answers with the entrant they are in, which
- * `onEntered` is given. A contest whose sign-up asks for a code takes it as
- * `code`. An accepted role reads the session again, since the roles there
- * decide what every page offers; an accepted place reads the contest list
- * and the contest's home again, since the contest now shows the person's
- * entry. A refusal because the invite lapsed reads the list again, which
- * shows it lapsed; any other keeps the card, so its reason stays beside it.
- * The focus moves to `card` once a choice is answered.
+ * Accept or decline, leaving the answer in the invite's place so the card says
+ * what came of it. An accepted role rereads the session, since roles decide
+ * what every page offers.
  */
 export function useDecide(
   card: RefObject<HTMLElement | null>,

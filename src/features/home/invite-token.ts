@@ -1,10 +1,6 @@
 /**
- * The token an invite's mail link carries after its `#`. It is moved out of
- * the address as soon as the page sees it and kept in this tab, so it never
- * travels in a URL: not in the `?next=` of a sign-in, which the backend and
- * the proxy would log, and not in the browser's history. The tab's storage
- * outlives the full-page trip through Forgejo; where storage is refused, the
- * copy in memory still serves a person already signed in.
+ * An invite link's `#` token, kept in this tab so it never travels in a URL
+ * (a sign-in's `?next=` is logged). Tab storage survives the trip through Forgejo.
  */
 const KEY = 'unicon.invite-token';
 

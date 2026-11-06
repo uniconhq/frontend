@@ -1,4 +1,3 @@
-/* The one look of a link: accent text, underlined while the pointer is on it. */
 .link {
   color: var(--unicon-text-accent);
   font-size: inherit;
@@ -16,10 +15,7 @@
   border-radius: 2px;
 }
 
-/*
- * The arrow after a link that leaves the app, with no text for a screen
- * reader where the browser takes the second form.
- */
+/* The second `content` gives screen readers no text where the browser supports it. */
 .out::after {
   content: '↗';
   content: '↗' / '';

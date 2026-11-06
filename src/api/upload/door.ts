@@ -3,21 +3,11 @@ import type { Upload } from '@/api/types';
 import { digestOf } from './digest';
 import { sendToForge } from './transfer';
 
-/**
- * The steps every file takes through the upload door, whoever sends it: a
- * contestant's file for a submission, or an organiser's for a task. The
- * caller asks for the slot and completes the upload with its own route; what
- * happens between, and what the answers mean, is the same for both.
- */
+// Shared by contestant and organiser uploads; each brings its own slot and complete routes.
 
-/** Where an upload stands once completed. */
 type Status = Upload['status'];
 
-/**
- * The SHA-256 of a file, reporting the share read, from 0 to 1. A file the
- * browser can no longer read, moved or deleted since it was chosen, fails
- * as an upload that did not go through.
- */
+/** A file moved or deleted since it was chosen fails as `upload_failed`. */
 export async function hashOf(
   file: File,
   onShare: (share: number) => void,
@@ -33,11 +23,7 @@ export async function hashOf(
   }
 }
 
-/**
- * Sends the file to its slot and completes it, answering where the upload
- * stands. A slot with no address is for a file the forge holds already, and
- * nothing is sent to it.
- */
+/** A slot with no URL is a file the forge already holds; nothing is sent. */
 export async function sendAndComplete(
   slot: { url: string | null },
   file: File,
@@ -49,10 +35,7 @@ export async function sendAndComplete(
   return (await complete()).status;
 }
 
-/**
- * Where an upload stands, or null while its bytes are not there: a send that
- * failed may still have arrived, and this asks before sending again.
- */
+/** Null while the bytes are not there; a failed send may still have arrived. */
 export async function arrival(complete: () => Promise<Upload>): Promise<Status | null> {
   try {
     return (await complete()).status;
@@ -62,7 +45,6 @@ export async function arrival(complete: () => Promise<Upload>): Promise<Status |
   }
 }
 
-/** Fails unless the forge holds the file as it was declared. */
 export function mustBeVerified(status: Status): void {
   if (status !== 'verified') {
     throw new ApiError({

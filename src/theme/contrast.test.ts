@@ -1,13 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { theme, uniconTokens, type ColorSchemeName } from './theme';
 
-/**
- * Contrast was checked at 4.5:1 for body text and 3:1 for headline-scale type
- * in both schemes. This is that check as a test, so changing a grey by two hex
- * digits fails here rather than being noticed by somebody reading a leaderboard
- * in a bright hall. WCAG 2.1 relative luminance and contrast ratio, written out
- * rather than pulling in a colour library.
- */
+// WCAG 2.1 relative luminance and contrast ratio, written out to avoid a colour library.
 function relativeLuminance(hex: string): number {
   const channels = [1, 3, 5].map((offset) => {
     const value = Number.parseInt(hex.slice(offset, offset + 2), 16) / 255;
@@ -23,24 +17,18 @@ function contrastRatio(foreground: string, background: string): number {
   return (lighter + 0.05) / (darker + 0.05);
 }
 
-/** The four surfaces text is ever set on. Borders are lines, not grounds. */
+// Borders are lines, not grounds.
 const GROUNDS = ['canvas', 'chrome', 'body', 'hover'] as const;
 type Ground = (typeof GROUNDS)[number];
 
 type Rule = {
-  /** The --unicon-text-* token, without the prefix. */
   token: 'body' | 'secondary' | 'accent' | 'meta' | 'danger';
-  /** Where it is allowed to appear. */
   on: readonly Ground[];
   floor: number;
   why: string;
 };
 
-/**
- * `meta` is the 10px uppercase label token and nothing else, so it is held to
- * the 3:1 floor and only on the two grounds labels sit on. Readable content
- * uses `secondary` instead.
- */
+// `meta` is only for 10px uppercase labels, hence its 3:1 floor.
 const RULES: Rule[] = [
   {
     token: 'body',

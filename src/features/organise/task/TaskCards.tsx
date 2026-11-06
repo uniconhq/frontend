@@ -13,7 +13,6 @@ type TaskPath = { org: string; contest: string; task: string };
 
 const TASK = '/api/v1/orgs/{org}/contests/{contest}/tasks/{task}';
 
-/** How many entrant rows are in the grading queue. */
 export function QueueCard({ path }: { path: TaskPath }) {
   const view = queryView(
     $api.useQuery(
@@ -41,7 +40,6 @@ export function QueueCard({ path }: { path: TaskPath }) {
   );
 }
 
-/** How many gradings there are, and how many still run. */
 export function GradingsCard({ path }: { path: TaskPath }) {
   const live = useLiveConnected();
   const view = queryView(

@@ -2,9 +2,8 @@ import { useEffect } from 'react';
 import { useLocation } from 'react-router';
 
 /**
- * Call `then` with what `find` finds, now or as soon as the page draws it,
- * since a card may show its fields only once its data has come; the
- * returned function stops looking.
+ * Calls `then` with what `find` finds, now or once drawn, since a card may show
+ * its fields only after its data comes. The returned function stops looking.
  */
 export function whenDrawn<T>(
   find: () => T | null,
@@ -35,10 +34,8 @@ function loadingAbove(element: Element): boolean {
 }
 
 /**
- * The part of the page an address's anchor names (`#file`), scrolled to once
- * it is drawn and nothing above it is still loading, so it stays where it was
- * scrolled to; and again each time a link names it, from another page or from
- * this one.
+ * Scrolls to the address's anchor (`#file`) once nothing above it is still
+ * loading, so it stays in place; and again each time a link names it.
  */
 export function useAnchor() {
   const { hash, key } = useLocation();

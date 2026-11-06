@@ -7,12 +7,7 @@ import { isSessionExpired, subscribe } from './expired';
 import { currentPath, loginHref } from './login-href';
 import classes from './SessionExpiredModal.module.css';
 
-/**
- * Rendered once, in the root layout. The page underneath stays mounted, so an
- * unsent clarification and every filter the person set are still there when
- * they come back, and the modal cannot be dismissed into a signed-out page
- * pretending to work.
- */
+/** Not dismissable; the page underneath stays mounted so typed work survives. */
 export function SessionExpiredModal() {
   const location = useLocation();
   const expired = useSyncExternalStore(subscribe, isSessionExpired, () => false);

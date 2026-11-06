@@ -1,13 +1,7 @@
 import { MutationCache, QueryCache, QueryClient } from '@tanstack/react-query';
 import { isApiError } from './problem';
 
-/**
- * The app's one query client, built here rather than in app.tsx so the tests
- * exercise the same retry policy and the same 401 handling the browser gets.
- * What a 401 means is not this layer's business, so it takes a callback.
- *
- * @param onUnauthenticated every 401 the app sees, read or write.
- */
+/** Built here, not in app.tsx, so tests get the same retry and 401 handling. */
 export function createQueryClient(options: {
   onUnauthenticated: () => void;
 }): QueryClient {

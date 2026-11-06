@@ -2,30 +2,14 @@ import { Button as MantineButton } from '@mantine/core';
 import type { CSSProperties, HTMLAttributes, ReactNode, Ref } from 'react';
 
 /**
- * Primary is a flat sunset fill with dark ink: the pink is light enough that
- * white text fails contrast in both schemes. Secondary and danger are outlines
- * with the text colour carrying the meaning, because the destructive step is
- * the one inside the dialog and a wall of red before then teaches people to
- * click through it.
+ * Primary has dark ink because white text fails contrast on the pink. Danger is
+ * an outline: the destructive step is inside the dialog, and red before it
+ * teaches people to click through.
  *
- * The outline is set as Mantine's own button variables rather than as a
- * background and a border, so the hover rule still fires. A disabled button
- * drops its variant's text colour and takes the theme's disabled one, the
- * same grey for every variant, so it never reads as a pink button with its
- * fill taken away. `href` turns the
- * button into a real anchor, for the trips out of the app the browser has to
- * perform.
- *
- * The rules every page keeps: a button does something, and a link (PageLink,
- * OutLink) goes somewhere; a card or a form has at most one primary button;
- * a destructive one never sits on a hub. Every action of a page, a card, a
- * form or a dialog is `sm`, the default, so equal actions side by side are
- * one size; `xs` is only for an action on one item of a list or one row of a
- * table, which keeps the row low.
- *
- * A button that opens a menu or a popover is its target: `ref` and the
- * attributes the menu adds (`aria-expanded`, its key handling) pass through
- * to the button itself.
+ * The outline is set as Mantine's button variables so the hover rule still fires.
+ * A button does something; a link (PageLink, OutLink) goes somewhere. A card
+ * or form has at most one primary, and no destructive button sits on a hub.
+ * Actions are `sm`; `xs` is only for an action on one row of a list or table.
  */
 export function Button({
   children,

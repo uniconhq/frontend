@@ -27,7 +27,7 @@ function leafOf(node: Record<string, unknown>): [string, unknown] | null {
 
 const GATHERED: Record<string, string> = { runs: 'runs', results: 'results' };
 
-/** Whether `node`'s inputs fit `form`: by name, by list or one, by gathered leaf. */
+/** Inputs fit by name, by list or one, and by gathered leaf. */
 function fits(form: BlockForm, node: Record<string, unknown>): boolean {
   const given = Object.keys(node).filter((key) => key !== 'block');
   if (given.some((key) => !(key in form.inputs))) return false;
@@ -50,10 +50,7 @@ function fits(form: BlockForm, node: Record<string, unknown>): boolean {
   });
 }
 
-/**
- * The form of a block a stored node means, as the forge's `form_of` reads a
- * task's value: the first its inputs fit, else the only form a task can use.
- */
+/** Mirrors the forge's `form_of`: the first form that fits, else the only task form. */
 function formOf(catalogue: Catalogue, node: Record<string, unknown>): BlockForm | null {
   const block = catalogue.blocks.find((item) => item.name === node['block']);
   if (block === undefined) return null;
@@ -64,12 +61,8 @@ function formOf(catalogue: Catalogue, node: Record<string, unknown>): BlockForm 
 }
 
 /**
- * Whether each of a task's values gives text, as the forge's `_tree_gives`
- * reads a stored tree (forge domain/blocks/check.py): a text; a run's column
- * that is text (`texts`, such as `verdict` or a text input an axis fills);
- * another value that gives text, followed by name; or a block that gives a
- * number or text whose number-or-text inputs all give text, such as an `if`
- * choosing between two texts. Anything else gives a number.
+ * The values that give text, mirroring the forge's `_tree_gives`
+ * (domain/blocks/check.py). Anything else gives a number.
  */
 export function textValues(
   values: Readonly<Record<string, unknown>>,

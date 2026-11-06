@@ -1,20 +1,17 @@
 import { useRef, useState, type RefObject } from 'react';
 import { isApiError } from './problem';
 
-/** How a change went: its answer, or the refusal, or null when another was under way. */
+/** `error` is null when another change was already under way. */
 type Outcome<T> = { ok: true; value: T } | { ok: false; error: unknown };
 
 export type Change = {
-  /** Which change is under way, such as `approve:20`, while one is. */
+  /** Such as `approve:20`. */
   pending: string | null;
-  /** The last refusal, shown until the next change or until it is dismissed. */
   error: unknown;
   dismiss: () => void;
   /**
-   * Make one change at a time, then read the page again, so a second click
-   * while the page catches up never sends the same change twice. The focus
-   * then moves to `focus`, since the button that was clicked has usually
-   * gone. `own` is for a form that keeps the focus and says its own refusals.
+   * One at a time, so a second click never sends twice. Focus moves to `focus`,
+   * as the button has usually gone; with `own` the form keeps focus and error.
    */
   run: <T>(
     key: string,
@@ -25,21 +22,16 @@ export type Change = {
 
 const NONE: ReadonlySet<string> = new Set();
 
-/**
- * One busy flag and one refusal for a part of a page whose changes run
- * through more than one mutation, so that only one runs at a time.
- */
 export function useChange({
   reread,
   rereadDone = true,
   behind = NONE,
   focus,
 }: {
-  /** The reads a change can move, read again before the change counts as done. */
   reread?: () => Promise<unknown>;
   /** False when each change writes its answer into the reads itself. */
   rereadDone?: boolean;
-  /** Refusals that mean the page is behind, which read it again too. */
+  /** Refusal codes that mean the page is behind, so it re-reads. */
   behind?: ReadonlySet<string>;
   focus?: RefObject<HTMLElement | null>;
 } = {}): Change {

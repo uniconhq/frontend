@@ -4,13 +4,8 @@ import { Modal } from '@/ui/Modal';
 import { CreateForm, type SecondField } from './CreateForm';
 
 /**
- * Making one org, contest or task: the list's one button, which opens the
- * form in a dialog over the page, so no form sits open on a hub. The thing is
- * made before the create answers, so the dialog closes as soon as it has, and
- * the new thing is in the list or its page is open; a refusal keeps the
- * dialog with what was typed and says why, for the person to try again.
- * Closing the dialog drops what was typed, and puts the focus back on the
- * button.
+ * Opens the create form in a dialog, so no form sits open on a hub. A refusal
+ * keeps what was typed; closing drops it and puts focus back on the button.
  */
 export function CreateButton({
   openLabel,
@@ -23,9 +18,8 @@ export function CreateButton({
   onSubmit,
   children,
 }: {
-  /** The button, and the dialog's title, such as "New contest". */
+  /** Also the dialog's title. */
   openLabel: string;
-  /** A line above the form, about what is being made. */
   intro?: ReactNode;
   second: SecondField;
   submitLabel: string;
@@ -33,7 +27,7 @@ export function CreateButton({
   error: unknown;
   /** Called as the dialog opens, to forget the last refusal. */
   onOpen: () => void;
-  /** More of the form, under its two lines, such as the kind of task. */
+  /** More fields under the two lines, such as the kind of task. */
   children?: ReactNode;
   /** Resolves once the thing is made. */
   onSubmit: (name: string, second: string) => Promise<void>;

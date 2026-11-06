@@ -3,12 +3,8 @@ import { Popout } from './Popout';
 import classes from './InfoTip.module.css';
 
 /**
- * Background for a field or a heading, behind a small ⓘ beside its label:
- * what a thing is, not what to type, which stays in plain sight under the
- * box. It opens on hover for a mouse, and on a click or a tap, which keeps it
- * open until the next click, a click elsewhere or Escape, so it works on a
- * touch screen and from the keyboard, where the ⓘ is a button like any other.
- * `about` names what it explains, for a screen reader: "About Worth".
+ * What a thing is, not what to type (that stays under the box). Opens on hover,
+ * and a click or tap keeps it open, so it works on touch and from the keyboard.
  */
 export function InfoTip({ about, children }: { about: string; children: ReactNode }) {
   return (

@@ -3,7 +3,6 @@ import { Chip } from './Chip';
 import { InfoTip } from './InfoTip';
 import { PageLink } from './PageLink';
 
-/** The organisers page explains who can change these readable fields. */
 export function ReadOnly({ to, organisers }: { to: string; organisers: string }) {
   return (
     <Group gap={4}>

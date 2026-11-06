@@ -9,10 +9,6 @@ import { routes } from '@/router';
 import { createQueryClient } from '@/api/query-client';
 import { reportUnauthenticated } from '@/session';
 
-/**
- * Components read colours and fonts from the provider, so a bare render() would
- * test a different component than the one that ships.
- */
 export function renderWithProviders(ui: ReactElement): RenderResult {
   const queryClient = createQueryClient({ onUnauthenticated: reportUnauthenticated });
 
@@ -32,11 +28,7 @@ export function renderWithProviders(ui: ReactElement): RenderResult {
   return render(ui, { wrapper: Providers });
 }
 
-/**
- * The whole app at one address, with the real route table, the real shell and
- * the real session boot. Anything about guards or redirects is only true when
- * all three are in play.
- */
+/** The whole app at one address: real routes, shell and session boot. */
 export function renderApp(path: string): RenderResult & {
   router: ReturnType<typeof createMemoryRouter>;
 } {

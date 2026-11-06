@@ -1,12 +1,8 @@
 import type { InputValues, TaskValues } from '../forms/task-values';
 
-/**
- * What a save of the task's cards would change, a line each in words, for
- * the save bar to list before anything is saved: the workflow, each input by
- * its title, the runs, the scoring, the checks and the submission rules.
- */
+/** What a save of the task's cards would change, a line each, for the save bar. */
 
-/** An input's fields that say what it holds, without how it was read. */
+/** What an input holds, without how it was read. */
 function held(input: InputValues): string {
   const {
     id,
@@ -36,7 +32,7 @@ function held(input: InputValues): string {
   ]);
 }
 
-/** The lines of a save; `newFiles` are the settings given a new file, each said once as such. */
+/** `newFiles` are the settings given a new file, each said once as such. */
 export function changeLines(
   before: TaskValues,
   after: TaskValues,

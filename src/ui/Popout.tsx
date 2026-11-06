@@ -6,14 +6,8 @@ import classes from './Popout.module.css';
 const CROSSING_MS = 150;
 
 /**
- * A button that pops out what is behind it. It opens on hover for a mouse,
- * staying open while the pointer moves onto what it opened, and on a click or
- * a tap, which keeps it open until the next click, a click elsewhere or
- * Escape, so it works on a touch screen and from the keyboard. `label` names
- * the button for a screen reader; `children` may take a function that closes
- * it, for a choice made inside, and the side it opened on, which is not
- * `position` where the page has no room there. `bare` pops it out with no
- * card around it, right against the button, for what draws its own.
+ * Opens on hover, and a click or tap keeps it open, so it works on touch and
+ * from the keyboard. The side it opened on may differ from `position` when there is no room.
  */
 export function Popout({
   label,

@@ -5,15 +5,13 @@ import classes from './RadioGroup.module.css';
 export type RadioOption = {
   value: string;
   label: string;
-  /** What choosing it means, or an example of it, under its label. */
   description?: string;
   disabled?: boolean;
   beside?: ReactNode;
-  /** Why a greyed option cannot be chosen, under it, never under the group. */
+  /** Why a greyed option cannot be chosen, shown under it, not under the group. */
   reason?: string | null;
 };
 
-/** What reads under an option: what it means, then, while greyed, why. */
 function underOption(option: RadioOption, greyed: boolean): ReactNode {
   const reason = greyed ? (option.reason ?? null) : null;
   if (reason === null) return option.description;
@@ -27,16 +25,7 @@ function underOption(option: RadioOption, greyed: boolean): ReactNode {
   );
 }
 
-/**
- * One choice of a few, all in view at once, under a label that names what is
- * being chosen. It reads out as a radio group, so the arrow keys move between
- * the options. An option may carry a sentence under it saying what choosing
- * it means, such as an example; the options then stand one under the other,
- * so each sentence stays beside its own choice. A greyed option carries why
- * it cannot be chosen under it too. `description` is a line under the label
- * about the choice as a whole, and `error` what a save refused about the
- * option chosen; `required` marks a choice that must be made.
- */
+/** Options with a sentence under them stand one per line, so each sentence stays by its choice. */
 export function RadioGroup({
   label,
   value,
@@ -51,7 +40,6 @@ export function RadioGroup({
   value: string;
   options: RadioOption[];
   onChange: (value: string) => void;
-  /** A line under the label, such as why the choice is held. */
   description?: string;
   error?: string;
   required?: boolean;
@@ -82,8 +70,7 @@ export function RadioGroup({
     <Radio.Group
       label={label}
       description={description}
-      // The line about the choice as a whole reads under its question, before
-      // the options, never under the last option where it reads as that one's.
+      // Before the options, so it does not read as the last option's.
       inputWrapperOrder={['label', 'description', 'input', 'error']}
       error={error}
       withAsterisk={required}

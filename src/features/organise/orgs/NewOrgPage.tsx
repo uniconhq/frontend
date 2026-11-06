@@ -3,10 +3,7 @@ import { Page, PageHeader } from '@/ui/Page';
 import { CreateForm } from '../CreateForm';
 import { NEW_ORG, useCreateOrg } from './new-org';
 
-/**
- * The new org's form at an address of its own, for a link straight to it;
- * the orgs page opens the same form from its New org button.
- */
+/** The new org form at its own address, for a link straight to it. */
 export function NewOrgPage() {
   const { create, submit } = useCreateOrg();
   return (

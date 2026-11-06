@@ -3,11 +3,8 @@ import type { VerdictName } from '@/theme/theme';
 import { NOT_GIVEN } from './number/words';
 
 /**
- * What each verdict is called and which colour pair it takes, apart from the
- * badge that draws it, so the words can be said where no badge is drawn, such
- * as to a screen reader. A grading that has finished takes a pair of its own,
- * one still waiting the grey, and one held up or ended without a result the
- * limit's amber, so the three never read alike.
+ * Apart from the badge, so the words can be said where no badge is drawn.
+ * Finished, waiting and held-up gradings take different pairs, so they never read alike.
  */
 
 export type Verdict = Outcome | GradingStatus | SubmissionState;
@@ -45,7 +42,6 @@ export function lookOf(verdict: string): { label: string; colors: VerdictName } 
     : { label: verdict.replaceAll('_', ' ').toUpperCase(), colors: 'queued' };
 }
 
-/** The words a verdict is shown in, for saying it where no badge is drawn. */
 export function verdictLabel(verdict: Verdict | (string & {})): string {
   return lookOf(verdict).label;
 }

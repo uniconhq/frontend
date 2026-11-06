@@ -1,13 +1,8 @@
 import { Textarea as MantineTextarea } from '@mantine/core';
 
 /**
- * A multi-line field. `mono` is for file contents, where columns line up and
- * a stray space has to be visible, so lines do not wrap. It is `rows` tall and
- * the person can drag it taller; it does not grow on its own, so a long file
- * scrolls inside it and the save button stays in place. `readOnly` keeps the
- * text as it is while something is working on it, `autoFocus` takes the
- * focus as the field appears, and `required` will not let a form send it
- * empty. `onCommit` runs as the field is left.
+ * `mono` is for file contents: lines do not wrap, so columns line up. It does
+ * not grow on its own, so a long file scrolls inside and Save stays in place.
  */
 export function Textarea({
   label,

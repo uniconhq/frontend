@@ -3,11 +3,8 @@ import type { ReactNode } from 'react';
 import { useFieldLabel } from './FieldLabel';
 
 /**
- * A date and a time as the browser's own field takes them, in the viewer's
- * local time (`2026-06-01T17:00`, seconds when `seconds`). The page converts
- * to and from the time it stores; this only shows and takes the local value.
- * `description` reads under the box, and `info` is background behind an ⓘ
- * beside the label. `width` is as `TextInput`'s; full width when absent.
+ * Takes and shows the viewer's local time (`2026-06-01T17:00`); the page
+ * converts to and from the time it stores.
  */
 export function DateTimeInput({
   label,

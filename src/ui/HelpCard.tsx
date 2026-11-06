@@ -2,7 +2,7 @@ import { Popover } from '@mantine/core';
 import { useViewportSize } from '@mantine/hooks';
 import type { ReactElement, ReactNode } from 'react';
 
-/** An explanation beside or below its target, kept below the formula it explains. */
+/** `ceiling` keeps the card below the formula it explains. */
 export function HelpCard({
   opened,
   ceiling,

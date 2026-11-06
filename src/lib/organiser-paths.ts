@@ -1,9 +1,6 @@
 /**
- * Where each organiser page lives. Every one is under `/orgs`: the proxy in
- * `deploy` sends exactly `/orgs` and `/orgs/...` to this app and answers a
- * path it does not list with its own 404, so a page anywhere else loads in the
- * dev server and breaks behind the proxy. The organiser pages and the shell's
- * breadcrumb both build their links here.
+ * Organiser pages must live under `/orgs`: the proxy in `deploy` sends only
+ * that here, so a page elsewhere works in dev and 404s behind the proxy.
  */
 const part = encodeURIComponent;
 
@@ -26,11 +23,7 @@ export function taskPath(org: string, contest: string, task: string): string {
   return `${contestPath(org, contest)}/tasks/${part(task)}`;
 }
 
-/**
- * The workflow pages, at `/workflows` and `/workflows/<owner>/<name>`, which
- * the proxy sends here as well: a workflow is a person's or an org's, so it
- * has an address of its own rather than one under an org.
- */
+/** A workflow belongs to a person or an org, so it lives outside `/orgs`. */
 export const WORKFLOWS_PATH = '/workflows';
 
 export function workflowPath(owner: string, name: string, version?: string): string {

@@ -3,9 +3,8 @@ import { BEING_CHECKED, MISSING } from './words';
 import classes from './number.module.css';
 
 /**
- * One value or one leaderboard cell, as every page shows it: a number
- * rounded, its exact digits on hover; text as given, on one line; "–" when
- * it is missing or hidden; "being checked" while it waits.
+ * A value or leaderboard cell as every page shows it: a number rounded with
+ * its exact digits on hover, "–" when missing or hidden.
  */
 export function ShownValue({
   number,

@@ -3,14 +3,8 @@ import type { ReactNode } from 'react';
 import { useFieldLabel } from './FieldLabel';
 
 /**
- * A choice from a short list, as the browser's own select: it opens with the
- * keyboard, reads out as a list and works on a phone without any help.
- * `placeholder` is an empty first option, for a choice nobody has made yet.
- * `description` reads under the box, as every field's hint does, and
- * `error`, when given, under it too, marking it invalid. `info` is
- * background behind an ⓘ beside the label. `labelHidden` names the box for
- * a screen reader alone, for a box on a row whose place already says what
- * it is, such as the second of a leaderboard's ways to rank.
+ * The browser's own select, so it works from the keyboard and on a phone.
+ * `placeholder` is an empty first option; `labelHidden` names the box for a screen reader only.
  */
 export function Select({
   label,

@@ -3,19 +3,9 @@ import type { QueryFunction, QueryKey, UseQueryResult } from '@tanstack/react-qu
 import { apiClient } from './client';
 import { type ApiError, toApiError } from './problem';
 
-/**
- * Every server read goes through `$api`, so the request, the response and the
- * query key are all typed from the backend's OpenAPI document.
- */
 export const $api = createQueryClient(apiClient);
 
-/**
- * The same read at one of several typed addresses, such as a folder of a
- * contest or of a task. Each `$api.queryOptions` call keeps its own key type,
- * so a function choosing between them returns a union `useQuery` cannot take;
- * this keeps the key and the fetch exactly as generated and forgets only the
- * key's literal type.
- */
+/** Forgets a key's literal type, so a choice between typed addresses fits `useQuery`. */
 export function widenQuery<TData, TKey extends QueryKey>(options: {
   queryKey: TKey;
   queryFn: QueryFunction<TData, TKey>;
@@ -29,13 +19,7 @@ export type QueryView<T> =
   | { state: 'error'; error: ApiError; retry: () => void }
   | { state: 'ready'; data: T };
 
-/**
- * Three states a page has to render, from the dozen React Query exposes. It
- * also corrects the error type: the middleware in client.ts turns every failure
- * into an ApiError, which is not what the document declares. A refetch that
- * fails after an answer arrived keeps showing that answer, so a page that
- * polls does not swap itself for an error over one missed poll.
- */
+/** A failed refetch keeps the last answer, so one missed poll shows no error. */
 export function queryView<T>(query: UseQueryResult<T, unknown>): QueryView<T> {
   if (query.isPending) return { state: 'loading' };
   if (query.data !== undefined) return { state: 'ready', data: query.data };

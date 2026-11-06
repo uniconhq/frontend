@@ -1,9 +1,4 @@
-/**
- * Where each contestant page lives. They are under `/contests`, which the
- * proxy in `deploy` sends to this app the way it sends `/orgs`, and the same
- * address serves a visitor and a signed-in person, so a link to a contest can
- * be passed around before anyone has an account.
- */
+/** Contestant pages live under `/contests`, which the proxy in `deploy` sends here. */
 const part = encodeURIComponent;
 
 const CONTESTS_PATH = '/contests';

@@ -2,12 +2,7 @@ import { $api } from '@/api/query';
 import { OutLink } from '@/ui/OutLink';
 import { useSession } from './session-context';
 
-/**
- * The way in for someone with no account yet. Renders nothing unless the
- * instance lets people register themselves, which the backend says by
- * answering GET register-url with a URL rather than null. Only asked once the
- * visitor is known to be signed out.
- */
+/** Shown only when the server gives a register URL (self sign-up is on). */
 export function CreateAccountLink() {
   const session = useSession();
   const register = $api.useQuery('get', '/api/v1/auth/register-url', undefined, {

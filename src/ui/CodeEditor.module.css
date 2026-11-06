@@ -5,10 +5,7 @@
   min-width: 0;
 }
 
-/*
- * The editor fills the frame, which the person can drag taller; a long file
- * scrolls inside it, so what sits under the editor stays in place.
- */
+/* A long file scrolls inside the frame, so what sits under it stays in place. */
 .frame {
   min-height: 120px;
   overflow: hidden;

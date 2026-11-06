@@ -15,12 +15,7 @@ a {
   color-scheme: light dark;
 }
 
-/*
- * A field the browser filled in itself keeps the field's own colours. Chrome
- * paints a filled field with a light background of its own, which leaves the
- * dark scheme's light text unreadable on it; the inset shadow covers that
- * background, and the long transition keeps Chrome's from showing through.
- */
+/* Chrome's light autofill background hides dark-scheme text; the shadow and long transition cover it. */
 input:-webkit-autofill,
 input:-webkit-autofill:hover,
 input:-webkit-autofill:focus {

@@ -1,12 +1,7 @@
 import type { CodeEditor as Real } from '@/ui/CodeEditor';
 import { Textarea } from '@/ui/Textarea';
 
-/**
- * What the tests use in place of `ui/CodeEditor`: jsdom lays nothing out, so
- * CodeMirror cannot be typed into there the way a person types. This takes
- * the same props and is a plain text field with the same label, so a test
- * finds the editor by its label, reads its value and types into it.
- */
+/** Stands in for `ui/CodeEditor`: jsdom does no layout, so CodeMirror can't be typed into. */
 export function CodeEditor({
   label,
   value,

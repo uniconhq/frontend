@@ -1,9 +1,4 @@
-/**
- * The backend answers failures with RFC 9457 problem documents. `code` is the
- * stable part, since messages get reworded and codes do not, so the UI branches
- * on it and never on `title`. Anything that is not a problem document becomes
- * an ApiError too, so callers have one shape to handle.
- */
+// Failures are RFC 9457 problem documents. Branch on `code`, never on `title`.
 
 export type ApiErrorCode =
   | 'unexpected_response'
@@ -20,10 +15,7 @@ export class ApiError extends Error {
   readonly status: number;
   readonly title: string;
   readonly detail: string | undefined;
-  /**
-   * Members beyond the four standard ones. Keeping them raw means a new code
-   * needs no change here.
-   */
+  /** Kept raw so a new code needs no change here. */
   readonly extensions: Record<string, unknown>;
 
   constructor(init: {
@@ -56,7 +48,6 @@ function isProblemDocument(body: unknown): body is ProblemDocument {
   return typeof body === 'object' && body !== null;
 }
 
-/** Everything the standard members do not already carry. */
 function extensionsOf(body: ProblemDocument): Record<string, unknown> {
   const standard = new Set(['type', 'title', 'status', 'detail', 'code']);
   return Object.fromEntries(
@@ -108,7 +99,6 @@ export function isApiError(error: unknown): error is ApiError {
   return error instanceof ApiError;
 }
 
-/** Anything React Query hands back, as one type. */
 export function toApiError(error: unknown): ApiError {
   if (isApiError(error)) return error;
   return new ApiError({

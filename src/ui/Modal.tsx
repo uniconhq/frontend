@@ -2,11 +2,8 @@ import { Modal as MantineModal } from '@mantine/core';
 import type { ReactNode } from 'react';
 
 /**
- * Mantine's Modal, kept for its focus trap, escape handling and scroll lock,
- * which are expensive to get right and invisible when they work. `dismissable:
- * false` is for the session-expired modal, where there is nothing useful behind
- * it. `wide` is for a dialog that shows a file or a table, which a form's
- * width would wrap.
+ * Mantine's Modal, kept for its focus trap, escape handling and scroll lock.
+ * `dismissable: false` is for the session-expired modal.
  */
 export function Modal({
   opened,
