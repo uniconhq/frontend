@@ -1,16 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import { emptyInput, emptyTuple, type TaskValues } from '../forms/task-values';
 import { changeLines } from './changes';
+import { emptyShow, withMoment } from './scoring-model';
 
 function task(overrides: Partial<TaskValues> = {}): TaskValues {
   return {
     name: 'Sum',
-    workflow: 'unicon/classic@v5',
+    workflow: 'unicon/classic@v6',
     inputs: [],
     axes: [],
     scoreGroups: [],
     scoreValues: [],
-    show: {},
+    show: emptyShow(),
     checks: [],
     max: '',
     rateCount: '',
@@ -43,7 +44,7 @@ describe('what a save of the task’s cards changes', () => {
   it('says the runs, the scoring, the checks and the submission rules, each once', () => {
     const now = task({
       axes: [{ inputs: ['input'], tuples: [emptyTuple(['input'])] }],
-      show: { score: 'now' },
+      show: withMoment(emptyShow(), 'values', 'score', 'always', true),
       checks: [],
       max: '10',
     });

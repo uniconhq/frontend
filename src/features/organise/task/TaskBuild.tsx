@@ -296,6 +296,14 @@ function BuildForm({
     inputFiles.map((change) => change.id),
   );
   const changed = lines.length > 0 || values.inputs.some(heldTheOtherWay);
+  // What the preview cannot show until it is published: any change but show's.
+  const elsewhere =
+    changeLines(
+      read.values,
+      { ...values, show: read.values.show },
+      titles,
+      inputFiles.map((change) => change.id),
+    ).length > 0 || values.inputs.some(heldTheOtherWay);
   // A save's answer is about that save: once something is changed again, it
   // goes, rather than standing in the bar beside changes it does not cover.
   // The cards read the task afresh once a save is through, so an answer that
@@ -483,6 +491,7 @@ function BuildForm({
         <>
           <ScoringCard
             place={place}
+            elsewhere={elsewhere}
             values={values}
             titles={titles}
             workflowText={workflowRaw}

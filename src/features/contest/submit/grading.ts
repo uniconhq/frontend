@@ -2,6 +2,7 @@ import type { GradingResult, SubmissionState, Submission } from '@/api/types';
 import { formatExact } from '@/lib/exact';
 import { serverNow } from '@/lib/time';
 import { BEING_CHECKED, MISSING } from '@/ui/number/words';
+import { FIRST_NOT_PASSED } from '@/ui/scored/scored-text';
 
 /**
  * How often a contestant's submissions are read again: soon while a grading
@@ -30,14 +31,6 @@ const REFUSED_MS = 5_000;
  * Unicon tries it again by itself, and the page should see it move on.
  */
 const UNFINISHED = new Set<SubmissionState>(['queued', 'grading', 'delayed']);
-
-/**
- * What an entrant reads under a delayed grading's badge (#442): the grading
- * failed on Unicon's side, which says nothing of their submission, so no
- * more than the wait already says of a hidden step.
- */
-export const DELAYED_SENTENCE =
-  "A problem on Unicon's side. Nothing is lost, and it does not use up a submission.";
 
 function unfinished(submission: Submission): boolean {
   return submission.grading !== null && UNFINISHED.has(submission.grading.status);
@@ -101,15 +94,6 @@ function revealWait(submissions: Submission[], now: Date): number | null {
 }
 
 /**
- * Why the organisers cancelled the grading, in their words: the sentence a
- * cancelled grading carries, or null on any other status or with none given.
- */
-export function cancelReason(grading: GradingResult): string | null {
-  if (grading.status !== 'cancelled') return null;
-  return grading.reason === null || grading.reason === '' ? null : grading.reason;
-}
-
-/**
  * The submissions whose grading finished between two reads of the list: each
  * one still being graded in `before` and finished in `after`. Nothing on the
  * first read, when there is no `before`.
@@ -149,8 +133,13 @@ export function resultLine(grading: GradingResult | null): string {
       })
       .join(' · ');
   }
-  const tests = grading.runs.length;
+  // Only the runs whose show names `passed` say whether they passed; the
+  // first run not passed is a run already counted under its own entry.
+  const told = grading.runs.flatMap((run) =>
+    run.passed === null || run.group === FIRST_NOT_PASSED ? [] : [run.passed],
+  );
+  const tests = told.length;
   if (tests === 0) return '';
-  const passed = grading.runs.reduce((sum, run) => sum + run.passed, 0);
+  const passed = told.reduce((sum, each) => sum + each, 0);
   return `Passed ${String(passed)} of ${String(tests)} ${tests === 1 ? 'test' : 'tests'}`;
 }

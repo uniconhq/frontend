@@ -12,6 +12,7 @@ const done: GradingResult = {
   limit: null,
   compiled: null,
   once: { reports: {}, texts: {} },
+  inputs: {},
   reveal_at: null,
   run_values: [],
   runs: [],
@@ -103,6 +104,7 @@ describe('what a submission came to, in its row', () => {
     reports: [],
     texts: {},
     label: null,
+    labelled: null,
     message: null,
   };
   const value = {
@@ -150,5 +152,28 @@ describe('what a submission came to, in its row', () => {
       }),
     ).toBe('Passed 1 of 2 tests');
     expect(resultLine({ ...done, runs: [run] })).toBe('Passed 1 of 1 test');
+  });
+
+  it('counts only the tests whose show names passed', () => {
+    expect(
+      resultLine({
+        ...done,
+        runs: [run, { ...run, place: 2, verdict: null, passed: null }],
+      }),
+    ).toBe('Passed 1 of 1 test');
+    expect(resultLine({ ...done, runs: [{ ...run, passed: null }] })).toBe('');
+  });
+
+  it('does not count the first run not passed again', () => {
+    expect(
+      resultLine({
+        ...done,
+        runs: [
+          run,
+          { ...run, place: 2, passed: 0 },
+          { ...run, group: 'first_not_passed', place: 1, passed: 0 },
+        ],
+      }),
+    ).toBe('Passed 1 of 2 tests');
   });
 });

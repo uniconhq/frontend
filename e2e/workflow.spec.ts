@@ -19,19 +19,19 @@ const INPUTS_SHOWN_KEY = 'unicon.workflow-graph.inputs';
 const CLASSIC = `# kenny/tuned, a workflow.
 inputs:
   submission: {type: file, title: Solution}
-  language: {type: enum, options: [c, cpp, java, python], title: Language}
+  language: {type: enum, options: [c, cpp, java, kotlin, python, javascript, typescript, csharp, rust, r, ruby], title: Language}
   time_limit: {type: number, title: Time limit}
   memory_limit: {type: number, title: Memory limit}
   input: {type: file, title: Input}
   answer: {type: file, title: Answer}
 steps:
   - id: build
-    use: unicon/exec@v3
+    use: unicon/exec@v4
     with:
       source: \${{ inputs.submission }}
       language: \${{ inputs.language }}
   - id: run
-    use: unicon/exec@v3
+    use: unicon/exec@v4
     with:
       source: \${{ inputs.submission }}
       language: \${{ inputs.language }}
@@ -79,7 +79,22 @@ const LIMITS = {
 /** What exec's forms take to compile a program. */
 const SOURCE = {
   source: port('folder', { runs: true }),
-  language: port('enum', { options: ['c', 'cpp', 'java', 'python', 'ipynb'] }),
+  language: port('enum', {
+    options: [
+      'c',
+      'cpp',
+      'java',
+      'kotlin',
+      'python',
+      'ipynb',
+      'javascript',
+      'typescript',
+      'csharp',
+      'rust',
+      'r',
+      'ruby',
+    ],
+  }),
   entry: port('text', { optional: true }),
 };
 
@@ -109,7 +124,7 @@ const PRIMITIVES = [
     problem: null,
   },
   {
-    ref: 'unicon/exec@v3',
+    ref: 'unicon/exec@v4',
     name: 'exec',
     title: 'Run programs',
     description:
@@ -781,7 +796,7 @@ test('a box opens two levels in, and a problem opens the step inside', async ({
     });
   const draft = 'steps:\n  - {id: build, use: kenny/inner@v1}\n';
   const inner = 'steps:\n  - {id: compile, use: kenny/deep@v1}\n';
-  const deep = 'steps:\n  - {id: link, use: unicon/exec@v3}\n';
+  const deep = 'steps:\n  - {id: link, use: unicon/exec@v4}\n';
   const box = {
     inputs: [
       {

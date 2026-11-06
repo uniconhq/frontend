@@ -26,6 +26,48 @@ import classes from './task.module.css';
 
 const TASK = '/api/v1/orgs/{org}/contests/{contest}/tasks/{task}';
 
+/** What pages call each language a task's toolchain is prepared for. */
+const LANGUAGE_NAMES: Record<string, string> = {
+  c: 'C',
+  cpp: 'C++',
+  java: 'Java',
+  kotlin: 'Kotlin',
+  python: 'Python',
+  javascript: 'JavaScript',
+  typescript: 'TypeScript',
+  csharp: 'C#',
+  rust: 'Rust',
+  r: 'R',
+  ruby: 'Ruby',
+};
+
+/**
+ * A toolchain's package as people know it, before its version: the
+ * compiler or runtime by its own name, and none where the language's name
+ * already says it, as "Python: 3.14.3".
+ */
+const TOOL_NAMES: Record<string, string> = {
+  gcc: 'gcc ',
+  gxx: 'gcc ',
+  openjdk: 'OpenJDK ',
+  nodejs: 'Node.js ',
+  dotnet: '.NET ',
+  python: '',
+  kotlin: '',
+  typescript: '',
+  rust: '',
+  'r-base': '',
+  ruby: '',
+};
+
+/** A toolchain as it was picked, "gxx 14.3.0", in the words above: "gcc 14.3.0". */
+function pickedWords(picked: string): string {
+  const space = picked.indexOf(' ');
+  if (space < 0) return picked;
+  const tool = TOOL_NAMES[picked.slice(0, space)];
+  return tool === undefined ? picked : `${tool}${picked.slice(space + 1)}`;
+}
+
 /** Where the task's files stand, in a word beside its name. */
 function StateChip({ state }: { state: TaskState }) {
   if (state.draft && state.errors.length > 0) {
@@ -258,14 +300,7 @@ export function TaskStanding({
           </BodyText>
           {Object.entries(task.toolchains ?? {}).map(([language, toolchain]) => (
             <BodyText key={language} tone="secondary">
-              {{ c: 'C', cpp: 'C++', java: 'Java', python: 'Python' }[language] ??
-                language}
-              :{' '}
-              {toolchain.picked
-                .replace(/^gxx /, 'gcc ')
-                .replace(/^python /, '')
-                .replace(/^openjdk /, 'OpenJDK ')}{' '}
-              (
+              {LANGUAGE_NAMES[language] ?? language}: {pickedWords(toolchain.picked)} (
               {toolchain.version === null
                 ? 'newest when first prepared'
                 : `named ${toolchain.version}`}

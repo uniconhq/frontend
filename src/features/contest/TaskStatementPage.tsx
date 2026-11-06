@@ -21,6 +21,8 @@ import { BySession } from './BySession';
 import { SignInPrompt } from './SignInPrompt';
 import { TaskCountdown } from './TaskCountdown';
 import { TaskSubmissions } from './submit/TaskSubmissions';
+import { readShownFiles } from './submit/download';
+import { ShownTask } from '@/ui/scored/ShownInputs';
 import { headingOf } from '@/lib/task-names';
 import classes from './contest.module.css';
 
@@ -89,11 +91,40 @@ function NoSuchTask({ org, contest }: { org: string; contest: string }) {
 }
 
 /**
+ * What the task shows before any submission, the settings and the runs'
+ * inputs its show names now, under the statement; nothing when it shows
+ * neither.
+ */
+function Shown({
+  where,
+  runs,
+  inputs,
+}: {
+  where: { org: string; contest: string; task: string };
+  runs: TaskPage['runs'];
+  inputs: TaskPage['shown_inputs'];
+}) {
+  if (runs.length === 0 && Object.keys(inputs).length === 0) return null;
+  return (
+    <Card>
+      <div className={classes.stack}>
+        <SectionTitle>Tests</SectionTitle>
+        <ShownTask
+          runs={runs}
+          inputs={inputs}
+          readFiles={(ask) => readShownFiles(where, ask)}
+        />
+      </div>
+    </Card>
+  );
+}
+
+/**
  * A released task as a signed-in person reads it: first the time left on it
  * for them, counted to its due and its close, and the way to ask the
- * organisers about it; then its announcements, the statement, its times and
- * limits, the panel they submit from while the task is open, or why it is
- * not, and their submissions. Crossing the due or the close reads the page
+ * organisers about it; then its announcements, the statement, the tests and
+ * settings it shows, its times and limits, the panel they submit from while
+ * the task is open, or why it is not, and their submissions. Crossing the due or the close reads the page
  * again at once.
  */
 function SignedInTask({
@@ -151,6 +182,11 @@ function SignedInTask({
       <Card>
         <Markdown task={{ org, contest, task }}>{page.statement}</Markdown>
       </Card>
+      <Shown
+        where={{ org, contest, task }}
+        runs={page.runs}
+        inputs={page.shown_inputs}
+      />
       <Card>
         <div className={classes.stack}>
           <SectionTitle>Limits</SectionTitle>
@@ -164,7 +200,7 @@ function SignedInTask({
 
 /**
  * A released task of a public contest as a visitor reads it, which is its
- * statement alone. Any other task asks them to sign in.
+ * statement and what its show shows before any submission. Any other task asks them to sign in.
  */
 function PublicTask({
   org,
@@ -194,7 +230,7 @@ function PublicTask({
     return <ErrorBlock error={view.error} onRetry={view.retry} />;
   }
 
-  const { task: found, statement } = view.data;
+  const { task: found, statement, runs, shown_inputs: inputs } = view.data;
   return (
     <div className={classes.page}>
       <Back org={org} contest={contest} />
@@ -202,6 +238,7 @@ function PublicTask({
       <Card>
         <Markdown task={{ org, contest, task }}>{statement}</Markdown>
       </Card>
+      <Shown where={{ org, contest, task }} runs={runs} inputs={inputs} />
     </div>
   );
 }

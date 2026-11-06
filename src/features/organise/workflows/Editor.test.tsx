@@ -419,12 +419,12 @@ describe('the workflow editor', () => {
     const primitives = part('section', 'Primitives');
     expect(within(primitives).getAllByRole('button')).toHaveLength(2);
     const exec = trayButton('Primitives', 'Run programs');
-    expect(exec).toHaveTextContent('unicon/exec@v3');
+    expect(exec).toHaveTextContent('unicon/exec@v4');
     await user.click(exec);
 
     expect(await stepBox('exec')).toHaveAttribute('data-open', 'true');
     expect(drawer('Step exec')).toBeInTheDocument();
-    expect(await fileText(user)).toContain('- id: exec\n    use: unicon/exec@v3\n');
+    expect(await fileText(user)).toContain('- id: exec\n    use: unicon/exec@v4\n');
   });
 
   it('adds a run workflow from the tray, found by its name, and never this one', async () => {
@@ -548,7 +548,7 @@ describe('the workflow editor', () => {
     ).toBeInTheDocument();
     answer();
     expect(
-      await within(workflows).findByRole('button', { name: 'unicon/classic@v5' }),
+      await within(workflows).findByRole('button', { name: 'unicon/classic@v6' }),
     ).toBeInTheDocument();
     expect(workflows).not.toHaveTextContent('Finding workflows…');
   });
@@ -1000,8 +1000,8 @@ describe('the workflow editor', () => {
   it('keeps a step’s drawer open when the step is renamed', async () => {
     const two = [
       'steps:',
-      '  - {id: first, use: unicon/exec@v3}',
-      '  - {id: second, use: unicon/exec@v3}',
+      '  - {id: first, use: unicon/exec@v4}',
+      '  - {id: second, use: unicon/exec@v4}',
       '',
     ].join('\n');
     server.use(
@@ -1153,7 +1153,7 @@ describe('the workflow editor', () => {
   it('opens a box two levels in, and a problem opens the step inside', async () => {
     const draft = ['steps:', '  - {id: build, use: kenny/inner@v1}', ''].join('\n');
     const inner = ['steps:', '  - {id: compile, use: kenny/deep@v1}', ''].join('\n');
-    const deep = ['steps:', '  - {id: link, use: unicon/exec@v3}', ''].join('\n');
+    const deep = ['steps:', '  - {id: link, use: unicon/exec@v4}', ''].join('\n');
     const port = (name: string) => ({
       name,
       type: 'file',
@@ -1355,7 +1355,7 @@ describe('the drawer', () => {
     { listed = true, newer = true }: { listed?: boolean; newer?: boolean } = {},
   ) => {
     const draft = ['inputs:', '  code: file', 'steps:', ...steps, ''].join('\n');
-    const inner = ['steps:', '  - {id: compile, use: unicon/exec@v3}', ''].join('\n');
+    const inner = ['steps:', '  - {id: compile, use: unicon/exec@v4}', ''].join('\n');
     const port = (name: string) => ({
       name,
       type: 'file',
@@ -1471,7 +1471,7 @@ describe('the drawer', () => {
   it('opens a box into the well, between what feeds it and what it feeds', async () => {
     serveInner([
       '  - {id: build, use: kenny/inner@v1, with: {source: "${{ inputs.code }}"}}',
-      '  - {id: after, use: unicon/exec@v3, with: {source: "${{ steps.build.program }}"}}',
+      '  - {id: after, use: unicon/exec@v4, with: {source: "${{ steps.build.program }}"}}',
     ]);
     const user = userEvent.setup();
     renderApp(EDITOR_PAGE);
@@ -1961,7 +1961,7 @@ describe('wiring workflow files', () => {
   answer: file
 steps:
   - id: check
-    use: unicon/exec@v3
+    use: unicon/exec@v4
     with:
       language: cpp
       files:

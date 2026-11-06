@@ -38,6 +38,10 @@ describe('the task page', () => {
           toolchains: {
             cpp: { picked: 'gxx 14.3.0', version: '14' },
             python: { picked: 'python 3.14.3', version: null },
+            kotlin: { picked: 'kotlin 2.4.0', version: '2.4' },
+            csharp: { picked: 'dotnet 10.0.1', version: null },
+            javascript: { picked: 'nodejs 26.1.0', version: '26' },
+            r: { picked: 'r-base 4.5.3', version: '4.5' },
           },
         }),
       ),
@@ -47,6 +51,14 @@ describe('the task page', () => {
     expect(
       await screen.findByText('Python: 3.14.3 (newest when first prepared)'),
     ).toBeInTheDocument();
+    expect(screen.getByText('Kotlin: 2.4.0 (named 2.4)')).toBeInTheDocument();
+    expect(
+      screen.getByText('C#: .NET 10.0.1 (newest when first prepared)'),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('JavaScript: Node.js 26.1.0 (named 26)'),
+    ).toBeInTheDocument();
+    expect(screen.getByText('R: 4.5.3 (named 4.5)')).toBeInTheDocument();
   });
   it('says what contestants are graded on, under the task’s name', async () => {
     server.use(signedIn, taskState, publicationList, ...repoFiles);
@@ -276,7 +288,7 @@ describe('the task page', () => {
       // A saved workflow that reads, so the Scoring and Checks cards are there.
       http.get(`${TASK_API}/workflow-form`, () =>
         HttpResponse.json({
-          workflow: 'unicon/classic@v5',
+          workflow: 'unicon/classic@v6',
           newer: null,
           problem: null,
           graded: false,
@@ -397,7 +409,7 @@ describe('what the task has, under its name', { timeout: 20_000 }, () => {
       ),
       http.get(`${TASK_API}/workflow-form`, () =>
         HttpResponse.json({
-          workflow: 'unicon/classic@v5',
+          workflow: 'unicon/classic@v6',
           newer: null,
           problem: null,
           graded: false,
@@ -460,7 +472,7 @@ describe('what the task has, under its name', { timeout: 20_000 }, () => {
         HttpResponse.json({
           ...files['task.yaml'],
           content:
-            'name: sum\nworkflow: unicon/classic@v5\nrepeat:\n  - inputs: [time_limit]\n    tuples: [[1], [2]]\n',
+            'name: sum\nworkflow: unicon/classic@v6\nrepeat:\n  - inputs: [time_limit]\n    tuples: [[1], [2]]\n',
         }),
       ),
     );

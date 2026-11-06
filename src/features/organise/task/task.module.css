@@ -403,3 +403,89 @@
   gap: 12px;
   padding-top: 16px;
 }
+
+/* What entrants see: a row for each part, a switch for each moment. The
+   moments keep a narrow column each, so the names have the rest at phone width. */
+.showFrame {
+  overflow-x: auto;
+  border: 1px solid var(--unicon-border);
+  border-radius: var(--mantine-radius-sm);
+}
+.showGrid {
+  width: 100%;
+  min-width: 18rem;
+  table-layout: fixed;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.showGrid :is(th, td) {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--unicon-border);
+  vertical-align: top;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+.showGrid :is(th, td):first-child {
+  text-align: left;
+  font-weight: 500;
+}
+.showGrid thead th:not(:first-child) {
+  width: 4.75rem;
+  font-weight: 600;
+}
+.showGrid td > * {
+  display: inline-flex;
+}
+.showGrid .showSection {
+  padding-top: 12px;
+  font-weight: 600;
+  background: var(--unicon-hover);
+}
+.showEntry {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.showGrid .showEmpty {
+  color: var(--unicon-text-secondary);
+}
+
+/* The preview under the grid: its controls, then the entrant's page as they would read it. */
+.preview {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.previewControls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 24px;
+  align-items: flex-start;
+}
+
+/* Framed like a card of the entrant's own page, so it reads as theirs. */
+.previewPage {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--unicon-border);
+  border-radius: var(--mantine-radius-md);
+  background: var(--unicon-body);
+  overflow-wrap: anywhere;
+}
+
+.previewProblems,
+.previewSlots {
+  margin: 0;
+  padding-left: var(--mantine-spacing-lg);
+  font-size: 13px;
+}
+
+.previewSlots {
+  color: var(--unicon-text-secondary);
+}

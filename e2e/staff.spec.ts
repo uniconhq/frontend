@@ -139,7 +139,7 @@ async function stub(page: Page) {
     ),
   );
   await page.route(/\/files\/task\.yaml$/, (route) =>
-    json(route, file('task.yaml', 'name: Sum\nworkflow: unicon/classic@v2\n')),
+    json(route, file('task.yaml', 'name: Sum\nworkflow: unicon/classic@v6\n')),
   );
   await page.route(/\/tree(\?|$)/, (route) =>
     route.fulfill({

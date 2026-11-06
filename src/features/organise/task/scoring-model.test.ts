@@ -20,13 +20,21 @@ import {
   checkProblem,
   columnsOf,
   printed,
+  emptyShow,
+  hidesAlways,
+  momentsOf,
   readScoring,
   renamed,
+  renamedInShow,
+  runMoments,
   scopeOf,
   valueTree,
   withLine,
+  withMoment,
+  withRunMoment,
   writeScoring,
 } from './scoring-model';
+import { parse } from 'yaml';
 
 const catalogue = specCatalogue();
 
@@ -186,13 +194,13 @@ describe('renaming a value', () => {
       'score + sum(all.score) + first(all).score + if(otherwise(1, 0), 1, 0)';
     const text = `${line} + count(all, all.verdict == "score")`;
     const total = withLine(
-      { key: 't', name: 'total', text: '', tree: null, saved: 'never' },
+      { key: 't', name: 'total', text: '', tree: null },
       text,
       named,
       catalogue,
     );
     const next = renamed(
-      [{ key: 's', name: 'points', text: '', tree: '1', saved: 'never' }, total],
+      [{ key: 's', name: 'points', text: '', tree: '1' }, total],
       'score',
       'points',
       catalogue,
@@ -204,8 +212,230 @@ describe('renaming a value', () => {
   });
 });
 
+const SHOWN = [
+  'name: Mean',
+  'scoring:',
+  '  groups:',
+  '    sample: {input: sample.in}',
+  '  values:',
+  '    points: 1',
+  '    bonus: 2',
+  '  show:',
+  '    always:',
+  '      values: [points]',
+  '      inputs: [time_limit, memory_limit]',
+  '      outputs: [log]',
+  '      runs:',
+  '        - {of: sample, fields: [input, answer, verdict, score, time_ms]}',
+  '        - {of: first_not_passed, fields: [verdict]}',
+  '    after_deadline:',
+  '      values: [bonus]',
+  '      runs:',
+  '        - {of: all, fields: [input, answer, verdict, score]}',
+  '    after_release:',
+  '      values: [bonus]',
+  '',
+].join('\n');
+
+describe('a show', () => {
+  it('leaves scoring as written when its show is not in the shape the grid reads', () => {
+    for (const show of [
+      '  show:\n    always: {values: points}\n',
+      '  show:\n    now: [points]\n',
+      '  show:\n    always:\n      runs: [{of: sample, fields: verdict}]\n',
+      '  show:\n    always:\n      runs: [{of: sample, fields: [verdict], when: x}]\n',
+      '  show: [points]\n',
+    ]) {
+      const text = `name: Sum\nscoring:\n  values: {points: 1}\n${show}`;
+      const doc = open(text);
+      const before = readScoring((path) => exactAt(doc, path));
+      expect(before.unreadable).toContain('scoring');
+      const after = {
+        ...before,
+        scoreValues: before.scoreValues.map((value) => ({ ...value, tree: '2' })),
+      };
+      writeScoring(doc, before, after, (value) => value.tree);
+      expect(writeYaml(doc)).toBe(text);
+    }
+  });
+
+  it('reads a show in the shape, or none, as readable', () => {
+    for (const show of ['', '  show:\n    always:\n      values: [points]\n']) {
+      const doc = open(`name: Sum\nscoring:\n  values: {points: 1}\n${show}`);
+      expect(readScoring((path) => exactAt(doc, path)).unreadable).toEqual([]);
+    }
+  });
+
+  it('round-trips unchanged: a switch turned on and off again writes nothing', () => {
+    const doc = open(SHOWN);
+    const before = readScoring((path) => exactAt(doc, path));
+    const toggled = withMoment(
+      withMoment(before.show, 'values', 'bonus', 'always', true),
+      'values',
+      'bonus',
+      'always',
+      false,
+    );
+    const back = withMoment(
+      withMoment(toggled, 'values', 'bonus', 'after_deadline', true),
+      'values',
+      'bonus',
+      'after_release',
+      true,
+    );
+    expect(back).toEqual(before.show);
+    writeScoring(doc, before, { ...before, show: back }, (value) => value.tree);
+    expect(writeYaml(doc)).toBe(SHOWN);
+  });
+
+  it('writes each moment as it read it when the rest of scoring changes', () => {
+    const doc = open(SHOWN);
+    const before = readScoring((path) => exactAt(doc, path));
+    const after = {
+      ...before,
+      scoreValues: before.scoreValues.map((value) =>
+        value.name === 'bonus' ? { ...value, tree: '3' } : value,
+      ),
+    };
+    writeScoring(doc, before, after, (value) => value.tree);
+    const read = (text: string) =>
+      (parse(text) as { scoring: { show: unknown } }).scoring.show;
+    expect(read(writeYaml(doc))).toEqual(read(SHOWN));
+  });
+
+  it('leaves out an empty moment, list and run entry, and show itself when nothing is shown', () => {
+    const doc = open(SHOWN);
+    const before = readScoring((path) => exactAt(doc, path));
+    let show = before.show;
+    for (const [moment, name] of [
+      ['always', 'points'],
+      ['after_deadline', 'bonus'],
+      ['after_release', 'bonus'],
+    ] as const) {
+      show = withMoment(show, 'values', name, moment, false);
+    }
+    for (const name of ['time_limit', 'memory_limit'])
+      show = withMoment(show, 'inputs', name, 'always', false);
+    show = withMoment(show, 'outputs', 'log', 'always', false);
+    for (const [of, fields, moment] of [
+      ['sample', ['input', 'answer', 'verdict', 'score', 'time_ms'], 'always'],
+      ['first_not_passed', ['verdict'], 'always'],
+      ['all', ['input', 'answer', 'verdict', 'score'], 'after_deadline'],
+    ] as const) {
+      for (const field of fields) show = withRunMoment(show, of, field, moment, false);
+    }
+    expect(show).toEqual(emptyShow());
+    writeScoring(doc, before, { ...before, show }, (value) => value.tree);
+    expect(writeYaml(doc)).not.toContain('show');
+  });
+
+  it('turns both later moments on with Always, which they never do to each other', () => {
+    let show = emptyShow();
+    show = withMoment(show, 'values', 'score', 'after_deadline', true);
+    expect(momentsOf(show, 'values', 'score')).toEqual(['after_deadline']);
+    show = withMoment(show, 'values', 'score', 'after_release', true);
+    // Both later ones on write the name under both.
+    expect(show.after_deadline.values).toEqual(['score']);
+    expect(show.after_release.values).toEqual(['score']);
+    show = withMoment(show, 'values', 'score', 'after_deadline', false);
+    expect(momentsOf(show, 'values', 'score')).toEqual(['after_release']);
+
+    show = withMoment(show, 'values', 'score', 'always', true);
+    // Always shows it then already, so the later moments do not list it again.
+    expect(momentsOf(show, 'values', 'score')).toEqual(['always']);
+    expect(withMoment(show, 'values', 'score', 'after_deadline', true)).toBe(show);
+    expect(withMoment(show, 'values', 'score', 'always', false)).toEqual(emptyShow());
+  });
+
+  it('turns a run field on and off as a name, its entry going with its last field', () => {
+    let show = emptyShow();
+    show = withRunMoment(show, 'sample', 'verdict', 'after_deadline', true);
+    show = withRunMoment(show, 'sample', 'score', 'after_release', true);
+    show = withRunMoment(show, 'sample', 'score', 'after_deadline', true);
+    expect(show.after_deadline.runs).toEqual([
+      { of: 'sample', fields: ['verdict', 'score'] },
+    ]);
+    expect(runMoments(show, 'sample', 'score')).toEqual([
+      'after_deadline',
+      'after_release',
+    ]);
+    show = withRunMoment(show, 'sample', 'score', 'always', true);
+    expect(runMoments(show, 'sample', 'score')).toEqual(['always']);
+    expect(show.after_release.runs).toEqual([]);
+    expect(show.after_deadline.runs).toEqual([{ of: 'sample', fields: ['verdict'] }]);
+    show = withRunMoment(show, 'sample', 'verdict', 'after_deadline', false);
+    expect(show.after_deadline.runs).toEqual([]);
+  });
+
+  it('calls it hiding only when a part shown always stops reaching what it reached', () => {
+    const rows = runsOf([
+      {
+        inputs: ['input'],
+        tuples: ['sample.in', 'big.in'].map((value) => ({
+          title: '',
+          maxSize: '',
+          cells: { input: { entrant: false, value } },
+        })),
+      },
+    ]);
+    const sample: ScoreGroup = {
+      key: 'g',
+      name: 'sample',
+      picks: { input: ['sample.in'] },
+      none: false,
+    };
+    const saved = withRunMoment(
+      withMoment(emptyShow(), 'values', 'score', 'always', true),
+      'sample',
+      'score',
+      'always',
+      true,
+    );
+    const field = {
+      kind: 'runs' as const,
+      field: 'score',
+      runs: rows,
+      groups: [sample],
+    };
+    expect(hidesAlways(saved, emptyShow(), { kind: 'values', name: 'score' })).toBe(
+      true,
+    );
+    expect(
+      hidesAlways(saved, withMoment(saved, 'values', 'score', 'after_deadline', true), {
+        kind: 'values',
+        name: 'score',
+      }),
+    ).toBe(false);
+    // Moving a field from sample to all reaches every run sample did.
+    const moved = withRunMoment(
+      withRunMoment(saved, 'sample', 'score', 'always', false),
+      'all',
+      'score',
+      'always',
+      true,
+    );
+    expect(hidesAlways(saved, moved, { ...field, of: 'sample' })).toBe(false);
+    const savedAll = withRunMoment(emptyShow(), 'all', 'score', 'always', true);
+    const narrowed = withRunMoment(emptyShow(), 'sample', 'score', 'always', true);
+    expect(hidesAlways(savedAll, narrowed, { ...field, of: 'all' })).toBe(true);
+    const failing = withRunMoment(
+      emptyShow(),
+      'first_not_passed',
+      'score',
+      'always',
+      true,
+    );
+    expect(
+      hidesAlways(failing, emptyShow(), { ...field, of: 'first_not_passed' }),
+    ).toBe(true);
+    expect(hidesAlways(failing, failing, { ...field, of: 'first_not_passed' })).toBe(
+      false,
+    );
+  });
+});
+
 describe('a scoring write', () => {
-  it('renames a value where it stands, keeps comments, and writes no empty show list', () => {
+  it('renames a value where it stands, keeps comments, and renames it in show', () => {
     const text = [
       'name: Mean',
       'scoring:',
@@ -214,7 +444,8 @@ describe('a scoring write', () => {
       '    score: 1 # one point',
       '    extra: 2',
       '  show:',
-      '    now: [score]',
+      '    always:',
+      '      values: [score]',
       '',
     ].join('\n');
     const doc = open(text);
@@ -224,7 +455,7 @@ describe('a scoring write', () => {
       scoreValues: before.scoreValues.map((value) =>
         value.name === 'score' ? { ...value, name: 'points' } : value,
       ),
-      show: { points: 'now' as const },
+      show: renamedInShow(before.show, 'values', 'score', 'points'),
     };
     writeScoring(doc, before, after, (value) => value.tree);
     expect(writeYaml(doc)).toBe(
@@ -236,7 +467,8 @@ describe('a scoring write', () => {
         '    points: 1 # one point',
         '    extra: 2',
         '  show:',
-        '    now: [points]',
+        '    always:',
+        '      values: [points]',
         '',
       ].join('\n'),
     );
@@ -284,9 +516,7 @@ describe('the columns of a run', () => {
         ],
       ),
     );
-    const values = [
-      { key: 'v', name: 'top', text: '', tree: null, saved: 'never' as const },
-    ];
+    const values = [{ key: 'v', name: 'top', text: '', tree: null }];
     const read = (line: string) =>
       readLine(line, scopeOf([], values, columns, catalogue), catalogue);
     expect(read('max(all.seed)').problems).toEqual([]);
@@ -379,7 +609,6 @@ describe('group ticks on tables', () => {
     name: 'small',
     picks: {},
     none: true,
-    saved: 'never',
   };
   it('makes the one run every submission makes while no input repeats', () => {
     expect(submissionRuns([])).toEqual([{ id: '0', title: 'The one run', cells: {} }]);
@@ -495,7 +724,7 @@ it('keeps equal input values together when the file cannot distinguish rows', ()
   };
   const runs = runsOf([table]);
   const first = withTick(
-    { key: 'g', name: 'g', picks: {}, none: true, saved: 'never' },
+    { key: 'g', name: 'g', picks: {}, none: true },
     table,
     0,
     true,

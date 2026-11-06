@@ -1003,7 +1003,7 @@ describe('a submission opened from the list', () => {
           text: null,
           waiting: true,
           self_reported: false,
-          show: 'now',
+          show: 'always',
           facts: null,
           runs: null,
           values: null,

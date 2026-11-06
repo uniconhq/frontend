@@ -19,7 +19,7 @@ import {
   type CheckDraft,
   type ScoreGroup,
   type ScoreValue,
-  type When,
+  type Show,
 } from '../task/scoring-model';
 
 /**
@@ -48,8 +48,8 @@ export type TaskValues = {
   scoreGroups: ScoreGroup[];
   /** Named results, each a formula. */
   scoreValues: ScoreValue[];
-  /** When each part of the result is shown. */
-  show: Record<string, When>;
+  /** What entrants are shown of the result, and when. */
+  show: Show;
   checks: CheckDraft[];
   max: string;
   rateCount: string;

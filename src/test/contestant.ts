@@ -148,6 +148,8 @@ export const taskPage: TaskPage = {
   due: null,
   closes: '2026-09-12T10:30:00Z',
   marks: null,
+  runs: [],
+  shown_inputs: {},
 };
 
 export const publicContest: components['schemas']['PublicContest'] = {
@@ -215,6 +217,7 @@ export function grading(overrides: Partial<GradingResult> = {}): GradingResult {
     limit: null,
     compiled: null,
     once: { reports: {}, texts: {} },
+    inputs: {},
     reveal_at: null,
     run_values: [],
     runs: [],
@@ -235,6 +238,7 @@ function sampleRun(place: number, reports: RunShown['reports']): RunShown {
     reports,
     texts: {},
     label: null,
+    labelled: null,
     message: null,
   };
 }

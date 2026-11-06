@@ -1405,8 +1405,8 @@ async function who(inputs: HTMLElement, id: string, gives: string) {
 describe('islands, cartpole and tour', { timeout: 60_000 }, () => {
   it('saves islands’ inputs and its runs, each file at the path the editor names', async () => {
     const { sent } = taskBackend({
-      content: 'name: Islands\nworkflow: unicon/classic@v5\n',
-      form: runForm('unicon/classic@v5', [
+      content: 'name: Islands\nworkflow: unicon/classic@v6\n',
+      form: runForm('unicon/classic@v6', [
         declared('code', 'file'),
         declared('language', 'enum', { options: ['cpp', 'python'] }),
         declared('time_limit', 'number'),
@@ -1458,7 +1458,7 @@ describe('islands, cartpole and tour', { timeout: 60_000 }, () => {
 
     expect(written(sent[0])).toMatchObject({
       name: 'Islands',
-      workflow: 'unicon/classic@v5',
+      workflow: 'unicon/classic@v6',
       inputs: {
         code: { entrant: { label: 'Your solution', max_size: '1MB' } },
         language: { entrant: { options: ['cpp', 'python'], default: 'cpp' } },
@@ -1501,8 +1501,8 @@ describe('islands, cartpole and tour', { timeout: 60_000 }, () => {
       release = resolve;
     });
     const { sent } = taskBackend({
-      content: 'name: Islands\nworkflow: unicon/classic@v5\n',
-      form: runForm('unicon/classic@v5', [
+      content: 'name: Islands\nworkflow: unicon/classic@v6\n',
+      form: runForm('unicon/classic@v6', [
         declared('time_limit', 'number'),
         declared('input', 'file'),
       ]),
@@ -1539,8 +1539,8 @@ describe('islands, cartpole and tour', { timeout: 60_000 }, () => {
   it('clears a discarded upload when a run cell returns from the entrant', async () => {
     taskBackend({
       content:
-        'name: Tests\nworkflow: unicon/classic@v5\nrepeat:\n  - inputs: [input]\n    tuples: [{input: ""}]\n',
-      form: runForm('unicon/classic@v5', [declared('input', 'file')]),
+        'name: Tests\nworkflow: unicon/classic@v6\nrepeat:\n  - inputs: [input]\n    tuples: [{input: ""}]\n',
+      form: runForm('unicon/classic@v6', [declared('input', 'file')]),
     });
     await openTask();
     const runs = screen.getByRole('region', { name: 'Runs' });
@@ -1566,8 +1566,8 @@ describe('islands, cartpole and tour', { timeout: 60_000 }, () => {
   it('pairs two test files in one row and stages both in the task’s save', async () => {
     const { sent } = taskBackend({
       content:
-        'name: Tests\nworkflow: unicon/classic@v5\nrepeat:\n  - inputs: [input, answer]\n    tuples: []\n',
-      form: runForm('unicon/classic@v5', [
+        'name: Tests\nworkflow: unicon/classic@v6\nrepeat:\n  - inputs: [input, answer]\n    tuples: []\n',
+      form: runForm('unicon/classic@v6', [
         declared('input', 'file'),
         declared('answer', 'file'),
       ]),
@@ -1598,8 +1598,8 @@ describe('islands, cartpole and tour', { timeout: 60_000 }, () => {
   it('keeps a remaining row’s file when another row is removed and a new row uploaded', async () => {
     const { sent } = taskBackend({
       content:
-        'name: Files\nworkflow: unicon/classic@v5\nrepeat:\n  - inputs: [input]\n    tuples: [{input: runs/0/0/input}, {input: runs/0/1/input}]\n',
-      form: runForm('unicon/classic@v5', [declared('input', 'file')]),
+        'name: Files\nworkflow: unicon/classic@v6\nrepeat:\n  - inputs: [input]\n    tuples: [{input: runs/0/0/input}, {input: runs/0/1/input}]\n',
+      form: runForm('unicon/classic@v6', [declared('input', 'file')]),
     });
     await openTask();
     const runs = screen.getByRole('region', { name: 'Runs' });
@@ -1830,7 +1830,7 @@ repeat:
 });
 
 const ISLANDS = `name: Islands
-workflow: unicon/classic@v5
+workflow: unicon/classic@v6
 inputs:
   code: {entrant: {label: Solution}}
 repeat:
@@ -1838,6 +1838,40 @@ repeat:
     tuples:
       - {input: sample.in, title: Sample}
 `;
+
+/** A box like unicon/checked's: what a run reports, and a log written once. */
+function checkedBox(
+  more: { name: string; type: string; once: boolean; title?: string }[] = [],
+) {
+  return http.get('/api/v1/workflows/:owner/:name/versions/:version/box', () =>
+    HttpResponse.json({
+      run: true,
+      inputs: [],
+      newer_version: null,
+      description: null,
+      outputs: [
+        { name: 'fraction', type: 'number', once: false },
+        { name: 'time_ms', type: 'number', unit: 'ms', once: false },
+        ...more,
+      ].map((output) => ({
+        title: null,
+        unit: null,
+        better: null,
+        at_least: null,
+        at_most: null,
+        ...output,
+      })),
+    }),
+  );
+}
+
+/** The box for a part of what entrants see, at a moment. */
+function cell(part: string, moment: string): HTMLElement {
+  return within(screen.getByRole('table', { name: 'What entrants see' })).getByRole(
+    'checkbox',
+    { name: `${part}, ${moment}` },
+  );
+}
 
 async function typeLine(name: string, text: string) {
   const line = await screen.findByRole('textbox', { name });
@@ -1858,7 +1892,7 @@ describe('scoring, checks and what a save answers', { timeout: 60_000 }, () => {
   it('shows an observer the saved value formula without editing or its tray', async () => {
     taskBackend({
       content: `${ISLANDS}scoring:\n  values: {total: 1}\n`,
-      form: runForm('unicon/classic@v5', [
+      form: runForm('unicon/classic@v6', [
         declared('code', 'file'),
         declared('input', 'file'),
       ]),
@@ -1894,7 +1928,7 @@ describe('scoring, checks and what a save answers', { timeout: 60_000 }, () => {
   it('adds a value with a name free among existing values and groups after a removal', async () => {
     taskBackend({
       content: `${ISLANDS}scoring:\n  groups: {value_2: {input: small/1.in}}\n  values: {value_1: 1, value_3: 3}\n`,
-      form: runForm('unicon/classic@v5', [
+      form: runForm('unicon/classic@v6', [
         declared('code', 'file'),
         declared('input', 'file'),
       ]),
@@ -1918,12 +1952,12 @@ describe('scoring, checks and what a save answers', { timeout: 60_000 }, () => {
   it('says a submission with no input repeated runs once, on every card that counts its runs', async () => {
     taskBackend({
       content: `name: Islands
-workflow: unicon/classic@v5
+workflow: unicon/classic@v6
 inputs:
   code: {entrant: {label: Solution}}
   input: sample.in
 `,
-      form: runForm('unicon/classic@v5', [
+      form: runForm('unicon/classic@v6', [
         declared('code', 'file'),
         declared('input', 'file'),
       ]),
@@ -1955,7 +1989,7 @@ inputs:
   it('says what a run gives beyond the table, by its title, and the facts in words', async () => {
     taskBackend({
       content: `name: Islands
-workflow: unicon/classic@v5
+workflow: unicon/classic@v6
 inputs:
   code: {entrant: {label: Solution}}
   input: sample.in
@@ -1965,7 +1999,7 @@ repeat:
       - {seed: 1}
       - {seed: 2}
 `,
-      form: runForm('unicon/classic@v5', [
+      form: runForm('unicon/classic@v6', [
         declared('code', 'file'),
         declared('input', 'file'),
         declared('seed', 'number', { title: 'Random seed' }),
@@ -1982,7 +2016,7 @@ repeat:
   it('uses the workflow box’s output types for the runs table', async () => {
     taskBackend({
       content: ISLANDS,
-      form: runForm('unicon/classic@v5', [
+      form: runForm('unicon/classic@v6', [
         declared('code', 'file'),
         declared('input', 'file'),
       ]),
@@ -2027,25 +2061,23 @@ repeat:
     expect(within(runs).getByRole('cell', { name: 'text' })).toBeVisible();
   });
 
-  it('keeps Result open with its parts and gives each shown setting one control', async () => {
+  it('keeps Result open with its parts and gives each part the grid shows one row', async () => {
     taskBackend({
       content: `${ISLANDS}scoring:
   groups: {samples: {input: sample.in}}
   values: {total: 1, foot: 2}
-  show: {now: [total, samples]}
+  show:
+    always:
+      values: [total]
+      runs: [{of: samples, fields: [verdict]}]
 `,
-      form: runForm('unicon/classic@v5', [
+      form: runForm('unicon/classic@v6', [
         declared('code', 'file'),
         declared('input', 'file'),
       ]),
     });
     server.use(
-      http.get(`${TASK_API}/tree`, () =>
-        HttpResponse.json([
-          file('statement.md'),
-          { ...file('tests'), kind: 'directory' },
-        ]),
-      ),
+      checkedBox([{ name: 'log', type: 'file', once: true, title: 'Compile log' }]),
     );
     await openTask();
     const result = await screen.findByRole('list', { name: 'Result' });
@@ -2059,34 +2091,31 @@ repeat:
     const detail = result.querySelector('[class*="resultDetail"]');
     if (detail === null) throw new Error('A group has report details.');
     expect(fireEvent.keyDown(detail, { key: ' ' })).toBe(true);
+    expect(result).toHaveTextContent('Once outputs');
+    await waitFor(() => expect(result).toHaveTextContent('Compile log'));
 
-    expect(result).toHaveTextContent('time_ms (ms)');
-    expect(result).toHaveTextContent('On its own');
-    expect(result).toHaveTextContent('Files to download');
-    expect(result).toHaveTextContent('statement.md');
-    expect(result).toHaveTextContent('tests/');
-    for (const part of [
-      'total',
-      'samples',
-      'all',
-      'compiled',
-      'fraction',
-      'time_ms',
-      'statement.md',
-      'tests/',
-    ]) {
-      expect(document.querySelectorAll(`[data-show-part="${part}"]`)).toHaveLength(1);
+    const grid = screen.getByRole('table', { name: 'What entrants see' });
+    for (const part of ['total', 'foot', 'log', 'compiled', 'input', 'verdict']) {
+      expect(grid.querySelectorAll(`[data-show-part="${part}"]`)).toHaveLength(1);
     }
-    const value = screen.getByRole('group', { name: 'Value total' });
+    expect(cell('total', 'Always')).toBeChecked();
+    expect(cell('total', 'After the deadline')).toBeChecked();
+    expect(cell('total', 'After the deadline')).toBeDisabled();
+    expect(cell('foot', 'Always')).not.toBeChecked();
+    expect(cell('Verdict of samples', 'Always')).toBeChecked();
+    expect(cell('Passed of samples', 'Always')).not.toBeChecked();
+    const log = grid.querySelector('[data-show-part="log"]');
+    expect(log).toHaveTextContent('A file, and entrants are shown numbers and text.');
+    expect(cell('Compile log', 'Always')).toBeDisabled();
     expect(
-      within(value).getByRole('combobox', { name: 'Shown to entrants' }),
-    ).toHaveValue('now');
+      within(grid).getByRole('rowgroup', { name: 'Runs: samples' }),
+    ).toHaveTextContent('time_ms (ms)');
   });
 
   it('saves islands with its text value first_failed and a check', async () => {
     const { sent } = taskBackend({
       content: ISLANDS,
-      form: runForm('unicon/classic@v5', [
+      form: runForm('unicon/classic@v6', [
         declared('code', 'file'),
         declared('input', 'file'),
       ]),
@@ -2140,7 +2169,7 @@ repeat:
     });
   });
 
-  it('drops a removed part from show, moves a renamed group, and takes out a name no part has', async () => {
+  it('drops a removed part from show, moves a renamed group, and turns off a name no part has', async () => {
     const { sent } = taskBackend({
       content: `${ISLANDS}scoring:
   groups:
@@ -2150,20 +2179,20 @@ repeat:
     total: {block: sum, over: {runs: all}, of: {run: [all, passed]}}
     extra: 1
   show:
-    now: [total, extra, samples, big, gone]
+    always:
+      values: [total, extra, gone]
+      runs: [{of: samples, fields: [verdict]}, {of: big, fields: [passed]}]
 `,
-      form: runForm('unicon/classic@v5', [
+      form: runForm('unicon/classic@v6', [
         declared('code', 'file'),
         declared('input', 'file'),
       ]),
     });
     await openTask();
     const scoring = await screen.findByRole('region', { name: 'Scoring' });
-    const parts = await within(scoring).findByRole('row', { name: /gone/ });
-    expect(parts).toHaveTextContent('Not a part of this task');
-    await userEvent.click(
-      within(parts).getByRole('button', { name: 'Stop showing gone' }),
-    );
+    const gone = scoring.querySelector('[data-show-part="gone"]');
+    expect(gone).toHaveTextContent('Not a part of this task');
+    await userEvent.click(cell('gone', 'Always'));
     const samples = within(scoring).getByRole('textbox', { name: 'Name of samples' });
     fill(samples, 'tests');
     fireEvent.blur(samples);
@@ -2179,34 +2208,177 @@ repeat:
     expect(file).toMatchObject({
       scoring: {
         groups: { tests: { input: 'sample.in' } },
-        show: { now: ['total', 'tests'] },
+        show: {
+          always: { values: ['total'], runs: [{ of: 'tests', fields: ['verdict'] }] },
+        },
       },
     });
     expect(JSON.stringify(file)).not.toMatch(/extra|big|gone|samples/);
   });
 
-  it('lists a shown folder that holds nothing yet as a folder, not as a part to take out', async () => {
+  it('says where a name shown in the wrong section belongs', async () => {
     taskBackend({
       content: `${ISLANDS}scoring:
-  values:
-    total: {block: sum, over: {runs: all}, of: {run: [all, passed]}}
+  groups: {samples: {input: sample.in}}
+  values: {total: 1}
   show:
-    now: [total, public/]
+    always:
+      outputs: [time_ms]
+      inputs: [input]
+      runs: [{of: samples, fields: [total, gone]}]
 `,
-      form: runForm('unicon/classic@v5', [
+      form: runForm('unicon/classic@v6', [
+        declared('code', 'file'),
+        declared('input', 'file'),
+      ]),
+    });
+    server.use(checkedBox());
+    await openTask();
+    const grid = await screen.findByRole('table', { name: 'What entrants see' });
+    const row = (section: string, name: string) =>
+      within(grid)
+        .getAllByRole('rowgroup')
+        .find((group) => group.textContent?.startsWith(section))
+        ?.querySelector(`[data-show-part="${name}"]`);
+    await waitFor(() =>
+      expect(row('Once outputs', 'time_ms')).toHaveTextContent(
+        "time_ms is given for each run, so show it among a run's fields.",
+      ),
+    );
+    expect(row('Shared inputs', 'input')).toHaveTextContent(
+      "input is given for each run, so show it among a run's fields.",
+    );
+    const entry = within(grid).getByRole('rowgroup', { name: 'Runs: samples' });
+    expect(entry.querySelector('[data-show-part="total"]')).toHaveTextContent(
+      'total is a value, so show it under Values.',
+    );
+    expect(entry.querySelector('[data-show-part="gone"]')).toHaveTextContent(
+      'Not a part of this task',
+    );
+  });
+
+  it('greys the later moments under Always only, and writes a name on at both under both', async () => {
+    const { sent } = taskBackend({
+      content: `${ISLANDS}scoring:
+  values: {total: 1, foot: 2}
+`,
+      form: runForm('unicon/classic@v6', [
+        declared('code', 'file'),
+        declared('input', 'file'),
+      ]),
+    });
+    await openTask();
+    await screen.findByRole('table', { name: 'What entrants see' });
+    await userEvent.click(cell('total', 'After the deadline'));
+    expect(cell('total', 'After release')).toBeEnabled();
+    expect(cell('total', 'Always')).toBeEnabled();
+    await userEvent.click(cell('total', 'After release'));
+    expect(cell('total', 'After the deadline')).toBeEnabled();
+    expect(cell('total', 'After the deadline')).toBeChecked();
+    expect(cell('total', 'After release')).toBeChecked();
+
+    await userEvent.click(cell('foot', 'Always'));
+    for (const later of ['After the deadline', 'After release']) {
+      expect(cell('foot', later)).toBeChecked();
+      expect(cell('foot', later)).toBeDisabled();
+    }
+    await save();
+    expect(written(sent[0])).toMatchObject({
+      scoring: {
+        show: {
+          always: { values: ['foot'] },
+          after_deadline: { values: ['total'] },
+          after_release: { values: ['total'] },
+        },
+      },
+    });
+  });
+
+  it('turns a part on and off again with nothing to save, and adds the runs of a group picked', async () => {
+    const { sent } = taskBackend({
+      content: `${ISLANDS}scoring:
+  groups: {samples: {input: sample.in}}
+  values: {total: 1}
+  show:
+    always:
+      values: [total]
+`,
+      form: runForm('unicon/classic@v6', [
         declared('code', 'file'),
         declared('input', 'file'),
       ]),
     });
     await openTask();
     const scoring = await screen.findByRole('region', { name: 'Scoring' });
-    const folder = await within(scoring).findByRole('row', { name: /public\// });
-    expect(folder).not.toHaveTextContent('Not a part of this task');
-    expect(folder).toHaveTextContent('A folder, empty for now');
-    expect(within(scoring).queryByText(/Not a part of this task/)).toBeNull();
+    await userEvent.click(cell('total', 'Always'));
+    expect(screen.getByRole('region', { name: 'Save the task' })).toBeVisible();
+    await userEvent.click(cell('total', 'Always'));
+    expect(screen.queryByRole('region', { name: 'Save the task' })).toBeNull();
+
+    expect(scoring).toHaveTextContent('No runs are shown.');
+    await userEvent.click(within(scoring).getByRole('button', { name: 'Add runs' }));
+    const entry = within(scoring).getByRole('rowgroup', {
+      name: 'Runs: all, every run',
+    });
+    await userEvent.selectOptions(
+      within(entry).getByRole('combobox', { name: 'Runs of' }),
+      'samples',
+    );
+    await userEvent.click(cell('Passed of samples', 'After the deadline'));
+    await userEvent.click(within(scoring).getByRole('button', { name: 'Add runs' }));
+    await userEvent.click(cell('Label of all', 'After release'));
+    await save();
+    expect(written(sent[0])).toMatchObject({
+      scoring: {
+        show: {
+          always: { values: ['total'] },
+          after_deadline: { runs: [{ of: 'samples', fields: ['passed'] }] },
+          after_release: { runs: [{ of: 'all', fields: ['label'] }] },
+        },
+      },
+    });
   });
 
-  it('moves a renamed group\u2019s when once its name is done, past a value\u2019s name typed on the way', async () => {
+  it('drops runs added with nothing on once their group is removed, and says a group read from the file is none', async () => {
+    taskBackend({
+      content: `${ISLANDS}scoring:
+  groups: {samples: {input: sample.in}}
+  values: {total: 1}
+  show:
+    always:
+      values: [total]
+      runs: [{of: gone, fields: [verdict]}]
+`,
+      form: runForm('unicon/classic@v6', [
+        declared('code', 'file'),
+        declared('input', 'file'),
+      ]),
+    });
+    await openTask();
+    const scoring = await screen.findByRole('region', { name: 'Scoring' });
+    expect(
+      within(scoring).getByRole('rowgroup', { name: 'Runs: gone' }),
+    ).toHaveTextContent('The task has no group gone, so the save is refused.');
+
+    await userEvent.click(within(scoring).getByRole('button', { name: 'Add runs' }));
+    await userEvent.selectOptions(
+      within(
+        within(scoring).getByRole('rowgroup', { name: 'Runs: all, every run' }),
+      ).getByRole('combobox', { name: 'Runs of' }),
+      'samples',
+    );
+    expect(
+      within(scoring).getByRole('rowgroup', { name: 'Runs: samples' }),
+    ).toBeVisible();
+    await userEvent.click(
+      within(scoring).getByRole('button', { name: 'Remove group samples' }),
+    );
+    expect(
+      within(scoring).queryByRole('rowgroup', { name: 'Runs: samples' }),
+    ).toBeNull();
+  });
+
+  it('moves a renamed group’s runs once its name is done, past a value’s name typed on the way', async () => {
     const { sent } = taskBackend({
       content: `${ISLANDS}scoring:
   groups:
@@ -2214,10 +2386,12 @@ repeat:
   values:
     total: {block: sum, over: {runs: all}, of: {run: [all, passed]}}
   show:
-    now: [total]
-    after_close: [samples]
+    always:
+      values: [total]
+    after_deadline:
+      runs: [{of: samples, fields: [verdict]}]
 `,
-      form: runForm('unicon/classic@v5', [
+      form: runForm('unicon/classic@v6', [
         declared('code', 'file'),
         declared('input', 'file'),
       ]),
@@ -2230,14 +2404,19 @@ repeat:
     await save();
 
     expect(written(sent[0])).toMatchObject({
-      scoring: { show: { now: ['total'], after_close: ['totals'] } },
+      scoring: {
+        show: {
+          always: { values: ['total'] },
+          after_deadline: { runs: [{ of: 'totals', fields: ['verdict'] }] },
+        },
+      },
     });
   });
 
   it('reads each input an axis fills as a column of its run, a number or text as declared', async () => {
     const { sent } = taskBackend({
       content: `name: Seeds
-workflow: unicon/classic@v5
+workflow: unicon/classic@v6
 inputs:
   code: {entrant: {label: Solution}}
 repeat:
@@ -2249,7 +2428,7 @@ scoring:
   values:
     top: {block: max, over: {runs: all}, of: {run: [all, seed]}}
 `,
-      form: runForm('unicon/classic@v5', [
+      form: runForm('unicon/classic@v6', [
         declared('code', 'file'),
         declared('seed', 'number'),
         declared('name', 'text'),
@@ -2283,7 +2462,7 @@ scoring:
   values:
     odd: {block: max, of: [1, 2], colour: red}
 `,
-      form: runForm('unicon/classic@v5', [
+      form: runForm('unicon/classic@v6', [
         declared('code', 'file'),
         declared('input', 'file'),
       ]),
@@ -2302,39 +2481,37 @@ scoring:
     });
   });
 
-  it('says Not shown for a part entrants never see, and whether it compiled the same way in the control and the result', async () => {
+  it('says Not shown for a part entrants never see, and when it compiled is shown the same way in the grid and the result', async () => {
     taskBackend({
       content: ISLANDS,
-      form: runForm('unicon/classic@v5', [
+      form: runForm('unicon/classic@v6', [
         declared('code', 'file'),
         declared('input', 'file'),
       ]),
     });
     await openTask();
-    const scoring = await screen.findByRole('region', { name: 'Scoring' });
-    const all = within(scoring).getByRole('combobox', { name: 'When all is shown' });
-    expect(all).toHaveValue('never');
-    expect(all).toHaveDisplayValue('Not shown');
-    expect(within(scoring).queryByRole('option', { name: 'Never' })).toBeNull();
-    const compiled = within(scoring).getByRole('combobox', {
-      name: 'When compiled is shown',
-    });
-    expect(compiled).toHaveDisplayValue('Once any run is shown');
-    expect(compiled.closest('tr')).toHaveTextContent('Whether it compiledon its own');
-
+    await screen.findByRole('table', { name: 'What entrants see' });
+    expect(cell('Whether it compiled', 'Always')).not.toBeChecked();
     const result = await screen.findByRole('list', { name: 'Result' });
-    const fact = within(result)
-      .getAllByRole('listitem')
-      .find((item) => item.textContent?.startsWith('Whether it compiled'));
-    expect(fact).toHaveTextContent('Whether it compiledOnce any run is shown');
-    await userEvent.selectOptions(compiled, 'after_close');
-    expect(fact).toHaveTextContent('Whether it compiledAfter the close');
+    const fact = () =>
+      within(result)
+        .getAllByRole('listitem')
+        .find((item) => item.textContent?.startsWith('Whether it compiled'));
+    expect(fact()).toHaveTextContent('Whether it compiledNot shown');
+    await userEvent.click(cell('Whether it compiled', 'After release'));
+    expect(fact()).toHaveTextContent('Whether it compiledAfter release');
+    await userEvent.click(cell('Whether it compiled', 'After the deadline'));
+    expect(fact()).toHaveTextContent(
+      'Whether it compiledAfter the deadline or release',
+    );
+    await userEvent.click(cell('Whether it compiled', 'Always'));
+    expect(fact()).toHaveTextContent('Whether it compiledAlways');
   });
 
   it('heads the result’s groups Groups, and leaves out a heading with nothing under it', async () => {
     taskBackend({
       content: ISLANDS,
-      form: runForm('unicon/classic@v5', [
+      form: runForm('unicon/classic@v6', [
         declared('code', 'file'),
         declared('input', 'file'),
       ]),
@@ -2345,51 +2522,75 @@ scoring:
       .getAllByRole('listitem')
       .map((item) => item.textContent);
     expect(lines).toContain('GroupsKindShown');
-    expect(lines).toContain('On its own');
+    expect(lines).toContain('Once outputs');
     expect(lines.some((line) => line?.startsWith('Values'))).toBe(false);
     expect(lines.some((line) => line?.startsWith('Runs'))).toBe(false);
-    expect(lines.some((line) => line?.startsWith('Files to download'))).toBe(false);
+    expect(lines.some((line) => line?.startsWith('Shared inputs'))).toBe(false);
   });
 
-  it('offers to show what the forge serves: compiled, each output, and the files but task.yaml and plans/', async () => {
+  it('offers the settings every run shares, what is given once and what each run gives, refusing a secret and a file', async () => {
     taskBackend({
-      content: ISLANDS,
-      form: runForm('unicon/classic@v5', [
+      content: `${ISLANDS.replace(
+        '  code: {entrant: {label: Solution}}\n',
+        '  code: {entrant: {label: Solution}}\n  time_limit: 2\n  token: {secret: judge-token}\n',
+      )}scoring:
+  groups: {samples: {input: sample.in}}
+  show:
+    always:
+      runs: [{of: samples, fields: [verdict]}]
+`,
+      form: runForm('unicon/classic@v6', [
         declared('code', 'file'),
         declared('input', 'file'),
+        declared('time_limit', 'number', { title: 'Time limit' }),
+        declared('token', 'text'),
       ]),
     });
     server.use(
-      http.get(`${TASK_API}/tree`, () =>
-        HttpResponse.json([
-          file('task.yaml'),
-          { ...file('plans'), kind: 'directory' },
-          { ...file('public'), kind: 'directory' },
-          file('sample.in'),
-        ]),
-      ),
+      checkedBox([
+        { name: 'log', type: 'file', once: true, title: 'Compile log' },
+        { name: 'lines', type: 'number', once: true },
+      ]),
     );
     await openTask();
-    const scoring = await screen.findByRole('region', { name: 'Scoring' });
-    await within(scoring).findByRole('row', { name: /public\// });
-    const names = within(scoring)
-      .getAllByRole('row')
-      .filter((row) => within(row).queryByRole('combobox') !== null)
-      .map((row) => row.querySelector('th')?.textContent);
-    expect(names).toEqual([
-      'Shown to entrants',
-      'Whether it compiled',
+    const grid = await screen.findByRole('table', { name: 'What entrants see' });
+    await waitFor(() =>
+      expect(grid.querySelector('[data-show-part="lines"]')).not.toBeNull(),
+    );
+    const rows = (section: string) =>
+      [...within(grid).getAllByRole('rowgroup')]
+        .find((group) => group.textContent?.startsWith(section))
+        ?.querySelectorAll('[data-show-part]');
+    const names = (section: string) =>
+      [...(rows(section) ?? [])].map((row) => row.getAttribute('data-show-part'));
+    expect(names('Shared inputs')).toEqual(['time_limit', 'token']);
+    expect(names('Once outputs')).toEqual(['log', 'lines', 'compiled']);
+    const entry = within(grid).getByRole('rowgroup', { name: 'Runs: samples' });
+    expect(
+      [...entry.querySelectorAll('[data-show-part]')].map((row) =>
+        row.getAttribute('data-show-part'),
+      ),
+    ).toEqual([
+      'input',
+      'verdict',
+      'passed',
+      'label',
+      'message',
       'fraction',
-      'time_ms (ms)',
-      'public/',
-      'sample.in',
+      'time_ms',
     ]);
+    expect(grid.querySelector('[data-show-part="token"]')).toHaveTextContent(
+      'A secret, which is never shown.',
+    );
+    expect(cell('token', 'Always')).toBeDisabled();
+    expect(cell('Time limit', 'Always')).toBeEnabled();
+    expect(grid.querySelector('[data-show-part="code"]')).toBeNull();
   });
 
   it('refuses a value named like a group, and a loop, before the save', async () => {
     const { sent } = taskBackend({
       content: ISLANDS,
-      form: runForm('unicon/classic@v5', [
+      form: runForm('unicon/classic@v6', [
         declared('code', 'file'),
         declared('input', 'file'),
       ]),
@@ -2416,32 +2617,30 @@ scoring:
     expect(sent).toEqual([]);
   });
 
-  it('keeps a part shown now from being hidden later, once a submission is graded', async () => {
+  it('warns on its row before what was shown always is hidden, once a submission is graded', async () => {
     taskBackend({
       content:
-        'name: Islands\nworkflow: unicon/classic@v5\nscoring:\n  show:\n    now: [compiled]\n',
+        'name: Islands\nworkflow: unicon/classic@v6\nscoring:\n  values: {total: 1}\n  show:\n    always:\n      values: [total]\n      outputs: [compiled]\n',
       form: {
-        ...runForm('unicon/classic@v5', [declared('code', 'file')]),
+        ...runForm('unicon/classic@v6', [declared('code', 'file')]),
         graded: true,
       },
     });
     await openTask();
-    const scoring = await screen.findByRole('region', { name: 'Scoring' });
-    const when = within(scoring).getByRole('combobox', {
-      name: 'When compiled is shown',
-    });
-    expect(within(when).getByRole('option', { name: 'Now' })).toBeEnabled();
-    expect(
-      within(when).getByRole('option', {
-        name: 'After the close: no, entrants have seen it',
-      }),
-    ).toBeDisabled();
+    const grid = await screen.findByRole('table', { name: 'What entrants see' });
+    const seen = 'Entrants may have seen this. The save asks before hiding it.';
+    expect(grid).not.toHaveTextContent(seen);
+    await userEvent.click(cell('Whether it compiled', 'Always'));
+    await userEvent.click(cell('Whether it compiled', 'After release'));
+    expect(grid.querySelector('[data-show-part="compiled"]')).toHaveTextContent(seen);
+    expect(grid.querySelector('[data-show-part="total"]')).not.toHaveTextContent(seen);
+    expect(within(grid).getAllByText(seen)).toHaveLength(1);
   });
 
   it('shows the summary and sends confirm and asked when a save asks first', async () => {
     const { sent } = taskBackend({
       content: ISLANDS,
-      form: runForm('unicon/classic@v5', [
+      form: runForm('unicon/classic@v6', [
         declared('code', 'file'),
         declared('input', 'file'),
       ]),
@@ -2467,6 +2666,264 @@ scoring:
   });
 });
 
+describe('the preview of what entrants see', { timeout: 30_000 }, () => {
+  /** The preview's answer for each body it is sent: what the show lists at the moment, as placeholders. */
+  function echoPreview(bodies: unknown[]) {
+    server.use(
+      http.post(`${TASK_API}/show-preview`, async ({ request }) => {
+        const body = (await request.json()) as {
+          show: Record<string, { values?: string[] }>;
+          moment: string;
+          entrant?: string;
+          number?: number;
+        };
+        bodies.push(body);
+        const listed = [
+          ...(body.show.always?.values ?? []),
+          ...(body.moment === 'always' ? [] : (body.show[body.moment]?.values ?? [])),
+        ];
+        if (body.number !== undefined) {
+          return HttpResponse.json({
+            hidden: 2,
+            moment: body.moment,
+            placeholders: null,
+            result: {
+              id: '0199a2c1-6b7e-7c3a-9f10-5d2e4b8a6c40',
+              attempt: 1,
+              status: 'graded',
+              compiled: null,
+              limit: null,
+              reason: null,
+              reveal_at: null,
+              inputs: {},
+              once: { reports: {}, texts: {} },
+              runs: [],
+              run_values: listed.map((name) => ({
+                name,
+                number: '7',
+                text: null,
+                waiting: false,
+                self_reported: false,
+                show: 'always',
+                facts: null,
+                runs: null,
+                values: null,
+              })),
+            },
+          });
+        }
+        return HttpResponse.json({
+          hidden: 0,
+          moment: body.moment,
+          placeholders: { values: listed, outputs: [], inputs: {}, runs: [] },
+          result: null,
+        });
+      }),
+    );
+  }
+
+  const islands = `${ISLANDS}scoring:
+  values: {total: 1}
+`;
+  const form = runForm('unicon/classic@v6', [
+    declared('code', 'file'),
+    declared('input', 'file'),
+  ]);
+
+  it('changes as a cell is toggled, at the moment picked', async () => {
+    const bodies: unknown[] = [];
+    taskBackend({ content: islands, form });
+    echoPreview(bodies);
+    await openTask();
+    const preview = await screen.findByRole('region', { name: "An entrant's page" });
+    expect(
+      await within(preview).findByText('Entrants see nothing at this moment.'),
+    ).toBeVisible();
+    await userEvent.click(cell('total', 'After release'));
+    expect(within(preview).queryByText('total appears here')).toBeNull();
+    const part = screen.getByRole('region', { name: 'Preview' });
+    await userEvent.click(within(part).getByRole('radio', { name: 'After release' }));
+    expect(await within(preview).findByText('total appears here')).toBeVisible();
+    await userEvent.click(
+      within(part).getByRole('radio', { name: 'After the deadline' }),
+    );
+    expect(
+      await within(preview).findByText('Entrants see nothing at this moment.'),
+    ).toBeVisible();
+    expect(bodies.at(-1)).toEqual({
+      show: { after_release: { values: ['total'] } },
+      moment: 'after_deadline',
+    });
+    expect(screen.queryByText(/Publish to preview these changes/)).toBeNull();
+  });
+
+  it('previews with a graded submission picked by entrant and number, and counts the runs hidden', async () => {
+    const bodies: unknown[] = [];
+    taskBackend({
+      content: `${islands}  show:\n    always:\n      values: [total]\n`,
+      form,
+    });
+    echoPreview(bodies);
+    const graded = {
+      id: '0199a2c1-6b7e-7c3a-9f10-5d2e4b8a6c41',
+      submission_number: 3,
+      submitted_at: '2026-09-26T10:00:00Z',
+      publication: 2,
+      attempt: 1,
+      latest: true,
+      status: 'done' as const,
+      error: null,
+      result: null,
+      queued_at: '2026-09-26T10:00:00Z',
+      dispatched_at: null,
+      started_at: null,
+      finished_at: null,
+      deadline_at: null,
+      cancel_reason: null,
+      automatic: false,
+      early: null,
+      pipeline: 'early' as const,
+      limit: null,
+      retry_limit: null,
+      regrade: null,
+      change: null,
+      last_good: null,
+      submitted_by: null,
+    };
+    const by = { entrant: 'e-ada', entrant_name: 'Ada', user_id: 11, username: 'ada' };
+    server.use(
+      http.get(`${TASK_API}/gradings`, () =>
+        HttpResponse.json([
+          { task: 'sum', label: 'A', by, grading: graded },
+          {
+            task: 'sum',
+            label: 'A',
+            by,
+            grading: { ...graded, id: `${graded.id.slice(0, -1)}2`, status: 'running' },
+          },
+        ]),
+      ),
+    );
+    await openTask();
+    const preview = await screen.findByRole('region', { name: "An entrant's page" });
+    expect(await within(preview).findByText('total appears here')).toBeVisible();
+    const picker = await screen.findByRole('combobox', { name: 'Preview with' });
+    expect(picker).toHaveDisplayValue('No submission');
+    await waitFor(() =>
+      expect(
+        within(picker)
+          .getAllByRole('option')
+          .map((option) => option.textContent),
+      ).toEqual(['No submission', 'Ada, #3']),
+    );
+    await userEvent.selectOptions(picker, 'Ada, #3');
+    expect(await within(preview).findByText('2 runs hidden')).toBeVisible();
+    expect(within(preview).getByLabelText('Values')).toHaveTextContent('total7');
+    expect(bodies.at(-1)).toMatchObject({
+      entrant: 'e-ada',
+      number: 3,
+      moment: 'always',
+    });
+  });
+
+  it('says to publish first while the draft changes more than show, or the saved task is not the publication', async () => {
+    taskBackend({ content: islands, form });
+    await openTask();
+    const scoring = await screen.findByRole('region', { name: 'Scoring' });
+    await screen.findByRole('region', { name: "An entrant's page" });
+    await userEvent.click(cell('total', 'Always'));
+    expect(screen.queryByText(/Publish to preview these changes/)).toBeNull();
+    await userEvent.click(within(scoring).getByRole('button', { name: 'Add a value' }));
+    expect(screen.getByText(/Publish to preview these changes/)).toBeVisible();
+  });
+
+  it('says so of a saved task ahead of its publication', async () => {
+    taskBackend({ content: islands, form });
+    server.use(http.get(TASK_API, () => HttpResponse.json(draftTask)));
+    await openTask();
+    expect(await screen.findByText(/Publish to preview these changes/)).toBeVisible();
+  });
+
+  it('asks again once a save publishes, though the show it sends is the same', async () => {
+    let published = publishedTask;
+    let asked = 0;
+    taskBackend({
+      content: `${islands}  show:\n    always:\n      values: [total]\n`,
+      form,
+      answer: () => {
+        const latest = { ...publications[1]!, number: 3, version: 'f'.repeat(20) };
+        published = { ...publishedTask, head: latest.version, latest };
+        return HttpResponse.json(PUBLISHED);
+      },
+    });
+    server.use(
+      http.get(TASK_API, () => HttpResponse.json(published)),
+      http.post(`${TASK_API}/show-preview`, () => {
+        asked += 1;
+        return HttpResponse.json({
+          hidden: 0,
+          moment: 'always',
+          placeholders: {
+            values: [`answer ${String(asked)}`],
+            outputs: [],
+            inputs: {},
+            runs: [],
+          },
+          result: null,
+        });
+      }),
+    );
+    const { inputs } = await openTask();
+    expect(await screen.findByText('answer 1 appears here')).toBeVisible();
+    fill(fieldIn(inputs, 'code', 'Label shown to entrants'), 'Your solution');
+    expect(await screen.findByText(/Publish to preview these changes/)).toBeVisible();
+    await save();
+    expect(await screen.findByText('answer 2 appears here')).toBeVisible();
+    expect(screen.queryByText(/Publish to preview these changes/)).toBeNull();
+  });
+
+  it('says why when the task could not be read, rather than waiting', async () => {
+    taskBackend({ content: islands, form });
+    server.use(http.get(TASK_API, () => problem(500, 'internal_error')));
+    await openTask();
+    const part = await screen.findByRole('region', { name: 'Preview' });
+    expect(
+      await within(part).findByRole('button', { name: /Try again/ }),
+    ).toBeVisible();
+  });
+
+  it('asks a task never published to be published first', async () => {
+    const bodies: unknown[] = [];
+    taskBackend({ content: islands, form });
+    echoPreview(bodies);
+    server.use(
+      http.get(TASK_API, () => HttpResponse.json({ ...publishedTask, latest: null })),
+    );
+    await openTask();
+    expect(await screen.findByText('Publish the task to preview it.')).toBeVisible();
+    expect(bodies).toEqual([]);
+  });
+
+  it('words a show the save would refuse as the save does', async () => {
+    taskBackend({ content: islands, form });
+    server.use(
+      http.post(`${TASK_API}/show-preview`, () =>
+        problem(422, 'invalid_definition', {
+          errors: [
+            {
+              path: 'scoring.show.always.values[0]',
+              message: 'There is no value nope.',
+            },
+          ],
+        }),
+      ),
+    );
+    await openTask();
+    const preview = await screen.findByRole('region', { name: "An entrant's page" });
+    expect(await within(preview).findByText('There is no value nope.')).toBeVisible();
+  });
+});
+
 describe('a publication’s checks', { timeout: 30_000 }, () => {
   beforeEach(fakeLiveStream);
   afterEach(realLiveStream);
@@ -2474,7 +2931,7 @@ describe('a publication’s checks', { timeout: 30_000 }, () => {
   it('reads never checked, and still saves', async () => {
     const { sent } = taskBackend({
       content: ISLANDS,
-      form: runForm('unicon/classic@v5', [
+      form: runForm('unicon/classic@v6', [
         declared('code', 'file'),
         declared('input', 'file'),
       ]),
@@ -2501,7 +2958,7 @@ describe('a publication’s checks', { timeout: 30_000 }, () => {
   it('turns a checking publication refused on the checks nudge, and does not poll', async () => {
     taskBackend({
       content: ISLANDS,
-      form: runForm('unicon/classic@v5', [
+      form: runForm('unicon/classic@v6', [
         declared('code', 'file'),
         declared('input', 'file'),
       ]),
@@ -2575,7 +3032,7 @@ describe('scoring while what it reads is not in', { timeout: 60_000 }, () => {
     total: {block: sum, over: {runs: all}, of: {run: [all, time_ms]}}
 `;
   const islands = () =>
-    runForm('unicon/classic@v5', [declared('code', 'file'), declared('input', 'file')]);
+    runForm('unicon/classic@v6', [declared('code', 'file'), declared('input', 'file')]);
 
   it('reads an output as a number once the workflow is read', async () => {
     taskBackend({ content: SCORED, form: islands() });

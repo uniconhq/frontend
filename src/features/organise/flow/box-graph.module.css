@@ -191,7 +191,7 @@
   background: var(--unicon-hover);
   color: var(--unicon-text-body);
 }
-.resultWhen[data-shown='now'] {
+.resultWhen[data-shown='always'] {
   background: color-mix(in srgb, #5b8def 22%, transparent);
   color: var(--unicon-text-body);
   font-weight: 600;

@@ -584,6 +584,7 @@ describe("the organisers' scored view of a submission", () => {
       compiled: null,
       facts: {},
       once: { reports: {}, texts: {} },
+      inputs: {},
       run_values: [
         {
           name: 'score',
@@ -591,7 +592,7 @@ describe("the organisers' scored view of a submission", () => {
           text: null,
           waiting: false,
           self_reported: false,
-          show: 'after_close',
+          show: 'after_deadline',
           runs: ['run-1'],
           values: [],
           facts: [],
@@ -609,6 +610,7 @@ describe("the organisers' scored view of a submission", () => {
           reports: [{ title: 'Run time', unit: 'ms', number: '12' }],
           texts: {},
           label: null,
+          labelled: null,
           message: null,
         },
       ],
@@ -643,7 +645,7 @@ describe("the organisers' scored view of a submission", () => {
     expect(main).toHaveTextContent('Test 1');
     expect(main).toHaveTextContent('Run time (ms) 12');
     expect(within(view).getByLabelText('Values')).toHaveTextContent(
-      'score100 After the close',
+      'score100 After the deadline',
     );
     expect(view).not.toHaveTextContent(/points/);
     expect(view).toHaveTextContent('Done');

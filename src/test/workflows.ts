@@ -11,27 +11,27 @@ import { problem } from './server';
  * each port do (#436), as each primitive's own `primitive.yaml` says them.
  *
  * `CLASSIC` is one run of a task judged by comparing output with an answer,
- * in the shape of deploy's unicon/classic@v5 but not a copy of it: its `run`
+ * in the shape of deploy's unicon/classic@v6 but not a copy of it: its `run`
  * step compiles the submission and runs it on the run's input under the
  * task's limits, and its `check` step compares the output with the run's
  * answer with diff-check, where deploy's compares with a diff script run by
  * exec given a manifest. `FOLDER` is the same with a folder of sources.
- * `CLASSIC_V5` is deploy's workflow.yaml for unicon/classic@v5 as it is.
+ * `CLASSIC_V6` is deploy's workflow.yaml for unicon/classic@v6 as it is.
  */
 export const CLASSIC = `# One run of a task judged by comparing output with an answer, in the
-# shape of unicon/classic@v5: compile the submission and run it on the
+# shape of unicon/classic@v6: compile the submission and run it on the
 # run's input under the task's limits, then compare its output with the
 # run's answer. The format is SIMPLER-CORE.md section 7.
 inputs:
   submission: file
-  language: {type: enum, options: [c, cpp, java, python]}
+  language: {type: enum, options: [c, cpp, java, kotlin, python, javascript, typescript, csharp, rust, r, ruby]}
   time_limit: number
   memory_limit: number
   input: file
   answer: file
 steps:
   - id: run
-    use: unicon/exec@v3
+    use: unicon/exec@v4
     with:
       source: \${{ inputs.submission }}
       language: \${{ inputs.language }}
@@ -55,7 +55,7 @@ export const FOLDER = `# A program of several files: compile the entrant's folde
 # under the task's limits, then compare its output with the run's answer.
 inputs:
   program: folder
-  language: {type: enum, options: [c, cpp, java, python]}
+  language: {type: enum, options: [c, cpp, java, kotlin, python, javascript, typescript, csharp, rust, r, ruby]}
   entry: text
   time_limit: number
   memory_limit: number
@@ -63,7 +63,7 @@ inputs:
   answer: file
 steps:
   - id: run
-    use: unicon/exec@v3
+    use: unicon/exec@v4
     with:
       source: \${{ inputs.program }}
       entry: \${{ inputs.entry }}
@@ -80,13 +80,13 @@ outputs:
   log: \${{ steps.run.log }}
 `;
 
-/** deploy's workflows/classic/v5/workflow.yaml, unicon/classic@v5 as deploy seeds it. */
-export const CLASSIC_V5 = `# unicon/classic@v5, workflow.yaml: one run of an entrant's program on one
+/** deploy's workflows/classic/v6/workflow.yaml, unicon/classic@v6 as deploy seeds it. */
+export const CLASSIC_V6 = `# unicon/classic@v6, workflow.yaml: one run of an entrant's program on one
 # input, its output compared word by word with the answer by the diff
 # script beside this file. The format is SIMPLER-CORE.md 7.
 inputs:
   code: {type: folder, title: Solution}
-  language: {type: enum, options: [c, cpp, java, python], title: Language}
+  language: {type: enum, options: [c, cpp, java, kotlin, python, javascript, typescript, csharp, rust, r, ruby], title: Language}
   input: {type: file, title: Input}
   answer: {type: file, title: Answer}
   time_limit: {type: number, title: Time limit, unit: seconds}
@@ -94,7 +94,7 @@ inputs:
 
 steps:
   - id: solution
-    use: unicon/exec@v3
+    use: unicon/exec@v4
     with:
       source: \${{ inputs.code }}
       language: \${{ inputs.language }}
@@ -102,7 +102,7 @@ steps:
       time_limit: \${{ inputs.time_limit }}
       memory_limit: \${{ inputs.memory_limit }}
   - id: compare
-    use: unicon/exec@v3
+    use: unicon/exec@v4
     with:
       source: \${{ workflow.diff/ }}
       language: python
@@ -174,7 +174,20 @@ const SOURCE = {
     description: "The program's source files, with their layout.",
   }),
   language: port('enum', {
-    options: ['c', 'cpp', 'java', 'python', 'ipynb'],
+    options: [
+      'c',
+      'cpp',
+      'java',
+      'kotlin',
+      'python',
+      'ipynb',
+      'javascript',
+      'typescript',
+      'csharp',
+      'rust',
+      'r',
+      'ruby',
+    ],
     description: 'The language the source is written in; ipynb is a Jupyter notebook.',
   }),
   entry: port('text', {
@@ -224,7 +237,7 @@ const ARGS = port('text', {
  * `source` and `language` alone is drawn as the one form.
  */
 const EXEC: PrimitiveInfo = {
-  ref: 'unicon/exec@v3',
+  ref: 'unicon/exec@v4',
   name: 'exec',
   title: 'Run programs',
   description:
@@ -492,7 +505,10 @@ export const PRIMITIVES: PrimitiveInfo[] = [
     },
     problem: null,
   },
-  retired('exec', 'unicon/compile and unicon/exec@v1 are retired; use unicon/exec@v3.'),
+  retired(
+    'exec',
+    'unicon/compile and unicon/exec@v1 to v3 are retired; use unicon/exec@v4.',
+  ),
   EXEC,
 ];
 
@@ -556,7 +572,7 @@ export function workflowBackend(
           owner: 'unicon',
           name: 'classic',
           visibility: 'public',
-          versions: ['v5'],
+          versions: ['v6'],
           editable: false,
         },
       ]),

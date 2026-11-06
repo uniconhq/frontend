@@ -35,7 +35,7 @@ describe('a workflow drawn', () => {
 
     const run = await screen.findByRole('group', { name: 'Step run' });
     expect(within(run).getByText('Run programs')).toBeInTheDocument();
-    expect(within(run).getByText('unicon/exec@v3')).toBeInTheDocument();
+    expect(within(run).getByText('unicon/exec@v4')).toBeInTheDocument();
     expect(
       within(run).getByText(
         'Compiles a program once, runs it under limits and records its output, time and memory.',
@@ -56,7 +56,7 @@ describe('a workflow drawn', () => {
 
     const run = await screen.findByRole('group', { name: 'Step run' });
     expect(within(run).getByText('exec')).toBeInTheDocument();
-    expect(within(run).getByText('unicon/exec@v3')).toBeInTheDocument();
+    expect(within(run).getByText('unicon/exec@v4')).toBeInTheDocument();
   });
 
   it('marks ports in plain words, and leaves out what the author never acts on', async () => {
@@ -100,7 +100,7 @@ describe('a workflow drawn', () => {
     renderWithProviders(
       <DrawnGraph
         text={
-          'steps:\n  - {id: diff, use: unicon/exec@v3, with: {source: "${{ workflow.diff/ }}"}}\n'
+          'steps:\n  - {id: diff, use: unicon/exec@v4, with: {source: "${{ workflow.diff/ }}"}}\n'
         }
         primitives={PRIMITIVES}
       />,

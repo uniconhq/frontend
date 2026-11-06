@@ -87,6 +87,10 @@ export type OrganisedSubmission = Schemas['OrganisedSubmission'];
 /** A submission's grading as organisers read it, every value and run filled in. */
 export type OrganisedResult = Schemas['OrganisedResult'];
 export type RunShown = Schemas['RunShown'];
+/** A run whose inputs a task's page shows before any submission. */
+export type TaskRun = Schemas['TaskRun'];
+/** One file of an input a task or a result shows, by its address at the download door. */
+export type ShownFile = Schemas['ShownFile'];
 export type RunValue = Schemas['RunValue'];
 export type OnceShown = Schemas['OnceShown'];
 export type Grading = Schemas['Grading'];
@@ -99,6 +103,9 @@ export type RegradeSummary = Schemas['RegradeSummary'];
 export type RegradeChangeKind = Schemas['ChangeKind'];
 /** One attempt in a contest's gradings feed, with its task and who submitted. */
 export type FeedEntry = Schemas['FeedEntry'];
+/** What an entrant would be shown at a moment under a draft show, as staff preview it. */
+export type ShowPreview = Schemas['ShowPreview'];
+export type ShowPreviewRequest = Schemas['ShowPreviewRequest'];
 export type Submitter = Schemas['Submitter'];
 export type QueueDepth = Schemas['QueueDepth'];
 export type Announcement = Schemas['Announcement'];
@@ -124,6 +131,8 @@ export type PrimitivePort = Schemas['PrimitivePort'];
 export type WorkflowItem = Schemas['WorkflowItem'];
 /** A version's inputs and outputs, for drawing it as a box. */
 export type WorkflowBox = Schemas['WorkflowBox'];
+/** One output of a run workflow drawn as a box, and whether it is given once for every run. */
+export type BoxOutput = Schemas['BoxOutput'];
 /** A workflow as its page shows it, with the draft for one who may edit it. */
 export type WorkflowPage = Schemas['WorkflowPage'];
 /** One problem a version would be refused for, at its YAML path. */

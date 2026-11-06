@@ -45,8 +45,8 @@ export type GraphPort = {
   label?: string;
   kind?: string;
   when?: string;
-  /** How `when` is drawn: stands out while shown now, dimmed while never. */
-  shown?: 'now' | 'later' | 'never';
+  /** How `when` is drawn: stands out while shown always, dimmed while never. */
+  shown?: 'always' | 'later' | 'never';
   detail?: string;
   /** What a row holds, drawn as tags under it, such as a group's columns. */
   parts?: string[];

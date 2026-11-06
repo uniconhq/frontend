@@ -138,6 +138,20 @@ const noContests = [
   http.get('/api/v1/contests', () => HttpResponse.json([])),
 ];
 
+/** A preview of a task's show that shows nothing, until a test says what it shows. */
+const nothingPreviewed = http.post(
+  '/api/v1/orgs/:org/contests/:contest/tasks/:task/show-preview',
+  async ({ request }) => {
+    const { moment } = (await request.json()) as { moment: string };
+    return HttpResponse.json({
+      hidden: 0,
+      moment,
+      placeholders: { values: [], outputs: [], inputs: {}, runs: [] },
+      result: null,
+    });
+  },
+);
+
 /** No grading of any task yet, until a test says there is one. */
 const noGradings = http.get(
   '/api/v1/orgs/:org/contests/:contest/tasks/:task/gradings',
@@ -288,6 +302,7 @@ export const server = setupServer(
   ...noHolders,
   ...noInvites,
   noGradings,
+  nothingPreviewed,
   ...emptyOrganising,
   ...noThreads,
   ...noBoards,

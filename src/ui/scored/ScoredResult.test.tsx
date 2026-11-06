@@ -20,6 +20,7 @@ function run(reports: { title: string; unit: string | null; number: string }[]) 
     reports,
     texts: {},
     label: null,
+    labelled: null,
     message: null,
   };
 }
@@ -69,7 +70,7 @@ describe('a run task’s result', () => {
               text: null,
               waiting: false,
               self_reported: true,
-              show: 'now',
+              show: 'always',
               facts: null,
               runs: null,
               values: null,
@@ -90,6 +91,7 @@ describe('a run task’s result', () => {
               reports: [],
               texts: {},
               label: null,
+              labelled: null,
               message: null,
             },
           ],
@@ -139,6 +141,7 @@ describe('a run task’s result', () => {
               reports: [],
               texts: {},
               label: null,
+              labelled: null,
               message: null,
             },
           ],
@@ -169,6 +172,7 @@ describe('a run task’s result', () => {
           reason: null,
           limit: null,
           once: { reports: {}, texts: {} },
+          inputs: {},
           runs: [
             {
               group: 'all',
@@ -181,6 +185,7 @@ describe('a run task’s result', () => {
               reports: [],
               texts: {},
               label: null,
+              labelled: null,
               message: null,
             },
           ],
@@ -191,7 +196,7 @@ describe('a run task’s result', () => {
               text: null,
               waiting: false,
               self_reported: false,
-              show: 'on_release',
+              show: 'after_release',
               facts: null,
               runs: null,
               values: null,
@@ -202,7 +207,7 @@ describe('a run task’s result', () => {
         }}
       />,
     );
-    expect(screen.getByText(/On release/)).toBeVisible();
+    expect(screen.getByText(/After release/)).toBeVisible();
     expect(screen.getByText('Dropped')).toBeVisible();
     expect(screen.getByText('Seconds late').closest('div')).toHaveTextContent('0');
     expect(screen.getByText('Whether it compiled').closest('div')).toHaveTextContent(
@@ -220,6 +225,7 @@ describe('a run task’s result', () => {
           reason: null,
           limit: null,
           once: { reports: {}, texts: {} },
+          inputs: {},
           runs: [],
           run_values: [],
           facts: { compiled: '0', first_failed: '3' },
@@ -233,5 +239,111 @@ describe('a run task’s result', () => {
     expect(screen.getByText('First failed').closest('div')).toHaveTextContent('3');
     expect(screen.queryByText('compiled')).toBeNull();
     expect(screen.queryByText('first_failed')).toBeNull();
+  });
+});
+
+describe('what an entry of show names', () => {
+  it('says whether a run passed when its entry names passed alone', () => {
+    renderWithProviders(
+      <ScoredResult
+        grading={grading({
+          status: 'graded',
+          runs: [
+            { ...run([]), verdict: null, passed: 1 },
+            { ...run([]), place: 2, verdict: null, passed: 0 },
+          ],
+        })}
+      />,
+    );
+    const group = screen.getByRole('region', { name: 'Group main' });
+    expect(group).toHaveTextContent('Test 1Small gridPassed');
+    expect(group).toHaveTextContent('Test 2Small gridNot passed');
+    expect(group).not.toHaveTextContent(/accepted/i);
+  });
+
+  it('shows a run with only the fields its entry names, and names the first run not passed by its own place', () => {
+    renderWithProviders(
+      <ScoredResult
+        grading={grading({
+          status: 'graded',
+          runs: [
+            {
+              ...run([]),
+              group: 'samples',
+              tuples: [{ title: null, key: { seed: 2 } }],
+              verdict: null,
+              passed: null,
+            },
+            {
+              ...run([]),
+              group: 'first_not_passed',
+              tuples: [{ title: null, key: {} }],
+              verdict: 'wrong_answer',
+              labelled: { group: 'big', place: 3 },
+            },
+          ],
+        })}
+      />,
+    );
+    const samples = screen.getByRole('region', { name: 'Group samples' });
+    expect(samples).toHaveTextContent('Test 1seed 2');
+    expect(samples).not.toHaveTextContent(/passed/i);
+    expect(samples).not.toHaveTextContent(/accepted/i);
+    const first = screen.getByRole('region', { name: 'Group First test not passed' });
+    expect(first).toHaveTextContent('Test 3 of big');
+    expect(first).toHaveTextContent(/wrong/i);
+    expect(screen.queryByLabelText('Inputs')).toBeNull();
+  });
+
+  it('shows the settings it names, and lists a shown file or folder when it is opened', async () => {
+    const asked: unknown[] = [];
+    renderWithProviders(
+      <ScoredResult
+        grading={grading({
+          status: 'graded',
+          inputs: { time_limit: 2, checker: { file: 'checker.py' } },
+          runs: [
+            {
+              ...run([]),
+              group: 'all',
+              tuples: [{ title: null, key: { tests: { folder: 'tests/big' } } }],
+            },
+          ],
+        })}
+        readFiles={(ask) => {
+          asked.push(ask);
+          return Promise.resolve(
+            ask.group === null
+              ? [{ path: null, download: '/-/downloads/checker' }]
+              : [
+                  { path: '1.in', download: '/-/downloads/big/1.in' },
+                  { path: '2.in', download: '/-/downloads/big/2.in' },
+                ],
+          );
+        }}
+      />,
+    );
+    const inputs = screen.getByLabelText('Inputs');
+    expect(inputs).toHaveTextContent('time_limit2');
+    await userEvent.click(
+      within(inputs).getByRole('button', { name: 'Files of checker' }),
+    );
+    expect(
+      await within(inputs).findByRole('link', { name: 'checker.py' }),
+    ).toHaveAttribute('href', '/-/downloads/checker');
+
+    const all = screen.getByRole('region', { name: 'Group all' });
+    expect(all).toHaveTextContent('big/');
+    await userEvent.click(
+      within(all).getByRole('button', { name: 'Files of tests, all Test 1' }),
+    );
+    expect(await within(all).findByRole('link', { name: '2.in' })).toHaveAttribute(
+      'href',
+      '/-/downloads/big/2.in',
+    );
+    expect(asked).toEqual([
+      { group: null, place: null, name: 'checker' },
+      { group: 'all', place: 1, name: 'tests' },
+    ]);
   });
 });
