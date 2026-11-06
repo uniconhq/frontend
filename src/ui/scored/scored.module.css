@@ -49,3 +49,18 @@
   color: var(--unicon-text-body);
   white-space: pre;
 }
+
+/* The files of a shown input, each a download, wrapping at any width. */
+.files {
+  margin: 0;
+  padding-left: var(--mantine-spacing-lg);
+  overflow-wrap: anywhere;
+}
+
+/* A grading's badge, and what is said beside it. */
+.verdict {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}

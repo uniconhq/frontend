@@ -268,7 +268,7 @@ describe('the statement beside its preview', { timeout: 20_000 }, () => {
       await user.upload(screen.getByLabelText('Picture'), file);
     }
 
-    it('stages a picture under a name of its own, draws it from its own bytes, and saves it with the statement in one save', async () => {
+    it('stages a picture under a name of its own, draws it from its own bytes, and saves it with the statement in one save, leaving show as it is', async () => {
       const { sent, saves } = picturesBackend();
       const user = userEvent.setup();
       renderApp('/orgs/acme/contests/spring/tasks/sum/statement');
@@ -319,15 +319,6 @@ describe('the statement beside its preview', { timeout: 20_000 }, () => {
               encoding: 'base64',
               remove: false,
             },
-            {
-              // The task's show lists no picture, so the save shows them now.
-              path: 'task.yaml',
-              token: 'token-task-yaml',
-              content:
-                'name: sum\nworkflow: unicon/classic@v2\nscoring:\n  show:\n    now: [public/]\n',
-              encoding: 'utf-8',
-              remove: false,
-            },
           ],
           confirm: false,
           keep_as_draft: false,
@@ -369,7 +360,6 @@ describe('the statement beside its preview', { timeout: 20_000 }, () => {
       expect(saves[1]?.changes.map((change) => change.path)).toEqual([
         'statement.md',
         'public/tree.gif',
-        'task.yaml',
       ]);
     });
 

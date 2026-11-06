@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useReducer, useState, type KeyboardEvent } from 'react';
+import { useMemo, useReducer, useState, type KeyboardEvent } from 'react';
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
 import { $api } from '@/api/query';
 import { toApiError, type ApiError } from '@/api/problem';
@@ -11,6 +11,7 @@ import { CodeEditor } from '@/ui/CodeEditor';
 import { LeaveGuard } from '@/ui/LeaveGuard';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { type MenuEntry } from '@/ui/ActionMenu';
+import { useSettled } from '@/lib/use-settled';
 import { MergeView } from '../forms/MergeView';
 import { parseYaml } from '../forms/yaml-doc';
 import { WorkflowBar } from './Bar';
@@ -142,16 +143,6 @@ function history(state: History, action: Action): History {
       };
     }
   }
-}
-
-/** `value`, once it has stayed the same for `delay` milliseconds. */
-function useSettled<T>(value: T, delay: number): T {
-  const [settled, setSettled] = useState(value);
-  useEffect(() => {
-    const timer = setTimeout(() => setSettled(value), delay);
-    return () => clearTimeout(timer);
-  }, [value, delay]);
-  return settled;
 }
 
 /**

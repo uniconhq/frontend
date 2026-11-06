@@ -3,6 +3,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { formatDateTime, formatWhen } from '@/lib/time';
 import { renderApp } from '@/test/render';
+import userEvent from '@/test/user-event';
 import { problem, server, signedIn } from '@/test/server';
 import {
   CONTEST_API,
@@ -346,6 +347,78 @@ describe('a task page for a signed-in person', () => {
   });
 });
 
+describe('what a task page shows of its show', () => {
+  it('lists the runs and settings the task shows, each file through its own route', async () => {
+    server.use(
+      signedIn,
+      noSubmissions,
+      http.get(`${TASK_API}/page`, () =>
+        HttpResponse.json({
+          ...taskPage,
+          runs: [
+            {
+              group: 'samples',
+              place: 1,
+              tuples: [{ title: null, key: { input: { file: 'samples/1.in' } } }],
+            },
+          ],
+          shown_inputs: { time_limit: 2 },
+        }),
+      ),
+      http.get(`${TASK_API}/runs/:group/:place/inputs/:name`, ({ params }) =>
+        HttpResponse.json({
+          files: [
+            {
+              path: null,
+              download: `/-/downloads/${String(params.group)}/${String(params.place)}/${String(params.name)}`,
+            },
+          ],
+        }),
+      ),
+    );
+    renderApp(PAGE);
+
+    const samples = await screen.findByRole('region', { name: 'Group samples' });
+    expect(samples).toHaveTextContent('Test 11.in');
+    expect(screen.getByLabelText('Inputs')).toHaveTextContent('time_limit2');
+    await userEvent.click(
+      within(samples).getByRole('button', { name: 'Files of input, samples Test 1' }),
+    );
+    expect(await within(samples).findByRole('link', { name: '1.in' })).toHaveAttribute(
+      'href',
+      '/-/downloads/samples/1/input',
+    );
+  });
+
+  it('shows nothing of it when the task shows nothing before a submission', async () => {
+    server.use(
+      signedIn,
+      noSubmissions,
+      http.get(`${TASK_API}/page`, () => HttpResponse.json(taskPage)),
+    );
+    renderApp(PAGE);
+    expect(await screen.findByLabelText('Limits')).toBeVisible();
+    expect(screen.queryByRole('heading', { name: 'Tests' })).toBeNull();
+  });
+
+  it('lists them for a visitor too', async () => {
+    server.use(
+      http.get(`${PUBLIC_API}/:org/:contest/tasks/:task`, () =>
+        HttpResponse.json({
+          task: { name: 'sum', label: 'A', title: 'Sum of Two' },
+          statement: 'Add two numbers.\n',
+          runs: [{ group: 'all', place: 2, tuples: [{ title: 'Big', key: {} }] }],
+          shown_inputs: {},
+        }),
+      ),
+    );
+    renderApp(PAGE);
+    expect(await screen.findByRole('region', { name: 'Group all' })).toHaveTextContent(
+      'Test 2Big',
+    );
+  });
+});
+
 describe('a task page as the task opens', () => {
   withFakeTimers();
 
@@ -390,6 +463,8 @@ describe('a task page for a visitor', () => {
       http.get(`${PUBLIC_API}/:org/:contest/tasks/:task`, () =>
         HttpResponse.json({
           task: { name: 'sum', label: 'A', title: 'Sum of Two' },
+          runs: [],
+          shown_inputs: {},
           statement: 'Add two numbers.\n',
         }),
       ),
@@ -408,6 +483,8 @@ describe('a task page for a visitor', () => {
       http.get(`${PUBLIC_API}/:org/:contest/tasks/:task`, () =>
         HttpResponse.json({
           task: { name: 'sum', label: 'A', title: 'Sum of Two' },
+          runs: [],
+          shown_inputs: {},
           statement: '![the tree](public/tree.png)\n',
         }),
       ),

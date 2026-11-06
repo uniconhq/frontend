@@ -254,6 +254,19 @@ export function specCatalogue(): Catalogue {
     leaderboard_leaves: ['value', 'results', 'column', 'name'],
     leaderboard_facts: ['attempt', 'seconds', 'seconds_late', 'marked', 'compiled'],
     skip: 'skip',
-    languages: ['c', 'cpp', 'java', 'python', 'ipynb'],
+    languages: [
+      'c',
+      'cpp',
+      'java',
+      'python',
+      'javascript',
+      'typescript',
+      'kotlin',
+      'csharp',
+      'rust',
+      'r',
+      'ruby',
+      'ipynb',
+    ],
   };
 }

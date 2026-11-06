@@ -57,11 +57,20 @@ function declOf(box: WorkflowBox): BoxDecl {
   };
 }
 
-export function boxOptions(use: UseRef) {
+/**
+ * A version as a box. Given a task's repeated inputs, each output also says
+ * whether it is given once for every run of that task.
+ */
+export function boxOptions(use: UseRef, repeated?: readonly string[]) {
   return $api.queryOptions(
     'get',
     '/api/v1/workflows/{owner}/{name}/versions/{version}/box',
-    { params: { path: use } },
+    {
+      params: {
+        path: use,
+        ...(repeated === undefined ? {} : { query: { repeated: [...repeated] } }),
+      },
+    },
   );
 }
 

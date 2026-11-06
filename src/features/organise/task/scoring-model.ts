@@ -14,16 +14,46 @@ import {
   type Doc,
 } from '../forms/yaml-doc';
 import type { AxisValues, InputValues, TupleValues } from '../forms/task-values';
+import { FIRST_NOT_PASSED } from '@/ui/scored/scored-text';
 
-/** When entrants see a part of the result. Unlisted means never, said "Not shown". */
-export type When = 'now' | 'after_close' | 'on_release' | 'never';
+/**
+ * A moment entrants see a part of the result at: `always`, as soon as a
+ * grading ends, and for inputs whenever the statement is; `after_deadline`,
+ * once the task has closed for everyone; `after_release`, while its results
+ * are released. The two later ones are separate: either may come first.
+ */
+export type Moment = 'always' | 'after_deadline' | 'after_release';
 
-export const WHEN: { value: When; label: string }[] = [
-  { value: 'now', label: 'Now' },
-  { value: 'after_close', label: 'After the close' },
-  { value: 'on_release', label: 'On release' },
-  { value: 'never', label: 'Not shown' },
+export const MOMENTS: { value: Moment; label: string }[] = [
+  { value: 'always', label: 'Always' },
+  { value: 'after_deadline', label: 'After the deadline' },
+  { value: 'after_release', label: 'After release' },
 ];
+
+/** What `show` names by itself at a moment: values, the task's settings, and outputs given once. */
+export type ShowKind = 'values' | 'inputs' | 'outputs';
+
+const KINDS: ShowKind[] = ['values', 'inputs', 'outputs'];
+
+/** One entry of a moment's `runs`: the runs `of` picks, and the fields shown of each. */
+type ShownRuns = { of: string; fields: string[] };
+
+/** What one moment of `show` lists, as the file does. */
+type Shown = Record<ShowKind, string[]> & { runs: ShownRuns[] };
+
+/** A task's `show`: each moment's lists. Nothing is shown unless named. */
+export type Show = Record<Moment, Shown>;
+
+const nothingShown = (): Shown => ({ values: [], inputs: [], outputs: [], runs: [] });
+
+/** A `show` that lists nothing at any moment. */
+export function emptyShow(): Show {
+  return {
+    always: nothingShown(),
+    after_deadline: nothingShown(),
+    after_release: nothingShown(),
+  };
+}
 
 /** Facts a value may read, each by what pages call it. Each is a number. */
 export const FACTS: { name: string; title: string; line: string }[] = [
@@ -58,7 +88,7 @@ const NAME_KEYS = new Set([
   'language',
 ]);
 
-/** One group: the runs its pick matches. `saved` is the when it was read at. */
+/** One group: the runs its pick matches. */
 export type ScoreGroup = {
   key: string;
   name: string;
@@ -66,16 +96,14 @@ export type ScoreGroup = {
   picks: Record<string, string[]>;
   /** An empty pick matches no run. One read from the file matches every run. */
   none: boolean;
-  saved: When;
 };
 
-/** One value. `saved` is the tree as read, until the line is edited. */
+/** One value. `tree` is the tree as read, until the line is edited. */
 export type ScoreValue = {
   key: string;
   name: string;
   text: string;
   tree: Tree | null;
-  saved: When;
 };
 
 /** One check: a made-up submission and what it should get. */
@@ -203,20 +231,57 @@ export function formulaYaml(tree: Tree): unknown {
   return yamlTree(tree);
 }
 
-function whenOf(show: Record<string, When>, name: string): When {
-  return show[name] ?? 'never';
+function names(node: unknown): string[] {
+  if (!Array.isArray(node)) return [];
+  return node.map(textOf).filter((name) => name !== '');
 }
 
-function readShow(node: unknown): Record<string, When> {
-  if (!isRecord(node)) return {};
-  const show: Record<string, When> = {};
-  for (const when of ['now', 'after_close', 'on_release'] as const) {
-    const listed = node[when];
-    if (!Array.isArray(listed)) continue;
-    for (const name of listed) {
-      const text = textOf(name);
-      if (text !== '') show[text] = when;
-    }
+/** A list of names, as `show` holds each. */
+function isNames(node: unknown): boolean {
+  return Array.isArray(node) && node.every((item) => typeof item === 'string');
+}
+
+/**
+ * Whether `show` is in the shape the grid reads, or not there: each moment a
+ * map of its lists, each list of names, each run entry an `of` and its
+ * fields. One that is not, such as a list given as one name or a moment the
+ * grid does not know, is not read, so a save leaves it as it is written.
+ */
+function showReadable(node: unknown): boolean {
+  if (node === undefined) return true;
+  if (!isRecord(node)) return false;
+  return Object.entries(node).every(([moment, listed]) => {
+    if (!MOMENTS.some(({ value }) => value === moment) || !isRecord(listed))
+      return false;
+    return Object.entries(listed).every(([kind, list]) => {
+      if (KINDS.some((each) => each === kind)) return isNames(list);
+      if (kind !== 'runs' || !Array.isArray(list)) return false;
+      return list.every(
+        (entry) =>
+          isRecord(entry) &&
+          Object.keys(entry).every((key) => key === 'of' || key === 'fields') &&
+          typeof entry.of === 'string' &&
+          entry.of !== '' &&
+          isNames(entry.fields),
+      );
+    });
+  });
+}
+
+/** `show` as the file holds it, each list in its order; what is not in that shape is left out. */
+function readShow(node: unknown): Show {
+  const show = emptyShow();
+  if (!isRecord(node)) return show;
+  for (const { value: moment } of MOMENTS) {
+    const listed = node[moment];
+    if (!isRecord(listed)) continue;
+    for (const kind of KINDS) show[moment][kind] = names(listed[kind]);
+    show[moment].runs = (Array.isArray(listed.runs) ? listed.runs : []).flatMap(
+      (entry): ShownRuns[] =>
+        isRecord(entry) && textOf(entry.of) !== ''
+          ? [{ of: textOf(entry.of), fields: names(entry.fields) }]
+          : [],
+    );
   }
   return show;
 }
@@ -238,7 +303,7 @@ function readPicks(entry: unknown): Record<string, string[]> {
 export type ScoringRead = {
   scoreGroups: ScoreGroup[];
   scoreValues: ScoreValue[];
-  show: Record<string, When>;
+  show: Show;
   checks: CheckDraft[];
   unreadable: string[];
 };
@@ -247,11 +312,12 @@ export type ScoringRead = {
 export function readScoring(at: (path: string[]) => unknown): ScoringRead {
   const unreadable: string[] = [];
   const scoring = at(['scoring']);
-  const show = isRecord(scoring) ? readShow(scoring['show']) : {};
+  const show = readShow(isRecord(scoring) ? scoring['show'] : undefined);
   const scoreGroups: ScoreGroup[] = [];
   const scoreValues: ScoreValue[] = [];
   if (scoring !== undefined && !isRecord(scoring)) unreadable.push('scoring');
   if (isRecord(scoring)) {
+    if (!showReadable(scoring['show'])) unreadable.push('scoring');
     const groups = scoring['groups'];
     if (groups !== undefined && !isRecord(groups)) unreadable.push('scoring');
     if (isRecord(groups)) {
@@ -263,7 +329,6 @@ export function readScoring(at: (path: string[]) => unknown): ScoringRead {
           name,
           picks,
           none: false,
-          saved: whenOf(show, name),
         });
       }
     }
@@ -276,7 +341,6 @@ export function readScoring(at: (path: string[]) => unknown): ScoringRead {
           name,
           text: '',
           tree: asTree(entry),
-          saved: whenOf(show, name),
         });
       }
     }
@@ -332,16 +396,185 @@ function pickEntry(
   return entry;
 }
 
-/** `show` as the file writes it: only the lists with a name, or none at all. */
-function showLists(show: Record<string, When>): Record<string, string[]> | undefined {
-  const lists: Record<string, string[]> = {};
-  for (const when of ['now', 'after_close', 'on_release'] as const) {
-    const names = Object.entries(show)
-      .filter(([name, at]) => at === when && name.trim() !== '')
-      .map(([name]) => name);
-    if (names.length > 0) lists[when] = names;
+/**
+ * `show` as the file writes it: each moment with something listed, each
+ * list in its order and only when it names something, a run entry only
+ * with a field; none at all when nothing is shown.
+ */
+export function showLists(show: Show): Record<string, unknown> | undefined {
+  const written: Record<string, unknown> = {};
+  for (const { value: moment } of MOMENTS) {
+    const listed: Record<string, unknown> = {};
+    for (const kind of KINDS) {
+      const named = show[moment][kind].filter((name) => name.trim() !== '');
+      if (named.length > 0) listed[kind] = named;
+    }
+    const runs = show[moment].runs.filter((entry) => entry.fields.length > 0);
+    if (runs.length > 0) listed.runs = runs.map(({ of, fields }) => ({ of, fields }));
+    if (Object.keys(listed).length > 0) written[moment] = listed;
   }
-  return Object.keys(lists).length === 0 ? undefined : lists;
+  return Object.keys(written).length === 0 ? undefined : written;
+}
+
+/** The moments `show` lists `name` under, of `kind`. */
+export function momentsOf(show: Show, kind: ShowKind, name: string): Moment[] {
+  return MOMENTS.map(({ value }) => value).filter((moment) =>
+    show[moment][kind].includes(name),
+  );
+}
+
+/** The moments a run entry of `of` lists `field` under. */
+export function runMoments(show: Show, of: string, field: string): Moment[] {
+  return MOMENTS.map(({ value }) => value).filter((moment) =>
+    show[moment].runs.some((entry) => entry.of === of && entry.fields.includes(field)),
+  );
+}
+
+/**
+ * `show` with `name` listed under `moment`, or not. `always` already shows
+ * it at both later moments, which may not list it again, so turning it on
+ * takes it out of them; while it is on, the later moments are left as they
+ * are. The later moments never touch each other.
+ */
+export function withMoment(
+  show: Show,
+  kind: ShowKind,
+  name: string,
+  moment: Moment,
+  on: boolean,
+): Show {
+  const next = structuredClone(show);
+  const list = (at: Moment) => next[at][kind];
+  if (!on) {
+    next[moment][kind] = list(moment).filter((each) => each !== name);
+    return next;
+  }
+  if (moment !== 'always' && list('always').includes(name)) return show;
+  if (!list(moment).includes(name)) next[moment][kind] = [...list(moment), name];
+  if (moment === 'always') {
+    for (const later of ['after_deadline', 'after_release'] as const) {
+      next[later][kind] = list(later).filter((each) => each !== name);
+    }
+  }
+  return next;
+}
+
+/** `show` with `field` among the fields its `of` entry lists under `moment`, or not, as `withMoment`. */
+export function withRunMoment(
+  show: Show,
+  of: string,
+  field: string,
+  moment: Moment,
+  on: boolean,
+): Show {
+  const next = structuredClone(show);
+  const set = (at: Moment, shown: boolean) => {
+    const runs = next[at].runs;
+    const entry = runs.find((each) => each.of === of);
+    if (shown && entry === undefined) runs.push({ of, fields: [field] });
+    else if (shown && entry !== undefined && !entry.fields.includes(field))
+      entry.fields.push(field);
+    else if (!shown && entry !== undefined) {
+      entry.fields = entry.fields.filter((each) => each !== field);
+      if (entry.fields.length === 0)
+        next[at].runs = runs.filter((each) => each !== entry);
+    }
+  };
+  if (on && moment !== 'always' && runMoments(show, of, field).includes('always'))
+    return show;
+  set(moment, on);
+  if (on && moment === 'always') {
+    set('after_deadline', false);
+    set('after_release', false);
+  }
+  return next;
+}
+
+/** `show` with `from`, of `kind` or a run entry's `of`, named `to` wherever it is listed. */
+export function renamedInShow(
+  show: Show,
+  kind: ShowKind | 'runs',
+  from: string,
+  to: string,
+): Show {
+  if (from === to) return show;
+  const next = structuredClone(show);
+  for (const { value: moment } of MOMENTS) {
+    if (kind === 'runs') {
+      for (const entry of next[moment].runs) if (entry.of === from) entry.of = to;
+    } else {
+      next[moment][kind] = next[moment][kind].map((name) =>
+        name === from ? to : name,
+      );
+    }
+  }
+  return next;
+}
+
+/** `show` without `name`, of `kind` or a run entry's `of`, as when what it names is removed. */
+export function withoutInShow(show: Show, kind: ShowKind | 'runs', name: string): Show {
+  const next = structuredClone(show);
+  for (const { value: moment } of MOMENTS) {
+    if (kind === 'runs')
+      next[moment].runs = next[moment].runs.filter((e) => e.of !== name);
+    else next[moment][kind] = next[moment][kind].filter((each) => each !== name);
+  }
+  return next;
+}
+
+/** Each run entry's `of`, in the order `show` first lists it. */
+export function runEntries(show: Show): string[] {
+  return [
+    ...new Set(
+      MOMENTS.flatMap(({ value }) => show[value].runs.map((entry) => entry.of)),
+    ),
+  ];
+}
+
+/**
+ * The runs a run entry's `of` picks, by id: a group's, or every run for
+ * `all`; null for `first_not_passed`, whose run is known only once graded.
+ */
+function picked(
+  of: string,
+  runs: RunRow[],
+  groups: readonly ScoreGroup[],
+): RunRow[] | null {
+  if (of === FIRST_NOT_PASSED) return null;
+  if (of === 'all') return runs;
+  const group = groups.find((each) => each.name === of);
+  return group === undefined ? [] : runs.filter((run) => inGroup(run, group));
+}
+
+/**
+ * Whether the draft stops showing always what `saved` showed always: a
+ * value, a setting or an output by its name; a run's field by the runs it
+ * reached, so moving it to an entry that picks the same runs hides nothing.
+ */
+export function hidesAlways(
+  saved: Show,
+  draft: Show,
+  part:
+    | { kind: ShowKind; name: string }
+    | { kind: 'runs'; of: string; field: string; runs: RunRow[]; groups: ScoreGroup[] },
+): boolean {
+  if (part.kind !== 'runs') {
+    return (
+      saved.always[part.kind].includes(part.name) &&
+      !draft.always[part.kind].includes(part.name)
+    );
+  }
+  const { of, field, runs, groups } = part;
+  if (!runMoments(saved, of, field).includes('always')) return false;
+  const reached = picked(of, runs, groups);
+  const entries = draft.always.runs.filter((entry) => entry.fields.includes(field));
+  if (reached === null) return !entries.some((entry) => entry.of === of);
+  const still = new Set(
+    entries.flatMap((entry) =>
+      (picked(entry.of, runs, groups) ?? []).map((run) => run.id),
+    ),
+  );
+  return reached.some((run) => !still.has(run.id));
 }
 
 /** The tree a value writes: the line's, once it has been edited, else the one read. */

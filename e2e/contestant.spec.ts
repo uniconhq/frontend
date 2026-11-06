@@ -112,6 +112,8 @@ async function stubContestantApi(page: Page, signedIn: boolean) {
     json(route, {
       task: { name: 'sum', label: 'A', title: 'Sum of Two' },
       statement: '# Sum\n\nPrint the sum of two numbers.\n',
+      runs: [],
+      shown_inputs: {},
     } satisfies Schemas['PublicStatement']),
   );
   await page.route('**/api/v1/contests', (route) =>
@@ -233,6 +235,8 @@ async function stubContestantApi(page: Page, signedIn: boolean) {
         due: null,
         closes: CONTEST.end,
         marks: null,
+        runs: [],
+        shown_inputs: {},
       } satisfies Schemas['TaskPage']);
     }
     if (path.endsWith('/tasks/sum/submissions')) return json(route, []);

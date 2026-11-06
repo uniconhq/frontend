@@ -1,21 +1,20 @@
 import { apiClient } from '@/api/client';
 import { $api, queryView } from '@/api/query';
-import type { GradingResult, InputField } from '@/api/types';
+import type { InputField } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { PageLink } from '@/ui/PageLink';
 import { OutLink } from '@/ui/OutLink';
 import { SectionTitle } from '@/ui/SectionTitle';
-import { VerdictBadge } from '@/ui/VerdictBadge';
 import { ErrorBlock } from '@/ui/feedback/ErrorBlock';
 import { PageSkeleton } from '@/ui/feedback/PageSkeleton';
-import { ScoredResult, type TextAsk } from '@/ui/scored/ScoredResult';
+import { Grading } from '@/ui/scored/Grading';
+import type { TextAsk } from '@/ui/scored/ScoredResult';
 import { formatDateTime } from '@/lib/time';
-import { downloadHref } from './download';
+import { downloadHref, readShownFiles } from './download';
 import { nameOf, submittedItems } from '@/lib/submitted';
 import { useLiveConnected, useLiveRefused } from '@/live';
 import { serverNow } from '@/lib/time';
-import { DELAYED_SENTENCE, cancelReason, pollEvery } from './grading';
-import { overLimitSentence } from '@/ui/scored/scored-text';
+import { pollEvery } from './grading';
 import shared from '../contest.module.css';
 import classes from './submit.module.css';
 
@@ -40,79 +39,6 @@ function readText(where: Where, ask: TextAsk): Promise<string> {
       },
     )
     .then((found) => found.data ?? '');
-}
-
-/**
- * What the grading holds for the entrant: its verdict, the values and runs
- * the task shows, and what its steps done once reported, such as a compile
- * log. A grading the organisers cancelled holds their sentence instead,
- * and says the submission no longer counts against the task's limit: a cancel
- * with a sentence is the one the forge leaves out of the limit, so one
- * without (made before cancels carried one) says nothing about the limit. A
- * delayed one says its grading failed on Unicon's side, then shows the runs
- * it did give and its values, one reading a failed run "being checked"; one
- * over the limit, that it was not graded and why (#445).
- */
-function Grading({
-  grading,
-  readText,
-}: {
-  grading: GradingResult;
-  readText: (ask: TextAsk) => Promise<string>;
-}) {
-  if (grading.status === 'delayed') {
-    return (
-      <>
-        <div className={classes.verdict}>
-          <VerdictBadge verdict="delayed" />
-        </div>
-        <BodyText>{DELAYED_SENTENCE}</BodyText>
-        <ScoredResult grading={grading} readText={readText} />
-      </>
-    );
-  }
-  if (grading.status === 'over_limit') {
-    return (
-      <>
-        <div className={classes.verdict}>
-          <VerdictBadge verdict="over_limit" />
-        </div>
-        <BodyText>{overLimitSentence('you', grading.limit)}</BodyText>
-        <BodyText tone="secondary">
-          It has no result and counts on no leaderboard.
-        </BodyText>
-      </>
-    );
-  }
-  if (grading.status === 'cancelled') {
-    const reason = cancelReason(grading);
-    return (
-      <>
-        <div className={classes.verdict}>
-          <VerdictBadge verdict="cancelled" />
-        </div>
-        <BodyText>
-          Cancelled by the organisers{reason === null ? '.' : `: ${reason}`}
-        </BodyText>
-        {reason !== null && (
-          <BodyText tone="secondary">
-            It is not graded, and it does not count against the task&apos;s limit on
-            submissions.
-          </BodyText>
-        )}
-      </>
-    );
-  }
-  return (
-    <>
-      <div className={classes.verdict}>
-        <VerdictBadge verdict={grading.status} />
-        {/* Entrants' pages speak of a submission, not of its gradings' attempts. */}
-        {grading.attempt > 1 && <BodyText tone="secondary">Graded again</BodyText>}
-      </div>
-      <ScoredResult grading={grading} readText={readText} />
-    </>
-  );
 }
 
 /**
@@ -211,6 +137,7 @@ export function SubmissionDetail({
             <Grading
               grading={view.data.grading}
               readText={(ask) => readText(where, ask)}
+              readFiles={(ask) => readShownFiles(where, ask)}
             />
           )}
         </>

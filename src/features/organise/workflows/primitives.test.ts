@@ -25,7 +25,7 @@ describe('a primitive as a step declares it', () => {
   it('is the first form whose inputs hold every port the step gives', () => {
     const one = declared(
       primitives,
-      stepOf('unicon/exec@v3', {
+      stepOf('unicon/exec@v4', {
         source: 'a',
         language: 'c',
         stdin: 'b',
@@ -63,13 +63,13 @@ describe('a primitive as a step declares it', () => {
   });
 
   it('is the first form for a new step, a half-wired one, or one given only what compiles a program', () => {
-    const one = primitives.get('unicon/exec@v3')?.forms.one;
+    const one = primitives.get('unicon/exec@v4')?.forms.one;
     for (const given of [
       {},
       { source: 'a', time_limit: 1 },
       { source: 'a', language: 'c' },
     ]) {
-      const drawn = declared(primitives, stepOf('unicon/exec@v3', given));
+      const drawn = declared(primitives, stepOf('unicon/exec@v4', given));
       expect(drawn?.inputs).toBe(one?.inputs);
       expect(drawn?.outputs).toEqual(one?.outputs);
     }
@@ -78,7 +78,7 @@ describe('a primitive as a step declares it', () => {
   it('gives each program of a programs form its outputs, by the name the step gives it', () => {
     const programs = declared(
       primitives,
-      stepOf('unicon/exec@v3', {
+      stepOf('unicon/exec@v4', {
         programs: {
           entrant: { source: 'a', language: 'c', time_limit: 1 },
           judge: { source: 'b', language: 'python', time_limit: 2 },
@@ -105,7 +105,7 @@ describe('a primitive as a step declares it', () => {
   it('has no ports when no one form holds every port the step gives', () => {
     const none = declared(
       primitives,
-      stepOf('unicon/exec@v3', { source: 'a', language: 'c', programs: {} }),
+      stepOf('unicon/exec@v4', { source: 'a', language: 'c', programs: {} }),
     );
     expect(none?.inputs).toEqual({});
     expect(none?.outputs).toEqual({});

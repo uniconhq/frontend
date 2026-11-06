@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   overLimitSentence,
   reportLabel,
+  shownPath,
   submissionsWords,
   tupleLine,
 } from './scored-text';
@@ -17,6 +18,19 @@ describe('a run’s rows', () => {
     expect(
       tupleLine([{ title: null, key: { route: 'hidden/route.txt', seed: 2 } }]),
     ).toBe('route.txt · seed 2');
+  });
+
+  it('names a column shown as a file or a folder by its name', () => {
+    expect(
+      tupleLine([
+        {
+          title: null,
+          key: { input: { file: 'tests/1.in' }, data: { folder: 'grids' } },
+        },
+      ]),
+    ).toBe('1.in · grids/');
+    expect(shownPath({ folder: 'grids' })).toEqual({ path: 'grids', folder: true });
+    expect(shownPath(2)).toBeNull();
   });
 });
 

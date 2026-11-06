@@ -452,7 +452,7 @@ describe('settings someone else saved first', () => {
 
 describe('mending settings that do not read', () => {
   const TASK_FILE = `${TASK_API}/files/:path`;
-  const BROKEN_TASK = 'name: sum\nworkflow: [unicon/classic@v2\n';
+  const BROKEN_TASK = 'name: sum\nworkflow: [unicon/classic@v6\n';
 
   /** The sum task, its settings no longer YAML, and every save of them refused as `answer` says. */
   function brokenBackend(answer: () => Response) {

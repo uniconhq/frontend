@@ -227,7 +227,7 @@ describe('a workflow one may only read', () => {
       '  Compiles the code.',
       '  Gives its log.',
       'steps:',
-      '  - {id: solution, use: unicon/exec@v3}',
+      '  - {id: solution, use: unicon/exec@v4}',
       '',
     ].join('\n');
     const said = /^Compiles the code\.\s+Gives its log\.$/;

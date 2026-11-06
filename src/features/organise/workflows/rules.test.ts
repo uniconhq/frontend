@@ -105,7 +105,7 @@ const WORKFLOW = readWorkflow(
 inputs:
   submission: file
   language: {type: enum, options: [c, cpp]}
-  wide: {type: enum, options: [c, rust]}
+  wide: {type: enum, options: [c, cobol]}
   mode: {type: enum, options: [exact]}
   input: file
   limit: number
@@ -113,10 +113,10 @@ inputs:
   key: {type: text, optional: true}
   flag: boolean
 steps:
-  - {id: build, use: unicon/exec@v3, with: {source: "\${{ inputs.submission }}", language: c}}
-  - {id: run, use: unicon/exec@v3, with: {${RUNS}, args: "\${{ steps.build.log }}"}}
+  - {id: build, use: unicon/exec@v4, with: {source: "\${{ inputs.submission }}", language: c}}
+  - {id: run, use: unicon/exec@v4, with: {${RUNS}, args: "\${{ steps.build.log }}"}}
   - {id: check, use: unicon/checker-like@v1, with: {}}
-  - {id: late, use: unicon/exec@v3, with: {source: "\${{ inputs.submission }}", language: c}}
+  - {id: late, use: unicon/exec@v4, with: {source: "\${{ inputs.submission }}", language: c}}
 `),
 );
 
@@ -173,7 +173,7 @@ describe('the drag rules', () => {
       0,
       'language',
       input('wide'),
-      'This takes one of c, cpp, java, python, ipynb, not rust.',
+      'This takes one of c, cpp, java, kotlin, python, ipynb, javascript, typescript, csharp, rust, r, ruby, not cobol.',
     ],
     [
       'a step reading its own output',
@@ -212,8 +212,8 @@ describe('the drag rules', () => {
       parse(`
 inputs: {}
 steps:
-  - {id: first, use: unicon/exec@v3, with: {${RUNS}}}
-  - {id: second, use: unicon/exec@v3, with: {${RUNS}}}
+  - {id: first, use: unicon/exec@v4, with: {${RUNS}}}
+  - {id: second, use: unicon/exec@v4, with: {${RUNS}}}
 `),
     );
 
@@ -227,7 +227,7 @@ steps:
       parse(`
 steps:
   - {id: check, use: unicon/checker-like@v1, with: {}}
-  - {id: run, use: unicon/exec@v3, with: {${RUNS}}}
+  - {id: run, use: unicon/exec@v4, with: {${RUNS}}}
 `),
     );
 
@@ -273,7 +273,9 @@ steps:
       valueRefusal(WORKFLOW, primitives, 0, 'language', '${{ inputs.limit }}s', [
         input('limit'),
       ]),
-    ).toBe('This takes one of c, cpp, java, python, ipynb.');
+    ).toBe(
+      'This takes one of c, cpp, java, kotlin, python, ipynb, javascript, typescript, csharp, rust, r, ruby.',
+    );
     expect(
       valueRefusal(WORKFLOW, primitives, 0, 'entry', 'x ${{ inputs.missing }}', [
         input('missing'),
@@ -286,8 +288,8 @@ steps:
     ).toBe(
       '${{ inputs.key }} is optional, so it can be given only whole, to an optional port, not written into text.',
     );
-    expect(valueRefusal(WORKFLOW, primitives, 0, 'language', 'rust', [])).toBe(
-      'This takes one of c, cpp, java, python, ipynb.',
+    expect(valueRefusal(WORKFLOW, primitives, 0, 'language', 'cobol', [])).toBe(
+      'This takes one of c, cpp, java, kotlin, python, ipynb, javascript, typescript, csharp, rust, r, ruby.',
     );
     expect(valueRefusal(WORKFLOW, primitives, 1, 'stdin', true, [])).toBe(
       'This takes a file, not true or false.',
@@ -306,10 +308,10 @@ steps:
     const workflow = readWorkflow(
       parse(`
 steps:
-  - {id: a, use: unicon/exec@v3}
-  - {id: b, use: unicon/exec@v3, with: {entry: "\${{ steps.a.log }}"}}
-  - {id: c, use: unicon/exec@v3, with: {entry: "\${{ steps.b.log }}"}}
-  - {id: d, use: unicon/exec@v3}
+  - {id: a, use: unicon/exec@v4}
+  - {id: b, use: unicon/exec@v4, with: {entry: "\${{ steps.a.log }}"}}
+  - {id: c, use: unicon/exec@v4, with: {entry: "\${{ steps.b.log }}"}}
+  - {id: d, use: unicon/exec@v4}
 `),
     );
 
@@ -324,7 +326,7 @@ inputs:
   key: text
   other: text
 steps:
-  - {id: run, use: unicon/exec@v3, with: {source: "\${{ inputs.other }}", language: c, time_limit: 1, memory_limit: 256, args: "\${{ inputs.key }}"}}
+  - {id: run, use: unicon/exec@v4, with: {source: "\${{ inputs.other }}", language: c, time_limit: 1, memory_limit: 256, args: "\${{ inputs.key }}"}}
 `),
     );
 
@@ -413,7 +415,7 @@ inputs:
   submission: file
   input: file
 steps:
-  - {id: run, use: unicon/exec@v3, with: {${RUNS}, entry: main.c}}
+  - {id: run, use: unicon/exec@v4, with: {${RUNS}, entry: main.c}}
 `),
     );
     expect(portFor(given, primitives, 0, input('input'))).toEqual({ port: 'manifest' });

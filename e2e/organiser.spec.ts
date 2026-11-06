@@ -8,13 +8,13 @@ type Schemas = components['schemas'];
 const UPLOADED_AT = 'a1b2c3d4e5f6a7b8c9d0a1b2c3d4e5f6a7b8c9d0';
 
 /**
- * The inputs a task's form reads of unicon/classic@v5, titled for the form
+ * The inputs a task's form reads of unicon/classic@v6, titled for the form
  * (#434), with no steps: a stand-in, not deploy's, which names the solution
  * `code`, a folder, and has an input and an answer.
  */
 const CLASSIC = `inputs:
   submission: {type: file, title: Solution}
-  language: {type: enum, options: [c, cpp, java, python], title: Language}
+  language: {type: enum, options: [c, cpp, java, kotlin, python, javascript, typescript, csharp, rust, r, ruby], title: Language}
   time_limit: {type: number, title: Time limit, unit: seconds, help: The CPU time the program may use on each run.}
   memory_limit: {type: number, title: Memory limit, unit: MB}
 steps: []
@@ -36,7 +36,7 @@ async function stubOrganiserApi(page: Page) {
       'name: Spring 2026\nstart: 2030-10-01T09:00:00Z\nend: 2030-10-01T14:00:00Z\nstate: draft\nvisibility: signed-in\ntasks:\n  - id: sum\n',
     contestSaves: 0,
     taskYaml:
-      'name: Sum\nworkflow: unicon/classic@v5\ninputs:\n  submission: {entrant: {label: Your solution}}\n  language: {entrant: {options: [python]}}\n  time_limit: 2\n  memory_limit: 256\n',
+      'name: Sum\nworkflow: unicon/classic@v6\ninputs:\n  submission: {entrant: {label: Your solution}}\n  language: {entrant: {options: [python]}}\n  time_limit: 2\n  memory_limit: 256\n',
     taskSaves: [] as unknown[],
     /** How many gradings failed and wait, as the queue counts them. */
     failed: 0,
@@ -80,17 +80,17 @@ async function stubOrganiserApi(page: Page) {
         yanked: {},
         owner: 'unicon',
         name: 'classic',
-        versions: ['v5'],
+        versions: ['v6'],
         editable: false,
         visibility: 'public',
       },
     ] satisfies Schemas['WorkflowItem'][]),
   );
-  await page.route('**/api/v1/workflows/unicon/classic/versions/v5', (route) =>
+  await page.route('**/api/v1/workflows/unicon/classic/versions/v6', (route) =>
     json(route, { content: CLASSIC }),
   );
   await page.route('**/api/v1/blocks', (route) => json(route, specCatalogue()));
-  await page.route('**/api/v1/workflows/unicon/classic/versions/v5/box', (route) =>
+  await page.route('**/api/v1/workflows/unicon/classic/versions/v6/box*', (route) =>
     json(route, {
       run: true,
       newer_version: null,
@@ -186,6 +186,33 @@ async function stubOrganiserApi(page: Page) {
     ) {
       return json(route, []);
     }
+    if (path === `${task}/show-preview`) {
+      // What the show lists always, as placeholders: each value, and the
+      // first run of each run entry with the fields it names.
+      const body = request.postDataJSON() as {
+        show: {
+          always?: { values?: string[]; runs?: { of: string; fields: string[] }[] };
+        };
+        moment: Schemas['ShowPreview']['moment'];
+      };
+      const always = body.show.always ?? {};
+      return json(route, {
+        hidden: 0,
+        moment: body.moment,
+        placeholders: {
+          values: always.values ?? [],
+          outputs: [],
+          inputs: {},
+          runs: (always.runs ?? []).map((entry) => ({
+            group: entry.of,
+            place: 1,
+            tuples: [{ title: 'Sample 1', key: {} }],
+            fields: entry.fields,
+          })),
+        },
+        result: null,
+      } satisfies Schemas['ShowPreview']);
+    }
     if (path === `${contest}/gradings/queue`) {
       return json(route, { queued: 0, dispatched: 0, failed: state.failed });
     }
@@ -209,14 +236,26 @@ async function stubOrganiserApi(page: Page) {
         ...more,
       });
       return json(route, {
-        workflow: 'unicon/classic@v5',
+        workflow: 'unicon/classic@v6',
         newer: null,
         problem: null,
         inputs: [
           input('submission', 'file', { title: 'Solution' }),
           input('language', 'enum', {
             title: 'Language',
-            options: ['c', 'cpp', 'java', 'python'],
+            options: [
+              'c',
+              'cpp',
+              'java',
+              'kotlin',
+              'python',
+              'javascript',
+              'typescript',
+              'csharp',
+              'rust',
+              'r',
+              'ruby',
+            ],
           }),
           input('time_limit', 'number', {
             title: 'Time limit',
@@ -572,7 +611,7 @@ test('an organiser reads how many submissions a task takes', async ({ page }) =>
   ).toHaveAttribute('placeholder', '50');
 });
 
-test('an organiser ticks the named runs of a group and keeps its shown setting on rename', async ({
+test('an organiser ticks the named runs of a group and keeps its shown runs on rename', async ({
   page,
 }) => {
   const state = await stubOrganiserApi(page);
@@ -586,7 +625,8 @@ scoring:
   groups:
     samples: {input: samples/1.in}
   show:
-    now: [samples]
+    always:
+      runs: [{of: samples, fields: [verdict]}]
 `;
   await page.goto('/orgs/acme/contests/spring/tasks/sum');
   const groups = page.getByRole('table', { name: 'Groups', exact: true });
@@ -602,9 +642,30 @@ scoring:
   await groups
     .getByRole('textbox', { name: 'Name of tests', exact: true })
     .press('Tab');
+  const shown = page.getByRole('table', { name: 'What entrants see', exact: true });
   await expect(
-    groups.getByRole('combobox', { name: 'When tests is shown', exact: true }),
-  ).toHaveValue('now');
+    shown
+      .getByRole('rowgroup', { name: 'Runs: tests', exact: true })
+      .getByRole('combobox', { name: 'Runs of', exact: true }),
+  ).toHaveValue('tests');
+  await expect(
+    shown.getByRole('checkbox', { name: 'Verdict of tests, Always', exact: true }),
+  ).toBeChecked();
+  const preview = page.getByRole('region', { name: "An entrant's page", exact: true });
+  await expect(preview.getByRole('region', { name: 'Group tests' })).toContainText(
+    'verdict appears here',
+  );
+  // At a phone's width the grid and the preview keep within the page.
+  await page.setViewportSize({ width: 375, height: 800 });
+  await expect(preview).toBeVisible();
+  await expect(
+    shown.getByRole('columnheader', { name: 'After release' }),
+  ).toBeVisible();
+  expect(
+    await page
+      .locator('html')
+      .evaluate((el: { scrollWidth: number }) => el.scrollWidth),
+  ).toBeLessThanOrEqual(375);
 });
 
 test('the result flow goes to a value’s only formula and reads its shown setting', async ({
@@ -630,13 +691,15 @@ scoring:
   await expect(page.getByRole('textbox', { name: 'points', exact: true })).toHaveCount(
     1,
   );
-  const card = page.getByRole('group', { name: 'Value points', exact: true });
-  await card
-    .getByRole('combobox', { name: 'Shown to entrants', exact: true })
-    .selectOption('after_close');
+  // Leaving the formula closes its tray, which moves the grid up the page.
+  await page.getByRole('heading', { name: 'What entrants see', exact: true }).click();
+  await page
+    .getByRole('table', { name: 'What entrants see', exact: true })
+    .getByRole('checkbox', { name: 'points, After the deadline', exact: true })
+    .check();
   await expect(
     result.getByRole('listitem').filter({ hasText: /^points/ }),
-  ).toContainText('After the close');
+  ).toContainText('After the deadline');
   await expect(page.locator('[data-show-part="points"]')).toHaveCount(1);
   await page.getByRole('button', { name: 'samples group', exact: true }).click();
   await expect(page.locator('[id="group-samples"]')).toHaveAttribute(
@@ -672,7 +735,7 @@ test('the Runs card pairs files, lines up its cells, and gives a cell to the ent
       route.fulfill({
         contentType: 'application/json',
         body: JSON.stringify({
-          workflow: 'unicon/classic@v5',
+          workflow: 'unicon/classic@v6',
           newer: null,
           problem: null,
           graded: false,
@@ -690,7 +753,7 @@ test('the Runs card pairs files, lines up its cells, and gives a cell to the ent
         }),
       }),
   );
-  await page.route('**/api/v1/workflows/unicon/classic/versions/v5', (route) =>
+  await page.route('**/api/v1/workflows/unicon/classic/versions/v6', (route) =>
     route.fulfill({
       contentType: 'application/json',
       body: JSON.stringify({
@@ -798,7 +861,7 @@ test('long run paths and report titles stay within the page and their Result row
   const state = await stubOrganiserApi(page);
   state.orgMade = true;
   const path = `tests/${'z'.repeat(240)}/1.in`;
-  state.taskYaml = `name: Islands\nworkflow: unicon/classic@v5\nrepeat:\n  - inputs: [input]\n    tuples: [{input: ${path}}]\nscoring:\n  groups: {samples: {input: ${path}}}\n`;
+  state.taskYaml = `name: Islands\nworkflow: unicon/classic@v6\nrepeat:\n  - inputs: [input]\n    tuples: [{input: ${path}}]\nscoring:\n  groups: {samples: {input: ${path}}}\n`;
   const outputs = Array.from({ length: 12 }, (_, index) => ({
     name: `out_${index}`,
     title: `Detailed report number ${index} from the program being tested`,
@@ -813,7 +876,7 @@ test('long run paths and report titles stay within the page and their Result row
     (route) =>
       route.fulfill({
         json: {
-          workflow: 'unicon/classic@v5',
+          workflow: 'unicon/classic@v6',
           newer: null,
           problem: null,
           graded: false,
@@ -833,7 +896,7 @@ test('long run paths and report titles stay within the page and their Result row
         },
       }),
   );
-  await page.route('**/api/v1/workflows/unicon/classic/versions/v5', (route) =>
+  await page.route('**/api/v1/workflows/unicon/classic/versions/v6', (route) =>
     route.fulfill({
       json: {
         content:
@@ -847,7 +910,7 @@ test('long run paths and report titles stay within the page and their Result row
       },
     }),
   );
-  await page.route('**/api/v1/workflows/unicon/classic/versions/v5/box', (route) =>
+  await page.route('**/api/v1/workflows/unicon/classic/versions/v6/box*', (route) =>
     route.fulfill({
       json: { run: true, inputs: [], outputs, newer_version: null, description: null },
     }),
@@ -899,7 +962,7 @@ scoring:
   groups: {small: {input: [small/1.in, small/2.in, small/3.in]}}
   values: {points: 1}
 `;
-  await page.route('**/api/v1/workflows/unicon/classic/versions/v5', (route) =>
+  await page.route('**/api/v1/workflows/unicon/classic/versions/v6', (route) =>
     route.fulfill({
       json: { content: CLASSIC + 'outputs: {score: 1, time_ms: 1}\n' },
     }),

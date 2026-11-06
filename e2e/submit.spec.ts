@@ -52,6 +52,7 @@ const queued = {
   limit: null,
   compiled: null,
   once: { reports: {}, texts: {} },
+  inputs: {},
   reveal_at: null,
   run_values: [],
   runs: [],
@@ -68,6 +69,7 @@ const runOf = (overrides: Partial<Schemas['RunShown']>): Schemas['RunShown'] => 
   reports: [],
   texts: {},
   label: null,
+  labelled: null,
   message: null,
   ...overrides,
 });
@@ -116,6 +118,11 @@ type State = {
   detailReads: number;
   /** What an opened submission's log holds, read when it is shown. */
   log: string;
+  /** The runs and settings the task's page shows before any submission. */
+  runs: Schemas['TaskRun'][];
+  shownInputs: Record<string, unknown>;
+  /** Each shown input's files asked for, by the path below the task. */
+  filesAsked: string[];
 };
 
 async function stubApi(page: Page, overrides: Partial<State> = {}): Promise<State> {
@@ -132,6 +139,9 @@ async function stubApi(page: Page, overrides: Partial<State> = {}): Promise<Stat
     later: null,
     detailReads: 0,
     log: 'Compiled cleanly.',
+    runs: [],
+    shownInputs: {},
+    filesAsked: [],
     ...overrides,
   };
   const json = (route: Route, body: unknown, status = 200) =>
@@ -189,6 +199,8 @@ async function stubApi(page: Page, overrides: Partial<State> = {}): Promise<Stat
         due: null,
         closes: '2026-09-29T12:00:00Z',
         marks: null,
+        runs: state.runs,
+        shown_inputs: state.shownInputs,
       } satisfies Schemas['TaskPage']);
     }
     if (path === '/uploads') {
@@ -261,6 +273,14 @@ async function stubApi(page: Page, overrides: Partial<State> = {}): Promise<Stat
       const grading =
         state.later !== null && state.detailReads > 2 ? state.later : found.grading;
       return json(route, { ...found, grading });
+    }
+    // A shown input's files: a setting's, or a run's on the task's page or
+    // in a submission's result, each through its own route.
+    if (/^(\/submissions\/\d+)?(\/runs\/[^/]+\/\d+)?\/inputs\/[^/]+$/.test(path)) {
+      state.filesAsked.push(path);
+      return json(route, {
+        files: [{ path: null, download: `/-/downloads/acme/spring/sum${path}` }],
+      } satisfies Schemas['ShownInputFiles']);
     }
     if (/^\/submissions\/\d+\/text$/.test(path)) {
       return route.fulfill({ status: 200, contentType: 'text/plain', body: state.log });
@@ -642,7 +662,7 @@ test('samples show now, and the rest appears when the task reveals', async ({
     compiled: 1,
     reveal_at: '2026-09-29T10:00:03Z',
     runs: [runOf({})],
-    run_values: [valueOf('score', '10', 'now')],
+    run_values: [valueOf('score', '10', 'always')],
     once: { reports: {}, texts: {} },
   };
   const revealed: Schemas['Result'] = {
@@ -660,7 +680,10 @@ test('samples show now, and the rest appears when the task reveals', async ({
         passed: 0,
       }),
     ],
-    run_values: [valueOf('score', '10', 'now'), valueOf('full', '7', 'on_release')],
+    run_values: [
+      valueOf('score', '10', 'always'),
+      valueOf('full', '7', 'after_release'),
+    ],
   };
   await stubApi(page, {
     later: revealed,
@@ -683,4 +706,76 @@ test('samples show now, and the rest appears when the task reveals', async ({
   });
   await expect(detail.getByText('NOT GIVEN')).toBeVisible();
   await expect(detail.getByText('full')).toBeVisible();
+});
+
+test('a result shows only what its show names, and a shown input downloads through its own route', async ({
+  page,
+}) => {
+  const state = await stubApi(page, {
+    runs: [
+      {
+        group: 'samples',
+        place: 1,
+        tuples: [{ title: null, key: { input: { file: 'samples/1.in' } } }],
+      },
+    ],
+    submissions: [
+      {
+        number: 1,
+        submitted_at: '2026-09-29T09:30:00Z',
+        grading: {
+          ...graded,
+          compiled: null,
+          once: { reports: {}, texts: {} },
+          inputs: { time_limit: 2, checker: { file: 'checker.py' } },
+          runs: [
+            runOf({
+              tuples: [{ title: null, key: { input: { file: 'samples/1.in' } } }],
+              verdict: null,
+              passed: null,
+            }),
+            runOf({
+              group: 'first_not_passed',
+              verdict: 'wrong_answer',
+              passed: 0,
+              labelled: { group: 'big', place: 3 },
+            }),
+          ],
+        },
+      },
+    ],
+  });
+  await page.setViewportSize({ width: 375, height: 800 });
+  await page.goto(PAGE);
+
+  const shown = page.getByRole('region', { name: 'Group samples' }).first();
+  await expect(shown).toContainText('Test 1');
+  await expect(shown).toContainText('1.in');
+  await page.getByRole('link', { name: '#1' }).click();
+  const detail = page.getByRole('region', { name: 'Submission 1' });
+  const samples = detail.getByRole('region', { name: 'Group samples' });
+  await expect(samples).toContainText('1.in');
+  await expect(samples).not.toContainText('ACCEPTED');
+  await expect(
+    detail.getByRole('region', { name: 'Group First test not passed' }),
+  ).toContainText('Test 3 of big');
+  await expect(detail.getByLabel('Inputs')).toContainText('time_limit2');
+  await expect(detail.getByRole('button', { name: 'Show log' })).toHaveCount(0);
+
+  await samples.getByRole('button', { name: 'Files of input, samples Test 1' }).click();
+  await expect(samples.getByRole('link', { name: '1.in' })).toHaveAttribute(
+    'href',
+    '/-/downloads/acme/spring/sum/submissions/1/runs/samples/1/inputs/input',
+  );
+  await detail.getByRole('button', { name: 'Files of checker' }).click();
+  await expect(detail.getByRole('link', { name: 'checker.py' })).toBeVisible();
+  expect(state.filesAsked).toEqual([
+    '/submissions/1/runs/samples/1/inputs/input',
+    '/inputs/checker',
+  ]);
+  expect(
+    await page
+      .locator('html')
+      .evaluate((el: { scrollWidth: number }) => el.scrollWidth),
+  ).toBeLessThanOrEqual(375);
 });

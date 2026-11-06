@@ -1,7 +1,7 @@
 import type { GradingResult } from '@/api/types';
 import { BodyText } from '@/ui/BodyText';
 import { VerdictBadge } from '@/ui/VerdictBadge';
-import { DELAYED_SENTENCE, cancelReason } from './grading';
+import { DELAYED_SENTENCE, cancelReason } from '@/ui/scored/scored-text';
 import { overLimitSentence } from '@/ui/scored/scored-text';
 
 /**

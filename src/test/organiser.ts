@@ -288,7 +288,7 @@ export const files: Record<string, FileContent> = {
   'task.yaml': {
     path: 'task.yaml',
     encoding: 'utf-8',
-    content: 'name: sum\nworkflow: unicon/classic@v2\n',
+    content: 'name: sum\nworkflow: unicon/classic@v6\n',
     token: 'token-task-yaml',
     upload: null,
     version: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',

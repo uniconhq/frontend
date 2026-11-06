@@ -176,7 +176,7 @@ describe('parseFormula', () => {
     });
     expect(messages('exec("programs/mean.py", cobol, all)', task)).toEqual([
       'Give the folder of the task that holds the program and its program.yaml, such as programs/mean/.',
-      "Give the program's language, one of c, cpp, java, python, ipynb.",
+      "Give the program's language, one of c, cpp, java, python, javascript, typescript, kotlin, csharp, rust, r, ruby, ipynb.",
     ]);
   });
 

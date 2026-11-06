@@ -12,7 +12,8 @@ import { ShownValue } from '@/ui/number/ShownValue';
 import { RESULTS_AFTER } from '@/ui/number/words';
 import { VerdictBadge } from '@/ui/VerdictBadge';
 import { formatDateTime } from '@/lib/time';
-import { reportLabel, tupleLine } from './scored-text';
+import { entryTitle, groupsOf, reportLabel, runTitle } from './scored-text';
+import { RunInputs, ShownInputs, type ReadFiles } from './ShownInputs';
 import classes from './scored.module.css';
 
 /**
@@ -32,9 +33,9 @@ export type TextAsk = {
 type ShownResult = GradingResult | OrganisedResult;
 
 const SHOWN_AT: Record<NonNullable<RunValue['show']>, string> = {
-  now: 'Now',
-  after_close: 'After the close',
-  on_release: 'On release',
+  always: 'Always',
+  after_deadline: 'After the deadline',
+  after_release: 'After release',
 };
 
 function factsOf(grading: ShownResult): Record<string, string> {
@@ -43,21 +44,6 @@ function factsOf(grading: ShownResult): Record<string, string> {
 
 function hasFacts(grading: ShownResult): boolean {
   return Object.keys(factsOf(grading)).length > 0 || grading.compiled !== null;
-}
-
-function groupsOf(runs: RunShown[]): { name: string; runs: RunShown[] }[] {
-  const order: string[] = [];
-  const by = new Map<string, RunShown[]>();
-  for (const run of runs) {
-    const list = by.get(run.group);
-    if (list === undefined) {
-      order.push(run.group);
-      by.set(run.group, [run]);
-    } else {
-      list.push(run);
-    }
-  }
-  return order.map((name) => ({ name, runs: by.get(name) ?? [] }));
 }
 
 /** A text, read the first time it is opened and then shown as the step wrote it. */
@@ -111,17 +97,21 @@ function OpenText({
 function RunRow({
   run,
   readText,
+  readFiles,
 }: {
   run: RunShown;
   readText?: (ask: TextAsk) => Promise<string>;
+  readFiles?: ReadFiles;
 }) {
-  const line = tupleLine(run.tuples);
   const ask = { group: run.group, place: run.place };
   return (
     <div className={classes.run}>
-      <BodyText>{`Test ${String(run.place)}`}</BodyText>
-      {line !== '' && <BodyText>{line}</BodyText>}
-      <VerdictBadge verdict={run.verdict} />
+      <BodyText>{runTitle(run)}</BodyText>
+      <RunInputs run={run} readFiles={readFiles} />
+      {run.verdict !== null && <VerdictBadge verdict={run.verdict} />}
+      {run.passed !== null && (
+        <BodyText>{run.passed === 1 ? 'Passed' : 'Not passed'}</BodyText>
+      )}
       {run.dropped && <BodyText tone="secondary">Dropped</BodyText>}
       {run.reports.map((report, index) => (
         <span key={index}>
@@ -208,16 +198,20 @@ function OnceReports({
 
 /**
  * What a grading's result holds beside where it stands: the values its
- * entrant is shown, each run, and what its steps done once reported, each
- * value by its name. Staff read the same, with every value and run there
- * and the facts the values read.
+ * entrant is shown, the task's settings shown with it, each run its show
+ * names under the entry that names it, with only the fields named, and
+ * what its steps done once reported, each value by its name. Staff read
+ * the same, with every value and run there and the facts the values read.
  */
 export function ScoredResult({
   grading,
   readText,
+  readFiles,
 }: {
   grading: ShownResult;
   readText?: (ask: TextAsk) => Promise<string>;
+  /** Lists a shown input's files; without it a file or folder is its name alone. */
+  readFiles?: ReadFiles;
 }) {
   const runs = grading.runs;
   const values = grading.run_values;
@@ -225,6 +219,7 @@ export function ScoredResult({
   const shown =
     runs.length > 0 ||
     values.length > 0 ||
+    Object.keys(grading.inputs).length > 0 ||
     Object.keys(once.reports).length > 0 ||
     Object.keys(once.texts).length > 0 ||
     hasFacts(grading);
@@ -262,18 +257,20 @@ export function ScoredResult({
           ))}
         </dl>
       )}
+      <ShownInputs inputs={grading.inputs} readFiles={readFiles} />
       {groupsOf(runs).map((group) => (
         <section
           key={group.name}
-          aria-label={`Group ${group.name}`}
+          aria-label={`Group ${entryTitle(group.name)}`}
           className={classes.stack}
         >
-          <BodyText>{group.name}</BodyText>
+          <BodyText>{entryTitle(group.name)}</BodyText>
           {group.runs.map((run) => (
             <RunRow
               key={`${run.group}:${String(run.place)}`}
               run={run}
               readText={readText}
+              readFiles={readFiles}
             />
           ))}
         </section>

@@ -58,13 +58,6 @@
   color: var(--unicon-text-body);
 }
 
-.verdict {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  flex-wrap: wrap;
-}
-
 /* Said to a screen reader and not shown: out of sight, still read. */
 .announce {
   position: absolute;
