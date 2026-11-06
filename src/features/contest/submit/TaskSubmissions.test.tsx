@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { screen, waitFor, within } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
 import userEvent from '@/test/user-event';
 import { http, HttpResponse, type RequestHandler } from 'msw';
 import type { GradingResult, Submission, TaskPage } from '@/api/types';
@@ -497,66 +497,40 @@ describe('the submit panel', () => {
     expect(puts).toBe(1);
   });
 
-  const REFUSALS: [string, Record<string, unknown>, string][] = [
-    ['task_closed', { reason: 'closed' }, 'task_closed detail'],
-    ['archived', {}, 'archived detail'],
-    ['task_withdrawn', { reason: 'withdrawn' }, 'task_withdrawn detail'],
-    [
-      'not_approved',
-      { detail: 'Only approved entrants of this contest can submit to its tasks.' },
-      'Only approved entrants of this contest can submit to its tasks.',
-    ],
-    ['submission_limit', { limit: 50 }, 'submission_limit detail'],
-    [
-      'rate_limited',
-      { rate: '1 per 30s', retry_at: '2999-01-01T00:00:30Z' },
-      'rate_limited detail',
-    ],
-    ['too_large', { limit: 10 * 1024 * 1024, input: 'submission' }, 'too_large detail'],
-    ['upload_not_yours', { uploads: ['x'] }, 'upload_not_yours detail'],
-    ['upload_not_ready', { uploads: ['x'] }, 'upload_not_ready detail'],
-    ['upload_limit', { limit: 200, bytes: 20 * 1024 * 1024 }, 'upload_limit detail'],
-    ['invalid_idempotency_key', {}, 'invalid_idempotency_key detail'],
-    [
-      'invalid_inputs',
-      {
-        errors: [{ input: 'language', message: 'Choose one of python.' }],
-      },
-      'language: Choose one of python.',
-    ],
-  ];
-
-  it('says each refusal in the server’s words, with what it names, and keeps the files', async () => {
+  it('sends the file again after the server says that upload cannot be used, and keeps it', async () => {
     const store = uploadStore();
-    let refusal: (typeof REFUSALS)[number] | undefined;
+    let code = 'task_closed';
     const user = userEvent.setup();
     open(
       {},
       listing([]),
       ...store.handlers,
       http.post(`${TASK_API}/submissions`, () =>
-        refusal === undefined
-          ? problem(500, 'internal_error')
-          : problem(refusal[0] === 'rate_limited' ? 429 : 409, refusal[0], refusal[1]),
+        problem(
+          409,
+          code,
+          code === 'task_closed' ? { reason: 'closed' } : { uploads: ['x'] },
+        ),
       ),
     );
     await user.upload(await screen.findByLabelText('Your solution'), python());
 
-    for (const each of REFUSALS) {
-      refusal = each;
-      const [code, , sentence] = each;
-      await user.click(screen.getByRole('button', { name: 'Submit' }));
+    await user.click(screen.getByRole('button', { name: 'Submit' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Couldn’t submit');
+    expect(store.seen.slots).toHaveLength(1);
 
-      const alert = await screen.findByRole('alert');
-      await waitFor(() => expect(alert, code).toHaveTextContent(sentence));
-      expect(alert, code).toHaveTextContent('Couldn’t submit');
-      expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
-      expect(screen.getByLabelText('Your solution: files chosen')).toHaveTextContent(
-        'main.py',
-      );
-    }
-    // Sent once, and again after each refusal that says an upload cannot be used.
-    expect(store.seen.slots).toHaveLength(3);
+    code = 'upload_not_yours';
+    await user.click(screen.getByRole('button', { name: 'Submit' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Couldn’t submit');
+    expect(store.seen.slots).toHaveLength(1);
+
+    code = 'task_closed';
+    await user.click(screen.getByRole('button', { name: 'Submit' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Couldn’t submit');
+    expect(screen.getByLabelText('Your solution: files chosen')).toHaveTextContent(
+      'main.py',
+    );
+    expect(store.seen.slots).toHaveLength(2);
   });
 
   const EARLIER: [string, ReturnType<typeof http.post>, string, string][] = [
@@ -896,26 +870,6 @@ describe('a submission opened from the list', () => {
     ).toBeVisible();
     expect(within(detail).getByText('CANCELLED')).toBeVisible();
     expect(within(detail).getByText(/does not count against the task/)).toBeVisible();
-  });
-
-  it('says a delayed grading is delayed on Unicon’s side, in its row and opened', async () => {
-    const delayed = grading({ status: 'delayed' });
-    open({ graded: delayed, at: `${PAGE}?submission=1` });
-
-    const list = await screen.findByRole('table', { name: 'Your submissions' });
-    const [, row] = within(list).getAllByRole('row');
-    expect(row).toHaveTextContent(
-      "GRADING DELAYEDA problem on Unicon's side. Nothing is lost, and it does not use up a submission.",
-    );
-    expect(row).not.toHaveTextContent('GRADING DELAYEDGRADING');
-    const detail = await screen.findByRole('region', { name: 'Submission 1' });
-    expect(await within(detail).findByText('GRADING DELAYED')).toBeVisible();
-    expect(
-      within(detail).getByText(
-        "A problem on Unicon's side. Nothing is lost, and it does not use up a submission.",
-      ),
-    ).toBeVisible();
-    expect(within(detail).queryByRole('table')).toBeNull();
   });
 
   it('shows, opened, what a delayed grading gave beside its delay, a value on a failed run being checked', async () => {

@@ -8,17 +8,12 @@ import { teamsSentence } from './words';
 import { useContestSettings } from './settings';
 import classes from './contest.module.css';
 
-/** A time the form holds in the organiser's own zone, as a date and time. */
+/** The form holds this time in the organiser's own zone. */
 function when(local: string): string {
   return local === '' ? 'Not set' : formatDateTime(new Date(local));
 }
 
-/**
- * The contest's settings at a glance, at the top of its page: its schedule,
- * as the settings page names it, how people enter, as one sentence, and
- * whether in teams. The card goes to the settings page, where they are
- * changed. Who sees the contest is on its Status card, where it is changed.
- */
+/** Who sees the contest is on its Status card. */
 export function ContestSummary({ org, contest }: { org: string; contest: string }) {
   const view = useContestSettings(org, contest);
   return (

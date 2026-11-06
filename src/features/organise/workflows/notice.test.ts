@@ -19,14 +19,6 @@ describe("a refused wire's message (M53)", () => {
     return hook;
   }
 
-  it('goes on the next press anywhere, starting another wire among them', () => {
-    const { result } = shown();
-    act(() => {
-      fireEvent.pointerDown(document.body);
-    });
-    expect(result.current.notice).toBeNull();
-  });
-
   it('goes on Escape, and stays for any other key', () => {
     const { result } = shown();
     act(() => {

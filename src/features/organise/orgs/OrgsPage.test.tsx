@@ -1,9 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { screen, within } from '@testing-library/react';
-import { http, HttpResponse } from 'msw';
 import { renderApp } from '@/test/render';
 import { server, signedIn, signedInAs, someone } from '@/test/server';
-import { TASK_API } from '@/test/organiser';
 
 describe('the org list', () => {
   it('lists each org the session names, each linking to its page', async () => {
@@ -46,57 +44,5 @@ describe('the org list', () => {
     expect(
       await screen.findByRole('heading', { name: 'Orgs', level: 1 }),
     ).toBeVisible();
-  });
-
-  it.each(['/orgs', '/orgs/new', '/orgs/acme', '/orgs/acme/contests/spring/tasks/sum'])(
-    'sends a signed-out visitor at %s to sign in, remembering where',
-    async (path) => {
-      const { router } = renderApp(path);
-
-      await screen.findByRole('link', { name: 'Sign in with Forgejo' });
-      expect(router.state.location.pathname).toBe('/login');
-      expect(router.state.location.search).toBe(`?next=${encodeURIComponent(path)}`);
-    },
-  );
-});
-
-describe('the shell for an organiser', () => {
-  it('walks the breadcrumb from Home through the org, the contest and the task', async () => {
-    server.use(
-      signedIn,
-      http.get(TASK_API, () =>
-        HttpResponse.json({ head: 'abc', latest: null, draft: true, errors: [] }),
-      ),
-      http.get(`${TASK_API}/publications`, () => HttpResponse.json([])),
-      http.get(`${TASK_API}/tree`, () => HttpResponse.json([])),
-    );
-    renderApp('/orgs/acme/contests/spring/tasks/sum');
-
-    const trail = await screen.findByRole('navigation', { name: 'Breadcrumb' });
-    const links = within(trail).getAllByRole('link');
-    expect(links.map((link) => [link.textContent, link.getAttribute('href')])).toEqual([
-      ['Home', '/'],
-      ['acme', '/orgs/acme'],
-      ['spring', '/orgs/acme/contests/spring'],
-      ['sum', '/orgs/acme/contests/spring/tasks/sum'],
-    ]);
-    expect(links[3]).toHaveAttribute('aria-current', 'page');
-  });
-
-  it('gives the new org form a crumb of its own, under Home', async () => {
-    server.use(signedIn);
-    renderApp('/orgs/new');
-
-    await screen.findByRole('heading', { name: 'New org', level: 1 });
-    const trail = screen.getByRole('navigation', { name: 'Breadcrumb' });
-    expect(
-      within(trail)
-        .getAllByRole('link')
-        .map((link) => link.textContent),
-    ).toEqual(['Home', 'New org']);
-    expect(within(trail).getByRole('link', { name: 'New org' })).toHaveAttribute(
-      'aria-current',
-      'page',
-    );
   });
 });

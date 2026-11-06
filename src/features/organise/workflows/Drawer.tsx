@@ -1,25 +1,15 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import classes from './workflows.module.css';
 
-/** How wide the drawer is, which the graph keeps clear of the box it shows. */
+/** The graph keeps this width clear of the box the drawer shows. */
 export const DRAWER_WIDTH = 440;
 
-/**
- * The selected box's drawer, from the right, over the graph (M37): what a
- * step, the inputs or the outputs hold, to change. It is not
- * modal: the graph stays live beside it, so choosing another box shows that
- * one instead. It closes with its × or with Escape, unless Escape is for a
- * menu or a dialog open over it. Opening moves the focus to its title, and
- * closing gives it back to where it was, so the keyboard does not lose its
- * place. It starts below the workflow's bar, wherever the page has
- * scrolled it, so Save and the rest of the bar are never under it.
- */
+/** Not modal (M37): the graph stays live beside it. It starts below the bar, so Save is never under it. */
 export function Drawer({
   title,
   onClose,
   children,
 }: {
-  /** What it shows; null while it is closed. */
   title: string | null;
   onClose: () => void;
   children: ReactNode;

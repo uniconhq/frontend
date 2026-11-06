@@ -286,6 +286,17 @@ describe("the breadcrumb's menus", () => {
     );
   });
 
+  it('gives the new org form a crumb of its own, under Home', async () => {
+    server.use(signedIn);
+    renderApp('/orgs/new');
+    await screen.findByRole('heading', { name: 'New org', level: 1 });
+
+    expect(await trail()).toEqual([
+      { label: 'Home', to: '/', current: false },
+      { label: 'New org', to: '/orgs/new', current: true },
+    ]);
+  });
+
   it("lists a task's build cards and sections", async () => {
     server.use(signedIn);
     renderApp('/orgs/acme/contests/spring/tasks/sum/marking');

@@ -1,4 +1,4 @@
-/** The two ends of each valid link, counted independently in the given order. */
+/** The first use of each end is `prints` or `reads`; a later one is named for the other end. */
 export function linkRoles(programs: readonly string[], links: readonly string[]) {
   const names = new Set(programs);
   const writes = new Set<string>();

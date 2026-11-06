@@ -1,17 +1,9 @@
 import { useEffect, useState } from 'react';
 import type { Notice } from './ends';
 
-/** How long a refused wire's message shows before it has faded away by itself. */
 export const NOTICE_MS = 5_000;
 
-/**
- * Why the last wire dropped was refused, said at the box of the port it was
- * dropped on (M53), for as long as nothing else happens: it goes on the next
- * thing done (a press anywhere, starting another wire among them, or Escape)
- * and by itself after `NOTICE_MS`, fading out as it ends. The reason is not
- * lost when it goes: while a wire is dragged, a port that would refuse it
- * says so on its mark and when hovered.
- */
+/** Said at the port's box (M53). While a wire is dragged, a refusing port still says so on its mark. */
 export function useNotice(): {
   notice: Notice | null;
   show: (notice: Omit<Notice, 'count'>) => void;
